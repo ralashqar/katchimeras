@@ -43,7 +43,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Mossprout is a cute plantling tied to park encounters, with moss hood, leaf ears, dew glow, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include moss hood, leaf ears, dew glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Mossprout is a cute plantling tied to park encounters, with moss hood, leaf ears, dew glow, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include moss hood, leaf ears, dew glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Mossprout reflects the way repeated park moments quietly shape who you are becoming.",
+    "unlockLine": "Today's park path revealed Mossprout.",
+    "repeatLine": "Returning to park is deepening Mossprout's line in your deck.",
+    "rareLine": "A rarer form of Mossprout can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Mossprout reminds you that calmer green moments still count as a meaningful day.",
+    "progressLine": "Mossprout shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around city park, Mossprout emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_park_benchkin",
@@ -89,7 +96,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Benchkin is a cute objectling tied to park encounters, with wood slat shell, park brass details, ivy trim, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include wood slat shell, park brass details, ivy trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Benchkin is a cute objectling tied to park encounters, with wood slat shell, park brass details, ivy trim, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include wood slat shell, park brass details, ivy trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Benchkin reflects the way repeated park moments quietly shape who you are becoming.",
+    "unlockLine": "Today's park path revealed Benchkin.",
+    "repeatLine": "Returning to park is deepening Benchkin's line in your deck.",
+    "rareLine": "A rarer form of Benchkin can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Benchkin reminds you that calmer green moments still count as a meaningful day.",
+    "progressLine": "Benchkin shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around city park, Benchkin emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_park_puddlehop",
@@ -135,7 +149,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Puddlehop is a cute sprite tied to park encounters, with rain-gloss feet, splash ring, soft pebble tail, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include rain-gloss feet, splash ring, soft pebble tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Puddlehop is a cute sprite tied to park encounters, with rain-gloss feet, splash ring, soft pebble tail, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include rain-gloss feet, splash ring, soft pebble tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Puddlehop reflects the way repeated park moments quietly shape who you are becoming.",
+    "unlockLine": "Today's park path revealed Puddlehop.",
+    "repeatLine": "Returning to park is deepening Puddlehop's line in your deck.",
+    "rareLine": "A rarer form of Puddlehop can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Puddlehop reminds you that calmer green moments still count as a meaningful day.",
+    "progressLine": "Puddlehop shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around city park, Puddlehop emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_park_breezleaf",
@@ -181,7 +202,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Breezleaf is a cute spirit tied to park encounters, with wind ribbon, leaf plume, pale green aura, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include wind ribbon, leaf plume, pale green aura. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Breezleaf is a cute spirit tied to park encounters, with wind ribbon, leaf plume, pale green aura, a soft natural calm mood, and cozy-premium stylized 3D collectible presence.. park-born creature with leafy details and calm outdoor energy. Include wind ribbon, leaf plume, pale green aura. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Breezleaf reflects the way repeated park moments quietly shape who you are becoming.",
+    "unlockLine": "Today's park path revealed Breezleaf.",
+    "repeatLine": "Returning to park is deepening Breezleaf's line in your deck.",
+    "rareLine": "A rarer form of Breezleaf can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Breezleaf reminds you that calmer green moments still count as a meaningful day.",
+    "progressLine": "Breezleaf shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around city park, Breezleaf emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_garden_petalimp",
@@ -227,7 +255,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Petalimp is a cute plantling tied to garden encounters, with petal collar, pollen freckles, bud tail, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include petal collar, pollen freckles, bud tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Petalimp is a cute plantling tied to garden encounters, with petal collar, pollen freckles, bud tail, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include petal collar, pollen freckles, bud tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Petalimp reflects the way repeated garden moments quietly shape who you are becoming.",
+    "unlockLine": "Today's garden path revealed Petalimp.",
+    "repeatLine": "Returning to garden is deepening Petalimp's line in your deck.",
+    "rareLine": "A rarer form of Petalimp can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Petalimp reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Petalimp shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around botanical garden, Petalimp emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_garden_troweloo",
@@ -273,7 +308,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Troweloo is a cute objectling tied to garden encounters, with spade crest, terracotta paws, twine bow, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include spade crest, terracotta paws, twine bow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Troweloo is a cute objectling tied to garden encounters, with spade crest, terracotta paws, twine bow, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include spade crest, terracotta paws, twine bow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Troweloo reflects the way repeated garden moments quietly shape who you are becoming.",
+    "unlockLine": "Today's garden path revealed Troweloo.",
+    "repeatLine": "Returning to garden is deepening Troweloo's line in your deck.",
+    "rareLine": "A rarer form of Troweloo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Troweloo reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Troweloo shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around botanical garden, Troweloo emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_garden_bloomble",
@@ -319,7 +361,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Bloomble is a cute sprite tied to garden encounters, with flower puff fur, bead eyes, nectar glow, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include flower puff fur, bead eyes, nectar glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Bloomble is a cute sprite tied to garden encounters, with flower puff fur, bead eyes, nectar glow, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include flower puff fur, bead eyes, nectar glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Bloomble reflects the way repeated garden moments quietly shape who you are becoming.",
+    "unlockLine": "Today's garden path revealed Bloomble.",
+    "repeatLine": "Returning to garden is deepening Bloomble's line in your deck.",
+    "rareLine": "A rarer form of Bloomble can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Bloomble reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Bloomble shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around botanical garden, Bloomble emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_garden_sniplet",
@@ -365,7 +414,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Sniplet is a cute hybrid tied to garden encounters, with shear-shaped ears, fresh stem details, mint shimmer, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include shear-shaped ears, fresh stem details, mint shimmer. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Sniplet is a cute hybrid tied to garden encounters, with shear-shaped ears, fresh stem details, mint shimmer, a floral gentle bright mood, and cozy-premium stylized 3D collectible presence.. garden creature with petal textures and curated bloom details. Include shear-shaped ears, fresh stem details, mint shimmer. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Sniplet reflects the way repeated garden moments quietly shape who you are becoming.",
+    "unlockLine": "Today's garden path revealed Sniplet.",
+    "repeatLine": "Returning to garden is deepening Sniplet's line in your deck.",
+    "rareLine": "A rarer form of Sniplet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Sniplet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Sniplet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around botanical garden, Sniplet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_farm_hayhorn",
@@ -411,7 +467,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Hayhorn is a cute beast tied to farm encounters, with hay mane, wooden hoof caps, amber eyes, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include hay mane, wooden hoof caps, amber eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Hayhorn is a cute beast tied to farm encounters, with hay mane, wooden hoof caps, amber eyes, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include hay mane, wooden hoof caps, amber eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Hayhorn reflects the way repeated farm moments quietly shape who you are becoming.",
+    "unlockLine": "Today's farm path revealed Hayhorn.",
+    "repeatLine": "Returning to farm is deepening Hayhorn's line in your deck.",
+    "rareLine": "A rarer form of Hayhorn can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Hayhorn reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Hayhorn shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around working farm, Hayhorn emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_farm_beetlet",
@@ -457,7 +520,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Beetlet is a cute foodling tied to farm encounters, with beet bulb body, leaf sprouts, soil dust blush, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include beet bulb body, leaf sprouts, soil dust blush. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Beetlet is a cute foodling tied to farm encounters, with beet bulb body, leaf sprouts, soil dust blush, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include beet bulb body, leaf sprouts, soil dust blush. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Beetlet reflects the way repeated farm moments quietly shape who you are becoming.",
+    "unlockLine": "Today's farm path revealed Beetlet.",
+    "repeatLine": "Returning to farm is deepening Beetlet's line in your deck.",
+    "rareLine": "A rarer form of Beetlet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Beetlet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Beetlet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around working farm, Beetlet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_farm_coopuff",
@@ -503,7 +573,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Coopuff is a cute hybrid tied to farm encounters, with nest fluff, grain-speckled wings, tiny comb, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include nest fluff, grain-speckled wings, tiny comb. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Coopuff is a cute hybrid tied to farm encounters, with nest fluff, grain-speckled wings, tiny comb, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include nest fluff, grain-speckled wings, tiny comb. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Coopuff reflects the way repeated farm moments quietly shape who you are becoming.",
+    "unlockLine": "Today's farm path revealed Coopuff.",
+    "repeatLine": "Returning to farm is deepening Coopuff's line in your deck.",
+    "rareLine": "A rarer form of Coopuff can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Coopuff reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Coopuff shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around working farm, Coopuff emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_farm_pailmoo",
@@ -549,7 +626,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Pailmoo is a cute objectling tied to farm encounters, with tin pail body, cream swirl horns, bell strap, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include tin pail body, cream swirl horns, bell strap. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Pailmoo is a cute objectling tied to farm encounters, with tin pail body, cream swirl horns, bell strap, a warm rustic grounded mood, and cozy-premium stylized 3D collectible presence.. farm-themed creature with straw, produce and barnyard charm. Include tin pail body, cream swirl horns, bell strap. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Pailmoo reflects the way repeated farm moments quietly shape who you are becoming.",
+    "unlockLine": "Today's farm path revealed Pailmoo.",
+    "repeatLine": "Returning to farm is deepening Pailmoo's line in your deck.",
+    "rareLine": "A rarer form of Pailmoo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Pailmoo reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Pailmoo shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around working farm, Pailmoo emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_forest_fernip",
@@ -595,7 +679,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Fernip is a cute plantling tied to forest encounters, with fern frill, moss paws, spore sparkle, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include fern frill, moss paws, spore sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Fernip is a cute plantling tied to forest encounters, with fern frill, moss paws, spore sparkle, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include fern frill, moss paws, spore sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Fernip reflects the way repeated forest moments quietly shape who you are becoming.",
+    "unlockLine": "Today's forest path revealed Fernip.",
+    "repeatLine": "Returning to forest is deepening Fernip's line in your deck.",
+    "rareLine": "A rarer form of Fernip can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Fernip reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Fernip shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around woodland trail, Fernip emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_forest_twiglow",
@@ -641,7 +732,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Twiglow is a cute spirit tied to forest encounters, with twig antlers, firefly core, bark trim, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include twig antlers, firefly core, bark trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Twiglow is a cute spirit tied to forest encounters, with twig antlers, firefly core, bark trim, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include twig antlers, firefly core, bark trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Twiglow reflects the way repeated forest moments quietly shape who you are becoming.",
+    "unlockLine": "Today's forest path revealed Twiglow.",
+    "repeatLine": "Returning to forest is deepening Twiglow's line in your deck.",
+    "rareLine": "A rarer form of Twiglow can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Twiglow reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Twiglow shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around woodland trail, Twiglow emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_forest_barkbit",
@@ -687,7 +785,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Barkbit is a cute beast tied to forest encounters, with bark plating, seed satchel, lichen spots, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include bark plating, seed satchel, lichen spots. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Barkbit is a cute beast tied to forest encounters, with bark plating, seed satchel, lichen spots, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include bark plating, seed satchel, lichen spots. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Barkbit reflects the way repeated forest moments quietly shape who you are becoming.",
+    "unlockLine": "Today's forest path revealed Barkbit.",
+    "repeatLine": "Returning to forest is deepening Barkbit's line in your deck.",
+    "rareLine": "A rarer form of Barkbit can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Barkbit reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Barkbit shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around woodland trail, Barkbit emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_forest_owlmoss",
@@ -733,7 +838,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Owlmoss is a cute hybrid tied to forest encounters, with owl mask, moss ruff, moonlit pupils, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include owl mask, moss ruff, moonlit pupils. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Owlmoss is a cute hybrid tied to forest encounters, with owl mask, moss ruff, moonlit pupils, a mossy magical shaded mood, and cozy-premium stylized 3D collectible presence.. forest creature with bark, fern and twilight woodland motifs. Include owl mask, moss ruff, moonlit pupils. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Owlmoss reflects the way repeated forest moments quietly shape who you are becoming.",
+    "unlockLine": "Today's forest path revealed Owlmoss.",
+    "repeatLine": "Returning to forest is deepening Owlmoss's line in your deck.",
+    "rareLine": "A rarer form of Owlmoss can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Owlmoss reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Owlmoss shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around woodland trail, Owlmoss emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_beach_shellio",
@@ -779,7 +891,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Shellio is a cute objectling tied to beach encounters, with shell helm, pearl belly, sea-glass sheen, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include shell helm, pearl belly, sea-glass sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Shellio is a cute objectling tied to beach encounters, with shell helm, pearl belly, sea-glass sheen, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include shell helm, pearl belly, sea-glass sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Shellio reflects the way repeated beach moments quietly shape who you are becoming.",
+    "unlockLine": "Today's beach path revealed Shellio.",
+    "repeatLine": "Returning to beach is deepening Shellio's line in your deck.",
+    "rareLine": "A rarer form of Shellio can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Shellio reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Shellio shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sandy beach, Shellio emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_beach_pebblip",
@@ -825,7 +944,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Pebblip is a cute sprite tied to beach encounters, with pebble body, foam socks, salt sparkle, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include pebble body, foam socks, salt sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Pebblip is a cute sprite tied to beach encounters, with pebble body, foam socks, salt sparkle, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include pebble body, foam socks, salt sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Pebblip reflects the way repeated beach moments quietly shape who you are becoming.",
+    "unlockLine": "Today's beach path revealed Pebblip.",
+    "repeatLine": "Returning to beach is deepening Pebblip's line in your deck.",
+    "rareLine": "A rarer form of Pebblip can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Pebblip reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Pebblip shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sandy beach, Pebblip emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_beach_foamlit",
@@ -871,7 +997,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Foamlit is a cute spirit tied to beach encounters, with foam ribbon, aqua glow, soft crest, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include foam ribbon, aqua glow, soft crest. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Foamlit is a cute spirit tied to beach encounters, with foam ribbon, aqua glow, soft crest, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include foam ribbon, aqua glow, soft crest. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Foamlit reflects the way repeated beach moments quietly shape who you are becoming.",
+    "unlockLine": "Today's beach path revealed Foamlit.",
+    "repeatLine": "Returning to beach is deepening Foamlit's line in your deck.",
+    "rareLine": "A rarer form of Foamlit can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Foamlit reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Foamlit shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sandy beach, Foamlit emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_beach_sandyfin",
@@ -917,7 +1050,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Sandyfin is a cute hybrid tied to beach encounters, with sand-speckled fins, dune tail, sunlit freckles, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include sand-speckled fins, dune tail, sunlit freckles. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Sandyfin is a cute hybrid tied to beach encounters, with sand-speckled fins, dune tail, sunlit freckles, a bright coastal breezy mood, and cozy-premium stylized 3D collectible presence.. beach creature with shell, foam and sunwashed coastal details. Include sand-speckled fins, dune tail, sunlit freckles. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Sandyfin reflects the way repeated beach moments quietly shape who you are becoming.",
+    "unlockLine": "Today's beach path revealed Sandyfin.",
+    "repeatLine": "Returning to beach is deepening Sandyfin's line in your deck.",
+    "rareLine": "A rarer form of Sandyfin can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Sandyfin reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Sandyfin shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sandy beach, Sandyfin emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_riverwalk_ripplet",
@@ -963,7 +1103,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Ripplet is a cute sprite tied to riverwalk encounters, with ripple rings, glassy paws, stream tail, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include ripple rings, glassy paws, stream tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Ripplet is a cute sprite tied to riverwalk encounters, with ripple rings, glassy paws, stream tail, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include ripple rings, glassy paws, stream tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Ripplet reflects the way repeated riverwalk moments quietly shape who you are becoming.",
+    "unlockLine": "Today's riverwalk path revealed Ripplet.",
+    "repeatLine": "Returning to riverwalk is deepening Ripplet's line in your deck.",
+    "rareLine": "A rarer form of Ripplet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Ripplet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Ripplet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around river path, Ripplet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_riverwalk_docklet",
@@ -1009,7 +1156,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Docklet is a cute objectling tied to riverwalk encounters, with rope belt, oak post body, brass cleat ears, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include rope belt, oak post body, brass cleat ears. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Docklet is a cute objectling tied to riverwalk encounters, with rope belt, oak post body, brass cleat ears, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include rope belt, oak post body, brass cleat ears. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Docklet reflects the way repeated riverwalk moments quietly shape who you are becoming.",
+    "unlockLine": "Today's riverwalk path revealed Docklet.",
+    "repeatLine": "Returning to riverwalk is deepening Docklet's line in your deck.",
+    "rareLine": "A rarer form of Docklet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Docklet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Docklet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around river path, Docklet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_riverwalk_reedrop",
@@ -1055,7 +1209,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Reedrop is a cute plantling tied to riverwalk encounters, with reed plume, droplet cheeks, marsh green gradient, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include reed plume, droplet cheeks, marsh green gradient. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Reedrop is a cute plantling tied to riverwalk encounters, with reed plume, droplet cheeks, marsh green gradient, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include reed plume, droplet cheeks, marsh green gradient. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Reedrop reflects the way repeated riverwalk moments quietly shape who you are becoming.",
+    "unlockLine": "Today's riverwalk path revealed Reedrop.",
+    "repeatLine": "Returning to riverwalk is deepening Reedrop's line in your deck.",
+    "rareLine": "A rarer form of Reedrop can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Reedrop reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Reedrop shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around river path, Reedrop emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_riverwalk_skipperstone",
@@ -1101,7 +1262,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Skipperstone is a cute beast tied to riverwalk encounters, with smooth stone shell, blue-gray fins, wake glow, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include smooth stone shell, blue-gray fins, wake glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Skipperstone is a cute beast tied to riverwalk encounters, with smooth stone shell, blue-gray fins, wake glow, a reflective urban water mood, and cozy-premium stylized 3D collectible presence.. riverside creature with flowing water motifs and reflective urban charm. Include smooth stone shell, blue-gray fins, wake glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Skipperstone reflects the way repeated riverwalk moments quietly shape who you are becoming.",
+    "unlockLine": "Today's riverwalk path revealed Skipperstone.",
+    "repeatLine": "Returning to riverwalk is deepening Skipperstone's line in your deck.",
+    "rareLine": "A rarer form of Skipperstone can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Skipperstone reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Skipperstone shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around river path, Skipperstone emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_coffee_shop_lattelet",
@@ -1147,7 +1315,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Lattelet is a cute foodling tied to coffee shop encounters, with latte foam swirl, ceramic cup hood, caramel glow, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include latte foam swirl, ceramic cup hood, caramel glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Lattelet is a cute foodling tied to coffee shop encounters, with latte foam swirl, ceramic cup hood, caramel glow, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include latte foam swirl, ceramic cup hood, caramel glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Lattelet reflects the way repeated coffee shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's coffee shop path revealed Lattelet.",
+    "repeatLine": "Returning to coffee shop is deepening Lattelet's line in your deck.",
+    "rareLine": "A rarer form of Lattelet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Lattelet reminds you that warmth, pause, and routine can still move your life forward.",
+    "progressLine": "Lattelet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent cafe, Lattelet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_coffee_shop_beanhop",
@@ -1193,7 +1368,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Beanhop is a cute foodling tied to coffee shop encounters, with espresso bean body, tiny steam ears, cocoa shine, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include espresso bean body, tiny steam ears, cocoa shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Beanhop is a cute foodling tied to coffee shop encounters, with espresso bean body, tiny steam ears, cocoa shine, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include espresso bean body, tiny steam ears, cocoa shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Beanhop reflects the way repeated coffee shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's coffee shop path revealed Beanhop.",
+    "repeatLine": "Returning to coffee shop is deepening Beanhop's line in your deck.",
+    "rareLine": "A rarer form of Beanhop can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Beanhop reminds you that warmth, pause, and routine can still move your life forward.",
+    "progressLine": "Beanhop shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent cafe, Beanhop emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_coffee_shop_mochamoo",
@@ -1239,7 +1421,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Mochamoo is a cute hybrid tied to coffee shop encounters, with mocha drizzle spots, cream tuft, rounded mug hooves, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include mocha drizzle spots, cream tuft, rounded mug hooves. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Mochamoo is a cute hybrid tied to coffee shop encounters, with mocha drizzle spots, cream tuft, rounded mug hooves, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include mocha drizzle spots, cream tuft, rounded mug hooves. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Mochamoo reflects the way repeated coffee shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's coffee shop path revealed Mochamoo.",
+    "repeatLine": "Returning to coffee shop is deepening Mochamoo's line in your deck.",
+    "rareLine": "A rarer form of Mochamoo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Mochamoo reminds you that warmth, pause, and routine can still move your life forward.",
+    "progressLine": "Mochamoo shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent cafe, Mochamoo emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_coffee_shop_steamip",
@@ -1285,7 +1474,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Steamip is a cute spirit tied to coffee shop encounters, with steam ribbon, glossy cup core, soft amber aura, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include steam ribbon, glossy cup core, soft amber aura. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Steamip is a cute spirit tied to coffee shop encounters, with steam ribbon, glossy cup core, soft amber aura, a warm aromatic cozy mood, and cozy-premium stylized 3D collectible presence.. cute coffee creature with cafe warmth, creamy details and collectible polish. Include steam ribbon, glossy cup core, soft amber aura. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Steamip reflects the way repeated coffee shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's coffee shop path revealed Steamip.",
+    "repeatLine": "Returning to coffee shop is deepening Steamip's line in your deck.",
+    "rareLine": "A rarer form of Steamip can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Steamip reminds you that warmth, pause, and routine can still move your life forward.",
+    "progressLine": "Steamip shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent cafe, Steamip emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bakery_crumbun",
@@ -1331,7 +1527,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Crumbun is a cute foodling tied to bakery encounters, with brioche body, powdered cheeks, gold crust ears, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include brioche body, powdered cheeks, gold crust ears. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Crumbun is a cute foodling tied to bakery encounters, with brioche body, powdered cheeks, gold crust ears, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include brioche body, powdered cheeks, gold crust ears. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Crumbun reflects the way repeated bakery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bakery path revealed Crumbun.",
+    "repeatLine": "Returning to bakery is deepening Crumbun's line in your deck.",
+    "rareLine": "A rarer form of Crumbun can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Crumbun reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Crumbun shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around artisan bakery, Crumbun emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bakery_rollino",
@@ -1377,7 +1580,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Rollino is a cute foodling tied to bakery encounters, with spiral roll shell, icing line, tiny mitt paws, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include spiral roll shell, icing line, tiny mitt paws. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Rollino is a cute foodling tied to bakery encounters, with spiral roll shell, icing line, tiny mitt paws, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include spiral roll shell, icing line, tiny mitt paws. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Rollino reflects the way repeated bakery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bakery path revealed Rollino.",
+    "repeatLine": "Returning to bakery is deepening Rollino's line in your deck.",
+    "rareLine": "A rarer form of Rollino can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Rollino reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Rollino shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around artisan bakery, Rollino emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bakery_butterbit",
@@ -1423,7 +1633,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Butterbit is a cute sprite tied to bakery encounters, with butter pat crest, warm oven glow, crumb sparkles, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include butter pat crest, warm oven glow, crumb sparkles. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Butterbit is a cute sprite tied to bakery encounters, with butter pat crest, warm oven glow, crumb sparkles, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include butter pat crest, warm oven glow, crumb sparkles. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Butterbit reflects the way repeated bakery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bakery path revealed Butterbit.",
+    "repeatLine": "Returning to bakery is deepening Butterbit's line in your deck.",
+    "rareLine": "A rarer form of Butterbit can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Butterbit reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Butterbit shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around artisan bakery, Butterbit emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bakery_glazette",
@@ -1469,7 +1686,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Glazette is a cute hybrid tied to bakery encounters, with glaze sheen, pastry ruffle, sugar pearl tail, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include glaze sheen, pastry ruffle, sugar pearl tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Glazette is a cute hybrid tied to bakery encounters, with glaze sheen, pastry ruffle, sugar pearl tail, a buttery warm soft mood, and cozy-premium stylized 3D collectible presence.. cute pastry creature with bakery warmth and golden oven details. Include glaze sheen, pastry ruffle, sugar pearl tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Glazette reflects the way repeated bakery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bakery path revealed Glazette.",
+    "repeatLine": "Returning to bakery is deepening Glazette's line in your deck.",
+    "rareLine": "A rarer form of Glazette can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Glazette reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Glazette shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around artisan bakery, Glazette emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_pizza_place_crustling",
@@ -1515,7 +1739,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Crustling is a cute foodling tied to pizza place encounters, with pizza crust hood, melted cheese trim, tomato blush, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include pizza crust hood, melted cheese trim, tomato blush. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Crustling is a cute foodling tied to pizza place encounters, with pizza crust hood, melted cheese trim, tomato blush, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include pizza crust hood, melted cheese trim, tomato blush. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Crustling reflects the way repeated pizza place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's pizza place path revealed Crustling.",
+    "repeatLine": "Returning to pizza place is deepening Crustling's line in your deck.",
+    "rareLine": "A rarer form of Crustling can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Crustling reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Crustling shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around pizza restaurant, Crustling emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_pizza_place_mozzlet",
@@ -1561,7 +1792,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Mozzlet is a cute foodling tied to pizza place encounters, with cheese pull tail, soft white body, oregano freckles, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include cheese pull tail, soft white body, oregano freckles. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Mozzlet is a cute foodling tied to pizza place encounters, with cheese pull tail, soft white body, oregano freckles, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include cheese pull tail, soft white body, oregano freckles. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Mozzlet reflects the way repeated pizza place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's pizza place path revealed Mozzlet.",
+    "repeatLine": "Returning to pizza place is deepening Mozzlet's line in your deck.",
+    "rareLine": "A rarer form of Mozzlet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Mozzlet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Mozzlet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around pizza restaurant, Mozzlet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_pizza_place_pepperimp",
@@ -1607,7 +1845,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Pepperimp is a cute hybrid tied to pizza place encounters, with pepperoni spots, red ember eyes, crisp triangle ears, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include pepperoni spots, red ember eyes, crisp triangle ears. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Pepperimp is a cute hybrid tied to pizza place encounters, with pepperoni spots, red ember eyes, crisp triangle ears, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include pepperoni spots, red ember eyes, crisp triangle ears. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Pepperimp reflects the way repeated pizza place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's pizza place path revealed Pepperimp.",
+    "repeatLine": "Returning to pizza place is deepening Pepperimp's line in your deck.",
+    "rareLine": "A rarer form of Pepperimp can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Pepperimp reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Pepperimp shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around pizza restaurant, Pepperimp emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_pizza_place_slicey",
@@ -1653,7 +1898,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Slicey is a cute objectling tied to pizza place encounters, with slice silhouette, box tab cape, golden cheese shine, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include slice silhouette, box tab cape, golden cheese shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Slicey is a cute objectling tied to pizza place encounters, with slice silhouette, box tab cape, golden cheese shine, a cheerful melty warm mood, and cozy-premium stylized 3D collectible presence.. cute pizza creature with cheesy textures and playful slice-shop details. Include slice silhouette, box tab cape, golden cheese shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Slicey reflects the way repeated pizza place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's pizza place path revealed Slicey.",
+    "repeatLine": "Returning to pizza place is deepening Slicey's line in your deck.",
+    "rareLine": "A rarer form of Slicey can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Slicey reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Slicey shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around pizza restaurant, Slicey emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_sushi_place_nigirimp",
@@ -1699,7 +1951,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Nigirimp is a cute foodling tied to sushi place encounters, with rice body, salmon drape, soy gloss eyes, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include rice body, salmon drape, soy gloss eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Nigirimp is a cute foodling tied to sushi place encounters, with rice body, salmon drape, soy gloss eyes, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include rice body, salmon drape, soy gloss eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Nigirimp reflects the way repeated sushi place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's sushi place path revealed Nigirimp.",
+    "repeatLine": "Returning to sushi place is deepening Nigirimp's line in your deck.",
+    "rareLine": "A rarer form of Nigirimp can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Nigirimp reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Nigirimp shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sushi bar, Nigirimp emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_sushi_place_rolli",
@@ -1745,7 +2004,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Rolli is a cute foodling tied to sushi place encounters, with maki roll body, sesame freckles, nori wrap cape, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include maki roll body, sesame freckles, nori wrap cape. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Rolli is a cute foodling tied to sushi place encounters, with maki roll body, sesame freckles, nori wrap cape, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include maki roll body, sesame freckles, nori wrap cape. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Rolli reflects the way repeated sushi place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's sushi place path revealed Rolli.",
+    "repeatLine": "Returning to sushi place is deepening Rolli's line in your deck.",
+    "rareLine": "A rarer form of Rolli can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Rolli reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Rolli shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sushi bar, Rolli emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_sushi_place_wasabibi",
@@ -1791,7 +2057,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Wasabibi is a cute sprite tied to sushi place encounters, with lime-green crest, spice spark aura, tiny chopstick tail, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include lime-green crest, spice spark aura, tiny chopstick tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Wasabibi is a cute sprite tied to sushi place encounters, with lime-green crest, spice spark aura, tiny chopstick tail, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include lime-green crest, spice spark aura, tiny chopstick tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Wasabibi reflects the way repeated sushi place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's sushi place path revealed Wasabibi.",
+    "repeatLine": "Returning to sushi place is deepening Wasabibi's line in your deck.",
+    "rareLine": "A rarer form of Wasabibi can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Wasabibi reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Wasabibi shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sushi bar, Wasabibi emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_sushi_place_misoop",
@@ -1837,7 +2110,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Misoop is a cute spirit tied to sushi place encounters, with broth glow, steam halo, soft tofu beads, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include broth glow, steam halo, soft tofu beads. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Misoop is a cute spirit tied to sushi place encounters, with broth glow, steam halo, soft tofu beads, a clean glossy refined mood, and cozy-premium stylized 3D collectible presence.. cute sushi creature with polished ingredients and collectible premium finish. Include broth glow, steam halo, soft tofu beads. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Misoop reflects the way repeated sushi place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's sushi place path revealed Misoop.",
+    "repeatLine": "Returning to sushi place is deepening Misoop's line in your deck.",
+    "rareLine": "A rarer form of Misoop can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Misoop reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Misoop shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around sushi bar, Misoop emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_ramen_place_noodloo",
@@ -1883,7 +2163,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Noodloo is a cute foodling tied to ramen place encounters, with noodle curl hair, broth belly, chopstick tail, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include noodle curl hair, broth belly, chopstick tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Noodloo is a cute foodling tied to ramen place encounters, with noodle curl hair, broth belly, chopstick tail, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include noodle curl hair, broth belly, chopstick tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Noodloo reflects the way repeated ramen place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's ramen place path revealed Noodloo.",
+    "repeatLine": "Returning to ramen place is deepening Noodloo's line in your deck.",
+    "rareLine": "A rarer form of Noodloo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Noodloo reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Noodloo shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ramen bar, Noodloo emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_ramen_place_brothlet",
@@ -1929,7 +2216,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Brothlet is a cute spirit tied to ramen place encounters, with amber broth core, steam crown, scallion flecks, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include amber broth core, steam crown, scallion flecks. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Brothlet is a cute spirit tied to ramen place encounters, with amber broth core, steam crown, scallion flecks, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include amber broth core, steam crown, scallion flecks. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Brothlet reflects the way repeated ramen place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's ramen place path revealed Brothlet.",
+    "repeatLine": "Returning to ramen place is deepening Brothlet's line in your deck.",
+    "rareLine": "A rarer form of Brothlet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Brothlet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Brothlet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ramen bar, Brothlet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_ramen_place_menmaru",
@@ -1975,7 +2269,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Menmaru is a cute hybrid tied to ramen place encounters, with ramen bowl shell, egg crest, noodle whiskers, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include ramen bowl shell, egg crest, noodle whiskers. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Menmaru is a cute hybrid tied to ramen place encounters, with ramen bowl shell, egg crest, noodle whiskers, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include ramen bowl shell, egg crest, noodle whiskers. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Menmaru reflects the way repeated ramen place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's ramen place path revealed Menmaru.",
+    "repeatLine": "Returning to ramen place is deepening Menmaru's line in your deck.",
+    "rareLine": "A rarer form of Menmaru can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Menmaru reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Menmaru shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ramen bar, Menmaru emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_ramen_place_steamrimp",
@@ -2021,7 +2322,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Steamrimp is a cute sprite tied to ramen place encounters, with steam ribbon tail, neon broth highlights, tiny lantern eyes, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include steam ribbon tail, neon broth highlights, tiny lantern eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Steamrimp is a cute sprite tied to ramen place encounters, with steam ribbon tail, neon broth highlights, tiny lantern eyes, a steamy urban cozy mood, and cozy-premium stylized 3D collectible presence.. cute ramen creature with noodle forms, steam and warm city-night details. Include steam ribbon tail, neon broth highlights, tiny lantern eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Steamrimp reflects the way repeated ramen place moments quietly shape who you are becoming.",
+    "unlockLine": "Today's ramen place path revealed Steamrimp.",
+    "repeatLine": "Returning to ramen place is deepening Steamrimp's line in your deck.",
+    "rareLine": "A rarer form of Steamrimp can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Steamrimp reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Steamrimp shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ramen bar, Steamrimp emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_dessert_shop_sundael",
@@ -2067,7 +2375,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Sundael is a cute foodling tied to dessert shop encounters, with soft-serve swirl, cherry topper, glass-cup sparkle, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include soft-serve swirl, cherry topper, glass-cup sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Sundael is a cute foodling tied to dessert shop encounters, with soft-serve swirl, cherry topper, glass-cup sparkle, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include soft-serve swirl, cherry topper, glass-cup sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Sundael reflects the way repeated dessert shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's dessert shop path revealed Sundael.",
+    "repeatLine": "Returning to dessert shop is deepening Sundael's line in your deck.",
+    "rareLine": "A rarer form of Sundael can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Sundael reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Sundael shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ice cream shop, Sundael emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_dessert_shop_trufflet",
@@ -2113,7 +2428,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Trufflet is a cute foodling tied to dessert shop encounters, with truffle body, cocoa dust, ribbon wrapper trim, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include truffle body, cocoa dust, ribbon wrapper trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Trufflet is a cute foodling tied to dessert shop encounters, with truffle body, cocoa dust, ribbon wrapper trim, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include truffle body, cocoa dust, ribbon wrapper trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Trufflet reflects the way repeated dessert shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's dessert shop path revealed Trufflet.",
+    "repeatLine": "Returning to dessert shop is deepening Trufflet's line in your deck.",
+    "rareLine": "A rarer form of Trufflet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Trufflet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Trufflet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ice cream shop, Trufflet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_dessert_shop_sprinklepuff",
@@ -2159,7 +2481,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Sprinklepuff is a cute sprite tied to dessert shop encounters, with sprinkle confetti, marshmallow fluff, pastel glow, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include sprinkle confetti, marshmallow fluff, pastel glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Sprinklepuff is a cute sprite tied to dessert shop encounters, with sprinkle confetti, marshmallow fluff, pastel glow, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include sprinkle confetti, marshmallow fluff, pastel glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Sprinklepuff reflects the way repeated dessert shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's dessert shop path revealed Sprinklepuff.",
+    "repeatLine": "Returning to dessert shop is deepening Sprinklepuff's line in your deck.",
+    "rareLine": "A rarer form of Sprinklepuff can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Sprinklepuff reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Sprinklepuff shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ice cream shop, Sprinklepuff emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_dessert_shop_gelatoon",
@@ -2205,7 +2534,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Gelatoon is a cute hybrid tied to dessert shop encounters, with gelato scoop mane, waffle cone details, cool gloss finish, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include gelato scoop mane, waffle cone details, cool gloss finish. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Gelatoon is a cute hybrid tied to dessert shop encounters, with gelato scoop mane, waffle cone details, cool gloss finish, a bright sugary polished mood, and cozy-premium stylized 3D collectible presence.. cute dessert creature with creamy textures, colorful toppings and premium finish. Include gelato scoop mane, waffle cone details, cool gloss finish. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Gelatoon reflects the way repeated dessert shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's dessert shop path revealed Gelatoon.",
+    "repeatLine": "Returning to dessert shop is deepening Gelatoon's line in your deck.",
+    "rareLine": "A rarer form of Gelatoon can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Gelatoon reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Gelatoon shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around ice cream shop, Gelatoon emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bubble_tea_shop_bobaloo",
@@ -2251,7 +2587,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Bobaloo is a cute foodling tied to bubble tea shop encounters, with boba pearls, clear cup sheen, tea gradient body, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include boba pearls, clear cup sheen, tea gradient body. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Bobaloo is a cute foodling tied to bubble tea shop encounters, with boba pearls, clear cup sheen, tea gradient body, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include boba pearls, clear cup sheen, tea gradient body. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Bobaloo reflects the way repeated bubble tea shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bubble tea shop path revealed Bobaloo.",
+    "repeatLine": "Returning to bubble tea shop is deepening Bobaloo's line in your deck.",
+    "rareLine": "A rarer form of Bobaloo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Bobaloo reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Bobaloo shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around bubble tea shop, Bobaloo emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bubble_tea_shop_tapiwink",
@@ -2297,7 +2640,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Tapiwink is a cute sprite tied to bubble tea shop encounters, with tapioca bead clusters, straw antenna, jelly gloss, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include tapioca bead clusters, straw antenna, jelly gloss. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Tapiwink is a cute sprite tied to bubble tea shop encounters, with tapioca bead clusters, straw antenna, jelly gloss, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include tapioca bead clusters, straw antenna, jelly gloss. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Tapiwink reflects the way repeated bubble tea shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bubble tea shop path revealed Tapiwink.",
+    "repeatLine": "Returning to bubble tea shop is deepening Tapiwink's line in your deck.",
+    "rareLine": "A rarer form of Tapiwink can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Tapiwink reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Tapiwink shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around bubble tea shop, Tapiwink emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bubble_tea_shop_jellybob",
@@ -2343,7 +2693,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Jellybob is a cute hybrid tied to bubble tea shop encounters, with fruit jelly tail, cup-lid cap, fruit tea shimmer, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include fruit jelly tail, cup-lid cap, fruit tea shimmer. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Jellybob is a cute hybrid tied to bubble tea shop encounters, with fruit jelly tail, cup-lid cap, fruit tea shimmer, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include fruit jelly tail, cup-lid cap, fruit tea shimmer. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Jellybob reflects the way repeated bubble tea shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bubble tea shop path revealed Jellybob.",
+    "repeatLine": "Returning to bubble tea shop is deepening Jellybob's line in your deck.",
+    "rareLine": "A rarer form of Jellybob can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Jellybob reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Jellybob shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around bubble tea shop, Jellybob emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bubble_tea_shop_sipplet",
@@ -2389,7 +2746,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Sipplet is a cute objectling tied to bubble tea shop encounters, with striped straw horn, slosh glow belly, rounded cup feet, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include striped straw horn, slosh glow belly, rounded cup feet. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Sipplet is a cute objectling tied to bubble tea shop encounters, with striped straw horn, slosh glow belly, rounded cup feet, a cute glossy buoyant mood, and cozy-premium stylized 3D collectible presence.. cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce. Include striped straw horn, slosh glow belly, rounded cup feet. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Sipplet reflects the way repeated bubble tea shop moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bubble tea shop path revealed Sipplet.",
+    "repeatLine": "Returning to bubble tea shop is deepening Sipplet's line in your deck.",
+    "rareLine": "A rarer form of Sipplet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Sipplet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Sipplet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around bubble tea shop, Sipplet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bookstore_pagelet",
@@ -2435,7 +2799,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Pagelet is a cute objectling tied to bookstore encounters, with page ears, bookmark tail, linen cover texture, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include page ears, bookmark tail, linen cover texture. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Pagelet is a cute objectling tied to bookstore encounters, with page ears, bookmark tail, linen cover texture, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include page ears, bookmark tail, linen cover texture. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Pagelet reflects the way repeated bookstore moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bookstore path revealed Pagelet.",
+    "repeatLine": "Returning to bookstore is deepening Pagelet's line in your deck.",
+    "rareLine": "A rarer form of Pagelet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Pagelet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Pagelet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent bookstore, Pagelet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bookstore_inkwisp",
@@ -2481,7 +2852,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Inkwisp is a cute spirit tied to bookstore encounters, with ink drop core, quill plume, navy glow, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include ink drop core, quill plume, navy glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Inkwisp is a cute spirit tied to bookstore encounters, with ink drop core, quill plume, navy glow, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include ink drop core, quill plume, navy glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Inkwisp reflects the way repeated bookstore moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bookstore path revealed Inkwisp.",
+    "repeatLine": "Returning to bookstore is deepening Inkwisp's line in your deck.",
+    "rareLine": "A rarer form of Inkwisp can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Inkwisp reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Inkwisp shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent bookstore, Inkwisp emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bookstore_bindle",
@@ -2527,7 +2905,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Bindle is a cute hybrid tied to bookstore encounters, with stitched binding, gold foil corners, soft cloth paws, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include stitched binding, gold foil corners, soft cloth paws. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Bindle is a cute hybrid tied to bookstore encounters, with stitched binding, gold foil corners, soft cloth paws, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include stitched binding, gold foil corners, soft cloth paws. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Bindle reflects the way repeated bookstore moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bookstore path revealed Bindle.",
+    "repeatLine": "Returning to bookstore is deepening Bindle's line in your deck.",
+    "rareLine": "A rarer form of Bindle can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Bindle reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Bindle shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent bookstore, Bindle emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_bookstore_marginip",
@@ -2573,7 +2958,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Marginip is a cute sprite tied to bookstore encounters, with margin marks, paper winglets, graphite sparkle, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include margin marks, paper winglets, graphite sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Marginip is a cute sprite tied to bookstore encounters, with margin marks, paper winglets, graphite sparkle, a cozy curious warm mood, and cozy-premium stylized 3D collectible presence.. cute bookstore creature with book textures, paper details and thoughtful charm. Include margin marks, paper winglets, graphite sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Marginip reflects the way repeated bookstore moments quietly shape who you are becoming.",
+    "unlockLine": "Today's bookstore path revealed Marginip.",
+    "repeatLine": "Returning to bookstore is deepening Marginip's line in your deck.",
+    "rareLine": "A rarer form of Marginip can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Marginip reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Marginip shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around independent bookstore, Marginip emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_library_shelflet",
@@ -2619,7 +3011,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Shelflet is a cute objectling tied to library encounters, with stacked book shell, wood shelf trim, catalog eyes, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include stacked book shell, wood shelf trim, catalog eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Shelflet is a cute objectling tied to library encounters, with stacked book shell, wood shelf trim, catalog eyes, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include stacked book shell, wood shelf trim, catalog eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Shelflet reflects the way repeated library moments quietly shape who you are becoming.",
+    "unlockLine": "Today's library path revealed Shelflet.",
+    "repeatLine": "Returning to library is deepening Shelflet's line in your deck.",
+    "rareLine": "A rarer form of Shelflet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Shelflet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Shelflet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around public library, Shelflet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_library_hushpage",
@@ -2665,7 +3064,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Hushpage is a cute spirit tied to library encounters, with paper veil, soft ivory glow, silent rune marks, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include paper veil, soft ivory glow, silent rune marks. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Hushpage is a cute spirit tied to library encounters, with paper veil, soft ivory glow, silent rune marks, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include paper veil, soft ivory glow, silent rune marks. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Hushpage reflects the way repeated library moments quietly shape who you are becoming.",
+    "unlockLine": "Today's library path revealed Hushpage.",
+    "repeatLine": "Returning to library is deepening Hushpage's line in your deck.",
+    "rareLine": "A rarer form of Hushpage can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Hushpage reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Hushpage shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around public library, Hushpage emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_library_quietome",
@@ -2711,7 +3117,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Quietome is a cute hybrid tied to library encounters, with lamp-lit brow, clothbound fur, small index tab tail, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include lamp-lit brow, clothbound fur, small index tab tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Quietome is a cute hybrid tied to library encounters, with lamp-lit brow, clothbound fur, small index tab tail, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include lamp-lit brow, clothbound fur, small index tab tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Quietome reflects the way repeated library moments quietly shape who you are becoming.",
+    "unlockLine": "Today's library path revealed Quietome.",
+    "repeatLine": "Returning to library is deepening Quietome's line in your deck.",
+    "rareLine": "A rarer form of Quietome can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Quietome reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Quietome shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around public library, Quietome emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_library_indexip",
@@ -2757,7 +3170,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Indexip is a cute sprite tied to library encounters, with tabbed card fins, filing glow, precise linework, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include tabbed card fins, filing glow, precise linework. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Indexip is a cute sprite tied to library encounters, with tabbed card fins, filing glow, precise linework, a hushed refined calm mood, and cozy-premium stylized 3D collectible presence.. cute library creature with archival details, quiet elegance and collectible polish. Include tabbed card fins, filing glow, precise linework. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Indexip reflects the way repeated library moments quietly shape who you are becoming.",
+    "unlockLine": "Today's library path revealed Indexip.",
+    "repeatLine": "Returning to library is deepening Indexip's line in your deck.",
+    "rareLine": "A rarer form of Indexip can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Indexip reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Indexip shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around public library, Indexip emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_museum_relicoon",
@@ -2803,7 +3223,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Relicoon is a cute hybrid tied to museum encounters, with artifact charm belt, patina glow, arched brow crest, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include artifact charm belt, patina glow, arched brow crest. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Relicoon is a cute hybrid tied to museum encounters, with artifact charm belt, patina glow, arched brow crest, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include artifact charm belt, patina glow, arched brow crest. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Relicoon reflects the way repeated museum moments quietly shape who you are becoming.",
+    "unlockLine": "Today's museum path revealed Relicoon.",
+    "repeatLine": "Returning to museum is deepening Relicoon's line in your deck.",
+    "rareLine": "A rarer form of Relicoon can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Relicoon reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Relicoon shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around art museum, Relicoon emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_museum_framebit",
@@ -2849,7 +3276,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Framebit is a cute objectling tied to museum encounters, with frame corners, velvet backing, soft gilt shine, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include frame corners, velvet backing, soft gilt shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Framebit is a cute objectling tied to museum encounters, with frame corners, velvet backing, soft gilt shine, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include frame corners, velvet backing, soft gilt shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Framebit reflects the way repeated museum moments quietly shape who you are becoming.",
+    "unlockLine": "Today's museum path revealed Framebit.",
+    "repeatLine": "Returning to museum is deepening Framebit's line in your deck.",
+    "rareLine": "A rarer form of Framebit can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Framebit reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Framebit shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around art museum, Framebit emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_museum_fossipple",
@@ -2895,7 +3329,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Fossipple is a cute beast tied to museum encounters, with fossil spiral markings, stone paws, dusty pearl eyes, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include fossil spiral markings, stone paws, dusty pearl eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Fossipple is a cute beast tied to museum encounters, with fossil spiral markings, stone paws, dusty pearl eyes, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include fossil spiral markings, stone paws, dusty pearl eyes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Fossipple reflects the way repeated museum moments quietly shape who you are becoming.",
+    "unlockLine": "Today's museum path revealed Fossipple.",
+    "repeatLine": "Returning to museum is deepening Fossipple's line in your deck.",
+    "rareLine": "A rarer form of Fossipple can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Fossipple reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Fossipple shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around art museum, Fossipple emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_museum_curioot",
@@ -2941,7 +3382,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Curioot is a cute sprite tied to museum encounters, with display-case glow, tiny museum label tag, glassy shimmer, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include display-case glow, tiny museum label tag, glassy shimmer. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Curioot is a cute sprite tied to museum encounters, with display-case glow, tiny museum label tag, glassy shimmer, a elevated curious polished mood, and cozy-premium stylized 3D collectible presence.. cute museum creature with gallery polish, artifact cues and elegant collectible styling. Include display-case glow, tiny museum label tag, glassy shimmer. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Curioot reflects the way repeated museum moments quietly shape who you are becoming.",
+    "unlockLine": "Today's museum path revealed Curioot.",
+    "repeatLine": "Returning to museum is deepening Curioot's line in your deck.",
+    "rareLine": "A rarer form of Curioot can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Curioot reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Curioot shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around art museum, Curioot emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_cinema_reelbit",
@@ -2987,7 +3435,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Reelbit is a cute objectling tied to cinema encounters, with film reel ears, projector glow, silver trim, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include film reel ears, projector glow, silver trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Reelbit is a cute objectling tied to cinema encounters, with film reel ears, projector glow, silver trim, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include film reel ears, projector glow, silver trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Reelbit reflects the way repeated cinema moments quietly shape who you are becoming.",
+    "unlockLine": "Today's cinema path revealed Reelbit.",
+    "repeatLine": "Returning to cinema is deepening Reelbit's line in your deck.",
+    "rareLine": "A rarer form of Reelbit can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Reelbit reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Reelbit shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around movie theater, Reelbit emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_cinema_flickerbun",
@@ -3033,7 +3488,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Flickerbun is a cute hybrid tied to cinema encounters, with velvet fur, screen-light pupils, marquee sparkle, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include velvet fur, screen-light pupils, marquee sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Flickerbun is a cute hybrid tied to cinema encounters, with velvet fur, screen-light pupils, marquee sparkle, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include velvet fur, screen-light pupils, marquee sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Flickerbun reflects the way repeated cinema moments quietly shape who you are becoming.",
+    "unlockLine": "Today's cinema path revealed Flickerbun.",
+    "repeatLine": "Returning to cinema is deepening Flickerbun's line in your deck.",
+    "rareLine": "A rarer form of Flickerbun can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Flickerbun reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Flickerbun shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around movie theater, Flickerbun emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_cinema_ticketi",
@@ -3079,7 +3541,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Ticketi is a cute sprite tied to cinema encounters, with ticket edge trim, stub tail, red carpet accents, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include ticket edge trim, stub tail, red carpet accents. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Ticketi is a cute sprite tied to cinema encounters, with ticket edge trim, stub tail, red carpet accents, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include ticket edge trim, stub tail, red carpet accents. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Ticketi reflects the way repeated cinema moments quietly shape who you are becoming.",
+    "unlockLine": "Today's cinema path revealed Ticketi.",
+    "repeatLine": "Returning to cinema is deepening Ticketi's line in your deck.",
+    "rareLine": "A rarer form of Ticketi can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Ticketi reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Ticketi shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around movie theater, Ticketi emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_cinema_popcornoo",
@@ -3125,7 +3594,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Popcornoo is a cute foodling tied to cinema encounters, with popcorn puff mane, bucket stripes, golden butter sheen, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include popcorn puff mane, bucket stripes, golden butter sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Popcornoo is a cute foodling tied to cinema encounters, with popcorn puff mane, bucket stripes, golden butter sheen, a dark glossy cinematic mood, and cozy-premium stylized 3D collectible presence.. cute cinema creature with marquee glow, film motifs and polished collectible styling. Include popcorn puff mane, bucket stripes, golden butter sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Popcornoo reflects the way repeated cinema moments quietly shape who you are becoming.",
+    "unlockLine": "Today's cinema path revealed Popcornoo.",
+    "repeatLine": "Returning to cinema is deepening Popcornoo's line in your deck.",
+    "rareLine": "A rarer form of Popcornoo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Popcornoo reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Popcornoo shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around movie theater, Popcornoo emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_mall_bagsprite",
@@ -3171,7 +3647,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Bagsprite is a cute objectling tied to mall encounters, with shopping bag body, rope handle ears, foil tissue trim, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include shopping bag body, rope handle ears, foil tissue trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Bagsprite is a cute objectling tied to mall encounters, with shopping bag body, rope handle ears, foil tissue trim, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include shopping bag body, rope handle ears, foil tissue trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Bagsprite reflects the way repeated mall moments quietly shape who you are becoming.",
+    "unlockLine": "Today's mall path revealed Bagsprite.",
+    "repeatLine": "Returning to mall is deepening Bagsprite's line in your deck.",
+    "rareLine": "A rarer form of Bagsprite can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Bagsprite reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Bagsprite shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around shopping mall, Bagsprite emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_mall_shoplet",
@@ -3217,7 +3700,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Shoplet is a cute sprite tied to mall encounters, with storefront glow, glassy paws, receipt ribbon, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include storefront glow, glassy paws, receipt ribbon. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Shoplet is a cute sprite tied to mall encounters, with storefront glow, glassy paws, receipt ribbon, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include storefront glow, glassy paws, receipt ribbon. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Shoplet reflects the way repeated mall moments quietly shape who you are becoming.",
+    "unlockLine": "Today's mall path revealed Shoplet.",
+    "repeatLine": "Returning to mall is deepening Shoplet's line in your deck.",
+    "rareLine": "A rarer form of Shoplet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Shoplet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Shoplet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around shopping mall, Shoplet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_mall_escaloon",
@@ -3263,7 +3753,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Escaloon is a cute hybrid tied to mall encounters, with chrome stripe tail, step-like shell, cool glow, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include chrome stripe tail, step-like shell, cool glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Escaloon is a cute hybrid tied to mall encounters, with chrome stripe tail, step-like shell, cool glow, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include chrome stripe tail, step-like shell, cool glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Escaloon reflects the way repeated mall moments quietly shape who you are becoming.",
+    "unlockLine": "Today's mall path revealed Escaloon.",
+    "repeatLine": "Returning to mall is deepening Escaloon's line in your deck.",
+    "rareLine": "A rarer form of Escaloon can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Escaloon reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Escaloon shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around shopping mall, Escaloon emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_mall_glimmerbag",
@@ -3309,7 +3806,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Glimmerbag is a cute objectling tied to mall encounters, with gift-bag silhouette, sparkle confetti, ribbon bow, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include gift-bag silhouette, sparkle confetti, ribbon bow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Glimmerbag is a cute objectling tied to mall encounters, with gift-bag silhouette, sparkle confetti, ribbon bow, a bright urban polished mood, and cozy-premium stylized 3D collectible presence.. cute mall creature with glossy retail details, polished surfaces and playful shopping motifs. Include gift-bag silhouette, sparkle confetti, ribbon bow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Glimmerbag reflects the way repeated mall moments quietly shape who you are becoming.",
+    "unlockLine": "Today's mall path revealed Glimmerbag.",
+    "repeatLine": "Returning to mall is deepening Glimmerbag's line in your deck.",
+    "rareLine": "A rarer form of Glimmerbag can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Glimmerbag reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Glimmerbag shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around shopping mall, Glimmerbag emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_grocery_broccolite",
@@ -3355,7 +3859,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Broccolite is a cute foodling tied to grocery encounters, with broccoli crown, stalk body, crisp green glow, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include broccoli crown, stalk body, crisp green glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Broccolite is a cute foodling tied to grocery encounters, with broccoli crown, stalk body, crisp green glow, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include broccoli crown, stalk body, crisp green glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Broccolite reflects the way repeated grocery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's grocery path revealed Broccolite.",
+    "repeatLine": "Returning to grocery is deepening Broccolite's line in your deck.",
+    "rareLine": "A rarer form of Broccolite can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Broccolite reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Broccolite shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around supermarket, Broccolite emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_grocery_carrotle",
@@ -3401,7 +3912,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Carrotle is a cute foodling tied to grocery encounters, with carrot body, leaf tuft, garden orange shine, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include carrot body, leaf tuft, garden orange shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Carrotle is a cute foodling tied to grocery encounters, with carrot body, leaf tuft, garden orange shine, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include carrot body, leaf tuft, garden orange shine. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Carrotle reflects the way repeated grocery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's grocery path revealed Carrotle.",
+    "repeatLine": "Returning to grocery is deepening Carrotle's line in your deck.",
+    "rareLine": "A rarer form of Carrotle can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Carrotle reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Carrotle shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around supermarket, Carrotle emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_grocery_melomallow",
@@ -3447,7 +3965,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Melomallow is a cute hybrid tied to grocery encounters, with melon rind shell, fruit blush, soft green stripes, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include melon rind shell, fruit blush, soft green stripes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Melomallow is a cute hybrid tied to grocery encounters, with melon rind shell, fruit blush, soft green stripes, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include melon rind shell, fruit blush, soft green stripes. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Melomallow reflects the way repeated grocery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's grocery path revealed Melomallow.",
+    "repeatLine": "Returning to grocery is deepening Melomallow's line in your deck.",
+    "rareLine": "A rarer form of Melomallow can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Melomallow reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Melomallow shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around supermarket, Melomallow emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_grocery_cartle",
@@ -3493,7 +4018,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Cartle is a cute objectling tied to grocery encounters, with cart basket shell, small wheel feet, checklist charm, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include cart basket shell, small wheel feet, checklist charm. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Cartle is a cute objectling tied to grocery encounters, with cart basket shell, small wheel feet, checklist charm, a fresh bright grounded mood, and cozy-premium stylized 3D collectible presence.. cute grocery creature with produce motifs, cart details and everyday nourishing charm. Include cart basket shell, small wheel feet, checklist charm. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Cartle reflects the way repeated grocery moments quietly shape who you are becoming.",
+    "unlockLine": "Today's grocery path revealed Cartle.",
+    "repeatLine": "Returning to grocery is deepening Cartle's line in your deck.",
+    "rareLine": "A rarer form of Cartle can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Cartle reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Cartle shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around supermarket, Cartle emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_basketball_court_hooplet",
@@ -3539,7 +4071,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Hooplet is a cute objectling tied to basketball court encounters, with basketball texture, net collar, orange bounce glow, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include basketball texture, net collar, orange bounce glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Hooplet is a cute objectling tied to basketball court encounters, with basketball texture, net collar, orange bounce glow, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include basketball texture, net collar, orange bounce glow. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Hooplet reflects the way repeated basketball court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's basketball court path revealed Hooplet.",
+    "repeatLine": "Returning to basketball court is deepening Hooplet's line in your deck.",
+    "rareLine": "A rarer form of Hooplet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Hooplet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Hooplet shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor basketball court, Hooplet emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_basketball_court_dribblit",
@@ -3585,7 +4124,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Dribblit is a cute sprite tied to basketball court encounters, with bounce trail, court-line stripes, speed dots, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include bounce trail, court-line stripes, speed dots. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Dribblit is a cute sprite tied to basketball court encounters, with bounce trail, court-line stripes, speed dots, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include bounce trail, court-line stripes, speed dots. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Dribblit reflects the way repeated basketball court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's basketball court path revealed Dribblit.",
+    "repeatLine": "Returning to basketball court is deepening Dribblit's line in your deck.",
+    "rareLine": "A rarer form of Dribblit can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Dribblit reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Dribblit shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor basketball court, Dribblit emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_basketball_court_netter",
@@ -3631,7 +4177,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Netter is a cute hybrid tied to basketball court encounters, with mesh ruff, rim halo, backboard sheen, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include mesh ruff, rim halo, backboard sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Netter is a cute hybrid tied to basketball court encounters, with mesh ruff, rim halo, backboard sheen, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include mesh ruff, rim halo, backboard sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Netter reflects the way repeated basketball court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's basketball court path revealed Netter.",
+    "repeatLine": "Returning to basketball court is deepening Netter's line in your deck.",
+    "rareLine": "A rarer form of Netter can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Netter reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Netter shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor basketball court, Netter emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_basketball_court_courtail",
@@ -3677,7 +4230,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Courtail is a cute beast tied to basketball court encounters, with sneaker sole paws, paint-area markings, athletic posture, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include sneaker sole paws, paint-area markings, athletic posture. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Courtail is a cute beast tied to basketball court encounters, with sneaker sole paws, paint-area markings, athletic posture, a energetic sporty urban mood, and cozy-premium stylized 3D collectible presence.. cute basketball creature with sporty court details, rubber textures and dynamic collectible styling. Include sneaker sole paws, paint-area markings, athletic posture. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Courtail reflects the way repeated basketball court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's basketball court path revealed Courtail.",
+    "repeatLine": "Returning to basketball court is deepening Courtail's line in your deck.",
+    "rareLine": "A rarer form of Courtail can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Courtail reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Courtail shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor basketball court, Courtail emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_tennis_court_serveling",
@@ -3723,7 +4283,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Serveling is a cute sprite tied to tennis court encounters, with tennis ball glow, racket halo, court-line details, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include tennis ball glow, racket halo, court-line details. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Serveling is a cute sprite tied to tennis court encounters, with tennis ball glow, racket halo, court-line details, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include tennis ball glow, racket halo, court-line details. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Serveling reflects the way repeated tennis court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's tennis court path revealed Serveling.",
+    "repeatLine": "Returning to tennis court is deepening Serveling's line in your deck.",
+    "rareLine": "A rarer form of Serveling can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Serveling reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Serveling shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor tennis court, Serveling emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_tennis_court_racketot",
@@ -3769,7 +4336,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Racketot is a cute objectling tied to tennis court encounters, with racket frame ears, string mesh belly, grip-wrap tail, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include racket frame ears, string mesh belly, grip-wrap tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Racketot is a cute objectling tied to tennis court encounters, with racket frame ears, string mesh belly, grip-wrap tail, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include racket frame ears, string mesh belly, grip-wrap tail. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Racketot reflects the way repeated tennis court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's tennis court path revealed Racketot.",
+    "repeatLine": "Returning to tennis court is deepening Racketot's line in your deck.",
+    "rareLine": "A rarer form of Racketot can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Racketot reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Racketot shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor tennis court, Racketot emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_tennis_court_volleyboo",
@@ -3815,7 +4389,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Volleyboo is a cute hybrid tied to tennis court encounters, with ball fuzz trim, swoosh tail, court dust sparkle, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include ball fuzz trim, swoosh tail, court dust sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Volleyboo is a cute hybrid tied to tennis court encounters, with ball fuzz trim, swoosh tail, court dust sparkle, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include ball fuzz trim, swoosh tail, court dust sparkle. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Volleyboo reflects the way repeated tennis court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's tennis court path revealed Volleyboo.",
+    "repeatLine": "Returning to tennis court is deepening Volleyboo's line in your deck.",
+    "rareLine": "A rarer form of Volleyboo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Volleyboo reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Volleyboo shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor tennis court, Volleyboo emerged as the small living mark that this day left behind."
   },
   {
     "id": "location_tennis_court_baselinep",
@@ -3861,7 +4442,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Baselinep is a cute beast tied to tennis court encounters, with baseline stripe markings, athletic stance, clean white accents, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include baseline stripe markings, athletic stance, clean white accents. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Baselinep is a cute beast tied to tennis court encounters, with baseline stripe markings, athletic stance, clean white accents, a crisp sporty bright mood, and cozy-premium stylized 3D collectible presence.. cute tennis creature with crisp court lines, racket motifs and premium sporty charm. Include baseline stripe markings, athletic stance, clean white accents. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Baselinep reflects the way repeated tennis court moments quietly shape who you are becoming.",
+    "unlockLine": "Today's tennis court path revealed Baselinep.",
+    "repeatLine": "Returning to tennis court is deepening Baselinep's line in your deck.",
+    "rareLine": "A rarer form of Baselinep can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Baselinep reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Baselinep shows that your everyday choices are becoming something visible and collectible.",
+    "storySeed": "After time around outdoor tennis court, Baselinep emerged as the small living mark that this day left behind."
   },
   {
     "id": "activity_run_session_dashbun",
@@ -3907,7 +4495,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Dashbun is a cute beast tied to run session encounters, with wind-swept ears, speed streak tail, shoe-lace accents, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include wind-swept ears, speed streak tail, shoe-lace accents. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Dashbun is a cute beast tied to run session encounters, with wind-swept ears, speed streak tail, shoe-lace accents, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include wind-swept ears, speed streak tail, shoe-lace accents. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Dashbun reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's run session revealed Dashbun.",
+    "repeatLine": "Returning to run session is deepening Dashbun's line in your deck.",
+    "rareLine": "A rarer form of Dashbun can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Dashbun reminds you that recovery is part of real progress.",
+    "progressLine": "Dashbun shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your run session, Dashbun appeared and kept pace with the rest of the day."
   },
   {
     "id": "activity_run_session_stridlet",
@@ -3953,7 +4548,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Stridlet is a cute sprite tied to run session encounters, with pulse lines, cadence dots, lean silhouette, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include pulse lines, cadence dots, lean silhouette. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Stridlet is a cute sprite tied to run session encounters, with pulse lines, cadence dots, lean silhouette, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include pulse lines, cadence dots, lean silhouette. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Stridlet reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's run session revealed Stridlet.",
+    "repeatLine": "Returning to run session is deepening Stridlet's line in your deck.",
+    "rareLine": "A rarer form of Stridlet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Stridlet reminds you that recovery is part of real progress.",
+    "progressLine": "Stridlet shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your run session, Stridlet appeared and kept pace with the rest of the day."
   },
   {
     "id": "activity_run_session_sprintail",
@@ -3999,7 +4601,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Sprintail is a cute hybrid tied to run session encounters, with flame tail, split-light markings, charged posture, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include flame tail, split-light markings, charged posture. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Sprintail is a cute hybrid tied to run session encounters, with flame tail, split-light markings, charged posture, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include flame tail, split-light markings, charged posture. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Sprintail reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's run session revealed Sprintail.",
+    "repeatLine": "Returning to run session is deepening Sprintail's line in your deck.",
+    "rareLine": "A rarer form of Sprintail can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Sprintail reminds you that recovery is part of real progress.",
+    "progressLine": "Sprintail shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your run session, Sprintail appeared and kept pace with the rest of the day."
   },
   {
     "id": "activity_run_session_pulsepup",
@@ -4045,7 +4654,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Pulsepup is a cute beast tied to run session encounters, with heart-glow chest, sport band collar, electric paw trails, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include heart-glow chest, sport band collar, electric paw trails. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Pulsepup is a cute beast tied to run session encounters, with heart-glow chest, sport band collar, electric paw trails, a fast focused vivid mood, and cozy-premium stylized 3D collectible presence.. cute running creature with aerodynamic forms, energetic motion and premium sporty styling. Include heart-glow chest, sport band collar, electric paw trails. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Pulsepup reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's run session revealed Pulsepup.",
+    "repeatLine": "Returning to run session is deepening Pulsepup's line in your deck.",
+    "rareLine": "A rarer form of Pulsepup can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Pulsepup reminds you that recovery is part of real progress.",
+    "progressLine": "Pulsepup shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your run session, Pulsepup appeared and kept pace with the rest of the day."
   },
   {
     "id": "activity_high_steps_day_steppling",
@@ -4091,7 +4707,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Steppling is a cute sprite tied to high steps day encounters, with footprint marks, mile-counter glow, light travel scuffs, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include footprint marks, mile-counter glow, light travel scuffs. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Steppling is a cute sprite tied to high steps day encounters, with footprint marks, mile-counter glow, light travel scuffs, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include footprint marks, mile-counter glow, light travel scuffs. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Steppling reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's high steps day revealed Steppling.",
+    "repeatLine": "Returning to high steps day is deepening Steppling's line in your deck.",
+    "rareLine": "A rarer form of Steppling can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Steppling reminds you that recovery is part of real progress.",
+    "progressLine": "Steppling shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your high steps day, Steppling appeared and kept pace with the rest of the day."
   },
   {
     "id": "activity_high_steps_day_treklet",
@@ -4137,7 +4760,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Treklet is a cute beast tied to high steps day encounters, with trail satchel, sturdy paws, route-line markings, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include trail satchel, sturdy paws, route-line markings. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Treklet is a cute beast tied to high steps day encounters, with trail satchel, sturdy paws, route-line markings, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include trail satchel, sturdy paws, route-line markings. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Treklet reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's high steps day revealed Treklet.",
+    "repeatLine": "Returning to high steps day is deepening Treklet's line in your deck.",
+    "rareLine": "A rarer form of Treklet can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Treklet reminds you that recovery is part of real progress.",
+    "progressLine": "Treklet shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your high steps day, Treklet appeared and kept pace with the rest of the day."
   },
   {
     "id": "activity_high_steps_day_milemite",
@@ -4183,7 +4813,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Milemite is a cute objectling tied to high steps day encounters, with pedometer chest, route dots, soft neon numerals, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include pedometer chest, route dots, soft neon numerals. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Milemite is a cute objectling tied to high steps day encounters, with pedometer chest, route dots, soft neon numerals, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include pedometer chest, route dots, soft neon numerals. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Milemite reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's high steps day revealed Milemite.",
+    "repeatLine": "Returning to high steps day is deepening Milemite's line in your deck.",
+    "rareLine": "A rarer form of Milemite can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Milemite reminds you that recovery is part of real progress.",
+    "progressLine": "Milemite shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your high steps day, Milemite appeared and kept pace with the rest of the day."
   },
   {
     "id": "activity_high_steps_day_paceroo",
@@ -4229,7 +4866,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Paceroo is a cute hybrid tied to high steps day encounters, with pace-line stripe, spring ankles, day-glow trim, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include pace-line stripe, spring ankles, day-glow trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Paceroo is a cute hybrid tied to high steps day encounters, with pace-line stripe, spring ankles, day-glow trim, a upbeat resilient moving mood, and cozy-premium stylized 3D collectible presence.. cute active-day creature with travel-worn charm, step motifs and energetic collectible styling. Include pace-line stripe, spring ankles, day-glow trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Paceroo reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's high steps day revealed Paceroo.",
+    "repeatLine": "Returning to high steps day is deepening Paceroo's line in your deck.",
+    "rareLine": "A rarer form of Paceroo can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Paceroo reminds you that recovery is part of real progress.",
+    "progressLine": "Paceroo shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your high steps day, Paceroo appeared and kept pace with the rest of the day."
   },
   {
     "id": "landmark_eiffel_tower_tourbelle",
@@ -4272,7 +4916,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Tourbelle is a cute spirit tied to eiffel tower encounters, with iron lattice details, warm Paris lamp glow, elegant plume, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include iron lattice details, warm Paris lamp glow, elegant plume. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Tourbelle is a cute spirit tied to eiffel tower encounters, with iron lattice details, warm Paris lamp glow, elegant plume, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include iron lattice details, warm Paris lamp glow, elegant plume. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Tourbelle reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Eiffel Tower brought Tourbelle into your deck today.",
+    "repeatLine": "Returning to eiffel tower is deepening Tourbelle's line in your deck.",
+    "rareLine": "Tourbelle marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Tourbelle reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Tourbelle turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Eiffel Tower, Tourbelle followed the memory home and settled into your deck."
   },
   {
     "id": "landmark_eiffel_tower_ironette",
@@ -4315,7 +4966,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Ironette is a cute hybrid tied to eiffel tower encounters, with wrought iron filigree, champagne shimmer, arched silhouette, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include wrought iron filigree, champagne shimmer, arched silhouette. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Ironette is a cute hybrid tied to eiffel tower encounters, with wrought iron filigree, champagne shimmer, arched silhouette, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include wrought iron filigree, champagne shimmer, arched silhouette. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Ironette reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Eiffel Tower brought Ironette into your deck today.",
+    "repeatLine": "Returning to eiffel tower is deepening Ironette's line in your deck.",
+    "rareLine": "Ironette marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Ironette reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Ironette turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Eiffel Tower, Ironette followed the memory home and settled into your deck."
   },
   {
     "id": "landmark_eiffel_tower_parisprout",
@@ -4358,7 +5016,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Parisprout is a cute sprite tied to eiffel tower encounters, with city-light glow, tiny lantern eyes, skyline ribbon, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include city-light glow, tiny lantern eyes, skyline ribbon. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Parisprout is a cute sprite tied to eiffel tower encounters, with city-light glow, tiny lantern eyes, skyline ribbon, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include city-light glow, tiny lantern eyes, skyline ribbon. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Parisprout reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Eiffel Tower brought Parisprout into your deck today.",
+    "repeatLine": "Returning to eiffel tower is deepening Parisprout's line in your deck.",
+    "rareLine": "Parisprout marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Parisprout reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Parisprout turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Eiffel Tower, Parisprout followed the memory home and settled into your deck."
   },
   {
     "id": "landmark_eiffel_tower_lamplume",
@@ -4401,7 +5066,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Lamplume is a cute spirit tied to eiffel tower encounters, with feathered lamp plume, gold dusk aura, ornate metal trim, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include feathered lamp plume, gold dusk aura, ornate metal trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Lamplume is a cute spirit tied to eiffel tower encounters, with feathered lamp plume, gold dusk aura, ornate metal trim, a romantic luminous elegant mood, and cozy-premium stylized 3D collectible presence.. rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence. Include feathered lamp plume, gold dusk aura, ornate metal trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Lamplume reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Eiffel Tower brought Lamplume into your deck today.",
+    "repeatLine": "Returning to eiffel tower is deepening Lamplume's line in your deck.",
+    "rareLine": "Lamplume marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Lamplume reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Lamplume turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Eiffel Tower, Lamplume followed the memory home and settled into your deck."
   },
   {
     "id": "landmark_shibuya_crossing_neonpoko",
@@ -4444,7 +5116,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Neonpoko is a cute sprite tied to shibuya crossing encounters, with neon sign glow, city-light blush, playful bounce, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include neon sign glow, city-light blush, playful bounce. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Neonpoko is a cute sprite tied to shibuya crossing encounters, with neon sign glow, city-light blush, playful bounce, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include neon sign glow, city-light blush, playful bounce. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Neonpoko reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Shibuya Crossing brought Neonpoko into your deck today.",
+    "repeatLine": "Returning to shibuya crossing is deepening Neonpoko's line in your deck.",
+    "rareLine": "Neonpoko marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Neonpoko reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Neonpoko turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Shibuya Crossing, Neonpoko followed the memory home and settled into your deck."
   },
   {
     "id": "landmark_shibuya_crossing_crosslet",
@@ -4487,7 +5166,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Crosslet is a cute objectling tied to shibuya crossing encounters, with crosswalk stripes, signal accents, glossy urban trim, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include crosswalk stripes, signal accents, glossy urban trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Crosslet is a cute objectling tied to shibuya crossing encounters, with crosswalk stripes, signal accents, glossy urban trim, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include crosswalk stripes, signal accents, glossy urban trim. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Crosslet reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Shibuya Crossing brought Crosslet into your deck today.",
+    "repeatLine": "Returning to shibuya crossing is deepening Crosslet's line in your deck.",
+    "rareLine": "Crosslet marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Crosslet reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Crosslet turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Shibuya Crossing, Crosslet followed the memory home and settled into your deck."
   },
   {
     "id": "landmark_shibuya_crossing_signalbun",
@@ -4530,7 +5216,14 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Signalbun is a cute hybrid tied to shibuya crossing encounters, with signal-light ears, neon tail, compact streetwear styling, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include signal-light ears, neon tail, compact streetwear styling. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Signalbun is a cute hybrid tied to shibuya crossing encounters, with signal-light ears, neon tail, compact streetwear styling, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include signal-light ears, neon tail, compact streetwear styling. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Signalbun reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Shibuya Crossing brought Signalbun into your deck today.",
+    "repeatLine": "Returning to shibuya crossing is deepening Signalbun's line in your deck.",
+    "rareLine": "Signalbun marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Signalbun reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Signalbun turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Shibuya Crossing, Signalbun followed the memory home and settled into your deck."
   },
   {
     "id": "landmark_shibuya_crossing_tokilume",
@@ -4573,6 +5266,13 @@
       "cute funny collectible creature",
       "cozy-premium stylized 3D companion"
     ],
-    "imagePrompt": "Tokilume is a cute spirit tied to shibuya crossing encounters, with luminous kanban glow, streetlight ribbon, midnight city sheen, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include luminous kanban glow, streetlight ribbon, midnight city sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop."
+    "imagePrompt": "Tokilume is a cute spirit tied to shibuya crossing encounters, with luminous kanban glow, streetlight ribbon, midnight city sheen, a neon lively urban mood, and cozy-premium stylized 3D collectible presence.. rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling. Include luminous kanban glow, streetlight ribbon, midnight city sheen. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.",
+    "identityInsight": "Tokilume reflects the part of you that changes when a rare place becomes real.",
+    "unlockLine": "A rare encounter with Shibuya Crossing brought Tokilume into your deck today.",
+    "repeatLine": "Returning to shibuya crossing is deepening Tokilume's line in your deck.",
+    "rareLine": "Tokilume marks a rare memory-tier encounter that your deck will keep differently.",
+    "restorativeLine": "Tokilume reminds you that quieter moments still become part of your deck.",
+    "progressLine": "Tokilume turns a memorable place into lasting identity progress.",
+    "storySeed": "After standing near Shibuya Crossing, Tokilume followed the memory home and settled into your deck."
   }
 ]

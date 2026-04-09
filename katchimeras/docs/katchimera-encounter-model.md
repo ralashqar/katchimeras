@@ -119,3 +119,25 @@ The strongest categories in the first batch are:
 - basketball courts, tennis courts
 - run sessions, high-step days
 - landmark rares like `Eiffel Tower` and `Shibuya Crossing`
+
+## Copy Layers
+
+Each encounter Katchimera should carry two layers of meaning:
+
+1. `Creature identity`
+   - `caption`
+   - `userFacingDescription`
+   - `motivationalQuote`
+2. `Day reflection`
+   - `identityInsight`
+   - `unlockLine`
+   - `repeatLine`
+   - `rareLine`
+   - `restorativeLine`
+   - `progressLine`
+   - `storySeed`
+
+This lets the app say both:
+
+- what the Katchimera is
+- what today's pattern meant

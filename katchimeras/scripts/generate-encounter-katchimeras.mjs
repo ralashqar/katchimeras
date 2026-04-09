@@ -20,6 +20,8 @@ const title = (value) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
+const lowerTitle = (value) => title(value).toLowerCase();
+
 const describeTrigger = (seed) => {
   if (seed.topLevelType === 'landmark') {
     return `a rare encounter with ${title(seed.triggerSubtype)}`;
@@ -48,6 +50,89 @@ const createDescription = (seed, variant) => {
   return `${variant.name} appears when your day keeps returning to ${describeTrigger(
     seed
   )}. It captures the ${seed.theme} side of your routine and turns it into something collectible.`;
+};
+
+const createIdentityInsight = (seed, variant) => {
+  if (seed.topLevelType === 'landmark') {
+    return `${variant.name} reflects the part of you that changes when a rare place becomes real.`;
+  }
+
+  if (seed.topLevelType === 'activity') {
+    return `${variant.name} reflects the momentum that builds when your body commits to a stronger day.`;
+  }
+
+  return `${variant.name} reflects the way repeated ${lowerTitle(
+    seed.triggerSubtype
+  )} moments quietly shape who you are becoming.`;
+};
+
+const createUnlockLine = (seed, variant) => {
+  if (seed.topLevelType === 'landmark') {
+    return `A rare encounter with ${title(seed.triggerSubtype)} brought ${variant.name} into your deck today.`;
+  }
+
+  if (seed.topLevelType === 'activity') {
+    return `Today's ${lowerTitle(seed.triggerSubtype)} revealed ${variant.name}.`;
+  }
+
+  return `Today's ${lowerTitle(seed.triggerSubtype)} path revealed ${variant.name}.`;
+};
+
+const createRepeatLine = (seed, variant) =>
+  `Returning to ${lowerTitle(seed.triggerSubtype)} is deepening ${variant.name}'s line in your deck.`;
+
+const createRareLine = (seed, variant) => {
+  if (seed.topLevelType === 'landmark') {
+    return `${variant.name} marks a rare memory-tier encounter that your deck will keep differently.`;
+  }
+
+  return `A rarer form of ${variant.name} can appear when this pattern becomes more distinctive over time.`;
+};
+
+const createRestorativeLine = (seed, variant) => {
+  if (seed.topLevelType === 'activity') {
+    return `Even after bigger movement, ${variant.name} reminds you that recovery is part of real progress.`;
+  }
+
+  if (seed.triggerCategory === 'park' || seed.triggerSubtype === 'park') {
+    return `${variant.name} reminds you that calmer green moments still count as a meaningful day.`;
+  }
+
+  if (seed.triggerCategory === 'cafe' || seed.triggerSubtype === 'coffee_shop') {
+    return `${variant.name} reminds you that warmth, pause, and routine can still move your life forward.`;
+  }
+
+  return `${variant.name} reminds you that quieter moments still become part of your deck.`;
+};
+
+const createProgressLine = (seed, variant) => {
+  if (seed.topLevelType === 'landmark') {
+    return `${variant.name} turns a memorable place into lasting identity progress.`;
+  }
+
+  if (seed.topLevelType === 'activity') {
+    return `${variant.name} shows that your effort is no longer abstract. It is starting to take shape.`;
+  }
+
+  return `${variant.name} shows that your everyday choices are becoming something visible and collectible.`;
+};
+
+const createStorySeed = (seed, variant) => {
+  const source = seed.sourceExamples[0] ?? lowerTitle(seed.triggerSubtype);
+
+  if (seed.topLevelType === 'landmark') {
+    return `After standing near ${title(
+      seed.triggerSubtype
+    )}, ${variant.name} followed the memory home and settled into your deck.`;
+  }
+
+  if (seed.topLevelType === 'activity') {
+    return `Somewhere in the middle of your ${lowerTitle(
+      seed.triggerSubtype
+    )}, ${variant.name} appeared and kept pace with the rest of the day.`;
+  }
+
+  return `After time around ${source}, ${variant.name} emerged as the small living mark that this day left behind.`;
 };
 
 const createVisualDescription = (seed, variant) =>
@@ -93,6 +178,13 @@ const buildCatalog = (seeds) =>
       visualDescription: createVisualDescription(seed, variant),
       promptHooks: createPromptHooks(seed, variant),
       imagePrompt: createImagePrompt(seed, variant),
+      identityInsight: createIdentityInsight(seed, variant),
+      unlockLine: createUnlockLine(seed, variant),
+      repeatLine: createRepeatLine(seed, variant),
+      rareLine: createRareLine(seed, variant),
+      restorativeLine: createRestorativeLine(seed, variant),
+      progressLine: createProgressLine(seed, variant),
+      storySeed: createStorySeed(seed, variant),
     }))
   );
 

@@ -40,6 +40,13 @@ export type KatchimeraEncounterProfile = {
   visualDescription: string;
   promptHooks: string[];
   imagePrompt: string;
+  identityInsight: string;
+  unlockLine: string;
+  repeatLine: string;
+  rareLine: string;
+  restorativeLine: string;
+  progressLine: string;
+  storySeed: string;
 };
 
 export type KatchimeraArtProfile = KatchimeraRenderProfile | KatchimeraEncounterProfile;
