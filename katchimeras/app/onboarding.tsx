@@ -1,37 +1,135 @@
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, useRouter } from 'expo-router';
-import { MotiView } from 'moti';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PagerView from 'react-native-pager-view';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
 import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
+import { presenceEnter, presenceExit, rewardEnter, usePressMotion } from '@/components/katchadeck/motion';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
+import { VeilMascot, type VeilMascotMood } from '@/components/katchadeck/veil-mascot';
+import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   aspirationOptions,
   createStarterReveal,
   painPointOptions,
   preferenceOptions,
 } from '@/constants/katchadeck';
+import { KatchaDeckUI } from '@/constants/theme';
 import {
   defaultOnboardingProfile,
   loadOnboardingProfile,
   saveOnboardingProfile,
 } from '@/utils/onboarding-state';
 
-const pageBackgrounds: [string, string][] = [
-  ['#090a16', '#1b1832'],
-  ['#0d1421', '#17263e'],
-  ['#150f23', '#281a38'],
-  ['#111528', '#1d2742'],
-  ['#101422', '#242042'],
-  ['#151229', '#27233f'],
-  ['#0d1420', '#1b2541'],
-  ['#0e1321', '#1a2441'],
+type OnboardingTheme = {
+  accentColor: string;
+  colors: readonly [string, string, string];
+  meshColors: readonly [string, string, string, string];
+  mascotMood: VeilMascotMood;
+  pageLabel: string;
+  primaryCtaLabel?: string;
+  secondaryCtaLabel?: string;
+};
+
+const pageThemes: OnboardingTheme[] = [
+  {
+    accentColor: 'rgba(200,216,255,0.14)',
+    colors: ['#090B12', '#11192B', '#171D34'],
+    meshColors: [
+      'rgba(200,216,255,0.14)',
+      'rgba(95,168,123,0.08)',
+      'rgba(106,95,232,0.08)',
+      'rgba(227,160,110,0.08)',
+    ],
+    mascotMood: 'curious',
+    pageLabel: 'Welcome',
+    primaryCtaLabel: 'Begin',
+  },
+  {
+    accentColor: 'rgba(200,216,255,0.12)',
+    colors: ['#090B12', '#101828', '#151E30'],
+    meshColors: [
+      'rgba(200,216,255,0.14)',
+      'rgba(106,95,232,0.06)',
+      'rgba(95,168,123,0.06)',
+      'rgba(200,216,255,0.06)',
+    ],
+    mascotMood: 'calm',
+    pageLabel: 'Your goal',
+    primaryCtaLabel: 'This fits',
+  },
+  {
+    accentColor: 'rgba(227,160,110,0.12)',
+    colors: ['#090B12', '#131825', '#1A1F2E'],
+    meshColors: [
+      'rgba(227,160,110,0.14)',
+      'rgba(200,216,255,0.06)',
+      'rgba(106,95,232,0.08)',
+      'rgba(95,168,123,0.06)',
+    ],
+    mascotMood: 'bright',
+    pageLabel: 'What is missing',
+    primaryCtaLabel: 'Keep going',
+  },
+  {
+    accentColor: 'rgba(95,168,123,0.12)',
+    colors: ['#090B12', '#101926', '#152133'],
+    meshColors: [
+      'rgba(95,168,123,0.14)',
+      'rgba(200,216,255,0.08)',
+      'rgba(106,95,232,0.06)',
+      'rgba(227,160,110,0.06)',
+    ],
+    mascotMood: 'curious',
+    pageLabel: 'World tone',
+    primaryCtaLabel: 'Shape my deck',
+  },
+  {
+    accentColor: 'rgba(227,160,110,0.14)',
+    colors: ['#090B12', '#171329', '#221C35'],
+    meshColors: [
+      'rgba(227,160,110,0.14)',
+      'rgba(200,216,255,0.08)',
+      'rgba(106,95,232,0.1)',
+      'rgba(95,168,123,0.06)',
+    ],
+    mascotMood: 'bright',
+    pageLabel: 'Reading your pattern',
+  },
+  {
+    accentColor: 'rgba(200,216,255,0.12)',
+    colors: ['#090B12', '#10192A', '#171E34'],
+    meshColors: [
+      'rgba(200,216,255,0.14)',
+      'rgba(227,160,110,0.08)',
+      'rgba(95,168,123,0.08)',
+      'rgba(106,95,232,0.08)',
+    ],
+    mascotMood: 'guide',
+    pageLabel: 'First reveal',
+    primaryCtaLabel: 'See what this becomes',
+  },
+  {
+    accentColor: 'rgba(200,216,255,0.14)',
+    colors: ['#090B12', '#12192A', '#1A2136'],
+    meshColors: [
+      'rgba(200,216,255,0.16)',
+      'rgba(240,223,255,0.1)',
+      'rgba(255,216,192,0.08)',
+      'rgba(95,168,123,0.06)',
+    ],
+    mascotMood: 'guide',
+    pageLabel: 'What happens next',
+    primaryCtaLabel: 'Open my deck',
+    secondaryCtaLabel: 'See premium preview',
+  },
 ];
 
 export default function OnboardingScreen() {
@@ -41,13 +139,11 @@ export default function OnboardingScreen() {
   const storedProfile = loadOnboardingProfile();
   const [page, setPage] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
-  const [draft, setDraft] = useState(() => {
-    return {
-      aspirationId: storedProfile.aspirationId,
-      painPointIds: storedProfile.painPointIds,
-      preferenceIds: storedProfile.preferenceIds,
-    };
-  });
+  const [draft, setDraft] = useState(() => ({
+    aspirationId: storedProfile.aspirationId,
+    painPointIds: storedProfile.painPointIds,
+    preferenceIds: storedProfile.preferenceIds,
+  }));
 
   const reveal = useMemo(
     () =>
@@ -58,9 +154,10 @@ export default function OnboardingScreen() {
     [draft]
   );
 
-  const totalSteps = 8;
-  const isProcessingStep = page === 6;
-  const isFinalStep = page === 7;
+  const totalSteps = pageThemes.length;
+  const isProcessingStep = page === 4;
+  const isFinalStep = page === 6;
+  const currentTheme = pageThemes[page];
 
   useEffect(() => {
     if (!isProcessingStep) {
@@ -68,9 +165,9 @@ export default function OnboardingScreen() {
     }
 
     const timer = setTimeout(() => {
-      pagerRef.current?.setPage(7);
-      setPage(7);
-    }, 1800);
+      pagerRef.current?.setPage(5);
+      setPage(5);
+    }, 1650);
 
     return () => clearTimeout(timer);
   }, [isProcessingStep]);
@@ -80,15 +177,9 @@ export default function OnboardingScreen() {
       ? Boolean(draft.aspirationId)
       : page === 2
         ? draft.painPointIds.length > 0
-        : page === 4
+        : page === 3
           ? draft.preferenceIds.length > 0
           : true;
-
-  const selectedAspiration =
-    aspirationOptions.find((option) => option.id === draft.aspirationId) ?? aspirationOptions[0];
-  const selectedPainPoints = painPointOptions.filter((option) =>
-    draft.painPointIds.includes(option.id)
-  );
 
   function setCurrentPage(nextPage: number) {
     pagerRef.current?.setPage(nextPage);
@@ -101,14 +192,6 @@ export default function OnboardingScreen() {
     }
 
     setCurrentPage(page + 1);
-  }
-
-  function handleBack() {
-    if (page === 0 || isProcessingStep) {
-      return;
-    }
-
-    setCurrentPage(page - 1);
   }
 
   function togglePainPoint(id: string) {
@@ -129,6 +212,28 @@ export default function OnboardingScreen() {
     }));
   }
 
+  function handleResetFlow() {
+    Alert.alert(
+      'Start over?',
+      'This will clear the current answers and return to the beginning.',
+      [
+        { text: 'Keep going', style: 'cancel' },
+        {
+          text: 'Start over',
+          style: 'destructive',
+          onPress: () => {
+            setDraft({
+              aspirationId: null,
+              painPointIds: [],
+              preferenceIds: [],
+            });
+            setCurrentPage(0);
+          },
+        },
+      ]
+    );
+  }
+
   function completeOnboarding() {
     saveOnboardingProfile({
       completed: true,
@@ -145,326 +250,442 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <LinearGradient colors={pageBackgrounds[page]} style={styles.screen}>
-      <View style={[styles.safeArea, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.header}>
-          <ThemedText style={styles.kicker} lightColor="#cedcff" darkColor="#cedcff">
-            KatchaDeck
-          </ThemedText>
+    <View style={styles.screen}>
+      <TransitioningOnboardingBackground page={page} theme={currentTheme} />
+      <View style={[styles.safeArea, { paddingTop: insets.top + 10 }]}>
+        <Animated.View entering={presenceEnter()} style={styles.header}>
+          <View style={styles.headerRow}>
+            <ThemedText type="onboardingLabel" style={styles.brandLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
+              KatchaDeck
+            </ThemedText>
+            {page > 0 && !isProcessingStep ? (
+              <Pressable onPress={handleResetFlow} style={styles.resetAction}>
+                <IconSymbol color="#C8D8FF" name="arrow.counterclockwise" size={14} />
+                <ThemedText style={styles.resetLabel} lightColor="#C8D8FF" darkColor="#C8D8FF">
+                  Start over
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
           {!isFinalStep ? <ProgressBar current={page + 1} total={totalSteps} /> : null}
-        </View>
+        </Animated.View>
 
         <PagerView
           ref={pagerRef}
           initialPage={0}
           onPageSelected={(event) => setPage(event.nativeEvent.position)}
+          overdrag={false}
           scrollEnabled={false}
           style={styles.pager}>
           <ScrollView
             key="welcome"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 48 }]}
+            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 56 }]}
+            contentInsetAdjustmentBehavior="automatic"
             showsVerticalScrollIndicator={false}>
-            <MotiView animate={{ opacity: 1, translateY: 0 }} from={{ opacity: 0, translateY: 18 }}>
-              <ThemedText type="title" style={styles.heroTitle} lightColor="#f8fbff" darkColor="#f8fbff">
+            <Animated.View entering={presenceEnter(40)} style={styles.welcomeCopy}>
+              <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
+                Your life, collected
+              </ThemedText>
+              <ThemedText type="hero" style={styles.welcomeTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
                 Your life becomes your deck.
               </ThemedText>
-              <ThemedText style={styles.heroBody} lightColor="#dbe4ff" darkColor="#dbe4ff">
-                Walk your life. Collect what it becomes. KatchaDeck turns movement, places, and
-                routine into a collectible identity that feels like you.
+              <ThemedText type="bodyLarge" style={styles.welcomeBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                Every walk, place, and repeated return leaves a collectible mark.
               </ThemedText>
-            </MotiView>
-            <View style={styles.heroVisual}>
-              <HoodedAvatar size={188} />
-              <View style={styles.heroCards}>
-                <CollectibleCard
-                  compact
-                  location="Riverside Park"
-                  name="Mosskeeper"
-                  palette={['#1c3b2a', '#7cc88f']}
-                  rarity="Rooted"
-                  trait="Park path affinity"
-                />
-                <CollectibleCard
-                  compact
-                  location="Favorite cafe"
-                  name="Bramblecup"
-                  palette={['#5a291f', '#eea77b']}
-                  rarity="Warm"
-                  trait="Comfort pocket"
-                />
-              </View>
-            </View>
-          </ScrollView>
+            </Animated.View>
 
-          <ScrollView
-            key="aspiration"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 48 }]}
-            showsVerticalScrollIndicator={false}>
-            <ThemedText type="title" style={styles.pageTitle} lightColor="#f7fbff" darkColor="#f7fbff">
-              What do you want your life to feel like?
-            </ThemedText>
-            <ThemedText style={styles.pageBody} lightColor="#d2defd" darkColor="#d2defd">
-              Pick the direction you want KatchaDeck to reflect back to you.
-            </ThemedText>
-            <View style={styles.stack}>
-              {aspirationOptions.map((option) => {
-                const selected = draft.aspirationId === option.id;
-
-                return (
-                  <Pressable
-                    key={option.id}
-                    onPress={() => setDraft((current) => ({ ...current, aspirationId: option.id }))}
-                    style={[
-                      styles.selectCard,
-                      selected ? { borderColor: option.accent, backgroundColor: 'rgba(255,255,255,0.12)' } : null,
-                    ]}>
-                    <View style={[styles.accentDot, { backgroundColor: option.accent }]} />
-                    <View style={styles.selectCardBody}>
-                      <ThemedText type="subtitle" style={styles.selectTitle} lightColor="#f8fbff" darkColor="#f8fbff">
-                        {option.title}
-                      </ThemedText>
-                      <ThemedText style={styles.selectDescription} lightColor="#d9e3ff" darkColor="#d9e3ff">
-                        {option.description}
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-
-          <ScrollView
-            key="pain"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 48 }]}
-            showsVerticalScrollIndicator={false}>
-            <ThemedText type="title" style={styles.pageTitle} lightColor="#f7fbff" darkColor="#f7fbff">
-              What feels missing right now?
-            </ThemedText>
-            <ThemedText style={styles.pageBody} lightColor="#d2defd" darkColor="#d2defd">
-              Choose the friction you want this to soften. Pick as many as fit.
-            </ThemedText>
-            <View style={styles.stack}>
-              {painPointOptions.map((option) => {
-                const selected = draft.painPointIds.includes(option.id);
-
-                return (
-                  <Pressable
-                    key={option.id}
-                    onPress={() => togglePainPoint(option.id)}
-                    style={[styles.selectCard, selected ? styles.selectedMultiCard : null]}>
-                    <View style={[styles.checkbox, selected ? styles.checkboxActive : null]} />
-                    <View style={styles.selectCardBody}>
-                      <ThemedText type="subtitle" style={styles.selectTitle} lightColor="#f8fbff" darkColor="#f8fbff">
-                        {option.title}
-                      </ThemedText>
-                      <ThemedText style={styles.selectDescription} lightColor="#d9e3ff" darkColor="#d9e3ff">
-                        {option.description}
-                      </ThemedText>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-
-          <ScrollView
-            key="reflection"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 48 }]}
-            showsVerticalScrollIndicator={false}>
-            <ThemedText type="title" style={styles.pageTitle} lightColor="#f7fbff" darkColor="#f7fbff">
-              This is not a reward. It is a reflection.
-            </ThemedText>
-            <ThemedText style={styles.pageBody} lightColor="#d2defd" darkColor="#d2defd">
-              You said you want to {selectedAspiration.title.toLowerCase()}. KatchaDeck turns daily
-              movement, familiar places, and repeated rhythms into something you can see and care about.
-            </ThemedText>
-            <BlurView intensity={24} tint="dark" style={styles.reflectionPanel}>
-              <ThemedText type="subtitle" style={styles.panelTitle} lightColor="#f9fbff" darkColor="#f9fbff">
-                What this means for you
-              </ThemedText>
-              {selectedPainPoints.slice(0, 3).map((point) => (
-                <View key={point.id} style={styles.panelRow}>
-                  <View style={styles.panelDot} />
-                  <ThemedText style={styles.panelText} lightColor="#dbe4ff" darkColor="#dbe4ff">
-                    {point.title} becomes part of the story your deck will answer back to.
-                  </ThemedText>
+            <Animated.View entering={presenceEnter(160)} style={styles.heroStage}>
+              <Animated.View entering={presenceEnter(220)} style={styles.heroFigure}>
+                <HoodedAvatar size={210} />
+                <View style={styles.heroVeil}>
+                  <VeilMascot interactive mood="curious" size={84} />
                 </View>
-              ))}
-              <ThemedText style={styles.panelCaption} lightColor="#b8c8eb" darkColor="#b8c8eb">
-                Your first reveal will be seeded from the identity you choose here.
-              </ThemedText>
-            </BlurView>
+              </Animated.View>
+            </Animated.View>
           </ScrollView>
 
-          <ScrollView
-            key="preferences"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 48 }]}
-            showsVerticalScrollIndicator={false}>
-            <ThemedText type="title" style={styles.pageTitle} lightColor="#f7fbff" darkColor="#f7fbff">
-              What kind of world should your deck lean toward?
-            </ThemedText>
-            <ThemedText style={styles.pageBody} lightColor="#d2defd" darkColor="#d2defd">
-              Pick the moods and places that feel most like your life right now.
-            </ThemedText>
-            <View style={styles.preferenceGrid}>
-              {preferenceOptions.map((option) => {
-                const selected = draft.preferenceIds.includes(option.id);
+          <QuestionPage
+            key="goal"
+            footerHeight={footerHeight}
+            question="What do you want your life to feel like?"
+          >
+            {aspirationOptions.map((option, index) => (
+              <Animated.View entering={presenceEnter(60 + index * 45)} key={option.id}>
+                <QuestionOptionCard
+                  accentColor={option.accent}
+                  description={option.description}
+                  onPress={() => setDraft((current) => ({ ...current, aspirationId: option.id }))}
+                  selected={draft.aspirationId === option.id}
+                  title={option.title}
+                />
+              </Animated.View>
+            ))}
+          </QuestionPage>
 
-                return (
-                  <Pressable
-                    key={option.id}
+          <QuestionPage
+            key="pain"
+            footerHeight={footerHeight}
+            question="What feels absent right now?"
+          >
+            {painPointOptions.map((option, index) => {
+              const selected = draft.painPointIds.includes(option.id);
+
+              return (
+                <Animated.View entering={presenceEnter(60 + index * 45)} key={option.id}>
+                  <QuestionOptionCard
+                    accentColor="#E3A06E"
+                    description={option.description}
+                    multiSelect
+                    onPress={() => togglePainPoint(option.id)}
+                    selected={selected}
+                    title={option.title}
+                  />
+                </Animated.View>
+              );
+            })}
+          </QuestionPage>
+
+          <QuestionPage
+            key="world"
+            footerHeight={footerHeight}
+            question="What kind of world should your deck lean toward?"
+          >
+            {preferenceOptions.map((option, index) => {
+              const selected = draft.preferenceIds.includes(option.id);
+
+              return (
+                <Animated.View entering={presenceEnter(60 + index * 40)} key={option.id}>
+                  <QuestionOptionCard
+                    accentColor={option.palette[1]}
+                    description={option.description}
+                    multiSelect
                     onPress={() => togglePreference(option.id)}
-                    style={styles.preferenceCell}>
-                    <LinearGradient
-                      colors={option.palette}
-                      style={[styles.preferenceCard, selected ? styles.preferenceCardSelected : null]}>
-                      <Text style={styles.preferenceGlyph}>{option.glyph}</Text>
-                      <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#fff8f2" darkColor="#fff8f2">
-                        {option.title}
-                      </ThemedText>
-                      <ThemedText style={styles.preferenceDescription} lightColor="#fff1ea" darkColor="#fff1ea">
-                        {option.description}
-                      </ThemedText>
-                    </LinearGradient>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </ScrollView>
-
-          <ScrollView
-            key="permissions"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 48 }]}
-            showsVerticalScrollIndicator={false}>
-            <ThemedText type="title" style={styles.pageTitle} lightColor="#f7fbff" darkColor="#f7fbff">
-              Later, movement and places can deepen your world.
-            </ThemedText>
-            <ThemedText style={styles.pageBody} lightColor="#d2defd" darkColor="#d2defd">
-              In the full experience, steps and location help cards evolve, places leave visual
-              imprints, and repeated routes gain depth. For now, we will start with your first deck.
-            </ThemedText>
-            <BlurView intensity={22} tint="dark" style={styles.reflectionPanel}>
-              <View style={styles.panelRow}>
-                <View style={styles.panelDot} />
-                <ThemedText style={styles.panelText} lightColor="#dbe4ff" darkColor="#dbe4ff">
-                  Walking adds momentum and future evolution potential.
-                </ThemedText>
-              </View>
-              <View style={styles.panelRow}>
-                <View style={styles.panelDot} />
-                <ThemedText style={styles.panelText} lightColor="#dbe4ff" darkColor="#dbe4ff">
-                  Places eventually become backplates, roots, and story anchors.
-                </ThemedText>
-              </View>
-              <View style={styles.panelRow}>
-                <View style={styles.panelDot} />
-                <ThemedText style={styles.panelText} lightColor="#dbe4ff" darkColor="#dbe4ff">
-                  Home days matter too. Recovery and repetition shape your deck differently.
-                </ThemedText>
-              </View>
-            </BlurView>
-          </ScrollView>
+                    selected={selected}
+                    title={option.title}
+                  />
+                </Animated.View>
+              );
+            })}
+          </QuestionPage>
 
           <View key="processing" style={[styles.pageContent, styles.processingPage]}>
-            <MotiView
-              animate={{ opacity: 1, scale: 1 }}
-              from={{ opacity: 0, scale: 0.94 }}
-              style={styles.processingOrb}>
-              <View style={styles.processingCore} />
-            </MotiView>
-            <ThemedText type="title" style={styles.pageTitle} lightColor="#f7fbff" darkColor="#f7fbff">
-              Preparing your first deck...
-            </ThemedText>
-            <ThemedText style={styles.pageBody} lightColor="#d2defd" darkColor="#d2defd">
-              Looking for the first pattern in your rhythm, places, and mood.
-            </ThemedText>
+            <Animated.View entering={rewardEnter()} style={styles.processingStack}>
+              <View style={styles.processingFigure}>
+                <HoodedAvatar size={194} />
+                <View style={styles.processingVeil}>
+                  <VeilMascot glow mood="bright" size={88} variant="halo" />
+                </View>
+              </View>
+              <View style={styles.processingCopy}>
+                <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#FFDCC0" darkColor="#FFDCC0">
+                  {pageThemes[4].pageLabel}
+                </ThemedText>
+                <ThemedText type="title" style={styles.questionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                  Reading the first pattern...
+                </ThemedText>
+                <ThemedText style={styles.questionBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                  Looking for rhythm, places, and the tone beneath the day.
+                </ThemedText>
+              </View>
+            </Animated.View>
           </View>
 
           <ScrollView
             key="reveal"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: 180 }]}
+            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 56 }]}
+            contentInsetAdjustmentBehavior="automatic"
             showsVerticalScrollIndicator={false}>
-            <ThemedText style={styles.kicker} lightColor="#cedcff" darkColor="#cedcff">
-              First reveal
-            </ThemedText>
-            <ThemedText type="title" style={styles.pageTitle} lightColor="#f7fbff" darkColor="#f7fbff">
-              {reveal.greeting}
-            </ThemedText>
-            <ThemedText style={styles.pageBody} lightColor="#d2defd" darkColor="#d2defd">
-              {reveal.narrative}
-            </ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardRow}>
-              {reveal.cards.map((card) => (
-                <CollectibleCard
-                  key={card.id}
-                  location={card.location}
-                  name={card.name}
-                  palette={card.palette}
-                  rarity={card.rarity}
-                  trait={card.trait}
-                />
+            <Animated.View entering={rewardEnter()} style={styles.revealHeader}>
+              <View style={styles.revealCopy}>
+                <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
+                  Congratulations
+                </ThemedText>
+                <ThemedText type="title" style={styles.questionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                  You started your deck.
+                </ThemedText>
+                <ThemedText style={styles.questionBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                  {reveal.narrative}
+                </ThemedText>
+              </View>
+              <VeilMascot interactive mood="guide" size={82} variant="guide" />
+            </Animated.View>
+
+            <ScrollView
+              horizontal
+              contentContainerStyle={styles.cardRow}
+              showsHorizontalScrollIndicator={false}>
+              {reveal.cards.map((card, index) => (
+                <Animated.View entering={presenceEnter(100 + index * 70)} key={card.id}>
+                  <CollectibleCard
+                    interactive={false}
+                    location={card.location}
+                    name={card.name}
+                    palette={card.palette}
+                    rarity={card.rarity}
+                    trait={card.trait}
+                  />
+                </Animated.View>
               ))}
             </ScrollView>
-            <BlurView intensity={28} tint="dark" style={styles.insightPanel}>
-              <ThemedText type="subtitle" style={styles.panelTitle} lightColor="#f9fbff" darkColor="#f9fbff">
-                Identity insight
+
+            <Animated.View entering={presenceEnter(220)}>
+              <GlassPanel contentStyle={styles.revealPanel}>
+                <ThemedText type="onboardingLabel" style={styles.panelLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
+                  First signal
+                </ThemedText>
+                <ThemedText type="subtitle" style={styles.revealInsightTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                  The app can already read a direction
+                </ThemedText>
+                <ThemedText style={styles.panelBody} lightColor="#E6EEFF" darkColor="#E6EEFF">
+                  {reveal.identityInsight}
+                </ThemedText>
+              </GlassPanel>
+            </Animated.View>
+          </ScrollView>
+
+          <ScrollView
+            key="benefits"
+            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 56 }]}
+            contentInsetAdjustmentBehavior="automatic"
+            showsVerticalScrollIndicator={false}>
+            <Animated.View entering={rewardEnter()} style={styles.benefitHeader}>
+              <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#FFE7D7" darkColor="#FFE7D7">
+                {pageThemes[6].pageLabel}
               </ThemedText>
-              <ThemedText style={styles.panelText} lightColor="#e0e7ff" darkColor="#e0e7ff">
-                {reveal.identityInsight}
+              <ThemedText type="title" style={styles.questionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                Here is what KatchaDeck gives back.
               </ThemedText>
-              <ThemedText style={styles.panelCaption} lightColor="#bac8ef" darkColor="#bac8ef">
-                {reveal.premiumTease}
+              <ThemedText style={styles.questionBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                You move through life. The app turns that movement into something visible, memorable,
+                and worth keeping.
               </ThemedText>
-            </BlurView>
+            </Animated.View>
+
+            <Animated.View entering={presenceEnter(120)}>
+              <GlassPanel contentStyle={styles.benefitPanel}>
+                <BenefitRow
+                  body="The deck grows from what you actually do, not from a streak gimmick."
+                  title="Your walks become creatures"
+                />
+                <BenefitRow
+                  body="Places leave visual marks, so repeated routes and favorite corners start to matter."
+                  title="Your places shape the cards"
+                />
+                <BenefitRow
+                  body="Quiet days, city days, and return visits all push the collection in different directions."
+                  title="Your routine evolves over time"
+                />
+              </GlassPanel>
+            </Animated.View>
+
+            <Animated.View entering={presenceEnter(220)}>
+              <GlassPanel contentStyle={styles.previewPanel}>
+                <ThemedText type="onboardingLabel" style={styles.panelLabel} lightColor="#FFE7D7" darkColor="#FFE7D7">
+                  Premium preview
+                </ThemedText>
+                <ThemedText type="subtitle" style={styles.revealInsightTitle} lightColor="#FFF8F4" darkColor="#FFF8F4">
+                  Unlock the fuller version of your life
+                </ThemedText>
+                <ThemedText style={styles.panelBody} lightColor="#F2E6E1" darkColor="#F2E6E1">
+                  Enhanced card variants, deeper identity reads, story-comic moments, and evolution
+                  systems are waiting behind the next layer.
+                </ThemedText>
+              </GlassPanel>
+            </Animated.View>
           </ScrollView>
         </PagerView>
 
-        <BlurView
-          intensity={32}
+        <View
           onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-          tint="dark"
-          style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
-          {isFinalStep ? (
-            <>
-              <Pressable onPress={() => router.push('/modal')} style={styles.secondaryButton}>
-                <ThemedText style={styles.secondaryButtonText} lightColor="#f7fbff" darkColor="#f7fbff">
-                  Unlock premium preview
-                </ThemedText>
-              </Pressable>
-              <Pressable onPress={completeOnboarding} style={styles.primaryButton}>
-                <ThemedText style={styles.primaryButtonText} lightColor="#0d1120" darkColor="#0d1120">
-                  Open my deck
-                </ThemedText>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Pressable
-                disabled={page === 0 || isProcessingStep}
-                onPress={handleBack}
-                style={[styles.backButton, page === 0 || isProcessingStep ? styles.backButtonDisabled : null]}>
-                <ThemedText style={styles.backButtonText} lightColor="#edf2ff" darkColor="#edf2ff">
-                  Back
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                disabled={!canContinue || isProcessingStep}
-                onPress={handleNext}
-                style={[styles.primaryButton, !canContinue || isProcessingStep ? styles.primaryButtonDisabled : null]}>
-                <ThemedText style={styles.primaryButtonText} lightColor="#0d1120" darkColor="#0d1120">
-                  {page === 5 ? 'Prepare my deck' : 'Continue'}
-                </ThemedText>
-              </Pressable>
-            </>
-          )}
-        </BlurView>
+          style={[styles.footerWrap, { paddingBottom: insets.bottom + 10 }]}>
+          <View style={styles.footerShell}>
+            <Animated.View
+              entering={presenceEnter(20)}
+              exiting={presenceExit()}
+              key={`footer-${page}-${isFinalStep ? 'final' : 'flow'}`}>
+              {isProcessingStep ? (
+                <View style={styles.footerPlaceholder} />
+              ) : isFinalStep ? (
+                <View style={styles.footerStack}>
+                  <KatchaButton
+                    icon="sparkles"
+                    label={currentTheme.secondaryCtaLabel ?? 'See premium preview'}
+                    onPress={() => router.push('/modal')}
+                    variant="secondary"
+                  />
+                  <KatchaButton
+                    icon="arrow.right"
+                    label={currentTheme.primaryCtaLabel ?? 'Open my deck'}
+                    onPress={completeOnboarding}
+                    variant="primary"
+                  />
+                </View>
+              ) : (
+                <KatchaButton
+                  disabled={!canContinue}
+                  icon="arrow.right"
+                  label={currentTheme.primaryCtaLabel ?? 'Continue'}
+                  onPress={handleNext}
+                  variant="secondary"
+                />
+              )}
+            </Animated.View>
+          </View>
+        </View>
       </View>
-    </LinearGradient>
+    </View>
+  );
+}
+
+function QuestionPage({
+  question,
+  footerHeight,
+  children,
+}: {
+  question: string;
+  footerHeight: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <ScrollView
+      contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 56 }]}
+      contentInsetAdjustmentBehavior="automatic"
+      showsVerticalScrollIndicator={false}>
+      <Animated.View entering={presenceEnter()} style={styles.questionHeader}>
+        <ThemedText type="title" style={styles.questionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          {question}
+        </ThemedText>
+      </Animated.View>
+      <View style={styles.answerStack}>{children}</View>
+    </ScrollView>
+  );
+}
+
+function QuestionOptionCard({
+  title,
+  description,
+  selected,
+  onPress,
+  accentColor,
+  multiSelect = false,
+}: {
+  title: string;
+  description: string;
+  selected: boolean;
+  onPress: () => void;
+  accentColor: string;
+  multiSelect?: boolean;
+}) {
+  const press = usePressMotion();
+
+  return (
+    <Pressable onPress={onPress} onPressIn={press.onPressIn} onPressOut={press.onPressOut}>
+      <Animated.View style={press.animatedStyle}>
+        <View
+          style={[
+            styles.answerCard,
+            selected ? styles.answerCardSelected : null,
+            { borderColor: selected ? accentColor : 'rgba(255,255,255,0.18)' },
+          ]}>
+          <View style={styles.answerCopy}>
+            <ThemedText type="subtitle" style={styles.answerTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+              {title}
+            </ThemedText>
+            <ThemedText style={styles.answerDescription} lightColor="#DCE6FF" darkColor="#DCE6FF">
+              {description}
+            </ThemedText>
+          </View>
+          <View
+            style={[
+              styles.answerIndicator,
+              multiSelect ? styles.answerIndicatorMulti : null,
+              selected ? { borderColor: accentColor, backgroundColor: accentColor } : null,
+            ]}
+          />
+        </View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function BenefitRow({ title, body }: { title: string; body: string }) {
+  return (
+    <View style={styles.benefitRow}>
+      <View style={styles.benefitDot} />
+      <View style={styles.benefitCopy}>
+        <ThemedText type="subtitle" style={styles.benefitTitle} lightColor="#FFF8F4" darkColor="#FFF8F4">
+          {title}
+        </ThemedText>
+        <ThemedText style={styles.benefitBody} lightColor="#E6EEFF" darkColor="#E6EEFF">
+          {body}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function TransitioningOnboardingBackground({
+  page,
+  theme,
+}: {
+  page: number;
+  theme: OnboardingTheme;
+}) {
+  const [previousTheme, setPreviousTheme] = useState<OnboardingTheme | null>(null);
+  const [activeTheme, setActiveTheme] = useState(theme);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    if (page === 0 && activeTheme === theme) {
+      return;
+    }
+
+    setPreviousTheme(activeTheme);
+    setActiveTheme(theme);
+    opacity.value = 0;
+    opacity.value = withTiming(1, { duration: 620 });
+
+    const timer = setTimeout(() => {
+      setPreviousTheme(null);
+    }, 680);
+
+    return () => clearTimeout(timer);
+  }, [activeTheme, opacity, page, theme]);
+
+  const currentStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: 1 + (1 - opacity.value) * 0.02 }],
+  }));
+
+  const previousStyle = useAnimatedStyle(() => ({
+    opacity: 1 - opacity.value,
+  }));
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {previousTheme ? (
+        <Animated.View style={[StyleSheet.absoluteFill, previousStyle]}>
+          <AmbientBackground
+            accentColor={previousTheme.accentColor}
+            colors={previousTheme.colors}
+            meshColors={previousTheme.meshColors}
+          />
+        </Animated.View>
+      ) : null}
+      <Animated.View style={[StyleSheet.absoluteFill, currentStyle]}>
+        <AmbientBackground
+          accentColor={activeTheme.accentColor}
+          colors={activeTheme.colors}
+          meshColors={activeTheme.meshColors}
+        />
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
+    backgroundColor: '#090B12',
     flex: 1,
   },
   safeArea: {
@@ -472,245 +693,224 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
   },
-  kicker: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
+  headerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  brandLabel: {
+    fontSize: 11,
+  },
+  resetAction: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  resetLabel: {
+    ...KatchaDeckUI.typography.onboardingCTA,
+    fontSize: 13,
   },
   pager: {
     flex: 1,
   },
   pageContent: {
-    gap: 20,
-    paddingHorizontal: 24,
-    paddingTop: 24,
+    gap: 22,
+    minHeight: '100%',
+    paddingHorizontal: 20,
+    paddingTop: 22,
   },
-  heroTitle: {
-    fontSize: 44,
-    fontWeight: '700',
-    lineHeight: 44,
+  pageLabel: {
+    fontSize: 11,
+    marginBottom: 2,
   },
-  heroBody: {
-    fontSize: 17,
-    lineHeight: 26,
-    marginTop: 16,
+  welcomeCopy: {
+    gap: 10,
+    maxWidth: 320,
   },
-  heroVisual: {
+  welcomeTitle: {
+    fontSize: 38,
+    lineHeight: 42,
+    maxWidth: 300,
+  },
+  welcomeBody: {
+    maxWidth: 310,
+  },
+  heroStage: {
     alignItems: 'center',
-    gap: 18,
-    marginTop: 20,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 380,
   },
-  heroCards: {
-    flexDirection: 'row',
-    gap: 16,
+  heroFigure: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 260,
+    width: '100%',
   },
-  pageTitle: {
-    fontSize: 34,
-    fontWeight: '700',
-    lineHeight: 36,
+  heroVeil: {
+    position: 'absolute',
+    right: 34,
+    top: 6,
   },
-  pageBody: {
+  questionHeader: {
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: 330,
+    alignSelf: 'center',
+  },
+  questionTitle: {
+    fontFamily: KatchaDeckUI.typography.headline.fontFamily,
+    fontSize: 35,
+    lineHeight: 40,
+    maxWidth: 320,
+    textAlign: 'center',
+  },
+  questionBody: {
     fontSize: 16,
+    lineHeight: 23,
+    maxWidth: 330,
+  },
+  answerStack: {
+    gap: 14,
+  },
+  answerCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderCurve: 'continuous',
+    borderRadius: 28,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 94,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+  },
+  answerCardSelected: {
+    backgroundColor: 'rgba(200,216,255,0.14)',
+  },
+  answerCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  answerTitle: {
+    fontSize: 20,
     lineHeight: 24,
   },
-  stack: {
-    gap: 14,
-  },
-  selectCard: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderCurve: 'continuous',
-    borderRadius: 24,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 14,
-    padding: 18,
-  },
-  selectedMultiCard: {
-    backgroundColor: 'rgba(196, 214, 255, 0.14)',
-    borderColor: 'rgba(196, 214, 255, 0.52)',
-  },
-  accentDot: {
-    borderRadius: 999,
-    height: 12,
-    width: 12,
-  },
-  checkbox: {
-    borderColor: 'rgba(255,255,255,0.34)',
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 20,
-    width: 20,
-  },
-  checkboxActive: {
-    backgroundColor: '#d9e5ff',
-    borderColor: '#d9e5ff',
-  },
-  selectCardBody: {
-    flex: 1,
-    gap: 6,
-  },
-  selectTitle: {
-    fontSize: 20,
-  },
-  selectDescription: {
+  answerDescription: {
     fontSize: 14,
     lineHeight: 20,
   },
-  reflectionPanel: {
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    gap: 14,
-    overflow: 'hidden',
-    padding: 20,
-  },
-  panelTitle: {
-    fontSize: 20,
-  },
-  panelRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  panelDot: {
-    backgroundColor: '#cedcff',
+  answerIndicator: {
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(255,255,255,0.28)',
     borderRadius: 999,
-    height: 8,
-    marginTop: 8,
-    width: 8,
+    borderWidth: 1.5,
+    height: 20,
+    width: 20,
   },
-  panelText: {
-    flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  panelCaption: {
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 4,
-  },
-  preferenceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 14,
-  },
-  preferenceCell: {
-    width: '47%',
-  },
-  preferenceCard: {
-    borderCurve: 'continuous',
-    borderRadius: 24,
-    gap: 8,
-    minHeight: 152,
-    padding: 18,
-  },
-  preferenceCardSelected: {
-    borderColor: '#f5f7ff',
-    borderWidth: 2,
-  },
-  preferenceGlyph: {
-    color: '#fff7f1',
-    fontSize: 30,
-  },
-  preferenceTitle: {
-    fontSize: 18,
-  },
-  preferenceDescription: {
-    fontSize: 13,
-    lineHeight: 18,
+  answerIndicatorMulti: {
+    borderRadius: 6,
   },
   processingPage: {
+    justifyContent: 'center',
+    minHeight: 620,
+  },
+  processingStack: {
     alignItems: 'center',
+    gap: 22,
+  },
+  processingFigure: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 240,
+    width: '100%',
+  },
+  processingVeil: {
+    position: 'absolute',
+    right: 40,
+    top: 8,
+  },
+  processingCopy: {
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: 310,
+  },
+  revealHeader: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 14,
+    justifyContent: 'space-between',
+  },
+  revealCopy: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  processingOrb: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    height: 120,
-    justifyContent: 'center',
-    marginBottom: 24,
-    width: 120,
-  },
-  processingCore: {
-    backgroundColor: '#cedcff',
-    borderRadius: 999,
-    height: 54,
-    width: 54,
+    gap: 8,
   },
   cardRow: {
     gap: 16,
-    paddingRight: 24,
+    paddingRight: 20,
   },
-  insightPanel: {
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    gap: 10,
-    overflow: 'hidden',
-    padding: 20,
+  revealPanel: {
+    gap: 8,
   },
-  footer: {
-    alignItems: 'center',
-    borderTopColor: 'rgba(255,255,255,0.08)',
-    borderTopWidth: 1,
+  panelLabel: {
+    fontSize: 11,
+  },
+  revealInsightTitle: {
+    fontSize: 20,
+  },
+  panelBody: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  benefitHeader: {
+    gap: 8,
+    maxWidth: 330,
+  },
+  benefitPanel: {
+    gap: 18,
+  },
+  benefitRow: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 24,
-    paddingTop: 12,
   },
-  backButton: {
-    alignItems: 'center',
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderCurve: 'continuous',
+  benefitDot: {
+    backgroundColor: '#C8D8FF',
     borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 54,
-    paddingHorizontal: 20,
+    height: 9,
+    marginTop: 8,
+    width: 9,
   },
-  backButtonDisabled: {
-    opacity: 0.35,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  primaryButton: {
-    alignItems: 'center',
-    backgroundColor: '#d9e5ff',
-    borderRadius: 999,
+  benefitCopy: {
     flex: 1,
-    justifyContent: 'center',
-    minHeight: 54,
-    paddingHorizontal: 22,
+    gap: 4,
   },
-  primaryButtonDisabled: {
-    opacity: 0.45,
+  benefitTitle: {
+    fontSize: 19,
   },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  secondaryButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 54,
-    paddingHorizontal: 20,
-  },
-  secondaryButtonText: {
+  benefitBody: {
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 22,
+  },
+  previewPanel: {
+    gap: 8,
+  },
+  footerWrap: {
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: 20,
+    position: 'absolute',
+    right: 0,
+  },
+  footerShell: {
+    backgroundColor: 'transparent',
+    paddingVertical: 10,
+  },
+  footerPlaceholder: {
+    minHeight: 60,
+  },
+  footerStack: {
+    gap: 10,
   },
 });

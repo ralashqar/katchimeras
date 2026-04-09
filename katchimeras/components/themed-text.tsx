@@ -1,11 +1,23 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
+import { KatchaDeckUI } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
-  type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
+  type?:
+    | 'default'
+    | 'title'
+    | 'display'
+    | 'hero'
+    | 'onboardingDisplay'
+    | 'onboardingLabel'
+    | 'defaultSemiBold'
+    | 'subtitle'
+    | 'bodyLarge'
+    | 'label'
+    | 'link';
 };
 
 export function ThemedText({
@@ -23,8 +35,14 @@ export function ThemedText({
         { color },
         type === 'default' ? styles.default : undefined,
         type === 'title' ? styles.title : undefined,
+        type === 'display' ? styles.display : undefined,
+        type === 'hero' ? styles.hero : undefined,
+        type === 'onboardingDisplay' ? styles.onboardingDisplay : undefined,
+        type === 'onboardingLabel' ? styles.onboardingLabel : undefined,
         type === 'defaultSemiBold' ? styles.defaultSemiBold : undefined,
         type === 'subtitle' ? styles.subtitle : undefined,
+        type === 'bodyLarge' ? styles.bodyLarge : undefined,
+        type === 'label' ? styles.label : undefined,
         type === 'link' ? styles.link : undefined,
         style,
       ]}
@@ -34,27 +52,22 @@ export function ThemedText({
 }
 
 const styles = StyleSheet.create({
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
+  default: KatchaDeckUI.typography.body,
   defaultSemiBold: {
-    fontSize: 16,
-    lineHeight: 24,
+    ...KatchaDeckUI.typography.body,
     fontWeight: '600',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    lineHeight: 32,
-  },
-  subtitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
+  title: KatchaDeckUI.typography.headline,
+  display: KatchaDeckUI.typography.display,
+  hero: KatchaDeckUI.typography.hero,
+  onboardingDisplay: KatchaDeckUI.typography.onboardingDisplay,
+  onboardingLabel: KatchaDeckUI.typography.onboardingLabel,
+  subtitle: KatchaDeckUI.typography.subtitle,
+  bodyLarge: KatchaDeckUI.typography.bodyLarge,
+  label: KatchaDeckUI.typography.label,
   link: {
-    lineHeight: 30,
-    fontSize: 16,
-    color: '#0a7ea4',
+    ...KatchaDeckUI.typography.body,
+    color: KatchaDeckUI.palette.deepNavy,
+    fontWeight: '600',
   },
 });

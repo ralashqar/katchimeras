@@ -1,13 +1,18 @@
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
+import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
+import { presenceEnter } from '@/components/katchadeck/motion';
+import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { createStarterReveal } from '@/constants/katchadeck';
+import { KatchaDeckUI } from '@/constants/theme';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
 
 export default function ExploreScreen() {
@@ -37,120 +42,116 @@ export default function ExploreScreen() {
   }
 
   return (
-    <LinearGradient colors={['#0e1220', '#151c2e', '#181a2b']} style={styles.screen}>
+    <View style={styles.screen}>
+      <AmbientBackground
+        accentColor="rgba(95,168,123,0.16)"
+        colors={KatchaDeckUI.gradients.world}
+        meshColors={['rgba(95,168,123,0.14)', 'rgba(200,216,255,0.1)', 'rgba(106,95,232,0.12)', 'rgba(227,160,110,0.1)']}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <ThemedText style={styles.kicker} lightColor="#bfd3ff" darkColor="#bfd3ff">
+        <Animated.View entering={presenceEnter()}>
+          <ThemedText type="label" style={styles.kicker} lightColor="#C4D8FF" darkColor="#C4D8FF">
             World preview
           </ThemedText>
-          <ThemedText type="title" style={styles.title} lightColor="#f8fbff" darkColor="#f8fbff">
+          <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
             Your early collection
           </ThemedText>
-          <ThemedText style={styles.body} lightColor="#d8e3ff" darkColor="#d8e3ff">
-            These first cards are only the opening shape. Repetition deepens roots, and exploration
-            opens new branches.
+          <ThemedText type="bodyLarge" style={styles.body} lightColor="#D9E4FF" darkColor="#D9E4FF">
+            These first cards are only the opening shape. Repetition deepens roots, and
+            exploration opens new branches.
           </ThemedText>
-        </View>
+        </Animated.View>
 
-        <BlurView intensity={24} tint="dark" style={styles.panel}>
-          <ThemedText type="subtitle" style={styles.panelTitle} lightColor="#f8fbff" darkColor="#f8fbff">
-            Where your deck is leaning
-          </ThemedText>
-          <ThemedText style={styles.body} lightColor="#d8e3ff" darkColor="#d8e3ff">
-            {reveal.identityInsight}
-          </ThemedText>
-        </BlurView>
+        <Animated.View entering={presenceEnter(80)}>
+          <GlassPanel contentStyle={styles.panelBody}>
+            <SectionHeader label="Collection tilt" title="Where your deck is leaning" />
+            <ThemedText style={styles.panelText} lightColor="#D9E4FF" darkColor="#D9E4FF">
+              {reveal.identityInsight}
+            </ThemedText>
+          </GlassPanel>
+        </Animated.View>
+
+        <Animated.View entering={presenceEnter(140)}>
+          <SectionHeader label="Collected places" title="Emerging cards" />
+        </Animated.View>
 
         <View style={styles.collectionGrid}>
-          {reveal.collection.map((card) => (
-            <CollectibleCard
-              key={card.id}
-              compact
-              location={card.location}
-              name={card.name}
-              palette={card.palette}
-              rarity={card.rarity}
-              trait={card.trait}
-            />
+          {reveal.collection.map((card, index) => (
+            <Animated.View entering={presenceEnter(180 + index * 60)} key={card.id}>
+              <CollectibleCard
+                compact
+                location={card.location}
+                name={card.name}
+                palette={card.palette}
+                rarity={card.rarity}
+                trait={card.trait}
+              />
+            </Animated.View>
           ))}
         </View>
 
-        <BlurView intensity={20} tint="dark" style={styles.panel}>
-          <ThemedText type="subtitle" style={styles.panelTitle} lightColor="#f8fbff" darkColor="#f8fbff">
-            Coming next
-          </ThemedText>
-          <View style={styles.bulletRow}>
-            <View style={styles.dot} />
-            <ThemedText style={styles.bulletText} lightColor="#d8e3ff" darkColor="#d8e3ff">
-              Places that become backplates and roots
-            </ThemedText>
-          </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.dot} />
-            <ThemedText style={styles.bulletText} lightColor="#d8e3ff" darkColor="#d8e3ff">
-              Story moments when a day becomes worth remembering
-            </ThemedText>
-          </View>
-          <View style={styles.bulletRow}>
-            <View style={styles.dot} />
-            <ThemedText style={styles.bulletText} lightColor="#d8e3ff" darkColor="#d8e3ff">
-              Premium evolution, fusion, and deeper identity insight
-            </ThemedText>
-          </View>
-        </BlurView>
+        <Animated.View entering={presenceEnter(360)}>
+          <GlassPanel contentStyle={styles.panelBody}>
+            <SectionHeader label="Coming next" title="The world deepens from here" />
+            <View style={styles.bullets}>
+              <Bullet text="Places become backplates, roots, and long-term memory." />
+              <Bullet text="Story moments appear when a day drifts beyond the ordinary." />
+              <Bullet text="Premium evolution and fusion add stronger variants to familiar routes." />
+            </View>
+          </GlassPanel>
+        </Animated.View>
 
-        <Pressable onPress={handleReset} style={styles.resetButton}>
-          <ThemedText style={styles.resetText} lightColor="#f8fbff" darkColor="#f8fbff">
-            Restart onboarding
-          </ThemedText>
-        </Pressable>
+        <Animated.View entering={presenceEnter(420)}>
+          <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
+        </Animated.View>
       </ScrollView>
-    </LinearGradient>
+    </View>
+  );
+}
+
+function Bullet({ text }: { text: string }) {
+  return (
+    <View style={styles.bulletRow}>
+      <View style={styles.dot} />
+      <ThemedText style={styles.bulletText} lightColor="#D9E4FF" darkColor="#D9E4FF">
+        {text}
+      </ThemedText>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
+    backgroundColor: '#090B12',
     flex: 1,
   },
   content: {
-    gap: 18,
-    paddingBottom: 36,
+    gap: KatchaDeckUI.spacing.lg,
+    paddingBottom: 132,
     paddingHorizontal: 20,
     paddingTop: 24,
   },
-  header: {
-    gap: 10,
-  },
   kicker: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
+    fontSize: 11,
+    marginBottom: 6,
   },
   title: {
-    fontSize: 36,
-    fontWeight: '700',
-    lineHeight: 38,
+    fontSize: 42,
+    lineHeight: 44,
+    marginBottom: 12,
   },
   body: {
+    maxWidth: 330,
+  },
+  panelBody: {
+    gap: 12,
+  },
+  panelText: {
     fontSize: 15,
     lineHeight: 22,
-  },
-  panel: {
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderCurve: 'continuous',
-    borderRadius: 26,
-    borderWidth: 1,
-    gap: 10,
-    overflow: 'hidden',
-    padding: 18,
-  },
-  panelTitle: {
-    fontSize: 21,
   },
   collectionGrid: {
     flexDirection: 'row',
@@ -158,12 +159,15 @@ const styles = StyleSheet.create({
     gap: 14,
     justifyContent: 'space-between',
   },
+  bullets: {
+    gap: 12,
+  },
   bulletRow: {
     flexDirection: 'row',
     gap: 10,
   },
   dot: {
-    backgroundColor: '#cadeff',
+    backgroundColor: '#C8D8FF',
     borderRadius: 999,
     height: 8,
     marginTop: 8,
@@ -173,18 +177,5 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     lineHeight: 22,
-  },
-  resetButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  resetText: {
-    fontSize: 15,
-    fontWeight: '600',
   },
 });

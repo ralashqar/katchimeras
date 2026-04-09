@@ -1,4 +1,8 @@
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+
+import { KatchaDeckUI } from '@/constants/theme';
 
 type ProgressBarProps = {
   current: number;
@@ -6,23 +10,35 @@ type ProgressBarProps = {
 };
 
 export function ProgressBar({ current, total }: ProgressBarProps) {
+  const progress = useSharedValue(current / total);
+
+  useEffect(() => {
+    progress.value = withTiming(current / total, {
+      duration: KatchaDeckUI.motion.base,
+    });
+  }, [current, progress, total]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${Math.max(progress.value * 100, 6)}%`,
+  }));
+
   return (
     <View style={styles.track}>
-      <View style={[styles.fill, { width: `${(current / total) * 100}%` }]} />
+      <Animated.View style={[styles.fill, fillStyle]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   track: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 999,
     height: 6,
     overflow: 'hidden',
     width: '100%',
   },
   fill: {
-    backgroundColor: '#c0d8ff',
+    backgroundColor: '#C8D8FF',
     borderRadius: 999,
     height: '100%',
   },
