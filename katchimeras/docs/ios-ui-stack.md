@@ -22,8 +22,6 @@ This project now has a stronger frontend stack for polished iPhone-style UI, onb
   High-end graphics, shaders, particles, custom loaders, and dynamic backgrounds.
 - `@shopify/flash-list`
   Better list performance for media-heavy or card-heavy feeds.
-- `@expo/ui`
-  Native-first UI surface for iOS-oriented interfaces. Useful when you want Apple-like controls and presentation styles.
 - `@rive-app/react-native`
   Best option for interactive motion graphics and state-machine-driven onboarding illustrations.
 - `expo-dev-client`
@@ -35,8 +33,6 @@ This project now has a stronger frontend stack for polished iPhone-style UI, onb
   `react-native-pager-view` + `moti` + `expo-mesh-gradient` + `expo-blur`
 - Product transitions and delight:
   `react-native-reanimated` + `moti`
-- Native-feeling iPhone surfaces:
-  `@expo/ui` + `expo-blur`
 - Interactive illustrations and motion graphics:
   `@rive-app/react-native`
 - Advanced visual systems:
@@ -49,8 +45,8 @@ This project now has a stronger frontend stack for polished iPhone-style UI, onb
 - Usually fine in Expo Go:
   `react-native-reanimated`, `moti`, `react-native-pager-view`, `expo-blur`, `expo-linear-gradient`, `expo-mesh-gradient`, `@shopify/flash-list`
 - Prefer a development build:
-  `@expo/ui`, `@rive-app/react-native`
-- If you start using Rive or `@expo/ui`, move your daily workflow to a dev client instead of Expo Go.
+  `@rive-app/react-native`
+- If you start using Rive, move your daily workflow to a dev client instead of Expo Go.
 
 ## Skills installed
 
@@ -66,7 +62,7 @@ This project now has a stronger frontend stack for polished iPhone-style UI, onb
 3. Animate copy and artwork with `moti`, and reserve lower-level `react-native-reanimated` work for gestures and shared transitions.
 4. Use `expo-mesh-gradient` or Skia for one strong visual background system instead of stacking many effects.
 5. Add one Rive animation only if it carries real product meaning, such as account creation, sync state, or personalization.
-6. Switch to a dev build before shipping any `@expo/ui` or Rive-based screen.
+6. Switch to a dev build before shipping any Rive-based screen.
 
 ## Suggested design direction
 

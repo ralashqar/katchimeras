@@ -3,15 +3,23 @@
     "name": "katchimeras",
     "slug": "katchimeras",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "katchimeras",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.daruk.katchimeras",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.daruk.katchimeras",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -44,6 +52,15 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "0ee214f1-a591-4ba1-83d0-3485be43c124"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0ee214f1-a591-4ba1-83d0-3485be43c124"
     }
   }
 }
