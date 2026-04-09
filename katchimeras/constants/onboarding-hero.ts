@@ -6,6 +6,9 @@ export const heroOrbitAssets = {
   lattelet: require('../assets/images/onboarding-hero/lattelet.png'),
   sprintail: require('../assets/images/onboarding-hero/sprintail.png'),
   neonpoko: require('../assets/images/onboarding-hero/neonpoko.png'),
+  crumbun: require('../assets/images/onboarding-hero/crumbun.png'),
+  hayhorn: require('../assets/images/onboarding-hero/hayhorn.png'),
+  ironette: require('../assets/images/onboarding-hero/ironette.png'),
 } as const satisfies Record<string, ImageSourcePropType>;
 
 export type HeroOrbitAssetKey = keyof typeof heroOrbitAssets;
@@ -98,6 +101,36 @@ export const openingHeroScene: HeroSceneConfig = {
       rotationDuration: 52000,
       parallaxDepth: 1.12,
       opacity: 0.9,
+    },
+    {
+      id: 'crumbun',
+      assetKey: 'crumbun',
+      orbitRadius: 142,
+      startAngle: 44,
+      size: 72,
+      rotationDuration: 44000,
+      parallaxDepth: 1.02,
+      opacity: 0.9,
+    },
+    {
+      id: 'hayhorn',
+      assetKey: 'hayhorn',
+      orbitRadius: 168,
+      startAngle: 164,
+      size: 76,
+      rotationDuration: 56000,
+      parallaxDepth: 1.14,
+      opacity: 0.86,
+    },
+    {
+      id: 'ironette',
+      assetKey: 'ironette',
+      orbitRadius: 168,
+      startAngle: 250,
+      size: 76,
+      rotationDuration: 60000,
+      parallaxDepth: 1.16,
+      opacity: 0.88,
     },
   ],
   arcLayers: [
