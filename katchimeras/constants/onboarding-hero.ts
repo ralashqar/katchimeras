@@ -14,6 +14,11 @@ export const heroOrbitAssets = {
 export type HeroOrbitAssetKey = keyof typeof heroOrbitAssets;
 export type HeroOrbitLane = 'inner' | 'middle' | 'outer';
 export type HeroSequencePhase = 'idle' | 'spotlightIn' | 'spotlightHold' | 'spotlightOut';
+export type HeroOrbitPosition = {
+  x: number;
+  y: number;
+  depth: number;
+};
 
 export type HeroArcLayer = {
   id: string;
@@ -36,6 +41,7 @@ export type HeroOrbitItem = {
   parallaxDepth: number;
   opacity: number;
   lane: HeroOrbitLane;
+  showcaseCaption: string;
 };
 
 const laneBaseAngles: Record<HeroOrbitLane, number> = {
@@ -72,6 +78,16 @@ export function resolveHeroOrbitItems(items: readonly HeroOrbitItem[]): HeroOrbi
   });
 }
 
+export function getOrbitPositionForElapsed(item: HeroOrbitItem, elapsedMs: number): HeroOrbitPosition {
+  const degrees = item.startAngle + ((elapsedMs % item.rotationDuration) / item.rotationDuration) * 360;
+  const radians = (degrees * Math.PI) / 180;
+  const x = Math.cos(radians) * item.orbitRadius;
+  const y = Math.sin(radians) * item.orbitRadius * (0.84 + item.parallaxDepth * 0.08);
+  const depth = (Math.sin(radians) + 1) / 2;
+
+  return { x, y, depth };
+}
+
 export type HeroTimingConfig = {
   arcDelay: number;
   avatarDelay: number;
@@ -87,6 +103,12 @@ export type HeroSequenceConfig = {
   spotlightHoldDuration: number;
   spotlightOutDuration: number;
   gapDuration: number;
+  spotlightScale: number;
+};
+
+export type HeroCaptionStage = {
+  offsetY: number;
+  maxWidth: number;
 };
 
 export type HeroSceneConfig = {
@@ -96,6 +118,7 @@ export type HeroSceneConfig = {
   backgroundPalette: readonly [string, string, string];
   accentColor: string;
   orbitItems: readonly HeroOrbitItem[];
+  captionStage: HeroCaptionStage;
   sequence: HeroSequenceConfig;
   arcLayers: readonly HeroArcLayer[];
   timings: HeroTimingConfig;
@@ -118,6 +141,7 @@ export const openingHeroScene: HeroSceneConfig = {
       parallaxDepth: 0.92,
       opacity: 0.96,
       lane: 'inner',
+      showcaseCaption: 'You make room for green, even on ordinary days.',
     },
     {
       id: 'lattelet',
@@ -129,6 +153,7 @@ export const openingHeroScene: HeroSceneConfig = {
       parallaxDepth: 1.06,
       opacity: 0.92,
       lane: 'middle',
+      showcaseCaption: 'You keep finding your way back to coffee.',
     },
     {
       id: 'sprintail',
@@ -140,6 +165,7 @@ export const openingHeroScene: HeroSceneConfig = {
       parallaxDepth: 0.9,
       opacity: 0.94,
       lane: 'inner',
+      showcaseCaption: 'You turn movement into momentum.',
     },
     {
       id: 'neonpoko',
@@ -151,6 +177,7 @@ export const openingHeroScene: HeroSceneConfig = {
       parallaxDepth: 1.14,
       opacity: 0.9,
       lane: 'outer',
+      showcaseCaption: 'You collect energy from the places that light up at night.',
     },
     {
       id: 'crumbun',
@@ -162,6 +189,7 @@ export const openingHeroScene: HeroSceneConfig = {
       parallaxDepth: 1.02,
       opacity: 0.9,
       lane: 'middle',
+      showcaseCaption: 'You notice warmth in the places you return to.',
     },
     {
       id: 'hayhorn',
@@ -173,6 +201,7 @@ export const openingHeroScene: HeroSceneConfig = {
       parallaxDepth: 1.14,
       opacity: 0.86,
       lane: 'outer',
+      showcaseCaption: 'You carry a steadier, earthier rhythm than you think.',
     },
     {
       id: 'ironette',
@@ -184,14 +213,20 @@ export const openingHeroScene: HeroSceneConfig = {
       parallaxDepth: 1.16,
       opacity: 0.88,
       lane: 'outer',
+      showcaseCaption: 'Some places turn a day into something memorable.',
     },
   ],
+  captionStage: {
+    offsetY: 18,
+    maxWidth: 320,
+  },
   sequence: {
     startDelay: 2200,
     spotlightInDuration: 780,
     spotlightHoldDuration: 1800,
     spotlightOutDuration: 820,
     gapDuration: 280,
+    spotlightScale: 1.14,
   },
   arcLayers: [
     {
