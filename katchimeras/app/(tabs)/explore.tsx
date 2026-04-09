@@ -105,6 +105,10 @@ export default function ExploreScreen() {
         </Animated.View>
 
         <Animated.View entering={presenceEnter(420)}>
+          <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
+        </Animated.View>
+
+        <Animated.View entering={presenceEnter(460)}>
           <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
         </Animated.View>
       </ScrollView>

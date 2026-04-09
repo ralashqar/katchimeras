@@ -68,6 +68,7 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'KatchaDeck Premium' }} />
       </Stack>
       <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />

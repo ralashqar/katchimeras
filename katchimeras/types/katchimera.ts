@@ -1,0 +1,43 @@
+export type KatchimeraRenderProfile = {
+  id: string;
+  familyId: string;
+  habitatAspectId: string;
+  stageId: string;
+  displayName: string;
+  subtitle: string;
+  caption: string;
+  userFacingDescription: string;
+  motivationalQuote: string;
+  deckRole: string;
+  lifestyleMatch: string;
+  associatedLifestyleProperties: string[];
+  visualDescription: string;
+  imagePrompt: string;
+  paletteHints: string[];
+  signatureDetails: string[];
+  styleGuideId: string;
+};
+
+export type GeneratedKatchimeraRecord = {
+  id: string;
+  render_profile_id: string;
+  family_id: string;
+  habitat_aspect_id: string;
+  stage_id: string;
+  display_name: string;
+  model_id: string;
+  status: 'queued' | 'generating' | 'completed' | 'failed';
+  prompt: string;
+  caption: string | null;
+  motivational_quote: string | null;
+  storage_bucket: string | null;
+  storage_path: string | null;
+  image_url: string | null;
+  fal_request_id: string | null;
+  error_message: string | null;
+  approved: boolean;
+  source_profile: KatchimeraRenderProfile;
+  result_payload: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
