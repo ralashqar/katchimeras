@@ -7,9 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
-import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
 import { presenceEnter, presenceExit, rewardEnter, usePressMotion } from '@/components/katchadeck/motion';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
+import { ResolvedAvatar } from '@/components/katchadeck/resolved-avatar';
 import { VeilMascot, type VeilMascotMood } from '@/components/katchadeck/veil-mascot';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -296,7 +296,7 @@ export default function OnboardingScreen() {
 
             <Animated.View entering={presenceEnter(160)} style={styles.heroStage}>
               <Animated.View entering={presenceEnter(220)} style={styles.heroFigure}>
-                <HoodedAvatar size={210} />
+                <ResolvedAvatar size={210} />
                 <View style={styles.heroVeil}>
                   <VeilMascot interactive mood="curious" size={84} />
                 </View>
@@ -371,7 +371,7 @@ export default function OnboardingScreen() {
           <View key="processing" style={[styles.pageContent, styles.processingPage]}>
             <Animated.View entering={rewardEnter()} style={styles.processingStack}>
               <View style={styles.processingFigure}>
-                <HoodedAvatar size={194} />
+                <ResolvedAvatar size={194} />
                 <View style={styles.processingVeil}>
                   <VeilMascot glow mood="bright" size={88} variant="halo" />
                 </View>

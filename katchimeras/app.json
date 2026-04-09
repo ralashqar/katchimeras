@@ -15,7 +15,8 @@
       "bundleIdentifier": "com.daruk.katchimeras",
       "supportsTablet": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar."
       }
     },
     "android": {
@@ -35,6 +36,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar."
+        }
+      ],
       [
         "expo-splash-screen",
         {

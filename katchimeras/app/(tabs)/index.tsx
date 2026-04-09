@@ -6,8 +6,8 @@ import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
-import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
 import { presenceEnter, rewardEnter } from '@/components/katchadeck/motion';
+import { ResolvedAvatar } from '@/components/katchadeck/resolved-avatar';
 import { VeilMascot } from '@/components/katchadeck/veil-mascot';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -49,7 +49,7 @@ export default function HomeScreen() {
             </ThemedText>
           </View>
           <View style={styles.heroVisual}>
-            <HoodedAvatar size={176} />
+            <ResolvedAvatar size={176} />
             <View style={styles.mascotAnchor}>
               <VeilMascot interactive mood="guide" size={74} variant="guide" />
             </View>
