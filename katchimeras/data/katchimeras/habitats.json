@@ -1,0 +1,72 @@
+[
+  {
+    "id": "home",
+    "title": "Home Rhythm",
+    "description": "Recovery, reset, and quiet space.",
+    "venueCategories": ["home", "residential", "indoor"],
+    "motifs": ["lamplight", "blanket folds", "soft corners", "hearth glow"],
+    "backplateTags": ["sanctuary", "indoor-warmth", "rest-space"],
+    "vectorBias": {
+      "placeAffinity": ["home"],
+      "routineDepth": ["rooted", "ritualized"],
+      "recoveryBalance": ["restored", "restorative"],
+      "timeAffinity": ["dusk", "night"]
+    }
+  },
+  {
+    "id": "cozy",
+    "title": "Cozy Pocket",
+    "description": "Cafes, corners, warmth, and social stillness.",
+    "venueCategories": ["cafe", "bakery", "bookstore", "small venue"],
+    "motifs": ["steam", "wood grain", "cups", "amber light"],
+    "backplateTags": ["comfort-zone", "warm-stop", "return-corner"],
+    "vectorBias": {
+      "placeAffinity": ["cozy"],
+      "routineDepth": ["recurring", "rooted"],
+      "tempo": ["slow", "measured"],
+      "timeAffinity": ["morning", "dusk"]
+    }
+  },
+  {
+    "id": "urban",
+    "title": "Urban Thread",
+    "description": "Streets, momentum, crossings, and city pattern.",
+    "venueCategories": ["street", "transit", "shopping", "city-center"],
+    "motifs": ["signal lines", "glass reflections", "concrete marks", "neon edges"],
+    "backplateTags": ["street-grid", "city-signal", "night-route"],
+    "vectorBias": {
+      "placeAffinity": ["urban"],
+      "explorationStyle": ["local", "roaming", "exploratory"],
+      "tempo": ["steady", "brisk"],
+      "timeAffinity": ["midday", "night"]
+    }
+  },
+  {
+    "id": "nature",
+    "title": "Nature Vein",
+    "description": "Parks, trails, green edges, and open ground.",
+    "venueCategories": ["park", "trail", "green-space", "garden"],
+    "motifs": ["leaf canopies", "moss", "wind lines", "soil marks"],
+    "backplateTags": ["canopy", "trail-loop", "green-edge"],
+    "vectorBias": {
+      "placeAffinity": ["nature"],
+      "explorationStyle": ["rooted", "local", "exploratory"],
+      "timeAffinity": ["dawn", "morning", "dusk"],
+      "recoveryBalance": ["neutral", "restored"]
+    }
+  },
+  {
+    "id": "waterside",
+    "title": "Waterside Drift",
+    "description": "Open air, shoreline, riverside, and distance.",
+    "venueCategories": ["river", "coast", "lake", "marina"],
+    "motifs": ["spray", "ripple light", "stone edges", "open horizon"],
+    "backplateTags": ["shoreline", "river-path", "open-air"],
+    "vectorBias": {
+      "placeAffinity": ["waterside"],
+      "explorationStyle": ["roaming", "exploratory", "wandering"],
+      "timeAffinity": ["morning", "dusk", "night"],
+      "tempo": ["measured", "steady"]
+    }
+  }
+]

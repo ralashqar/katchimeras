@@ -1,0 +1,45 @@
+{
+  "styleId": "katchimera-premium-cgi-v1",
+  "name": "Katchimera Premium CGI",
+  "recommendedStyle": "stylized premium 3D creature CGI",
+  "summary": "A premium stylized 3D fantasy creature look with believable materials, calm magical atmosphere, and collectible-card readability.",
+  "positiveStyleTokens": [
+    "premium stylized 3D CGI fantasy creature collectible",
+    "soft cinematic lighting",
+    "high-end mobile game creature art",
+    "calm magical mood",
+    "readable elegant silhouette",
+    "premium materials and subtle glow",
+    "dark atmospheric background",
+    "hero-quality render"
+  ],
+  "negativeStyleTokens": [
+    "no text",
+    "no watermark",
+    "no frame",
+    "no extra creatures",
+    "no human",
+    "no weapon",
+    "no UI overlay",
+    "no chibi proportions",
+    "no exaggerated comedy",
+    "no plastic toy look"
+  ],
+  "compositionDefaults": {
+    "camera": "three-quarter view",
+    "framing": "single creature portrait with breathing room",
+    "background": "dark atmospheric habitat hint only",
+    "detailLevel": "high",
+    "pose": "clear silhouette, poised rather than aggressive"
+  },
+  "renderDefaults": {
+    "finish": "cinematic polished CGI",
+    "materials": ["fur", "moss", "stone", "shell", "velvet", "ember glow", "mist"],
+    "lighting": ["soft rim light", "subtle key light", "controlled atmospheric bloom"]
+  },
+  "comparativeNotes": {
+    "fortnite": "too loud, too heroic, too broad for KatchaDeck's calm identity",
+    "clashRoyale": "too toy-like and exaggerated for reflective collectible mood",
+    "realisticCG": "use realism in materials and lighting, but keep anatomy stylized and magical"
+  }
+}

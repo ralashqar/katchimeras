@@ -1,0 +1,362 @@
+[
+  {
+    "id": "mosskeeper",
+    "name": "Mosskeeper",
+    "archetype": "rooted guardian",
+    "silhouette": "stag-lizard hybrid",
+    "temperament": "calm",
+    "motionSignature": "rooted",
+    "baseRarity": "common",
+    "habitatBias": ["nature", "home"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["rooted", "local"],
+      "routineDepth": ["recurring", "rooted"],
+      "placeAffinity": ["nature", "home"],
+      "timeAffinity": ["morning", "dusk"]
+    },
+    "visualTraits": ["moss crest", "branch antlers", "stone feet"]
+  },
+  {
+    "id": "bramblecup",
+    "name": "Bramblecup",
+    "archetype": "comfort sprite",
+    "silhouette": "round-bodied cup beast",
+    "temperament": "warm",
+    "motionSignature": "drifting",
+    "baseRarity": "common",
+    "habitatBias": ["cozy", "home"],
+    "vectorAffinity": {
+      "activityLevel": ["sedentary", "light"],
+      "explorationStyle": ["rooted", "local"],
+      "routineDepth": ["rooted", "ritualized"],
+      "placeAffinity": ["cozy", "home"],
+      "timeAffinity": ["morning", "dusk", "night"]
+    },
+    "visualTraits": ["cup ears", "berry fringe", "ember belly"]
+  },
+  {
+    "id": "signalfox",
+    "name": "Signalfox",
+    "archetype": "street scout",
+    "silhouette": "slim fox with signal tail",
+    "temperament": "alert",
+    "motionSignature": "prowling",
+    "baseRarity": "common",
+    "habitatBias": ["urban"],
+    "vectorAffinity": {
+      "activityLevel": ["steady", "active"],
+      "explorationStyle": ["local", "roaming"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["urban"],
+      "timeAffinity": ["midday", "dusk"]
+    },
+    "visualTraits": ["signal tail", "streetline markings", "bright eye band"]
+  },
+  {
+    "id": "velowl",
+    "name": "Velowl",
+    "archetype": "night watcher",
+    "silhouette": "owl with velvet wing cape",
+    "temperament": "calm",
+    "motionSignature": "gliding",
+    "baseRarity": "uncommon",
+    "habitatBias": ["night", "urban", "nature"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["local", "roaming"],
+      "routineDepth": ["recurring", "rooted"],
+      "placeAffinity": ["urban", "nature"],
+      "timeAffinity": ["dusk", "night"]
+    },
+    "visualTraits": ["moon mask", "soft wing folds", "lantern pupils"]
+  },
+  {
+    "id": "tidewhorl",
+    "name": "Tidewhorl",
+    "archetype": "shoreline drifter",
+    "silhouette": "shell-whale spiral",
+    "temperament": "calm",
+    "motionSignature": "drifting",
+    "baseRarity": "uncommon",
+    "habitatBias": ["waterside"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["roaming", "exploratory"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["waterside"],
+      "timeAffinity": ["morning", "dusk"]
+    },
+    "visualTraits": ["spiral shell", "spray fins", "ripple mane"]
+  },
+  {
+    "id": "restroot",
+    "name": "Restroot",
+    "archetype": "recovery guardian",
+    "silhouette": "burrow beast with root mane",
+    "temperament": "calm",
+    "motionSignature": "rooted",
+    "baseRarity": "common",
+    "habitatBias": ["home"],
+    "vectorAffinity": {
+      "activityLevel": ["sedentary", "light"],
+      "explorationStyle": ["rooted"],
+      "routineDepth": ["rooted", "ritualized"],
+      "placeAffinity": ["home"],
+      "timeAffinity": ["dusk", "night"]
+    },
+    "visualTraits": ["root mane", "burrow paws", "soft glow core"]
+  },
+  {
+    "id": "lanthare",
+    "name": "Lanthare",
+    "archetype": "guide runner",
+    "silhouette": "hare with lantern antlers",
+    "temperament": "luminous",
+    "motionSignature": "bounding",
+    "baseRarity": "uncommon",
+    "habitatBias": ["urban", "nature"],
+    "vectorAffinity": {
+      "activityLevel": ["steady", "active"],
+      "explorationStyle": ["local", "exploratory"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["urban", "nature"],
+      "timeAffinity": ["dawn", "dusk", "night"]
+    },
+    "visualTraits": ["lantern antlers", "long stride", "guide glow"]
+  },
+  {
+    "id": "rooklet",
+    "name": "Rooklet",
+    "archetype": "quick collector",
+    "silhouette": "compact crow imp",
+    "temperament": "alert",
+    "motionSignature": "gliding",
+    "baseRarity": "common",
+    "habitatBias": ["urban", "cozy"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["local", "roaming"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["urban", "cozy"],
+      "timeAffinity": ["morning", "midday"]
+    },
+    "visualTraits": ["crest plume", "ink feathers", "key-like claws"]
+  },
+  {
+    "id": "hushling",
+    "name": "Hushling",
+    "archetype": "quiet companion",
+    "silhouette": "small drifting spirit",
+    "temperament": "calm",
+    "motionSignature": "drifting",
+    "baseRarity": "common",
+    "habitatBias": ["home", "cozy"],
+    "vectorAffinity": {
+      "activityLevel": ["sedentary", "light"],
+      "explorationStyle": ["rooted", "local"],
+      "routineDepth": ["rooted", "ritualized"],
+      "placeAffinity": ["home", "cozy"],
+      "timeAffinity": ["dusk", "night"]
+    },
+    "visualTraits": ["blanket tail", "soft face", "mist fringe"]
+  },
+  {
+    "id": "stonehare",
+    "name": "Stonehare",
+    "archetype": "disciplined runner",
+    "silhouette": "hare with stone limb armor",
+    "temperament": "alert",
+    "motionSignature": "bounding",
+    "baseRarity": "common",
+    "habitatBias": ["urban", "nature"],
+    "vectorAffinity": {
+      "activityLevel": ["steady", "active", "intense"],
+      "explorationStyle": ["local", "roaming"],
+      "routineDepth": ["recurring", "rooted"],
+      "placeAffinity": ["urban", "nature"],
+      "timeAffinity": ["dawn", "morning"]
+    },
+    "visualTraits": ["stone cuffs", "runner ears", "dust wake"]
+  },
+  {
+    "id": "embermoth",
+    "name": "Embermoth",
+    "archetype": "warm-hour seeker",
+    "silhouette": "moth with ember wing veil",
+    "temperament": "warm",
+    "motionSignature": "gliding",
+    "baseRarity": "uncommon",
+    "habitatBias": ["cozy", "night"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["local", "roaming"],
+      "routineDepth": ["recurring", "rooted"],
+      "placeAffinity": ["cozy", "urban"],
+      "timeAffinity": ["dusk", "night"]
+    },
+    "visualTraits": ["ember dust", "soft wing eyes", "warm glow abdomen"]
+  },
+  {
+    "id": "fernrunner",
+    "name": "Fernrunner",
+    "archetype": "trail dart",
+    "silhouette": "fawn-lizard runner",
+    "temperament": "alert",
+    "motionSignature": "bounding",
+    "baseRarity": "common",
+    "habitatBias": ["nature"],
+    "vectorAffinity": {
+      "activityLevel": ["steady", "active"],
+      "explorationStyle": ["local", "exploratory"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["nature"],
+      "timeAffinity": ["dawn", "morning"]
+    },
+    "visualTraits": ["fern mane", "trail legs", "leaf-tail"]
+  },
+  {
+    "id": "neonrook",
+    "name": "Neonrook",
+    "archetype": "after-hours flyer",
+    "silhouette": "sleek corvid with neon wing cuts",
+    "temperament": "luminous",
+    "motionSignature": "gliding",
+    "baseRarity": "rare",
+    "habitatBias": ["urban"],
+    "vectorAffinity": {
+      "activityLevel": ["steady", "active"],
+      "explorationStyle": ["roaming", "exploratory"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["urban"],
+      "timeAffinity": ["dusk", "night"]
+    },
+    "visualTraits": ["neon cutlines", "rail feathers", "glow beak"]
+  },
+  {
+    "id": "lumenhare",
+    "name": "Lumenhare",
+    "archetype": "bright-route sprinter",
+    "silhouette": "hare with halo pelt",
+    "temperament": "luminous",
+    "motionSignature": "bounding",
+    "baseRarity": "uncommon",
+    "habitatBias": ["nature", "urban"],
+    "vectorAffinity": {
+      "activityLevel": ["active", "intense"],
+      "explorationStyle": ["roaming", "exploratory"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["nature", "urban"],
+      "timeAffinity": ["dawn", "morning"]
+    },
+    "visualTraits": ["halo fur", "light-track feet", "sunrise eyes"]
+  },
+  {
+    "id": "skylarkel",
+    "name": "Skylarkel",
+    "archetype": "distance caller",
+    "silhouette": "bird-eel hybrid",
+    "temperament": "luminous",
+    "motionSignature": "gliding",
+    "baseRarity": "rare",
+    "habitatBias": ["waterside"],
+    "vectorAffinity": {
+      "activityLevel": ["steady", "active"],
+      "explorationStyle": ["exploratory", "wandering"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["waterside"],
+      "timeAffinity": ["morning", "dusk"]
+    },
+    "visualTraits": ["fin-wings", "long neck ribbon", "open-horizon tail"]
+  },
+  {
+    "id": "softden",
+    "name": "Softden",
+    "archetype": "sanctuary keeper",
+    "silhouette": "badger-blanket hybrid",
+    "temperament": "warm",
+    "motionSignature": "rooted",
+    "baseRarity": "common",
+    "habitatBias": ["home", "cozy"],
+    "vectorAffinity": {
+      "activityLevel": ["sedentary", "light"],
+      "explorationStyle": ["rooted", "local"],
+      "routineDepth": ["rooted", "ritualized"],
+      "placeAffinity": ["home", "cozy"],
+      "timeAffinity": ["night"]
+    },
+    "visualTraits": ["blanket back", "hearth ears", "cushion paws"]
+  },
+  {
+    "id": "duskfin",
+    "name": "Duskfin",
+    "archetype": "twilight swimmer",
+    "silhouette": "bat-fish ribbon form",
+    "temperament": "calm",
+    "motionSignature": "drifting",
+    "baseRarity": "uncommon",
+    "habitatBias": ["waterside", "night"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["roaming", "wandering"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["waterside"],
+      "timeAffinity": ["dusk", "night"]
+    },
+    "visualTraits": ["ribbon fins", "twilight crest", "mirror scales"]
+  },
+  {
+    "id": "pebblegeist",
+    "name": "Pebblegeist",
+    "archetype": "small route spirit",
+    "silhouette": "stacked stone ghost",
+    "temperament": "calm",
+    "motionSignature": "drifting",
+    "baseRarity": "common",
+    "habitatBias": ["waterside", "nature", "home"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["rooted", "local", "roaming"],
+      "routineDepth": ["recurring", "rooted"],
+      "placeAffinity": ["waterside", "nature", "home"],
+      "timeAffinity": ["morning", "dusk"]
+    },
+    "visualTraits": ["stone stack body", "soft vapor tail", "tide marks"]
+  },
+  {
+    "id": "ivyclaw",
+    "name": "Ivyclaw",
+    "archetype": "wild edge stalker",
+    "silhouette": "vine-cat climber",
+    "temperament": "feral",
+    "motionSignature": "prowling",
+    "baseRarity": "uncommon",
+    "habitatBias": ["nature", "urban"],
+    "vectorAffinity": {
+      "activityLevel": ["steady", "active"],
+      "explorationStyle": ["roaming", "exploratory"],
+      "routineDepth": ["varied", "recurring"],
+      "placeAffinity": ["nature", "urban"],
+      "timeAffinity": ["dusk", "night"]
+    },
+    "visualTraits": ["ivy tail", "hook claws", "climbing spine"]
+  },
+  {
+    "id": "halofern",
+    "name": "Halofern",
+    "archetype": "growth spirit",
+    "silhouette": "floating fern halo form",
+    "temperament": "luminous",
+    "motionSignature": "drifting",
+    "baseRarity": "rare",
+    "habitatBias": ["nature", "home"],
+    "vectorAffinity": {
+      "activityLevel": ["light", "steady"],
+      "explorationStyle": ["rooted", "exploratory"],
+      "routineDepth": ["recurring", "ritualized"],
+      "placeAffinity": ["nature", "home"],
+      "timeAffinity": ["dawn", "morning", "dusk"]
+    },
+    "visualTraits": ["fern halo", "spore ring", "light stem tail"]
+  }
+]

@@ -1,0 +1,89 @@
+{
+  "rawSignals": [
+    "steps",
+    "activeMinutes",
+    "distanceKm",
+    "uniquePlaces",
+    "repeatVisits",
+    "homeTimeRatio",
+    "venueCategories",
+    "timeOfDayDistribution",
+    "weekdayWeekendSplit",
+    "movementConsistency",
+    "explorationRadiusKm"
+  ],
+  "primaryAxes": [
+    "activityLevel",
+    "explorationStyle",
+    "routineDepth",
+    "placeAffinity",
+    "timeAffinity"
+  ],
+  "supportingAxes": [
+    "recoveryBalance",
+    "tempo",
+    "noveltyBias",
+    "consistency"
+  ],
+  "derivedVectors": {
+    "activityLevel": {
+      "description": "How physically active the day was overall.",
+      "levels": ["sedentary", "light", "steady", "active", "intense"]
+    },
+    "explorationStyle": {
+      "description": "How wide or familiar the user's movement was.",
+      "levels": ["rooted", "local", "roaming", "exploratory", "wandering"]
+    },
+    "routineDepth": {
+      "description": "How strongly the day reflected repeated habits and returns.",
+      "levels": ["chaotic", "varied", "recurring", "rooted", "ritualized"]
+    },
+    "placeAffinity": {
+      "description": "Which type of environment most defined the day.",
+      "levels": ["home", "cozy", "urban", "nature", "waterside"]
+    },
+    "timeAffinity": {
+      "description": "When the strongest movement or place-signature happened.",
+      "levels": ["dawn", "morning", "midday", "dusk", "night"]
+    },
+    "recoveryBalance": {
+      "description": "Whether the day leaned depleted or restorative.",
+      "levels": ["depleted", "neutral", "restored", "restorative"]
+    },
+    "tempo": {
+      "description": "The pace and cadence of movement across the day.",
+      "levels": ["slow", "measured", "steady", "brisk", "surging"]
+    },
+    "noveltyBias": {
+      "description": "Whether the day favored familiar places or novelty.",
+      "levels": ["familiar", "mixed", "novelty-seeking"]
+    },
+    "consistency": {
+      "description": "How stable the user's daily rhythm has been recently.",
+      "levels": ["irregular", "building", "stable", "disciplined"]
+    }
+  },
+  "instanceOnlyTags": {
+    "timeEditionTags": [
+      "dawn-touched",
+      "morning-marked",
+      "sunlit",
+      "dusk-lit",
+      "night-bloom"
+    ],
+    "movementTags": [
+      "steady-step",
+      "surge-walk",
+      "slow-return",
+      "long-route",
+      "quiet-loop"
+    ],
+    "placeTags": [
+      "park-return",
+      "homebound",
+      "corner-cafe",
+      "city-thread",
+      "waterside-drift"
+    ]
+  }
+}

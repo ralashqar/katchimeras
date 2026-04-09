@@ -1,0 +1,47 @@
+[
+  {
+    "habitatId": "home",
+    "title": "Home Rhythm",
+    "captionSuffix": "shaped by sanctuary and return",
+    "descriptionModifier": "Its form leans into sanctuary, restoration, and the private rhythm of home.",
+    "visualModifier": "warm sanctuary lighting, softer edges, quiet interior atmosphere, subtle hearth glow, domestic magical details",
+    "promptModifier": "home habitat variant, sanctuary-lit, soft interior warmth, subtle hearth glow, quiet magical domestic atmosphere",
+    "paletteShift": ["warm amber", "plum shadow", "soft cream"]
+  },
+  {
+    "habitatId": "cozy",
+    "title": "Cozy Pocket",
+    "captionSuffix": "shaped by warmth and familiar corners",
+    "descriptionModifier": "Its form carries the mood of warm stops, comfort rituals, and places that invite you to linger.",
+    "visualModifier": "amber highlights, plush textures, intimate lighting, warm reflective surfaces, cozy magical atmosphere",
+    "promptModifier": "cozy habitat variant, warm amber light, plush texture accents, intimate cafe-like magical atmosphere",
+    "paletteShift": ["ember orange", "mulled berry", "cocoa brown"]
+  },
+  {
+    "habitatId": "urban",
+    "title": "Urban Thread",
+    "captionSuffix": "shaped by crossings, signals, and city rhythm",
+    "descriptionModifier": "Its form sharpens around routes, signals, and the momentum of urban repetition.",
+    "visualModifier": "sleek edges, subtle neon reflections, cityline markings, reflective surfaces, controlled metropolitan mood",
+    "promptModifier": "urban habitat variant, sleek cityline details, subtle neon reflections, premium metropolitan fantasy atmosphere",
+    "paletteShift": ["signal cyan", "steel gray", "deep navy"]
+  },
+  {
+    "habitatId": "nature",
+    "title": "Nature Vein",
+    "captionSuffix": "shaped by trails, canopy, and green return",
+    "descriptionModifier": "Its form deepens around park paths, trail edges, and the slow texture of green places.",
+    "visualModifier": "moss details, leaf-light, wind-touched materials, organic surfaces, grounded forest atmosphere",
+    "promptModifier": "nature habitat variant, moss and leaf-light details, grounded organic forms, premium forest spirit atmosphere",
+    "paletteShift": ["moss green", "jade", "earth brown"]
+  },
+  {
+    "habitatId": "waterside",
+    "title": "Waterside Drift",
+    "captionSuffix": "shaped by horizon, current, and open air",
+    "descriptionModifier": "Its form carries distance, air, and the reflective pull of shoreline movement.",
+    "visualModifier": "ripple light, airy spacing, shoreline textures, mist accents, open-horizon atmosphere",
+    "promptModifier": "waterside habitat variant, ripple light, shoreline textures, airy open-horizon magical atmosphere",
+    "paletteShift": ["sea teal", "foam blue", "pearl gray"]
+  }
+]
