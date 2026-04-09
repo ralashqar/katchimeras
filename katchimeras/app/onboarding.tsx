@@ -9,11 +9,12 @@ import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
 import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
 import { presenceEnter, presenceExit, rewardEnter, usePressMotion } from '@/components/katchadeck/motion';
-import { OrbitHeroIntro } from '@/components/katchadeck/onboarding/orbit-hero-intro';
+import { DayInMotionIntro } from '@/components/katchadeck/onboarding/day-in-motion-intro';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
+import { dayInMotionPalette } from '@/constants/day-in-motion-intro';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   aspirationOptions,
@@ -39,14 +40,9 @@ type OnboardingTheme = {
 
 const pageThemes: OnboardingTheme[] = [
   {
-    accentColor: 'rgba(200,216,255,0.14)',
-    colors: ['#090B12', '#11192B', '#171D34'],
-    meshColors: [
-      'rgba(200,216,255,0.14)',
-      'rgba(95,168,123,0.08)',
-      'rgba(106,95,232,0.08)',
-      'rgba(227,160,110,0.08)',
-    ],
+    accentColor: dayInMotionPalette.accent,
+    colors: dayInMotionPalette.colors,
+    meshColors: dayInMotionPalette.meshColors,
     pageLabel: 'Welcome',
     primaryCtaLabel: 'Begin',
   },
@@ -277,7 +273,7 @@ export default function OnboardingScreen() {
             contentContainerStyle={[styles.pageContent, styles.introPageContent]}
             contentInsetAdjustmentBehavior="automatic"
             showsVerticalScrollIndicator={false}>
-            <OrbitHeroIntro onBegin={handleNext} />
+            <DayInMotionIntro onBegin={handleNext} />
           </ScrollView>
 
           <QuestionPage

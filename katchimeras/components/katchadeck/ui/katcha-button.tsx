@@ -8,7 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI } from '@/constants/theme';
 
 type KatchaButtonVariant = 'primary' | 'secondary' | 'premium';
-type KatchaButtonIcon = 'arrow.right' | 'sparkles' | 'arrow.counterclockwise' | 'xmark';
+type KatchaButtonIcon = 'arrow.right' | 'sparkles' | 'arrow.counterclockwise' | 'xmark' | 'star.fill';
 
 type KatchaButtonProps = {
   label: string;

@@ -19,6 +19,7 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'arrow.right': 'arrow-forward',
+  'star.fill': 'star',
   'sparkles': 'auto-awesome',
   'arrow.counterclockwise': 'refresh',
   'xmark': 'close',
