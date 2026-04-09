@@ -12,6 +12,8 @@ export const heroOrbitAssets = {
 } as const satisfies Record<string, ImageSourcePropType>;
 
 export type HeroOrbitAssetKey = keyof typeof heroOrbitAssets;
+export type HeroOrbitLane = 'inner' | 'middle' | 'outer';
+export type HeroSequencePhase = 'idle' | 'spotlightIn' | 'spotlightHold' | 'spotlightOut';
 
 export type HeroArcLayer = {
   id: string;
@@ -33,7 +35,42 @@ export type HeroOrbitItem = {
   rotationDuration: number;
   parallaxDepth: number;
   opacity: number;
+  lane: HeroOrbitLane;
 };
+
+const laneBaseAngles: Record<HeroOrbitLane, number> = {
+  inner: -28,
+  middle: 16,
+  outer: -10,
+};
+
+export function resolveHeroOrbitItems(items: readonly HeroOrbitItem[]): HeroOrbitItem[] {
+  const counts = items.reduce<Record<HeroOrbitLane, number>>(
+    (accumulator, item) => {
+      accumulator[item.lane] += 1;
+      return accumulator;
+    },
+    { inner: 0, middle: 0, outer: 0 }
+  );
+
+  const laneIndices: Record<HeroOrbitLane, number> = {
+    inner: 0,
+    middle: 0,
+    outer: 0,
+  };
+
+  return items.map((item) => {
+    const laneCount = counts[item.lane];
+    const slotIndex = laneIndices[item.lane];
+    laneIndices[item.lane] += 1;
+    const slotAngle = laneCount > 0 ? (360 / laneCount) * slotIndex : 0;
+
+    return {
+      ...item,
+      startAngle: laneBaseAngles[item.lane] + slotAngle + item.startAngle,
+    };
+  });
+}
 
 export type HeroTimingConfig = {
   arcDelay: number;
@@ -44,6 +81,14 @@ export type HeroTimingConfig = {
   ctaDelay: number;
 };
 
+export type HeroSequenceConfig = {
+  startDelay: number;
+  spotlightInDuration: number;
+  spotlightHoldDuration: number;
+  spotlightOutDuration: number;
+  gapDuration: number;
+};
+
 export type HeroSceneConfig = {
   title: string;
   subtitle?: string;
@@ -51,6 +96,7 @@ export type HeroSceneConfig = {
   backgroundPalette: readonly [string, string, string];
   accentColor: string;
   orbitItems: readonly HeroOrbitItem[];
+  sequence: HeroSequenceConfig;
   arcLayers: readonly HeroArcLayer[];
   timings: HeroTimingConfig;
 };
@@ -65,74 +111,88 @@ export const openingHeroScene: HeroSceneConfig = {
     {
       id: 'mossprout',
       assetKey: 'mossprout',
-      orbitRadius: 126,
-      startAngle: -18,
-      size: 72,
-      rotationDuration: 38000,
-      parallaxDepth: 0.95,
+      orbitRadius: 114,
+      startAngle: 0,
+      size: 68,
+      rotationDuration: 36000,
+      parallaxDepth: 0.92,
       opacity: 0.96,
+      lane: 'inner',
     },
     {
       id: 'lattelet',
       assetKey: 'lattelet',
-      orbitRadius: 144,
-      startAngle: 98,
-      size: 76,
-      rotationDuration: 46000,
-      parallaxDepth: 1.08,
+      orbitRadius: 140,
+      startAngle: -8,
+      size: 74,
+      rotationDuration: 43000,
+      parallaxDepth: 1.06,
       opacity: 0.92,
+      lane: 'middle',
     },
     {
       id: 'sprintail',
       assetKey: 'sprintail',
-      orbitRadius: 118,
-      startAngle: 206,
-      size: 68,
-      rotationDuration: 34000,
+      orbitRadius: 114,
+      startAngle: 18,
+      size: 66,
+      rotationDuration: 32000,
       parallaxDepth: 0.9,
       opacity: 0.94,
+      lane: 'inner',
     },
     {
       id: 'neonpoko',
       assetKey: 'neonpoko',
-      orbitRadius: 154,
-      startAngle: 292,
-      size: 80,
+      orbitRadius: 164,
+      startAngle: -12,
+      size: 78,
       rotationDuration: 52000,
-      parallaxDepth: 1.12,
+      parallaxDepth: 1.14,
       opacity: 0.9,
+      lane: 'outer',
     },
     {
       id: 'crumbun',
       assetKey: 'crumbun',
-      orbitRadius: 142,
-      startAngle: 44,
+      orbitRadius: 140,
+      startAngle: 12,
       size: 72,
       rotationDuration: 44000,
       parallaxDepth: 1.02,
       opacity: 0.9,
+      lane: 'middle',
     },
     {
       id: 'hayhorn',
       assetKey: 'hayhorn',
       orbitRadius: 168,
-      startAngle: 164,
+      startAngle: 10,
       size: 76,
       rotationDuration: 56000,
       parallaxDepth: 1.14,
       opacity: 0.86,
+      lane: 'outer',
     },
     {
       id: 'ironette',
       assetKey: 'ironette',
       orbitRadius: 168,
-      startAngle: 250,
+      startAngle: -22,
       size: 76,
       rotationDuration: 60000,
       parallaxDepth: 1.16,
       opacity: 0.88,
+      lane: 'outer',
     },
   ],
+  sequence: {
+    startDelay: 2200,
+    spotlightInDuration: 780,
+    spotlightHoldDuration: 1800,
+    spotlightOutDuration: 820,
+    gapDuration: 280,
+  },
   arcLayers: [
     {
       id: 'inner-arc',

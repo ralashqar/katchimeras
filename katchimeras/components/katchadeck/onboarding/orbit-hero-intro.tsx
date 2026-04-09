@@ -5,9 +5,10 @@ import { Image } from 'expo-image';
 
 import { OrbitRingBackdrop } from '@/components/katchadeck/onboarding/orbit-ring-backdrop';
 import { OrbitingKatchimera } from '@/components/katchadeck/onboarding/orbiting-katchimera';
+import { useHeroShowcaseSequence } from '@/components/katchadeck/onboarding/use-hero-showcase-sequence';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import { heroOrbitAssets, openingHeroScene } from '@/constants/onboarding-hero';
+import { heroOrbitAssets, openingHeroScene, resolveHeroOrbitItems } from '@/constants/onboarding-hero';
 import { KatchaDeckUI } from '@/constants/theme';
 
 type OrbitHeroIntroProps = {
@@ -18,7 +19,17 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
   const { width } = useWindowDimensions();
   const scene = openingHeroScene;
   const sceneSize = useMemo(() => Math.min(width - 36, 368), [width]);
+  const resolvedOrbitItems = useMemo(() => resolveHeroOrbitItems(scene.orbitItems), [scene.orbitItems]);
   const avatarEntrance = useSharedValue(0);
+
+  useHeroShowcaseSequence({
+    itemCount: resolvedOrbitItems.length,
+    startDelay: scene.sequence.startDelay,
+    spotlightInDuration: scene.sequence.spotlightInDuration,
+    spotlightHoldDuration: scene.sequence.spotlightHoldDuration,
+    spotlightOutDuration: scene.sequence.spotlightOutDuration,
+    gapDuration: scene.sequence.gapDuration,
+  });
 
   useEffect(() => {
     avatarEntrance.value = 0;
@@ -41,7 +52,7 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
       <View style={[styles.sceneWrap, { minHeight: sceneSize + 72 }]}>
         <View style={[styles.sceneStage, { height: sceneSize, width: sceneSize }]}>
           <OrbitRingBackdrop delay={scene.timings.arcDelay} layers={scene.arcLayers} size={sceneSize} />
-          {scene.orbitItems.map((item, index) => (
+          {resolvedOrbitItems.map((item, index) => (
             <OrbitingKatchimera
               delay={scene.timings.orbitDelayStart + index * scene.timings.orbitStagger}
               item={item}
