@@ -18,12 +18,43 @@ export type KatchimeraRenderProfile = {
   styleGuideId: string;
 };
 
+export type KatchimeraEncounterProfile = {
+  id: string;
+  seedId: string;
+  topLevelType: string;
+  triggerCategory: string;
+  triggerSubtype: string;
+  theme: string;
+  creatureKind: string;
+  name: string;
+  displayName: string;
+  caption: string;
+  userFacingDescription: string;
+  motivationalQuote: string;
+  baseRarity: string;
+  variantSupport: string[];
+  lifestyleSignals: string[];
+  sourceExamples: string[];
+  visualTone: string;
+  visualMotifs: string[];
+  visualDescription: string;
+  promptHooks: string[];
+  imagePrompt: string;
+};
+
+export type KatchimeraArtProfile = KatchimeraRenderProfile | KatchimeraEncounterProfile;
+
 export type GeneratedKatchimeraRecord = {
   id: string;
   render_profile_id: string;
-  family_id: string;
-  habitat_aspect_id: string;
-  stage_id: string;
+  family_id: string | null;
+  habitat_aspect_id: string | null;
+  stage_id: string | null;
+  top_level_type: string | null;
+  trigger_category: string | null;
+  trigger_subtype: string | null;
+  theme: string | null;
+  creature_kind: string | null;
   display_name: string;
   model_id: string;
   status: 'queued' | 'generating' | 'completed' | 'failed';
@@ -36,7 +67,7 @@ export type GeneratedKatchimeraRecord = {
   fal_request_id: string | null;
   error_message: string | null;
   approved: boolean;
-  source_profile: KatchimeraRenderProfile;
+  source_profile: KatchimeraArtProfile;
   result_payload: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;

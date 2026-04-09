@@ -11,20 +11,20 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import {
-  katchimeraFamilyIds,
-  katchimeraHabitatIds,
-  katchimeraRenderProfiles,
-  katchimeraStageIds,
-} from '@/constants/katchimera-render-profiles';
+  katchimeraEncounterCategories,
+  katchimeraEncounterProfiles,
+  katchimeraEncounterSubtypes,
+  katchimeraEncounterTypes,
+} from '@/constants/katchimera-encounter-profiles';
 import { KatchaDeckUI } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
-import type { GeneratedKatchimeraRecord } from '@/types/katchimera';
+import type { GeneratedKatchimeraRecord, KatchimeraEncounterProfile } from '@/types/katchimera';
 import { supabase } from '@/utils/supabase';
 
 export default function ArtLabScreen() {
-  const [familyId, setFamilyId] = useState<string>(katchimeraFamilyIds[0] ?? '');
-  const [habitatId, setHabitatId] = useState<string>('all');
-  const [stageId, setStageId] = useState<string>('all');
+  const [topLevelType, setTopLevelType] = useState<string>(katchimeraEncounterTypes[0] ?? 'location');
+  const [triggerCategory, setTriggerCategory] = useState<string>('all');
+  const [triggerSubtype, setTriggerSubtype] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,16 +35,16 @@ export default function ArtLabScreen() {
   const filteredProfiles = useMemo(() => {
     const lowered = search.trim().toLowerCase();
 
-    return katchimeraRenderProfiles.filter((profile) => {
-      if (familyId && profile.familyId !== familyId) {
+    return katchimeraEncounterProfiles.filter((profile) => {
+      if (topLevelType && profile.topLevelType !== topLevelType) {
         return false;
       }
 
-      if (habitatId !== 'all' && profile.habitatAspectId !== habitatId) {
+      if (triggerCategory !== 'all' && profile.triggerCategory !== triggerCategory) {
         return false;
       }
 
-      if (stageId !== 'all' && profile.stageId !== stageId) {
+      if (triggerSubtype !== 'all' && profile.triggerSubtype !== triggerSubtype) {
         return false;
       }
 
@@ -55,10 +55,11 @@ export default function ArtLabScreen() {
       return (
         profile.displayName.toLowerCase().includes(lowered) ||
         profile.caption.toLowerCase().includes(lowered) ||
-        profile.familyId.toLowerCase().includes(lowered)
+        profile.triggerSubtype.toLowerCase().includes(lowered) ||
+        profile.theme.toLowerCase().includes(lowered)
       );
     });
-  }, [familyId, habitatId, search, stageId]);
+  }, [search, topLevelType, triggerCategory, triggerSubtype]);
 
   const selectedProfile =
     filteredProfiles.find((profile) => profile.id === selectedId) ?? filteredProfiles[0] ?? null;
@@ -148,13 +149,13 @@ export default function ArtLabScreen() {
             Generate Katchimera art
           </ThemedText>
           <ThemedText type="bodyLarge" style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
-            Select a render profile, invoke the Edge Function, and inspect the stored result.
+            Select an encounter-based Katchimera, invoke the Edge Function, and inspect the stored result.
           </ThemedText>
         </Animated.View>
 
         <Animated.View entering={presenceEnter(80)}>
           <GlassPanel contentStyle={styles.panel}>
-            <SectionHeader label="Filters" title="Choose a family and variant" />
+            <SectionHeader label="Filters" title="Choose a trigger and encounter" />
             <TextInput
               onChangeText={setSearch}
               placeholder="Search by name or caption"
@@ -162,18 +163,54 @@ export default function ArtLabScreen() {
               style={styles.searchInput}
               value={search}
             />
-            <ChipRow items={katchimeraFamilyIds} label="Family" selected={familyId} onSelect={(value) => {
-              setFamilyId(value);
-              setSelectedId(null);
-            }} />
-            <ChipRow items={['all', ...katchimeraHabitatIds]} label="Habitat" selected={habitatId} onSelect={(value) => {
-              setHabitatId(value);
-              setSelectedId(null);
-            }} />
-            <ChipRow items={['all', ...katchimeraStageIds]} label="Stage" selected={stageId} onSelect={(value) => {
-              setStageId(value);
-              setSelectedId(null);
-            }} />
+            <ChipRow
+              items={katchimeraEncounterTypes}
+              label="Type"
+              selected={topLevelType}
+              onSelect={(value) => {
+                setTopLevelType(value);
+                setTriggerCategory('all');
+                setTriggerSubtype('all');
+                setSelectedId(null);
+              }}
+            />
+            <ChipRow
+              items={[
+                'all',
+                ...katchimeraEncounterCategories.filter((category) =>
+                  katchimeraEncounterProfiles.some(
+                    (profile) =>
+                      profile.topLevelType === topLevelType && profile.triggerCategory === category
+                  )
+                ),
+              ]}
+              label="Category"
+              selected={triggerCategory}
+              onSelect={(value) => {
+                setTriggerCategory(value);
+                setTriggerSubtype('all');
+                setSelectedId(null);
+              }}
+            />
+            <ChipRow
+              items={[
+                'all',
+                ...katchimeraEncounterSubtypes.filter((subtype) =>
+                  katchimeraEncounterProfiles.some(
+                    (profile) =>
+                      profile.topLevelType === topLevelType &&
+                      (triggerCategory === 'all' || profile.triggerCategory === triggerCategory) &&
+                      profile.triggerSubtype === subtype
+                  )
+                ),
+              ]}
+              label="Trigger"
+              selected={triggerSubtype}
+              onSelect={(value) => {
+                setTriggerSubtype(value);
+                setSelectedId(null);
+              }}
+            />
           </GlassPanel>
         </Animated.View>
 
@@ -205,8 +242,14 @@ export default function ArtLabScreen() {
               <ThemedText style={styles.panelText} lightColor="#DCE6FF" darkColor="#DCE6FF">
                 {selectedProfile.caption}
               </ThemedText>
+              <ThemedText style={styles.metaText} lightColor="#C9DBFF" darkColor="#C9DBFF">
+                {formatEncounterMeta(selectedProfile)}
+              </ThemedText>
               <ThemedText style={styles.panelText} lightColor="#DCE6FF" darkColor="#DCE6FF">
                 {selectedProfile.userFacingDescription}
+              </ThemedText>
+              <ThemedText style={styles.panelText} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                {selectedProfile.visualDescription}
               </ThemedText>
               <ThemedText selectable style={styles.promptText} lightColor="#E9F1FF" darkColor="#E9F1FF">
                 {selectedProfile.imagePrompt}
@@ -277,6 +320,25 @@ export default function ArtLabScreen() {
   );
 }
 
+function formatEncounterMeta(profile: KatchimeraEncounterProfile) {
+  return [
+    formatChipLabel(profile.topLevelType),
+    formatChipLabel(profile.triggerCategory),
+    formatChipLabel(profile.triggerSubtype),
+    formatChipLabel(profile.creatureKind),
+    formatChipLabel(profile.baseRarity),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function formatChipLabel(value: string) {
+  return value
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function ChipRow({
   label,
   items,
@@ -301,7 +363,7 @@ function ChipRow({
               onPress={() => onSelect(item)}
               style={[styles.filterChip, selected === item ? styles.filterChipSelected : null]}>
               <ThemedText style={styles.filterChipText} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                {item}
+                {formatChipLabel(item)}
               </ThemedText>
             </Pressable>
           ))}
@@ -397,6 +459,11 @@ const styles = StyleSheet.create({
   panelText: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  metaText: {
+    fontSize: 12,
+    letterSpacing: 0.5,
+    textTransform: 'capitalize',
   },
   promptText: {
     fontSize: 13,

@@ -19,10 +19,15 @@ const defaultFalInput = {
 
 type RenderProfilePayload = {
   id: string;
-  familyId: string;
-  habitatAspectId: string;
-  stageId: string;
   displayName: string;
+  familyId?: string;
+  habitatAspectId?: string;
+  stageId?: string;
+  topLevelType?: string;
+  triggerCategory?: string;
+  triggerSubtype?: string;
+  theme?: string;
+  creatureKind?: string;
   caption?: string;
   motivationalQuote?: string;
   imagePrompt: string;
@@ -132,9 +137,14 @@ Deno.serve(async (req) => {
       .from('generated_katchimeras')
       .insert({
         render_profile_id: renderProfile.id,
-        family_id: renderProfile.familyId,
-        habitat_aspect_id: renderProfile.habitatAspectId,
-        stage_id: renderProfile.stageId,
+        family_id: renderProfile.familyId ?? null,
+        habitat_aspect_id: renderProfile.habitatAspectId ?? null,
+        stage_id: renderProfile.stageId ?? null,
+        top_level_type: renderProfile.topLevelType ?? null,
+        trigger_category: renderProfile.triggerCategory ?? null,
+        trigger_subtype: renderProfile.triggerSubtype ?? null,
+        theme: renderProfile.theme ?? null,
+        creature_kind: renderProfile.creatureKind ?? null,
         display_name: renderProfile.displayName,
         model_id: modelId,
         status: 'generating',
@@ -184,7 +194,12 @@ Deno.serve(async (req) => {
 
     const contentType = imageResponse.headers.get('content-type') ?? 'image/png';
     const extension = getExtension(contentType, imageUrl);
-    const storagePath = `${renderProfile.familyId}/${renderProfile.habitatAspectId}/${renderProfile.stageId}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+    const storageSegments = [
+      renderProfile.topLevelType ?? 'legacy',
+      renderProfile.triggerSubtype ?? renderProfile.familyId ?? 'misc',
+      renderProfile.id,
+    ];
+    const storagePath = `${storageSegments.join('/')}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
     const imageBuffer = await imageResponse.arrayBuffer();
 
     const { error: uploadError } = await supabaseAdmin.storage

@@ -1,0 +1,1177 @@
+[
+  {
+    "id": "park",
+    "topLevelType": "location",
+    "triggerCategory": "park",
+    "triggerSubtype": "park",
+    "theme": "green retreat",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["parkVisit", "freshAir", "lightMovement"],
+    "sourceExamples": ["city park", "dog park", "neighborhood green"],
+    "visualTone": "soft natural calm",
+    "promptBase": "park-born creature with leafy details and calm outdoor energy",
+    "variants": [
+      {
+        "idSuffix": "mossprout",
+        "creatureKind": "plantling",
+        "name": "Mossprout",
+        "caption": "A tiny park spirit that grows with every green detour.",
+        "motivationalQuote": "Small walks still make a world.",
+        "visualMotifs": ["moss hood", "leaf ears", "dew glow"]
+      },
+      {
+        "idSuffix": "benchkin",
+        "creatureKind": "objectling",
+        "name": "Benchkin",
+        "caption": "A quiet little companion shaped by pause and shade.",
+        "motivationalQuote": "Rest belongs in a well-lived day.",
+        "visualMotifs": ["wood slat shell", "park brass details", "ivy trim"]
+      },
+      {
+        "idSuffix": "puddlehop",
+        "creatureKind": "sprite",
+        "name": "Puddlehop",
+        "caption": "A cheerful hopling that appears after grassy wanderings.",
+        "motivationalQuote": "A playful step still counts.",
+        "visualMotifs": ["rain-gloss feet", "splash ring", "soft pebble tail"]
+      },
+      {
+        "idSuffix": "breezleaf",
+        "creatureKind": "spirit",
+        "name": "Breezleaf",
+        "caption": "A drifting park familiar carried by open-air afternoons.",
+        "motivationalQuote": "Calm movement keeps you open.",
+        "visualMotifs": ["wind ribbon", "leaf plume", "pale green aura"]
+      }
+    ]
+  },
+  {
+    "id": "garden",
+    "topLevelType": "location",
+    "triggerCategory": "garden",
+    "triggerSubtype": "garden",
+    "theme": "tended bloom",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["gardenVisit", "slowExploration", "quietRoutine"],
+    "sourceExamples": ["botanical garden", "community garden", "rose garden"],
+    "visualTone": "floral gentle bright",
+    "promptBase": "garden creature with petal textures and curated bloom details",
+    "variants": [
+      {
+        "idSuffix": "petalimp",
+        "creatureKind": "plantling",
+        "name": "Petalimp",
+        "caption": "A bloom-tipped helper found where care turns into color.",
+        "motivationalQuote": "What you tend begins to answer back.",
+        "visualMotifs": ["petal collar", "pollen freckles", "bud tail"]
+      },
+      {
+        "idSuffix": "troweloo",
+        "creatureKind": "objectling",
+        "name": "Troweloo",
+        "caption": "A polished little digger born from planted afternoons.",
+        "motivationalQuote": "Depth comes from returning gently.",
+        "visualMotifs": ["spade crest", "terracotta paws", "twine bow"]
+      },
+      {
+        "idSuffix": "bloomble",
+        "creatureKind": "sprite",
+        "name": "Bloomble",
+        "caption": "A round floral puff that gathers the scent of patient places.",
+        "motivationalQuote": "Gentleness still leaves a mark.",
+        "visualMotifs": ["flower puff fur", "bead eyes", "nectar glow"]
+      },
+      {
+        "idSuffix": "sniplet",
+        "creatureKind": "hybrid",
+        "name": "Sniplet",
+        "caption": "A trim little pruner spirit that loves shaped paths and beds.",
+        "motivationalQuote": "Care sharpens what matters.",
+        "visualMotifs": ["shear-shaped ears", "fresh stem details", "mint shimmer"]
+      }
+    ]
+  },
+  {
+    "id": "farm",
+    "topLevelType": "location",
+    "triggerCategory": "farm",
+    "triggerSubtype": "farm",
+    "theme": "earthy harvest",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["farmVisit", "countryTravel", "produceConnection"],
+    "sourceExamples": ["working farm", "petting farm", "farmers' market grounds"],
+    "visualTone": "warm rustic grounded",
+    "promptBase": "farm-themed creature with straw, produce and barnyard charm",
+    "variants": [
+      {
+        "idSuffix": "hayhorn",
+        "creatureKind": "beast",
+        "name": "Hayhorn",
+        "caption": "A sturdy field companion with a straw-soft crown.",
+        "motivationalQuote": "Rooted days build lasting strength.",
+        "visualMotifs": ["hay mane", "wooden hoof caps", "amber eyes"]
+      },
+      {
+        "idSuffix": "beetlet",
+        "creatureKind": "foodling",
+        "name": "Beetlet",
+        "caption": "A rosy little crop creature born from earthy places.",
+        "motivationalQuote": "Growth often begins underground.",
+        "visualMotifs": ["beet bulb body", "leaf sprouts", "soil dust blush"]
+      },
+      {
+        "idSuffix": "coopuff",
+        "creatureKind": "hybrid",
+        "name": "Coopuff",
+        "caption": "A feathery barn sprite that thrives around open yards.",
+        "motivationalQuote": "Simple rhythms can still feel full.",
+        "visualMotifs": ["nest fluff", "grain-speckled wings", "tiny comb"]
+      },
+      {
+        "idSuffix": "pailmoo",
+        "creatureKind": "objectling",
+        "name": "Pailmoo",
+        "caption": "A round milk-pail familiar with a soft pastoral glow.",
+        "motivationalQuote": "Nourishment is part of momentum.",
+        "visualMotifs": ["tin pail body", "cream swirl horns", "bell strap"]
+      }
+    ]
+  },
+  {
+    "id": "forest",
+    "topLevelType": "location",
+    "triggerCategory": "forest",
+    "triggerSubtype": "forest",
+    "theme": "deep wild green",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["forestVisit", "trailTime", "natureImmersion"],
+    "sourceExamples": ["woodland trail", "forest preserve", "pine path"],
+    "visualTone": "mossy magical shaded",
+    "promptBase": "forest creature with bark, fern and twilight woodland motifs",
+    "variants": [
+      {
+        "idSuffix": "fernip",
+        "creatureKind": "plantling",
+        "name": "Fernip",
+        "caption": "A curled green scout that follows quiet trails.",
+        "motivationalQuote": "The deeper path changes your shape.",
+        "visualMotifs": ["fern frill", "moss paws", "spore sparkle"]
+      },
+      {
+        "idSuffix": "twiglow",
+        "creatureKind": "spirit",
+        "name": "Twiglow",
+        "caption": "A lantern-like wood wisp found among dim branches.",
+        "motivationalQuote": "A little light is enough to continue.",
+        "visualMotifs": ["twig antlers", "firefly core", "bark trim"]
+      },
+      {
+        "idSuffix": "barkbit",
+        "creatureKind": "beast",
+        "name": "Barkbit",
+        "caption": "A stout woodland nibbler with a carved-wood grin.",
+        "motivationalQuote": "Steady steps make wild places familiar.",
+        "visualMotifs": ["bark plating", "seed satchel", "lichen spots"]
+      },
+      {
+        "idSuffix": "owlmoss",
+        "creatureKind": "hybrid",
+        "name": "Owlmoss",
+        "caption": "A soft forest watcher with feathered moss around its face.",
+        "motivationalQuote": "Quiet awareness is its own kind of progress.",
+        "visualMotifs": ["owl mask", "moss ruff", "moonlit pupils"]
+      }
+    ]
+  },
+  {
+    "id": "beach",
+    "topLevelType": "location",
+    "triggerCategory": "beach",
+    "triggerSubtype": "beach",
+    "theme": "saltlight leisure",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["beachVisit", "coastWalk", "sunsetTrip"],
+    "sourceExamples": ["sandy beach", "boardwalk shore", "seaside promenade"],
+    "visualTone": "bright coastal breezy",
+    "promptBase": "beach creature with shell, foam and sunwashed coastal details",
+    "variants": [
+      {
+        "idSuffix": "shellio",
+        "creatureKind": "objectling",
+        "name": "Shellio",
+        "caption": "A pearly little shoreline companion with a spiral shell heart.",
+        "motivationalQuote": "Even light days can leave treasure behind.",
+        "visualMotifs": ["shell helm", "pearl belly", "sea-glass sheen"]
+      },
+      {
+        "idSuffix": "pebblip",
+        "creatureKind": "sprite",
+        "name": "Pebblip",
+        "caption": "A smooth skipping creature polished by shore walks.",
+        "motivationalQuote": "Small moments round you into something better.",
+        "visualMotifs": ["pebble body", "foam socks", "salt sparkle"]
+      },
+      {
+        "idSuffix": "foamlit",
+        "creatureKind": "spirit",
+        "name": "Foamlit",
+        "caption": "A pale sea wisp drifting wherever the tide softens the day.",
+        "motivationalQuote": "Ease can still move you forward.",
+        "visualMotifs": ["foam ribbon", "aqua glow", "soft crest"]
+      },
+      {
+        "idSuffix": "sandyfin",
+        "creatureKind": "hybrid",
+        "name": "Sandyfin",
+        "caption": "A playful dune-hopper with fins made for warm wind.",
+        "motivationalQuote": "Joy is part of the journey too.",
+        "visualMotifs": ["sand-speckled fins", "dune tail", "sunlit freckles"]
+      }
+    ]
+  },
+  {
+    "id": "riverwalk",
+    "topLevelType": "location",
+    "triggerCategory": "riverwalk",
+    "triggerSubtype": "riverwalk",
+    "theme": "flowing city calm",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["waterfrontWalk", "eveningStroll", "steadyMovement"],
+    "sourceExamples": ["river path", "canal walk", "quayside route"],
+    "visualTone": "reflective urban water",
+    "promptBase": "riverside creature with flowing water motifs and reflective urban charm",
+    "variants": [
+      {
+        "idSuffix": "ripplet",
+        "creatureKind": "sprite",
+        "name": "Ripplet",
+        "caption": "A water-skipping friend that gathers your calmer miles.",
+        "motivationalQuote": "Steady movement has its own music.",
+        "visualMotifs": ["ripple rings", "glassy paws", "stream tail"]
+      },
+      {
+        "idSuffix": "docklet",
+        "creatureKind": "objectling",
+        "name": "Docklet",
+        "caption": "A mooring-post creature that loves repeat riverside loops.",
+        "motivationalQuote": "Returning can be its own kind of adventure.",
+        "visualMotifs": ["rope belt", "oak post body", "brass cleat ears"]
+      },
+      {
+        "idSuffix": "reedrop",
+        "creatureKind": "plantling",
+        "name": "Reedrop",
+        "caption": "A slim waterside sproutling shaped by breezes and banks.",
+        "motivationalQuote": "Flexibility keeps you growing.",
+        "visualMotifs": ["reed plume", "droplet cheeks", "marsh green gradient"]
+      },
+      {
+        "idSuffix": "skipperstone",
+        "creatureKind": "beast",
+        "name": "Skipperstone",
+        "caption": "A sturdy little river companion with a polished skipping back.",
+        "motivationalQuote": "Progress adds up across the surface.",
+        "visualMotifs": ["smooth stone shell", "blue-gray fins", "wake glow"]
+      }
+    ]
+  },
+  {
+    "id": "coffee_shop",
+    "topLevelType": "location",
+    "triggerCategory": "cafe",
+    "triggerSubtype": "coffee_shop",
+    "theme": "coffee comfort",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["coffeeStop", "cozyRoutine", "socialBreak"],
+    "sourceExamples": ["independent cafe", "espresso bar", "coffee chain"],
+    "visualTone": "warm aromatic cozy",
+    "promptBase": "cute coffee creature with cafe warmth, creamy details and collectible polish",
+    "variants": [
+      {
+        "idSuffix": "lattelet",
+        "creatureKind": "foodling",
+        "name": "Lattelet",
+        "caption": "A warm little coffee familiar that appears around your soft starts.",
+        "motivationalQuote": "Ritual can be a form of care.",
+        "visualMotifs": ["latte foam swirl", "ceramic cup hood", "caramel glow"]
+      },
+      {
+        "idSuffix": "beanhop",
+        "creatureKind": "foodling",
+        "name": "Beanhop",
+        "caption": "A bouncing espresso bean creature charged by repeat cafe visits.",
+        "motivationalQuote": "Momentum often starts small.",
+        "visualMotifs": ["espresso bean body", "tiny steam ears", "cocoa shine"]
+      },
+      {
+        "idSuffix": "mochamoo",
+        "creatureKind": "hybrid",
+        "name": "Mochamoo",
+        "caption": "A plush cocoa-and-coffee companion with a sweet steady energy.",
+        "motivationalQuote": "Comfort can still move you.",
+        "visualMotifs": ["mocha drizzle spots", "cream tuft", "rounded mug hooves"]
+      },
+      {
+        "idSuffix": "steamip",
+        "creatureKind": "spirit",
+        "name": "Steamip",
+        "caption": "A drifting cafe wisp that lingers around thoughtful mornings.",
+        "motivationalQuote": "Some beginnings arrive gently.",
+        "visualMotifs": ["steam ribbon", "glossy cup core", "soft amber aura"]
+      }
+    ]
+  },
+  {
+    "id": "bakery",
+    "topLevelType": "location",
+    "triggerCategory": "food_spot",
+    "triggerSubtype": "bakery",
+    "theme": "oven glow",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["bakeryVisit", "morningErrand", "treatStop"],
+    "sourceExamples": ["artisan bakery", "pastry shop", "bread counter"],
+    "visualTone": "buttery warm soft",
+    "promptBase": "cute pastry creature with bakery warmth and golden oven details",
+    "variants": [
+      {
+        "idSuffix": "crumbun",
+        "creatureKind": "foodling",
+        "name": "Crumbun",
+        "caption": "A fluffy little bun creature born from buttery stops and warm windows.",
+        "motivationalQuote": "Warmth makes a routine easier to keep.",
+        "visualMotifs": ["brioche body", "powdered cheeks", "gold crust ears"]
+      },
+      {
+        "idSuffix": "rollino",
+        "creatureKind": "foodling",
+        "name": "Rollino",
+        "caption": "A swirled pastry sprite that loves your slower mornings.",
+        "motivationalQuote": "A softer pace can still be intentional.",
+        "visualMotifs": ["spiral roll shell", "icing line", "tiny mitt paws"]
+      },
+      {
+        "idSuffix": "butterbit",
+        "creatureKind": "sprite",
+        "name": "Butterbit",
+        "caption": "A golden oven spark that flickers around favorite bakeries.",
+        "motivationalQuote": "Little delights help a day hold together.",
+        "visualMotifs": ["butter pat crest", "warm oven glow", "crumb sparkles"]
+      },
+      {
+        "idSuffix": "glazette",
+        "creatureKind": "hybrid",
+        "name": "Glazette",
+        "caption": "A polished sweetling with a glossy finish and a cheerful hop.",
+        "motivationalQuote": "Brightness belongs in your routine too.",
+        "visualMotifs": ["glaze sheen", "pastry ruffle", "sugar pearl tail"]
+      }
+    ]
+  },
+  {
+    "id": "pizza_place",
+    "topLevelType": "location",
+    "triggerCategory": "food_spot",
+    "triggerSubtype": "pizza_place",
+    "theme": "cheesy comfort",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["pizzaVisit", "groupMeal", "comfortFood"],
+    "sourceExamples": ["pizza restaurant", "slice shop", "late-night pizza stop"],
+    "visualTone": "cheerful melty warm",
+    "promptBase": "cute pizza creature with cheesy textures and playful slice-shop details",
+    "variants": [
+      {
+        "idSuffix": "crustling",
+        "creatureKind": "foodling",
+        "name": "Crustling",
+        "caption": "A crisp-edged slice sprite that shows up around easy comfort nights.",
+        "motivationalQuote": "Enjoyment still belongs in a full life.",
+        "visualMotifs": ["pizza crust hood", "melted cheese trim", "tomato blush"]
+      },
+      {
+        "idSuffix": "mozzlet",
+        "creatureKind": "foodling",
+        "name": "Mozzlet",
+        "caption": "A stretchy little cheese companion born from favorite slice stops.",
+        "motivationalQuote": "Some rituals are meant to be shared.",
+        "visualMotifs": ["cheese pull tail", "soft white body", "oregano freckles"]
+      },
+      {
+        "idSuffix": "pepperimp",
+        "creatureKind": "hybrid",
+        "name": "Pepperimp",
+        "caption": "A spicy little imp with bold charm and a pizza-shop grin.",
+        "motivationalQuote": "A bit of fire keeps days memorable.",
+        "visualMotifs": ["pepperoni spots", "red ember eyes", "crisp triangle ears"]
+      },
+      {
+        "idSuffix": "slicey",
+        "creatureKind": "objectling",
+        "name": "Slicey",
+        "caption": "A cheerful wedge-shaped wanderer built from quick meal detours.",
+        "motivationalQuote": "The simple stop can still become part of you.",
+        "visualMotifs": ["slice silhouette", "box tab cape", "golden cheese shine"]
+      }
+    ]
+  },
+  {
+    "id": "sushi_place",
+    "topLevelType": "location",
+    "triggerCategory": "food_spot",
+    "triggerSubtype": "sushi_place",
+    "theme": "precise freshness",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["sushiVisit", "diningOut", "curatedTaste"],
+    "sourceExamples": ["sushi bar", "omakase spot", "casual sushi place"],
+    "visualTone": "clean glossy refined",
+    "promptBase": "cute sushi creature with polished ingredients and collectible premium finish",
+    "variants": [
+      {
+        "idSuffix": "nigirimp",
+        "creatureKind": "foodling",
+        "name": "Nigirimp",
+        "caption": "A tidy little sushi familiar that favors balanced evenings out.",
+        "motivationalQuote": "Refinement is built one choice at a time.",
+        "visualMotifs": ["rice body", "salmon drape", "soy gloss eyes"]
+      },
+      {
+        "idSuffix": "rolli",
+        "creatureKind": "foodling",
+        "name": "Rolli",
+        "caption": "A happy rolled companion with seaweed trim and calm poise.",
+        "motivationalQuote": "Good rhythm comes from balance.",
+        "visualMotifs": ["maki roll body", "sesame freckles", "nori wrap cape"]
+      },
+      {
+        "idSuffix": "wasabibi",
+        "creatureKind": "sprite",
+        "name": "Wasabibi",
+        "caption": "A bright little spark that appears when the night has a kick.",
+        "motivationalQuote": "A little boldness sharpens the moment.",
+        "visualMotifs": ["lime-green crest", "spice spark aura", "tiny chopstick tail"]
+      },
+      {
+        "idSuffix": "misoop",
+        "creatureKind": "spirit",
+        "name": "Misoop",
+        "caption": "A warm bowl-like wisp that settles around comforting meals.",
+        "motivationalQuote": "Depth often feels like warmth.",
+        "visualMotifs": ["broth glow", "steam halo", "soft tofu beads"]
+      }
+    ]
+  },
+  {
+    "id": "ramen_place",
+    "topLevelType": "location",
+    "triggerCategory": "food_spot",
+    "triggerSubtype": "ramen_place",
+    "theme": "brothy neon comfort",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["ramenVisit", "cityDining", "nightMeal"],
+    "sourceExamples": ["ramen bar", "noodle house", "late-night ramen spot"],
+    "visualTone": "steamy urban cozy",
+    "promptBase": "cute ramen creature with noodle forms, steam and warm city-night details",
+    "variants": [
+      {
+        "idSuffix": "noodloo",
+        "creatureKind": "foodling",
+        "name": "Noodloo",
+        "caption": "A springy noodle creature with a soft glow and endless comfort.",
+        "motivationalQuote": "Warmth can help you keep going.",
+        "visualMotifs": ["noodle curl hair", "broth belly", "chopstick tail"]
+      },
+      {
+        "idSuffix": "brothlet",
+        "creatureKind": "spirit",
+        "name": "Brothlet",
+        "caption": "A savory little steam spirit that gathers around restoring meals.",
+        "motivationalQuote": "Being refilled is part of progress.",
+        "visualMotifs": ["amber broth core", "steam crown", "scallion flecks"]
+      },
+      {
+        "idSuffix": "menmaru",
+        "creatureKind": "hybrid",
+        "name": "Menmaru",
+        "caption": "A round noodle guardian with late-evening city charm.",
+        "motivationalQuote": "The day can end in comfort and still feel complete.",
+        "visualMotifs": ["ramen bowl shell", "egg crest", "noodle whiskers"]
+      },
+      {
+        "idSuffix": "steamrimp",
+        "creatureKind": "sprite",
+        "name": "Steamrimp",
+        "caption": "A lively steamling that bounces above bright noodle counters.",
+        "motivationalQuote": "Energy returns in different forms.",
+        "visualMotifs": ["steam ribbon tail", "neon broth highlights", "tiny lantern eyes"]
+      }
+    ]
+  },
+  {
+    "id": "dessert_shop",
+    "topLevelType": "location",
+    "triggerCategory": "food_spot",
+    "triggerSubtype": "dessert_shop",
+    "theme": "sweet treat",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["dessertVisit", "celebrationStop", "sweetCraving"],
+    "sourceExamples": ["ice cream shop", "dessert cafe", "gelato counter"],
+    "visualTone": "bright sugary polished",
+    "promptBase": "cute dessert creature with creamy textures, colorful toppings and premium finish",
+    "variants": [
+      {
+        "idSuffix": "sundael",
+        "creatureKind": "foodling",
+        "name": "Sundael",
+        "caption": "A whipped dessert spirit that appears on sweeter detours.",
+        "motivationalQuote": "Pleasure can be part of balance.",
+        "visualMotifs": ["soft-serve swirl", "cherry topper", "glass-cup sparkle"]
+      },
+      {
+        "idSuffix": "trufflet",
+        "creatureKind": "foodling",
+        "name": "Trufflet",
+        "caption": "A rich little sweetling with velvety charm and a playful wobble.",
+        "motivationalQuote": "Small luxuries count too.",
+        "visualMotifs": ["truffle body", "cocoa dust", "ribbon wrapper trim"]
+      },
+      {
+        "idSuffix": "sprinklepuff",
+        "creatureKind": "sprite",
+        "name": "Sprinklepuff",
+        "caption": "A colorful puff that floats in after cheerful treats.",
+        "motivationalQuote": "Lightness belongs in your deck.",
+        "visualMotifs": ["sprinkle confetti", "marshmallow fluff", "pastel glow"]
+      },
+      {
+        "idSuffix": "gelatoon",
+        "creatureKind": "hybrid",
+        "name": "Gelatoon",
+        "caption": "A glossy scoop companion built for slower evening rewards.",
+        "motivationalQuote": "Joy deepens the memory of a day.",
+        "visualMotifs": ["gelato scoop mane", "waffle cone details", "cool gloss finish"]
+      }
+    ]
+  },
+  {
+    "id": "bubble_tea_shop",
+    "topLevelType": "location",
+    "triggerCategory": "food_spot",
+    "triggerSubtype": "bubble_tea_shop",
+    "theme": "bouncy refreshment",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["bubbleTeaVisit", "socialStop", "playfulBreak"],
+    "sourceExamples": ["bubble tea shop", "tea bar", "boba kiosk"],
+    "visualTone": "cute glossy buoyant",
+    "promptBase": "cute bubble tea creature with tapioca pearls, clear cup gloss and playful bounce",
+    "variants": [
+      {
+        "idSuffix": "bobaloo",
+        "creatureKind": "foodling",
+        "name": "Bobaloo",
+        "caption": "A buoyant tea companion with pearl-like paws and cheerful energy.",
+        "motivationalQuote": "A playful stop can still be part of your rhythm.",
+        "visualMotifs": ["boba pearls", "clear cup sheen", "tea gradient body"]
+      },
+      {
+        "idSuffix": "tapiwink",
+        "creatureKind": "sprite",
+        "name": "Tapiwink",
+        "caption": "A tiny bouncing pearl sprite that loves your favorite tea runs.",
+        "motivationalQuote": "Little delights can keep a day bright.",
+        "visualMotifs": ["tapioca bead clusters", "straw antenna", "jelly gloss"]
+      },
+      {
+        "idSuffix": "jellybob",
+        "creatureKind": "hybrid",
+        "name": "Jellybob",
+        "caption": "A wobbling treatling with a clear glow and a happy sway.",
+        "motivationalQuote": "Soft joy makes routines easier to return to.",
+        "visualMotifs": ["fruit jelly tail", "cup-lid cap", "fruit tea shimmer"]
+      },
+      {
+        "idSuffix": "sipplet",
+        "creatureKind": "objectling",
+        "name": "Sipplet",
+        "caption": "A little straw-capped wanderer shaped by playful drink stops.",
+        "motivationalQuote": "Refreshment can be its own reward.",
+        "visualMotifs": ["striped straw horn", "slosh glow belly", "rounded cup feet"]
+      }
+    ]
+  },
+  {
+    "id": "bookstore",
+    "topLevelType": "location",
+    "triggerCategory": "culture",
+    "triggerSubtype": "bookstore",
+    "theme": "curious pages",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["bookstoreVisit", "browsingTime", "quietCuriosity"],
+    "sourceExamples": ["independent bookstore", "used bookstore", "mall bookshop"],
+    "visualTone": "cozy curious warm",
+    "promptBase": "cute bookstore creature with book textures, paper details and thoughtful charm",
+    "variants": [
+      {
+        "idSuffix": "pagelet",
+        "creatureKind": "objectling",
+        "name": "Pagelet",
+        "caption": "A paper-soft little browser that appears among your curious stops.",
+        "motivationalQuote": "Curiosity builds a richer deck.",
+        "visualMotifs": ["page ears", "bookmark tail", "linen cover texture"]
+      },
+      {
+        "idSuffix": "inkwisp",
+        "creatureKind": "spirit",
+        "name": "Inkwisp",
+        "caption": "A drifting ink spirit found where stories gather on shelves.",
+        "motivationalQuote": "Attention is a kind of devotion.",
+        "visualMotifs": ["ink drop core", "quill plume", "navy glow"]
+      },
+      {
+        "idSuffix": "bindle",
+        "creatureKind": "hybrid",
+        "name": "Bindle",
+        "caption": "A stout little volume creature with stitched-spine charm.",
+        "motivationalQuote": "What you collect shapes you back.",
+        "visualMotifs": ["stitched binding", "gold foil corners", "soft cloth paws"]
+      },
+      {
+        "idSuffix": "marginip",
+        "creatureKind": "sprite",
+        "name": "Marginip",
+        "caption": "A tiny note-loving sidekick that thrives in long browses.",
+        "motivationalQuote": "The details become part of the memory.",
+        "visualMotifs": ["margin marks", "paper winglets", "graphite sparkle"]
+      }
+    ]
+  },
+  {
+    "id": "library",
+    "topLevelType": "location",
+    "triggerCategory": "culture",
+    "triggerSubtype": "library",
+    "theme": "quiet order",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["libraryVisit", "focusTime", "quietRoutine"],
+    "sourceExamples": ["public library", "campus library", "reading room"],
+    "visualTone": "hushed refined calm",
+    "promptBase": "cute library creature with archival details, quiet elegance and collectible polish",
+    "variants": [
+      {
+        "idSuffix": "shelflet",
+        "creatureKind": "objectling",
+        "name": "Shelflet",
+        "caption": "A tiny orderly creature who appears around focused hours and quiet aisles.",
+        "motivationalQuote": "Structure can feel gentle too.",
+        "visualMotifs": ["stacked book shell", "wood shelf trim", "catalog eyes"]
+      },
+      {
+        "idSuffix": "hushpage",
+        "creatureKind": "spirit",
+        "name": "Hushpage",
+        "caption": "A pale page spirit that gathers around calm concentration.",
+        "motivationalQuote": "Stillness can sharpen your shape.",
+        "visualMotifs": ["paper veil", "soft ivory glow", "silent rune marks"]
+      },
+      {
+        "idSuffix": "quietome",
+        "creatureKind": "hybrid",
+        "name": "Quietome",
+        "caption": "A cozy reading-room familiar with a wise, rounded silhouette.",
+        "motivationalQuote": "A calm mind leaves deeper tracks.",
+        "visualMotifs": ["lamp-lit brow", "clothbound fur", "small index tab tail"]
+      },
+      {
+        "idSuffix": "indexip",
+        "creatureKind": "sprite",
+        "name": "Indexip",
+        "caption": "A neat little sorting sprite that loves revisited study corners.",
+        "motivationalQuote": "Returning is how a pattern becomes yours.",
+        "visualMotifs": ["tabbed card fins", "filing glow", "precise linework"]
+      }
+    ]
+  },
+  {
+    "id": "museum",
+    "topLevelType": "location",
+    "triggerCategory": "culture",
+    "triggerSubtype": "museum",
+    "theme": "curated wonder",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["museumVisit", "rareOuting", "slowExploration"],
+    "sourceExamples": ["art museum", "history museum", "science museum"],
+    "visualTone": "elevated curious polished",
+    "promptBase": "cute museum creature with gallery polish, artifact cues and elegant collectible styling",
+    "variants": [
+      {
+        "idSuffix": "relicoon",
+        "creatureKind": "hybrid",
+        "name": "Relicoon",
+        "caption": "A softly glowing curator creature that appears after wonder-filled outings.",
+        "motivationalQuote": "Wonder keeps your world expanding.",
+        "visualMotifs": ["artifact charm belt", "patina glow", "arched brow crest"]
+      },
+      {
+        "idSuffix": "framebit",
+        "creatureKind": "objectling",
+        "name": "Framebit",
+        "caption": "A neat gallery sprite with gold-edged corners and patient eyes.",
+        "motivationalQuote": "What you pause for becomes part of you.",
+        "visualMotifs": ["frame corners", "velvet backing", "soft gilt shine"]
+      },
+      {
+        "idSuffix": "fossipple",
+        "creatureKind": "beast",
+        "name": "Fossipple",
+        "caption": "A curious little fossil friend shaped by ancient halls and long gazes.",
+        "motivationalQuote": "Depth builds through attention.",
+        "visualMotifs": ["fossil spiral markings", "stone paws", "dusty pearl eyes"]
+      },
+      {
+        "idSuffix": "curioot",
+        "creatureKind": "sprite",
+        "name": "Curioot",
+        "caption": "A bright exhibit sprite that flickers wherever fascination lingers.",
+        "motivationalQuote": "Curiosity is a kind of movement too.",
+        "visualMotifs": ["display-case glow", "tiny museum label tag", "glassy shimmer"]
+      }
+    ]
+  },
+  {
+    "id": "cinema",
+    "topLevelType": "location",
+    "triggerCategory": "culture",
+    "triggerSubtype": "cinema",
+    "theme": "screen glow",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["cinemaVisit", "nightOut", "storyMoment"],
+    "sourceExamples": ["movie theater", "indie cinema", "mall cinema"],
+    "visualTone": "dark glossy cinematic",
+    "promptBase": "cute cinema creature with marquee glow, film motifs and polished collectible styling",
+    "variants": [
+      {
+        "idSuffix": "reelbit",
+        "creatureKind": "objectling",
+        "name": "Reelbit",
+        "caption": "A silver little film creature that gathers around shared stories.",
+        "motivationalQuote": "Some nights are meant to feel larger.",
+        "visualMotifs": ["film reel ears", "projector glow", "silver trim"]
+      },
+      {
+        "idSuffix": "flickerbun",
+        "creatureKind": "hybrid",
+        "name": "Flickerbun",
+        "caption": "A soft cinema hopper with a velvet-dark coat and bright eyes.",
+        "motivationalQuote": "A little wonder can reset a day.",
+        "visualMotifs": ["velvet fur", "screen-light pupils", "marquee sparkle"]
+      },
+      {
+        "idSuffix": "ticketi",
+        "creatureKind": "sprite",
+        "name": "Ticketi",
+        "caption": "A playful ticket stub sprite born from the ritual of going out.",
+        "motivationalQuote": "Making space for delight matters.",
+        "visualMotifs": ["ticket edge trim", "stub tail", "red carpet accents"]
+      },
+      {
+        "idSuffix": "popcornoo",
+        "creatureKind": "foodling",
+        "name": "Popcornoo",
+        "caption": "A fluffy little screen-snack familiar with a buttery bounce.",
+        "motivationalQuote": "Joy doesn’t need to justify itself.",
+        "visualMotifs": ["popcorn puff mane", "bucket stripes", "golden butter sheen"]
+      }
+    ]
+  },
+  {
+    "id": "mall",
+    "topLevelType": "location",
+    "triggerCategory": "commerce",
+    "triggerSubtype": "mall",
+    "theme": "glossy bustle",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["mallVisit", "shoppingTrip", "indoorWandering"],
+    "sourceExamples": ["shopping mall", "retail center", "department complex"],
+    "visualTone": "bright urban polished",
+    "promptBase": "cute mall creature with glossy retail details, polished surfaces and playful shopping motifs",
+    "variants": [
+      {
+        "idSuffix": "bagsprite",
+        "creatureKind": "objectling",
+        "name": "Bagsprite",
+        "caption": "A glossy little carry-all spirit shaped by lively shopping loops.",
+        "motivationalQuote": "Busy days still leave their own imprint.",
+        "visualMotifs": ["shopping bag body", "rope handle ears", "foil tissue trim"]
+      },
+      {
+        "idSuffix": "shoplet",
+        "creatureKind": "sprite",
+        "name": "Shoplet",
+        "caption": "A bright indoor wanderer that thrives around bustling routes.",
+        "motivationalQuote": "Movement takes many forms.",
+        "visualMotifs": ["storefront glow", "glassy paws", "receipt ribbon"]
+      },
+      {
+        "idSuffix": "escaloon",
+        "creatureKind": "hybrid",
+        "name": "Escaloon",
+        "caption": "A smooth silver companion inspired by up-and-down mall energy.",
+        "motivationalQuote": "Momentum can come from ordinary places.",
+        "visualMotifs": ["chrome stripe tail", "step-like shell", "cool glow"]
+      },
+      {
+        "idSuffix": "glimmerbag",
+        "creatureKind": "objectling",
+        "name": "Glimmerbag",
+        "caption": "A sparkly little shopper who loves festive, bright indoor stops.",
+        "motivationalQuote": "Even errand days can shine a little.",
+        "visualMotifs": ["gift-bag silhouette", "sparkle confetti", "ribbon bow"]
+      }
+    ]
+  },
+  {
+    "id": "grocery",
+    "topLevelType": "location",
+    "triggerCategory": "commerce",
+    "triggerSubtype": "grocery",
+    "theme": "fresh everyday nourishment",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["groceryVisit", "errandLoop", "foodPlanning"],
+    "sourceExamples": ["supermarket", "local grocer", "produce market"],
+    "visualTone": "fresh bright grounded",
+    "promptBase": "cute grocery creature with produce motifs, cart details and everyday nourishing charm",
+    "variants": [
+      {
+        "idSuffix": "broccolite",
+        "creatureKind": "foodling",
+        "name": "Broccolite",
+        "caption": "A tiny broccoli guardian that appears around fresh, practical days.",
+        "motivationalQuote": "Care often looks ordinary from the outside.",
+        "visualMotifs": ["broccoli crown", "stalk body", "crisp green glow"]
+      },
+      {
+        "idSuffix": "carrotle",
+        "creatureKind": "foodling",
+        "name": "Carrotle",
+        "caption": "A bright produceling with steady energy and a cheerful bounce.",
+        "motivationalQuote": "Consistency is a kind of strength.",
+        "visualMotifs": ["carrot body", "leaf tuft", "garden orange shine"]
+      },
+      {
+        "idSuffix": "melomallow",
+        "creatureKind": "hybrid",
+        "name": "Melomallow",
+        "caption": "A round fruit companion that sweetens long errand loops.",
+        "motivationalQuote": "Practical days still feed your future.",
+        "visualMotifs": ["melon rind shell", "fruit blush", "soft green stripes"]
+      },
+      {
+        "idSuffix": "cartle",
+        "creatureKind": "objectling",
+        "name": "Cartle",
+        "caption": "A rolling little helper built from lists, aisles, and follow-through.",
+        "motivationalQuote": "Showing up counts, even quietly.",
+        "visualMotifs": ["cart basket shell", "small wheel feet", "checklist charm"]
+      }
+    ]
+  },
+  {
+    "id": "basketball_court",
+    "topLevelType": "location",
+    "triggerCategory": "sport",
+    "triggerSubtype": "basketball_court",
+    "theme": "court rhythm",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "intensity", "repeatDepth"],
+    "lifestyleSignals": ["courtVisit", "courtSport", "groupActivity"],
+    "sourceExamples": ["outdoor basketball court", "gym court", "park hoops"],
+    "visualTone": "energetic sporty urban",
+    "promptBase": "cute basketball creature with sporty court details, rubber textures and dynamic collectible styling",
+    "variants": [
+      {
+        "idSuffix": "hooplet",
+        "creatureKind": "objectling",
+        "name": "Hooplet",
+        "caption": "A lively court companion that appears when the day gets active and playful.",
+        "motivationalQuote": "Energy shared with the world comes back brighter.",
+        "visualMotifs": ["basketball texture", "net collar", "orange bounce glow"]
+      },
+      {
+        "idSuffix": "dribblit",
+        "creatureKind": "sprite",
+        "name": "Dribblit",
+        "caption": "A quick little spark built from rhythm, movement, and repeat runs.",
+        "motivationalQuote": "Momentum grows through repetition.",
+        "visualMotifs": ["bounce trail", "court-line stripes", "speed dots"]
+      },
+      {
+        "idSuffix": "netter",
+        "creatureKind": "hybrid",
+        "name": "Netter",
+        "caption": "A soft but focused hoop familiar with a clean arc and steady aim.",
+        "motivationalQuote": "Precision is practice made visible.",
+        "visualMotifs": ["mesh ruff", "rim halo", "backboard sheen"]
+      },
+      {
+        "idSuffix": "courtail",
+        "creatureKind": "beast",
+        "name": "Courtail",
+        "caption": "A fast-footed court beast that thrives on active outdoor hours.",
+        "motivationalQuote": "Your body remembers what you repeat.",
+        "visualMotifs": ["sneaker sole paws", "paint-area markings", "athletic posture"]
+      }
+    ]
+  },
+  {
+    "id": "tennis_court",
+    "topLevelType": "location",
+    "triggerCategory": "sport",
+    "triggerSubtype": "tennis_court",
+    "theme": "clean rally",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "intensity", "repeatDepth"],
+    "lifestyleSignals": ["courtVisit", "racketSport", "focusedActivity"],
+    "sourceExamples": ["outdoor tennis court", "club court", "park tennis court"],
+    "visualTone": "crisp sporty bright",
+    "promptBase": "cute tennis creature with crisp court lines, racket motifs and premium sporty charm",
+    "variants": [
+      {
+        "idSuffix": "serveling",
+        "creatureKind": "sprite",
+        "name": "Serveling",
+        "caption": "A sharp little rally spirit that appears on disciplined active days.",
+        "motivationalQuote": "Clean effort leaves a clean trace.",
+        "visualMotifs": ["tennis ball glow", "racket halo", "court-line details"]
+      },
+      {
+        "idSuffix": "racketot",
+        "creatureKind": "objectling",
+        "name": "Racketot",
+        "caption": "A focused little courtling shaped by practice and return.",
+        "motivationalQuote": "Control is built shot by shot.",
+        "visualMotifs": ["racket frame ears", "string mesh belly", "grip-wrap tail"]
+      },
+      {
+        "idSuffix": "volleyboo",
+        "creatureKind": "hybrid",
+        "name": "Volleyboo",
+        "caption": "A nimble playful familiar that loves quick-footed sessions.",
+        "motivationalQuote": "Light movement can still be exact.",
+        "visualMotifs": ["ball fuzz trim", "swoosh tail", "court dust sparkle"]
+      },
+      {
+        "idSuffix": "baselinep",
+        "creatureKind": "beast",
+        "name": "Baselinep",
+        "caption": "A determined little runner that appears around long, committed rallies.",
+        "motivationalQuote": "Endurance creates its own elegance.",
+        "visualMotifs": ["baseline stripe markings", "athletic stance", "clean white accents"]
+      }
+    ]
+  },
+  {
+    "id": "run_session",
+    "topLevelType": "activity",
+    "triggerCategory": "movement",
+    "triggerSubtype": "run_session",
+    "theme": "deliberate push",
+    "defaultRarity": "uncommon",
+    "variantSupport": ["timeOfDay", "intensity", "novelty"],
+    "lifestyleSignals": ["runSession", "highHeartRate", "purposefulExercise"],
+    "sourceExamples": ["road run", "treadmill run", "interval session"],
+    "visualTone": "fast focused vivid",
+    "promptBase": "cute running creature with aerodynamic forms, energetic motion and premium sporty styling",
+    "variants": [
+      {
+        "idSuffix": "dashbun",
+        "creatureKind": "beast",
+        "name": "Dashbun",
+        "caption": "A fast little runner companion born from committed sessions.",
+        "motivationalQuote": "The push changes you, even when no one sees it.",
+        "visualMotifs": ["wind-swept ears", "speed streak tail", "shoe-lace accents"]
+      },
+      {
+        "idSuffix": "stridlet",
+        "creatureKind": "sprite",
+        "name": "Stridlet",
+        "caption": "A rhythmic pace spirit that follows the pattern of your run.",
+        "motivationalQuote": "Rhythm can carry you farther than force.",
+        "visualMotifs": ["pulse lines", "cadence dots", "lean silhouette"]
+      },
+      {
+        "idSuffix": "sprintail",
+        "creatureKind": "hybrid",
+        "name": "Sprintail",
+        "caption": "A quick, focused spark built from sharper efforts and stronger days.",
+        "motivationalQuote": "Intensity reveals what is already growing.",
+        "visualMotifs": ["flame tail", "split-light markings", "charged posture"]
+      },
+      {
+        "idSuffix": "pulsepup",
+        "creatureKind": "beast",
+        "name": "Pulsepup",
+        "caption": "A bright-hearted little athlete that appears when movement turns intentional.",
+        "motivationalQuote": "Your effort leaves a living signature.",
+        "visualMotifs": ["heart-glow chest", "sport band collar", "electric paw trails"]
+      }
+    ]
+  },
+  {
+    "id": "high_steps_day",
+    "topLevelType": "activity",
+    "triggerCategory": "movement",
+    "triggerSubtype": "high_steps_day",
+    "theme": "big day momentum",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "intensity", "repeatDepth"],
+    "lifestyleSignals": ["highSteps", "distance", "activeDay"],
+    "sourceExamples": ["travel day", "busy city day", "walk-heavy day"],
+    "visualTone": "upbeat resilient moving",
+    "promptBase": "cute active-day creature with travel-worn charm, step motifs and energetic collectible styling",
+    "variants": [
+      {
+        "idSuffix": "steppling",
+        "creatureKind": "sprite",
+        "name": "Steppling",
+        "caption": "A cheerful little mileage spirit built from days that kept you moving.",
+        "motivationalQuote": "Long days leave stronger tracks.",
+        "visualMotifs": ["footprint marks", "mile-counter glow", "light travel scuffs"]
+      },
+      {
+        "idSuffix": "treklet",
+        "creatureKind": "beast",
+        "name": "Treklet",
+        "caption": "A durable little wanderer shaped by distance and follow-through.",
+        "motivationalQuote": "Endurance grows one step beyond comfort.",
+        "visualMotifs": ["trail satchel", "sturdy paws", "route-line markings"]
+      },
+      {
+        "idSuffix": "milemite",
+        "creatureKind": "objectling",
+        "name": "Milemite",
+        "caption": "A tiny counter creature that shows up after unusually full days.",
+        "motivationalQuote": "More of life fits inside movement than you think.",
+        "visualMotifs": ["pedometer chest", "route dots", "soft neon numerals"]
+      },
+      {
+        "idSuffix": "paceroo",
+        "creatureKind": "hybrid",
+        "name": "Paceroo",
+        "caption": "A lively pace keeper with a bounce that matches your biggest days.",
+        "motivationalQuote": "Your momentum is becoming visible.",
+        "visualMotifs": ["pace-line stripe", "spring ankles", "day-glow trim"]
+      }
+    ]
+  },
+  {
+    "id": "eiffel_tower",
+    "topLevelType": "landmark",
+    "triggerCategory": "global_landmark",
+    "triggerSubtype": "eiffel_tower",
+    "theme": "iconic travel wonder",
+    "defaultRarity": "rare",
+    "variantSupport": ["timeOfDay", "novelty"],
+    "lifestyleSignals": ["landmarkVisit", "travelMilestone", "rarePlace"],
+    "sourceExamples": ["Eiffel Tower"],
+    "visualTone": "romantic luminous elegant",
+    "promptBase": "rare Paris landmark creature with wrought-iron elegance, lantern glow and premium collectible presence",
+    "variants": [
+      {
+        "idSuffix": "tourbelle",
+        "creatureKind": "spirit",
+        "name": "Tourbelle",
+        "caption": "A rare Paris wisp touched by height, light, and arrival.",
+        "motivationalQuote": "Some days become landmarks inside you too.",
+        "visualMotifs": ["iron lattice details", "warm Paris lamp glow", "elegant plume"]
+      },
+      {
+        "idSuffix": "ironette",
+        "creatureKind": "hybrid",
+        "name": "Ironette",
+        "caption": "A refined towerling with delicate structure and a rare traveler’s glow.",
+        "motivationalQuote": "Wonder leaves a stronger mark when you stand inside it.",
+        "visualMotifs": ["wrought iron filigree", "champagne shimmer", "arched silhouette"]
+      },
+      {
+        "idSuffix": "parisprout",
+        "creatureKind": "sprite",
+        "name": "Parisprout",
+        "caption": "A bright little city spark born from iconic firsts.",
+        "motivationalQuote": "A new place can open a new version of you.",
+        "visualMotifs": ["city-light glow", "tiny lantern eyes", "skyline ribbon"]
+      },
+      {
+        "idSuffix": "lamplume",
+        "creatureKind": "spirit",
+        "name": "Lamplume",
+        "caption": "A soft-glowing travel familiar shaped by evening wonder in Paris.",
+        "motivationalQuote": "Beauty changes the pace of memory.",
+        "visualMotifs": ["feathered lamp plume", "gold dusk aura", "ornate metal trim"]
+      }
+    ]
+  },
+  {
+    "id": "shibuya_crossing",
+    "topLevelType": "landmark",
+    "triggerCategory": "global_landmark",
+    "triggerSubtype": "shibuya_crossing",
+    "theme": "neon crossing energy",
+    "defaultRarity": "rare",
+    "variantSupport": ["timeOfDay", "novelty"],
+    "lifestyleSignals": ["landmarkVisit", "travelMilestone", "denseUrbanExperience"],
+    "sourceExamples": ["Shibuya Crossing"],
+    "visualTone": "neon lively urban",
+    "promptBase": "rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling",
+    "variants": [
+      {
+        "idSuffix": "neonpoko",
+        "creatureKind": "sprite",
+        "name": "Neonpoko",
+        "caption": "A bright Tokyo spark born from movement, lights, and density.",
+        "motivationalQuote": "Big energy can wake something in you.",
+        "visualMotifs": ["neon sign glow", "city-light blush", "playful bounce"]
+      },
+      {
+        "idSuffix": "crosslet",
+        "creatureKind": "objectling",
+        "name": "Crosslet",
+        "caption": "A tiny crossing creature patterned after the flow of crowds and signals.",
+        "motivationalQuote": "Even in motion, you can still become more yourself.",
+        "visualMotifs": ["crosswalk stripes", "signal accents", "glossy urban trim"]
+      },
+      {
+        "idSuffix": "signalbun",
+        "creatureKind": "hybrid",
+        "name": "Signalbun",
+        "caption": "A rare city hopper with neon ears and a crowd-ready rhythm.",
+        "motivationalQuote": "New intensity can become new perspective.",
+        "visualMotifs": ["signal-light ears", "neon tail", "compact streetwear styling"]
+      },
+      {
+        "idSuffix": "tokilume",
+        "creatureKind": "spirit",
+        "name": "Tokilume",
+        "caption": "A sleek urban wisp that gathers the pulse of iconic crossings.",
+        "motivationalQuote": "A charged place can reframe your momentum.",
+        "visualMotifs": ["luminous kanban glow", "streetlight ribbon", "midnight city sheen"]
+      }
+    ]
+  }
+]
