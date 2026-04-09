@@ -27,8 +27,9 @@ export function HeroShowcaseCaption({ title, subtitle }: HeroShowcaseCaptionProp
 
 const styles = StyleSheet.create({
   shell: {
-    alignItems: 'flex-start',
-    maxWidth: 190,
+    alignItems: 'center',
+    alignSelf: 'center',
+    width: '100%',
   },
   pill: {
     backgroundColor: 'rgba(9, 13, 24, 0.82)',
@@ -36,6 +37,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     gap: 2,
+    minWidth: '100%',
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -43,9 +45,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: -0.1,
     lineHeight: 17,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 11,
     lineHeight: 14,
+    textAlign: 'center',
   },
 });

@@ -13,7 +13,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
-import { HeroShowcaseCaption } from '@/components/katchadeck/onboarding/hero-showcase-caption';
 import { OrbitRingBackdrop } from '@/components/katchadeck/onboarding/orbit-ring-backdrop';
 import { OrbitingKatchimera } from '@/components/katchadeck/onboarding/orbiting-katchimera';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -69,29 +68,28 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
     () => {
       const loop = loopProgress.value;
       let bestIndex = -1;
-      let bestDistance = Number.MAX_SAFE_INTEGER;
+      let bestProgress = -1;
 
       for (let index = 0; index < visibleCount; index += 1) {
         const slotProgress = ((loop + index / visibleCount) % 1 + 1) % 1;
-        const distance = Math.min(
-          Math.abs(slotProgress - scene.flywheel.highlightProgress),
-          1 - Math.abs(slotProgress - scene.flywheel.highlightProgress)
-        );
-
-        if (distance < bestDistance) {
-          bestDistance = distance;
+        if (
+          slotProgress >= scene.flywheel.activeStartProgress &&
+          slotProgress <= scene.flywheel.activeEndProgress &&
+          slotProgress > bestProgress
+        ) {
+          bestProgress = slotProgress;
           bestIndex = index;
         }
       }
 
-      return bestDistance <= scene.flywheel.highlightWindow ? bestIndex : -1;
+      return bestIndex;
     },
     (next, previous) => {
       if (next !== previous) {
         runOnJS(setActiveSlot)(next);
       }
     },
-    [scene.flywheel.highlightProgress, scene.flywheel.highlightWindow, visibleCount]
+    [scene.flywheel.activeEndProgress, scene.flywheel.activeStartProgress, visibleCount]
   );
 
   const handleWrap = useCallback(
@@ -105,8 +103,6 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
     },
     [roster]
   );
-
-  const activeItem = activeSlot >= 0 ? slotAssignments[activeSlot] : null;
 
   const avatarStyle = useAnimatedStyle(() => ({
     opacity: avatarEntrance.value,
@@ -125,6 +121,7 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
               item={item}
               key={`${index}-${item.id}`}
               loopProgress={loopProgress}
+              active={index === activeSlot}
               onWrap={handleWrap}
               sceneSize={sceneSize}
               slotIndex={index}
@@ -141,19 +138,6 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
               <View style={styles.centerAvatarAura} />
             </View>
           </Animated.View>
-          {activeItem ? (
-            <View
-              pointerEvents="none"
-              style={[
-                styles.captionOverlay,
-                {
-                  left: sceneSize / 2 + scene.flywheel.captionOffset.x,
-                  top: sceneSize / 2 + scene.flywheel.captionOffset.y,
-                },
-              ]}>
-              <HeroShowcaseCaption subtitle={activeItem.subcaption} title={activeItem.caption} />
-            </View>
-          ) : null}
         </View>
       </View>
 
@@ -192,10 +176,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  captionOverlay: {
-    maxWidth: 190,
-    position: 'absolute',
   },
   centerAvatar: {
     alignItems: 'center',

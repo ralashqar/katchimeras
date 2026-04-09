@@ -4,6 +4,8 @@ import Animated, {
   Easing,
   runOnJS,
   SharedValue,
+  FadeInDown,
+  FadeOut,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
@@ -12,6 +14,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
+import { HeroShowcaseCaption } from '@/components/katchadeck/onboarding/hero-showcase-caption';
 import type { HeroFlywheelConfig, HeroRosterItem } from '@/constants/onboarding-hero';
 import { KatchaDeckUI } from '@/constants/theme';
 
@@ -24,6 +27,7 @@ type OrbitingKatchimeraProps = {
   slotIndex: number;
   visibleCount: number;
   flywheel: HeroFlywheelConfig;
+  active?: boolean;
   onWrap: (slotIndex: number) => void;
 };
 
@@ -36,6 +40,7 @@ export function OrbitingKatchimera({
   slotIndex,
   visibleCount,
   flywheel,
+  active = false,
   onWrap,
 }: OrbitingKatchimeraProps) {
   const reveal = useSharedValue(0);
@@ -85,13 +90,18 @@ export function OrbitingKatchimera({
     const exitFade = Math.min(1, (1 - progress) / flywheel.exitFadeWindow);
     const leftFade = Math.min(entryFade, exitFade);
     const introShiftX = -flywheel.entryOffsetX * (1 - reveal.value);
+    const exitFactor =
+      progress > 1 - flywheel.exitFadeWindow
+        ? (progress - (1 - flywheel.exitFadeWindow)) / flywheel.exitFadeWindow
+        : 0;
+    const exitShiftX = -flywheel.exitOffsetX * exitFactor;
     const scale = (0.9 + depth * 0.15) * (0.9 + reveal.value * 0.1) * (1 + (flywheel.highlightScale - 1) * highlightFactor);
     const opacityBoost = 0.84 + highlightFactor * 0.16;
 
     return {
       opacity: reveal.value * leftFade * opacityBoost,
       transform: [
-        { translateX: orbitX + introShiftX + flywheel.highlightOffset.x * highlightFactor },
+        { translateX: orbitX + introShiftX + exitShiftX + flywheel.highlightOffset.x * highlightFactor },
         { translateY: orbitY + flywheel.highlightOffset.y * highlightFactor },
         { scale },
       ],
@@ -119,6 +129,22 @@ export function OrbitingKatchimera({
           <Image contentFit="cover" source={source} style={styles.image} transition={250} />
         </View>
       </View>
+      {active ? (
+        <Animated.View
+          entering={FadeInDown.duration(220)}
+          exiting={FadeOut.duration(180)}
+          pointerEvents="none"
+          style={[
+            styles.captionAnchor,
+            {
+              left: (flywheel.itemSize - flywheel.captionWidth) / 2 + flywheel.captionOffset.x,
+              top: flywheel.itemSize + flywheel.captionOffset.y,
+              width: flywheel.captionWidth,
+            },
+          ]}>
+          <HeroShowcaseCaption subtitle={item.subcaption} title={item.caption} />
+        </Animated.View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -147,5 +173,8 @@ const styles = StyleSheet.create({
   },
   image: {
     flex: 1,
+  },
+  captionAnchor: {
+    position: 'absolute',
   },
 });

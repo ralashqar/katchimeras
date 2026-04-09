@@ -38,9 +38,12 @@ export type HeroFlywheelConfig = {
   orbitRadiusY: number;
   speedMsPerLoop: number;
   entryOffsetX: number;
+  exitOffsetX: number;
   entryFadeWindow: number;
   exitFadeWindow: number;
   itemSize: number;
+  activeStartProgress: number;
+  activeEndProgress: number;
   highlightProgress: number;
   highlightWindow: number;
   highlightScale: number;
@@ -48,6 +51,7 @@ export type HeroFlywheelConfig = {
     x: number;
     y: number;
   };
+  captionWidth: number;
   captionOffset: {
     x: number;
     y: number;
@@ -131,19 +135,23 @@ export const openingHeroScene: HeroSceneConfig = {
     orbitRadiusY: 118,
     speedMsPerLoop: 24000,
     entryOffsetX: 82,
+    exitOffsetX: 96,
     entryFadeWindow: 0.08,
     exitFadeWindow: 0.08,
     itemSize: 72,
-    highlightProgress: 0.375,
-    highlightWindow: 0.085,
+    activeStartProgress: 0.58,
+    activeEndProgress: 0.9,
+    highlightProgress: 0.72,
+    highlightWindow: 0.18,
     highlightScale: 1.18,
     highlightOffset: {
       x: 20,
       y: 22,
     },
+    captionWidth: 168,
     captionOffset: {
-      x: 58,
-      y: 126,
+      x: 0,
+      y: -4,
     },
   },
   arcLayers: [
