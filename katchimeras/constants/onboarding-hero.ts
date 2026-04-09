@@ -151,7 +151,7 @@ export const openingHeroScene: HeroSceneConfig = {
     captionWidth: 168,
     captionOffset: {
       x: 0,
-      y: -4,
+      y: -32,
     },
   },
   arcLayers: [

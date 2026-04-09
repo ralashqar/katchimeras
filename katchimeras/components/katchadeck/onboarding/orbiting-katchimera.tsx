@@ -1,11 +1,9 @@
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
   SharedValue,
-  FadeInDown,
-  FadeOut,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
@@ -27,7 +25,6 @@ type OrbitingKatchimeraProps = {
   slotIndex: number;
   visibleCount: number;
   flywheel: HeroFlywheelConfig;
-  active?: boolean;
   onWrap: (slotIndex: number) => void;
 };
 
@@ -40,7 +37,6 @@ export function OrbitingKatchimera({
   slotIndex,
   visibleCount,
   flywheel,
-  active = false,
   onWrap,
 }: OrbitingKatchimeraProps) {
   const reveal = useSharedValue(0);
@@ -109,43 +105,100 @@ export function OrbitingKatchimera({
     };
   });
 
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.anchor,
+  const captionStyle = useAnimatedStyle(() => {
+    const rawProgress = loopProgress.value + slotIndex / visibleCount;
+    const progress = ((rawProgress % 1) + 1) % 1;
+    const angle = progress * 360 + 180;
+    const radians = (angle * Math.PI) / 180;
+    const orbitX = Math.cos(radians) * flywheel.orbitRadiusX;
+    const orbitY = Math.sin(radians) * flywheel.orbitRadiusY;
+    const distanceToHighlight = Math.min(
+      Math.abs(progress - flywheel.highlightProgress),
+      1 - Math.abs(progress - flywheel.highlightProgress)
+    );
+    const highlightFactor = Math.max(0, 1 - distanceToHighlight / flywheel.highlightWindow);
+    const entryFade = Math.min(1, progress / flywheel.entryFadeWindow);
+    const exitFade = Math.min(1, (1 - progress) / flywheel.exitFadeWindow);
+    const leftFade = Math.min(entryFade, exitFade);
+    const introShiftX = -flywheel.entryOffsetX * (1 - reveal.value);
+    const exitFactor =
+      progress > 1 - flywheel.exitFadeWindow
+        ? (progress - (1 - flywheel.exitFadeWindow)) / flywheel.exitFadeWindow
+        : 0;
+    const exitShiftX = -flywheel.exitOffsetX * exitFactor;
+    let activeFactor = 0;
+
+    if (progress >= flywheel.activeStartProgress && progress <= flywheel.activeEndProgress) {
+      const mid = flywheel.highlightProgress;
+      if (progress <= mid) {
+        activeFactor = (progress - flywheel.activeStartProgress) / Math.max(mid - flywheel.activeStartProgress, 0.001);
+      } else {
+        activeFactor = (flywheel.activeEndProgress - progress) / Math.max(flywheel.activeEndProgress - mid, 0.001);
+      }
+    }
+
+    const opacity = Math.max(0, Math.min(1, activeFactor));
+
+    return {
+      opacity: reveal.value * leftFade * opacity,
+      transform: [
         {
-          height: flywheel.itemSize,
-          left: sceneSize / 2,
-          marginLeft: -flywheel.itemSize / 2,
-          marginTop: -flywheel.itemSize / 2,
-          top: sceneSize / 2,
-          width: flywheel.itemSize,
+          translateX:
+            orbitX +
+            introShiftX +
+            exitShiftX +
+            flywheel.highlightOffset.x * highlightFactor +
+            flywheel.captionOffset.x,
         },
-        animatedStyle,
-      ]}>
-      <View style={styles.frame}>
-        <View style={styles.imageSurface}>
-          <Image contentFit="cover" source={source} style={styles.image} transition={250} />
+        {
+          translateY:
+            orbitY +
+            flywheel.highlightOffset.y * highlightFactor +
+            flywheel.itemSize +
+            flywheel.captionOffset.y +
+            8 * (1 - opacity),
+        },
+      ],
+      zIndex: 240,
+    };
+  });
+
+  return (
+    <Fragment>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.anchor,
+          {
+            height: flywheel.itemSize,
+            left: sceneSize / 2,
+            marginLeft: -flywheel.itemSize / 2,
+            marginTop: -flywheel.itemSize / 2,
+            top: sceneSize / 2,
+            width: flywheel.itemSize,
+          },
+          animatedStyle,
+        ]}>
+        <View style={styles.frame}>
+          <View style={styles.imageSurface}>
+            <Image contentFit="cover" source={source} style={styles.image} transition={250} />
+          </View>
         </View>
-      </View>
-      {active ? (
-        <Animated.View
-          entering={FadeInDown.duration(220)}
-          exiting={FadeOut.duration(180)}
-          pointerEvents="none"
-          style={[
-            styles.captionAnchor,
-            {
-              left: (flywheel.itemSize - flywheel.captionWidth) / 2 + flywheel.captionOffset.x,
-              top: flywheel.itemSize + flywheel.captionOffset.y,
-              width: flywheel.captionWidth,
-            },
-          ]}>
-          <HeroShowcaseCaption subtitle={item.subcaption} title={item.caption} />
-        </Animated.View>
-      ) : null}
-    </Animated.View>
+      </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.captionAnchor,
+          {
+            left: sceneSize / 2 - flywheel.captionWidth / 2,
+            top: sceneSize / 2,
+            width: flywheel.captionWidth,
+          },
+          captionStyle,
+        ]}>
+        <HeroShowcaseCaption subtitle={item.subcaption} title={item.caption} />
+      </Animated.View>
+    </Fragment>
   );
 }
 

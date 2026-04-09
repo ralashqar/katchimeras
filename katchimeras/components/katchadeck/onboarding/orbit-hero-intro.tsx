@@ -3,8 +3,6 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   FadeInDown,
-  runOnJS,
-  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -30,7 +28,6 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
   const sceneSize = useMemo(() => Math.min(width - 36, 368), [width]);
   const loopProgress = useSharedValue(0);
   const avatarEntrance = useSharedValue(0);
-  const [activeSlot, setActiveSlot] = useState(-1);
   const visibleCount = scene.flywheel.visibleCount;
   const roster = scene.heroRoster;
   const nextIndexRef = useRef(visibleCount % roster.length);
@@ -64,34 +61,6 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
     );
   }, [avatarEntrance, scene.timings.avatarDelay]);
 
-  useAnimatedReaction(
-    () => {
-      const loop = loopProgress.value;
-      let bestIndex = -1;
-      let bestProgress = -1;
-
-      for (let index = 0; index < visibleCount; index += 1) {
-        const slotProgress = ((loop + index / visibleCount) % 1 + 1) % 1;
-        if (
-          slotProgress >= scene.flywheel.activeStartProgress &&
-          slotProgress <= scene.flywheel.activeEndProgress &&
-          slotProgress > bestProgress
-        ) {
-          bestProgress = slotProgress;
-          bestIndex = index;
-        }
-      }
-
-      return bestIndex;
-    },
-    (next, previous) => {
-      if (next !== previous) {
-        runOnJS(setActiveSlot)(next);
-      }
-    },
-    [scene.flywheel.activeEndProgress, scene.flywheel.activeStartProgress, visibleCount]
-  );
-
   const handleWrap = useCallback(
     (slotIndex: number) => {
       setSlotAssignments((previous) => {
@@ -121,7 +90,6 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
               item={item}
               key={`${index}-${item.id}`}
               loopProgress={loopProgress}
-              active={index === activeSlot}
               onWrap={handleWrap}
               sceneSize={sceneSize}
               slotIndex={index}
