@@ -1,15 +1,18 @@
 {
-  "styleId": "katchimera-premium-cgi-v1",
-  "name": "Katchimera Premium CGI",
-  "recommendedStyle": "stylized premium 3D creature CGI",
-  "summary": "A premium stylized 3D fantasy creature look with believable materials, calm magical atmosphere, and collectible-card readability.",
+  "styleId": "katchimera-cozy-premium-cgi-v2",
+  "name": "Katchimera Cozy Premium CGI",
+  "recommendedStyle": "cozy-premium stylized 3D creature CGI",
+  "summary": "A cozy-premium stylized 3D fantasy creature look with believable materials, softened proportions, warm emotional readability, and collectible-card clarity.",
   "positiveStyleTokens": [
-    "premium stylized 3D CGI fantasy creature collectible",
+    "cozy-premium stylized 3D CGI fantasy creature companion",
     "soft cinematic lighting",
-    "high-end mobile game creature art",
+    "premium spirit companion creature art",
     "calm magical mood",
     "readable elegant silhouette",
-    "premium materials and subtle glow",
+    "slightly softened proportions",
+    "emotionally readable face",
+    "premium materials with soft tactile warmth",
+    "subtle magical glow",
     "dark atmospheric background",
     "hero-quality render"
   ],
@@ -21,25 +24,26 @@
     "no human",
     "no weapon",
     "no UI overlay",
-    "no chibi proportions",
+    "no heavy chibi proportions",
     "no exaggerated comedy",
-    "no plastic toy look"
+    "no plastic toy look",
+    "no aggressive monster face"
   ],
   "compositionDefaults": {
     "camera": "three-quarter view",
     "framing": "single creature portrait with breathing room",
     "background": "dark atmospheric habitat hint only",
     "detailLevel": "high",
-    "pose": "clear silhouette, poised rather than aggressive"
+    "pose": "clear silhouette, poised and companion-like rather than aggressive"
   },
   "renderDefaults": {
-    "finish": "cinematic polished CGI",
-    "materials": ["fur", "moss", "stone", "shell", "velvet", "ember glow", "mist"],
-    "lighting": ["soft rim light", "subtle key light", "controlled atmospheric bloom"]
+    "finish": "cinematic polished CGI with soft tactile warmth",
+    "materials": ["fur", "moss", "stone", "shell", "velvet", "ember glow", "mist", "plush fiber"],
+    "lighting": ["soft rim light", "subtle key light", "controlled atmospheric bloom", "warm eye-light readability"]
   },
   "comparativeNotes": {
     "fortnite": "too loud, too heroic, too broad for KatchaDeck's calm identity",
     "clashRoyale": "too toy-like and exaggerated for reflective collectible mood",
-    "realisticCG": "use realism in materials and lighting, but keep anatomy stylized and magical"
+    "realisticCG": "use realism in materials and lighting, but keep anatomy stylized, warm, and companion-like"
   }
 }
