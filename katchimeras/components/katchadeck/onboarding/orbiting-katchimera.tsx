@@ -1,24 +1,30 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  runOnJS,
+  SharedValue,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
-import type { HeroOrbitItem, HeroOrbitPosition, HeroSequencePhase } from '@/constants/onboarding-hero';
+import type { HeroFlywheelConfig, HeroRosterItem } from '@/constants/onboarding-hero';
 import { KatchaDeckUI } from '@/constants/theme';
 
 type OrbitingKatchimeraProps = {
-  item: HeroOrbitItem;
+  item: HeroRosterItem;
   sceneSize: number;
   source: number;
   delay: number;
-  elapsedMs?: number;
-  hidden?: boolean;
-  mode?: 'orbit' | 'spotlight';
-  spotlightPhase?: HeroSequencePhase;
-  spotlightOrigin?: HeroOrbitPosition | null;
-  spotlightTarget?: { x: number; y: number };
-  spotlightReturnTarget?: HeroOrbitPosition | null;
-  spotlightScale?: number;
+  loopProgress: SharedValue<number>;
+  slotIndex: number;
+  visibleCount: number;
+  flywheel: HeroFlywheelConfig;
+  onWrap: (slotIndex: number) => void;
 };
 
 export function OrbitingKatchimera({
@@ -26,122 +32,70 @@ export function OrbitingKatchimera({
   sceneSize,
   source,
   delay,
-  hidden = false,
-  mode = 'orbit',
-  spotlightPhase = 'idle',
-  spotlightOrigin = null,
-  spotlightTarget = { x: 0, y: 0 },
-  spotlightReturnTarget = null,
-  spotlightScale = 1.12,
+  loopProgress,
+  slotIndex,
+  visibleCount,
+  flywheel,
+  onWrap,
 }: OrbitingKatchimeraProps) {
-  const orbitRotation = useSharedValue(0);
-  const reveal = useSharedValue(mode === 'orbit' ? 0 : 1);
-  const hiddenProgress = useSharedValue(hidden ? 1 : 0);
-  const centerProgress = useSharedValue(spotlightPhase === 'idle' ? 0 : 1);
-  const returnProgress = useSharedValue(spotlightPhase === 'spotlightOut' ? 1 : 0);
+  const reveal = useSharedValue(0);
 
   useEffect(() => {
-    if (mode === 'orbit') {
-      orbitRotation.value = withRepeat(
-        withTiming(360, {
-          duration: item.rotationDuration,
-          easing: Easing.linear,
-        }),
-        -1,
-        false
-      );
-    }
-
+    reveal.value = 0;
     reveal.value = withDelay(
       delay,
       withTiming(1, {
-        duration: 900,
+        duration: 760,
         easing: Easing.out(Easing.cubic),
       })
     );
-  }, [delay, item.rotationDuration, mode, orbitRotation, reveal]);
+  }, [delay, item.id, reveal]);
 
-  useEffect(() => {
-    hiddenProgress.value = withTiming(hidden ? 1 : 0, {
-      duration: hidden ? 220 : 280,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [hidden, hiddenProgress]);
+  useAnimatedReaction(
+    () => {
+      const rawProgress = loopProgress.value + slotIndex / visibleCount;
+      return ((rawProgress % 1) + 1) % 1;
+    },
+    (current, previous) => {
+      if (previous === null || previous === undefined) {
+        return;
+      }
 
-  useEffect(() => {
-    if (mode !== 'spotlight') {
-      return;
-    }
-
-    if (spotlightPhase === 'spotlightIn') {
-      centerProgress.value = 0;
-      returnProgress.value = 0;
-      centerProgress.value = withTiming(1, {
-        duration: 780,
-        easing: Easing.out(Easing.cubic),
-      });
-      return;
-    }
-
-    if (spotlightPhase === 'spotlightHold') {
-      centerProgress.value = withTiming(1, {
-        duration: 160,
-        easing: Easing.out(Easing.cubic),
-      });
-      returnProgress.value = withTiming(0, {
-        duration: 120,
-        easing: Easing.out(Easing.cubic),
-      });
-      return;
-    }
-
-    if (spotlightPhase === 'spotlightOut') {
-      centerProgress.value = withTiming(1, {
-        duration: 120,
-        easing: Easing.out(Easing.cubic),
-      });
-      returnProgress.value = withTiming(1, {
-        duration: 820,
-        easing: Easing.inOut(Easing.cubic),
-      });
-      return;
-    }
-
-    centerProgress.value = 0;
-    returnProgress.value = 0;
-  }, [centerProgress, mode, returnProgress, spotlightPhase]);
+      if (previous > 1 - flywheel.exitFadeWindow && current < flywheel.entryFadeWindow) {
+        runOnJS(onWrap)(slotIndex);
+      }
+    },
+    [flywheel.entryFadeWindow, flywheel.exitFadeWindow, onWrap, slotIndex, visibleCount]
+  );
 
   const animatedStyle = useAnimatedStyle(() => {
-    if (mode === 'spotlight') {
-      const origin = spotlightOrigin ?? { x: 0, y: 0, depth: 0.5 };
-      const returnTarget = spotlightReturnTarget ?? origin;
-      const toCenterX = origin.x + (spotlightTarget.x - origin.x) * centerProgress.value;
-      const toCenterY = origin.y + (spotlightTarget.y - origin.y) * centerProgress.value;
-      const finalX = toCenterX + (returnTarget.x - spotlightTarget.x) * returnProgress.value;
-      const finalY = toCenterY + (returnTarget.y - spotlightTarget.y) * returnProgress.value;
-
-      return {
-        opacity: reveal.value * (1 - returnProgress.value * 0.08),
-        transform: [
-          { translateX: finalX },
-          { translateY: finalY },
-          { scale: 1 + (spotlightScale - 1) * centerProgress.value - returnProgress.value * 0.05 },
-        ],
-        zIndex: 220,
-      };
-    }
-
-    const degrees = item.startAngle + orbitRotation.value;
-    const radians = (degrees * Math.PI) / 180;
-    const orbitX = Math.cos(radians) * item.orbitRadius;
-    const orbitY = Math.sin(radians) * item.orbitRadius * (0.84 + item.parallaxDepth * 0.08);
+    const rawProgress = loopProgress.value + slotIndex / visibleCount;
+    const progress = ((rawProgress % 1) + 1) % 1;
+    const angle = progress * 360 + 180;
+    const radians = (angle * Math.PI) / 180;
+    const orbitX = Math.cos(radians) * flywheel.orbitRadiusX;
+    const orbitY = Math.sin(radians) * flywheel.orbitRadiusY;
     const depth = (Math.sin(radians) + 1) / 2;
-    const scale = (0.92 + depth * 0.12) * (0.9 + reveal.value * 0.1);
+    const distanceToHighlight = Math.min(
+      Math.abs(progress - flywheel.highlightProgress),
+      1 - Math.abs(progress - flywheel.highlightProgress)
+    );
+    const highlightFactor = Math.max(0, 1 - distanceToHighlight / flywheel.highlightWindow);
+    const entryFade = Math.min(1, progress / flywheel.entryFadeWindow);
+    const exitFade = Math.min(1, (1 - progress) / flywheel.exitFadeWindow);
+    const leftFade = Math.min(entryFade, exitFade);
+    const introShiftX = -flywheel.entryOffsetX * (1 - reveal.value);
+    const scale = (0.9 + depth * 0.15) * (0.9 + reveal.value * 0.1) * (1 + (flywheel.highlightScale - 1) * highlightFactor);
+    const opacityBoost = 0.84 + highlightFactor * 0.16;
 
     return {
-      opacity: reveal.value * item.opacity * (1 - hiddenProgress.value),
-      transform: [{ translateX: orbitX }, { translateY: orbitY }, { scale }],
-      zIndex: Math.round(depth * 100),
+      opacity: reveal.value * leftFade * opacityBoost,
+      transform: [
+        { translateX: orbitX + introShiftX + flywheel.highlightOffset.x * highlightFactor },
+        { translateY: orbitY + flywheel.highlightOffset.y * highlightFactor },
+        { scale },
+      ],
+      zIndex: Math.round(depth * 100 + highlightFactor * 60),
     };
   });
 
@@ -151,16 +105,16 @@ export function OrbitingKatchimera({
       style={[
         styles.anchor,
         {
-          height: item.size,
+          height: flywheel.itemSize,
           left: sceneSize / 2,
-          marginLeft: -item.size / 2,
-          marginTop: -item.size / 2,
+          marginLeft: -flywheel.itemSize / 2,
+          marginTop: -flywheel.itemSize / 2,
           top: sceneSize / 2,
-          width: item.size,
+          width: flywheel.itemSize,
         },
         animatedStyle,
       ]}>
-      <View style={[styles.frame, mode === 'spotlight' ? styles.spotlightFrame : null]}>
+      <View style={styles.frame}>
         <View style={styles.imageSurface}>
           <Image contentFit="cover" source={source} style={styles.image} transition={250} />
         </View>
@@ -183,10 +137,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 4,
     width: '100%',
-  },
-  spotlightFrame: {
-    borderColor: 'rgba(241, 247, 255, 0.28)',
-    boxShadow: KatchaDeckUI.shadows.card,
   },
   imageSurface: {
     aspectRatio: 1,

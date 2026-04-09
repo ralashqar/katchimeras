@@ -1,37 +1,51 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 
 type HeroShowcaseCaptionProps = {
   title: string;
+  subtitle?: string;
 };
 
-export function HeroShowcaseCaption({ title }: HeroShowcaseCaptionProps) {
+export function HeroShowcaseCaption({ title, subtitle }: HeroShowcaseCaptionProps) {
   return (
     <Animated.View entering={FadeInDown.duration(320)} exiting={FadeOut.duration(220)} style={styles.shell}>
-      <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#D4E1FF" darkColor="#D4E1FF">
-        A day in motion
-      </ThemedText>
-      <ThemedText type="subtitle" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
-        {title}
-      </ThemedText>
+      <View style={styles.pill}>
+        <ThemedText type="default" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          {title}
+        </ThemedText>
+        {subtitle ? (
+          <ThemedText type="label" style={styles.subtitle} lightColor="#C9D8FF" darkColor="#C9D8FF">
+            {subtitle}
+          </ThemedText>
+        ) : null}
+      </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   shell: {
-    alignItems: 'center',
-    gap: 6,
-    maxWidth: 320,
+    alignItems: 'flex-start',
+    maxWidth: 190,
   },
-  kicker: {
-    fontSize: 11,
+  pill: {
+    backgroundColor: 'rgba(9, 13, 24, 0.82)',
+    borderColor: 'rgba(216, 228, 255, 0.16)',
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   title: {
-    fontSize: 20,
-    lineHeight: 26,
-    textAlign: 'center',
+    fontSize: 13,
+    letterSpacing: -0.1,
+    lineHeight: 17,
+  },
+  subtitle: {
+    fontSize: 11,
+    lineHeight: 14,
   },
 });

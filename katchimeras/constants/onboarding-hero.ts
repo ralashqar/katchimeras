@@ -12,13 +12,6 @@ export const heroOrbitAssets = {
 } as const satisfies Record<string, ImageSourcePropType>;
 
 export type HeroOrbitAssetKey = keyof typeof heroOrbitAssets;
-export type HeroOrbitLane = 'inner' | 'middle' | 'outer';
-export type HeroSequencePhase = 'idle' | 'spotlightIn' | 'spotlightHold' | 'spotlightOut';
-export type HeroOrbitPosition = {
-  x: number;
-  y: number;
-  depth: number;
-};
 
 export type HeroArcLayer = {
   id: string;
@@ -31,62 +24,35 @@ export type HeroArcLayer = {
   segmentStarts: readonly number[];
 };
 
-export type HeroOrbitItem = {
+export type HeroRosterItem = {
   id: string;
   assetKey: HeroOrbitAssetKey;
-  orbitRadius: number;
-  startAngle: number;
-  size: number;
-  rotationDuration: number;
-  parallaxDepth: number;
-  opacity: number;
-  lane: HeroOrbitLane;
-  showcaseCaption: string;
+  caption: string;
+  subcaption?: string;
+  priority: number;
 };
 
-const laneBaseAngles: Record<HeroOrbitLane, number> = {
-  inner: -28,
-  middle: 16,
-  outer: -10,
-};
-
-export function resolveHeroOrbitItems(items: readonly HeroOrbitItem[]): HeroOrbitItem[] {
-  const counts = items.reduce<Record<HeroOrbitLane, number>>(
-    (accumulator, item) => {
-      accumulator[item.lane] += 1;
-      return accumulator;
-    },
-    { inner: 0, middle: 0, outer: 0 }
-  );
-
-  const laneIndices: Record<HeroOrbitLane, number> = {
-    inner: 0,
-    middle: 0,
-    outer: 0,
+export type HeroFlywheelConfig = {
+  visibleCount: number;
+  orbitRadiusX: number;
+  orbitRadiusY: number;
+  speedMsPerLoop: number;
+  entryOffsetX: number;
+  entryFadeWindow: number;
+  exitFadeWindow: number;
+  itemSize: number;
+  highlightProgress: number;
+  highlightWindow: number;
+  highlightScale: number;
+  highlightOffset: {
+    x: number;
+    y: number;
   };
-
-  return items.map((item) => {
-    const laneCount = counts[item.lane];
-    const slotIndex = laneIndices[item.lane];
-    laneIndices[item.lane] += 1;
-    const slotAngle = laneCount > 0 ? (360 / laneCount) * slotIndex : 0;
-
-    return {
-      ...item,
-      startAngle: laneBaseAngles[item.lane] + slotAngle + item.startAngle,
-    };
-  });
-}
-
-export function getOrbitPositionForElapsed(item: HeroOrbitItem, elapsedMs: number): HeroOrbitPosition {
-  const degrees = item.startAngle + ((elapsedMs % item.rotationDuration) / item.rotationDuration) * 360;
-  const radians = (degrees * Math.PI) / 180;
-  const x = Math.cos(radians) * item.orbitRadius;
-  const y = Math.sin(radians) * item.orbitRadius * (0.84 + item.parallaxDepth * 0.08);
-  const depth = (Math.sin(radians) + 1) / 2;
-
-  return { x, y, depth };
-}
+  captionOffset: {
+    x: number;
+    y: number;
+  };
+};
 
 export type HeroTimingConfig = {
   arcDelay: number;
@@ -97,29 +63,14 @@ export type HeroTimingConfig = {
   ctaDelay: number;
 };
 
-export type HeroSequenceConfig = {
-  startDelay: number;
-  spotlightInDuration: number;
-  spotlightHoldDuration: number;
-  spotlightOutDuration: number;
-  gapDuration: number;
-  spotlightScale: number;
-};
-
-export type HeroCaptionStage = {
-  offsetY: number;
-  maxWidth: number;
-};
-
 export type HeroSceneConfig = {
   title: string;
   subtitle?: string;
   ctaLabel: string;
   backgroundPalette: readonly [string, string, string];
   accentColor: string;
-  orbitItems: readonly HeroOrbitItem[];
-  captionStage: HeroCaptionStage;
-  sequence: HeroSequenceConfig;
+  heroRoster: readonly HeroRosterItem[];
+  flywheel: HeroFlywheelConfig;
   arcLayers: readonly HeroArcLayer[];
   timings: HeroTimingConfig;
 };
@@ -130,103 +81,70 @@ export const openingHeroScene: HeroSceneConfig = {
   ctaLabel: 'Begin',
   backgroundPalette: ['#090B12', '#11192B', '#171D34'],
   accentColor: 'rgba(200,216,255,0.16)',
-  orbitItems: [
+  heroRoster: [
     {
       id: 'mossprout',
       assetKey: 'mossprout',
-      orbitRadius: 114,
-      startAngle: 0,
-      size: 68,
-      rotationDuration: 36000,
-      parallaxDepth: 0.92,
-      opacity: 0.96,
-      lane: 'inner',
-      showcaseCaption: 'You make room for green, even on ordinary days.',
+      caption: 'You keep a little room for green.',
+      priority: 1,
     },
     {
       id: 'lattelet',
       assetKey: 'lattelet',
-      orbitRadius: 140,
-      startAngle: -8,
-      size: 74,
-      rotationDuration: 43000,
-      parallaxDepth: 1.06,
-      opacity: 0.92,
-      lane: 'middle',
-      showcaseCaption: 'You keep finding your way back to coffee.',
+      caption: 'Coffee keeps finding you back.',
+      priority: 2,
     },
     {
       id: 'sprintail',
       assetKey: 'sprintail',
-      orbitRadius: 114,
-      startAngle: 18,
-      size: 66,
-      rotationDuration: 32000,
-      parallaxDepth: 0.9,
-      opacity: 0.94,
-      lane: 'inner',
-      showcaseCaption: 'You turn movement into momentum.',
+      caption: 'Motion suits you today.',
+      priority: 3,
     },
     {
       id: 'neonpoko',
       assetKey: 'neonpoko',
-      orbitRadius: 164,
-      startAngle: -12,
-      size: 78,
-      rotationDuration: 52000,
-      parallaxDepth: 1.14,
-      opacity: 0.9,
-      lane: 'outer',
-      showcaseCaption: 'You collect energy from the places that light up at night.',
+      caption: 'Night places leave a mark.',
+      priority: 4,
     },
     {
       id: 'crumbun',
       assetKey: 'crumbun',
-      orbitRadius: 140,
-      startAngle: 12,
-      size: 72,
-      rotationDuration: 44000,
-      parallaxDepth: 1.02,
-      opacity: 0.9,
-      lane: 'middle',
-      showcaseCaption: 'You notice warmth in the places you return to.',
+      caption: 'Warm places still count.',
+      priority: 5,
     },
     {
       id: 'hayhorn',
       assetKey: 'hayhorn',
-      orbitRadius: 168,
-      startAngle: 10,
-      size: 76,
-      rotationDuration: 56000,
-      parallaxDepth: 1.14,
-      opacity: 0.86,
-      lane: 'outer',
-      showcaseCaption: 'You carry a steadier, earthier rhythm than you think.',
+      caption: 'Your pace is steadier than it feels.',
+      priority: 6,
     },
     {
       id: 'ironette',
       assetKey: 'ironette',
-      orbitRadius: 168,
-      startAngle: -22,
-      size: 76,
-      rotationDuration: 60000,
-      parallaxDepth: 1.16,
-      opacity: 0.88,
-      lane: 'outer',
-      showcaseCaption: 'Some places turn a day into something memorable.',
+      caption: 'Some stops become the day.',
+      priority: 7,
     },
   ],
-  captionStage: {
-    offsetY: 18,
-    maxWidth: 320,
-  },
-  sequence: {
-    startDelay: 2200,
-    spotlightInDuration: 780,
-    spotlightHoldDuration: 1800,
-    spotlightOutDuration: 820,
-    gapDuration: 280,
-    spotlightScale: 1.14,
+  flywheel: {
+    visibleCount: 4,
+    orbitRadiusX: 148,
+    orbitRadiusY: 118,
+    speedMsPerLoop: 24000,
+    entryOffsetX: 82,
+    entryFadeWindow: 0.08,
+    exitFadeWindow: 0.08,
+    itemSize: 72,
+    highlightProgress: 0.375,
+    highlightWindow: 0.085,
+    highlightScale: 1.18,
+    highlightOffset: {
+      x: 20,
+      y: 22,
+    },
+    captionOffset: {
+      x: 58,
+      y: 126,
+    },
   },
   arcLayers: [
     {

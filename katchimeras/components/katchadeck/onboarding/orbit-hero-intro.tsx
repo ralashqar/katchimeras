@@ -1,15 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { Easing, FadeInDown, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeInDown,
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
 
 import { HeroShowcaseCaption } from '@/components/katchadeck/onboarding/hero-showcase-caption';
 import { OrbitRingBackdrop } from '@/components/katchadeck/onboarding/orbit-ring-backdrop';
 import { OrbitingKatchimera } from '@/components/katchadeck/onboarding/orbiting-katchimera';
-import { useHeroShowcaseSequence } from '@/components/katchadeck/onboarding/use-hero-showcase-sequence';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import { getOrbitPositionForElapsed, heroOrbitAssets, openingHeroScene, resolveHeroOrbitItems } from '@/constants/onboarding-hero';
+import { heroOrbitAssets, openingHeroScene } from '@/constants/onboarding-hero';
 import { KatchaDeckUI } from '@/constants/theme';
 
 type OrbitHeroIntroProps = {
@@ -20,30 +29,30 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
   const { width } = useWindowDimensions();
   const scene = openingHeroScene;
   const sceneSize = useMemo(() => Math.min(width - 36, 368), [width]);
-  const resolvedOrbitItems = useMemo(() => resolveHeroOrbitItems(scene.orbitItems), [scene.orbitItems]);
-  const startRef = useRef(Date.now());
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const [spotlightOrigin, setSpotlightOrigin] = useState<ReturnType<typeof getOrbitPositionForElapsed> | null>(null);
-  const [spotlightReturnTarget, setSpotlightReturnTarget] = useState<ReturnType<typeof getOrbitPositionForElapsed> | null>(null);
+  const loopProgress = useSharedValue(0);
   const avatarEntrance = useSharedValue(0);
-  const { activeIndex, phase } = useHeroShowcaseSequence({
-    itemCount: resolvedOrbitItems.length,
-    startDelay: scene.sequence.startDelay,
-    spotlightInDuration: scene.sequence.spotlightInDuration,
-    spotlightHoldDuration: scene.sequence.spotlightHoldDuration,
-    spotlightOutDuration: scene.sequence.spotlightOutDuration,
-    gapDuration: scene.sequence.gapDuration,
-  });
-
-  const activeItem = activeIndex !== null ? resolvedOrbitItems[activeIndex] : null;
+  const [activeSlot, setActiveSlot] = useState(-1);
+  const visibleCount = scene.flywheel.visibleCount;
+  const roster = scene.heroRoster;
+  const nextIndexRef = useRef(visibleCount % roster.length);
+  const [slotAssignments, setSlotAssignments] = useState(() => roster.slice(0, visibleCount));
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsedMs(Date.now() - startRef.current);
-    }, 60);
+    setSlotAssignments(roster.slice(0, visibleCount));
+    nextIndexRef.current = visibleCount % roster.length;
+  }, [roster, visibleCount]);
 
-    return () => clearInterval(timer);
-  }, []);
+  useEffect(() => {
+    loopProgress.value = 0;
+    loopProgress.value = withRepeat(
+      withTiming(1, {
+        duration: scene.flywheel.speedMsPerLoop,
+        easing: Easing.linear,
+      }),
+      -1,
+      false
+    );
+  }, [loopProgress, scene.flywheel.speedMsPerLoop]);
 
   useEffect(() => {
     avatarEntrance.value = 0;
@@ -56,22 +65,48 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
     );
   }, [avatarEntrance, scene.timings.avatarDelay]);
 
-  useEffect(() => {
-    if (!activeItem || phase !== 'spotlightIn') {
-      return;
-    }
+  useAnimatedReaction(
+    () => {
+      const loop = loopProgress.value;
+      let bestIndex = -1;
+      let bestDistance = Number.MAX_SAFE_INTEGER;
 
-    setSpotlightOrigin(getOrbitPositionForElapsed(activeItem, elapsedMs));
-    setSpotlightReturnTarget(null);
-  }, [activeItem, elapsedMs, phase]);
+      for (let index = 0; index < visibleCount; index += 1) {
+        const slotProgress = ((loop + index / visibleCount) % 1 + 1) % 1;
+        const distance = Math.min(
+          Math.abs(slotProgress - scene.flywheel.highlightProgress),
+          1 - Math.abs(slotProgress - scene.flywheel.highlightProgress)
+        );
 
-  useEffect(() => {
-    if (!activeItem || phase !== 'spotlightOut') {
-      return;
-    }
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = index;
+        }
+      }
 
-    setSpotlightReturnTarget(getOrbitPositionForElapsed(activeItem, elapsedMs));
-  }, [activeItem, elapsedMs, phase]);
+      return bestDistance <= scene.flywheel.highlightWindow ? bestIndex : -1;
+    },
+    (next, previous) => {
+      if (next !== previous) {
+        runOnJS(setActiveSlot)(next);
+      }
+    },
+    [scene.flywheel.highlightProgress, scene.flywheel.highlightWindow, visibleCount]
+  );
+
+  const handleWrap = useCallback(
+    (slotIndex: number) => {
+      setSlotAssignments((previous) => {
+        const next = [...previous];
+        next[slotIndex] = roster[nextIndexRef.current % roster.length];
+        nextIndexRef.current += 1;
+        return next;
+      });
+    },
+    [roster]
+  );
+
+  const activeItem = activeSlot >= 0 ? slotAssignments[activeSlot] : null;
 
   const avatarStyle = useAnimatedStyle(() => ({
     opacity: avatarEntrance.value,
@@ -80,36 +115,23 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
 
   return (
     <View style={styles.page}>
-      <View style={[styles.sceneWrap, { minHeight: sceneSize + 136 }]}>
+      <View style={[styles.sceneWrap, { minHeight: sceneSize + 48 }]}>
         <View style={[styles.sceneStage, { height: sceneSize, width: sceneSize }]}>
           <OrbitRingBackdrop delay={scene.timings.arcDelay} layers={scene.arcLayers} size={sceneSize} />
-          {resolvedOrbitItems.map((item, index) => (
+          {slotAssignments.map((item, index) => (
             <OrbitingKatchimera
               delay={scene.timings.orbitDelayStart + index * scene.timings.orbitStagger}
-              elapsedMs={elapsedMs}
-              hidden={activeItem?.id === item.id}
+              flywheel={scene.flywheel}
               item={item}
-              key={item.id}
+              key={`${index}-${item.id}`}
+              loopProgress={loopProgress}
+              onWrap={handleWrap}
               sceneSize={sceneSize}
+              slotIndex={index}
               source={heroOrbitAssets[item.assetKey]}
+              visibleCount={visibleCount}
             />
           ))}
-          {activeItem && spotlightOrigin ? (
-            <OrbitingKatchimera
-              delay={0}
-              elapsedMs={elapsedMs}
-              item={activeItem}
-              key={`spotlight-${activeItem.id}`}
-              mode="spotlight"
-              sceneSize={sceneSize}
-              source={heroOrbitAssets[activeItem.assetKey]}
-              spotlightOrigin={spotlightOrigin}
-              spotlightPhase={phase}
-              spotlightReturnTarget={spotlightReturnTarget}
-              spotlightScale={scene.sequence.spotlightScale}
-              spotlightTarget={{ x: 0, y: sceneSize * 0.44 }}
-            />
-          ) : null}
           <Animated.View style={[styles.centerAvatar, avatarStyle]}>
             <View style={[styles.centerAvatarFrame, { height: Math.min(sceneSize * 0.46, 182), width: Math.min(sceneSize * 0.46, 182) }]}>
               <View style={styles.centerAvatarRing} />
@@ -119,15 +141,23 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
               <View style={styles.centerAvatarAura} />
             </View>
           </Animated.View>
-        </View>
-        <View style={[styles.captionStage, { marginTop: scene.captionStage.offsetY, maxWidth: scene.captionStage.maxWidth }]}>
-          {activeItem && phase !== 'spotlightOut' ? <HeroShowcaseCaption title={activeItem.showcaseCaption} /> : null}
+          {activeItem ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.captionOverlay,
+                {
+                  left: sceneSize / 2 + scene.flywheel.captionOffset.x,
+                  top: sceneSize / 2 + scene.flywheel.captionOffset.y,
+                },
+              ]}>
+              <HeroShowcaseCaption subtitle={activeItem.subcaption} title={activeItem.caption} />
+            </View>
+          ) : null}
         </View>
       </View>
 
-      <Animated.View
-        entering={FadeInDown.duration(760).delay(scene.timings.titleDelay)}
-        style={styles.copyInner}>
+      <Animated.View entering={FadeInDown.duration(760).delay(scene.timings.titleDelay)} style={styles.copyInner}>
         <ThemedText type="onboardingDisplay" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
           {scene.title}
         </ThemedText>
@@ -138,9 +168,7 @@ export function OrbitHeroIntro({ onBegin }: OrbitHeroIntroProps) {
         ) : null}
       </Animated.View>
 
-      <Animated.View
-        entering={FadeInDown.duration(760).delay(scene.timings.ctaDelay)}
-        style={styles.ctaWrap}>
+      <Animated.View entering={FadeInDown.duration(760).delay(scene.timings.ctaDelay)} style={styles.ctaWrap}>
         <KatchaButton glow icon="arrow.right" label={scene.ctaLabel} onPress={onBegin} variant="primary" />
       </Animated.View>
     </View>
@@ -165,10 +193,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  captionStage: {
-    alignItems: 'center',
-    minHeight: 62,
-    width: '100%',
+  captionOverlay: {
+    maxWidth: 190,
+    position: 'absolute',
   },
   centerAvatar: {
     alignItems: 'center',
