@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { VeilMascot } from '@/components/katchadeck/veil-mascot';
+import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
 import { presenceEnter, rewardEnter } from '@/components/katchadeck/motion';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -37,7 +37,7 @@ export default function ModalScreen() {
               and the richer sense that your life is building into something distinct.
             </ThemedText>
           </View>
-          <VeilMascot glow mood="bright" size={116} variant="guide" />
+          <HoodedAvatar size={116} />
         </Animated.View>
 
         <Animated.View entering={presenceEnter(120)}>

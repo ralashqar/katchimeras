@@ -8,7 +8,6 @@ import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
 import { presenceEnter, rewardEnter } from '@/components/katchadeck/motion';
 import { ResolvedAvatar } from '@/components/katchadeck/resolved-avatar';
-import { VeilMascot } from '@/components/katchadeck/veil-mascot';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SectionHeader } from '@/components/katchadeck/ui/section-header';
@@ -50,9 +49,6 @@ export default function HomeScreen() {
           </View>
           <View style={styles.heroVisual}>
             <ResolvedAvatar size={176} />
-            <View style={styles.mascotAnchor}>
-              <VeilMascot interactive mood="guide" size={74} variant="guide" />
-            </View>
           </View>
         </Animated.View>
 
@@ -100,7 +96,7 @@ export default function HomeScreen() {
 
         <Animated.View entering={presenceEnter(300)}>
           <GlassPanel contentStyle={styles.progressPanel}>
-            <SectionHeader label="Katcher status" title="Veil can already sense a pattern" actionLabel="Stage one" />
+            <SectionHeader label="Katcher status" title="A pattern is starting to show itself" actionLabel="Stage one" />
             <View style={styles.progressCopy}>
               <ThemedText style={styles.progressBody} lightColor="#D9E4FF" darkColor="#D9E4FF">
                 The hooded figure is still mostly hidden. More days, repeated routes, and quiet
@@ -173,11 +169,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 6,
-  },
-  mascotAnchor: {
-    position: 'absolute',
-    right: 42,
-    top: 10,
   },
   insightPanel: {
     gap: 12,

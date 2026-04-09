@@ -7,10 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
+import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
 import { presenceEnter, presenceExit, rewardEnter, usePressMotion } from '@/components/katchadeck/motion';
+import { OrbitHeroIntro } from '@/components/katchadeck/onboarding/orbit-hero-intro';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
-import { ResolvedAvatar } from '@/components/katchadeck/resolved-avatar';
-import { VeilMascot, type VeilMascotMood } from '@/components/katchadeck/veil-mascot';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
@@ -32,7 +32,6 @@ type OnboardingTheme = {
   accentColor: string;
   colors: readonly [string, string, string];
   meshColors: readonly [string, string, string, string];
-  mascotMood: VeilMascotMood;
   pageLabel: string;
   primaryCtaLabel?: string;
   secondaryCtaLabel?: string;
@@ -48,7 +47,6 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(106,95,232,0.08)',
       'rgba(227,160,110,0.08)',
     ],
-    mascotMood: 'curious',
     pageLabel: 'Welcome',
     primaryCtaLabel: 'Begin',
   },
@@ -61,7 +59,6 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(95,168,123,0.06)',
       'rgba(200,216,255,0.06)',
     ],
-    mascotMood: 'calm',
     pageLabel: 'Your goal',
     primaryCtaLabel: 'This fits',
   },
@@ -74,7 +71,6 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(106,95,232,0.08)',
       'rgba(95,168,123,0.06)',
     ],
-    mascotMood: 'bright',
     pageLabel: 'What is missing',
     primaryCtaLabel: 'Keep going',
   },
@@ -87,7 +83,6 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(106,95,232,0.06)',
       'rgba(227,160,110,0.06)',
     ],
-    mascotMood: 'curious',
     pageLabel: 'World tone',
     primaryCtaLabel: 'Shape my deck',
   },
@@ -100,7 +95,6 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(106,95,232,0.1)',
       'rgba(95,168,123,0.06)',
     ],
-    mascotMood: 'bright',
     pageLabel: 'Reading your pattern',
   },
   {
@@ -112,7 +106,6 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(95,168,123,0.08)',
       'rgba(106,95,232,0.08)',
     ],
-    mascotMood: 'guide',
     pageLabel: 'First reveal',
     primaryCtaLabel: 'See what this becomes',
   },
@@ -125,7 +118,6 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(255,216,192,0.08)',
       'rgba(95,168,123,0.06)',
     ],
-    mascotMood: 'guide',
     pageLabel: 'What happens next',
     primaryCtaLabel: 'Open my deck',
     secondaryCtaLabel: 'See premium preview',
@@ -155,9 +147,12 @@ export default function OnboardingScreen() {
   );
 
   const totalSteps = pageThemes.length;
+  const isIntroStep = page === 0;
   const isProcessingStep = page === 4;
   const isFinalStep = page === 6;
   const currentTheme = pageThemes[page];
+  const progressCurrent = Math.max(1, page);
+  const progressTotal = totalSteps - 1;
 
   useEffect(() => {
     if (!isProcessingStep) {
@@ -256,7 +251,7 @@ export default function OnboardingScreen() {
         <Animated.View entering={presenceEnter()} style={styles.header}>
           <View style={styles.headerRow}>
             <ThemedText type="onboardingLabel" style={styles.brandLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
-              KatchaDeck
+              {isIntroStep ? 'Katchimeras' : 'KatchaDeck'}
             </ThemedText>
             {page > 0 && !isProcessingStep ? (
               <Pressable onPress={handleResetFlow} style={styles.resetAction}>
@@ -267,7 +262,7 @@ export default function OnboardingScreen() {
               </Pressable>
             ) : null}
           </View>
-          {!isFinalStep ? <ProgressBar current={page + 1} total={totalSteps} /> : null}
+          {!isIntroStep && !isFinalStep ? <ProgressBar current={progressCurrent} total={progressTotal} /> : null}
         </Animated.View>
 
         <PagerView
@@ -279,29 +274,10 @@ export default function OnboardingScreen() {
           style={styles.pager}>
           <ScrollView
             key="welcome"
-            contentContainerStyle={[styles.pageContent, { paddingBottom: footerHeight + 56 }]}
+            contentContainerStyle={[styles.pageContent, styles.introPageContent]}
             contentInsetAdjustmentBehavior="automatic"
             showsVerticalScrollIndicator={false}>
-            <Animated.View entering={presenceEnter(40)} style={styles.welcomeCopy}>
-              <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
-                Your life, collected
-              </ThemedText>
-              <ThemedText type="hero" style={styles.welcomeTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                Your life becomes your deck.
-              </ThemedText>
-              <ThemedText type="bodyLarge" style={styles.welcomeBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                Every walk, place, and repeated return leaves a collectible mark.
-              </ThemedText>
-            </Animated.View>
-
-            <Animated.View entering={presenceEnter(160)} style={styles.heroStage}>
-              <Animated.View entering={presenceEnter(220)} style={styles.heroFigure}>
-                <ResolvedAvatar size={210} />
-                <View style={styles.heroVeil}>
-                  <VeilMascot interactive mood="curious" size={84} />
-                </View>
-              </Animated.View>
-            </Animated.View>
+            <OrbitHeroIntro onBegin={handleNext} />
           </ScrollView>
 
           <QuestionPage
@@ -370,12 +346,7 @@ export default function OnboardingScreen() {
 
           <View key="processing" style={[styles.pageContent, styles.processingPage]}>
             <Animated.View entering={rewardEnter()} style={styles.processingStack}>
-              <View style={styles.processingFigure}>
-                <ResolvedAvatar size={194} />
-                <View style={styles.processingVeil}>
-                  <VeilMascot glow mood="bright" size={88} variant="halo" />
-                </View>
-              </View>
+              <HoodedAvatar size={194} />
               <View style={styles.processingCopy}>
                 <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#FFDCC0" darkColor="#FFDCC0">
                   {pageThemes[4].pageLabel}
@@ -407,7 +378,7 @@ export default function OnboardingScreen() {
                   {reveal.narrative}
                 </ThemedText>
               </View>
-              <VeilMascot interactive mood="guide" size={82} variant="guide" />
+              <HoodedAvatar size={148} />
             </Animated.View>
 
             <ScrollView
@@ -495,43 +466,45 @@ export default function OnboardingScreen() {
           </ScrollView>
         </PagerView>
 
-        <View
-          onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
-          style={[styles.footerWrap, { paddingBottom: insets.bottom + 10 }]}>
-          <View style={styles.footerShell}>
-            <Animated.View
-              entering={presenceEnter(20)}
-              exiting={presenceExit()}
-              key={`footer-${page}-${isFinalStep ? 'final' : 'flow'}`}>
-              {isProcessingStep ? (
-                <View style={styles.footerPlaceholder} />
-              ) : isFinalStep ? (
-                <View style={styles.footerStack}>
+        {!isIntroStep ? (
+          <View
+            onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+            style={[styles.footerWrap, { paddingBottom: insets.bottom + 10 }]}>
+            <View style={styles.footerShell}>
+              <Animated.View
+                entering={presenceEnter(20)}
+                exiting={presenceExit()}
+                key={`footer-${page}-${isFinalStep ? 'final' : 'flow'}`}>
+                {isProcessingStep ? (
+                  <View style={styles.footerPlaceholder} />
+                ) : isFinalStep ? (
+                  <View style={styles.footerStack}>
+                    <KatchaButton
+                      icon="sparkles"
+                      label={currentTheme.secondaryCtaLabel ?? 'See premium preview'}
+                      onPress={() => router.push('/modal')}
+                      variant="secondary"
+                    />
+                    <KatchaButton
+                      icon="arrow.right"
+                      label={currentTheme.primaryCtaLabel ?? 'Open my deck'}
+                      onPress={completeOnboarding}
+                      variant="primary"
+                    />
+                  </View>
+                ) : (
                   <KatchaButton
-                    icon="sparkles"
-                    label={currentTheme.secondaryCtaLabel ?? 'See premium preview'}
-                    onPress={() => router.push('/modal')}
+                    disabled={!canContinue}
+                    icon="arrow.right"
+                    label={currentTheme.primaryCtaLabel ?? 'Continue'}
+                    onPress={handleNext}
                     variant="secondary"
                   />
-                  <KatchaButton
-                    icon="arrow.right"
-                    label={currentTheme.primaryCtaLabel ?? 'Open my deck'}
-                    onPress={completeOnboarding}
-                    variant="primary"
-                  />
-                </View>
-              ) : (
-                <KatchaButton
-                  disabled={!canContinue}
-                  icon="arrow.right"
-                  label={currentTheme.primaryCtaLabel ?? 'Continue'}
-                  onPress={handleNext}
-                  variant="secondary"
-                />
-              )}
-            </Animated.View>
+                )}
+              </Animated.View>
+            </View>
           </View>
-        </View>
+        ) : null}
       </View>
     </View>
   );
@@ -721,6 +694,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 22,
   },
+  introPageContent: {
+    paddingBottom: 12,
+  },
   pageLabel: {
     fontSize: 11,
     marginBottom: 2,
@@ -748,11 +724,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 260,
     width: '100%',
-  },
-  heroVeil: {
-    position: 'absolute',
-    right: 34,
-    top: 6,
   },
   questionHeader: {
     alignItems: 'center',
@@ -826,11 +797,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 240,
     width: '100%',
-  },
-  processingVeil: {
-    position: 'absolute',
-    right: 40,
-    top: 8,
   },
   processingCopy: {
     alignItems: 'center',
