@@ -1,24 +1,25 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { Link, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { CollectibleCard } from '@/components/katchadeck/collectible-card';
-import { presenceEnter, rewardEnter } from '@/components/katchadeck/motion';
-import { ResolvedAvatar } from '@/components/katchadeck/resolved-avatar';
+import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
+import { presenceEnter } from '@/components/katchadeck/motion';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
-import { KatchaDeckUI } from '@/constants/theme';
 import { createStarterReveal } from '@/constants/katchadeck';
+import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
+import { KatchaDeckUI } from '@/constants/theme';
+import type { TimelineSelectableId } from '@/types/timeline';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState(loadOnboardingProfile());
+  const [selectedEntryId, setSelectedEntryId] = useState<TimelineSelectableId>('today-cafe');
 
   useFocusEffect(
     useCallback(() => {
@@ -35,92 +36,56 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}>
-        <Animated.View entering={rewardEnter()} style={styles.heroShell}>
-          <View style={styles.heroCopy}>
-            <ThemedText type="label" style={styles.kicker} lightColor="#C8D8FF" darkColor="#C8D8FF">
-              Daily reveal
-            </ThemedText>
-            <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
-              {reveal.greeting}
-            </ThemedText>
-            <ThemedText type="bodyLarge" style={styles.body} lightColor="#D9E4FF" darkColor="#D9E4FF">
-              {reveal.narrative}
-            </ThemedText>
-          </View>
-          <View style={styles.heroVisual}>
-            <ResolvedAvatar size={176} />
-          </View>
+        <Animated.View entering={presenceEnter()} style={styles.heroCopy}>
+          <ThemedText type="label" style={styles.kicker} lightColor="#C8D8FF" darkColor="#C8D8FF">
+            Timeline home
+          </ThemedText>
+          <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            {reveal.greeting}
+          </ThemedText>
+          <ThemedText type="bodyLarge" style={styles.body} lightColor="#D9E4FF" darkColor="#D9E4FF">
+            Swipe through your week and revisit what each day became.
+          </ThemedText>
         </Animated.View>
 
         <Animated.View entering={presenceEnter(80)}>
-          <GlassPanel contentStyle={styles.insightPanel}>
-            <SectionHeader label="Identity insight" title="Your rhythm is starting to show itself" />
-            <ThemedText style={styles.insightBody} lightColor="#E6EEFF" darkColor="#E6EEFF">
+          <DayTimeline
+            entries={timelineDemoEntries}
+            mode="interactive"
+            onSelectEntry={setSelectedEntryId}
+            selectedEntryId={selectedEntryId}
+            showMemoryCard
+            showTomorrowEgg
+            tomorrowState={timelineTomorrowState}
+          />
+        </Animated.View>
+
+        <Animated.View entering={presenceEnter(160)}>
+          <GlassPanel contentStyle={styles.panelBody}>
+            <ThemedText type="onboardingLabel" style={styles.panelLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
+              Identity insight
+            </ThemedText>
+            <ThemedText type="subtitle" style={styles.panelTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+              Your rhythm is starting to show itself
+            </ThemedText>
+            <ThemedText style={styles.panelText} lightColor="#E6EEFF" darkColor="#E6EEFF">
               {reveal.identityInsight}
             </ThemedText>
           </GlassPanel>
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(140)}>
-          <SectionHeader
-            label="Collected today"
-            title="Today's cards"
-            action={
-              <Link href="/(tabs)/explore" asChild>
-                <Pressable>
-                  <ThemedText style={styles.sectionLink} lightColor="#C8D8FF" darkColor="#C8D8FF">
-                    View deck
-                  </ThemedText>
-                </Pressable>
-              </Link>
-            }
-          />
-        </Animated.View>
-
-        <ScrollView
-          horizontal
-          contentContainerStyle={styles.cardRow}
-          showsHorizontalScrollIndicator={false}>
-          {reveal.cards.map((card, index) => (
-            <Animated.View entering={presenceEnter(180 + index * 90)} key={card.id}>
-              <CollectibleCard
-                location={card.location}
-                name={card.name}
-                palette={card.palette}
-                rarity={card.rarity}
-                trait={card.trait}
-              />
-            </Animated.View>
-          ))}
-        </ScrollView>
-
-        <Animated.View entering={presenceEnter(300)}>
-          <GlassPanel contentStyle={styles.progressPanel}>
-            <SectionHeader label="Katcher status" title="A pattern is starting to show itself" actionLabel="Stage one" />
-            <View style={styles.progressCopy}>
-              <ThemedText style={styles.progressBody} lightColor="#D9E4FF" darkColor="#D9E4FF">
-                The hooded figure is still mostly hidden. More days, repeated routes, and quiet
-                returns will reveal what presence is taking shape.
-              </ThemedText>
-              <View style={styles.progressMeterTrack}>
-                <View style={styles.progressMeterFill} />
-              </View>
-            </View>
-          </GlassPanel>
-        </Animated.View>
-
-        <Animated.View entering={presenceEnter(360)}>
+        <Animated.View entering={presenceEnter(240)}>
           <GlassPanel
-            contentStyle={styles.premiumPanel}
+            contentStyle={styles.panelBody}
             fillColor="rgba(255, 239, 231, 0.08)"
             gradientColors={['rgba(221,232,255,0.16)', 'rgba(240,223,255,0.14)', 'rgba(255,216,192,0.1)']}>
-            <ThemedText type="label" style={styles.premiumLabel} lightColor="#FFE8D9" darkColor="#FFE8D9">
+            <ThemedText type="onboardingLabel" style={styles.premiumLabel} lightColor="#FFE8D9" darkColor="#FFE8D9">
               Premium preview
             </ThemedText>
             <ThemedText type="hero" style={styles.premiumTitle} lightColor="#FFF6F1" darkColor="#FFF6F1">
               Unlock the full version of your life.
             </ThemedText>
-            <ThemedText style={styles.premiumBody} lightColor="#F5EAE4" darkColor="#F5EAE4">
+            <ThemedText style={styles.panelText} lightColor="#F5EAE4" darkColor="#F5EAE4">
               Get deeper identity reads, evolved variants, and the story-comic layer when a day
               becomes worth remembering.
             </ThemedText>
@@ -146,13 +111,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
   },
-  heroShell: {
-    gap: 22,
-    minHeight: 296,
-    justifyContent: 'space-between',
-  },
   heroCopy: {
-    gap: 12,
+    gap: 10,
     maxWidth: 320,
   },
   kicker: {
@@ -165,61 +125,26 @@ const styles = StyleSheet.create({
   body: {
     maxWidth: 320,
   },
-  heroVisual: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-  },
-  insightPanel: {
+  panelBody: {
     gap: 12,
   },
-  insightBody: {
-    fontSize: 16,
-    lineHeight: 24,
+  panelLabel: {
+    fontSize: 11,
   },
-  sectionLink: {
-    ...KatchaDeckUI.typography.body,
-    fontWeight: '600',
+  panelTitle: {
+    fontSize: 26,
+    lineHeight: 31,
   },
-  cardRow: {
-    gap: 16,
-    paddingRight: 20,
-  },
-  progressPanel: {
-    gap: 14,
-  },
-  progressCopy: {
-    gap: 14,
-  },
-  progressBody: {
+  panelText: {
     fontSize: 15,
     lineHeight: 22,
   },
-  progressMeterTrack: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    height: 8,
-    overflow: 'hidden',
-  },
-  progressMeterFill: {
-    backgroundColor: '#C8D8FF',
-    borderRadius: 999,
-    height: '100%',
-    width: '34%',
-  },
-  premiumPanel: {
-    gap: 12,
-  },
   premiumLabel: {
-    color: '#FFE8D9',
+    fontSize: 11,
   },
   premiumTitle: {
     fontSize: 34,
     lineHeight: 38,
-  },
-  premiumBody: {
-    fontSize: 15,
-    lineHeight: 22,
   },
   buttonRow: {
     flexDirection: 'row',

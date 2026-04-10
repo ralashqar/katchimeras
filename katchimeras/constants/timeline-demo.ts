@@ -1,0 +1,126 @@
+import { heroOrbitAssets } from '@/constants/onboarding-hero';
+import { onboardingShowcaseAssets } from '@/constants/onboarding-showcase-assets';
+import type { TimelineDayEntry, TimelineTomorrowState } from '@/types/timeline';
+
+export const timelineDemoEntries: readonly TimelineDayEntry[] = [
+  {
+    id: 'morning-walk',
+    dayLabel: 'Mon',
+    dateLabel: 'Apr 6',
+    cardTitle: 'Morning walk',
+    cardCue: 'A slower start with clear air.',
+    summary: 'A light walk turned the morning into motion you could feel and keep.',
+    creature: {
+      id: 'voltstep',
+      name: 'Voltstep',
+      accent: '#93C7FF',
+      imageSource: onboardingShowcaseAssets.onboarding_run_voltstep.source,
+    },
+    memory: {
+      title: 'Riverside walk',
+      body: 'A quiet loop woke the day up gently, and the energy stayed with you after it ended.',
+      timeLabel: '7:18 AM',
+      location: 'Riverside path',
+      tag: 'Movement',
+      metrics: '2.4 km · calm pace · clear start',
+    },
+  },
+  {
+    id: 'morning-coffee',
+    dayLabel: 'Tue',
+    dateLabel: 'Apr 7',
+    cardTitle: 'Morning coffee',
+    cardCue: 'Comfort settled in before the rush.',
+    summary: 'The same coffee ritual made the day feel warm, familiar, and collectible.',
+    creature: {
+      id: 'hearthsip',
+      name: 'Hearthsip',
+      accent: '#F3B788',
+      imageSource: onboardingShowcaseAssets.onboarding_home_hearthsip.source,
+    },
+    memory: {
+      title: 'Coffee at home',
+      body: 'Steam, routine, and a favorite mug turned a small pause into the thing that defined the morning.',
+      timeLabel: '9:05 AM',
+      location: 'Kitchen counter',
+      tag: 'Cozy',
+      metrics: '18 min pause · familiar start · home ritual',
+    },
+  },
+  {
+    id: 'gym-session',
+    dayLabel: 'Wed',
+    dateLabel: 'Apr 8',
+    cardTitle: 'Gym session',
+    cardCue: 'Effort pushed the day into focus.',
+    summary: 'A sharper workout left a charged rhythm behind it.',
+    creature: {
+      id: 'pulsepounce',
+      name: 'Pulsepounce',
+      accent: '#AEB6FF',
+      imageSource: heroOrbitAssets.hayhorn,
+    },
+    memory: {
+      title: 'Lunchtime workout',
+      body: 'The day split in half around a stronger session, and everything after it felt more awake.',
+      timeLabel: '12:26 PM',
+      location: 'Local gym',
+      tag: 'Energy',
+      metrics: '41 active min · strength set · elevated pace',
+    },
+  },
+  {
+    id: 'family-dinner',
+    dayLabel: 'Thu',
+    dateLabel: 'Apr 9',
+    cardTitle: 'Dinner with family',
+    cardCue: 'The evening softened around shared time.',
+    summary: 'Connection made the day feel held together instead of just finished.',
+    creature: {
+      id: 'gatherglow',
+      name: 'Gatherglow',
+      accent: '#F2C2A8',
+      imageSource: heroOrbitAssets.crumbun,
+    },
+    memory: {
+      title: 'Dinner together',
+      body: 'A long table, familiar voices, and the feeling of staying a little longer gave the day its real shape.',
+      timeLabel: '7:42 PM',
+      location: 'Family table',
+      tag: 'Connection',
+      metrics: 'Shared meal · slow evening · protective warmth',
+    },
+  },
+  {
+    id: 'today-cafe',
+    dayLabel: 'Today',
+    dateLabel: 'Apr 10',
+    cardTitle: 'Cafe stop',
+    cardCue: 'A repeat place became the clearest part of the day.',
+    summary: 'Today condensed into something warm, familiar, and unmistakably yours.',
+    creature: {
+      id: 'creamalume',
+      name: 'Creamalume',
+      accent: '#F3B788',
+      imageSource: onboardingShowcaseAssets.onboarding_today_cremalume.source,
+    },
+    memory: {
+      title: "Today's coffee path",
+      body: "A repeat stop, a favorite corner, and a little room to breathe turned today's rhythm into something you could revisit.",
+      timeLabel: '8:12 AM',
+      location: 'Independent cafe',
+      tag: 'Today',
+      metrics: 'Soft start · repeat stop · familiar comfort',
+    },
+  },
+] as const;
+
+export const timelineTomorrowState: TimelineTomorrowState = {
+  id: 'tomorrow',
+  dayLabel: 'Tomorrow',
+  dateLabel: 'Forming',
+  title: 'Tomorrow is already forming.',
+  subtitle: 'Come back each day to see what your life becomes next.',
+  statusLabel: 'Forming',
+  accent: '#D8E2FF',
+} as const;

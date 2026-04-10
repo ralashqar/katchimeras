@@ -1,20 +1,30 @@
 import { Redirect, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import PagerView from 'react-native-pager-view';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CollectibleCard } from '@/components/katchadeck/collectible-card';
 import { HoodedAvatar } from '@/components/katchadeck/hooded-avatar';
-import { presenceEnter, presenceExit, rewardEnter, usePressMotion } from '@/components/katchadeck/motion';
-import { DayInMotionIntro } from '@/components/katchadeck/onboarding/day-in-motion-intro';
+import {
+  CinematicOnboardingPage,
+} from '@/components/katchadeck/onboarding/cinematic-onboarding-page';
+import {
+  presenceEnter,
+  presenceExit,
+  rewardEnter,
+  usePressMotion,
+} from '@/components/katchadeck/motion';
 import { ProgressBar } from '@/components/katchadeck/progress-bar';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import { dayInMotionPalette } from '@/constants/day-in-motion-intro';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
   aspirationOptions,
@@ -22,6 +32,7 @@ import {
   painPointOptions,
   preferenceOptions,
 } from '@/constants/katchadeck';
+import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
 import { KatchaDeckUI } from '@/constants/theme';
 import {
   defaultOnboardingProfile,
@@ -40,11 +51,15 @@ type OnboardingTheme = {
 
 const pageThemes: OnboardingTheme[] = [
   {
-    accentColor: dayInMotionPalette.accent,
-    colors: dayInMotionPalette.colors,
-    meshColors: dayInMotionPalette.meshColors,
-    pageLabel: 'Welcome',
-    primaryCtaLabel: 'Begin',
+    accentColor: 'rgba(200,216,255,0.12)',
+    colors: ['#05070D', '#0B1020', '#12172A'],
+    meshColors: [
+      'rgba(200,216,255,0.12)',
+      'rgba(106,95,232,0.06)',
+      'rgba(95,168,123,0.04)',
+      'rgba(243,183,136,0.06)',
+    ],
+    pageLabel: 'Intro',
   },
   {
     accentColor: 'rgba(200,216,255,0.12)',
@@ -115,10 +130,17 @@ const pageThemes: OnboardingTheme[] = [
       'rgba(95,168,123,0.06)',
     ],
     pageLabel: 'What happens next',
-    primaryCtaLabel: 'Open my deck',
+    primaryCtaLabel: 'Open my timeline',
     secondaryCtaLabel: 'See premium preview',
   },
 ];
+
+const CINEMATIC_PAGE_INDEX = 0;
+const GOAL_PAGE = 1;
+const PAIN_PAGE = GOAL_PAGE + 1;
+const WORLD_PAGE = GOAL_PAGE + 2;
+const PROCESSING_PAGE = GOAL_PAGE + 3;
+const REVEAL_PAGE = GOAL_PAGE + 4;
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -143,12 +165,12 @@ export default function OnboardingScreen() {
   );
 
   const totalSteps = pageThemes.length;
-  const isIntroStep = page === 0;
-  const isProcessingStep = page === 4;
-  const isFinalStep = page === 6;
+  const isCinematicStep = page === CINEMATIC_PAGE_INDEX;
+  const isProcessingStep = page === PROCESSING_PAGE;
+  const isFinalStep = page === totalSteps - 1;
   const currentTheme = pageThemes[page];
   const progressCurrent = Math.max(1, page);
-  const progressTotal = totalSteps - 1;
+  const progressTotal = totalSteps - 2;
 
   useEffect(() => {
     if (!isProcessingStep) {
@@ -156,19 +178,18 @@ export default function OnboardingScreen() {
     }
 
     const timer = setTimeout(() => {
-      pagerRef.current?.setPage(5);
-      setPage(5);
+      setCurrentPage(REVEAL_PAGE);
     }, 1650);
 
     return () => clearTimeout(timer);
   }, [isProcessingStep]);
 
   const canContinue =
-    page === 1
+    page === GOAL_PAGE
       ? Boolean(draft.aspirationId)
-      : page === 2
+      : page === PAIN_PAGE
         ? draft.painPointIds.length > 0
-        : page === 3
+        : page === WORLD_PAGE
           ? draft.preferenceIds.length > 0
           : true;
 
@@ -247,9 +268,9 @@ export default function OnboardingScreen() {
         <Animated.View entering={presenceEnter()} style={styles.header}>
           <View style={styles.headerRow}>
             <ThemedText type="onboardingLabel" style={styles.brandLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
-              {isIntroStep ? 'Katchimeras' : 'KatchaDeck'}
+              {isCinematicStep ? 'Katchimeras' : 'KatchaDeck'}
             </ThemedText>
-            {page > 0 && !isProcessingStep ? (
+            {!isCinematicStep && !isProcessingStep ? (
               <Pressable onPress={handleResetFlow} style={styles.resetAction}>
                 <IconSymbol color="#C8D8FF" name="arrow.counterclockwise" size={14} />
                 <ThemedText style={styles.resetLabel} lightColor="#C8D8FF" darkColor="#C8D8FF">
@@ -258,7 +279,9 @@ export default function OnboardingScreen() {
               </Pressable>
             ) : null}
           </View>
-          {!isIntroStep && !isFinalStep ? <ProgressBar current={progressCurrent} total={progressTotal} /> : null}
+          {!isCinematicStep && !isFinalStep ? (
+            <ProgressBar current={progressCurrent} total={progressTotal} />
+          ) : null}
         </Animated.View>
 
         <PagerView
@@ -268,19 +291,18 @@ export default function OnboardingScreen() {
           overdrag={false}
           scrollEnabled={false}
           style={styles.pager}>
-          <ScrollView
-            key="welcome"
-            contentContainerStyle={[styles.pageContent, styles.introPageContent]}
-            contentInsetAdjustmentBehavior="automatic"
-            showsVerticalScrollIndicator={false}>
-            <DayInMotionIntro onBegin={handleNext} />
-          </ScrollView>
+          <View key="cinematic" style={styles.cinematicPage}>
+            <CinematicOnboardingPage
+              entries={timelineDemoEntries}
+              onAdvance={handleNext}
+              tomorrowState={timelineTomorrowState}
+            />
+          </View>
 
           <QuestionPage
             key="goal"
             footerHeight={footerHeight}
-            question="What do you want your life to feel like?"
-          >
+            question="What do you want your life to feel like?">
             {aspirationOptions.map((option, index) => (
               <Animated.View entering={presenceEnter(60 + index * 45)} key={option.id}>
                 <QuestionOptionCard
@@ -297,8 +319,7 @@ export default function OnboardingScreen() {
           <QuestionPage
             key="pain"
             footerHeight={footerHeight}
-            question="What feels absent right now?"
-          >
+            question="What feels absent right now?">
             {painPointOptions.map((option, index) => {
               const selected = draft.painPointIds.includes(option.id);
 
@@ -320,8 +341,7 @@ export default function OnboardingScreen() {
           <QuestionPage
             key="world"
             footerHeight={footerHeight}
-            question="What kind of world should your deck lean toward?"
-          >
+            question="What kind of world should your deck lean toward?">
             {preferenceOptions.map((option, index) => {
               const selected = draft.preferenceIds.includes(option.id);
 
@@ -345,7 +365,7 @@ export default function OnboardingScreen() {
               <HoodedAvatar size={194} />
               <View style={styles.processingCopy}>
                 <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#FFDCC0" darkColor="#FFDCC0">
-                  {pageThemes[4].pageLabel}
+                  {pageThemes[PROCESSING_PAGE].pageLabel}
                 </ThemedText>
                 <ThemedText type="title" style={styles.questionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
                   Reading the first pattern...
@@ -368,7 +388,7 @@ export default function OnboardingScreen() {
                   Congratulations
                 </ThemedText>
                 <ThemedText type="title" style={styles.questionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                  You started your deck.
+                  You started your timeline.
                 </ThemedText>
                 <ThemedText style={styles.questionBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
                   {reveal.narrative}
@@ -377,10 +397,7 @@ export default function OnboardingScreen() {
               <HoodedAvatar size={148} />
             </Animated.View>
 
-            <ScrollView
-              horizontal
-              contentContainerStyle={styles.cardRow}
-              showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal contentContainerStyle={styles.cardRow} showsHorizontalScrollIndicator={false}>
               {reveal.cards.map((card, index) => (
                 <Animated.View entering={presenceEnter(100 + index * 70)} key={card.id}>
                   <CollectibleCard
@@ -417,14 +434,14 @@ export default function OnboardingScreen() {
             showsVerticalScrollIndicator={false}>
             <Animated.View entering={rewardEnter()} style={styles.benefitHeader}>
               <ThemedText type="onboardingLabel" style={styles.pageLabel} lightColor="#FFE7D7" darkColor="#FFE7D7">
-                {pageThemes[6].pageLabel}
+                {pageThemes[totalSteps - 1].pageLabel}
               </ThemedText>
               <ThemedText type="title" style={styles.questionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
                 Here is what KatchaDeck gives back.
               </ThemedText>
               <ThemedText style={styles.questionBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                You move through life. The app turns that movement into something visible, memorable,
-                and worth keeping.
+                You move through life. The app turns that movement into something visible,
+                memorable, and worth keeping.
               </ThemedText>
             </Animated.View>
 
@@ -462,7 +479,7 @@ export default function OnboardingScreen() {
           </ScrollView>
         </PagerView>
 
-        {!isIntroStep ? (
+        {!isCinematicStep ? (
           <View
             onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
             style={[styles.footerWrap, { paddingBottom: insets.bottom + 10 }]}>
@@ -483,7 +500,7 @@ export default function OnboardingScreen() {
                     />
                     <KatchaButton
                       icon="arrow.right"
-                      label={currentTheme.primaryCtaLabel ?? 'Open my deck'}
+                      label={currentTheme.primaryCtaLabel ?? 'Open my timeline'}
                       onPress={completeOnboarding}
                       variant="primary"
                     />
@@ -513,7 +530,7 @@ function QuestionPage({
 }: {
   question: string;
   footerHeight: number;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <ScrollView
@@ -684,48 +701,26 @@ const styles = StyleSheet.create({
   pager: {
     flex: 1,
   },
+  cinematicPage: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
   pageContent: {
     gap: 22,
     minHeight: '100%',
     paddingHorizontal: 20,
     paddingTop: 22,
   },
-  introPageContent: {
-    paddingBottom: 12,
-  },
   pageLabel: {
     fontSize: 11,
     marginBottom: 2,
   },
-  welcomeCopy: {
-    gap: 10,
-    maxWidth: 320,
-  },
-  welcomeTitle: {
-    fontSize: 38,
-    lineHeight: 42,
-    maxWidth: 300,
-  },
-  welcomeBody: {
-    maxWidth: 310,
-  },
-  heroStage: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 380,
-  },
-  heroFigure: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 260,
-    width: '100%',
-  },
   questionHeader: {
     alignItems: 'center',
+    alignSelf: 'center',
     gap: 8,
     maxWidth: 330,
-    alignSelf: 'center',
   },
   questionTitle: {
     fontFamily: KatchaDeckUI.typography.headline.fontFamily,
@@ -778,57 +773,53 @@ const styles = StyleSheet.create({
     width: 20,
   },
   answerIndicatorMulti: {
-    borderRadius: 6,
+    borderRadius: 7,
   },
   processingPage: {
+    alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 620,
   },
   processingStack: {
     alignItems: 'center',
-    gap: 22,
-  },
-  processingFigure: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 240,
-    width: '100%',
+    gap: 18,
+    maxWidth: 300,
   },
   processingCopy: {
     alignItems: 'center',
     gap: 8,
-    maxWidth: 310,
   },
   revealHeader: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 14,
+    gap: 20,
     justifyContent: 'space-between',
   },
   revealCopy: {
     flex: 1,
     gap: 8,
+    maxWidth: 260,
   },
   cardRow: {
     gap: 16,
     paddingRight: 20,
   },
   revealPanel: {
-    gap: 8,
+    gap: 12,
   },
   panelLabel: {
     fontSize: 11,
   },
   revealInsightTitle: {
-    fontSize: 20,
+    fontSize: 24,
+    lineHeight: 29,
   },
   panelBody: {
     fontSize: 15,
     lineHeight: 22,
   },
   benefitHeader: {
+    alignItems: 'center',
     gap: 8,
-    maxWidth: 330,
   },
   benefitPanel: {
     gap: 18,
@@ -838,39 +829,41 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   benefitDot: {
-    backgroundColor: '#C8D8FF',
+    backgroundColor: '#FFE7D7',
     borderRadius: 999,
-    height: 9,
+    height: 8,
     marginTop: 8,
-    width: 9,
+    width: 8,
   },
   benefitCopy: {
     flex: 1,
     gap: 4,
   },
   benefitTitle: {
-    fontSize: 19,
+    fontSize: 18,
+    lineHeight: 22,
   },
   benefitBody: {
     fontSize: 15,
     lineHeight: 22,
   },
   previewPanel: {
-    gap: 8,
+    gap: 12,
   },
   footerWrap: {
-    bottom: 0,
-    left: 0,
     paddingHorizontal: 20,
-    position: 'absolute',
-    right: 0,
+    paddingTop: 10,
   },
   footerShell: {
-    backgroundColor: 'transparent',
-    paddingVertical: 10,
+    backgroundColor: 'rgba(8, 11, 20, 0.76)',
+    borderColor: 'rgba(216,228,255,0.1)',
+    borderCurve: 'continuous',
+    borderRadius: 28,
+    borderWidth: 1,
+    padding: 12,
   },
   footerPlaceholder: {
-    minHeight: 60,
+    height: 52,
   },
   footerStack: {
     gap: 10,
