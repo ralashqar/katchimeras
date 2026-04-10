@@ -44,6 +44,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
   const [sceneIndex, setSceneIndex] = useState(0);
   const [replayKey, setReplayKey] = useState(0);
   const [reduceMotionEnabled, setReduceMotionEnabled] = useState(false);
+  const [manualFocusedCreatureId, setManualFocusedCreatureId] = useState<string | null>(null);
 
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const railTranslateX = useSharedValue(0);
@@ -60,19 +61,39 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
     () => new Map(onboardingShowcaseProfiles.map((profile) => [profile.id, profile])),
     []
   );
+  const showcaseSequence = useMemo(() => {
+    if (onboardingShowcaseEntries.length < 2) {
+      return onboardingShowcaseEntries;
+    }
+
+    return [
+      onboardingShowcaseEntries[1],
+      onboardingShowcaseEntries[0],
+      ...onboardingShowcaseEntries.slice(2),
+    ];
+  }, []);
   const railItems = useMemo(
     () =>
-      onboardingShowcaseEntries.map((entry, index) => ({
+      showcaseSequence.map((entry, index) => ({
         ...entry,
         appearAtScene: index === 0 ? 0 : index + 1,
         caption: profileMap.get(entry.profileId)?.displayName ?? entry.beat,
       })),
-    [profileMap]
+    [profileMap, showcaseSequence]
   );
+  const visibleRailIds = useMemo(
+    () => railItems.filter((item) => sceneIndex >= item.appearAtScene).map((item) => item.id),
+    [railItems, sceneIndex]
+  );
+  const focusedCreatureId =
+    manualFocusedCreatureId && visibleRailIds.includes(manualFocusedCreatureId)
+      ? manualFocusedCreatureId
+      : scene.focusedCreatureId;
   const activeShowcaseEntry = useMemo(
-    () => railItems.find((item) => item.id === scene.focusedCreatureId) ?? railItems[0],
-    [railItems, scene.focusedCreatureId]
+    () => railItems.find((item) => item.id === focusedCreatureId) ?? railItems[0],
+    [focusedCreatureId, railItems]
   );
+  const showJourneyEntry = Boolean(scene.showJourneyEntry || manualFocusedCreatureId);
   const activeJournalEntry: DayInMotionJourneyEntry | null = activeShowcaseEntry
     ? {
         timeLabel: activeShowcaseEntry.journal.timeLabel,
@@ -87,7 +108,16 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
     () => Array.from(new Set(sceneList.map((entry) => entry.dayLabel))),
     [sceneList]
   );
-  const activeDayIndex = Math.max(0, dayLabels.findIndex((label) => label === scene.dayLabel));
+  const activeDayIndex = useMemo(() => {
+    if (manualFocusedCreatureId) {
+      const focusedIndex = railItems.findIndex((item) => item.id === focusedCreatureId);
+      if (focusedIndex >= 0) {
+        return Math.min(dayLabels.length - 1, focusedIndex);
+      }
+    }
+
+    return Math.max(0, dayLabels.findIndex((label) => label === scene.dayLabel));
+  }, [dayLabels, focusedCreatureId, manualFocusedCreatureId, railItems, scene.dayLabel]);
   const sceneSize = useMemo(() => Math.min(width - 36, height < 760 ? 332 : 360), [height, width]);
   const stageHeight = useMemo(
     () => (height < 760 ? 348 : 392),
@@ -117,13 +147,22 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
   );
 
   const applySceneState = useCallback(
-    (nextScene: DayInMotionScene, immediate = false) => {
+    (
+      nextScene: DayInMotionScene,
+      immediate = false,
+      options?: {
+        focusedCreatureId?: DayInMotionScene['focusedCreatureId'];
+        showJourneyEntry?: boolean;
+      }
+    ) => {
       const transitionDuration = immediate ? 0 : reduceMotionEnabled ? 180 : 560;
       const easing = Easing.out(Easing.cubic);
+      const nextFocusedCreatureId = options?.focusedCreatureId ?? nextScene.focusedCreatureId;
+      const nextShowJourneyEntry = options?.showJourneyEntry ?? Boolean(nextScene.showJourneyEntry);
 
       railTranslateX.value = immediate
-        ? getRailTarget(nextScene.focusedCreatureId)
-        : withTiming(getRailTarget(nextScene.focusedCreatureId), {
+        ? getRailTarget(nextFocusedCreatureId)
+        : withTiming(getRailTarget(nextFocusedCreatureId), {
             duration: transitionDuration,
             easing,
           });
@@ -134,18 +173,18 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
             easing,
           });
       journeyOpacity.value = immediate
-        ? nextScene.showJourneyEntry
+        ? nextShowJourneyEntry
           ? 1
           : 0
-        : withTiming(nextScene.showJourneyEntry ? 1 : 0, {
+        : withTiming(nextShowJourneyEntry ? 1 : 0, {
             duration: transitionDuration,
             easing,
           });
       journeyShift.value = immediate
-        ? nextScene.showJourneyEntry
+        ? nextShowJourneyEntry
           ? 0
           : 44
-        : withTiming(nextScene.showJourneyEntry ? 0 : 44, {
+        : withTiming(nextShowJourneyEntry ? 0 : 44, {
             duration: transitionDuration,
             easing,
           });
@@ -233,10 +272,17 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
   }, []);
 
   useEffect(() => {
+    if (manualFocusedCreatureId && !visibleRailIds.includes(manualFocusedCreatureId)) {
+      setManualFocusedCreatureId(null);
+    }
+  }, [manualFocusedCreatureId, visibleRailIds]);
+
+  useEffect(() => {
     clearTimers();
     const firstScene = sceneList[0];
 
     setSceneIndex(0);
+    setManualFocusedCreatureId(null);
     applySceneState(firstScene, true);
     stageOpacity.value = 0;
 
@@ -262,10 +308,13 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
       return;
     }
 
-    if (sceneIndex > 0) {
-      applySceneState(scene);
+    if (sceneIndex > 0 || manualFocusedCreatureId) {
+      applySceneState(scene, false, {
+        focusedCreatureId,
+        showJourneyEntry,
+      });
     }
-  }, [applySceneState, scene, sceneIndex]);
+  }, [applySceneState, focusedCreatureId, manualFocusedCreatureId, scene, sceneIndex, showJourneyEntry]);
 
   const railTrackStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: railTranslateX.value }],
@@ -281,6 +330,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
   }));
 
   const handleReplay = useCallback(() => {
+    setManualFocusedCreatureId(null);
     setReplayKey((current) => current + 1);
   }, []);
 
@@ -311,7 +361,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
                 ]}>
                 {railItems.map((item) => {
                   const isVisible = sceneIndex >= item.appearAtScene;
-                  const isActive = scene.focusedCreatureId === item.id;
+                  const isActive = focusedCreatureId === item.id;
                   const showCaption =
                     isActive &&
                     (item.id !== 'reveal-creamalume' || scene.todayState === 'reveal');
@@ -325,27 +375,32 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
                   return (
                     <View key={item.id} style={[styles.railCell, { width: bubbleSize }]}>
                       {isVisible ? (
-                        <Animated.View
-                          entering={FadeInRight.duration(reduceMotionEnabled ? 140 : 360)}
-                          style={styles.railItemWrap}>
-                          <CreatureRailItem
-                            accent={item.accent}
-                            isActive={isActive}
-                            isToday={item.id === 'reveal-creamalume'}
-                            questionOpacity={questionOpacity}
-                            questionShake={questionShake}
-                            reduceMotionEnabled={reduceMotionEnabled}
-                            revealOpacity={revealOpacity}
-                            size={bubbleSize}
-                            source={source}
-                            todayState={scene.todayState}
-                          />
-                          <CreatureRailCaption
-                            isActive={showCaption}
-                            reduceMotionEnabled={reduceMotionEnabled}
-                            title={item.caption}
-                          />
-                        </Animated.View>
+                        <Pressable
+                          hitSlop={20}
+                          onPress={() => setManualFocusedCreatureId(item.id)}
+                          style={styles.railPressable}>
+                          <Animated.View
+                            entering={FadeInRight.duration(reduceMotionEnabled ? 140 : 360)}
+                            style={styles.railItemWrap}>
+                            <CreatureRailItem
+                              accent={item.accent}
+                              isActive={isActive}
+                              isToday={item.id === 'reveal-creamalume'}
+                              questionOpacity={questionOpacity}
+                              questionShake={questionShake}
+                              reduceMotionEnabled={reduceMotionEnabled}
+                              revealOpacity={revealOpacity}
+                              size={bubbleSize}
+                              source={source}
+                              todayState={scene.todayState}
+                            />
+                            <CreatureRailCaption
+                              isActive={showCaption}
+                              reduceMotionEnabled={reduceMotionEnabled}
+                              title={item.caption}
+                            />
+                          </Animated.View>
+                        </Pressable>
                       ) : (
                         <View style={[styles.railGhost, { height: bubbleSize, width: bubbleSize }]} />
                       )}
@@ -356,7 +411,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
             </View>
 
             <Animated.View style={[styles.journeyShell, journeyStyle]}>
-              {scene.showJourneyEntry && activeJournalEntry ? (
+              {showJourneyEntry && activeJournalEntry ? (
                 <JourneyEntryPreview entry={activeJournalEntry} />
               ) : (
                 <View style={styles.journeySpacer} />
@@ -765,6 +820,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 148,
     overflow: 'visible',
+  },
+  railPressable: {
+    alignItems: 'center',
   },
   railItemWrap: {
     alignItems: 'center',

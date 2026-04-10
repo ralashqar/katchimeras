@@ -23,7 +23,7 @@ export const dayInMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'intro-copy',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'run-voltstep',
+    focusedCreatureId: 'coffee-hearthsip',
     line: "Your days don't disappear.",
     durationMs: 2200,
     todayState: 'hidden',
@@ -31,7 +31,7 @@ export const dayInMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'day-1-visible',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'run-voltstep',
+    focusedCreatureId: 'coffee-hearthsip',
     line: 'They become something.',
     durationMs: 1200,
     todayState: 'hidden',
@@ -40,7 +40,7 @@ export const dayInMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'day-2',
     dayLabel: 'Day 2',
-    focusedCreatureId: 'coffee-hearthsip',
+    focusedCreatureId: 'run-voltstep',
     line: 'They become something.',
     durationMs: 1450,
     todayState: 'hidden',
@@ -96,7 +96,7 @@ export const reducedMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'intro-copy',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'run-voltstep',
+    focusedCreatureId: 'coffee-hearthsip',
     line: "Your days don't disappear.",
     durationMs: 480,
     todayState: 'hidden',
@@ -104,7 +104,7 @@ export const reducedMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'day-1-visible',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'run-voltstep',
+    focusedCreatureId: 'coffee-hearthsip',
     line: 'They become something.',
     durationMs: 180,
     todayState: 'hidden',
@@ -113,7 +113,7 @@ export const reducedMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'day-2',
     dayLabel: 'Day 2',
-    focusedCreatureId: 'coffee-hearthsip',
+    focusedCreatureId: 'run-voltstep',
     line: 'They become something.',
     durationMs: 220,
     todayState: 'hidden',
