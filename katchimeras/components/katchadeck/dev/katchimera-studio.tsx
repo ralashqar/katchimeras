@@ -14,6 +14,7 @@ import {
   katchimeraEncounterSubtypes,
   katchimeraEncounterTypes,
 } from '@/constants/katchimera-encounter-profiles';
+import { onboardingShowcaseEntries, onboardingShowcaseProfiles } from '@/constants/onboarding-showcase';
 import { KatchaDeckUI } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import type { GeneratedKatchimeraRecord, KatchimeraEncounterProfile } from '@/types/katchimera';
@@ -34,6 +35,9 @@ export function KatchimeraStudio() {
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(null);
+  const [showcaseLoading, setShowcaseLoading] = useState(false);
+  const [showcaseError, setShowcaseError] = useState<string | null>(null);
+  const [showcaseProgress, setShowcaseProgress] = useState<string | null>(null);
 
   const filteredProfiles = useMemo(() => {
     const lowered = search.trim().toLowerCase();
@@ -68,6 +72,15 @@ export function KatchimeraStudio() {
     filteredProfiles.find((profile) => profile.id === selectedId) ?? filteredProfiles[0] ?? null;
   const selectedLibraryRecord =
     libraryRecords.find((record) => record.id === selectedLibraryId) ?? null;
+  const onboardingShowcaseSet = useMemo(
+    () =>
+      onboardingShowcaseEntries.map((entry) => ({
+        ...entry,
+        profile:
+          onboardingShowcaseProfiles.find((profile) => profile.id === entry.profileId) ?? null,
+      })),
+    []
+  );
 
   const loadLibrary = useCallback(async () => {
     setLibraryLoading(true);
@@ -164,6 +177,66 @@ export function KatchimeraStudio() {
     await loadLibrary();
   }
 
+  async function handleGenerateOnboardingSet() {
+    const resolvedEntries = onboardingShowcaseSet.filter(
+      (entry): entry is (typeof onboardingShowcaseSet)[number] & { profile: KatchimeraEncounterProfile } =>
+        Boolean(entry.profile)
+    );
+
+    if (resolvedEntries.length !== onboardingShowcaseSet.length) {
+      const missing = onboardingShowcaseSet
+        .filter((entry) => !entry.profile)
+        .map((entry) => entry.profileId)
+        .join(', ');
+      setShowcaseError(`Missing onboarding showcase profiles: ${missing}`);
+      return;
+    }
+
+    setShowcaseLoading(true);
+    setShowcaseError(null);
+    setShowcaseProgress(null);
+
+    const failures: string[] = [];
+    let lastRecord: GeneratedKatchimeraRecord | null = null;
+
+    for (let index = 0; index < resolvedEntries.length; index += 1) {
+      const entry = resolvedEntries[index];
+      setShowcaseProgress(`Generating ${index + 1}/${resolvedEntries.length}: ${entry.profile.displayName}`);
+
+      const { data, error: invokeError } = await supabase.functions.invoke('generate-katchimera-art', {
+        body: {
+          renderProfile: entry.profile,
+        },
+      });
+
+      if (invokeError || !data?.record) {
+        failures.push(entry.profile.displayName);
+        continue;
+      }
+
+      lastRecord = data.record as GeneratedKatchimeraRecord;
+    }
+
+    setShowcaseLoading(false);
+    setShowcaseProgress(null);
+
+    if (lastRecord) {
+      setLatestRecord(lastRecord);
+    }
+
+    if (selectedProfile) {
+      await loadRecent(selectedProfile.id);
+    }
+    await loadLibrary();
+
+    if (failures.length > 0) {
+      setShowcaseError(`Failed to generate: ${failures.join(', ')}`);
+      return;
+    }
+
+    setShowcaseError(null);
+  }
+
   return (
     <>
       <Animated.View entering={presenceEnter(60)}>
@@ -190,6 +263,57 @@ export function KatchimeraStudio() {
 
       {viewMode === 'generate' ? (
         <>
+          <Animated.View entering={presenceEnter(80)}>
+            <GlassPanel contentStyle={styles.panel}>
+              <SectionHeader label="Onboarding showcase" title="Curated range for intro sequencing" />
+              <ThemedText style={styles.panelText} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                A stronger onboarding set should span movement, ritual, curiosity, rare places, and the final personal reveal.
+              </ThemedText>
+              <View style={styles.showcaseList}>
+                {onboardingShowcaseSet.map((entry) => (
+                  <View key={entry.id} style={styles.showcaseRow}>
+                    <View style={styles.showcaseBeat}>
+                      <ThemedText type="label" style={styles.showcaseBeatText} lightColor="#C4D8FF" darkColor="#C4D8FF">
+                        {entry.beat}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.showcaseCopy}>
+                      <ThemedText style={styles.showcaseTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                        {entry.profile?.displayName ?? entry.profileId}
+                      </ThemedText>
+                      <ThemedText style={styles.showcaseMeta} lightColor="#C9DBFF" darkColor="#C9DBFF">
+                        {entry.journal.title} · {entry.journal.timeLabel} · {entry.journal.location}
+                      </ThemedText>
+                      <ThemedText style={styles.showcaseMetrics} lightColor="#E9D1BE" darkColor="#E9D1BE">
+                        {entry.journal.metrics}
+                      </ThemedText>
+                      <ThemedText style={styles.showcaseBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                        {entry.journal.body}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ))}
+              </View>
+              <KatchaButton
+                disabled={showcaseLoading}
+                icon="sparkles"
+                label={showcaseLoading ? 'Generating onboarding set...' : 'Generate onboarding set'}
+                onPress={() => void handleGenerateOnboardingSet()}
+                variant="primary"
+              />
+              {showcaseProgress ? (
+                <ThemedText style={styles.metaText} lightColor="#C9DBFF" darkColor="#C9DBFF">
+                  {showcaseProgress}
+                </ThemedText>
+              ) : null}
+              {showcaseError ? (
+                <ThemedText selectable style={styles.errorText} lightColor="#FFD8C0" darkColor="#FFD8C0">
+                  {showcaseError}
+                </ThemedText>
+              ) : null}
+            </GlassPanel>
+          </Animated.View>
+
           <Animated.View entering={presenceEnter(100)}>
             <GlassPanel contentStyle={styles.panel}>
               <SectionHeader label="Filters" title="Choose a trigger and encounter" />
@@ -583,6 +707,49 @@ const styles = StyleSheet.create({
   },
   panel: {
     gap: 14,
+  },
+  showcaseList: {
+    gap: 12,
+  },
+  showcaseRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  showcaseBeat: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(200,216,255,0.08)',
+    borderColor: 'rgba(200,216,255,0.16)',
+    borderCurve: 'continuous',
+    borderRadius: 14,
+    borderWidth: 1,
+    minWidth: 88,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  showcaseBeatText: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  showcaseCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  showcaseTitle: {
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  showcaseMeta: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  showcaseMetrics: {
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  showcaseBody: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   searchInput: {
     backgroundColor: 'rgba(255,255,255,0.08)',

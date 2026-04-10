@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, useWindowDimensions, View, type ImageSourcePropType } from 'react-native';
 import Animated, {
   Easing,
   FadeInDown,
@@ -21,15 +21,14 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
-  dayInMotionRailItems,
   dayInMotionScenes,
-  dayInMotionTodayEntry,
   reducedMotionScenes,
   type DayInMotionJourneyEntry,
-  type DayInMotionRailItem,
   type DayInMotionScene,
   type DayInMotionTodayState,
 } from '@/constants/day-in-motion-intro';
+import { onboardingShowcaseAssets } from '@/constants/onboarding-showcase-assets';
+import { onboardingShowcaseEntries, onboardingShowcaseProfiles } from '@/constants/onboarding-showcase';
 import { heroOrbitAssets } from '@/constants/onboarding-hero';
 import { KatchaDeckUI } from '@/constants/theme';
 
@@ -38,6 +37,7 @@ type DayInMotionIntroProps = {
 };
 
 const FINAL_SCENE_INDEX = dayInMotionScenes.length - 1;
+type ShowcaseImageSource = ImageSourcePropType | { uri: string };
 
 export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
   const { height, width } = useWindowDimensions();
@@ -56,6 +56,33 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
 
   const sceneList = reduceMotionEnabled ? reducedMotionScenes : dayInMotionScenes;
   const scene = sceneList[sceneIndex] ?? sceneList[0];
+  const profileMap = useMemo(
+    () => new Map(onboardingShowcaseProfiles.map((profile) => [profile.id, profile])),
+    []
+  );
+  const railItems = useMemo(
+    () =>
+      onboardingShowcaseEntries.map((entry, index) => ({
+        ...entry,
+        appearAtScene: index === 0 ? 0 : index + 1,
+        caption: profileMap.get(entry.profileId)?.displayName ?? entry.beat,
+      })),
+    [profileMap]
+  );
+  const activeShowcaseEntry = useMemo(
+    () => railItems.find((item) => item.id === scene.focusedCreatureId) ?? railItems[0],
+    [railItems, scene.focusedCreatureId]
+  );
+  const activeJournalEntry: DayInMotionJourneyEntry | null = activeShowcaseEntry
+    ? {
+        timeLabel: activeShowcaseEntry.journal.timeLabel,
+        title: activeShowcaseEntry.journal.title,
+        subtitle: activeShowcaseEntry.journal.body,
+        location: activeShowcaseEntry.journal.location,
+        iconOrTag: activeShowcaseEntry.journal.tag,
+        metrics: activeShowcaseEntry.journal.metrics,
+      }
+    : null;
   const dayLabels = useMemo(
     () => Array.from(new Set(sceneList.map((entry) => entry.dayLabel))),
     [sceneList]
@@ -82,11 +109,11 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
     (focusedCreatureId: DayInMotionScene['focusedCreatureId']) => {
       const focusIndex = Math.max(
         0,
-        dayInMotionRailItems.findIndex((item) => item.id === focusedCreatureId)
+        railItems.findIndex((item) => item.id === focusedCreatureId)
       );
       return railViewportWidth / 2 - bubbleSize / 2 - focusIndex * railStep;
     },
-    [bubbleSize, railStep, railViewportWidth]
+    [bubbleSize, railItems, railStep, railViewportWidth]
   );
 
   const applySceneState = useCallback(
@@ -125,8 +152,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
 
       if (immediate) {
         questionOpacity.value = nextScene.todayState === 'question' ? 1 : 0;
-        revealOpacity.value =
-          nextScene.todayState === 'reveal' || nextScene.todayState === 'card' ? 1 : 0;
+        revealOpacity.value = nextScene.todayState === 'reveal' ? 1 : 0;
         questionShake.value = 0;
         return;
       }
@@ -136,7 +162,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
         easing: Easing.out(Easing.quad),
       });
       revealOpacity.value =
-        nextScene.todayState === 'reveal' || nextScene.todayState === 'card'
+        nextScene.todayState === 'reveal'
           ? withDelay(
               nextScene.todayState === 'reveal' && !reduceMotionEnabled ? 620 : 0,
               withTiming(1, {
@@ -283,13 +309,18 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
                   },
                   railTrackStyle,
                 ]}>
-                {dayInMotionRailItems.map((item) => {
+                {railItems.map((item) => {
                   const isVisible = sceneIndex >= item.appearAtScene;
                   const isActive = scene.focusedCreatureId === item.id;
                   const showCaption =
                     isActive &&
-                    scene.todayState !== 'card' &&
-                    (item.id !== 'lattelet' || scene.todayState === 'reveal');
+                    (item.id !== 'reveal-creamalume' || scene.todayState === 'reveal');
+                  const localAsset =
+                    onboardingShowcaseAssets[
+                      item.profileId as keyof typeof onboardingShowcaseAssets
+                    ];
+                  const source: ShowcaseImageSource =
+                    localAsset?.source ?? heroOrbitAssets[item.fallbackAssetKey];
 
                   return (
                     <View key={item.id} style={[styles.railCell, { width: bubbleSize }]}>
@@ -300,13 +331,13 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
                           <CreatureRailItem
                             accent={item.accent}
                             isActive={isActive}
-                            isToday={item.id === 'lattelet'}
-                            item={item}
+                            isToday={item.id === 'reveal-creamalume'}
                             questionOpacity={questionOpacity}
                             questionShake={questionShake}
                             reduceMotionEnabled={reduceMotionEnabled}
                             revealOpacity={revealOpacity}
                             size={bubbleSize}
+                            source={source}
                             todayState={scene.todayState}
                           />
                           <CreatureRailCaption
@@ -325,7 +356,11 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
             </View>
 
             <Animated.View style={[styles.journeyShell, journeyStyle]}>
-              {scene.showJourneyEntry ? <JourneyEntryPreview entry={dayInMotionTodayEntry} /> : <View style={styles.journeySpacer} />}
+              {scene.showJourneyEntry && activeJournalEntry ? (
+                <JourneyEntryPreview entry={activeJournalEntry} />
+              ) : (
+                <View style={styles.journeySpacer} />
+              )}
             </Animated.View>
           </Animated.View>
         </View>
@@ -437,7 +472,6 @@ function CalendarProgressSlit({
 }
 
 function CreatureRailItem({
-  item,
   size,
   accent,
   isActive,
@@ -447,8 +481,8 @@ function CreatureRailItem({
   questionOpacity,
   revealOpacity,
   questionShake,
+  source,
 }: {
-  item: DayInMotionRailItem;
   size: number;
   accent: string;
   isActive: boolean;
@@ -458,6 +492,7 @@ function CreatureRailItem({
   questionOpacity: SharedValue<number>;
   revealOpacity: SharedValue<number>;
   questionShake: SharedValue<number>;
+  source: ShowcaseImageSource;
 }) {
   const opacity = useSharedValue(1);
   const scale = useSharedValue(isActive ? 1.08 : 0.9);
@@ -535,7 +570,7 @@ function CreatureRailItem({
                   allowDownscaling={false}
                   contentFit="contain"
                   contentPosition="center"
-                  source={heroOrbitAssets[item.assetKey]}
+                  source={source}
                   style={styles.creatureImage}
                   transition={0}
                 />
@@ -547,7 +582,7 @@ function CreatureRailItem({
                 allowDownscaling={false}
                 contentFit="contain"
                 contentPosition="center"
-                source={heroOrbitAssets[item.assetKey]}
+                source={source}
                 style={styles.creatureImage}
                 transition={0}
               />
@@ -615,8 +650,8 @@ function JourneyEntryPreview({ entry }: { entry: DayInMotionJourneyEntry }) {
       <ThemedText style={styles.journeyLocation} lightColor="#F3C8A5" darkColor="#F3C8A5">
         {entry.location}
       </ThemedText>
-      <ThemedText style={styles.journeyBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
-        {entry.subtitle}
+      <ThemedText style={styles.journeyMetrics} lightColor="#EAD4C4" darkColor="#EAD4C4">
+        {entry.metrics}
       </ThemedText>
     </View>
   );
@@ -837,6 +872,10 @@ const styles = StyleSheet.create({
   },
   journeyLocation: {
     fontSize: 13,
+    lineHeight: 16,
+  },
+  journeyMetrics: {
+    fontSize: 12,
     lineHeight: 16,
   },
   journeyBody: {

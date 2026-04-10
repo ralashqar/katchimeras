@@ -1,14 +1,4 @@
-import type { HeroOrbitAssetKey } from '@/constants/onboarding-hero';
-
-export type DayInMotionTodayState = 'hidden' | 'question' | 'reveal' | 'card';
-
-export type DayInMotionRailItem = {
-  id: string;
-  assetKey: HeroOrbitAssetKey;
-  caption: string;
-  accent: string;
-  appearAtScene: number;
-};
+export type DayInMotionTodayState = 'hidden' | 'question' | 'reveal';
 
 export type DayInMotionJourneyEntry = {
   timeLabel: string;
@@ -16,55 +6,24 @@ export type DayInMotionJourneyEntry = {
   subtitle: string;
   location: string;
   iconOrTag: string;
+  metrics: string;
 };
 
 export type DayInMotionScene = {
   id: string;
   dayLabel: string;
-  focusedCreatureId: DayInMotionRailItem['id'];
+  focusedCreatureId: string;
   line: string;
   durationMs: number;
   todayState: DayInMotionTodayState;
   showJourneyEntry?: boolean;
-  showCard?: boolean;
 };
-
-export const dayInMotionRailItems: readonly DayInMotionRailItem[] = [
-  {
-    id: 'hayhorn',
-    assetKey: 'hayhorn',
-    caption: 'A calm day',
-    accent: '#9ED8AE',
-    appearAtScene: 0,
-  },
-  {
-    id: 'mossprout',
-    assetKey: 'mossprout',
-    caption: 'A familiar place',
-    accent: '#8FC8A0',
-    appearAtScene: 2,
-  },
-  {
-    id: 'sprintail',
-    assetKey: 'sprintail',
-    caption: 'A moment of movement',
-    accent: '#93C7FF',
-    appearAtScene: 3,
-  },
-  {
-    id: 'lattelet',
-    assetKey: 'lattelet',
-    caption: 'A coffee day',
-    accent: '#F3B788',
-    appearAtScene: 4,
-  },
-] as const;
 
 export const dayInMotionScenes: readonly DayInMotionScene[] = [
   {
-    id: 'day-1',
+    id: 'intro-copy',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'hayhorn',
+    focusedCreatureId: 'run-voltstep',
     line: "Your days don't disappear.",
     durationMs: 2200,
     todayState: 'hidden',
@@ -72,31 +31,43 @@ export const dayInMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'day-1-visible',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'hayhorn',
+    focusedCreatureId: 'run-voltstep',
     line: 'They become something.',
     durationMs: 1200,
     todayState: 'hidden',
+    showJourneyEntry: true,
   },
   {
     id: 'day-2',
     dayLabel: 'Day 2',
-    focusedCreatureId: 'mossprout',
+    focusedCreatureId: 'coffee-hearthsip',
     line: 'They become something.',
-    durationMs: 1500,
+    durationMs: 1450,
     todayState: 'hidden',
+    showJourneyEntry: true,
   },
   {
     id: 'day-3',
     dayLabel: 'Day 3',
-    focusedCreatureId: 'sprintail',
+    focusedCreatureId: 'museum-glimmuse',
     line: 'They become something.',
-    durationMs: 1600,
+    durationMs: 1500,
     todayState: 'hidden',
+    showJourneyEntry: true,
+  },
+  {
+    id: 'day-4',
+    dayLabel: 'Day 4',
+    focusedCreatureId: 'landmark-skysette',
+    line: 'They become something.',
+    durationMs: 1650,
+    todayState: 'hidden',
+    showJourneyEntry: true,
   },
   {
     id: 'today-question',
     dayLabel: 'TODAY',
-    focusedCreatureId: 'lattelet',
+    focusedCreatureId: 'reveal-creamalume',
     line: 'This came from your day.',
     durationMs: 3400,
     todayState: 'question',
@@ -104,16 +75,16 @@ export const dayInMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'today-reveal',
     dayLabel: 'TODAY',
-    focusedCreatureId: 'lattelet',
+    focusedCreatureId: 'reveal-creamalume',
     line: 'Your Katcher is forming.',
     durationMs: 2600,
     todayState: 'reveal',
     showJourneyEntry: true,
   },
   {
-    id: 'reveal-card',
+    id: 'today-finale',
     dayLabel: 'TODAY',
-    focusedCreatureId: 'lattelet',
+    focusedCreatureId: 'reveal-creamalume',
     line: 'See what your day became.',
     durationMs: 0,
     todayState: 'reveal',
@@ -123,9 +94,9 @@ export const dayInMotionScenes: readonly DayInMotionScene[] = [
 
 export const reducedMotionScenes: readonly DayInMotionScene[] = [
   {
-    id: 'day-1',
+    id: 'intro-copy',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'hayhorn',
+    focusedCreatureId: 'run-voltstep',
     line: "Your days don't disappear.",
     durationMs: 480,
     todayState: 'hidden',
@@ -133,31 +104,43 @@ export const reducedMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'day-1-visible',
     dayLabel: 'Day 1',
-    focusedCreatureId: 'hayhorn',
+    focusedCreatureId: 'run-voltstep',
     line: 'They become something.',
     durationMs: 180,
     todayState: 'hidden',
+    showJourneyEntry: true,
   },
   {
     id: 'day-2',
     dayLabel: 'Day 2',
-    focusedCreatureId: 'mossprout',
+    focusedCreatureId: 'coffee-hearthsip',
     line: 'They become something.',
     durationMs: 220,
     todayState: 'hidden',
+    showJourneyEntry: true,
   },
   {
     id: 'day-3',
     dayLabel: 'Day 3',
-    focusedCreatureId: 'sprintail',
+    focusedCreatureId: 'museum-glimmuse',
+    line: 'They become something.',
+    durationMs: 220,
+    todayState: 'hidden',
+    showJourneyEntry: true,
+  },
+  {
+    id: 'day-4',
+    dayLabel: 'Day 4',
+    focusedCreatureId: 'landmark-skysette',
     line: 'They become something.',
     durationMs: 240,
     todayState: 'hidden',
+    showJourneyEntry: true,
   },
   {
     id: 'today-question',
     dayLabel: 'TODAY',
-    focusedCreatureId: 'lattelet',
+    focusedCreatureId: 'reveal-creamalume',
     line: 'This came from your day.',
     durationMs: 760,
     todayState: 'question',
@@ -165,38 +148,22 @@ export const reducedMotionScenes: readonly DayInMotionScene[] = [
   {
     id: 'today-reveal',
     dayLabel: 'TODAY',
-    focusedCreatureId: 'lattelet',
+    focusedCreatureId: 'reveal-creamalume',
     line: 'Your Katcher is forming.',
     durationMs: 560,
     todayState: 'reveal',
     showJourneyEntry: true,
   },
   {
-    id: 'reveal-card',
+    id: 'today-finale',
     dayLabel: 'TODAY',
-    focusedCreatureId: 'lattelet',
+    focusedCreatureId: 'reveal-creamalume',
     line: 'See what your day became.',
     durationMs: 0,
     todayState: 'reveal',
     showJourneyEntry: true,
   },
 ] as const;
-
-export const dayInMotionTodayEntry: DayInMotionJourneyEntry = {
-  timeLabel: '8:12 AM',
-  title: 'Coffee stop',
-  subtitle: 'A soft-start ritual begins to shape the day.',
-  location: 'Independent cafe',
-  iconOrTag: 'Cafe',
-};
-
-export const dayInMotionCard = {
-  location: 'Independent cafe',
-  name: 'Lattelet',
-  palette: ['#5A291F', '#F3B788'] as [string, string],
-  rarity: 'Warm',
-  trait: 'A coffee-day familiar built from soft starts, return visits, and the ritual that keeps finding you.',
-} as const;
 
 export const dayInMotionPalette = {
   accent: 'rgba(200,216,255,0.12)',
