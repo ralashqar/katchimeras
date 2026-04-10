@@ -116,8 +116,8 @@ export const dayInMotionScenes: readonly DayInMotionScene[] = [
     focusedCreatureId: 'lattelet',
     line: 'See what your day became.',
     durationMs: 0,
-    todayState: 'card',
-    showCard: true,
+    todayState: 'reveal',
+    showJourneyEntry: true,
   },
 ] as const;
 
@@ -177,8 +177,8 @@ export const reducedMotionScenes: readonly DayInMotionScene[] = [
     focusedCreatureId: 'lattelet',
     line: 'See what your day became.',
     durationMs: 0,
-    todayState: 'card',
-    showCard: true,
+    todayState: 'reveal',
+    showJourneyEntry: true,
   },
 ] as const;
 

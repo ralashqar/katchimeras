@@ -6,6 +6,7 @@ import Animated, {
   FadeInRight,
   FadeOutDown,
   cancelAnimation,
+  interpolateColor,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -20,7 +21,6 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
-  dayInMotionCard,
   dayInMotionRailItems,
   dayInMotionScenes,
   dayInMotionTodayEntry,
@@ -48,8 +48,6 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const railTranslateX = useSharedValue(0);
   const stageOpacity = useSharedValue(1);
-  const cardOpacity = useSharedValue(0);
-  const cardShift = useSharedValue(28);
   const journeyOpacity = useSharedValue(0);
   const journeyShift = useSharedValue(44);
   const questionOpacity = useSharedValue(0);
@@ -58,12 +56,16 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
 
   const sceneList = reduceMotionEnabled ? reducedMotionScenes : dayInMotionScenes;
   const scene = sceneList[sceneIndex] ?? sceneList[0];
+  const dayLabels = useMemo(
+    () => Array.from(new Set(sceneList.map((entry) => entry.dayLabel))),
+    [sceneList]
+  );
+  const activeDayIndex = Math.max(0, dayLabels.findIndex((label) => label === scene.dayLabel));
   const sceneSize = useMemo(() => Math.min(width - 36, height < 760 ? 332 : 360), [height, width]);
   const stageHeight = useMemo(
     () => (height < 760 ? 348 : 392),
     [height]
   );
-  const compactCard = height < 780;
   const bubbleSize = height < 760 ? 72 : 82;
   const railGap = width < 390 ? 18 : 22;
   const railStep = bubbleSize + railGap;
@@ -89,7 +91,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
 
   const applySceneState = useCallback(
     (nextScene: DayInMotionScene, immediate = false) => {
-      const transitionDuration = immediate ? 0 : reduceMotionEnabled ? 180 : nextScene.showCard ? 780 : 560;
+      const transitionDuration = immediate ? 0 : reduceMotionEnabled ? 180 : 560;
       const easing = Easing.out(Easing.cubic);
 
       railTranslateX.value = immediate
@@ -99,26 +101,8 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
             easing,
           });
       stageOpacity.value = immediate
-        ? nextScene.showCard
-          ? 0.18
-          : 1
-        : withTiming(nextScene.showCard ? 0.18 : 1, {
-            duration: transitionDuration,
-            easing,
-          });
-      cardOpacity.value = immediate
-        ? nextScene.showCard
-          ? 1
-          : 0
-        : withTiming(nextScene.showCard ? 1 : 0, {
-            duration: transitionDuration,
-            easing,
-          });
-      cardShift.value = immediate
-        ? nextScene.showCard
-          ? 0
-          : 28
-        : withTiming(nextScene.showCard ? 0 : 28, {
+        ? 1
+        : withTiming(1, {
             duration: transitionDuration,
             easing,
           });
@@ -154,7 +138,7 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
       revealOpacity.value =
         nextScene.todayState === 'reveal' || nextScene.todayState === 'card'
           ? withDelay(
-              nextScene.todayState === 'reveal' && !reduceMotionEnabled ? 360 : 0,
+              nextScene.todayState === 'reveal' && !reduceMotionEnabled ? 620 : 0,
               withTiming(1, {
                 duration: reduceMotionEnabled ? 180 : 320,
                 easing,
@@ -166,7 +150,15 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
             });
 
       cancelAnimation(questionShake);
-      if (nextScene.todayState === 'reveal' && !reduceMotionEnabled) {
+      if (nextScene.todayState === 'question' && !reduceMotionEnabled) {
+        questionShake.value = withSequence(
+          withTiming(-0.35, { duration: 90, easing: Easing.linear }),
+          withTiming(0.35, { duration: 90, easing: Easing.linear }),
+          withTiming(-0.25, { duration: 80, easing: Easing.linear }),
+          withTiming(0.25, { duration: 80, easing: Easing.linear }),
+          withTiming(0, { duration: 70, easing: Easing.out(Easing.quad) })
+        );
+      } else if (nextScene.todayState === 'reveal' && !reduceMotionEnabled) {
         questionShake.value = withSequence(
           withTiming(-1, { duration: 70, easing: Easing.linear }),
           withTiming(1, { duration: 85, easing: Easing.linear }),
@@ -183,8 +175,6 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
       }
     },
     [
-      cardOpacity,
-      cardShift,
       getRailTarget,
       journeyOpacity,
       journeyShift,
@@ -259,11 +249,6 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
     opacity: stageOpacity.value,
   }));
 
-  const cardStyle = useAnimatedStyle(() => ({
-    opacity: cardOpacity.value,
-    transform: [{ translateY: cardShift.value }],
-  }));
-
   const journeyStyle = useAnimatedStyle(() => ({
     opacity: journeyOpacity.value,
     transform: [{ translateX: journeyShift.value }],
@@ -279,7 +264,13 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
         <View style={[styles.sceneStage, { minHeight: stageHeight, width: sceneSize }]}>
           <Animated.View style={[styles.stageShell, stageStyle]}>
             <View style={[styles.calendarStage, { width: calendarWidth }]}>
-              <CalendarFace key={scene.dayLabel} label={scene.dayLabel} reduceMotionEnabled={reduceMotionEnabled} />
+              <CalendarFace
+                activeDayIndex={activeDayIndex}
+                dayCount={dayLabels.length}
+                key={scene.dayLabel}
+                label={scene.dayLabel}
+                reduceMotionEnabled={reduceMotionEnabled}
+              />
             </View>
 
             <View style={[styles.railViewport, { width: railViewportWidth }]}>
@@ -337,17 +328,6 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
               {scene.showJourneyEntry ? <JourneyEntryPreview entry={dayInMotionTodayEntry} /> : <View style={styles.journeySpacer} />}
             </Animated.View>
           </Animated.View>
-
-          <Animated.View style={[styles.cardShell, cardStyle]}>
-            <RevealCardPreview
-              compact={compactCard}
-              location={dayInMotionCard.location}
-              name={dayInMotionCard.name}
-              palette={dayInMotionCard.palette}
-              rarity={dayInMotionCard.rarity}
-              trait={dayInMotionCard.trait}
-            />
-          </Animated.View>
         </View>
       </View>
 
@@ -385,17 +365,27 @@ export function DayInMotionIntro({ onBegin }: DayInMotionIntroProps) {
 }
 
 function CalendarFace({
+  dayCount,
+  activeDayIndex,
   label,
   reduceMotionEnabled,
 }: {
+  dayCount: number;
+  activeDayIndex: number;
   label: string;
   reduceMotionEnabled: boolean;
 }) {
   return (
     <View style={[styles.calendarCard, styles.calendarFace]}>
       <View style={styles.calendarTopBar}>
-        <View style={styles.calendarRing} />
-        <View style={styles.calendarRing} />
+        {Array.from({ length: dayCount }).map((_, index) => (
+          <CalendarProgressSlit
+            active={index <= activeDayIndex}
+            index={index}
+            key={`day-slit-${index}`}
+            reduceMotionEnabled={reduceMotionEnabled}
+          />
+        ))}
       </View>
       <View style={styles.calendarBody}>
         <ThemedText type="label" style={styles.calendarKicker} lightColor="#D6E2FF" darkColor="#D6E2FF">
@@ -414,6 +404,36 @@ function CalendarFace({
       </View>
     </View>
   );
+}
+
+function CalendarProgressSlit({
+  active,
+  reduceMotionEnabled,
+  index,
+}: {
+  active: boolean;
+  reduceMotionEnabled: boolean;
+  index: number;
+}) {
+  const fill = useSharedValue(active ? 1 : 0);
+
+  useEffect(() => {
+    fill.value = withDelay(
+      reduceMotionEnabled ? 0 : index * 45,
+      withTiming(active ? 1 : 0, {
+        duration: reduceMotionEnabled ? 120 : 360,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
+  }, [active, fill, index, reduceMotionEnabled]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(fill.value, [0, 1], ['rgba(174, 180, 193, 0.42)', '#73C38F']),
+    opacity: 0.66 + fill.value * 0.34,
+    transform: [{ scaleX: 0.96 + fill.value * 0.04 }],
+  }));
+
+  return <Animated.View style={[styles.calendarRing, animatedStyle]} />;
 }
 
 function CreatureRailItem({
@@ -602,62 +622,6 @@ function JourneyEntryPreview({ entry }: { entry: DayInMotionJourneyEntry }) {
   );
 }
 
-function RevealCardPreview({
-  name,
-  trait,
-  location,
-  rarity,
-  palette,
-  compact,
-}: {
-  name: string;
-  trait: string;
-  location: string;
-  rarity: string;
-  palette: [string, string];
-  compact: boolean;
-}) {
-  return (
-    <View
-      style={[
-        styles.revealCard,
-        compact ? styles.revealCardCompact : null,
-        { borderColor: 'rgba(255,255,255,0.16)' },
-      ]}>
-      <View style={[styles.revealGlow, { backgroundColor: `${palette[1]}36` }]} />
-      <View style={styles.revealTopRow}>
-        <ThemedText type="label" style={styles.revealRarity} lightColor="#F7FBFF" darkColor="#F7FBFF">
-          {rarity}
-        </ThemedText>
-        <View style={styles.revealLocationPill}>
-          <ThemedText style={styles.revealLocationText} lightColor="#F4F8FF" darkColor="#F4F8FF">
-            {location}
-          </ThemedText>
-        </View>
-      </View>
-      <View style={styles.revealVisual}>
-        <View style={[styles.revealHalo, { backgroundColor: `${palette[1]}38` }]} />
-        <Image
-          allowDownscaling={false}
-          contentFit="contain"
-          contentPosition="center"
-          source={heroOrbitAssets.lattelet}
-          style={styles.revealImage}
-          transition={0}
-        />
-      </View>
-      <View style={styles.revealFooter}>
-        <ThemedText type="subtitle" style={styles.revealName} lightColor="#F8FBFF" darkColor="#F8FBFF">
-          {name}
-        </ThemedText>
-        <ThemedText style={styles.revealTrait} lightColor="#D7E5FF" darkColor="#D7E5FF">
-          {trait}
-        </ThemedText>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   page: {
     alignItems: 'center',
@@ -710,16 +674,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.08)',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     justifyContent: 'center',
     paddingBottom: 10,
     paddingTop: 12,
   },
   calendarRing: {
-    backgroundColor: 'rgba(243,183,136,0.92)',
     borderRadius: 999,
     height: 8,
-    width: 34,
+    width: 24,
   },
   calendarBody: {
     alignItems: 'center',
@@ -877,83 +840,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   journeyBody: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  cardShell: {
-    bottom: 0,
-    position: 'absolute',
-    zIndex: 40,
-  },
-  revealCard: {
-    backgroundColor: 'rgba(9,13,24,0.96)',
-    borderCurve: 'continuous',
-    borderRadius: 30,
-    borderWidth: 1,
-    boxShadow: KatchaDeckUI.shadows.card,
-    gap: 12,
-    minHeight: 288,
-    overflow: 'hidden',
-    padding: 18,
-    width: 250,
-  },
-  revealCardCompact: {
-    minHeight: 248,
-    width: 218,
-  },
-  revealGlow: {
-    borderRadius: 999,
-    height: 132,
-    left: '18%',
-    position: 'absolute',
-    top: 52,
-    width: 132,
-  },
-  revealTopRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  revealRarity: {
-    fontSize: 11,
-  },
-  revealLocationPill: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  revealLocationText: {
-    ...KatchaDeckUI.typography.body,
-    fontSize: 12,
-    lineHeight: 14,
-  },
-  revealVisual: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: 138,
-  },
-  revealHalo: {
-    borderRadius: 999,
-    height: 130,
-    position: 'absolute',
-    width: 130,
-  },
-  revealImage: {
-    height: '94%',
-    width: '94%',
-  },
-  revealFooter: {
-    gap: 6,
-  },
-  revealName: {
-    fontSize: 26,
-    lineHeight: 28,
-  },
-  revealTrait: {
     fontSize: 14,
     lineHeight: 20,
   },
