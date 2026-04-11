@@ -9,12 +9,14 @@ type AmbientBackgroundProps = {
   colors: readonly [string, string, string];
   meshColors?: readonly [string, string, string, string];
   accentColor?: string;
+  showOrbs?: boolean;
 };
 
 export function AmbientBackground({
   colors,
   meshColors = ['rgba(200,216,255,0.12)', 'rgba(95,168,123,0.16)', 'rgba(227,160,110,0.12)', 'rgba(106,95,232,0.14)'],
   accentColor = 'rgba(200,216,255,0.18)',
+  showOrbs = true,
 }: AmbientBackgroundProps) {
   const topOrbStyle = useFloatingMotion(10);
   const bottomOrbStyle = useFloatingMotion(14, 320);
@@ -29,8 +31,8 @@ export function AmbientBackground({
         rows={2}
         style={[StyleSheet.absoluteFill, styles.mesh]}
       />
-      <Animated.View style={[styles.topOrb, { backgroundColor: accentColor }, topOrbStyle, pulseStyle]} />
-      <Animated.View style={[styles.bottomOrb, { backgroundColor: 'rgba(95,168,123,0.12)' }, bottomOrbStyle]} />
+      {showOrbs ? <Animated.View style={[styles.topOrb, { backgroundColor: accentColor }, topOrbStyle, pulseStyle]} /> : null}
+      {showOrbs ? <Animated.View style={[styles.bottomOrb, { backgroundColor: 'rgba(95,168,123,0.12)' }, bottomOrbStyle]} /> : null}
     </View>
   );
 }

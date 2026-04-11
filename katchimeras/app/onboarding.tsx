@@ -655,6 +655,7 @@ function TransitioningOnboardingBackground({
             accentColor={previousTheme.accentColor}
             colors={previousTheme.colors}
             meshColors={previousTheme.meshColors}
+            showOrbs={false}
           />
         </Animated.View>
       ) : null}
@@ -663,6 +664,7 @@ function TransitioningOnboardingBackground({
           accentColor={activeTheme.accentColor}
           colors={activeTheme.colors}
           meshColors={activeTheme.meshColors}
+          showOrbs={false}
         />
       </Animated.View>
     </View>
