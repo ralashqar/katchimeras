@@ -241,19 +241,27 @@ export function CinematicOnboardingPage({
       <View style={styles.copyViewport}>
         {hasCopy ? (
           <Animated.View
-            entering={FadeInUp.duration(reduceMotionEnabled ? 140 : 620)}
-            exiting={FadeOutDown.duration(reduceMotionEnabled ? 120 : 280)}
             key={`copy-${copyKey}-${restartToken}`}
             style={styles.copyBlock}>
             {displayedHeadline ? (
-              <ThemedText type="onboardingDisplay" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                {displayedHeadline}
-              </ThemedText>
+              <Animated.View
+                entering={FadeInUp.duration(reduceMotionEnabled ? 140 : 620)}
+                exiting={FadeOutDown.duration(reduceMotionEnabled ? 120 : 220)}>
+                <ThemedText type="onboardingDisplay" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                  {displayedHeadline}
+                </ThemedText>
+              </Animated.View>
             ) : null}
             {displayedSubtext ? (
-              <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                {displayedSubtext}
-              </ThemedText>
+              <Animated.View
+                entering={FadeInUp.delay(
+                  isOpeningBeat && currentOpeningScene?.id === 'scene-1-opening-line' && !reduceMotionEnabled ? 900 : 120
+                ).duration(reduceMotionEnabled ? 140 : 520)}
+                exiting={FadeOutDown.duration(reduceMotionEnabled ? 120 : 220)}>
+                <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                  {displayedSubtext}
+                </ThemedText>
+              </Animated.View>
             ) : null}
           </Animated.View>
         ) : (
@@ -633,10 +641,13 @@ function OpeningMomentChipBadge({
   const driftY = useSharedValue(0);
   const pullX = useSharedValue(0);
   const pullY = useSharedValue(0);
+  const enterX = useSharedValue(0);
+  const enterY = useSharedValue(0);
   const rotate = useSharedValue(0);
   const zoneStyle = getChipZoneStyle(chip.zone);
   const centerPull = getChipCenterPull(chip.zone);
   const direction = getChipLaneDirection(chip.lane);
+  const entryOffset = getChipEntryOffset(chip.zone, chip.enterFrom);
 
   useEffect(() => {
     const isVisible =
@@ -680,6 +691,20 @@ function OpeningMomentChipBadge({
       delayMs,
       withTiming(targetScale, {
         duration: reduceMotionEnabled ? 140 : 520,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
+    enterX.value = withDelay(
+      delayMs,
+      withTiming(isVisible ? 0 : entryOffset.x * 0.34, {
+        duration: reduceMotionEnabled ? 160 : isVisible ? 860 : 220,
+        easing: Easing.out(Easing.cubic),
+      })
+    );
+    enterY.value = withDelay(
+      delayMs,
+      withTiming(isVisible ? 0 : entryOffset.y * 0.34, {
+        duration: reduceMotionEnabled ? 160 : isVisible ? 860 : 220,
         easing: Easing.out(Easing.cubic),
       })
     );
@@ -727,6 +752,10 @@ function OpeningMomentChipBadge({
     direction.y,
     driftX,
     driftY,
+    enterX,
+    enterY,
+    entryOffset.x,
+    entryOffset.y,
     opacity,
     pullX,
     pullY,
@@ -739,8 +768,8 @@ function OpeningMomentChipBadge({
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [
-      { translateX: driftX.value + pullX.value },
-      { translateY: driftY.value + pullY.value },
+      { translateX: enterX.value + driftX.value + pullX.value },
+      { translateY: enterY.value + driftY.value + pullY.value },
       { rotateZ: `${rotate.value}deg` },
       { scale: scale.value },
     ],
@@ -960,7 +989,9 @@ function OpeningEggReveal({
 
       <Animated.View style={[styles.openingCreatureWrap, creatureStyle]}>
         <View style={[styles.openingCreatureGlow, { backgroundColor: `${revealEntry.creature.accent}38` }]} />
-        <Image contentFit="contain" source={revealEntry.creature.imageSource} style={styles.openingCreatureImage} transition={0} />
+        <View style={styles.openingCreatureImageShell}>
+          <Image contentFit="cover" source={revealEntry.creature.imageSource} style={styles.openingCreatureImage} transition={0} />
+        </View>
       </Animated.View>
 
       <Animated.View style={[styles.openingMemoryPanelWrap, memoryStyle]}>
@@ -1084,28 +1115,28 @@ function TomorrowStage({ entry }: { entry: TimelineDayEntry }) {
 
 function getChipZoneStyle(zone: OpeningMomentChip['zone']) {
   if (zone === 'top-left') {
-    return { left: '6%', top: '10%' } as const;
+    return { left: '-2%', top: '10%' } as const;
   }
   if (zone === 'top-center') {
-    return { left: '34%', top: '8%' } as const;
+    return { left: '32%', top: '6%' } as const;
   }
   if (zone === 'top-right') {
-    return { right: '6%', top: '12%' } as const;
+    return { right: '-2%', top: '12%' } as const;
   }
   if (zone === 'mid-left') {
-    return { left: '4%', top: '36%' } as const;
+    return { left: '-4%', top: '34%' } as const;
   }
   if (zone === 'mid-right') {
-    return { right: '4%', top: '38%' } as const;
+    return { right: '-4%', top: '36%' } as const;
   }
   if (zone === 'bottom-left') {
-    return { left: '8%', bottom: '18%' } as const;
+    return { left: '2%', bottom: '22%' } as const;
   }
   if (zone === 'bottom-center') {
-    return { left: '30%', bottom: '12%' } as const;
+    return { left: '26%', bottom: '10%' } as const;
   }
 
-  return { right: '8%', bottom: '18%' } as const;
+  return { right: '2%', bottom: '22%' } as const;
 }
 
 function getChipCenterPull(zone: OpeningMomentChip['zone']) {
@@ -1146,6 +1177,34 @@ function getChipLaneDirection(lane: OpeningMomentChip['lane']) {
   }
 
   return { x: -1, y: 1 };
+}
+
+function getChipEntryOffset(zone: OpeningMomentChip['zone'], enterFrom: OpeningMomentChip['enterFrom']) {
+  const horizontal = enterFrom === 'left' ? -1 : 1;
+
+  if (zone === 'top-left') {
+    return { x: horizontal * 142, y: -46 };
+  }
+  if (zone === 'top-center') {
+    return { x: horizontal * 132, y: -84 };
+  }
+  if (zone === 'top-right') {
+    return { x: horizontal * 142, y: -42 };
+  }
+  if (zone === 'mid-left') {
+    return { x: horizontal * 156, y: -10 };
+  }
+  if (zone === 'mid-right') {
+    return { x: horizontal * 156, y: 10 };
+  }
+  if (zone === 'bottom-left') {
+    return { x: horizontal * 136, y: 84 };
+  }
+  if (zone === 'bottom-center') {
+    return { x: horizontal * 126, y: 98 };
+  }
+
+  return { x: horizontal * 136, y: 84 };
 }
 
 function getDepthScale(depth: OpeningMomentChip['depth']) {
@@ -1208,17 +1267,19 @@ const styles = StyleSheet.create({
   },
   copyViewport: {
     alignItems: 'center',
+    height: 140,
     justifyContent: 'center',
-    minHeight: 112,
+    overflow: 'hidden',
     paddingTop: 6,
   },
   copyBlock: {
     alignItems: 'center',
     gap: 10,
     maxWidth: 336,
+    position: 'absolute',
   },
   copySpacer: {
-    height: 112,
+    height: 140,
   },
   title: {
     fontSize: 40,
@@ -1309,7 +1370,7 @@ const styles = StyleSheet.create({
   },
   eggRevealShell: {
     alignItems: 'center',
-    bottom: 42,
+    bottom: 0,
     justifyContent: 'flex-end',
     left: 0,
     position: 'absolute',
@@ -1407,14 +1468,15 @@ const styles = StyleSheet.create({
   burstParticle: {
     borderRadius: 999,
     position: 'absolute',
-    top: 164,
+    top: 176,
   },
   openingCreatureWrap: {
     alignItems: 'center',
-    height: 150,
+    height: 156,
     justifyContent: 'center',
-    marginTop: 82,
-    width: 150,
+    position: 'absolute',
+    top: 98,
+    width: 156,
   },
   openingCreatureGlow: {
     borderRadius: 999,
@@ -1424,12 +1486,23 @@ const styles = StyleSheet.create({
     right: -10,
     top: -10,
   },
+  openingCreatureImageShell: {
+    backgroundColor: 'rgba(13, 18, 28, 0.9)',
+    borderColor: 'rgba(231, 238, 255, 0.22)',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    boxShadow: KatchaDeckUI.shadows.card,
+    height: '100%',
+    overflow: 'hidden',
+    width: '100%',
+  },
   openingCreatureImage: {
     height: '100%',
     width: '100%',
   },
   openingMemoryPanelWrap: {
-    marginTop: 16,
+    position: 'absolute',
+    top: 274,
     width: 272,
   },
   openingMemoryPanel: {
