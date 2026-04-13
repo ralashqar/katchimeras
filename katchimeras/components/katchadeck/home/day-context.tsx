@@ -40,7 +40,7 @@ export function DayContext({ day, onAddMoment, onReveal }: DayContextProps) {
           </ScrollView>
         ) : (
           <ThemedText style={styles.helperCompact} lightColor="#DCE6FF" darkColor="#DCE6FF">
-            Coffee, a walk, one new place.
+            Photo, inspiration, one small moment.
           </ThemedText>
         )}
 

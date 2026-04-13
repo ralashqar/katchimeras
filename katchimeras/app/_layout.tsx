@@ -5,6 +5,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
@@ -64,14 +65,16 @@ export default function RootLayout() {
         };
 
   return (
-    <ThemeProvider value={navigationTheme}>
-      <Stack>
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'KatchaDeck Premium' }} />
-      </Stack>
-      <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={navigationTheme}>
+        <Stack>
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'KatchaDeck Premium' }} />
+        </Stack>
+        <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

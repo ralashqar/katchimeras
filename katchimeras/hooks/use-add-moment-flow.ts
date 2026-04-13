@@ -7,24 +7,37 @@ import type {
   AddMomentFlowError,
   AddMomentFlowState,
   AddMomentInput,
+  HomeDayRecord,
+  HomeQuickMomentType,
+  HomeTimelineDay,
+  InspirationCategory,
   RecentPhotoAsset,
   RadialMomentAction,
 } from '@/types/home';
+import { deriveInspirationSelection } from '@/utils/home-engine';
 
 type UseAddMomentFlowOptions = {
   enabled: boolean;
   onAddMoment: (input: AddMomentInput) => void;
+  timelineDays: HomeTimelineDay[];
+  todayDay: HomeDayRecord | null;
 };
 
 const closedState: AddMomentFlowState = {
   stage: 'closed',
   actions: [],
   recentPhotos: [],
+  inspirationSelection: null,
   absorption: null,
   error: null,
 };
 
-export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptions) {
+export function useAddMomentFlow({
+  enabled,
+  onAddMoment,
+  timelineDays,
+  todayDay,
+}: UseAddMomentFlowOptions) {
   const actions = useMemo<RadialMomentAction[]>(
     () =>
       homeRadialActionOrder.map((id) => ({
@@ -32,7 +45,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
         label: homeMomentOptions[id].label,
         icon: homeMomentOptions[id].icon,
         accentColor: homeMomentOptions[id].accentColor,
-        kind: id === 'photo' ? 'photo' : 'quick_tag',
+        kind: id === 'photo' ? 'photo' : id === 'inspiration' ? 'inspiration' : 'quick_tag',
       })),
     []
   );
@@ -54,6 +67,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
         stage,
         actions,
         recentPhotos: [],
+        inspirationSelection: null,
         absorption: null,
         error: null,
       });
@@ -79,6 +93,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
       stage: 'moment_ring',
       actions,
       recentPhotos: [],
+      inspirationSelection: null,
       absorption: null,
       error: null,
     }));
@@ -124,16 +139,13 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
     [clearTimers, onAddMoment, resetState]
   );
 
-  const setError = useCallback(
-    (error: AddMomentFlowError) => {
-      setState((current) => ({
-        ...current,
-        stage: 'error',
-        error,
-      }));
-    },
-    []
-  );
+  const setError = useCallback((error: AddMomentFlowError) => {
+    setState((current) => ({
+      ...current,
+      stage: 'error',
+      error,
+    }));
+  }, []);
 
   const loadRecentPhotos = useCallback(async () => {
     const mediaLibraryNative = requireOptionalNativeModule('ExpoMediaLibrary');
@@ -168,7 +180,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
       return;
     }
 
-    let ImagePickerModule: typeof import('expo-image-picker');
+    let imagePickerModule: typeof import('expo-image-picker');
     const imagePickerNative = requireOptionalNativeModule('ExponentImagePicker');
     if (!imagePickerNative) {
       setError({
@@ -180,7 +192,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
     }
 
     try {
-      ImagePickerModule = await import('expo-image-picker');
+      imagePickerModule = await import('expo-image-picker');
     } catch {
       setError({
         title: 'Photo picker unavailable',
@@ -196,7 +208,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
       error: null,
     }));
 
-    const result = await ImagePickerModule.launchImageLibraryAsync({
+    const result = await imagePickerModule.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.82,
       selectionLimit: 1,
@@ -234,6 +246,22 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
     );
   }, [beginAbsorption, enabled, setError]);
 
+  const openInspirationCard = useCallback(
+    (category?: InspirationCategory) => {
+      const selection = deriveInspirationSelection(timelineDays, category);
+
+      setState((current) => ({
+        ...current,
+        stage: 'inspiration_card',
+        recentPhotos: [],
+        inspirationSelection: selection,
+        absorption: null,
+        error: null,
+      }));
+    },
+    [timelineDays]
+  );
+
   const selectAction = useCallback(
     async (actionId: string) => {
       if (!enabled) {
@@ -245,7 +273,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
         return;
       }
 
-      if (action.kind === 'quick_tag' && action.id !== 'photo') {
+      if (action.kind === 'quick_tag') {
         beginAbsorption(
           {
             kind: 'tag',
@@ -256,10 +284,15 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
             orbitCount: actions.length,
           },
           {
-            type: action.id,
+            type: action.id as HomeQuickMomentType,
             source: 'quick_tag',
           }
         );
+        return;
+      }
+
+      if (action.kind === 'inspiration') {
+        openInspirationCard();
         return;
       }
 
@@ -312,7 +345,7 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
         });
       }
     },
-    [actions, beginAbsorption, enabled, loadRecentPhotos, setError]
+    [actions, beginAbsorption, enabled, loadRecentPhotos, openInspirationCard, setError]
   );
 
   const selectRecentPhoto = useCallback(
@@ -349,12 +382,51 @@ export function useAddMomentFlow({ enabled, onAddMoment }: UseAddMomentFlowOptio
     [beginAbsorption, state.recentPhotos]
   );
 
+  const selectInspirationCategory = useCallback(
+    (category: InspirationCategory) => {
+      openInspirationCard(category);
+    },
+    [openInspirationCard]
+  );
+
+  const confirmInspiration = useCallback(() => {
+    if (!state.inspirationSelection || !todayDay) {
+      return;
+    }
+
+    const inspirationIndex = actions.findIndex((action) => action.id === 'inspiration');
+    const { category, contextTags, quote } = state.inspirationSelection;
+
+    beginAbsorption(
+      {
+        kind: 'inspiration',
+        label: `${homeMomentOptions.inspiration.label}`,
+        icon: homeMomentOptions.inspiration.icon,
+        accentColor: homeMomentOptions.inspiration.accentColor,
+        orbitIndex: inspirationIndex >= 0 ? inspirationIndex : 0,
+        orbitCount: actions.length,
+      },
+      {
+        type: 'inspiration',
+        source: 'inspiration_library',
+        metadata: {
+          category,
+          contextTags,
+          quoteId: quote.id,
+          text: quote.text,
+        },
+      }
+    );
+  }, [actions, beginAbsorption, state.inspirationSelection, todayDay]);
+
   return {
     state,
     open,
     close,
     selectAction,
     selectRecentPhoto,
+    selectInspirationCategory,
+    confirmInspiration,
     dismissError,
     usePhotoPickerFallback,
   };

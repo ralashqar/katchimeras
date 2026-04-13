@@ -1,8 +1,17 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 
-export type HomeMomentType = 'photo' | 'coffee' | 'walk' | 'new_place' | 'social' | 'calm' | 'focus';
-export type HomeQuickMomentType = Exclude<HomeMomentType, 'photo'>;
-export type HomeMomentSource = 'quick_tag' | 'photo_library';
+export type InspirationCategory = 'calm' | 'motivation' | 'reflection' | 'energy' | 'gratitude';
+export type HomeMomentType =
+  | 'photo'
+  | 'inspiration'
+  | 'coffee'
+  | 'walk'
+  | 'new_place'
+  | 'social'
+  | 'calm'
+  | 'focus';
+export type HomeQuickMomentType = Exclude<HomeMomentType, 'photo' | 'inspiration'>;
+export type HomeMomentSource = 'quick_tag' | 'photo_library' | 'inspiration_library';
 export type HomeDayState = 'forming' | 'ready_to_hatch' | 'hatched';
 export type HomeScoreKey = 'energy' | 'calm' | 'social' | 'exploration' | 'focus';
 export type HomeRarityTier = 'common' | 'rare' | 'epic' | 'legendary';
@@ -31,6 +40,10 @@ export type HomeMomentMetadata = {
   width?: number;
   height?: number;
   isScreenshot?: boolean;
+  text?: string;
+  category?: InspirationCategory;
+  contextTags?: string[];
+  quoteId?: string;
 };
 
 export type HomeMoment = {
@@ -55,6 +68,16 @@ export type AddMomentInput =
       metadata: HomeMomentMetadata & {
         localUri: string;
       };
+    }
+  | {
+      type: 'inspiration';
+      source: 'inspiration_library';
+      metadata: HomeMomentMetadata & {
+        text: string;
+        category: InspirationCategory;
+        contextTags: string[];
+        quoteId: string;
+      };
     };
 
 export type LocalPathOption = {
@@ -74,6 +97,30 @@ export type EggVisualState = {
   shimmer: boolean;
   swirl: number;
   label: string;
+};
+
+export type EggAuraInteractionState = {
+  dragX: number;
+  dragY: number;
+  pressProgress: number;
+  releaseVelocity: number;
+  interactionEnergy: number;
+};
+
+export type EggRippleEvent = {
+  id: string;
+  originX: number;
+  originY: number;
+  startedAt: number;
+};
+
+export type EggAuraConfig = {
+  baseRadius: number;
+  membraneThickness: number;
+  maxPullDistance: number;
+  rippleDurationMs: number;
+  particleCount: number;
+  hapticsEnabled: boolean;
 };
 
 export type LocalCreatureRecord = {
@@ -139,7 +186,7 @@ export type RadialMomentAction = {
   label: string;
   icon: IconSymbolName;
   accentColor: string;
-  kind: 'photo' | 'quick_tag';
+  kind: 'photo' | 'quick_tag' | 'inspiration';
 };
 
 export type RecentPhotoAsset = {
@@ -152,8 +199,22 @@ export type RecentPhotoAsset = {
   isScreenshot?: boolean;
 };
 
+export type InspirationQuote = {
+  id: string;
+  text: string;
+  category: InspirationCategory;
+  tags: string[];
+};
+
+export type InspirationSelection = {
+  quote: InspirationQuote;
+  category: InspirationCategory;
+  contextTags: string[];
+  mode: 'auto' | 'category';
+};
+
 export type AbsorptionPayload = {
-  kind: 'tag' | 'photo';
+  kind: 'tag' | 'photo' | 'inspiration';
   label: string;
   icon?: IconSymbolName;
   accentColor: string;
@@ -165,6 +226,7 @@ export type AbsorptionPayload = {
 export type AddMomentFlowStage =
   | 'closed'
   | 'moment_ring'
+  | 'inspiration_card'
   | 'photo_permission_request'
   | 'photo_ring_loading'
   | 'photo_ring_ready'
@@ -183,6 +245,7 @@ export type AddMomentFlowState = {
   stage: AddMomentFlowStage;
   actions: RadialMomentAction[];
   recentPhotos: RecentPhotoAsset[];
+  inspirationSelection: InspirationSelection | null;
   absorption: AbsorptionPayload | null;
   error: AddMomentFlowError | null;
 };

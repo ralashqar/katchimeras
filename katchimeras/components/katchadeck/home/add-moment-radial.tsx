@@ -2,18 +2,21 @@ import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } f
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import { AddMomentOrbit } from '@/components/katchadeck/home/add-moment-orbit';
+import { InspirationQuoteCard } from '@/components/katchadeck/home/inspiration-quote-card';
 import { PhotoOrbitRing } from '@/components/katchadeck/home/photo-orbit-ring';
 import { MomentAbsorptionOverlay } from '@/components/katchadeck/home/moment-absorption-overlay';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import type { AddMomentFlowState } from '@/types/home';
+import type { AddMomentFlowState, InspirationCategory } from '@/types/home';
 
 type AddMomentRadialProps = {
   anchorY: number;
   onClose: () => void;
+  onConfirmInspiration: () => void;
   onDismissError: () => void;
   onSelectAction: (actionId: string) => void;
+  onSelectInspirationCategory: (category: InspirationCategory) => void;
   onSelectRecentPhoto: (assetId: string) => void;
   onUsePickerFallback: () => void;
   state: AddMomentFlowState;
@@ -22,8 +25,10 @@ type AddMomentRadialProps = {
 export function AddMomentRadial({
   anchorY,
   onClose,
+  onConfirmInspiration,
   onDismissError,
   onSelectAction,
+  onSelectInspirationCategory,
   onSelectRecentPhoto,
   onUsePickerFallback,
   state,
@@ -49,6 +54,10 @@ export function AddMomentRadial({
           <AddMomentOrbit actions={state.actions} onSelectAction={onSelectAction} />
         ) : null}
 
+        {state.stage === 'inspiration_card' ? (
+          <Pressable onPress={onConfirmInspiration} style={styles.eggTapTarget} />
+        ) : null}
+
         {state.stage === 'photo_ring_ready' && state.recentPhotos.length > 0 ? (
           <PhotoOrbitRing onSelectPhoto={onSelectRecentPhoto} photos={state.recentPhotos} />
         ) : null}
@@ -68,6 +77,14 @@ export function AddMomentRadial({
               </ThemedText>
             </GlassPanel>
           </Animated.View>
+        ) : null}
+
+        {state.stage === 'inspiration_card' && state.inspirationSelection ? (
+          <InspirationQuoteCard
+            onAdd={onConfirmInspiration}
+            onSelectCategory={onSelectInspirationCategory}
+            selection={state.inspirationSelection}
+          />
         ) : null}
 
         {state.stage === 'photo_permission_request' || state.stage === 'photo_ring_loading' || state.stage === 'photo_picker_fallback' ? (
@@ -149,6 +166,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     width: 132,
+  },
+  eggTapTarget: {
+    borderRadius: 999,
+    height: 128,
+    left: '50%',
+    marginLeft: -64,
+    marginTop: -64,
+    position: 'absolute',
+    top: '50%',
+    width: 128,
   },
   panelWrap: {
     left: 16,

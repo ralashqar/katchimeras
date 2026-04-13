@@ -37,12 +37,16 @@ export default function HomeScreen() {
   const addMomentFlow = useAddMomentFlow({
     enabled: selectedDay?.kind === 'day' && selectedDay.canAddMoments,
     onAddMoment: addMoment,
+    timelineDays,
+    todayDay: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay : null,
   });
   const {
     close: closeAddMomentFlow,
+    confirmInspiration,
     dismissError: dismissAddMomentError,
     open: openAddMomentFlow,
     selectAction: selectAddMomentAction,
+    selectInspirationCategory,
     selectRecentPhoto,
     state: addMomentFlowState,
     usePhotoPickerFallback,
@@ -188,6 +192,7 @@ export default function HomeScreen() {
               <FormingEgg
                 caption={heroSubtitle}
                 egg={selectedDay.egg}
+                interactive={selectedDay.isToday}
                 onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
                 reactionKey={selectedDay.moments.length + (selectedDay.selectedPathId ? 1 : 0)}
               />
@@ -235,8 +240,10 @@ export default function HomeScreen() {
       <AddMomentRadial
         anchorY={heroAnchorY}
         onClose={closeAddMomentFlow}
+        onConfirmInspiration={confirmInspiration}
         onDismissError={dismissAddMomentError}
         onSelectAction={selectAddMomentAction}
+        onSelectInspirationCategory={selectInspirationCategory}
         onSelectRecentPhoto={selectRecentPhoto}
         onUsePickerFallback={usePhotoPickerFallback}
         state={addMomentFlowState}
