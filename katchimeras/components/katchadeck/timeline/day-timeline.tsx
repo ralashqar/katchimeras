@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  type LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,11 +30,20 @@ import { KatchaDeckUI } from '@/constants/theme';
 import type {
   ScriptedTimelineState,
   TimelineDayEntry,
+  TimelineCreatureVisual,
   TimelineSelectableId,
   TimelineTomorrowState,
 } from '@/types/timeline';
 
 type TimelineMode = 'scripted' | 'interactive';
+type TimelineFutureGhost = {
+  kind: 'future-ghost';
+  id: 'after-tomorrow' | 'later';
+  dayLabel: string;
+  dateLabel: string;
+  title: string;
+  accent: string;
+};
 
 type DayTimelineProps = {
   entries: readonly TimelineDayEntry[];
@@ -49,9 +59,27 @@ type DayTimelineProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-type RailItem = TimelineDayEntry | TimelineTomorrowState;
+type RailItem = TimelineDayEntry | TimelineTomorrowState | TimelineFutureGhost;
 
 const TOMORROW_ID = 'tomorrow';
+const futureGhosts: readonly TimelineFutureGhost[] = [
+  {
+    kind: 'future-ghost',
+    id: 'after-tomorrow',
+    dayLabel: 'After tomorrow',
+    dateLabel: 'Later',
+    title: 'Unformed',
+    accent: '#B8C2DE',
+  },
+  {
+    kind: 'future-ghost',
+    id: 'later',
+    dayLabel: 'Later',
+    dateLabel: 'Ahead',
+    title: 'Waiting',
+    accent: '#9AA6C8',
+  },
+] as const;
 
 export function DayTimeline({
   entries,
@@ -68,10 +96,12 @@ export function DayTimeline({
 }: DayTimelineProps) {
   const scrollRef = useRef<ScrollView>(null);
   const { width } = useWindowDimensions();
-  const bubbleSize = width < 390 ? 82 : 92;
-  const railGap = width < 390 ? 16 : 20;
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
+  const railWidth = viewportWidth ?? width;
+  const bubbleSize = railWidth < 390 ? 82 : 92;
+  const railGap = railWidth < 390 ? 16 : 20;
   const snapInterval = bubbleSize + railGap;
-  const sidePadding = Math.max(20, width / 2 - bubbleSize / 2);
+  const sidePadding = Math.max(20, railWidth / 2 - bubbleSize / 2);
   const scriptedVisibleIds = mode === 'scripted' ? scriptedState?.visibleEntryIds : undefined;
   const activeVisibleIds = scriptedVisibleIds ?? visibleEntryIds;
   const activeFocusedId = mode === 'scripted' ? scriptedState?.focusedEntryId : focusedEntryId;
@@ -90,8 +120,19 @@ export function DayTimeline({
 
   const shouldShowTomorrow = Boolean(activeShowTomorrowEgg && tomorrowState);
   const railItems = useMemo<readonly RailItem[]>(
-    () => (shouldShowTomorrow && tomorrowState ? [...railEntries, tomorrowState] : railEntries),
+    () =>
+      shouldShowTomorrow && tomorrowState
+        ? [...railEntries, tomorrowState, ...futureGhosts]
+        : railEntries,
     [railEntries, shouldShowTomorrow, tomorrowState]
+  );
+  const selectableRailItems = useMemo(
+    () => railItems.filter((item): item is TimelineDayEntry | TimelineTomorrowState => !isFutureGhost(item)),
+    [railItems]
+  );
+  const snapOffsets = useMemo(
+    () => selectableRailItems.map((_, index) => index * snapInterval),
+    [selectableRailItems, snapInterval]
   );
 
   const resolvedSelectedId =
@@ -144,24 +185,44 @@ export function DayTimeline({
   }
 
   function handleMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    if (mode !== 'interactive' || railItems.length === 0) {
+    if (mode !== 'interactive' || selectableRailItems.length === 0 || snapOffsets.length === 0) {
       return;
     }
 
-    const nextIndex = Math.max(
-      0,
-      Math.min(railItems.length - 1, Math.round(event.nativeEvent.contentOffset.x / snapInterval))
-    );
-    const nextItem = railItems[nextIndex];
+    const offset = event.nativeEvent.contentOffset.x;
+    let nextIndex = 0;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    snapOffsets.forEach((snapOffset, index) => {
+      const distance = Math.abs(snapOffset - offset);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        nextIndex = index;
+      }
+    });
+
+    const nextItem = selectableRailItems[nextIndex];
 
     if (nextItem) {
       handleSelect(nextItem.id);
     }
   }
 
+  function handleViewportLayout(event: LayoutChangeEvent) {
+    const nextWidth = event.nativeEvent.layout.width;
+
+    setViewportWidth((current) => {
+      if (current !== null && Math.abs(current - nextWidth) < 1) {
+        return current;
+      }
+
+      return nextWidth;
+    });
+  }
+
   return (
     <View style={[styles.shell, style]}>
-      <View style={[styles.railViewport, { minHeight: bubbleSize + 66 }]}>
+      <View onLayout={handleViewportLayout} style={[styles.railViewport, { minHeight: bubbleSize + 66 }]}>
         <View style={styles.railLine} />
         {mode === 'scripted' && scriptedState?.activityCardsVisible?.length ? (
           <View style={styles.activityFeedRow}>
@@ -203,9 +264,13 @@ export function DayTimeline({
             onMomentumScrollEnd={handleMomentumEnd}
             scrollEnabled={mode === 'interactive'}
             showsHorizontalScrollIndicator={false}
-            snapToInterval={snapInterval}>
+            snapToOffsets={snapOffsets}>
             {railItems.map((item, index) =>
-              isTomorrowItem(item) ? (
+              isFutureGhost(item) ? (
+                <Animated.View entering={FadeInUp.duration(320).delay(index * 70)} key={item.id}>
+                  <FutureGhostRailItem bubbleSize={bubbleSize} state={item} />
+                </Animated.View>
+              ) : isTomorrowItem(item) ? (
                 <Animated.View entering={FadeInUp.duration(320).delay(index * 70)} key={item.id}>
                   <TomorrowRailItem
                     bubbleSize={bubbleSize}
@@ -306,11 +371,15 @@ function TimelineRailEntry({
             glowStyle,
           ]}
         />
-        <View style={styles.creatureFrame}>
-          <View style={styles.creatureSurface}>
-            <Image contentFit="contain" source={entry.creature.imageSource} style={styles.creatureImage} transition={0} />
+        {isEggVisual(entry.creature) ? (
+          <TimelineEggVisual visual={entry.creature} />
+        ) : (
+          <View style={styles.creatureFrame}>
+            <View style={styles.creatureSurface}>
+              <Image contentFit="contain" source={entry.creature.imageSource} style={styles.creatureImage} transition={0} />
+            </View>
           </View>
-        </View>
+        )}
       </Animated.View>
       <ThemedText style={styles.creatureName} lightColor="#F8FBFF" darkColor="#F8FBFF">
         {entry.creature.name}
@@ -448,6 +517,92 @@ function TomorrowRailItem({
   );
 }
 
+function FutureGhostRailItem({
+  state,
+  bubbleSize,
+}: {
+  state: TimelineFutureGhost;
+  bubbleSize: number;
+}) {
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1800, easing: Easing.out(Easing.sin) }),
+        withTiming(0, { duration: 1800, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1,
+      false
+    );
+  }, [pulse]);
+
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.12 + pulse.value * 0.16,
+    transform: [{ scale: 0.94 + pulse.value * 0.08 }],
+  }));
+
+  return (
+    <View style={[styles.railCell, styles.futureRailCell]}>
+      <ThemedText type="onboardingLabel" style={styles.futureLabel} lightColor="#8693B5" darkColor="#8693B5">
+        {state.dayLabel}
+      </ThemedText>
+      <ThemedText style={styles.futureDateLabel} lightColor="#677390" darkColor="#677390">
+        {state.dateLabel}
+      </ThemedText>
+      <View style={[styles.bubbleShell, { height: bubbleSize, width: bubbleSize }]}>
+        <Animated.View style={[styles.creatureGlow, { backgroundColor: `${state.accent}16` }, haloStyle]} />
+        <View style={[styles.futureEgg, { borderColor: `${state.accent}40` }]}>
+          <View style={[styles.futureEggCore, { backgroundColor: `${state.accent}12` }]} />
+        </View>
+      </View>
+      <ThemedText style={styles.futureTitle} lightColor="#707C98" darkColor="#707C98">
+        {state.title}
+      </ThemedText>
+    </View>
+  );
+}
+
+function TimelineEggVisual({
+  visual,
+}: {
+  visual: Extract<TimelineCreatureVisual, { kind: 'egg' }>;
+}) {
+  const pulse = useSharedValue(visual.shimmer ? 1 : 0.24);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1500, easing: Easing.out(Easing.sin) }),
+        withTiming(0.24, { duration: 1500, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1,
+      false
+    );
+  }, [pulse, visual.shimmer]);
+
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.32 + pulse.value * (visual.intensity ?? 0.7) * 0.4,
+    transform: [{ scale: 0.92 + pulse.value * 0.14 }],
+  }));
+
+  return (
+    <View style={styles.creatureFrame}>
+      <Animated.View
+        style={[
+          styles.timelineEggHalo,
+          { backgroundColor: `${visual.accent}30` },
+          haloStyle,
+        ]}
+      />
+      <View style={[styles.timelineEggShell, { borderColor: `${visual.accent}88` }]}>
+        <View style={[styles.timelineEggCore, { backgroundColor: visual.coreColor ?? `${visual.accent}36` }]} />
+      </View>
+      <View style={[styles.timelineEggSpark, { backgroundColor: `${visual.accent}88` }]} />
+    </View>
+  );
+}
+
 function TimelineMemoryCard({ entry }: { entry: TimelineDayEntry }) {
   return (
     <GlassPanel contentStyle={styles.detailPanel}>
@@ -496,6 +651,14 @@ function TomorrowMemoryCard({ state }: { state: TimelineTomorrowState }) {
 
 function isTomorrowItem(item: RailItem): item is TimelineTomorrowState {
   return item.id === TOMORROW_ID;
+}
+
+function isFutureGhost(item: RailItem): item is TimelineFutureGhost {
+  return 'kind' in item && item.kind === 'future-ghost';
+}
+
+function isEggVisual(visual: TimelineCreatureVisual): visual is Extract<TimelineCreatureVisual, { kind: 'egg' }> {
+  return visual.kind === 'egg';
 }
 
 const styles = StyleSheet.create({
@@ -564,6 +727,9 @@ const styles = StyleSheet.create({
     gap: 4,
     width: 96,
   },
+  futureRailCell: {
+    opacity: 0.78,
+  },
   dayLabel: {
     fontSize: 11,
   },
@@ -602,6 +768,38 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
+  timelineEggHalo: {
+    borderRadius: 999,
+    bottom: -6,
+    left: -6,
+    position: 'absolute',
+    right: -6,
+    top: -6,
+  },
+  timelineEggShell: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(9,13,24,0.92)',
+    borderRadius: 999,
+    borderWidth: 1,
+    boxShadow: KatchaDeckUI.shadows.card,
+    height: '100%',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: '100%',
+  },
+  timelineEggCore: {
+    borderRadius: 999,
+    height: '56%',
+    width: '56%',
+  },
+  timelineEggSpark: {
+    borderRadius: 999,
+    height: 12,
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    width: 12,
+  },
   creatureImage: {
     height: '100%',
     width: '100%',
@@ -622,9 +820,40 @@ const styles = StyleSheet.create({
     height: '58%',
     width: '58%',
   },
+  futureEgg: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(9,13,24,0.54)',
+    borderRadius: 999,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    height: '100%',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: '100%',
+  },
+  futureEggCore: {
+    borderRadius: 999,
+    height: '54%',
+    width: '54%',
+  },
   creatureName: {
     fontSize: 13,
     lineHeight: 17,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  futureLabel: {
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  futureDateLabel: {
+    fontSize: 11,
+    lineHeight: 14,
+    textAlign: 'center',
+  },
+  futureTitle: {
+    fontSize: 12,
+    lineHeight: 16,
     marginTop: 2,
     textAlign: 'center',
   },

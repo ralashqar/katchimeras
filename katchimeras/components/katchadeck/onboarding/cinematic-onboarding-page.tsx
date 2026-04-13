@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions, type DimensionValue } from 'react-native';
 import Animated, {
@@ -15,6 +16,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { BlurMask, Canvas, Line } from '@shopify/react-native-skia';
 
 import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
@@ -38,6 +40,8 @@ type CinematicOnboardingPageProps = {
 
 const FINAL_BEAT_INDEX = onboardingCinematicBeats.length - 1;
 const FOLLOW_UP_BEAT_INDEX = 1;
+const OPENING_BASE_STAGE_WIDTH = 390;
+const OPENING_BASE_STAGE_HEIGHT = 392;
 
 type AmbientParticleConfig = {
   id: string;
@@ -50,16 +54,6 @@ type AmbientParticleConfig = {
   opacity: number;
 };
 
-type EnergyLinkConfig = {
-  id: string;
-  left?: DimensionValue;
-  right?: DimensionValue;
-  top?: DimensionValue;
-  bottom?: DimensionValue;
-  width: number;
-  rotation: string;
-};
-
 const AMBIENT_PARTICLES: readonly AmbientParticleConfig[] = [
   { id: 'p-1', left: '10%', top: '12%', size: 5, durationMs: 5200, travel: 18, delayMs: 0, opacity: 0.14 },
   { id: 'p-2', left: '84%', top: '18%', size: 3, durationMs: 6000, travel: 24, delayMs: 180, opacity: 0.12 },
@@ -68,13 +62,6 @@ const AMBIENT_PARTICLES: readonly AmbientParticleConfig[] = [
   { id: 'p-5', left: '16%', top: '58%', size: 4, durationMs: 6100, travel: 22, delayMs: 540, opacity: 0.12 },
   { id: 'p-6', left: '88%', top: '62%', size: 5, durationMs: 5600, travel: 18, delayMs: 360, opacity: 0.14 },
   { id: 'p-7', left: '40%', top: '74%', size: 3, durationMs: 6800, travel: 14, delayMs: 240, opacity: 0.1 },
-] as const;
-
-const ENERGY_LINKS: readonly EnergyLinkConfig[] = [
-  { id: 'line-1', left: '19%', top: '23%', width: 122, rotation: '25deg' },
-  { id: 'line-2', right: '20%', top: '26%', width: 118, rotation: '-30deg' },
-  { id: 'line-3', left: '20%', bottom: '23%', width: 130, rotation: '-19deg' },
-  { id: 'line-4', right: '19%', bottom: '21%', width: 124, rotation: '18deg' },
 ] as const;
 
 const HATCH_PARTICLES = [
@@ -398,12 +385,19 @@ function OpeningSequenceStage({
   reduceMotionEnabled: boolean;
   restartToken: number;
 }) {
+  const { width } = useWindowDimensions();
+  const stageMetrics = useMemo(() => getOpeningStageMetrics(width, stageHeight), [stageHeight, width]);
   return (
     <View style={[styles.openingStage, { height: stageHeight }]}>
       <AmbientParticleField reduceMotionEnabled={reduceMotionEnabled} restartToken={restartToken} />
-      {scene.showEnergyLinks ? (
-        <OpeningEnergyLinks reduceMotionEnabled={reduceMotionEnabled} restartToken={restartToken} />
-      ) : null}
+      <OpeningMergeField
+        chips={chips}
+        reduceMotionEnabled={reduceMotionEnabled}
+        restartToken={restartToken}
+        scene={scene}
+        stageHeight={stageHeight}
+        stageMetrics={stageMetrics}
+      />
 
       {chips.map((chip) => (
         <OpeningMomentChipBadge
@@ -411,6 +405,7 @@ function OpeningSequenceStage({
           key={`${chip.id}-${restartToken}`}
           reduceMotionEnabled={reduceMotionEnabled}
           scene={scene}
+          stageScale={stageMetrics.scale}
         />
       ))}
 
@@ -419,6 +414,7 @@ function OpeningSequenceStage({
         restartToken={restartToken}
         revealEntry={revealEntry}
         scene={scene}
+        stageMetrics={stageMetrics}
       />
 
       {scene.bottomCopy ? (
@@ -548,81 +544,331 @@ function AmbientParticle({
   );
 }
 
-function OpeningEnergyLinks({
+function OpeningMergeField({
+  chips,
   reduceMotionEnabled,
   restartToken,
+  scene,
+  stageHeight,
+  stageMetrics,
 }: {
+  chips: readonly OpeningMomentChip[];
   reduceMotionEnabled: boolean;
   restartToken: number;
+  scene: OpeningScene;
+  stageHeight: number;
+  stageMetrics: ReturnType<typeof getOpeningStageMetrics>;
 }) {
+  const isActive = scene.chipBehavior === 'converge' || scene.chipBehavior === 'build';
+  const showCorona = scene.eggState === 'build';
+  const center = {
+    x: stageMetrics.stageWidth * 0.5,
+    y: stageMetrics.eggCenterY,
+  };
+
+  if (!isActive && !showCorona) {
+    return null;
+  }
+
   return (
-    <View pointerEvents="none" style={styles.energyLayer}>
-      {ENERGY_LINKS.map((line) => (
-        <OpeningEnergyLink
-          key={`${line.id}-${restartToken}`}
-          left={line.left}
-          reduceMotionEnabled={reduceMotionEnabled}
-          right={line.right}
-          rotation={line.rotation}
-          top={line.top}
-          width={line.width}
-          bottom={line.bottom}
-        />
-      ))}
+    <View pointerEvents="none" style={styles.mergeField}>
+      {isActive
+        ? chips.map((chip) => (
+            <OpeningMomentStream
+              center={center}
+              chip={chip}
+              key={`${chip.id}-${scene.id}-${restartToken}`}
+              reduceMotionEnabled={reduceMotionEnabled}
+              stageHeight={stageHeight}
+              stageWidth={stageMetrics.stageWidth}
+              stageScale={stageMetrics.scale}
+              tension={scene.chipBehavior === 'build' ? 'tight' : 'soft'}
+            />
+          ))
+        : null}
+      <OpeningIntakeGlow center={center} reduceMotionEnabled={reduceMotionEnabled} scene={scene} stageMetrics={stageMetrics} />
+      {showCorona ? <OpeningEggCorona center={center} reduceMotionEnabled={reduceMotionEnabled} stageMetrics={stageMetrics} /> : null}
     </View>
   );
 }
 
-function OpeningEnergyLink({
-  bottom,
-  left,
+function OpeningMomentStream({
+  center,
+  chip,
   reduceMotionEnabled,
-  right,
-  rotation,
-  top,
-  width,
+  stageHeight,
+  stageScale,
+  stageWidth,
+  tension,
 }: {
-  bottom?: DimensionValue;
-  left?: DimensionValue;
+  center: { x: number; y: number };
+  chip: OpeningMomentChip;
   reduceMotionEnabled: boolean;
-  right?: DimensionValue;
-  rotation: string;
-  top?: DimensionValue;
-  width: number;
+  stageHeight: number;
+  stageScale: number;
+  stageWidth: number;
+  tension: 'soft' | 'tight';
 }) {
+  const shimmerA = useSharedValue(0);
+  const shimmerB = useSharedValue(0.24);
   const opacity = useSharedValue(0);
-  const scale = useSharedValue(0.82);
+  const anchor = getChipZoneAnchor(chip.zone);
+  const startX = anchor.x * stageWidth;
+  const startY = anchor.y * stageHeight;
+  const dx = center.x - startX;
+  const dy = center.y - startY;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  const angle = `${(Math.atan2(dy, dx) * 180) / Math.PI}deg`;
+  const midpointX = (startX + center.x) / 2;
+  const midpointY = (startY + center.y) / 2;
+  const sparkTravel = Math.max(length - 34, 24);
 
   useEffect(() => {
-    opacity.value = withSequence(
-      withTiming(0.7, { duration: reduceMotionEnabled ? 120 : 360, easing: Easing.out(Easing.cubic) }),
-      withTiming(0.22, { duration: reduceMotionEnabled ? 240 : 720, easing: Easing.inOut(Easing.sin) })
-    );
-    scale.value = withSequence(
-      withTiming(1, { duration: reduceMotionEnabled ? 120 : 420, easing: Easing.out(Easing.cubic) }),
-      withTiming(1.06, { duration: reduceMotionEnabled ? 240 : 680, easing: Easing.inOut(Easing.sin) })
-    );
-  }, [opacity, reduceMotionEnabled, scale]);
+    opacity.value = withTiming(tension === 'tight' ? 0.26 : 0.38, {
+      duration: reduceMotionEnabled ? 120 : 360,
+      easing: Easing.out(Easing.cubic),
+    });
 
-  const animatedStyle = useAnimatedStyle(() => ({
+    if (reduceMotionEnabled) {
+      shimmerA.value = withTiming(0.62, { duration: 160, easing: Easing.out(Easing.cubic) });
+      shimmerB.value = withTiming(0.26, { duration: 160, easing: Easing.out(Easing.cubic) });
+      return;
+    }
+
+    shimmerA.value = withRepeat(
+      withSequence(
+        withTiming(1, {
+          duration: tension === 'tight' ? 460 : 680,
+          easing: Easing.inOut(Easing.sin),
+        }),
+        withTiming(0, {
+          duration: tension === 'tight' ? 460 : 680,
+          easing: Easing.inOut(Easing.sin),
+        })
+      ),
+      -1,
+      false
+    );
+    shimmerB.value = withDelay(
+      tension === 'tight' ? 120 : 180,
+      withRepeat(
+        withSequence(
+          withTiming(1, {
+            duration: tension === 'tight' ? 480 : 720,
+            easing: Easing.inOut(Easing.sin),
+          }),
+          withTiming(0, {
+            duration: tension === 'tight' ? 480 : 720,
+            easing: Easing.inOut(Easing.sin),
+          })
+        ),
+        -1,
+        false
+      )
+    );
+  }, [opacity, reduceMotionEnabled, shimmerA, shimmerB, tension]);
+
+  const streamStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [{ rotateZ: rotation }, { scaleX: scale.value }],
+    transform: [{ rotateZ: angle }, { scaleX: 0.96 + opacity.value * 0.08 }],
+  }));
+
+  const sparkleAStyle = useAnimatedStyle(() => ({
+    opacity: 0.2 + shimmerA.value * 0.72,
+    transform: [{ translateX: shimmerA.value * sparkTravel }, { scale: 0.72 + shimmerA.value * 0.42 }],
+  }));
+
+  const sparkleBStyle = useAnimatedStyle(() => ({
+    opacity: 0.16 + shimmerB.value * 0.64,
+    transform: [{ translateX: shimmerB.value * sparkTravel }, { scale: 0.68 + shimmerB.value * 0.34 }],
   }));
 
   return (
     <Animated.View
       style={[
-        styles.energyLink,
+        styles.streamWrap,
         {
-          bottom,
-          left,
-          right,
-          top,
-          width,
+          left: midpointX - length / 2,
+          top: midpointY - 7 * stageScale,
+          width: length,
         },
-        animatedStyle,
+        streamStyle,
+      ]}>
+      <LinearGradient
+        colors={['rgba(255,255,255,0)', `${chip.accent}12`, `${chip.accent}8A`]}
+        locations={[0, 0.54, 1]}
+        style={[
+          styles.streamBeam,
+          { height: 2 * stageScale, marginTop: 6 * stageScale },
+          tension === 'tight' ? [styles.streamBeamTight, { height: 2.4 * stageScale, marginTop: 5.8 * stageScale }] : null,
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.streamParticle,
+          {
+            backgroundColor: chip.accent,
+            height: 4 * stageScale,
+            top: 5 * stageScale,
+            width: 4 * stageScale,
+          },
+          sparkleAStyle,
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.streamParticle,
+          styles.streamParticleSecondary,
+          {
+            backgroundColor: `${chip.accent}CC`,
+            height: 3 * stageScale,
+            top: 5.5 * stageScale,
+            width: 3 * stageScale,
+          },
+          sparkleBStyle,
+        ]}
+      />
+    </Animated.View>
+  );
+}
+
+function OpeningIntakeGlow({
+  center,
+  reduceMotionEnabled,
+  scene,
+  stageMetrics,
+}: {
+  center: { x: number; y: number };
+  reduceMotionEnabled: boolean;
+  scene: OpeningScene;
+  stageMetrics: ReturnType<typeof getOpeningStageMetrics>;
+}) {
+  const pulse = useSharedValue(scene.eggState === 'build' ? 1 : 0.4);
+
+  useEffect(() => {
+    if (reduceMotionEnabled) {
+      pulse.value = withTiming(scene.eggState === 'build' ? 0.92 : 0.48, {
+        duration: 120,
+        easing: Easing.out(Easing.cubic),
+      });
+      return;
+    }
+
+    pulse.value =
+      scene.eggState === 'build'
+        ? withRepeat(
+            withSequence(
+              withTiming(1, { duration: 520, easing: Easing.inOut(Easing.sin) }),
+              withTiming(0.36, { duration: 620, easing: Easing.inOut(Easing.sin) })
+            ),
+            -1,
+            false
+          )
+        : withRepeat(
+            withSequence(
+              withTiming(0.76, { duration: 860, easing: Easing.inOut(Easing.sin) }),
+              withTiming(0.28, { duration: 980, easing: Easing.inOut(Easing.sin) })
+            ),
+            -1,
+            false
+          );
+  }, [pulse, reduceMotionEnabled, scene.eggState]);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: 0.18 + pulse.value * (scene.eggState === 'build' ? 0.42 : 0.18),
+    transform: [{ scale: 0.82 + pulse.value * (scene.eggState === 'build' ? 0.26 : 0.14) }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.intakeGlow,
+        {
+          height: stageMetrics.intakeSize,
+          left: center.x - stageMetrics.intakeSize / 2,
+          top: center.y - stageMetrics.intakeSize / 2,
+          width: stageMetrics.intakeSize,
+        },
+        glowStyle,
       ]}
     />
+  );
+}
+
+function OpeningEggCorona({
+  center,
+  reduceMotionEnabled,
+  stageMetrics,
+}: {
+  center: { x: number; y: number };
+  reduceMotionEnabled: boolean;
+  stageMetrics: ReturnType<typeof getOpeningStageMetrics>;
+}) {
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduceMotionEnabled) {
+      pulse.value = withTiming(0.58, {
+        duration: 120,
+        easing: Easing.out(Easing.cubic),
+      });
+      return;
+    }
+
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 520, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.24, { duration: 640, easing: Easing.inOut(Easing.sin) })
+      ),
+      -1,
+      false
+    );
+  }, [pulse, reduceMotionEnabled]);
+
+  const coronaStyle = useAnimatedStyle(() => ({
+    opacity: 0.22 + pulse.value * 0.34,
+    transform: [{ scale: 0.94 + pulse.value * 0.1 }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        styles.coronaWrap,
+        {
+          height: stageMetrics.coronaSize,
+          left: center.x - stageMetrics.coronaSize / 2,
+          top: center.y - stageMetrics.coronaSize / 2,
+          width: stageMetrics.coronaSize,
+        },
+        coronaStyle,
+      ]}>
+      <Canvas style={{ height: stageMetrics.coronaSize, width: stageMetrics.coronaSize }}>
+        {Array.from({ length: 12 }, (_, index) => {
+          const angle = (Math.PI * 2 * index) / 12;
+          const innerRadius = (index % 2 === 0 ? 42 : 46) * stageMetrics.scale;
+          const outerRadius = (index % 2 === 0 ? 62 : 68) * stageMetrics.scale;
+          const centerPoint = stageMetrics.coronaSize / 2;
+
+          return (
+            <Line
+              color="rgba(234, 239, 255, 0.5)"
+              key={`ray-${index}`}
+              p1={{
+                x: centerPoint + Math.cos(angle) * innerRadius,
+                y: centerPoint + Math.sin(angle) * innerRadius,
+              }}
+              p2={{
+                x: centerPoint + Math.cos(angle) * outerRadius,
+                y: centerPoint + Math.sin(angle) * outerRadius,
+              }}
+              strokeCap="round"
+              strokeWidth={(index % 3 === 0 ? 2 : 1.3) * stageMetrics.scale}>
+              <BlurMask blur={1.6} style="solid" />
+            </Line>
+          );
+        })}
+      </Canvas>
+    </Animated.View>
   );
 }
 
@@ -630,10 +876,12 @@ function OpeningMomentChipBadge({
   chip,
   reduceMotionEnabled,
   scene,
+  stageScale,
 }: {
   chip: OpeningMomentChip;
   reduceMotionEnabled: boolean;
   scene: OpeningScene;
+  stageScale: number;
 }) {
   const opacity = useSharedValue(0);
   const scale = useSharedValue(getDepthScale(chip.depth) - 0.08);
@@ -645,9 +893,9 @@ function OpeningMomentChipBadge({
   const enterY = useSharedValue(0);
   const rotate = useSharedValue(0);
   const zoneStyle = getChipZoneStyle(chip.zone);
-  const centerPull = getChipCenterPull(chip.zone);
+  const centerPull = getChipCenterPull(chip.zone, stageScale);
   const direction = getChipLaneDirection(chip.lane);
-  const entryOffset = getChipEntryOffset(chip.zone, chip.enterFrom);
+  const entryOffset = getChipEntryOffset(chip.zone, chip.enterFrom, stageScale);
 
   useEffect(() => {
     const isVisible =
@@ -666,11 +914,11 @@ function OpeningMomentChipBadge({
     const amplitude =
       chip.emphasis === 'strong'
         ? isFastMotion
-          ? 22
-          : 12
+          ? 22 * stageScale
+          : 12 * stageScale
         : isFastMotion
-          ? 16
-          : 8;
+          ? 16 * stageScale
+          : 8 * stageScale;
     const duration = reduceMotionEnabled ? 220 : isFastMotion ? 1450 : 3200;
     const delayMs =
       reduceMotionEnabled || !isVisible
@@ -763,6 +1011,7 @@ function OpeningMomentChipBadge({
     rotate,
     scale,
     scene.chipBehavior,
+    stageScale,
   ]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -802,11 +1051,13 @@ function OpeningEggReveal({
   restartToken,
   revealEntry,
   scene,
+  stageMetrics,
 }: {
   reduceMotionEnabled: boolean;
   restartToken: number;
   revealEntry: TimelineDayEntry;
   scene: OpeningScene;
+  stageMetrics: ReturnType<typeof getOpeningStageMetrics>;
 }) {
   const eggOpacity = useSharedValue(0);
   const eggScale = useSharedValue(0.42);
@@ -967,34 +1218,149 @@ function OpeningEggReveal({
 
   return (
     <View pointerEvents="none" style={styles.eggRevealShell}>
-      <Animated.View style={[styles.openingEggGlow, eggGlowStyle]} />
+      <Animated.View
+        style={[
+          styles.openingEggGlow,
+          {
+            height: stageMetrics.glowSize,
+            top: stageMetrics.eggTop - 34 * stageMetrics.scale,
+            width: stageMetrics.glowSize,
+          },
+          eggGlowStyle,
+        ]}
+      />
 
-      <Animated.View style={[styles.openingEggShell, eggShellStyle]}>
+      <Animated.View
+        style={[
+          styles.openingEggShell,
+          {
+            height: stageMetrics.eggSize,
+            top: stageMetrics.eggTop,
+            width: stageMetrics.eggSize,
+          },
+          eggShellStyle,
+        ]}>
         <Animated.View style={[styles.openingEggInnerFlash, innerFlashStyle]}>
-          <View style={[styles.openingEggEcho, styles.openingEggEchoWarm]} />
-          <View style={[styles.openingEggEcho, styles.openingEggEchoCool]} />
-          <View style={[styles.openingEggEcho, styles.openingEggEchoPhoto]} />
+          <View
+            style={[
+              styles.openingEggEcho,
+              styles.openingEggEchoWarm,
+              {
+                height: 28 * stageMetrics.scale,
+                left: 24 * stageMetrics.scale,
+                top: 24 * stageMetrics.scale,
+                width: 28 * stageMetrics.scale,
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.openingEggEcho,
+              styles.openingEggEchoCool,
+              {
+                height: 20 * stageMetrics.scale,
+                right: 24 * stageMetrics.scale,
+                top: 34 * stageMetrics.scale,
+                width: 20 * stageMetrics.scale,
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.openingEggEcho,
+              styles.openingEggEchoPhoto,
+              {
+                bottom: 22 * stageMetrics.scale,
+                height: 18 * stageMetrics.scale,
+                left: 40 * stageMetrics.scale,
+                width: 18 * stageMetrics.scale,
+              },
+            ]}
+          />
         </Animated.View>
         <Animated.View style={[styles.openingEggCracks, crackStyle]}>
-          <View style={[styles.openingEggCrack, styles.openingEggCrackPrimary]} />
-          <View style={[styles.openingEggCrack, styles.openingEggCrackLeft]} />
-          <View style={[styles.openingEggCrack, styles.openingEggCrackRight]} />
+          <View
+            style={[
+              styles.openingEggCrack,
+              styles.openingEggCrackPrimary,
+              {
+                height: 36 * stageMetrics.scale,
+                left: 48 * stageMetrics.scale,
+                top: 18 * stageMetrics.scale,
+                width: 1.5 * stageMetrics.scale,
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.openingEggCrack,
+              styles.openingEggCrackLeft,
+              {
+                height: 20 * stageMetrics.scale,
+                left: 38 * stageMetrics.scale,
+                top: 34 * stageMetrics.scale,
+                width: 1.5 * stageMetrics.scale,
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.openingEggCrack,
+              styles.openingEggCrackRight,
+              {
+                height: 18 * stageMetrics.scale,
+                right: 38 * stageMetrics.scale,
+                top: 30 * stageMetrics.scale,
+                width: 1.5 * stageMetrics.scale,
+              },
+            ]}
+          />
         </Animated.View>
-        <View style={styles.openingEggCore} />
+        <View
+          style={[
+            styles.openingEggCore,
+            {
+              height: 46 * stageMetrics.scale,
+              width: 46 * stageMetrics.scale,
+            },
+          ]}
+        />
       </Animated.View>
 
       {HATCH_PARTICLES.map((particle) => (
-        <OpeningBurstParticle key={`${particle.id}-${restartToken}`} particle={particle} progress={burstProgress} />
+        <OpeningBurstParticle
+          key={`${particle.id}-${restartToken}`}
+          particle={particle}
+          progress={burstProgress}
+          stageMetrics={stageMetrics}
+        />
       ))}
 
-      <Animated.View style={[styles.openingCreatureWrap, creatureStyle]}>
+      <Animated.View
+        style={[
+          styles.openingCreatureWrap,
+          {
+            height: 156 * stageMetrics.scale,
+            top: 98 * stageMetrics.scale,
+            width: 156 * stageMetrics.scale,
+          },
+          creatureStyle,
+        ]}>
         <View style={[styles.openingCreatureGlow, { backgroundColor: `${revealEntry.creature.accent}38` }]} />
         <View style={styles.openingCreatureImageShell}>
           <Image contentFit="cover" source={revealEntry.creature.imageSource} style={styles.openingCreatureImage} transition={0} />
         </View>
       </Animated.View>
 
-      <Animated.View style={[styles.openingMemoryPanelWrap, memoryStyle]}>
+      <Animated.View
+        style={[
+          styles.openingMemoryPanelWrap,
+          {
+            top: 274 * stageMetrics.scale,
+            width: 272 * stageMetrics.scale,
+          },
+          memoryStyle,
+        ]}>
         <GlassPanel contentStyle={styles.openingMemoryPanel}>
           <ThemedText type="onboardingLabel" style={styles.openingMemoryTag} lightColor="#FFDCC0" darkColor="#FFDCC0">
             {revealEntry.memory.tag}
@@ -1014,15 +1380,17 @@ function OpeningEggReveal({
 function OpeningBurstParticle({
   particle,
   progress,
+  stageMetrics,
 }: {
   particle: (typeof HATCH_PARTICLES)[number];
   progress: SharedValue<number>;
+  stageMetrics: ReturnType<typeof getOpeningStageMetrics>;
 }) {
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [
-      { translateX: particle.x * progress.value },
-      { translateY: particle.y * progress.value },
+      { translateX: particle.x * stageMetrics.scale * progress.value },
+      { translateY: particle.y * stageMetrics.scale * progress.value },
       { scale: 0.52 + progress.value * 0.9 },
     ],
   }));
@@ -1033,8 +1401,9 @@ function OpeningBurstParticle({
         styles.burstParticle,
         {
           backgroundColor: particle.color,
-          height: particle.size,
-          width: particle.size,
+          height: particle.size * stageMetrics.scale,
+          top: stageMetrics.eggCenterY + 3 * stageMetrics.scale,
+          width: particle.size * stageMetrics.scale,
         },
         animatedStyle,
       ]}
@@ -1139,30 +1508,56 @@ function getChipZoneStyle(zone: OpeningMomentChip['zone']) {
   return { right: '2%', bottom: '22%' } as const;
 }
 
-function getChipCenterPull(zone: OpeningMomentChip['zone']) {
+function getChipZoneAnchor(zone: OpeningMomentChip['zone']) {
   if (zone === 'top-left') {
-    return { x: 94, y: 64 };
+    return { x: 0.18, y: 0.19 };
   }
   if (zone === 'top-center') {
-    return { x: 0, y: 74 };
+    return { x: 0.5, y: 0.17 };
   }
   if (zone === 'top-right') {
-    return { x: -94, y: 64 };
+    return { x: 0.82, y: 0.21 };
   }
   if (zone === 'mid-left') {
-    return { x: 92, y: 2 };
+    return { x: 0.17, y: 0.42 };
   }
   if (zone === 'mid-right') {
-    return { x: -92, y: 2 };
+    return { x: 0.82, y: 0.44 };
   }
   if (zone === 'bottom-left') {
-    return { x: 88, y: -72 };
+    return { x: 0.22, y: 0.72 };
   }
   if (zone === 'bottom-center') {
-    return { x: 0, y: -94 };
+    return { x: 0.5, y: 0.79 };
   }
 
-  return { x: -88, y: -72 };
+  return { x: 0.78, y: 0.72 };
+}
+
+function getChipCenterPull(zone: OpeningMomentChip['zone'], scale: number) {
+  if (zone === 'top-left') {
+    return { x: 94 * scale, y: 64 * scale };
+  }
+  if (zone === 'top-center') {
+    return { x: 0, y: 74 * scale };
+  }
+  if (zone === 'top-right') {
+    return { x: -94 * scale, y: 64 * scale };
+  }
+  if (zone === 'mid-left') {
+    return { x: 92 * scale, y: 2 * scale };
+  }
+  if (zone === 'mid-right') {
+    return { x: -92 * scale, y: 2 * scale };
+  }
+  if (zone === 'bottom-left') {
+    return { x: 88 * scale, y: -72 * scale };
+  }
+  if (zone === 'bottom-center') {
+    return { x: 0, y: -94 * scale };
+  }
+
+  return { x: -88 * scale, y: -72 * scale };
 }
 
 function getChipLaneDirection(lane: OpeningMomentChip['lane']) {
@@ -1179,32 +1574,53 @@ function getChipLaneDirection(lane: OpeningMomentChip['lane']) {
   return { x: -1, y: 1 };
 }
 
-function getChipEntryOffset(zone: OpeningMomentChip['zone'], enterFrom: OpeningMomentChip['enterFrom']) {
+function getChipEntryOffset(zone: OpeningMomentChip['zone'], enterFrom: OpeningMomentChip['enterFrom'], scale: number) {
   const horizontal = enterFrom === 'left' ? -1 : 1;
 
   if (zone === 'top-left') {
-    return { x: horizontal * 142, y: -46 };
+    return { x: horizontal * 142 * scale, y: -46 * scale };
   }
   if (zone === 'top-center') {
-    return { x: horizontal * 132, y: -84 };
+    return { x: horizontal * 132 * scale, y: -84 * scale };
   }
   if (zone === 'top-right') {
-    return { x: horizontal * 142, y: -42 };
+    return { x: horizontal * 142 * scale, y: -42 * scale };
   }
   if (zone === 'mid-left') {
-    return { x: horizontal * 156, y: -10 };
+    return { x: horizontal * 156 * scale, y: -10 * scale };
   }
   if (zone === 'mid-right') {
-    return { x: horizontal * 156, y: 10 };
+    return { x: horizontal * 156 * scale, y: 10 * scale };
   }
   if (zone === 'bottom-left') {
-    return { x: horizontal * 136, y: 84 };
+    return { x: horizontal * 136 * scale, y: 84 * scale };
   }
   if (zone === 'bottom-center') {
-    return { x: horizontal * 126, y: 98 };
+    return { x: horizontal * 126 * scale, y: 98 * scale };
   }
 
-  return { x: horizontal * 136, y: 84 };
+  return { x: horizontal * 136 * scale, y: 84 * scale };
+}
+
+function getOpeningStageMetrics(stageWidth: number, stageHeight: number) {
+  const scale = Math.max(
+    0.92,
+    Math.min(1.32, Math.min(stageWidth / OPENING_BASE_STAGE_WIDTH, stageHeight / OPENING_BASE_STAGE_HEIGHT))
+  );
+  const eggSize = 102 * scale;
+  const eggTop = stageHeight * 0.311;
+
+  return {
+    coronaSize: 148 * scale,
+    eggCenterY: eggTop + eggSize / 2,
+    eggSize,
+    eggTop,
+    glowSize: 176 * scale,
+    intakeSize: 104 * scale,
+    scale,
+    stageHeight,
+    stageWidth,
+  };
 }
 
 function getDepthScale(depth: OpeningMomentChip['depth']) {
@@ -1318,14 +1734,47 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     position: 'absolute',
   },
-  energyLayer: {
+  mergeField: {
     ...StyleSheet.absoluteFillObject,
   },
-  energyLink: {
-    backgroundColor: 'rgba(226, 236, 255, 0.48)',
-    borderRadius: 999,
-    height: 1,
+  streamWrap: {
+    height: 14,
     position: 'absolute',
+  },
+  streamBeam: {
+    borderRadius: 999,
+    height: 2,
+    marginTop: 6,
+    width: '100%',
+  },
+  streamBeamTight: {
+    height: 2.4,
+    marginTop: 5.8,
+  },
+  streamParticle: {
+    borderRadius: 999,
+    height: 4,
+    left: 0,
+    position: 'absolute',
+    top: 5,
+    width: 4,
+  },
+  streamParticleSecondary: {
+    height: 3,
+    top: 5.5,
+    width: 3,
+  },
+  intakeGlow: {
+    backgroundColor: 'rgba(234, 240, 255, 0.22)',
+    borderRadius: 999,
+    height: 104,
+    position: 'absolute',
+    width: 104,
+  },
+  coronaWrap: {
+    height: 148,
+    position: 'absolute',
+    width: 148,
   },
   memoryChip: {
     alignItems: 'center',
@@ -1380,10 +1829,7 @@ const styles = StyleSheet.create({
   openingEggGlow: {
     backgroundColor: 'rgba(238, 230, 255, 0.18)',
     borderRadius: 999,
-    height: 176,
     position: 'absolute',
-    top: 88,
-    width: 176,
   },
   openingEggShell: {
     alignItems: 'center',
@@ -1392,12 +1838,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     boxShadow: KatchaDeckUI.shadows.card,
-    height: 102,
     justifyContent: 'center',
     overflow: 'hidden',
     position: 'absolute',
-    top: 122,
-    width: 102,
   },
   openingEggCore: {
     backgroundColor: 'rgba(243,183,136,0.18)',

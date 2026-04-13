@@ -1,103 +1,268 @@
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
 
+import { AddMomentSheet } from '@/components/katchadeck/home/add-moment-sheet';
+import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
+import { DayContext } from '@/components/katchadeck/home/day-context';
+import { FormingEgg } from '@/components/katchadeck/home/forming-egg';
+import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/home/hatch-sequence';
+import { InsightPathsPanel } from '@/components/katchadeck/home/insight-paths-panel';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { presenceEnter } from '@/components/katchadeck/motion';
-import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
+import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import { createStarterReveal } from '@/constants/katchadeck';
-import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
-import { KatchaDeckUI } from '@/constants/theme';
-import type { TimelineSelectableId } from '@/types/timeline';
-import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { useHomeScreenState } from '@/hooks/use-home-screen-state';
+import type { HomeDayRecord } from '@/types/home';
+import type { TimelineDayEntry, TimelineTomorrowState } from '@/types/timeline';
+import { getCreatureVisual } from '@/utils/home-engine';
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const [profile, setProfile] = useState(loadOnboardingProfile());
-  const [selectedEntryId, setSelectedEntryId] = useState<TimelineSelectableId>('today-cafe');
+  const {
+    addQuickMoment,
+    closeMomentSheet,
+    momentSheetOpen,
+    openMomentSheet,
+    selectPath,
+    selectedDay,
+    selectedDayId,
+    selectTimelineDay,
+    timelineDays,
+    triggerHatchIfReady,
+    refreshState,
+    resetHomeState,
+  } = useHomeScreenState();
+  const [hatchTargetId, setHatchTargetId] = useState<string | null>(null);
+  const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
 
-  useFocusEffect(
-    useCallback(() => {
-      setProfile(loadOnboardingProfile());
-    }, [])
-  );
+  const dayEntries = timelineDays.filter((day): day is HomeDayRecord => day.kind === 'day').map(toTimelineEntry);
+  const tomorrowDay = timelineDays.find((day) => day.kind === 'tomorrow');
+  const tomorrowState: TimelineTomorrowState = tomorrowDay
+    ? {
+        id: 'tomorrow',
+        dayLabel: tomorrowDay.dayLabel,
+        dateLabel: tomorrowDay.dateLabel,
+        title: tomorrowDay.title,
+        subtitle: tomorrowDay.subtitle,
+        statusLabel: 'Forming',
+        accent: tomorrowDay.accentColor,
+      }
+    : {
+        id: 'tomorrow',
+        dayLabel: 'Tomorrow',
+        dateLabel: 'Forming',
+        title: 'Not yet formed',
+        subtitle: 'Another day is waiting for a little motion.',
+        statusLabel: 'Forming',
+        accent: '#D8E2FF',
+      };
 
-  const reveal = createStarterReveal(profile);
+  const backgroundAccent =
+    selectedDay?.kind === 'day'
+      ? selectedDay.state === 'hatched' && selectedDay.creature
+        ? `${selectedDay.creature.accentColor}18`
+        : `${selectedDay.egg.haloColor}18`
+      : 'rgba(216,226,255,0.16)';
+
+  const heroSubtitle =
+    selectedDay?.kind === 'day' && selectedDay.state === 'hatched'
+      ? selectedDay.highlight ?? selectedDay.creature?.reflection ?? ''
+      : selectedDay?.kind === 'day'
+        ? selectedDay.highlight ?? 'Small moments change the shape of the day.'
+        : selectedDay?.subtitle ?? 'Another day is waiting in the wings.';
+  const hatchDay =
+    hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId ? selectedDay : null;
+
+  useEffect(() => {
+    if (!hatchTargetId || !hatchDay) {
+      return;
+    }
+
+    const recapTimer = setTimeout(() => setHatchPhase('converging'), 700);
+    const revealTimer = setTimeout(() => setHatchPhase('revealing'), 1450);
+    const finalizeTimer = setTimeout(() => {
+      triggerHatchIfReady();
+    }, 1700);
+    const cleanupTimer = setTimeout(() => {
+      setHatchTargetId(null);
+      setHatchPhase('recap');
+      refreshState();
+    }, 2350);
+
+    return () => {
+      clearTimeout(recapTimer);
+      clearTimeout(revealTimer);
+      clearTimeout(finalizeTimer);
+      clearTimeout(cleanupTimer);
+    };
+  }, [hatchDay, hatchTargetId, refreshState, triggerHatchIfReady]);
+
+  useEffect(() => {
+    if (hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId && selectedDay.state === 'hatched') {
+      const timer = setTimeout(() => {
+        setHatchTargetId(null);
+        setHatchPhase('recap');
+      }, 520);
+
+      return () => clearTimeout(timer);
+    }
+  }, [hatchTargetId, selectedDay]);
+
+  const handleReveal = () => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) {
+      return;
+    }
+
+    setHatchTargetId(selectedDay.id);
+    setHatchPhase('recap');
+  };
+
+  const handleSkipHatch = () => {
+    triggerHatchIfReady();
+    setHatchTargetId(null);
+    setHatchPhase('recap');
+    refreshState();
+  };
 
   return (
     <View style={styles.screen}>
-      <AmbientBackground colors={KatchaDeckUI.gradients.reveal} />
+      <AmbientBackground
+        accentColor={backgroundAccent}
+        colors={['#090B12', '#101A2B', '#171E35']}
+        meshColors={['rgba(200,216,255,0.14)', 'rgba(95,168,123,0.08)', 'rgba(227,160,110,0.08)', 'rgba(106,95,232,0.12)']}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}>
-        <Animated.View entering={presenceEnter()} style={styles.heroCopy}>
-          <ThemedText type="label" style={styles.kicker} lightColor="#C8D8FF" darkColor="#C8D8FF">
-            Timeline home
-          </ThemedText>
-          <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
-            {reveal.greeting}
-          </ThemedText>
-          <ThemedText type="bodyLarge" style={styles.body} lightColor="#D9E4FF" darkColor="#D9E4FF">
-            Swipe through your week and revisit what each day became.
-          </ThemedText>
+        <Animated.View entering={presenceEnter()} style={styles.timelineHeader}>
+          {__DEV__ ? (
+            <KatchaButton
+              icon="arrow.counterclockwise"
+              label="Reset loop"
+              onPress={resetHomeState}
+              style={styles.resetButton}
+              variant="secondary"
+            />
+          ) : null}
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(80)}>
+        <Animated.View entering={presenceEnter(30)}>
           <DayTimeline
-            entries={timelineDemoEntries}
+            entries={dayEntries}
             mode="interactive"
-            onSelectEntry={setSelectedEntryId}
-            selectedEntryId={selectedEntryId}
-            showMemoryCard
+            onSelectEntry={selectTimelineDay}
+            selectedEntryId={selectedDayId}
             showTomorrowEgg
-            tomorrowState={timelineTomorrowState}
+            tomorrowState={tomorrowState}
           />
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(160)}>
-          <GlassPanel contentStyle={styles.panelBody}>
-            <ThemedText type="onboardingLabel" style={styles.panelLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
-              Identity insight
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.panelTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-              Your rhythm is starting to show itself
-            </ThemedText>
-            <ThemedText style={styles.panelText} lightColor="#E6EEFF" darkColor="#E6EEFF">
-              {reveal.identityInsight}
-            </ThemedText>
-          </GlassPanel>
+        <Animated.View entering={presenceEnter(70)} style={styles.heroStage}>
+          {selectedDay?.kind === 'day' ? (
+            selectedDay.state === 'hatched' && selectedDay.creature ? (
+              <CreatureHero creature={selectedDay.creature} moments={selectedDay.moments} subtitle={heroSubtitle} />
+            ) : (
+              <FormingEgg
+                caption={heroSubtitle}
+                egg={selectedDay.egg}
+                onPress={selectedDay.canAddMoments ? openMomentSheet : undefined}
+                reactionKey={selectedDay.moments.length + (selectedDay.selectedPathId ? 1 : 0)}
+              />
+            )
+          ) : (
+            <FormingEgg
+              caption={selectedDay?.subtitle}
+              egg={{
+                accentColor: tomorrowState.accent,
+                haloColor: tomorrowState.accent,
+                coreColor: 'rgba(216,226,255,0.32)',
+                intensity: 0.3,
+                shimmer: true,
+                swirl: 0.2,
+                label: tomorrowState.title,
+              }}
+            />
+          )}
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(240)}>
-          <GlassPanel
-            contentStyle={styles.panelBody}
-            fillColor="rgba(255, 239, 231, 0.08)"
-            gradientColors={['rgba(221,232,255,0.16)', 'rgba(240,223,255,0.14)', 'rgba(255,216,192,0.1)']}>
-            <ThemedText type="onboardingLabel" style={styles.premiumLabel} lightColor="#FFE8D9" darkColor="#FFE8D9">
-              Premium preview
-            </ThemedText>
-            <ThemedText type="hero" style={styles.premiumTitle} lightColor="#FFF6F1" darkColor="#FFF6F1">
-              Unlock the full version of your life.
-            </ThemedText>
-            <ThemedText style={styles.panelText} lightColor="#F5EAE4" darkColor="#F5EAE4">
-              Get deeper identity reads, evolved variants, and the story-comic layer when a day
-              becomes worth remembering.
-            </ThemedText>
-            <View style={styles.buttonRow}>
-              <KatchaButton label="Open premium" onPress={() => router.push('/modal')} variant="premium" />
-              <KatchaButton label="View world" onPress={() => router.push('/(tabs)/explore')} variant="secondary" />
+        {selectedDay?.kind === 'day' ? (
+          <Animated.View entering={presenceEnter(110)}>
+            <DayContext day={selectedDay} onAddMoment={openMomentSheet} onReveal={handleReveal} />
+          </Animated.View>
+        ) : (
+          <Animated.View entering={presenceEnter(110)}>
+            <View style={styles.tomorrowCopy}>
+              <ThemedText type="onboardingLabel" style={styles.tomorrowLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
+                Tomorrow
+              </ThemedText>
+              <ThemedText style={styles.tomorrowBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                {selectedDay?.title}. {selectedDay?.subtitle}
+              </ThemedText>
             </View>
-          </GlassPanel>
-        </Animated.View>
+          </Animated.View>
+        )}
+
+        {selectedDay?.kind === 'day' && selectedDay.isToday ? (
+          <Animated.View entering={presenceEnter(150)}>
+            <InsightPathsPanel day={selectedDay} onSelectPath={selectPath} />
+          </Animated.View>
+        ) : null}
       </ScrollView>
+
+      <AddMomentSheet onClose={closeMomentSheet} onSelectMoment={addQuickMoment} open={momentSheetOpen} />
+      {hatchDay ? <HatchSequence day={hatchDay} onSkip={handleSkipHatch} phase={hatchPhase} /> : null}
+      {hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId && selectedDay.state === 'hatched' ? (
+        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(260)} style={styles.revealFlash}>
+          <ThemedText type="onboardingLabel" style={styles.flashLabel} lightColor="#FFE8D9" darkColor="#FFE8D9">
+            Hatched
+          </ThemedText>
+          <ThemedText type="subtitle" style={styles.flashTitle} lightColor="#FFF8F4" darkColor="#FFF8F4">
+            {selectedDay.creature?.name}
+          </ThemedText>
+        </Animated.View>
+      ) : null}
     </View>
   );
+}
+
+function toTimelineEntry(day: HomeDayRecord): TimelineDayEntry {
+  const creatureVisual =
+    day.state === 'hatched' && day.creature
+      ? {
+          id: day.creature.id,
+          name: day.creature.name,
+          accent: day.creature.accentColor,
+          imageSource: getCreatureVisual(day.creature.visualKey).source,
+        }
+      : {
+          kind: 'egg' as const,
+          id: `egg-${day.id}`,
+          name: day.canHatch ? 'Ready' : 'Forming',
+          accent: day.egg.accentColor,
+          coreColor: day.egg.coreColor,
+          shimmer: day.egg.shimmer,
+          intensity: day.egg.intensity,
+        };
+
+  return {
+    id: day.id,
+    dayLabel: day.dayLabel,
+    dateLabel: day.dateLabel,
+    cardTitle: day.state === 'hatched' && day.creature ? day.creature.name : day.egg.label,
+    cardCue: day.highlight ?? 'The day is still collecting shape.',
+    summary: day.highlight ?? 'The day is still collecting shape.',
+    creature: creatureVisual,
+    memory: {
+      title: day.state === 'hatched' && day.creature ? day.creature.name : day.egg.label,
+      body: day.highlight ?? 'The day is still collecting shape.',
+      timeLabel: day.dateLabel,
+      location: day.isToday ? 'Today' : 'Stored day',
+      tag: day.state === 'hatched' ? 'Creature' : 'Forming',
+      metrics: day.moments.length > 0 ? day.moments.map((moment) => moment.label).join(' · ') : 'No moments yet',
+    },
+  };
 }
 
 const styles = StyleSheet.create({
@@ -106,49 +271,49 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    gap: KatchaDeckUI.spacing.lg,
-    paddingBottom: 132,
-    paddingHorizontal: 20,
-    paddingTop: 24,
+    gap: 14,
+    paddingBottom: 164,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
-  heroCopy: {
-    gap: 10,
-    maxWidth: 320,
+  timelineHeader: {
+    alignItems: 'flex-end',
+    minHeight: 8,
   },
-  kicker: {
+  resetButton: {
+    minHeight: 44,
+  },
+  heroStage: {
+    minHeight: 282,
+  },
+  tomorrowCopy: {
+    gap: 4,
+    maxWidth: 300,
+  },
+  tomorrowLabel: {
     fontSize: 11,
   },
-  title: {
-    fontSize: 46,
-    lineHeight: 48,
+  tomorrowBody: {
+    fontSize: 14,
+    lineHeight: 20,
   },
-  body: {
-    maxWidth: 320,
+  revealFlash: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(8, 11, 19, 0.68)',
+    borderRadius: 999,
+    bottom: 120,
+    left: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    position: 'absolute',
+    right: 24,
   },
-  panelBody: {
-    gap: 12,
-  },
-  panelLabel: {
+  flashLabel: {
     fontSize: 11,
   },
-  panelTitle: {
-    fontSize: 26,
-    lineHeight: 31,
-  },
-  panelText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  premiumLabel: {
-    fontSize: 11,
-  },
-  premiumTitle: {
-    fontSize: 34,
-    lineHeight: 38,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 6,
+  flashTitle: {
+    fontSize: 20,
+    lineHeight: 24,
+    marginTop: 2,
   },
 });

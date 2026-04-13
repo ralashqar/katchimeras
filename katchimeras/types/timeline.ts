@@ -1,11 +1,23 @@
 import type { ImageSourcePropType } from 'react-native';
 
-export type TimelineCreatureVisual = {
-  id: string;
-  name: string;
-  accent: string;
-  imageSource: ImageSourcePropType;
-};
+export type TimelineCreatureVisual =
+  | {
+      kind?: 'creature';
+      id: string;
+      name: string;
+      accent: string;
+      imageSource: ImageSourcePropType;
+    }
+  | {
+      kind: 'egg';
+      id: string;
+      name: string;
+      accent: string;
+      imageSource?: ImageSourcePropType;
+      coreColor?: string;
+      shimmer?: boolean;
+      intensity?: number;
+    };
 
 export type TimelineDayMemory = {
   title: string;
