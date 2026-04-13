@@ -15,8 +15,8 @@ type FormingEggProps = {
   interactive?: boolean;
 };
 
-const AURA_SIZE = 308;
-const RIPPLE_DURATION_MS = 720;
+const AURA_SIZE = 388;
+const RIPPLE_DURATION_MS = 860;
 
 export function FormingEgg({
   egg,
@@ -46,7 +46,7 @@ export function FormingEgg({
   );
 
   const handleRipple = useCallback((event: EggRippleEvent) => {
-    setRipples((current) => [...current.slice(-3), event]);
+    setRipples((current) => [...current.slice(-4), event]);
 
     const timer = setTimeout(() => {
       setRipples((current) => current.filter((entry) => entry.id !== event.id));
@@ -62,9 +62,13 @@ export function FormingEgg({
           <EggAuraField egg={egg} enabled={interactive} motion={motion} onRipple={handleRipple} ripples={ripples} size={AURA_SIZE} />
         ) : null}
 
-        <Pressable disabled={!onPress} onPress={onPress} style={styles.centerPressable}>
-          <EggShell egg={egg} motion={motion} reactionKey={reactionKey} />
-        </Pressable>
+        <EggShell egg={egg} motion={motion} reactionKey={reactionKey} />
+        <Pressable
+          disabled={!onPress}
+          hitSlop={12}
+          onPress={onPress}
+          style={styles.centerPressable}
+        />
       </View>
 
       <View style={styles.captionWrap}>
@@ -88,15 +92,15 @@ const styles = StyleSheet.create({
   },
   heroStage: {
     alignItems: 'center',
-    height: 310,
+    height: 372,
     justifyContent: 'center',
     width: '100%',
   },
   centerPressable: {
-    alignItems: 'center',
-    height: 232,
-    justifyContent: 'center',
-    width: 196,
+    borderRadius: 999,
+    height: 112,
+    position: 'absolute',
+    width: 112,
     zIndex: 2,
   },
   captionWrap: {

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { BlurMask, Canvas, Circle } from '@shopify/react-native-skia';
-import { useEffect, useMemo, useRef } from 'react';
+import { BlurMask, Canvas, Circle, Group, Path, Skia } from '@shopify/react-native-skia';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -30,9 +30,9 @@ type EggAuraFieldProps = {
 const auraConfig: EggAuraConfig = {
   baseRadius: 116,
   membraneThickness: 2,
-  maxPullDistance: 58,
-  rippleDurationMs: 720,
-  particleCount: 7,
+  maxPullDistance: 74,
+  rippleDurationMs: 860,
+  particleCount: 5,
   hapticsEnabled: true,
 };
 
@@ -47,9 +47,14 @@ export function EggAuraField({
 }: EggAuraFieldProps) {
   const center = size / 2;
   const auraRadius = auraConfig.baseRadius + egg.intensity * 32;
+  const nucleusRadius = 66;
+  const touchRadius = auraRadius + 22;
   const idlePulse = useSharedValue(0);
   const thresholdTriggered = useSharedValue(0);
+  const panActive = useSharedValue(0);
   const releaseVelocityRef = useRef(0);
+  const waveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [waveNow, setWaveNow] = useState(() => Date.now());
 
   useEffect(() => {
     idlePulse.value = withRepeat(
@@ -61,6 +66,27 @@ export function EggAuraField({
       false
     );
   }, [idlePulse]);
+
+  useEffect(() => {
+    if (ripples.length === 0) {
+      if (waveIntervalRef.current) {
+        clearInterval(waveIntervalRef.current);
+        waveIntervalRef.current = null;
+      }
+      return;
+    }
+
+    waveIntervalRef.current = setInterval(() => {
+      setWaveNow(Date.now());
+    }, 33);
+
+    return () => {
+      if (waveIntervalRef.current) {
+        clearInterval(waveIntervalRef.current);
+        waveIntervalRef.current = null;
+      }
+    };
+  }, [ripples.length]);
 
   const particles = useMemo(
     () =>
@@ -78,16 +104,57 @@ export function EggAuraField({
     [auraRadius, center]
   );
 
+  const boundaryPath = useMemo(() => {
+    const baseBoundaryRadius = auraRadius * 0.93;
+    const path = Skia.Path.Make();
+    const steps = 48;
+    const tapStackBoost = 1 + Math.min(0.5, ripples.length * 0.1);
+
+    for (let index = 0; index <= steps; index += 1) {
+      const angle = (Math.PI * 2 * index) / steps;
+      let waveOffset = 0;
+
+      ripples.forEach((ripple) => {
+        const progress = Math.max(0, Math.min(1, (waveNow - ripple.startedAt) / auraConfig.rippleDurationMs));
+        if (progress >= 1) {
+          return;
+        }
+
+        const rippleAngle = Math.atan2(ripple.originY - center, ripple.originX - center);
+        const angleDelta = normalizeAngle(angle - rippleAngle);
+        const angularDistance = Math.abs(angleDelta);
+        const angularInfluence = Math.exp(-((angularDistance * angularDistance) / 0.6));
+        const amplitude = 8.4 * (1 - progress) * tapStackBoost;
+        const primaryOscillation = Math.sin(progress * 5.4 - angleDelta * 3.1);
+        const trailingOscillation = Math.sin(progress * 3.2 - angleDelta * 2.2 - 0.85);
+        waveOffset += amplitude * angularInfluence * (primaryOscillation * 0.74 + trailingOscillation * 0.26);
+      });
+
+      const radius = baseBoundaryRadius + waveOffset;
+      const x = center + Math.cos(angle) * radius;
+      const y = center + Math.sin(angle) * radius;
+
+      if (index === 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+
+    path.close();
+    return path;
+  }, [auraRadius, center, ripples, waveNow]);
+
   const outerAuraStyle = useAnimatedStyle(() => {
     const dragMagnitude = Math.min(1, Math.hypot(motion.dragX.value, motion.dragY.value) / auraConfig.maxPullDistance);
 
     return {
-      opacity: 0.58 + idlePulse.value * 0.08 + motion.pressProgress.value * 0.12,
+      opacity: 0.62 + idlePulse.value * 0.1 + motion.pressProgress.value * 0.18,
       transform: [
-        { translateX: motion.dragX.value * 0.08 },
-        { translateY: motion.dragY.value * 0.08 },
-        { scaleX: 1 + dragMagnitude * 0.06 + motion.pressProgress.value * 0.02 },
-        { scaleY: 1 - dragMagnitude * 0.032 + motion.pressProgress.value * 0.03 + idlePulse.value * 0.02 },
+        { translateX: motion.dragX.value * 0.12 },
+        { translateY: motion.dragY.value * 0.12 },
+        { scaleX: 1 + dragMagnitude * 0.1 + motion.pressProgress.value * 0.04 },
+        { scaleY: 1 - dragMagnitude * 0.056 + motion.pressProgress.value * 0.06 + idlePulse.value * 0.03 },
       ],
     };
   });
@@ -112,7 +179,7 @@ export function EggAuraField({
 
   const fireSelectionHaptic = () => {
     if (process.env.EXPO_OS === 'ios' && auraConfig.hapticsEnabled) {
-      Haptics.selectionAsync();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -122,50 +189,70 @@ export function EggAuraField({
     }
   };
 
-  const emitRipple = (originX: number, originY: number) => {
+  const emitRipple = useCallback((originX: number, originY: number) => {
     onRipple({
       id: `ripple-${Date.now().toString(36)}-${Math.round(originX)}-${Math.round(originY)}`,
       originX,
       originY,
       startedAt: Date.now(),
     });
-  };
+  }, [onRipple]);
 
-  const updateEnergy = (value: number) => {
+  const updateEnergy = useCallback((value: number) => {
     onInteractionEnergyChange?.(value);
-  };
+  }, [onInteractionEnergyChange]);
 
-  const tapGesture = Gesture.Tap()
-    .enabled(enabled)
-    .maxDuration(260)
-    .onStart((event) => {
-      const dx = event.x - center;
-      const dy = event.y - center;
-      const distance = Math.hypot(dx, dy);
-      if (distance > auraRadius) {
+  const triggerTapCluster = useCallback(
+    (touches: { x: number; y: number }[]) => {
+      const validTouches = touches.filter((touch) => {
+        const dx = touch.x - center;
+        const dy = touch.y - center;
+        const distance = Math.hypot(dx, dy);
+        return distance <= touchRadius && distance >= nucleusRadius;
+      });
+
+      if (validTouches.length === 0) {
         return;
       }
 
-      motion.pressProgress.value = withSequence(
-        withTiming(0.8, { duration: 120, easing: Easing.out(Easing.cubic) }),
-        withTiming(0, { duration: 420, easing: Easing.out(Easing.cubic) })
+      validTouches.forEach((touch) => {
+        emitRipple(touch.x, touch.y);
+      });
+
+      const centroid = validTouches.reduce(
+        (sum, touch) => ({
+          x: sum.x + touch.x,
+          y: sum.y + touch.y,
+        }),
+        { x: 0, y: 0 }
       );
-      motion.interactionEnergy.value = withSequence(
-        withTiming(0.44, { duration: 120, easing: Easing.out(Easing.cubic) }),
+      const centroidX = centroid.x / validTouches.length;
+      const centroidY = centroid.y / validTouches.length;
+      const dx = centroidX - center;
+      const dy = centroidY - center;
+      const tapStrength = Math.min(1, 0.72 + (validTouches.length - 1) * 0.14);
+
+      motion.pressProgress.value = withSequence(
+        withTiming(1, { duration: 110, easing: Easing.out(Easing.cubic) }),
         withTiming(0, { duration: 560, easing: Easing.out(Easing.cubic) })
       );
+      motion.interactionEnergy.value = withSequence(
+        withTiming(tapStrength, { duration: 120, easing: Easing.out(Easing.cubic) }),
+        withTiming(0, { duration: 720, easing: Easing.out(Easing.cubic) })
+      );
       motion.glowLagX.value = withSequence(
-        withTiming(dx * 0.16, { duration: 120 }),
-        withTiming(0, { duration: 520, easing: Easing.out(Easing.cubic) })
+        withTiming(dx * 0.28, { duration: 120 }),
+        withTiming(0, { duration: 660, easing: Easing.out(Easing.cubic) })
       );
       motion.glowLagY.value = withSequence(
-        withTiming(dy * 0.16, { duration: 120 }),
-        withTiming(0, { duration: 520, easing: Easing.out(Easing.cubic) })
+        withTiming(dy * 0.28, { duration: 120 }),
+        withTiming(0, { duration: 660, easing: Easing.out(Easing.cubic) })
       );
-      runOnJS(emitRipple)(event.x, event.y);
-      runOnJS(fireSelectionHaptic)();
-      runOnJS(updateEnergy)(0.44);
-    });
+      fireSelectionHaptic();
+      updateEnergy(tapStrength);
+    },
+    [center, emitRipple, motion, nucleusRadius, touchRadius, updateEnergy]
+  );
 
   const longPressGesture = Gesture.LongPress()
     .enabled(enabled)
@@ -173,13 +260,14 @@ export function EggAuraField({
     .onStart((event) => {
       const dx = event.x - center;
       const dy = event.y - center;
-      if (Math.hypot(dx, dy) > auraRadius) {
+      const distance = Math.hypot(dx, dy);
+      if (distance > touchRadius || distance < nucleusRadius) {
         return;
       }
 
-      motion.pressProgress.value = withTiming(0.9, { duration: 180, easing: Easing.out(Easing.cubic) });
-      motion.interactionEnergy.value = withTiming(0.5, { duration: 180, easing: Easing.out(Easing.cubic) });
-      runOnJS(updateEnergy)(0.5);
+      motion.pressProgress.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
+      motion.interactionEnergy.value = withTiming(0.58, { duration: 180, easing: Easing.out(Easing.cubic) });
+      runOnJS(updateEnergy)(0.58);
     })
     .onFinalize(() => {
       motion.pressProgress.value = withTiming(0, { duration: 260 });
@@ -190,21 +278,23 @@ export function EggAuraField({
   const panGesture = Gesture.Pan()
     .enabled(enabled)
     .maxPointers(1)
-    .onBegin(() => {
+    .onBegin((event) => {
       thresholdTriggered.value = 0;
-      releaseVelocityRef.current = 0;
-    })
-    .onChange((event) => {
       const dx = event.x - center;
       const dy = event.y - center;
       const distance = Math.hypot(dx, dy);
-      if (distance > auraRadius * 1.08) {
+      panActive.value = distance <= touchRadius && distance >= nucleusRadius ? 1 : 0;
+      releaseVelocityRef.current = 0;
+    })
+    .onChange((event) => {
+      if (panActive.value === 0) {
         return;
       }
 
-      const clampedDistance = Math.min(distance, auraConfig.maxPullDistance);
-      const directionX = distance > 0 ? dx / distance : 0;
-      const directionY = distance > 0 ? dy / distance : 0;
+      const translationDistance = Math.hypot(event.translationX, event.translationY);
+      const clampedDistance = Math.min(translationDistance, auraConfig.maxPullDistance);
+      const directionX = translationDistance > 0 ? event.translationX / translationDistance : 0;
+      const directionY = translationDistance > 0 ? event.translationY / translationDistance : 0;
       const nextDragX = directionX * clampedDistance;
       const nextDragY = directionY * clampedDistance;
       const energy = clamp01(clampedDistance / auraConfig.maxPullDistance);
@@ -217,7 +307,7 @@ export function EggAuraField({
       motion.interactionEnergy.value = energy;
       motion.releaseVelocity.value = Math.min(
         1,
-        Math.hypot(event.velocityX, event.velocityY) / 780
+        Math.hypot(event.velocityX, event.velocityY) / 700
       );
       releaseVelocityRef.current = motion.releaseVelocity.value;
       runOnJS(updateEnergy)(energy);
@@ -228,24 +318,25 @@ export function EggAuraField({
       }
     })
     .onFinalize(() => {
+      panActive.value = 0;
       const releaseVelocity = releaseVelocityRef.current;
       motion.dragX.value = withSpring(0, {
-        damping: 15,
-        stiffness: 140,
-        velocity: releaseVelocity * 28,
+        damping: 13,
+        stiffness: 160,
+        velocity: releaseVelocity * 34,
       });
       motion.dragY.value = withSpring(0, {
-        damping: 15,
-        stiffness: 140,
-        velocity: releaseVelocity * 28,
+        damping: 13,
+        stiffness: 160,
+        velocity: releaseVelocity * 34,
       });
       motion.glowLagX.value = withSpring(0, {
-        damping: 16,
-        stiffness: 160,
+        damping: 14,
+        stiffness: 180,
       });
       motion.glowLagY.value = withSpring(0, {
-        damping: 16,
-        stiffness: 160,
+        damping: 14,
+        stiffness: 180,
       });
       motion.pressProgress.value = withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) });
       motion.interactionEnergy.value = withTiming(0, { duration: 360, easing: Easing.out(Easing.cubic) });
@@ -253,28 +344,39 @@ export function EggAuraField({
       runOnJS(updateEnergy)(0);
     });
 
-  const gesture = Gesture.Simultaneous(longPressGesture, Gesture.Race(panGesture, tapGesture));
+  const gesture = Gesture.Simultaneous(longPressGesture, panGesture);
 
   return (
     <GestureDetector gesture={gesture}>
-      <View pointerEvents="box-only" style={[styles.shell, { height: size, width: size }]}>
+      <View
+        onTouchStart={(event) => {
+          if (!enabled) {
+            return;
+          }
+
+          const touches = event.nativeEvent.changedTouches.map((touch) => ({
+            x: touch.locationX,
+            y: touch.locationY,
+          }));
+
+          triggerTapCluster(touches);
+        }}
+        pointerEvents="box-only"
+        style={[styles.shell, { height: size, width: size }]}>
         <Animated.View pointerEvents="none" style={[styles.layerFill, outerAuraStyle]}>
           <Canvas style={{ height: size, width: size }}>
-            <Circle color={`${egg.haloColor}18`} cx={center} cy={center} r={auraRadius * 0.94}>
-              <BlurMask blur={26} style="solid" />
-            </Circle>
-            <Circle color={`${egg.accentColor}12`} cx={center} cy={center} r={auraRadius * 1.06}>
-              <BlurMask blur={34} style="solid" />
-            </Circle>
-            <Circle color="rgba(255,255,255,0.04)" cx={center} cy={center} r={auraRadius * 0.96} />
-            <Circle
-              color={`${egg.accentColor}4E`}
-              cx={center}
-              cy={center}
-              r={auraRadius * 0.92}
-              style="stroke"
-              strokeWidth={auraConfig.membraneThickness}
-            />
+            <Group clip={boundaryPath}>
+              <Circle color={`${egg.haloColor}26`} cx={center} cy={center} r={auraRadius * 0.98}>
+                <BlurMask blur={32} style="solid" />
+              </Circle>
+              <Circle color={`${egg.accentColor}1A`} cx={center} cy={center} r={auraRadius * 1.08}>
+                <BlurMask blur={48} style="solid" />
+              </Circle>
+              <Circle color="rgba(255,255,255,0.07)" cx={center} cy={center} r={auraRadius * 0.98} />
+            </Group>
+            <Path color={`${egg.accentColor}AA`} path={boundaryPath} style="stroke" strokeWidth={2.1}>
+              <BlurMask blur={4} style="solid" />
+            </Path>
           </Canvas>
         </Animated.View>
 
@@ -340,13 +442,18 @@ function AuraRipple({
   }, [durationMs, progress]);
 
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: 0.34 - progress.value * 0.34,
-    transform: [{ scale: 0.16 + progress.value * 1.28 }],
+    opacity: 0.68 - progress.value * 0.68,
+    transform: [{ scale: 0.22 + progress.value * 2.2 }],
   }));
 
   const fillStyle = useAnimatedStyle(() => ({
-    opacity: 0.14 - progress.value * 0.14,
-    transform: [{ scale: 0.2 + progress.value * 0.76 }],
+    opacity: 0.22 - progress.value * 0.22,
+    transform: [{ scale: 0.34 + progress.value * 1.16 }],
+  }));
+
+  const secondRingStyle = useAnimatedStyle(() => ({
+    opacity: 0.42 - progress.value * 0.42,
+    transform: [{ scale: 0.16 + progress.value * 2.86 }],
   }));
 
   return (
@@ -366,11 +473,23 @@ function AuraRipple({
       <Animated.View
         pointerEvents="none"
         style={[
+          styles.rippleRingSecondary,
+          {
+            borderColor: `${color}44`,
+            left: originX - 18,
+            top: originY - 18,
+          },
+          secondRingStyle,
+        ]}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={[
           styles.rippleRing,
           {
-            borderColor: `${color}66`,
-            left: originX - 14,
-            top: originY - 14,
+            borderColor: `${color}AA`,
+            left: originX - 18,
+            top: originY - 18,
           },
           ringStyle,
         ]}
@@ -384,10 +503,23 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
+function normalizeAngle(angle: number) {
+  let nextAngle = angle;
+  while (nextAngle > Math.PI) {
+    nextAngle -= Math.PI * 2;
+  }
+  while (nextAngle < -Math.PI) {
+    nextAngle += Math.PI * 2;
+  }
+  return nextAngle;
+}
+
 const styles = StyleSheet.create({
   shell: {
     alignItems: 'center',
+    borderRadius: 999,
     justifyContent: 'center',
+    overflow: 'hidden',
     position: 'absolute',
   },
   layerFill: {
@@ -398,15 +530,22 @@ const styles = StyleSheet.create({
   },
   rippleFill: {
     borderRadius: 999,
-    height: 28,
+    height: 36,
     position: 'absolute',
-    width: 28,
+    width: 36,
   },
   rippleRing: {
     borderRadius: 999,
-    borderWidth: 1.4,
-    height: 28,
+    borderWidth: 1.8,
+    height: 36,
     position: 'absolute',
-    width: 28,
+    width: 36,
+  },
+  rippleRingSecondary: {
+    borderRadius: 999,
+    borderWidth: 1.1,
+    height: 36,
+    position: 'absolute',
+    width: 36,
   },
 });

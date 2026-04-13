@@ -116,7 +116,7 @@ export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
   }));
 
   return (
-    <Animated.View style={[styles.eggWrap, shellStyle]}>
+    <Animated.View pointerEvents="none" style={[styles.eggWrap, shellStyle]}>
       <Animated.View style={[styles.shellGlow, { backgroundColor: `${egg.accentColor}18` }, shellGlowStyle]} />
       <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']} style={styles.eggSheen} />
       <View style={[styles.eggShell, { borderColor: `${egg.accentColor}9C` }]}>
