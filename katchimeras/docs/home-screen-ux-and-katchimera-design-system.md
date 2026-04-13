@@ -2,6 +2,10 @@
 
 This document is the detailed reference for the post-onboarding core app experience. It expands on `docs/katchimera-app-mvp-design.md` and defines the intended Home screen behavior, Katchimera visual system, and the daily interaction loop.
 
+Related reference:
+
+- `docs/add-moment-rotary-capture-flow.md`
+
 ## 1. Core Principle
 
 The Home screen is a living timeline of time itself:
@@ -157,38 +161,46 @@ Shows minimal text:
 
 ### Entry points
 
-- Primary Add moment button
 - Tap on egg
+- Secondary Add moment button if needed for accessibility and discoverability
 
 ### UI
 
-Bottom sheet with:
+Egg-centered radial carousel with:
 
-- Quick tags, primary
+- Quick tags
 - Photo
-- Text, optional
-
-Quick tags, horizontal:
-
-- Coffee
-- Walk
-- New place
-- Social
-- Calm
-- Focus
+- Note
+- Voice
+- Mood or energy
+- Location or outing
 
 ### Interaction
 
-Tap tag:
+- tap egg opens a circular orbit around the egg
+- orbit items bloom outward and settle with gentle rotation
+- selecting a quick tag creates the moment immediately
+- selecting `Photo` transitions the orbit into recent-photo thumbnails around the egg
 
-- moment created instantly
+Quick-tag requirement:
+
 - no confirmation screen
+- stay one tap where possible
 
 ### Feedback
 
 - chip appears
-- chip animates into the egg
+- selected item animates into the egg
 - egg pulses or glows
+- ring collapses cleanly
+
+### Photo path
+
+- request permission only when `Photo` is tapped
+- keep the user in the egg-centered flow whenever possible
+- show recent photos in the orbit
+- prefer real camera photos over screenshots where the platform path supports it
+- if filtering is unavailable, fall back gracefully to recent images
 
 ## 7. Insight + Paths
 
@@ -430,6 +442,7 @@ For implementation purposes, this spec implies:
 - the Home screen is a state-driven screen, not a set of independent widgets
 - the selected timeline day is the primary state axis
 - today's egg must support live mutation from moments, passive signals, and path selection
+- Add Moment should be treated as an egg-centered state machine, not a generic modal picker
 - creature generation must stay deterministic enough to be explainable, even if presentation feels magical
 - visible creature traits must remain traceable back to input signals and moments
 

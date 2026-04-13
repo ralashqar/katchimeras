@@ -1,6 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import type {
+  HomeQuickMomentType,
   HomeMomentType,
   HomeScoreKey,
   HomeVisualKey,
@@ -10,17 +11,33 @@ import { onboardingShowcaseAssets } from '@/constants/onboarding-showcase-assets
 
 export const HOME_HATCH_HOUR = 20;
 export const HOME_STORAGE_KEY = 'katchadeck.home-v1';
+export const homeRadialActionOrder: readonly HomeMomentType[] = ['photo', 'coffee', 'walk', 'new_place', 'social', 'calm', 'focus'];
+export const homeQuickMomentTypes: readonly HomeQuickMomentType[] = ['coffee', 'walk', 'new_place', 'social', 'calm', 'focus'];
 
 export const homeMomentOptions: Record<
   HomeMomentType,
   {
     id: HomeMomentType;
     label: string;
-    icon: 'cup.and.saucer.fill' | 'figure.walk' | 'mappin.and.ellipse' | 'bubble.left.and.bubble.right.fill' | 'moon.stars.fill' | 'bolt.fill';
+    icon:
+      | 'camera.fill'
+      | 'cup.and.saucer.fill'
+      | 'figure.walk'
+      | 'mappin.and.ellipse'
+      | 'bubble.left.and.bubble.right.fill'
+      | 'moon.stars.fill'
+      | 'bolt.fill';
     accentColor: string;
     scoreBias: Partial<Record<HomeScoreKey, number>>;
   }
 > = {
+  photo: {
+    id: 'photo',
+    label: 'Photo',
+    icon: 'camera.fill',
+    accentColor: '#F1D4B4',
+    scoreBias: { exploration: 0.14, social: 0.1, calm: 0.06 },
+  },
   coffee: {
     id: 'coffee',
     label: 'Coffee',
@@ -206,4 +223,3 @@ export const homeNameSuffixes: Record<HomeScoreKey, readonly string[]> = {
   exploration: ['sette', 'muse', 'trail', 'drift'],
   focus: ['mark', 'ette', 'form', 'line'],
 };
-

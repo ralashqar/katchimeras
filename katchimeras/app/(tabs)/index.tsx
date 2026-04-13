@@ -1,8 +1,8 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { type LayoutChangeEvent, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 
-import { AddMomentSheet } from '@/components/katchadeck/home/add-moment-sheet';
+import { AddMomentRadial } from '@/components/katchadeck/home/add-moment-radial';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { DayContext } from '@/components/katchadeck/home/day-context';
 import { FormingEgg } from '@/components/katchadeck/home/forming-egg';
@@ -13,6 +13,7 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
+import { useAddMomentFlow } from '@/hooks/use-add-moment-flow';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import type { HomeDayRecord } from '@/types/home';
 import type { TimelineDayEntry, TimelineTomorrowState } from '@/types/timeline';
@@ -20,10 +21,7 @@ import { getCreatureVisual } from '@/utils/home-engine';
 
 export default function HomeScreen() {
   const {
-    addQuickMoment,
-    closeMomentSheet,
-    momentSheetOpen,
-    openMomentSheet,
+    addMoment,
     selectPath,
     selectedDay,
     selectedDayId,
@@ -35,6 +33,20 @@ export default function HomeScreen() {
   } = useHomeScreenState();
   const [hatchTargetId, setHatchTargetId] = useState<string | null>(null);
   const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
+  const [heroAnchorY, setHeroAnchorY] = useState(316);
+  const addMomentFlow = useAddMomentFlow({
+    enabled: selectedDay?.kind === 'day' && selectedDay.canAddMoments,
+    onAddMoment: addMoment,
+  });
+  const {
+    close: closeAddMomentFlow,
+    dismissError: dismissAddMomentError,
+    open: openAddMomentFlow,
+    selectAction: selectAddMomentAction,
+    selectRecentPhoto,
+    state: addMomentFlowState,
+    usePhotoPickerFallback,
+  } = addMomentFlow;
 
   const dayEntries = timelineDays.filter((day): day is HomeDayRecord => day.kind === 'day').map(toTimelineEntry);
   const tomorrowDay = timelineDays.find((day) => day.kind === 'tomorrow');
@@ -109,6 +121,10 @@ export default function HomeScreen() {
     }
   }, [hatchTargetId, selectedDay]);
 
+  useEffect(() => {
+    closeAddMomentFlow();
+  }, [closeAddMomentFlow, selectedDayId]);
+
   const handleReveal = () => {
     if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) {
       return;
@@ -124,6 +140,11 @@ export default function HomeScreen() {
     setHatchPhase('recap');
     refreshState();
   };
+
+  function handleHeroStageLayout(event: LayoutChangeEvent) {
+    const { height, y } = event.nativeEvent.layout;
+    setHeroAnchorY(y + height / 2);
+  }
 
   return (
     <View style={styles.screen}>
@@ -159,7 +180,7 @@ export default function HomeScreen() {
           />
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(70)} style={styles.heroStage}>
+        <Animated.View entering={presenceEnter(70)} onLayout={handleHeroStageLayout} style={styles.heroStage}>
           {selectedDay?.kind === 'day' ? (
             selectedDay.state === 'hatched' && selectedDay.creature ? (
               <CreatureHero creature={selectedDay.creature} moments={selectedDay.moments} subtitle={heroSubtitle} />
@@ -167,7 +188,7 @@ export default function HomeScreen() {
               <FormingEgg
                 caption={heroSubtitle}
                 egg={selectedDay.egg}
-                onPress={selectedDay.canAddMoments ? openMomentSheet : undefined}
+                onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
                 reactionKey={selectedDay.moments.length + (selectedDay.selectedPathId ? 1 : 0)}
               />
             )
@@ -189,7 +210,7 @@ export default function HomeScreen() {
 
         {selectedDay?.kind === 'day' ? (
           <Animated.View entering={presenceEnter(110)}>
-            <DayContext day={selectedDay} onAddMoment={openMomentSheet} onReveal={handleReveal} />
+            <DayContext day={selectedDay} onAddMoment={openAddMomentFlow} onReveal={handleReveal} />
           </Animated.View>
         ) : (
           <Animated.View entering={presenceEnter(110)}>
@@ -211,7 +232,15 @@ export default function HomeScreen() {
         ) : null}
       </ScrollView>
 
-      <AddMomentSheet onClose={closeMomentSheet} onSelectMoment={addQuickMoment} open={momentSheetOpen} />
+      <AddMomentRadial
+        anchorY={heroAnchorY}
+        onClose={closeAddMomentFlow}
+        onDismissError={dismissAddMomentError}
+        onSelectAction={selectAddMomentAction}
+        onSelectRecentPhoto={selectRecentPhoto}
+        onUsePickerFallback={usePhotoPickerFallback}
+        state={addMomentFlowState}
+      />
       {hatchDay ? <HatchSequence day={hatchDay} onSkip={handleSkipHatch} phase={hatchPhase} /> : null}
       {hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId && selectedDay.state === 'hatched' ? (
         <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(260)} style={styles.revealFlash}>

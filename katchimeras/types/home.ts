@@ -1,7 +1,8 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 
-export type HomeMomentType = 'coffee' | 'walk' | 'new_place' | 'social' | 'calm' | 'focus';
-export type HomeMomentSource = 'quick_tag';
+export type HomeMomentType = 'photo' | 'coffee' | 'walk' | 'new_place' | 'social' | 'calm' | 'focus';
+export type HomeQuickMomentType = Exclude<HomeMomentType, 'photo'>;
+export type HomeMomentSource = 'quick_tag' | 'photo_library';
 export type HomeDayState = 'forming' | 'ready_to_hatch' | 'hatched';
 export type HomeScoreKey = 'energy' | 'calm' | 'social' | 'exploration' | 'focus';
 export type HomeRarityTier = 'common' | 'rare' | 'epic' | 'legendary';
@@ -23,6 +24,15 @@ export type HomeVisualKey =
 
 export type DayScores = Record<HomeScoreKey, number>;
 
+export type HomeMomentMetadata = {
+  localUri?: string;
+  assetId?: string | null;
+  thumbnailUri?: string;
+  width?: number;
+  height?: number;
+  isScreenshot?: boolean;
+};
+
 export type HomeMoment = {
   id: string;
   type: HomeMomentType;
@@ -31,7 +41,21 @@ export type HomeMoment = {
   accentColor: string;
   createdAt: string;
   source: HomeMomentSource;
+  metadata?: HomeMomentMetadata | null;
 };
+
+export type AddMomentInput =
+  | {
+      type: HomeQuickMomentType;
+      source?: 'quick_tag';
+    }
+  | {
+      type: 'photo';
+      source: 'photo_library';
+      metadata: HomeMomentMetadata & {
+        localUri: string;
+      };
+    };
 
 export type LocalPathOption = {
   id: string;
@@ -110,3 +134,55 @@ export type HomeTomorrowRecord = {
 
 export type HomeTimelineDay = HomeDayRecord | HomeTomorrowRecord;
 
+export type RadialMomentAction = {
+  id: HomeMomentType;
+  label: string;
+  icon: IconSymbolName;
+  accentColor: string;
+  kind: 'photo' | 'quick_tag';
+};
+
+export type RecentPhotoAsset = {
+  id: string;
+  uri: string;
+  thumbnailUri: string;
+  createdAt: number;
+  width: number;
+  height: number;
+  isScreenshot?: boolean;
+};
+
+export type AbsorptionPayload = {
+  kind: 'tag' | 'photo';
+  label: string;
+  icon?: IconSymbolName;
+  accentColor: string;
+  previewUri?: string;
+  orbitIndex: number;
+  orbitCount: number;
+};
+
+export type AddMomentFlowStage =
+  | 'closed'
+  | 'moment_ring'
+  | 'photo_permission_request'
+  | 'photo_ring_loading'
+  | 'photo_ring_ready'
+  | 'photo_picker_fallback'
+  | 'absorbing'
+  | 'completed'
+  | 'error';
+
+export type AddMomentFlowError = {
+  title: string;
+  body: string;
+  action: 'retry_photo' | 'use_picker' | null;
+};
+
+export type AddMomentFlowState = {
+  stage: AddMomentFlowStage;
+  actions: RadialMomentAction[];
+  recentPhotos: RecentPhotoAsset[];
+  absorption: AbsorptionPayload | null;
+  error: AddMomentFlowError | null;
+};

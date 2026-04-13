@@ -6,6 +6,7 @@ Related references:
 
 - `docs/home-screen-ux-and-katchimera-design-system.md`
 - `docs/mvp-implementation-plan.md`
+- `docs/add-moment-rotary-capture-flow.md`
 
 ## 1. Product Summary
 
@@ -134,14 +135,20 @@ UI:
 Input methods:
 
 - Quick tag, primary
-- Photo, optional
-- Text, optional
+- Photo via egg-centered recent-photo ring
+- Text or note, optional
+- Voice, optional
 
 Behavior on add:
 
 - chip appears
 - chip animates toward the egg
 - egg reacts with a visual pulse
+
+Interaction principle:
+
+- tapping the egg should open a radial moment carousel around the egg
+- richer capture types should stay inside that egg-centered interaction whenever possible
 
 #### 3.3.4 Past Day View
 

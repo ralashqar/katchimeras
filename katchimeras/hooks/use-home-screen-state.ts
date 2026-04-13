@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { HomeMomentType, StoredHomeState } from '@/types/home';
+import type { AddMomentInput, StoredHomeState } from '@/types/home';
 import {
   addMomentToDay,
   hydrateHomeState,
@@ -14,7 +14,6 @@ import { loadOnboardingProfile } from '@/utils/onboarding-state';
 export function useHomeScreenState() {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
-  const [momentSheetOpen, setMomentSheetOpen] = useState(false);
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
 
   useEffect(() => {
@@ -81,15 +80,14 @@ export function useHomeScreenState() {
     timelineDays[0] ??
     null;
 
-  const addQuickMoment = useCallback((momentType: HomeMomentType) => {
+  const addMoment = useCallback((momentInput: AddMomentInput) => {
     const now = new Date();
     const profile = loadOnboardingProfile();
 
     setStoredState((currentState) => {
       const hydrated = hydrateHomeState(currentState, profile, now);
-      return addMomentToDay(hydrated.state, profile, momentType, now);
+      return addMomentToDay(hydrated.state, profile, momentInput, now);
     });
-    setMomentSheetOpen(false);
   }, []);
 
   const selectTimelineDay = useCallback((dayId: string) => {
@@ -126,16 +124,6 @@ export function useHomeScreenState() {
     });
   }, [selectedDay]);
 
-  const openMomentSheet = useCallback(() => {
-    if (selectedDay?.kind === 'day' && selectedDay.canAddMoments) {
-      setMomentSheetOpen(true);
-    }
-  }, [selectedDay]);
-
-  const closeMomentSheet = useCallback(() => {
-    setMomentSheetOpen(false);
-  }, []);
-
   const refreshState = useCallback(() => {
     syncState();
   }, [syncState]);
@@ -148,20 +136,16 @@ export function useHomeScreenState() {
     clearStoredHomeState();
     setStoredState(hydrated.state);
     setSelectedDayId(hydrated.todayId);
-    setMomentSheetOpen(false);
   }, []);
 
   return {
     timelineDays,
     selectedDayId: selectedDay?.id ?? viewModel.todayId,
     selectedDay,
-    addQuickMoment,
+    addMoment,
     selectTimelineDay,
     selectPath,
     triggerHatchIfReady,
-    openMomentSheet,
-    closeMomentSheet,
-    momentSheetOpen,
     refreshState,
     resetHomeState,
   };

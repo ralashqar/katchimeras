@@ -2,6 +2,10 @@
 
 This plan describes how to move from the current prototype to the intended Home-screen-driven MVP. It covers frontend, backend, and Supabase work together, with explicit sequencing so the system stays coherent.
 
+Related reference:
+
+- `docs/add-moment-rotary-capture-flow.md`
+
 ## 1. Recommended Architecture Direction
 
 ### Product target
@@ -237,8 +241,9 @@ Frontend tasks:
   - tomorrow mode: minimal "Not yet formed"
 - Add moment sheet
   - quick-tag fast path
-  - optional photo and text
-  - instant add with no confirmation screen
+  - evolve into egg-centered radial capture flow
+  - optional photo, note, voice, and richer moment types
+  - instant add with no confirmation screen for quick tags
 - Insight + Paths
   - collapsed subtle one-liner
   - expandable detail
@@ -256,6 +261,60 @@ Suggested component slices:
 Deliverable:
 
 - the full Home UX exists locally with realistic state transitions
+
+### Phase 4A. Refactor Add Moment Into A Radial Capture System
+
+Goal:
+
+Replace the current utility-style input shell with a product-native egg-centered interaction.
+
+Frontend tasks:
+
+- replace `AddMomentSheet` with a radial capture controller
+- keep the egg mounted as the visual anchor
+- add state for:
+  - closed
+  - moment ring
+  - photo loading
+  - photo ring
+  - absorbing
+  - completed
+- preserve current quick-tag mutation path inside the new shell
+- add a shared absorption animation so selected moments visibly feed into the egg
+
+Recommended component slices:
+
+- `components/katchadeck/home/add-moment-radial.tsx`
+- `components/katchadeck/home/add-moment-orbit.tsx`
+- `components/katchadeck/home/photo-orbit-ring.tsx`
+- `components/katchadeck/home/moment-absorption-overlay.tsx`
+
+Deliverable:
+
+- Add Moment feels like a core part of the Home experience rather than a standard form utility
+
+### Phase 4B. Add Photo-Orbit Capture
+
+Goal:
+
+Support photo moments inside the same interaction grammar.
+
+Frontend tasks:
+
+- request photo permission only when `Photo` is tapped
+- fetch a small recent asset set
+- prefer non-screenshot camera images where supported by the integration path
+- display recent photos in the same orbit around the egg
+- animate selected thumbnails into the egg
+
+Backend tasks:
+
+- none required for the first local slice
+- later persistence work should allow `photo` moment metadata
+
+Deliverable:
+
+- photo moments feel native to the product world without forcing a generic picker-first flow
 
 ## Phase 5. Add MVP Persistence Model In Supabase
 
@@ -521,9 +580,11 @@ In order:
 3. Build the Egg component and its live reaction system.
 4. Build the Context area variants for today, past, and tomorrow.
 5. Add the Add moment bottom sheet with instant quick-tag flow.
-6. Add the collapsed and expanded Insight + Paths module.
-7. Add hatch animation flow and skip logic.
-8. Add optimistic state syncing to Supabase-backed mutations.
+6. Refactor Add Moment into an egg-centered radial capture flow.
+7. Add recent-photo orbit mode and absorption animation.
+8. Add the collapsed and expanded Insight + Paths module.
+9. Add hatch animation flow and skip logic.
+10. Add optimistic state syncing to Supabase-backed mutations.
 
 ## 5. Concrete Backend Worklist
 

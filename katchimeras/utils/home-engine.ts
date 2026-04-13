@@ -10,11 +10,13 @@ import {
 } from '@/constants/home-mvp';
 import { timelineDemoEntries } from '@/constants/timeline-demo';
 import type {
+  AddMomentInput,
   DayScores,
   EggVisualState,
   HomeDayRecord,
   HomeDayState,
   HomeMoment,
+  HomeMomentMetadata,
   HomeScoreKey,
   HomeTimelineDay,
   HomeTomorrowRecord,
@@ -114,10 +116,10 @@ export function hydrateHomeState(
 export function addMomentToDay(
   state: StoredHomeState,
   profile: OnboardingProfile,
-  momentType: HomeMoment['type'],
+  momentInput: AddMomentInput,
   now: Date
 ): StoredHomeState {
-  const moment = createMoment(momentType, now);
+  const moment = createMoment(momentInput, now);
   const nextToday: StoredHomeDayRecord = {
     ...state.today,
     moments: [...state.today.moments, moment],
@@ -599,6 +601,9 @@ function buildHatchedHighlight(moment: HomeMoment | null, primaryTrait: HomeScor
   if (moment.type === 'calm') {
     return 'Stillness became the part of the day that stayed visible.';
   }
+  if (moment.type === 'photo') {
+    return 'One image caught the day at the right angle and kept it glowing.';
+  }
 
   if (primaryTrait === 'focus') {
     return 'A sharper line ran through the day and held it together.';
@@ -654,16 +659,17 @@ function preferredMomentTypeForTrait(trait: HomeScoreKey) {
   return 'coffee';
 }
 
-function createMoment(type: HomeMoment['type'], now: Date): HomeMoment {
-  const option = homeMomentOptions[type];
+function createMoment(input: AddMomentInput, now: Date): HomeMoment {
+  const option = homeMomentOptions[input.type];
   return {
-    id: `moment-${now.getTime().toString(36)}-${type}`,
-    type,
+    id: `moment-${now.getTime().toString(36)}-${input.type}`,
+    type: input.type,
     label: option.label,
     icon: option.icon,
     accentColor: option.accentColor,
     createdAt: now.toISOString(),
-    source: 'quick_tag',
+    source: input.type === 'photo' ? input.source : 'quick_tag',
+    metadata: resolveMomentMetadata(input),
   };
 }
 
@@ -677,7 +683,16 @@ function createSeedMoment(type: HomeMoment['type'], date: Date, index: number): 
     accentColor: option.accentColor,
     createdAt: date.toISOString(),
     source: 'quick_tag',
+    metadata: null,
   };
+}
+
+function resolveMomentMetadata(input: AddMomentInput): HomeMomentMetadata | null {
+  if (input.type === 'photo') {
+    return input.metadata;
+  }
+
+  return null;
 }
 
 function inferMomentTypeFromEntry(entryId: string): HomeMoment['type'] {
