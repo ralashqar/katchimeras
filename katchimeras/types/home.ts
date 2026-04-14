@@ -129,6 +129,23 @@ export type EggDragTrailState = {
   points: EggDragTrailPoint[];
 };
 
+export type EggMembranePoint = {
+  angle: number;
+  baseRadius: number;
+  offset: number;
+  velocity: number;
+};
+
+export type EggForceImpulse = {
+  id: string;
+  kind: 'tap' | 'drag' | 'wake';
+  x: number;
+  y: number;
+  strength: number;
+  createdAt: number;
+  durationMs: number;
+};
+
 export type EggAuraConfig = {
   baseRadius: number;
   membraneThickness: number;
@@ -136,6 +153,21 @@ export type EggAuraConfig = {
   rippleDurationMs: number;
   particleCount: number;
   hapticsEnabled: boolean;
+};
+
+export type EggMembraneConfig = {
+  pointCount: number;
+  springStrength: number;
+  damping: number;
+  neighborInfluence: number;
+  maxPullDistance: number;
+};
+
+export type EggInteriorFieldConfig = {
+  glowStrength: number;
+  wakeBlur: number;
+  chargeDecay: number;
+  shaderEnabled: boolean;
 };
 
 export type LocalCreatureRecord = {

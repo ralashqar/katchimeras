@@ -5,7 +5,6 @@ import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -14,13 +13,16 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import type { EggAuraMotionValues } from '@/components/katchadeck/home/egg-shell';
 import type {
   EggAuraConfig,
-  EggDragTrailPoint,
+  EggForceImpulse,
+  EggInteriorFieldConfig,
+  EggMembraneConfig,
+  EggMembranePoint,
   EggRippleEvent,
   EggVisualState,
 } from '@/types/home';
-import type { EggAuraMotionValues } from '@/components/katchadeck/home/egg-shell';
 
 type EggAuraFieldProps = {
   egg: EggVisualState;
@@ -32,6 +34,13 @@ type EggAuraFieldProps = {
   size: number;
 };
 
+type MembraneSnapshot = {
+  points: EggMembranePoint[];
+  impulses: EggForceImpulse[];
+  charge: number;
+  dragStrength: number;
+};
+
 const auraConfig: EggAuraConfig = {
   baseRadius: 116,
   membraneThickness: 2,
@@ -40,9 +49,26 @@ const auraConfig: EggAuraConfig = {
   particleCount: 5,
   hapticsEnabled: true,
 };
-const TRAIL_DURATION_MS = 280;
+
+const membraneConfig: EggMembraneConfig = {
+  pointCount: 24,
+  springStrength: 0.14,
+  damping: 0.84,
+  neighborInfluence: 0.18,
+  maxPullDistance: auraConfig.maxPullDistance,
+};
+
+const interiorFieldConfig: EggInteriorFieldConfig = {
+  glowStrength: 0.34,
+  wakeBlur: 16,
+  chargeDecay: 0.94,
+  shaderEnabled: false,
+};
+
+const TAP_DURATION_MS = 900;
+const WAKE_DURATION_MS = 320;
 const TRAIL_SAMPLE_DISTANCE = 14;
-const MAX_TRAIL_POINTS = 8;
+const MAX_FORCE_IMPULSES = 16;
 
 export function EggAuraField({
   egg,
@@ -60,18 +86,26 @@ export function EggAuraField({
   const idlePulse = useSharedValue(0);
   const thresholdTriggered = useSharedValue(0);
   const panActive = useSharedValue(0);
+  const visualCharge = useSharedValue(0);
   const releaseVelocityRef = useRef(0);
-  const activeDragRef = useRef<{ x: number; y: number; strength: number }>({
+  const lastTrailSampleRef = useRef<{ x: number; y: number } | null>(null);
+  const activeDragRef = useRef({
     x: 0,
     y: 0,
     strength: 0,
+    velocity: 0,
   });
-  const lastTrailSampleRef = useRef<{ x: number; y: number } | null>(null);
-  const trailTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const waveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [waveNow, setWaveNow] = useState(() => Date.now());
-  const [dragVisualActive, setDragVisualActive] = useState(false);
-  const [trailPoints, setTrailPoints] = useState<EggDragTrailPoint[]>([]);
+  const impulsesRef = useRef<EggForceImpulse[]>([]);
+  const membranePointsRef = useRef<EggMembranePoint[]>(createMembranePoints(membraneConfig.pointCount, auraRadius * 0.93));
+  const chargeRef = useRef(0);
+  const frameIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastTimestampRef = useRef<number | null>(null);
+  const [snapshot, setSnapshot] = useState<MembraneSnapshot>(() => ({
+    points: membranePointsRef.current.map((point) => ({ ...point })),
+    impulses: [],
+    charge: 0,
+    dragStrength: 0,
+  }));
 
   useEffect(() => {
     idlePulse.value = withRepeat(
@@ -85,33 +119,64 @@ export function EggAuraField({
   }, [idlePulse]);
 
   useEffect(() => {
-    if (ripples.length === 0 && trailPoints.length === 0 && !dragVisualActive) {
-      if (waveIntervalRef.current) {
-        clearInterval(waveIntervalRef.current);
-        waveIntervalRef.current = null;
-      }
+    membranePointsRef.current = createMembranePoints(membraneConfig.pointCount, auraRadius * 0.93);
+    setSnapshot((current) => ({
+      ...current,
+      points: membranePointsRef.current.map((point) => ({ ...point })),
+    }));
+  }, [auraRadius]);
+
+  useEffect(() => {
+    if (!enabled) {
       return;
     }
 
-    waveIntervalRef.current = setInterval(() => {
-      setWaveNow(Date.now());
-    }, 33);
+    const step = () => {
+      const timestamp = Date.now();
+      const lastTimestamp = lastTimestampRef.current ?? timestamp;
+      const dt = Math.min(0.033, (timestamp - lastTimestamp) / 1000 || 0.016);
+      lastTimestampRef.current = timestamp;
+
+      const now = Date.now();
+      impulsesRef.current = impulsesRef.current.filter((impulse) => now - impulse.createdAt < impulse.durationMs);
+      chargeRef.current *= Math.pow(interiorFieldConfig.chargeDecay, dt * 60);
+      if (chargeRef.current < 0.01) {
+        chargeRef.current = 0;
+      }
+
+      const substeps = Math.max(1, Math.min(3, Math.round(dt / 0.016)));
+      const substepDt = dt / substeps;
+      for (let index = 0; index < substeps; index += 1) {
+        advanceMembrane(
+          membranePointsRef.current,
+          impulsesRef.current,
+          activeDragRef.current,
+          center,
+          now,
+          substepDt
+        );
+      }
+
+      setSnapshot({
+        points: membranePointsRef.current.map((point) => ({ ...point })),
+        impulses: impulsesRef.current.map((impulse) => ({ ...impulse })),
+        charge: chargeRef.current,
+        dragStrength: activeDragRef.current.strength,
+      });
+      visualCharge.value = chargeRef.current;
+    };
+
+    frameIntervalRef.current = setInterval(step, 33);
+    step();
 
     return () => {
-      if (waveIntervalRef.current) {
-        clearInterval(waveIntervalRef.current);
-        waveIntervalRef.current = null;
+      if (frameIntervalRef.current) {
+        clearInterval(frameIntervalRef.current);
       }
+      frameIntervalRef.current = null;
+      lastTimestampRef.current = null;
     };
-  }, [dragVisualActive, ripples.length, trailPoints.length]);
-
-  useEffect(
-    () => () => {
-      trailTimersRef.current.forEach(clearTimeout);
-      trailTimersRef.current = [];
-    },
-    []
-  );
+  }, [center, enabled, visualCharge]);
 
   const particles = useMemo(
     () =>
@@ -123,148 +188,95 @@ export function EggAuraField({
           x: center + Math.cos(angle) * ringRadius,
           y: center + Math.sin(angle) * ringRadius,
           radius: 3 + (index % 3),
-          opacity: 0.18 + (index % 4) * 0.04,
+          opacity: 0.14 + (index % 4) * 0.04,
         };
       }),
     [auraRadius, center]
   );
 
-  const activeTrailPoints = useMemo(
-    () =>
-      trailPoints.filter((point) => waveNow - point.startedAt < TRAIL_DURATION_MS),
-    [trailPoints, waveNow]
+  const boundaryPath = useMemo(
+    () => buildSplinePath(snapshot.points, center),
+    [center, snapshot.points]
   );
 
-  const boundaryPath = useMemo(() => {
-    const baseBoundaryRadius = auraRadius * 0.93;
-    const path = Skia.Path.Make();
-    const steps = 48;
-    const tapStackBoost = 1 + Math.min(0.5, ripples.length * 0.1);
-    const activeDrag = activeDragRef.current;
-    const dragAngle = Math.atan2(activeDrag.y, activeDrag.x);
-    const dragStrength = activeDrag.strength;
-
-    for (let index = 0; index <= steps; index += 1) {
-      const angle = (Math.PI * 2 * index) / steps;
-      let waveOffset = 0;
-
-      ripples.forEach((ripple) => {
-        const progress = Math.max(0, Math.min(1, (waveNow - ripple.startedAt) / auraConfig.rippleDurationMs));
-        if (progress >= 1) {
-          return;
-        }
-
-        const rippleAngle = Math.atan2(ripple.originY - center, ripple.originX - center);
-        const angleDelta = normalizeAngle(angle - rippleAngle);
-        const angularDistance = Math.abs(angleDelta);
-        const angularInfluence = Math.exp(-((angularDistance * angularDistance) / 0.6));
-        const amplitude = 8.4 * (1 - progress) * tapStackBoost;
-        const primaryOscillation = Math.sin(progress * 5.4 - angleDelta * 3.1);
-        const trailingOscillation = Math.sin(progress * 3.2 - angleDelta * 2.2 - 0.85);
-        waveOffset += amplitude * angularInfluence * (primaryOscillation * 0.74 + trailingOscillation * 0.26);
-      });
-
-      if (dragStrength > 0.02) {
-        const dragAngleDelta = normalizeAngle(angle - dragAngle);
-        const dragAngularInfluence = Math.exp(-((dragAngleDelta * dragAngleDelta) / 0.42));
-        waveOffset += 20 * dragStrength * dragAngularInfluence;
-      }
-
-      activeTrailPoints.forEach((point) => {
-        const progress = Math.max(0, Math.min(1, (waveNow - point.startedAt) / TRAIL_DURATION_MS));
-        if (progress >= 1) {
-          return;
-        }
-
-        const trailAngle = Math.atan2(point.y - center, point.x - center);
-        const angleDelta = normalizeAngle(angle - trailAngle);
-        const angularDistance = Math.abs(angleDelta);
-        const angularInfluence = Math.exp(-((angularDistance * angularDistance) / 0.82));
-        const amplitude = 7.2 * point.strength * (1 - progress);
-        const oscillation = Math.sin(progress * 4.2 - angleDelta * 2.4 - 0.35);
-        waveOffset += amplitude * angularInfluence * oscillation;
-      });
-
-      const radius = baseBoundaryRadius + waveOffset;
-      const x = center + Math.cos(angle) * radius;
-      const y = center + Math.sin(angle) * radius;
-
-      if (index === 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    path.close();
-    return path;
-  }, [activeTrailPoints, auraRadius, center, ripples, waveNow]);
-
   const wakeCircles = useMemo(() => {
-    return activeTrailPoints.flatMap((point) => {
-      const progress = Math.max(0, Math.min(1, (waveNow - point.startedAt) / TRAIL_DURATION_MS));
-      const angle = Math.atan2(point.y - center, point.x - center);
-      const tangentX = -Math.sin(angle);
-      const tangentY = Math.cos(angle);
-      const wakeOffset = (1 - progress) * 12 * point.strength;
-      const primaryRadius = 7 + point.strength * 13 + progress * 6;
-      const secondaryRadius = 4 + point.strength * 8 + progress * 4;
-      const alpha = 0.2 * (1 - progress) * point.strength;
+    return snapshot.impulses
+      .filter((impulse) => impulse.kind === 'wake')
+      .flatMap((impulse) => {
+        const progress = clamp01((Date.now() - impulse.createdAt) / impulse.durationMs);
+        const angle = Math.atan2(impulse.y - center, impulse.x - center);
+        const tangentX = -Math.sin(angle);
+        const tangentY = Math.cos(angle);
+        const wakeOffset = (1 - progress) * 10 * impulse.strength;
+        const primaryRadius = 10 + impulse.strength * 14 + progress * 7;
+        const secondaryRadius = 5 + impulse.strength * 9 + progress * 4;
+        const alpha = 0.18 * (1 - progress) * impulse.strength;
 
-      return [
-        {
-          id: `${point.id}-primary`,
-          color: `${egg.accentColor}${Math.round(alpha * 255)
-            .toString(16)
-            .padStart(2, '0')}`,
-          x: point.x,
-          y: point.y,
-          radius: primaryRadius,
-          blur: 16,
-        },
-        {
-          id: `${point.id}-secondary`,
-          color: `${egg.coreColor}${Math.round(alpha * 210)
-            .toString(16)
-            .padStart(2, '0')}`,
-          x: point.x - tangentX * wakeOffset,
-          y: point.y - tangentY * wakeOffset,
-          radius: secondaryRadius,
-          blur: 10,
-        },
-      ];
-    });
-  }, [activeTrailPoints, center, egg.accentColor, egg.coreColor, waveNow]);
+        return [
+          {
+            id: `${impulse.id}-primary`,
+            blur: interiorFieldConfig.wakeBlur,
+            color: withAlpha(egg.accentColor, alpha),
+            radius: primaryRadius,
+            x: impulse.x,
+            y: impulse.y,
+          },
+          {
+            id: `${impulse.id}-secondary`,
+            blur: 10,
+            color: withAlpha(egg.coreColor, alpha * 0.8),
+            radius: secondaryRadius,
+            x: impulse.x - tangentX * wakeOffset,
+            y: impulse.y - tangentY * wakeOffset,
+          },
+        ];
+      });
+  }, [center, egg.accentColor, egg.coreColor, snapshot.impulses]);
+
+  const tapPressureCircles = useMemo(() => {
+    return snapshot.impulses
+      .filter((impulse) => impulse.kind === 'tap')
+      .map((impulse) => {
+        const progress = clamp01((Date.now() - impulse.createdAt) / impulse.durationMs);
+        return {
+          id: impulse.id,
+          color: withAlpha(egg.haloColor, (1 - progress) * 0.12 * impulse.strength),
+          radius: 18 + progress * 28 + impulse.strength * 10,
+          x: impulse.x,
+          y: impulse.y,
+        };
+      });
+  }, [egg.haloColor, snapshot.impulses]);
 
   const outerAuraStyle = useAnimatedStyle(() => {
     const dragMagnitude = Math.min(1, Math.hypot(motion.dragX.value, motion.dragY.value) / auraConfig.maxPullDistance);
 
     return {
-      opacity: 0.62 + idlePulse.value * 0.1 + motion.pressProgress.value * 0.18,
+      opacity: 0.58 + idlePulse.value * 0.1 + motion.pressProgress.value * 0.18 + visualCharge.value * 0.14,
       transform: [
         { translateX: motion.dragX.value * 0.12 },
         { translateY: motion.dragY.value * 0.12 },
-        { scaleX: 1 + dragMagnitude * 0.1 + motion.pressProgress.value * 0.04 },
-        { scaleY: 1 - dragMagnitude * 0.056 + motion.pressProgress.value * 0.06 + idlePulse.value * 0.03 },
+        { scaleX: 1 + dragMagnitude * 0.08 + motion.pressProgress.value * 0.04 },
+        { scaleY: 1 - dragMagnitude * 0.045 + motion.pressProgress.value * 0.05 + idlePulse.value * 0.03 },
       ],
     };
   });
 
   const innerGlowStyle = useAnimatedStyle(() => ({
-    opacity: 0.36 + motion.interactionEnergy.value * 0.18 + idlePulse.value * 0.08,
+    opacity: 0.34 + motion.interactionEnergy.value * 0.22 + idlePulse.value * 0.08 + visualCharge.value * 0.12,
     transform: [
-      { translateX: motion.glowLagX.value * 0.36 },
-      { translateY: motion.glowLagY.value * 0.36 },
-      { scale: 0.98 + motion.interactionEnergy.value * 0.08 + idlePulse.value * 0.03 },
+      { translateX: motion.glowLagX.value * 0.4 },
+      { translateY: motion.glowLagY.value * 0.4 },
+      { scale: 0.98 + motion.interactionEnergy.value * 0.09 + idlePulse.value * 0.03 + visualCharge.value * 0.05 },
     ],
   }));
 
   const particleLayerStyle = useAnimatedStyle(() => ({
-    opacity: 0.8 + motion.interactionEnergy.value * 0.16,
+    opacity: 0.74 + motion.interactionEnergy.value * 0.18 + visualCharge.value * 0.08,
     transform: [
       { translateX: motion.dragX.value * 0.12 },
       { translateY: motion.dragY.value * 0.12 },
-      { scale: 1 + motion.pressProgress.value * 0.018 },
+      { scale: 1 + motion.pressProgress.value * 0.02 + visualCharge.value * 0.02 },
     ],
   }));
 
@@ -280,43 +292,37 @@ export function EggAuraField({
     }
   };
 
-  const emitRipple = useCallback((originX: number, originY: number) => {
-    onRipple({
-      id: `ripple-${Date.now().toString(36)}-${Math.round(originX)}-${Math.round(originY)}`,
-      originX,
-      originY,
-      startedAt: Date.now(),
-    });
-  }, [onRipple]);
+  const emitRipple = useCallback(
+    (originX: number, originY: number) => {
+      onRipple({
+        id: `ripple-${Date.now().toString(36)}-${Math.round(originX)}-${Math.round(originY)}`,
+        originX,
+        originY,
+        startedAt: Date.now(),
+      });
+    },
+    [onRipple]
+  );
 
-  const updateEnergy = useCallback((value: number) => {
-    onInteractionEnergyChange?.(value);
-  }, [onInteractionEnergyChange]);
+  const addImpulse = useCallback((kind: EggForceImpulse['kind'], x: number, y: number, strength: number, durationMs: number) => {
+    const nextImpulse: EggForceImpulse = {
+      id: `${kind}-${Date.now().toString(36)}-${Math.round(x)}-${Math.round(y)}`,
+      kind,
+      x,
+      y,
+      strength,
+      createdAt: Date.now(),
+      durationMs,
+    };
 
-  const clearTrailTimers = useCallback(() => {
-    trailTimersRef.current.forEach(clearTimeout);
-    trailTimersRef.current = [];
+    impulsesRef.current = [...impulsesRef.current.slice(-(MAX_FORCE_IMPULSES - 1)), nextImpulse];
   }, []);
 
-  const addTrailPoint = useCallback(
-    (x: number, y: number, strength: number) => {
-      const point: EggDragTrailPoint = {
-        id: `trail-${Date.now().toString(36)}-${Math.round(x)}-${Math.round(y)}`,
-        x,
-        y,
-        strength,
-        startedAt: Date.now(),
-      };
-
-      setTrailPoints((current) => [...current.slice(-(MAX_TRAIL_POINTS - 1)), point]);
-
-      const timer = setTimeout(() => {
-        setTrailPoints((current) => current.filter((entry) => entry.id !== point.id));
-      }, TRAIL_DURATION_MS + 24);
-
-      trailTimersRef.current.push(timer);
+  const updateEnergy = useCallback(
+    (value: number) => {
+      onInteractionEnergyChange?.(value);
     },
-    []
+    [onInteractionEnergyChange]
   );
 
   const triggerTapCluster = useCallback(
@@ -334,6 +340,7 @@ export function EggAuraField({
 
       validTouches.forEach((touch) => {
         emitRipple(touch.x, touch.y);
+        addImpulse('tap', touch.x, touch.y, Math.min(1, 0.72 + (validTouches.length - 1) * 0.08), TAP_DURATION_MS);
       });
 
       const centroid = validTouches.reduce(
@@ -349,6 +356,7 @@ export function EggAuraField({
       const dy = centroidY - center;
       const tapStrength = Math.min(1, 0.72 + (validTouches.length - 1) * 0.14);
 
+      chargeRef.current = Math.min(1, chargeRef.current + tapStrength * 0.24);
       motion.pressProgress.value = withSequence(
         withTiming(1, { duration: 110, easing: Easing.out(Easing.cubic) }),
         withTiming(0, { duration: 560, easing: Easing.out(Easing.cubic) })
@@ -368,11 +376,12 @@ export function EggAuraField({
       fireSelectionHaptic();
       updateEnergy(tapStrength);
     },
-    [center, emitRipple, motion, nucleusRadius, touchRadius, updateEnergy]
+    [addImpulse, center, emitRipple, motion, nucleusRadius, touchRadius, updateEnergy]
   );
 
   const longPressGesture = Gesture.LongPress()
     .enabled(enabled)
+    .runOnJS(true)
     .minDuration(220)
     .onStart((event) => {
       const dx = event.x - center;
@@ -382,18 +391,20 @@ export function EggAuraField({
         return;
       }
 
+      chargeRef.current = Math.min(1, chargeRef.current + 0.16);
       motion.pressProgress.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
       motion.interactionEnergy.value = withTiming(0.58, { duration: 180, easing: Easing.out(Easing.cubic) });
-      runOnJS(updateEnergy)(0.58);
+      updateEnergy(0.58);
     })
     .onFinalize(() => {
       motion.pressProgress.value = withTiming(0, { duration: 260 });
       motion.interactionEnergy.value = withTiming(0, { duration: 360 });
-      runOnJS(updateEnergy)(0);
+      updateEnergy(0);
     });
 
   const panGesture = Gesture.Pan()
     .enabled(enabled)
+    .runOnJS(true)
     .maxPointers(1)
     .onBegin((event) => {
       thresholdTriggered.value = 0;
@@ -402,13 +413,8 @@ export function EggAuraField({
       const distance = Math.hypot(dx, dy);
       panActive.value = distance <= touchRadius && distance >= nucleusRadius ? 1 : 0;
       releaseVelocityRef.current = 0;
-      activeDragRef.current = { x: 0, y: 0, strength: 0 };
+      activeDragRef.current = { x: 0, y: 0, strength: 0, velocity: 0 };
       lastTrailSampleRef.current = null;
-      runOnJS(clearTrailTimers)();
-      runOnJS(setTrailPoints)([]);
-      if (distance <= touchRadius && distance >= nucleusRadius) {
-        runOnJS(setDragVisualActive)(true);
-      }
     })
     .onChange((event) => {
       if (panActive.value === 0) {
@@ -424,6 +430,7 @@ export function EggAuraField({
       const energy = clamp01(clampedDistance / auraConfig.maxPullDistance);
       const currentX = center + nextDragX;
       const currentY = center + nextDragY;
+      const releaseVelocity = Math.min(1, Math.hypot(event.velocityX, event.velocityY) / 700);
 
       motion.dragX.value = nextDragX;
       motion.dragY.value = nextDragY;
@@ -431,38 +438,39 @@ export function EggAuraField({
       motion.glowLagY.value = nextDragY * 0.55;
       motion.pressProgress.value = 0.42 + energy * 0.54;
       motion.interactionEnergy.value = energy;
-      motion.releaseVelocity.value = Math.min(
-        1,
-        Math.hypot(event.velocityX, event.velocityY) / 700
-      );
-      releaseVelocityRef.current = motion.releaseVelocity.value;
+      motion.releaseVelocity.value = releaseVelocity;
+      releaseVelocityRef.current = releaseVelocity;
       activeDragRef.current = {
         x: nextDragX,
         y: nextDragY,
         strength: energy,
+        velocity: releaseVelocity,
       };
-      runOnJS(updateEnergy)(energy);
+      chargeRef.current = Math.min(1, chargeRef.current + energy * 0.02);
+      updateEnergy(energy);
 
       const lastSample = lastTrailSampleRef.current;
       if (!lastSample || Math.hypot(currentX - lastSample.x, currentY - lastSample.y) >= TRAIL_SAMPLE_DISTANCE) {
         lastTrailSampleRef.current = { x: currentX, y: currentY };
-        runOnJS(addTrailPoint)(
+        addImpulse(
+          'wake',
           currentX,
           currentY,
-          Math.max(0.28, Math.min(1, energy * 0.86 + motion.releaseVelocity.value * 0.22))
+          Math.max(0.28, Math.min(1, energy * 0.86 + releaseVelocity * 0.22)),
+          WAKE_DURATION_MS
         );
       }
 
       if (energy > 0.58 && thresholdTriggered.value === 0) {
         thresholdTriggered.value = 1;
-        runOnJS(firePullHaptic)();
+        firePullHaptic();
       }
     })
     .onFinalize(() => {
       panActive.value = 0;
       const releaseVelocity = releaseVelocityRef.current;
       const finalDrag = activeDragRef.current;
-      activeDragRef.current = { x: 0, y: 0, strength: 0 };
+      activeDragRef.current = { x: 0, y: 0, strength: 0, velocity: 0 };
       motion.dragX.value = withSpring(0, {
         damping: 13,
         stiffness: 160,
@@ -485,15 +493,16 @@ export function EggAuraField({
       motion.interactionEnergy.value = withTiming(0, { duration: 360, easing: Easing.out(Easing.cubic) });
       motion.releaseVelocity.value = withTiming(0, { duration: 220 });
       if (finalDrag.strength > 0.08) {
-        runOnJS(addTrailPoint)(
+        addImpulse(
+          'wake',
           center + finalDrag.x,
           center + finalDrag.y,
-          Math.min(1, finalDrag.strength * 0.72 + releaseVelocity * 0.34)
+          Math.min(1, finalDrag.strength * 0.7 + releaseVelocity * 0.34),
+          WAKE_DURATION_MS + 80
         );
       }
       lastTrailSampleRef.current = null;
-      runOnJS(setDragVisualActive)(false);
-      runOnJS(updateEnergy)(0);
+      updateEnergy(0);
     });
 
   const gesture = Gesture.Simultaneous(longPressGesture, panGesture);
@@ -518,15 +527,15 @@ export function EggAuraField({
         <Animated.View pointerEvents="none" style={[styles.layerFill, outerAuraStyle]}>
           <Canvas style={{ height: size, width: size }}>
             <Group clip={boundaryPath}>
-              <Circle color={`${egg.haloColor}26`} cx={center} cy={center} r={auraRadius * 0.98}>
-                <BlurMask blur={32} style="solid" />
+              <Circle color={withAlpha(egg.haloColor, 0.15 + snapshot.charge * 0.08)} cx={center} cy={center} r={auraRadius * 1.02}>
+                <BlurMask blur={40} style="solid" />
               </Circle>
-              <Circle color={`${egg.accentColor}1A`} cx={center} cy={center} r={auraRadius * 1.08}>
-                <BlurMask blur={48} style="solid" />
+              <Circle color={withAlpha(egg.accentColor, 0.12 + snapshot.dragStrength * 0.08)} cx={center} cy={center} r={auraRadius * 1.08}>
+                <BlurMask blur={54} style="solid" />
               </Circle>
-              <Circle color="rgba(255,255,255,0.07)" cx={center} cy={center} r={auraRadius * 0.98} />
+              <Circle color="rgba(255,255,255,0.06)" cx={center} cy={center} r={auraRadius} />
             </Group>
-            <Path color={`${egg.accentColor}AA`} path={boundaryPath} style="stroke" strokeWidth={2.1}>
+            <Path color={withAlpha(egg.accentColor, 0.74)} path={boundaryPath} style="stroke" strokeWidth={2.1}>
               <BlurMask blur={4} style="solid" />
             </Path>
           </Canvas>
@@ -534,9 +543,23 @@ export function EggAuraField({
 
         <Animated.View pointerEvents="none" style={[styles.layerFill, innerGlowStyle]}>
           <Canvas style={{ height: size, width: size }}>
-            <Circle color={`${egg.coreColor}28`} cx={center} cy={center} r={auraRadius * 0.46}>
-              <BlurMask blur={18} style="solid" />
-            </Circle>
+            <Group clip={boundaryPath}>
+              <Circle color={withAlpha(egg.coreColor, 0.24 + snapshot.charge * interiorFieldConfig.glowStrength)} cx={center} cy={center} r={auraRadius * 0.44}>
+                <BlurMask blur={24} style="solid" />
+              </Circle>
+              <Circle
+                color={withAlpha(egg.accentColor, 0.14 + snapshot.dragStrength * 0.1)}
+                cx={center + activeDragRef.current.x * 0.22}
+                cy={center + activeDragRef.current.y * 0.22}
+                r={auraRadius * (0.24 + snapshot.dragStrength * 0.08)}>
+                <BlurMask blur={22} style="solid" />
+              </Circle>
+              {tapPressureCircles.map((pressure) => (
+                <Circle color={pressure.color} cx={pressure.x} cy={pressure.y} key={pressure.id} r={pressure.radius}>
+                  <BlurMask blur={18} style="solid" />
+                </Circle>
+              ))}
+            </Group>
           </Canvas>
         </Animated.View>
 
@@ -544,9 +567,7 @@ export function EggAuraField({
           <Canvas style={{ height: size, width: size }}>
             {particles.map((particle) => (
               <Circle
-                color={`${egg.accentColor}${Math.round(particle.opacity * 255)
-                  .toString(16)
-                  .padStart(2, '0')}`}
+                color={withAlpha(egg.accentColor, particle.opacity)}
                 cx={particle.x}
                 cy={particle.y}
                 key={particle.id}
@@ -627,7 +648,7 @@ function AuraRipple({
         style={[
           styles.rippleFill,
           {
-            backgroundColor: `${color}1A`,
+            backgroundColor: withAlpha(color, 0.1),
             left: originX - 14,
             top: originY - 14,
           },
@@ -639,7 +660,7 @@ function AuraRipple({
         style={[
           styles.rippleRingSecondary,
           {
-            borderColor: `${color}44`,
+            borderColor: withAlpha(color, 0.27),
             left: originX - 18,
             top: originY - 18,
           },
@@ -651,7 +672,7 @@ function AuraRipple({
         style={[
           styles.rippleRing,
           {
-            borderColor: `${color}AA`,
+            borderColor: withAlpha(color, 0.66),
             left: originX - 18,
             top: originY - 18,
           },
@@ -662,9 +683,173 @@ function AuraRipple({
   );
 }
 
+function createMembranePoints(pointCount: number, baseRadius: number): EggMembranePoint[] {
+  return Array.from({ length: pointCount }, (_, index) => ({
+    angle: (-Math.PI / 2) + (Math.PI * 2 * index) / pointCount,
+    baseRadius,
+    offset: 0,
+    velocity: 0,
+  }));
+}
+
+function advanceMembrane(
+  points: EggMembranePoint[],
+  impulses: EggForceImpulse[],
+  activeDrag: { x: number; y: number; strength: number; velocity: number },
+  center: number,
+  now: number,
+  dt: number
+) {
+  if (points.length === 0) {
+    return;
+  }
+
+  const previousOffsets = points.map((point) => point.offset);
+
+  points.forEach((point, index) => {
+    const previousIndex = (index - 1 + points.length) % points.length;
+    const nextIndex = (index + 1) % points.length;
+    const prevOffset = previousOffsets[previousIndex];
+    const nextOffset = previousOffsets[nextIndex];
+    let force = -point.offset * membraneConfig.springStrength;
+
+    force += (prevOffset + nextOffset - point.offset * 2) * membraneConfig.neighborInfluence;
+
+    impulses.forEach((impulse) => {
+      const progress = clamp01((now - impulse.createdAt) / impulse.durationMs);
+      if (progress >= 1) {
+        return;
+      }
+
+      const impulseAngle = Math.atan2(impulse.y - center, impulse.x - center);
+      const angleDelta = normalizeAngle(point.angle - impulseAngle);
+      const angularFalloff =
+        impulse.kind === 'tap'
+          ? Math.exp(-((angleDelta * angleDelta) / 0.42))
+          : Math.exp(-((angleDelta * angleDelta) / 0.64));
+      const amplitudeBase =
+        impulse.kind === 'tap'
+          ? 22
+          : impulse.kind === 'drag'
+            ? 18
+            : 12;
+      const oscillation =
+        impulse.kind === 'tap'
+          ? Math.sin(progress * Math.PI * 2.35)
+          : 1 - progress;
+
+      force += amplitudeBase * impulse.strength * angularFalloff * oscillation * 0.18;
+    });
+
+    if (activeDrag.strength > 0.01) {
+      const dragAngle = Math.atan2(activeDrag.y, activeDrag.x);
+      const dragAngleDelta = normalizeAngle(point.angle - dragAngle);
+      const dragFalloff = Math.exp(-((dragAngleDelta * dragAngleDelta) / 0.28));
+      force += 28 * activeDrag.strength * dragFalloff * 0.16;
+    }
+
+    point.velocity += force * dt * 60;
+    point.velocity *= Math.pow(membraneConfig.damping, dt * 60);
+    point.offset += point.velocity * dt * 60;
+    point.offset = clamp(point.offset, -18, 34);
+  });
+}
+
+function buildSplinePath(points: EggMembranePoint[], center: number) {
+  const path = Skia.Path.Make();
+  if (points.length < 2) {
+    return path;
+  }
+
+  const controlPoints = points.map((point) => {
+    const radius = point.baseRadius + point.offset;
+    return {
+      offset: point.offset,
+      x: center + Math.cos(point.angle) * radius,
+      y: center + Math.sin(point.angle) * radius,
+    };
+  });
+
+  const renderPoints: { x: number; y: number }[] = [];
+  for (let index = 0; index < controlPoints.length; index += 1) {
+    const p0 = controlPoints[(index - 1 + controlPoints.length) % controlPoints.length];
+    const p1 = controlPoints[index];
+    const p2 = controlPoints[(index + 1) % controlPoints.length];
+    const p3 = controlPoints[(index + 2) % controlPoints.length];
+    const segmentLength = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const offsetDelta = Math.abs(p2.offset - p1.offset);
+    const subdivisions = clamp(
+      5 + Math.ceil(segmentLength / 18) + Math.ceil(offsetDelta / 3.5),
+      6,
+      14
+    );
+
+    for (let step = 0; step < subdivisions; step += 1) {
+      const t = step / subdivisions;
+      renderPoints.push(catmullRomPoint(p0, p1, p2, p3, t));
+    }
+  }
+
+  const first = renderPoints[0];
+  if (!first) {
+    return path;
+  }
+
+  path.moveTo(first.x, first.y);
+  for (let index = 1; index < renderPoints.length; index += 1) {
+    const point = renderPoints[index];
+    path.lineTo(point.x, point.y);
+  }
+  path.close();
+  return path;
+}
+
+function catmullRomPoint(
+  p0: { x: number; y: number },
+  p1: { x: number; y: number },
+  p2: { x: number; y: number },
+  p3: { x: number; y: number },
+  t: number
+) {
+  const t2 = t * t;
+  const t3 = t2 * t;
+
+  return {
+    x:
+      0.5 *
+      ((2 * p1.x) +
+        (-p0.x + p2.x) * t +
+        (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+        (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+    y:
+      0.5 *
+      ((2 * p1.y) +
+        (-p0.y + p2.y) * t +
+        (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+        (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+  };
+}
+
+function withAlpha(color: string, alpha: number) {
+  const normalized = clamp01(alpha);
+  if (color.startsWith('#')) {
+    const base = color.length === 9 ? color.slice(0, 7) : color;
+    return `${base}${Math.round(normalized * 255)
+      .toString(16)
+      .padStart(2, '0')}`;
+  }
+
+  return `${color}${Math.round(normalized * 255)
+    .toString(16)
+    .padStart(2, '0')}`;
+}
+
 function clamp01(value: number) {
-  'worklet';
   return Math.max(0, Math.min(1, value));
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function normalizeAngle(angle: number) {
