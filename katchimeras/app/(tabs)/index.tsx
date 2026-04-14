@@ -187,12 +187,18 @@ export default function HomeScreen() {
         <Animated.View entering={presenceEnter(70)} onLayout={handleHeroStageLayout} style={styles.heroStage}>
           {selectedDay?.kind === 'day' ? (
             selectedDay.state === 'hatched' && selectedDay.creature ? (
-              <CreatureHero creature={selectedDay.creature} moments={selectedDay.moments} subtitle={heroSubtitle} />
+              <CreatureHero
+                creature={selectedDay.creature}
+                interactive
+                moments={selectedDay.moments}
+                onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
+                subtitle={heroSubtitle}
+              />
             ) : (
               <FormingEgg
                 caption={heroSubtitle}
                 egg={selectedDay.egg}
-                interactive={selectedDay.isToday}
+                interactive
                 onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
                 reactionKey={selectedDay.moments.length + (selectedDay.selectedPathId ? 1 : 0)}
               />
@@ -209,6 +215,7 @@ export default function HomeScreen() {
                 swirl: 0.2,
                 label: tomorrowState.title,
               }}
+              interactive
             />
           )}
         </Animated.View>

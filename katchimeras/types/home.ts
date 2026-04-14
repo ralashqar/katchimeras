@@ -114,6 +114,21 @@ export type EggRippleEvent = {
   startedAt: number;
 };
 
+export type EggDragTrailPoint = {
+  id: string;
+  x: number;
+  y: number;
+  strength: number;
+  startedAt: number;
+};
+
+export type EggDragTrailState = {
+  activeX: number | null;
+  activeY: number | null;
+  releaseVelocity: number;
+  points: EggDragTrailPoint[];
+};
+
 export type EggAuraConfig = {
   baseRadius: number;
   membraneThickness: number;

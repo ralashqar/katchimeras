@@ -10,20 +10,23 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
+import { HeroAuraFrame } from '@/components/katchadeck/home/hero-aura-frame';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/utils/home-engine';
-import type { HomeMoment, LocalCreatureRecord } from '@/types/home';
+import type { EggVisualState, HomeMoment, LocalCreatureRecord } from '@/types/home';
 import { KatchaDeckUI } from '@/constants/theme';
 import { homeMomentOptions } from '@/constants/home-mvp';
 
 type CreatureHeroProps = {
   creature: LocalCreatureRecord;
+  interactive?: boolean;
   moments: HomeMoment[];
+  onPress?: () => void;
   subtitle?: string;
 };
 
-export function CreatureHero({ creature, moments, subtitle }: CreatureHeroProps) {
+export function CreatureHero({ creature, interactive = false, moments, onPress, subtitle }: CreatureHeroProps) {
   const visual = getCreatureVisual(creature.visualKey);
   const float = useSharedValue(0);
   const glow = useSharedValue(0.2);
@@ -60,28 +63,41 @@ export function CreatureHero({ creature, moments, subtitle }: CreatureHeroProps)
   const motifMoments = Array.from(new Set(moments.map((moment) => moment.type)))
     .slice(0, 2)
     .map((type) => homeMomentOptions[type]);
+  const aura: EggVisualState = {
+    accentColor: creature.accentColor,
+    haloColor: creature.accentColor,
+    coreColor: `${creature.accentColor}66`,
+    intensity: creature.rarity === 'legendary' ? 0.78 : creature.rarity === 'epic' ? 0.66 : creature.rarity === 'rare' ? 0.54 : 0.42,
+    shimmer: true,
+    swirl: 0.34,
+    label: creature.name,
+  };
 
   return (
     <View style={styles.shell}>
-      <View style={styles.visualWrap}>
-        <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}32` }, haloStyle]} />
-        <Animated.View style={[styles.creatureWrap, visualStyle]}>
-          <View style={[styles.creaturePlate, { borderColor: `${visual.accentColor}40` }]}>
-            <Image contentFit="contain" source={visual.source} style={styles.image} transition={0} />
+      <HeroAuraFrame aura={aura} centerPressSize={112} interactive={interactive} onPress={onPress}>
+        {() => (
+          <View pointerEvents="none" style={styles.visualWrap}>
+            <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}32` }, haloStyle]} />
+            <Animated.View style={[styles.creatureWrap, visualStyle]}>
+              <View style={[styles.creaturePlate, { borderColor: `${visual.accentColor}40` }]}>
+                <Image contentFit="contain" source={visual.source} style={styles.image} transition={0} />
+              </View>
+            </Animated.View>
+            {motifMoments.map((moment, index) => (
+              <View
+                key={moment.id}
+                style={[
+                  styles.motifOrbit,
+                  index === 0 ? styles.motifLeft : styles.motifRight,
+                  { backgroundColor: `${moment.accentColor}22`, borderColor: `${moment.accentColor}55` },
+                ]}>
+                <IconSymbol color={moment.accentColor} name={moment.icon} size={16} />
+              </View>
+            ))}
           </View>
-        </Animated.View>
-        {motifMoments.map((moment, index) => (
-          <View
-            key={moment.id}
-            style={[
-              styles.motifOrbit,
-              index === 0 ? styles.motifLeft : styles.motifRight,
-              { backgroundColor: `${moment.accentColor}22`, borderColor: `${moment.accentColor}55` },
-            ]}>
-            <IconSymbol color={moment.accentColor} name={moment.icon} size={16} />
-          </View>
-        ))}
-      </View>
+        )}
+      </HeroAuraFrame>
       <View style={styles.copy}>
         <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
           {creature.rarity}
@@ -104,7 +120,6 @@ const styles = StyleSheet.create({
   },
   visualWrap: {
     alignItems: 'center',
-    height: 310,
     justifyContent: 'center',
     width: '100%',
   },
@@ -170,4 +185,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
