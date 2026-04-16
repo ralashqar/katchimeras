@@ -15,9 +15,12 @@ import { timelineDemoEntries } from '@/constants/timeline-demo';
 import type {
   AddMomentInput,
   DayScores,
+  DayMapSummary,
   EggVisualState,
   HomeDayRecord,
   HomeDayState,
+  HomeLocationSource,
+  HomeLocationType,
   HomeMoment,
   HomeMomentMetadata,
   HomeScoreKey,
@@ -25,23 +28,38 @@ import type {
   HomeTomorrowRecord,
   InspirationCategory,
   InspirationSelection,
+  LocationPermissionState,
   LocalCreatureRecord,
   LocalPathOption,
+  RecentPhotoAsset,
   StoredHomeDayRecord,
+  StoredHomeLocationPoint,
   StoredHomeState,
   WeekProfile,
 } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
+import { deriveDayMapSummary } from '@/utils/day-map-engine';
 
 const scoreOrder: HomeScoreKey[] = ['energy', 'calm', 'social', 'exploration', 'focus'];
 const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
+const MAX_STORED_DAY_LOCATIONS = 180;
+const LOCATION_LINK_WINDOW_MS = 20 * 60 * 1000;
+const LOCATION_DEDUPE_WINDOW_MS = 4 * 60 * 1000;
+const LOCATION_DEDUPE_DISTANCE_METERS = 65;
 const pathSupportMap: Record<HomeScoreKey, HomeScoreKey> = {
   energy: 'exploration',
   calm: 'focus',
   social: 'calm',
   exploration: 'energy',
   focus: 'calm',
+};
+
+type LegacyStoredHomeDayRecord = Omit<StoredHomeDayRecord, 'locations'>;
+type LegacyStoredHomeState = {
+  version?: 1;
+  archivedDays: LegacyStoredHomeDayRecord[];
+  today: LegacyStoredHomeDayRecord;
 };
 
 export function createEmptyScores(): DayScores {
@@ -67,6 +85,7 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
       isoDate: toLocalDateId(dayDate),
       state: 'hatched' as const,
       moments: [moment],
+      locations: createSeedLocations(momentType, dayDate, index, moment.id),
       selectedPathId: null,
       creature: {
         id: `seed-creature-${entry.creature.id}`,
@@ -85,14 +104,15 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
   });
 
   return {
-    version: 1,
+    version: 2,
+    locationPermission: 'unknown',
     archivedDays,
     today: createEmptyStoredDay(now, profile),
   };
 }
 
 export function hydrateHomeState(
-  storedState: StoredHomeState | null,
+  storedState: StoredHomeState | LegacyStoredHomeState | null,
   profile: OnboardingProfile,
   now: Date
 ): {
@@ -118,6 +138,66 @@ export function hydrateHomeState(
   };
 }
 
+export function updateLocationPermissionState(
+  state: StoredHomeState,
+  permission: LocationPermissionState,
+  profile: OnboardingProfile,
+  now: Date
+) {
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      locationPermission: permission,
+    },
+    profile,
+    now
+  );
+}
+
+export function recordForegroundLocationSample(
+  state: StoredHomeState,
+  sample: {
+    lat: number;
+    lng: number;
+    capturedAt: string;
+    accuracyMeters?: number;
+    type?: HomeLocationType;
+    source?: HomeLocationSource;
+  },
+  profile: OnboardingProfile,
+  now: Date
+) {
+  const nextPoint: StoredHomeLocationPoint = {
+    id: `loc-${new Date(sample.capturedAt).getTime().toString(36)}-${Math.abs(
+      Math.round(sample.lat * 10000 + sample.lng * 10000)
+    ).toString(36)}`,
+    lat: Number(sample.lat.toFixed(6)),
+    lng: Number(sample.lng.toFixed(6)),
+    capturedAt: sample.capturedAt,
+    type: sample.type ?? 'unknown',
+    hasPhoto: false,
+    source: sample.source ?? 'foreground',
+    momentId: null,
+    accuracyMeters: sample.accuracyMeters ? Number(sample.accuracyMeters.toFixed(1)) : undefined,
+  };
+
+  if (shouldSkipLocationSample(state.today.locations, nextPoint)) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: {
+        ...state.today,
+        locations: [...state.today.locations, nextPoint].slice(-MAX_STORED_DAY_LOCATIONS),
+      },
+    },
+    profile,
+    now
+  );
+}
+
 export function addMomentToDay(
   state: StoredHomeState,
   profile: OnboardingProfile,
@@ -125,15 +205,77 @@ export function addMomentToDay(
   now: Date
 ): StoredHomeState {
   const moment = createMoment(momentInput, now);
+  const nextLocations = appendPhotoMomentLocation(linkMomentToLatestLocation(state.today.locations, moment), moment);
   const nextToday: StoredHomeDayRecord = {
     ...state.today,
     moments: [...state.today.moments, moment],
+    locations: nextLocations,
   };
 
   return normalizeStoredHomeState(
     {
       ...state,
       today: nextToday,
+    },
+    profile,
+    now
+  );
+}
+
+export function seedRecentPhotoLocationsForToday(
+  state: StoredHomeState,
+  photos: RecentPhotoAsset[],
+  profile: OnboardingProfile,
+  now: Date
+) {
+  const geotaggedPhotos = photos
+    .map((photo) => ({
+      ...photo,
+      latitude: normalizeCoordinate(photo.latitude),
+      longitude: normalizeCoordinate(photo.longitude),
+    }))
+    .filter((photo) => photo.latitude != null && photo.longitude != null)
+    .sort((left, right) => left.createdAt - right.createdAt)
+    .slice(-8);
+
+  if (geotaggedPhotos.length === 0) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  const nextLocations = [...state.today.locations];
+  geotaggedPhotos.forEach((photo, index) => {
+    const seededPoint: StoredHomeLocationPoint = {
+      id: `camera-roll-photo-${photo.id}`,
+      lat: Number(photo.latitude!.toFixed(6)),
+      lng: Number(photo.longitude!.toFixed(6)),
+      capturedAt: buildRecentPhotoSeedTimestamp(now, index, geotaggedPhotos.length),
+      type: 'unknown',
+      hasPhoto: true,
+      source: 'photo_attachment',
+      momentId: null,
+      thumbnailUri: photo.thumbnailUri || photo.uri,
+    };
+    const existingIndex = nextLocations.findIndex((point) => point.id === seededPoint.id);
+
+    if (existingIndex >= 0) {
+      nextLocations[existingIndex] = {
+        ...nextLocations[existingIndex],
+        ...seededPoint,
+        momentId: nextLocations[existingIndex]?.momentId ?? null,
+      };
+      return;
+    }
+
+    nextLocations.push(seededPoint);
+  });
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: {
+        ...state.today,
+        locations: nextLocations.slice(-MAX_STORED_DAY_LOCATIONS),
+      },
     },
     profile,
     now
@@ -217,6 +359,7 @@ export function deriveHomeDayRecord(
   const pathOptions = buildPathOptions(weekProfile);
   const egg = deriveEggVisualState(scores, storedDay.selectedPathId, profile, state);
   const highlight = storedDay.creature?.highlight ?? buildUnhatchedHighlight(storedDay, state);
+  const dayMap = deriveDayMapSummary(storedDay.locations, storedDay.moments);
 
   return {
     ...storedDay,
@@ -232,6 +375,7 @@ export function deriveHomeDayRecord(
     canAddMoments: isToday && state !== 'hatched',
     canHatch: state === 'ready_to_hatch',
     highlight,
+    dayMap,
   };
 }
 
@@ -314,13 +458,14 @@ export function buildInsightLine(profile: WeekProfile, onboardingProfile: Onboar
 }
 
 function normalizeStoredHomeState(
-  inputState: StoredHomeState,
+  inputState: StoredHomeState | LegacyStoredHomeState,
   profile: OnboardingProfile,
   now: Date
 ): StoredHomeState {
+  const upgradedState = upgradeStoredHomeState(inputState);
   const todayDateId = toLocalDateId(now);
-  let archivedDays: StoredHomeDayRecord[] = [...inputState.archivedDays];
-  let today: StoredHomeDayRecord = { ...inputState.today };
+  let archivedDays: StoredHomeDayRecord[] = [...upgradedState.archivedDays];
+  let today: StoredHomeDayRecord = { ...upgradedState.today };
 
   if (today.isoDate !== todayDateId) {
     archivedDays = [...archivedDays, resolveRolledPastDay(today, profile, now)].slice(-5);
@@ -340,7 +485,8 @@ function normalizeStoredHomeState(
     .slice(-5);
 
   return {
-    version: 1,
+    version: 2,
+    locationPermission: upgradedState.locationPermission,
     archivedDays,
     today,
   };
@@ -374,9 +520,204 @@ function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHome
     isoDate: toLocalDateId(now),
     state: 'forming',
     moments: [],
+    locations: [],
     selectedPathId: buildInitialPathId(profile),
     creature: null,
   };
+}
+
+function upgradeStoredHomeState(inputState: StoredHomeState | LegacyStoredHomeState): StoredHomeState {
+  if ('version' in inputState && inputState.version === 2) {
+    return {
+      ...inputState,
+      archivedDays: inputState.archivedDays.map(ensureLocationsOnDayRecord),
+      today: ensureLocationsOnDayRecord(inputState.today),
+    };
+  }
+
+  const legacy = inputState as LegacyStoredHomeState;
+
+  return {
+    version: 2,
+    locationPermission: 'unknown',
+    archivedDays: legacy.archivedDays.map(ensureLocationsOnDayRecord),
+    today: ensureLocationsOnDayRecord(legacy.today),
+  };
+}
+
+function ensureLocationsOnDayRecord(day: StoredHomeDayRecord | LegacyStoredHomeDayRecord): StoredHomeDayRecord {
+  const existingLocations = 'locations' in day ? day.locations ?? [] : [];
+  return {
+    ...day,
+    locations: existingLocations.length > 0 ? existingLocations : createFallbackLocationsForStoredDay(day),
+  };
+}
+
+function shouldSkipLocationSample(existingPoints: StoredHomeLocationPoint[], nextPoint: StoredHomeLocationPoint) {
+  const latestPoint = existingPoints[existingPoints.length - 1];
+  if (!latestPoint) {
+    return false;
+  }
+
+  const timeDelta = new Date(nextPoint.capturedAt).getTime() - new Date(latestPoint.capturedAt).getTime();
+  const distance = getDistanceMeters(nextPoint.lat, nextPoint.lng, latestPoint.lat, latestPoint.lng);
+
+  return timeDelta >= 0 && timeDelta <= LOCATION_DEDUPE_WINDOW_MS && distance <= LOCATION_DEDUPE_DISTANCE_METERS;
+}
+
+function buildRecentPhotoSeedTimestamp(now: Date, index: number, total: number) {
+  const base = new Date(now);
+  const remaining = total - index - 1;
+  base.setSeconds(0, 0);
+  base.setMinutes(base.getMinutes() - remaining * 42);
+  return base.toISOString();
+}
+
+function normalizeCoordinate(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function linkMomentToLatestLocation(points: StoredHomeLocationPoint[], moment: HomeMoment) {
+  if (points.length === 0) {
+    return points;
+  }
+
+  const momentTime = new Date(moment.createdAt).getTime();
+  const momentType = deriveLocationTypeFromMoment(moment);
+  let linked = false;
+
+  const nextPoints = points.map((point, index, collection) => {
+    if (linked) {
+      return point;
+    }
+
+    const pointTime = new Date(point.capturedAt).getTime();
+    const isFresh = momentTime >= pointTime && momentTime - pointTime <= LOCATION_LINK_WINDOW_MS;
+    const isLatest = index === collection.length - 1;
+
+    if (!isFresh || !isLatest) {
+      return point;
+    }
+
+    linked = true;
+    return {
+      ...point,
+      hasPhoto: point.hasPhoto || moment.type === 'photo',
+      momentId: moment.type === 'photo' || !point.momentId ? moment.id : point.momentId,
+      thumbnailUri: moment.type === 'photo' ? moment.metadata?.thumbnailUri ?? point.thumbnailUri : point.thumbnailUri,
+      type: momentType ?? point.type,
+    };
+  });
+
+  return nextPoints;
+}
+
+function appendPhotoMomentLocation(points: StoredHomeLocationPoint[], moment: HomeMoment) {
+  if (moment.type !== 'photo' || !moment.metadata?.latitude || !moment.metadata?.longitude) {
+    return points;
+  }
+
+  const attachedPoint: StoredHomeLocationPoint = {
+    id: `photo-location-${moment.id}`,
+    lat: Number(moment.metadata.latitude.toFixed(6)),
+    lng: Number(moment.metadata.longitude.toFixed(6)),
+    capturedAt: moment.createdAt,
+    type: moment.metadata.locationType ?? 'unknown',
+    hasPhoto: true,
+    source: 'photo_attachment',
+    momentId: moment.id,
+    thumbnailUri: moment.metadata.thumbnailUri,
+  };
+
+  const hasNearbyPoint = points.some((point) => {
+    const timeDelta = Math.abs(new Date(point.capturedAt).getTime() - new Date(moment.createdAt).getTime());
+    const distance = getDistanceMeters(point.lat, point.lng, attachedPoint.lat, attachedPoint.lng);
+    return timeDelta <= LOCATION_LINK_WINDOW_MS && distance <= 180;
+  });
+
+  if (hasNearbyPoint) {
+    return points.map((point) => {
+      const timeDelta = Math.abs(new Date(point.capturedAt).getTime() - new Date(moment.createdAt).getTime());
+      const distance = getDistanceMeters(point.lat, point.lng, attachedPoint.lat, attachedPoint.lng);
+
+      if (timeDelta <= LOCATION_LINK_WINDOW_MS && distance <= 180) {
+        return {
+          ...point,
+          hasPhoto: true,
+          momentId: point.momentId ?? moment.id,
+          thumbnailUri: moment.metadata?.thumbnailUri ?? point.thumbnailUri,
+        };
+      }
+
+      return point;
+    });
+  }
+
+  return [...points, attachedPoint].slice(-MAX_STORED_DAY_LOCATIONS);
+}
+
+function deriveLocationTypeFromMoment(moment: HomeMoment): HomeLocationType | null {
+  if (moment.type === 'coffee') {
+    return 'cafe';
+  }
+
+  if (moment.type === 'walk' || moment.type === 'new_place') {
+    return 'park';
+  }
+
+  if (moment.type === 'calm' || moment.type === 'focus') {
+    return 'home';
+  }
+
+  return null;
+}
+
+function createSeedLocations(
+  momentType: HomeMoment['type'],
+  date: Date,
+  seedIndex: number,
+  momentId: string
+): StoredHomeLocationPoint[] {
+  const presets = seedLocationPresets[momentType] ?? seedLocationPresets.focus;
+  const baseDate = new Date(date);
+  baseDate.setHours(9, 0, 0, 0);
+
+  return presets.map((preset, index) => {
+    const capturedAt = new Date(baseDate);
+    capturedAt.setHours(baseDate.getHours() + index * 3);
+
+    return {
+      id: `seed-location-${seedIndex}-${index}`,
+      lat: preset.lat,
+      lng: preset.lng,
+      capturedAt: capturedAt.toISOString(),
+      type: preset.type,
+      hasPhoto: momentType === 'photo',
+      source: 'foreground',
+      momentId: index === presets.length - 1 ? momentId : null,
+      accuracyMeters: 80,
+    };
+  });
+}
+
+function createFallbackLocationsForStoredDay(day: Pick<StoredHomeDayRecord, 'id' | 'isoDate' | 'moments' | 'creature'>) {
+  if (day.moments.length === 0) {
+    return [];
+  }
+
+  const firstMoment = day.moments[0];
+  const dayDate = new Date(`${day.isoDate}T12:00:00`);
+  const seedIndex = stableHash(`${day.id}|${day.isoDate}`) % 1000;
+  return createSeedLocations(firstMoment.type, dayDate, seedIndex, firstMoment.id);
 }
 
 function buildInitialPathId(profile: OnboardingProfile) {
@@ -768,6 +1109,55 @@ function uniqueMomentLabels(moments: HomeMoment[]) {
 
 function clampScore(value: number) {
   return Math.max(0, Math.min(1, Number(value.toFixed(3))));
+}
+
+const seedLocationPresets: Record<HomeMoment['type'], readonly { lat: number; lng: number; type: HomeLocationType }[]> = {
+  photo: [
+    { lat: 51.5084, lng: -0.1276, type: 'unknown' },
+    { lat: 51.5106, lng: -0.1202, type: 'park' },
+  ],
+  inspiration: [
+    { lat: 51.5145, lng: -0.1421, type: 'home' },
+  ],
+  coffee: [
+    { lat: 51.5124, lng: -0.1363, type: 'home' },
+    { lat: 51.5152, lng: -0.1416, type: 'cafe' },
+  ],
+  walk: [
+    { lat: 51.5062, lng: -0.1165, type: 'park' },
+    { lat: 51.5024, lng: -0.1199, type: 'park' },
+    { lat: 51.4996, lng: -0.1248, type: 'park' },
+  ],
+  new_place: [
+    { lat: 51.5111, lng: -0.1288, type: 'unknown' },
+    { lat: 51.5194, lng: -0.1269, type: 'park' },
+  ],
+  social: [
+    { lat: 51.5139, lng: -0.1352, type: 'cafe' },
+    { lat: 51.5172, lng: -0.1317, type: 'unknown' },
+  ],
+  calm: [
+    { lat: 51.5149, lng: -0.1428, type: 'home' },
+  ],
+  focus: [
+    { lat: 51.5157, lng: -0.1412, type: 'home' },
+  ],
+};
+
+function getDistanceMeters(leftLat: number, leftLng: number, rightLat: number, rightLng: number) {
+  const earthRadiusMeters = 6371000;
+  const latDelta = toRadians(rightLat - leftLat);
+  const lngDelta = toRadians(rightLng - leftLng);
+  const leftLatRadians = toRadians(leftLat);
+  const rightLatRadians = toRadians(rightLat);
+  const haversine =
+    Math.sin(latDelta / 2) ** 2 +
+    Math.cos(leftLatRadians) * Math.cos(rightLatRadians) * Math.sin(lngDelta / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
 }
 
 function shiftLocalDate(date: Date, dayOffset: number) {

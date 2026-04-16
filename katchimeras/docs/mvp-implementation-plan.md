@@ -316,6 +316,31 @@ Deliverable:
 
 - photo moments feel native to the product world without forcing a generic picker-first flow
 
+### Phase 4C. Add Day Map
+
+Goal:
+
+Add a spatial reflection layer to Home without turning the app into a tracker.
+
+Frontend and domain tasks:
+
+- extend the Home state model with stored foreground location samples
+- migrate local Home persistence to include `locations[]` and permission state
+- add a pure day-map derivation module for clustering, key-location selection, path building, and viewport math
+- attach photo and location-adjacent moments to the freshest stored sample when available
+- render a compact day map preview for past days inside the Home context area
+- add a dedicated `/day-map/[dayId]` route for the full-screen interactive version
+
+Permission and signal tasks:
+
+- use foreground-only location permission
+- capture while Home is active on today
+- avoid raw GPS presentation and navigation-style chrome
+
+Deliverable:
+
+- past days gain a clear place-based memory layer that complements the creature and highlight
+
 ## Phase 5. Add MVP Persistence Model In Supabase
 
 Goal:
@@ -582,9 +607,10 @@ In order:
 5. Add the Add moment bottom sheet with instant quick-tag flow.
 6. Refactor Add Moment into an egg-centered radial capture flow.
 7. Add recent-photo orbit mode and absorption animation.
-8. Add the collapsed and expanded Insight + Paths module.
-9. Add hatch animation flow and skip logic.
-10. Add optimistic state syncing to Supabase-backed mutations.
+8. Add Day Map preview and full-screen day map route.
+9. Add the collapsed and expanded Insight + Paths module.
+10. Add hatch animation flow and skip logic.
+11. Add optimistic state syncing to Supabase-backed mutations.
 
 ## 5. Concrete Backend Worklist
 

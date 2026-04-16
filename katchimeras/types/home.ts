@@ -15,6 +15,9 @@ export type HomeMomentSource = 'quick_tag' | 'photo_library' | 'inspiration_libr
 export type HomeDayState = 'forming' | 'ready_to_hatch' | 'hatched';
 export type HomeScoreKey = 'energy' | 'calm' | 'social' | 'exploration' | 'focus';
 export type HomeRarityTier = 'common' | 'rare' | 'epic' | 'legendary';
+export type HomeLocationType = 'home' | 'cafe' | 'park' | 'unknown';
+export type HomeLocationSource = 'foreground' | 'photo_attachment' | 'manual';
+export type LocationPermissionState = 'unknown' | 'granted' | 'denied';
 export type HomeVisualKey =
   | 'voltstep'
   | 'hearthsip'
@@ -44,6 +47,56 @@ export type HomeMomentMetadata = {
   category?: InspirationCategory;
   contextTags?: string[];
   quoteId?: string;
+  locationType?: HomeLocationType;
+  latitude?: number;
+  longitude?: number;
+};
+
+export type StoredHomeLocationPoint = {
+  id: string;
+  lat: number;
+  lng: number;
+  capturedAt: string;
+  type: HomeLocationType;
+  hasPhoto: boolean;
+  source: HomeLocationSource;
+  momentId?: string | null;
+  thumbnailUri?: string;
+  accuracyMeters?: number;
+};
+
+export type DayMapCoordinate = {
+  latitude: number;
+  longitude: number;
+};
+
+export type DayMapNode = {
+  id: string;
+  latitude: number;
+  longitude: number;
+  type: HomeLocationType;
+  importance: number;
+  hasPhoto: boolean;
+  linkedMomentId: string | null;
+  photoThumbnailUri: string | null;
+  startedAt: string;
+  endedAt: string;
+  sampleCount: number;
+};
+
+export type DayMapViewport = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+export type DayMapSummary = {
+  nodes: DayMapNode[];
+  path: DayMapCoordinate[];
+  primaryLocationId: string | null;
+  viewport: DayMapViewport | null;
+  totalSamples: number;
 };
 
 export type HomeMoment = {
@@ -189,12 +242,14 @@ export type StoredHomeDayRecord = {
   isoDate: string;
   state: HomeDayState;
   moments: HomeMoment[];
+  locations: StoredHomeLocationPoint[];
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
 };
 
 export type StoredHomeState = {
-  version: 1;
+  version: 2;
+  locationPermission: LocationPermissionState;
   archivedDays: StoredHomeDayRecord[];
   today: StoredHomeDayRecord;
 };
@@ -213,6 +268,7 @@ export type HomeDayRecord = StoredHomeDayRecord & {
   canAddMoments: boolean;
   canHatch: boolean;
   highlight: string | null;
+  dayMap: DayMapSummary | null;
 };
 
 export type HomeTomorrowRecord = {
@@ -244,6 +300,8 @@ export type RecentPhotoAsset = {
   width: number;
   height: number;
   isScreenshot?: boolean;
+  latitude?: number;
+  longitude?: number;
 };
 
 export type InspirationQuote = {

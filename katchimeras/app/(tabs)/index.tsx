@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { type LayoutChangeEvent, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useEffect, useState } from 'react';
@@ -14,17 +15,24 @@ import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { useAddMomentFlow } from '@/hooks/use-add-moment-flow';
+import { useDayLocationCapture } from '@/hooks/use-day-location-capture';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
+import { useRecentPhotoMapSeeding } from '@/hooks/use-recent-photo-map-seeding';
 import type { HomeDayRecord } from '@/types/home';
 import type { TimelineDayEntry, TimelineTomorrowState } from '@/types/timeline';
 import { getCreatureVisual } from '@/utils/home-engine';
 
 export default function HomeScreen() {
+  const router = useRouter();
   const {
     addMoment,
+    addForegroundLocationSample,
+    locationPermission,
     selectPath,
     selectedDay,
     selectedDayId,
+    seedRecentPhotoLocations,
+    setLocationPermission,
     selectTimelineDay,
     timelineDays,
     triggerHatchIfReady,
@@ -90,6 +98,19 @@ export default function HomeScreen() {
   const hatchDay =
     hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId ? selectedDay : null;
 
+  useDayLocationCapture({
+    enabled: selectedDay?.kind === 'day' && selectedDay.isToday,
+    onPermissionResolved: setLocationPermission,
+    onSample: addForegroundLocationSample,
+    permissionState: locationPermission,
+  });
+
+  useRecentPhotoMapSeeding({
+    dayId: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay.id : null,
+    enabled: selectedDay?.kind === 'day' && selectedDay.isToday,
+    onSeed: seedRecentPhotoLocations,
+  });
+
   useEffect(() => {
     if (!hatchTargetId || !hatchDay) {
       return;
@@ -148,6 +169,13 @@ export default function HomeScreen() {
   function handleHeroStageLayout(event: LayoutChangeEvent) {
     const { height, y } = event.nativeEvent.layout;
     setHeroAnchorY(y + height / 2);
+  }
+
+  function handleOpenDayMap(dayId: string) {
+    router.push({
+      pathname: '/day-map/[dayId]',
+      params: { dayId },
+    });
   }
 
   return (
@@ -222,7 +250,12 @@ export default function HomeScreen() {
 
         {selectedDay?.kind === 'day' ? (
           <Animated.View entering={presenceEnter(110)}>
-            <DayContext day={selectedDay} onAddMoment={openAddMomentFlow} onReveal={handleReveal} />
+            <DayContext
+              day={selectedDay}
+              onAddMoment={openAddMomentFlow}
+              onReveal={handleReveal}
+              onViewDayMap={() => handleOpenDayMap(selectedDay.id)}
+            />
           </Animated.View>
         ) : (
           <Animated.View entering={presenceEnter(110)}>

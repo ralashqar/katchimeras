@@ -460,3 +460,51 @@ Relevant current pieces:
   - can remain a world or collection view rather than the main daily loop
 
 The current implementation is still a stylized prototype. This document defines the intended production-facing behavior.
+
+## 21. Day Map Layer
+
+The Home screen now includes a spatial memory layer for past days.
+
+### Placement
+
+For a selected past day:
+
+- Creature remains the hero
+- Highlight remains the main textual summary
+- Day Map preview sits directly below the highlight
+- moments follow underneath
+
+This keeps the map secondary to the creature, while still making place visible.
+
+### Interaction
+
+The embedded preview should feel quiet and preview-like:
+
+- compact height
+- minimal interaction
+- CTA: `View day map`
+
+The dedicated day map route holds the richer interaction:
+
+- tap node for a detail card
+- tap map to dismiss
+
+### Visual language
+
+The Day Map should follow the same KatchaDeck design language:
+
+- glowing orbs instead of literal pins
+- soft path line instead of route chrome
+- creature accent color drives the map accent
+- restrained motion and low visual density
+
+### Important boundary
+
+This map is not a live movement view for today.
+
+In MVP, the map is reflective:
+
+- past-day preview on Home
+- full-screen day memory map on demand
+
+That preserves the app's identity as reflection over tracking.

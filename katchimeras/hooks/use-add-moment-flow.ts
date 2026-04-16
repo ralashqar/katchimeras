@@ -1,3 +1,4 @@
+import * as ImagePicker from 'expo-image-picker';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -15,6 +16,7 @@ import type {
   RadialMomentAction,
 } from '@/types/home';
 import { deriveInspirationSelection } from '@/utils/home-engine';
+import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
 
 type UseAddMomentFlowOptions = {
   enabled: boolean;
@@ -180,23 +182,11 @@ export function useAddMomentFlow({
       return;
     }
 
-    let imagePickerModule: typeof import('expo-image-picker');
     const imagePickerNative = requireOptionalNativeModule('ExponentImagePicker');
     if (!imagePickerNative) {
       setError({
         title: 'Photo picker unavailable',
         body: 'This build does not include photo picking yet. Rebuild and reinstall the development app to enable the photo path.',
-        action: null,
-      });
-      return;
-    }
-
-    try {
-      imagePickerModule = await import('expo-image-picker');
-    } catch {
-      setError({
-        title: 'Photo picker unavailable',
-        body: 'This build does not include photo picking yet. Rebuild the app to enable the photo path.',
         action: null,
       });
       return;
@@ -208,7 +198,17 @@ export function useAddMomentFlow({
       error: null,
     }));
 
-    const result = await imagePickerModule.launchImageLibraryAsync({
+    if (typeof ImagePicker.launchImageLibraryAsync !== 'function') {
+      setError({
+        title: 'Photo picker unavailable',
+        body: 'The image picker package loaded, but its native-facing JS entrypoint is not exposing launchImageLibraryAsync in this runtime. Fully restart Metro and reopen the dev client. If it still fails, rebuild the dev client once more to refresh the native module registration.',
+        action: null,
+      });
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      exif: true,
       mediaTypes: ['images'],
       quality: 0.82,
       selectionLimit: 1,
@@ -238,7 +238,9 @@ export function useAddMomentFlow({
         metadata: {
           assetId: selectedAsset.assetId,
           height: selectedAsset.height,
+          latitude: resolvePhotoLatitude(selectedAsset.exif ?? null),
           localUri: selectedAsset.uri,
+          longitude: resolvePhotoLongitude(selectedAsset.exif ?? null),
           thumbnailUri: selectedAsset.uri,
           width: selectedAsset.width,
         },
@@ -349,11 +351,35 @@ export function useAddMomentFlow({
   );
 
   const selectRecentPhoto = useCallback(
-    (assetId: string) => {
+    async (assetId: string) => {
       const index = state.recentPhotos.findIndex((asset) => asset.id === assetId);
       const asset = state.recentPhotos[index];
       if (!asset) {
         return;
+      }
+
+      let resolvedLocation = {
+        latitude: asset.latitude,
+        longitude: asset.longitude,
+      };
+
+      if ((resolvedLocation.latitude == null || resolvedLocation.longitude == null) && asset.id) {
+        try {
+          const MediaLibrary = await import('expo-media-library');
+          const info = await MediaLibrary.getAssetInfoAsync(asset.id);
+          resolvedLocation = {
+            latitude:
+              info.location?.latitude ??
+              resolvePhotoLatitude((info as { exif?: Record<string, unknown> | null }).exif ?? null) ??
+              undefined,
+            longitude:
+              info.location?.longitude ??
+              resolvePhotoLongitude((info as { exif?: Record<string, unknown> | null }).exif ?? null) ??
+              undefined,
+          };
+        } catch {
+          resolvedLocation = resolvedLocation;
+        }
       }
 
       beginAbsorption(
@@ -372,7 +398,9 @@ export function useAddMomentFlow({
             assetId: asset.id,
             height: asset.height,
             isScreenshot: asset.isScreenshot,
+            latitude: resolvedLocation.latitude,
             localUri: asset.uri,
+            longitude: resolvedLocation.longitude,
             thumbnailUri: asset.thumbnailUri,
             width: asset.width,
           },

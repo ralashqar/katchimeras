@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { DayMapPreview } from '@/components/katchadeck/home/day-map-preview';
 import type { HomeDayRecord, HomeMoment } from '@/types/home';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { ThemedText } from '@/components/themed-text';
@@ -12,9 +13,10 @@ type DayContextProps = {
   day: HomeDayRecord;
   onAddMoment: () => void;
   onReveal: () => void;
+  onViewDayMap: () => void;
 };
 
-export function DayContext({ day, onAddMoment, onReveal }: DayContextProps) {
+export function DayContext({ day, onAddMoment, onReveal, onViewDayMap }: DayContextProps) {
   if (day.isToday && day.state !== 'hatched') {
     return (
       <View style={styles.stack}>
@@ -44,6 +46,8 @@ export function DayContext({ day, onAddMoment, onReveal }: DayContextProps) {
           </ThemedText>
         )}
 
+        <DayMapPreview accentColor={day.creature?.accentColor ?? day.egg.accentColor} day={day} onPress={onViewDayMap} />
+
         {day.canHatch ? (
           <GlassPanel
             contentStyle={styles.revealPanel}
@@ -70,6 +74,11 @@ export function DayContext({ day, onAddMoment, onReveal }: DayContextProps) {
       <ThemedText type="subtitle" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
         {day.highlight ?? 'The day still has room to take shape.'}
       </ThemedText>
+      <DayMapPreview
+        accentColor={day.creature?.accentColor ?? day.egg.accentColor}
+        day={day}
+        onPress={onViewDayMap}
+      />
       <View style={styles.momentList}>
         {day.moments.length > 0 ? (
           day.moments.map((moment) => <MomentRow key={moment.id} moment={moment} />)

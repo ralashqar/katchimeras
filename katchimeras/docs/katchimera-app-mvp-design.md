@@ -424,3 +424,57 @@ Not:
 ## Implementation Note
 
 Future backend, Supabase schema, and state-flow work should treat this document as the target product shape, not the current shipped implementation. The current app still uses local demo state for the main user loop.
+
+## Day Map Addendum
+
+### MVP scope update
+
+The Day Map is now part of the Home MVP.
+
+Included:
+
+- single-day map preview on past days
+- dedicated full-screen day map route
+- foreground-only location capture while the app is open
+- local-first persistence in Home state
+
+Still excluded post-MVP:
+
+- global map
+- background capture
+- replay and heatmap features
+
+### Home behavior
+
+For past days, the context layer should include:
+
+- highlight
+- day map preview
+- moments list
+
+Today should not become a live tracker surface in MVP. The spatial layer is shown retrospectively, after the day has enough shape to read as memory.
+
+### Day record extension
+
+Add per-day location samples and a derived day-map summary alongside moments and scores.
+
+Recommended stored fields:
+
+- `locations[]`
+- `location_permission`
+
+Recommended derived fields:
+
+- `day_map.nodes`
+- `day_map.path`
+- `day_map.primary_location`
+- `day_map.viewport`
+
+### Product rule
+
+The Day Map must preserve the app's emotional framing:
+
+- no raw coordinate UI
+- no navigation instructions
+- no tracker dashboard styling
+- clarity first, magic second

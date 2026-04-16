@@ -2,11 +2,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { AddMomentInput, StoredHomeState } from '@/types/home';
+import type { AddMomentInput, LocationPermissionState, RecentPhotoAsset, StoredHomeState } from '@/types/home';
 import {
   addMomentToDay,
   hydrateHomeState,
+  recordForegroundLocationSample,
+  seedRecentPhotoLocationsForToday,
   triggerHatchForDay,
+  updateLocationPermissionState,
 } from '@/utils/home-engine';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
@@ -90,6 +93,44 @@ export function useHomeScreenState() {
     });
   }, []);
 
+  const setLocationPermission = useCallback((permission: LocationPermissionState) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return updateLocationPermissionState(hydrated.state, permission, profile, now);
+    });
+  }, []);
+
+  const addForegroundLocationSample = useCallback(
+    (sample: {
+      lat: number;
+      lng: number;
+      capturedAt: string;
+      accuracyMeters?: number;
+    }) => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return recordForegroundLocationSample(hydrated.state, sample, profile, now);
+      });
+    },
+    []
+  );
+
+  const seedRecentPhotoLocations = useCallback((photos: RecentPhotoAsset[]) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return seedRecentPhotoLocationsForToday(hydrated.state, photos, profile, now);
+    });
+  }, []);
+
   const selectTimelineDay = useCallback((dayId: string) => {
     setSelectedDayId(dayId);
   }, []);
@@ -142,7 +183,11 @@ export function useHomeScreenState() {
     timelineDays,
     selectedDayId: selectedDay?.id ?? viewModel.todayId,
     selectedDay,
+    locationPermission: viewModel.state.locationPermission,
     addMoment,
+    addForegroundLocationSample,
+    seedRecentPhotoLocations,
+    setLocationPermission,
     selectTimelineDay,
     selectPath,
     triggerHatchIfReady,

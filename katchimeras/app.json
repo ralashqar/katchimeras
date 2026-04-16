@@ -16,11 +16,16 @@
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar."
+        "NSCameraUsageDescription": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar.",
+        "NSLocationWhenInUseUsageDescription": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps."
       }
     },
     "android": {
       "package": "com.daruk.katchimeras",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -40,6 +45,24 @@
         "expo-camera",
         {
           "cameraPermission": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps.",
+          "locationWhenInUsePermission": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Katchimeras uses your photos so you can turn moments into memories and attach place when a photo already knows where it was taken.",
+          "savePhotosPermission": "Katchimeras can save generated images to your photo library when you choose to keep them.",
+          "isAccessMediaLocationEnabled": true,
+          "granularPermissions": [
+            "photo"
+          ]
         }
       ],
       [
