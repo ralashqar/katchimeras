@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { type LayoutChangeEvent, ScrollView, StyleSheet, View } from 'react-native';
+import { type LayoutChangeEvent, ScrollView, Share, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { captureRef } from 'react-native-view-shot';
 
 import { AddMomentRadial } from '@/components/katchadeck/home/add-moment-radial';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
@@ -9,6 +10,7 @@ import { DayContext } from '@/components/katchadeck/home/day-context';
 import { FormingEgg } from '@/components/katchadeck/home/forming-egg';
 import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/home/hatch-sequence';
 import { InsightPathsPanel } from '@/components/katchadeck/home/insight-paths-panel';
+import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
@@ -16,6 +18,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { useAddMomentFlow } from '@/hooks/use-add-moment-flow';
 import { useDayLocationCapture } from '@/hooks/use-day-location-capture';
+import { useDayStepCapture } from '@/hooks/use-day-step-capture';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useRecentPhotoMapSeeding } from '@/hooks/use-recent-photo-map-seeding';
 import type { HomeDayRecord } from '@/types/home';
@@ -26,6 +29,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const {
     addMoment,
+    activityPermission,
     addForegroundLocationSample,
     importingHealthRouteDayId,
     importHealthRoutesForDay,
@@ -34,7 +38,9 @@ export default function HomeScreen() {
     selectedDay,
     selectedDayId,
     seedRecentPhotoLocations,
+    setActivityPermission,
     setLocationPermission,
+    setTodayStepCount,
     selectTimelineDay,
     timelineDays,
     triggerHatchIfReady,
@@ -44,6 +50,8 @@ export default function HomeScreen() {
   const [hatchTargetId, setHatchTargetId] = useState<string | null>(null);
   const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
   const [heroAnchorY, setHeroAnchorY] = useState(316);
+  const [sharingDayId, setSharingDayId] = useState<string | null>(null);
+  const postcardRef = useRef<View>(null);
   const addMomentFlow = useAddMomentFlow({
     enabled: selectedDay?.kind === 'day' && selectedDay.canAddMoments,
     onAddMoment: addMoment,
@@ -99,12 +107,23 @@ export default function HomeScreen() {
         : selectedDay?.subtitle ?? 'Another day is waiting in the wings.';
   const hatchDay =
     hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId ? selectedDay : null;
+  const shareableDay =
+    selectedDay?.kind === 'day' && selectedDay.state === 'hatched' && selectedDay.creature
+      ? (selectedDay as HomeDayRecord & { creature: NonNullable<HomeDayRecord['creature']> })
+      : null;
 
   useDayLocationCapture({
     enabled: selectedDay?.kind === 'day' && selectedDay.isToday,
     onPermissionResolved: setLocationPermission,
     onSample: addForegroundLocationSample,
     permissionState: locationPermission,
+  });
+
+  useDayStepCapture({
+    enabled: selectedDay?.kind === 'day' && selectedDay.isToday,
+    onPermissionResolved: setActivityPermission,
+    onStepCount: setTodayStepCount,
+    permissionState: activityPermission,
   });
 
   useRecentPhotoMapSeeding({
@@ -178,6 +197,37 @@ export default function HomeScreen() {
       pathname: '/day-map/[dayId]',
       params: { dayId },
     });
+  }
+
+  async function handleShareDay() {
+    if (
+      !selectedDay ||
+      selectedDay.kind !== 'day' ||
+      selectedDay.state !== 'hatched' ||
+      !selectedDay.creature ||
+      !selectedDay.shareReadyAt ||
+      !postcardRef.current
+    ) {
+      return;
+    }
+
+    setSharingDayId(selectedDay.id);
+
+    try {
+      const uri = await captureRef(postcardRef.current, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+
+      await Share.share({
+        message: `${selectedDay.creature.name} — ${selectedDay.highlight ?? selectedDay.creature.highlight}`,
+        title: `${selectedDay.creature.name} postcard`,
+        url: uri,
+      });
+    } finally {
+      setSharingDayId((current) => (current === selectedDay.id ? null : current));
+    }
   }
 
   return (
@@ -258,7 +308,9 @@ export default function HomeScreen() {
               isImportingHealthRoutes={importingHealthRouteDayId === selectedDay.id}
               onImportHealthRoutes={() => importHealthRoutesForDay(selectedDay.id)}
               onReveal={handleReveal}
+              onShare={handleShareDay}
               onViewDayMap={() => handleOpenDayMap(selectedDay.id)}
+              isSharing={sharingDayId === selectedDay.id}
             />
           </Animated.View>
         ) : (
@@ -303,6 +355,11 @@ export default function HomeScreen() {
           </ThemedText>
         </Animated.View>
       ) : null}
+      {shareableDay ? (
+        <View pointerEvents="none" style={styles.captureCardWrap}>
+          <MemoryPostcard day={shareableDay} ref={postcardRef} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -340,9 +397,27 @@ function toTimelineEntry(day: HomeDayRecord): TimelineDayEntry {
       timeLabel: day.dateLabel,
       location: day.isToday ? 'Today' : 'Stored day',
       tag: day.state === 'hatched' ? 'Creature' : 'Forming',
-      metrics: day.moments.length > 0 ? day.moments.map((moment) => moment.label).join(' · ') : 'No moments yet',
+      metrics: day.moments.length > 0 ? day.moments.map((moment) => moment.label).join(' · ') : buildPassiveMetrics(day),
     },
   };
+}
+
+function buildPassiveMetrics(day: HomeDayRecord) {
+  const parts: string[] = [];
+
+  if (day.stepsCount > 0) {
+    parts.push(`${day.stepsCount.toLocaleString()} steps`);
+  }
+
+  if (day.visitedPlaceCount > 0) {
+    parts.push(`${day.visitedPlaceCount} ${day.visitedPlaceCount === 1 ? 'place' : 'places'}`);
+  }
+
+  if (day.newPlaceCount > 0) {
+    parts.push(`${day.newPlaceCount} new`);
+  }
+
+  return parts.join(' · ') || 'No moments yet';
 }
 
 const styles = StyleSheet.create({
@@ -387,6 +462,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     position: 'absolute',
     right: 24,
+  },
+  captureCardWrap: {
+    left: -2000,
+    position: 'absolute',
+    top: -2000,
   },
   flashLabel: {
     fontSize: 11,

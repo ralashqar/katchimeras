@@ -72,7 +72,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
           <Stack.Screen name="day-map/[dayId]" options={{ title: 'Day Map' }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'KatchaDeck Premium' }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
         </Stack>
         <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />
       </ThemeProvider>

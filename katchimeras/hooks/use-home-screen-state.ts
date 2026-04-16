@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 
 import type {
   AddMomentInput,
+  ActivityPermissionState,
   HealthPermissionState,
   LocationPermissionState,
   RecentPhotoAsset,
@@ -17,8 +18,10 @@ import {
   recordForegroundLocationSample,
   seedRecentPhotoLocationsForToday,
   triggerHatchForDay,
+  updateActivityPermissionState,
   updateHealthPermissionState,
   updateLocationPermissionState,
+  updateTodayStepCount,
 } from '@/utils/home-engine';
 import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
@@ -121,6 +124,26 @@ export function useHomeScreenState() {
     setStoredState((currentState) => {
       const hydrated = hydrateHomeState(currentState, profile, now);
       return updateHealthPermissionState(hydrated.state, permission, profile, now);
+    });
+  }, []);
+
+  const setActivityPermission = useCallback((permission: ActivityPermissionState) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return updateActivityPermissionState(hydrated.state, permission, profile, now);
+    });
+  }, []);
+
+  const setTodayStepCount = useCallback((stepsCount: number) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return updateTodayStepCount(hydrated.state, stepsCount, profile, now);
     });
   }, []);
 
@@ -275,14 +298,17 @@ export function useHomeScreenState() {
     selectedDayId: selectedDay?.id ?? viewModel.todayId,
     selectedDay,
     locationPermission: viewModel.state.locationPermission,
+    activityPermission: viewModel.state.activityPermission,
     healthPermission: viewModel.state.healthPermission,
     importingHealthRouteDayId,
     addMoment,
     addForegroundLocationSample,
     importHealthRoutesForDay,
     seedRecentPhotoLocations,
+    setActivityPermission,
     setHealthPermission,
     setLocationPermission,
+    setTodayStepCount,
     selectTimelineDay,
     selectPath,
     triggerHatchIfReady,

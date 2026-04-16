@@ -61,10 +61,10 @@ export function DayMapPreview({
       <View style={styles.header}>
         <View style={styles.copy}>
           <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
-            {day.isToday ? 'Live day map' : 'Day map'}
+            {day.isToday ? 'Day trace' : 'Day map'}
           </ThemedText>
           <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
-            {day.isToday ? 'What the day has captured so far.' : 'Where the day left its strongest trace.'}
+            {day.isToday ? 'Where today is already leaving a trace.' : 'Where the day left its strongest trace.'}
           </ThemedText>
         </View>
         <View style={styles.actions}>

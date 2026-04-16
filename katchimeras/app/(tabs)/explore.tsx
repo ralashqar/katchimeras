@@ -12,7 +12,9 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { createStarterReveal } from '@/constants/katchadeck';
+import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { KatchaDeckUI } from '@/constants/theme';
+import { clearStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
 
 export default function ExploreScreen() {
@@ -28,7 +30,7 @@ export default function ExploreScreen() {
   const reveal = createStarterReveal(profile);
 
   function handleReset() {
-    Alert.alert('Restart onboarding?', 'This will wipe the current KatchaDeck setup on this device.', [
+    Alert.alert('Restart onboarding?', 'This will wipe the current onboarding profile on this device.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Restart',
@@ -36,6 +38,20 @@ export default function ExploreScreen() {
         onPress: () => {
           resetOnboardingProfile();
           router.replace('/onboarding');
+        },
+      },
+    ]);
+  }
+
+  function handleResetHomeLoop() {
+    Alert.alert('Reset local loop?', 'This clears the stored Home-day state so you can test the daily flow again.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: () => {
+          clearStoredHomeState();
+          router.replace('/(tabs)');
         },
       },
     ]);
@@ -54,20 +70,37 @@ export default function ExploreScreen() {
         showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter()}>
           <ThemedText type="label" style={styles.kicker} lightColor="#C4D8FF" darkColor="#C4D8FF">
-            World preview
+            {DEV_DEBUG_NAV_ENABLED ? 'Developer tools' : 'World preview'}
           </ThemedText>
           <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
-            Your early collection
+            {DEV_DEBUG_NAV_ENABLED ? 'Debug surfaces' : 'Your early collection'}
           </ThemedText>
           <ThemedText type="bodyLarge" style={styles.body} lightColor="#D9E4FF" darkColor="#D9E4FF">
-            These first cards are only the opening shape. Repetition deepens roots, and
-            exploration opens new branches.
+            {DEV_DEBUG_NAV_ENABLED
+              ? 'Use this tab during development to jump into tooling, reset local state, and rerun onboarding without reopening hidden routes.'
+              : 'These first cards are only the opening shape. Repetition deepens roots, and exploration opens new branches.'}
           </ThemedText>
         </Animated.View>
 
+        {DEV_DEBUG_NAV_ENABLED ? (
+          <Animated.View entering={presenceEnter(60)}>
+            <GlassPanel contentStyle={styles.panelBody}>
+              <SectionHeader label="Fast actions" title="Reset and debug" />
+              <View style={styles.devActions}>
+                <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
+                <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
+                <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
+              </View>
+            </GlassPanel>
+          </Animated.View>
+        ) : null}
+
         <Animated.View entering={presenceEnter(80)}>
           <GlassPanel contentStyle={styles.panelBody}>
-            <SectionHeader label="Collection tilt" title="Where your deck is leaning" />
+            <SectionHeader
+              label={DEV_DEBUG_NAV_ENABLED ? 'Current profile' : 'Collection tilt'}
+              title={DEV_DEBUG_NAV_ENABLED ? 'What the local onboarding profile is shaping' : 'Where your deck is leaning'}
+            />
             <ThemedText style={styles.panelText} lightColor="#D9E4FF" darkColor="#D9E4FF">
               {reveal.identityInsight}
             </ThemedText>
@@ -105,11 +138,19 @@ export default function ExploreScreen() {
         </Animated.View>
 
         <Animated.View entering={presenceEnter(420)}>
-          <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
+          <KatchaButton
+            label={DEV_DEBUG_NAV_ENABLED ? 'Open Home' : 'Open art lab'}
+            onPress={() => (DEV_DEBUG_NAV_ENABLED ? router.replace('/(tabs)') : router.push('/art-lab'))}
+            variant="secondary"
+          />
         </Animated.View>
 
         <Animated.View entering={presenceEnter(460)}>
-          <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
+          <KatchaButton
+            label={DEV_DEBUG_NAV_ENABLED ? 'Open onboarding reset' : 'Restart onboarding'}
+            onPress={handleReset}
+            variant="secondary"
+          />
         </Animated.View>
       </ScrollView>
     </View>
@@ -156,6 +197,9 @@ const styles = StyleSheet.create({
   panelText: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  devActions: {
+    gap: 10,
   },
   collectionGrid: {
     flexDirection: 'row',

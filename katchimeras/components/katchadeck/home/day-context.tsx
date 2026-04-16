@@ -16,7 +16,9 @@ type DayContextProps = {
   onImportHealthRoutes: () => Promise<ImportedHealthRoutesPayload>;
   isImportingHealthRoutes?: boolean;
   onReveal: () => void;
+  onShare?: () => void;
   onViewDayMap: () => void;
+  isSharing?: boolean;
 };
 
 export function DayContext({
@@ -25,9 +27,13 @@ export function DayContext({
   onImportHealthRoutes,
   isImportingHealthRoutes = false,
   onReveal,
+  onShare,
   onViewDayMap,
+  isSharing = false,
 }: DayContextProps) {
   if (day.isToday && day.state !== 'hatched') {
+    const passiveSignals = buildPassiveSignals(day);
+
     return (
       <View style={styles.stack}>
         <View style={styles.todayHeader}>
@@ -55,6 +61,18 @@ export function DayContext({
             Photo, inspiration, one small moment.
           </ThemedText>
         )}
+
+        {passiveSignals.length > 0 ? (
+          <ScrollView horizontal contentContainerStyle={styles.chipRow} showsHorizontalScrollIndicator={false}>
+            {passiveSignals.map((signal) => (
+              <View key={signal.id} style={styles.signalChip}>
+                <ThemedText style={styles.signalLabel} lightColor="#DCE6FF" darkColor="#DCE6FF">
+                  {signal.label}
+                </ThemedText>
+              </View>
+            ))}
+          </ScrollView>
+        ) : null}
 
         <DayMapPreview
           accentColor={day.creature?.accentColor ?? day.egg.accentColor}
@@ -106,6 +124,14 @@ export function DayContext({
           </ThemedText>
         )}
       </View>
+      {day.state === 'hatched' && day.creature && day.shareReadyAt ? (
+        <KatchaButton
+          disabled={isSharing}
+          label={isSharing ? 'Preparing postcard...' : 'Share postcard'}
+          onPress={onShare}
+          variant="primary"
+        />
+      ) : null}
       {day.canHatch ? (
         <KatchaButton icon="arrow.right" label="Reveal hatch" onPress={onReveal} variant="secondary" />
       ) : null}
@@ -135,6 +161,33 @@ function MomentRow({ moment }: { moment: HomeMoment }) {
       </ThemedText>
     </View>
   );
+}
+
+function buildPassiveSignals(day: HomeDayRecord) {
+  const signals: { id: string; label: string }[] = [];
+
+  if (day.stepsCount > 0) {
+    signals.push({
+      id: 'steps',
+      label: `${day.stepsCount.toLocaleString()} steps shaping the egg`,
+    });
+  }
+
+  if (day.visitedPlaceCount > 0) {
+    signals.push({
+      id: 'places',
+      label: `${day.visitedPlaceCount} ${day.visitedPlaceCount === 1 ? 'place' : 'places'} leaving a trace`,
+    });
+  }
+
+  if (day.newPlaceCount > 0) {
+    signals.push({
+      id: 'new-places',
+      label: `${day.newPlaceCount} new ${day.newPlaceCount === 1 ? 'place' : 'places'} widening the day`,
+    });
+  }
+
+  return signals;
 }
 
 const styles = StyleSheet.create({
@@ -193,6 +246,19 @@ const styles = StyleSheet.create({
   },
   pastPanel: {
     gap: 12,
+  },
+  signalChip: {
+    backgroundColor: 'rgba(216, 228, 255, 0.08)',
+    borderColor: 'rgba(216, 228, 255, 0.14)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  signalLabel: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   momentList: {
     gap: 10,

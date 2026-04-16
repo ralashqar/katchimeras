@@ -24,8 +24,9 @@ This does not read Apple's general location history.
 
 ## Storage changes
 
-- `StoredHomeState.version` is now `3`
+- `StoredHomeState.version` is now `4`
 - `StoredHomeState.healthPermission` tracks the local Health import permission state
+- `StoredHomeState.activityPermission` tracks local step-permission state for the broader MVP loop
 - each stored day now includes:
   - `healthRouteImport`
   - `exactRouteSegments`

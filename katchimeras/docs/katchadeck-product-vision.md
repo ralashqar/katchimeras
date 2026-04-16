@@ -1,5 +1,16 @@
 # KatchaDeck Product Vision
 
+Important note:
+
+This document is now a **future/world-phase reference**, not the source of truth for the current MVP.
+
+The current MVP is defined by:
+
+- `docs/katchimeras-core-mvp.md`
+- `docs/mvp-implementation-plan.md`
+
+Use this file only for later deck/world expansion work after the Katchimeras daily loop is stable.
+
 ## Name
 
 Primary name:

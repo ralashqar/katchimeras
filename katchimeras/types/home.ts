@@ -18,6 +18,7 @@ export type HomeRarityTier = 'common' | 'rare' | 'epic' | 'legendary';
 export type HomeLocationType = 'home' | 'cafe' | 'park' | 'unknown';
 export type HomeLocationSource = 'foreground' | 'photo_attachment' | 'manual' | 'health_workout_route';
 export type LocationPermissionState = 'unknown' | 'granted' | 'denied';
+export type ActivityPermissionState = 'unknown' | 'granted' | 'denied' | 'unavailable';
 export type HealthPermissionState = 'unknown' | 'granted' | 'denied' | 'unavailable';
 export type HealthRouteImportStatus = 'idle' | 'success' | 'no_data' | 'denied' | 'unavailable' | 'error';
 export type HomeVisualKey =
@@ -268,6 +269,11 @@ export type StoredHomeDayRecord = {
   id: string;
   isoDate: string;
   state: HomeDayState;
+  stepsCount: number;
+  visitedPlaceCount: number;
+  newPlaceCount: number;
+  locationSampleCount: number;
+  shareReadyAt: string | null;
   moments: HomeMoment[];
   locations: StoredHomeLocationPoint[];
   healthRouteImport: StoredHealthRouteImportMeta | null;
@@ -277,8 +283,9 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 3;
+  version: 4;
   locationPermission: LocationPermissionState;
+  activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;
   archivedDays: StoredHomeDayRecord[];
   today: StoredHomeDayRecord;

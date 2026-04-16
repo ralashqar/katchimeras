@@ -14,6 +14,7 @@ import {
 import { timelineDemoEntries } from '@/constants/timeline-demo';
 import type {
   AddMomentInput,
+  ActivityPermissionState,
   DayScores,
   DayMapSummary,
   EggVisualState,
@@ -51,6 +52,7 @@ const MAX_HEALTH_ROUTE_SAMPLE_POINTS = 120;
 const LOCATION_LINK_WINDOW_MS = 20 * 60 * 1000;
 const LOCATION_DEDUPE_WINDOW_MS = 4 * 60 * 1000;
 const LOCATION_DEDUPE_DISTANCE_METERS = 65;
+const NEW_PLACE_DISTANCE_METERS = 220;
 const pathSupportMap: Record<HomeScoreKey, HomeScoreKey> = {
   energy: 'exploration',
   calm: 'focus',
@@ -59,20 +61,54 @@ const pathSupportMap: Record<HomeScoreKey, HomeScoreKey> = {
   focus: 'calm',
 };
 
-type LegacyStoredHomeDayRecord = Omit<StoredHomeDayRecord, 'locations' | 'healthRouteImport' | 'exactRouteSegments'>;
-type Version2StoredHomeDayRecord = Omit<StoredHomeDayRecord, 'healthRouteImport' | 'exactRouteSegments'>;
+type LegacyStoredHomeDayRecord = Omit<
+  StoredHomeDayRecord,
+  | 'locations'
+  | 'healthRouteImport'
+  | 'exactRouteSegments'
+  | 'stepsCount'
+  | 'visitedPlaceCount'
+  | 'newPlaceCount'
+  | 'locationSampleCount'
+  | 'shareReadyAt'
+>;
+type Version2StoredHomeDayRecord = Omit<
+  StoredHomeDayRecord,
+  | 'healthRouteImport'
+  | 'exactRouteSegments'
+  | 'stepsCount'
+  | 'visitedPlaceCount'
+  | 'newPlaceCount'
+  | 'locationSampleCount'
+  | 'shareReadyAt'
+>;
+type Version3StoredHomeDayRecord = Omit<
+  StoredHomeDayRecord,
+  'stepsCount' | 'visitedPlaceCount' | 'newPlaceCount' | 'locationSampleCount' | 'shareReadyAt'
+>;
 type Version2StoredHomeState = {
   version: 2;
   locationPermission: LocationPermissionState;
   archivedDays: Version2StoredHomeDayRecord[];
   today: Version2StoredHomeDayRecord;
 };
+type Version3StoredHomeState = {
+  version: 3;
+  locationPermission: LocationPermissionState;
+  healthPermission: HealthPermissionState;
+  archivedDays: Version3StoredHomeDayRecord[];
+  today: Version3StoredHomeDayRecord;
+};
 type LegacyStoredHomeState = {
   version?: 1;
   archivedDays: LegacyStoredHomeDayRecord[];
   today: LegacyStoredHomeDayRecord;
 };
-type UpgradeableStoredHomeState = StoredHomeState | Version2StoredHomeState | LegacyStoredHomeState;
+type UpgradeableStoredHomeState =
+  | StoredHomeState
+  | Version3StoredHomeState
+  | Version2StoredHomeState
+  | LegacyStoredHomeState;
 
 export type ImportedHealthRoutePoint = {
   latitude: number;
@@ -121,6 +157,11 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
       id: `seed-${entry.id}`,
       isoDate: toLocalDateId(dayDate),
       state: 'hatched' as const,
+      stepsCount: 1800 + index * 1100,
+      visitedPlaceCount: 0,
+      newPlaceCount: 0,
+      locationSampleCount: 0,
+      shareReadyAt: new Date(new Date(`${toLocalDateId(dayDate)}T21:00:00`).getTime()).toISOString(),
       moments: [moment],
       locations: createSeedLocations(momentType, dayDate, index, moment.id),
       healthRouteImport: null,
@@ -143,8 +184,9 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
   });
 
   return {
-    version: 3,
+    version: 4,
     locationPermission: 'unknown',
+    activityPermission: 'unknown',
     healthPermission: 'unknown',
     archivedDays,
     today: createEmptyStoredDay(now, profile),
@@ -204,6 +246,45 @@ export function updateHealthPermissionState(
     {
       ...state,
       healthPermission: permission,
+    },
+    profile,
+    now
+  );
+}
+
+export function updateActivityPermissionState(
+  state: StoredHomeState,
+  permission: ActivityPermissionState,
+  profile: OnboardingProfile,
+  now: Date
+) {
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      activityPermission: permission,
+    },
+    profile,
+    now
+  );
+}
+
+export function updateTodayStepCount(
+  state: StoredHomeState,
+  stepsCount: number,
+  profile: OnboardingProfile,
+  now: Date
+) {
+  if (!Number.isFinite(stepsCount) || stepsCount < 0) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: {
+        ...state.today,
+        stepsCount: Math.max(state.today.stepsCount, Math.round(stepsCount)),
+      },
     },
     profile,
     now
@@ -563,12 +644,19 @@ function normalizeStoredHomeState(
     }))
     .slice(-5);
 
+  const normalizedArchived: StoredHomeDayRecord[] = [];
+  archivedDays.forEach((day) => {
+    normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now));
+  });
+  const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now);
+
   return {
-    version: 3,
+    version: 4,
     locationPermission: upgradedState.locationPermission,
+    activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
-    archivedDays,
-    today,
+    archivedDays: normalizedArchived,
+    today: normalizedToday,
   };
 }
 
@@ -577,7 +665,7 @@ function resolveRolledPastDay(day: StoredHomeDayRecord, _profile: OnboardingProf
     return day;
   }
 
-  if (day.moments.length === 0) {
+  if (!dayHasShape(day)) {
     return {
       ...day,
       state: 'forming',
@@ -599,6 +687,11 @@ function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHome
     id: `day-${toLocalDateId(now)}`,
     isoDate: toLocalDateId(now),
     state: 'forming',
+    stepsCount: 0,
+    visitedPlaceCount: 0,
+    newPlaceCount: 0,
+    locationSampleCount: 0,
+    shareReadyAt: null,
     moments: [],
     locations: [],
     healthRouteImport: null,
@@ -609,7 +702,7 @@ function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHome
 }
 
 function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
-  if ('version' in inputState && inputState.version === 3) {
+  if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
       archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
@@ -617,10 +710,22 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
     };
   }
 
+  if ('version' in inputState && inputState.version === 3) {
+    return {
+      version: 4,
+      locationPermission: inputState.locationPermission,
+      activityPermission: 'unknown',
+      healthPermission: inputState.healthPermission,
+      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
+      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
+    };
+  }
+
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 3,
+      version: 4,
       locationPermission: inputState.locationPermission,
+      activityPermission: 'unknown',
       healthPermission: 'unknown',
       archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
       today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
@@ -630,8 +735,9 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 3,
+    version: 4,
     locationPermission: 'unknown',
+    activityPermission: 'unknown',
     healthPermission: 'unknown',
     archivedDays: legacy.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
     today: ensureHealthRouteFieldsOnDayRecord(legacy.today),
@@ -639,11 +745,23 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
 }
 
 function ensureHealthRouteFieldsOnDayRecord(
-  day: StoredHomeDayRecord | Version2StoredHomeDayRecord | LegacyStoredHomeDayRecord
+  day: StoredHomeDayRecord | Version3StoredHomeDayRecord | Version2StoredHomeDayRecord | LegacyStoredHomeDayRecord
 ): StoredHomeDayRecord {
   const existingLocations = 'locations' in day ? day.locations ?? [] : [];
   return {
     ...day,
+    stepsCount: 'stepsCount' in day && typeof day.stepsCount === 'number' ? Math.max(0, Math.round(day.stepsCount)) : 0,
+    visitedPlaceCount:
+      'visitedPlaceCount' in day && typeof day.visitedPlaceCount === 'number'
+        ? Math.max(0, Math.round(day.visitedPlaceCount))
+        : 0,
+    newPlaceCount:
+      'newPlaceCount' in day && typeof day.newPlaceCount === 'number' ? Math.max(0, Math.round(day.newPlaceCount)) : 0,
+    locationSampleCount:
+      'locationSampleCount' in day && typeof day.locationSampleCount === 'number'
+        ? Math.max(0, Math.round(day.locationSampleCount))
+        : existingLocations.length,
+    shareReadyAt: 'shareReadyAt' in day ? day.shareReadyAt ?? null : null,
     locations: existingLocations.length > 0 ? existingLocations : createFallbackLocationsForStoredDay(day),
     healthRouteImport: 'healthRouteImport' in day ? day.healthRouteImport ?? null : null,
     exactRouteSegments: 'exactRouteSegments' in day ? day.exactRouteSegments ?? [] : [],
@@ -972,6 +1090,57 @@ function createFallbackLocationsForStoredDay(day: Pick<StoredHomeDayRecord, 'id'
   return createSeedLocations(firstMoment.type, dayDate, seedIndex, firstMoment.id);
 }
 
+function updateStoredDayDerivedFields(
+  day: StoredHomeDayRecord,
+  priorDays: StoredHomeDayRecord[],
+  now: Date
+): StoredHomeDayRecord {
+  const dayMap = deriveDayMapSummary(day.locations, day.moments);
+  const visitedPlaceCount = dayMap?.nodes.length ?? 0;
+  const locationSampleCount = day.locations.length;
+  const newPlaceCount = countNewPlacesForDay(dayMap, priorDays);
+  const shareReadyAt =
+    day.shareReadyAt ??
+    (day.creature ? new Date(`${day.isoDate}T21:00:00`).toISOString() : null);
+
+  return {
+    ...day,
+    state: resolveDayState(day, now),
+    visitedPlaceCount,
+    newPlaceCount,
+    locationSampleCount,
+    shareReadyAt,
+  };
+}
+
+function countNewPlacesForDay(dayMap: DayMapSummary | null, priorDays: StoredHomeDayRecord[]) {
+  if (!dayMap || dayMap.nodes.length === 0) {
+    return 0;
+  }
+
+  const previousLocations = priorDays.flatMap((day) => day.locations);
+  if (previousLocations.length === 0) {
+    return dayMap.nodes.length;
+  }
+
+  return dayMap.nodes.filter((node) => {
+    return !previousLocations.some((location) => {
+      const distance = getDistanceMeters(node.latitude, node.longitude, location.lat, location.lng);
+      return distance <= NEW_PLACE_DISTANCE_METERS;
+    });
+  }).length;
+}
+
+function dayHasShape(day: StoredHomeDayRecord) {
+  return (
+    day.moments.length > 0 ||
+    day.stepsCount > 0 ||
+    day.locationSampleCount > 0 ||
+    day.visitedPlaceCount > 0 ||
+    day.locations.length > 0
+  );
+}
+
 function buildInitialPathId(profile: OnboardingProfile) {
   if (profile.aspirationId === 'adventurous') {
     return 'contrast:exploration';
@@ -993,7 +1162,7 @@ function resolveDayState(day: StoredHomeDayRecord, now: Date): HomeDayState {
     return 'ready_to_hatch';
   }
 
-  if (day.moments.length === 0) {
+  if (!dayHasShape(day)) {
     return 'forming';
   }
 
@@ -1025,6 +1194,21 @@ function computeDayScores(day: StoredHomeDayRecord) {
       });
     }
   });
+
+  const stepEnergy = clampScore(Math.min(day.stepsCount / 5200, 1) * 0.34);
+  const placeEnergy = clampScore(Math.min(day.locationSampleCount / 8, 1) * 0.06);
+  const explorationFromPlaces = clampScore(
+    Math.min(day.newPlaceCount * 0.18 + Math.max(day.visitedPlaceCount - 1, 0) * 0.08, 0.4)
+  );
+  const calmFromSteadyDay =
+    day.locationSampleCount > 0 && day.visitedPlaceCount <= 1 && day.stepsCount < 2400 ? 0.12 : 0;
+  const focusFromSteadyDay =
+    day.locationSampleCount >= 3 && day.visitedPlaceCount <= 1 ? 0.14 : day.locationSampleCount >= 5 ? 0.06 : 0;
+
+  nextScores.energy = clampScore(nextScores.energy + stepEnergy + placeEnergy);
+  nextScores.exploration = clampScore(nextScores.exploration + explorationFromPlaces);
+  nextScores.calm = clampScore(nextScores.calm + calmFromSteadyDay);
+  nextScores.focus = clampScore(nextScores.focus + focusFromSteadyDay);
 
   const pathDelta = getPathDelta(day.selectedPathId);
   scoreOrder.forEach((key) => {
@@ -1118,6 +1302,18 @@ function buildUnhatchedHighlight(day: StoredHomeDayRecord, state: HomeDayState) 
   }
 
   if (day.moments.length === 0) {
+    if (day.stepsCount >= 1800 && day.newPlaceCount > 0) {
+      return 'Movement and a change of place are already bending the egg toward something curious.';
+    }
+
+    if (day.stepsCount >= 1800) {
+      return 'The day is already gathering motion. The egg has started responding to it.';
+    }
+
+    if (day.locationSampleCount > 0) {
+      return 'Places have started settling into the egg, even before a moment was added by hand.';
+    }
+
     return 'Nothing has landed in the egg yet, but the day still has room to take shape.';
   }
 
@@ -1151,6 +1347,7 @@ function finalizeDayHatch(day: StoredHomeDayRecord, profile: OnboardingProfile, 
   return {
     ...day,
     state: 'hatched',
+    shareReadyAt: day.shareReadyAt ?? now.toISOString(),
     creature: {
       id: `creature-${day.isoDate}-${hash}`,
       name,
@@ -1160,7 +1357,7 @@ function finalizeDayHatch(day: StoredHomeDayRecord, profile: OnboardingProfile, 
       visualKey,
       accentColor,
       highlightMomentId: highlightMoment?.id ?? null,
-      highlight: buildHatchedHighlight(highlightMoment, primaryTrait),
+      highlight: buildHatchedHighlight(day, highlightMoment, primaryTrait),
       reflection: buildReflectionLine(profile, primaryTrait, secondaryTrait, day.selectedPathId),
       motifTags: uniqueMomentLabels(day.moments).slice(0, 2),
     },
@@ -1189,8 +1386,20 @@ function pickHighlightMoment(moments: HomeMoment[], primaryTrait: HomeScoreKey) 
   return [...moments].reverse().find((moment) => moment.type === preferredType) ?? moments[moments.length - 1] ?? null;
 }
 
-function buildHatchedHighlight(moment: HomeMoment | null, primaryTrait: HomeScoreKey) {
+function buildHatchedHighlight(day: StoredHomeDayRecord, moment: HomeMoment | null, primaryTrait: HomeScoreKey) {
   if (!moment) {
+    if (day.stepsCount >= 3200 && day.newPlaceCount > 0) {
+      return 'Distance and a changed setting gave the day enough contrast to become something vivid.';
+    }
+
+    if (day.stepsCount >= 3200) {
+      return 'Movement alone carried enough energy to give the day a visible form.';
+    }
+
+    if (day.locationSampleCount > 0) {
+      return 'The places you moved through quietly shaped the hatch, even without a saved moment.';
+    }
+
     return 'Even a quieter day left enough behind to become visible.';
   }
 
