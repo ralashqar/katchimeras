@@ -16,8 +16,10 @@ export type HomeDayState = 'forming' | 'ready_to_hatch' | 'hatched';
 export type HomeScoreKey = 'energy' | 'calm' | 'social' | 'exploration' | 'focus';
 export type HomeRarityTier = 'common' | 'rare' | 'epic' | 'legendary';
 export type HomeLocationType = 'home' | 'cafe' | 'park' | 'unknown';
-export type HomeLocationSource = 'foreground' | 'photo_attachment' | 'manual';
+export type HomeLocationSource = 'foreground' | 'photo_attachment' | 'manual' | 'health_workout_route';
 export type LocationPermissionState = 'unknown' | 'granted' | 'denied';
+export type HealthPermissionState = 'unknown' | 'granted' | 'denied' | 'unavailable';
+export type HealthRouteImportStatus = 'idle' | 'success' | 'no_data' | 'denied' | 'unavailable' | 'error';
 export type HomeVisualKey =
   | 'voltstep'
   | 'hearthsip'
@@ -97,6 +99,31 @@ export type DayMapSummary = {
   primaryLocationId: string | null;
   viewport: DayMapViewport | null;
   totalSamples: number;
+};
+
+export type StoredExactRouteCoordinate = {
+  latitude: number;
+  longitude: number;
+  capturedAt: string;
+};
+
+export type StoredExactRouteSegment = {
+  id: string;
+  workoutId: string;
+  activityType: string;
+  startedAt: string;
+  endedAt: string;
+  coordinates: StoredExactRouteCoordinate[];
+};
+
+export type StoredHealthRouteImportMeta = {
+  status: HealthRouteImportStatus;
+  importedAt: string | null;
+  workoutIds: string[];
+  importedWorkoutCount: number;
+  sampledPointCount: number;
+  segmentCount: number;
+  message?: string | null;
 };
 
 export type HomeMoment = {
@@ -243,13 +270,16 @@ export type StoredHomeDayRecord = {
   state: HomeDayState;
   moments: HomeMoment[];
   locations: StoredHomeLocationPoint[];
+  healthRouteImport: StoredHealthRouteImportMeta | null;
+  exactRouteSegments: StoredExactRouteSegment[];
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
 };
 
 export type StoredHomeState = {
-  version: 2;
+  version: 3;
   locationPermission: LocationPermissionState;
+  healthPermission: HealthPermissionState;
   archivedDays: StoredHomeDayRecord[];
   today: StoredHomeDayRecord;
 };

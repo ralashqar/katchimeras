@@ -2,21 +2,32 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import type { AddMomentInput, LocationPermissionState, RecentPhotoAsset, StoredHomeState } from '@/types/home';
+import type {
+  AddMomentInput,
+  HealthPermissionState,
+  LocationPermissionState,
+  RecentPhotoAsset,
+  StoredHomeState,
+} from '@/types/home';
 import {
   addMomentToDay,
   hydrateHomeState,
+  importHealthRoutesForDay as applyHealthRoutesForDay,
+  type ImportedHealthRoutesPayload,
   recordForegroundLocationSample,
   seedRecentPhotoLocationsForToday,
   triggerHatchForDay,
+  updateHealthPermissionState,
   updateLocationPermissionState,
 } from '@/utils/home-engine';
+import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 export function useHomeScreenState() {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
+  const [importingHealthRouteDayId, setImportingHealthRouteDayId] = useState<string | null>(null);
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
 
   useEffect(() => {
@@ -103,6 +114,16 @@ export function useHomeScreenState() {
     });
   }, []);
 
+  const setHealthPermission = useCallback((permission: HealthPermissionState) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return updateHealthPermissionState(hydrated.state, permission, profile, now);
+    });
+  }, []);
+
   const addForegroundLocationSample = useCallback(
     (sample: {
       lat: number;
@@ -179,14 +200,88 @@ export function useHomeScreenState() {
     setSelectedDayId(hydrated.todayId);
   }, []);
 
+  const importHealthRoutesForDay = useCallback(async (dayId: string): Promise<ImportedHealthRoutesPayload> => {
+    const profile = loadOnboardingProfile();
+    const initialNow = new Date();
+    const hydrated = hydrateHomeState(loadStoredHomeState() ?? storedStateRef.current, profile, initialNow);
+    const targetDay =
+      hydrated.state.today.id === dayId
+        ? hydrated.state.today
+        : hydrated.state.archivedDays.find((day) => day.id === dayId) ?? null;
+
+    if (!targetDay) {
+        return {
+          status: 'error',
+          importedWorkoutCount: 0,
+          sampledPointCount: 0,
+          segmentCount: 0,
+        workoutIds: [],
+        message: 'That day could not be resolved from local state.',
+      };
+    }
+
+    setImportingHealthRouteDayId(dayId);
+
+    try {
+      const availability = await getHealthRouteAvailability();
+      let permissionState = availability.permissionState;
+
+      if (permissionState === 'unknown') {
+        permissionState = await requestHealthRoutePermission();
+      }
+
+      const permissionNow = new Date();
+      setStoredState((currentState) => {
+        const currentHydrated = hydrateHomeState(currentState, profile, permissionNow);
+        return updateHealthPermissionState(currentHydrated.state, permissionState, profile, permissionNow);
+      });
+
+      if (permissionState !== 'granted') {
+        return {
+          status: permissionState === 'unavailable' ? 'unavailable' : 'denied',
+          importedWorkoutCount: 0,
+          sampledPointCount: 0,
+          segmentCount: 0,
+          workoutIds: [],
+          message:
+            permissionState === 'unavailable'
+              ? 'Health route import is only available on iPhone builds with HealthKit enabled.'
+              : 'Apple Health route access was not granted.',
+        };
+      }
+
+      const result = await importRoutesForDay({ isoDate: targetDay.isoDate });
+      const resultNow = new Date();
+
+      setStoredState((currentState) => {
+        const currentHydrated = hydrateHomeState(currentState, profile, resultNow);
+        const withHealthPermission = updateHealthPermissionState(
+          currentHydrated.state,
+          'granted',
+          profile,
+          resultNow
+        );
+        return applyHealthRoutesForDay(withHealthPermission, dayId, result, profile, resultNow);
+      });
+
+      return result;
+    } finally {
+      setImportingHealthRouteDayId((current) => (current === dayId ? null : current));
+    }
+  }, []);
+
   return {
     timelineDays,
     selectedDayId: selectedDay?.id ?? viewModel.todayId,
     selectedDay,
     locationPermission: viewModel.state.locationPermission,
+    healthPermission: viewModel.state.healthPermission,
+    importingHealthRouteDayId,
     addMoment,
     addForegroundLocationSample,
+    importHealthRoutesForDay,
     seedRecentPhotoLocations,
+    setHealthPermission,
     setLocationPermission,
     selectTimelineDay,
     selectPath,

@@ -17,6 +17,7 @@ import type {
   DayScores,
   DayMapSummary,
   EggVisualState,
+  HealthPermissionState,
   HomeDayRecord,
   HomeDayState,
   HomeLocationSource,
@@ -32,8 +33,10 @@ import type {
   LocalCreatureRecord,
   LocalPathOption,
   RecentPhotoAsset,
+  StoredExactRouteSegment,
   StoredHomeDayRecord,
   StoredHomeLocationPoint,
+  StoredHealthRouteImportMeta,
   StoredHomeState,
   WeekProfile,
 } from '@/types/home';
@@ -44,6 +47,7 @@ const scoreOrder: HomeScoreKey[] = ['energy', 'calm', 'social', 'exploration', '
 const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 const MAX_STORED_DAY_LOCATIONS = 180;
+const MAX_HEALTH_ROUTE_SAMPLE_POINTS = 120;
 const LOCATION_LINK_WINDOW_MS = 20 * 60 * 1000;
 const LOCATION_DEDUPE_WINDOW_MS = 4 * 60 * 1000;
 const LOCATION_DEDUPE_DISTANCE_METERS = 65;
@@ -55,11 +59,44 @@ const pathSupportMap: Record<HomeScoreKey, HomeScoreKey> = {
   focus: 'calm',
 };
 
-type LegacyStoredHomeDayRecord = Omit<StoredHomeDayRecord, 'locations'>;
+type LegacyStoredHomeDayRecord = Omit<StoredHomeDayRecord, 'locations' | 'healthRouteImport' | 'exactRouteSegments'>;
+type Version2StoredHomeDayRecord = Omit<StoredHomeDayRecord, 'healthRouteImport' | 'exactRouteSegments'>;
+type Version2StoredHomeState = {
+  version: 2;
+  locationPermission: LocationPermissionState;
+  archivedDays: Version2StoredHomeDayRecord[];
+  today: Version2StoredHomeDayRecord;
+};
 type LegacyStoredHomeState = {
   version?: 1;
   archivedDays: LegacyStoredHomeDayRecord[];
   today: LegacyStoredHomeDayRecord;
+};
+type UpgradeableStoredHomeState = StoredHomeState | Version2StoredHomeState | LegacyStoredHomeState;
+
+export type ImportedHealthRoutePoint = {
+  latitude: number;
+  longitude: number;
+  capturedAt: string;
+};
+
+export type ImportedHealthRouteSegment = {
+  id: string;
+  workoutId: string;
+  activityType: string;
+  startedAt: string;
+  endedAt: string;
+  coordinates: ImportedHealthRoutePoint[];
+};
+
+export type ImportedHealthRoutesPayload = {
+  status: 'success' | 'no_data' | 'denied' | 'unavailable' | 'error';
+  importedWorkoutCount: number;
+  sampledPointCount: number;
+  segmentCount: number;
+  workoutIds: string[];
+  segments?: ImportedHealthRouteSegment[];
+  message?: string | null;
 };
 
 export function createEmptyScores(): DayScores {
@@ -86,6 +123,8 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
       state: 'hatched' as const,
       moments: [moment],
       locations: createSeedLocations(momentType, dayDate, index, moment.id),
+      healthRouteImport: null,
+      exactRouteSegments: [],
       selectedPathId: null,
       creature: {
         id: `seed-creature-${entry.creature.id}`,
@@ -104,15 +143,16 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
   });
 
   return {
-    version: 2,
+    version: 3,
     locationPermission: 'unknown',
+    healthPermission: 'unknown',
     archivedDays,
     today: createEmptyStoredDay(now, profile),
   };
 }
 
 export function hydrateHomeState(
-  storedState: StoredHomeState | LegacyStoredHomeState | null,
+  storedState: UpgradeableStoredHomeState | null,
   profile: OnboardingProfile,
   now: Date
 ): {
@@ -148,6 +188,22 @@ export function updateLocationPermissionState(
     {
       ...state,
       locationPermission: permission,
+    },
+    profile,
+    now
+  );
+}
+
+export function updateHealthPermissionState(
+  state: StoredHomeState,
+  permission: HealthPermissionState,
+  profile: OnboardingProfile,
+  now: Date
+) {
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      healthPermission: permission,
     },
     profile,
     now
@@ -280,6 +336,29 @@ export function seedRecentPhotoLocationsForToday(
     profile,
     now
   );
+}
+
+export function importHealthRoutesForDay(
+  state: StoredHomeState,
+  dayId: string,
+  payload: ImportedHealthRoutesPayload,
+  profile: OnboardingProfile,
+  now: Date
+) {
+  const nextState =
+    state.today.id === dayId
+      ? {
+          ...state,
+          today: applyHealthRoutesToDayRecord(state.today, payload, now),
+        }
+      : {
+          ...state,
+          archivedDays: state.archivedDays.map((day) =>
+            day.id === dayId ? applyHealthRoutesToDayRecord(day, payload, now) : day
+          ),
+        };
+
+  return normalizeStoredHomeState(nextState, profile, now);
 }
 
 export function selectPathForToday(
@@ -458,7 +537,7 @@ export function buildInsightLine(profile: WeekProfile, onboardingProfile: Onboar
 }
 
 function normalizeStoredHomeState(
-  inputState: StoredHomeState | LegacyStoredHomeState,
+  inputState: UpgradeableStoredHomeState,
   profile: OnboardingProfile,
   now: Date
 ): StoredHomeState {
@@ -485,8 +564,9 @@ function normalizeStoredHomeState(
     .slice(-5);
 
   return {
-    version: 2,
+    version: 3,
     locationPermission: upgradedState.locationPermission,
+    healthPermission: upgradedState.healthPermission,
     archivedDays,
     today,
   };
@@ -521,36 +601,208 @@ function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHome
     state: 'forming',
     moments: [],
     locations: [],
+    healthRouteImport: null,
+    exactRouteSegments: [],
     selectedPathId: buildInitialPathId(profile),
     creature: null,
   };
 }
 
-function upgradeStoredHomeState(inputState: StoredHomeState | LegacyStoredHomeState): StoredHomeState {
-  if ('version' in inputState && inputState.version === 2) {
+function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
+  if ('version' in inputState && inputState.version === 3) {
     return {
       ...inputState,
-      archivedDays: inputState.archivedDays.map(ensureLocationsOnDayRecord),
-      today: ensureLocationsOnDayRecord(inputState.today),
+      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
+      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
+    };
+  }
+
+  if ('version' in inputState && inputState.version === 2) {
+    return {
+      version: 3,
+      locationPermission: inputState.locationPermission,
+      healthPermission: 'unknown',
+      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
+      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
     };
   }
 
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 2,
+    version: 3,
     locationPermission: 'unknown',
-    archivedDays: legacy.archivedDays.map(ensureLocationsOnDayRecord),
-    today: ensureLocationsOnDayRecord(legacy.today),
+    healthPermission: 'unknown',
+    archivedDays: legacy.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
+    today: ensureHealthRouteFieldsOnDayRecord(legacy.today),
   };
 }
 
-function ensureLocationsOnDayRecord(day: StoredHomeDayRecord | LegacyStoredHomeDayRecord): StoredHomeDayRecord {
+function ensureHealthRouteFieldsOnDayRecord(
+  day: StoredHomeDayRecord | Version2StoredHomeDayRecord | LegacyStoredHomeDayRecord
+): StoredHomeDayRecord {
   const existingLocations = 'locations' in day ? day.locations ?? [] : [];
   return {
     ...day,
     locations: existingLocations.length > 0 ? existingLocations : createFallbackLocationsForStoredDay(day),
+    healthRouteImport: 'healthRouteImport' in day ? day.healthRouteImport ?? null : null,
+    exactRouteSegments: 'exactRouteSegments' in day ? day.exactRouteSegments ?? [] : [],
   };
+}
+
+function applyHealthRoutesToDayRecord(
+  day: StoredHomeDayRecord,
+  payload: ImportedHealthRoutesPayload,
+  now: Date
+): StoredHomeDayRecord {
+  const nextImportMeta = buildHealthRouteImportMeta(payload, now);
+
+  if (payload.status !== 'success' || !payload.segments || payload.segments.length === 0) {
+    return {
+      ...day,
+      healthRouteImport: nextImportMeta,
+    };
+  }
+
+  const normalizedSegments = payload.segments
+    .map(normalizeImportedHealthRouteSegment)
+    .filter((segment) => segment.coordinates.length > 0);
+
+  const baseLocations = day.locations.filter((point) => point.source !== 'health_workout_route');
+  const sampledRouteLocations = buildSampledHealthRouteLocations(normalizedSegments, baseLocations);
+
+  return {
+    ...day,
+    locations: [...baseLocations, ...sampledRouteLocations].slice(-MAX_STORED_DAY_LOCATIONS),
+    healthRouteImport: {
+      ...nextImportMeta,
+      sampledPointCount: sampledRouteLocations.length,
+      segmentCount: normalizedSegments.length,
+    },
+    exactRouteSegments: normalizedSegments,
+  };
+}
+
+function buildHealthRouteImportMeta(
+  payload: ImportedHealthRoutesPayload,
+  now: Date
+): StoredHealthRouteImportMeta {
+  return {
+    status: payload.status,
+    importedAt: payload.status === 'success' ? now.toISOString() : null,
+    workoutIds: payload.workoutIds,
+    importedWorkoutCount: payload.importedWorkoutCount,
+    sampledPointCount: payload.sampledPointCount,
+    segmentCount: payload.segmentCount,
+    message: payload.message ?? null,
+  };
+}
+
+function normalizeImportedHealthRouteSegment(segment: ImportedHealthRouteSegment): StoredExactRouteSegment {
+  return {
+    ...segment,
+    coordinates: segment.coordinates
+      .map((coordinate) => ({
+        latitude: Number(coordinate.latitude.toFixed(6)),
+        longitude: Number(coordinate.longitude.toFixed(6)),
+        capturedAt: coordinate.capturedAt,
+      }))
+      .filter(
+        (coordinate) =>
+          Number.isFinite(coordinate.latitude) &&
+          Number.isFinite(coordinate.longitude) &&
+          Boolean(coordinate.capturedAt)
+      ),
+  };
+}
+
+function buildSampledHealthRouteLocations(
+  segments: StoredExactRouteSegment[],
+  baseLocations: StoredHomeLocationPoint[]
+): StoredHomeLocationPoint[] {
+  const collectedPoints: StoredHomeLocationPoint[] = [];
+  const existingPoints = [...baseLocations];
+
+  for (const segment of segments) {
+    const downsampled = downsampleRouteCoordinates(segment.coordinates);
+    for (const coordinate of downsampled) {
+      if (collectedPoints.length >= MAX_HEALTH_ROUTE_SAMPLE_POINTS) {
+        return collectedPoints;
+      }
+
+      const nextPoint: StoredHomeLocationPoint = {
+        id: `health-route-${segment.workoutId}-${new Date(coordinate.capturedAt).getTime().toString(36)}-${collectedPoints.length.toString(36)}`,
+        lat: coordinate.latitude,
+        lng: coordinate.longitude,
+        capturedAt: coordinate.capturedAt,
+        type: classifyHealthRouteLocationType(segment.activityType),
+        hasPhoto: false,
+        source: 'health_workout_route',
+        momentId: null,
+      };
+
+      if (isDuplicateImportedHealthRoutePoint([...existingPoints, ...collectedPoints], nextPoint)) {
+        continue;
+      }
+
+      collectedPoints.push(nextPoint);
+    }
+  }
+
+  return collectedPoints;
+}
+
+function downsampleRouteCoordinates(
+  coordinates: StoredExactRouteSegment['coordinates']
+): StoredExactRouteSegment['coordinates'] {
+  if (coordinates.length <= 2) {
+    return coordinates;
+  }
+
+  const kept: StoredExactRouteSegment['coordinates'] = [coordinates[0]];
+  let lastKept = coordinates[0];
+
+  for (let index = 1; index < coordinates.length - 1; index += 1) {
+    const candidate = coordinates[index];
+    const distance = getDistanceMeters(
+      lastKept.latitude,
+      lastKept.longitude,
+      candidate.latitude,
+      candidate.longitude
+    );
+    const elapsedMs = Math.abs(new Date(candidate.capturedAt).getTime() - new Date(lastKept.capturedAt).getTime());
+
+    if (distance >= 100 || elapsedMs >= 120_000) {
+      kept.push(candidate);
+      lastKept = candidate;
+    }
+  }
+
+  const lastCoordinate = coordinates[coordinates.length - 1];
+  if (kept[kept.length - 1]?.capturedAt !== lastCoordinate.capturedAt) {
+    kept.push(lastCoordinate);
+  }
+
+  return kept;
+}
+
+function isDuplicateImportedHealthRoutePoint(
+  existingPoints: StoredHomeLocationPoint[],
+  nextPoint: StoredHomeLocationPoint
+) {
+  return existingPoints.some((point) => {
+    const timeDelta = Math.abs(new Date(point.capturedAt).getTime() - new Date(nextPoint.capturedAt).getTime());
+    const distance = getDistanceMeters(point.lat, point.lng, nextPoint.lat, nextPoint.lng);
+    return timeDelta <= LOCATION_LINK_WINDOW_MS && distance <= 100;
+  });
+}
+
+function classifyHealthRouteLocationType(activityType: string): HomeLocationType {
+  const normalized = activityType.toLowerCase();
+  if (normalized.includes('walk') || normalized.includes('run') || normalized.includes('hike')) {
+    return 'park';
+  }
+  return 'unknown';
 }
 
 function shouldSkipLocationSample(existingPoints: StoredHomeLocationPoint[], nextPoint: StoredHomeLocationPoint) {

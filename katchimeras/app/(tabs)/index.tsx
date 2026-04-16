@@ -27,6 +27,8 @@ export default function HomeScreen() {
   const {
     addMoment,
     addForegroundLocationSample,
+    importingHealthRouteDayId,
+    importHealthRoutesForDay,
     locationPermission,
     selectPath,
     selectedDay,
@@ -253,6 +255,8 @@ export default function HomeScreen() {
             <DayContext
               day={selectedDay}
               onAddMoment={openAddMomentFlow}
+              isImportingHealthRoutes={importingHealthRouteDayId === selectedDay.id}
+              onImportHealthRoutes={() => importHealthRoutesForDay(selectedDay.id)}
               onReveal={handleReveal}
               onViewDayMap={() => handleOpenDayMap(selectedDay.id)}
             />

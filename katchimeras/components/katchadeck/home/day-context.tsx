@@ -8,15 +8,25 @@ import { ThemedText } from '@/components/themed-text';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
+import type { ImportedHealthRoutesPayload } from '@/utils/home-engine';
 
 type DayContextProps = {
   day: HomeDayRecord;
   onAddMoment: () => void;
+  onImportHealthRoutes: () => Promise<ImportedHealthRoutesPayload>;
+  isImportingHealthRoutes?: boolean;
   onReveal: () => void;
   onViewDayMap: () => void;
 };
 
-export function DayContext({ day, onAddMoment, onReveal, onViewDayMap }: DayContextProps) {
+export function DayContext({
+  day,
+  onAddMoment,
+  onImportHealthRoutes,
+  isImportingHealthRoutes = false,
+  onReveal,
+  onViewDayMap,
+}: DayContextProps) {
   if (day.isToday && day.state !== 'hatched') {
     return (
       <View style={styles.stack}>
@@ -46,7 +56,13 @@ export function DayContext({ day, onAddMoment, onReveal, onViewDayMap }: DayCont
           </ThemedText>
         )}
 
-        <DayMapPreview accentColor={day.creature?.accentColor ?? day.egg.accentColor} day={day} onPress={onViewDayMap} />
+        <DayMapPreview
+          accentColor={day.creature?.accentColor ?? day.egg.accentColor}
+          day={day}
+          isImportingHealthRoutes={isImportingHealthRoutes}
+          onImportHealthRoutes={onImportHealthRoutes}
+          onPress={onViewDayMap}
+        />
 
         {day.canHatch ? (
           <GlassPanel
@@ -77,6 +93,8 @@ export function DayContext({ day, onAddMoment, onReveal, onViewDayMap }: DayCont
       <DayMapPreview
         accentColor={day.creature?.accentColor ?? day.egg.accentColor}
         day={day}
+        isImportingHealthRoutes={isImportingHealthRoutes}
+        onImportHealthRoutes={onImportHealthRoutes}
         onPress={onViewDayMap}
       />
       <View style={styles.momentList}>

@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
@@ -32,6 +32,7 @@ export function DayMapSurface({
   const [nativeMaps, setNativeMaps] = useState<NativeMapsModule | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(day.dayMap?.primaryLocationId ?? null);
   const [expandedPhotoUri, setExpandedPhotoUri] = useState<string | null>(null);
+  const ignoreNextMapPressRef = useRef(false);
   const momentIndex = useMemo(() => new Map(day.moments.map((moment) => [moment.id, moment])), [day.moments]);
 
   useEffect(() => {
@@ -109,6 +110,10 @@ export function DayMapSurface({
         region={day.dayMap.viewport}
         mapType="standard"
         onPress={() => {
+          if (ignoreNextMapPressRef.current) {
+            ignoreNextMapPressRef.current = false;
+            return;
+          }
           if (interactive) {
             setSelectedNodeId(null);
           }
@@ -126,6 +131,21 @@ export function DayMapSurface({
         toolbarEnabled={false}
         zoomControlEnabled={false}
         zoomEnabled={interactive}>
+        {day.exactRouteSegments.map((segment) =>
+          segment.coordinates.length > 1 ? (
+            <Polyline
+              coordinates={segment.coordinates.map((coordinate) => ({
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+              }))}
+              key={segment.id}
+              lineCap="round"
+              lineJoin="round"
+              strokeColor={mapTheme.exactRoute}
+              strokeWidth={interactive ? 3 : 2}
+            />
+          ) : null
+        )}
         {day.dayMap.path.length > 1 ? (
           <Polyline
             coordinates={day.dayMap.path}
@@ -142,7 +162,12 @@ export function DayMapSurface({
             key={node.id}
             tracksViewChanges={Boolean(node.photoThumbnailUri)}
             onPress={() => {
+              ignoreNextMapPressRef.current = true;
               if (interactive) {
+                if (node.photoThumbnailUri && selectedNode?.id === node.id) {
+                  setExpandedPhotoUri(node.photoThumbnailUri);
+                  return;
+                }
                 setSelectedNodeId(node.id);
               }
             }}>
@@ -161,6 +186,7 @@ export function DayMapSurface({
             key={`creature-catch-${day.id}`}
             tracksViewChanges
             onPress={() => {
+              ignoreNextMapPressRef.current = true;
               if (interactive && primaryNode) {
                 setSelectedNodeId(primaryNode.id);
               }
@@ -348,6 +374,7 @@ function resolveNodeTheme(type: HomeLocationType, accentColor: string) {
 
 function resolveMapTheme(accentColor: string) {
   return {
+    exactRoute: `${accentColor}52`,
     path: `${accentColor}B8`,
   };
 }

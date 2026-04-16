@@ -73,6 +73,12 @@ You do need a new build when:
 - adding native health integrations such as HealthKit
 - changing any native capability that affects the signed app
 
+For the Day Map Health import specifically, a rebuild is required whenever the local HealthKit Expo module or its config plugin changes, because the dev client must include:
+
+- the `KatchimeraHealthRoutes` native module
+- the HealthKit entitlement
+- the `NSHealthShareUsageDescription` permission string
+
 ## KatchaDeck-specific guidance
 
 Use Expo Go only for very early foreground-only experiments.
