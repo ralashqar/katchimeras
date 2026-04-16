@@ -36,6 +36,7 @@ type CinematicOnboardingPageProps = {
   entries: readonly TimelineDayEntry[];
   tomorrowState: TimelineTomorrowState;
   onAdvance: () => void;
+  stopAfterOpening?: boolean;
 };
 
 const FINAL_BEAT_INDEX = onboardingCinematicBeats.length - 1;
@@ -77,6 +78,7 @@ export function CinematicOnboardingPage({
   entries,
   tomorrowState,
   onAdvance,
+  stopAfterOpening = false,
 }: CinematicOnboardingPageProps) {
   const { height } = useWindowDimensions();
   const [beatIndex, setBeatIndex] = useState(0);
@@ -94,6 +96,7 @@ export function CinematicOnboardingPage({
   const entryMap = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
   const openingRevealEntry =
     openingSequence?.handoff.revealTargetId ? entryMap.get(openingSequence.handoff.revealTargetId) ?? null : null;
+  const finalBeatIndex = stopAfterOpening ? 0 : FINAL_BEAT_INDEX;
 
   useEffect(() => {
     let mounted = true;
@@ -124,6 +127,11 @@ export function CinematicOnboardingPage({
       const lastSceneIndex = openingSequence.scenes.length - 1;
       const timer = setTimeout(() => {
         if (openingSceneIndex >= lastSceneIndex) {
+          if (stopAfterOpening) {
+            onAdvance();
+            return;
+          }
+
           setBeatIndex(FOLLOW_UP_BEAT_INDEX);
           return;
         }
@@ -134,12 +142,12 @@ export function CinematicOnboardingPage({
       return () => clearTimeout(timer);
     }
 
-    if (beatIndex >= FINAL_BEAT_INDEX) {
+    if (beatIndex >= finalBeatIndex) {
       return;
     }
 
     const timer = setTimeout(
-      () => setBeatIndex((current) => Math.min(current + 1, FINAL_BEAT_INDEX)),
+      () => setBeatIndex((current) => Math.min(current + 1, finalBeatIndex)),
       reduceMotionEnabled ? 900 : currentBeat.durationMs
     );
 
@@ -153,7 +161,10 @@ export function CinematicOnboardingPage({
     isOpeningBeat,
     openingSceneIndex,
     openingSequence,
+    onAdvance,
     reduceMotionEnabled,
+    stopAfterOpening,
+    finalBeatIndex,
   ]);
 
   useEffect(() => {
@@ -195,8 +206,8 @@ export function CinematicOnboardingPage({
       return;
     }
 
-    if (beatIndex < FINAL_BEAT_INDEX) {
-      setBeatIndex((current) => Math.min(current + 1, FINAL_BEAT_INDEX));
+    if (beatIndex < finalBeatIndex) {
+      setBeatIndex((current) => Math.min(current + 1, finalBeatIndex));
       return;
     }
 

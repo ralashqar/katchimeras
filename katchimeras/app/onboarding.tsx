@@ -105,6 +105,7 @@ export default function OnboardingScreen() {
           <CinematicOnboardingPage
             entries={timelineDemoEntries}
             onAdvance={() => setStep(1)}
+            stopAfterOpening
             tomorrowState={timelineTomorrowState}
           />
         </View>
