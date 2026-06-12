@@ -80,10 +80,10 @@ export function EggShell({ egg: _egg, motion, reactionKey = 0, crackStage = 0 }:
       transform: [
         { translateX: motion.dragX.value * 0.14 },
         { translateY: motion.dragY.value * 0.14 },
-        { scaleX: 1 + breathe.value * 0.035 + reaction.value * 0.06 + press * 0.03 + dragMagnitude * 0.03 },
+        { scaleX: 1 + breathe.value * 0.05 + reaction.value * 0.06 + press * 0.03 + dragMagnitude * 0.03 },
         {
           scaleY:
-            1 + breathe.value * 0.035 + reaction.value * 0.06 + press * 0.03 - dragMagnitude * 0.018 + energy * 0.025,
+            1 + breathe.value * 0.05 + reaction.value * 0.06 + press * 0.03 - dragMagnitude * 0.018 + energy * 0.025,
         },
       ],
     };
