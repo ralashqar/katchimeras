@@ -1,4 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -18,9 +18,14 @@ import { ThemedText } from '@/components/themed-text';
 import type { HomeDayRecord } from '@/types/home';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
-import { KatchaDeckUI } from '@/constants/theme';
 
 export type HatchSequencePhase = 'recap' | 'converging' | 'revealing';
+
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
+const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 type HatchSequenceProps = {
   day: HomeDayRecord;
@@ -73,8 +78,16 @@ export function HatchSequence({ day, phase, onSkip }: HatchSequenceProps) {
   }));
 
   const coreStyle = useAnimatedStyle(() => ({
-    opacity: 0.6 + pulse.value * 0.18 + phaseProgress.value * 0.12,
+    opacity: 0.18 + pulse.value * 0.12 + phaseProgress.value * 0.1,
     transform: [{ scale: 0.92 + phaseProgress.value * 0.1 }],
+  }));
+
+  const crackOneStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(phaseProgress.value, [0, 1, 2], [0, 1, 0.35]),
+  }));
+
+  const crackTwoStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(phaseProgress.value, [0, 1, 2], [0, 0, 1]),
   }));
 
   const ringStyle = useAnimatedStyle(() => ({
@@ -110,12 +123,10 @@ export function HatchSequence({ day, phase, onSkip }: HatchSequenceProps) {
           <Animated.View style={[styles.outerRing, { borderColor: `${day.egg.accentColor}66` }, ringStyle]} />
           <Animated.View style={[styles.innerRing, { borderColor: `${day.egg.coreColor}7A` }, ringStyle]} />
           <Animated.View style={[styles.coreShell, coreShellStyle]}>
-            <LinearGradient colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0)']} style={styles.coreSheen} />
-            <View style={[styles.coreEgg, { borderColor: `${day.egg.accentColor}A0` }]}>
-              <Animated.View style={[styles.coreOrb, { backgroundColor: day.egg.coreColor }, coreStyle]} />
-              <View style={[styles.coreSpark, { backgroundColor: day.egg.accentColor }]} />
-              <View style={[styles.coreSparkSecondary, { backgroundColor: `${day.egg.coreColor}CC` }]} />
-            </View>
+            <Image contentFit="contain" source={eggBase} style={styles.coreEggImage} transition={0} />
+            <AnimatedImage contentFit="contain" source={eggCrackOne} style={[styles.coreEggImage, crackOneStyle]} transition={0} />
+            <AnimatedImage contentFit="contain" source={eggCrackTwo} style={[styles.coreEggImage, crackTwoStyle]} transition={0} />
+            <Animated.View style={[styles.coreOrb, { backgroundColor: day.egg.coreColor }, coreStyle]} />
           </Animated.View>
           {day.moments.map((moment, index) => (
             <View
@@ -255,47 +266,15 @@ const styles = StyleSheet.create({
     top: '50%',
     width: 84,
   },
-  coreEgg: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(10,14,24,0.96)',
-    borderRadius: 999,
-    borderWidth: 1.25,
-    boxShadow: KatchaDeckUI.shadows.card,
+  coreEggImage: {
     height: '100%',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: '100%',
-  },
-  coreSheen: {
-    borderRadius: 999,
-    height: 34,
-    left: 14,
-    opacity: 0.8,
     position: 'absolute',
-    top: 12,
-    width: 24,
-    zIndex: 2,
+    width: '116%',
   },
   coreOrb: {
     borderRadius: 999,
     height: 38,
     width: 38,
-  },
-  coreSpark: {
-    borderRadius: 999,
-    height: 10,
-    position: 'absolute',
-    right: 18,
-    top: 14,
-    width: 10,
-  },
-  coreSparkSecondary: {
-    borderRadius: 999,
-    bottom: 18,
-    height: 8,
-    left: 18,
-    position: 'absolute',
-    width: 8,
   },
   momentChip: {
     alignItems: 'center',
