@@ -251,13 +251,8 @@ const styles = StyleSheet.create({
   },
   creaturePlate: {
     alignItems: 'center',
-    backgroundColor: 'rgba(9,14,25,0.94)',
-    borderColor: 'rgba(224,234,255,0.18)',
-    borderRadius: 999,
-    borderWidth: 1,
     height: 408,
     justifyContent: 'center',
-    overflow: 'hidden',
     width: 408,
   },
   creatureImage: {
