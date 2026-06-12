@@ -396,7 +396,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 6,
   },
+  // The aura frame is 372px tall with the egg centered inside; the negative
+  // margins collapse its dead space so the egg's visual center matches the
+  // creature hero's 258px stage when flipping between days.
   eggScale: {
+    marginBottom: -46,
+    marginTop: -52,
     transform: [{ scale: 1.06 }],
   },
   sectionGap: {
@@ -445,11 +450,10 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   spacer: {
-    flexGrow: 1,
-    minHeight: 10,
+    height: 6,
   },
   ctaArea: {
-    marginTop: 8,
+    marginTop: 12,
   },
   ctaRow: {
     flexDirection: 'row',
