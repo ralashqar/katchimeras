@@ -6,7 +6,7 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { FormingEgg } from '@/components/katchadeck/home/forming-egg';
+import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { CinematicOnboardingPage } from '@/components/katchadeck/onboarding/cinematic-onboarding-page';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
@@ -199,10 +199,7 @@ export default function OnboardingScreen() {
           </Animated.View>
 
           <Animated.View entering={presenceEnter(90)}>
-            <FormingEgg
-              caption="A walk, a stop, and a saved image are already changing the shape of the day."
-              egg={sampleEgg}
-            />
+            <LanternEgg egg={sampleEgg} />
           </Animated.View>
 
           <View style={styles.momentRow}>

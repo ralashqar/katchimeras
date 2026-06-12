@@ -6,8 +6,8 @@ import { captureRef } from 'react-native-view-shot';
 
 import { AddMomentRadial } from '@/components/katchadeck/home/add-moment-radial';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { FormingEgg } from '@/components/katchadeck/home/forming-egg';
 import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/home/hatch-sequence';
+import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
@@ -234,30 +234,24 @@ export default function HomeScreen() {
             isHatched ? (
               <CreatureHero creature={selectedDay.creature!} hideSubtitle />
             ) : (
-              <View style={styles.eggScale}>
-                <FormingEgg
-                  egg={selectedDay.egg}
-                  interactive
-                  onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
-                  reactionKey={selectedDay.moments.length}
-                />
-              </View>
+              <LanternEgg
+                egg={selectedDay.egg}
+                onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
+                reactionKey={selectedDay.moments.length}
+              />
             )
           ) : (
-            <View style={styles.eggScale}>
-              <FormingEgg
-                egg={{
-                  accentColor: '#A78BFA',
-                  haloColor: '#A78BFA',
-                  coreColor: 'rgba(201,194,232,0.3)',
-                  intensity: 0.26,
-                  shimmer: true,
-                  swirl: 0.2,
-                  label: 'Not yet formed',
-                }}
-                interactive
-              />
-            </View>
+            <LanternEgg
+              egg={{
+                accentColor: '#A78BFA',
+                haloColor: '#A78BFA',
+                coreColor: 'rgba(201,194,232,0.3)',
+                intensity: 0.26,
+                shimmer: true,
+                swirl: 0.2,
+                label: 'Not yet formed',
+              }}
+            />
           )}
         </Animated.View>
 
@@ -395,14 +389,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 6,
-  },
-  // The aura frame is 372px tall with the egg centered inside; the negative
-  // margins collapse its dead space so the egg's visual center matches the
-  // creature hero's 258px stage when flipping between days.
-  eggScale: {
-    marginBottom: -46,
-    marginTop: -52,
-    transform: [{ scale: 1.06 }],
   },
   sectionGap: {
     marginTop: 12,
