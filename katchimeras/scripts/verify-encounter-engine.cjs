@@ -27,7 +27,7 @@ const encounterProfiles = JSON.parse(
 const visualKeys = [
   'voltstep', 'hearthsip', 'glimmuse', 'skysette', 'creamalume', 'pulsepounce', 'gatherglow',
   'mossprout', 'lattelet', 'sprintail', 'neonpoko', 'crumbun', 'hayhorn', 'ironette',
-  'bedrotte', 'steppling',
+  'bedrotte', 'steppling', 'errandimp',
 ];
 const homeCreatureVisualsStub = Object.fromEntries(
   visualKeys.map((key) => [key, { source: 0, accentColor: '#FFFFFF' }])
@@ -151,9 +151,19 @@ const parkHistory = { location_park_mossprout: { count: 3, lastSeenIsoDate: '202
 const mixedCreature = engine.buildEncounterCreature(mixedDay, parkHistory, 'energy', 'calm');
 check('repeat history favors returning character', mixedCreature?.name === 'Mossprout', JSON.stringify(mixedCreature?.name));
 
-// 8. Day with no signals at all (moments the cast does not cover) falls back to null.
+// 8. Social moments hatch Gatherglow.
 const socialDay = makeDay({ moments: [makeMoment('social', 0)], stepsCount: 3000 });
-check('uncovered day returns null (trait fallback)', engine.buildEncounterCreature(socialDay, {}, 'social', 'calm') === null);
+const socialCreature = engine.buildEncounterCreature(socialDay, {}, 'social', 'calm');
+check('social day matches Gatherglow', socialCreature?.name === 'Gatherglow', JSON.stringify(socialCreature?.name));
+
+// 8b. Multi-stop day without a workout or big steps hatches Errandimp.
+const errandDay = makeDay({ stepsCount: 3400, visitedPlaceCount: 4 });
+const errandCreature = engine.buildEncounterCreature(errandDay, {}, 'energy', 'focus');
+check('errand day matches Errandimp', errandCreature?.name === 'Errandimp', JSON.stringify(errandCreature?.name));
+
+// 8c. Day with no signals at all (moments the cast does not cover) falls back to null.
+const focusDay = makeDay({ moments: [makeMoment('focus', 0)], stepsCount: 3000 });
+check('uncovered day returns null (trait fallback)', engine.buildEncounterCreature(focusDay, {}, 'focus', 'calm') === null);
 
 // 9. History recording: increments once per day, idempotent for same day.
 let h = engine.recordEncounterHatch({}, 'location_park_mossprout', '2026-06-12');

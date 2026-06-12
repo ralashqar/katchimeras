@@ -37,7 +37,8 @@ export type HomeVisualKey =
   | 'hayhorn'
   | 'ironette'
   | 'bedrotte'
-  | 'steppling';
+  | 'steppling'
+  | 'errandimp';
 
 export type DayScores = Record<HomeScoreKey, number>;
 

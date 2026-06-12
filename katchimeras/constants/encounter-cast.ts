@@ -66,6 +66,20 @@ export const encounterLiveCast: readonly EncounterCastEntry[] = [
     visualKey: 'bedrotte',
   },
   {
+    profileId: 'activity_social_gathering_gatherglow',
+    voice: 'a hearth spirit that glows brightest in company',
+    seedId: 'social_gathering',
+    categoryLabel: 'Time together',
+    visualKey: 'gatherglow',
+  },
+  {
+    profileId: 'activity_errand_loop_errandimp',
+    voice: 'a frazzled, triumphant little gremlin of small missions',
+    seedId: 'errand_loop',
+    categoryLabel: 'Errand day',
+    visualKey: 'errandimp',
+  },
+  {
     profileId: 'landmark_eiffel_tower_ironette',
     voice: 'elegant and theatrical, a collector of grand moments',
     seedId: 'eiffel_tower',
