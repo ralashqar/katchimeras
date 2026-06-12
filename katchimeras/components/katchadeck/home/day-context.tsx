@@ -100,13 +100,15 @@ export function DayContext({
     );
   }
 
+  const hatchedReflection = day.state === 'hatched' ? day.creature?.reflection : null;
+
   return (
     <GlassPanel contentStyle={styles.pastPanel}>
       <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
-        {day.state === 'hatched' ? 'Highlight' : 'Still forming'}
+        {day.state === 'hatched' ? 'Reflection' : 'Still forming'}
       </ThemedText>
       <ThemedText type="subtitle" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
-        {day.highlight ?? 'The day still has room to take shape.'}
+        {hatchedReflection ?? day.highlight ?? 'The day still has room to take shape.'}
       </ThemedText>
       <DayMapPreview
         accentColor={day.creature?.accentColor ?? day.egg.accentColor}

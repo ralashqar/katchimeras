@@ -478,7 +478,7 @@ export function triggerHatchForDay(
   now: Date
 ): StoredHomeState {
   if (state.today.id === dayId) {
-    const todayState = resolveDayState(state.today, now);
+    const todayState = resolveDayState(state.today, now, resolveHatchHour(profile));
     if (todayState !== 'ready_to_hatch') {
       return state;
     }
@@ -502,7 +502,7 @@ export function triggerHatchForDay(
   }
 
   const target = state.archivedDays[archivedIndex];
-  if (resolveDayState(target, now) !== 'ready_to_hatch') {
+  if (resolveDayState(target, now, resolveHatchHour(profile)) !== 'ready_to_hatch') {
     return state;
   }
 
@@ -535,7 +535,7 @@ export function deriveHomeDayRecord(
   weekProfile: WeekProfile,
   now: Date
 ): HomeDayRecord {
-  const state = resolveDayState(storedDay, now);
+  const state = resolveDayState(storedDay, now, resolveHatchHour(profile));
   const scores = computeDayScores(storedDay);
   const insightLine = buildInsightLine(weekProfile, profile);
   const pathOptions = buildPathOptions(weekProfile);
@@ -646,6 +646,7 @@ function normalizeStoredHomeState(
 ): StoredHomeState {
   const upgradedState = upgradeStoredHomeState(inputState);
   const todayDateId = toLocalDateId(now);
+  const hatchHour = resolveHatchHour(profile);
   let archivedDays: StoredHomeDayRecord[] = [...upgradedState.archivedDays];
   let today: StoredHomeDayRecord = { ...upgradedState.today };
 
@@ -656,21 +657,21 @@ function normalizeStoredHomeState(
 
   today = {
     ...today,
-    state: resolveDayState(today, now),
+    state: resolveDayState(today, now, hatchHour),
   };
 
   archivedDays = archivedDays
     .map((day): StoredHomeDayRecord => ({
       ...day,
-      state: resolveDayState(day, now),
+      state: resolveDayState(day, now, hatchHour),
     }))
     .slice(-5);
 
   const normalizedArchived: StoredHomeDayRecord[] = [];
   archivedDays.forEach((day) => {
-    normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now));
+    normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now, hatchHour));
   });
-  const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now);
+  const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now, hatchHour);
 
   return {
     version: 5,
@@ -683,7 +684,7 @@ function normalizeStoredHomeState(
   };
 }
 
-function resolveRolledPastDay(day: StoredHomeDayRecord, _profile: OnboardingProfile, now: Date): StoredHomeDayRecord {
+function resolveRolledPastDay(day: StoredHomeDayRecord, profile: OnboardingProfile, now: Date): StoredHomeDayRecord {
   if (day.state === 'hatched') {
     return day;
   }
@@ -695,7 +696,7 @@ function resolveRolledPastDay(day: StoredHomeDayRecord, _profile: OnboardingProf
     };
   }
 
-  if (resolveDayState(day, now) === 'ready_to_hatch') {
+  if (resolveDayState(day, now, resolveHatchHour(profile)) === 'ready_to_hatch') {
     return day;
   }
 
@@ -1137,7 +1138,8 @@ function createFallbackLocationsForStoredDay(day: Pick<StoredHomeDayRecord, 'id'
 function updateStoredDayDerivedFields(
   day: StoredHomeDayRecord,
   priorDays: StoredHomeDayRecord[],
-  now: Date
+  now: Date,
+  hatchHour: number
 ): StoredHomeDayRecord {
   const dayMap = deriveDayMapSummary(day.locations, day.moments);
   const visitedPlaceCount = dayMap?.nodes.length ?? 0;
@@ -1149,7 +1151,7 @@ function updateStoredDayDerivedFields(
 
   return {
     ...day,
-    state: resolveDayState(day, now),
+    state: resolveDayState(day, now, hatchHour),
     visitedPlaceCount,
     newPlaceCount,
     locationSampleCount,
@@ -1185,7 +1187,12 @@ function dayHasShape(day: StoredHomeDayRecord) {
   );
 }
 
-function resolveDayState(day: StoredHomeDayRecord, now: Date): HomeDayState {
+export function resolveHatchHour(profile: OnboardingProfile) {
+  const hour = profile.hatchHour ?? HOME_HATCH_HOUR;
+  return Math.min(Math.max(Math.round(hour), 17), 23);
+}
+
+function resolveDayState(day: StoredHomeDayRecord, now: Date, hatchHour: number): HomeDayState {
   if (day.creature) {
     return 'hatched';
   }
@@ -1199,7 +1206,7 @@ function resolveDayState(day: StoredHomeDayRecord, now: Date): HomeDayState {
   }
 
   const sameDay = day.isoDate === toLocalDateId(now);
-  if (sameDay && now.getHours() >= HOME_HATCH_HOUR) {
+  if (sameDay && now.getHours() >= hatchHour) {
     return 'ready_to_hatch';
   }
 
