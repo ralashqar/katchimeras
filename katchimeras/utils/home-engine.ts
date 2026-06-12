@@ -43,6 +43,9 @@ import type {
 } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { deriveDayMapSummary } from '@/utils/day-map-engine';
+import { buildEncounterCreature, recordEncounterHatch } from '@/utils/encounter-engine';
+
+import type { EncounterHistoryMap } from '@/types/home';
 
 const scoreOrder: HomeScoreKey[] = ['energy', 'calm', 'social', 'exploration', 'focus'];
 const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -104,8 +107,12 @@ type LegacyStoredHomeState = {
   archivedDays: LegacyStoredHomeDayRecord[];
   today: LegacyStoredHomeDayRecord;
 };
+type Version4StoredHomeState = Omit<StoredHomeState, 'version' | 'encounterHistory'> & {
+  version: 4;
+};
 type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version4StoredHomeState
   | Version3StoredHomeState
   | Version2StoredHomeState
   | LegacyStoredHomeState;
@@ -179,15 +186,18 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
         highlight: entry.summary,
         reflection: entry.memory.body,
         motifTags: [moment.label],
+        encounterProfileId: null,
+        repeatDepth: 0,
       },
     };
   });
 
   return {
-    version: 4,
+    version: 5,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
+    encounterHistory: {},
     archivedDays,
     today: createEmptyStoredDay(now, profile),
   };
@@ -473,10 +483,13 @@ export function triggerHatchForDay(
       return state;
     }
 
+    const hatchedToday = finalizeDayHatch(state.today, profile, now, state.encounterHistory);
+
     return normalizeStoredHomeState(
       {
         ...state,
-        today: finalizeDayHatch(state.today, profile, now),
+        encounterHistory: recordHatchedEncounter(state.encounterHistory, hatchedToday),
+        today: hatchedToday,
       },
       profile,
       now
@@ -494,16 +507,25 @@ export function triggerHatchForDay(
   }
 
   const nextArchived = [...state.archivedDays];
-  nextArchived[archivedIndex] = finalizeDayHatch(target, profile, now);
+  const hatchedDay = finalizeDayHatch(target, profile, now, state.encounterHistory);
+  nextArchived[archivedIndex] = hatchedDay;
 
   return normalizeStoredHomeState(
     {
       ...state,
+      encounterHistory: recordHatchedEncounter(state.encounterHistory, hatchedDay),
       archivedDays: nextArchived,
     },
     profile,
     now
   );
+}
+
+function recordHatchedEncounter(history: EncounterHistoryMap, day: StoredHomeDayRecord) {
+  if (!day.creature?.encounterProfileId) {
+    return history;
+  }
+  return recordEncounterHatch(history, day.creature.encounterProfileId, day.isoDate);
 }
 
 export function deriveHomeDayRecord(
@@ -651,10 +673,11 @@ function normalizeStoredHomeState(
   const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now);
 
   return {
-    version: 4,
+    version: 5,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
+    encounterHistory: upgradedState.encounterHistory,
     archivedDays: normalizedArchived,
     today: normalizedToday,
   };
@@ -696,15 +719,26 @@ function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHome
     locations: [],
     healthRouteImport: null,
     exactRouteSegments: [],
-    selectedPathId: buildInitialPathId(profile),
+    selectedPathId: null,
     creature: null,
   };
 }
 
 function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
+  if ('version' in inputState && inputState.version === 5) {
+    return {
+      ...inputState,
+      encounterHistory: inputState.encounterHistory ?? {},
+      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
+      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
+    };
+  }
+
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
+      version: 5,
+      encounterHistory: {},
       archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
       today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
     };
@@ -712,10 +746,11 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 4,
+      version: 5,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
+      encounterHistory: {},
       archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
       today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
     };
@@ -723,10 +758,11 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 4,
+      version: 5,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
+      encounterHistory: {},
       archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
       today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
     };
@@ -735,10 +771,11 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 4,
+    version: 5,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
+    encounterHistory: {},
     archivedDays: legacy.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
     today: ensureHealthRouteFieldsOnDayRecord(legacy.today),
   };
@@ -765,6 +802,13 @@ function ensureHealthRouteFieldsOnDayRecord(
     locations: existingLocations.length > 0 ? existingLocations : createFallbackLocationsForStoredDay(day),
     healthRouteImport: 'healthRouteImport' in day ? day.healthRouteImport ?? null : null,
     exactRouteSegments: 'exactRouteSegments' in day ? day.exactRouteSegments ?? [] : [],
+    creature: day.creature
+      ? {
+          ...day.creature,
+          encounterProfileId: day.creature.encounterProfileId ?? null,
+          repeatDepth: day.creature.repeatDepth ?? 0,
+        }
+      : null,
   };
 }
 
@@ -1141,18 +1185,6 @@ function dayHasShape(day: StoredHomeDayRecord) {
   );
 }
 
-function buildInitialPathId(profile: OnboardingProfile) {
-  if (profile.aspirationId === 'adventurous') {
-    return 'contrast:exploration';
-  }
-
-  if (profile.aspirationId === 'calm') {
-    return 'reinforce:calm';
-  }
-
-  return null;
-}
-
 function resolveDayState(day: StoredHomeDayRecord, now: Date): HomeDayState {
   if (day.creature) {
     return 'hatched';
@@ -1324,11 +1356,27 @@ function buildUnhatchedHighlight(day: StoredHomeDayRecord, state: HomeDayState) 
   return `${lastMoment.label} was the latest thing to settle into the day.`;
 }
 
-function finalizeDayHatch(day: StoredHomeDayRecord, profile: OnboardingProfile, now: Date): StoredHomeDayRecord {
+function finalizeDayHatch(
+  day: StoredHomeDayRecord,
+  profile: OnboardingProfile,
+  now: Date,
+  encounterHistory: EncounterHistoryMap
+): StoredHomeDayRecord {
   const scores = computeDayScores(day);
   const sortedTraits = [...scoreOrder].sort((left, right) => scores[right] - scores[left]);
   const primaryTrait = sortedTraits[0] ?? 'calm';
   const secondaryTrait = sortedTraits[1] ?? 'focus';
+
+  const encounterCreature = buildEncounterCreature(day, encounterHistory, primaryTrait, secondaryTrait);
+  if (encounterCreature) {
+    return {
+      ...day,
+      state: 'hatched',
+      shareReadyAt: day.shareReadyAt ?? now.toISOString(),
+      creature: encounterCreature,
+    };
+  }
+
   const signature = [
     day.isoDate,
     ...day.moments.map((moment) => moment.type),
@@ -1360,6 +1408,8 @@ function finalizeDayHatch(day: StoredHomeDayRecord, profile: OnboardingProfile, 
       highlight: buildHatchedHighlight(day, highlightMoment, primaryTrait),
       reflection: buildReflectionLine(profile, primaryTrait, secondaryTrait, day.selectedPathId),
       motifTags: uniqueMomentLabels(day.moments).slice(0, 2),
+      encounterProfileId: null,
+      repeatDepth: 0,
     },
   };
 }

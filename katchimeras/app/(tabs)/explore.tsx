@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { createStarterReveal } from '@/constants/katchadeck';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { KatchaDeckUI } from '@/constants/theme';
+import { applyDevScenario, devScenarioOptions } from '@/utils/dev-scenarios';
 import { clearStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
 
@@ -57,6 +58,15 @@ export default function ExploreScreen() {
     ]);
   }
 
+  function handleApplyScenario(scenarioId: (typeof devScenarioOptions)[number]['id']) {
+    const applied = applyDevScenario(scenarioId, new Date());
+    if (!applied) {
+      Alert.alert('No stored day yet', 'Open Home once so a stored day exists, then apply a scenario.');
+      return;
+    }
+    router.replace('/(tabs)');
+  }
+
   return (
     <View style={styles.screen}>
       <AmbientBackground
@@ -90,6 +100,14 @@ export default function ExploreScreen() {
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
+                {devScenarioOptions.map((scenario) => (
+                  <KatchaButton
+                    key={scenario.id}
+                    label={scenario.label}
+                    onPress={() => handleApplyScenario(scenario.id)}
+                    variant="secondary"
+                  />
+                ))}
               </View>
             </GlassPanel>
           </Animated.View>

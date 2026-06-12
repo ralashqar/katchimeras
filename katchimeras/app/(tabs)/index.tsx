@@ -326,7 +326,11 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        {selectedDay?.kind === 'day' && selectedDay.isToday ? (
+        {selectedDay?.kind === 'day' &&
+        selectedDay.isToday &&
+        selectedDay.state !== 'hatched' &&
+        (Boolean(selectedDay.selectedPathId) ||
+          (selectedDay.moments.length === 0 && selectedDay.stepsCount < 2400)) ? (
           <Animated.View entering={presenceEnter(150)}>
             <InsightPathsPanel day={selectedDay} onSelectPath={selectPath} />
           </Animated.View>

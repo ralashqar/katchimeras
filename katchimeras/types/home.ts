@@ -263,7 +263,16 @@ export type LocalCreatureRecord = {
   highlight: string;
   reflection: string;
   motifTags: string[];
+  encounterProfileId: string | null;
+  repeatDepth: number;
 };
+
+export type EncounterHistoryEntry = {
+  count: number;
+  lastSeenIsoDate: string;
+};
+
+export type EncounterHistoryMap = Record<string, EncounterHistoryEntry>;
 
 export type StoredHomeDayRecord = {
   id: string;
@@ -283,10 +292,11 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 4;
+  version: 5;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;
+  encounterHistory: EncounterHistoryMap;
   archivedDays: StoredHomeDayRecord[];
   today: StoredHomeDayRecord;
 };
