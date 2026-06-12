@@ -19,6 +19,11 @@
         "NSCameraUsageDescription": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar.",
         "NSLocationWhenInUseUsageDescription": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps.",
         "NSHealthShareUsageDescription": "Katchimeras can read your workout routes from Apple Health when you choose to import a walk into a memory map."
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.daruk.katchimeras"
+        ]
       }
     },
     "android": {
@@ -79,7 +84,8 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,

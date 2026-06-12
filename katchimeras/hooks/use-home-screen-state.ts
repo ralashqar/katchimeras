@@ -32,6 +32,7 @@ import {
   syncHatchNotification,
 } from '@/utils/hatch-notification';
 import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
+import { syncWidgetState } from '@/utils/widget-state';
 import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
@@ -213,7 +214,9 @@ export function useHomeScreenState() {
       return;
     }
 
-    void syncHatchNotification(state, loadOnboardingProfile());
+    const profile = loadOnboardingProfile();
+    void syncHatchNotification(state, profile);
+    void syncWidgetState(state, profile);
   }, [todayId, todayState]);
 
   const placeResolutionInFlight = useRef<string | null>(null);
