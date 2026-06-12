@@ -293,6 +293,7 @@ export type StoredHomeDayRecord = {
   exactRouteSegments: StoredExactRouteSegment[];
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
+  placeCategorySeeds?: string[];
 };
 
 export type StoredHomeState = {

@@ -37,6 +37,15 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
   const signals: EncounterSignal[] = [];
   const momentsByType = groupMomentIdsByType(day);
 
+  (day.placeCategorySeeds ?? []).forEach((seedId, index) => {
+    signals.push({
+      seedId,
+      intensity: index === 0 ? 0.58 : 0.5,
+      sourceMomentIds: [],
+      isRecovery: false,
+    });
+  });
+
   const coffeeIds = momentsByType.get('coffee') ?? [];
   if (coffeeIds.length > 0) {
     signals.push({

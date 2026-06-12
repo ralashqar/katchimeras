@@ -161,6 +161,25 @@ const errandDay = makeDay({ stepsCount: 3400, visitedPlaceCount: 4 });
 const errandCreature = engine.buildEncounterCreature(errandDay, {}, 'energy', 'focus');
 check('errand day matches Errandimp', errandCreature?.name === 'Errandimp', JSON.stringify(errandCreature?.name));
 
+// 8d. Resolved place categories hatch the dormant cast: a bakery visit wakes Crumbun.
+const bakeryDay = makeDay({ stepsCount: 2100, placeCategorySeeds: ['bakery'] });
+const bakeryCreature = engine.buildEncounterCreature(bakeryDay, {}, 'calm', 'social');
+check('resolved bakery place matches Crumbun', bakeryCreature?.name === 'Crumbun', JSON.stringify(bakeryCreature?.name));
+
+// 8e. A food market visit wakes Hayhorn.
+const marketDay = makeDay({ stepsCount: 2600, placeCategorySeeds: ['farm'] });
+const marketCreature = engine.buildEncounterCreature(marketDay, {}, 'calm', 'energy');
+check('resolved market place matches Hayhorn', marketCreature?.name === 'Hayhorn', JSON.stringify(marketCreature?.name));
+
+// 8f. A resolved place outranks a manual tag (place evidence is stronger).
+const placeVsTagDay = makeDay({
+  moments: [makeMoment('coffee', 0)],
+  stepsCount: 1800,
+  placeCategorySeeds: ['park'],
+});
+const placeVsTagCreature = engine.buildEncounterCreature(placeVsTagDay, {}, 'calm', 'energy');
+check('resolved place outranks manual tag', placeVsTagCreature?.name === 'Mossprout', JSON.stringify(placeVsTagCreature?.name));
+
 // 8c. Day with no signals at all (moments the cast does not cover) falls back to null.
 const focusDay = makeDay({ moments: [makeMoment('focus', 0)], stepsCount: 3000 });
 check('uncovered day returns null (trait fallback)', engine.buildEncounterCreature(focusDay, {}, 'focus', 'calm') === null);

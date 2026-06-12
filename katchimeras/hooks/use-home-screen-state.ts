@@ -18,6 +18,7 @@ import {
   type ImportedHealthRoutesPayload,
   recordForegroundLocationSample,
   seedRecentPhotoLocationsForToday,
+  setPlaceCategorySeedsForDay,
   triggerHatchForDay,
   updateActivityPermissionState,
   updateHealthPermissionState,
@@ -25,6 +26,7 @@ import {
   updateTodayStepCount,
 } from '@/utils/home-engine';
 import { requestDayReflection } from '@/utils/day-reflection';
+import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
 import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
@@ -197,6 +199,31 @@ export function useHomeScreenState() {
     });
   }, []);
 
+  const placeResolutionInFlight = useRef<string | null>(null);
+
+  useEffect(() => {
+    const today = viewModel.state.today;
+    if (
+      today.state !== 'ready_to_hatch' ||
+      today.placeCategorySeeds !== undefined ||
+      today.locations.length === 0 ||
+      placeResolutionInFlight.current === today.id
+    ) {
+      return;
+    }
+
+    placeResolutionInFlight.current = today.id;
+    void (async () => {
+      const seeds = await resolvePlaceSeedsForDay(today, viewModel.state.archivedDays);
+      const profile = loadOnboardingProfile();
+      const now = new Date();
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return setPlaceCategorySeedsForDay(hydrated.state, today.id, seeds, profile, now);
+      });
+    })();
+  }, [viewModel]);
+
   const enhanceDayReflection = useCallback(async (hatchedState: StoredHomeState, dayId: string) => {
     const profile = loadOnboardingProfile();
     const day =
@@ -220,16 +247,36 @@ export function useHomeScreenState() {
     });
   }, []);
 
-  const triggerHatchIfReady = useCallback(() => {
+  const triggerHatchIfReady = useCallback(async () => {
     if (!selectedDay || selectedDay.kind !== 'day') {
       return;
     }
 
-    const now = new Date();
     const profile = loadOnboardingProfile();
+    let now = new Date();
     const hydrated = hydrateHomeState(loadStoredHomeState() ?? storedStateRef.current, profile, now);
-    const hatchedState = triggerHatchForDay(hydrated.state, selectedDay.id, profile, now);
+    let baseState = hydrated.state;
 
+    const targetDay =
+      baseState.today.id === selectedDay.id
+        ? baseState.today
+        : baseState.archivedDays.find((day) => day.id === selectedDay.id) ?? null;
+
+    if (targetDay && targetDay.placeCategorySeeds === undefined && targetDay.locations.length > 0) {
+      const seeds = await Promise.race([
+        resolvePlaceSeedsForDay(
+          targetDay,
+          baseState.archivedDays.filter((day) => day.id !== targetDay.id)
+        ),
+        new Promise<string[]>((resolve) => {
+          setTimeout(() => resolve([]), 2500);
+        }),
+      ]);
+      now = new Date();
+      baseState = setPlaceCategorySeedsForDay(baseState, selectedDay.id, seeds, profile, now);
+    }
+
+    const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
     setStoredState(hatchedState);
     void enhanceDayReflection(hatchedState, selectedDay.id);
   }, [enhanceDayReflection, selectedDay]);
