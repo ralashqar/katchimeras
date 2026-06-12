@@ -37,11 +37,11 @@ const sampleMoments = [
 
 const castIntroItems = [
   {
-    id: 'lattelet',
-    name: 'Lattelet',
+    id: 'baristabbit',
+    name: 'Baristabbit',
     line: 'Appears when your day keeps a coffee ritual.',
-    accentColor: '#F3B788',
-    source: heroOrbitAssets.lattelet,
+    accentColor: '#E3B68C',
+    source: require('../assets/images/katchimeras/baristabbit.png'),
   },
   {
     id: 'mossprout',

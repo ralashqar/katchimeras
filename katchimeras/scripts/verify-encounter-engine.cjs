@@ -27,7 +27,7 @@ const encounterProfiles = JSON.parse(
 const visualKeys = [
   'voltstep', 'hearthsip', 'glimmuse', 'skysette', 'creamalume', 'pulsepounce', 'gatherglow',
   'mossprout', 'lattelet', 'sprintail', 'neonpoko', 'crumbun', 'hayhorn', 'ironette',
-  'bedrotte', 'steppling', 'errandimp',
+  'bedrotte', 'steppling', 'errandimp', 'quietome', 'relicoon', 'shellio', 'flickerbun', 'baristabbit',
 ];
 const homeCreatureVisualsStub = Object.fromEntries(
   visualKeys.map((key) => [key, { source: 0, accentColor: '#FFFFFF' }])
@@ -105,12 +105,12 @@ function check(label, condition, detail) {
   }
 }
 
-// 1. Coffee day hatches Lattelet with the unlock line on first encounter.
+// 1. Coffee day hatches Baristabbit with the unlock line on first encounter.
 const coffeeDay = makeDay({ moments: [makeMoment('coffee', 0), makeMoment('coffee', 1)], stepsCount: 1600 });
 const coffeeCreature = engine.buildEncounterCreature(coffeeDay, {}, 'calm', 'energy');
-check('coffee day matches Lattelet', coffeeCreature?.name === 'Lattelet', JSON.stringify(coffeeCreature));
-check('first encounter uses unlock line', /revealed Lattelet/.test(coffeeCreature?.highlight ?? ''), coffeeCreature?.highlight);
-check('encounter profile id recorded', coffeeCreature?.encounterProfileId === 'location_coffee_shop_lattelet');
+check('coffee day matches Baristabbit', coffeeCreature?.name === 'Baristabbit', JSON.stringify(coffeeCreature));
+check('first encounter uses unlock line', /revealed Baristabbit/.test(coffeeCreature?.highlight ?? ''), coffeeCreature?.highlight);
+check('encounter profile id recorded', coffeeCreature?.encounterProfileId === 'location_coffee_shop_baristabbit');
 check('no deck language in copy', !/deck/i.test(`${coffeeCreature?.highlight} ${coffeeCreature?.reflection}`),
   `${coffeeCreature?.highlight} | ${coffeeCreature?.reflection}`);
 
@@ -119,7 +119,7 @@ const coffeeCreatureAgain = engine.buildEncounterCreature(coffeeDay, {}, 'calm',
 check('hatch is deterministic', JSON.stringify(coffeeCreature) === JSON.stringify(coffeeCreatureAgain));
 
 // 3. Repeat encounter switches to repeat copy and carries repeatDepth.
-const history = { location_coffee_shop_lattelet: { count: 2, lastSeenIsoDate: '2026-06-10' } };
+const history = { location_coffee_shop_baristabbit: { count: 2, lastSeenIsoDate: '2026-06-10' } };
 const repeatCreature = engine.buildEncounterCreature(coffeeDay, history, 'calm', 'energy');
 check('repeat depth carried', repeatCreature?.repeatDepth === 2, String(repeatCreature?.repeatDepth));
 check('repeat copy differs from unlock copy', repeatCreature?.highlight !== coffeeCreature?.highlight, repeatCreature?.highlight);
@@ -170,6 +170,16 @@ check('resolved bakery place matches Crumbun', bakeryCreature?.name === 'Crumbun
 const marketDay = makeDay({ stepsCount: 2600, placeCategorySeeds: ['farm'] });
 const marketCreature = engine.buildEncounterCreature(marketDay, {}, 'calm', 'energy');
 check('resolved market place matches Hayhorn', marketCreature?.name === 'Hayhorn', JSON.stringify(marketCreature?.name));
+
+// 8g. Resolved institutions hatch the new cast: a library afternoon wakes Quietome.
+const libraryDay = makeDay({ stepsCount: 1900, placeCategorySeeds: ['library'] });
+const libraryCreature = engine.buildEncounterCreature(libraryDay, {}, 'focus', 'calm');
+check('resolved library place matches Quietome', libraryCreature?.name === 'Quietome', JSON.stringify(libraryCreature?.name));
+
+// 8h. A cinema evening wakes Flickerbun.
+const cinemaDay = makeDay({ stepsCount: 2400, placeCategorySeeds: ['cinema'] });
+const cinemaCreature = engine.buildEncounterCreature(cinemaDay, {}, 'social', 'calm');
+check('resolved cinema place matches Flickerbun', cinemaCreature?.name === 'Flickerbun', JSON.stringify(cinemaCreature?.name));
 
 // 8f. A resolved place outranks a manual tag (place evidence is stronger).
 const placeVsTagDay = makeDay({

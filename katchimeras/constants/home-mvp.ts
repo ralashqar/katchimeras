@@ -250,6 +250,26 @@ export const homeCreatureVisuals: Record<
     source: require('../assets/images/katchimeras/errandimp.png'),
     accentColor: '#EF9F6E',
   },
+  quietome: {
+    source: require('../assets/images/katchimeras/quietome.png'),
+    accentColor: '#E0C18F',
+  },
+  relicoon: {
+    source: require('../assets/images/katchimeras/relicoon.png'),
+    accentColor: '#D98C6B',
+  },
+  shellio: {
+    source: require('../assets/images/katchimeras/shellio.png'),
+    accentColor: '#9FE0CB',
+  },
+  flickerbun: {
+    source: require('../assets/images/katchimeras/flickerbun.png'),
+    accentColor: '#B89CE8',
+  },
+  baristabbit: {
+    source: require('../assets/images/katchimeras/baristabbit.png'),
+    accentColor: '#E3B68C',
+  },
 };
 
 export const homeVisualPools: Record<HomeScoreKey, readonly HomeVisualKey[]> = {

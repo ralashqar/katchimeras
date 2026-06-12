@@ -17,11 +17,13 @@ export type EncounterCastEntry = {
 // new flagship (art-lab pipeline) and adding one entry here.
 export const encounterLiveCast: readonly EncounterCastEntry[] = [
   {
-    profileId: 'location_coffee_shop_lattelet',
-    voice: 'warm and ritual-loving, quietly proud of small routines',
+    // Baristabbit replaced Lattelet as the coffee flagship per the greenfield
+    // mascot board; Lattelet's render remains in the trait pools.
+    profileId: 'location_coffee_shop_baristabbit',
+    voice: 'an over-serious little barista who treats coffee as sacred ritual',
     seedId: 'coffee_shop',
     categoryLabel: 'Coffee shop',
-    visualKey: 'lattelet',
+    visualKey: 'baristabbit',
   },
   {
     profileId: 'location_park_mossprout',
@@ -78,6 +80,34 @@ export const encounterLiveCast: readonly EncounterCastEntry[] = [
     seedId: 'errand_loop',
     categoryLabel: 'Errand day',
     visualKey: 'errandimp',
+  },
+  {
+    profileId: 'location_library_quietome',
+    voice: 'a hushed reading-room familiar, patient and softly wise',
+    seedId: 'library',
+    categoryLabel: 'Library',
+    visualKey: 'quietome',
+  },
+  {
+    profileId: 'location_museum_relicoon',
+    voice: 'a softly glowing curator who collects moments of wonder',
+    seedId: 'museum',
+    categoryLabel: 'Museum',
+    visualKey: 'relicoon',
+  },
+  {
+    profileId: 'location_beach_shellio',
+    voice: 'a pearly shoreline spirit, unhurried as the tide',
+    seedId: 'beach',
+    categoryLabel: 'Beach',
+    visualKey: 'shellio',
+  },
+  {
+    profileId: 'location_cinema_flickerbun',
+    voice: 'a velvet-dark story lover with projector-bright eyes',
+    seedId: 'cinema',
+    categoryLabel: 'Cinema',
+    visualKey: 'flickerbun',
   },
   {
     profileId: 'landmark_eiffel_tower_ironette',
