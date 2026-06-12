@@ -158,7 +158,7 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0 }: La
           contentFit="contain"
           pointerEvents="none"
           source={glassDome}
-          style={[styles.membrane, membraneStyle]}
+          style={[styles.dome, membraneStyle]}
           transition={0}
         />
         <AnimatedImage
@@ -197,6 +197,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -42,
     width: 330,
+  },
+  // Tight glass shell around the egg (geometry verified by compositing at
+  // stage scale - the egg's visible body is ~120x180 inside its padded
+  // cutout); ripples use the wider ring so they travel outward past the dome.
+  dome: {
+    height: 200,
+    position: 'absolute',
+    top: 19,
+    width: 200,
   },
   membrane: {
     height: 286,
