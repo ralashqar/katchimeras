@@ -56,16 +56,14 @@ export const encounterLiveCast: readonly EncounterCastEntry[] = [
     voice: 'a cheerful wanderer who counts the world in steps',
     seedId: 'high_steps_day',
     categoryLabel: 'Big walking day',
-    visualKey: 'voltstep',
-    placeholderArt: true,
+    visualKey: 'steppling',
   },
   {
     profileId: 'location_home_evening_bedrotte',
     voice: 'soft and sleepy, fiercely protective of rest',
     seedId: 'home_evening',
     categoryLabel: 'Home evening',
-    visualKey: 'hearthsip',
-    placeholderArt: true,
+    visualKey: 'bedrotte',
   },
   {
     profileId: 'landmark_eiffel_tower_ironette',

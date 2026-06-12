@@ -27,6 +27,7 @@ const encounterProfiles = JSON.parse(
 const visualKeys = [
   'voltstep', 'hearthsip', 'glimmuse', 'skysette', 'creamalume', 'pulsepounce', 'gatherglow',
   'mossprout', 'lattelet', 'sprintail', 'neonpoko', 'crumbun', 'hayhorn', 'ironette',
+  'bedrotte', 'steppling',
 ];
 const homeCreatureVisualsStub = Object.fromEntries(
   visualKeys.map((key) => [key, { source: 0, accentColor: '#FFFFFF' }])

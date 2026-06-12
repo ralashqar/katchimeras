@@ -238,6 +238,14 @@ export const homeCreatureVisuals: Record<
     source: heroOrbitAssets.ironette,
     accentColor: '#B6D2FF',
   },
+  bedrotte: {
+    source: require('../assets/images/katchimeras/bedrotte.png'),
+    accentColor: '#F0C9A0',
+  },
+  steppling: {
+    source: require('../assets/images/katchimeras/steppling.png'),
+    accentColor: '#92D7FF',
+  },
 };
 
 export const homeVisualPools: Record<HomeScoreKey, readonly HomeVisualKey[]> = {
