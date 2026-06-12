@@ -26,6 +26,11 @@ import {
   updateTodayStepCount,
 } from '@/utils/home-engine';
 import { requestDayReflection } from '@/utils/day-reflection';
+import {
+  getHatchNotificationPermission,
+  requestHatchNotificationPermission,
+  syncHatchNotification,
+} from '@/utils/hatch-notification';
 import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
 import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
@@ -199,6 +204,18 @@ export function useHomeScreenState() {
     });
   }, []);
 
+  const todayId = viewModel.state.today.id;
+  const todayState = viewModel.state.today.state;
+
+  useEffect(() => {
+    const state = storedStateRef.current;
+    if (!state) {
+      return;
+    }
+
+    void syncHatchNotification(state, loadOnboardingProfile());
+  }, [todayId, todayState]);
+
   const placeResolutionInFlight = useRef<string | null>(null);
 
   useEffect(() => {
@@ -279,6 +296,13 @@ export function useHomeScreenState() {
     const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
     setStoredState(hatchedState);
     void enhanceDayReflection(hatchedState, selectedDay.id);
+    void (async () => {
+      const permission = await getHatchNotificationPermission();
+      if (permission === 'undetermined') {
+        await requestHatchNotificationPermission();
+      }
+      await syncHatchNotification(hatchedState, profile);
+    })();
   }, [enhanceDayReflection, selectedDay]);
 
   const refreshState = useCallback(() => {
