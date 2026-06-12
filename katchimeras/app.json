@@ -94,7 +94,24 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0ee214f1-a591-4ba1-83d0-3485be43c124"
+        "projectId": "0ee214f1-a591-4ba1-83d0-3485be43c124",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "KatchimeraWidget",
+                  "bundleIdentifier": "com.daruk.katchimeras.widget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.daruk.katchimeras"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
     "updates": {
