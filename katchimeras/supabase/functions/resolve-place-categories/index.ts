@@ -39,6 +39,10 @@ const PROBE_GROUPS: {
     regionDelta: 0.004,
   },
   { query: 'market', categories: ['FoodMarket'], snap: { kind: 'distance', radiusMeters: 55 }, regionDelta: 0.0012 },
+  { query: 'library', categories: ['Library'], snap: { kind: 'distance', radiusMeters: 70 }, regionDelta: 0.0012 },
+  { query: 'museum', categories: ['Museum'], snap: { kind: 'distance', radiusMeters: 160 }, regionDelta: 0.003 },
+  { query: 'cinema', categories: ['MovieTheater'], snap: { kind: 'distance', radiusMeters: 70 }, regionDelta: 0.0012 },
+  { query: 'beach', categories: ['Beach'], snap: { kind: 'containment' }, regionDelta: 0.004 },
 ];
 
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
@@ -164,41 +168,116 @@ function snapsToResult(
   );
 }
 
-async function resolveCluster(cluster: ClusterInput, accessToken: string) {
-  for (const group of PROBE_GROUPS) {
-    const params = new URLSearchParams({
-      q: group.query,
-      searchRegion: [
-        cluster.latitude + group.regionDelta,
-        cluster.longitude + group.regionDelta,
-        cluster.latitude - group.regionDelta,
-        cluster.longitude - group.regionDelta,
-      ].join(','),
-      searchRegionPriority: 'required',
-      resultTypeFilter: 'Poi',
-      includePoiCategories: group.categories.join(','),
-    });
+// Dense cities defeat naive priority ordering: there is a cafe within 55 m of
+// nearly every landmark, and big institutions sit inside park bounding boxes
+// (the Louvre is "inside" the Tuileries box). So all probes run in parallel
+// and the winner is chosen by specificity class:
+//   1. door-level: any distance match within 30 m (you were at the counter)
+//   2. institutions (library, museum, cinema) - rarer, more specific presence
+//   3. shops (cafe, bakery, market) by nearest distance
+//   4. areas (park, beach) by smallest containing bounding box
+const DOOR_LEVEL_METERS = 30;
+const INSTITUTION_CATEGORIES = new Set(['Library', 'Museum', 'MovieTheater']);
+const AREA_CATEGORIES = new Set(['Park', 'NationalPark', 'Playground', 'Beach']);
 
-    const response = await fetch(`${MAPS_API_BASE}/v1/search?${params}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+type SnapCandidate = {
+  appleCategory: string;
+  metricMeters: number;
+};
 
-    if (!response.ok) {
-      continue;
-    }
+function classifyCandidate(candidate: SnapCandidate) {
+  if (INSTITUTION_CATEGORIES.has(candidate.appleCategory)) return 2;
+  if (AREA_CATEGORIES.has(candidate.appleCategory)) return 4;
+  return 3;
+}
 
-    const data = (await response.json()) as { results?: AppleSearchResult[] };
-    const snapped = (data.results ?? []).find((result) => snapsToResult(cluster, result, group.snap));
+function bboxDiagonalMeters(region: NonNullable<AppleSearchResult['displayMapRegion']>) {
+  return getDistanceMeters(
+    region.southLatitude,
+    region.westLongitude,
+    region.northLatitude,
+    region.eastLongitude
+  );
+}
 
-    if (snapped) {
-      return {
-        clusterId: cluster.id,
-        appleCategory: snapped.poiCategory ?? group.categories[0],
-      };
-    }
+async function probeGroup(
+  cluster: ClusterInput,
+  group: (typeof PROBE_GROUPS)[number],
+  accessToken: string
+): Promise<SnapCandidate | null> {
+  const params = new URLSearchParams({
+    q: group.query,
+    searchRegion: [
+      cluster.latitude + group.regionDelta,
+      cluster.longitude + group.regionDelta,
+      cluster.latitude - group.regionDelta,
+      cluster.longitude - group.regionDelta,
+    ].join(','),
+    searchRegionPriority: 'required',
+    resultTypeFilter: 'Poi',
+    includePoiCategories: group.categories.join(','),
+  });
+
+  const response = await fetch(`${MAPS_API_BASE}/v1/search?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    return null;
   }
 
-  return { clusterId: cluster.id, appleCategory: null };
+  const data = (await response.json()) as { results?: AppleSearchResult[] };
+  const snapped = (data.results ?? []).find((result) => snapsToResult(cluster, result, group.snap));
+  if (!snapped) {
+    return null;
+  }
+
+  const metricMeters =
+    group.snap.kind === 'distance' && snapped.coordinate
+      ? getDistanceMeters(
+          cluster.latitude,
+          cluster.longitude,
+          snapped.coordinate.latitude,
+          snapped.coordinate.longitude
+        )
+      : snapped.displayMapRegion
+        ? bboxDiagonalMeters(snapped.displayMapRegion)
+        : Number.MAX_SAFE_INTEGER;
+
+  return {
+    // Apple's category filter sometimes surfaces a POI whose own category is
+    // broader (the New York Public Library is categorized Landmark but matches
+    // the Library filter) - report the probe's category so the client mapping
+    // stays closed.
+    appleCategory:
+      snapped.poiCategory && group.categories.includes(snapped.poiCategory)
+        ? snapped.poiCategory
+        : group.categories[0],
+    metricMeters,
+  };
+}
+
+async function resolveCluster(cluster: ClusterInput, accessToken: string) {
+  const candidates = (
+    await Promise.all(PROBE_GROUPS.map((group) => probeGroup(cluster, group, accessToken)))
+  ).filter((candidate): candidate is SnapCandidate => candidate !== null);
+
+  if (candidates.length === 0) {
+    return { clusterId: cluster.id, appleCategory: null };
+  }
+
+  const doorLevel = candidates
+    .filter((candidate) => classifyCandidate(candidate) !== 4 && candidate.metricMeters <= DOOR_LEVEL_METERS)
+    .sort((left, right) => left.metricMeters - right.metricMeters)[0];
+
+  const winner =
+    doorLevel ??
+    [...candidates].sort((left, right) => {
+      const classDelta = classifyCandidate(left) - classifyCandidate(right);
+      return classDelta !== 0 ? classDelta : left.metricMeters - right.metricMeters;
+    })[0];
+
+  return { clusterId: cluster.id, appleCategory: winner.appleCategory };
 }
 
 function isValidCluster(value: unknown): value is ClusterInput {

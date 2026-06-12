@@ -18,6 +18,10 @@ const APPLE_CATEGORY_TO_SEED: Record<string, string> = {
   NationalPark: 'park',
   Playground: 'park',
   FoodMarket: 'farm',
+  Library: 'library',
+  Museum: 'museum',
+  Beach: 'beach',
+  MovieTheater: 'cinema',
 };
 
 type ResolvedCategory = {
