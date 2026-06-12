@@ -9,6 +9,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import type { ImportedHealthRoutesPayload } from '@/utils/home-engine';
+import { Lantern } from '@/constants/theme';
 
 type DayContextProps = {
   day: HomeDayRecord;
@@ -63,15 +64,9 @@ export function DayContext({
         )}
 
         {passiveSignals.length > 0 ? (
-          <ScrollView horizontal contentContainerStyle={styles.chipRow} showsHorizontalScrollIndicator={false}>
-            {passiveSignals.map((signal) => (
-              <View key={signal.id} style={styles.signalChip}>
-                <ThemedText style={styles.signalLabel} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                  {signal.label}
-                </ThemedText>
-              </View>
-            ))}
-          </ScrollView>
+          <ThemedText style={styles.signalLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            {passiveSignals.map((signal) => signal.label).join('  ·  ')}
+          </ThemedText>
         ) : null}
 
         <DayMapPreview
@@ -104,8 +99,12 @@ export function DayContext({
 
   return (
     <GlassPanel contentStyle={styles.pastPanel}>
-      <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
-        {day.state === 'hatched' ? 'Reflection' : 'Still forming'}
+      <ThemedText
+        type="onboardingLabel"
+        style={styles.label}
+        lightColor={day.state === 'hatched' ? Lantern.ember300 : '#D7E4FF'}
+        darkColor={day.state === 'hatched' ? Lantern.ember300 : '#D7E4FF'}>
+        {day.state === 'hatched' ? `${day.creature?.name ?? 'The hatch'} remembers` : 'Still forming'}
       </ThemedText>
       <ThemedText type="subtitle" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
         {hatchedReflection ?? day.highlight ?? 'The day still has room to take shape.'}
@@ -143,9 +142,9 @@ export function DayContext({
 
 function MomentChip({ moment }: { moment: HomeMoment }) {
   return (
-    <View style={[styles.momentChip, { backgroundColor: `${moment.accentColor}16`, borderColor: `${moment.accentColor}44` }]}>
-      <IconSymbol color={moment.accentColor} name={moment.icon} size={14} />
-      <ThemedText style={styles.chipLabel} lightColor="#F8FBFF" darkColor="#F8FBFF">
+    <View style={styles.momentChip}>
+      <View style={[styles.chipDot, { backgroundColor: moment.accentColor, boxShadow: `0 0 12px ${moment.accentColor}AA` }]} />
+      <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
         {moment.label}
       </ThemedText>
     </View>
@@ -169,24 +168,18 @@ function buildPassiveSignals(day: HomeDayRecord) {
   const signals: { id: string; label: string }[] = [];
 
   if (day.stepsCount > 0) {
-    signals.push({
-      id: 'steps',
-      label: `${day.stepsCount.toLocaleString()} steps shaping the egg`,
-    });
+    signals.push({ id: 'steps', label: `${day.stepsCount.toLocaleString()} steps` });
   }
 
   if (day.visitedPlaceCount > 0) {
     signals.push({
       id: 'places',
-      label: `${day.visitedPlaceCount} ${day.visitedPlaceCount === 1 ? 'place' : 'places'} leaving a trace`,
+      label: `${day.visitedPlaceCount} ${day.visitedPlaceCount === 1 ? 'place' : 'places'}`,
     });
   }
 
   if (day.newPlaceCount > 0) {
-    signals.push({
-      id: 'new-places',
-      label: `${day.newPlaceCount} new ${day.newPlaceCount === 1 ? 'place' : 'places'} widening the day`,
-    });
+    signals.push({ id: 'new-places', label: `${day.newPlaceCount} new` });
   }
 
   return signals;
@@ -231,13 +224,18 @@ const styles = StyleSheet.create({
   },
   momentChip: {
     alignItems: 'center',
+    backgroundColor: Lantern.dusk700,
     borderCurve: 'continuous',
     borderRadius: 999,
-    borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
+    gap: 9,
+    paddingHorizontal: 15,
     paddingVertical: 11,
+  },
+  chipDot: {
+    borderRadius: 999,
+    height: 8,
+    width: 8,
   },
   chipLabel: {
     fontSize: 14,
@@ -249,17 +247,9 @@ const styles = StyleSheet.create({
   pastPanel: {
     gap: 12,
   },
-  signalChip: {
-    backgroundColor: 'rgba(216, 228, 255, 0.08)',
-    borderColor: 'rgba(216, 228, 255, 0.14)',
-    borderCurve: 'continuous',
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  signalLabel: {
+  signalLine: {
     fontSize: 13,
+    fontWeight: '600',
     lineHeight: 18,
   },
   momentList: {

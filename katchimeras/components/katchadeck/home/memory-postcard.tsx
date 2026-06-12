@@ -27,7 +27,7 @@ export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function Mem
   return (
     <View collapsable={false} ref={ref} style={styles.captureFrame}>
       <LinearGradient
-        colors={['#09111E', '#101B31', '#161D37']}
+        colors={['#16112B', '#0C0A14', '#1A1226']}
         end={{ x: 1, y: 1 }}
         start={{ x: 0, y: 0 }}
         style={[styles.card, { borderColor: `${day.creature.accentColor}44` }]}>
@@ -225,15 +225,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   kicker: {
-    color: '#EAF2FF',
+    color: '#C9C2E8',
     fontFamily: 'Manrope',
     fontSize: 26,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 3,
     textTransform: 'uppercase',
   },
   date: {
-    color: '#CAD8F7',
+    color: '#908AB5',
     fontFamily: 'Manrope',
     fontSize: 24,
     fontWeight: '600',
@@ -260,10 +260,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   creatureName: {
-    color: '#F8FBFF',
+    color: '#F6F3FF',
     fontFamily: 'InstrumentSerif',
-    fontSize: 78,
-    lineHeight: 84,
+    fontSize: 86,
+    fontStyle: 'italic',
+    lineHeight: 92,
     marginTop: 24,
     textAlign: 'center',
   },
@@ -292,10 +293,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   mapCard: {
-    backgroundColor: 'rgba(9, 14, 25, 0.7)',
-    borderColor: 'rgba(224,234,255,0.14)',
+    backgroundColor: 'rgba(20, 17, 31, 0.85)',
     borderRadius: 38,
-    borderWidth: 1,
     marginTop: 54,
     paddingHorizontal: 28,
     paddingVertical: 28,
@@ -339,7 +338,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   footerText: {
-    color: '#C7D5F4',
+    color: '#908AB5',
     fontFamily: 'Manrope',
     fontSize: 24,
     fontWeight: '600',

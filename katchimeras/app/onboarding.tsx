@@ -13,6 +13,7 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { preferenceOptions } from '@/constants/katchadeck';
+import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
 import { defaultOnboardingProfile, loadOnboardingProfile, saveOnboardingProfile } from '@/utils/onboarding-state';
 
@@ -152,7 +153,7 @@ export default function OnboardingScreen() {
           <View style={styles.castStack}>
             {castIntroItems.map((item, index) => (
               <Animated.View entering={presenceEnter(80 + index * 60)} key={item.id}>
-                <View style={[styles.castCard, { borderColor: `${item.accentColor}3D` }]}>
+                <View style={styles.castCard}>
                   <View style={[styles.castPortrait, { backgroundColor: `${item.accentColor}14` }]}>
                     <Image contentFit="contain" source={item.source} style={styles.castImage} transition={0} />
                   </View>
@@ -230,8 +231,8 @@ export default function OnboardingScreen() {
                       <View style={[styles.hatchHourChip, selected ? styles.hatchHourChipSelected : null]}>
                         <ThemedText
                           style={styles.hatchHourLabel}
-                          lightColor={selected ? '#0B1322' : '#F8FBFF'}
-                          darkColor={selected ? '#0B1322' : '#F8FBFF'}>
+                          lightColor={selected ? Lantern.emberInk : '#F8FBFF'}
+                          darkColor={selected ? Lantern.emberInk : '#F8FBFF'}>
                           {option.label}
                         </ThemedText>
                       </View>
@@ -538,10 +539,10 @@ const styles = StyleSheet.create({
   },
   castCard: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: Lantern.ink800,
     borderCurve: 'continuous',
     borderRadius: 26,
-    borderWidth: 1,
+    boxShadow: '0 14px 40px rgba(0,0,0,0.35)',
     flexDirection: 'row',
     gap: 16,
     paddingHorizontal: 16,
@@ -564,8 +565,11 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   castName: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontFamily: AppFontFamilies.instrumentSerif,
+    fontSize: 25,
+    fontStyle: 'italic',
+    fontWeight: '400',
+    lineHeight: 29,
   },
   castLine: {
     fontSize: 14,
@@ -591,8 +595,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   hatchHourChipSelected: {
-    backgroundColor: '#E9F1FF',
-    borderColor: '#E9F1FF',
+    backgroundColor: Lantern.ember300,
+    borderColor: Lantern.ember300,
+    boxShadow: '0 6px 22px rgba(245,142,60,0.4)',
   },
   hatchHourLabel: {
     fontSize: 15,

@@ -13,7 +13,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
-import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { ThemedText } from '@/components/themed-text';
 import type { HomeDayRecord } from '@/types/home';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -98,10 +97,7 @@ export function HatchSequence({ day, phase, onSkip }: HatchSequenceProps) {
   return (
     <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(220)} style={styles.overlay}>
       <Animated.View style={[styles.halo, { backgroundColor: `${day.egg.haloColor}20` }, haloStyle]} />
-      <GlassPanel
-        contentStyle={styles.panel}
-        fillColor="rgba(7, 10, 19, 0.82)"
-        gradientColors={['rgba(221,232,255,0.12)', 'rgba(240,223,255,0.08)', 'rgba(255,216,192,0.06)']}>
+      <View style={styles.panel}>
         <View style={styles.header}>
           <View style={styles.headerCopy}>
             <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
@@ -156,7 +152,7 @@ export function HatchSequence({ day, phase, onSkip }: HatchSequenceProps) {
                 : 'One form is about to carry the whole day forward.'}
           </ThemedText>
         </View>
-      </GlassPanel>
+      </View>
     </Animated.View>
   );
 }
@@ -190,7 +186,7 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
-    backgroundColor: 'rgba(4, 6, 14, 0.66)',
+    backgroundColor: 'rgba(8, 7, 15, 0.94)',
     justifyContent: 'center',
     padding: 20,
     zIndex: 20,
@@ -203,7 +199,8 @@ const styles = StyleSheet.create({
   },
   panel: {
     gap: 20,
-    minHeight: 360,
+    minHeight: 420,
+    padding: 8,
     width: '100%',
   },
   header: {
@@ -220,51 +217,51 @@ const styles = StyleSheet.create({
     lineHeight: 30,
   },
   momentCloud: {
-    height: 172,
+    height: 250,
     position: 'relative',
   },
   coreHalo: {
     borderRadius: 999,
-    height: 122,
+    height: 190,
     left: '50%',
-    marginLeft: -61,
-    marginTop: -61,
+    marginLeft: -95,
+    marginTop: -95,
     position: 'absolute',
     top: '50%',
-    width: 122,
+    width: 190,
   },
   outerRing: {
     borderRadius: 999,
     borderWidth: 1,
-    height: 112,
+    height: 176,
     left: '50%',
-    marginLeft: -56,
-    marginTop: -56,
+    marginLeft: -88,
+    marginTop: -88,
     position: 'absolute',
     top: '50%',
-    width: 112,
+    width: 176,
   },
   innerRing: {
     borderRadius: 999,
     borderWidth: 1,
-    height: 82,
+    height: 134,
     left: '50%',
-    marginLeft: -41,
-    marginTop: -41,
+    marginLeft: -67,
+    marginTop: -67,
     position: 'absolute',
     top: '50%',
-    width: 82,
+    width: 134,
   },
   coreShell: {
     alignItems: 'center',
-    height: 104,
+    height: 176,
     justifyContent: 'center',
     left: '50%',
-    marginLeft: -42,
-    marginTop: -50,
+    marginLeft: -71,
+    marginTop: -88,
     position: 'absolute',
     top: '50%',
-    width: 84,
+    width: 142,
   },
   coreEggImage: {
     height: '100%',

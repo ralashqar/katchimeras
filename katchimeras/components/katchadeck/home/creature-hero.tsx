@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/utils/home-engine';
 import type { EggVisualState, HomeMoment, LocalCreatureRecord } from '@/types/home';
 import { homeMomentOptions } from '@/constants/home-mvp';
+import { Lantern } from '@/constants/theme';
 
 type CreatureHeroProps = {
   creature: LocalCreatureRecord;
@@ -98,7 +99,11 @@ export function CreatureHero({ creature, interactive = false, moments, onPress, 
         )}
       </HeroAuraFrame>
       <View style={styles.copy}>
-        <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
+        <ThemedText
+          type="onboardingLabel"
+          style={styles.label}
+          lightColor={Lantern.ember300}
+          darkColor={Lantern.ember300}>
           {buildCreatureKicker(creature)}
         </ThemedText>
         <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
@@ -195,8 +200,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   title: {
-    fontSize: 44,
-    lineHeight: 46,
+    fontSize: 52,
+    fontStyle: 'italic',
+    lineHeight: 56,
     textAlign: 'center',
   },
   subtitle: {

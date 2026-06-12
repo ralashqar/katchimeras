@@ -4,12 +4,10 @@ import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Lantern } from '@/constants/theme';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const onboardingProfile = loadOnboardingProfile();
 
   if (!onboardingProfile.completed) {
@@ -19,40 +17,52 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Lantern.ember300,
+        tabBarInactiveTintColor: Lantern.moon500,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
-          backgroundColor: 'rgba(10, 14, 24, 0.94)',
-          borderTopColor: Colors[colorScheme ?? 'light'].border,
-          display: DEV_DEBUG_NAV_ENABLED ? 'flex' : 'none',
-          height: 88,
-          paddingBottom: 10,
+          backgroundColor: 'rgba(28, 24, 48, 0.94)',
+          borderTopWidth: 0,
+          borderRadius: 999,
+          bottom: 24,
+          boxShadow: '0 18px 40px rgba(0,0,0,0.5)',
+          height: 68,
+          left: 24,
+          marginHorizontal: 24,
+          paddingBottom: 8,
           paddingTop: 10,
           position: 'absolute',
+          right: 24,
         },
-        tabBarLabelStyle: DEV_DEBUG_NAV_ENABLED
-          ? {
-              fontSize: 11,
-              fontWeight: '600',
-              marginBottom: 4,
-            }
-          : undefined,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '700',
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: 'Today',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="moon.stars.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="collection"
+        options={{
+          title: 'Collection',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="sparkles" color={color} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           href: DEV_DEBUG_NAV_ENABLED ? '/explore' : null,
-          title: DEV_DEBUG_NAV_ENABLED ? 'Dev' : 'World',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Dev',
+          tabBarIcon: ({ color }) => <IconSymbol size={26} name="paperplane.fill" color={color} />,
         }}
       />
     </Tabs>
