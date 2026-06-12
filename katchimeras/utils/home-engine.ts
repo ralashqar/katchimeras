@@ -528,6 +528,27 @@ function recordHatchedEncounter(history: EncounterHistoryMap, day: StoredHomeDay
   return recordEncounterHatch(history, day.creature.encounterProfileId, day.isoDate);
 }
 
+export function setPlaceCategorySeedsForDay(
+  state: StoredHomeState,
+  dayId: string,
+  seeds: string[],
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const applyToDay = (day: StoredHomeDayRecord): StoredHomeDayRecord =>
+    day.id === dayId ? { ...day, placeCategorySeeds: seeds } : day;
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: applyToDay(state.today),
+      archivedDays: state.archivedDays.map(applyToDay),
+    },
+    profile,
+    now
+  );
+}
+
 export function applyGeneratedReflection(
   state: StoredHomeState,
   dayId: string,
