@@ -135,24 +135,89 @@ const createStorySeed = (seed, variant) => {
   return `After time around ${source}, ${variant.name} emerged as the small living mark that this day left behind.`;
 };
 
+const createPosePrompt = (seed, variant) => {
+  if (seed.triggerCategory === 'home' || seed.triggerSubtype === 'home_evening') {
+    return 'slouchy cozy pose with asymmetrical lean, tucked limbs, soft head tilt, and blanket-like clingy appeal';
+  }
+
+  if (seed.topLevelType === 'activity' || seed.triggerCategory === 'movement' || seed.triggerCategory === 'sport') {
+    return 'mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow';
+  }
+
+  if (
+    seed.triggerCategory === 'cafe' ||
+    seed.triggerCategory === 'food_spot' ||
+    seed.triggerCategory === 'commerce'
+  ) {
+    return 'bouncy asymmetrical mascot pose with torso turn, lifted paw, head tilt, and playful weight shift';
+  }
+
+  if (seed.topLevelType === 'landmark' || seed.triggerCategory === 'global_landmark') {
+    return 'confident dynamic pose with torso twist, lifted chest, head tilt, and expressive ears, tail, or plume';
+  }
+
+  if (variant.creatureKind === 'spirit') {
+    return 'curved hovering pose with flowing S-line, gentle drift, and readable floating gesture';
+  }
+
+  return 'appealing asymmetrical mascot pose with slight lean, torso turn, head tilt, and one lifted limb';
+};
+
+const createExpressionPrompt = (seed) => {
+  if (seed.triggerCategory === 'home' || seed.triggerSubtype === 'home_evening') {
+    return 'sleepy relaxed smile with half-lidded eyes, soft cheeks, and cozy low-energy charm';
+  }
+
+  if (seed.triggerCategory === 'cafe' || seed.triggerCategory === 'food_spot') {
+    return 'delighted or smug-cute expression with lifted cheeks, bright eyes, and playful mouth asymmetry';
+  }
+
+  if (seed.triggerCategory === 'commerce') {
+    return 'overfocused cute expression with determined brows, tiny concentrated mouth, and competent gremlin energy';
+  }
+
+  if (seed.topLevelType === 'activity' || seed.triggerCategory === 'movement' || seed.triggerCategory === 'sport') {
+    return 'proud energized expression with bright eyes, confident brows, and active cheek lift';
+  }
+
+  if (seed.topLevelType === 'landmark' || seed.triggerCategory === 'global_landmark') {
+    return 'wide-eyed delighted expression with wonder, charged curiosity, and clear facial acting';
+  }
+
+  return 'curious warm expression with clear cheek lift, readable brow shape, and appealing mascot charm';
+};
+
+const createShadingPrompt = () =>
+  'cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces';
+
 const createVisualDescription = (seed, variant) =>
   `${variant.name} is a cute ${variant.creatureKind} tied to ${title(seed.triggerSubtype).toLowerCase()} encounters, with ${variant.visualMotifs.join(
     ', '
-  )}, a ${seed.visualTone} mood, and cozy-premium stylized 3D collectible presence.`;
+  )}, a ${seed.visualTone} mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence`;
 
 const createPromptHooks = (seed, variant) => [
   seed.promptBase,
   ...variant.visualMotifs,
   seed.visualTone,
-  'cute funny collectible creature',
-  'cozy-premium stylized 3D companion',
+  'dramatically oversized glossy luminous eyes',
+  'visible inner glow core',
+  'head-dominant rounded mascot silhouette',
+  'exaggerated chunky readable proportions',
+  createPosePrompt(seed, variant),
+  createExpressionPrompt(seed),
+  createShadingPrompt(),
+  'one overscaled signature encounter motif',
+  'premium stylized 3D mascot creature render',
 ];
 
 const createImagePrompt = (seed, variant) => {
   const visualDescription = createVisualDescription(seed, variant);
-  return `${visualDescription}. ${seed.promptBase}. Include ${variant.visualMotifs.join(
+  const posePrompt = createPosePrompt(seed, variant);
+  const expressionPrompt = createExpressionPrompt(seed);
+  const shadingPrompt = createShadingPrompt();
+  return `${visualDescription} ${seed.promptBase}. Include ${variant.visualMotifs.join(
     ', '
-  )}. Premium mobile game creature render, isolated subject, centered composition, 512x512 square image, no text, no frame, transparent-free dark-neutral backdrop.`;
+  )}. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, ${posePrompt}, ${expressionPrompt}, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, ${shadingPrompt}, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no realistic animal anatomy, no hyper-detailed texture realism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face, avoid full battle-game hero energy.`;
 };
 
 const buildCatalog = (seeds) =>

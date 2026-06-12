@@ -1,19 +1,37 @@
 {
-  "styleId": "katchimera-cozy-premium-cgi-v2",
-  "name": "Katchimera Cozy Premium CGI",
-  "recommendedStyle": "cozy-premium stylized 3D creature CGI",
-  "summary": "A cozy-premium stylized 3D fantasy creature look with believable materials, softened proportions, warm emotional readability, and collectible-card clarity.",
+  "styleId": "katchimera-premium-stylized-mascot-cgi-v7",
+  "name": "Katchimera Premium Stylized Mascot CGI Plus",
+  "recommendedStyle": "premium stylized 3D mascot creature render",
+  "summary": "A premium stylized 3D mascot look with cartoony proportions, dynamic pose and expression, believable premium shading, and polished mobile-game charm without photorealism or battle-game aggression.",
   "positiveStyleTokens": [
-    "cozy-premium stylized 3D CGI fantasy creature companion",
-    "soft cinematic lighting",
-    "premium spirit companion creature art",
-    "calm magical mood",
-    "readable elegant silhouette",
-    "slightly softened proportions",
+    "premium stylized 3D mascot creature render",
+    "premium stylized game mascot CGI",
+    "Fortnite-inspired silhouette clarity without combat energy",
+    "Royal Match-inspired facial readability and charm",
+    "dramatically oversized glossy luminous eyes",
+    "visible inner glow core",
+    "head-dominant rounded mascot silhouette",
+    "exaggerated chunky readable proportions",
+    "top-heavy body design",
+    "short simplified limbs",
+    "oversized paws and feet",
+    "clean stylized lighting",
+    "dynamic appealing pose",
+    "expressive cartoony facial acting",
+    "cartoony proportions with believable premium shading",
+    "realistic lighting response on stylized materials",
     "emotionally readable face",
-    "premium materials with soft tactile warmth",
-    "subtle magical glow",
-    "dark atmospheric background",
+    "tiny compressed mouth and nose",
+    "soft cheek treatment",
+    "bold silhouette clarity",
+    "clean simplified material rendering",
+    "bold color blocking",
+    "polished mobile-game render quality",
+    "calm magical mood",
+    "strongly cartoony proportions",
+    "one overscaled signature encounter motif",
+    "playful premium game-character energy",
+    "simple premium background treatment",
     "hero-quality render"
   ],
   "negativeStyleTokens": [
@@ -24,26 +42,79 @@
     "no human",
     "no weapon",
     "no UI overlay",
-    "no heavy chibi proportions",
-    "no exaggerated comedy",
-    "no plastic toy look",
-    "no aggressive monster face"
+    "no extreme chibi proportions",
+    "no full battle-game hero energy",
+    "no flat sticker neon",
+    "no doll-like humanoid character",
+    "no cheap toy-commercial plastic look",
+    "no aggressive monster face",
+    "no photorealism",
+    "no realistic animal anatomy",
+    "no hyper-detailed texture realism",
+    "no moody cinematic realism"
   ],
   "compositionDefaults": {
     "camera": "three-quarter view",
     "framing": "single creature portrait with breathing room",
-    "background": "dark atmospheric habitat hint only",
+    "background": "simple premium habitat hint only",
     "detailLevel": "high",
-    "pose": "clear silhouette, poised and companion-like rather than aggressive"
+    "pose": "clear dynamic mascot pose with appealing movement and readable silhouette",
+    "faceRead": "eyes and glow core must remain readable at thumbnail size"
   },
+  "proportionTargets": {
+    "headShareOfHeight": "45 to 55 percent",
+    "eyeShareOfFaceRead": "30 to 38 percent",
+    "pawAndFootOverscale": "20 to 30 percent",
+    "heroMotifOverscale": "1.25x to 1.75x realism"
+  },
+  "poseFamilies": [
+    "bounce pose",
+    "mid-hop pose",
+    "proud pose",
+    "clingy pose",
+    "sneak pose",
+    "slouchy cozy pose"
+  ],
+  "expressionPresets": [
+    "delighted",
+    "smug-cute",
+    "shy",
+    "sleepy",
+    "startled",
+    "proud",
+    "overfocused"
+  ],
   "renderDefaults": {
-    "finish": "cinematic polished CGI with soft tactile warmth",
-    "materials": ["fur", "moss", "stone", "shell", "velvet", "ember glow", "mist", "plush fiber"],
-    "lighting": ["soft rim light", "subtle key light", "controlled atmospheric bloom", "warm eye-light readability"]
+    "finish": "polished stylized game-mascot CGI with simplified premium forms and believable premium shading",
+    "materials": [
+      "soft plush",
+      "stylized matte resin",
+      "clean ceramic",
+      "moss",
+      "bark",
+      "shell",
+      "pastry texture",
+      "limited brushed metal accents"
+    ],
+    "lighting": [
+      "clean key light",
+      "soft fill light",
+      "soft rim light",
+      "bright eye-light readability",
+      "controlled stylized bloom",
+      "grounded contact shadows"
+    ]
+  },
+  "renderRecipe": {
+    "shapeRule": "stylize anatomy and pose aggressively, simplify body masses, overscale the hero motif",
+    "surfaceRule": "keep shading believable and premium, but keep textures simplified and graphic",
+    "lightingRule": "use real studio-light logic with key, fill, rim, bounce, and contact shadow",
+    "detailRule": "spend the richest shading on eyes, glow core, and the hero motif; keep the rest broader and cleaner"
   },
   "comparativeNotes": {
-    "fortnite": "too loud, too heroic, too broad for KatchaDeck's calm identity",
-    "clashRoyale": "too toy-like and exaggerated for reflective collectible mood",
-    "realisticCG": "use realism in materials and lighting, but keep anatomy stylized, warm, and companion-like"
+    "fortnite": "borrow silhouette confidence, strong pose design, and stylized render polish, but avoid hero aggression and combat energy",
+    "royalMatch": "borrow facial charm, cartoony readability, color clarity, and instant appeal, but avoid cheap toy-commercial plastic and over-bright casual-game polish",
+    "realisticCG": "borrow lighting logic and premium shading response, not realistic anatomy or heavy texture realism",
+    "princessDoll": "landmark rares can feel regal, but they should stay creature-first rather than doll-first"
   }
 }

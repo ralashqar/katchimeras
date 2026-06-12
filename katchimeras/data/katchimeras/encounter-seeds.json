@@ -295,6 +295,14 @@
     "promptBase": "cute coffee creature with cafe warmth, creamy details and collectible polish",
     "variants": [
       {
+        "idSuffix": "baristabbit",
+        "creatureKind": "hybrid",
+        "name": "Baristabbit",
+        "caption": "A tiny barista rabbit shaped by sacred coffee stops and over-serious little rituals.",
+        "motivationalQuote": "Ritual can turn an ordinary stop into care.",
+        "visualMotifs": ["latte-foam ears", "ceramic cup hood", "caramel glow core"]
+      },
+      {
         "idSuffix": "lattelet",
         "creatureKind": "foodling",
         "name": "Lattelet",
@@ -859,6 +867,14 @@
     "promptBase": "cute grocery creature with produce motifs, cart details and everyday nourishing charm",
     "variants": [
       {
+        "idSuffix": "errandimp",
+        "creatureKind": "hybrid",
+        "name": "Errandimp",
+        "caption": "A practical little gremlin built from checklists, aisle loops, and quietly competent days.",
+        "motivationalQuote": "Taking care of life still counts as momentum.",
+        "visualMotifs": ["receipt ribbon tail", "cart-wheel feet", "checklist charm"]
+      },
+      {
         "idSuffix": "broccolite",
         "creatureKind": "foodling",
         "name": "Broccolite",
@@ -889,6 +905,29 @@
         "caption": "A rolling little helper built from lists, aisles, and follow-through.",
         "motivationalQuote": "Showing up counts, even quietly.",
         "visualMotifs": ["cart basket shell", "small wheel feet", "checklist charm"]
+      }
+    ]
+  },
+  {
+    "id": "home_evening",
+    "topLevelType": "location",
+    "triggerCategory": "home",
+    "triggerSubtype": "home_evening",
+    "theme": "restorative sanctuary",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["homeStay", "recoveryDay", "softEvening"],
+    "sourceExamples": ["bedroom", "couch corner", "blanket nest"],
+    "visualTone": "soft cozy restorative",
+    "promptBase": "cute home recovery creature with blanket textures, pillow-soft forms and a warm sanctuary glow",
+    "variants": [
+      {
+        "idSuffix": "bedrotte",
+        "creatureKind": "hybrid",
+        "name": "Bedrotte",
+        "caption": "A blanket-nest creature born from recovery nights, canceled plans, and deliberate softness.",
+        "motivationalQuote": "Stillness is part of building a life.",
+        "visualMotifs": ["blanket mantle", "pillow-crown silhouette", "sleepy ember belly"]
       }
     ]
   },
@@ -1140,6 +1179,14 @@
     "visualTone": "neon lively urban",
     "promptBase": "rare Tokyo landmark creature with neon signage, crossing patterns and premium urban collectible styling",
     "variants": [
+      {
+        "idSuffix": "signalhop",
+        "creatureKind": "hybrid",
+        "name": "Signalhop",
+        "caption": "A neon-crossing rabbit charged by city signals, crowd flow, and overstimulated wonder.",
+        "motivationalQuote": "A charged place can wake up a sharper version of you.",
+        "visualMotifs": ["signal-light ears", "crosswalk stripe markings", "neon tail loop"]
+      },
       {
         "idSuffix": "neonpoko",
         "creatureKind": "sprite",
