@@ -42,6 +42,8 @@ const sampleCreature: LocalCreatureRecord = {
   highlight: 'A warm stop and a little movement became the thing the day kept glowing around.',
   reflection: 'The hatch kept warmth first, with just enough curiosity underneath to stay alive.',
   motifTags: ['Coffee', 'Walk'],
+  encounterProfileId: null,
+  repeatDepth: 0,
 };
 
 const sampleMoments = [
