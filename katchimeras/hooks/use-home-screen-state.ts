@@ -12,6 +12,7 @@ import type {
 } from '@/types/home';
 import {
   addMomentToDay,
+  applyGeneratedReflection,
   hydrateHomeState,
   importHealthRoutesForDay as applyHealthRoutesForDay,
   type ImportedHealthRoutesPayload,
@@ -23,6 +24,7 @@ import {
   updateLocationPermissionState,
   updateTodayStepCount,
 } from '@/utils/home-engine';
+import { requestDayReflection } from '@/utils/day-reflection';
 import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
@@ -195,6 +197,29 @@ export function useHomeScreenState() {
     });
   }, []);
 
+  const enhanceDayReflection = useCallback(async (hatchedState: StoredHomeState, dayId: string) => {
+    const profile = loadOnboardingProfile();
+    const day =
+      hatchedState.today.id === dayId
+        ? hatchedState.today
+        : hatchedState.archivedDays.find((candidate) => candidate.id === dayId) ?? null;
+
+    if (!day?.creature || day.creature.reflectionSource === 'generated') {
+      return;
+    }
+
+    const generated = await requestDayReflection(day, profile);
+    if (!generated) {
+      return;
+    }
+
+    const now = new Date();
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return applyGeneratedReflection(hydrated.state, dayId, generated, profile, now);
+    });
+  }, []);
+
   const triggerHatchIfReady = useCallback(() => {
     if (!selectedDay || selectedDay.kind !== 'day') {
       return;
@@ -202,12 +227,12 @@ export function useHomeScreenState() {
 
     const now = new Date();
     const profile = loadOnboardingProfile();
+    const hydrated = hydrateHomeState(loadStoredHomeState() ?? storedStateRef.current, profile, now);
+    const hatchedState = triggerHatchForDay(hydrated.state, selectedDay.id, profile, now);
 
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return triggerHatchForDay(hydrated.state, selectedDay.id, profile, now);
-    });
-  }, [selectedDay]);
+    setStoredState(hatchedState);
+    void enhanceDayReflection(hatchedState, selectedDay.id);
+  }, [enhanceDayReflection, selectedDay]);
 
   const refreshState = useCallback(() => {
     syncState();
