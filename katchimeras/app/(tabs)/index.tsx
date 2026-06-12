@@ -232,13 +232,7 @@ export default function HomeScreen() {
         <Animated.View entering={presenceEnter(70)} onLayout={handleHeroStageLayout} style={styles.heroStage}>
           {isDay ? (
             isHatched ? (
-              <CreatureHero
-                creature={selectedDay.creature!}
-                hideSubtitle
-                interactive
-                moments={selectedDay.moments}
-                onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
-              />
+              <CreatureHero creature={selectedDay.creature!} hideSubtitle />
             ) : (
               <View style={styles.eggScale}>
                 <FormingEgg
@@ -385,13 +379,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    paddingBottom: 116,
+    paddingBottom: 112,
     paddingHorizontal: 24,
-    paddingTop: 14,
+    paddingTop: 6,
   },
   devReset: {
     alignSelf: 'flex-end',
-    paddingBottom: 4,
+    paddingBottom: 2,
   },
   devResetLabel: {
     fontSize: 11,
@@ -400,19 +394,18 @@ const styles = StyleSheet.create({
   heroStage: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
-    minHeight: 320,
+    marginTop: 6,
   },
   eggScale: {
-    transform: [{ scale: 1.12 }],
+    transform: [{ scale: 1.06 }],
   },
   sectionGap: {
-    marginTop: 16,
+    marginTop: 12,
   },
   formingCopy: {
     alignItems: 'center',
-    gap: 13,
-    marginTop: 4,
+    gap: 12,
+    marginTop: 2,
   },
   formingTitle: {
     fontFamily: AppFontFamilies.instrumentSerif,
@@ -453,10 +446,10 @@ const styles = StyleSheet.create({
   },
   spacer: {
     flexGrow: 1,
-    minHeight: 20,
+    minHeight: 10,
   },
   ctaArea: {
-    marginTop: 12,
+    marginTop: 8,
   },
   ctaRow: {
     flexDirection: 'row',

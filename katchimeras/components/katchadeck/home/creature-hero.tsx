@@ -10,32 +10,20 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
-import { HeroAuraFrame } from '@/components/katchadeck/home/hero-aura-frame';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/utils/home-engine';
-import type { EggVisualState, HomeMoment, LocalCreatureRecord } from '@/types/home';
-import { homeMomentOptions } from '@/constants/home-mvp';
+import type { LocalCreatureRecord } from '@/types/home';
 import { Lantern } from '@/constants/theme';
 
 type CreatureHeroProps = {
   creature: LocalCreatureRecord;
-  interactive?: boolean;
-  moments: HomeMoment[];
-  onPress?: () => void;
   subtitle?: string;
-  // Lantern Home shows the reflection in its own quote card below the hero.
   hideSubtitle?: boolean;
 };
 
-export function CreatureHero({
-  creature,
-  interactive = false,
-  moments,
-  onPress,
-  subtitle,
-  hideSubtitle = false,
-}: CreatureHeroProps) {
+// Lantern hero: the creature floats free over the ink - no membrane ring, no
+// plate, no motif orbits. Halo and float are the only ornament.
+export function CreatureHero({ creature, subtitle, hideSubtitle = false }: CreatureHeroProps) {
   const visual = getCreatureVisual(creature.visualKey);
   const float = useSharedValue(0);
   const glow = useSharedValue(0.2);
@@ -61,52 +49,22 @@ export function CreatureHero({
   }, [float, glow]);
 
   const visualStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -float.value * 10 }, { scale: 1 + glow.value * 0.03 }],
+    transform: [{ translateY: -float.value * 9 }, { scale: 1 + glow.value * 0.03 }],
   }));
 
   const haloStyle = useAnimatedStyle(() => ({
-    opacity: 0.22 + glow.value * 0.22,
+    opacity: 0.26 + glow.value * 0.22,
     transform: [{ scale: 0.94 + glow.value * 0.08 }],
   }));
 
-  const motifMoments = Array.from(new Set(moments.map((moment) => moment.type)))
-    .slice(0, 2)
-    .map((type) => homeMomentOptions[type]);
-  const aura: EggVisualState = {
-    accentColor: creature.accentColor,
-    haloColor: creature.accentColor,
-    coreColor: `${creature.accentColor}66`,
-    intensity: creature.rarity === 'legendary' ? 0.78 : creature.rarity === 'epic' ? 0.66 : creature.rarity === 'rare' ? 0.54 : 0.42,
-    shimmer: true,
-    swirl: 0.34,
-    label: creature.name,
-  };
-
   return (
     <View style={styles.shell}>
-      <HeroAuraFrame aura={aura} centerPressSize={112} interactive={interactive} onPress={onPress}>
-        {() => (
-          <View pointerEvents="none" style={styles.visualWrap}>
-            <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}32` }, haloStyle]} />
-            <Animated.View style={[styles.creatureWrap, visualStyle]}>
-              <View style={styles.creaturePlate}>
-                <Image contentFit="contain" source={visual.source} style={styles.image} transition={0} />
-              </View>
-            </Animated.View>
-            {motifMoments.map((moment, index) => (
-              <View
-                key={moment.id}
-                style={[
-                  styles.motifOrbit,
-                  index === 0 ? styles.motifLeft : styles.motifRight,
-                  { backgroundColor: `${moment.accentColor}22`, borderColor: `${moment.accentColor}55` },
-                ]}>
-                <IconSymbol color={moment.accentColor} name={moment.icon} size={16} />
-              </View>
-            ))}
-          </View>
-        )}
-      </HeroAuraFrame>
+      <View style={styles.stage}>
+        <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
+        <Animated.View style={visualStyle}>
+          <Image contentFit="contain" source={visual.source} style={styles.image} transition={0} />
+        </Animated.View>
+      </View>
       <View style={styles.copy}>
         <ThemedText
           type="onboardingLabel"
@@ -115,11 +73,11 @@ export function CreatureHero({
           darkColor={Lantern.ember300}>
           {buildCreatureKicker(creature)}
         </ThemedText>
-        <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
+        <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           {creature.name}
         </ThemedText>
         {hideSubtitle ? null : (
-          <ThemedText style={styles.subtitle} lightColor="#E6EEFF" darkColor="#E6EEFF">
+          <ThemedText style={styles.subtitle} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
             {subtitle ?? creature.reflection}
           </ThemedText>
         )}
@@ -157,63 +115,36 @@ function formatVisitNumber(visit: number) {
 const styles = StyleSheet.create({
   shell: {
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
   },
-  visualWrap: {
+  stage: {
     alignItems: 'center',
+    height: 258,
     justifyContent: 'center',
     width: '100%',
   },
   halo: {
     borderRadius: 999,
-    height: 270,
+    height: 240,
     position: 'absolute',
-    width: 270,
-  },
-  creatureWrap: {
-    height: 244,
-    justifyContent: 'center',
-    width: 244,
-  },
-  creaturePlate: {
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'center',
-    width: '100%',
+    width: 240,
   },
   image: {
-    height: '100%',
-    width: '100%',
-  },
-  motifOrbit: {
-    alignItems: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: 42,
-  },
-  motifLeft: {
-    left: 44,
-    top: 64,
-  },
-  motifRight: {
-    bottom: 54,
-    right: 46,
+    height: 248,
+    width: 248,
   },
   copy: {
     alignItems: 'center',
-    gap: 8,
-    maxWidth: 300,
+    gap: 6,
+    maxWidth: 320,
   },
   label: {
     fontSize: 11,
   },
   title: {
-    fontSize: 52,
+    fontSize: 46,
     fontStyle: 'italic',
-    lineHeight: 56,
+    lineHeight: 52,
     textAlign: 'center',
   },
   subtitle: {
