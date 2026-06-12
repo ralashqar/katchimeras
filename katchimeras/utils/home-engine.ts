@@ -528,6 +528,69 @@ function recordHatchedEncounter(history: EncounterHistoryMap, day: StoredHomeDay
   return recordEncounterHatch(history, day.creature.encounterProfileId, day.isoDate);
 }
 
+// Replaces demo-seed history (or empty past days) with real reconstructed
+// days from pedometer history and photo geotags. Days the user already lived
+// in the app (hatched, or carrying real data) are never overwritten - real
+// days only merge in extra steps/locations they were missing.
+export function applyBackfilledDays(
+  state: StoredHomeState,
+  backfilled: { isoDate: string; stepsCount: number; locations: StoredHomeLocationPoint[] }[],
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const byIsoDate = new Map(backfilled.map((day) => [day.isoDate, day]));
+  const todayIso = toLocalDateId(now);
+  const keptArchived = state.archivedDays
+    .filter((day) => !(day.id.startsWith('seed-') && byIsoDate.has(day.isoDate)))
+    .map((day) => {
+      const incoming = byIsoDate.get(day.isoDate);
+      if (!incoming || day.creature) {
+        byIsoDate.delete(day.isoDate);
+        return day;
+      }
+
+      byIsoDate.delete(day.isoDate);
+      return {
+        ...day,
+        stepsCount: Math.max(day.stepsCount, incoming.stepsCount),
+        locations: day.locations.length > 0 ? day.locations : incoming.locations,
+      };
+    });
+
+  const newDays: StoredHomeDayRecord[] = [...byIsoDate.values()]
+    .filter((day) => day.isoDate !== todayIso)
+    .map((day) => ({
+      id: `day-${day.isoDate}`,
+      isoDate: day.isoDate,
+      state: 'forming' as const,
+      stepsCount: day.stepsCount,
+      visitedPlaceCount: 0,
+      newPlaceCount: 0,
+      locationSampleCount: day.locations.length,
+      shareReadyAt: null,
+      moments: [],
+      locations: day.locations,
+      healthRouteImport: null,
+      exactRouteSegments: [],
+      selectedPathId: null,
+      creature: null,
+    }));
+
+  const mergedArchived = [...keptArchived, ...newDays].sort((left, right) =>
+    left.isoDate.localeCompare(right.isoDate)
+  );
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      archivedDays: mergedArchived,
+      backfilledAt: now.toISOString(),
+    },
+    profile,
+    now
+  );
+}
+
 export function setPlaceCategorySeedsForDay(
   state: StoredHomeState,
   dayId: string,
@@ -736,6 +799,7 @@ function normalizeStoredHomeState(
     encounterHistory: upgradedState.encounterHistory,
     archivedDays: normalizedArchived,
     today: normalizedToday,
+    backfilledAt: upgradedState.backfilledAt,
   };
 }
 

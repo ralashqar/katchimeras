@@ -309,6 +309,7 @@ export type StoredHomeState = {
   encounterHistory: EncounterHistoryMap;
   archivedDays: StoredHomeDayRecord[];
   today: StoredHomeDayRecord;
+  backfilledAt?: string;
 };
 
 export type WeekProfile = DayScores;

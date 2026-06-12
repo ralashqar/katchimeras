@@ -12,6 +12,7 @@ import type {
 } from '@/types/home';
 import {
   addMomentToDay,
+  applyBackfilledDays,
   applyGeneratedReflection,
   hydrateHomeState,
   importHealthRoutesForDay as applyHealthRoutesForDay,
@@ -25,6 +26,7 @@ import {
   updateLocationPermissionState,
   updateTodayStepCount,
 } from '@/utils/home-engine';
+import { collectBackfillDays } from '@/utils/day-backfill';
 import { requestDayReflection } from '@/utils/day-reflection';
 import {
   getHatchNotificationPermission,
@@ -218,6 +220,31 @@ export function useHomeScreenState() {
     void syncHatchNotification(state, profile);
     void syncWidgetState(state, profile);
   }, [todayId, todayState]);
+
+  // One-shot retrospective init: reconstruct the last few days from pedometer
+  // history and already-granted photo geotags, replacing the demo seed days.
+  const backfillAttempted = useRef(false);
+  const hasBackfilled = Boolean(viewModel.state.backfilledAt);
+
+  useEffect(() => {
+    if (backfillAttempted.current || hasBackfilled) {
+      return;
+    }
+    backfillAttempted.current = true;
+
+    void (async () => {
+      const profile = loadOnboardingProfile();
+      const days = await collectBackfillDays(new Date(), 3);
+      const now = new Date();
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        if (hydrated.state.backfilledAt) {
+          return hydrated.state;
+        }
+        return applyBackfilledDays(hydrated.state, days, profile, now);
+      });
+    })();
+  }, [hasBackfilled]);
 
   const placeResolutionInFlight = useRef<string | null>(null);
 

@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { createStarterReveal } from '@/constants/katchadeck';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { KatchaDeckUI } from '@/constants/theme';
+import { runDevBackfill } from '@/utils/day-backfill';
 import { applyDevScenario, devScenarioOptions } from '@/utils/dev-scenarios';
 import { clearStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
@@ -58,6 +59,11 @@ export default function ExploreScreen() {
     ]);
   }
 
+  async function handleBackfill() {
+    const summary = await runDevBackfill();
+    Alert.alert('Backfill', summary, [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]);
+  }
+
   function handleApplyScenario(scenarioId: (typeof devScenarioOptions)[number]['id']) {
     const applied = applyDevScenario(scenarioId, new Date());
     if (!applied) {
@@ -100,6 +106,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
+                <KatchaButton label="Backfill real history" onPress={handleBackfill} variant="secondary" />
                 {devScenarioOptions.map((scenario) => (
                   <KatchaButton
                     key={scenario.id}
