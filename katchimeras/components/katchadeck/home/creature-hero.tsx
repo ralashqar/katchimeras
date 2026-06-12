@@ -100,7 +100,7 @@ export function CreatureHero({ creature, interactive = false, moments, onPress, 
       </HeroAuraFrame>
       <View style={styles.copy}>
         <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
-          {creature.rarity}
+          {buildCreatureKicker(creature)}
         </ThemedText>
         <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
           {creature.name}
@@ -111,6 +111,32 @@ export function CreatureHero({ creature, interactive = false, moments, onPress, 
       </View>
     </View>
   );
+}
+
+function buildCreatureKicker(creature: LocalCreatureRecord) {
+  const encounterCue = creature.encounterProfileId ? creature.motifTags[0] ?? null : null;
+  if (!encounterCue) {
+    return creature.rarity;
+  }
+
+  if (creature.repeatDepth > 0) {
+    return `${encounterCue} · ${formatVisitNumber(creature.repeatDepth + 1)} visit`;
+  }
+
+  if (creature.rarity !== 'common') {
+    return `${encounterCue} · ${creature.rarity}`;
+  }
+
+  return encounterCue;
+}
+
+function formatVisitNumber(visit: number) {
+  const remainderTen = visit % 10;
+  const remainderHundred = visit % 100;
+  if (remainderTen === 1 && remainderHundred !== 11) return `${visit}st`;
+  if (remainderTen === 2 && remainderHundred !== 12) return `${visit}nd`;
+  if (remainderTen === 3 && remainderHundred !== 13) return `${visit}rd`;
+  return `${visit}th`;
 }
 
 const styles = StyleSheet.create({

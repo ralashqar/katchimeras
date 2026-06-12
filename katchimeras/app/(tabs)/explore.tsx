@@ -117,7 +117,7 @@ export default function ExploreScreen() {
           <GlassPanel contentStyle={styles.panelBody}>
             <SectionHeader
               label={DEV_DEBUG_NAV_ENABLED ? 'Current profile' : 'Collection tilt'}
-              title={DEV_DEBUG_NAV_ENABLED ? 'What the local onboarding profile is shaping' : 'Where your deck is leaning'}
+              title={DEV_DEBUG_NAV_ENABLED ? 'What the local onboarding profile is shaping' : 'Where your days are leaning'}
             />
             <ThemedText style={styles.panelText} lightColor="#D9E4FF" darkColor="#D9E4FF">
               {reveal.identityInsight}

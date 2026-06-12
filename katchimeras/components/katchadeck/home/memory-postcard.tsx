@@ -48,6 +48,13 @@ export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function Mem
           </View>
           <Text style={styles.creatureName}>{day.creature.name}</Text>
           <Text style={styles.highlight}>{day.highlight ?? day.creature.highlight}</Text>
+          {buildEncounterCue(day.creature) ? (
+            <View style={[styles.cuePill, { borderColor: `${day.creature.accentColor}66` }]}>
+              <Text style={[styles.cueText, { color: day.creature.accentColor }]}>
+                {buildEncounterCue(day.creature)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.mapCard}>
@@ -96,6 +103,19 @@ export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function Mem
     </View>
   );
 });
+
+function buildEncounterCue(creature: NonNullable<HomeDayRecord['creature']>) {
+  if (!creature.encounterProfileId) {
+    return null;
+  }
+
+  const cue = creature.motifTags[0];
+  if (!cue) {
+    return null;
+  }
+
+  return creature.repeatDepth > 0 ? `${cue} · visit ${creature.repeatDepth + 1}` : cue;
+}
 
 function buildMapCaption(day: HomeDayRecord) {
   if (day.newPlaceCount > 0) {
@@ -261,6 +281,20 @@ const styles = StyleSheet.create({
     marginTop: 18,
     maxWidth: 720,
     textAlign: 'center',
+  },
+  cuePill: {
+    borderRadius: 999,
+    borderWidth: 2,
+    marginTop: 22,
+    paddingHorizontal: 26,
+    paddingVertical: 10,
+  },
+  cueText: {
+    fontFamily: 'Manrope',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
   },
   mapCard: {
     backgroundColor: 'rgba(9, 14, 25, 0.7)',

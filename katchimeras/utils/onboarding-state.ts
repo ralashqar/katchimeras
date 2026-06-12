@@ -8,6 +8,7 @@ export type OnboardingProfile = {
   painPointIds: string[];
   preferenceIds: string[];
   completedAt: string | null;
+  hatchHour: number | null;
 };
 
 export const defaultOnboardingProfile: OnboardingProfile = {
@@ -16,10 +17,12 @@ export const defaultOnboardingProfile: OnboardingProfile = {
   painPointIds: [],
   preferenceIds: [],
   completedAt: null,
+  hatchHour: null,
 };
 
-export function loadOnboardingProfile() {
-  return getStoredJson(ONBOARDING_STORAGE_KEY, defaultOnboardingProfile);
+export function loadOnboardingProfile(): OnboardingProfile {
+  const stored = getStoredJson(ONBOARDING_STORAGE_KEY, defaultOnboardingProfile);
+  return { ...defaultOnboardingProfile, ...stored };
 }
 
 export function saveOnboardingProfile(profile: OnboardingProfile) {
