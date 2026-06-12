@@ -15,7 +15,6 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/utils/home-engine';
 import type { EggVisualState, HomeMoment, LocalCreatureRecord } from '@/types/home';
-import { KatchaDeckUI } from '@/constants/theme';
 import { homeMomentOptions } from '@/constants/home-mvp';
 
 type CreatureHeroProps = {
@@ -80,7 +79,7 @@ export function CreatureHero({ creature, interactive = false, moments, onPress, 
           <View pointerEvents="none" style={styles.visualWrap}>
             <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}32` }, haloStyle]} />
             <Animated.View style={[styles.creatureWrap, visualStyle]}>
-              <View style={[styles.creaturePlate, { borderColor: `${visual.accentColor}40` }]}>
+              <View style={styles.creaturePlate}>
                 <Image contentFit="contain" source={visual.source} style={styles.image} transition={0} />
               </View>
             </Animated.View>
@@ -162,13 +161,8 @@ const styles = StyleSheet.create({
   },
   creaturePlate: {
     alignItems: 'center',
-    backgroundColor: 'rgba(10,14,24,0.92)',
-    borderRadius: 999,
-    borderWidth: 1,
-    boxShadow: KatchaDeckUI.shadows.card,
     height: '100%',
     justifyContent: 'center',
-    overflow: 'hidden',
     width: '100%',
   },
   image: {

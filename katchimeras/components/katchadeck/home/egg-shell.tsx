@@ -1,4 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -12,7 +12,6 @@ import Animated, {
 import { useEffect } from 'react';
 
 import type { EggVisualState } from '@/types/home';
-import { KatchaDeckUI } from '@/constants/theme';
 
 export type EggAuraMotionValues = {
   dragX: SharedValue<number>;
@@ -28,12 +27,24 @@ type EggShellProps = {
   egg: EggVisualState;
   motion: EggAuraMotionValues;
   reactionKey?: number;
+  // 0 = whole shell, 1 = first glowing cracks, 2 = bursting. The stages are
+  // generated edits of the same render, tight-cropped to a shared bounding
+  // box so crossfades stay pixel-aligned.
+  crackStage?: 0 | 1 | 2;
 };
 
-export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
+const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+
+export function EggShell({ egg, motion, reactionKey = 0, crackStage = 0 }: EggShellProps) {
   const breathe = useSharedValue(0);
   const reaction = useSharedValue(0);
   const shimmer = useSharedValue(egg.shimmer ? 1 : 0);
+  const crackOne = useSharedValue(0);
+  const crackTwo = useSharedValue(0);
 
   useEffect(() => {
     breathe.value = withRepeat(
@@ -65,6 +76,11 @@ export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
     );
   }, [reaction, reactionKey]);
 
+  useEffect(() => {
+    crackOne.value = withTiming(crackStage >= 1 ? 1 : 0, { duration: 360, easing: Easing.out(Easing.cubic) });
+    crackTwo.value = withTiming(crackStage >= 2 ? 1 : 0, { duration: 320, easing: Easing.out(Easing.cubic) });
+  }, [crackOne, crackTwo, crackStage]);
+
   const shellStyle = useAnimatedStyle(() => {
     const energy = motion.interactionEnergy.value;
     const dragMagnitude = Math.min(1, Math.hypot(motion.dragX.value, motion.dragY.value) / 88);
@@ -80,7 +96,7 @@ export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
   });
 
   const shellGlowStyle = useAnimatedStyle(() => ({
-    opacity: 0.16 + breathe.value * 0.14 + motion.interactionEnergy.value * 0.3,
+    opacity: 0.18 + breathe.value * 0.14 + motion.interactionEnergy.value * 0.3,
     transform: [
       { translateX: motion.glowLagX.value * 0.06 },
       { translateY: motion.glowLagY.value * 0.06 },
@@ -88,26 +104,34 @@ export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
     ],
   }));
 
-  const coreStyle = useAnimatedStyle(() => ({
-    opacity: 0.52 + shimmer.value * 0.34 + reaction.value * 0.16 + motion.pressProgress.value * 0.1,
+  const crackOneStyle = useAnimatedStyle(() => ({
+    opacity: crackOne.value * (1 - crackTwo.value * 0.65),
+  }));
+
+  const crackTwoStyle = useAnimatedStyle(() => ({
+    opacity: crackTwo.value,
+    transform: [{ scale: 1 + crackTwo.value * 0.02 }],
+  }));
+
+  // The aurora is baked into the artwork; this accent layer keeps the day's
+  // own color identity and the moment-reaction pulses alive on top of it.
+  const accentGlowStyle = useAnimatedStyle(() => ({
+    opacity:
+      0.14 +
+      shimmer.value * 0.14 +
+      egg.intensity * 0.1 +
+      reaction.value * 0.22 +
+      motion.pressProgress.value * 0.12 +
+      motion.interactionEnergy.value * 0.12,
     transform: [
       { translateX: motion.glowLagX.value * 0.18 },
       { translateY: motion.glowLagY.value * 0.18 },
-      { scale: 0.9 + egg.intensity * 0.14 + reaction.value * 0.08 + motion.interactionEnergy.value * 0.12 },
-    ],
-  }));
-
-  const swirlStyle = useAnimatedStyle(() => ({
-    opacity: 0.18 + shimmer.value * 0.16 + motion.interactionEnergy.value * 0.08,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.08 },
-      { translateY: motion.glowLagY.value * 0.08 },
-      { rotateZ: `${egg.swirl * 210 + reaction.value * 16 + motion.dragX.value * 0.06}deg` },
+      { scale: 0.92 + egg.intensity * 0.12 + reaction.value * 0.08 },
     ],
   }));
 
   const sparkStyle = useAnimatedStyle(() => ({
-    opacity: 0.74 + motion.interactionEnergy.value * 0.2,
+    opacity: 0.6 + shimmer.value * 0.24 + motion.interactionEnergy.value * 0.16,
     transform: [
       { translateX: motion.glowLagX.value * 0.1 },
       { translateY: motion.glowLagY.value * 0.06 },
@@ -118,13 +142,12 @@ export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
   return (
     <Animated.View pointerEvents="none" style={[styles.eggWrap, shellStyle]}>
       <Animated.View style={[styles.shellGlow, { backgroundColor: `${egg.accentColor}18` }, shellGlowStyle]} />
-      <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']} style={styles.eggSheen} />
-      <View style={[styles.eggShell, { borderColor: `${egg.accentColor}9C` }]}>
-        <Animated.View style={[styles.eggCore, { backgroundColor: egg.coreColor }, coreStyle]} />
-        <Animated.View style={[styles.eggSwirl, { borderColor: `${egg.accentColor}80` }, swirlStyle]} />
-        <Animated.View style={[styles.spark, { backgroundColor: egg.accentColor }, sparkStyle]} />
-        <Animated.View style={[styles.sparkSecondary, { backgroundColor: `${egg.coreColor}CC` }, sparkStyle]} />
-      </View>
+      <Image contentFit="contain" source={eggBase} style={styles.eggImage} transition={0} />
+      <AnimatedImage contentFit="contain" source={eggCrackOne} style={[styles.eggImage, crackOneStyle]} transition={0} />
+      <AnimatedImage contentFit="contain" source={eggCrackTwo} style={[styles.eggImage, crackTwoStyle]} transition={0} />
+      <Animated.View style={[styles.accentGlow, { backgroundColor: egg.coreColor }, accentGlowStyle]} />
+      <Animated.View style={[styles.spark, { backgroundColor: egg.accentColor }, sparkStyle]} />
+      <Animated.View style={[styles.sparkSecondary, { backgroundColor: `${egg.coreColor}CC` }, sparkStyle]} />
     </Animated.View>
   );
 }
@@ -142,55 +165,31 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 154,
   },
-  eggShell: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(10,14,24,0.96)',
-    borderRadius: 120,
-    borderWidth: 1.25,
-    boxShadow: KatchaDeckUI.shadows.card,
+  eggImage: {
     height: '100%',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: '100%',
-  },
-  eggSheen: {
-    borderRadius: 999,
-    height: 86,
-    left: 24,
-    opacity: 0.7,
     position: 'absolute',
-    top: 26,
-    width: 56,
-    zIndex: 2,
+    width: '112%',
   },
-  eggCore: {
+  accentGlow: {
     borderRadius: 999,
-    height: 96,
-    width: 96,
-  },
-  eggSwirl: {
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 118,
-    opacity: 0.44,
-    position: 'absolute',
-    transform: [{ rotateZ: '22deg' }],
-    width: 88,
+    height: 104,
+    opacity: 0.2,
+    width: 104,
   },
   spark: {
     borderRadius: 999,
-    height: 16,
+    height: 12,
     position: 'absolute',
-    right: 42,
-    top: 40,
-    width: 16,
+    right: 44,
+    top: 46,
+    width: 12,
   },
   sparkSecondary: {
     borderRadius: 999,
-    bottom: 46,
-    height: 10,
-    left: 52,
+    bottom: 52,
+    height: 8,
+    left: 56,
     position: 'absolute',
-    width: 10,
+    width: 8,
   },
 });

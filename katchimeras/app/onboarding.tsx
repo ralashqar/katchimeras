@@ -13,7 +13,6 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { preferenceOptions } from '@/constants/katchadeck';
-import { heroOrbitAssets } from '@/constants/onboarding-hero';
 import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
 import { defaultOnboardingProfile, loadOnboardingProfile, saveOnboardingProfile } from '@/utils/onboarding-state';
 
@@ -41,21 +40,21 @@ const castIntroItems = [
     name: 'Baristabbit',
     line: 'Appears when your day keeps a coffee ritual.',
     accentColor: '#E3B68C',
-    source: require('../assets/images/katchimeras/baristabbit.png'),
+    source: require('../assets/images/katchimeras/cutouts/baristabbit.png'),
   },
   {
     id: 'mossprout',
     name: 'Mossprout',
     line: 'Grows out of park walks and green detours.',
     accentColor: '#8FD8BE',
-    source: heroOrbitAssets.mossprout,
+    source: require('../assets/images/katchimeras/cutouts/mossprout.png'),
   },
   {
     id: 'sprintail',
     name: 'Sprintail',
     line: 'Shows up on the days you really moved.',
     accentColor: '#93C7FF',
-    source: heroOrbitAssets.sprintail,
+    source: require('../assets/images/katchimeras/cutouts/sprintail.png'),
   },
 ] as const;
 
