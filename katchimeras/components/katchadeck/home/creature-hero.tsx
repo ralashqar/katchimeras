@@ -24,9 +24,18 @@ type CreatureHeroProps = {
   moments: HomeMoment[];
   onPress?: () => void;
   subtitle?: string;
+  // Lantern Home shows the reflection in its own quote card below the hero.
+  hideSubtitle?: boolean;
 };
 
-export function CreatureHero({ creature, interactive = false, moments, onPress, subtitle }: CreatureHeroProps) {
+export function CreatureHero({
+  creature,
+  interactive = false,
+  moments,
+  onPress,
+  subtitle,
+  hideSubtitle = false,
+}: CreatureHeroProps) {
   const visual = getCreatureVisual(creature.visualKey);
   const float = useSharedValue(0);
   const glow = useSharedValue(0.2);
@@ -109,9 +118,11 @@ export function CreatureHero({ creature, interactive = false, moments, onPress, 
         <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
           {creature.name}
         </ThemedText>
-        <ThemedText style={styles.subtitle} lightColor="#E6EEFF" darkColor="#E6EEFF">
-          {subtitle ?? creature.reflection}
-        </ThemedText>
+        {hideSubtitle ? null : (
+          <ThemedText style={styles.subtitle} lightColor="#E6EEFF" darkColor="#E6EEFF">
+            {subtitle ?? creature.reflection}
+          </ThemedText>
+        )}
       </View>
     </View>
   );

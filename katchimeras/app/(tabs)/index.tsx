@@ -1,29 +1,27 @@
 import { useRouter } from 'expo-router';
-import { type LayoutChangeEvent, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { type LayoutChangeEvent, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useEffect, useRef, useState } from 'react';
 import { captureRef } from 'react-native-view-shot';
 
 import { AddMomentRadial } from '@/components/katchadeck/home/add-moment-radial';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { DayContext } from '@/components/katchadeck/home/day-context';
 import { FormingEgg } from '@/components/katchadeck/home/forming-egg';
 import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/home/hatch-sequence';
-import { InsightPathsPanel } from '@/components/katchadeck/home/insight-paths-panel';
+import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
+import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { presenceEnter } from '@/components/katchadeck/motion';
-import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
+import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useAddMomentFlow } from '@/hooks/use-add-moment-flow';
 import { useDayLocationCapture } from '@/hooks/use-day-location-capture';
 import { useDayStepCapture } from '@/hooks/use-day-step-capture';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useRecentPhotoMapSeeding } from '@/hooks/use-recent-photo-map-seeding';
-import type { HomeDayRecord } from '@/types/home';
-import type { TimelineDayEntry, TimelineTomorrowState } from '@/types/timeline';
-import { getCreatureVisual } from '@/utils/home-engine';
+import type { HomeDayRecord, HomeMoment } from '@/types/home';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -31,10 +29,7 @@ export default function HomeScreen() {
     addMoment,
     activityPermission,
     addForegroundLocationSample,
-    importingHealthRouteDayId,
-    importHealthRoutesForDay,
     locationPermission,
-    selectPath,
     selectedDay,
     selectedDayId,
     seedRecentPhotoLocations,
@@ -70,41 +65,17 @@ export default function HomeScreen() {
     usePhotoPickerFallback,
   } = addMomentFlow;
 
-  const dayEntries = timelineDays.filter((day): day is HomeDayRecord => day.kind === 'day').map(toTimelineEntry);
-  const tomorrowDay = timelineDays.find((day) => day.kind === 'tomorrow');
-  const tomorrowState: TimelineTomorrowState = tomorrowDay
-    ? {
-        id: 'tomorrow',
-        dayLabel: tomorrowDay.dayLabel,
-        dateLabel: tomorrowDay.dateLabel,
-        title: tomorrowDay.title,
-        subtitle: tomorrowDay.subtitle,
-        statusLabel: 'Forming',
-        accent: tomorrowDay.accentColor,
-      }
-    : {
-        id: 'tomorrow',
-        dayLabel: 'Tomorrow',
-        dateLabel: 'Forming',
-        title: 'Not yet formed',
-        subtitle: 'Another day is waiting for a little motion.',
-        statusLabel: 'Forming',
-        accent: '#D8E2FF',
-      };
-
   const backgroundAccent =
     selectedDay?.kind === 'day'
       ? selectedDay.state === 'hatched' && selectedDay.creature
-        ? `${selectedDay.creature.accentColor}18`
-        : `${selectedDay.egg.haloColor}18`
-      : 'rgba(216,226,255,0.16)';
+        ? `${selectedDay.creature.accentColor}16`
+        : `${selectedDay.egg.haloColor}14`
+      : 'rgba(167,139,250,0.12)';
 
-  const heroSubtitle =
-    selectedDay?.kind === 'day' && selectedDay.state === 'hatched'
-      ? selectedDay.highlight ?? selectedDay.creature?.reflection ?? ''
-      : selectedDay?.kind === 'day'
-        ? selectedDay.highlight ?? 'Small moments change the shape of the day.'
-        : selectedDay?.subtitle ?? 'Another day is waiting in the wings.';
+  const formingTitle =
+    selectedDay?.kind === 'day'
+      ? selectedDay.highlight ?? 'Small moments change the shape of the day.'
+      : (selectedDay?.subtitle ?? 'Another day is waiting in the wings.');
   const hatchDay =
     hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId ? selectedDay : null;
   const shareableDay =
@@ -230,111 +201,131 @@ export default function HomeScreen() {
     }
   }
 
+  const isDay = selectedDay?.kind === 'day';
+  const isHatched = isDay && selectedDay.state === 'hatched' && selectedDay.creature;
+  const isFormingToday = isDay && selectedDay.isToday && selectedDay.state !== 'hatched';
+  const signalLine = isDay ? buildSignalLine(selectedDay) : null;
+
   return (
     <View style={styles.screen}>
       <AmbientBackground
         accentColor={backgroundAccent}
-        colors={['#090B12', '#101A2B', '#171E35']}
-        meshColors={['rgba(200,216,255,0.14)', 'rgba(95,168,123,0.08)', 'rgba(227,160,110,0.08)', 'rgba(106,95,232,0.12)']}
+        colors={['#0C0A14', '#14111F', '#1A1430']}
+        meshColors={['rgba(167,139,250,0.12)', 'rgba(125,232,205,0.06)', 'rgba(255,195,107,0.08)', 'rgba(20,17,31,0.2)']}
       />
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}>
-        <Animated.View entering={presenceEnter()} style={styles.timelineHeader}>
-          {__DEV__ ? (
-            <KatchaButton
-              icon="arrow.counterclockwise"
-              label="Reset loop"
-              onPress={resetHomeState}
-              style={styles.resetButton}
-              variant="secondary"
-            />
-          ) : null}
-        </Animated.View>
+        {__DEV__ ? (
+          <Pressable onPress={resetHomeState} style={styles.devReset}>
+            <ThemedText style={styles.devResetLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              reset
+            </ThemedText>
+          </Pressable>
+        ) : null}
 
-        <Animated.View entering={presenceEnter(30)}>
-          <DayTimeline
-            entries={dayEntries}
-            mode="interactive"
-            onSelectEntry={selectTimelineDay}
-            selectedEntryId={selectedDayId}
-            showTomorrowEgg
-            tomorrowState={tomorrowState}
-          />
+        <Animated.View entering={presenceEnter(20)}>
+          <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
         </Animated.View>
 
         <Animated.View entering={presenceEnter(70)} onLayout={handleHeroStageLayout} style={styles.heroStage}>
-          {selectedDay?.kind === 'day' ? (
-            selectedDay.state === 'hatched' && selectedDay.creature ? (
+          {isDay ? (
+            isHatched ? (
               <CreatureHero
-                creature={selectedDay.creature}
+                creature={selectedDay.creature!}
+                hideSubtitle
                 interactive
                 moments={selectedDay.moments}
                 onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
-                subtitle={heroSubtitle}
               />
             ) : (
-              <FormingEgg
-                caption={heroSubtitle}
-                egg={selectedDay.egg}
-                interactive
-                onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
-                reactionKey={selectedDay.moments.length + (selectedDay.selectedPathId ? 1 : 0)}
-              />
+              <View style={styles.eggScale}>
+                <FormingEgg
+                  egg={selectedDay.egg}
+                  interactive
+                  onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
+                  reactionKey={selectedDay.moments.length}
+                />
+              </View>
             )
           ) : (
-            <FormingEgg
-              caption={selectedDay?.subtitle}
-              egg={{
-                accentColor: tomorrowState.accent,
-                haloColor: tomorrowState.accent,
-                coreColor: 'rgba(216,226,255,0.32)',
-                intensity: 0.3,
-                shimmer: true,
-                swirl: 0.2,
-                label: tomorrowState.title,
-              }}
-              interactive
-            />
+            <View style={styles.eggScale}>
+              <FormingEgg
+                egg={{
+                  accentColor: '#A78BFA',
+                  haloColor: '#A78BFA',
+                  coreColor: 'rgba(201,194,232,0.3)',
+                  intensity: 0.26,
+                  shimmer: true,
+                  swirl: 0.2,
+                  label: 'Not yet formed',
+                }}
+                interactive
+              />
+            </View>
           )}
         </Animated.View>
 
-        {selectedDay?.kind === 'day' ? (
-          <Animated.View entering={presenceEnter(110)}>
-            <DayContext
-              day={selectedDay}
-              onAddMoment={openAddMomentFlow}
-              isImportingHealthRoutes={importingHealthRouteDayId === selectedDay.id}
-              onImportHealthRoutes={() => importHealthRoutesForDay(selectedDay.id)}
-              onReveal={handleReveal}
-              onShare={handleShareDay}
-              onViewDayMap={() => handleOpenDayMap(selectedDay.id)}
-              isSharing={sharingDayId === selectedDay.id}
-            />
+        {isHatched ? (
+          <Animated.View entering={presenceEnter(120)} style={styles.sectionGap}>
+            <ReflectionCard creature={selectedDay.creature!} />
           </Animated.View>
         ) : (
-          <Animated.View entering={presenceEnter(110)}>
-            <View style={styles.tomorrowCopy}>
-              <ThemedText type="onboardingLabel" style={styles.tomorrowLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
-                Tomorrow
+          <Animated.View entering={presenceEnter(120)} style={styles.formingCopy}>
+            <ThemedText style={styles.formingTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              {formingTitle}
+            </ThemedText>
+            {signalLine ? (
+              <ThemedText style={styles.signalLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                {signalLine}
               </ThemedText>
-              <ThemedText style={styles.tomorrowBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                {selectedDay?.title}. {selectedDay?.subtitle}
-              </ThemedText>
-            </View>
+            ) : null}
+            {isFormingToday && selectedDay.moments.length > 0 ? (
+              <View style={styles.chipRow}>
+                {dedupeMoments(selectedDay.moments).map((moment) => (
+                  <View key={moment.id} style={styles.chip}>
+                    <View
+                      style={[
+                        styles.chipDot,
+                        { backgroundColor: moment.accentColor, boxShadow: `0 0 12px ${moment.accentColor}AA` },
+                      ]}
+                    />
+                    <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                      {moment.label}
+                    </ThemedText>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </Animated.View>
         )}
 
-        {selectedDay?.kind === 'day' &&
-        selectedDay.isToday &&
-        selectedDay.state !== 'hatched' &&
-        (Boolean(selectedDay.selectedPathId) ||
-          (selectedDay.moments.length === 0 && selectedDay.stepsCount < 2400)) ? (
-          <Animated.View entering={presenceEnter(150)}>
-            <InsightPathsPanel day={selectedDay} onSelectPath={selectPath} />
-          </Animated.View>
-        ) : null}
+        <View style={styles.spacer} />
+
+        <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
+          {isDay && selectedDay.canHatch ? (
+            <KatchaButton label="Reveal the hatch" onPress={handleReveal} variant="primary" />
+          ) : isHatched ? (
+            <View style={styles.ctaRow}>
+              <KatchaButton
+                label="Day map"
+                onPress={() => handleOpenDayMap(selectedDay.id)}
+                style={styles.ctaQuiet}
+                variant="secondary"
+              />
+              <KatchaButton
+                disabled={sharingDayId === selectedDay.id}
+                label={sharingDayId === selectedDay.id ? 'Preparing…' : 'Share postcard'}
+                onPress={handleShareDay}
+                style={styles.ctaMain}
+                variant="primary"
+              />
+            </View>
+          ) : isFormingToday ? (
+            <KatchaButton label="Add a moment" onPress={openAddMomentFlow} variant="primary" />
+          ) : null}
+        </Animated.View>
       </ScrollView>
 
       <AddMomentRadial
@@ -351,10 +342,10 @@ export default function HomeScreen() {
       {hatchDay ? <HatchSequence day={hatchDay} onSkip={handleSkipHatch} phase={hatchPhase} /> : null}
       {hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId && selectedDay.state === 'hatched' ? (
         <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(260)} style={styles.revealFlash}>
-          <ThemedText type="onboardingLabel" style={styles.flashLabel} lightColor="#FFE8D9" darkColor="#FFE8D9">
+          <ThemedText type="onboardingLabel" style={styles.flashLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
             Hatched
           </ThemedText>
-          <ThemedText type="subtitle" style={styles.flashTitle} lightColor="#FFF8F4" darkColor="#FFF8F4">
+          <ThemedText type="subtitle" style={styles.flashTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
             {selectedDay.creature?.name}
           </ThemedText>
         </Animated.View>
@@ -368,116 +359,141 @@ export default function HomeScreen() {
   );
 }
 
-function toTimelineEntry(day: HomeDayRecord): TimelineDayEntry {
-  const creatureVisual =
-    day.state === 'hatched' && day.creature
-      ? {
-          id: day.creature.id,
-          name: day.creature.name,
-          accent: day.creature.accentColor,
-          imageSource: getCreatureVisual(day.creature.visualKey).source,
-        }
-      : {
-          kind: 'egg' as const,
-          id: `egg-${day.id}`,
-          name: day.canHatch ? 'Ready' : 'Forming',
-          accent: day.egg.accentColor,
-          coreColor: day.egg.coreColor,
-          shimmer: day.egg.shimmer,
-          intensity: day.egg.intensity,
-        };
-
-  return {
-    id: day.id,
-    dayLabel: day.dayLabel,
-    dateLabel: day.dateLabel,
-    cardTitle: day.state === 'hatched' && day.creature ? day.creature.name : day.egg.label,
-    cardCue: day.highlight ?? 'The day is still collecting shape.',
-    summary: day.highlight ?? 'The day is still collecting shape.',
-    creature: creatureVisual,
-    memory: {
-      title: day.state === 'hatched' && day.creature ? day.creature.name : day.egg.label,
-      body: day.highlight ?? 'The day is still collecting shape.',
-      timeLabel: day.dateLabel,
-      location: day.isToday ? 'Today' : 'Stored day',
-      tag: day.state === 'hatched' ? 'Creature' : 'Forming',
-      metrics: day.moments.length > 0 ? day.moments.map((moment) => moment.label).join(' · ') : buildPassiveMetrics(day),
-    },
-  };
-}
-
-function buildPassiveMetrics(day: HomeDayRecord) {
+function buildSignalLine(day: HomeDayRecord) {
   const parts: string[] = [];
-
-  if (day.stepsCount > 0) {
-    parts.push(`${day.stepsCount.toLocaleString()} steps`);
-  }
-
+  if (day.stepsCount > 0) parts.push(`${day.stepsCount.toLocaleString()} steps`);
   if (day.visitedPlaceCount > 0) {
     parts.push(`${day.visitedPlaceCount} ${day.visitedPlaceCount === 1 ? 'place' : 'places'}`);
   }
+  if (day.newPlaceCount > 0) parts.push(`${day.newPlaceCount} new`);
+  return parts.length > 0 ? parts.join('  ·  ') : null;
+}
 
-  if (day.newPlaceCount > 0) {
-    parts.push(`${day.newPlaceCount} new`);
-  }
-
-  return parts.join(' · ') || 'No moments yet';
+function dedupeMoments(moments: HomeMoment[]) {
+  const seen = new Set<string>();
+  return moments.filter((moment) => {
+    if (seen.has(moment.type)) return false;
+    seen.add(moment.type);
+    return true;
+  }).slice(0, 4);
 }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: '#090B12',
+    backgroundColor: Lantern.ink950,
     flex: 1,
   },
   content: {
-    gap: 14,
-    paddingBottom: 164,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    flexGrow: 1,
+    paddingBottom: 116,
+    paddingHorizontal: 24,
+    paddingTop: 14,
   },
-  timelineHeader: {
-    alignItems: 'flex-end',
-    minHeight: 8,
+  devReset: {
+    alignSelf: 'flex-end',
+    paddingBottom: 4,
   },
-  resetButton: {
-    minHeight: 44,
+  devResetLabel: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   heroStage: {
-    minHeight: 282,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 320,
   },
-  tomorrowCopy: {
-    gap: 4,
+  eggScale: {
+    transform: [{ scale: 1.12 }],
+  },
+  sectionGap: {
+    marginTop: 16,
+  },
+  formingCopy: {
+    alignItems: 'center',
+    gap: 13,
+    marginTop: 4,
+  },
+  formingTitle: {
+    fontFamily: AppFontFamilies.instrumentSerif,
+    fontSize: 26,
+    lineHeight: 33,
     maxWidth: 300,
+    textAlign: 'center',
   },
-  tomorrowLabel: {
-    fontSize: 11,
+  signalLine: {
+    fontSize: 13,
+    fontWeight: '600',
   },
-  tomorrowBody: {
-    fontSize: 14,
-    lineHeight: 20,
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center',
+  },
+  chip: {
+    alignItems: 'center',
+    backgroundColor: Lantern.dusk700,
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  chipDot: {
+    borderRadius: 999,
+    height: 8,
+    width: 8,
+  },
+  chipLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 17,
+  },
+  spacer: {
+    flexGrow: 1,
+    minHeight: 20,
+  },
+  ctaArea: {
+    marginTop: 12,
+  },
+  ctaRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  ctaQuiet: {
+    flex: 1,
+  },
+  ctaMain: {
+    flex: 1.4,
   },
   revealFlash: {
     alignItems: 'center',
-    backgroundColor: 'rgba(8, 11, 19, 0.68)',
-    borderRadius: 999,
-    bottom: 120,
-    left: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(8, 7, 15, 0.9)',
+    borderRadius: 26,
+    bottom: '44%',
+    gap: 6,
+    left: 36,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     position: 'absolute',
-    right: 24,
-  },
-  captureCardWrap: {
-    left: -2000,
-    position: 'absolute',
-    top: -2000,
+    right: 36,
+    zIndex: 30,
   },
   flashLabel: {
     fontSize: 11,
   },
   flashTitle: {
-    fontSize: 20,
-    lineHeight: 24,
-    marginTop: 2,
+    fontFamily: AppFontFamilies.instrumentSerif,
+    fontSize: 30,
+    fontStyle: 'italic',
+    fontWeight: '400',
+    textAlign: 'center',
+  },
+  captureCardWrap: {
+    left: -2000,
+    position: 'absolute',
+    top: -2000,
   },
 });
