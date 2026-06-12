@@ -528,6 +528,40 @@ function recordHatchedEncounter(history: EncounterHistoryMap, day: StoredHomeDay
   return recordEncounterHatch(history, day.creature.encounterProfileId, day.isoDate);
 }
 
+export function applyGeneratedReflection(
+  state: StoredHomeState,
+  dayId: string,
+  generated: { highlight: string; reflection: string },
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const applyToDay = (day: StoredHomeDayRecord): StoredHomeDayRecord => {
+    if (day.id !== dayId || !day.creature || day.creature.reflectionSource === 'generated') {
+      return day;
+    }
+
+    return {
+      ...day,
+      creature: {
+        ...day.creature,
+        highlight: generated.highlight,
+        reflection: generated.reflection,
+        reflectionSource: 'generated',
+      },
+    };
+  };
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: applyToDay(state.today),
+      archivedDays: state.archivedDays.map(applyToDay),
+    },
+    profile,
+    now
+  );
+}
+
 export function deriveHomeDayRecord(
   storedDay: StoredHomeDayRecord,
   profile: OnboardingProfile,

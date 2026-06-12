@@ -265,6 +265,7 @@ export type LocalCreatureRecord = {
   motifTags: string[];
   encounterProfileId: string | null;
   repeatDepth: number;
+  reflectionSource?: 'local' | 'generated';
 };
 
 export type EncounterHistoryEntry = {
