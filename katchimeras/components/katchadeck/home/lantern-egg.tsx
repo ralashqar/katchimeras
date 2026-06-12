@@ -26,6 +26,7 @@ type LanternEggProps = {
 
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
 const softRing = require('../../../assets/images/katchimeras/soft-ring.png');
+const glassDome = require('../../../assets/images/katchimeras/glass-dome.png');
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const DRAG_LIMIT = 60;
@@ -117,10 +118,12 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0 }: La
     ],
   }));
 
+  // The glass dome sits faintly over the egg at rest, brightens under the
+  // finger, and stretches elastically with the drag.
   const membraneStyle = useAnimatedStyle(() => {
     const magnitude = Math.min(1, Math.hypot(dragX.value, dragY.value) / DRAG_LIMIT);
     return {
-      opacity: pressProgress.value * 0.22 + magnitude * 0.45,
+      opacity: 0.5 + pressProgress.value * 0.22 + magnitude * 0.28,
       transform: [
         { translateX: dragX.value * 0.55 },
         { translateY: dragY.value * 0.55 },
@@ -154,9 +157,8 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0 }: La
         <AnimatedImage
           contentFit="contain"
           pointerEvents="none"
-          source={softRing}
+          source={glassDome}
           style={[styles.membrane, membraneStyle]}
-          tintColor={egg.accentColor}
           transition={0}
         />
         <AnimatedImage
