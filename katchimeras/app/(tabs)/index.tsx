@@ -97,9 +97,11 @@ export default function HomeScreen() {
     permissionState: activityPermission,
   });
 
+  // Seeds photos onto the days they were taken (today + recent past), so it
+  // runs whenever Home is up - not only when today is the selected day.
   useRecentPhotoMapSeeding({
-    dayId: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay.id : null,
-    enabled: selectedDay?.kind === 'day' && selectedDay.isToday,
+    dayId: timelineDays.length > 0 ? `seed-${new Date().toISOString().slice(0, 10)}` : null,
+    enabled: timelineDays.some((day) => day.kind === 'day'),
     onSeed: seedRecentPhotoLocations,
   });
 

@@ -115,7 +115,9 @@ async function readPhotoLocationsBetween(start: Date, end: Date): Promise<Stored
         }
 
         points.push({
-          id: `backfill-photo-${asset.id}`,
+          // Same id scheme as live photo seeding so the two never duplicate
+          // a photo on the same day.
+          id: `camera-roll-photo-${asset.id}`,
           lat: latitude,
           lng: longitude,
           capturedAt: new Date(asset.creationTime).toISOString(),

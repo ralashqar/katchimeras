@@ -18,7 +18,7 @@ import {
   importHealthRoutesForDay as applyHealthRoutesForDay,
   type ImportedHealthRoutesPayload,
   recordForegroundLocationSample,
-  seedRecentPhotoLocationsForToday,
+  seedPhotoLocationsByDay,
   setPlaceCategorySeedsForDay,
   triggerHatchForDay,
   updateActivityPermissionState,
@@ -183,7 +183,7 @@ export function useHomeScreenState() {
 
     setStoredState((currentState) => {
       const hydrated = hydrateHomeState(currentState, profile, now);
-      return seedRecentPhotoLocationsForToday(hydrated.state, photos, profile, now);
+      return seedPhotoLocationsByDay(hydrated.state, photos, profile, now);
     });
   }, []);
 

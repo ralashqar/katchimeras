@@ -369,60 +369,87 @@ export function addMomentToDay(
   );
 }
 
-export function seedRecentPhotoLocationsForToday(
+// Routes each geotagged photo to the day it was actually taken - today or a
+// matching archived day - using the photo's real capture time so travel paths
+// order correctly. Hatched days are never rewritten. Replaces the old
+// today-only seeder, which dumped every recent photo onto today and faked the
+// timestamp (so last week's photo appeared on today's map).
+export function seedPhotoLocationsByDay(
   state: StoredHomeState,
   photos: RecentPhotoAsset[],
   profile: OnboardingProfile,
   now: Date
 ) {
-  const geotaggedPhotos = photos
+  type NormalizedPhoto = Omit<RecentPhotoAsset, 'latitude' | 'longitude'> & {
+    latitude: number;
+    longitude: number;
+  };
+  const geotaggedByDate = new Map<string, NormalizedPhoto[]>();
+  photos
     .map((photo) => ({
       ...photo,
       latitude: normalizeCoordinate(photo.latitude),
       longitude: normalizeCoordinate(photo.longitude),
     }))
-    .filter((photo) => photo.latitude != null && photo.longitude != null)
-    .sort((left, right) => left.createdAt - right.createdAt)
-    .slice(-8);
+    .filter((photo): photo is NormalizedPhoto => photo.latitude != null && photo.longitude != null)
+    .forEach((photo) => {
+      const dateId = toLocalDateId(new Date(photo.createdAt));
+      const bucket = geotaggedByDate.get(dateId) ?? [];
+      bucket.push(photo);
+      geotaggedByDate.set(dateId, bucket);
+    });
 
-  if (geotaggedPhotos.length === 0) {
+  if (geotaggedByDate.size === 0) {
     return normalizeStoredHomeState(state, profile, now);
   }
 
-  const nextLocations = [...state.today.locations];
-  geotaggedPhotos.forEach((photo, index) => {
-    const seededPoint: StoredHomeLocationPoint = {
-      id: `camera-roll-photo-${photo.id}`,
-      lat: Number(photo.latitude!.toFixed(6)),
-      lng: Number(photo.longitude!.toFixed(6)),
-      capturedAt: buildRecentPhotoSeedTimestamp(now, index, geotaggedPhotos.length),
-      type: 'unknown',
-      hasPhoto: true,
-      source: 'photo_attachment',
-      momentId: null,
-      thumbnailUri: photo.thumbnailUri || photo.uri,
-    };
-    const existingIndex = nextLocations.findIndex((point) => point.id === seededPoint.id);
-
-    if (existingIndex >= 0) {
-      nextLocations[existingIndex] = {
-        ...nextLocations[existingIndex],
-        ...seededPoint,
-        momentId: nextLocations[existingIndex]?.momentId ?? null,
-      };
-      return;
+  const applyToDay = (day: StoredHomeDayRecord): StoredHomeDayRecord => {
+    if (day.creature) {
+      return day;
+    }
+    const bucket = geotaggedByDate.get(day.isoDate);
+    if (!bucket || bucket.length === 0) {
+      return day;
     }
 
-    nextLocations.push(seededPoint);
-  });
+    const nextLocations = [...day.locations];
+    [...bucket]
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .slice(-MAX_STORED_DAY_LOCATIONS)
+      .forEach((photo) => {
+        const seededPoint: StoredHomeLocationPoint = {
+          id: `camera-roll-photo-${photo.id}`,
+          lat: Number(photo.latitude.toFixed(6)),
+          lng: Number(photo.longitude.toFixed(6)),
+          capturedAt: new Date(photo.createdAt).toISOString(),
+          type: 'unknown',
+          hasPhoto: true,
+          source: 'photo_attachment',
+          momentId: null,
+          thumbnailUri: photo.thumbnailUri || photo.uri,
+        };
+        const existingIndex = nextLocations.findIndex((point) => point.id === seededPoint.id);
+
+        if (existingIndex >= 0) {
+          nextLocations[existingIndex] = {
+            ...nextLocations[existingIndex],
+            ...seededPoint,
+            momentId: nextLocations[existingIndex]?.momentId ?? null,
+          };
+          return;
+        }
+
+        nextLocations.push(seededPoint);
+      });
+
+    return { ...day, locations: nextLocations.slice(-MAX_STORED_DAY_LOCATIONS) };
+  };
 
   return normalizeStoredHomeState(
     {
       ...state,
-      today: {
-        ...state.today,
-        locations: nextLocations.slice(-MAX_STORED_DAY_LOCATIONS),
-      },
+      today: applyToDay(state.today),
+      archivedDays: state.archivedDays.map(applyToDay),
     },
     profile,
     now
@@ -1097,14 +1124,6 @@ function shouldSkipLocationSample(existingPoints: StoredHomeLocationPoint[], nex
   const distance = getDistanceMeters(nextPoint.lat, nextPoint.lng, latestPoint.lat, latestPoint.lng);
 
   return timeDelta >= 0 && timeDelta <= LOCATION_DEDUPE_WINDOW_MS && distance <= LOCATION_DEDUPE_DISTANCE_METERS;
-}
-
-function buildRecentPhotoSeedTimestamp(now: Date, index: number, total: number) {
-  const base = new Date(now);
-  const remaining = total - index - 1;
-  base.setSeconds(0, 0);
-  base.setMinutes(base.getMinutes() - remaining * 42);
-  return base.toISOString();
 }
 
 function normalizeCoordinate(value: unknown) {

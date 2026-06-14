@@ -4,8 +4,11 @@ import { useEffect, useRef } from 'react';
 import type { RecentPhotoAsset } from '@/types/home';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
 
-const MAX_RECENT_PHOTO_SEEDS = 8;
-const RECENT_PHOTO_SCAN_SIZE = 32;
+// Scan a multi-day window so photos land on the days they were actually taken
+// (today and recent past), not just the newest handful that might all be old.
+const MAX_RECENT_PHOTO_SEEDS = 40;
+const RECENT_PHOTO_SCAN_SIZE = 120;
+const RECENT_PHOTO_WINDOW_DAYS = 6;
 
 type UseRecentPhotoMapSeedingOptions = {
   enabled: boolean;
@@ -42,7 +45,12 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
           return;
         }
 
+        const windowStart = new Date();
+        windowStart.setDate(windowStart.getDate() - RECENT_PHOTO_WINDOW_DAYS);
+        windowStart.setHours(0, 0, 0, 0);
+
         const page = await MediaLibrary.getAssetsAsync({
+          createdAfter: windowStart.getTime(),
           first: RECENT_PHOTO_SCAN_SIZE,
           mediaType: MediaLibrary.MediaType.photo,
           sortBy: [['creationTime', false]],
