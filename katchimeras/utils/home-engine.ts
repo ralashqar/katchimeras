@@ -31,6 +31,7 @@ import type {
   InspirationCategory,
   InspirationSelection,
   LocationPermissionState,
+  PhotoVisionResult,
   LocalCreatureRecord,
   LocalPathOption,
   RecentPhotoAsset,
@@ -44,6 +45,8 @@ import type {
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { deriveDayMapSummary } from '@/utils/day-map-engine';
 import { buildEncounterCreature, recordEncounterHatch } from '@/utils/encounter-engine';
+import { curatePhotos } from '@/utils/photo-curation';
+import { aggregatePhotoVision } from '@/utils/vision-signals';
 
 import type { EncounterHistoryMap } from '@/types/home';
 
@@ -384,8 +387,12 @@ export function seedPhotoLocationsByDay(
     latitude: number;
     longitude: number;
   };
+  // Curate before anything enters the day: screenshots, burst duplicates, and
+  // tiny throwaways never become locations, so the map (and the roll the user
+  // sees) stays composed of keepers only. Pure metadata work — no pixels move.
+  const keepers = curatePhotos(photos).keepers;
   const geotaggedByDate = new Map<string, NormalizedPhoto[]>();
-  photos
+  keepers
     .map((photo) => ({
       ...photo,
       latitude: normalizeCoordinate(photo.latitude),
@@ -427,6 +434,7 @@ export function seedPhotoLocationsByDay(
           source: 'photo_attachment',
           momentId: null,
           thumbnailUri: photo.thumbnailUri || photo.uri,
+          similarityHash: photo.similarityHash,
         };
         const existingIndex = nextLocations.findIndex((point) => point.id === seededPoint.id);
 
@@ -442,7 +450,15 @@ export function seedPhotoLocationsByDay(
         nextLocations.push(seededPoint);
       });
 
-    return { ...day, locations: nextLocations.slice(-MAX_STORED_DAY_LOCATIONS) };
+    // Aggregate any on-device vision reads from this day's keeper photos into a
+    // day-level summary the encounter engine can match on (scenes, signs,
+    // faces). Absent until the native vision module has analysed the frames.
+    const visionResults = bucket
+      .map((photo) => photo.vision)
+      .filter((result): result is PhotoVisionResult => result != null);
+    const nextVision = visionResults.length > 0 ? aggregatePhotoVision(visionResults) : day.vision;
+
+    return { ...day, locations: nextLocations.slice(-MAX_STORED_DAY_LOCATIONS), vision: nextVision };
   };
 
   return normalizeStoredHomeState(

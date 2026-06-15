@@ -47,6 +47,27 @@ export type HomeVisualKey =
 
 export type DayScores = Record<HomeScoreKey, number>;
 
+// On-device vision read ("Read the day"). Produced per-photo by the native
+// Apple Vision module (utils/photo-vision.ts), then aggregated per day. All
+// fields are derived on-device — no pixels leave the phone.
+export type PhotoVisionLabel = {
+  name: string;
+  confidence: number;
+};
+
+export type PhotoVisionResult = {
+  labels: PhotoVisionLabel[];
+  text: string[];
+  faceCount: number;
+};
+
+export type DayVisionSummary = {
+  labels: PhotoVisionLabel[];
+  maxFaceCount: number;
+  textTokens: string[];
+  analyzedPhotoCount: number;
+};
+
 export type HomeMomentMetadata = {
   localUri?: string;
   assetId?: string | null;
@@ -74,11 +95,21 @@ export type StoredHomeLocationPoint = {
   momentId?: string | null;
   thumbnailUri?: string;
   accuracyMeters?: number;
+  // Perceptual hash of the attached photo (when one is present), used to
+  // collapse visual near-duplicates during day-map album curation.
+  similarityHash?: string;
 };
 
 export type DayMapCoordinate = {
   latitude: number;
   longitude: number;
+};
+
+export type DayMapNodePhoto = {
+  id: string;
+  thumbnailUri: string;
+  capturedAt: string;
+  momentId: string | null;
 };
 
 export type DayMapNode = {
@@ -90,6 +121,8 @@ export type DayMapNode = {
   hasPhoto: boolean;
   linkedMomentId: string | null;
   photoThumbnailUri: string | null;
+  // The curated album for this place cluster — keepers only, in capture order.
+  photos: DayMapNodePhoto[];
   startedAt: string;
   endedAt: string;
   sampleCount: number;
@@ -274,6 +307,13 @@ export type LocalCreatureRecord = {
   encounterProfileId: string | null;
   repeatDepth: number;
   reflectionSource?: 'local' | 'generated';
+  // Rarity is fixed at birth from the day's living conditions; bond grows with
+  // return visits. The two axes are deliberately independent — see
+  // utils/living-rarity.ts and utils/bond.ts.
+  rarityReason?: string | null;
+  livingFactors?: string[];
+  bondStage?: number;
+  bondVisitCount?: number;
 };
 
 export type EncounterHistoryEntry = {
@@ -299,6 +339,9 @@ export type StoredHomeDayRecord = {
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
   placeCategorySeeds?: string[];
+  // Aggregated on-device vision read of the day's photos (optional — present
+  // only once the native vision module has analysed them).
+  vision?: DayVisionSummary;
 };
 
 export type StoredHomeState = {
@@ -360,6 +403,10 @@ export type RecentPhotoAsset = {
   isScreenshot?: boolean;
   latitude?: number;
   longitude?: number;
+  // On-device perceptual hash (hex dHash) for visual-similarity curation.
+  similarityHash?: string;
+  // On-device vision read of this frame (labels/OCR/face count), when analysed.
+  vision?: PhotoVisionResult;
 };
 
 export type InspirationQuote = {

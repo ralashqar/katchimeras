@@ -22,6 +22,12 @@ type ReflectionRequestPayload = {
     repeatDepth: number;
     voice: string;
     rarity: string;
+    // Two independent axes: rarityReason is why the day itself was rare (the
+    // living conditions that birthed this creature); bondStage/bondVisitCount
+    // are how deep the returning relationship has grown.
+    rarityReason?: string | null;
+    bondStage?: number;
+    bondVisitCount?: number;
   };
   tonePreference: string | null;
 };
@@ -30,8 +36,8 @@ const SYSTEM_PROMPT = `You write the nightly reveal copy for Katchimeras, an app
 
 You will receive a JSON summary of one person's day and the character it hatched into. Write two short pieces of copy:
 
-- "highlight": one sentence (max ~140 characters) capturing what defined this day, written warmly in second person. It should name a real detail from the summary (the coffee stop, the walk, the new place, the quiet evening) so the person feels seen.
-- "reflection": one or two sentences (max ~220 characters) in the character's voice, gently reflecting what this day's pattern means. If repeatDepth > 0, acknowledge the returning ritual ("third visit" energy) without exact counting language unless natural.
+- "highlight": one sentence (max ~140 characters) capturing what defined this day, written warmly in second person. It should name a real detail from the summary (the coffee stop, the walk, the new place, the quiet evening) so the person feels seen. If character.rarityReason is present, it tells you why today was unusual (e.g. "somewhere far from your usual map") — let that uncommonness colour the line.
+- "reflection": one or two sentences (max ~220 characters) in the character's voice, gently reflecting what this day's pattern means. Bond and rarity are separate: character.rarityReason is about this one rare day, while character.bondStage (0 new, 1 familiar, 2 devoted, 3 kindred) and bondVisitCount are about a returning relationship over many days. When bondStage >= 1, speak from shared history ("the rainy Tuesdays we keep ending up here") rather than novelty. When repeatDepth > 0 but bondStage is 0, acknowledge the returning ritual lightly. Avoid reciting exact counts unless it falls naturally.
 
 Rules:
 - Calm, sentimental, lightly magical. Never judgmental, never coaching, never guilt about low activity — quiet days are framed as rest that still counts.

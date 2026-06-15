@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI } from '@/constants/theme';
-import type { DayMapNode, HomeDayRecord, HomeLocationType, HomeMoment } from '@/types/home';
+import type { DayMapNode, DayMapNodePhoto, HomeDayRecord, HomeLocationType, HomeMoment } from '@/types/home';
 import { getCreatureVisual } from '@/utils/home-engine';
 
 type DayMapSurfaceProps = {
@@ -31,13 +32,31 @@ export function DayMapSurface({
 }: DayMapSurfaceProps) {
   const [nativeMaps, setNativeMaps] = useState<NativeMapsModule | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(day.dayMap?.primaryLocationId ?? null);
-  const [expandedPhotoUri, setExpandedPhotoUri] = useState<string | null>(null);
+  // The enlarged viewer holds the whole album it was opened from plus the
+  // current index, so the user can page left/right without closing it.
+  const [expandedAlbum, setExpandedAlbum] = useState<{ uris: string[]; index: number } | null>(null);
   const ignoreNextMapPressRef = useRef(false);
   const momentIndex = useMemo(() => new Map(day.moments.map((moment) => [moment.id, moment])), [day.moments]);
 
+  const openExpandedAlbum = (uris: string[], index: number) => {
+    if (uris.length === 0) {
+      return;
+    }
+    setExpandedAlbum({ uris, index: Math.min(Math.max(index, 0), uris.length - 1) });
+  };
+  const stepExpandedAlbum = (delta: number) => {
+    setExpandedAlbum((current) => {
+      if (!current) {
+        return current;
+      }
+      const nextIndex = Math.min(Math.max(current.index + delta, 0), current.uris.length - 1);
+      return nextIndex === current.index ? current : { ...current, index: nextIndex };
+    });
+  };
+
   useEffect(() => {
     setSelectedNodeId(day.dayMap?.primaryLocationId ?? null);
-    setExpandedPhotoUri(null);
+    setExpandedAlbum(null);
   }, [day.dayMap?.primaryLocationId, day.id]);
 
   useEffect(() => {
@@ -94,6 +113,7 @@ export function DayMapSurface({
     null;
   const selectedMoment = selectedNode?.linkedMomentId ? momentIndex.get(selectedNode.linkedMomentId) ?? null : null;
   const selectedThumbnailUri = selectedMoment?.metadata?.thumbnailUri ?? selectedNode?.photoThumbnailUri ?? null;
+  const selectedAlbum = selectedNode?.photos ?? [];
   const primaryNode = day.dayMap.nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ?? null;
   const creatureVisual = day.creature ? getCreatureVisual(day.creature.visualKey) : null;
   const creatureMarkerCoordinate =
@@ -164,8 +184,10 @@ export function DayMapSurface({
             onPress={() => {
               ignoreNextMapPressRef.current = true;
               if (interactive) {
-                if (node.photoThumbnailUri && selectedNode?.id === node.id) {
-                  setExpandedPhotoUri(node.photoThumbnailUri);
+                if (node.photos.length > 0 && selectedNode?.id === node.id) {
+                  const uris = node.photos.map((photo) => photo.thumbnailUri);
+                  const coverIndex = node.photoThumbnailUri ? uris.indexOf(node.photoThumbnailUri) : 0;
+                  openExpandedAlbum(uris, coverIndex < 0 ? 0 : coverIndex);
                   return;
                 }
                 setSelectedNodeId(node.id);
@@ -213,8 +235,10 @@ export function DayMapSurface({
           <GlassPanel contentStyle={styles.detailPanel} fillColor="rgba(10, 15, 28, 0.88)">
             {detailMode === 'bottom' ? (
               <View style={styles.memoryCaptionStack}>
-                {selectedThumbnailUri ? (
-                  <Pressable onPress={() => setExpandedPhotoUri(selectedThumbnailUri)} style={styles.thumbnailPressable}>
+                {selectedAlbum.length > 0 ? (
+                  <ClusterAlbumStrip photos={selectedAlbum} onSelect={openExpandedAlbum} />
+                ) : selectedThumbnailUri ? (
+                  <Pressable onPress={() => openExpandedAlbum([selectedThumbnailUri], 0)} style={styles.thumbnailPressable}>
                     <Image contentFit="cover" source={selectedThumbnailUri} style={styles.captionThumbnail} />
                   </Pressable>
                 ) : null}
@@ -222,7 +246,7 @@ export function DayMapSurface({
                   {resolveNodeCaption(selectedNode, selectedMoment, day)}
                 </ThemedText>
                 <ThemedText style={styles.memoryCaptionMeta} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                  {formatNodeTimeRange(selectedNode)}
+                  {formatNodeAlbumMeta(selectedNode)}
                 </ThemedText>
               </View>
             ) : (
@@ -239,8 +263,14 @@ export function DayMapSurface({
                       {formatNodeTimeRange(selectedNode)}
                     </ThemedText>
                   </View>
-                  {selectedThumbnailUri ? (
-                    <Pressable onPress={() => setExpandedPhotoUri(selectedThumbnailUri)} style={styles.thumbnailPressable}>
+                  {selectedAlbum.length > 0 ? (
+                    <Pressable
+                      onPress={() => openExpandedAlbum(selectedAlbum.map((photo) => photo.thumbnailUri), 0)}
+                      style={styles.thumbnailPressable}>
+                      <Image contentFit="cover" source={selectedAlbum[0].thumbnailUri} style={styles.thumbnail} />
+                    </Pressable>
+                  ) : selectedThumbnailUri ? (
+                    <Pressable onPress={() => openExpandedAlbum([selectedThumbnailUri], 0)} style={styles.thumbnailPressable}>
                       <Image contentFit="cover" source={selectedThumbnailUri} style={styles.thumbnail} />
                     </Pressable>
                   ) : null}
@@ -253,14 +283,85 @@ export function DayMapSurface({
           </GlassPanel>
         </View>
       ) : null}
-      {expandedPhotoUri ? (
-        <Pressable onPress={() => setExpandedPhotoUri(null)} style={styles.expandedPhotoOverlay}>
+      {expandedAlbum ? (
+        <Pressable onPress={() => setExpandedAlbum(null)} style={styles.expandedPhotoOverlay}>
           <View style={styles.expandedPhotoFrame}>
-            <Image contentFit="contain" source={expandedPhotoUri} style={styles.expandedPhoto} transition={120} />
+            <Image
+              contentFit="contain"
+              source={expandedAlbum.uris[expandedAlbum.index]}
+              style={styles.expandedPhoto}
+              transition={120}
+            />
           </View>
+          {expandedAlbum.uris.length > 1 ? (
+            <>
+              <Pressable
+                disabled={expandedAlbum.index === 0}
+                hitSlop={12}
+                onPress={() => stepExpandedAlbum(-1)}
+                style={[
+                  styles.expandedNavButton,
+                  styles.expandedNavLeft,
+                  expandedAlbum.index === 0 ? styles.expandedNavDisabled : null,
+                ]}>
+                <IconSymbol color="#F8FBFF" name="chevron.left" size={22} />
+              </Pressable>
+              <Pressable
+                disabled={expandedAlbum.index === expandedAlbum.uris.length - 1}
+                hitSlop={12}
+                onPress={() => stepExpandedAlbum(1)}
+                style={[
+                  styles.expandedNavButton,
+                  styles.expandedNavRight,
+                  expandedAlbum.index === expandedAlbum.uris.length - 1 ? styles.expandedNavDisabled : null,
+                ]}>
+                <IconSymbol color="#F8FBFF" name="chevron.right" size={22} />
+              </Pressable>
+              <View pointerEvents="none" style={styles.expandedCounter}>
+                <ThemedText style={styles.expandedCounterText} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                  {expandedAlbum.index + 1} / {expandedAlbum.uris.length}
+                </ThemedText>
+              </View>
+            </>
+          ) : null}
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+// The cleaned-up mini album for one place cluster: keepers only, in capture
+// order. One photo reads as a single frame; several become a scrollable strip
+// the user can tap through. Tapping any frame opens the full-size overlay.
+function ClusterAlbumStrip({
+  photos,
+  onSelect,
+}: {
+  photos: DayMapNodePhoto[];
+  onSelect: (uris: string[], index: number) => void;
+}) {
+  const uris = photos.map((photo) => photo.thumbnailUri);
+
+  if (photos.length === 1) {
+    return (
+      <Pressable onPress={() => onSelect(uris, 0)} style={styles.thumbnailPressable}>
+        <Image contentFit="cover" source={photos[0].thumbnailUri} style={styles.captionThumbnail} />
+      </Pressable>
+    );
+  }
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.albumStrip}
+      style={styles.albumStripWrap}>
+      {photos.map((photo, index) => (
+        <Pressable key={photo.id} onPress={() => onSelect(uris, index)} style={styles.thumbnailPressable}>
+          <Image contentFit="cover" source={photo.thumbnailUri} style={styles.albumThumbnail} />
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -459,6 +560,15 @@ function resolveNodeCaption(node: DayMapNode, moment: HomeMoment | null, day: Ho
   return 'This point stayed in the map as one of the day’s small anchors.';
 }
 
+function formatNodeAlbumMeta(node: DayMapNode) {
+  const timeRange = formatNodeTimeRange(node);
+  const count = node.photos.length;
+  if (count > 1) {
+    return `${count} photos · ${timeRange}`;
+  }
+  return timeRange;
+}
+
 function formatNodeTimeRange(node: DayMapNode) {
   const start = formatShortTime(node.startedAt);
   const end = formatShortTime(node.endedAt);
@@ -619,6 +729,21 @@ const styles = StyleSheet.create({
     height: 52,
     width: 52,
   },
+  albumStripWrap: {
+    alignSelf: 'stretch',
+    flexGrow: 0,
+  },
+  albumStrip: {
+    gap: 8,
+    justifyContent: 'center',
+    minWidth: '100%',
+    paddingHorizontal: 4,
+  },
+  albumThumbnail: {
+    borderRadius: 16,
+    height: 64,
+    width: 64,
+  },
   creatureMarkerWrap: {
     alignItems: 'center',
     justifyContent: 'flex-end',
@@ -687,5 +812,41 @@ const styles = StyleSheet.create({
     height: 420,
     maxHeight: '100%',
     width: '100%',
+  },
+  expandedNavButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 15, 28, 0.72)',
+    borderColor: 'rgba(215, 228, 255, 0.18)',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+    position: 'absolute',
+    top: '50%',
+    transform: [{ translateY: -24 }],
+    width: 48,
+  },
+  expandedNavLeft: {
+    left: 16,
+  },
+  expandedNavRight: {
+    right: 16,
+  },
+  expandedNavDisabled: {
+    opacity: 0.3,
+  },
+  expandedCounter: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(10, 15, 28, 0.72)',
+    borderRadius: 999,
+    bottom: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    position: 'absolute',
+  },
+  expandedCounterText: {
+    fontSize: 13,
+    letterSpacing: 0.4,
   },
 });

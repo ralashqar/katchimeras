@@ -9,6 +9,9 @@ import type {
   LocalCreatureRecord,
   StoredHomeDayRecord,
 } from '@/types/home';
+import { computeLivingRarity, computeDaySpanMeters, maxRarity, type LivingRarity } from '@/utils/living-rarity';
+import { resolveBondStage, type BondStage } from '@/utils/bond';
+import { buildVisionSignals } from '@/utils/vision-signals';
 
 export type EncounterSignal = {
   seedId: string;
@@ -23,6 +26,7 @@ export type EncounterMatch = {
   signal: EncounterSignal;
   repeatDepth: number;
   rarity: HomeRarityTier;
+  livingRarity: LivingRarity;
 };
 
 const REPEAT_FAVOR_PER_VISIT = 0.06;
@@ -30,6 +34,10 @@ const REPEAT_FAVOR_CAP = 0.18;
 const THIN_DAY_STEP_LIMIT = 2400;
 const HIGH_STEPS_THRESHOLD = 6500;
 const RUN_ACTIVITY_PATTERN = /run|jog/i;
+// Passive "stayed in" read: a quiet, low-movement day spent inside one tight
+// area reads as a home/rest day with no manual tag required.
+const STAY_PUT_SPREAD_METERS = 350;
+const QUIET_DAY_STEP_LIMIT = 4000;
 
 const profilesById = new Map(katchimeraEncounterProfiles.map((profile) => [profile.id, profile]));
 
@@ -45,6 +53,21 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       isRecovery: false,
     });
   });
+
+  // On-device vision read: what the day's photos actually showed (scenes, signs,
+  // people) becomes encounter signals — including social_gathering from a face
+  // count, the one signal passive sensors can't reach. Present only once the
+  // native vision module has analysed the day.
+  if (day.vision) {
+    buildVisionSignals(day.vision).forEach((visionSignal) => {
+      signals.push({
+        seedId: visionSignal.seedId,
+        intensity: visionSignal.intensity,
+        sourceMomentIds: [],
+        isRecovery: visionSignal.isRecovery,
+      });
+    });
+  }
 
   const coffeeIds = momentsByType.get('coffee') ?? [];
   if (coffeeIds.length > 0) {
@@ -110,6 +133,22 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
     });
   }
 
+  // Passive home/rest read — no tag needed. A low-movement day spent in one
+  // tight area hatches the home-evening companion on its own, which is what
+  // makes tagging optional for the most common quiet day. Its intensity is kept
+  // low on purpose: any resolved place or real activity above outranks it in
+  // the candidate sort, so it only wins when nothing more specific is present.
+  const stayedPut =
+    day.locations.length >= 2 && computeDaySpanMeters(day.locations) <= STAY_PUT_SPREAD_METERS;
+  if (stayedPut && day.stepsCount < QUIET_DAY_STEP_LIMIT && calmIds.length === 0) {
+    signals.push({
+      seedId: 'home_evening',
+      intensity: clamp01(0.4 + Math.min((day.locations.length - 2) * 0.01, 0.06)),
+      sourceMomentIds: [],
+      isRecovery: true,
+    });
+  }
+
   const isThinDay =
     day.moments.length === 0 &&
     day.stepsCount < THIN_DAY_STEP_LIMIT &&
@@ -163,12 +202,20 @@ export function matchEncounterForDay(
     return null;
   }
 
+  // Rarity is fixed at birth: the higher of the creature's intrinsic floor (a
+  // landmark is never "common") and the rarity the day's living conditions
+  // earned. It no longer reacts to signal intensity — only to how the day was
+  // actually lived.
+  const livingRarity = computeLivingRarity(day);
+  const rarity = maxRarity(speciesRarityFloor(best.profile.baseRarity), livingRarity.tier);
+
   return {
     castEntry: best.castEntry,
     profile: best.profile,
     signal: best.signal,
     repeatDepth: best.repeatDepth,
-    rarity: resolveEncounterRarity(best.profile.baseRarity, best.signal, day),
+    rarity,
+    livingRarity,
   };
 }
 
@@ -183,9 +230,12 @@ export function buildEncounterCreature(
     return null;
   }
 
-  const { profile, castEntry, signal, repeatDepth, rarity } = match;
+  const { profile, castEntry, signal, repeatDepth, rarity, livingRarity } = match;
   const visual = homeCreatureVisuals[castEntry.visualKey];
-  const lines = pickEncounterLines(profile, castEntry, repeatDepth, rarity, signal.isRecovery);
+  // This hatch is the (repeatDepth + 1)th time you've met this creature.
+  const bondVisitCount = repeatDepth + 1;
+  const bondStage = resolveBondStage(bondVisitCount);
+  const lines = pickEncounterLines(profile, castEntry, repeatDepth, rarity, signal.isRecovery, bondStage);
   const highlightMomentId = signal.sourceMomentIds[signal.sourceMomentIds.length - 1] ?? null;
 
   return {
@@ -202,6 +252,10 @@ export function buildEncounterCreature(
     motifTags: buildMotifTags(profile, castEntry),
     encounterProfileId: profile.id,
     repeatDepth,
+    rarityReason: livingRarity.reason,
+    livingFactors: livingRarity.factors,
+    bondStage,
+    bondVisitCount,
   };
 }
 
@@ -224,20 +278,13 @@ export function recordEncounterHatch(
   };
 }
 
-function resolveEncounterRarity(
-  baseRarity: string,
-  signal: EncounterSignal,
-  day: StoredHomeDayRecord
-): HomeRarityTier {
-  const baseTier: HomeRarityTier =
-    baseRarity === 'rare' ? 'epic' : baseRarity === 'uncommon' ? 'rare' : 'common';
-  const patternBreak = signal.intensity >= 0.82 || day.newPlaceCount >= 2;
-  if (!patternBreak) {
-    return baseTier;
-  }
-  if (baseTier === 'common') return 'rare';
-  if (baseTier === 'rare') return 'epic';
-  return 'legendary';
+// A creature's intrinsic rarity floor — how hard it is to meet at all,
+// independent of any one day. The day's living conditions can lift a creature
+// above its floor (see computeLivingRarity), never below it.
+function speciesRarityFloor(baseRarity: string): HomeRarityTier {
+  if (baseRarity === 'rare') return 'epic';
+  if (baseRarity === 'uncommon') return 'rare';
+  return 'common';
 }
 
 function pickEncounterLines(
@@ -245,7 +292,8 @@ function pickEncounterLines(
   castEntry: EncounterCastEntry,
   repeatDepth: number,
   rarity: HomeRarityTier,
-  isRecovery: boolean
+  isRecovery: boolean,
+  bondStage: BondStage
 ): { highlight: string; reflection: string } {
   const category = castEntry.categoryLabel.toLowerCase();
   const repeatFallback = `Returning to ${category} moments is deepening your bond with ${profile.name}.`;
@@ -259,7 +307,8 @@ function pickEncounterLines(
     highlight = sanitizeLine(profile.restorativeLine, restorativeFallback);
   } else if (repeatDepth === 0) {
     highlight = sanitizeLine(profile.unlockLine, profile.caption);
-  } else if (repeatDepth >= 4) {
+  } else if (bondStage >= 1 || repeatDepth >= 4) {
+    // A deepened bond speaks to the shared history, not the single day.
     highlight = sanitizeLine(profile.progressLine, progressFallback);
   } else {
     highlight = sanitizeLine(profile.repeatLine, repeatFallback);

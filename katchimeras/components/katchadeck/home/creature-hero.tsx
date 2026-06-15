@@ -73,6 +73,11 @@ export function CreatureHero({ creature, subtitle, hideSubtitle = false }: Creat
           darkColor={Lantern.ember300}>
           {buildCreatureKicker(creature)}
         </ThemedText>
+        {buildRarityReason(creature) ? (
+          <ThemedText style={styles.rarityReason} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            {buildRarityReason(creature)}
+          </ThemedText>
+        ) : null}
         <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           {creature.name}
         </ThemedText>
@@ -92,15 +97,27 @@ function buildCreatureKicker(creature: LocalCreatureRecord) {
     return creature.rarity;
   }
 
-  if (creature.repeatDepth > 0) {
-    return `${encounterCue} · ${formatVisitNumber(creature.repeatDepth + 1)} visit`;
-  }
-
+  // Rarity (how hard the day was to live) leads when it rises above common;
+  // bond (how often you return) carries the everyday repeat days.
   if (creature.rarity !== 'common') {
     return `${encounterCue} · ${creature.rarity}`;
   }
 
+  if (creature.repeatDepth > 0) {
+    return `${encounterCue} · ${formatVisitNumber(creature.repeatDepth + 1)} visit`;
+  }
+
   return encounterCue;
+}
+
+// The living conditions that made this creature rare, surfaced as the poetic
+// "you can only collect it by having the day" beat. Only shown when the day
+// actually earned rarity above the common floor.
+function buildRarityReason(creature: LocalCreatureRecord) {
+  if (creature.rarity === 'common' || !creature.rarityReason) {
+    return null;
+  }
+  return `Only from ${creature.rarityReason}`;
 }
 
 function formatVisitNumber(visit: number) {
@@ -140,6 +157,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
+  },
+  rarityReason: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    textAlign: 'center',
   },
   title: {
     fontSize: 46,

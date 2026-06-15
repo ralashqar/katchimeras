@@ -16,16 +16,21 @@ import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { KatchaDeckUI } from '@/constants/theme';
 import { runDevBackfill } from '@/utils/day-backfill';
 import { applyDevScenario, devScenarioOptions } from '@/utils/dev-scenarios';
-import { clearStoredHomeState } from '@/utils/home-storage';
+import { clearStoredHomeState, loadStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
+import { isVisionAvailable } from '@/utils/photo-vision';
+import { buildVisionSignals } from '@/utils/vision-signals';
+import type { DayVisionSummary, StoredHomeDayRecord } from '@/types/home';
 
 export default function ExploreScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState(loadOnboardingProfile());
+  const [storedState, setStoredState] = useState(loadStoredHomeState());
 
   useFocusEffect(
     useCallback(() => {
       setProfile(loadOnboardingProfile());
+      setStoredState(loadStoredHomeState());
     }, [])
   );
 
@@ -120,6 +125,20 @@ export default function ExploreScreen() {
           </Animated.View>
         ) : null}
 
+        {DEV_DEBUG_NAV_ENABLED ? (
+          <Animated.View entering={presenceEnter(100)}>
+            <GlassPanel contentStyle={styles.panelBody}>
+              <SectionHeader label="On-device vision" title="What the camera read" />
+              <ThemedText style={styles.visionStatus} lightColor="#C8E6D2" darkColor="#C8E6D2">
+                {isVisionAvailable()
+                  ? 'Native Vision module: present'
+                  : 'Native Vision module: not in this build — rebuild the dev client to enable.'}
+              </ThemedText>
+              <VisionReadout days={collectVisionDays(storedState?.today, storedState?.archivedDays)} />
+            </GlassPanel>
+          </Animated.View>
+        ) : null}
+
         <Animated.View entering={presenceEnter(80)}>
           <GlassPanel contentStyle={styles.panelBody}>
             <SectionHeader
@@ -182,6 +201,69 @@ export default function ExploreScreen() {
   );
 }
 
+type VisionDay = StoredHomeDayRecord & { vision: DayVisionSummary };
+
+// Days (today first) that actually carry an on-device vision read.
+function collectVisionDays(
+  today: StoredHomeDayRecord | undefined,
+  archived: StoredHomeDayRecord[] | undefined
+): VisionDay[] {
+  const all = [today, ...(archived ?? [])].filter((day): day is StoredHomeDayRecord => day != null);
+  return all
+    .filter((day): day is VisionDay => day.vision != null)
+    .sort((left, right) => right.isoDate.localeCompare(left.isoDate));
+}
+
+// Dev-only raw dump of each day's vision read and the encounter signals it would
+// produce — the fastest way to confirm the native bridge is returning data
+// while testing on device.
+function VisionReadout({ days }: { days: VisionDay[] }) {
+  if (days.length === 0) {
+    return (
+      <ThemedText style={styles.panelText} lightColor="#D9E4FF" darkColor="#D9E4FF">
+        No vision reads yet. Once the dev client is built, open a day with geotagged photos so they get analysed,
+        then return here.
+      </ThemedText>
+    );
+  }
+
+  return (
+    <View style={styles.visionList}>
+      {days.map((day) => {
+        const signals = buildVisionSignals(day.vision);
+        return (
+          <View key={day.id} style={styles.visionDay}>
+            <ThemedText style={styles.visionDayTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+              {day.isoDate}
+            </ThemedText>
+            <ThemedText style={styles.visionMeta} lightColor="#C4D8FF" darkColor="#C4D8FF">
+              {day.vision.analyzedPhotoCount} photos analysed · {day.vision.maxFaceCount} faces
+            </ThemedText>
+            <ThemedText style={styles.visionLine} lightColor="#D9E4FF" darkColor="#D9E4FF">
+              {day.vision.labels.length > 0
+                ? day.vision.labels
+                    .slice(0, 6)
+                    .map((label) => `${label.name} ${Math.round(label.confidence * 100)}%`)
+                    .join('  ·  ')
+                : '— no labels —'}
+            </ThemedText>
+            {day.vision.textTokens.length > 0 ? (
+              <ThemedText style={styles.visionLine} lightColor="#A9C4FF" darkColor="#A9C4FF">
+                “{day.vision.textTokens.slice(0, 8).join(', ')}”
+              </ThemedText>
+            ) : null}
+            <ThemedText style={styles.visionSignals} lightColor="#FFD9B8" darkColor="#FFD9B8">
+              {signals.length > 0
+                ? `→ ${signals.map((signal) => `${signal.seedId} ${Math.round(signal.intensity * 100)}%`).join(', ')}`
+                : '→ no encounter signals'}
+            </ThemedText>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function Bullet({ text }: { text: string }) {
   return (
     <View style={styles.bulletRow}>
@@ -222,6 +304,37 @@ const styles = StyleSheet.create({
   panelText: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  visionStatus: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  visionList: {
+    gap: 14,
+  },
+  visionDay: {
+    borderTopColor: 'rgba(200, 216, 255, 0.14)',
+    borderTopWidth: 1,
+    gap: 3,
+    paddingTop: 12,
+  },
+  visionDayTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  visionMeta: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  visionLine: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  visionSignals: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    marginTop: 2,
   },
   devActions: {
     gap: 10,

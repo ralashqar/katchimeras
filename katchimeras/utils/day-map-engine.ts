@@ -1,11 +1,13 @@
 import type {
   DayMapCoordinate,
   DayMapNode,
+  DayMapNodePhoto,
   DayMapSummary,
   HomeLocationType,
   HomeMoment,
   StoredHomeLocationPoint,
 } from '@/types/home';
+import { curatePhotos } from '@/utils/photo-curation';
 
 const CLUSTER_RADIUS_METERS = 150;
 const MAX_DAY_MAP_NODES = 5;
@@ -122,10 +124,54 @@ function createNode(cluster: LocationCluster): DayMapNode {
     hasPhoto,
     linkedMomentId: linkedPoint?.momentId ?? null,
     photoThumbnailUri: latestPhotoPoint?.thumbnailUri ?? null,
+    photos: collectClusterPhotos(sortedPoints),
     startedAt,
     endedAt,
     sampleCount: sortedPoints.length,
   };
+}
+
+// The cluster's mini album: the keepers among this place's photo points, in
+// capture order. Seed-time curation already trims most near-duplicates, but a
+// second collapse here also tidies days that were seeded before curation (or
+// under a tighter window), since stored points are never retroactively removed.
+function collectClusterPhotos(sortedPoints: StoredHomeLocationPoint[]): DayMapNodePhoto[] {
+  const seenThumbnail = new Set<string>();
+  const candidates: DayMapNodePhoto[] = [];
+
+  sortedPoints.forEach((point) => {
+    if (!point.hasPhoto || !point.thumbnailUri || seenThumbnail.has(point.thumbnailUri)) {
+      return;
+    }
+    seenThumbnail.add(point.thumbnailUri);
+    candidates.push({
+      id: point.id,
+      thumbnailUri: point.thumbnailUri,
+      capturedAt: point.capturedAt,
+      momentId: point.momentId ?? null,
+    });
+  });
+
+  if (candidates.length <= 1) {
+    return candidates;
+  }
+
+  const keeperIds = new Set(
+    curatePhotos(
+      candidates.map((photo, index) => {
+        const point = sortedPoints.find((entry) => entry.id === photo.id);
+        return {
+          id: photo.id,
+          createdAt: new Date(photo.capturedAt).getTime() || index,
+          latitude: point?.lat,
+          longitude: point?.lng,
+          similarityHash: point?.similarityHash,
+        };
+      })
+    ).keepers.map((photo) => photo.id)
+  );
+
+  return candidates.filter((photo) => keeperIds.has(photo.id));
 }
 
 function pickPrimaryLocationId(nodes: DayMapNode[], moments: HomeMoment[]) {

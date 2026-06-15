@@ -39,6 +39,11 @@ export function buildReflectionRequest(day: StoredHomeDayRecord, profile: Onboar
       repeatDepth: creature.repeatDepth,
       voice: castEntry?.voice ?? FALLBACK_VOICE,
       rarity: creature.rarity,
+      // Two independent axes the narrator can lean on: why this day was rare
+      // (living conditions) and how deep the bond has grown (return visits).
+      rarityReason: creature.rarityReason ?? null,
+      bondStage: creature.bondStage ?? 0,
+      bondVisitCount: creature.bondVisitCount ?? creature.repeatDepth + 1,
     },
     tonePreference: profile.preferenceIds[0] ?? null,
   };
