@@ -18,8 +18,10 @@ type DayContextProps = {
   isImportingHealthRoutes?: boolean;
   onReveal: () => void;
   onShare?: () => void;
+  onShareComic?: () => void;
   onViewDayMap: () => void;
   isSharing?: boolean;
+  isSharingComic?: boolean;
 };
 
 export function DayContext({
@@ -29,8 +31,10 @@ export function DayContext({
   isImportingHealthRoutes = false,
   onReveal,
   onShare,
+  onShareComic,
   onViewDayMap,
   isSharing = false,
+  isSharingComic = false,
 }: DayContextProps) {
   if (day.isToday && day.state !== 'hatched') {
     const passiveSignals = buildPassiveSignals(day);
@@ -128,9 +132,18 @@ export function DayContext({
       {day.state === 'hatched' && day.creature && day.shareReadyAt ? (
         <KatchaButton
           disabled={isSharing}
-          label={isSharing ? 'Preparing postcard...' : 'Share postcard'}
+          label={isSharing ? 'Preparing card...' : 'Share day card'}
           onPress={onShare}
           variant="primary"
+        />
+      ) : null}
+      {day.state === 'hatched' && day.creature && day.shareReadyAt && onShareComic ? (
+        <KatchaButton
+          disabled={isSharingComic}
+          icon="sparkles"
+          label={isSharingComic ? 'Drawing comic...' : 'Make the comic'}
+          onPress={onShareComic}
+          variant="premium"
         />
       ) : null}
       {day.canHatch ? (

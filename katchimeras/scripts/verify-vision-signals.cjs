@@ -19,7 +19,7 @@ function transpileToTemp(relativeSourcePath, outName) {
   return outPath;
 }
 
-const { aggregatePhotoVision, buildVisionSignals } = require(
+const { aggregatePhotoVision, buildVisionSignals, pickProminentTags } = require(
   transpileToTemp('utils/vision-signals.ts', 'vision-signals.js')
 );
 
@@ -33,46 +33,99 @@ function check(label, condition, detail) {
   }
 }
 
-function seedsOf(vision) {
-  return buildVisionSignals(vision).map((signal) => signal.seedId).sort();
+function photo(labels, faceCount = 0, text = []) {
+  return { labels: labels.map(([name, confidence]) => ({ name, confidence })), faceCount, text };
+}
+function summary(concepts, extra = {}) {
+  return {
+    concepts,
+    maxFaceCount: 0,
+    faceCoverage: 0,
+    textTokens: [],
+    analyzedPhotoCount: 5,
+    ...extra,
+  };
 }
 
-// 1. Aggregation: averages label confidence, takes max face count, unions text.
-const summary = aggregatePhotoVision([
-  { labels: [{ name: 'Coffee', confidence: 0.8 }], text: ['ESPRESSO'], faceCount: 1 },
-  { labels: [{ name: 'coffee', confidence: 0.6 }], text: ['Latte'], faceCount: 4 },
+// --- Aggregation: grouping, salience, coverage ---
+
+// 1. Synonyms collapse to one canonical concept; a photo contributes it once.
+const grouped = aggregatePhotoVision([photo([['dog', 0.9], ['golden_retriever', 0.8]])]);
+check('synonyms collapse to one concept', grouped.concepts.length === 1 && grouped.concepts[0].name === 'dog', JSON.stringify(grouped.concepts));
+check('within-photo concept counts once at peak', grouped.concepts[0].count === 1 && Math.abs(grouped.concepts[0].salience - 0.9) < 1e-9, JSON.stringify(grouped.concepts[0]));
+
+// 2. Frequency beats a single lucky close-up: 4 medium beach shots > 1 strong coffee.
+const themed = aggregatePhotoVision([
+  photo([['beach', 0.5]]),
+  photo([['ocean', 0.5]]),
+  photo([['beach', 0.5]]),
+  photo([['seaside', 0.5]]),
+  photo([['coffee', 0.95]]),
 ]);
-check('label names normalized + averaged', summary.labels[0]?.name === 'coffee' && Math.abs(summary.labels[0].confidence - 0.7) < 1e-9, JSON.stringify(summary.labels));
-check('max face count taken', summary.maxFaceCount === 4, String(summary.maxFaceCount));
-check('text tokens lowercased + unioned', summary.textTokens.includes('espresso') && summary.textTokens.includes('latte'), JSON.stringify(summary.textTokens));
-check('analyzed count tracked', summary.analyzedPhotoCount === 2, String(summary.analyzedPhotoCount));
+check('frequent theme outranks single high-confidence', themed.concepts[0].name === 'beach', JSON.stringify(themed.concepts.map((c) => c.name)));
+check('coverage = share of photos', Math.abs(themed.concepts.find((c) => c.name === 'beach').coverage - 0.8) < 1e-9, JSON.stringify(themed.concepts.find((c) => c.name === 'beach')));
 
-// 2. A scene label maps to its location seed.
-check('beach label -> beach seed', seedsOf({ labels: [{ name: 'sandy beach', confidence: 0.9 }], maxFaceCount: 0, textTokens: [], analyzedPhotoCount: 1 }).includes('beach'));
-check('library label -> library seed', seedsOf({ labels: [{ name: 'bookshelf', confidence: 0.7 }], maxFaceCount: 0, textTokens: [], analyzedPhotoCount: 1 }).includes('library'));
+// 3. Generic labels never become concepts.
+const generics = aggregatePhotoVision([photo([['outdoor', 0.9], ['person', 0.95], ['dog', 0.6]])]);
+check('generics dropped, subject kept', generics.concepts.length === 1 && generics.concepts[0].name === 'dog', JSON.stringify(generics.concepts));
 
-// 3. Face count >= 2 yields the social seed; a lone face does not.
-check('two faces -> social_gathering', seedsOf({ labels: [], maxFaceCount: 2, textTokens: [], analyzedPhotoCount: 1 }).includes('social_gathering'));
-check('one face -> no social seed', !seedsOf({ labels: [], maxFaceCount: 1, textTokens: [], analyzedPhotoCount: 1 }).includes('social_gathering'));
+// 3b. Specific raw labels are kept as `details` (un-canonicalised) even as they
+// collapse into a broad concept for matching.
+const museum = aggregatePhotoVision([
+  photo([['art gallery', 0.8], ['marble sculpture', 0.7]]),
+  photo([['oil painting', 0.6]]),
+]);
+check('concepts collapse to museum', museum.concepts[0].name === 'museum', JSON.stringify(museum.concepts.map((c) => c.name)));
+check('details keep the specific raw labels', museum.details.includes('art gallery') && museum.details.includes('marble sculpture'), JSON.stringify(museum.details));
+check('details drop generics', !aggregatePhotoVision([photo([['outdoor', 0.9], ['painting', 0.6]])]).details.includes('outdoor'));
 
-// 4. OCR corroboration lifts the matching seed's intensity above a bare label.
-const labelOnly = buildVisionSignals({ labels: [{ name: 'cinema', confidence: 0.5 }], maxFaceCount: 0, textTokens: [], analyzedPhotoCount: 1 })
-  .find((signal) => signal.seedId === 'cinema');
-const labelPlusText = buildVisionSignals({ labels: [{ name: 'cinema', confidence: 0.5 }], maxFaceCount: 0, textTokens: ['now showing'], analyzedPhotoCount: 1 })
-  .find((signal) => signal.seedId === 'cinema');
-check('OCR corroboration raises intensity', (labelPlusText?.intensity ?? 0) > (labelOnly?.intensity ?? 0), JSON.stringify({ labelOnly, labelPlusText }));
+// 4. Face coverage tracks how much of the day had people in frame.
+const faces = aggregatePhotoVision([photo([], 3), photo([], 0), photo([], 4)]);
+check('max face count taken', faces.maxFaceCount === 4, String(faces.maxFaceCount));
+check('face coverage = social photos / total', Math.abs(faces.faceCoverage - 2 / 3) < 1e-9, String(faces.faceCoverage));
 
-// 5. Empty vision yields no signals.
-check('empty vision -> no signals', buildVisionSignals({ labels: [], maxFaceCount: 0, textTokens: [], analyzedPhotoCount: 0 }).length === 0);
+// --- Signals: frequency-aware encounters ---
 
-// 6. One seed per kind (no duplicate beach signals from two beach labels).
-const dupes = buildVisionSignals({
-  labels: [{ name: 'beach', confidence: 0.9 }, { name: 'ocean', confidence: 0.8 }],
-  maxFaceCount: 0,
-  textTokens: [],
-  analyzedPhotoCount: 2,
-});
-check('no duplicate seed signals', dupes.filter((signal) => signal.seedId === 'beach').length === 1, JSON.stringify(dupes));
+// 5. A scene concept maps to its seed; coverage raises intensity.
+const dominant = buildVisionSignals(summary([{ name: 'beach', salience: 2, coverage: 0.8, count: 4, peakConfidence: 0.6 }]));
+const oneOff = buildVisionSignals(summary([{ name: 'beach', salience: 0.6, coverage: 0.1, count: 1, peakConfidence: 0.6 }], { analyzedPhotoCount: 10 }));
+const dominantBeach = dominant.find((s) => s.seedId === 'beach');
+const oneOffBeach = oneOff.find((s) => s.seedId === 'beach');
+check('scene concept maps to seed', Boolean(dominantBeach), JSON.stringify(dominant));
+check('coverage raises hatch intensity', dominantBeach.intensity > oneOffBeach.intensity, JSON.stringify({ dominantBeach, oneOffBeach }));
+
+// 6. Faces produce the social encounter; a lone face does not.
+check('faces -> social_gathering encounter', buildVisionSignals(summary([], { maxFaceCount: 3, faceCoverage: 0.8 })).some((s) => s.seedId === 'social_gathering'));
+check('a lone face is not social', !buildVisionSignals(summary([], { maxFaceCount: 1, faceCoverage: 0 })).some((s) => s.seedId === 'social_gathering'));
+const manyPeople = buildVisionSignals(summary([], { maxFaceCount: 2, faceCoverage: 1 })).find((s) => s.seedId === 'social_gathering');
+const fewPeople = buildVisionSignals(summary([], { maxFaceCount: 2, faceCoverage: 0.1, analyzedPhotoCount: 10 })).find((s) => s.seedId === 'social_gathering');
+check('more people-frames raise social intensity', manyPeople.intensity > fewPeople.intensity, JSON.stringify({ manyPeople, fewPeople }));
+
+// 7. OCR corroboration lifts a matching concept's intensity.
+const labelOnly = buildVisionSignals(summary([{ name: 'cinema', salience: 0.5, coverage: 0.3, count: 1, peakConfidence: 0.5 }])).find((s) => s.seedId === 'cinema');
+const withText = buildVisionSignals(summary([{ name: 'cinema', salience: 0.5, coverage: 0.3, count: 1, peakConfidence: 0.5 }], { textTokens: ['now showing'] })).find((s) => s.seedId === 'cinema');
+check('OCR corroboration raises intensity', withText.intensity > labelOnly.intensity, JSON.stringify({ labelOnly, withText }));
+
+// 8. Dog now maps to its creature's seed (Waglet); a subject still without a
+// creature (cat) produces no encounter signal yet.
+check('dog concept maps to dog_companion seed', buildVisionSignals(summary([{ name: 'dog', salience: 1.5, coverage: 0.6, count: 3, peakConfidence: 0.8 }])).some((s) => s.seedId === 'dog_companion'));
+check('unmapped concept (bicycle) has no seed', buildVisionSignals(summary([{ name: 'bicycle', salience: 1.5, coverage: 0.6, count: 3, peakConfidence: 0.8 }])).length === 0);
+
+// --- Prominent tags for the nightly line ---
+
+const tagSummary = aggregatePhotoVision([
+  photo([['dog', 0.9], ['golden_retriever', 0.8]]),
+  photo([['dog', 0.7]]),
+  photo([['coffee', 0.6]]),
+]);
+check('prominent tags lead with the salient concept', pickProminentTags(tagSummary, 2)[0] === 'dog', JSON.stringify(tagSummary.concepts.map((c) => c.name)));
+check('prominent tags respect limit', pickProminentTags(tagSummary, 1).length === 1);
+check('low-confidence concept excluded from tags', pickProminentTags(summary([{ name: 'haze', salience: 0.2, coverage: 1, count: 1, peakConfidence: 0.1 }])).length === 0);
+
+// --- Edges ---
+const empty = aggregatePhotoVision([]);
+check('empty aggregation handled', empty.concepts.length === 0 && empty.analyzedPhotoCount === 0 && empty.faceCoverage === 0, JSON.stringify(empty));
+check('empty vision -> no signals', buildVisionSignals(empty).length === 0);
 
 console.log(failures === 0 ? '\nAll vision-signals checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -14,10 +14,27 @@ import { AlphaType, ColorType, Skia } from '@shopify/react-native-skia';
 const HASH_WIDTH = 9; // 9 columns → 8 horizontal comparisons per row
 const HASH_HEIGHT = 8; // 8 rows → 64 bits total → 16 hex characters
 
-// Best-effort: returns a 16-character hex hash, or null if the frame can't be
-// decoded (unsupported URI, transient failure). Callers treat null as "no
-// similarity signal" and fall back to the time-based heuristic.
-export async function computePhotoHash(uri: string): Promise<string | null> {
+// A single on-device read of a frame: its perceptual hash plus cheap quality
+// signals computed from the very same decoded grayscale grid (so the extra
+// information costs nothing beyond the decode we already pay for).
+//   - meanLuminance: average brightness (0-255). A near-zero mean is a fully
+//     black/blacked-out frame.
+//   - luminanceRange: max minus min brightness across the grid (0-255). A tiny
+//     range is a flat frame with no tonal structure — a blank wall, a lens-cap
+//     shot, or an over-blurred/over-exposed throwaway.
+// Both are deliberately coarse (read off the 9x8 grid); they reliably catch the
+// "fully black" and "no detail" cases the curator wants to drop without
+// pretending to be a real sharpness model.
+export type PhotoSignature = {
+  hash: string;
+  meanLuminance: number;
+  luminanceRange: number;
+};
+
+// Best-effort: returns the frame's signature, or null if it can't be decoded
+// (unsupported URI, transient failure). Callers treat null as "no signal" and
+// fall back to time-based heuristics / never drop on a guess.
+export async function computePhotoSignature(uri: string): Promise<PhotoSignature | null> {
   try {
     const data = await Skia.Data.fromURI(uri);
     if (!data) {
@@ -54,19 +71,31 @@ export async function computePhotoHash(uri: string): Promise<string | null> {
       return null;
     }
 
-    return dHashFromRgba(pixels, HASH_WIDTH, HASH_HEIGHT);
+    return signatureFromRgba(pixels, HASH_WIDTH, HASH_HEIGHT);
   } catch {
     return null;
   }
 }
 
-function dHashFromRgba(pixels: Uint8Array | Float32Array, width: number, height: number): string {
+// Back-compat thin wrapper for callers that only need the similarity hash.
+export async function computePhotoHash(uri: string): Promise<string | null> {
+  return (await computePhotoSignature(uri))?.hash ?? null;
+}
+
+function signatureFromRgba(pixels: Uint8Array | Float32Array, width: number, height: number): PhotoSignature {
   const gray = new Array<number>(width * height);
+  let min = 255;
+  let max = 0;
+  let sum = 0;
   for (let index = 0; index < width * height; index += 1) {
     const r = Number(pixels[index * 4]);
     const g = Number(pixels[index * 4 + 1]);
     const b = Number(pixels[index * 4 + 2]);
-    gray[index] = 0.299 * r + 0.587 * g + 0.114 * b;
+    const value = 0.299 * r + 0.587 * g + 0.114 * b;
+    gray[index] = value;
+    sum += value;
+    if (value < min) min = value;
+    if (value > max) max = value;
   }
 
   let bits = '';
@@ -80,5 +109,10 @@ function dHashFromRgba(pixels: Uint8Array | Float32Array, width: number, height:
   for (let index = 0; index < bits.length; index += 4) {
     hex += Number.parseInt(bits.slice(index, index + 4), 2).toString(16);
   }
-  return hex;
+
+  return {
+    hash: hex,
+    meanLuminance: sum / (width * height),
+    luminanceRange: max - min,
+  };
 }

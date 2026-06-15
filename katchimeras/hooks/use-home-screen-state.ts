@@ -28,6 +28,7 @@ import {
 } from '@/utils/home-engine';
 import { collectBackfillDays } from '@/utils/day-backfill';
 import { requestDayReflection } from '@/utils/day-reflection';
+import { ensureDayVision } from '@/utils/photo-vision';
 import {
   getHatchNotificationPermission,
   requestHatchNotificationPermission,
@@ -282,7 +283,12 @@ export function useHomeScreenState() {
       return;
     }
 
-    const generated = await requestDayReflection(day, profile);
+    // Make sure the day's photos have been read so the quote can name what they
+    // actually showed; falls back to whatever vision (or none) was there.
+    const vision = await ensureDayVision(day);
+    const dayForReflection = vision ? { ...day, vision } : day;
+
+    const generated = await requestDayReflection(dayForReflection, profile);
     if (!generated) {
       return;
     }

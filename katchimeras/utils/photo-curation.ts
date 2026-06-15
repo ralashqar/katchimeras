@@ -22,9 +22,21 @@ export type CuratablePhoto = {
   // time+place alone would dare. Produced by the on-device vision pass; absent
   // for now, so curation falls back to the time+place heuristic.
   similarityHash?: string | null;
+  // Optional on-device brightness signals (0-255), from the same decode that
+  // produced the hash. When present they let the curator drop fully-black frames
+  // (near-zero mean) and flat/structureless throwaways (near-zero range — a
+  // lens-cap shot, a blank wall, an over-blurred frame). Absent → never dropped
+  // on a guess.
+  meanLuminance?: number | null;
+  luminanceRange?: number | null;
 };
 
-export type CurationDropReason = 'screenshot' | 'burst_duplicate' | 'low_resolution';
+export type CurationDropReason =
+  | 'screenshot'
+  | 'burst_duplicate'
+  | 'low_resolution'
+  | 'too_dark'
+  | 'low_detail';
 
 export type CurationDrop<T> = { photo: T; reason: CurationDropReason };
 
@@ -37,6 +49,8 @@ export type CurationResult<T> = {
     screenshots: number;
     burstDuplicates: number;
     lowResolution: number;
+    tooDark: number;
+    lowDetail: number;
   };
 };
 
@@ -46,6 +60,8 @@ export type CurationOptions = {
   minResolutionPixels?: number;
   nearDuplicateWindowMs?: number;
   similarityHammingThreshold?: number;
+  darkLuminanceThreshold?: number;
+  flatLuminanceRangeThreshold?: number;
 };
 
 // Time alone is a blunt signal, so the pure-time window is deliberately tight —
@@ -60,6 +76,11 @@ const DEFAULT_MIN_RESOLUTION_PIXELS = 160 * 160;
 // dupes go, distinct shots of the same place stay.
 const DEFAULT_NEAR_DUPLICATE_WINDOW_MS = 120_000;
 const DEFAULT_SIMILARITY_HAMMING_THRESHOLD = 6;
+// Brightness gates (0-255). Conservative on purpose — only frames that are
+// genuinely black or genuinely structureless go; a dim-but-real night photo
+// keeps its tonal range and survives.
+const DEFAULT_DARK_LUMINANCE_THRESHOLD = 12;
+const DEFAULT_FLAT_LUMINANCE_RANGE_THRESHOLD = 8;
 
 export function curatePhotos<T extends CuratablePhoto>(
   photos: T[],
@@ -71,6 +92,9 @@ export function curatePhotos<T extends CuratablePhoto>(
   const nearDuplicateWindowMs = options.nearDuplicateWindowMs ?? DEFAULT_NEAR_DUPLICATE_WINDOW_MS;
   const similarityHammingThreshold =
     options.similarityHammingThreshold ?? DEFAULT_SIMILARITY_HAMMING_THRESHOLD;
+  const darkLuminanceThreshold = options.darkLuminanceThreshold ?? DEFAULT_DARK_LUMINANCE_THRESHOLD;
+  const flatLuminanceRangeThreshold =
+    options.flatLuminanceRangeThreshold ?? DEFAULT_FLAT_LUMINANCE_RANGE_THRESHOLD;
 
   const dropped: CurationDrop<T>[] = [];
   const survivors: T[] = [];
@@ -84,6 +108,14 @@ export function curatePhotos<T extends CuratablePhoto>(
     }
     if (isBelowResolution(photo, minResolutionPixels)) {
       dropped.push({ photo, reason: 'low_resolution' });
+      continue;
+    }
+    if (isTooDark(photo, darkLuminanceThreshold)) {
+      dropped.push({ photo, reason: 'too_dark' });
+      continue;
+    }
+    if (isLowDetail(photo, flatLuminanceRangeThreshold)) {
+      dropped.push({ photo, reason: 'low_detail' });
       continue;
     }
     survivors.push(photo);
@@ -146,6 +178,8 @@ export function curatePhotos<T extends CuratablePhoto>(
       screenshots: dropped.filter((entry) => entry.reason === 'screenshot').length,
       burstDuplicates: dropped.filter((entry) => entry.reason === 'burst_duplicate').length,
       lowResolution: dropped.filter((entry) => entry.reason === 'low_resolution').length,
+      tooDark: dropped.filter((entry) => entry.reason === 'too_dark').length,
+      lowDetail: dropped.filter((entry) => entry.reason === 'low_detail').length,
     },
   };
 }
@@ -155,6 +189,29 @@ function isBelowResolution(photo: CuratablePhoto, minResolutionPixels: number): 
     return false; // unknown dimensions — never drop on a guess
   }
   return photo.width * photo.height < minResolutionPixels;
+}
+
+// A fully black / blacked-out frame: average brightness sits on the floor. Only
+// acts when the signal is present (never drops on a guess) — and NEVER on a
+// geotagged frame: a photo with a real GPS location marks a place you actually
+// went, so it always earns its map pin, dark or not. The quality gates drop
+// junk; they must never erase where you were.
+function isTooDark(photo: CuratablePhoto, threshold: number): boolean {
+  if (hasCoordinates(photo)) {
+    return false;
+  }
+  return typeof photo.meanLuminance === 'number' && photo.meanLuminance <= threshold;
+}
+
+// A flat, structureless frame: almost no tonal range across the image — a blank
+// wall, a lens-cap shot, an over-blurred/over-exposed throwaway. Kept separate
+// from "too dark" so a bright-but-blank frame is caught too. Only acts when the
+// signal is present, and — like the dark gate — never on a geotagged frame.
+function isLowDetail(photo: CuratablePhoto, threshold: number): boolean {
+  if (hasCoordinates(photo)) {
+    return false;
+  }
+  return typeof photo.luminanceRange === 'number' && photo.luminanceRange <= threshold;
 }
 
 function isSameBurst(

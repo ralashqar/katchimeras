@@ -116,6 +116,67 @@ check('low-resolution counted', tiny.summary.lowResolution === 1, JSON.stringify
 const unknown = curatePhotos([{ id: 'u1', createdAt: BASE }, { id: 'u2', createdAt: BASE + 60_000 }]);
 check('unknown dimensions kept', unknown.keepers.length === 2, JSON.stringify(unknown.summary));
 
+// 6a. Fully black frames (near-zero mean luminance) are dropped; a normal frame
+// with the same low-but-nonzero range is unaffected by the dark gate.
+const dark = curatePhotos([
+  photo('keep', { createdAt: BASE, meanLuminance: 120, luminanceRange: 200 }),
+  photo('black', { createdAt: BASE + 60_000, meanLuminance: 3, luminanceRange: 4 }),
+]);
+check('black frame dropped', dark.keepers.map((p) => p.id).join(',') === 'keep', JSON.stringify(dark.keepers.map((p) => p.id)));
+check('black frame counted too_dark', dark.summary.tooDark === 1, JSON.stringify(dark.summary));
+
+// 6b. Flat/structureless frames (tiny luminance range) are dropped as low_detail
+// even when bright — a blank wall, a lens-cap shot, an over-blurred throwaway.
+const flat = curatePhotos([
+  photo('real', { createdAt: BASE, meanLuminance: 130, luminanceRange: 180 }),
+  photo('blank', { createdAt: BASE + 60_000, meanLuminance: 200, luminanceRange: 3 }),
+]);
+check('flat frame dropped', flat.keepers.map((p) => p.id).join(',') === 'real', JSON.stringify(flat.keepers.map((p) => p.id)));
+check('flat frame counted low_detail', flat.summary.lowDetail === 1, JSON.stringify(flat.summary));
+
+// 6a-geo. A geotagged frame is NEVER dropped by the brightness gates — a real
+// GPS location marks a place you went, so it always earns its map pin even if
+// the frame itself is black/flat. (Load-bearing for "pins always show".)
+const darkButGeotagged = curatePhotos([
+  photo('placeshot', { createdAt: BASE, latitude: 40, longitude: -74, meanLuminance: 1, luminanceRange: 2 }),
+]);
+check('geotagged dark/flat frame kept', darkButGeotagged.keepers.length === 1, JSON.stringify(darkButGeotagged.summary));
+
+// 6c. A dim-but-real night photo keeps its tonal range and survives both gates.
+const nightShot = curatePhotos([
+  photo('night', { createdAt: BASE, meanLuminance: 40, luminanceRange: 150 }),
+]);
+check('dim photo with real range kept', nightShot.keepers.length === 1, JSON.stringify(nightShot.summary));
+
+// 6e. THE MAP INVARIANT: a geotagged frame marks a real place visited, so the
+// quality gates must NEVER drop it — even if it's pitch black AND flat. Without
+// this, a dark/flat geotagged photo would be erased before it becomes a map pin,
+// which is exactly the "no pins on the day map" regression. A photo with GPS is a
+// place you went; it always earns its pin.
+const geotaggedDark = curatePhotos([
+  photo('place', {
+    createdAt: BASE,
+    latitude: 40.4,
+    longitude: -3.7,
+    meanLuminance: 2,
+    luminanceRange: 3,
+  }),
+]);
+check(
+  'geotagged dark+flat frame kept (becomes a map pin)',
+  geotaggedDark.keepers.length === 1 &&
+    geotaggedDark.summary.tooDark === 0 &&
+    geotaggedDark.summary.lowDetail === 0,
+  JSON.stringify(geotaggedDark.summary)
+);
+
+// 6d. Missing brightness signals never trigger a drop (no guessing).
+const noSignals = curatePhotos([
+  photo('a', { createdAt: BASE }),
+  photo('b', { createdAt: BASE + 60_000 }),
+]);
+check('absent brightness signals never drop', noSignals.keepers.length === 2, JSON.stringify(noSignals.summary));
+
 // 7. Original ordering is preserved in the kept set.
 const order = curatePhotos([
   photo('z', { createdAt: BASE + 60_000 }),

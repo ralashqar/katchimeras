@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { type LayoutChangeEvent, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, type LayoutChangeEvent, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useEffect, useRef, useState } from 'react';
 import { captureRef } from 'react-native-view-shot';
@@ -10,6 +10,10 @@ import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
+import { DayComic } from '@/components/katchadeck/home/day-comic';
+import { requestComicBeats } from '@/utils/day-reflection';
+import { ensureDayVision } from '@/utils/photo-vision';
+import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { presenceEnter } from '@/components/katchadeck/motion';
@@ -21,6 +25,7 @@ import { useDayLocationCapture } from '@/hooks/use-day-location-capture';
 import { useDayStepCapture } from '@/hooks/use-day-step-capture';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useRecentPhotoMapSeeding } from '@/hooks/use-recent-photo-map-seeding';
+import { useBackfillStatus } from '@/utils/backfill-status';
 import type { HomeDayRecord, HomeMoment } from '@/types/home';
 
 export default function HomeScreen() {
@@ -42,11 +47,15 @@ export default function HomeScreen() {
     refreshState,
     resetHomeState,
   } = useHomeScreenState();
+  const backfillStatus = useBackfillStatus();
   const [hatchTargetId, setHatchTargetId] = useState<string | null>(null);
   const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
   const [heroAnchorY, setHeroAnchorY] = useState(316);
   const [sharingDayId, setSharingDayId] = useState<string | null>(null);
+  const [sharingComicDayId, setSharingComicDayId] = useState<string | null>(null);
+  const [comicBeats, setComicBeats] = useState<string[] | null>(null);
   const postcardRef = useRef<View>(null);
+  const comicRef = useRef<View>(null);
   const addMomentFlow = useAddMomentFlow({
     enabled: selectedDay?.kind === 'day' && selectedDay.canAddMoments,
     onAddMoment: addMoment,
@@ -144,6 +153,14 @@ export default function HomeScreen() {
     closeAddMomentFlow();
   }, [closeAddMomentFlow, selectedDayId]);
 
+  // Each time a background backfill reflection is written, pull it into view so
+  // the day's specific quote appears without the user re-opening Home.
+  useEffect(() => {
+    if (backfillStatus.completedVersion > 0) {
+      refreshState();
+    }
+  }, [backfillStatus.completedVersion, refreshState]);
+
   const handleReveal = () => {
     if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) {
       return;
@@ -195,11 +212,54 @@ export default function HomeScreen() {
 
       await Share.share({
         message: `${selectedDay.creature.name} — ${selectedDay.highlight ?? selectedDay.creature.highlight}`,
-        title: `${selectedDay.creature.name} postcard`,
+        title: `${selectedDay.creature.name} day card`,
         url: uri,
       });
     } finally {
       setSharingDayId((current) => (current === selectedDay.id ? null : current));
+    }
+  }
+
+  async function handleShareComic() {
+    if (
+      !selectedDay ||
+      selectedDay.kind !== 'day' ||
+      selectedDay.state !== 'hatched' ||
+      !selectedDay.creature ||
+      !selectedDay.shareReadyAt ||
+      !comicRef.current
+    ) {
+      return;
+    }
+
+    setSharingComicDayId(selectedDay.id);
+
+    try {
+      // Make sure the day has a vision read so the beats can name what the
+      // photos actually showed (analyses on the spot if it was never read).
+      const vision = await ensureDayVision(selectedDay);
+      const dayForBeats = vision ? { ...selectedDay, vision } : selectedDay;
+
+      // Fetch the LLM panel beats first (null on failure → local beats), then
+      // let the off-screen DayComic re-render with them before we capture.
+      const beats = await requestComicBeats(dayForBeats, loadOnboardingProfile());
+      setComicBeats(beats);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+
+      const uri = await captureRef(comicRef.current, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+
+      await Share.share({
+        message: `${selectedDay.creature.name} — a four-panel day.`,
+        title: `${selectedDay.creature.name} comic`,
+        url: uri,
+      });
+    } finally {
+      setSharingComicDayId((current) => (current === selectedDay.id ? null : current));
+      setComicBeats(null);
     }
   }
 
@@ -297,19 +357,28 @@ export default function HomeScreen() {
           {isDay && selectedDay.canHatch ? (
             <KatchaButton label="Reveal the hatch" onPress={handleReveal} variant="primary" />
           ) : isHatched ? (
-            <View style={styles.ctaRow}>
+            <View style={styles.hatchedCtas}>
+              <View style={styles.ctaRow}>
+                <KatchaButton
+                  label="Day map"
+                  onPress={() => handleOpenDayMap(selectedDay.id)}
+                  style={styles.ctaQuiet}
+                  variant="secondary"
+                />
+                <KatchaButton
+                  disabled={sharingDayId === selectedDay.id}
+                  label={sharingDayId === selectedDay.id ? 'Preparing…' : 'Share day card'}
+                  onPress={handleShareDay}
+                  style={styles.ctaMain}
+                  variant="primary"
+                />
+              </View>
               <KatchaButton
-                label="Day map"
-                onPress={() => handleOpenDayMap(selectedDay.id)}
-                style={styles.ctaQuiet}
-                variant="secondary"
-              />
-              <KatchaButton
-                disabled={sharingDayId === selectedDay.id}
-                label={sharingDayId === selectedDay.id ? 'Preparing…' : 'Share postcard'}
-                onPress={handleShareDay}
-                style={styles.ctaMain}
-                variant="primary"
+                disabled={sharingComicDayId === selectedDay.id}
+                icon="sparkles"
+                label={sharingComicDayId === selectedDay.id ? 'Drawing comic…' : 'Make the comic'}
+                onPress={handleShareComic}
+                variant="premium"
               />
             </View>
           ) : isFormingToday ? (
@@ -340,9 +409,20 @@ export default function HomeScreen() {
           </ThemedText>
         </Animated.View>
       ) : null}
+      {backfillStatus.active ? (
+        <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(220)} pointerEvents="none" style={styles.backfillTag}>
+          <ActivityIndicator color={Lantern.ember300} size="small" />
+          <ThemedText style={styles.backfillTagLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            {backfillStatus.remaining > 0
+              ? `Polishing ${backfillStatus.remaining} day${backfillStatus.remaining === 1 ? '' : 's'}…`
+              : 'Polishing your days…'}
+          </ThemedText>
+        </Animated.View>
+      ) : null}
       {shareableDay ? (
         <View pointerEvents="none" style={styles.captureCardWrap}>
           <MemoryPostcard day={shareableDay} ref={postcardRef} />
+          <DayComic beats={comicBeats} day={shareableDay} ref={comicRef} />
         </View>
       ) : null}
     </View>
@@ -443,6 +523,9 @@ const styles = StyleSheet.create({
   ctaArea: {
     marginTop: 12,
   },
+  hatchedCtas: {
+    gap: 12,
+  },
   ctaRow: {
     flexDirection: 'row',
     gap: 12,
@@ -480,5 +563,25 @@ const styles = StyleSheet.create({
     left: -2000,
     position: 'absolute',
     top: -2000,
+  },
+  backfillTag: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(12, 10, 20, 0.86)',
+    borderColor: 'rgba(255, 195, 107, 0.28)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    position: 'absolute',
+    right: 16,
+    top: 60,
+    zIndex: 40,
+  },
+  backfillTagLabel: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

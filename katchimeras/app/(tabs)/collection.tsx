@@ -1,5 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
@@ -7,6 +8,7 @@ import Animated from 'react-native-reanimated';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { encounterCastByProfileId } from '@/constants/encounter-cast';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
@@ -50,6 +52,7 @@ function buildMetCharacters(state: StoredHomeState): MetCharacter[] {
 }
 
 export default function CollectionScreen() {
+  const router = useRouter();
   const [state, setState] = useState<StoredHomeState | null>(null);
 
   useFocusEffect(
@@ -88,6 +91,10 @@ export default function CollectionScreen() {
             {hatchedDays.length} {hatchedDays.length === 1 ? 'day' : 'days'} hatched · {met.length}{' '}
             {met.length === 1 ? 'character' : 'characters'} met
           </ThemedText>
+        </Animated.View>
+
+        <Animated.View entering={presenceEnter(40)}>
+          <KatchaButton label="Open the life map" onPress={() => router.push('/life-map')} variant="secondary" />
         </Animated.View>
 
         {met.length > 0 ? (

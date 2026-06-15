@@ -31,6 +31,18 @@ export type EncounterMatch = {
 
 const REPEAT_FAVOR_PER_VISIT = 0.06;
 const REPEAT_FAVOR_CAP = 0.18;
+// Generic "activity" fallbacks — these describe HOW MUCH you moved, not what the
+// day was actually about. When the photos/places say something specific (a
+// museum, a child, a landmark, a café), that should win over "you walked a lot".
+const GENERIC_FALLBACK_SEEDS = new Set(['high_steps_day', 'errand_loop', 'home_evening']);
+// How much a specific (scene/subject/place/social) signal is favored over a
+// generic activity one. Big enough that a clear museum beats a high-steps day,
+// small enough that a genuinely empty walking day still hatches its walker.
+const SPECIFICITY_BONUS = 0.22;
+// When asked to avoid a profile (e.g. the previous backfilled day's creature),
+// demote it so a different creature wins IF one is competitive — but it can still
+// win when it's the only real candidate.
+const AVOID_REPEAT_PENALTY = 0.3;
 const THIN_DAY_STEP_LIMIT = 2400;
 const HIGH_STEPS_THRESHOLD = 6500;
 const RUN_ACTIVITY_PATTERN = /run|jog/i;
@@ -168,7 +180,8 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
 
 export function matchEncounterForDay(
   day: StoredHomeDayRecord,
-  history: EncounterHistoryMap
+  history: EncounterHistoryMap,
+  options: { avoidProfileId?: string } = {}
 ): EncounterMatch | null {
   const candidates = extractEncounterSignals(day)
     .map((signal) => {
@@ -181,8 +194,16 @@ export function matchEncounterForDay(
         return null;
       }
       const repeatDepth = history[castEntry.profileId]?.count ?? 0;
+      // Specific scene/subject/place signals are favored over generic activity
+      // fallbacks, so "what the day was about" beats "how much you moved".
+      const specificityBonus = GENERIC_FALLBACK_SEEDS.has(signal.seedId) ? 0 : SPECIFICITY_BONUS;
+      // Avoid repeating the day-before's creature when something else is close.
+      const avoidPenalty = options.avoidProfileId === castEntry.profileId ? AVOID_REPEAT_PENALTY : 0;
       const favored = clamp01(
-        signal.intensity + Math.min(repeatDepth * REPEAT_FAVOR_PER_VISIT, REPEAT_FAVOR_CAP)
+        signal.intensity +
+          Math.min(repeatDepth * REPEAT_FAVOR_PER_VISIT, REPEAT_FAVOR_CAP) +
+          specificityBonus -
+          avoidPenalty
       );
       return { castEntry, profile, signal, repeatDepth, favored };
     })
@@ -223,9 +244,10 @@ export function buildEncounterCreature(
   day: StoredHomeDayRecord,
   history: EncounterHistoryMap,
   primaryTrait: HomeScoreKey,
-  secondaryTrait: HomeScoreKey
+  secondaryTrait: HomeScoreKey,
+  options: { avoidProfileId?: string } = {}
 ): LocalCreatureRecord | null {
-  const match = matchEncounterForDay(day, history);
+  const match = matchEncounterForDay(day, history, options);
   if (!match) {
     return null;
   }

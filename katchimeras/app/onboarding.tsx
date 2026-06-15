@@ -117,7 +117,9 @@ export default function OnboardingScreen() {
       preferenceIds: [selectedToneId],
       hatchHour: selectedHatchHour,
     });
-    router.replace('/(tabs)');
+    // End on the emotional peak: reveal the collection already hidden in their
+    // recent days, then drop into the app.
+    router.replace('/hatch-your-past');
   }
 
   function renderContent() {

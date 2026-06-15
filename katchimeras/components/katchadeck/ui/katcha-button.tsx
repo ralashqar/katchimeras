@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, type StyleProp, type ViewStyle, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { usePressMotion } from '@/components/katchadeck/motion';
@@ -14,6 +14,7 @@ type KatchaButtonProps = {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  loading?: boolean;
   variant?: KatchaButtonVariant;
   style?: StyleProp<ViewStyle>;
   glow?: boolean;
@@ -24,6 +25,7 @@ export function KatchaButton({
   label,
   onPress,
   disabled = false,
+  loading = false,
   variant = 'primary',
   style,
   glow = false,
@@ -35,7 +37,7 @@ export function KatchaButton({
 
   return (
     <Pressable
-      disabled={disabled}
+      disabled={disabled || loading}
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
@@ -80,6 +82,7 @@ export function KatchaButton({
             />
           ) : null}
           <View style={styles.labelRow}>
+            {loading ? <ActivityIndicator color={iconColor} size="small" /> : null}
             <ThemedText
               style={
                 variant === 'premium'
@@ -92,7 +95,7 @@ export function KatchaButton({
               darkColor={variant === 'secondary' ? Lantern.moon50 : Lantern.emberInk}>
               {label}
             </ThemedText>
-            {icon ? <IconSymbol color={iconColor} name={icon} size={16} /> : null}
+            {icon && !loading ? <IconSymbol color={iconColor} name={icon} size={16} /> : null}
           </View>
         </View>
       </Animated.View>

@@ -1,6 +1,10 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-import type { PhotoVisionResult } from '@/types/home';
+import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
+import { aggregatePhotoVision } from '@/utils/vision-signals';
+
+const CAMERA_ROLL_PREFIX = 'camera-roll-photo-';
+const MAX_ON_DEMAND_PHOTOS = 12;
 
 // JS bridge to the on-device Apple Vision module (modules/katchimera-vision).
 // `requireOptionalNativeModule` returns null when the native module isn't in
@@ -45,4 +49,48 @@ export async function analyzePhoto(uri: string): Promise<PhotoVisionResult | nul
   } catch {
     return null;
   }
+}
+
+// Guarantees a day has a vision read before we ask the LLM to narrate it — so a
+// comic or reflection always gets to consider what the photos actually show. If
+// the day was already analysed, returns its summary unchanged; otherwise it
+// re-analyses the day's camera-roll photos on the spot (best-effort, native
+// only). Returns null only when there's nothing to read.
+export async function ensureDayVision(day: StoredHomeDayRecord): Promise<DayVisionSummary | null> {
+  if (hasUsableVision(day.vision)) {
+    return day.vision ?? null;
+  }
+  if (!nativeVision) {
+    return day.vision ?? null;
+  }
+
+  const assetIds = day.locations
+    .filter((point) => point.hasPhoto && point.id.startsWith(CAMERA_ROLL_PREFIX))
+    .map((point) => point.id.slice(CAMERA_ROLL_PREFIX.length))
+    .slice(0, MAX_ON_DEMAND_PHOTOS);
+  if (assetIds.length === 0) {
+    return day.vision ?? null;
+  }
+
+  try {
+    const MediaLibrary = await import('expo-media-library');
+    const results: PhotoVisionResult[] = [];
+    for (const assetId of assetIds) {
+      const info = await MediaLibrary.getAssetInfoAsync(assetId);
+      const localInfo = info as { localUri?: string; uri?: string };
+      const result = await analyzePhoto(localInfo.localUri ?? localInfo.uri ?? '');
+      if (result) {
+        results.push(result);
+      }
+    }
+    return results.length > 0 ? aggregatePhotoVision(results) : (day.vision ?? null);
+  } catch {
+    return day.vision ?? null;
+  }
+}
+
+function hasUsableVision(vision: DayVisionSummary | undefined): boolean {
+  return Boolean(
+    vision && (vision.concepts.length > 0 || vision.details.length > 0 || vision.textTokens.length > 0)
+  );
 }

@@ -2,6 +2,7 @@ import { encounterCastByProfileId } from '@/constants/encounter-cast';
 import type { StoredHomeDayRecord } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { supabase } from '@/utils/supabase';
+import { pickProminentTags } from '@/utils/vision-signals';
 
 export type GeneratedDayReflection = {
   highlight: string;
@@ -15,8 +16,9 @@ const FALLBACK_VOICE = 'a gentle companion who notices small true things';
 
 const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Privacy contract: the request carries place categories, moment labels, and
-// step bands only — never coordinates, photo URIs, free text, or identifiers.
+// Privacy contract: the request carries place categories, moment labels, step
+// bands, and abstract photo subject words only — never coordinates, photo URIs,
+// place names, free text, or identifiers.
 export function buildReflectionRequest(day: StoredHomeDayRecord, profile: OnboardingProfile) {
   const creature = day.creature;
   if (!creature) {
@@ -33,6 +35,16 @@ export function buildReflectionRequest(day: StoredHomeDayRecord, profile: Onboar
     stepsBand: resolveStepsBand(day.stepsCount),
     visitedPlaceCount: day.visitedPlaceCount,
     newPlaceCount: day.newPlaceCount,
+    // The recurring photo subjects of the day (e.g. "dog", "coffee", "water"),
+    // so the line can name something specific. Abstract content words only.
+    prominentTags: day.vision ? pickProminentTags(day.vision) : [],
+    // The specific raw things the camera saw ("marble sculpture", "ramen
+    // bowl") — more evocative than the grouped concepts above.
+    photoDetails: day.vision?.details ?? [],
+    // Actual words read off signs/placards/menus/tickets (OCR). The single most
+    // specific signal — it lets the line name the real exhibit or dish. NOTE:
+    // this is free text and loosens the "labels not text" privacy contract.
+    signText: day.vision ? day.vision.textTokens.slice(0, 12) : [],
     character: {
       name: creature.name,
       encounterCue: castEntry?.categoryLabel ?? null,
@@ -80,6 +92,42 @@ export async function requestDayReflection(
       highlight: highlight.slice(0, MAX_HIGHLIGHT_LENGTH),
       reflection: reflection.slice(0, MAX_REFLECTION_LENGTH),
     };
+  } catch {
+    return null;
+  }
+}
+
+// On-demand LLM panel captions for the 4-panel comic (open, scene, turn,
+// close). Same privacy-clean payload as the reflection, plus wantComic. Returns
+// null on any failure → the comic falls back to local templated beats.
+export async function requestComicBeats(
+  day: StoredHomeDayRecord,
+  profile: OnboardingProfile
+): Promise<string[] | null> {
+  const payload = buildReflectionRequest(day, profile);
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const invocation = supabase.functions.invoke('generate-day-reflection', {
+      body: { ...payload, wantComic: true },
+    });
+    const timeout = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), REQUEST_TIMEOUT_MS);
+    });
+    const result = await Promise.race([invocation, timeout]);
+
+    if (!result || result.error) {
+      return null;
+    }
+
+    const beats = (result.data as { beats?: unknown } | null)?.beats;
+    if (!Array.isArray(beats) || beats.length < 4) {
+      return null;
+    }
+
+    return beats.slice(0, 4).map((beat) => (typeof beat === 'string' ? beat.trim() : ''));
   } catch {
     return null;
   }

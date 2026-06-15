@@ -1,4 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
@@ -14,18 +17,33 @@ import { ThemedText } from '@/components/themed-text';
 import { createStarterReveal } from '@/constants/katchadeck';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { KatchaDeckUI } from '@/constants/theme';
-import { runDevBackfill } from '@/utils/day-backfill';
+import { enrichBackfillReflections, runBackfillFoundation, runBackfillPhotosOnly } from '@/utils/day-backfill';
 import { applyDevScenario, devScenarioOptions } from '@/utils/dev-scenarios';
 import { clearStoredHomeState, loadStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
-import { isVisionAvailable } from '@/utils/photo-vision';
-import { buildVisionSignals } from '@/utils/vision-signals';
-import type { DayVisionSummary, StoredHomeDayRecord } from '@/types/home';
+import { analyzePhoto, ensureDayVision, isVisionAvailable } from '@/utils/photo-vision';
+import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals';
+import { requestComicBeats } from '@/utils/day-reflection';
+import { encounterLiveCast } from '@/constants/encounter-cast';
+import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
+import { getCreatureVisual } from '@/utils/home-engine';
+import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 
 export default function ExploreScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState(loadOnboardingProfile());
   const [storedState, setStoredState] = useState(loadStoredHomeState());
+  const [pickedVision, setPickedVision] = useState<{
+    uri: string;
+    analyzing: boolean;
+    result: PhotoVisionResult | null;
+  } | null>(null);
+  const [comicPreview, setComicPreview] = useState<{
+    creature: string;
+    loading: boolean;
+    beats: string[] | null;
+  } | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,8 +83,83 @@ export default function ExploreScreen() {
   }
 
   async function handleBackfill() {
-    const summary = await runDevBackfill();
-    Alert.alert('Backfill', summary, [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]);
+    if (backfilling) {
+      return;
+    }
+    setBackfilling(true);
+    try {
+      // Full pipeline: scan + clean + cluster photos into pins (persisted FIRST,
+      // so it's safe), hatch the past days, then finish the LLM quotes in the
+      // background. Photos are saved before anything that could fail.
+      const { summary, pendingReflectionDayIds } = await runBackfillFoundation();
+      if (pendingReflectionDayIds.length > 0) {
+        void enrichBackfillReflections(pendingReflectionDayIds);
+      }
+      Alert.alert('Backfill', summary, [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]);
+    } finally {
+      setBackfilling(false);
+    }
+  }
+
+  // Fast debug fallback: photos → pins only (no hatch/LLM/network), with the
+  // full PHOTO CHECK diagnostic. Use this to isolate the scan if anything regresses.
+  async function handleBackfillPhotosOnly() {
+    if (backfilling) {
+      return;
+    }
+    setBackfilling(true);
+    try {
+      const summary = await runBackfillPhotosOnly();
+      Alert.alert('Backfill (photos only)', summary, [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]);
+    } finally {
+      setBackfilling(false);
+    }
+  }
+
+  // Dev affordance: pick any photo and run the on-device Vision read against it,
+  // showing raw labels/OCR/face count and the encounter signals they produce.
+  async function handleAnalyzePickedPhoto() {
+    if (!isVisionAvailable()) {
+      Alert.alert('Vision module not in this build', 'Rebuild the dev client so the native Vision module is present.');
+      return;
+    }
+    if (!requireOptionalNativeModule('ExponentImagePicker')) {
+      Alert.alert('Photo picker unavailable', 'This build does not include the image picker yet. Rebuild the dev client.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+      selectionLimit: 1,
+    });
+    if (result.canceled || !result.assets?.[0]) {
+      return;
+    }
+
+    const uri = result.assets[0].uri;
+    setPickedVision({ uri, analyzing: true, result: null });
+    const vision = await analyzePhoto(uri);
+    setPickedVision({ uri, analyzing: false, result: vision });
+  }
+
+  // Dev: fetch the LLM comic beats for the most recent hatched day, so you can
+  // read the four panel captions without share-capturing the whole comic.
+  async function handlePreviewComicBeats() {
+    const stored = loadStoredHomeState();
+    const days = stored ? [stored.today, ...stored.archivedDays] : [];
+    const hatched = days
+      .filter((day) => day.creature != null)
+      .sort((left, right) => right.isoDate.localeCompare(left.isoDate))[0];
+    if (!hatched?.creature) {
+      Alert.alert('No hatched day yet', 'Hatch a day (or apply a dev scenario), then preview the comic beats.');
+      return;
+    }
+    setComicPreview({ creature: hatched.creature.name, loading: true, beats: null });
+    const vision = await ensureDayVision(hatched);
+    const dayForBeats = vision ? { ...hatched, vision } : hatched;
+    const beats = await requestComicBeats(dayForBeats, loadOnboardingProfile());
+    setComicPreview({ creature: hatched.creature.name, loading: false, beats });
   }
 
   function handleApplyScenario(scenarioId: (typeof devScenarioOptions)[number]['id']) {
@@ -109,9 +202,23 @@ export default function ExploreScreen() {
               <SectionHeader label="Fast actions" title="Reset and debug" />
               <View style={styles.devActions}>
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
+                <KatchaButton label="Analyze a photo (vision)" onPress={handleAnalyzePickedPhoto} variant="secondary" />
+                <KatchaButton label="Preview comic beats (LLM)" onPress={handlePreviewComicBeats} variant="secondary" />
+                <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
-                <KatchaButton label="Backfill real history" onPress={handleBackfill} variant="secondary" />
+                <KatchaButton
+                  label={backfilling ? 'Backfilling…' : 'Backfill real history (pins + hatch + LLM)'}
+                  loading={backfilling}
+                  onPress={handleBackfill}
+                  variant="secondary"
+                />
+                <KatchaButton
+                  label={backfilling ? 'Scanning…' : 'Backfill: photos only (debug)'}
+                  loading={backfilling}
+                  onPress={handleBackfillPhotosOnly}
+                  variant="secondary"
+                />
                 {devScenarioOptions.map((scenario) => (
                   <KatchaButton
                     key={scenario.id}
@@ -126,6 +233,15 @@ export default function ExploreScreen() {
         ) : null}
 
         {DEV_DEBUG_NAV_ENABLED ? (
+          <Animated.View entering={presenceEnter(90)}>
+            <GlassPanel contentStyle={styles.panelBody}>
+              <SectionHeader label="Full cast" title={`All creatures (${encounterLiveCast.length})`} />
+              <CreatureGallery />
+            </GlassPanel>
+          </Animated.View>
+        ) : null}
+
+        {DEV_DEBUG_NAV_ENABLED ? (
           <Animated.View entering={presenceEnter(100)}>
             <GlassPanel contentStyle={styles.panelBody}>
               <SectionHeader label="On-device vision" title="What the camera read" />
@@ -135,6 +251,59 @@ export default function ExploreScreen() {
                   : 'Native Vision module: not in this build — rebuild the dev client to enable.'}
               </ThemedText>
               <VisionReadout days={collectVisionDays(storedState?.today, storedState?.archivedDays)} />
+            </GlassPanel>
+          </Animated.View>
+        ) : null}
+
+        {DEV_DEBUG_NAV_ENABLED && pickedVision ? (
+          <Animated.View entering={presenceEnter(120)}>
+            <GlassPanel contentStyle={styles.panelBody}>
+              <SectionHeader label="Photo analysis" title="Tags for the picked image" />
+              <Image contentFit="cover" source={pickedVision.uri} style={styles.pickedImage} transition={120} />
+              {pickedVision.analyzing ? (
+                <ThemedText style={styles.panelText} lightColor="#D9E4FF" darkColor="#D9E4FF">
+                  Analysing…
+                </ThemedText>
+              ) : pickedVision.result ? (
+                <View style={styles.visionDay}>
+                  <VisionSummaryRows summary={aggregatePhotoVision([pickedVision.result])} />
+                </View>
+              ) : (
+                <ThemedText style={styles.panelText} lightColor="#D9E4FF" darkColor="#D9E4FF">
+                  No result — the frame couldn’t be analysed (try a different photo).
+                </ThemedText>
+              )}
+            </GlassPanel>
+          </Animated.View>
+        ) : null}
+
+        {DEV_DEBUG_NAV_ENABLED && comicPreview ? (
+          <Animated.View entering={presenceEnter(130)}>
+            <GlassPanel contentStyle={styles.panelBody}>
+              <SectionHeader label="Comic beats" title={`LLM panels for ${comicPreview.creature}`} />
+              {comicPreview.loading ? (
+                <ThemedText style={styles.panelText} lightColor="#D9E4FF" darkColor="#D9E4FF">
+                  Asking the model…
+                </ThemedText>
+              ) : comicPreview.beats ? (
+                <View style={styles.visionList}>
+                  {comicPreview.beats.map((beat, index) => (
+                    <View key={`beat-${index}`} style={styles.visionDay}>
+                      <ThemedText style={styles.visionDayTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                        {['Open', 'Scene', 'Turn', 'Close'][index] ?? `Panel ${index + 1}`}
+                      </ThemedText>
+                      <ThemedText style={styles.visionLine} lightColor="#D9E4FF" darkColor="#D9E4FF">
+                        {beat}
+                      </ThemedText>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <ThemedText style={styles.panelText} lightColor="#FFD9B8" darkColor="#FFD9B8">
+                  No beats returned — the comic falls back to local beats. If you expected LLM beats, deploy the
+                  function: supabase functions deploy generate-day-reflection
+                </ThemedText>
+              )}
             </GlassPanel>
           </Animated.View>
         ) : null}
@@ -229,33 +398,84 @@ function VisionReadout({ days }: { days: VisionDay[] }) {
 
   return (
     <View style={styles.visionList}>
-      {days.map((day) => {
-        const signals = buildVisionSignals(day.vision);
+      {days.map((day) => (
+        <View key={day.id} style={styles.visionDay}>
+          <ThemedText style={styles.visionDayTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            {day.isoDate}
+          </ThemedText>
+          <VisionSummaryRows summary={day.vision} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// Shared renderer for one vision summary: meta line, labels, OCR text, and the
+// encounter signals it produces. Used for both per-day reads and a picked photo.
+function VisionSummaryRows({ summary }: { summary: DayVisionSummary }) {
+  const signals = buildVisionSignals(summary);
+  return (
+    <>
+      <ThemedText style={styles.visionMeta} lightColor="#C4D8FF" darkColor="#C4D8FF">
+        {summary.analyzedPhotoCount} photo{summary.analyzedPhotoCount === 1 ? '' : 's'} · {summary.maxFaceCount} faces ({Math.round(summary.faceCoverage * 100)}% of frames)
+      </ThemedText>
+      <ThemedText style={styles.visionLine} lightColor="#D9E4FF" darkColor="#D9E4FF">
+        {summary.concepts.length > 0
+          ? summary.concepts
+              .slice(0, 8)
+              .map((concept) => `${concept.name} ${Math.round(concept.coverage * 100)}%`)
+              .join('  ·  ')
+          : '— no concepts —'}
+      </ThemedText>
+      {summary.details.length > 0 ? (
+        <ThemedText style={styles.visionLine} lightColor="#C8E6D2" darkColor="#C8E6D2">
+          details: {summary.details.slice(0, 8).join(', ')}
+        </ThemedText>
+      ) : null}
+      {summary.textTokens.length > 0 ? (
+        <ThemedText style={styles.visionLine} lightColor="#A9C4FF" darkColor="#A9C4FF">
+          “{summary.textTokens.slice(0, 8).join(', ')}”
+        </ThemedText>
+      ) : null}
+      <ThemedText style={styles.visionSignals} lightColor="#FFD9B8" darkColor="#FFD9B8">
+        {signals.length > 0
+          ? `→ ${signals.map((signal) => `${signal.seedId} ${Math.round(signal.intensity * 100)}%`).join(', ')}`
+          : '→ no encounter signals'}
+      </ThemedText>
+    </>
+  );
+}
+
+const profilesById = new Map(katchimeraEncounterProfiles.map((profile) => [profile.id, profile]));
+const RARITY_ORDER: Record<string, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4 };
+
+// Dev-only gallery of every live cast member with its real art — the fast way
+// to review the whole roster (the Collection tab only shows creatures met).
+function CreatureGallery() {
+  const entries = [...encounterLiveCast].sort((left, right) => {
+    const leftRarity = RARITY_ORDER[profilesById.get(left.profileId)?.baseRarity ?? 'common'] ?? 0;
+    const rightRarity = RARITY_ORDER[profilesById.get(right.profileId)?.baseRarity ?? 'common'] ?? 0;
+    if (leftRarity !== rightRarity) {
+      return rightRarity - leftRarity;
+    }
+    return left.categoryLabel.localeCompare(right.categoryLabel);
+  });
+
+  return (
+    <View style={styles.galleryGrid}>
+      {entries.map((entry) => {
+        const visual = getCreatureVisual(entry.visualKey);
+        const profile = profilesById.get(entry.profileId);
         return (
-          <View key={day.id} style={styles.visionDay}>
-            <ThemedText style={styles.visionDayTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-              {day.isoDate}
+          <View key={entry.profileId} style={styles.galleryCard}>
+            <View style={[styles.galleryHalo, { backgroundColor: `${visual.accentColor}26` }]}>
+              <Image contentFit="contain" source={visual.source} style={styles.galleryImage} transition={0} />
+            </View>
+            <ThemedText style={styles.galleryName} lightColor="#F8FBFF" darkColor="#F8FBFF" numberOfLines={1}>
+              {profile?.name ?? entry.visualKey}
             </ThemedText>
-            <ThemedText style={styles.visionMeta} lightColor="#C4D8FF" darkColor="#C4D8FF">
-              {day.vision.analyzedPhotoCount} photos analysed · {day.vision.maxFaceCount} faces
-            </ThemedText>
-            <ThemedText style={styles.visionLine} lightColor="#D9E4FF" darkColor="#D9E4FF">
-              {day.vision.labels.length > 0
-                ? day.vision.labels
-                    .slice(0, 6)
-                    .map((label) => `${label.name} ${Math.round(label.confidence * 100)}%`)
-                    .join('  ·  ')
-                : '— no labels —'}
-            </ThemedText>
-            {day.vision.textTokens.length > 0 ? (
-              <ThemedText style={styles.visionLine} lightColor="#A9C4FF" darkColor="#A9C4FF">
-                “{day.vision.textTokens.slice(0, 8).join(', ')}”
-              </ThemedText>
-            ) : null}
-            <ThemedText style={styles.visionSignals} lightColor="#FFD9B8" darkColor="#FFD9B8">
-              {signals.length > 0
-                ? `→ ${signals.map((signal) => `${signal.seedId} ${Math.round(signal.intensity * 100)}%`).join(', ')}`
-                : '→ no encounter signals'}
+            <ThemedText style={styles.galleryMeta} lightColor="#C4D8FF" darkColor="#C4D8FF" numberOfLines={1}>
+              {entry.categoryLabel}
             </ThemedText>
           </View>
         );
@@ -308,6 +528,41 @@ const styles = StyleSheet.create({
   visionStatus: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  pickedImage: {
+    borderRadius: 16,
+    height: 200,
+    width: '100%',
+  },
+  galleryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  galleryCard: {
+    alignItems: 'center',
+    gap: 3,
+    width: '30%',
+  },
+  galleryHalo: {
+    alignItems: 'center',
+    aspectRatio: 1,
+    borderRadius: 18,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  galleryImage: {
+    height: '82%',
+    width: '82%',
+  },
+  galleryName: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  galleryMeta: {
+    fontSize: 10,
+    lineHeight: 13,
   },
   visionList: {
     gap: 14,

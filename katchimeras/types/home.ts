@@ -43,7 +43,35 @@ export type HomeVisualKey =
   | 'relicoon'
   | 'shellio'
   | 'flickerbun'
-  | 'baristabbit';
+  | 'baristabbit'
+  | 'waglet'
+  | 'whiskit'
+  | 'snuglet'
+  | 'driftkin'
+  | 'duskle'
+  | 'crustling'
+  | 'nigirimp'
+  | 'noodloo'
+  | 'sundael'
+  | 'bobaloo'
+  | 'pagelet'
+  | 'hooplet'
+  | 'serveling'
+  | 'petalimp'
+  | 'fernip'
+  | 'drizzlet'
+  | 'amberleaf'
+  | 'blossle'
+  | 'peakle'
+  | 'stillo'
+  | 'twinklet'
+  | 'feastle'
+  | 'museling'
+  | 'tasklet'
+  | 'cheerlet'
+  | 'voyagle'
+  | 'skylo'
+  | 'flexel';
 
 export type DayScores = Record<HomeScoreKey, number>;
 
@@ -61,9 +89,26 @@ export type PhotoVisionResult = {
   faceCount: number;
 };
 
+// A canonical day-level subject, after grouping synonyms across the day's
+// photos. `salience` (sum of per-photo confidence) weights it by frequency AND
+// reliability; `coverage` (share of photos featuring it) says how much the day
+// was *about* it. Both drive hatch intensity and the nightly line.
+export type DayVisionConcept = {
+  name: string;
+  salience: number;
+  coverage: number;
+  count: number;
+  peakConfidence: number;
+};
+
 export type DayVisionSummary = {
-  labels: PhotoVisionLabel[];
+  concepts: DayVisionConcept[];
+  // The most salient *specific* raw labels, un-canonicalised ("marble
+  // sculpture", "golden retriever"), for narration — more evocative than the
+  // grouped concepts, which exist for seed matching.
+  details: string[];
   maxFaceCount: number;
+  faceCoverage: number;
   textTokens: string[];
   analyzedPhotoCount: number;
 };
@@ -342,6 +387,9 @@ export type StoredHomeDayRecord = {
   // Aggregated on-device vision read of the day's photos (optional — present
   // only once the native vision module has analysed them).
   vision?: DayVisionSummary;
+  // Cheap signature of the inputs the derived fields (dayMap, place counts)
+  // depend on — lets normalize skip re-deriving settled archived days.
+  derivedSignature?: string;
 };
 
 export type StoredHomeState = {

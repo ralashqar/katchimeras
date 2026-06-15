@@ -54,6 +54,9 @@ const scoreOrder: HomeScoreKey[] = ['energy', 'calm', 'social', 'exploration', '
 const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 const MAX_STORED_DAY_LOCATIONS = 180;
+// How many past days the device retains — the depth the Life Map fills in over
+// time. The timeline UI still only shows the last 5; this is the storage depth.
+const MAX_ARCHIVED_DAYS = 120;
 const MAX_HEALTH_ROUTE_SAMPLE_POINTS = 120;
 const LOCATION_LINK_WINDOW_MS = 20 * 60 * 1000;
 const LOCATION_DEDUPE_WINDOW_MS = 4 * 60 * 1000;
@@ -812,7 +815,7 @@ function normalizeStoredHomeState(
   let today: StoredHomeDayRecord = { ...upgradedState.today };
 
   if (today.isoDate !== todayDateId) {
-    archivedDays = [...archivedDays, resolveRolledPastDay(today, profile, now)].slice(-5);
+    archivedDays = [...archivedDays, resolveRolledPastDay(today, profile, now)].slice(-MAX_ARCHIVED_DAYS);
     today = createEmptyStoredDay(now, profile);
   }
 
@@ -826,13 +829,18 @@ function normalizeStoredHomeState(
       ...day,
       state: resolveDayState(day, now, hatchHour),
     }))
-    .slice(-5);
+    .slice(-MAX_ARCHIVED_DAYS);
 
+  // Archived days are settled — their derived fields (dayMap, place counts) only
+  // change when their own locations/moments change. Memoize by signature so a
+  // routine state update doesn't re-derive every past day's map (the cross-day
+  // new-place scan is otherwise quadratic at this retention depth). Today is the
+  // one actively-edited day, so it always recomputes.
   const normalizedArchived: StoredHomeDayRecord[] = [];
   archivedDays.forEach((day) => {
-    normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now, hatchHour));
+    normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now, hatchHour, false));
   });
-  const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now, hatchHour);
+  const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now, hatchHour, true);
 
   return {
     version: 5,
@@ -1289,12 +1297,26 @@ function createFallbackLocationsForStoredDay(day: Pick<StoredHomeDayRecord, 'id'
   return createSeedLocations(firstMoment.type, dayDate, seedIndex, firstMoment.id);
 }
 
+function dayInputSignature(day: StoredHomeDayRecord): string {
+  return `${day.locations.length}|${day.moments.length}|${day.selectedPathId ?? ''}|${day.creature ? 1 : 0}`;
+}
+
 function updateStoredDayDerivedFields(
   day: StoredHomeDayRecord,
   priorDays: StoredHomeDayRecord[],
   now: Date,
-  hatchHour: number
+  hatchHour: number,
+  force: boolean
 ): StoredHomeDayRecord {
+  const signature = dayInputSignature(day);
+
+  // Inputs unchanged since this day was last derived — keep the cached fields
+  // and only refresh the time-dependent state (forming → ready as the hour
+  // passes). Skips the expensive dayMap derivation and cross-day place scan.
+  if (!force && day.derivedSignature === signature) {
+    return { ...day, state: resolveDayState(day, now, hatchHour) };
+  }
+
   const dayMap = deriveDayMapSummary(day.locations, day.moments);
   const visitedPlaceCount = dayMap?.nodes.length ?? 0;
   const locationSampleCount = day.locations.length;
@@ -1310,6 +1332,7 @@ function updateStoredDayDerivedFields(
     newPlaceCount,
     locationSampleCount,
     shareReadyAt,
+    derivedSignature: signature,
   };
 }
 

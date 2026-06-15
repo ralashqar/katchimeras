@@ -28,6 +28,11 @@ const visualKeys = [
   'voltstep', 'hearthsip', 'glimmuse', 'skysette', 'creamalume', 'pulsepounce', 'gatherglow',
   'mossprout', 'lattelet', 'sprintail', 'neonpoko', 'crumbun', 'hayhorn', 'ironette',
   'bedrotte', 'steppling', 'errandimp', 'quietome', 'relicoon', 'shellio', 'flickerbun', 'baristabbit',
+  'waglet', 'whiskit', 'snuglet', 'driftkin', 'duskle',
+  'crustling', 'nigirimp', 'noodloo', 'sundael', 'bobaloo',
+  'pagelet', 'hooplet', 'serveling', 'petalimp', 'fernip',
+  'drizzlet', 'amberleaf', 'blossle', 'peakle', 'stillo', 'twinklet', 'feastle',
+  'museling', 'tasklet', 'cheerlet', 'voyagle', 'skylo', 'flexel',
 ];
 const homeCreatureVisualsStub = Object.fromEntries(
   visualKeys.map((key) => [key, { source: 0, accentColor: '#FFFFFF' }])
@@ -38,6 +43,7 @@ const livingRarityPath = transpileToTemp('utils/living-rarity.ts', 'living-rarit
 const bondPath = transpileToTemp('utils/bond.ts', 'bond.js');
 const visionSignalsPath = transpileToTemp('utils/vision-signals.ts', 'vision-signals.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
+const hatchPastPath = transpileToTemp('utils/hatch-your-past.ts', 'hatch-your-past.js');
 
 const stubs = {
   '@/constants/encounter-cast': castPath,
@@ -46,6 +52,7 @@ const stubs = {
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/bond': bondPath,
   '@/utils/vision-signals': visionSignalsPath,
+  '@/utils/encounter-engine': enginePath,
   '@/types/home': {},
   '@/types/katchimera': {},
 };
@@ -67,6 +74,7 @@ Module._resolveFilename = function (request, ...rest) {
 };
 
 const engine = require(enginePath);
+const hatchPast = require(hatchPastPath);
 
 function makeDay(overrides = {}) {
   return {
@@ -230,7 +238,13 @@ check('busy day is not pulled into home read', busyCreature?.name === 'Steppling
 // place resolution and no tag — the camera's evidence routes the encounter.
 const beachVisionDay = makeDay({
   stepsCount: 3000,
-  vision: { labels: [{ name: 'beach', confidence: 0.92 }], maxFaceCount: 0, textTokens: [], analyzedPhotoCount: 2 },
+  vision: {
+    concepts: [{ name: 'beach', salience: 1.8, coverage: 0.9, count: 2, peakConfidence: 0.92 }],
+    maxFaceCount: 0,
+    faceCoverage: 0,
+    textTokens: [],
+    analyzedPhotoCount: 2,
+  },
 });
 const beachCreature = engine.buildEncounterCreature(beachVisionDay, {}, 'calm', 'energy');
 check('vision beach labels match Shellio', beachCreature?.name === 'Shellio', JSON.stringify(beachCreature?.name));
@@ -239,16 +253,125 @@ check('vision beach labels match Shellio', beachCreature?.name === 'Shellio', JS
 // hatch the time-together companion, no manual tag.
 const facesDay = makeDay({
   stepsCount: 2600,
-  vision: { labels: [], maxFaceCount: 3, textTokens: [], analyzedPhotoCount: 4 },
+  vision: { concepts: [], maxFaceCount: 3, faceCoverage: 1, textTokens: [], analyzedPhotoCount: 4 },
 });
 const facesCreature = engine.buildEncounterCreature(facesDay, {}, 'social', 'calm');
 check('vision face count matches Gatherglow', facesCreature?.name === 'Gatherglow', JSON.stringify(facesCreature?.name));
+
+// 8m-spec. A specific scene (museum in the photos) beats a high-steps day — what
+// the day was ABOUT outranks how much you moved (so a museum visit isn't Steppling).
+const museumWalkDay = makeDay({
+  stepsCount: 12000,
+  vision: {
+    concepts: [{ name: 'museum', salience: 1.6, coverage: 0.7, count: 3, peakConfidence: 0.85 }],
+    maxFaceCount: 0,
+    faceCoverage: 0,
+    textTokens: [],
+    analyzedPhotoCount: 4,
+  },
+});
+const museumWalkCreature = engine.buildEncounterCreature(museumWalkDay, {}, 'energy', 'calm');
+check(
+  'specific vision (museum) beats a high-steps day',
+  museumWalkCreature?.visualKey === 'relicoon',
+  JSON.stringify({ name: museumWalkCreature?.name, visualKey: museumWalkCreature?.visualKey })
+);
+
+// 8m-avoid. avoidProfileId demotes the day-before's creature when another is
+// competitive (variety across consecutive backfilled days), but a steps-only day
+// still hatches its walker when there's no alternative.
+const twoSignalDay = makeDay({ moments: [makeMoment('coffee', 0)], stepsCount: 1800, placeCategorySeeds: ['park'] });
+const normalPick = engine.buildEncounterCreature(twoSignalDay, {}, 'calm', 'energy');
+const avoidedPick = engine.buildEncounterCreature(twoSignalDay, {}, 'calm', 'energy', {
+  avoidProfileId: 'location_park_mossprout',
+});
+check(
+  'avoidProfileId picks a different creature when one is competitive',
+  normalPick?.name === 'Mossprout' && avoidedPick != null && avoidedPick.name !== 'Mossprout',
+  JSON.stringify({ normal: normalPick?.name, avoided: avoidedPick?.name })
+);
+const stepsAvoidedCreature = engine.buildEncounterCreature(stepsDay, {}, 'energy', 'calm', {
+  avoidProfileId: 'activity_high_steps_day_steppling',
+});
+check(
+  'avoid still hatches the only candidate (steps-only stays Steppling)',
+  stepsAvoidedCreature?.name === 'Steppling',
+  JSON.stringify(stepsAvoidedCreature?.name)
+);
+
+// 8o. Subject creature: a day whose photos were full of a dog hatches Waglet —
+// the new "what was with you" axis, from vision alone.
+const dogDay = makeDay({
+  stepsCount: 3200,
+  vision: {
+    concepts: [{ name: 'dog', salience: 2.4, coverage: 0.8, count: 4, peakConfidence: 0.9 }],
+    maxFaceCount: 0,
+    faceCoverage: 0,
+    textTokens: [],
+    analyzedPhotoCount: 5,
+  },
+});
+const dogCreature = engine.buildEncounterCreature(dogDay, {}, 'calm', 'social');
+check('dog-filled day hatches Waglet (subject creature)', dogCreature?.name === 'Waglet', JSON.stringify(dogCreature?.name));
+check('Waglet carries its profile + cue', dogCreature?.encounterProfileId === 'subject_dog_companion_waglet', JSON.stringify(dogCreature?.encounterProfileId));
+
+// 8p. The rest of the subject set hatches from its concept.
+function subjectDay(concept) {
+  return makeDay({
+    stepsCount: 2800,
+    vision: {
+      concepts: [{ name: concept, salience: 2.2, coverage: 0.75, count: 3, peakConfidence: 0.88 }],
+      maxFaceCount: 0,
+      faceCoverage: 0,
+      textTokens: [],
+      analyzedPhotoCount: 4,
+    },
+  });
+}
+check('cat day hatches Whiskit', engine.buildEncounterCreature(subjectDay('cat'), {}, 'calm', 'social')?.name === 'Whiskit');
+check('baby day hatches Snuglet', engine.buildEncounterCreature(subjectDay('baby'), {}, 'calm', 'social')?.name === 'Snuglet');
+check('snow day hatches Driftkin (rare)', (() => { const c = engine.buildEncounterCreature(subjectDay('snow'), {}, 'calm', 'energy'); return c?.name === 'Driftkin' && c?.rarity === 'rare'; })());
+check('sunset day hatches Duskle', engine.buildEncounterCreature(subjectDay('sunset'), {}, 'calm', 'energy')?.name === 'Duskle');
+
+// 8q. Wave A — activated place creatures hatch from their vision concept.
+[
+  ['pizza', 'Crustling'], ['sushi', 'Nigirimp'], ['ramen', 'Noodloo'], ['dessert', 'Sundael'],
+  ['bubble_tea', 'Bobaloo'], ['bookstore', 'Pagelet'], ['basketball', 'Hooplet'],
+  ['tennis', 'Serveling'], ['garden', 'Petalimp'], ['forest', 'Fernip'],
+].forEach(([concept, name]) => {
+  const creature = engine.buildEncounterCreature(subjectDay(concept), {}, 'calm', 'energy');
+  check(`${concept} day hatches ${name}`, creature?.name === name, JSON.stringify(creature?.name));
+});
+
+// 8r. Wave B — moments & seasons; `flowers` reuses the live garden creature.
+[
+  ['rain', 'Drizzlet'], ['autumn', 'Amberleaf'], ['blossom', 'Blossle'], ['mountains', 'Peakle'],
+  ['water', 'Stillo'], ['stars', 'Twinklet'], ['food', 'Feastle'], ['flowers', 'Petalimp'],
+].forEach(([concept, name]) => {
+  const creature = engine.buildEncounterCreature(subjectDay(concept), {}, 'calm', 'energy');
+  check(`${concept} day hatches ${name}`, creature?.name === name, JSON.stringify(creature?.name));
+});
+
+// 8s. Wave C + capstone.
+[
+  ['creative', 'Museling'], ['focus_work', 'Tasklet'], ['celebration', 'Cheerlet'], ['travel', 'Voyagle'],
+  ['city', 'Skylo'], ['gym', 'Flexel'],
+].forEach(([concept, name]) => {
+  const creature = engine.buildEncounterCreature(subjectDay(concept), {}, 'calm', 'energy');
+  check(`${concept} day hatches ${name}`, creature?.name === name, JSON.stringify(creature?.name));
+});
 
 // 8n. A real run still outranks an incidental vision label (intensity ordering).
 const runWithVisionDay = makeDay({
   stepsCount: 9800,
   exactRouteSegments: [{ id: 'r1', workoutId: 'w1', activityType: 'running', startedAt: '', endedAt: '', coordinates: [] }],
-  vision: { labels: [{ name: 'park', confidence: 0.5 }], maxFaceCount: 0, textTokens: [], analyzedPhotoCount: 1 },
+  vision: {
+    concepts: [{ name: 'park', salience: 0.5, coverage: 0.5, count: 1, peakConfidence: 0.5 }],
+    maxFaceCount: 0,
+    faceCoverage: 0,
+    textTokens: [],
+    analyzedPhotoCount: 2,
+  },
 });
 const runWithVisionCreature = engine.buildEncounterCreature(runWithVisionDay, {}, 'energy', 'focus');
 check('run outranks incidental vision label', runWithVisionCreature?.name === 'Sprintail', JSON.stringify(runWithVisionCreature?.name));
@@ -312,6 +435,48 @@ const bondedCreature = engine.buildEncounterCreature(coffeeDay, deepHistory, 'ca
 check('deep bond advances to stage 2', bondedCreature?.bondStage === 2 && bondedCreature?.bondVisitCount === 31,
   JSON.stringify({ stage: bondedCreature?.bondStage, count: bondedCreature?.bondVisitCount }));
 check('bond does not change rarity', bondedCreature?.rarity === 'common', String(bondedCreature?.rarity));
+
+// --- Hatch Your Past (onboarding reveal) ---
+function pastDay(iso, overrides = {}) {
+  return makeDay({ isoDate: iso, ...overrides });
+}
+
+// HP1. Repeat days bond into ONE creature with an accumulating visit count.
+const repeatPast = hatchPast.buildHatchYourPast([
+  pastDay('2026-06-10', { placeCategorySeeds: ['coffee_shop'] }),
+  pastDay('2026-06-11', { placeCategorySeeds: ['coffee_shop'] }),
+  pastDay('2026-06-12', { placeCategorySeeds: ['coffee_shop'] }),
+]);
+check('HP: repeat days bond into one creature', repeatPast.creatures.length === 1 && repeatPast.creatures[0].name === 'Baristabbit', JSON.stringify(repeatPast.creatures.map((c) => c.name)));
+check('HP: bond visit count accumulates', repeatPast.creatures[0].visitCount === 3, String(repeatPast.creatures[0]?.visitCount));
+check('HP: days hatched counted', repeatPast.daysHatched === 3, String(repeatPast.daysHatched));
+
+// HP2. Varied days yield distinct creatures.
+const variedPast = hatchPast.buildHatchYourPast([
+  pastDay('2026-06-10', { placeCategorySeeds: ['coffee_shop'] }),
+  pastDay('2026-06-11', { placeCategorySeeds: ['park'] }),
+  pastDay('2026-06-12', { stepsCount: 9000 }),
+]);
+check('HP: varied days yield unique creatures', variedPast.creatures.length === 3, JSON.stringify(variedPast.creatures.map((c) => c.name)));
+
+// HP3. No days → empty collection.
+check('HP: no days yields empty collection', hatchPast.buildHatchYourPast([]).creatures.length === 0);
+
+// HP4. Reveal is capped at 6.
+const manyPast = hatchPast.buildHatchYourPast(
+  ['coffee_shop', 'park', 'bakery', 'farm', 'library', 'museum', 'beach', 'cinema'].map((seed, index) =>
+    pastDay(`2026-06-0${index + 1}`, { placeCategorySeeds: [seed] })
+  )
+);
+check('HP: reveal capped at six', manyPast.creatures.length === 6, String(manyPast.creatures.length));
+
+// HP5. The rarest creature is revealed last (the climax).
+const rarePast = hatchPast.buildHatchYourPast([
+  pastDay('2026-06-11', { placeCategorySeeds: ['coffee_shop'] }),
+  pastDay('2026-06-12', { placeCategorySeeds: ['park'], newPlaceCount: 2 }),
+]);
+const climax = rarePast.creatures[rarePast.creatures.length - 1];
+check('HP: rarer creature revealed last', climax.rarity !== 'common', JSON.stringify(rarePast.creatures.map((c) => ({ n: c.name, r: c.rarity }))));
 
 console.log(failures === 0 ? '\nAll encounter-engine checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
