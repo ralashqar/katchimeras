@@ -19,7 +19,7 @@ function transpileToTemp(relativeSourcePath, outName) {
   return outPath;
 }
 
-const { curatePhotos } = require(transpileToTemp('utils/photo-curation.ts', 'photo-curation.js'));
+const { curatePhotos, isBlackOrFlatFrame } = require(transpileToTemp('utils/photo-curation.ts', 'photo-curation.js'));
 
 const BASE = new Date('2026-06-12T10:00:00.000Z').getTime();
 function photo(id, overrides = {}) {
@@ -134,13 +134,14 @@ const flat = curatePhotos([
 check('flat frame dropped', flat.keepers.map((p) => p.id).join(',') === 'real', JSON.stringify(flat.keepers.map((p) => p.id)));
 check('flat frame counted low_detail', flat.summary.lowDetail === 1, JSON.stringify(flat.summary));
 
-// 6a-geo. A geotagged frame is NEVER dropped by the brightness gates — a real
-// GPS location marks a place you went, so it always earns its map pin even if
-// the frame itself is black/flat. (Load-bearing for "pins always show".)
+// 6a-geo. A black/flat frame is junk even WITH a GPS tag (a covered-lens shot is
+// a pointless pin), so the brightness gates now drop it regardless of location.
+// (Backfill keeps a day's other photos placeable via separate coordinate sources,
+// so dropping a black anchor doesn't strand them.)
 const darkButGeotagged = curatePhotos([
   photo('placeshot', { createdAt: BASE, latitude: 40, longitude: -74, meanLuminance: 1, luminanceRange: 2 }),
 ]);
-check('geotagged dark/flat frame kept', darkButGeotagged.keepers.length === 1, JSON.stringify(darkButGeotagged.summary));
+check('geotagged black/flat frame dropped', darkButGeotagged.keepers.length === 0, JSON.stringify(darkButGeotagged.summary));
 
 // 6c. A dim-but-real night photo keeps its tonal range and survives both gates.
 const nightShot = curatePhotos([
@@ -148,11 +149,9 @@ const nightShot = curatePhotos([
 ]);
 check('dim photo with real range kept', nightShot.keepers.length === 1, JSON.stringify(nightShot.summary));
 
-// 6e. THE MAP INVARIANT: a geotagged frame marks a real place visited, so the
-// quality gates must NEVER drop it — even if it's pitch black AND flat. Without
-// this, a dark/flat geotagged photo would be erased before it becomes a map pin,
-// which is exactly the "no pins on the day map" regression. A photo with GPS is a
-// place you went; it always earns its pin.
+// 6e. A geotagged pitch-black AND flat frame (camera covered) is dropped and
+// counted — the more aggressive thresholds catch covered-lens / single-colour
+// shots wherever they were taken.
 const geotaggedDark = curatePhotos([
   photo('place', {
     createdAt: BASE,
@@ -163,10 +162,8 @@ const geotaggedDark = curatePhotos([
   }),
 ]);
 check(
-  'geotagged dark+flat frame kept (becomes a map pin)',
-  geotaggedDark.keepers.length === 1 &&
-    geotaggedDark.summary.tooDark === 0 &&
-    geotaggedDark.summary.lowDetail === 0,
+  'geotagged black+flat frame dropped (no pointless pin)',
+  geotaggedDark.keepers.length === 0 && (geotaggedDark.summary.tooDark === 1 || geotaggedDark.summary.lowDetail === 1),
   JSON.stringify(geotaggedDark.summary)
 );
 
@@ -188,6 +185,14 @@ check('caller ordering preserved', order.keepers.map((p) => p.id).join(',') === 
 // 8. Empty input is handled.
 const empty = curatePhotos([]);
 check('empty input handled', empty.keepers.length === 0 && empty.summary.total === 0, JSON.stringify(empty.summary));
+
+// 9. The display-time predicate (used by the day-map album) flags black / flat
+// frames and spares real ones and signal-less ones.
+check('isBlackOrFlatFrame: pure black flagged', isBlackOrFlatFrame({ meanLuminance: 2, luminanceRange: 3 }) === true);
+check('isBlackOrFlatFrame: single-colour (flat) flagged', isBlackOrFlatFrame({ meanLuminance: 200, luminanceRange: 4 }) === true);
+check('isBlackOrFlatFrame: real photo spared', isBlackOrFlatFrame({ meanLuminance: 120, luminanceRange: 180 }) === false);
+check('isBlackOrFlatFrame: dim-but-real spared', isBlackOrFlatFrame({ meanLuminance: 30, luminanceRange: 120 }) === false);
+check('isBlackOrFlatFrame: no signal never flags', isBlackOrFlatFrame({}) === false);
 
 console.log(failures === 0 ? '\nAll photo-curation checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

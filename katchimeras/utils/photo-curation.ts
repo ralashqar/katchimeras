@@ -76,11 +76,13 @@ const DEFAULT_MIN_RESOLUTION_PIXELS = 160 * 160;
 // dupes go, distinct shots of the same place stay.
 const DEFAULT_NEAR_DUPLICATE_WINDOW_MS = 120_000;
 const DEFAULT_SIMILARITY_HAMMING_THRESHOLD = 6;
-// Brightness gates (0-255). Conservative on purpose — only frames that are
-// genuinely black or genuinely structureless go; a dim-but-real night photo
-// keeps its tonal range and survives.
-const DEFAULT_DARK_LUMINANCE_THRESHOLD = 12;
-const DEFAULT_FLAT_LUMINANCE_RANGE_THRESHOLD = 8;
+// Brightness gates (0-255). Tuned to be decisive about junk: a fully-black /
+// camera-covered frame, or a single-colour / structureless one (a wall, a lens
+// cap, a blank), goes. A dim-but-real night photo keeps real tonal range across
+// the frame (a wide max-min), so the FLATNESS gate is the main signal and spares
+// it; the dark gate only adds the pure-black corner.
+const DEFAULT_DARK_LUMINANCE_THRESHOLD = 16;
+const DEFAULT_FLAT_LUMINANCE_RANGE_THRESHOLD = 14;
 
 export function curatePhotos<T extends CuratablePhoto>(
   photos: T[],
@@ -191,27 +193,36 @@ function isBelowResolution(photo: CuratablePhoto, minResolutionPixels: number): 
   return photo.width * photo.height < minResolutionPixels;
 }
 
-// A fully black / blacked-out frame: average brightness sits on the floor. Only
-// acts when the signal is present (never drops on a guess) — and NEVER on a
-// geotagged frame: a photo with a real GPS location marks a place you actually
-// went, so it always earns its map pin, dark or not. The quality gates drop
-// junk; they must never erase where you were.
-function isTooDark(photo: CuratablePhoto, threshold: number): boolean {
-  if (hasCoordinates(photo)) {
-    return false;
-  }
+// A fully black / blacked-out frame (camera covered): average brightness sits on
+// the floor. Only acts when the signal is present (never drops on a guess). A
+// black frame is junk even with a GPS tag — a pointless pin is worse than none —
+// so this no longer spares geotagged photos. (Backfill keeps non-geotagged
+// photos placeable via separate coordinate sources, so dropping a black anchor
+// can't strand a day's other photos.)
+function isTooDark(photo: { meanLuminance?: number | null }, threshold: number): boolean {
   return typeof photo.meanLuminance === 'number' && photo.meanLuminance <= threshold;
 }
 
 // A flat, structureless frame: almost no tonal range across the image — a blank
-// wall, a lens-cap shot, an over-blurred/over-exposed throwaway. Kept separate
-// from "too dark" so a bright-but-blank frame is caught too. Only acts when the
-// signal is present, and — like the dark gate — never on a geotagged frame.
-function isLowDetail(photo: CuratablePhoto, threshold: number): boolean {
-  if (hasCoordinates(photo)) {
-    return false;
-  }
+// wall, a lens-cap shot, a single-colour / covered frame, an over-blurred or
+// over-exposed throwaway. A dim-but-real photo keeps a wide tonal range and
+// survives. Like the dark gate, this acts on geotagged frames too.
+function isLowDetail(photo: { luminanceRange?: number | null }, threshold: number): boolean {
   return typeof photo.luminanceRange === 'number' && photo.luminanceRange <= threshold;
+}
+
+// Shared predicate: is this frame black / single-colour junk? Used both at
+// curation time AND at display time (the day-map album), so a black photo is
+// never shown on a pin even if it slipped into stored points. Returns false when
+// brightness signals are absent (never guesses).
+export function isBlackOrFlatFrame(signals: {
+  meanLuminance?: number | null;
+  luminanceRange?: number | null;
+}): boolean {
+  return (
+    isTooDark(signals, DEFAULT_DARK_LUMINANCE_THRESHOLD) ||
+    isLowDetail(signals, DEFAULT_FLAT_LUMINANCE_RANGE_THRESHOLD)
+  );
 }
 
 function isSameBurst(

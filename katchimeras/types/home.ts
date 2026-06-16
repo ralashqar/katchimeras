@@ -143,6 +143,11 @@ export type StoredHomeLocationPoint = {
   // Perceptual hash of the attached photo (when one is present), used to
   // collapse visual near-duplicates during day-map album curation.
   similarityHash?: string;
+  // On-device brightness signals (0-255) of the attached photo, so the day-map
+  // album can drop black / single-colour frames at DISPLAY time even if they
+  // slipped into stored points.
+  meanLuminance?: number;
+  luminanceRange?: number;
 };
 
 export type DayMapCoordinate = {
@@ -155,6 +160,8 @@ export type DayMapNodePhoto = {
   thumbnailUri: string;
   capturedAt: string;
   momentId: string | null;
+  meanLuminance?: number;
+  luminanceRange?: number;
 };
 
 export type DayMapNode = {
@@ -453,6 +460,10 @@ export type RecentPhotoAsset = {
   longitude?: number;
   // On-device perceptual hash (hex dHash) for visual-similarity curation.
   similarityHash?: string;
+  // On-device brightness signals (0-255) so the live seeder also drops black /
+  // single-colour junk before it becomes a pin.
+  meanLuminance?: number;
+  luminanceRange?: number;
   // On-device vision read of this frame (labels/OCR/face count), when analysed.
   vision?: PhotoVisionResult;
 };

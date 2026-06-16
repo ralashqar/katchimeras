@@ -7,7 +7,7 @@ import type {
   HomeMoment,
   StoredHomeLocationPoint,
 } from '@/types/home';
-import { curatePhotos } from '@/utils/photo-curation';
+import { curatePhotos, isBlackOrFlatFrame } from '@/utils/photo-curation';
 
 const CLUSTER_RADIUS_METERS = 150;
 const MAX_DAY_MAP_NODES = 5;
@@ -100,7 +100,12 @@ function createNode(cluster: LocationCluster): DayMapNode {
   const startedAt = sortedPoints[0]?.capturedAt ?? new Date().toISOString();
   const endedAt = sortedPoints[sortedPoints.length - 1]?.capturedAt ?? startedAt;
   const hasPhoto = sortedPoints.some((point) => point.hasPhoto);
-  const latestPhotoPoint = [...sortedPoints].reverse().find((point) => point.hasPhoto && point.thumbnailUri) ?? null;
+  // The marker's representative thumbnail must not be a black / single-colour
+  // frame — a pin should never show a black square.
+  const latestPhotoPoint =
+    [...sortedPoints]
+      .reverse()
+      .find((point) => point.hasPhoto && point.thumbnailUri && !isBlackOrFlatFrame(point)) ?? null;
   const linkedPoint =
     latestPhotoPoint ??
     [...sortedPoints].reverse().find((point) => point.hasPhoto && point.momentId) ??
@@ -143,12 +148,20 @@ function collectClusterPhotos(sortedPoints: StoredHomeLocationPoint[]): DayMapNo
     if (!point.hasPhoto || !point.thumbnailUri || seenThumbnail.has(point.thumbnailUri)) {
       return;
     }
+    // DISPLAY-TIME BLACK FILTER: a black / single-colour frame is never shown on
+    // a pin, however it was stored. Skipped only when the point carries no
+    // brightness signal (older points) — re-seeding/backfill populates it.
+    if (isBlackOrFlatFrame(point)) {
+      return;
+    }
     seenThumbnail.add(point.thumbnailUri);
     candidates.push({
       id: point.id,
       thumbnailUri: point.thumbnailUri,
       capturedAt: point.capturedAt,
       momentId: point.momentId ?? null,
+      meanLuminance: point.meanLuminance,
+      luminanceRange: point.luminanceRange,
     });
   });
 
@@ -166,6 +179,8 @@ function collectClusterPhotos(sortedPoints: StoredHomeLocationPoint[]): DayMapNo
           latitude: point?.lat,
           longitude: point?.lng,
           similarityHash: point?.similarityHash,
+          meanLuminance: point?.meanLuminance,
+          luminanceRange: point?.luminanceRange,
         };
       })
     ).keepers.map((photo) => photo.id)

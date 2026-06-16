@@ -3,8 +3,8 @@ import { useEffect, useRef } from 'react';
 
 import type { RecentPhotoAsset } from '@/types/home';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
-import { computePhotoHash } from '@/utils/photo-similarity';
-import { analyzePhoto, isVisionAvailable } from '@/utils/photo-vision';
+import { computePhotoSignature } from '@/utils/photo-similarity';
+import { analyzePhoto, analyzePhotoLuminance, isVisionAvailable } from '@/utils/photo-vision';
 
 // Scan a multi-day window so photos land on the days they were actually taken
 // (today and recent past), not just the newest handful that might all be old.
@@ -75,12 +75,15 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
             }
 
             const isScreenshot = asset.mediaSubtypes?.includes('screenshot');
-            // Perceptual hash + vision read both run on the decodable local file
-            // (ph:// asset URIs aren't directly decodable). Skipped for
-            // screenshots, which curation drops anyway. Both best-effort: they
-            // no-op when the native modules aren't in the build.
+            // Perceptual hash + brightness signals (one Skia decode) + vision read
+            // all run on the decodable local file (ph:// asset URIs aren't directly
+            // decodable). Skipped for screenshots, which curation drops anyway. All
+            // best-effort: they no-op when the native modules aren't in the build.
             const hashSource = info.localUri ?? asset.uri;
-            const similarityHash = isScreenshot ? undefined : (await computePhotoHash(hashSource)) ?? undefined;
+            // Brightness from the reliable native read (local thumbnail); Skia
+            // only for the dedup hash. Both best-effort.
+            const luminance = isScreenshot ? null : await analyzePhotoLuminance(asset.id);
+            const signature = isScreenshot ? null : await computePhotoSignature(hashSource);
             const vision =
               isScreenshot || !isVisionAvailable() ? undefined : (await analyzePhoto(hashSource)) ?? undefined;
 
@@ -91,7 +94,9 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
               isScreenshot,
               latitude,
               longitude,
-              similarityHash,
+              similarityHash: signature?.hash ?? undefined,
+              meanLuminance: luminance?.meanLuminance ?? signature?.meanLuminance ?? undefined,
+              luminanceRange: luminance?.luminanceRange ?? signature?.luminanceRange ?? undefined,
               vision,
               thumbnailUri: asset.uri,
               uri: asset.uri,

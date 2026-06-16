@@ -18,12 +18,45 @@ type VisionNativeModule = {
     text?: unknown[];
     faceCount?: unknown;
   }>;
+  // Reliable native brightness read (local thumbnail, Apple decode) — null when
+  // unavailable in the build or unreadable. Added so black/blank photos can be
+  // filtered even when the Skia decode returns nothing for them.
+  imageLuminanceAsync?: (assetId: string) => Promise<{
+    meanLuminance?: unknown;
+    luminanceRange?: unknown;
+  } | null>;
 };
 
 const nativeVision = requireOptionalNativeModule<VisionNativeModule>('KatchimeraVision');
 
 export function isVisionAvailable(): boolean {
   return nativeVision != null;
+}
+
+export type PhotoLuminance = { meanLuminance: number; luminanceRange: number };
+
+// Native brightness stats for one asset (by id or ph:// uri). Reliable where the
+// Skia decode fails (HEIC / iCloud-optimised photos), because it reads the local
+// thumbnail through Apple's pipeline. Returns null if the native module is absent
+// (old build) or the frame can't be read — callers must degrade gracefully.
+export async function analyzePhotoLuminance(assetId: string): Promise<PhotoLuminance | null> {
+  if (!nativeVision?.imageLuminanceAsync) {
+    return null;
+  }
+  try {
+    const raw = await nativeVision.imageLuminanceAsync(assetId);
+    if (!raw) {
+      return null;
+    }
+    const mean = Number(raw.meanLuminance);
+    const range = Number(raw.luminanceRange);
+    if (!Number.isFinite(mean) || !Number.isFinite(range)) {
+      return null;
+    }
+    return { meanLuminance: mean, luminanceRange: range };
+  } catch {
+    return null;
+  }
 }
 
 // Best-effort: returns the on-device read of one photo, or null if the module

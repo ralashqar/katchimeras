@@ -12,7 +12,7 @@ import type {
 import { curatePhotos, type CuratablePhoto } from '@/utils/photo-curation';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
 import { computePhotoSignature } from '@/utils/photo-similarity';
-import { analyzePhoto, isVisionAvailable } from '@/utils/photo-vision';
+import { analyzePhoto, analyzePhotoLuminance, isVisionAvailable } from '@/utils/photo-vision';
 import { aggregatePhotoVision } from '@/utils/vision-signals';
 import {
   beginBackfillEnrichment,
@@ -43,9 +43,10 @@ const SCAN_PAGE_SIZE = 200;
 const MAX_SCAN_PAGES = 20;
 // Assets processed per day. Generous so a busy day's whole roll is considered.
 const MAX_PHOTO_SCAN_PER_DAY = 120;
-// Frames we decode (Skia) for the dedup hash + brightness signals, per day. Caps
-// the on-device pixel work; frames past this keep but lose black/blur/dup filtering.
-const MAX_SIGNATURE_PER_DAY = 60;
+// Frames we decode (Skia) for the dedup hash + brightness signals, per day. Set
+// to the scan cap so EVERY photo that can become a point gets a brightness signal
+// — otherwise black frames past the cap have no signal and can't be filtered.
+const MAX_SIGNATURE_PER_DAY = MAX_PHOTO_SCAN_PER_DAY;
 // Mean luminance (0-255) at/below which a frame reads as black — used only to spot
 // a degenerate/broken decode across a day, never to drop a single frame directly.
 const DEGENERATE_DARK_LUMINANCE = 4;
@@ -331,18 +332,28 @@ async function buildDayPhotos(
       }
 
       const isScreenshot = asset.mediaSubtypes?.includes('screenshot') ?? false;
-      // Best-effort pixel signals (hash + brightness) for black/blur/dup
-      // filtering. Capped, skipped for screenshots, and never fatal.
       let meanLuminance: number | null = null;
       let luminanceRange: number | null = null;
       let similarityHash: string | null = null;
-      if (!isScreenshot && signaturesComputed < MAX_SIGNATURE_PER_DAY) {
-        const signature = await computePhotoSignature(localUri);
-        if (signature) {
-          meanLuminance = signature.meanLuminance;
-          luminanceRange = signature.luminanceRange;
-          similarityHash = signature.hash;
-          signaturesComputed += 1;
+      if (!isScreenshot) {
+        // Brightness from the NATIVE module (reliable — local thumbnail, Apple
+        // decode) so black/blank frames are caught even when Skia can't decode
+        // the photo. This is the black-filter signal.
+        const luminance = await analyzePhotoLuminance(asset.id);
+        if (luminance) {
+          meanLuminance = luminance.meanLuminance;
+          luminanceRange = luminance.luminanceRange;
+        }
+        // Skia signature only for the dedup HASH (best-effort, capped); fall back
+        // to its brightness only if the native read was unavailable.
+        if (signaturesComputed < MAX_SIGNATURE_PER_DAY) {
+          const signature = await computePhotoSignature(localUri);
+          if (signature) {
+            similarityHash = signature.hash;
+            if (meanLuminance == null) meanLuminance = signature.meanLuminance;
+            if (luminanceRange == null) luminanceRange = signature.luminanceRange;
+            signaturesComputed += 1;
+          }
         }
       }
 
@@ -362,12 +373,12 @@ async function buildDayPhotos(
       });
     }
 
-    // If the day's pixel signal looks broken, discard it so the quality gates
-    // can't wrongly delete real photos (hard lesson — see isDegenerateSignal).
+    // If the Skia signal looks broken, discard ONLY the dedup hash (so a
+    // degenerate hash can't over-collapse near-duplicates). The brightness now
+    // comes from the reliable native read, so it's kept — the black filter still
+    // works even when the hash is junk.
     if (isDegenerateSignal(scanned)) {
       for (const photo of scanned) {
-        photo.meanLuminance = null;
-        photo.luminanceRange = null;
         photo.similarityHash = null;
       }
     }
@@ -391,33 +402,28 @@ async function buildDayPhotos(
     }));
     const keeperIds = new Set(curatePhotos(curatable).keepers.map((photo) => photo.id));
 
-    // 3. Turn photos into located points. Every geotagged photo earns its pin
-    //    (anchors come straight from the geotagged set, so cleanup can't drop the
-    //    last photo at a place). Non-geotagged photos must be curation keepers to
-    //    ride along, and each borrows the nearest-in-time anchor so it joins that
-    //    place's album — no time cap, because the goal is to show the whole day.
-    const anchors = scanned
+    // 3. Turn photos into located points. ONLY curation keepers become points, so
+    //    junk (screenshots/tiny/black/blur/dup) — geotagged or not — never shows
+    //    as a pin. But borrowing uses ALL geotagged photos as coordinate sources
+    //    (even dropped black ones), so dropping a black anchor can never strand a
+    //    day's other good photos: a non-geotagged keeper can still borrow that
+    //    place and become the pin there. No time cap — show the whole day.
+    const coordSources = scanned
       .filter((photo) => photo.latitude != null && photo.longitude != null)
       .sort((left, right) => left.createdAt - right.createdAt);
 
-    const placed: { photo: ScannedPhoto; lat: number; lng: number }[] = anchors.map((photo) => ({
-      photo,
-      lat: photo.latitude as number,
-      lng: photo.longitude as number,
-    }));
-
-    if (anchors.length > 0) {
-      for (const photo of scanned) {
-        if (photo.latitude != null && photo.longitude != null) {
-          continue; // already an anchor
-        }
-        if (!keeperIds.has(photo.id)) {
-          continue; // curation dropped this extra (screenshot/tiny/black/blur/dup)
-        }
-        const anchor = nearestAnchorByTime(anchors, photo.createdAt);
-        if (anchor) {
-          placed.push({ photo, lat: anchor.latitude, lng: anchor.longitude });
-        }
+    const placed: { photo: ScannedPhoto; lat: number; lng: number }[] = [];
+    for (const photo of scanned) {
+      if (!keeperIds.has(photo.id)) {
+        continue; // dropped by curation (screenshot/tiny/black/blur/dup)
+      }
+      if (photo.latitude != null && photo.longitude != null) {
+        placed.push({ photo, lat: photo.latitude, lng: photo.longitude });
+        continue;
+      }
+      const anchor = nearestAnchorByTime(coordSources, photo.createdAt);
+      if (anchor) {
+        placed.push({ photo, lat: anchor.latitude, lng: anchor.longitude });
       }
     }
 
@@ -435,9 +441,11 @@ async function buildDayPhotos(
         hasPhoto: true,
         source: 'photo_attachment' as const,
         thumbnailUri: photo.thumbnailUri,
-        // Carry the hash so the day-map's display-time album curation can also
-        // collapse look-alikes within each cluster.
+        // Carry the hash + brightness so the day-map's display-time pass can
+        // collapse look-alikes AND drop any black frame within each cluster.
         similarityHash: photo.similarityHash ?? undefined,
+        meanLuminance: photo.meanLuminance ?? undefined,
+        luminanceRange: photo.luminanceRange ?? undefined,
       }));
 
     // 4. On-device Vision read for the day's narrative (labels/OCR/faces) —
@@ -461,7 +469,7 @@ async function buildDayPhotos(
       visionResults,
       rawAssets,
       scanned: scanned.length,
-      geotagged: anchors.length,
+      geotagged: coordSources.length,
     };
   } catch {
     return { ...EMPTY_PHOTO_SCAN };
@@ -556,10 +564,14 @@ function isDegenerateSignal(scanned: ScannedPhoto[]): boolean {
   if (signed.length < 4) {
     return false;
   }
+  // Only a TRULY broken decode reads most of the roll as pure black — a real
+  // night-out day can legitimately have many dark frames, and we must not let
+  // that disable black filtering. So this is deliberately high (0.7); the more
+  // reliable broken-decode tell is one identical hash dominating every frame.
   const blackish = signed.filter(
     (photo) => typeof photo.meanLuminance === 'number' && photo.meanLuminance <= DEGENERATE_DARK_LUMINANCE
   ).length;
-  if (blackish / signed.length > 0.3) {
+  if (blackish / signed.length > 0.7) {
     return true;
   }
   const hashCounts = new Map<string, number>();
@@ -571,7 +583,7 @@ function isDegenerateSignal(scanned: ScannedPhoto[]): boolean {
       topHashCount = next;
     }
   }
-  return topHashCount / signed.length > 0.5;
+  return topHashCount / signed.length > 0.6;
 }
 
 // Diagnostic: dump the newest few photos' resolved DAY and whether they carry a
@@ -602,7 +614,10 @@ async function sampleNewestTimestamps(): Promise<string> {
       } catch (error) {
         loc = `err:${String((error as { message?: string })?.message ?? error).slice(0, 34)}`;
       }
-      lines.push(`  ${day} ${loc}`);
+      // Native brightness — confirms the black filter has real numbers to act on.
+      const lum = await analyzePhotoLuminance(asset.id);
+      const lumStr = lum ? `lum=${lum.meanLuminance.toFixed(0)} rng=${lum.luminanceRange.toFixed(0)}` : 'lum=NULL';
+      lines.push(`  ${day} ${loc} ${lumStr}`);
     }
     return lines.join('\n');
   } catch (error) {
@@ -610,24 +625,29 @@ async function sampleNewestTimestamps(): Promise<string> {
   }
 }
 
-// Additive merge of two located-photo sets keyed by stable photo id: keeps every
-// existing point (and its momentId/links) and folds in any freshly-scanned point
-// that wasn't already there, in capture order. Never removes a point, so a fresh
-// scan that happens to find fewer photos can't erase a day's existing pins.
-function unionLocationsById(
+// An auto-seeded camera-roll photo point (from backfill or the live seeder) —
+// NOT a user-attached moment photo, route point, or GPS sample.
+function isAutoSeededPhotoPoint(point: StoredHomeLocationPoint): boolean {
+  return (
+    point.source === 'photo_attachment' &&
+    point.id.startsWith('camera-roll-photo-') &&
+    point.momentId == null
+  );
+}
+
+// REPLACES a day's auto-seeded photo points with the freshly-curated scan
+// (`incoming` already has black/blur/dup removed). A plain additive union could
+// never prune a black photo a previous run stored, so cleanup never "took". This
+// preserves everything else (moment-linked photos, route, GPS samples) and only
+// swaps the auto-seeded set — so re-pressing Backfill actually removes junk.
+function mergeFreshPhotoPoints(
   existing: StoredHomeLocationPoint[],
   incoming: StoredHomeLocationPoint[]
 ): StoredHomeLocationPoint[] {
-  const byId = new Map<string, StoredHomeLocationPoint>();
-  for (const point of existing) {
-    byId.set(point.id, point);
-  }
-  for (const point of incoming) {
-    if (!byId.has(point.id)) {
-      byId.set(point.id, point);
-    }
-  }
-  return [...byId.values()].sort(
+  const preserved = existing.filter((point) => !isAutoSeededPhotoPoint(point));
+  const preservedIds = new Set(preserved.map((point) => point.id));
+  const fresh = incoming.filter((point) => !preservedIds.has(point.id));
+  return [...preserved, ...fresh].sort(
     (left, right) => new Date(left.capturedAt).getTime() - new Date(right.capturedAt).getTime()
   );
 }
@@ -686,8 +706,8 @@ export async function runBackfillPhotosOnly(): Promise<string> {
   // fold, and the "PHOTO CHECK v3" banner confirms this fresh code is running.
   const dump = await sampleNewestTimestamps();
   const top =
-    `PHOTO CHECK v5\n` +
-    `newest photos (day + GPS):\n${dump}\n` +
+    `PHOTO CHECK v6\n` +
+    `newest photos (day + GPS + brightness):\n${dump}\n` +
     `— access:${access} library:${libraryTotal} raw:${totalRaw} scanned:${totalScanned} geo:${totalGeotagged}`;
 
   if (totalRaw === 0) {
@@ -705,12 +725,9 @@ export async function runBackfillPhotosOnly(): Promise<string> {
   const mergeDay = (day: StoredHomeDayRecord): StoredHomeDayRecord => {
     const rich = richByDate.get(day.isoDate);
     if (!rich || rich.locations.length === 0) {
-      return day;
+      return day; // no fresh photos this run — never wipe a day on a blank scan
     }
-    const merged = unionLocationsById(day.locations, rich.locations);
-    if (merged.length === day.locations.length) {
-      return day;
-    }
+    const merged = mergeFreshPhotoPoints(day.locations, rich.locations);
     return { ...day, locations: merged, locationSampleCount: merged.length };
   };
 
@@ -756,12 +773,9 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
   const mergeDay = (day: StoredHomeDayRecord): StoredHomeDayRecord => {
     const rich = richByDate.get(day.isoDate);
     if (!rich || rich.locations.length === 0) {
-      return day;
+      return day; // no fresh photos this run — never wipe a day on a blank scan
     }
-    const merged = unionLocationsById(day.locations, rich.locations);
-    if (merged.length === day.locations.length) {
-      return day;
-    }
+    const merged = mergeFreshPhotoPoints(day.locations, rich.locations);
     return { ...day, locations: merged, locationSampleCount: merged.length };
   };
 

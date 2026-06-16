@@ -438,6 +438,8 @@ export function seedPhotoLocationsByDay(
           momentId: null,
           thumbnailUri: photo.thumbnailUri || photo.uri,
           similarityHash: photo.similarityHash,
+          meanLuminance: photo.meanLuminance,
+          luminanceRange: photo.luminanceRange,
         };
         const existingIndex = nextLocations.findIndex((point) => point.id === seededPoint.id);
 
