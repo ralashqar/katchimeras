@@ -2,6 +2,7 @@ import ExpoModulesCore
 import Vision
 import Photos
 import CoreGraphics
+import UIKit
 import Foundation
 
 // On-device photo read with Apple's Vision framework: scene/object labels, OCR
@@ -28,6 +29,111 @@ public final class KatchimeraVisionModule: Module {
       DispatchQueue.global(qos: .userInitiated).async {
         self.imageLuminance(assetId: assetId, promise: promise)
       }
+    }
+
+    // Resized JPEG (base64) of a photo, for the day-comic generator — reliable
+    // where Skia/JS can't read HEIC / iCloud photos (Apple decode, downloads from
+    // iCloud if needed since this is a deliberate share action). Returns null when
+    // the asset or its image can't be read.
+    AsyncFunction("thumbnailBase64Async") { (assetId: String, maxSize: Int, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        self.thumbnailBase64(assetId: assetId, maxSize: maxSize, promise: promise)
+      }
+    }
+
+    // Combines several photos into ONE grid image (JPEG base64) — for sending the
+    // comic generator a single combined reference instead of N separate ones.
+    AsyncFunction("combineThumbnailsBase64Async") { (assetIds: [String], maxSize: Int, promise: Promise) in
+      DispatchQueue.global(qos: .userInitiated).async {
+        self.combineThumbnails(assetIds: assetIds, maxSize: maxSize, promise: promise)
+      }
+    }
+  }
+
+  // Synchronous PHAsset → UIImage (downloads from iCloud if needed). Shared by the
+  // single-thumbnail and the grid functions.
+  private func loadThumbnailUIImage(assetId: String, maxSize: Int) -> UIImage? {
+    let localId = assetId.hasPrefix("ph://") ? String(assetId.dropFirst(5)) : assetId
+    let fetch = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
+    guard let asset = fetch.firstObject else {
+      return nil
+    }
+    let options = PHImageRequestOptions()
+    options.deliveryMode = .highQualityFormat
+    options.resizeMode = .fast
+    options.isNetworkAccessAllowed = true   // a share artifact — OK to fetch from iCloud
+    options.isSynchronous = true
+    let side = CGFloat(min(max(maxSize, 64), 1536))
+    var result: UIImage?
+    PHImageManager.default().requestImage(
+      for: asset,
+      targetSize: CGSize(width: side, height: side),
+      contentMode: .aspectFit,
+      options: options
+    ) { image, _ in
+      if result == nil, let image = image {
+        result = image
+      }
+    }
+    return result
+  }
+
+  private func thumbnailBase64(assetId: String, maxSize: Int, promise: Promise) {
+    if let image = loadThumbnailUIImage(assetId: assetId, maxSize: maxSize),
+       let data = image.jpegData(compressionQuality: 0.72) {
+      promise.resolve(data.base64EncodedString())
+    } else {
+      promise.resolve(NSNull())
+    }
+  }
+
+  private func combineThumbnails(assetIds: [String], maxSize: Int, promise: Promise) {
+    var images: [UIImage] = []
+    for assetId in assetIds.prefix(9) {
+      if let image = loadThumbnailUIImage(assetId: assetId, maxSize: maxSize) {
+        images.append(image)
+      }
+    }
+    guard !images.isEmpty else {
+      promise.resolve(NSNull())
+      return
+    }
+
+    let count = images.count
+    let cols = Int(ceil(Double(count).squareRoot()))
+    let rows = Int(ceil(Double(count) / Double(cols)))
+    let cell = CGFloat(min(max(maxSize, 256), 1536)) / CGFloat(cols)
+    let canvas = CGSize(width: cell * CGFloat(cols), height: cell * CGFloat(rows))
+
+    let renderer = UIGraphicsImageRenderer(size: canvas)
+    let combined = renderer.image { context in
+      UIColor.white.setFill()
+      context.fill(CGRect(origin: .zero, size: canvas))
+      for (index, image) in images.enumerated() {
+        let column = index % cols
+        let row = index / cols
+        let rect = CGRect(x: CGFloat(column) * cell, y: CGFloat(row) * cell, width: cell, height: cell)
+        // Aspect-fill each cell (scale to cover, clip the overflow).
+        let scale = max(rect.width / image.size.width, rect.height / image.size.height)
+        let drawnWidth = image.size.width * scale
+        let drawnHeight = image.size.height * scale
+        let drawRect = CGRect(
+          x: rect.midX - drawnWidth / 2,
+          y: rect.midY - drawnHeight / 2,
+          width: drawnWidth,
+          height: drawnHeight
+        )
+        context.cgContext.saveGState()
+        context.cgContext.clip(to: rect)
+        image.draw(in: drawRect)
+        context.cgContext.restoreGState()
+      }
+    }
+
+    if let data = combined.jpegData(compressionQuality: 0.78) {
+      promise.resolve(data.base64EncodedString())
+    } else {
+      promise.resolve(NSNull())
     }
   }
 

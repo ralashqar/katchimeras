@@ -413,6 +413,18 @@ entrypoint = "./functions/generate-katchimera-art/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/generate-katchimera-art/*.html" ]
 
+[functions.generate-day-comic]
+enabled = true
+verify_jwt = false
+import_map = "./functions/generate-day-comic/deno.json"
+entrypoint = "./functions/generate-day-comic/index.ts"
+
+[functions.cleanup-comic-inputs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/cleanup-comic-inputs/deno.json"
+entrypoint = "./functions/cleanup-comic-inputs/index.ts"
+
 [functions.generate-player-avatar]
 enabled = true
 verify_jwt = false

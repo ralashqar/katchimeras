@@ -25,6 +25,10 @@ type VisionNativeModule = {
     meanLuminance?: unknown;
     luminanceRange?: unknown;
   } | null>;
+  // Resized JPEG base64 of a photo (no data: prefix). Null when unreadable.
+  thumbnailBase64Async?: (assetId: string, maxSize: number) => Promise<string | null>;
+  // One grid JPEG base64 combining several photos. Null when unavailable.
+  combineThumbnailsBase64Async?: (assetIds: string[], maxSize: number) => Promise<string | null>;
 };
 
 const nativeVision = requireOptionalNativeModule<VisionNativeModule>('KatchimeraVision');
@@ -54,6 +58,40 @@ export async function analyzePhotoLuminance(assetId: string): Promise<PhotoLumin
       return null;
     }
     return { meanLuminance: mean, luminanceRange: range };
+  } catch {
+    return null;
+  }
+}
+
+// A resized JPEG data URI for one photo (by id / ph:// uri), for the day-comic
+// generator. Native (reliable for HEIC / iCloud). Returns null if unavailable.
+export async function getPhotoThumbnailDataUri(
+  assetId: string,
+  maxSize = 768
+): Promise<string | null> {
+  if (!nativeVision?.thumbnailBase64Async) {
+    return null;
+  }
+  try {
+    const base64 = await nativeVision.thumbnailBase64Async(assetId, maxSize);
+    return base64 ? `data:image/jpeg;base64,${base64}` : null;
+  } catch {
+    return null;
+  }
+}
+
+// One combined grid data URI of several photos (native). Null if unavailable
+// (older build) — callers fall back to separate photos.
+export async function getCombinedThumbnailDataUri(
+  assetIds: string[],
+  maxSize = 1024
+): Promise<string | null> {
+  if (!nativeVision?.combineThumbnailsBase64Async || assetIds.length === 0) {
+    return null;
+  }
+  try {
+    const base64 = await nativeVision.combineThumbnailsBase64Async(assetIds, maxSize);
+    return base64 ? `data:image/jpeg;base64,${base64}` : null;
   } catch {
     return null;
   }

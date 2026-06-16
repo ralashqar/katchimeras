@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, type LayoutChangeEvent, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, type LayoutChangeEvent, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useEffect, useRef, useState } from 'react';
 import { captureRef } from 'react-native-view-shot';
@@ -10,9 +11,9 @@ import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
-import { DayComic } from '@/components/katchadeck/home/day-comic';
-import { requestComicBeats } from '@/utils/day-reflection';
+import { renderDayComic } from '@/utils/day-comic-render';
 import { ensureDayVision } from '@/utils/photo-vision';
+import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
@@ -27,6 +28,8 @@ import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useRecentPhotoMapSeeding } from '@/hooks/use-recent-photo-map-seeding';
 import { useBackfillStatus } from '@/utils/backfill-status';
 import type { HomeDayRecord, HomeMoment } from '@/types/home';
+
+const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -52,10 +55,13 @@ export default function HomeScreen() {
   const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
   const [heroAnchorY, setHeroAnchorY] = useState(316);
   const [sharingDayId, setSharingDayId] = useState<string | null>(null);
-  const [sharingComicDayId, setSharingComicDayId] = useState<string | null>(null);
-  const [comicBeats, setComicBeats] = useState<string[] | null>(null);
+  // GPT-Image comic generation: full-page A4 comic rendered from the day's
+  // photos + creature (sent to the server — opt-in, see consent gate).
+  const [comicGen, setComicGen] = useState<
+    { dayId: string; status: 'generating' | 'done' | 'error'; imageUrl?: string; error?: string } | null
+  >(null);
   const postcardRef = useRef<View>(null);
-  const comicRef = useRef<View>(null);
+  const comicShotRef = useRef<View>(null);
   const addMomentFlow = useAddMomentFlow({
     enabled: selectedDay?.kind === 'day' && selectedDay.canAddMoments,
     onAddMoment: addMoment,
@@ -220,46 +226,68 @@ export default function HomeScreen() {
     }
   }
 
-  async function handleShareComic() {
-    if (
-      !selectedDay ||
-      selectedDay.kind !== 'day' ||
-      selectedDay.state !== 'hatched' ||
-      !selectedDay.creature ||
-      !selectedDay.shareReadyAt ||
-      !comicRef.current
-    ) {
+  // The comic now renders a full A4 page with GPT-Image from the day's real
+  // photos + creature — which means those photos leave the device. Gate the very
+  // first generation behind an explicit, one-time consent.
+  function handleMakeComic() {
+    if (!shareableDay) {
       return;
     }
+    const day = shareableDay;
+    if (getStoredJson(COMIC_PHOTO_CONSENT_KEY, false)) {
+      void generateComic(day);
+      return;
+    }
+    Alert.alert(
+      'Make a comic from your photos?',
+      'This sends a few of the day’s photos to our image generator to draw your comic page. Your photos stay private otherwise.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Generate',
+          onPress: () => {
+            setStoredJson(COMIC_PHOTO_CONSENT_KEY, true);
+            void generateComic(day);
+          },
+        },
+      ]
+    );
+  }
 
-    setSharingComicDayId(selectedDay.id);
-
+  async function generateComic(day: HomeDayRecord & { creature: NonNullable<HomeDayRecord['creature']> }) {
+    setComicGen({ dayId: day.id, status: 'generating' });
     try {
-      // Make sure the day has a vision read so the beats can name what the
+      // Make sure the day has a vision read so the comic's text can name what the
       // photos actually showed (analyses on the spot if it was never read).
-      const vision = await ensureDayVision(selectedDay);
-      const dayForBeats = vision ? { ...selectedDay, vision } : selectedDay;
+      const vision = await ensureDayVision(day);
+      const dayForComic = vision ? { ...day, vision } : day;
+      const result = await renderDayComic(dayForComic, loadOnboardingProfile());
+      if ('imageUrl' in result) {
+        setComicGen({ dayId: day.id, status: 'done', imageUrl: result.imageUrl });
+      } else {
+        setComicGen({ dayId: day.id, status: 'error', error: result.error });
+      }
+    } catch {
+      setComicGen({ dayId: day.id, status: 'error', error: 'Something went wrong generating the comic.' });
+    }
+  }
 
-      // Fetch the LLM panel beats first (null on failure → local beats), then
-      // let the off-screen DayComic re-render with them before we capture.
-      const beats = await requestComicBeats(dayForBeats, loadOnboardingProfile());
-      setComicBeats(beats);
-      await new Promise((resolve) => setTimeout(resolve, 60));
-
-      const uri = await captureRef(comicRef.current, {
-        format: 'png',
-        quality: 1,
-        result: 'tmpfile',
-      });
-
-      await Share.share({
-        message: `${selectedDay.creature.name} — a four-panel day.`,
-        title: `${selectedDay.creature.name} comic`,
-        url: uri,
-      });
-    } finally {
-      setSharingComicDayId((current) => (current === selectedDay.id ? null : current));
-      setComicBeats(null);
+  async function handleShareGeneratedComic() {
+    if (comicGen?.status !== 'done' || !comicGen.imageUrl) {
+      return;
+    }
+    const message = `${shareableDay?.creature.name ?? 'My'} day — a Katchimeras comic.`;
+    try {
+      // Capture the (already-loaded) comic image to a local file so the share
+      // sheet hands WhatsApp etc. the actual IMAGE, not just a link.
+      let url = comicGen.imageUrl;
+      if (comicShotRef.current) {
+        url = await captureRef(comicShotRef.current, { format: 'png', quality: 1, result: 'tmpfile' });
+      }
+      await Share.share({ message, url });
+    } catch {
+      // Fall back to sharing the hosted link if capture/share fails.
+      await Share.share({ message, url: comicGen.imageUrl });
     }
   }
 
@@ -374,10 +402,11 @@ export default function HomeScreen() {
                 />
               </View>
               <KatchaButton
-                disabled={sharingComicDayId === selectedDay.id}
+                disabled={comicGen?.status === 'generating'}
+                loading={comicGen?.status === 'generating'}
                 icon="sparkles"
-                label={sharingComicDayId === selectedDay.id ? 'Drawing comic…' : 'Make the comic'}
-                onPress={handleShareComic}
+                label={comicGen?.status === 'generating' ? 'Drawing your comic…' : 'Make the comic'}
+                onPress={handleMakeComic}
                 variant="premium"
               />
             </View>
@@ -422,8 +451,59 @@ export default function HomeScreen() {
       {shareableDay ? (
         <View pointerEvents="none" style={styles.captureCardWrap}>
           <MemoryPostcard day={shareableDay} ref={postcardRef} />
-          <DayComic beats={comicBeats} day={shareableDay} ref={comicRef} />
         </View>
+      ) : null}
+
+      {comicGen && comicGen.status !== 'done' && comicGen.dayId === selectedDay?.id ? (
+        <Animated.View entering={FadeIn.duration(220)} style={styles.comicOverlay}>
+          {comicGen.status === 'generating' ? (
+            <View style={styles.comicCenter}>
+              <ActivityIndicator color={Lantern.ember300} size="large" />
+              <ThemedText style={styles.comicStatus} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Drawing your comic page…
+              </ThemedText>
+              <ThemedText style={styles.comicSubStatus} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                This takes up to a minute.
+              </ThemedText>
+            </View>
+          ) : (
+            <View style={styles.comicCenter}>
+              <ThemedText style={styles.comicStatus} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Couldn’t draw the comic
+              </ThemedText>
+              <ThemedText style={styles.comicSubStatus} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                {comicGen.error ?? 'Please try again.'}
+              </ThemedText>
+              <View style={styles.comicActions}>
+                <KatchaButton label="Close" onPress={() => setComicGen(null)} variant="secondary" />
+                {shareableDay ? <KatchaButton label="Try again" onPress={() => generateComic(shareableDay)} variant="primary" /> : null}
+              </View>
+            </View>
+          )}
+        </Animated.View>
+      ) : null}
+
+      {comicGen?.status === 'done' && comicGen.imageUrl ? (
+        <Animated.View entering={FadeIn.duration(260)} style={styles.comicOverlay}>
+          <ScrollView
+            style={styles.comicViewer}
+            contentContainerStyle={styles.comicViewerScroll}
+            showsVerticalScrollIndicator={false}>
+            <View collapsable={false} ref={comicShotRef} style={styles.comicImage}>
+              <Image contentFit="contain" source={comicGen.imageUrl} style={StyleSheet.absoluteFill} transition={160} />
+            </View>
+          </ScrollView>
+          <View style={styles.comicActions}>
+            <KatchaButton label="Close" onPress={() => setComicGen(null)} style={styles.comicActionButton} variant="secondary" />
+            <KatchaButton
+              icon="sparkles"
+              label="Share comic"
+              onPress={handleShareGeneratedComic}
+              style={styles.comicActionButton}
+              variant="primary"
+            />
+          </View>
+        </Animated.View>
       ) : null}
     </View>
   );
@@ -583,5 +663,57 @@ const styles = StyleSheet.create({
   backfillTagLabel: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  comicOverlay: {
+    backgroundColor: 'rgba(6, 5, 12, 0.96)',
+    bottom: 0,
+    left: 0,
+    paddingBottom: 32,
+    paddingHorizontal: 18,
+    paddingTop: 64,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 60,
+  },
+  comicCenter: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+    justifyContent: 'center',
+  },
+  comicStatus: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  comicSubStatus: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  comicViewer: {
+    flex: 1,
+  },
+  comicViewerScroll: {
+    alignItems: 'center',
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingBottom: 16,
+  },
+  comicImage: {
+    aspectRatio: 3 / 4,
+    backgroundColor: '#0C0A14',
+    borderRadius: 18,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  comicActions: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  comicActionButton: {
+    flex: 1,
   },
 });
