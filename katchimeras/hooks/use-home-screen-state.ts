@@ -6,6 +6,7 @@ import type {
   AddMomentInput,
   ActivityPermissionState,
   DayPromptKind,
+  DayScores,
   DayVisionSummary,
   HealthPermissionState,
   LocationPermissionState,
@@ -17,7 +18,7 @@ import {
   answerDayPromptForToday,
   answerHeroPhotoMeaningForToday,
   applyBackfilledDays,
-  applyCapturedPhotoVisionForToday,
+  applyCapturedMomentForToday,
   applyGeneratedReflection,
   dismissDayPromptForToday,
   hydrateHomeState,
@@ -250,16 +251,19 @@ export function useHomeScreenState() {
     });
   }, [forceMeaningfulPhotoPrompt]);
 
-  // Fold a snapped-and-analysed photo's vision into today so it contributes to
-  // the hatch + reflection.
-  const applyCapturedPhotoVision = useCallback((vision: DayVisionSummary) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return applyCapturedPhotoVisionForToday(hydrated.state, vision, profile, now);
-    });
-  }, []);
+  // Fold a camera capture into today: its captured energy (score deltas) and the
+  // detected subject (vision) both contribute to the hatch + reflection.
+  const applyCapturedMoment = useCallback(
+    (capture: { energy: Partial<DayScores>; vision: DayVisionSummary | null }) => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return applyCapturedMomentForToday(hydrated.state, capture, profile, now);
+      });
+    },
+    []
+  );
 
   const answerPhotoMeaning = useCallback((input: { choiceIds: string[]; noteText?: string | null }) => {
     const now = new Date();
@@ -600,7 +604,7 @@ export function useHomeScreenState() {
     selectedDay,
     activeDayPrompt,
     availableDayPrompts,
-    applyCapturedPhotoVision,
+    applyCapturedMoment,
     locationPermission: viewModel.state.locationPermission,
     activityPermission: viewModel.state.activityPermission,
     healthPermission: viewModel.state.healthPermission,

@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { captureRef } from 'react-native-view-shot';
 
 import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
@@ -16,9 +17,8 @@ import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-f
 import { EggOrbitIcons, type OrbitIcon } from '@/components/katchadeck/home/egg-orbit-icons';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { renderDayComic } from '@/utils/day-comic-render';
-import { analyzePhoto, ensureDayVision } from '@/utils/photo-vision';
-import { aggregatePhotoVision } from '@/utils/vision-signals';
-import { resolvePhotoCategory } from '@/utils/photo-category';
+import { ensureDayVision } from '@/utils/photo-vision';
+import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
@@ -40,10 +40,10 @@ const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const {
     activeDayPrompt,
     availableDayPrompts,
-    applyCapturedPhotoVision,
     activityPermission,
     answerDayPrompt,
     answerPhotoMeaning,
@@ -95,11 +95,9 @@ export default function HomeScreen() {
     () => ({ ...dayPromptRegistry.meaning, photoCandidates: [] }),
     []
   );
-  // Camera capture: snap → analyse → feed the egg → orbit a category icon.
+  // Category icons orbiting the egg, one per fed photo (capture / photo prompt).
   const [orbitIcons, setOrbitIcons] = useState<OrbitIcon[]>([]);
-  const [capturing, setCapturing] = useState(false);
   const orbitNonce = useRef(0);
-  const cameraButtonRef = useRef<View | null>(null);
 
   const backgroundAccent =
     selectedDay?.kind === 'day'
@@ -377,49 +375,25 @@ export default function HomeScreen() {
     startEggFeed(from, { photoUri: photo.thumbnailUri }, () => {});
   }
 
-  // Snap a photo with the camera, read it on-device, feed it into the egg, and
-  // start a category icon (food / drink / landmark…) orbiting the egg. The
-  // analysed concepts also fold into today so the photo shapes the hatch.
-  async function handleCaptureMoment() {
-    if (capturing) {
-      return;
-    }
-    setCapturing(true);
-    try {
-      const ImagePicker = await import('expo-image-picker');
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Camera access needed', 'Allow camera access to snap a moment for today.');
+  // Returning from the Moment Capture screen: it already folded the moment into
+  // today; here we play the celebratory feed — the photo flies up into the egg
+  // from the bottom and its category icon starts orbiting. Runs on focus.
+  useFocusEffect(
+    useCallback(() => {
+      const feed = consumeCaptureFeed();
+      if (!feed) {
         return;
-      }
-      const result = await ImagePicker.launchCameraAsync({ quality: 0.6 });
-      if (result.canceled || !result.assets?.length) {
-        return;
-      }
-      const asset = result.assets[0];
-      const visionResult = await analyzePhoto(asset.uri);
-      const summary = visionResult ? aggregatePhotoVision([visionResult]) : null;
-      const category = summary
-        ? resolvePhotoCategory(summary)
-        : { id: 'moment', label: 'A moment', icon: 'sparkles' as const, accent: '#F1D4B4' };
-
-      if (summary) {
-        applyCapturedPhotoVision(summary);
       }
       orbitNonce.current += 1;
       const key = `orbit-${orbitNonce.current}`;
-      setOrbitIcons((prev) => [...prev, { key, icon: category.icon, accent: category.accent }].slice(-6));
-
-      const launch = (from: FeedSourceRect) => startEggFeed(from, { photoUri: asset.uri }, () => {});
-      if (cameraButtonRef.current) {
-        cameraButtonRef.current.measureInWindow((x, y, w, h) => launch({ x, y, w, h }));
-      }
-    } catch {
-      Alert.alert('Could not open the camera', 'Something went wrong opening the camera. Please try again.');
-    } finally {
-      setCapturing(false);
-    }
-  }
+      setOrbitIcons((prev) => [...prev, { key, icon: feed.icon, accent: feed.accent }].slice(-6));
+      const from: FeedSourceRect = { x: windowWidth / 2 - 30, y: windowHeight - 150, w: 60, h: 60 };
+      startEggFeed(from, { photoUri: feed.photoUri }, () => {});
+      // startEggFeed only touches refs + setState; the focus run reliably has no
+      // feed in flight, so its closure is safe to omit from deps.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [windowWidth, windowHeight])
+  );
 
   return (
     <View style={styles.screen}>
@@ -549,17 +523,11 @@ export default function HomeScreen() {
             <View style={styles.addRow}>
               <KatchaButton label="Add to today" onPress={openPromptSheet} variant="primary" style={styles.addMain} />
               <Pressable
-                ref={cameraButtonRef}
                 accessibilityRole="button"
-                accessibilityLabel="Snap a photo for today"
-                disabled={capturing}
-                onPress={handleCaptureMoment}
-                style={[styles.cameraButton, capturing && styles.cameraButtonBusy]}>
-                {capturing ? (
-                  <ActivityIndicator color={Lantern.ink900} />
-                ) : (
-                  <IconSymbol name="camera.fill" size={22} color={Lantern.ink900} />
-                )}
+                accessibilityLabel="Capture a moment with the camera"
+                onPress={() => router.push('/moment-capture')}
+                style={styles.cameraButton}>
+                <IconSymbol name="camera.fill" size={22} color={Lantern.ink900} />
               </Pressable>
             </View>
           ) : null}
@@ -783,9 +751,6 @@ const styles = StyleSheet.create({
     height: 54,
     justifyContent: 'center',
     width: 54,
-  },
-  cameraButtonBusy: {
-    opacity: 0.7,
   },
   revealFlash: {
     alignItems: 'center',

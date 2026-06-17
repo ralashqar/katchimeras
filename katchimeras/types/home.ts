@@ -471,6 +471,10 @@ export type StoredHomeDayRecord = {
   vision?: DayVisionSummary;
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
+  // Energy captured through the camera (Moment Capture): score deltas that fold
+  // into the day's scores alongside moments + prompt answers. See
+  // utils/capture-energy.ts.
+  capturedEnergy?: Partial<DayScores>;
   // Cheap signature of the inputs the derived fields (dayMap, place counts)
   // depend on — lets normalize skip re-deriving settled archived days.
   derivedSignature?: string;

@@ -57,6 +57,7 @@ import { curatePhotos } from '@/utils/photo-curation';
 import { buildReflectionContext } from '@/utils/reflection-context';
 import { resolveVariantCellId } from '@/utils/creature-variant';
 import { aggregatePhotoVision, mergeDayVision } from '@/utils/vision-signals';
+import { mergeCaptureEnergy } from '@/utils/capture-energy';
 
 import type { EncounterHistoryMap } from '@/types/home';
 
@@ -869,12 +870,12 @@ export function setPlaceCategorySeedsForDay(
   );
 }
 
-// Fold a snapped-and-analysed photo's vision into today, so a camera capture
-// contributes to the hatch + reflection. Best-effort: a no-op if the day isn't
-// today/forming.
-export function applyCapturedPhotoVisionForToday(
+// One camera capture's contribution to today: its captured energy (score
+// deltas) accumulate, and its detected subject folds into the day's vision.
+// Best-effort no-op once the day has hatched.
+export function applyCapturedMomentForToday(
   state: StoredHomeState,
-  vision: DayVisionSummary,
+  capture: { energy: Partial<DayScores>; vision: DayVisionSummary | null },
   profile: OnboardingProfile,
   now: Date
 ): StoredHomeState {
@@ -882,11 +883,12 @@ export function applyCapturedPhotoVisionForToday(
   if (today.state === 'hatched') {
     return state;
   }
-  return normalizeStoredHomeState(
-    { ...state, today: { ...today, vision: mergeDayVision(today.vision, vision) } },
-    profile,
-    now
-  );
+  const nextToday: StoredHomeDayRecord = {
+    ...today,
+    capturedEnergy: mergeCaptureEnergy(today.capturedEnergy, capture.energy),
+    vision: capture.vision ? mergeDayVision(today.vision, capture.vision) : today.vision,
+  };
+  return normalizeStoredHomeState({ ...state, today: nextToday }, profile, now);
 }
 
 export function setDayWeatherForDay(
@@ -1691,6 +1693,13 @@ function computeDayScores(day: StoredHomeDayRecord) {
         nextScores[key] = clampScore(nextScores[key] + (answer.scoreBias[key] ?? 0));
       });
     });
+
+  // Energy captured through the camera (Moment Capture) folds in like a moment.
+  if (day.capturedEnergy) {
+    scoreOrder.forEach((key) => {
+      nextScores[key] = clampScore(nextScores[key] + (day.capturedEnergy?.[key] ?? 0));
+    });
+  }
 
   const stepEnergy = clampScore(Math.min(day.stepsCount / 5200, 1) * 0.34);
   const placeEnergy = clampScore(Math.min(day.locationSampleCount / 8, 1) * 0.06);
