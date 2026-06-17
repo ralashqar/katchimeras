@@ -54,6 +54,7 @@ export function buildReflectionRequest(
   const persona = creature.encounterProfileId
     ? personasByProfileId[creature.encounterProfileId]
     : undefined;
+  const promptSummary = buildPromptReflectionSummary(day);
 
   return {
     dayLabel: weekdayNames[new Date(`${day.isoDate}T12:00:00`).getDay()] ?? 'Today',
@@ -102,12 +103,38 @@ export function buildReflectionRequest(
       priorVisits: context.priorVisits,
       dayShape: context.dayShape,
     },
+    promptFacts: promptSummary,
     // The day's actual weather (abstract label only). When present the line MAY
     // name it truthfully; when absent it must not invent any.
     weather: day.weather
       ? { condition: day.weather.condition, label: weatherLabel(day.weather.condition), tempMaxC: day.weather.tempMaxC ?? null }
       : null,
     tonePreference: profile.preferenceIds[0] ?? null,
+  };
+}
+
+function buildPromptReflectionSummary(day: StoredHomeDayRecord) {
+  const activeAnswers = day.promptAnswers.filter((answer) => !answer.dismissed);
+  const labelsFor = (kind: string) =>
+    activeAnswers
+      .filter((answer) => answer.kind === kind)
+      .flatMap((answer) => answer.labels)
+      .slice(0, 8);
+  const dayWord = labelsFor('day_word')[0] ?? null;
+  const noteText =
+    activeAnswers
+      .map((answer) => answer.noteText?.trim())
+      .find((text): text is string => Boolean(text)) ?? null;
+
+  return {
+    feelings: labelsFor('feeling'),
+    peopleLabels: labelsFor('people'),
+    activityLabels: labelsFor('activity'),
+    meaningLabels: labelsFor('meaning'),
+    dayWord,
+    intention: labelsFor('intention')[0] ?? null,
+    heroPhotoMeaning: day.heroPhoto?.meaningLabels ?? [],
+    userNoteSummary: noteText,
   };
 }
 

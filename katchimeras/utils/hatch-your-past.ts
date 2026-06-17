@@ -115,6 +115,8 @@ export function toHatchablePastDay(
     healthRouteImport: null,
     exactRouteSegments: [],
     selectedPathId: null,
+    promptAnswers: [],
+    heroPhoto: null,
     creature: null,
     placeCategorySeeds,
   };

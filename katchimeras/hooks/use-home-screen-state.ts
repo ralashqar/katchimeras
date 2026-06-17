@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import type {
   AddMomentInput,
   ActivityPermissionState,
+  DayPromptKind,
   HealthPermissionState,
   LocationPermissionState,
   RecentPhotoAsset,
@@ -12,13 +13,17 @@ import type {
 } from '@/types/home';
 import {
   addMomentToDay,
+  answerDayPromptForToday,
+  answerHeroPhotoMeaningForToday,
   applyBackfilledDays,
   applyGeneratedReflection,
+  dismissDayPromptForToday,
   hydrateHomeState,
   importHealthRoutesForDay as applyHealthRoutesForDay,
   type ImportedHealthRoutesPayload,
   recordForegroundLocationSample,
   seedPhotoLocationsByDay,
+  selectHeroPhotoForToday,
   setDayWeatherForDay,
   setPlaceCategorySeedsForDay,
   triggerHatchForDay,
@@ -27,6 +32,12 @@ import {
   updateLocationPermissionState,
   updateTodayStepCount,
 } from '@/utils/home-engine';
+import { selectActiveDayPrompt, type DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
+import {
+  clearStoredDevPromptPhotoCandidates,
+  loadProductionDayPromptPhotoCandidates,
+  loadStoredDevPromptPhotoCandidates,
+} from '@/utils/day-prompt-photos';
 import { collectBackfillDays } from '@/utils/day-backfill';
 import { requestDayReflection } from '@/utils/day-reflection';
 import { ensureDayVision } from '@/utils/photo-vision';
@@ -46,6 +57,8 @@ export function useHomeScreenState() {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
   const [importingHealthRouteDayId, setImportingHealthRouteDayId] = useState<string | null>(null);
+  const [promptPhotoCandidates, setPromptPhotoCandidates] = useState<DayPromptPhotoCandidate[]>([]);
+  const [forceMeaningfulPhotoPrompt, setForceMeaningfulPhotoPrompt] = useState(false);
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
 
   useEffect(() => {
@@ -111,6 +124,47 @@ export function useHomeScreenState() {
     timelineDays.find((day) => day.kind === 'day' && day.isToday) ??
     timelineDays[0] ??
     null;
+  const activeDayPrompt =
+    selectedDay?.kind === 'day' && selectedDay.isToday && selectedDay.state !== 'hatched'
+      ? selectActiveDayPrompt(selectedDay, new Date(), {
+          photoCandidates: promptPhotoCandidates.length > 0 ? promptPhotoCandidates : undefined,
+          forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
+        })
+      : null;
+  const selectedPromptDayId = selectedDay?.kind === 'day' ? selectedDay.id : null;
+  const selectedPromptDayIsToday = selectedDay?.kind === 'day' ? selectedDay.isToday : false;
+  const selectedPromptDayState = selectedDay?.kind === 'day' ? selectedDay.state : null;
+
+  useEffect(() => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') {
+      setPromptPhotoCandidates([]);
+      setForceMeaningfulPhotoPrompt(false);
+      return;
+    }
+
+    let active = true;
+
+    void (async () => {
+      const devCandidates = __DEV__ ? loadStoredDevPromptPhotoCandidates() : [];
+      if (devCandidates.length > 0) {
+        if (active) {
+          setPromptPhotoCandidates(devCandidates);
+          setForceMeaningfulPhotoPrompt(true);
+        }
+        return;
+      }
+
+      const candidates = await loadProductionDayPromptPhotoCandidates(new Date());
+      if (active) {
+        setPromptPhotoCandidates(candidates);
+        setForceMeaningfulPhotoPrompt(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedDay, selectedPromptDayId, selectedPromptDayIsToday, selectedPromptDayState]);
 
   const addMoment = useCallback((momentInput: AddMomentInput) => {
     const now = new Date();
@@ -119,6 +173,75 @@ export function useHomeScreenState() {
     setStoredState((currentState) => {
       const hydrated = hydrateHomeState(currentState, profile, now);
       return addMomentToDay(hydrated.state, profile, momentInput, now);
+    });
+  }, []);
+
+  const answerDayPrompt = useCallback((input: { kind: DayPromptKind; choiceIds: string[]; noteText?: string | null }) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return answerDayPromptForToday(
+        hydrated.state,
+        {
+          kind: input.kind,
+          choiceIds: input.choiceIds,
+          noteText: input.noteText,
+        },
+        profile,
+        now
+      );
+    });
+  }, []);
+
+  const dismissDayPrompt = useCallback((kind: DayPromptKind) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    if (kind === 'meaningful_photo' && forceMeaningfulPhotoPrompt) {
+      clearStoredDevPromptPhotoCandidates();
+      setForceMeaningfulPhotoPrompt(false);
+      setPromptPhotoCandidates([]);
+    }
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return dismissDayPromptForToday(hydrated.state, kind, profile, now);
+    });
+  }, [forceMeaningfulPhotoPrompt]);
+
+  const selectHeroPhoto = useCallback((photo: DayPromptPhotoCandidate) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    if (forceMeaningfulPhotoPrompt) {
+      clearStoredDevPromptPhotoCandidates();
+      setForceMeaningfulPhotoPrompt(false);
+    }
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return selectHeroPhotoForToday(
+        hydrated.state,
+        {
+          assetId: photo.assetId,
+          thumbnailUri: photo.thumbnailUri,
+          localUri: photo.localUri,
+        },
+        profile,
+        now
+      );
+    });
+  }, [forceMeaningfulPhotoPrompt]);
+
+  const answerPhotoMeaning = useCallback((input: { choiceIds: string[]; noteText?: string | null }) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return answerHeroPhotoMeaningForToday(hydrated.state, input, profile, now);
     });
   }, []);
 
@@ -449,14 +572,19 @@ export function useHomeScreenState() {
     timelineDays,
     selectedDayId: selectedDay?.id ?? viewModel.todayId,
     selectedDay,
+    activeDayPrompt,
     locationPermission: viewModel.state.locationPermission,
     activityPermission: viewModel.state.activityPermission,
     healthPermission: viewModel.state.healthPermission,
     importingHealthRouteDayId,
     addMoment,
+    answerDayPrompt,
+    answerPhotoMeaning,
+    dismissDayPrompt,
     addForegroundLocationSample,
     importHealthRoutesForDay,
     seedRecentPhotoLocations,
+    selectHeroPhoto,
     setActivityPermission,
     setHealthPermission,
     setLocationPermission,

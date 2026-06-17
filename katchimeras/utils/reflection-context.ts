@@ -154,6 +154,19 @@ export function buildReflectionContext(
 // "tender" on purpose — a quiet sick day misread as a lazy joke is the exact
 // spell-breaker to avoid.
 export function classifyMood(day: StoredHomeDayRecord): DayMood {
+  if (hasPromptTag(day, 'feeling:low') || hasPromptTag(day, 'feeling:drained') || hasPromptTag(day, 'body:tired')) {
+    return 'tender';
+  }
+  if (hasPromptTag(day, 'feeling:stressed') || hasPromptTag(day, 'restless_day')) {
+    return 'restless';
+  }
+  if (hasPromptTag(day, 'feeling:calm') || hasPromptTag(day, 'feeling:loved') || hasPromptTag(day, 'meaning:peaceful')) {
+    return 'cozy';
+  }
+  if (hasPromptTag(day, 'feeling:energized')) {
+    return 'defiant';
+  }
+
   const span = computeDaySpanMeters(day.locations);
   const stayedPut = day.locations.length < 2 || span <= STAY_PUT_METERS;
   const steps = day.stepsCount;
@@ -195,6 +208,10 @@ export function classifyMood(day: StoredHomeDayRecord): DayMood {
   }
   // Depleted or simply too thin to read — gentle by default.
   return 'tender';
+}
+
+function hasPromptTag(day: StoredHomeDayRecord, tag: string): boolean {
+  return day.promptAnswers.some((answer) => !answer.dismissed && answer.semanticTags.includes(tag));
 }
 
 // How deep the relationship is, by lifetime visits, with a current streak able

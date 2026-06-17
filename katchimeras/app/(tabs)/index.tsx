@@ -11,6 +11,7 @@ import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
+import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { renderDayComic } from '@/utils/day-comic-render';
 import { ensureDayVision } from '@/utils/photo-vision';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
@@ -35,12 +36,17 @@ export default function HomeScreen() {
   const router = useRouter();
   const {
     addMoment,
+    activeDayPrompt,
     activityPermission,
+    answerDayPrompt,
+    answerPhotoMeaning,
     addForegroundLocationSample,
+    dismissDayPrompt,
     locationPermission,
     selectedDay,
     selectedDayId,
     seedRecentPhotoLocations,
+    selectHeroPhoto,
     setActivityPermission,
     setLocationPermission,
     setTodayStepCount,
@@ -296,6 +302,14 @@ export default function HomeScreen() {
   const isFormingToday = isDay && selectedDay.isToday && selectedDay.state !== 'hatched';
   const signalLine = isDay ? buildSignalLine(selectedDay) : null;
 
+  function handleAnswerDayPrompt(kind: Parameters<typeof answerDayPrompt>[0]['kind'], choiceIds: string[]) {
+    if (kind === 'meaning' && selectedDay?.kind === 'day' && selectedDay.heroPhoto) {
+      answerPhotoMeaning({ choiceIds });
+      return;
+    }
+    answerDayPrompt({ kind, choiceIds });
+  }
+
   return (
     <View style={styles.screen}>
       <AmbientBackground
@@ -375,6 +389,14 @@ export default function HomeScreen() {
                   </View>
                 ))}
               </View>
+            ) : null}
+            {isFormingToday ? (
+              <DayPromptStrip
+                onAnswer={handleAnswerDayPrompt}
+                onDismiss={dismissDayPrompt}
+                onSelectHeroPhoto={selectHeroPhoto}
+                prompt={activeDayPrompt}
+              />
             ) : null}
           </Animated.View>
         )}

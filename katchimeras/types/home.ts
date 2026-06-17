@@ -75,6 +75,53 @@ export type HomeVisualKey =
 
 export type DayScores = Record<HomeScoreKey, number>;
 
+export type DayPromptKind =
+  | 'feeling'
+  | 'activity'
+  | 'people'
+  | 'meaning'
+  | 'day_word'
+  | 'meaningful_photo'
+  | 'intention'
+  | 'energy'
+  | 'inner_weather'
+  | 'highlight'
+  | 'gratitude'
+  | 'body'
+  | 'for_who';
+
+export type DayPromptAnswerSource = 'prompt_chip' | 'photo_meaning' | 'prefill_confirm';
+
+export type DayPromptEncounterBias = {
+  seedId: string;
+  intensity: number;
+};
+
+export type DayPromptAnswer = {
+  id: string;
+  kind: DayPromptKind;
+  choiceIds: string[];
+  labels: string[];
+  createdAt: string;
+  dismissed?: boolean;
+  source: DayPromptAnswerSource;
+  semanticTags: string[];
+  scoreBias: Partial<DayScores>;
+  encounterSeedBias?: DayPromptEncounterBias[];
+  relatedAssetId?: string | null;
+  noteText?: string | null;
+};
+
+export type DayHeroPhoto = {
+  assetId: string;
+  thumbnailUri: string;
+  localUri?: string;
+  selectedAt: string;
+  meaningChoiceIds: string[];
+  meaningLabels: string[];
+  noteText?: string | null;
+};
+
 // On-device vision read ("Read the day"). Produced per-photo by the native
 // Apple Vision module (utils/photo-vision.ts), then aggregated per day. All
 // fields are derived on-device — no pixels leave the phone.
@@ -416,6 +463,8 @@ export type StoredHomeDayRecord = {
   exactRouteSegments: StoredExactRouteSegment[];
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
+  promptAnswers: DayPromptAnswer[];
+  heroPhoto: DayHeroPhoto | null;
   placeCategorySeeds?: string[];
   // Aggregated on-device vision read of the day's photos (optional — present
   // only once the native vision module has analysed them).
@@ -428,7 +477,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 5;
+  version: 6;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

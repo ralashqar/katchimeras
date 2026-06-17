@@ -18,8 +18,13 @@ import { createStarterReveal } from '@/constants/katchadeck';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { KatchaDeckUI } from '@/constants/theme';
 import { enrichBackfillReflections, runBackfillFoundation, runBackfillPhotosOnly } from '@/utils/day-backfill';
+import {
+  clearStoredDevPromptPhotoCandidates,
+  loadDevRecentDayPromptPhotoCandidates,
+  saveStoredDevPromptPhotoCandidates,
+} from '@/utils/day-prompt-photos';
 import { applyDevScenario, devScenarioOptions } from '@/utils/dev-scenarios';
-import { clearStoredHomeState, loadStoredHomeState } from '@/utils/home-storage';
+import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
 import { analyzePhoto, ensureDayVision, isVisionAvailable } from '@/utils/photo-vision';
 import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals';
@@ -44,6 +49,7 @@ export default function ExploreScreen() {
     beats: string[] | null;
   } | null>(null);
   const [backfilling, setBackfilling] = useState(false);
+  const [promptPhotoLoading, setPromptPhotoLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,6 +120,61 @@ export default function ExploreScreen() {
     } finally {
       setBackfilling(false);
     }
+  }
+
+  async function handleForceMeaningfulPhotoPrompt(limit = 12) {
+    if (promptPhotoLoading) {
+      return;
+    }
+
+    const stored = loadStoredHomeState();
+    if (!stored?.today) {
+      Alert.alert('No stored day yet', 'Open Home once so a stored day exists, then come back and arm the prompt.');
+      return;
+    }
+
+    if (stored.today.creature || stored.today.state === 'hatched') {
+      Alert.alert('Today has already hatched', 'Reset the home loop or wait for a new forming day before testing this prompt.');
+      return;
+    }
+
+    setPromptPhotoLoading(true);
+    try {
+      const candidates = await loadDevRecentDayPromptPhotoCandidates(limit);
+      if (candidates.length < 3) {
+        Alert.alert(
+          'Not enough valid photos',
+          `Found ${candidates.length} curated recent photo${candidates.length === 1 ? '' : 's'}. The picker needs at least 3 valid, non-duplicate, non-black photos.`
+        );
+        return;
+      }
+
+      saveStoredDevPromptPhotoCandidates(candidates);
+      saveStoredHomeState({
+        ...stored,
+        today: {
+          ...stored.today,
+          heroPhoto: null,
+          promptAnswers: (stored.today.promptAnswers ?? []).filter(
+            (answer) => answer.kind !== 'meaningful_photo' && answer.kind !== 'meaning'
+          ),
+        },
+      });
+      setStoredState(loadStoredHomeState());
+      Alert.alert(
+        'Photo prompt armed',
+        `Loaded ${candidates.length} recent valid photos. Home will force the meaningful-photo prompt once, regardless of photo date.`,
+        [{ text: 'Open Home', onPress: () => router.replace('/(tabs)') }]
+      );
+    } finally {
+      setPromptPhotoLoading(false);
+    }
+  }
+
+  function handleClearForcedPhotoPrompt() {
+    clearStoredDevPromptPhotoCandidates();
+    setStoredState(loadStoredHomeState());
+    Alert.alert('Forced photo prompt cleared', 'Home will return to the normal today-photo eligibility rules.');
   }
 
   // Dev affordance: pick any photo and run the on-device Vision read against it,
@@ -203,6 +264,17 @@ export default function ExploreScreen() {
               <View style={styles.devActions}>
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
                 <KatchaButton label="Analyze a photo (vision)" onPress={handleAnalyzePickedPhoto} variant="secondary" />
+                <KatchaButton
+                  label={promptPhotoLoading ? 'Loading recent photos...' : 'Force photo prompt (last 12 valid)'}
+                  loading={promptPhotoLoading}
+                  onPress={() => handleForceMeaningfulPhotoPrompt(12)}
+                  variant="secondary"
+                />
+                <KatchaButton
+                  label="Clear forced photo prompt"
+                  onPress={handleClearForcedPhotoPrompt}
+                  variant="secondary"
+                />
                 <KatchaButton label="Preview comic beats (LLM)" onPress={handlePreviewComicBeats} variant="secondary" />
                 <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />

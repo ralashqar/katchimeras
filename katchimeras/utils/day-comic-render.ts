@@ -129,6 +129,10 @@ function collectComicPhotoAssetIds(day: HomeDayRecord, limit: number): string[] 
   const nodes = day.dayMap?.nodes ?? [];
   const ids: string[] = [];
   const seen = new Set<string>();
+  if (day.heroPhoto?.assetId) {
+    seen.add(day.heroPhoto.assetId);
+    ids.push(day.heroPhoto.assetId);
+  }
 
   // Round 1: the first photo from each place (spread across the day).
   for (const node of nodes) {

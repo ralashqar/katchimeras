@@ -11,6 +11,7 @@ import {
   homeScorePresentation,
   homeVisualPools,
 } from '@/constants/home-mvp';
+import { dayPromptRegistry } from '@/constants/day-prompts';
 import { timelineDemoEntries } from '@/constants/timeline-demo';
 import type {
   AddMomentInput,
@@ -35,6 +36,11 @@ import type {
   PhotoVisionResult,
   LocalCreatureRecord,
   LocalPathOption,
+  DayHeroPhoto,
+  DayPromptAnswer,
+  DayPromptKind,
+  DayPromptAnswerSource,
+  DayPromptEncounterBias,
   RecentPhotoAsset,
   StoredExactRouteSegment,
   StoredHomeDayRecord,
@@ -83,6 +89,8 @@ type LegacyStoredHomeDayRecord = Omit<
   | 'newPlaceCount'
   | 'locationSampleCount'
   | 'shareReadyAt'
+  | 'promptAnswers'
+  | 'heroPhoto'
 >;
 type Version2StoredHomeDayRecord = Omit<
   StoredHomeDayRecord,
@@ -93,10 +101,12 @@ type Version2StoredHomeDayRecord = Omit<
   | 'newPlaceCount'
   | 'locationSampleCount'
   | 'shareReadyAt'
+  | 'promptAnswers'
+  | 'heroPhoto'
 >;
 type Version3StoredHomeDayRecord = Omit<
   StoredHomeDayRecord,
-  'stepsCount' | 'visitedPlaceCount' | 'newPlaceCount' | 'locationSampleCount' | 'shareReadyAt'
+  'stepsCount' | 'visitedPlaceCount' | 'newPlaceCount' | 'locationSampleCount' | 'shareReadyAt' | 'promptAnswers' | 'heroPhoto'
 >;
 type Version2StoredHomeState = {
   version: 2;
@@ -116,11 +126,20 @@ type LegacyStoredHomeState = {
   archivedDays: LegacyStoredHomeDayRecord[];
   today: LegacyStoredHomeDayRecord;
 };
-type Version4StoredHomeState = Omit<StoredHomeState, 'version' | 'encounterHistory'> & {
+type Version5StoredHomeDayRecord = Omit<StoredHomeDayRecord, 'promptAnswers' | 'heroPhoto'>;
+type Version5StoredHomeState = Omit<StoredHomeState, 'version' | 'archivedDays' | 'today'> & {
+  version: 5;
+  archivedDays: Version5StoredHomeDayRecord[];
+  today: Version5StoredHomeDayRecord;
+};
+type Version4StoredHomeState = Omit<StoredHomeState, 'version' | 'encounterHistory' | 'archivedDays' | 'today'> & {
   version: 4;
+  archivedDays: Version5StoredHomeDayRecord[];
+  today: Version5StoredHomeDayRecord;
 };
 type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version5StoredHomeState
   | Version4StoredHomeState
   | Version3StoredHomeState
   | Version2StoredHomeState
@@ -149,6 +168,20 @@ export type ImportedHealthRoutesPayload = {
   workoutIds: string[];
   segments?: ImportedHealthRouteSegment[];
   message?: string | null;
+};
+
+export type DayPromptAnswerInput = {
+  kind: DayPromptKind;
+  choiceIds: string[];
+  source?: DayPromptAnswerSource;
+  relatedAssetId?: string | null;
+  noteText?: string | null;
+};
+
+export type SelectHeroPhotoInput = {
+  assetId: string;
+  thumbnailUri: string;
+  localUri?: string;
 };
 
 export function createEmptyScores(): DayScores {
@@ -183,6 +216,8 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
       healthRouteImport: null,
       exactRouteSegments: [],
       selectedPathId: null,
+      promptAnswers: [],
+      heroPhoto: null,
       creature: {
         id: `seed-creature-${entry.creature.id}`,
         name: entry.creature.name,
@@ -202,7 +237,7 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
   });
 
   return {
-    version: 5,
+    version: 6,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -372,6 +407,167 @@ export function addMomentToDay(
     {
       ...state,
       today: nextToday,
+    },
+    profile,
+    now
+  );
+}
+
+export function answerDayPromptForToday(
+  state: StoredHomeState,
+  input: DayPromptAnswerInput,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const answer = createDayPromptAnswer(input, now);
+  if (!answer) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: {
+        ...state.today,
+        promptAnswers: [
+          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== answer.kind),
+          answer,
+        ],
+      },
+    },
+    profile,
+    now
+  );
+}
+
+export function dismissDayPromptForToday(
+  state: StoredHomeState,
+  kind: DayPromptKind,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const answer: DayPromptAnswer = {
+    id: `prompt-${now.getTime().toString(36)}-${kind}-dismissed`,
+    kind,
+    choiceIds: [],
+    labels: [],
+    createdAt: now.toISOString(),
+    dismissed: true,
+    source: 'prompt_chip',
+    semanticTags: [],
+    scoreBias: {},
+    encounterSeedBias: [],
+    relatedAssetId: null,
+    noteText: null,
+  };
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: {
+        ...state.today,
+        promptAnswers: [
+          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== kind),
+          answer,
+        ],
+      },
+    },
+    profile,
+    now
+  );
+}
+
+export function selectHeroPhotoForToday(
+  state: StoredHomeState,
+  input: SelectHeroPhotoInput,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const heroPhoto: DayHeroPhoto = {
+    assetId: input.assetId,
+    thumbnailUri: input.thumbnailUri,
+    localUri: input.localUri,
+    selectedAt: now.toISOString(),
+    meaningChoiceIds: [],
+    meaningLabels: [],
+    noteText: null,
+  };
+  const photoAnswer: DayPromptAnswer = {
+    id: `prompt-${now.getTime().toString(36)}-meaningful_photo`,
+    kind: 'meaningful_photo',
+    choiceIds: ['selected'],
+    labels: ['Meaningful photo'],
+    createdAt: now.toISOString(),
+    source: 'prompt_chip',
+    semanticTags: ['meaningful_photo'],
+    scoreBias: { calm: 0.08, focus: 0.06 },
+    encounterSeedBias: [],
+    relatedAssetId: input.assetId,
+    noteText: null,
+  };
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: {
+        ...state.today,
+        heroPhoto,
+        promptAnswers: [
+          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== 'meaningful_photo'),
+          photoAnswer,
+        ],
+      },
+    },
+    profile,
+    now
+  );
+}
+
+export function answerHeroPhotoMeaningForToday(
+  state: StoredHomeState,
+  input: Omit<DayPromptAnswerInput, 'kind' | 'source' | 'relatedAssetId'>,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const heroPhoto = state.today.heroPhoto;
+  if (!heroPhoto) {
+    return answerDayPromptForToday(
+      state,
+      { ...input, kind: 'meaning', source: 'photo_meaning' },
+      profile,
+      now
+    );
+  }
+
+  const meaningAnswer = createDayPromptAnswer(
+    {
+      ...input,
+      kind: 'meaning',
+      source: 'photo_meaning',
+      relatedAssetId: heroPhoto.assetId,
+    },
+    now
+  );
+  if (!meaningAnswer) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: {
+        ...state.today,
+        heroPhoto: {
+          ...heroPhoto,
+          meaningChoiceIds: meaningAnswer.choiceIds,
+          meaningLabels: meaningAnswer.labels,
+          noteText: meaningAnswer.noteText ?? null,
+        },
+        promptAnswers: [
+          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== 'meaning'),
+          meaningAnswer,
+        ],
+      },
     },
     profile,
     now
@@ -631,6 +827,8 @@ export function applyBackfilledDays(
       healthRouteImport: null,
       exactRouteSegments: [],
       selectedPathId: null,
+      promptAnswers: [],
+      heroPhoto: null,
       creature: null,
     }));
 
@@ -876,7 +1074,7 @@ function normalizeStoredHomeState(
   const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now, hatchHour, true);
 
   return {
-    version: 5,
+    version: 6,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
@@ -924,69 +1122,86 @@ function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHome
     healthRouteImport: null,
     exactRouteSegments: [],
     selectedPathId: null,
+    promptAnswers: [],
+    heroPhoto: null,
     creature: null,
   };
 }
 
 function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
-  if ('version' in inputState && inputState.version === 5) {
+  if ('version' in inputState && inputState.version === 6) {
     return {
       ...inputState,
       encounterHistory: inputState.encounterHistory ?? {},
-      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
-      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
+    };
+  }
+
+  if ('version' in inputState && inputState.version === 5) {
+    return {
+      ...inputState,
+      version: 6,
+      encounterHistory: inputState.encounterHistory ?? {},
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
     };
   }
 
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
-      version: 5,
+      version: 6,
       encounterHistory: {},
-      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
-      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
     };
   }
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 5,
+      version: 6,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
       encounterHistory: {},
-      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
-      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
     };
   }
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 5,
+      version: 6,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
       encounterHistory: {},
-      archivedDays: inputState.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
-      today: ensureHealthRouteFieldsOnDayRecord(inputState.today),
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
     };
   }
 
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 5,
+    version: 6,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
     encounterHistory: {},
-    archivedDays: legacy.archivedDays.map(ensureHealthRouteFieldsOnDayRecord),
-    today: ensureHealthRouteFieldsOnDayRecord(legacy.today),
+    archivedDays: legacy.archivedDays.map(ensureStoredDayFields),
+    today: ensureStoredDayFields(legacy.today),
   };
 }
 
-function ensureHealthRouteFieldsOnDayRecord(
-  day: StoredHomeDayRecord | Version3StoredHomeDayRecord | Version2StoredHomeDayRecord | LegacyStoredHomeDayRecord
+function ensureStoredDayFields(
+  day:
+    | StoredHomeDayRecord
+    | Version5StoredHomeDayRecord
+    | Version3StoredHomeDayRecord
+    | Version2StoredHomeDayRecord
+    | LegacyStoredHomeDayRecord
 ): StoredHomeDayRecord {
   const existingLocations = 'locations' in day ? day.locations ?? [] : [];
   return {
@@ -1006,6 +1221,8 @@ function ensureHealthRouteFieldsOnDayRecord(
     locations: existingLocations.length > 0 ? existingLocations : createFallbackLocationsForStoredDay(day),
     healthRouteImport: 'healthRouteImport' in day ? day.healthRouteImport ?? null : null,
     exactRouteSegments: 'exactRouteSegments' in day ? day.exactRouteSegments ?? [] : [],
+    promptAnswers: 'promptAnswers' in day && Array.isArray(day.promptAnswers) ? day.promptAnswers : [],
+    heroPhoto: 'heroPhoto' in day ? day.heroPhoto ?? null : null,
     creature: day.creature
       ? {
           ...day.creature,
@@ -1393,7 +1610,9 @@ function dayHasShape(day: StoredHomeDayRecord) {
     day.stepsCount > 0 ||
     day.locationSampleCount > 0 ||
     day.visitedPlaceCount > 0 ||
-    day.locations.length > 0
+    day.locations.length > 0 ||
+    day.promptAnswers.some((answer) => !answer.dismissed) ||
+    Boolean(day.heroPhoto)
   );
 }
 
@@ -1443,6 +1662,14 @@ function computeDayScores(day: StoredHomeDayRecord) {
       });
     }
   });
+
+  day.promptAnswers
+    .filter((answer) => !answer.dismissed)
+    .forEach((answer) => {
+      scoreOrder.forEach((key) => {
+        nextScores[key] = clampScore(nextScores[key] + (answer.scoreBias[key] ?? 0));
+      });
+    });
 
   const stepEnergy = clampScore(Math.min(day.stepsCount / 5200, 1) * 0.34);
   const placeEnergy = clampScore(Math.min(day.locationSampleCount / 8, 1) * 0.06);
@@ -1769,6 +1996,39 @@ function createMoment(input: AddMomentInput, now: Date): HomeMoment {
   };
 }
 
+function createDayPromptAnswer(input: DayPromptAnswerInput, now: Date): DayPromptAnswer | null {
+  const definition = dayPromptRegistry[input.kind];
+  if (!definition) {
+    return null;
+  }
+
+  const options = input.choiceIds
+    .map((choiceId) => definition.options.find((option) => option.id === choiceId))
+    .filter((option): option is NonNullable<typeof option> => option != null);
+  if (input.choiceIds.length > 0 && options.length === 0 && input.kind !== 'meaningful_photo') {
+    return null;
+  }
+
+  const labels = input.kind === 'meaningful_photo' && options.length === 0 ? ['Meaningful photo'] : options.map((option) => option.label);
+  const semanticTags = uniqueStrings(options.flatMap((option) => option.semanticTags));
+  const scoreBias = mergeScoreBiases(options.map((option) => option.scoreBias));
+  const encounterSeedBias = mergeEncounterBiases(options.flatMap((option) => option.encounterSeedBias ?? []));
+
+  return {
+    id: `prompt-${now.getTime().toString(36)}-${input.kind}`,
+    kind: input.kind,
+    choiceIds: input.choiceIds,
+    labels,
+    createdAt: now.toISOString(),
+    source: input.source ?? 'prompt_chip',
+    semanticTags,
+    scoreBias,
+    encounterSeedBias,
+    relatedAssetId: input.relatedAssetId ?? null,
+    noteText: input.noteText?.trim() ? input.noteText.trim().slice(0, 240) : null,
+  };
+}
+
 function createSeedMoment(type: HomeMoment['type'], date: Date, index: number): HomeMoment {
   const option = homeMomentOptions[type];
   return {
@@ -1844,8 +2104,36 @@ function uniqueMomentLabels(moments: HomeMoment[]) {
   return Array.from(new Set(moments.map((moment) => moment.label)));
 }
 
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values));
+}
+
+function mergeScoreBiases(biases: Partial<DayScores>[]) {
+  return biases.reduce<Partial<DayScores>>((result, bias) => {
+    scoreOrder.forEach((key) => {
+      const value = bias[key];
+      if (typeof value === 'number') {
+        result[key] = clampScore((result[key] ?? 0) + value);
+      }
+    });
+    return result;
+  }, {});
+}
+
+function mergeEncounterBiases(biases: DayPromptEncounterBias[]) {
+  const bySeed = new Map<string, number>();
+  biases.forEach((bias) => {
+    bySeed.set(bias.seedId, Math.max(bySeed.get(bias.seedId) ?? 0, bias.intensity));
+  });
+  return [...bySeed.entries()].map(([seedId, intensity]) => ({ seedId, intensity: clamp01(intensity) }));
+}
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(1, Number(value.toFixed(3))));
+}
+
+function clamp01(value: number) {
+  return Math.min(Math.max(value, 0), 1);
 }
 
 const seedLocationPresets: Record<HomeMoment['type'], readonly { lat: number; lng: number; type: HomeLocationType }[]> = {

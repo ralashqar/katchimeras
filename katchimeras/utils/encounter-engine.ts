@@ -81,6 +81,22 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
     });
   }
 
+  day.promptAnswers
+    .filter((answer) => !answer.dismissed)
+    .forEach((answer) => {
+      (answer.encounterSeedBias ?? []).forEach((bias) => {
+        signals.push({
+          seedId: bias.seedId,
+          intensity: clamp01(bias.intensity),
+          sourceMomentIds: [],
+          isRecovery:
+            answer.semanticTags.includes('tender_day') ||
+            answer.semanticTags.includes('activity:resting') ||
+            answer.semanticTags.includes('meaning:got_through_it'),
+        });
+      });
+    });
+
   const coffeeIds = momentsByType.get('coffee') ?? [];
   if (coffeeIds.length > 0) {
     signals.push({

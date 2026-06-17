@@ -88,6 +88,8 @@ function makeDay(overrides = {}) {
     healthRouteImport: null,
     exactRouteSegments: [],
     selectedPathId: null,
+    promptAnswers: [],
+    heroPhoto: null,
     creature: { encounterProfileId: 'location_home_evening_bedrotte', name: 'Bedrotte', rarity: 'common', bondVisitCount: 1, repeatDepth: 0 },
     ...overrides,
   };
@@ -210,6 +212,56 @@ const latePoints = [
 ];
 const lateChosen = makeDay({ locations: latePoints, stepsCount: 2000, vision: vision(['dog']), weather: { condition: 'clear', source: 'forecast' } });
 check('late-start fair weekend-in softens to cozy', rc.classifyMood(lateChosen) === 'cozy', rc.classifyMood(lateChosen));
+
+// --- Explicit prompt feelings override ambiguous passive reads ---
+function promptAnswer(kind, choiceIds, labels, semanticTags, scoreBias = {}) {
+  return {
+    id: `prompt-${kind}-${choiceIds.join('-')}`,
+    kind,
+    choiceIds,
+    labels,
+    createdAt: '2026-06-14T20:00:00.000Z',
+    source: 'prompt_chip',
+    semanticTags,
+    scoreBias,
+    encounterSeedBias: [],
+  };
+}
+
+const explicitLow = makeDay({
+  locations: HOME_POINTS,
+  stepsCount: 6200,
+  promptAnswers: [promptAnswer('feeling', ['low'], ['Low'], ['feeling:low', 'tender_day'])],
+});
+check('explicit low feeling reads tender', rc.classifyMood(explicitLow) === 'tender', rc.classifyMood(explicitLow));
+
+const explicitDrained = makeDay({
+  locations: HOME_POINTS,
+  stepsCount: 500,
+  promptAnswers: [promptAnswer('feeling', ['drained'], ['Drained'], ['feeling:drained', 'body:tired'])],
+});
+check('explicit drained feeling reads tender', rc.classifyMood(explicitDrained) === 'tender', rc.classifyMood(explicitDrained));
+
+const explicitStressed = makeDay({
+  locations: HOME_POINTS,
+  stepsCount: 900,
+  promptAnswers: [promptAnswer('feeling', ['stressed'], ['Stressed'], ['feeling:stressed', 'restless_day'])],
+});
+check('explicit stressed feeling reads restless', rc.classifyMood(explicitStressed) === 'restless', rc.classifyMood(explicitStressed));
+
+const explicitLoved = makeDay({
+  locations: HOME_POINTS,
+  stepsCount: 900,
+  promptAnswers: [promptAnswer('feeling', ['loved'], ['Loved'], ['feeling:loved'])],
+});
+check('explicit loved feeling reads cozy', rc.classifyMood(explicitLoved) === 'cozy', rc.classifyMood(explicitLoved));
+
+const explicitCalm = makeDay({
+  locations: HOME_POINTS,
+  stepsCount: 900,
+  promptAnswers: [promptAnswer('feeling', ['calm'], ['Calm'], ['feeling:calm'])],
+});
+check('explicit calm feeling reads cozy', rc.classifyMood(explicitCalm) === 'cozy', rc.classifyMood(explicitCalm));
 
 Module._resolveFilename = originalResolve;
 fs.rmSync(tempDir, { recursive: true, force: true });

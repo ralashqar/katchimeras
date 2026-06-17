@@ -23,7 +23,7 @@ const CARD_HEIGHT = 1200;
 export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function MemoryPostcard({ day }, ref) {
   const visual = getCreatureVisual(day.creature.visualKey);
   const mapPoints = useMemo(() => buildMapPoints(day.dayMap?.nodes ?? []), [day.dayMap?.nodes]);
-  const cardPhotos = useMemo(() => collectCardPhotos(day.dayMap?.nodes ?? []), [day.dayMap?.nodes]);
+  const cardPhotos = useMemo(() => collectCardPhotos(day), [day]);
   const rarityLine = buildRarityLine(day.creature);
 
   return (
@@ -120,9 +120,14 @@ export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function Mem
 // The curated keepers behind the day — the photo-journaling centerpiece of the
 // Day Card. Pulled from the day-map clusters (already deduped/curated), in the
 // order the day unfolded, capped so the collage stays clean.
-function collectCardPhotos(nodes: DayMapNode[]): string[] {
+function collectCardPhotos(day: HomeDayRecord): string[] {
   const uris: string[] = [];
   const seen = new Set<string>();
+  if (day.heroPhoto?.thumbnailUri) {
+    seen.add(day.heroPhoto.thumbnailUri);
+    uris.push(day.heroPhoto.thumbnailUri);
+  }
+  const nodes = day.dayMap?.nodes ?? [];
   for (const node of nodes) {
     for (const photo of node.photos ?? []) {
       if (seen.has(photo.thumbnailUri)) {

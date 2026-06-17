@@ -91,6 +91,8 @@ function makeDay(overrides = {}) {
     healthRouteImport: null,
     exactRouteSegments: [],
     selectedPathId: null,
+    promptAnswers: [],
+    heroPhoto: null,
     creature: null,
     ...overrides,
   };
@@ -106,6 +108,20 @@ function makeMoment(type, index = 0) {
     createdAt: '2026-06-12T10:00:00.000Z',
     source: 'quick_tag',
     metadata: null,
+  };
+}
+
+function makePromptAnswer(kind, choiceIds, labels, semanticTags, scoreBias = {}, encounterSeedBias = []) {
+  return {
+    id: `prompt-${kind}-${choiceIds.join('-')}`,
+    kind,
+    choiceIds,
+    labels,
+    createdAt: '2026-06-12T18:00:00.000Z',
+    source: 'prompt_chip',
+    semanticTags,
+    scoreBias,
+    encounterSeedBias,
   };
 }
 
@@ -314,6 +330,67 @@ const dogDay = makeDay({
 const dogCreature = engine.buildEncounterCreature(dogDay, {}, 'calm', 'social');
 check('dog-filled day hatches Waglet (subject creature)', dogCreature?.name === 'Waglet', JSON.stringify(dogCreature?.name));
 check('Waglet carries its profile + cue', dogCreature?.encounterProfileId === 'subject_dog_companion_waglet', JSON.stringify(dogCreature?.encounterProfileId));
+
+// 8o-prompt. Explicit prompt answers are weak but useful encounter signals:
+// enough to rescue thin social/celebration days, not enough to beat clear
+// passive/manual evidence.
+const lowHomePromptDay = makeDay({
+  stepsCount: 700,
+  locationSampleCount: 2,
+  promptAnswers: [
+    makePromptAnswer('feeling', ['low'], ['Low'], ['feeling:low', 'tender_day'], { calm: 0.18 }),
+  ],
+});
+const lowHomeCreature = engine.buildEncounterCreature(lowHomePromptDay, {}, 'calm', 'focus');
+check('low feeling + home day keeps Bedrotte', lowHomeCreature?.name === 'Bedrotte', JSON.stringify(lowHomeCreature?.name));
+
+const familyPromptDay = makeDay({
+  stepsCount: 900,
+  promptAnswers: [
+    makePromptAnswer(
+      'people',
+      ['family'],
+      ['Family'],
+      ['people:family'],
+      { social: 0.26, calm: 0.08 },
+      [{ seedId: 'social_gathering', intensity: 0.42 }]
+    ),
+  ],
+});
+const familyPromptCreature = engine.buildEncounterCreature(familyPromptDay, {}, 'social', 'calm');
+check('family prompt boosts people-led signal', familyPromptCreature?.name === 'Gatherglow', JSON.stringify(familyPromptCreature?.name));
+
+const celebrationPromptDay = makeDay({
+  stepsCount: 1400,
+  promptAnswers: [
+    makePromptAnswer(
+      'meaning',
+      ['celebration'],
+      ['Celebration'],
+      ['meaning:celebration'],
+      { social: 0.18, energy: 0.08 },
+      [{ seedId: 'celebration', intensity: 0.42 }]
+    ),
+  ],
+});
+const celebrationPromptCreature = engine.buildEncounterCreature(celebrationPromptDay, {}, 'social', 'energy');
+check('celebration meaning can lift Cheerlet', celebrationPromptCreature?.name === 'Cheerlet', JSON.stringify(celebrationPromptCreature?.name));
+
+const coffeeWithPromptDay = makeDay({
+  moments: [makeMoment('coffee', 0)],
+  promptAnswers: [
+    makePromptAnswer(
+      'people',
+      ['family'],
+      ['Family'],
+      ['people:family'],
+      { social: 0.26 },
+      [{ seedId: 'social_gathering', intensity: 0.34 }]
+    ),
+  ],
+});
+const coffeeWithPromptCreature = engine.buildEncounterCreature(coffeeWithPromptDay, {}, 'calm', 'social');
+check('prompt does not overpower clear coffee evidence', coffeeWithPromptCreature?.name === 'Baristabbit', JSON.stringify(coffeeWithPromptCreature?.name));
 
 // 8p. The rest of the subject set hatches from its concept.
 function subjectDay(concept) {
