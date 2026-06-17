@@ -101,6 +101,25 @@ export type DayVisionConcept = {
   peakConfidence: number;
 };
 
+// A coarse read of the day's weather. Sourced either from the day's photos
+// (on-device vision: rain/snow) or a key-less forecast lookup on a coarsened
+// location (see utils/day-weather.ts). Feeds the mood classifier and the
+// nightly line, and shows as a small icon. Abstract label only — no coordinates.
+export type WeatherCondition =
+  | 'clear'
+  | 'partly_cloudy'
+  | 'cloudy'
+  | 'fog'
+  | 'rain'
+  | 'snow'
+  | 'storm';
+
+export type DayWeather = {
+  condition: WeatherCondition;
+  tempMaxC?: number;
+  source: 'vision' | 'forecast';
+};
+
 export type DayVisionSummary = {
   concepts: DayVisionConcept[];
   // The most salient *specific* raw labels, un-canonicalised ("marble
@@ -366,6 +385,13 @@ export type LocalCreatureRecord = {
   livingFactors?: string[];
   bondStage?: number;
   bondVisitCount?: number;
+  // The day's emotional read (mood) and relationship depth (bondDepth) at hatch,
+  // plus the resolved expression-grid cell `<mood>_<bondDepth>` when this creature
+  // has a variant set. Fixed at hatch like the rest of the record. See
+  // utils/reflection-context.ts and utils/creature-variant.ts.
+  mood?: string;
+  bondDepth?: string;
+  variantCell?: string;
 };
 
 export type EncounterHistoryEntry = {
@@ -394,6 +420,8 @@ export type StoredHomeDayRecord = {
   // Aggregated on-device vision read of the day's photos (optional — present
   // only once the native vision module has analysed them).
   vision?: DayVisionSummary;
+  // Coarse weather for the day (optional — resolved best-effort at hatch).
+  weather?: DayWeather;
   // Cheap signature of the inputs the derived fields (dayMap, place counts)
   // depend on — lets normalize skip re-deriving settled archived days.
   derivedSignature?: string;

@@ -9,13 +9,24 @@ const corsHeaders = {
 
 const bucketName = 'katchimera-art-dev';
 const defaultModelId = 'fal-ai/nano-banana-2';
-const defaultFalInput = {
-  aspect_ratio: '1:1',
-  resolution: '0.5K',
-  output_format: 'png',
-  num_images: 1,
-  limit_generations: true,
-};
+
+// Different FAL model families take different size params, so build them by
+// family (mirrors generate-day-comic's buildFalInput). Nano-Banana 2 (Gemini):
+// aspect_ratio + resolution. GPT Image 2: image_size (a NAMED preset, never a
+// pixel string) + quality — square_hd is right for a 4x4 variant grid. Caller
+// `input` overrides everything (image_urls for the /edit endpoint, an image_size
+// or quality override, etc.).
+function buildFalInput(
+  modelId: string,
+  prompt: string,
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const common = { prompt, num_images: 1, output_format: 'png' };
+  if (modelId.includes('nano-banana')) {
+    return { aspect_ratio: '1:1', resolution: '0.5K', limit_generations: true, ...common, ...input };
+  }
+  return { image_size: 'square_hd', quality: 'high', ...common, ...input };
+}
 
 type RenderProfilePayload = {
   id: string;
@@ -168,11 +179,7 @@ Deno.serve(async (req) => {
         Authorization: `Key ${falKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        ...defaultFalInput,
-        prompt: renderProfile.imagePrompt,
-        ...input,
-      }),
+      body: JSON.stringify(buildFalInput(modelId, renderProfile.imagePrompt, input)),
     });
 
     if (!falResponse.ok) {

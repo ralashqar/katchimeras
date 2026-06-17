@@ -11,20 +11,28 @@ import Animated, {
 import { useEffect } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/utils/home-engine';
-import type { LocalCreatureRecord } from '@/types/home';
+import { resolveCreatureVariantSource } from '@/utils/creature-variant';
+import { weatherIconName, weatherLabel } from '@/utils/day-weather';
+import type { DayWeather, LocalCreatureRecord } from '@/types/home';
 import { Lantern } from '@/constants/theme';
 
 type CreatureHeroProps = {
   creature: LocalCreatureRecord;
   subtitle?: string;
   hideSubtitle?: boolean;
+  weather?: DayWeather | null;
 };
 
 // Lantern hero: the creature floats free over the ink - no membrane ring, no
 // plate, no motif orbits. Halo and float are the only ornament.
-export function CreatureHero({ creature, subtitle, hideSubtitle = false }: CreatureHeroProps) {
+export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather }: CreatureHeroProps) {
   const visual = getCreatureVisual(creature.visualKey);
+  // Prefer the day's expression cutout (mood × bond depth) when one exists for
+  // this creature; otherwise fall back to the single base cutout.
+  const variantSource = resolveCreatureVariantSource(creature.visualKey, creature.variantCell);
+  const heroSource = variantSource ?? visual.source;
   const float = useSharedValue(0);
   const glow = useSharedValue(0.2);
 
@@ -62,10 +70,20 @@ export function CreatureHero({ creature, subtitle, hideSubtitle = false }: Creat
       <View style={styles.stage}>
         <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
         <Animated.View style={visualStyle}>
-          <Image contentFit="contain" source={visual.source} style={styles.image} transition={0} />
+          <Image contentFit="contain" source={heroSource} style={styles.image} transition={0} />
         </Animated.View>
       </View>
       <View style={styles.copy}>
+        {weather ? (
+          <View style={styles.weatherRow}>
+            <IconSymbol name={weatherIconName(weather.condition)} size={13} color={Lantern.moon300} />
+            <ThemedText style={styles.weatherText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              {weather.tempMaxC != null
+                ? `${weatherLabel(weather.condition)} · ${weather.tempMaxC}°`
+                : weatherLabel(weather.condition)}
+            </ThemedText>
+          </View>
+        ) : null}
         <ThemedText
           type="onboardingLabel"
           style={styles.label}
@@ -154,6 +172,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     maxWidth: 320,
+  },
+  weatherRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
+  weatherText: {
+    fontSize: 12,
   },
   label: {
     fontSize: 11,

@@ -1,0 +1,129 @@
+{
+  "$schema": "Per-creature 4x4 expression grid. Rows = the 4 moods (the day's emotional read); columns = the 4 bond depths (how it fits your history). Cell id = `<mood>_<bond>`. gridRow/gridCol are 0-indexed, matching the layout the grid image is generated and sliced in. `moodPose` drives the row (expression/posture); `bondDetail` drives the column (additive richness as the bond deepens). Selection at runtime: utils/reflection-context.ts {mood, bondDepth} -> this cell -> creatureMoodVisuals.",
+  "axes": {
+    "moodRows": ["cozy", "restless", "tender", "defiant"],
+    "bondColumns": ["fresh", "familiar", "deep", "knowing"]
+  },
+  "cellTemplate": [
+    { "id": "cozy_fresh", "mood": "cozy", "bond": "fresh", "gridRow": 0, "gridCol": 0 },
+    { "id": "cozy_familiar", "mood": "cozy", "bond": "familiar", "gridRow": 0, "gridCol": 1 },
+    { "id": "cozy_deep", "mood": "cozy", "bond": "deep", "gridRow": 0, "gridCol": 2 },
+    { "id": "cozy_knowing", "mood": "cozy", "bond": "knowing", "gridRow": 0, "gridCol": 3 },
+    { "id": "restless_fresh", "mood": "restless", "bond": "fresh", "gridRow": 1, "gridCol": 0 },
+    { "id": "restless_familiar", "mood": "restless", "bond": "familiar", "gridRow": 1, "gridCol": 1 },
+    { "id": "restless_deep", "mood": "restless", "bond": "deep", "gridRow": 1, "gridCol": 2 },
+    { "id": "restless_knowing", "mood": "restless", "bond": "knowing", "gridRow": 1, "gridCol": 3 },
+    { "id": "tender_fresh", "mood": "tender", "bond": "fresh", "gridRow": 2, "gridCol": 0 },
+    { "id": "tender_familiar", "mood": "tender", "bond": "familiar", "gridRow": 2, "gridCol": 1 },
+    { "id": "tender_deep", "mood": "tender", "bond": "deep", "gridRow": 2, "gridCol": 2 },
+    { "id": "tender_knowing", "mood": "tender", "bond": "knowing", "gridRow": 2, "gridCol": 3 },
+    { "id": "defiant_fresh", "mood": "defiant", "bond": "fresh", "gridRow": 3, "gridCol": 0 },
+    { "id": "defiant_familiar", "mood": "defiant", "bond": "familiar", "gridRow": 3, "gridCol": 1 },
+    { "id": "defiant_deep", "mood": "defiant", "bond": "deep", "gridRow": 3, "gridCol": 2 },
+    { "id": "defiant_knowing", "mood": "defiant", "bond": "knowing", "gridRow": 3, "gridCol": 3 }
+  ],
+  "creatures": {
+    "location_home_evening_bedrotte": {
+      "visualKey": "bedrotte",
+      "base": "Bedrotte — a small, head-dominant blanket-nest creature with dramatically oversized glossy eyes, a sleepy ember-glow belly, a pillow-crown silhouette and a soft blanket mantle. Cozy, restorative, premium stylized 3D mascot.",
+      "moodPose": {
+        "cozy": "curled and settled into the blanket, content half-lidded eyes, a small soft smile, fully at ease",
+        "restless": "half-risen and shifting, blanket slipping off one shoulder, eyes glancing to the side, one little paw fidgeting — quiet energy with nowhere to go",
+        "tender": "drooping and small, blanket pulled up to the chin, eyes large and soft and gentle, a fragile sleepy droop — a day that asked nothing",
+        "defiant": "sitting upright and proud, chin lifted, blanket worn like a little cape, a small knowing smug smile — chose this on purpose, no apology"
+      },
+      "bondDetail": {
+        "fresh": "simple and clean — a single thin blanket, soft neutral glow, minimal surrounding detail",
+        "familiar": "a touch more settled — one small added pillow, a slightly warmer ember glow",
+        "deep": "richer and lived-in — layered blankets, a well-defined pillow-crown, a stronger warm ember-belly glow",
+        "knowing": "a deep cozy nest of accumulated blankets and pillows, the deepest warm glow, a few tiny drifting embers — long-lived-in comfort"
+      },
+      "cells": "@cellTemplate"
+    },
+    "activity_high_steps_day_steppling": {
+      "visualKey": "steppling",
+      "base": "Steppling — a cute upbeat little walker sprite with footprint marks, a mile-counter glow, light travel scuffs, dramatically oversized glossy eyes, a visible inner glow core, head-dominant mascot proportions and little sturdy feet. Premium stylized 3D mascot.",
+      "moodPose": {
+        "cozy": "an easy happy amble, relaxed stride, content little smile — moving through the day in no hurry",
+        "restless": "jogging in place and bouncing, glancing eagerly ahead, fidgety feet — energy that needs somewhere to go",
+        "tender": "footsore and slowing, sitting to rest little feet, a soft tired smile — a day the body felt every step",
+        "defiant": "striding forward chin-up, arms pumping, a proud go-anywhere grin — covering real ground on your own terms"
+      },
+      "bondDetail": {
+        "fresh": "simple and clean — a single faint trail wisp, soft glow, minimal detail",
+        "familiar": "a small worn path beneath the feet, a slightly brighter mile-counter glow",
+        "deep": "a longer glowing trail of footprints, well-worn travel scuffs, a stronger warm glow",
+        "knowing": "a rich winding trail of many glowing footprints, the deepest mile-counter glow, tiny drifting distance sparks"
+      },
+      "cells": "@cellTemplate"
+    },
+    "location_coffee_shop_baristabbit": {
+      "visualKey": "baristabbit",
+      "base": "Baristabbit — a cute earnest little barista hybrid with latte-foam ears, a ceramic cup hood, a caramel glow core, dramatically oversized glossy eyes and head-dominant mascot proportions. Warm, aromatic, premium stylized 3D mascot.",
+      "moodPose": {
+        "cozy": "cradling a warm cup in both paws, a content sip, eyes soft and half-closed — the ritual gone easy",
+        "restless": "mid-pour and juggling, focused alert eyes, a little frazzled — warmly busy with too much to brew",
+        "tender": "slumped gently at the counter beside a quiet cooling cup, soft tired eyes — warmth offered, nothing asked",
+        "defiant": "presenting a perfect cup with solemn pride, chin up — this small good thing made exactly right, on purpose"
+      },
+      "bondDetail": {
+        "fresh": "simple and clean — a single plain cup, soft steam, minimal detail",
+        "familiar": "a small saucer and the beginnings of latte art, slightly warmer caramel glow",
+        "deep": "layered cafe details, refined latte art, a richer aromatic steam glow",
+        "knowing": "a full little ritual set-up of beans, cup and saucer, the deepest caramel glow, drifting aroma curls"
+      },
+      "cells": "@cellTemplate"
+    },
+    "location_park_mossprout": {
+      "visualKey": "mossprout",
+      "base": "Mossprout — a cute gentle little plantling with a moss hood, leaf ears, a soft dew glow, dramatically oversized glossy eyes, a visible inner glow core and head-dominant mascot proportions. Soft, natural, calm, premium stylized 3D mascot.",
+      "moodPose": {
+        "cozy": "nestled in soft grass, content and unhurried, leaves settled, a gentle smile",
+        "restless": "half-up and peeking around, leaf ears rustling, curious energy ready to roam the path",
+        "tender": "a little wilted and dew-soft, gentle soft eyes, a quiet droop — a low day met with shade",
+        "defiant": "standing tall and rooted, leaves spread wide, chin up — out in the open air on purpose, unbothered and proud"
+      },
+      "bondDetail": {
+        "fresh": "simple and clean — a single small sprout leaf, soft dew glow, minimal detail",
+        "familiar": "a couple more leaves and a tiny flower bud, a slightly lusher green",
+        "deep": "fuller foliage and small blossoms, a richer verdant glow",
+        "knowing": "a lush crown of leaves and flowers with mossy growth, the deepest green glow, drifting pollen motes"
+      },
+      "cells": "@cellTemplate"
+    },
+    "location_bakery_crumbun": {
+      "visualKey": "crumbun",
+      "base": "Crumbun — a cute cozy little foodling with a soft brioche body, powdered cheeks, gold crust ears, dramatically oversized glossy eyes and head-dominant mascot proportions. Buttery, warm, soft, premium stylized 3D mascot.",
+      "moodPose": {
+        "cozy": "hugging a warm bun, cheeks full and content, a soft sleepy smile — fresh-baked comfort",
+        "restless": "clutching its treats and glancing around protectively, a little antsy and eager",
+        "tender": "curled small around a single crumb, soft quiet eyes — a gentle low day asking only for warmth",
+        "defiant": "guarding a little hoard of treats, chin up with a proud possessive smile — this comfort is earned"
+      },
+      "bondDetail": {
+        "fresh": "simple and clean — a single plain bun, soft warm tones, minimal detail",
+        "familiar": "a small pastry added with a dusting of sugar, slightly warmer tones",
+        "deep": "a little spread of baked goods, a golden crust glow",
+        "knowing": "a generous heap of pastries and crumbs, the deepest warm oven glow, drifting flour and steam"
+      },
+      "cells": "@cellTemplate"
+    },
+    "activity_errand_loop_errandimp": {
+      "visualKey": "errandimp",
+      "base": "Errandimp — a cute frazzled little imp with overloaded tote bags, a crumpled checklist scrap, a jingling key charm, dramatically oversized glossy eyes and head-dominant mascot proportions. Busy, cheerful, determined, premium stylized 3D mascot.",
+      "moodPose": {
+        "cozy": "bags finally set down, a relieved content little smile — a loop closed and done",
+        "restless": "mid-dash and juggling tote bags, eyes darting down the checklist — busy, buzzing, its signature frazzle",
+        "tender": "collapsed under the weight of the bags, worn out with gentle tired eyes — a hard slog met with rest",
+        "defiant": "holding the checked-off list up high, chin lifted, a triumphant grin — the mission conquered on your own terms"
+      },
+      "bondDetail": {
+        "fresh": "simple and clean — a single small tote bag, soft glow, minimal detail",
+        "familiar": "a couple of bags and a tiny list, a slightly busier look",
+        "deep": "an armful of bags and tags, a brighter busy glow",
+        "knowing": "a towering triumphant haul of bags and a long checklist, the deepest glow, little drifting motion sparks"
+      },
+      "cells": "@cellTemplate"
+    }
+  }
+}

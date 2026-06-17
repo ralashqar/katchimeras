@@ -19,6 +19,7 @@ import {
   type ImportedHealthRoutesPayload,
   recordForegroundLocationSample,
   seedPhotoLocationsByDay,
+  setDayWeatherForDay,
   setPlaceCategorySeedsForDay,
   triggerHatchForDay,
   updateActivityPermissionState,
@@ -29,6 +30,7 @@ import {
 import { collectBackfillDays } from '@/utils/day-backfill';
 import { requestDayReflection } from '@/utils/day-reflection';
 import { ensureDayVision } from '@/utils/photo-vision';
+import { ensureDayWeather } from '@/utils/day-weather';
 import {
   getHatchNotificationPermission,
   requestHatchNotificationPermission,
@@ -288,7 +290,10 @@ export function useHomeScreenState() {
     const vision = await ensureDayVision(day);
     const dayForReflection = vision ? { ...day, vision } : day;
 
-    const generated = await requestDayReflection(dayForReflection, profile);
+    // The days before this one give the line its temporal read (streaks,
+    // recovery after a busy stretch, shared history with this creature).
+    const pastDays = hatchedState.archivedDays.filter((candidate) => candidate.id !== dayId);
+    const generated = await requestDayReflection(dayForReflection, profile, pastDays);
     if (!generated) {
       return;
     }
@@ -327,6 +332,21 @@ export function useHomeScreenState() {
       ]);
       now = new Date();
       baseState = setPlaceCategorySeedsForDay(baseState, selectedDay.id, seeds, profile, now);
+    }
+
+    // Resolve the day's weather before hatching so the mood read (and the
+    // persisted variant) can account for a rainy stay-in vs a fair-day choice,
+    // and so the small weather icon has something to show. Best-effort.
+    const weatherTarget =
+      baseState.today.id === selectedDay.id
+        ? baseState.today
+        : baseState.archivedDays.find((day) => day.id === selectedDay.id) ?? null;
+    if (weatherTarget && weatherTarget.weather === undefined && weatherTarget.locations.length > 0) {
+      const weather = await ensureDayWeather(weatherTarget);
+      if (weather) {
+        now = new Date();
+        baseState = setDayWeatherForDay(baseState, selectedDay.id, weather, profile, now);
+      }
     }
 
     const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);

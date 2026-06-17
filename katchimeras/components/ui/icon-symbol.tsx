@@ -32,6 +32,13 @@ const MAPPING = {
   'heart.fill': 'favorite',
   'camera.fill': 'photo-camera',
   'bubble.left.and.bubble.right.fill': 'forum',
+  'sun.max.fill': 'wb-sunny',
+  'cloud.sun.fill': 'wb-cloudy',
+  'cloud.fill': 'cloud',
+  'cloud.fog.fill': 'foggy',
+  'cloud.rain.fill': 'water-drop',
+  'cloud.snow.fill': 'ac-unit',
+  'cloud.bolt.rain.fill': 'thunderstorm',
 } as IconMapping;
 
 /**

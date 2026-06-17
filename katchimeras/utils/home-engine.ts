@@ -26,6 +26,7 @@ import type {
   HomeMoment,
   HomeMomentMetadata,
   HomeScoreKey,
+  DayWeather,
   HomeTimelineDay,
   HomeTomorrowRecord,
   InspirationCategory,
@@ -46,6 +47,8 @@ import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { deriveDayMapSummary } from '@/utils/day-map-engine';
 import { buildEncounterCreature, recordEncounterHatch } from '@/utils/encounter-engine';
 import { curatePhotos } from '@/utils/photo-curation';
+import { buildReflectionContext } from '@/utils/reflection-context';
+import { resolveVariantCellId } from '@/utils/creature-variant';
 import { aggregatePhotoVision } from '@/utils/vision-signals';
 
 import type { EncounterHistoryMap } from '@/types/home';
@@ -531,7 +534,13 @@ export function triggerHatchForDay(
       return state;
     }
 
-    const hatchedToday = finalizeDayHatch(state.today, profile, now, state.encounterHistory);
+    const hatchedToday = finalizeDayHatch(
+      state.today,
+      profile,
+      now,
+      state.encounterHistory,
+      state.archivedDays
+    );
 
     return normalizeStoredHomeState(
       {
@@ -555,7 +564,8 @@ export function triggerHatchForDay(
   }
 
   const nextArchived = [...state.archivedDays];
-  const hatchedDay = finalizeDayHatch(target, profile, now, state.encounterHistory);
+  const pastDays = [state.today, ...state.archivedDays].filter((entry) => entry.id !== dayId);
+  const hatchedDay = finalizeDayHatch(target, profile, now, state.encounterHistory, pastDays);
   nextArchived[archivedIndex] = hatchedDay;
 
   return normalizeStoredHomeState(
@@ -648,6 +658,27 @@ export function setPlaceCategorySeedsForDay(
 ): StoredHomeState {
   const applyToDay = (day: StoredHomeDayRecord): StoredHomeDayRecord =>
     day.id === dayId ? { ...day, placeCategorySeeds: seeds } : day;
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: applyToDay(state.today),
+      archivedDays: state.archivedDays.map(applyToDay),
+    },
+    profile,
+    now
+  );
+}
+
+export function setDayWeatherForDay(
+  state: StoredHomeState,
+  dayId: string,
+  weather: DayWeather,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const applyToDay = (day: StoredHomeDayRecord): StoredHomeDayRecord =>
+    day.id === dayId ? { ...day, weather } : day;
 
   return normalizeStoredHomeState(
     {
@@ -1546,7 +1577,8 @@ function finalizeDayHatch(
   day: StoredHomeDayRecord,
   profile: OnboardingProfile,
   now: Date,
-  encounterHistory: EncounterHistoryMap
+  encounterHistory: EncounterHistoryMap,
+  pastDays: readonly StoredHomeDayRecord[] = []
 ): StoredHomeDayRecord {
   const scores = computeDayScores(day);
   const sortedTraits = [...scoreOrder].sort((left, right) => scores[right] - scores[left]);
@@ -1555,11 +1587,19 @@ function finalizeDayHatch(
 
   const encounterCreature = buildEncounterCreature(day, encounterHistory, primaryTrait, secondaryTrait);
   if (encounterCreature) {
+    // The same mood × bond-depth read that drives the words also selects the
+    // creature's expression cutout — computed once here, at hatch, and persisted.
+    const context = buildReflectionContext({ ...day, creature: encounterCreature }, pastDays);
     return {
       ...day,
       state: 'hatched',
       shareReadyAt: day.shareReadyAt ?? now.toISOString(),
-      creature: encounterCreature,
+      creature: {
+        ...encounterCreature,
+        mood: context.mood,
+        bondDepth: context.bondDepth,
+        variantCell: resolveVariantCellId(context.mood, context.bondDepth) ?? undefined,
+      },
     };
   }
 

@@ -322,7 +322,7 @@ export default function HomeScreen() {
         <Animated.View entering={presenceEnter(70)} onLayout={handleHeroStageLayout} style={styles.heroStage}>
           {isDay ? (
             isHatched ? (
-              <CreatureHero creature={selectedDay.creature!} hideSubtitle />
+              <CreatureHero creature={selectedDay.creature!} weather={selectedDay.weather} hideSubtitle />
             ) : (
               <LanternEgg
                 egg={selectedDay.egg}

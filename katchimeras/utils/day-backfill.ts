@@ -897,7 +897,11 @@ export async function enrichBackfillReflections(dayIds: string[]): Promise<void>
       }
 
       // Specific because day.vision (photoDetails/signText) was stored at hatch.
-      const generated = await requestDayReflection(day, profile);
+      // The other stored days give the temporal/bond context for this one.
+      const pastDays = [stored.today, ...stored.archivedDays].filter(
+        (candidate) => candidate.id !== dayId
+      );
+      const generated = await requestDayReflection(day, profile, pastDays);
       if (generated) {
         const fresh = loadStoredHomeState() ?? stored;
         saveStoredHomeState(applyGeneratedReflection(fresh, dayId, generated, profile, new Date()));
