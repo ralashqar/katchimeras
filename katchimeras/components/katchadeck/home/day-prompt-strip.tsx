@@ -1,18 +1,37 @@
 import { Image } from 'expo-image';
+import { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { DayPromptKind } from '@/types/home';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 
+// Where on screen (window coords) the tapped item sits, so the answer's mote
+// can launch from exactly there and fly into the egg.
+export type FeedSourceRect = { x: number; y: number; w: number; h: number };
+
 type DayPromptStripProps = {
   prompt: ActiveDayPrompt | null;
-  onAnswer: (kind: DayPromptKind, choiceIds: string[]) => void;
+  onAnswer: (kind: DayPromptKind, choiceIds: string[], from: FeedSourceRect) => void;
   onDismiss: (kind: DayPromptKind) => void;
-  onSelectHeroPhoto: (photo: DayPromptPhotoCandidate) => void;
+  onSelectHeroPhoto: (photo: DayPromptPhotoCandidate, from: FeedSourceRect) => void;
 };
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const motionEasing = Easing.bezier(0.22, 1, 0.36, 1);
+
+// A few warm lantern hues so the option dots feel alive without shouting.
+const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#FFB4A2'];
 
 export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto }: DayPromptStripProps) {
   if (!prompt) {
@@ -20,9 +39,15 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
   }
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(140)} style={styles.wrap}>
+    <Animated.View
+      // Re-key per prompt so the whole strip plays its intro when the question
+      // changes, not just on first mount.
+      key={prompt.id}
+      entering={FadeIn.duration(220)}
+      exiting={FadeOut.duration(150)}
+      style={styles.wrap}>
       <View style={styles.header}>
-        <View style={styles.titleBlock}>
+        <Animated.View entering={FadeInDown.duration(280).easing(motionEasing)} style={styles.titleBlock}>
           <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
             {prompt.title}
           </ThemedText>
@@ -31,7 +56,7 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
               {prompt.body}
             </ThemedText>
           ) : null}
-        </View>
+        </Animated.View>
         <Pressable accessibilityRole="button" onPress={() => onDismiss(prompt.id)} style={styles.dismiss}>
           <ThemedText style={styles.dismissLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
             Later
@@ -40,38 +65,106 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
       </View>
 
       {prompt.id === 'meaningful_photo' ? (
-        <ScrollView
-          contentContainerStyle={styles.photoRow}
-          horizontal
-          showsHorizontalScrollIndicator={false}>
-          {prompt.photoCandidates.map((photo) => (
-            <Pressable
-              accessibilityRole="button"
+        <ScrollView contentContainerStyle={styles.photoRow} horizontal showsHorizontalScrollIndicator={false}>
+          {prompt.photoCandidates.map((photo, index) => (
+            <PromptPhoto
               key={photo.assetId}
-              onPress={() => onSelectHeroPhoto(photo)}
-              style={styles.photoButton}>
-              <Image contentFit="cover" source={{ uri: photo.thumbnailUri }} style={styles.photo} transition={120} />
-            </Pressable>
+              index={index}
+              photo={photo}
+              onPick={(from) => onSelectHeroPhoto(photo, from)}
+            />
           ))}
         </ScrollView>
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.chipRow}
-          horizontal
-          showsHorizontalScrollIndicator={false}>
-          {prompt.options.slice(0, prompt.maxOptions).map((option) => (
-            <Pressable
-              accessibilityRole="button"
+        <ScrollView contentContainerStyle={styles.chipRow} horizontal showsHorizontalScrollIndicator={false}>
+          {prompt.options.slice(0, prompt.maxOptions).map((option, index) => (
+            <PromptChip
               key={option.id}
-              onPress={() => onAnswer(prompt.id, [option.id])}
-              style={styles.chip}>
-              <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {option.label}
-              </ThemedText>
-            </Pressable>
+              index={index}
+              label={option.label}
+              accent={CHIP_ACCENTS[index % CHIP_ACCENTS.length]}
+              onPick={(from) => onAnswer(prompt.id, [option.id], from)}
+            />
           ))}
         </ScrollView>
       )}
+    </Animated.View>
+  );
+}
+
+function PromptChip({
+  label,
+  accent,
+  index,
+  onPick,
+}: {
+  label: string;
+  accent: string;
+  index: number;
+  onPick: (from: FeedSourceRect) => void;
+}) {
+  const ref = useRef<View | null>(null);
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const pick = () => {
+    ref.current?.measureInWindow((x, y, w, h) => onPick({ x, y, w, h }));
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.delay(80 + index * 45).duration(320).easing(motionEasing)}>
+      <AnimatedPressable
+        ref={ref}
+        accessibilityRole="button"
+        onPressIn={() => {
+          scale.value = withSpring(0.93, { damping: 15, stiffness: 320 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 14, stiffness: 240 });
+        }}
+        onPress={pick}
+        style={[styles.chip, animatedStyle]}>
+        <View style={[styles.chipDot, { backgroundColor: accent, boxShadow: `0 0 10px ${accent}AA` }]} />
+        <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+          {label}
+        </ThemedText>
+      </AnimatedPressable>
+    </Animated.View>
+  );
+}
+
+function PromptPhoto({
+  photo,
+  index,
+  onPick,
+}: {
+  photo: DayPromptPhotoCandidate;
+  index: number;
+  onPick: (from: FeedSourceRect) => void;
+}) {
+  const ref = useRef<View | null>(null);
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const pick = () => {
+    ref.current?.measureInWindow((x, y, w, h) => onPick({ x, y, w, h }));
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.delay(80 + index * 55).duration(340).easing(motionEasing)}>
+      <AnimatedPressable
+        ref={ref}
+        accessibilityRole="button"
+        onPressIn={() => {
+          scale.value = withSpring(0.93, { damping: 15, stiffness: 320 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 14, stiffness: 240 });
+        }}
+        onPress={pick}
+        style={[styles.photoButton, animatedStyle]}>
+        <Image contentFit="cover" source={{ uri: photo.thumbnailUri }} style={styles.photo} transition={120} />
+      </AnimatedPressable>
     </Animated.View>
   );
 }
@@ -125,19 +218,25 @@ const styles = StyleSheet.create({
   chipRow: {
     gap: 8,
     paddingRight: 4,
+    paddingVertical: 2,
   },
   chip: {
     alignItems: 'center',
     backgroundColor: 'rgba(12,10,20,0.72)',
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.12)',
     borderCurve: 'continuous',
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 8,
-    minHeight: 38,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    minHeight: 40,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  chipDot: {
+    borderRadius: 999,
+    height: 8,
+    width: 8,
   },
   chipLabel: {
     fontSize: 13,
@@ -147,6 +246,7 @@ const styles = StyleSheet.create({
   photoRow: {
     gap: 10,
     paddingRight: 4,
+    paddingVertical: 2,
   },
   photoButton: {
     backgroundColor: 'rgba(12,10,20,0.72)',

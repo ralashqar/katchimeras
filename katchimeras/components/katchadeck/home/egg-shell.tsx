@@ -33,6 +33,11 @@ type EggShellProps = {
   crackStage?: 0 | 1 | 2;
 };
 
+// Drag-to-tilt: dragX is already clamped to ±60 in LanternEgg's pan handler, so
+// a full sideways pull reaches the max tilt.
+const DRAG_TILT_RANGE = 60;
+const MAX_TILT_DEG = 9;
+
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
 const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
 const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
@@ -75,11 +80,17 @@ export function EggShell({ egg: _egg, motion, reactionKey = 0, crackStage = 0 }:
     const energy = motion.interactionEnergy.value;
     const press = motion.pressProgress.value;
     const dragMagnitude = Math.min(1, Math.hypot(motion.dragX.value, motion.dragY.value) / 88);
+    // Pulling the membrane swings the egg: a leftward pull (e.g. from the bottom
+    // left) tips it clockwise, a rightward pull counter-clockwise — driven by the
+    // horizontal component so a straight up/down pull leaves it upright. Clamped
+    // to a gentle tilt; springs back with dragX on release.
+    const tilt = Math.max(-1, Math.min(1, -motion.dragX.value / DRAG_TILT_RANGE)) * MAX_TILT_DEG;
 
     return {
       transform: [
         { translateX: motion.dragX.value * 0.14 },
         { translateY: motion.dragY.value * 0.14 },
+        { rotate: `${tilt}deg` },
         { scaleX: 1 + breathe.value * 0.05 + reaction.value * 0.06 + press * 0.03 + dragMagnitude * 0.03 },
         {
           scaleY:

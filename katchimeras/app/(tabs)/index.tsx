@@ -11,7 +11,8 @@ import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
-import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
+import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
+import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
 import { renderDayComic } from '@/utils/day-comic-render';
 import { ensureDayVision } from '@/utils/photo-vision';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
@@ -61,6 +62,15 @@ export default function HomeScreen() {
   const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
   const [heroAnchorY, setHeroAnchorY] = useState(316);
   const [sharingDayId, setSharingDayId] = useState<string | null>(null);
+  // The "feed the egg" flight: a mote launched from a tapped prompt option that
+  // arcs into the egg, where it lands and fires an absorb pulse (feedKey). The
+  // data mutation is deferred to arrival via pendingFeedCommit so the egg's
+  // reaction stays in sync with the visual.
+  const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
+  const [eggFeedKey, setEggFeedKey] = useState(0);
+  const heroStageRef = useRef<View | null>(null);
+  const pendingFeedCommit = useRef<(() => void) | null>(null);
+  const feedNonce = useRef(0);
   // GPT-Image comic generation: full-page A4 comic rendered from the day's
   // photos + creature (sent to the server — opt-in, see consent gate).
   const [comicGen, setComicGen] = useState<
@@ -302,12 +312,62 @@ export default function HomeScreen() {
   const isFormingToday = isDay && selectedDay.isToday && selectedDay.state !== 'hatched';
   const signalLine = isDay ? buildSignalLine(selectedDay) : null;
 
-  function handleAnswerDayPrompt(kind: Parameters<typeof answerDayPrompt>[0]['kind'], choiceIds: string[]) {
-    if (kind === 'meaning' && selectedDay?.kind === 'day' && selectedDay.heroPhoto) {
-      answerPhotoMeaning({ choiceIds });
+  // Launch a mote from the tapped item into the egg, deferring the actual
+  // answer until it lands so the egg's pulse lands with it. Guards against
+  // overlapping flights.
+  function startEggFeed(from: FeedSourceRect, payload: { label?: string; photoUri?: string }, commit: () => void) {
+    if (eggFeed) {
+      commit();
       return;
     }
-    answerDayPrompt({ kind, choiceIds });
+    const launch = (toX: number, toY: number) => {
+      feedNonce.current += 1;
+      pendingFeedCommit.current = commit;
+      setEggFeed({
+        nonce: feedNonce.current,
+        fromX: from.x + from.w / 2,
+        fromY: from.y + from.h / 2,
+        toX,
+        toY,
+        label: payload.label,
+        photoUri: payload.photoUri,
+        tint: Lantern.ember300,
+      });
+    };
+    if (heroStageRef.current) {
+      heroStageRef.current.measureInWindow((x, y, w, h) => launch(x + w / 2, y + h / 2));
+    } else {
+      // No measured egg yet — commit immediately rather than swallow the answer.
+      commit();
+    }
+  }
+
+  function handleEggFeedArrive() {
+    pendingFeedCommit.current?.();
+    pendingFeedCommit.current = null;
+    setEggFeed(null);
+    setEggFeedKey((key) => key + 1);
+  }
+
+  function handleAnswerDayPrompt(
+    kind: Parameters<typeof answerDayPrompt>[0]['kind'],
+    choiceIds: string[],
+    from: FeedSourceRect
+  ) {
+    const isPhotoMeaning = kind === 'meaning' && selectedDay?.kind === 'day' && !!selectedDay.heroPhoto;
+    const label =
+      activeDayPrompt?.options.find((option) => option.id === choiceIds[0])?.label ?? undefined;
+    startEggFeed(from, { label }, () => {
+      if (isPhotoMeaning) {
+        answerPhotoMeaning({ choiceIds });
+      } else {
+        answerDayPrompt({ kind, choiceIds });
+      }
+    });
+  }
+
+  function handleSelectHeroPhoto(photo: Parameters<typeof selectHeroPhoto>[0], from: FeedSourceRect) {
+    startEggFeed(from, { photoUri: photo.thumbnailUri }, () => selectHeroPhoto(photo));
   }
 
   return (
@@ -333,7 +393,11 @@ export default function HomeScreen() {
           <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(70)} onLayout={handleHeroStageLayout} style={styles.heroStage}>
+        <Animated.View
+          ref={heroStageRef}
+          entering={presenceEnter(70)}
+          onLayout={handleHeroStageLayout}
+          style={styles.heroStage}>
           {isDay ? (
             isHatched ? (
               <CreatureHero creature={selectedDay.creature!} weather={selectedDay.weather} hideSubtitle />
@@ -342,6 +406,7 @@ export default function HomeScreen() {
                 egg={selectedDay.egg}
                 onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
                 reactionKey={selectedDay.moments.length}
+                feedKey={eggFeedKey}
               />
             )
           ) : (
@@ -394,7 +459,7 @@ export default function HomeScreen() {
               <DayPromptStrip
                 onAnswer={handleAnswerDayPrompt}
                 onDismiss={dismissDayPrompt}
-                onSelectHeroPhoto={selectHeroPhoto}
+                onSelectHeroPhoto={handleSelectHeroPhoto}
                 prompt={activeDayPrompt}
               />
             ) : null}
@@ -437,6 +502,8 @@ export default function HomeScreen() {
           ) : null}
         </Animated.View>
       </ScrollView>
+
+      <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
 
       <AddMomentRadial
         anchorY={heroAnchorY}
