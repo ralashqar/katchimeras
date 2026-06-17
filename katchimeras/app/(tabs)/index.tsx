@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Alert, type LayoutChangeEvent, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { captureRef } from 'react-native-view-shot';
 
-import { AddMomentRadial } from '@/components/katchadeck/home/add-moment-radial';
+import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/home/hatch-sequence';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
@@ -13,8 +13,12 @@ import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
+import { EggOrbitIcons, type OrbitIcon } from '@/components/katchadeck/home/egg-orbit-icons';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { renderDayComic } from '@/utils/day-comic-render';
-import { ensureDayVision } from '@/utils/photo-vision';
+import { analyzePhoto, ensureDayVision } from '@/utils/photo-vision';
+import { aggregatePhotoVision } from '@/utils/vision-signals';
+import { resolvePhotoCategory } from '@/utils/photo-category';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
@@ -23,7 +27,8 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
-import { useAddMomentFlow } from '@/hooks/use-add-moment-flow';
+import { dayPromptRegistry } from '@/constants/day-prompts';
+import type { ActiveDayPrompt } from '@/utils/day-prompt-engine';
 import { useDayLocationCapture } from '@/hooks/use-day-location-capture';
 import { useDayStepCapture } from '@/hooks/use-day-step-capture';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
@@ -36,8 +41,9 @@ const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 export default function HomeScreen() {
   const router = useRouter();
   const {
-    addMoment,
     activeDayPrompt,
+    availableDayPrompts,
+    applyCapturedPhotoVision,
     activityPermission,
     answerDayPrompt,
     answerPhotoMeaning,
@@ -60,7 +66,6 @@ export default function HomeScreen() {
   const backfillStatus = useBackfillStatus();
   const [hatchTargetId, setHatchTargetId] = useState<string | null>(null);
   const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
-  const [heroAnchorY, setHeroAnchorY] = useState(316);
   const [sharingDayId, setSharingDayId] = useState<string | null>(null);
   // The "feed the egg" flight: a mote launched from a tapped prompt option that
   // arcs into the egg, where it lands and fires an absorb pulse (feedKey). The
@@ -78,23 +83,23 @@ export default function HomeScreen() {
   >(null);
   const postcardRef = useRef<View>(null);
   const comicShotRef = useRef<View>(null);
-  const addMomentFlow = useAddMomentFlow({
-    enabled: selectedDay?.kind === 'day' && selectedDay.canAddMoments,
-    onAddMoment: addMoment,
-    timelineDays,
-    todayDay: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay : null,
-  });
-  const {
-    close: closeAddMomentFlow,
-    confirmInspiration,
-    dismissError: dismissAddMomentError,
-    open: openAddMomentFlow,
-    selectAction: selectAddMomentAction,
-    selectInspirationCategory,
-    selectRecentPhoto,
-    state: addMomentFlowState,
-    usePhotoPickerFallback,
-  } = addMomentFlow;
+  // "Add to today" sheet: a menu of answerable prompt categories (replaces the
+  // old radial). Open from the egg tap or the CTA; tapping a category opens that
+  // prompt and answering feeds the egg.
+  const [promptSheetOpen, setPromptSheetOpen] = useState(false);
+  const openPromptSheet = () => setPromptSheetOpen(true);
+  const closePromptSheet = () => setPromptSheetOpen(false);
+  // The "what did it mean?" step that always follows a photo pick (its options
+  // are static, so build it once).
+  const meaningPrompt = useMemo<ActiveDayPrompt>(
+    () => ({ ...dayPromptRegistry.meaning, photoCandidates: [] }),
+    []
+  );
+  // Camera capture: snap → analyse → feed the egg → orbit a category icon.
+  const [orbitIcons, setOrbitIcons] = useState<OrbitIcon[]>([]);
+  const [capturing, setCapturing] = useState(false);
+  const orbitNonce = useRef(0);
+  const cameraButtonRef = useRef<View | null>(null);
 
   const backgroundAccent =
     selectedDay?.kind === 'day'
@@ -172,8 +177,9 @@ export default function HomeScreen() {
   }, [hatchTargetId, selectedDay]);
 
   useEffect(() => {
-    closeAddMomentFlow();
-  }, [closeAddMomentFlow, selectedDayId]);
+    setPromptSheetOpen(false);
+    setOrbitIcons([]);
+  }, [selectedDayId]);
 
   // Each time a background backfill reflection is written, pull it into view so
   // the day's specific quote appears without the user re-opening Home.
@@ -198,11 +204,6 @@ export default function HomeScreen() {
     setHatchPhase('recap');
     refreshState();
   };
-
-  function handleHeroStageLayout(event: LayoutChangeEvent) {
-    const { height, y } = event.nativeEvent.layout;
-    setHeroAnchorY(y + height / 2);
-  }
 
   function handleOpenDayMap(dayId: string) {
     router.push({
@@ -355,8 +356,10 @@ export default function HomeScreen() {
     from: FeedSourceRect
   ) {
     const isPhotoMeaning = kind === 'meaning' && selectedDay?.kind === 'day' && !!selectedDay.heroPhoto;
-    const label =
-      activeDayPrompt?.options.find((option) => option.id === choiceIds[0])?.label ?? undefined;
+    const sourcePrompts = [activeDayPrompt, ...availableDayPrompts].filter(Boolean);
+    const label = sourcePrompts
+      .find((prompt) => prompt?.id === kind)
+      ?.options.find((option) => option.id === choiceIds[0])?.label;
     startEggFeed(from, { label }, () => {
       if (isPhotoMeaning) {
         answerPhotoMeaning({ choiceIds });
@@ -367,7 +370,55 @@ export default function HomeScreen() {
   }
 
   function handleSelectHeroPhoto(photo: Parameters<typeof selectHeroPhoto>[0], from: FeedSourceRect) {
-    startEggFeed(from, { photoUri: photo.thumbnailUri }, () => selectHeroPhoto(photo));
+    // Commit immediately (not deferred to arrival) so the paired "meaning" step
+    // that opens next already has a hero photo to attach to. The mote still
+    // flies and pulses the egg on arrival.
+    selectHeroPhoto(photo);
+    startEggFeed(from, { photoUri: photo.thumbnailUri }, () => {});
+  }
+
+  // Snap a photo with the camera, read it on-device, feed it into the egg, and
+  // start a category icon (food / drink / landmark…) orbiting the egg. The
+  // analysed concepts also fold into today so the photo shapes the hatch.
+  async function handleCaptureMoment() {
+    if (capturing) {
+      return;
+    }
+    setCapturing(true);
+    try {
+      const ImagePicker = await import('expo-image-picker');
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera access needed', 'Allow camera access to snap a moment for today.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.6 });
+      if (result.canceled || !result.assets?.length) {
+        return;
+      }
+      const asset = result.assets[0];
+      const visionResult = await analyzePhoto(asset.uri);
+      const summary = visionResult ? aggregatePhotoVision([visionResult]) : null;
+      const category = summary
+        ? resolvePhotoCategory(summary)
+        : { id: 'moment', label: 'A moment', icon: 'sparkles' as const, accent: '#F1D4B4' };
+
+      if (summary) {
+        applyCapturedPhotoVision(summary);
+      }
+      orbitNonce.current += 1;
+      const key = `orbit-${orbitNonce.current}`;
+      setOrbitIcons((prev) => [...prev, { key, icon: category.icon, accent: category.accent }].slice(-6));
+
+      const launch = (from: FeedSourceRect) => startEggFeed(from, { photoUri: asset.uri }, () => {});
+      if (cameraButtonRef.current) {
+        cameraButtonRef.current.measureInWindow((x, y, w, h) => launch({ x, y, w, h }));
+      }
+    } catch {
+      Alert.alert('Could not open the camera', 'Something went wrong opening the camera. Please try again.');
+    } finally {
+      setCapturing(false);
+    }
   }
 
   return (
@@ -393,18 +444,14 @@ export default function HomeScreen() {
           <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
         </Animated.View>
 
-        <Animated.View
-          ref={heroStageRef}
-          entering={presenceEnter(70)}
-          onLayout={handleHeroStageLayout}
-          style={styles.heroStage}>
+        <Animated.View ref={heroStageRef} entering={presenceEnter(70)} style={styles.heroStage}>
           {isDay ? (
             isHatched ? (
               <CreatureHero creature={selectedDay.creature!} weather={selectedDay.weather} hideSubtitle />
             ) : (
               <LanternEgg
                 egg={selectedDay.egg}
-                onPress={selectedDay.canAddMoments ? openAddMomentFlow : undefined}
+                onPress={selectedDay.canAddMoments ? openPromptSheet : undefined}
                 reactionKey={selectedDay.moments.length}
                 feedKey={eggFeedKey}
               />
@@ -422,6 +469,7 @@ export default function HomeScreen() {
               }}
             />
           )}
+          {isFormingToday ? <EggOrbitIcons icons={orbitIcons} /> : null}
         </Animated.View>
 
         {isHatched ? (
@@ -498,24 +546,37 @@ export default function HomeScreen() {
               />
             </View>
           ) : isFormingToday ? (
-            <KatchaButton label="Add a moment" onPress={openAddMomentFlow} variant="primary" />
+            <View style={styles.addRow}>
+              <KatchaButton label="Add to today" onPress={openPromptSheet} variant="primary" style={styles.addMain} />
+              <Pressable
+                ref={cameraButtonRef}
+                accessibilityRole="button"
+                accessibilityLabel="Snap a photo for today"
+                disabled={capturing}
+                onPress={handleCaptureMoment}
+                style={[styles.cameraButton, capturing && styles.cameraButtonBusy]}>
+                {capturing ? (
+                  <ActivityIndicator color={Lantern.ink900} />
+                ) : (
+                  <IconSymbol name="camera.fill" size={22} color={Lantern.ink900} />
+                )}
+              </Pressable>
+            </View>
           ) : null}
         </Animated.View>
       </ScrollView>
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
 
-      <AddMomentRadial
-        anchorY={heroAnchorY}
-        onClose={closeAddMomentFlow}
-        onConfirmInspiration={confirmInspiration}
-        onDismissError={dismissAddMomentError}
-        onSelectAction={selectAddMomentAction}
-        onSelectInspirationCategory={selectInspirationCategory}
-        onSelectRecentPhoto={selectRecentPhoto}
-        onUsePickerFallback={usePhotoPickerFallback}
-        state={addMomentFlowState}
-      />
+      {promptSheetOpen ? (
+        <MomentPromptSheet
+          prompts={availableDayPrompts}
+          meaningPrompt={meaningPrompt}
+          onAnswer={handleAnswerDayPrompt}
+          onSelectHeroPhoto={handleSelectHeroPhoto}
+          onClose={closePromptSheet}
+        />
+      ) : null}
       {hatchDay ? <HatchSequence day={hatchDay} onSkip={handleSkipHatch} phase={hatchPhase} /> : null}
       {hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId && selectedDay.state === 'hatched' ? (
         <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(260)} style={styles.revealFlash}>
@@ -704,6 +765,27 @@ const styles = StyleSheet.create({
   },
   ctaMain: {
     flex: 1.4,
+  },
+  addRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  addMain: {
+    flex: 1,
+  },
+  cameraButton: {
+    alignItems: 'center',
+    backgroundColor: Lantern.ember300,
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    boxShadow: '0 10px 24px rgba(255,195,107,0.32)',
+    height: 54,
+    justifyContent: 'center',
+    width: 54,
+  },
+  cameraButtonBusy: {
+    opacity: 0.7,
   },
   revealFlash: {
     alignItems: 'center',

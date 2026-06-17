@@ -19,7 +19,7 @@ function transpileToTemp(relativeSourcePath, outName) {
   return outPath;
 }
 
-const { aggregatePhotoVision, buildVisionSignals, pickProminentTags } = require(
+const { aggregatePhotoVision, buildVisionSignals, mergeDayVision, pickProminentTags } = require(
   transpileToTemp('utils/vision-signals.ts', 'vision-signals.js')
 );
 
@@ -126,6 +126,15 @@ check('low-confidence concept excluded from tags', pickProminentTags(summary([{ 
 const empty = aggregatePhotoVision([]);
 check('empty aggregation handled', empty.concepts.length === 0 && empty.analyzedPhotoCount === 0 && empty.faceCoverage === 0, JSON.stringify(empty));
 check('empty vision -> no signals', buildVisionSignals(empty).length === 0);
+
+// --- mergeDayVision: a snapped photo folds into the running day vision ---
+const existingDay = aggregatePhotoVision([photo([['coffee', 0.9]]), photo([['coffee', 0.8]])]);
+const snapped = aggregatePhotoVision([photo([['pizza', 0.95]])]);
+const merged = mergeDayVision(existingDay, snapped);
+check('merge sums photo count', merged.analyzedPhotoCount === 3, String(merged.analyzedPhotoCount));
+check('merge keeps existing concept', merged.concepts.some((c) => c.name === 'coffee'));
+check('merge adds new concept', merged.concepts.some((c) => c.name === 'pizza'));
+check('merge into empty returns incoming', mergeDayVision(undefined, snapped) === snapped);
 
 console.log(failures === 0 ? '\nAll vision-signals checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

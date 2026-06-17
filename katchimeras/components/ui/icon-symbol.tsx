@@ -39,6 +39,17 @@ const MAPPING = {
   'cloud.rain.fill': 'water-drop',
   'cloud.snow.fill': 'ac-unit',
   'cloud.bolt.rain.fill': 'thunderstorm',
+  'fork.knife': 'restaurant',
+  'leaf.fill': 'park',
+  'building.columns.fill': 'museum',
+  'water.waves': 'waves',
+  'figure.run': 'directions-run',
+  'pawprint.fill': 'pets',
+  'person.2.fill': 'people',
+  'building.2.fill': 'location-city',
+  'party.popper.fill': 'celebration',
+  'paintbrush.fill': 'spa',
+  'camera.viewfinder': 'photo-camera',
 } as IconMapping;
 
 /**

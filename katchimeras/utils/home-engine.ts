@@ -27,6 +27,7 @@ import type {
   HomeMoment,
   HomeMomentMetadata,
   HomeScoreKey,
+  DayVisionSummary,
   DayWeather,
   HomeTimelineDay,
   HomeTomorrowRecord,
@@ -55,7 +56,7 @@ import { buildEncounterCreature, recordEncounterHatch } from '@/utils/encounter-
 import { curatePhotos } from '@/utils/photo-curation';
 import { buildReflectionContext } from '@/utils/reflection-context';
 import { resolveVariantCellId } from '@/utils/creature-variant';
-import { aggregatePhotoVision } from '@/utils/vision-signals';
+import { aggregatePhotoVision, mergeDayVision } from '@/utils/vision-signals';
 
 import type { EncounterHistoryMap } from '@/types/home';
 
@@ -863,6 +864,26 @@ export function setPlaceCategorySeedsForDay(
       today: applyToDay(state.today),
       archivedDays: state.archivedDays.map(applyToDay),
     },
+    profile,
+    now
+  );
+}
+
+// Fold a snapped-and-analysed photo's vision into today, so a camera capture
+// contributes to the hatch + reflection. Best-effort: a no-op if the day isn't
+// today/forming.
+export function applyCapturedPhotoVisionForToday(
+  state: StoredHomeState,
+  vision: DayVisionSummary,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const today = state.today;
+  if (today.state === 'hatched') {
+    return state;
+  }
+  return normalizeStoredHomeState(
+    { ...state, today: { ...today, vision: mergeDayVision(today.vision, vision) } },
     profile,
     now
   );

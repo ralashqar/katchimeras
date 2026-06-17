@@ -6,6 +6,7 @@ import type {
   AddMomentInput,
   ActivityPermissionState,
   DayPromptKind,
+  DayVisionSummary,
   HealthPermissionState,
   LocationPermissionState,
   RecentPhotoAsset,
@@ -16,6 +17,7 @@ import {
   answerDayPromptForToday,
   answerHeroPhotoMeaningForToday,
   applyBackfilledDays,
+  applyCapturedPhotoVisionForToday,
   applyGeneratedReflection,
   dismissDayPromptForToday,
   hydrateHomeState,
@@ -32,7 +34,12 @@ import {
   updateLocationPermissionState,
   updateTodayStepCount,
 } from '@/utils/home-engine';
-import { selectActiveDayPrompt, type DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
+import {
+  listAvailableDayPrompts,
+  selectActiveDayPrompt,
+  type ActiveDayPrompt,
+  type DayPromptPhotoCandidate,
+} from '@/utils/day-prompt-engine';
 import {
   clearStoredDevPromptPhotoCandidates,
   loadProductionDayPromptPhotoCandidates,
@@ -131,6 +138,14 @@ export function useHomeScreenState() {
           forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
         })
       : null;
+  // Every prompt the user could pick from the "Add to today" menu right now.
+  const availableDayPrompts: ActiveDayPrompt[] =
+    selectedDay?.kind === 'day' && selectedDay.isToday && selectedDay.state !== 'hatched'
+      ? listAvailableDayPrompts(selectedDay, new Date(), {
+          photoCandidates: promptPhotoCandidates.length > 0 ? promptPhotoCandidates : undefined,
+          forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
+        })
+      : [];
   const selectedPromptDayId = selectedDay?.kind === 'day' ? selectedDay.id : null;
   const selectedPromptDayIsToday = selectedDay?.kind === 'day' ? selectedDay.isToday : false;
   const selectedPromptDayState = selectedDay?.kind === 'day' ? selectedDay.state : null;
@@ -234,6 +249,17 @@ export function useHomeScreenState() {
       );
     });
   }, [forceMeaningfulPhotoPrompt]);
+
+  // Fold a snapped-and-analysed photo's vision into today so it contributes to
+  // the hatch + reflection.
+  const applyCapturedPhotoVision = useCallback((vision: DayVisionSummary) => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return applyCapturedPhotoVisionForToday(hydrated.state, vision, profile, now);
+    });
+  }, []);
 
   const answerPhotoMeaning = useCallback((input: { choiceIds: string[]; noteText?: string | null }) => {
     const now = new Date();
@@ -573,6 +599,8 @@ export function useHomeScreenState() {
     selectedDayId: selectedDay?.id ?? viewModel.todayId,
     selectedDay,
     activeDayPrompt,
+    availableDayPrompts,
+    applyCapturedPhotoVision,
     locationPermission: viewModel.state.locationPermission,
     activityPermission: viewModel.state.activityPermission,
     healthPermission: viewModel.state.healthPermission,

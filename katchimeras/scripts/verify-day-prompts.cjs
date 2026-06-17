@@ -183,6 +183,56 @@ check(
   promptEngine.selectActiveDayPrompt(heroPhotoDay, new Date('2026-06-17T19:00:00'))?.id === 'meaning'
 );
 
+// --- "Add to today" menu: listAvailableDayPrompts + buildDayPromptByKind ---
+
+// Daypart-independent: a launched, unanswered prompt is available even outside
+// its daypart window so the menu can offer it.
+const menuDay = makeDay();
+const menuKinds = promptEngine.listAvailableDayPrompts(menuDay, new Date('2026-06-17T08:00:00')).map((p) => p.id);
+check('menu lists multiple categories', menuKinds.length >= 2, menuKinds.join(','));
+check('menu excludes non-launched prompts', !menuKinds.includes('intention'), menuKinds.join(','));
+
+// No photos → no Photo option in the menu.
+check('no Photo option without photo candidates', !menuKinds.includes('meaningful_photo'), menuKinds.join(','));
+
+// "Photo meaning" is never a standalone menu button — even with a hero photo
+// set (which would otherwise make it answerable), it stays out of the menu
+// because it only follows a photo pick as a paired sequence.
+const heroMenu = promptEngine
+  .listAvailableDayPrompts(
+    makeDay({ heroPhoto: { assetId: 'a', thumbnailUri: 'file:///h.jpg', selectedAt: '2026-06-17T12:00:00.000Z', meaningChoiceIds: [], meaningLabels: [] } }),
+    new Date('2026-06-17T19:00:00')
+  )
+  .map((p) => p.id);
+check('menu never includes Photo meaning (meaning)', !heroMenu.includes('meaning'), heroMenu.join(','));
+
+// With enough recent photo candidates, the Photo option appears.
+const photoMenu = promptEngine
+  .listAvailableDayPrompts(menuDay, new Date('2026-06-17T19:00:00'), {
+    photoCandidates: [photoCandidate(1), photoCandidate(2), photoCandidate(3)],
+    forceMeaningfulPhoto: true,
+  })
+  .map((p) => p.id);
+check('Photo option appears with photo candidates', photoMenu.includes('meaningful_photo'), photoMenu.join(','));
+
+// Testing mode: answered categories stay in the menu (re-answerable) — the
+// once-per-day restriction is intentionally off for now.
+const answeredMenu = promptEngine
+  .listAvailableDayPrompts(makeDay({ promptAnswers: [promptAnswer('feeling')] }), new Date('2026-06-17T08:00:00'))
+  .map((p) => p.id);
+check('menu keeps answered category (restriction off)', answeredMenu.includes('feeling'), answeredMenu.join(','));
+
+// buildDayPromptByKind returns the requested kind (and null when answered).
+check('buildDayPromptByKind returns the kind', promptEngine.buildDayPromptByKind(menuDay, 'feeling')?.id === 'feeling');
+check(
+  'buildDayPromptByKind null for answered kind',
+  promptEngine.buildDayPromptByKind(makeDay({ promptAnswers: [promptAnswer('feeling')] }), 'feeling') === null
+);
+check(
+  'buildDayPromptByKind null for photo without candidates',
+  promptEngine.buildDayPromptByKind(menuDay, 'meaningful_photo') === null
+);
+
 Module._resolveFilename = originalResolve;
 fs.rmSync(tempDir, { recursive: true, force: true });
 

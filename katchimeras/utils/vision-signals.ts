@@ -215,6 +215,50 @@ export function aggregatePhotoVision(results: PhotoVisionResult[]): DayVisionSum
   };
 }
 
+// Fold a freshly analysed photo's vision (already aggregated as its own
+// one-photo summary) into the day's running summary, so a snapped photo
+// contributes to the hatch + reflection like any other. Pure — recomputes
+// coverage against the new total photo count.
+export function mergeDayVision(
+  existing: DayVisionSummary | undefined,
+  incoming: DayVisionSummary
+): DayVisionSummary {
+  if (!existing || existing.analyzedPhotoCount === 0) {
+    return incoming;
+  }
+
+  const totalPhotos = existing.analyzedPhotoCount + incoming.analyzedPhotoCount;
+  const byName = new Map<string, DayVisionConcept>();
+  for (const concept of [...existing.concepts, ...incoming.concepts]) {
+    const current = byName.get(concept.name);
+    if (current) {
+      current.salience += concept.salience;
+      current.count += concept.count;
+      current.peakConfidence = Math.max(current.peakConfidence, concept.peakConfidence);
+    } else {
+      byName.set(concept.name, { ...concept });
+    }
+  }
+  const concepts = [...byName.values()]
+    .map((concept) => ({ ...concept, coverage: totalPhotos > 0 ? concept.count / totalPhotos : 0 }))
+    .sort((left, right) => right.salience - left.salience)
+    .slice(0, 12);
+
+  const details = [...new Set([...incoming.details, ...existing.details])].slice(0, 8);
+  const textTokens = [...new Set([...existing.textTokens, ...incoming.textTokens])].slice(0, 40);
+  const socialPhotos =
+    existing.faceCoverage * existing.analyzedPhotoCount + incoming.faceCoverage * incoming.analyzedPhotoCount;
+
+  return {
+    concepts,
+    details,
+    maxFaceCount: Math.max(existing.maxFaceCount, incoming.maxFaceCount),
+    faceCoverage: totalPhotos > 0 ? socialPhotos / totalPhotos : 0,
+    textTokens,
+    analyzedPhotoCount: totalPhotos,
+  };
+}
+
 export function buildVisionSignals(vision: DayVisionSummary): VisionSignal[] {
   const bySeed = new Map<string, VisionSignal>();
   const consider = (seedId: string, intensity: number) => {

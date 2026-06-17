@@ -16,7 +16,7 @@
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar.",
+        "NSCameraUsageDescription": "Katchimeras uses the camera so you can snap a photo of a moment and feed it into today's egg.",
         "NSLocationWhenInUseUsageDescription": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps.",
         "NSHealthShareUsageDescription": "Katchimeras can read your workout routes from Apple Health when you choose to import a walk into a memory map."
       },
@@ -50,7 +50,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Katchimeras uses the camera in the dev avatar lab so you can capture a selfie and generate a stylized avatar."
+          "cameraPermission": "Katchimeras uses the camera so you can snap a photo of a moment and feed it into today's egg."
         }
       ],
       [

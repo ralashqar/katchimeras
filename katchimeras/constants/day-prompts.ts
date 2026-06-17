@@ -167,3 +167,21 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
 };
 
 export const launchedDayPrompts = Object.values(dayPromptRegistry).filter((prompt) => prompt.launchEnabled);
+
+// Short labels for the "Add to today" category buttons (the prompt titles are
+// full questions — too long for a chip).
+export const dayPromptMenuLabels: Record<DayPromptKind, string> = {
+  feeling: 'Feeling',
+  activity: 'Activity',
+  people: 'People',
+  meaning: 'Photo meaning',
+  day_word: 'A word',
+  meaningful_photo: 'Photo',
+  intention: 'Intention',
+  energy: 'Energy',
+  inner_weather: 'Inner weather',
+  highlight: 'Highlight',
+  gratitude: 'Gratitude',
+  body: 'Body',
+  for_who: 'For who',
+};

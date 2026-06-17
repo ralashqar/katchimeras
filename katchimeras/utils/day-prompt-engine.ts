@@ -68,6 +68,79 @@ export function selectActiveDayPrompt(
   return fallback ? { ...fallback, photoCandidates: [] } : null;
 }
 
+// Build a specific prompt by kind, applying the same gating used for the
+// auto-selected prompt (launch-enabled, photo availability, photo-meaning needs
+// a photo). Returns null when that prompt isn't currently answerable.
+export function buildDayPromptByKind(
+  day: StoredHomeDayRecord,
+  kind: DayPromptKind,
+  options: {
+    photoCandidates?: DayPromptPhotoCandidate[];
+    forceMeaningfulPhoto?: boolean;
+    // When false (default) an already-answered prompt is excluded. The "Add to
+    // today" menu passes true so every category stays visible/re-answerable —
+    // the once-per-day restriction can be reinstated later by flipping this.
+    includeAnswered?: boolean;
+  } = {}
+): ActiveDayPrompt | null {
+  if (day.state === 'hatched') {
+    return null;
+  }
+  const prompt = dayPromptRegistry[kind];
+  if (!prompt?.launchEnabled) {
+    return null;
+  }
+  if (!options.includeAnswered && day.promptAnswers.some((answer) => answer.kind === kind)) {
+    return null;
+  }
+  const photoCandidates = options.photoCandidates ?? collectDayPromptPhotoCandidates(day);
+  const eligiblePhotoCount = countEligiblePhotoCandidatesForDay(
+    photoCandidates,
+    day.isoDate,
+    options.forceMeaningfulPhoto === true
+  );
+  if (prompt.photoGated && eligiblePhotoCount < (prompt.minPhotoCandidates ?? 1)) {
+    return null;
+  }
+  if (kind === 'meaning' && !day.heroPhoto && !day.moments.some((moment) => moment.type === 'photo')) {
+    return null;
+  }
+  return { ...prompt, photoCandidates: prompt.photoGated ? photoCandidates : [] };
+}
+
+// Every prompt the user could answer right now, for the "Add to today" menu.
+// Daypart is intentionally ignored here — the menu lets the user pick any
+// available category, not just the time-of-day suggestion. Photo-gated prompts
+// only appear when recent photos exist (so "no photos → no Photo button").
+export function listAvailableDayPrompts(
+  day: StoredHomeDayRecord,
+  _now: Date = new Date(),
+  options: { photoCandidates?: DayPromptPhotoCandidate[]; forceMeaningfulPhoto?: boolean } = {}
+): ActiveDayPrompt[] {
+  if (day.state === 'hatched') {
+    return [];
+  }
+  const photoCandidates = options.photoCandidates ?? collectDayPromptPhotoCandidates(day);
+  const available: ActiveDayPrompt[] = [];
+  for (const prompt of launchedDayPrompts) {
+    // "Photo meaning" is never a standalone button — it always follows a photo
+    // pick as the second half of the Photo → meaning pair (see the sheet).
+    if (prompt.id === 'meaning') {
+      continue;
+    }
+    const built = buildDayPromptByKind(day, prompt.id, {
+      photoCandidates,
+      forceMeaningfulPhoto: options.forceMeaningfulPhoto,
+      // Testing: keep answered categories in the menu so they can be re-fed.
+      includeAnswered: true,
+    });
+    if (built) {
+      available.push(built);
+    }
+  }
+  return available;
+}
+
 export function resolveDaypart(now: Date): Daypart {
   const hour = now.getHours();
   if (hour < 11) {
