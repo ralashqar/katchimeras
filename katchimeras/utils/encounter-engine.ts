@@ -58,6 +58,16 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
     });
   }
 
+  const socialIds = momentsByType.get('social') ?? [];
+  if (socialIds.length > 0) {
+    signals.push({
+      seedId: 'social_gathering',
+      intensity: clamp01(0.5 + 0.12 * (socialIds.length - 1)),
+      sourceMomentIds: socialIds,
+      isRecovery: false,
+    });
+  }
+
   if (hasRunWorkout(day)) {
     signals.push({
       seedId: 'run_session',
@@ -69,6 +79,13 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
     signals.push({
       seedId: 'high_steps_day',
       intensity: clamp01(0.5 + Math.min((day.stepsCount - HIGH_STEPS_THRESHOLD) / 9000, 0.3)),
+      sourceMomentIds: [],
+      isRecovery: false,
+    });
+  } else if (day.visitedPlaceCount >= 3) {
+    signals.push({
+      seedId: 'errand_loop',
+      intensity: clamp01(0.4 + 0.06 * (day.visitedPlaceCount - 3)),
       sourceMomentIds: [],
       isRecovery: false,
     });

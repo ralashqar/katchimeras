@@ -207,8 +207,8 @@ export const homeCreatureVisuals: Record<
     accentColor: '#AEB6FF',
   },
   gatherglow: {
-    source: heroOrbitAssets.crumbun,
-    accentColor: '#F2C2A8',
+    source: require('../assets/images/katchimeras/gatherglow.png'),
+    accentColor: '#F5C98F',
   },
   mossprout: {
     source: heroOrbitAssets.mossprout,
@@ -237,6 +237,18 @@ export const homeCreatureVisuals: Record<
   ironette: {
     source: heroOrbitAssets.ironette,
     accentColor: '#B6D2FF',
+  },
+  bedrotte: {
+    source: require('../assets/images/katchimeras/bedrotte.png'),
+    accentColor: '#F0C9A0',
+  },
+  steppling: {
+    source: require('../assets/images/katchimeras/steppling.png'),
+    accentColor: '#92D7FF',
+  },
+  errandimp: {
+    source: require('../assets/images/katchimeras/errandimp.png'),
+    accentColor: '#EF9F6E',
   },
 };
 

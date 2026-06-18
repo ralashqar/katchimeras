@@ -6211,5 +6211,245 @@
     "restorativeLine": "Tokilume reminds you that quieter moments still become part of your deck.",
     "progressLine": "Tokilume turns a memorable place into lasting identity progress.",
     "storySeed": "After standing near Shibuya Crossing, Tokilume followed the memory home and settled into your deck."
+  },
+  {
+    "id": "activity_social_gathering_gatherglow",
+    "seedId": "social_gathering",
+    "topLevelType": "activity",
+    "triggerCategory": "connection",
+    "triggerSubtype": "social_gathering",
+    "theme": "shared warmth",
+    "creatureKind": "spirit",
+    "name": "Gatherglow",
+    "caption": "A warm little hearth spirit that only fully lights up when the day was shared.",
+    "userFacingDescription": "Gatherglow appears when your day is driven by a strong social gathering. It captures the shared warmth side of your momentum and turns it into something collectible.",
+    "motivationalQuote": "Warmth is something you make together.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth",
+      "novelty"
+    ],
+    "lifestyleSignals": [
+      "socialMoment",
+      "sharedMeal",
+      "togetherTime"
+    ],
+    "sourceExamples": [
+      "dinner with friends",
+      "family visit",
+      "long catch-up"
+    ],
+    "visualTone": "warm convivial glowing",
+    "visualMotifs": [
+      "lantern-glow belly",
+      "tiny shared-table scarf",
+      "orbiting ember sparks"
+    ],
+    "visualDescription": "Gatherglow is a cute spirit tied to social gathering encounters, with lantern-glow belly, tiny shared-table scarf, orbiting ember sparks, a warm convivial glowing mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute hearth-spirit creature that glows brighter around company, soft lantern warmth and premium stylized mascot styling",
+      "lantern-glow belly",
+      "tiny shared-table scarf",
+      "orbiting ember sparks",
+      "warm convivial glowing",
+      "dramatically oversized glossy luminous eyes",
+      "visible inner glow core",
+      "head-dominant rounded mascot silhouette",
+      "exaggerated chunky readable proportions",
+      "mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow",
+      "proud energized expression with bright eyes, confident brows, and active cheek lift",
+      "cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces",
+      "one overscaled signature encounter motif",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Gatherglow is a cute spirit tied to social gathering encounters, with lantern-glow belly, tiny shared-table scarf, orbiting ember sparks, a warm convivial glowing mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute hearth-spirit creature that glows brighter around company, soft lantern warmth and premium stylized mascot styling. Include lantern-glow belly, tiny shared-table scarf, orbiting ember sparks. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow, proud energized expression with bright eyes, confident brows, and active cheek lift, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no realistic animal anatomy, no hyper-detailed texture realism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face, avoid full battle-game hero energy.",
+    "identityInsight": "Gatherglow reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's social gathering revealed Gatherglow.",
+    "repeatLine": "Returning to social gathering is deepening Gatherglow's line in your deck.",
+    "rareLine": "A rarer form of Gatherglow can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Gatherglow reminds you that recovery is part of real progress.",
+    "progressLine": "Gatherglow shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your social gathering, Gatherglow appeared and kept pace with the rest of the day."
+  },
+  {
+    "id": "activity_social_gathering_chattermote",
+    "seedId": "social_gathering",
+    "topLevelType": "activity",
+    "triggerCategory": "connection",
+    "triggerSubtype": "social_gathering",
+    "theme": "shared warmth",
+    "creatureKind": "sprite",
+    "name": "Chattermote",
+    "caption": "A bright conversational spark that hums with the rhythm of good company.",
+    "userFacingDescription": "Chattermote appears when your day is driven by a strong social gathering. It captures the shared warmth side of your momentum and turns it into something collectible.",
+    "motivationalQuote": "Some days are measured in voices, not hours.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth",
+      "novelty"
+    ],
+    "lifestyleSignals": [
+      "socialMoment",
+      "sharedMeal",
+      "togetherTime"
+    ],
+    "sourceExamples": [
+      "dinner with friends",
+      "family visit",
+      "long catch-up"
+    ],
+    "visualTone": "warm convivial glowing",
+    "visualMotifs": [
+      "speech-ripple ears",
+      "twin chiming bells",
+      "fizzing halo"
+    ],
+    "visualDescription": "Chattermote is a cute sprite tied to social gathering encounters, with speech-ripple ears, twin chiming bells, fizzing halo, a warm convivial glowing mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute hearth-spirit creature that glows brighter around company, soft lantern warmth and premium stylized mascot styling",
+      "speech-ripple ears",
+      "twin chiming bells",
+      "fizzing halo",
+      "warm convivial glowing",
+      "dramatically oversized glossy luminous eyes",
+      "visible inner glow core",
+      "head-dominant rounded mascot silhouette",
+      "exaggerated chunky readable proportions",
+      "mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow",
+      "proud energized expression with bright eyes, confident brows, and active cheek lift",
+      "cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces",
+      "one overscaled signature encounter motif",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Chattermote is a cute sprite tied to social gathering encounters, with speech-ripple ears, twin chiming bells, fizzing halo, a warm convivial glowing mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute hearth-spirit creature that glows brighter around company, soft lantern warmth and premium stylized mascot styling. Include speech-ripple ears, twin chiming bells, fizzing halo. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow, proud energized expression with bright eyes, confident brows, and active cheek lift, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no realistic animal anatomy, no hyper-detailed texture realism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face, avoid full battle-game hero energy.",
+    "identityInsight": "Chattermote reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's social gathering revealed Chattermote.",
+    "repeatLine": "Returning to social gathering is deepening Chattermote's line in your deck.",
+    "rareLine": "A rarer form of Chattermote can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Chattermote reminds you that recovery is part of real progress.",
+    "progressLine": "Chattermote shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your social gathering, Chattermote appeared and kept pace with the rest of the day."
+  },
+  {
+    "id": "activity_errand_loop_errandimp",
+    "seedId": "errand_loop",
+    "topLevelType": "activity",
+    "triggerCategory": "movement",
+    "triggerSubtype": "errand_loop",
+    "theme": "small missions handled",
+    "creatureKind": "imp",
+    "name": "Errandimp",
+    "caption": "A tiny triumphant gremlin born from days of small missions actually handled.",
+    "userFacingDescription": "Errandimp appears when your day is driven by a strong errand loop. It captures the small missions handled side of your momentum and turns it into something collectible.",
+    "motivationalQuote": "Small missions still count as victories.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth",
+      "intensity"
+    ],
+    "lifestyleSignals": [
+      "multiStopDay",
+      "shortHops",
+      "adultLogistics"
+    ],
+    "sourceExamples": [
+      "pharmacy run",
+      "post office stop",
+      "grocery loop"
+    ],
+    "visualTone": "busy cheerful determined",
+    "visualMotifs": [
+      "overloaded tote bags",
+      "crumpled checklist scrap",
+      "jingling key charm"
+    ],
+    "visualDescription": "Errandimp is a cute imp tied to errand loop encounters, with overloaded tote bags, crumpled checklist scrap, jingling key charm, a busy cheerful determined mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute errand gremlin creature mid-scurry, comically determined about small tasks, premium stylized mascot styling",
+      "overloaded tote bags",
+      "crumpled checklist scrap",
+      "jingling key charm",
+      "busy cheerful determined",
+      "dramatically oversized glossy luminous eyes",
+      "visible inner glow core",
+      "head-dominant rounded mascot silhouette",
+      "exaggerated chunky readable proportions",
+      "mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow",
+      "proud energized expression with bright eyes, confident brows, and active cheek lift",
+      "cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces",
+      "one overscaled signature encounter motif",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Errandimp is a cute imp tied to errand loop encounters, with overloaded tote bags, crumpled checklist scrap, jingling key charm, a busy cheerful determined mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute errand gremlin creature mid-scurry, comically determined about small tasks, premium stylized mascot styling. Include overloaded tote bags, crumpled checklist scrap, jingling key charm. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow, proud energized expression with bright eyes, confident brows, and active cheek lift, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no realistic animal anatomy, no hyper-detailed texture realism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face, avoid full battle-game hero energy.",
+    "identityInsight": "Errandimp reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's errand loop revealed Errandimp.",
+    "repeatLine": "Returning to errand loop is deepening Errandimp's line in your deck.",
+    "rareLine": "A rarer form of Errandimp can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Errandimp reminds you that recovery is part of real progress.",
+    "progressLine": "Errandimp shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your errand loop, Errandimp appeared and kept pace with the rest of the day."
+  },
+  {
+    "id": "activity_errand_loop_loopling",
+    "seedId": "errand_loop",
+    "topLevelType": "activity",
+    "triggerCategory": "movement",
+    "triggerSubtype": "errand_loop",
+    "theme": "small missions handled",
+    "creatureKind": "sprite",
+    "name": "Loopling",
+    "caption": "A round little route spirit that traces the loops your day quietly drew.",
+    "userFacingDescription": "Loopling appears when your day is driven by a strong errand loop. It captures the small missions handled side of your momentum and turns it into something collectible.",
+    "motivationalQuote": "Even circles move you forward.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth",
+      "intensity"
+    ],
+    "lifestyleSignals": [
+      "multiStopDay",
+      "shortHops",
+      "adultLogistics"
+    ],
+    "sourceExamples": [
+      "pharmacy run",
+      "post office stop",
+      "grocery loop"
+    ],
+    "visualTone": "busy cheerful determined",
+    "visualMotifs": [
+      "looping ribbon trail",
+      "stamped map patches",
+      "spinning compass charm"
+    ],
+    "visualDescription": "Loopling is a cute sprite tied to errand loop encounters, with looping ribbon trail, stamped map patches, spinning compass charm, a busy cheerful determined mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute errand gremlin creature mid-scurry, comically determined about small tasks, premium stylized mascot styling",
+      "looping ribbon trail",
+      "stamped map patches",
+      "spinning compass charm",
+      "busy cheerful determined",
+      "dramatically oversized glossy luminous eyes",
+      "visible inner glow core",
+      "head-dominant rounded mascot silhouette",
+      "exaggerated chunky readable proportions",
+      "mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow",
+      "proud energized expression with bright eyes, confident brows, and active cheek lift",
+      "cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces",
+      "one overscaled signature encounter motif",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Loopling is a cute sprite tied to errand loop encounters, with looping ribbon trail, stamped map patches, spinning compass charm, a busy cheerful determined mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute errand gremlin creature mid-scurry, comically determined about small tasks, premium stylized mascot styling. Include looping ribbon trail, stamped map patches, spinning compass charm. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, mid-hop or forward-lean action pose with off-axis twist, springy limbs, and strong silhouette flow, proud energized expression with bright eyes, confident brows, and active cheek lift, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, cartoony proportions with believable premium shading, realistic lighting response on stylized materials, clean studio key light, soft fill light, controlled rim light, grounded contact shadows, subtle bounce light, richer eye gloss, richer shading on glow core and hero motif, simplified body surfaces, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no realistic animal anatomy, no hyper-detailed texture realism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face, avoid full battle-game hero energy.",
+    "identityInsight": "Loopling reflects the momentum that builds when your body commits to a stronger day.",
+    "unlockLine": "Today's errand loop revealed Loopling.",
+    "repeatLine": "Returning to errand loop is deepening Loopling's line in your deck.",
+    "rareLine": "A rarer form of Loopling can appear when this pattern becomes more distinctive over time.",
+    "restorativeLine": "Even after bigger movement, Loopling reminds you that recovery is part of real progress.",
+    "progressLine": "Loopling shows that your effort is no longer abstract. It is starting to take shape.",
+    "storySeed": "Somewhere in the middle of your errand loop, Loopling appeared and kept pace with the rest of the day."
   }
 ]

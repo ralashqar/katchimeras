@@ -1220,5 +1220,67 @@
         "visualMotifs": ["luminous kanban glow", "streetlight ribbon", "midnight city sheen"]
       }
     ]
+  },
+  {
+    "id": "social_gathering",
+    "topLevelType": "activity",
+    "triggerCategory": "connection",
+    "triggerSubtype": "social_gathering",
+    "theme": "shared warmth",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "novelty"],
+    "lifestyleSignals": ["socialMoment", "sharedMeal", "togetherTime"],
+    "sourceExamples": ["dinner with friends", "family visit", "long catch-up"],
+    "visualTone": "warm convivial glowing",
+    "promptBase": "cute hearth-spirit creature that glows brighter around company, soft lantern warmth and premium stylized mascot styling",
+    "variants": [
+      {
+        "idSuffix": "gatherglow",
+        "creatureKind": "spirit",
+        "name": "Gatherglow",
+        "caption": "A warm little hearth spirit that only fully lights up when the day was shared.",
+        "motivationalQuote": "Warmth is something you make together.",
+        "visualMotifs": ["lantern-glow belly", "tiny shared-table scarf", "orbiting ember sparks"]
+      },
+      {
+        "idSuffix": "chattermote",
+        "creatureKind": "sprite",
+        "name": "Chattermote",
+        "caption": "A bright conversational spark that hums with the rhythm of good company.",
+        "motivationalQuote": "Some days are measured in voices, not hours.",
+        "visualMotifs": ["speech-ripple ears", "twin chiming bells", "fizzing halo"]
+      }
+    ]
+  },
+  {
+    "id": "errand_loop",
+    "topLevelType": "activity",
+    "triggerCategory": "movement",
+    "triggerSubtype": "errand_loop",
+    "theme": "small missions handled",
+    "defaultRarity": "common",
+    "variantSupport": ["timeOfDay", "repeatDepth", "intensity"],
+    "lifestyleSignals": ["multiStopDay", "shortHops", "adultLogistics"],
+    "sourceExamples": ["pharmacy run", "post office stop", "grocery loop"],
+    "visualTone": "busy cheerful determined",
+    "promptBase": "cute errand gremlin creature mid-scurry, comically determined about small tasks, premium stylized mascot styling",
+    "variants": [
+      {
+        "idSuffix": "errandimp",
+        "creatureKind": "imp",
+        "name": "Errandimp",
+        "caption": "A tiny triumphant gremlin born from days of small missions actually handled.",
+        "motivationalQuote": "Small missions still count as victories.",
+        "visualMotifs": ["overloaded tote bags", "crumpled checklist scrap", "jingling key charm"]
+      },
+      {
+        "idSuffix": "loopling",
+        "creatureKind": "sprite",
+        "name": "Loopling",
+        "caption": "A round little route spirit that traces the loops your day quietly drew.",
+        "motivationalQuote": "Even circles move you forward.",
+        "visualMotifs": ["looping ribbon trail", "stamped map patches", "spinning compass charm"]
+      }
+    ]
   }
 ]
