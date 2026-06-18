@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 import type {
   AddMomentInput,
   ActivityPermissionState,
+  DayInputTarget,
   DayPromptKind,
   DayScores,
   DayVisionSummary,
@@ -20,6 +21,7 @@ import {
   applyBackfilledDays,
   applyCapturedMomentForToday,
   applyGeneratedReflection,
+  deriveTomorrowDayRecord,
   dismissDayPromptForToday,
   hydrateHomeState,
   importHealthRoutesForDay as applyHealthRoutesForDay,
@@ -147,6 +149,26 @@ export function useHomeScreenState() {
           forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
         })
       : [];
+  // Once today has hatched, the Add/Camera controls feed a forming "tomorrow"
+  // (until the rollover makes a fresh egg). Expose that day + its prompts.
+  const isTodayHatched = viewModel.state.today.state === 'hatched';
+  const tomorrowDay = useMemo(
+    () => deriveTomorrowDayRecord(viewModel.state, loadOnboardingProfile(), new Date()),
+    [viewModel.state]
+  );
+  const tomorrowActivePrompt = isTodayHatched
+    ? selectActiveDayPrompt(tomorrowDay, new Date(), {
+        photoCandidates: promptPhotoCandidates.length > 0 ? promptPhotoCandidates : undefined,
+        forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
+      })
+    : null;
+  const tomorrowAvailablePrompts: ActiveDayPrompt[] = isTodayHatched
+    ? listAvailableDayPrompts(tomorrowDay, new Date(), {
+        photoCandidates: promptPhotoCandidates.length > 0 ? promptPhotoCandidates : undefined,
+        forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
+      })
+    : [];
+
   const selectedPromptDayId = selectedDay?.kind === 'day' ? selectedDay.id : null;
   const selectedPromptDayIsToday = selectedDay?.kind === 'day' ? selectedDay.isToday : false;
   const selectedPromptDayState = selectedDay?.kind === 'day' ? selectedDay.state : null;
@@ -182,98 +204,115 @@ export function useHomeScreenState() {
     };
   }, [selectedDay, selectedPromptDayId, selectedPromptDayIsToday, selectedPromptDayState]);
 
-  const addMoment = useCallback((momentInput: AddMomentInput) => {
+  const addMoment = useCallback((momentInput: AddMomentInput, target: DayInputTarget = 'today') => {
     const now = new Date();
     const profile = loadOnboardingProfile();
 
     setStoredState((currentState) => {
       const hydrated = hydrateHomeState(currentState, profile, now);
-      return addMomentToDay(hydrated.state, profile, momentInput, now);
+      return addMomentToDay(hydrated.state, profile, momentInput, now, target);
     });
   }, []);
 
-  const answerDayPrompt = useCallback((input: { kind: DayPromptKind; choiceIds: string[]; noteText?: string | null }) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return answerDayPromptForToday(
-        hydrated.state,
-        {
-          kind: input.kind,
-          choiceIds: input.choiceIds,
-          noteText: input.noteText,
-        },
-        profile,
-        now
-      );
-    });
-  }, []);
-
-  const dismissDayPrompt = useCallback((kind: DayPromptKind) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    if (kind === 'meaningful_photo' && forceMeaningfulPhotoPrompt) {
-      clearStoredDevPromptPhotoCandidates();
-      setForceMeaningfulPhotoPrompt(false);
-      setPromptPhotoCandidates([]);
-    }
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return dismissDayPromptForToday(hydrated.state, kind, profile, now);
-    });
-  }, [forceMeaningfulPhotoPrompt]);
-
-  const selectHeroPhoto = useCallback((photo: DayPromptPhotoCandidate) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    if (forceMeaningfulPhotoPrompt) {
-      clearStoredDevPromptPhotoCandidates();
-      setForceMeaningfulPhotoPrompt(false);
-    }
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return selectHeroPhotoForToday(
-        hydrated.state,
-        {
-          assetId: photo.assetId,
-          thumbnailUri: photo.thumbnailUri,
-          localUri: photo.localUri,
-        },
-        profile,
-        now
-      );
-    });
-  }, [forceMeaningfulPhotoPrompt]);
-
-  // Fold a camera capture into today: its captured energy (score deltas) and the
-  // detected subject (vision) both contribute to the hatch + reflection.
-  const applyCapturedMoment = useCallback(
-    (capture: { energy: Partial<DayScores>; vision: DayVisionSummary | null }) => {
+  const answerDayPrompt = useCallback(
+    (
+      input: { kind: DayPromptKind; choiceIds: string[]; noteText?: string | null },
+      target: DayInputTarget = 'today'
+    ) => {
       const now = new Date();
       const profile = loadOnboardingProfile();
+
       setStoredState((currentState) => {
         const hydrated = hydrateHomeState(currentState, profile, now);
-        return applyCapturedMomentForToday(hydrated.state, capture, profile, now);
+        return answerDayPromptForToday(
+          hydrated.state,
+          {
+            kind: input.kind,
+            choiceIds: input.choiceIds,
+            noteText: input.noteText,
+          },
+          profile,
+          now,
+          target
+        );
       });
     },
     []
   );
 
-  const answerPhotoMeaning = useCallback((input: { choiceIds: string[]; noteText?: string | null }) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
+  const dismissDayPrompt = useCallback(
+    (kind: DayPromptKind, target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
 
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return answerHeroPhotoMeaningForToday(hydrated.state, input, profile, now);
-    });
-  }, []);
+      if (kind === 'meaningful_photo' && forceMeaningfulPhotoPrompt) {
+        clearStoredDevPromptPhotoCandidates();
+        setForceMeaningfulPhotoPrompt(false);
+        setPromptPhotoCandidates([]);
+      }
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return dismissDayPromptForToday(hydrated.state, kind, profile, now, target);
+      });
+    },
+    [forceMeaningfulPhotoPrompt]
+  );
+
+  const selectHeroPhoto = useCallback(
+    (photo: DayPromptPhotoCandidate, target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      if (forceMeaningfulPhotoPrompt) {
+        clearStoredDevPromptPhotoCandidates();
+        setForceMeaningfulPhotoPrompt(false);
+      }
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return selectHeroPhotoForToday(
+          hydrated.state,
+          {
+            assetId: photo.assetId,
+            thumbnailUri: photo.thumbnailUri,
+            localUri: photo.localUri,
+          },
+          profile,
+          now,
+          target
+        );
+      });
+    },
+    [forceMeaningfulPhotoPrompt]
+  );
+
+  // Fold a camera capture into today: its captured energy (score deltas) and the
+  // detected subject (vision) both contribute to the hatch + reflection.
+  const applyCapturedMoment = useCallback(
+    (capture: { energy: Partial<DayScores>; vision: DayVisionSummary | null }, target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return applyCapturedMomentForToday(hydrated.state, capture, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const answerPhotoMeaning = useCallback(
+    (input: { choiceIds: string[]; noteText?: string | null }, target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return answerHeroPhotoMeaningForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
 
   const setLocationPermission = useCallback((permission: LocationPermissionState) => {
     const now = new Date();
@@ -605,6 +644,10 @@ export function useHomeScreenState() {
     activeDayPrompt,
     availableDayPrompts,
     applyCapturedMoment,
+    isTodayHatched,
+    tomorrowDay,
+    tomorrowActivePrompt,
+    tomorrowAvailablePrompts,
     locationPermission: viewModel.state.locationPermission,
     activityPermission: viewModel.state.activityPermission,
     healthPermission: viewModel.state.healthPermission,

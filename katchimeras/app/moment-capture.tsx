@@ -2,9 +2,11 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
+import { DeviceMotion } from 'expo-sensors';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeInDown, FadeOut, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EssenceOverlay } from '@/components/katchadeck/capture/essence-overlay';
@@ -20,19 +22,35 @@ import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision } from '@/utils/vision-signals';
 import type { DayVisionSummary } from '@/types/home';
 
-type CaptureState = 'permission' | 'live' | 'capturing' | 'preview' | 'saving';
+type CaptureState = 'live' | 'capturing' | 'preview' | 'saving';
 
 export default function MomentCaptureScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  const { selectedDay, applyCapturedMoment } = useHomeScreenState();
+  const { selectedDay, applyCapturedMoment, isTodayHatched } = useHomeScreenState();
   const dayScores = selectedDay?.kind === 'day' ? selectedDay.scores : null;
+  // Once today has hatched, a capture feeds the forming tomorrow instead.
+  const captureTarget = isTodayHatched ? 'tomorrow' : 'today';
 
   const cameraRef = useRef<CameraView | null>(null);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const visionRef = useRef<DayVisionSummary | null>(null);
+
+  const { width, height } = useWindowDimensions();
+  // Tier-1 reactivity: tilt-parallax (device motion) + touch gathering. The
+  // particles respond to how you hold and touch the phone — feels alive/AR
+  // without needing live camera frames.
+  const tiltX = useSharedValue(0);
+  const tiltY = useSharedValue(0);
+  const touchX = useSharedValue(0);
+  const touchY = useSharedValue(0);
+  const touchActive = useSharedValue(0);
+  const interaction = useMemo(
+    () => ({ tiltX, tiltY, touchX, touchY, touchActive }),
+    [tiltX, tiltY, touchX, touchY, touchActive]
+  );
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -40,8 +58,49 @@ export default function MomentCaptureScreen() {
     }
   }, [permission, requestPermission]);
 
-  // Analyse the still in the background as soon as it's captured, so the chosen
-  // meaning + subject are ready the instant the user taps an option.
+  // Device-motion tilt → smoothed, normalized -1..1.
+  useEffect(() => {
+    let sub: { remove: () => void } | null = null;
+    void (async () => {
+      try {
+        await DeviceMotion.requestPermissionsAsync();
+      } catch {
+        // motion permission optional; degrade to no tilt
+      }
+      DeviceMotion.setUpdateInterval(60);
+      sub = DeviceMotion.addListener((data) => {
+        const gamma = data.rotation?.gamma ?? 0; // left/right lean
+        const beta = data.rotation?.beta ?? 0; // front/back lean
+        const norm = (v: number) => Math.max(-1, Math.min(1, v / (Math.PI / 4)));
+        tiltX.value = withTiming(norm(gamma), { duration: 120 });
+        tiltY.value = withTiming(norm(beta), { duration: 120 });
+      });
+    })();
+    return () => sub?.remove();
+  }, [tiltX, tiltY]);
+
+  // Touch → gather motes toward the finger (center-relative coords).
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .onBegin((e) => {
+          'worklet';
+          touchX.value = e.x - width / 2;
+          touchY.value = e.y - height / 2;
+          touchActive.value = withTiming(1, { duration: 160 });
+        })
+        .onUpdate((e) => {
+          'worklet';
+          touchX.value = e.x - width / 2;
+          touchY.value = e.y - height / 2;
+        })
+        .onFinalize(() => {
+          'worklet';
+          touchActive.value = withTiming(0, { duration: 420 });
+        }),
+    [width, height, touchX, touchY, touchActive]
+  );
+
   useEffect(() => {
     if (!photoUri) return;
     let active = true;
@@ -66,7 +125,6 @@ export default function MomentCaptureScreen() {
     } catch {
       setPhotoUri(null);
     }
-    // Let the particle collapse + flash play before revealing the meaning step.
     setTimeout(() => setState('preview'), 620);
   }, [state]);
 
@@ -84,14 +142,13 @@ export default function MomentCaptureScreen() {
         ? resolvePhotoCategory(vision)
         : { icon: 'sparkles' as const, accent: '#F1D4B4' };
 
-      applyCapturedMoment({ energy, vision });
+      applyCapturedMoment({ energy, vision }, captureTarget);
       queueCaptureFeed({ photoUri, icon: category.icon, accent: category.accent });
       router.back();
     },
-    [applyCapturedMoment, dayScores, photoUri, router]
+    [applyCapturedMoment, captureTarget, dayScores, photoUri, router]
   );
 
-  // --- Permission gate ---
   if (permission && !permission.granted) {
     return (
       <View style={[styles.screen, styles.permission, { paddingTop: insets.top + 40 }]}>
@@ -113,6 +170,7 @@ export default function MomentCaptureScreen() {
   }
 
   return (
+    <GestureDetector gesture={panGesture}>
     <View style={styles.screen}>
       {state !== 'preview' && state !== 'saving' ? (
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
@@ -125,25 +183,17 @@ export default function MomentCaptureScreen() {
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.vignette]} />
 
       {state === 'live' || state === 'capturing' ? (
-        <EssenceOverlay dayScores={dayScores} phase={state === 'capturing' ? 'capturing' : 'live'} />
+        <EssenceOverlay dayScores={dayScores} phase={state} interaction={interaction} />
       ) : null}
 
-      {/* capture flash */}
       {state === 'capturing' ? (
-        <Animated.View
-          entering={FadeIn.duration(120)}
-          exiting={FadeOut.duration(360)}
-          pointerEvents="none"
-          style={styles.flash}
-        />
+        <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(360)} pointerEvents="none" style={styles.flash} />
       ) : null}
 
-      {/* close */}
       <Pressable onPress={() => router.back()} style={[styles.close, { top: insets.top + 12 }]} accessibilityRole="button">
         <IconSymbol name="xmark" size={18} color={Lantern.moon50} />
       </Pressable>
 
-      {/* live prompt */}
       {state === 'live' ? (
         <Animated.View entering={FadeInDown.duration(320)} style={[styles.prompt, { top: insets.top + 18 }]}>
           <ThemedText style={styles.promptText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
@@ -152,7 +202,6 @@ export default function MomentCaptureScreen() {
         </Animated.View>
       ) : null}
 
-      {/* shutter */}
       {state === 'live' || state === 'capturing' ? (
         <View style={[styles.shutterRow, { bottom: insets.bottom + 36 }]}>
           <Pressable
@@ -166,7 +215,6 @@ export default function MomentCaptureScreen() {
         </View>
       ) : null}
 
-      {/* captured → meaning */}
       {state === 'preview' || state === 'saving' ? (
         <Animated.View entering={FadeIn.duration(260)} style={[styles.captured, { paddingBottom: insets.bottom + 36 }]}>
           <ThemedText type="onboardingLabel" style={styles.essenceLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
@@ -194,45 +242,19 @@ export default function MomentCaptureScreen() {
         </Animated.View>
       ) : null}
     </View>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: '#06040D',
-    flex: 1,
-  },
-  darkFill: {
-    backgroundColor: '#06040D',
-  },
-  vignette: {
-    backgroundColor: 'rgba(6,4,13,0.18)',
-  },
-  flash: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,243,224,0.85)',
-  },
-  permission: {
-    alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 28,
-  },
-  permTitle: {
-    fontSize: 30,
-    fontStyle: 'italic',
-    lineHeight: 36,
-    textAlign: 'center',
-  },
-  permBody: {
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-  },
-  permButtons: {
-    alignSelf: 'stretch',
-    gap: 10,
-    marginTop: 8,
-  },
+  screen: { backgroundColor: '#06040D', flex: 1 },
+  darkFill: { backgroundColor: '#06040D' },
+  vignette: { backgroundColor: 'rgba(6,4,13,0.18)' },
+  flash: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,243,224,0.85)' },
+  permission: { alignItems: 'center', gap: 16, paddingHorizontal: 28 },
+  permTitle: { fontSize: 30, fontStyle: 'italic', lineHeight: 36, textAlign: 'center' },
+  permBody: { fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  permButtons: { alignSelf: 'stretch', gap: 10, marginTop: 8 },
   close: {
     alignItems: 'center',
     backgroundColor: 'rgba(8,6,16,0.5)',
@@ -243,21 +265,9 @@ const styles = StyleSheet.create({
     right: 18,
     width: 38,
   },
-  prompt: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    position: 'absolute',
-  },
-  promptText: {
-    fontSize: 15,
-    fontWeight: '700',
-    opacity: 0.9,
-  },
-  shutterRow: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    position: 'absolute',
-  },
+  prompt: { alignItems: 'center', alignSelf: 'center', position: 'absolute' },
+  promptText: { fontSize: 15, fontWeight: '700', opacity: 0.9 },
+  shutterRow: { alignItems: 'center', alignSelf: 'center', position: 'absolute' },
   shutter: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -268,40 +278,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 78,
   },
-  shutterInner: {
-    backgroundColor: Lantern.moon50,
-    borderRadius: 999,
-    height: 60,
-    width: 60,
-  },
-  captured: {
-    alignItems: 'center',
-    bottom: 0,
-    gap: 8,
-    left: 0,
-    paddingHorizontal: 24,
-    position: 'absolute',
-    right: 0,
-  },
-  essenceLabel: {
-    fontSize: 12,
-  },
-  meaningTitle: {
-    fontSize: 26,
-    fontStyle: 'italic',
-    lineHeight: 31,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  savingSpinner: {
-    marginVertical: 24,
-  },
-  meaningGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
-  },
+  shutterInner: { backgroundColor: Lantern.moon50, borderRadius: 999, height: 60, width: 60 },
+  captured: { alignItems: 'center', bottom: 0, gap: 8, left: 0, paddingHorizontal: 24, position: 'absolute', right: 0 },
+  essenceLabel: { fontSize: 12 },
+  meaningTitle: { fontSize: 26, fontStyle: 'italic', lineHeight: 31, marginBottom: 10, textAlign: 'center' },
+  savingSpinner: { marginVertical: 24 },
+  meaningGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   meaningChip: {
     alignItems: 'center',
     backgroundColor: 'rgba(20,17,31,0.86)',
@@ -313,11 +295,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 13,
   },
-  meaningEmoji: {
-    fontSize: 17,
-  },
-  meaningLabel: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
+  meaningEmoji: { fontSize: 17 },
+  meaningLabel: { fontSize: 15, fontWeight: '800' },
 });

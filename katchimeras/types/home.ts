@@ -488,8 +488,15 @@ export type StoredHomeState = {
   encounterHistory: EncounterHistoryMap;
   archivedDays: StoredHomeDayRecord[];
   today: StoredHomeDayRecord;
+  // A forming "next day" the user can pre-feed (moments / prompts / captures)
+  // once today has hatched. Promoted to `today` at the calendar rollover. Absent
+  // until something is fed into it.
+  tomorrow?: StoredHomeDayRecord;
   backfilledAt?: string;
 };
+
+// Which forming day an input (moment / prompt / capture) targets.
+export type DayInputTarget = 'today' | 'tomorrow';
 
 export type WeekProfile = DayScores;
 

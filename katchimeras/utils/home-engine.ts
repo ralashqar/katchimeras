@@ -16,6 +16,7 @@ import { timelineDemoEntries } from '@/constants/timeline-demo';
 import type {
   AddMomentInput,
   ActivityPermissionState,
+  DayInputTarget,
   DayScores,
   DayMapSummary,
   EggVisualState,
@@ -391,62 +392,90 @@ export function recordForegroundLocationSample(
   );
 }
 
+// --- Forming-day input targeting ---------------------------------------------
+// Inputs (moments / prompts / captures) normally land on `today`, but once today
+// has hatched the user can pre-feed `tomorrow`. These helpers read/write the
+// chosen forming day, lazily creating tomorrow's record on first feed.
+
+function tomorrowDateId(now: Date): string {
+  return toLocalDateId(shiftLocalDate(now, 1));
+}
+
+function ensureTomorrowDay(
+  state: StoredHomeState,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeDayRecord {
+  const iso = tomorrowDateId(now);
+  if (state.tomorrow && state.tomorrow.isoDate === iso) {
+    return state.tomorrow;
+  }
+  return { ...createEmptyStoredDay(now, profile), id: `day-${iso}`, isoDate: iso };
+}
+
+function readInputDay(
+  state: StoredHomeState,
+  target: DayInputTarget,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeDayRecord {
+  return target === 'tomorrow' ? ensureTomorrowDay(state, profile, now) : state.today;
+}
+
+function writeInputDay(
+  state: StoredHomeState,
+  target: DayInputTarget,
+  day: StoredHomeDayRecord
+): StoredHomeState {
+  return target === 'tomorrow' ? { ...state, tomorrow: day } : { ...state, today: day };
+}
+
 export function addMomentToDay(
   state: StoredHomeState,
   profile: OnboardingProfile,
   momentInput: AddMomentInput,
-  now: Date
+  now: Date,
+  target: DayInputTarget = 'today'
 ): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
   const moment = createMoment(momentInput, now);
-  const nextLocations = appendPhotoMomentLocation(linkMomentToLatestLocation(state.today.locations, moment), moment);
-  const nextToday: StoredHomeDayRecord = {
-    ...state.today,
-    moments: [...state.today.moments, moment],
+  const nextLocations = appendPhotoMomentLocation(linkMomentToLatestLocation(base.locations, moment), moment);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    moments: [...base.moments, moment],
     locations: nextLocations,
   };
 
-  return normalizeStoredHomeState(
-    {
-      ...state,
-      today: nextToday,
-    },
-    profile,
-    now
-  );
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function answerDayPromptForToday(
   state: StoredHomeState,
   input: DayPromptAnswerInput,
   profile: OnboardingProfile,
-  now: Date
+  now: Date,
+  target: DayInputTarget = 'today'
 ): StoredHomeState {
   const answer = createDayPromptAnswer(input, now);
   if (!answer) {
     return normalizeStoredHomeState(state, profile, now);
   }
 
-  return normalizeStoredHomeState(
-    {
-      ...state,
-      today: {
-        ...state.today,
-        promptAnswers: [
-          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== answer.kind),
-          answer,
-        ],
-      },
-    },
-    profile,
-    now
-  );
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    promptAnswers: [...base.promptAnswers.filter((candidate) => candidate.kind !== answer.kind), answer],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function dismissDayPromptForToday(
   state: StoredHomeState,
   kind: DayPromptKind,
   profile: OnboardingProfile,
-  now: Date
+  now: Date,
+  target: DayInputTarget = 'today'
 ): StoredHomeState {
   const answer: DayPromptAnswer = {
     id: `prompt-${now.getTime().toString(36)}-${kind}-dismissed`,
@@ -463,27 +492,21 @@ export function dismissDayPromptForToday(
     noteText: null,
   };
 
-  return normalizeStoredHomeState(
-    {
-      ...state,
-      today: {
-        ...state.today,
-        promptAnswers: [
-          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== kind),
-          answer,
-        ],
-      },
-    },
-    profile,
-    now
-  );
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    promptAnswers: [...base.promptAnswers.filter((candidate) => candidate.kind !== kind), answer],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function selectHeroPhotoForToday(
   state: StoredHomeState,
   input: SelectHeroPhotoInput,
   profile: OnboardingProfile,
-  now: Date
+  now: Date,
+  target: DayInputTarget = 'today'
 ): StoredHomeState {
   const heroPhoto: DayHeroPhoto = {
     assetId: input.assetId,
@@ -508,36 +531,35 @@ export function selectHeroPhotoForToday(
     noteText: null,
   };
 
-  return normalizeStoredHomeState(
-    {
-      ...state,
-      today: {
-        ...state.today,
-        heroPhoto,
-        promptAnswers: [
-          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== 'meaningful_photo'),
-          photoAnswer,
-        ],
-      },
-    },
-    profile,
-    now
-  );
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    heroPhoto,
+    promptAnswers: [
+      ...base.promptAnswers.filter((candidate) => candidate.kind !== 'meaningful_photo'),
+      photoAnswer,
+    ],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function answerHeroPhotoMeaningForToday(
   state: StoredHomeState,
   input: Omit<DayPromptAnswerInput, 'kind' | 'source' | 'relatedAssetId'>,
   profile: OnboardingProfile,
-  now: Date
+  now: Date,
+  target: DayInputTarget = 'today'
 ): StoredHomeState {
-  const heroPhoto = state.today.heroPhoto;
+  const base = readInputDay(state, target, profile, now);
+  const heroPhoto = base.heroPhoto;
   if (!heroPhoto) {
     return answerDayPromptForToday(
       state,
       { ...input, kind: 'meaning', source: 'photo_meaning' },
       profile,
-      now
+      now,
+      target
     );
   }
 
@@ -554,26 +576,18 @@ export function answerHeroPhotoMeaningForToday(
     return normalizeStoredHomeState(state, profile, now);
   }
 
-  return normalizeStoredHomeState(
-    {
-      ...state,
-      today: {
-        ...state.today,
-        heroPhoto: {
-          ...heroPhoto,
-          meaningChoiceIds: meaningAnswer.choiceIds,
-          meaningLabels: meaningAnswer.labels,
-          noteText: meaningAnswer.noteText ?? null,
-        },
-        promptAnswers: [
-          ...state.today.promptAnswers.filter((candidate) => candidate.kind !== 'meaning'),
-          meaningAnswer,
-        ],
-      },
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    heroPhoto: {
+      ...heroPhoto,
+      meaningChoiceIds: meaningAnswer.choiceIds,
+      meaningLabels: meaningAnswer.labels,
+      noteText: meaningAnswer.noteText ?? null,
     },
-    profile,
-    now
-  );
+    promptAnswers: [...base.promptAnswers.filter((candidate) => candidate.kind !== 'meaning'), meaningAnswer],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 // Routes each geotagged photo to the day it was actually taken - today or a
@@ -877,18 +891,19 @@ export function applyCapturedMomentForToday(
   state: StoredHomeState,
   capture: { energy: Partial<DayScores>; vision: DayVisionSummary | null },
   profile: OnboardingProfile,
-  now: Date
+  now: Date,
+  target: DayInputTarget = 'today'
 ): StoredHomeState {
-  const today = state.today;
-  if (today.state === 'hatched') {
+  const base = readInputDay(state, target, profile, now);
+  if (base.state === 'hatched') {
     return state;
   }
-  const nextToday: StoredHomeDayRecord = {
-    ...today,
-    capturedEnergy: mergeCaptureEnergy(today.capturedEnergy, capture.energy),
-    vision: capture.vision ? mergeDayVision(today.vision, capture.vision) : today.vision,
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    capturedEnergy: mergeCaptureEnergy(base.capturedEnergy, capture.energy),
+    vision: capture.vision ? mergeDayVision(base.vision, capture.vision) : base.vision,
   };
-  return normalizeStoredHomeState({ ...state, today: nextToday }, profile, now);
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function setDayWeatherForDay(
@@ -979,6 +994,24 @@ export function deriveHomeDayRecord(
   };
 }
 
+// The forming "tomorrow" as a feedable day record — its egg/scores reflect
+// whatever has been pre-fed. Used once today has hatched so the Add/Camera
+// controls have somewhere to land. Always reports canAddMoments, never canHatch.
+export function deriveTomorrowDayRecord(
+  state: StoredHomeState,
+  profile: OnboardingProfile,
+  now: Date
+): HomeDayRecord {
+  const weekProfile = computeWeekProfile([...state.archivedDays.slice(-4), state.today]);
+  const iso = tomorrowDateId(now);
+  const stored =
+    state.tomorrow && state.tomorrow.isoDate === iso
+      ? state.tomorrow
+      : { ...createEmptyStoredDay(now, profile), id: `day-${iso}`, isoDate: iso };
+  const record = deriveHomeDayRecord(stored, profile, false, weekProfile, now);
+  return { ...record, dayLabel: 'Tomorrow', canAddMoments: true, canHatch: false };
+}
+
 export function createTomorrowRecord(now: Date): HomeTomorrowRecord {
   const tomorrowDate = shiftLocalDate(now, 1);
 
@@ -1064,13 +1097,26 @@ function normalizeStoredHomeState(
 ): StoredHomeState {
   const upgradedState = upgradeStoredHomeState(inputState);
   const todayDateId = toLocalDateId(now);
+  const tomorrowDate = tomorrowDateId(now);
   const hatchHour = resolveHatchHour(profile);
   let archivedDays: StoredHomeDayRecord[] = [...upgradedState.archivedDays];
   let today: StoredHomeDayRecord = { ...upgradedState.today };
+  let tomorrow: StoredHomeDayRecord | undefined = upgradedState.tomorrow
+    ? { ...upgradedState.tomorrow }
+    : undefined;
 
   if (today.isoDate !== todayDateId) {
     archivedDays = [...archivedDays, resolveRolledPastDay(today, profile, now)].slice(-MAX_ARCHIVED_DAYS);
-    today = createEmptyStoredDay(now, profile);
+    // The calendar advanced: if we pre-fed a tomorrow whose date is now today,
+    // promote it (it carries the moments/energy/vision the user already fed);
+    // otherwise start a fresh egg.
+    today = tomorrow && tomorrow.isoDate === todayDateId ? tomorrow : createEmptyStoredDay(now, profile);
+    tomorrow = undefined;
+  }
+
+  // Drop a stale tomorrow (already promoted, or left in the past).
+  if (tomorrow && tomorrow.isoDate !== tomorrowDate) {
+    tomorrow = undefined;
   }
 
   today = {
@@ -1095,6 +1141,18 @@ function normalizeStoredHomeState(
     normalizedArchived.push(updateStoredDayDerivedFields(day, normalizedArchived, now, hatchHour, false));
   });
   const normalizedToday = updateStoredDayDerivedFields(today, normalizedArchived, now, hatchHour, true);
+  // The forming tomorrow gets its derived fields too (so its egg reflects what's
+  // been fed), but only when something has actually been fed into it.
+  const normalizedTomorrow =
+    tomorrow && dayHasShape(tomorrow)
+      ? updateStoredDayDerivedFields(
+          { ...tomorrow, state: 'forming' },
+          [...normalizedArchived, normalizedToday],
+          now,
+          hatchHour,
+          false
+        )
+      : undefined;
 
   return {
     version: 6,
@@ -1104,6 +1162,7 @@ function normalizeStoredHomeState(
     encounterHistory: upgradedState.encounterHistory,
     archivedDays: normalizedArchived,
     today: normalizedToday,
+    tomorrow: normalizedTomorrow,
     backfilledAt: upgradedState.backfilledAt,
   };
 }
@@ -1158,6 +1217,7 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
       encounterHistory: inputState.encounterHistory ?? {},
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
+      tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
     };
   }
 

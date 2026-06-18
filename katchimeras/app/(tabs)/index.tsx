@@ -49,6 +49,10 @@ export default function HomeScreen() {
     answerPhotoMeaning,
     addForegroundLocationSample,
     dismissDayPrompt,
+    isTodayHatched,
+    tomorrowDay,
+    tomorrowActivePrompt,
+    tomorrowAvailablePrompts,
     locationPermission,
     selectedDay,
     selectedDayId,
@@ -311,6 +315,16 @@ export default function HomeScreen() {
   const isFormingToday = isDay && selectedDay.isToday && selectedDay.state !== 'hatched';
   const signalLine = isDay ? buildSignalLine(selectedDay) : null;
 
+  // Once today has hatched, the Tomorrow page becomes a forming egg the user can
+  // pre-feed (moments / prompts / camera) until the rollover. The forming target
+  // + which day/prompts to use are unified here so the same UI drives both.
+  const onTomorrowForming = selectedDay?.kind === 'tomorrow' && isTodayHatched;
+  const isForming = isFormingToday || onTomorrowForming;
+  const formingTarget = onTomorrowForming ? 'tomorrow' : 'today';
+  const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
+  const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
+  const formingActivePrompt = onTomorrowForming ? tomorrowActivePrompt : activeDayPrompt;
+
   // Launch a mote from the tapped item into the egg, deferring the actual
   // answer until it lands so the egg's pulse lands with it. Guards against
   // overlapping flights.
@@ -353,16 +367,16 @@ export default function HomeScreen() {
     choiceIds: string[],
     from: FeedSourceRect
   ) {
-    const isPhotoMeaning = kind === 'meaning' && selectedDay?.kind === 'day' && !!selectedDay.heroPhoto;
-    const sourcePrompts = [activeDayPrompt, ...availableDayPrompts].filter(Boolean);
+    const isPhotoMeaning = kind === 'meaning' && !!formingDay?.heroPhoto;
+    const sourcePrompts = [formingActivePrompt, ...formingPrompts].filter(Boolean);
     const label = sourcePrompts
       .find((prompt) => prompt?.id === kind)
       ?.options.find((option) => option.id === choiceIds[0])?.label;
     startEggFeed(from, { label }, () => {
       if (isPhotoMeaning) {
-        answerPhotoMeaning({ choiceIds });
+        answerPhotoMeaning({ choiceIds }, formingTarget);
       } else {
-        answerDayPrompt({ kind, choiceIds });
+        answerDayPrompt({ kind, choiceIds }, formingTarget);
       }
     });
   }
@@ -371,7 +385,7 @@ export default function HomeScreen() {
     // Commit immediately (not deferred to arrival) so the paired "meaning" step
     // that opens next already has a hero photo to attach to. The mote still
     // flies and pulses the egg on arrival.
-    selectHeroPhoto(photo);
+    selectHeroPhoto(photo, formingTarget);
     startEggFeed(from, { photoUri: photo.thumbnailUri }, () => {});
   }
 
@@ -430,6 +444,13 @@ export default function HomeScreen() {
                 feedKey={eggFeedKey}
               />
             )
+          ) : onTomorrowForming ? (
+            <LanternEgg
+              egg={tomorrowDay.egg}
+              onPress={openPromptSheet}
+              reactionKey={tomorrowDay.moments.length}
+              feedKey={eggFeedKey}
+            />
           ) : (
             <LanternEgg
               egg={{
@@ -443,7 +464,7 @@ export default function HomeScreen() {
               }}
             />
           )}
-          {isFormingToday ? <EggOrbitIcons icons={orbitIcons} /> : null}
+          {isForming ? <EggOrbitIcons icons={orbitIcons} /> : null}
         </Animated.View>
 
         {isHatched ? (
@@ -453,16 +474,16 @@ export default function HomeScreen() {
         ) : (
           <Animated.View entering={presenceEnter(120)} style={styles.formingCopy}>
             <ThemedText style={styles.formingTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              {formingTitle}
+              {onTomorrowForming ? 'Tomorrow is already forming' : formingTitle}
             </ThemedText>
-            {signalLine ? (
+            {!onTomorrowForming && signalLine ? (
               <ThemedText style={styles.signalLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
                 {signalLine}
               </ThemedText>
             ) : null}
-            {isFormingToday && selectedDay.moments.length > 0 ? (
+            {isForming && formingDay && formingDay.moments.length > 0 ? (
               <View style={styles.chipRow}>
-                {dedupeMoments(selectedDay.moments).map((moment) => (
+                {dedupeMoments(formingDay.moments).map((moment) => (
                   <View key={moment.id} style={styles.chip}>
                     <View
                       style={[
@@ -477,12 +498,12 @@ export default function HomeScreen() {
                 ))}
               </View>
             ) : null}
-            {isFormingToday ? (
+            {isForming ? (
               <DayPromptStrip
                 onAnswer={handleAnswerDayPrompt}
-                onDismiss={dismissDayPrompt}
+                onDismiss={(kind) => dismissDayPrompt(kind, formingTarget)}
                 onSelectHeroPhoto={handleSelectHeroPhoto}
-                prompt={activeDayPrompt}
+                prompt={formingActivePrompt}
               />
             ) : null}
           </Animated.View>
@@ -519,9 +540,14 @@ export default function HomeScreen() {
                 variant="premium"
               />
             </View>
-          ) : isFormingToday ? (
+          ) : isForming ? (
             <View style={styles.addRow}>
-              <KatchaButton label="Add to today" onPress={openPromptSheet} variant="primary" style={styles.addMain} />
+              <KatchaButton
+                label={onTomorrowForming ? 'Add to tomorrow' : 'Add to today'}
+                onPress={openPromptSheet}
+                variant="primary"
+                style={styles.addMain}
+              />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Capture a moment with the camera"
@@ -538,7 +564,7 @@ export default function HomeScreen() {
 
       {promptSheetOpen ? (
         <MomentPromptSheet
-          prompts={availableDayPrompts}
+          prompts={formingPrompts}
           meaningPrompt={meaningPrompt}
           onAnswer={handleAnswerDayPrompt}
           onSelectHeroPhoto={handleSelectHeroPhoto}

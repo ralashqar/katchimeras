@@ -16,9 +16,24 @@ import type { DayScores, HomeScoreKey } from '@/types/home';
 // toward the center as the moment is drawn in. Purely visual (no frame
 // processing), per the capture feature's perf rule.
 
+// Tilt-parallax + touch-attraction signals driving the field (Tier-1 "reactive"
+// without needing camera frames). All center-relative; touchActive 0..1.
+export type EssenceInteraction = {
+  tiltX: SharedValue<number>;
+  tiltY: SharedValue<number>;
+  touchX: SharedValue<number>;
+  touchY: SharedValue<number>;
+  touchActive: SharedValue<number>;
+};
+
 type EssenceOverlayProps = {
   dayScores: DayScores | null;
   phase: 'live' | 'capturing';
+  // Live scene brightness (0..1). Optional — if absent the field uses its steady
+  // day-energy look (reserved for a future VisionCamera frame processor).
+  liveIntensity?: SharedValue<number>;
+  // Device-motion tilt + touch gathering. Optional.
+  interaction?: EssenceInteraction;
 };
 
 type Mote = { angle: number; radius: number; size: number; drift: number; phase: number };
@@ -39,10 +54,19 @@ function dominantTheme(scores: DayScores | null) {
   return ENERGY_THEME[top];
 }
 
-export function EssenceOverlay({ dayScores, phase }: EssenceOverlayProps) {
+export function EssenceOverlay({ dayScores, phase, liveIntensity, interaction }: EssenceOverlayProps) {
   const { color, speed } = dominantTheme(dayScores);
   const drift = useSharedValue(0);
   const collapse = useSharedValue(0);
+  // Fallbacks when a signal isn't wired (all read-only zeros are safe to share).
+  const steadyIntensity = useSharedValue(0.5);
+  const zero = useSharedValue(0);
+  const intensity = liveIntensity ?? steadyIntensity;
+  const tiltX = interaction?.tiltX ?? zero;
+  const tiltY = interaction?.tiltY ?? zero;
+  const touchX = interaction?.touchX ?? zero;
+  const touchY = interaction?.touchY ?? zero;
+  const touchActive = interaction?.touchActive ?? zero;
 
   // Deterministic-enough spread; varied per mount so each open feels alive.
   const motes = useMemo<Mote[]>(
@@ -71,9 +95,21 @@ export function EssenceOverlay({ dayScores, phase }: EssenceOverlayProps) {
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.center]}>
       {motes.map((mote, index) => (
-        <EssenceMote key={index} mote={mote} color={color} drift={drift} collapse={collapse} />
+        <EssenceMote
+          key={index}
+          mote={mote}
+          color={color}
+          drift={drift}
+          collapse={collapse}
+          intensity={intensity}
+          tiltX={tiltX}
+          tiltY={tiltY}
+          touchX={touchX}
+          touchY={touchY}
+          touchActive={touchActive}
+        />
       ))}
-      <CenterAura color={color} collapse={collapse} />
+      <CenterAura color={color} collapse={collapse} intensity={intensity} />
     </View>
   );
 }
@@ -83,22 +119,48 @@ function EssenceMote({
   color,
   drift,
   collapse,
+  intensity,
+  tiltX,
+  tiltY,
+  touchX,
+  touchY,
+  touchActive,
 }: {
   mote: Mote;
   color: string;
   drift: SharedValue<number>;
   collapse: SharedValue<number>;
+  intensity: SharedValue<number>;
+  tiltX: SharedValue<number>;
+  tiltY: SharedValue<number>;
+  touchX: SharedValue<number>;
+  touchY: SharedValue<number>;
+  touchActive: SharedValue<number>;
 }) {
+  // Deeper motes (bigger orbit) parallax more as you tilt — the depth illusion.
+  const depth = mote.radius / 200;
+
   const style = useAnimatedStyle(() => {
     const spin = mote.phase + drift.value * Math.PI * 2 * mote.drift;
     const radius = mote.radius * (1 - collapse.value);
-    const x = Math.cos(spin) * radius;
+    let x = Math.cos(spin) * radius;
     // gentle upward float layered on the orbit
-    const y = Math.sin(spin) * radius - Math.sin(drift.value * Math.PI * 2 + mote.phase) * 10 * (1 - collapse.value);
+    let y = Math.sin(spin) * radius - Math.sin(drift.value * Math.PI * 2 + mote.phase) * 10 * (1 - collapse.value);
+
+    // Tilt parallax: the field shifts against the phone's lean, deeper motes more.
+    x += tiltX.value * 30 * depth;
+    y += tiltY.value * 30 * depth;
+
+    // Touch attraction: motes gather toward the finger while it's down.
+    const gather = touchActive.value * 0.6;
+    x += (touchX.value - x) * gather;
+    y += (touchY.value - y) * gather;
+
     const twinkle = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(drift.value * Math.PI * 4 + mote.phase));
+    const live = 0.55 + 0.7 * intensity.value;
     return {
-      opacity: twinkle * (1 - collapse.value * 0.85),
-      transform: [{ translateX: x }, { translateY: y }, { scale: 1 - collapse.value * 0.4 }],
+      opacity: twinkle * live * (1 - collapse.value * 0.85),
+      transform: [{ translateX: x }, { translateY: y }, { scale: (0.85 + 0.4 * intensity.value) * (1 - collapse.value * 0.4) }],
     };
   });
 
@@ -113,10 +175,18 @@ function EssenceMote({
   );
 }
 
-function CenterAura({ color, collapse }: { color: string; collapse: SharedValue<number> }) {
+function CenterAura({
+  color,
+  collapse,
+  intensity,
+}: {
+  color: string;
+  collapse: SharedValue<number>;
+  intensity: SharedValue<number>;
+}) {
   const style = useAnimatedStyle(() => ({
-    opacity: 0.12 + collapse.value * 0.5,
-    transform: [{ scale: 0.8 + collapse.value * 0.6 }],
+    opacity: 0.1 + intensity.value * 0.16 + collapse.value * 0.5,
+    transform: [{ scale: 0.8 + intensity.value * 0.15 + collapse.value * 0.6 }],
   }));
   return <Animated.View style={[styles.aura, { backgroundColor: `${color}55`, boxShadow: `0 0 60px ${color}` }, style]} />;
 }
