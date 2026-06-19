@@ -18,7 +18,6 @@ import {
   addMomentToDay,
   answerDayPromptForToday,
   answerHeroPhotoMeaningForToday,
-  applyBackfilledDays,
   applyCapturedMomentForToday,
   applyGeneratedReflection,
   deriveTomorrowDayRecord,
@@ -48,7 +47,6 @@ import {
   loadProductionDayPromptPhotoCandidates,
   loadStoredDevPromptPhotoCandidates,
 } from '@/utils/day-prompt-photos';
-import { collectBackfillDays } from '@/utils/day-backfill';
 import { requestDayReflection } from '@/utils/day-reflection';
 import { ensureDayVision } from '@/utils/photo-vision';
 import { ensureDayWeather } from '@/utils/day-weather';
@@ -428,33 +426,13 @@ export function useHomeScreenState() {
     void syncWidgetState(state, profile);
   }, [todayId, todayState]);
 
-  // One-shot retrospective init: reconstruct the last few days from pedometer
-  // history and already-granted photo geotags, replacing the demo seed days.
-  const backfillAttempted = useRef(false);
-  const hasBackfilled = Boolean(viewModel.state.backfilledAt);
-
-  useEffect(() => {
-    if (backfillAttempted.current || hasBackfilled) {
-      return;
-    }
-    backfillAttempted.current = true;
-
-    void (async () => {
-      const profile = loadOnboardingProfile();
-      // Reconstruct the last 5 days, reading each day's photos on-device so the
-      // stored day carries its vision — that's what lets a later hatch pick the
-      // creature the photos showed and write a specific (non-generic) quote.
-      const days = await collectBackfillDays(new Date(), 5, { analyzeVision: true });
-      const now = new Date();
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        if (hydrated.state.backfilledAt) {
-          return hydrated.state;
-        }
-        return applyBackfilledDays(hydrated.state, days, profile, now);
-      });
-    })();
-  }, [hasBackfilled]);
+  // NOTE: there is intentionally NO automatic retrospective backfill here.
+  // "Hatch your past" (run from onboarding, app/hatch-your-past.tsx) is the
+  // single source of the initial reconstruction — it reconstructs AND hatches
+  // the last few days, and the home then shows exactly those katchimeras. A
+  // separate auto-backfill used to run here and create *forming* (un-hatched)
+  // days, which diverged from the hatch-your-past reveal; it was removed so the
+  // two can never disagree.
 
   const placeResolutionInFlight = useRef<string | null>(null);
 

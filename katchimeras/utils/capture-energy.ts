@@ -162,43 +162,90 @@ const HOME_MEANINGS: readonly CaptureMeaning[] = [
   { id: 'energy', emoji: '✨', label: 'Recharged' },
 ];
 
-const KEYWORD_MEANING_RULES: { pattern: RegExp; meanings: readonly CaptureMeaning[] }[] = [
-  { pattern: /focus_work|laptop|computer|keyboard|monitor|\bdesk\b|office|workspace|spreadsheet|meeting/, meanings: WORK_MEANINGS },
-  { pattern: /gaming|game ?controller|gamepad|console|joystick|arcade|video game/, meanings: GAMES_MEANINGS },
-  { pattern: /live_music|concert|\bgig\b|\bstage\b|guitar|piano|violin|instrument|microphone|\bband\b|vinyl|headphones?|turntable|\bdrum/, meanings: MUSIC_MEANINGS },
-  { pattern: /television|\btv\b|remote control/, meanings: WATCHING_MEANINGS },
-  { pattern: /\bbook\b|reading|novel|paperback|bookshelf/, meanings: READING_MEANINGS },
-  { pattern: /shopping|\bstore\b|\bmall\b|retail|boutique|grocery|supermarket/, meanings: SHOPPING_MEANINGS },
-  { pattern: /\bcar\b|vehicle|driving|\broad\b|highway|traffic|\btrain\b|subway|\bbus\b|commute|bicycle|\bbike\b|motorcycle/, meanings: COMMUTE_MEANINGS },
-  { pattern: /couch|sofa|blanket|bedroom|living room|fireplace|\bcozy\b|pajamas/, meanings: HOME_MEANINGS },
+// An ambiguous device/screen photo offers the things you might have been doing
+// with it, so the user disambiguates (directly the "electronic device → work /
+// games" case). Lower priority than a SPECIFIC device read (laptop → work).
+const TECH_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'meaningful', emoji: '💻', label: 'Working' },
+  { id: 'energy', emoji: '🎮', label: 'Gaming' },
+  { id: 'together', emoji: '📺', label: 'Watching' },
+  { id: 'calm', emoji: '📱', label: 'Scrolling' },
 ];
 
-function matchKeywordMeanings(word: string): readonly CaptureMeaning[] | null {
-  for (const rule of KEYWORD_MEANING_RULES) {
-    if (rule.pattern.test(word)) {
-      return rule.meanings;
-    }
-  }
-  return null;
-}
+// Every meaning bucket with the vocabulary that votes for it. Order is the
+// tiebreak when two buckets score equally — earlier = more specific/intentional.
+// The patterns are deliberately broad (Apple Vision's labels are noisy) and are
+// scored across the WHOLE bag of tags, so one stray label can't hijack the read.
+const BUCKETS: { key: string; pattern: RegExp; meanings: readonly CaptureMeaning[] }[] = [
+  { key: 'people', pattern: /\bperson\b|people|\bface\b|portrait|\bbaby\b|infant|toddler|\bchild\b|\bkid\b|\bgroup\b|crowd|selfie|\bfriends?\b|family/, meanings: MEANINGS_BY_CATEGORY.people },
+  { key: 'celebration', pattern: /birthday|\bparty\b|celebration|balloon|confetti|wedding|champagne|firework/, meanings: MEANINGS_BY_CATEGORY.celebration },
+  { key: 'pet', pattern: /\bdog\b|puppy|\bcat\b|kitten|\bpet\b|\bpaw\b|hamster|\brabbit\b|\bbird\b|parrot|aquarium/, meanings: MEANINGS_BY_CATEGORY.pet },
+  { key: 'work', pattern: /focus_work|laptop|computer|keyboard|monitor|\bdesk\b|office|workspace|spreadsheet|\bmeeting\b|whiteboard|cubicle/, meanings: WORK_MEANINGS },
+  { key: 'games', pattern: /gaming|game ?controller|gamepad|console|joystick|arcade|video ?game|playstation|xbox|nintendo/, meanings: GAMES_MEANINGS },
+  { key: 'music', pattern: /live_music|concert|\bgig\b|\bstage\b|guitar|piano|violin|cello|\bdrum|saxophone|trumpet|instrument|microphone|\bband\b|vinyl|headphones?|turntable|orchestra/, meanings: MUSIC_MEANINGS },
+  { key: 'watching', pattern: /television|\btv\b|remote control|home cinema|streaming/, meanings: WATCHING_MEANINGS },
+  { key: 'reading', pattern: /\bbook\b|reading|novel|paperback|bookshelf|\bmagazine\b/, meanings: READING_MEANINGS },
+  { key: 'creative', pattern: /creative|paint|drawing|sketch|canvas|easel|pottery|\bcraft|knitting|sewing|origami/, meanings: MEANINGS_BY_CATEGORY.creative },
+  { key: 'active', pattern: /\bgym\b|fitness|workout|\bsport|basketball|tennis|soccer|football|baseball|\brun(ning)?\b|\bjog|cycl|\byoga\b|exercise|athletic|stadium|treadmill|dumbbell|skate|swim/, meanings: MEANINGS_BY_CATEGORY.active },
+  { key: 'food', pattern: /\bfood\b|\bmeal\b|\bdish\b|restaurant|burger|pizza|sushi|ramen|noodle|dessert|\bcake\b|bakery|\bbread\b|pastry|\bplate\b|cuisine|\bsnack\b|breakfast|\blunch\b|dinner|\bfruit\b|vegetable|\bfarm\b|barbecue|\bsalad\b/, meanings: MEANINGS_BY_CATEGORY.food },
+  { key: 'drink', pattern: /coffee|espresso|latte|cappuccino|\bcaf[eé]\b|\btea\b|boba|bubble tea|cocktail|\bbeer\b|\bwine\b|\bjuice\b|smoothie|beverage|\bdrink\b/, meanings: MEANINGS_BY_CATEGORY.drink },
+  { key: 'shopping', pattern: /shopping|\bstore\b|\bmall\b|retail|boutique|grocery|supermarket|\bmarket\b/, meanings: SHOPPING_MEANINGS },
+  { key: 'commute', pattern: /\bcar\b|vehicle|driving|\broad\b|highway|traffic|\btrain\b|subway|\bbus\b|commute|bicycle|\bbike\b|motorcycle|scooter|\bmetro\b/, meanings: COMMUTE_MEANINGS },
+  { key: 'culture', pattern: /museum|gallery|\bart\b|sculpture|painting|exhibit|architecture|monument|cinema|theat(er|re)|library|cathedral|\btemple\b/, meanings: MEANINGS_BY_CATEGORY.culture },
+  { key: 'landmark', pattern: /landmark|skyline|skyscraper|\bcity\b|downtown|urban|\btower\b|\bbridge\b|\btravel\b|airport|luggage|tourist|\bplaza\b/, meanings: MEANINGS_BY_CATEGORY.landmark },
+  { key: 'mountains', pattern: /mountain|\bhill\b|cliff|\bpeak\b|summit|valley|canyon|\balps\b|highland/, meanings: MEANINGS_BY_CATEGORY.mountains },
+  { key: 'water', pattern: /\bwater\b|beach|ocean|\bsea\b|\blake\b|\briver\b|\bpool\b|\bwave\b|shore|coast|waterfall|harbou?r/, meanings: MEANINGS_BY_CATEGORY.water },
+  { key: 'nature', pattern: /\btree\b|forest|\bpark\b|garden|\bplant\b|\bflower\b|\bleaf\b|\bgrass\b|meadow|\btrail\b|\bhike\b|jungle|botanical|blossom|autumn|foliage|greenery|woodland/, meanings: MEANINGS_BY_CATEGORY.nature },
+  { key: 'light', pattern: /sunset|sunrise|\bdusk\b|\bdawn\b|golden hour/, meanings: MEANINGS_BY_CATEGORY.light },
+  { key: 'night', pattern: /\bnight\b|\bstars?\b|starry|\bmoon\b|\bsnow\b|\brain\b|\bstorm\b|\bfog\b|aurora/, meanings: MEANINGS_BY_CATEGORY.night },
+  { key: 'home', pattern: /couch|sofa|blanket|bedroom|living room|fireplace|\bcozy\b|pajamas|\bbed\b/, meanings: HOME_MEANINGS },
+  { key: 'tech', pattern: /electronic|\bscreen\b|display|gadget|tablet|smartphone|\bphone\b|\bdevice\b/, meanings: TECH_MEANINGS },
+];
 
 // The meaning options to offer for a freshly captured photo, adapted to its
-// essence. Three layers, widest coverage first: (1) keyword rules over the
-// photo's concepts + raw detail labels in salience order, (2) the display
-// category (handles faces / food / nature / etc.), (3) the generic four.
+// essence. We SCORE every bucket across the whole bag of tags — concepts
+// weighted by confidence, raw detail labels by rank, plus a faces signal — and
+// take the strongest. Holistic, so one noisy/generic label can't hijack it, and
+// no single keyword has to be the "right" one. Falls back to the generic four
+// only when nothing meaningful was read.
 export function selectCaptureMeanings(vision: DayVisionSummary | null): readonly CaptureMeaning[] {
   if (!vision) {
     return CAPTURE_MEANINGS;
   }
-  const essenceWords = [...vision.concepts.map((concept) => concept.name), ...vision.details];
-  for (const word of essenceWords) {
-    const keyworded = matchKeywordMeanings(word.toLowerCase());
-    if (keyworded) {
-      return keyworded;
+
+  const scores = new Map<string, number>();
+  const score = (word: string, weight: number) => {
+    const lower = word.toLowerCase();
+    for (const bucket of BUCKETS) {
+      if (bucket.pattern.test(lower)) {
+        scores.set(bucket.key, (scores.get(bucket.key) ?? 0) + weight);
+      }
+    }
+  };
+
+  // A recognised concept is the reliable signal and always outweighs raw detail
+  // labels (which are supplementary, and noisier).
+  vision.concepts.forEach((concept) => score(concept.name, Math.max(concept.peakConfidence ?? 0.5, 0.4)));
+  vision.details.forEach((detail, index) => score(detail, Math.max(0.3 - index * 0.05, 0.15)));
+  if (vision.maxFaceCount >= 2) {
+    scores.set('people', (scores.get('people') ?? 0) + 0.8);
+  } else if (vision.maxFaceCount === 1) {
+    scores.set('people', (scores.get('people') ?? 0) + 0.4);
+  }
+
+  // Strict ">" + priority order means ties resolve to the earlier (more
+  // specific) bucket.
+  let best: { key: string; meanings: readonly CaptureMeaning[] } | null = null;
+  let bestScore = 0;
+  for (const bucket of BUCKETS) {
+    const value = scores.get(bucket.key) ?? 0;
+    if (value > bestScore) {
+      bestScore = value;
+      best = bucket;
     }
   }
-  const category = resolvePhotoCategory(vision).id;
-  return MEANINGS_BY_CATEGORY[category] ?? CAPTURE_MEANINGS;
+
+  return best ? best.meanings : CAPTURE_MEANINGS;
 }
 
 const SCORE_KEYS: HomeScoreKey[] = ['energy', 'calm', 'social', 'exploration', 'focus'];

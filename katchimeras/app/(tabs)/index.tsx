@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureRef } from 'react-native-view-shot';
 
 import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
@@ -27,8 +27,7 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
-import { dayPromptRegistry } from '@/constants/day-prompts';
-import type { ActiveDayPrompt } from '@/utils/day-prompt-engine';
+import type { DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 import { useDayLocationCapture } from '@/hooks/use-day-location-capture';
 import { useDayStepCapture } from '@/hooks/use-day-step-capture';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
@@ -57,7 +56,6 @@ export default function HomeScreen() {
     selectedDay,
     selectedDayId,
     seedRecentPhotoLocations,
-    selectHeroPhoto,
     setActivityPermission,
     setLocationPermission,
     setTodayStepCount,
@@ -93,12 +91,6 @@ export default function HomeScreen() {
   const [promptSheetOpen, setPromptSheetOpen] = useState(false);
   const openPromptSheet = () => setPromptSheetOpen(true);
   const closePromptSheet = () => setPromptSheetOpen(false);
-  // The "what did it mean?" step that always follows a photo pick (its options
-  // are static, so build it once).
-  const meaningPrompt = useMemo<ActiveDayPrompt>(
-    () => ({ ...dayPromptRegistry.meaning, photoCandidates: [] }),
-    []
-  );
   // Category icons orbiting the egg, one per fed photo (capture / photo prompt).
   const [orbitIcons, setOrbitIcons] = useState<OrbitIcon[]>([]);
   const orbitNonce = useRef(0);
@@ -381,12 +373,19 @@ export default function HomeScreen() {
     });
   }
 
-  function handleSelectHeroPhoto(photo: Parameters<typeof selectHeroPhoto>[0], from: FeedSourceRect) {
-    // Commit immediately (not deferred to arrival) so the paired "meaning" step
-    // that opens next already has a hero photo to attach to. The mote still
-    // flies and pulses the egg on arrival.
-    selectHeroPhoto(photo, formingTarget);
-    startEggFeed(from, { photoUri: photo.thumbnailUri }, () => {});
+  function handleSelectHeroPhoto(photo: DayPromptPhotoCandidate, _from: FeedSourceRect) {
+    // Open the chosen photo full and read its essence there ("what did this
+    // mean?"), which then feeds the day and marks it the hero photo.
+    closePromptSheet();
+    router.push({
+      pathname: '/photo-essence',
+      params: {
+        assetId: photo.assetId,
+        thumbnailUri: photo.thumbnailUri ?? '',
+        capturedAt: photo.capturedAt,
+        target: formingTarget,
+      },
+    });
   }
 
   // Returning from the Moment Capture screen: it already folded the moment into
@@ -558,7 +557,6 @@ export default function HomeScreen() {
       {promptSheetOpen ? (
         <MomentPromptSheet
           prompts={formingPrompts}
-          meaningPrompt={meaningPrompt}
           onAnswer={handleAnswerDayPrompt}
           onSelectHeroPhoto={handleSelectHeroPhoto}
           onClose={closePromptSheet}

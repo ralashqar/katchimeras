@@ -611,5 +611,89 @@ check(
   JSON.stringify(dogVisionPast.creatures.map((c) => c.name))
 );
 
+// HP7. When days already carry a persisted creature (the backfill hatched them
+// with the distinct floor), the reveal uses THOSE verbatim — so onboarding's
+// "X of Y" matches the 3 distinct creatures Home shows, never re-deriving fewer.
+function persistedDay(iso, profileId, name, visualKey) {
+  return makeDay({
+    isoDate: iso,
+    state: 'hatched',
+    creature: {
+      id: `creature-${iso}`,
+      name,
+      primaryTrait: 'calm',
+      secondaryTrait: 'focus',
+      rarity: 'common',
+      visualKey,
+      accentColor: '#FFFFFF',
+      encounterProfileId: profileId,
+      repeatDepth: 0,
+      bondStage: 1,
+      bondVisitCount: 1,
+    },
+  });
+}
+const persistedPast = hatchPast.buildHatchYourPast([
+  persistedDay('2026-06-10', 'activity_high_steps_day_steppling', 'Steppling', 'steppling'),
+  persistedDay('2026-06-11', 'location_home_evening_bedrotte', 'Bedrotte', 'bedrotte'),
+  persistedDay('2026-06-12', 'activity_errand_loop_errandimp', 'Errandimp', 'errandimp'),
+]);
+check(
+  'HP: persisted distinct creatures reveal all three (matches Home)',
+  persistedPast.creatures.length === 3,
+  JSON.stringify(persistedPast.creatures.map((c) => c.name))
+);
+check(
+  'HP: persisted reveal keeps the exact creatures',
+  persistedPast.creatures
+    .map((c) => c.name)
+    .sort()
+    .join(',') === 'Bedrotte,Errandimp,Steppling',
+  JSON.stringify(persistedPast.creatures.map((c) => c.name))
+);
+
+// Distinct backfill floor: three featureless days (no signal at all) must each
+// hatch a DIFFERENT real character — never a duplicate. This is the "hatch your
+// past always reveals 3 different ones" guarantee.
+const distinctUsed = new Set();
+const distinctNames = [];
+for (let i = 0; i < 3; i += 1) {
+  const blankDay = makeDay({ isoDate: `2026-06-${10 + i}`, stepsCount: 0 });
+  const creature = engine.buildDistinctEncounterCreature(blankDay, {}, distinctUsed, 'calm', 'focus');
+  distinctUsed.add(creature.encounterProfileId);
+  distinctNames.push(creature.name);
+}
+check('distinct floor: 3 blank days hatch 3 creatures', distinctNames.filter(Boolean).length === 3, JSON.stringify(distinctNames));
+check(
+  'distinct floor: all 3 are different species',
+  new Set(distinctNames).size === 3,
+  JSON.stringify(distinctNames)
+);
+
+// Distinct backfill also avoids repeating a clear real candidate: two coffee
+// days in the same run hatch Baristabbit once, then something else.
+const distinctUsed2 = new Set();
+const coffeeA = engine.buildDistinctEncounterCreature(
+  makeDay({ moments: [makeMoment('coffee', 0)], stepsCount: 1600 }),
+  {},
+  distinctUsed2,
+  'calm',
+  'energy'
+);
+distinctUsed2.add(coffeeA.encounterProfileId);
+const coffeeB = engine.buildDistinctEncounterCreature(
+  makeDay({ moments: [makeMoment('coffee', 0)], stepsCount: 1600 }),
+  {},
+  distinctUsed2,
+  'calm',
+  'energy'
+);
+check('distinct floor: first coffee day is Baristabbit', coffeeA.name === 'Baristabbit', coffeeA.name);
+check(
+  'distinct floor: second day avoids the used species',
+  coffeeB.encounterProfileId !== coffeeA.encounterProfileId,
+  `${coffeeA.name} / ${coffeeB.name}`
+);
+
 console.log(failures === 0 ? '\nAll encounter-engine checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

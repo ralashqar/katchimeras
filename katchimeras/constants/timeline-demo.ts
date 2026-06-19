@@ -11,10 +11,10 @@ export const timelineDemoEntries: readonly TimelineDayEntry[] = [
     cardCue: 'A slower start with clear air.',
     summary: 'A light walk turned the morning into motion you could feel and keep.',
     creature: {
-      id: 'voltstep',
-      name: 'Voltstep',
-      accent: '#93C7FF',
-      imageSource: onboardingShowcaseAssets.onboarding_run_voltstep.source,
+      id: 'sprintail',
+      name: 'Sprintail',
+      accent: '#FF8F5A',
+      imageSource: heroOrbitAssets.sprintail,
     },
     memory: {
       title: 'Riverside walk',

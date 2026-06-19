@@ -221,11 +221,11 @@ export const homeCreatureVisuals: Record<
   },
   sprintail: {
     source: require('../assets/images/katchimeras/cutouts/sprintail.png'),
-    accentColor: '#93C7FF',
+    accentColor: '#FF8F5A',
   },
   neonpoko: {
     source: require('../assets/images/katchimeras/cutouts/neonpoko.png'),
-    accentColor: '#B4BCFF',
+    accentColor: '#C77DFF',
   },
   crumbun: {
     source: require('../assets/images/katchimeras/cutouts/crumbun.png'),
@@ -237,7 +237,7 @@ export const homeCreatureVisuals: Record<
   },
   ironette: {
     source: require('../assets/images/katchimeras/cutouts/ironette.png'),
-    accentColor: '#B6D2FF',
+    accentColor: '#E7CDA0',
   },
   bedrotte: {
     source: require('../assets/images/katchimeras/cutouts/bedrotte.png'),

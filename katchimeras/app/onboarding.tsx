@@ -1,13 +1,20 @@
 import { Image } from 'expo-image';
 import { Redirect, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
-import { presenceEnter } from '@/components/katchadeck/motion';
+import { presenceEnter, useFloatingMotion, usePressMotion, usePulseMotion } from '@/components/katchadeck/motion';
 import { CinematicOnboardingPage } from '@/components/katchadeck/onboarding/cinematic-onboarding-page';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -54,7 +61,7 @@ const castIntroItems = [
     id: 'sprintail',
     name: 'Sprintail',
     line: 'Shows up on the days you really moved.',
-    accentColor: '#93C7FF',
+    accentColor: '#FF8F5A',
     source: require('../assets/images/katchimeras/cutouts/sprintail.png'),
   },
 ] as const;
@@ -154,21 +161,7 @@ export default function OnboardingScreen() {
 
           <View style={styles.castStack}>
             {castIntroItems.map((item, index) => (
-              <Animated.View entering={presenceEnter(80 + index * 60)} key={item.id}>
-                <View style={styles.castCard}>
-                  <View style={[styles.castPortrait, { backgroundColor: `${item.accentColor}14` }]}>
-                    <Image contentFit="contain" source={item.source} style={styles.castImage} transition={0} />
-                  </View>
-                  <View style={styles.castCopy}>
-                    <ThemedText type="subtitle" style={styles.castName} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                      {item.name}
-                    </ThemedText>
-                    <ThemedText style={styles.castLine} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                      {item.line}
-                    </ThemedText>
-                  </View>
-                </View>
-              </Animated.View>
+              <CastIntroCard item={item} index={index} key={item.id} />
             ))}
           </View>
 
@@ -223,21 +216,14 @@ export default function OnboardingScreen() {
                 When should the day be ready to reveal?
               </ThemedText>
               <View style={styles.hatchHourRow}>
-                {hatchHourOptions.map((option) => {
-                  const selected = option.hour === selectedHatchHour;
-                  return (
-                    <Pressable key={option.hour} onPress={() => setSelectedHatchHour(option.hour)} style={styles.hatchHourPressable}>
-                      <View style={[styles.hatchHourChip, selected ? styles.hatchHourChipSelected : null]}>
-                        <ThemedText
-                          style={styles.hatchHourLabel}
-                          lightColor={selected ? Lantern.emberInk : '#F8FBFF'}
-                          darkColor={selected ? Lantern.emberInk : '#F8FBFF'}>
-                          {option.label}
-                        </ThemedText>
-                      </View>
-                    </Pressable>
-                  );
-                })}
+                {hatchHourOptions.map((option) => (
+                  <HatchHourChip
+                    key={option.hour}
+                    label={option.label}
+                    onPress={() => setSelectedHatchHour(option.hour)}
+                    selected={option.hour === selectedHatchHour}
+                  />
+                ))}
               </View>
             </GlassPanel>
           </Animated.View>
@@ -261,40 +247,15 @@ export default function OnboardingScreen() {
           </Animated.View>
 
           <View style={styles.optionStack}>
-            {preferenceOptions.map((option, index) => {
-              const selected = option.id === selectedToneId;
-
-              return (
-                <Animated.View entering={presenceEnter(70 + index * 30)} key={option.id}>
-                  <Pressable onPress={() => setSelectedToneId(option.id)}>
-                    <View
-                      style={[
-                        styles.preferenceCard,
-                        selected ? styles.preferenceCardSelected : null,
-                        { borderColor: selected ? option.palette[1] : 'rgba(216,228,255,0.16)' },
-                      ]}>
-                      <View style={styles.preferenceCopy}>
-                        <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                          {option.title}
-                        </ThemedText>
-                        <ThemedText style={styles.preferenceBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                          {option.description}
-                        </ThemedText>
-                      </View>
-                      <View
-                        style={[
-                          styles.preferenceSwatch,
-                          {
-                            backgroundColor: option.palette[1],
-                            opacity: selected ? 1 : 0.7,
-                          },
-                        ]}
-                      />
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
+            {preferenceOptions.map((option, index) => (
+              <PreferenceCard
+                key={option.id}
+                index={index}
+                onPress={() => setSelectedToneId(option.id)}
+                option={option}
+                selected={option.id === selectedToneId}
+              />
+            ))}
           </View>
         </View>
       );
@@ -378,13 +339,7 @@ export default function OnboardingScreen() {
           </ThemedText>
           <View style={styles.progressTrack}>
             {Array.from({ length: totalSteps }).map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressSegment,
-                  index <= step ? styles.progressSegmentActive : null,
-                ]}
-              />
+              <ProgressSegment active={index <= step} index={index} key={index} />
             ))}
           </View>
         </View>
@@ -393,7 +348,13 @@ export default function OnboardingScreen() {
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}>
-          {renderContent()}
+          {step === 0 ? (
+            renderContent()
+          ) : (
+            <Animated.View entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))} key={step}>
+              {renderContent()}
+            </Animated.View>
+          )}
         </ScrollView>
 
         {step === 0 ? null : (
@@ -436,6 +397,119 @@ function PermissionRow({ title, body }: { title: string; body: string }) {
   );
 }
 
+function ProgressSegment({ active, index }: { active: boolean; index: number }) {
+  const fill = useSharedValue(active ? 1 : 0);
+
+  useEffect(() => {
+    fill.value = withDelay(
+      active ? index * 70 : 0,
+      withTiming(active ? 1 : 0, { duration: 460, easing: Easing.out(Easing.cubic) })
+    );
+  }, [active, fill, index]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    opacity: 0.35 + fill.value * 0.65,
+    transform: [{ scaleX: fill.value }],
+  }));
+
+  return (
+    <View style={styles.progressSegment}>
+      <Animated.View style={[styles.progressSegmentFill, fillStyle]} />
+    </View>
+  );
+}
+
+function CastIntroCard({ item, index }: { item: (typeof castIntroItems)[number]; index: number }) {
+  const floatStyle = useFloatingMotion(4, index * 240);
+  const haloStyle = usePulseMotion(0.86, 1.12, index * 240);
+
+  return (
+    <Animated.View entering={presenceEnter(80 + index * 60)}>
+      <View style={styles.castCard}>
+        <View style={styles.castPortraitWrap}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.castPortraitHalo, { backgroundColor: `${item.accentColor}2E` }, haloStyle]}
+          />
+          <Animated.View style={[styles.castPortrait, { backgroundColor: `${item.accentColor}14` }, floatStyle]}>
+            <Image contentFit="contain" source={item.source} style={styles.castImage} transition={0} />
+          </Animated.View>
+        </View>
+        <View style={styles.castCopy}>
+          <ThemedText type="subtitle" style={styles.castName} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            {item.name}
+          </ThemedText>
+          <ThemedText style={styles.castLine} lightColor="#DCE6FF" darkColor="#DCE6FF">
+            {item.line}
+          </ThemedText>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+function HatchHourChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressMotion();
+
+  return (
+    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.hatchHourPressable}>
+      <Animated.View style={[styles.hatchHourChip, selected ? styles.hatchHourChipSelected : null, animatedStyle]}>
+        <ThemedText
+          style={styles.hatchHourLabel}
+          lightColor={selected ? Lantern.emberInk : '#F8FBFF'}
+          darkColor={selected ? Lantern.emberInk : '#F8FBFF'}>
+          {label}
+        </ThemedText>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function PreferenceCard({
+  option,
+  selected,
+  onPress,
+  index,
+}: {
+  option: (typeof preferenceOptions)[number];
+  selected: boolean;
+  onPress: () => void;
+  index: number;
+}) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressMotion();
+  const swatchPulse = usePulseMotion(0.9, 1.16);
+
+  return (
+    <Animated.View entering={presenceEnter(70 + index * 30)}>
+      <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <Animated.View
+          style={[
+            styles.preferenceCard,
+            selected ? styles.preferenceCardSelected : null,
+            { borderColor: selected ? option.palette[1] : 'rgba(216,228,255,0.16)' },
+            animatedStyle,
+          ]}>
+          <View style={styles.preferenceCopy}>
+            <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+              {option.title}
+            </ThemedText>
+            <ThemedText style={styles.preferenceBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+              {option.description}
+            </ThemedText>
+          </View>
+          <Animated.View
+            style={[
+              styles.preferenceSwatch,
+              { backgroundColor: option.palette[1], opacity: selected ? 1 : 0.7 },
+              selected ? swatchPulse : null,
+            ]}
+          />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 async function primePassivePermissions() {
   if (process.env.EXPO_OS === 'web') {
     return;
@@ -453,6 +527,15 @@ async function primePassivePermissions() {
     await Sensors.Pedometer.requestPermissionsAsync();
   } catch {
     // Pedometer is iPhone-first and optional at onboarding time.
+  }
+
+  try {
+    // Apple Health read access for workout routes, so the first hatches can show
+    // real map routes for past walks/runs even when those days have no photos.
+    const { requestHealthRoutePermission } = await import('@/utils/health-route-import');
+    await requestHealthRoutePermission();
+  } catch {
+    // HealthKit needs a native dev build; absent in Expo Go — non-fatal.
   }
 }
 
@@ -492,9 +575,17 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     flex: 1,
     height: 6,
+    overflow: 'hidden',
   },
-  progressSegmentActive: {
+  progressSegmentFill: {
     backgroundColor: '#D7E4FF',
+    borderRadius: 999,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    transformOrigin: 'left',
   },
   content: {
     flexGrow: 1,
@@ -546,6 +637,18 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  castPortraitWrap: {
+    alignItems: 'center',
+    height: 76,
+    justifyContent: 'center',
+    width: 76,
+  },
+  castPortraitHalo: {
+    borderRadius: 999,
+    height: 92,
+    position: 'absolute',
+    width: 92,
   },
   castPortrait: {
     alignItems: 'center',

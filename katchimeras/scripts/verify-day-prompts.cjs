@@ -120,8 +120,9 @@ function check(label, condition, detail) {
 }
 
 check(
-  'morning selects feeling first',
-  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T08:00:00'))?.id === 'feeling'
+  'morning open surfaces sleep first',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T08:00:00'))?.id === 'sleep',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T08:00:00'))?.id
 );
 check(
   'midday selects activity first',
@@ -131,6 +132,24 @@ check(
   'evening selects day word when no photo candidates',
   promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T19:00:00'))?.id === 'day_word'
 );
+
+// --- Reactive surfacing: time of day + tracked behaviour ---
+check(
+  'a travelled day pushes the activity question up at midday',
+  promptEngine.selectActiveDayPrompt(makeDay({ newPlaceCount: 2 }), new Date('2026-06-17T13:00:00'))?.id === 'activity'
+);
+// Travel ranks activity above the usual midday baseline (sleep/feeling/hobby).
+const travelRank = promptEngine.rankPromptKinds(makeDay({ newPlaceCount: 2 }), new Date('2026-06-17T13:00:00'), 0);
+check('travel ranks activity at the very top', travelRank[0] === 'activity', travelRank.join(','));
+check(
+  'before bed surfaces a reflection (day word)',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T22:30:00'))?.id === 'day_word',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T22:30:00'))?.id
+);
+// Stacking: the "Add to today" menu is ordered by the same relevance, so the
+// most relevant sits first and the rest stack behind it.
+const morningMenu = promptEngine.listAvailableDayPrompts(makeDay(), new Date('2026-06-17T08:00:00')).map((p) => p.id);
+check('menu stacks by relevance (sleep before feeling in the morning)', morningMenu.indexOf('sleep') < morningMenu.indexOf('feeling'), morningMenu.join(','));
 
 const noRepeatDay = makeDay({ promptAnswers: [promptAnswer('feeling')] });
 check(
@@ -146,14 +165,16 @@ check(
 
 const onePhotoDay = makeDay({ locations: [photoPoint(0)] });
 check(
-  'no photo prompt when same-day photos are below threshold',
-  promptEngine.selectActiveDayPrompt(onePhotoDay, new Date('2026-06-17T19:00:00'))?.id !== 'meaningful_photo'
+  'a single same-day photo now surfaces the photo prompt',
+  promptEngine.selectActiveDayPrompt(onePhotoDay, new Date('2026-06-17T19:00:00'))?.id === 'meaningful_photo',
+  promptEngine.selectActiveDayPrompt(onePhotoDay, new Date('2026-06-17T19:00:00'))?.id
 );
 
-const mixedDatePhotoDay = makeDay({ locations: [photoPoint(0), photoPoint(1), photoPoint(2, '2026-06-16')] });
+// Same-day gating still holds: photos only from yesterday don't trigger today.
+const yesterdayOnlyPhotoDay = makeDay({ locations: [photoPoint(0, '2026-06-16'), photoPoint(1, '2026-06-16')] });
 check(
-  'regular photo prompt requires three valid photos from today',
-  promptEngine.selectActiveDayPrompt(mixedDatePhotoDay, new Date('2026-06-17T19:00:00'))?.id !== 'meaningful_photo'
+  'yesterday-only photos do not trigger the photo prompt today',
+  promptEngine.selectActiveDayPrompt(yesterdayOnlyPhotoDay, new Date('2026-06-17T19:00:00'))?.id !== 'meaningful_photo'
 );
 
 const photoRichDay = makeDay({ locations: [photoPoint(0), photoPoint(1), photoPoint(2), photoPoint(3)] });
@@ -180,8 +201,8 @@ const heroPhotoDay = makeDay({
   heroPhoto: { assetId: 'asset-1', thumbnailUri: 'file:///photo.jpg', selectedAt: '2026-06-17T19:00:00.000Z', meaningChoiceIds: [], meaningLabels: [] },
 });
 check(
-  'hero photo selection surfaces meaning follow-up',
-  promptEngine.selectActiveDayPrompt(heroPhotoDay, new Date('2026-06-17T19:00:00'))?.id === 'meaning'
+  'meaning is no longer a standalone surfaced prompt (asked in-flow on photo-essence)',
+  promptEngine.selectActiveDayPrompt(heroPhotoDay, new Date('2026-06-17T19:00:00'))?.id !== 'meaning'
 );
 
 // --- "Add to today" menu: listAvailableDayPrompts + buildDayPromptByKind ---

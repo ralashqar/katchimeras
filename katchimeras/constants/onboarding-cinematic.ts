@@ -184,9 +184,9 @@ const openingSequence: OpeningSequenceConfig = {
       id: 'scene-2-moments-slow',
       headline: '',
       subtext: '',
-      durationMs: 3200,
+      durationMs: 3600,
       chipBehavior: 'slow',
-      eggState: 'hidden',
+      eggState: 'forming',
       showEnergyLinks: false,
       bottomCopy: {
         text: 'Moments shape your day.',
@@ -199,7 +199,7 @@ const openingSequence: OpeningSequenceConfig = {
       subtext: '',
       durationMs: 2400,
       chipBehavior: 'fast',
-      eggState: 'hidden',
+      eggState: 'forming',
       showEnergyLinks: false,
       bottomCopy: {
         text: 'Every step. Every place. Every memory.',
@@ -240,7 +240,7 @@ const openingSequence: OpeningSequenceConfig = {
     },
     {
       id: 'scene-5-settle',
-      headline: 'Today became... Voltstep.',
+      headline: 'Today became... Baristabbit.',
       subtext: 'A living memory shaped by what the day held.',
       durationMs: 2100,
       chipBehavior: 'hidden-after-hatch',

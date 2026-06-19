@@ -23,6 +23,7 @@ import {
   loadDevRecentDayPromptPhotoCandidates,
   saveStoredDevPromptPhotoCandidates,
 } from '@/utils/day-prompt-photos';
+import { clearAllStoredValues } from '@/utils/app-storage';
 import { applyDevScenario, devScenarioOptions } from '@/utils/dev-scenarios';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
@@ -72,6 +73,29 @@ export default function ExploreScreen() {
         },
       },
     ]);
+  }
+
+  // One-button "test a brand-new user": wipes EVERYTHING (profile, days,
+  // history, photo picks, consent flags) and restarts the full first-run —
+  // onboarding → hatch-your-past (last ~3 days reconstructed) → home — so the
+  // whole fresh-profile flow can be seen from scratch with no old data left to
+  // interfere.
+  function handleFreshProfile() {
+    Alert.alert(
+      'Reset to a fresh profile?',
+      'Wipes ALL local app data and restarts the full first-run flow: onboarding, then hatch-your-past for the last few days, then home. Cannot be undone. (Photo/camera permissions are kept.)',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset everything',
+          style: 'destructive',
+          onPress: () => {
+            clearAllStoredValues();
+            router.replace('/onboarding');
+          },
+        },
+      ]
+    );
   }
 
   function handleResetHomeLoop() {
@@ -262,6 +286,7 @@ export default function ExploreScreen() {
             <GlassPanel contentStyle={styles.panelBody}>
               <SectionHeader label="Fast actions" title="Reset and debug" />
               <View style={styles.devActions}>
+                <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
                 <KatchaButton label="Analyze a photo (vision)" onPress={handleAnalyzePickedPhoto} variant="secondary" />
                 <KatchaButton

@@ -168,7 +168,10 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     categoryIcon: 'heart.fill',
     dayparts: ['evening'],
     maxOptions: 6,
-    launchEnabled: true,
+    // The photo's meaning is now asked in-flow on the photo-essence screen
+    // (select a photo → read its essence → "what did this mean?"), so the
+    // standalone prompt no longer surfaces.
+    launchEnabled: false,
     options: [
       { id: 'time_together', label: 'Time together', emoji: 'Together', icon: 'person.2.fill', semanticTags: ['meaning:time_together'], scoreBias: { social: 0.22, calm: 0.08 }, encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.36 }] },
       { id: 'peaceful', label: 'Peaceful', emoji: 'Peace', icon: 'moon.stars.fill', semanticTags: ['meaning:peaceful'], scoreBias: { calm: 0.24 } },
@@ -205,7 +208,10 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     maxOptions: 0,
     launchEnabled: true,
     photoGated: true,
-    minPhotoCandidates: 3,
+    // Even a single keeper photo from today is enough to offer the prompt, so
+    // the app reacts to "you took a photo" rather than waiting for a photo-heavy
+    // day. Curation already drops screenshots / blurry / duplicate frames.
+    minPhotoCandidates: 1,
     options: [],
   },
   intention: { id: 'intention', title: 'What do you want from today?', categoryIcon: 'sparkles', dayparts: ['morning'], maxOptions: 5, launchEnabled: false, options: [] },

@@ -2,7 +2,6 @@ import { dayPromptRegistry, launchedDayPrompts, type Daypart, type DayPromptDefi
 import type { DayPromptKind, StoredHomeDayRecord } from '@/types/home';
 
 const CAMERA_ROLL_PREFIX = 'camera-roll-photo-';
-const PHOTO_PROMPT_EARLIEST_HOUR = 17;
 
 export type DayPromptPhotoCandidate = {
   assetId: string;
@@ -33,7 +32,7 @@ export function selectActiveDayPrompt(
   const answeredOrDismissed = new Set(day.promptAnswers.map((answer) => answer.kind));
   const photoCandidates = options.photoCandidates ?? collectDayPromptPhotoCandidates(day);
   const eligiblePhotoCount = countEligiblePhotoCandidatesForDay(photoCandidates, day.isoDate, options.forceMeaningfulPhoto === true);
-  const order = promptOrderForDaypart(daypart, day, eligiblePhotoCount, now, options.forceMeaningfulPhoto === true);
+  const order = rankPromptKinds(day, now, eligiblePhotoCount, options.forceMeaningfulPhoto === true);
 
   for (const kind of order) {
     if (answeredOrDismissed.has(kind)) {
@@ -114,7 +113,7 @@ export function buildDayPromptByKind(
 // only appear when recent photos exist (so "no photos → no Photo button").
 export function listAvailableDayPrompts(
   day: StoredHomeDayRecord,
-  _now: Date = new Date(),
+  now: Date = new Date(),
   options: { photoCandidates?: DayPromptPhotoCandidate[]; forceMeaningfulPhoto?: boolean } = {}
 ): ActiveDayPrompt[] {
   if (day.state === 'hatched') {
@@ -138,7 +137,16 @@ export function listAvailableDayPrompts(
       available.push(built);
     }
   }
-  return available;
+
+  // Stack the menu by how relevant each prompt is right now — most relevant
+  // first — so it matches the surfaced question's ordering.
+  const eligiblePhotoCount = countEligiblePhotoCandidatesForDay(
+    photoCandidates,
+    day.isoDate,
+    options.forceMeaningfulPhoto === true
+  );
+  const order = rankPromptKinds(day, now, eligiblePhotoCount, options.forceMeaningfulPhoto === true);
+  return available.sort((left, right) => order.indexOf(left.id) - order.indexOf(right.id));
 }
 
 export function resolveDaypart(now: Date): Daypart {
@@ -150,6 +158,68 @@ export function resolveDaypart(now: Date): Daypart {
     return 'midday';
   }
   return 'evening';
+}
+
+// Fixed tiebreak when two prompts score equally.
+const RANK_TIEBREAK: DayPromptKind[] = ['sleep', 'meaningful_photo', 'meaning', 'feeling', 'activity', 'people', 'hobby', 'day_word'];
+
+// Rank the launched prompts by how relevant each is to the day RIGHT NOW — what
+// the app has actually noticed: sleep first thing in the morning, the activity
+// question after you've travelled, a photo worth keeping when the roll filled
+// up, a reflection before bed. Opening the app surfaces the top one; the rest
+// stack behind it in relevance order. Pure + deterministic.
+export function rankPromptKinds(
+  day: StoredHomeDayRecord,
+  now: Date,
+  photoCandidateCount: number,
+  forceMeaningfulPhoto = false
+): DayPromptKind[] {
+  const hour = now.getHours();
+  const isMorning = hour < 11;
+  const isMidday = hour >= 11 && hour < 17;
+  const isEvening = hour >= 17 && hour < 21;
+  const isNight = hour >= 21;
+
+  const vision = day.vision;
+  const faces = vision?.maxFaceCount ?? 0;
+  const concepts = new Set((vision?.concepts ?? []).map((concept) => concept.name));
+  const traveled = day.newPlaceCount >= 1 || concepts.has('travel') || concepts.has('city');
+  const moved = day.stepsCount >= 7000;
+  const social = faces >= 2 || day.moments.some((moment) => moment.type === 'social');
+  const minPhotos = dayPromptRegistry.meaningful_photo.minPhotoCandidates ?? 3;
+  const hasPhotos = photoCandidateCount >= minPhotos;
+  const hasHero = Boolean(day.heroPhoto);
+
+  const score: Partial<Record<DayPromptKind, number>> = {
+    // Morning open → "how did you sleep?" is the first thing.
+    sleep: isMorning ? 10 : isMidday ? 3 : 0,
+    // The day's photos are worth keeping — strongest in the evening wind-down.
+    meaningful_photo:
+      forceMeaningfulPhoto && !hasHero && photoCandidateCount > 0
+        ? 100
+        : hasPhotos && !hasHero
+          ? 8 + (isEvening || isNight ? 2 : 0)
+          : 0,
+    // Always follows a chosen photo.
+    meaning: hasHero ? 9 : 0,
+    // Travel / a big moving day push the activity question up.
+    activity: 4 + (traveled ? 5 : 0) + (moved ? 2 : 0) + (isMidday || isEvening ? 1 : 0),
+    feeling: isMorning ? 5 : isEvening ? 4 : isMidday ? 3 : 2,
+    people: (social ? 6 : 2) + (isEvening ? 1 : 0),
+    hobby: 3 + (isEvening || isNight ? 1 : 0),
+    // Before bed → "sum up your day".
+    day_word: isNight ? 8 : isEvening ? 6 : 1,
+  };
+
+  return launchedDayPrompts
+    .map((prompt) => prompt.id)
+    .sort((left, right) => {
+      const diff = (score[right] ?? 0) - (score[left] ?? 0);
+      if (diff !== 0) {
+        return diff;
+      }
+      return RANK_TIEBREAK.indexOf(left) - RANK_TIEBREAK.indexOf(right);
+    });
 }
 
 export function collectDayPromptPhotoCandidates(day: StoredHomeDayRecord): DayPromptPhotoCandidate[] {
@@ -193,36 +263,6 @@ function countEligiblePhotoCandidatesForDay(
     return candidates.length;
   }
   return candidates.filter((candidate) => candidate.dayIsoDate === isoDate).length;
-}
-
-function promptOrderForDaypart(
-  daypart: Daypart,
-  day: StoredHomeDayRecord,
-  photoCandidateCount: number,
-  now: Date,
-  forceMeaningfulPhoto: boolean
-): DayPromptKind[] {
-  if (forceMeaningfulPhoto && !day.heroPhoto && photoCandidateCount > 0) {
-    return ['meaningful_photo', 'meaning', 'day_word', 'feeling', 'people', 'activity', 'hobby'];
-  }
-  if (daypart === 'morning') {
-    return ['feeling', 'sleep', 'people'];
-  }
-  if (daypart === 'midday') {
-    return ['activity', 'hobby', 'people', 'feeling'];
-  }
-
-  const photoRich =
-    !day.heroPhoto &&
-    photoCandidateCount >= (dayPromptRegistry.meaningful_photo.minPhotoCandidates ?? 3) &&
-    now.getHours() >= PHOTO_PROMPT_EARLIEST_HOUR;
-  if (photoRich) {
-    return ['meaningful_photo', 'meaning', 'day_word', 'feeling', 'people', 'activity', 'hobby'];
-  }
-  if (day.heroPhoto) {
-    return ['meaning', 'day_word', 'feeling', 'people', 'activity', 'hobby'];
-  }
-  return ['day_word', 'feeling', 'people', 'activity', 'hobby'];
 }
 
 function toLocalDateId(date: Date) {

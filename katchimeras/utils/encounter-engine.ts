@@ -1,4 +1,4 @@
-import { encounterCastBySeedId, type EncounterCastEntry } from '@/constants/encounter-cast';
+import { encounterCastBySeedId, encounterLiveCast, type EncounterCastEntry } from '@/constants/encounter-cast';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
 import type { KatchimeraEncounterProfile } from '@/types/katchimera';
@@ -401,6 +401,179 @@ export function buildEncounterCreature(
   }
 
   return buildCreatureFromMatch(day, match, primaryTrait, secondaryTrait);
+}
+
+// Guaranteed floor for a reconstructed day. Backfilled days often carry only a
+// moderate step count with no geotag, vision, or manual tag — which resolves to
+// NO encounter signal (matchEncounterForDay returns null), so the day would
+// silently fail to hatch. Every lived day must still become a real character, so
+// this picks from the live cast by how much the day moved: the walker for an
+// active day, the home companion for a still one. Never returns null. Used only
+// by the backfill path; the live flow has its own trait-based fallback.
+export function buildFloorEncounterCreature(
+  day: StoredHomeDayRecord,
+  history: EncounterHistoryMap,
+  primaryTrait: HomeScoreKey,
+  secondaryTrait: HomeScoreKey
+): LocalCreatureRecord {
+  const seedId = day.stepsCount >= 1500 ? 'high_steps_day' : 'home_evening';
+  const castEntry = encounterCastBySeedId.get(seedId);
+  const profile = castEntry ? profilesById.get(castEntry.profileId) : undefined;
+  if (!castEntry || !profile) {
+    // Defensive: the floor seeds are guaranteed in the live cast, so this should
+    // never happen — but fall back to whatever the matcher can find rather than
+    // throwing during a backfill.
+    const match = matchEncounterForDay(day, history);
+    if (match) {
+      return buildCreatureFromMatch(day, match, primaryTrait, secondaryTrait);
+    }
+    throw new Error(`No floor encounter available for ${day.isoDate}`);
+  }
+
+  const livingRarity = computeLivingRarity(day);
+  const match: EncounterMatch = {
+    castEntry,
+    profile,
+    signal: {
+      seedId,
+      intensity: 0.36,
+      sourceMomentIds: [],
+      isRecovery: seedId === 'home_evening',
+      source: 'passive',
+    },
+    repeatDepth: history[castEntry.profileId]?.count ?? 0,
+    rarity: maxRarity(speciesRarityFloor(profile.baseRarity), livingRarity.tier),
+    livingRarity,
+  };
+
+  return buildCreatureFromMatch(day, match, primaryTrait, secondaryTrait);
+}
+
+// Generic "any day" floor species, ordered by how active the day was. Used to
+// guarantee DISTINCT fallbacks when several reconstructed days carry no specific
+// signal — so a 3-day backfill is three different characters, never repeats.
+const DISTINCT_FLOOR_SEEDS_ACTIVE = [
+  'high_steps_day',
+  'errand_loop',
+  'home_evening',
+  'well_rested',
+  'tender_day',
+] as const;
+const DISTINCT_FLOOR_SEEDS_QUIET = [
+  'home_evening',
+  'well_rested',
+  'tender_day',
+  'high_steps_day',
+  'errand_loop',
+] as const;
+
+function floorCreatureFromSeed(
+  day: StoredHomeDayRecord,
+  seedId: string,
+  history: EncounterHistoryMap,
+  primaryTrait: HomeScoreKey,
+  secondaryTrait: HomeScoreKey
+): LocalCreatureRecord | null {
+  const castEntry = encounterCastBySeedId.get(seedId);
+  const profile = castEntry ? profilesById.get(castEntry.profileId) : undefined;
+  if (!castEntry || !profile) {
+    return null;
+  }
+  const livingRarity = computeLivingRarity(day);
+  const isRecovery = seedId === 'home_evening' || seedId === 'tender_day' || seedId === 'well_rested';
+  const match: EncounterMatch = {
+    castEntry,
+    profile,
+    signal: { seedId, intensity: 0.36, sourceMomentIds: [], isRecovery, source: 'passive' },
+    repeatDepth: history[castEntry.profileId]?.count ?? 0,
+    rarity: maxRarity(speciesRarityFloor(profile.baseRarity), livingRarity.tier),
+    livingRarity,
+  };
+  return buildCreatureFromMatch(day, match, primaryTrait, secondaryTrait);
+}
+
+// Like buildEncounterCreature, but GUARANTEES a creature whose species is not in
+// `excludeProfileIds`. The backfill uses this so the reconstructed days are
+// always different characters: it takes the day's best UNUSED real candidate,
+// and if none remains, rotates through generic "any day" floor species (then any
+// unused cast member). Never returns null.
+export function buildDistinctEncounterCreature(
+  day: StoredHomeDayRecord,
+  history: EncounterHistoryMap,
+  excludeProfileIds: ReadonlySet<string>,
+  primaryTrait: HomeScoreKey,
+  secondaryTrait: HomeScoreKey
+): LocalCreatureRecord {
+  // 1. The day's real candidates, scored exactly like matchEncounterForDay, best
+  //    first — skipping any species already hatched this run.
+  const scored = extractEncounterSignals(day)
+    .map((signal) => {
+      const castEntry = encounterCastBySeedId.get(signal.seedId);
+      if (!castEntry) {
+        return null;
+      }
+      const profile = profilesById.get(castEntry.profileId);
+      if (!profile) {
+        return null;
+      }
+      const repeatDepth = history[castEntry.profileId]?.count ?? 0;
+      const specificityBonus = GENERIC_FALLBACK_SEEDS.has(signal.seedId) ? 0 : SPECIFICITY_BONUS;
+      const favored = clamp01(
+        signal.intensity + Math.min(repeatDepth * REPEAT_FAVOR_PER_VISIT, REPEAT_FAVOR_CAP) + specificityBonus
+      );
+      return { castEntry, profile, signal, repeatDepth, favored };
+    })
+    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+    .filter((candidate) => !excludeProfileIds.has(candidate.profile.id))
+    .sort((left, right) => {
+      if (right.favored !== left.favored) {
+        return right.favored - left.favored;
+      }
+      return (
+        stableHash(`${day.isoDate}|${left.castEntry.seedId}`) -
+        stableHash(`${day.isoDate}|${right.castEntry.seedId}`)
+      );
+    });
+
+  const best = scored[0];
+  if (best) {
+    const livingRarity = computeLivingRarity(day);
+    const match: EncounterMatch = {
+      castEntry: best.castEntry,
+      profile: best.profile,
+      signal: best.signal,
+      repeatDepth: best.repeatDepth,
+      rarity: maxRarity(speciesRarityFloor(best.profile.baseRarity), livingRarity.tier),
+      livingRarity,
+    };
+    return buildCreatureFromMatch(day, match, primaryTrait, secondaryTrait);
+  }
+
+  // 2. No unused real candidate — rotate generic floor species for variety.
+  const floorSeeds = day.stepsCount >= 1500 ? DISTINCT_FLOOR_SEEDS_ACTIVE : DISTINCT_FLOOR_SEEDS_QUIET;
+  for (const seedId of floorSeeds) {
+    const castEntry = encounterCastBySeedId.get(seedId);
+    if (castEntry && !excludeProfileIds.has(castEntry.profileId)) {
+      const creature = floorCreatureFromSeed(day, seedId, history, primaryTrait, secondaryTrait);
+      if (creature) {
+        return creature;
+      }
+    }
+  }
+
+  // 3. Last resort — any unused cast member at all.
+  for (const castEntry of encounterLiveCast) {
+    if (!excludeProfileIds.has(castEntry.profileId)) {
+      const creature = floorCreatureFromSeed(day, castEntry.seedId, history, primaryTrait, secondaryTrait);
+      if (creature) {
+        return creature;
+      }
+    }
+  }
+
+  // Every species is excluded (more days than the whole cast — impossible for 3):
+  // fall back to the plain floor so we still return a creature.
+  return buildFloorEncounterCreature(day, history, primaryTrait, secondaryTrait);
 }
 
 export function recordEncounterHatch(

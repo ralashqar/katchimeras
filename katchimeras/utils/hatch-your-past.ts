@@ -48,7 +48,11 @@ export function buildHatchYourPast(pastDays: StoredHomeDayRecord[]): HatchYourPa
 
   for (const day of ordered) {
     const [primary, secondary] = deriveTraits(day);
-    const creature = buildEncounterCreature(day, encounterHistory, primary, secondary);
+    // Prefer the creature the day was ALREADY hatched with (the backfill uses the
+    // distinct-floor logic, so the reveal matches Home exactly — 3 days reveal 3,
+    // all different). Only re-derive when a day arrives without one (other
+    // callers / harness tests that pass un-hatched days).
+    const creature = day.creature ?? buildEncounterCreature(day, encounterHistory, primary, secondary);
     if (!creature?.encounterProfileId) {
       continue;
     }

@@ -54,8 +54,10 @@ const DEGENERATE_DARK_LUMINANCE = 4;
 const MAX_LOCATION_POINTS_PER_DAY = 60;
 // Frames read by the on-device Vision pass (labels/OCR/faces).
 const MAX_VISION_PER_DAY = 8;
-// CMPedometer history reaches 7 days back; stay safely inside it.
-const MAX_BACKFILL_DAYS = 5;
+// How many recent days we reconstruct. Kept small (3) so a fresh profile fills
+// in just the last few days rather than a long, confusing tail. CMPedometer
+// history reaches 7 days back, so this stays safely inside it.
+const MAX_BACKFILL_DAYS = 3;
 
 // Reconstructs recent past days from what iOS can actually tell us in
 // retrospect: pedometer history (steps, up to 7 days back) and photo EXIF
@@ -193,6 +195,32 @@ async function readStepsBetween(start: Date, end: Date) {
     return Math.max(0, Math.round(result.steps));
   } catch {
     return 0;
+  }
+}
+
+// The device's current coordinates (last-known first, then a fresh read) — used
+// ONLY as a fallback anchor for a reconstructed day that has no other location.
+// iOS exposes no retrospective location history, so "where you are now" is the
+// best stand-in to give the first hatches a map pin instead of an empty map.
+async function resolveCurrentLocationCoord(): Promise<{ lat: number; lng: number } | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+  try {
+    const Location = await import('expo-location');
+    const permission = await Location.getForegroundPermissionsAsync();
+    if (!permission.granted) {
+      return null;
+    }
+    const known = await Location.getLastKnownPositionAsync();
+    const position = known ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+    if (!position) {
+      return null;
+    }
+    const { latitude, longitude } = position.coords;
+    return Number.isFinite(latitude) && Number.isFinite(longitude) ? { lat: latitude, lng: longitude } : null;
+  } catch {
+    return null;
   }
 }
 
@@ -761,8 +789,20 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
     analyzeVision: true,
     includeToday: true,
   });
-  if (richDays.length === 0) {
-    return { summary: 'No photos or steps found in the last few days.', pendingReflectionDayIds: [] };
+
+  // GUARANTEE the last MAX_BACKFILL_DAYS past days all exist, even when a day had
+  // no photos or steps to scan. Every recent day must still become a (distinct)
+  // character, so a fresh start always reveals 3 — never 2, never 0. Days with no
+  // signal get an empty record here and hatch from the distinct floor below.
+  const presentDates = new Set(richDays.map((day) => day.isoDate));
+  for (let offset = 1; offset <= MAX_BACKFILL_DAYS; offset += 1) {
+    const past = new Date(now);
+    past.setDate(past.getDate() - offset);
+    past.setHours(0, 0, 0, 0);
+    const isoDate = toLocalDateId(past);
+    if (!presentDates.has(isoDate)) {
+      richDays.push({ isoDate, stepsCount: 0, locations: [] });
+    }
   }
 
   // STEP 1 — PERSIST PHOTOS → PINS FIRST. This is the reliable part (no network,
@@ -789,45 +829,126 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
   };
   saveStoredHomeState(photoState);
 
-  // STEP 2 — HATCH PAST DAYS (best-effort). Today is the live day and is never
-  // hatched here. Each day's place-seed lookup hits the network, so it's wrapped
-  // per-day: a failure skips that day's creature but never loses its pins.
-  const { buildEncounterCreature, recordEncounterHatch } = await import('@/utils/encounter-engine');
-  const { resolvePlaceSeedsForDay } = await import('@/utils/place-categories');
   const visionByDate = new Map(richDays.map((day) => [day.isoDate, day.vision ?? null]));
-  let history: EncounterHistoryMap = { ...photoState.encounterHistory };
+  const isReconstructedPastDay = (isoDate: string) => richByDate.has(isoDate) && isoDate !== todayIso;
+
+  // STEP 1.5 — MAP LOCATION beyond photos, so reconstructed days are never
+  // map-less. iOS exposes NO general retrospective location history to apps, so
+  // the only sources for a past day are: photo geotags (above), Apple Health
+  // workout routes, and — as a last resort — where the phone is right now.
+  //   (a) Apple Health workout routes: a walk / run / hike day gets its real GPS
+  //       route + pins even with zero photos.
+  //   (b) Current device location: a day with neither photos nor a workout still
+  //       drops a single pin (the hatch is "planted" there) instead of opening to
+  //       an empty map.
+  let locationedState = photoState;
+  try {
+    const { importHealthRoutesForDay } = await import('@/utils/home-engine');
+    const { getHealthRouteAvailability, importRoutesForDay } = await import('@/utils/health-route-import');
+    const healthAvailability = await getHealthRouteAvailability();
+    if (healthAvailability.platformSupported && healthAvailability.permissionState === 'granted') {
+      for (const day of locationedState.archivedDays) {
+        if (!isReconstructedPastDay(day.isoDate)) {
+          continue;
+        }
+        try {
+          const payload = await importRoutesForDay({ isoDate: day.isoDate });
+          if (payload.status === 'success' && (payload.segments?.length ?? 0) > 0) {
+            locationedState = importHealthRoutesForDay(locationedState, day.id, payload, profile, now);
+          }
+        } catch {
+          // Workout-route import is best-effort — a failure just means no route.
+        }
+      }
+    }
+  } catch {
+    // Health module unavailable (Expo Go / non-iOS) — skip routes entirely.
+  }
+
+  const currentCoord = await resolveCurrentLocationCoord();
+  if (currentCoord) {
+    locationedState = {
+      ...locationedState,
+      archivedDays: locationedState.archivedDays.map((day) => {
+        if (!isReconstructedPastDay(day.isoDate) || day.locations.length > 0) {
+          return day;
+        }
+        const anchor: StoredHomeLocationPoint = {
+          id: `current-location-${day.isoDate}`,
+          lat: Number(currentCoord.lat.toFixed(6)),
+          lng: Number(currentCoord.lng.toFixed(6)),
+          capturedAt: new Date(`${day.isoDate}T12:00:00`).toISOString(),
+          type: 'unknown',
+          hasPhoto: false,
+          source: 'foreground',
+          momentId: null,
+        };
+        return { ...day, locations: [anchor], locationSampleCount: 1 };
+      }),
+    };
+  }
+  saveStoredHomeState(locationedState);
+
+  // STEP 2 — HATCH PAST DAYS (best-effort). Today is the live day and is never
+  // hatched here.
+  const { buildDistinctEncounterCreature, recordEncounterHatch } = await import('@/utils/encounter-engine');
+  const { resolvePlaceSeedsForDay } = await import('@/utils/place-categories');
+  let history: EncounterHistoryMap = { ...locationedState.encounterHistory };
   const priorDays: StoredHomeDayRecord[] = [];
-  const archived = [...photoState.archivedDays];
+  const archived = [...locationedState.archivedDays];
   const pendingReflectionDayIds: string[] = [];
   let hatchedCount = 0;
-  // The previous backfilled day's creature, so consecutive days don't repeat it
-  // when something else is competitive (variety across the reconstructed week).
-  let lastHatchedProfileId: string | undefined;
+  // Every species hatched this run, so the reconstructed days are always DIFFERENT
+  // characters — no two backfilled days ever share a creature.
+  const usedProfileIds = new Set<string>();
 
   for (let index = 0; index < archived.length; index += 1) {
     const day = archived[index];
-    // Only the just-reconstructed PAST days; never today, never a settled hatch.
-    if (!visionByDate.has(day.isoDate) || day.isoDate === todayIso || day.creature) {
+    // Only the just-reconstructed PAST days; never today.
+    if (!visionByDate.has(day.isoDate) || day.isoDate === todayIso) {
       priorDays.push(day);
       continue;
     }
+    // A day that somehow already has a creature keeps it, but still reserves its
+    // species so the remaining days stay distinct from it.
+    if (day.creature) {
+      if (day.creature.encounterProfileId) {
+        usedProfileIds.add(day.creature.encounterProfileId);
+      }
+      priorDays.push(day);
+      continue;
+    }
+    // Place-category seeds need the network. A failure here must NEVER skip the
+    // hatch — that was the "hatch your past hatches nothing" bug: when the place
+    // API was down, every day's resolve threw and the whole hatch (including the
+    // floor fallback below) was skipped. Resolve defensively so the day still
+    // hatches from steps / vision / the guaranteed real-cast floor.
+    let seeds: string[] = [];
     try {
-      const seeds = await resolvePlaceSeedsForDay(day, priorDays);
-      const enriched: StoredHomeDayRecord = {
-        ...day,
-        placeCategorySeeds: seeds,
-        vision: visionByDate.get(day.isoDate) ?? day.vision,
-      };
-      const [primary, secondary] = deriveBackfillTraits(enriched);
-      const creature = buildEncounterCreature(enriched, history, primary, secondary, {
-        avoidProfileId: lastHatchedProfileId,
-      });
+      seeds = await resolvePlaceSeedsForDay(day, priorDays);
+    } catch {
+      seeds = [];
+    }
 
-      let hatched = enriched;
+    const enriched: StoredHomeDayRecord = {
+      ...day,
+      placeCategorySeeds: seeds,
+      vision: visionByDate.get(day.isoDate) ?? day.vision,
+    };
+    const [primary, secondary] = deriveBackfillTraits(enriched);
+
+    let hatched = enriched;
+    try {
+      // Every reconstructed day hatches a real character that is DISTINCT from the
+      // other backfilled days: the day's best unused candidate, or a rotating
+      // generic floor when it has no specific signal. Never null, never a repeat —
+      // so a 3-day backfill is always 3 different creatures.
+      const creature = buildDistinctEncounterCreature(enriched, history, usedProfileIds, primary, secondary);
+
       if (creature?.encounterProfileId) {
         hatchedCount += 1;
+        usedProfileIds.add(creature.encounterProfileId);
         history = recordEncounterHatch(history, creature.encounterProfileId, day.isoDate);
-        lastHatchedProfileId = creature.encounterProfileId;
         hatched = {
           ...enriched,
           state: 'hatched',
@@ -837,18 +958,19 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
         // The reflection (LLM) is the slow part — defer it to the background pass.
         pendingReflectionDayIds.push(hatched.id);
       }
-      archived[index] = hatched;
-      priorDays.push(hatched);
     } catch {
-      // Hatching this day failed (e.g. place-seed network error). Keep its pins.
-      priorDays.push(day);
+      // Building the creature failed unexpectedly — keep the day (and its pins).
+      hatched = enriched;
     }
+
+    archived[index] = hatched;
+    priorDays.push(hatched);
   }
 
-  saveStoredHomeState({ ...photoState, archivedDays: archived, encounterHistory: history });
+  saveStoredHomeState({ ...locationedState, archivedDays: archived, encounterHistory: history });
 
   // Diagnostics.
-  const totalPlaced = [todayRecord, ...archived]
+  const totalPlaced = [locationedState.today, ...archived]
     .filter((day) => richByDate.has(day.isoDate))
     .reduce((sum, day) => sum + day.locations.length, 0);
   const totalScanned = richDays.reduce((sum, day) => sum + (day.photosScanned ?? 0), 0);

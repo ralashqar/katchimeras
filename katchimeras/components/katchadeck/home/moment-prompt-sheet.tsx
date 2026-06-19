@@ -17,9 +17,6 @@ import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-promp
 // that are currently answerable appear (so e.g. no recent photos → no Photo).
 type MomentPromptSheetProps = {
   prompts: ActiveDayPrompt[];
-  // The "what did it mean?" prompt that always follows a photo pick — Photo and
-  // Photo meaning are one paired sequence, never separate buttons.
-  meaningPrompt: ActiveDayPrompt;
   onClose: () => void;
   onAnswer: (kind: DayPromptKind, choiceIds: string[], from: FeedSourceRect) => void;
   onSelectHeroPhoto: (photo: DayPromptPhotoCandidate, from: FeedSourceRect) => void;
@@ -29,7 +26,6 @@ const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#F
 
 export function MomentPromptSheet({
   prompts,
-  meaningPrompt,
   onClose,
   onAnswer,
   onSelectHeroPhoto,
@@ -61,10 +57,9 @@ export function MomentPromptSheet({
               onClose();
             }}
             onSelectHeroPhoto={(photo, from) => {
-              // Picking a photo feeds the egg, then flows straight into the
-              // paired "what did it mean?" step rather than closing.
+              // Picking a photo opens the full-screen essence flow ("what did
+              // this mean?"); the parent closes this sheet and navigates.
               onSelectHeroPhoto(photo, from);
-              setSelected(meaningPrompt);
             }}
             onDismiss={() => setSelected(null)}
           />

@@ -22,11 +22,18 @@ function transpileToTemp(rel, out) {
 
 const categoryPath = transpileToTemp('utils/photo-category.ts', 'photo-category.js');
 const energyPath = transpileToTemp('utils/capture-energy.ts', 'capture-energy.js');
+const foundationPath = transpileToTemp('utils/foundation-meaning.ts', 'foundation-meaning.js');
+
+// expo-modules-core isn't available in Node; stub requireOptionalNativeModule so
+// the foundation-meaning module imports cleanly (native module reads as absent).
+const emcStub = path.join(tempDir, 'expo-modules-core.js');
+fs.writeFileSync(emcStub, 'module.exports = { requireOptionalNativeModule: () => null };');
 
 const stubs = {
   '@/utils/photo-category': categoryPath,
   '@/components/ui/icon-symbol': {},
   '@/types/home': {},
+  'expo-modules-core': emcStub,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
@@ -41,6 +48,7 @@ Module._resolveFilename = function (request, ...rest) {
 };
 
 const { buildCaptureEnergy, mergeCaptureEnergy, CAPTURE_MEANINGS, selectCaptureMeanings } = require(energyPath);
+const { mapFoundationMeanings } = require(foundationPath);
 
 function vision(conceptNames, maxFaceCount = 0) {
   return {
@@ -103,7 +111,32 @@ check('couch → home meanings', labelsOf(vision(['couch'])).includes('Cozy'), l
 const detailVision = { concepts: [{ name: 'outdoor', salience: 1, coverage: 1, count: 1, peakConfidence: 0.9 }], details: ['laptop'], maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1 };
 check('raw detail label (laptop) is matched', selectCaptureMeanings(detailVision).some((m) => m.label === 'Productive'), JSON.stringify(selectCaptureMeanings(detailVision).map((m) => m.label)));
 
+// Ambiguous device → the mixed TECH options (the user's exact case).
+check('electronic device → work/games/watch/scroll', labelsOf(vision(['electronic device'])).includes('Gaming') && labelsOf(vision(['electronic device'])).includes('Working'), labelsOf(vision(['electronic device'])).join(','));
+
+// A SPECIFIC device read (high-confidence laptop) beats the ambiguous tech tag.
+const laptopBag = { concepts: [{ name: 'focus_work', salience: 1, coverage: 1, count: 1, peakConfidence: 0.92 }], details: ['electronic device', 'screen'], maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1 };
+check('specific laptop read beats ambiguous tech', selectCaptureMeanings(laptopBag).some((m) => m.label === 'Productive') && !selectCaptureMeanings(laptopBag).some((m) => m.label === 'Working'), JSON.stringify(selectCaptureMeanings(laptopBag).map((m) => m.label)));
+
+// Holistic: a noisy bag where the meaningful tag isn't first still reads right.
+const noisyBag = { concepts: [{ name: 'indoor', salience: 1, coverage: 1, count: 1, peakConfidence: 0.8 }, { name: 'furniture', salience: 1, coverage: 1, count: 1, peakConfidence: 0.6 }, { name: 'gaming', salience: 1, coverage: 1, count: 1, peakConfidence: 0.85 }], details: [], maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1 };
+check('noisy bag still finds the meaningful tag (gaming)', selectCaptureMeanings(noisyBag).some((m) => m.label === 'Gaming'), JSON.stringify(selectCaptureMeanings(noisyBag).map((m) => m.label)));
+
 check('every contextual option maps to a valid energy archetype', ['food', 'people', 'dog', 'gym', 'sunset', 'museum', 'beach', 'city', 'laptop', 'gaming', 'guitar', 'television', 'book', 'mall', 'car', 'couch'].every((c) => selectCaptureMeanings(vision([c], c === 'people' ? 2 : 0)).every((m) => ['calm', 'energy', 'together', 'meaningful'].includes(m.id))));
+
+// --- Foundation Models output mapping (validates untrusted model output) ---
+const goodRaw = [
+  { label: 'Comfort', archetype: 'calm' },
+  { label: 'A treat', archetype: 'energy' },
+  { label: 'Shared', archetype: 'together' },
+  { label: 'Worth savoring', archetype: 'meaningful' },
+];
+const mapped = mapFoundationMeanings(goodRaw);
+check('maps a valid model response to 4 meanings', mapped && mapped.length === 4 && mapped[0].id === 'calm' && mapped[0].label === 'Comfort' && typeof mapped[0].emoji === 'string', JSON.stringify(mapped));
+check('mapped options use valid energy archetypes', mapped.every((m) => ['calm', 'energy', 'together', 'meaningful'].includes(m.id)));
+check('drops invalid archetype + dedups, falls back when <3 survive', mapFoundationMeanings([{ label: 'X', archetype: 'happy' }, { label: 'Y', archetype: 'calm' }, { label: 'Z', archetype: 'calm' }]) === null);
+check('drops empty + overlong labels', (() => { const r = mapFoundationMeanings([{ label: '', archetype: 'calm' }, { label: 'x'.repeat(40), archetype: 'energy' }, { label: 'Together', archetype: 'together' }, { label: 'Special', archetype: 'meaningful' }, { label: 'Calm', archetype: 'calm' }]); return r && r.length === 3 && !r.some((m) => m.label === ''); })());
+check('garbage response → null (falls back to rules)', mapFoundationMeanings([{ foo: 1 }, { label: 5, archetype: {} }]) === null);
 
 // merge sums + clamps to 1.
 const merged = mergeCaptureEnergy({ calm: 0.6 }, { calm: 0.6, energy: 0.2 });
