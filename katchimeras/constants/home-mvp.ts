@@ -383,6 +383,39 @@ export const homeCreatureVisuals: Record<
     source: require('../assets/images/katchimeras/cutouts/flexel.png'),
     accentColor: '#EE8A4A',
   },
+  // Wave D flagships (real renders).
+  mendle: {
+    source: require('../assets/images/katchimeras/cutouts/mendle.png'),
+    accentColor: '#F0B49A',
+  },
+  pixooka: {
+    source: require('../assets/images/katchimeras/cutouts/pixooka.png'),
+    accentColor: '#8C9BE8',
+  },
+  snoozle: {
+    source: require('../assets/images/katchimeras/cutouts/snoozle.png'),
+    accentColor: '#BFC9E8',
+  },
+  encora: {
+    source: require('../assets/images/katchimeras/cutouts/encora.png'),
+    accentColor: '#7FD8C4',
+  },
+  vesperitt: {
+    source: require('../assets/images/katchimeras/cutouts/vesperitt.png'),
+    accentColor: '#6E7BC4',
+  },
+  dawnle: {
+    source: require('../assets/images/katchimeras/cutouts/dawnle.png'),
+    accentColor: '#F4B48E',
+  },
+  tempesto: {
+    source: require('../assets/images/katchimeras/cutouts/tempesto.png'),
+    accentColor: '#9AB0CE',
+  },
+  mistle: {
+    source: require('../assets/images/katchimeras/cutouts/mistle.png'),
+    accentColor: '#C2CCD8',
+  },
 };
 
 export const homeVisualPools: Record<HomeScoreKey, readonly HomeVisualKey[]> = {

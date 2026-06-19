@@ -13,11 +13,16 @@ import { computeLivingRarity, computeDaySpanMeters, maxRarity, type LivingRarity
 import { resolveBondStage, type BondStage } from '@/utils/bond';
 import { buildVisionSignals } from '@/utils/vision-signals';
 
+// Where a signal came from — drives Hatch Engine v2 weighting (explicit
+// moment/prompt input counts as "intent") and the day-tag field's grouping.
+export type EncounterSignalSource = 'place' | 'vision' | 'prompt' | 'moment' | 'passive';
+
 export type EncounterSignal = {
   seedId: string;
   intensity: number;
   sourceMomentIds: string[];
   isRecovery: boolean;
+  source: EncounterSignalSource;
 };
 
 export type EncounterMatch = {
@@ -63,6 +68,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: index === 0 ? 0.58 : 0.5,
       sourceMomentIds: [],
       isRecovery: false,
+      source: 'place',
     });
   });
 
@@ -77,6 +83,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
         intensity: visionSignal.intensity,
         sourceMomentIds: [],
         isRecovery: visionSignal.isRecovery,
+        source: 'vision',
       });
     });
   }
@@ -93,6 +100,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
             answer.semanticTags.includes('tender_day') ||
             answer.semanticTags.includes('activity:resting') ||
             answer.semanticTags.includes('meaning:got_through_it'),
+          source: 'prompt',
         });
       });
     });
@@ -104,6 +112,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: clamp01(0.52 + 0.12 * (coffeeIds.length - 1)),
       sourceMomentIds: coffeeIds,
       isRecovery: false,
+      source: 'moment',
     });
   }
 
@@ -115,6 +124,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: clamp01(0.46 + 0.1 * (walkIds.length - 1) + stepBoost),
       sourceMomentIds: walkIds,
       isRecovery: false,
+      source: 'moment',
     });
   }
 
@@ -125,6 +135,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: clamp01(0.5 + 0.12 * (socialIds.length - 1)),
       sourceMomentIds: socialIds,
       isRecovery: false,
+      source: 'moment',
     });
   }
 
@@ -134,6 +145,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: 0.85,
       sourceMomentIds: [],
       isRecovery: false,
+      source: 'passive',
     });
   } else if (day.stepsCount >= HIGH_STEPS_THRESHOLD) {
     signals.push({
@@ -141,6 +153,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: clamp01(0.5 + Math.min((day.stepsCount - HIGH_STEPS_THRESHOLD) / 9000, 0.3)),
       sourceMomentIds: [],
       isRecovery: false,
+      source: 'passive',
     });
   } else if (day.visitedPlaceCount >= 3) {
     signals.push({
@@ -148,6 +161,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: clamp01(0.4 + 0.06 * (day.visitedPlaceCount - 3)),
       sourceMomentIds: [],
       isRecovery: false,
+      source: 'passive',
     });
   }
 
@@ -158,6 +172,7 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: clamp01(0.42 + 0.08 * (calmIds.length - 1)),
       sourceMomentIds: calmIds,
       isRecovery: true,
+      source: 'moment',
     });
   }
 
@@ -174,7 +189,27 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: clamp01(0.4 + Math.min((day.locations.length - 2) * 0.01, 0.06)),
       sourceMomentIds: [],
       isRecovery: true,
+      source: 'passive',
     });
+  }
+
+  // The weather the day actually had: the wild (storm) and the hushed (fog) days
+  // get their own companions. Rain/snow already arrive via vision concepts.
+  if (day.weather?.condition === 'storm') {
+    signals.push({ seedId: 'storm_day', intensity: 0.55, sourceMomentIds: [], isRecovery: false, source: 'passive' });
+  } else if (day.weather?.condition === 'fog') {
+    signals.push({ seedId: 'foggy_day', intensity: 0.5, sourceMomentIds: [], isRecovery: false, source: 'passive' });
+  }
+
+  // Time-of-day: being up in the small hours, or out before first light, is
+  // unusual enough to read as a night-owl / dawn day. Kept low-intensity so any
+  // resolved place or real activity outranks it, but it can carry an otherwise
+  // quiet late night or early morning.
+  const activityHours = collectDayHours(day);
+  if (activityHours.some((hour) => hour >= 0 && hour < 4)) {
+    signals.push({ seedId: 'night_owl', intensity: 0.46, sourceMomentIds: [], isRecovery: false, source: 'passive' });
+  } else if (activityHours.some((hour) => hour >= 4 && hour < 7)) {
+    signals.push({ seedId: 'first_light', intensity: 0.44, sourceMomentIds: [], isRecovery: false, source: 'passive' });
   }
 
   const isThinDay =
@@ -188,10 +223,107 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       intensity: 0.38,
       sourceMomentIds: [],
       isRecovery: true,
+      source: 'passive',
     });
   }
 
   return signals;
+}
+
+// --- Hatch Engine v2 candidate surface -------------------------------------
+// One scored candidate per distinct species the day's signals reach. This is
+// the raw "candidate field" the probabilistic selector (utils/hatch-selection)
+// consumes. Deterministic and pure — no pick, no randomness here.
+export type EncounterCandidate = {
+  castEntry: EncounterCastEntry;
+  profile: KatchimeraEncounterProfile;
+  signal: EncounterSignal;
+  repeatDepth: number;
+  lastSeenIsoDate: string | null;
+  // The creature's intrinsic rarity floor (a landmark is never common).
+  rarityFloor: HomeRarityTier;
+};
+
+// Collapse the day's signals to one candidate per species, keeping the
+// strongest signal for each (and preferring explicit moment/prompt sources on a
+// tie, so "you said so" wins the provenance). Drops signals with no live cast.
+export function extractEncounterCandidates(
+  day: StoredHomeDayRecord,
+  history: EncounterHistoryMap
+): EncounterCandidate[] {
+  const byProfile = new Map<string, EncounterCandidate>();
+  const intentSources: EncounterSignalSource[] = ['moment', 'prompt'];
+
+  for (const signal of extractEncounterSignals(day)) {
+    const castEntry = encounterCastBySeedId.get(signal.seedId);
+    if (!castEntry) {
+      continue;
+    }
+    const profile = profilesById.get(castEntry.profileId);
+    if (!profile) {
+      continue;
+    }
+
+    const existing = byProfile.get(castEntry.profileId);
+    if (existing) {
+      const strongerIntensity = signal.intensity > existing.signal.intensity;
+      const sameIntensityButExplicit =
+        signal.intensity === existing.signal.intensity &&
+        intentSources.includes(signal.source) &&
+        !intentSources.includes(existing.signal.source);
+      if (!strongerIntensity && !sameIntensityButExplicit) {
+        continue;
+      }
+    }
+
+    byProfile.set(castEntry.profileId, {
+      castEntry,
+      profile,
+      signal,
+      repeatDepth: history[castEntry.profileId]?.count ?? 0,
+      lastSeenIsoDate: history[castEntry.profileId]?.lastSeenIsoDate ?? null,
+      rarityFloor: speciesRarityFloor(profile.baseRarity),
+    });
+  }
+
+  return [...byProfile.values()];
+}
+
+// Build the persisted creature record for a chosen candidate. Shared by the
+// legacy argmax path (buildEncounterCreature) and the v2 probabilistic path
+// (utils/hatch-selection) so both produce identical records for a given match.
+export function buildCreatureFromMatch(
+  day: StoredHomeDayRecord,
+  match: EncounterMatch,
+  primaryTrait: HomeScoreKey,
+  secondaryTrait: HomeScoreKey
+): LocalCreatureRecord {
+  const { profile, castEntry, signal, repeatDepth, rarity, livingRarity } = match;
+  const visual = homeCreatureVisuals[castEntry.visualKey];
+  const bondVisitCount = repeatDepth + 1;
+  const bondStage = resolveBondStage(bondVisitCount);
+  const lines = pickEncounterLines(profile, castEntry, repeatDepth, rarity, signal.isRecovery, bondStage);
+  const highlightMomentId = signal.sourceMomentIds[signal.sourceMomentIds.length - 1] ?? null;
+
+  return {
+    id: `creature-${day.isoDate}-${stableHash(`${day.isoDate}|${profile.id}`)}`,
+    name: profile.name,
+    primaryTrait,
+    secondaryTrait,
+    rarity,
+    visualKey: castEntry.visualKey,
+    accentColor: visual.accentColor,
+    highlightMomentId,
+    highlight: lines.highlight,
+    reflection: lines.reflection,
+    motifTags: buildMotifTags(profile, castEntry),
+    encounterProfileId: profile.id,
+    repeatDepth,
+    rarityReason: livingRarity.reason,
+    livingFactors: livingRarity.factors,
+    bondStage,
+    bondVisitCount,
+  };
 }
 
 export function matchEncounterForDay(
@@ -268,33 +400,7 @@ export function buildEncounterCreature(
     return null;
   }
 
-  const { profile, castEntry, signal, repeatDepth, rarity, livingRarity } = match;
-  const visual = homeCreatureVisuals[castEntry.visualKey];
-  // This hatch is the (repeatDepth + 1)th time you've met this creature.
-  const bondVisitCount = repeatDepth + 1;
-  const bondStage = resolveBondStage(bondVisitCount);
-  const lines = pickEncounterLines(profile, castEntry, repeatDepth, rarity, signal.isRecovery, bondStage);
-  const highlightMomentId = signal.sourceMomentIds[signal.sourceMomentIds.length - 1] ?? null;
-
-  return {
-    id: `creature-${day.isoDate}-${stableHash(`${day.isoDate}|${profile.id}`)}`,
-    name: profile.name,
-    primaryTrait,
-    secondaryTrait,
-    rarity,
-    visualKey: castEntry.visualKey,
-    accentColor: visual.accentColor,
-    highlightMomentId,
-    highlight: lines.highlight,
-    reflection: lines.reflection,
-    motifTags: buildMotifTags(profile, castEntry),
-    encounterProfileId: profile.id,
-    repeatDepth,
-    rarityReason: livingRarity.reason,
-    livingFactors: livingRarity.factors,
-    bondStage,
-    bondVisitCount,
-  };
+  return buildCreatureFromMatch(day, match, primaryTrait, secondaryTrait);
 }
 
 export function recordEncounterHatch(
@@ -319,7 +425,7 @@ export function recordEncounterHatch(
 // A creature's intrinsic rarity floor — how hard it is to meet at all,
 // independent of any one day. The day's living conditions can lift a creature
 // above its floor (see computeLivingRarity), never below it.
-function speciesRarityFloor(baseRarity: string): HomeRarityTier {
+export function speciesRarityFloor(baseRarity: string): HomeRarityTier {
   if (baseRarity === 'rare') return 'epic';
   if (baseRarity === 'uncommon') return 'rare';
   return 'common';
@@ -372,6 +478,26 @@ function buildMotifTags(profile: KatchimeraEncounterProfile, castEntry: Encounte
 
 function hasRunWorkout(day: StoredHomeDayRecord) {
   return day.exactRouteSegments.some((segment) => RUN_ACTIVITY_PATTERN.test(segment.activityType));
+}
+
+// Local hours (0–23) of everything the day timestamps — used to spot the small
+// hours (night owl) and the dawn (first light).
+function collectDayHours(day: StoredHomeDayRecord): number[] {
+  const hours: number[] = [];
+  const push = (iso: string | null | undefined) => {
+    if (!iso) return;
+    const time = new Date(iso);
+    if (!Number.isNaN(time.getTime())) {
+      hours.push(time.getHours());
+    }
+  };
+  day.locations.forEach((point) => push(point.capturedAt));
+  day.moments.forEach((moment) => push(moment.createdAt));
+  day.exactRouteSegments.forEach((segment) => {
+    push(segment.startedAt);
+    segment.coordinates.forEach((coordinate) => push(coordinate.capturedAt));
+  });
+  return hours;
 }
 
 function groupMomentIdsByType(day: StoredHomeDayRecord) {

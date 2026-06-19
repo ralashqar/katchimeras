@@ -50,6 +50,17 @@ const MAPPING = {
   'party.popper.fill': 'celebration',
   'paintbrush.fill': 'spa',
   'camera.viewfinder': 'photo-camera',
+  // Daylio-style "add to today" inputs (mood / sleep / activity / hobby).
+  'film.fill': 'movie',
+  'book.fill': 'menu-book',
+  'music.note': 'music-note',
+  'gamecontroller.fill': 'sports-esports',
+  'bed.double.fill': 'bed',
+  'dumbbell.fill': 'fitness-center',
+  'face.smiling': 'mood',
+  'briefcase.fill': 'work',
+  'cart.fill': 'shopping-cart',
+  'fork.knife.circle.fill': 'restaurant',
 } as IconMapping;
 
 /**

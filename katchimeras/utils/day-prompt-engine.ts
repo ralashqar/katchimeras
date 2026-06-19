@@ -203,13 +203,13 @@ function promptOrderForDaypart(
   forceMeaningfulPhoto: boolean
 ): DayPromptKind[] {
   if (forceMeaningfulPhoto && !day.heroPhoto && photoCandidateCount > 0) {
-    return ['meaningful_photo', 'meaning', 'day_word', 'feeling', 'people', 'activity'];
+    return ['meaningful_photo', 'meaning', 'day_word', 'feeling', 'people', 'activity', 'hobby'];
   }
   if (daypart === 'morning') {
-    return ['feeling', 'people'];
+    return ['feeling', 'sleep', 'people'];
   }
   if (daypart === 'midday') {
-    return ['activity', 'people', 'feeling'];
+    return ['activity', 'hobby', 'people', 'feeling'];
   }
 
   const photoRich =
@@ -217,12 +217,12 @@ function promptOrderForDaypart(
     photoCandidateCount >= (dayPromptRegistry.meaningful_photo.minPhotoCandidates ?? 3) &&
     now.getHours() >= PHOTO_PROMPT_EARLIEST_HOUR;
   if (photoRich) {
-    return ['meaningful_photo', 'meaning', 'day_word', 'feeling', 'people', 'activity'];
+    return ['meaningful_photo', 'meaning', 'day_word', 'feeling', 'people', 'activity', 'hobby'];
   }
   if (day.heroPhoto) {
-    return ['meaning', 'day_word', 'feeling', 'people', 'activity'];
+    return ['meaning', 'day_word', 'feeling', 'people', 'activity', 'hobby'];
   }
-  return ['day_word', 'feeling', 'people', 'activity'];
+  return ['day_word', 'feeling', 'people', 'activity', 'hobby'];
 }
 
 function toLocalDateId(date: Date) {

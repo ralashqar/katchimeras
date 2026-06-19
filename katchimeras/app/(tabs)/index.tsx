@@ -469,6 +469,25 @@ export default function HomeScreen() {
 
         {isHatched ? (
           <Animated.View entering={presenceEnter(120)} style={styles.sectionGap}>
+            <View style={styles.actionDock}>
+              <IconAction
+                icon="mappin.and.ellipse"
+                label="Map"
+                onPress={() => handleOpenDayMap(selectedDay.id)}
+              />
+              <IconAction
+                icon="paperplane.fill"
+                label="Card"
+                busy={sharingDayId === selectedDay.id}
+                onPress={handleShareDay}
+              />
+              <IconAction
+                icon="sparkles"
+                label="Comic"
+                busy={comicGen?.status === 'generating'}
+                onPress={handleMakeComic}
+              />
+            </View>
             <ReflectionCard creature={selectedDay.creature!} />
           </Animated.View>
         ) : (
@@ -514,32 +533,6 @@ export default function HomeScreen() {
         <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
           {isDay && selectedDay.canHatch ? (
             <KatchaButton label="Reveal the hatch" onPress={handleReveal} variant="primary" />
-          ) : isHatched ? (
-            <View style={styles.hatchedCtas}>
-              <View style={styles.ctaRow}>
-                <KatchaButton
-                  label="Day map"
-                  onPress={() => handleOpenDayMap(selectedDay.id)}
-                  style={styles.ctaQuiet}
-                  variant="secondary"
-                />
-                <KatchaButton
-                  disabled={sharingDayId === selectedDay.id}
-                  label={sharingDayId === selectedDay.id ? 'Preparing…' : 'Share day card'}
-                  onPress={handleShareDay}
-                  style={styles.ctaMain}
-                  variant="primary"
-                />
-              </View>
-              <KatchaButton
-                disabled={comicGen?.status === 'generating'}
-                loading={comicGen?.status === 'generating'}
-                icon="sparkles"
-                label={comicGen?.status === 'generating' ? 'Drawing your comic…' : 'Make the comic'}
-                onPress={handleMakeComic}
-                variant="premium"
-              />
-            </View>
           ) : isForming ? (
             <View style={styles.addRow}>
               <KatchaButton
@@ -653,6 +646,40 @@ export default function HomeScreen() {
   );
 }
 
+// A compact circular action attached to the hatched creature (map / card /
+// comic), replacing the old full-width buttons. Shows a spinner while busy.
+function IconAction({
+  icon,
+  label,
+  onPress,
+  busy = false,
+}: {
+  icon: Parameters<typeof IconSymbol>[0]['name'];
+  label: string;
+  onPress: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={busy}
+      onPress={onPress}
+      style={styles.iconAction}>
+      <View style={styles.iconActionCircle}>
+        {busy ? (
+          <ActivityIndicator color={Lantern.moon50} size="small" />
+        ) : (
+          <IconSymbol name={icon} size={20} color={Lantern.moon50} />
+        )}
+      </View>
+      <ThemedText style={styles.iconActionLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 function buildSignalLine(day: HomeDayRecord) {
   const parts: string[] = [];
   if (day.stepsCount > 0) parts.push(`${day.stepsCount.toLocaleString()} steps`);
@@ -706,9 +733,9 @@ const styles = StyleSheet.create({
   },
   formingTitle: {
     fontFamily: AppFontFamilies.instrumentSerif,
-    fontSize: 26,
-    lineHeight: 33,
-    maxWidth: 300,
+    fontSize: 23,
+    lineHeight: 29,
+    maxWidth: 320,
     textAlign: 'center',
   },
   signalLine: {
@@ -747,18 +774,31 @@ const styles = StyleSheet.create({
   ctaArea: {
     marginTop: 12,
   },
-  hatchedCtas: {
-    gap: 12,
-  },
-  ctaRow: {
+  actionDock: {
+    alignSelf: 'flex-end',
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
+    marginBottom: 4,
+    paddingRight: 2,
   },
-  ctaQuiet: {
-    flex: 1,
+  iconAction: {
+    alignItems: 'center',
+    gap: 4,
   },
-  ctaMain: {
-    flex: 1.4,
+  iconActionCircle: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  iconActionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   addRow: {
     alignItems: 'center',

@@ -1,4 +1,5 @@
 import type {
+  DayVisionSummary,
   EncounterHistoryMap,
   HomeRarityTier,
   HomeScoreKey,
@@ -28,6 +29,10 @@ export type HatchYourPastResult = {
   creatures: HatchedPastCreature[];
   encounterHistory: EncounterHistoryMap;
   daysHatched: number;
+  // The per-day hatched records (creature + vision + locations + seeds), so the
+  // caller can PERSIST real hatched days — not just the reveal + history — and
+  // the Home page / Life Map show them with their maps.
+  hatchedDays: StoredHomeDayRecord[];
 };
 
 const MAX_REVEAL = 6;
@@ -38,6 +43,7 @@ export function buildHatchYourPast(pastDays: StoredHomeDayRecord[]): HatchYourPa
   const ordered = [...pastDays].sort((left, right) => left.isoDate.localeCompare(right.isoDate));
   let encounterHistory: EncounterHistoryMap = {};
   const byProfile = new Map<string, HatchedPastCreature>();
+  const hatchedDays: StoredHomeDayRecord[] = [];
   let daysHatched = 0;
 
   for (const day of ordered) {
@@ -48,6 +54,12 @@ export function buildHatchYourPast(pastDays: StoredHomeDayRecord[]): HatchYourPa
     }
     daysHatched += 1;
     encounterHistory = recordEncounterHatch(encounterHistory, creature.encounterProfileId, day.isoDate);
+    hatchedDays.push({
+      ...day,
+      state: 'hatched',
+      shareReadyAt: day.shareReadyAt ?? new Date(`${day.isoDate}T21:00:00`).toISOString(),
+      creature,
+    });
 
     const existing = byProfile.get(creature.encounterProfileId);
     if (existing) {
@@ -82,7 +94,7 @@ export function buildHatchYourPast(pastDays: StoredHomeDayRecord[]): HatchYourPa
     })
     .slice(-MAX_REVEAL);
 
-  return { creatures, encounterHistory, daysHatched };
+  return { creatures, encounterHistory, daysHatched, hatchedDays };
 }
 
 function deriveTraits(day: StoredHomeDayRecord): [HomeScoreKey, HomeScoreKey] {
@@ -98,7 +110,12 @@ function deriveTraits(day: StoredHomeDayRecord): [HomeScoreKey, HomeScoreKey] {
 // Build a minimal day record from a backfilled day (steps + photo places) plus
 // any resolved place-category seeds, ready to feed buildHatchYourPast.
 export function toHatchablePastDay(
-  backfilled: { isoDate: string; stepsCount: number; locations: StoredHomeDayRecord['locations'] },
+  backfilled: {
+    isoDate: string;
+    stepsCount: number;
+    locations: StoredHomeDayRecord['locations'];
+    vision?: DayVisionSummary | null;
+  },
   placeCategorySeeds: string[]
 ): StoredHomeDayRecord {
   return {
@@ -119,5 +136,8 @@ export function toHatchablePastDay(
     heroPhoto: null,
     creature: null,
     placeCategorySeeds,
+    // The photo subjects (dog/beach/museum/…) that make the hatch specific
+    // rather than a generic step/place creature.
+    vision: backfilled.vision ?? undefined,
   };
 }

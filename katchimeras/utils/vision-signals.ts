@@ -55,6 +55,10 @@ const CONCEPT_RULES: { concept: string; pattern: RegExp }[] = [
   { concept: 'rain', pattern: /rain|rainy|drizzle|umbrella|downpour|puddle/i },
   { concept: 'autumn', pattern: /autumn|fall foliage|autumn leaves|maple leaf|maple leaves/i },
   { concept: 'stars', pattern: /\bstar\b|stars|starry|night sky|milky way|constellation/i },
+  // Live music (attending) before creative (making) so a stage/gig reads as a
+  // concert, while an instrument at home still reads as creative.
+  { concept: 'concert', pattern: /concert|live music|\bgig\b|\bstage\b|music festival|\bdj\b|crowd at a show/i },
+  { concept: 'gaming', pattern: /game controller|gamepad|joystick|game console|video game|arcade|handheld console/i },
   // Life chapters (Wave C).
   { concept: 'creative', pattern: /guitar|piano|violin|instrument|microphone|painting|easel|paintbrush|sketch|canvas|pottery/i },
   { concept: 'focus_work', pattern: /laptop|computer|keyboard|monitor|\bdesk\b|workspace/i },
@@ -108,6 +112,9 @@ const CONCEPT_SEED_MAP: Record<string, string> = {
   focus_work: 'focus_day',
   celebration: 'celebration',
   travel: 'travel_day',
+  // Wave D — newly tracked inputs.
+  concert: 'live_music',
+  gaming: 'gaming_session',
   // Capstone — close the last common gaps.
   city: 'city_day',
   gym: 'gym_day',
@@ -257,6 +264,12 @@ export function mergeDayVision(
     textTokens,
     analyzedPhotoCount: totalPhotos,
   };
+}
+
+// The encounter seed a canonical concept maps to (if any). Exposed so the
+// day-tag field can link a vision tag to the candidate it feeds.
+export function conceptSeedId(concept: string): string | null {
+  return CONCEPT_SEED_MAP[concept] ?? null;
 }
 
 export function buildVisionSignals(vision: DayVisionSummary): VisionSignal[] {

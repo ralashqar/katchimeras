@@ -327,6 +327,65 @@ export const encounterLiveCast: readonly EncounterCastEntry[] = [
     categoryLabel: 'Gym',
     visualKey: 'flexel',
   },
+  {
+    // Wave D — embody the inputs we newly track (hobby, sleep, mood, time-of-day,
+    // weather). All ship with placeholder art (a thematically-close existing
+    // render) until their flagship is generated via the katchimera-assets skill.
+    profileId: 'subject_gaming_session_pixooka',
+    voice: 'a cozy, hyper-focused little player spirit, happiest mid-quest',
+    seedId: 'gaming_session',
+    categoryLabel: 'Gaming',
+    visualKey: 'pixooka',
+  },
+  {
+    profileId: 'state_well_rested_snoozle',
+    voice: 'a soft, just-woken spirit full of slow morning light',
+    seedId: 'well_rested',
+    categoryLabel: 'Rested',
+    visualKey: 'snoozle',
+  },
+  {
+    profileId: 'state_tender_day_mendle',
+    voice: 'a gentle companion for the days you barely got through, asking nothing',
+    seedId: 'tender_day',
+    categoryLabel: 'Tender day',
+    visualKey: 'mendle',
+  },
+  {
+    profileId: 'subject_live_music_encora',
+    voice: 'a rhythm-struck little spirit that hums with the night’s set',
+    seedId: 'live_music',
+    categoryLabel: 'Live music',
+    visualKey: 'encora',
+  },
+  {
+    profileId: 'state_night_owl_vesperitt',
+    voice: 'a wide-awake small-hours spirit, calm in the quiet after midnight',
+    seedId: 'night_owl',
+    categoryLabel: 'Night owl',
+    visualKey: 'vesperitt',
+  },
+  {
+    profileId: 'state_first_light_dawnle',
+    voice: 'a serene early riser greeting the first gold light of the day',
+    seedId: 'first_light',
+    categoryLabel: 'First light',
+    visualKey: 'dawnle',
+  },
+  {
+    profileId: 'subject_storm_day_tempesto',
+    voice: 'a thrilled little storm-watcher, delighted by wild weather',
+    seedId: 'storm_day',
+    categoryLabel: 'Storm',
+    visualKey: 'tempesto',
+  },
+  {
+    profileId: 'subject_foggy_day_mistle',
+    voice: 'a hushed, half-seen mist wisp carrying a small dim lantern',
+    seedId: 'foggy_day',
+    categoryLabel: 'Fog',
+    visualKey: 'mistle',
+  },
 ];
 
 export const encounterCastBySeedId: ReadonlyMap<string, EncounterCastEntry> = new Map(

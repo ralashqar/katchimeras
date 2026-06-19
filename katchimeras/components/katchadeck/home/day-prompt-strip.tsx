@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { DayPromptKind } from '@/types/home';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
@@ -76,17 +77,18 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
           ))}
         </ScrollView>
       ) : (
-        <ScrollView contentContainerStyle={styles.chipRow} horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.chipRow}>
           {prompt.options.slice(0, prompt.maxOptions).map((option, index) => (
             <PromptChip
               key={option.id}
               index={index}
               label={option.label}
+              icon={option.icon}
               accent={CHIP_ACCENTS[index % CHIP_ACCENTS.length]}
               onPick={(from) => onAnswer(prompt.id, [option.id], from)}
             />
           ))}
-        </ScrollView>
+        </View>
       )}
     </Animated.View>
   );
@@ -94,11 +96,13 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
 
 function PromptChip({
   label,
+  icon,
   accent,
   index,
   onPick,
 }: {
   label: string;
+  icon: IconSymbolName;
   accent: string;
   index: number;
   onPick: (from: FeedSourceRect) => void;
@@ -123,8 +127,8 @@ function PromptChip({
           scale.value = withSpring(1, { damping: 14, stiffness: 240 });
         }}
         onPress={pick}
-        style={[styles.chip, animatedStyle]}>
-        <View style={[styles.chipDot, { backgroundColor: accent, boxShadow: `0 0 10px ${accent}AA` }]} />
+        style={[styles.chip, { borderColor: `${accent}40` }, animatedStyle]}>
+        <IconSymbol name={icon} size={15} color={accent} />
         <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           {label}
         </ThemedText>
@@ -216,8 +220,10 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
-    paddingRight: 4,
+    justifyContent: 'center',
     paddingVertical: 2,
   },
   chip: {
@@ -228,15 +234,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 8,
+    gap: 7,
     minHeight: 40,
     paddingHorizontal: 13,
     paddingVertical: 9,
-  },
-  chipDot: {
-    borderRadius: 999,
-    height: 8,
-    width: 8,
   },
   chipLabel: {
     fontSize: 13,
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
   },
   photoRow: {
     gap: 10,
-    paddingRight: 4,
+    justifyContent: 'center',
     paddingVertical: 2,
   },
   photoButton: {

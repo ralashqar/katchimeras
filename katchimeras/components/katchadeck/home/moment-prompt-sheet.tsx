@@ -5,6 +5,7 @@ import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from
 
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { dayPromptMenuLabels } from '@/constants/day-prompts';
 import { Lantern } from '@/constants/theme';
 import type { DayPromptKind } from '@/types/home';
@@ -78,30 +79,31 @@ export function MomentPromptSheet({
               </ThemedText>
             ) : (
               <ScrollView
-                contentContainerStyle={styles.categoryRow}
+                contentContainerStyle={styles.categoryGrid}
                 showsVerticalScrollIndicator={false}
                 style={styles.categoryScroll}>
-                {prompts.map((prompt, index) => (
-                  <Animated.View key={prompt.id} entering={FadeInDown.delay(40 + index * 40).duration(280)}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setSelected(prompt)}
-                      style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
-                      <View
-                        style={[
-                          styles.categoryDot,
-                          {
-                            backgroundColor: CHIP_ACCENTS[index % CHIP_ACCENTS.length],
-                            boxShadow: `0 0 10px ${CHIP_ACCENTS[index % CHIP_ACCENTS.length]}AA`,
-                          },
-                        ]}
-                      />
-                      <ThemedText style={styles.categoryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                        {dayPromptMenuLabels[prompt.id]}
-                      </ThemedText>
-                    </Pressable>
-                  </Animated.View>
-                ))}
+                {prompts.map((prompt, index) => {
+                  const accent = CHIP_ACCENTS[index % CHIP_ACCENTS.length];
+                  return (
+                    <Animated.View
+                      key={prompt.id}
+                      entering={FadeInDown.delay(40 + index * 35).duration(280)}
+                      style={styles.categoryCell}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={dayPromptMenuLabels[prompt.id]}
+                        onPress={() => setSelected(prompt)}
+                        style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
+                        <View style={[styles.categoryIcon, { backgroundColor: `${accent}22`, borderColor: `${accent}55` }]}>
+                          <IconSymbol name={prompt.categoryIcon} size={20} color={accent} />
+                        </View>
+                        <ThemedText style={styles.categoryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                          {dayPromptMenuLabels[prompt.id]}
+                        </ThemedText>
+                      </Pressable>
+                    </Animated.View>
+                  );
+                })}
               </ScrollView>
             )}
             <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
@@ -155,47 +157,57 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     lineHeight: 22,
+    textAlign: 'center',
   },
   empty: {
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 19,
     paddingVertical: 8,
+    textAlign: 'center',
   },
   categoryScroll: {
-    maxHeight: 260,
+    maxHeight: 320,
   },
-  categoryRow: {
+  categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
+    justifyContent: 'center',
     paddingVertical: 4,
+  },
+  categoryCell: {
+    // Three across, centered — wraps to as many rows as needed (6 categories =
+    // a clean 3×2 grid).
+    width: '30%',
   },
   category: {
     alignItems: 'center',
     backgroundColor: 'rgba(12,10,20,0.72)',
     borderColor: 'rgba(255,255,255,0.12)',
     borderCurve: 'continuous',
-    borderRadius: 999,
+    borderRadius: 18,
     borderWidth: 1,
-    flexDirection: 'row',
-    gap: 8,
-    minHeight: 42,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    gap: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 13,
   },
   categoryPressed: {
     backgroundColor: 'rgba(40,34,60,0.9)',
   },
-  categoryDot: {
+  categoryIcon: {
+    alignItems: 'center',
     borderRadius: 999,
-    height: 8,
-    width: 8,
+    borderWidth: 1,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
   categoryLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 17,
+    fontSize: 12.5,
+    fontWeight: '700',
+    lineHeight: 16,
+    textAlign: 'center',
   },
   close: {
     alignSelf: 'center',

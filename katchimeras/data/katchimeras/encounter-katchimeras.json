@@ -7455,5 +7455,421 @@
     "restorativeLine": "Flexel reminds you that rest days are training days too, and earns its nap.",
     "progressLine": "Flexel shows that the work is adding up. The strength you are building is no longer abstract.",
     "storySeed": "In the middle of the reps in your photos, Flexel racked one more set and flashed a proud little grin."
+  },
+  {
+    "id": "subject_gaming_session_pixooka",
+    "seedId": "gaming_session",
+    "topLevelType": "activity",
+    "triggerCategory": "hobby",
+    "triggerSubtype": "gaming",
+    "theme": "focused playful flow",
+    "creatureKind": "hybrid",
+    "name": "Pixooka",
+    "caption": "A cozy little player spirit that turns up on the days you got lost in a game.",
+    "userFacingDescription": "Pixooka appears on the days a game pulled you in — that bright, focused flow where the hours quietly disappear. It keeps the joy of play and makes it something you can hold.",
+    "motivationalQuote": "Play is its own kind of focus.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "gaming",
+      "play",
+      "screen time",
+      "flow state"
+    ],
+    "sourceExamples": [
+      "an evening lost in a game",
+      "a long play session",
+      "a cozy controller night"
+    ],
+    "visualTone": "glowing playful electric",
+    "visualMotifs": [
+      "pixel-glow eyes",
+      "controller-shell chest",
+      "button freckles"
+    ],
+    "visualDescription": "Pixooka is a cute hybrid tied to gaming moments, with pixel-glow eyes, controller-shell chest, button freckles, a glowing playful electric mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute gaming creature with a controller-shell body, pixel-bright eyes and cozy arcade charm",
+      "pixel-glow eyes",
+      "controller-shell chest",
+      "button freckles",
+      "glowing playful electric",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Pixooka is a cute hybrid tied to gaming moments, with pixel-glow eyes, controller-shell chest, button freckles, a glowing playful electric mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute gaming creature with a controller-shell body, pixel-bright eyes and cozy arcade charm. Include pixel-glow eyes, controller-shell chest, button freckles. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Pixooka reflects the playful, absorbed focus of doing something purely because you love it.",
+    "unlockLine": "A game pulled you all the way in today, and Pixooka popped into the day on a bright pixel of light.",
+    "repeatLine": "Pixooka keeps respawning beside you. Play has quietly become part of your rhythm.",
+    "rareLine": "A rarer Pixooka surfaces on the nights play turns into something close to wonder.",
+    "restorativeLine": "Even a quiet night in front of a screen counts — Pixooka curls up in the glow and calls it rest.",
+    "progressLine": "Pixooka is not just dropping in anymore. Play has become part of how you recharge.",
+    "storySeed": "Somewhere in the glow of the screen, a tiny pixel blinked awake, picked up a controller, and refused to put it down."
+  },
+  {
+    "id": "state_well_rested_snoozle",
+    "seedId": "well_rested",
+    "topLevelType": "state",
+    "triggerCategory": "rest",
+    "triggerSubtype": "good_sleep",
+    "theme": "soft restored morning",
+    "creatureKind": "spirit",
+    "name": "Snoozle",
+    "caption": "A soft, just-woken spirit that appears after a night of real, deep sleep.",
+    "userFacingDescription": "Snoozle shows up on the mornings you actually slept — the rare good rest that leaves the whole day softer. It carries that restored, unhurried warmth wherever it goes.",
+    "motivationalQuote": "Rest is where tomorrow is made.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "good sleep",
+      "rested",
+      "soft morning",
+      "recovery"
+    ],
+    "sourceExamples": [
+      "a morning after deep sleep",
+      "a slow, rested start",
+      "waking up genuinely refreshed"
+    ],
+    "visualTone": "soft drowsy warm",
+    "visualMotifs": [
+      "pillow-cloud body",
+      "drowsy half-moon eyes",
+      "dawn-glow tuft"
+    ],
+    "visualDescription": "Snoozle is a cute spirit tied to good sleep moments, with pillow-cloud body, drowsy half-moon eyes, dawn-glow tuft, a soft drowsy warm mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute well-rested creature shaped like a soft pillow-cloud with sleepy half-moon eyes and a warm morning glow",
+      "pillow-cloud body",
+      "drowsy half-moon eyes",
+      "dawn-glow tuft",
+      "soft drowsy warm",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Snoozle is a cute spirit tied to good sleep moments, with pillow-cloud body, drowsy half-moon eyes, dawn-glow tuft, a soft drowsy warm mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute well-rested creature shaped like a soft pillow-cloud with sleepy half-moon eyes and a warm morning glow. Include pillow-cloud body, drowsy half-moon eyes, dawn-glow tuft. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Snoozle reflects how a truly rested start quietly steadies everything that follows.",
+    "unlockLine": "You woke up genuinely rested today, and Snoozle drifted in on the soft edge of the morning.",
+    "repeatLine": "Snoozle keeps settling in. Good rest is becoming a habit you can feel.",
+    "rareLine": "A rarer Snoozle appears after the deepest, most restoring kind of sleep.",
+    "restorativeLine": "Snoozle is rest itself — it asks nothing of you but to enjoy feeling whole again.",
+    "progressLine": "Snoozle is not a stranger anymore. Taking your rest seriously has changed your days.",
+    "storySeed": "On a morning that began gently, a small cloud of warmth uncurled from the pillow and decided to stay close."
+  },
+  {
+    "id": "state_tender_day_mendle",
+    "seedId": "tender_day",
+    "topLevelType": "state",
+    "triggerCategory": "emotion",
+    "triggerSubtype": "tender",
+    "theme": "gentle resilience",
+    "creatureKind": "spirit",
+    "name": "Mendle",
+    "caption": "A quiet companion that only comes on the days you barely got through — and asks nothing of you.",
+    "userFacingDescription": "Mendle appears on the hard days — the low ones, the barely-slept ones, the ones you simply got through. It is rare because those days are heavy, and it stays to remind you that surviving one still counts.",
+    "motivationalQuote": "Getting through it is enough.",
+    "baseRarity": "uncommon",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "tender day",
+      "low mood",
+      "got through it",
+      "gentle survival"
+    ],
+    "sourceExamples": [
+      "a hard day you got through",
+      "a low, tender evening",
+      "a day that simply asked you to endure"
+    ],
+    "visualTone": "soft muted tender",
+    "visualMotifs": [
+      "candle-flicker heart",
+      "soft bandage wrap",
+      "muted blanket hood"
+    ],
+    "visualDescription": "Mendle is a cute spirit tied to tender moments, with candle-flicker heart, soft bandage wrap, muted blanket hood, a soft muted tender mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute gentle comfort creature with a soft bandage wrap, a candle-flicker heart and a muted blanket hood",
+      "candle-flicker heart",
+      "soft bandage wrap",
+      "muted blanket hood",
+      "soft muted tender",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Mendle is a cute spirit tied to tender moments, with candle-flicker heart, soft bandage wrap, muted blanket hood, a soft muted tender mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute gentle comfort creature with a soft bandage wrap, a candle-flicker heart and a muted blanket hood. Include candle-flicker heart, soft bandage wrap, muted blanket hood. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Mendle reflects the quiet strength of the days you survived rather than won.",
+    "unlockLine": "Today asked a lot of you, and you got through it — so Mendle came close, carrying a small steady light.",
+    "repeatLine": "Mendle has sat with you before. It knows the shape of your harder days, and it stays anyway.",
+    "rareLine": "Mendle is rare on purpose. The heaviest days leave behind the gentlest, most uncommon companion.",
+    "restorativeLine": "Mendle asks nothing. It simply curls in close and lets the hard day soften at the edges.",
+    "progressLine": "Mendle keeps returning for the tender days — proof that you keep making it through them.",
+    "storySeed": "On a day that took everything, a small warm light flickered up beside you, sat down, and refused to leave you alone with it."
+  },
+  {
+    "id": "subject_live_music_encora",
+    "seedId": "live_music",
+    "topLevelType": "activity",
+    "triggerCategory": "hobby",
+    "triggerSubtype": "live_music",
+    "theme": "shared sound and light",
+    "creatureKind": "sprite",
+    "name": "Encora",
+    "caption": "A rhythm-struck little spirit that hums in after a night of music.",
+    "userFacingDescription": "Encora arrives when music filled the night — a set, a song you played on repeat, a room that moved. It keeps the lit-up feeling of sound you could feel in your chest.",
+    "motivationalQuote": "Some nights are measured in songs.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "live music",
+      "concert",
+      "listening",
+      "a song on repeat"
+    ],
+    "sourceExamples": [
+      "a gig that ran late",
+      "an evening soundtracked by a favourite album",
+      "a room that moved to the beat"
+    ],
+    "visualTone": "vivid rhythmic glowing",
+    "visualMotifs": [
+      "soundwave ribbons",
+      "ticket-stub tail",
+      "stage-light glow"
+    ],
+    "visualDescription": "Encora is a cute sprite tied to live music moments, with soundwave ribbons, ticket-stub tail, stage-light glow, a vivid rhythmic glowing mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute live-music creature wrapped in soundwave ribbons with a ticket-stub tail and a stage-light glow",
+      "soundwave ribbons",
+      "ticket-stub tail",
+      "stage-light glow",
+      "vivid rhythmic glowing",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Encora is a cute sprite tied to live music moments, with soundwave ribbons, ticket-stub tail, stage-light glow, a vivid rhythmic glowing mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute live-music creature wrapped in soundwave ribbons with a ticket-stub tail and a stage-light glow. Include soundwave ribbons, ticket-stub tail, stage-light glow. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Encora reflects how the right sound can re-tune an entire day.",
+    "unlockLine": "Music carried the night, and Encora hummed into the day still keeping the beat.",
+    "repeatLine": "Encora keeps coming back for the soundtrack. Music is becoming part of how you mark time.",
+    "rareLine": "A rarer Encora surfaces on the nights a song hit somewhere deeper than usual.",
+    "restorativeLine": "Even a quiet song counts — Encora sways gently and lets the sound do the resting.",
+    "progressLine": "Encora is not just passing through. Music has become one of the ways you come back to yourself.",
+    "storySeed": "As the last chord faded, a little spark kept the rhythm going, wrapped itself in soundwaves, and followed you home."
+  },
+  {
+    "id": "state_night_owl_vesperitt",
+    "seedId": "night_owl",
+    "topLevelType": "state",
+    "triggerCategory": "time",
+    "triggerSubtype": "small_hours",
+    "theme": "quiet small-hours wakefulness",
+    "creatureKind": "spirit",
+    "name": "Vesperitt",
+    "caption": "A wide-awake spirit that only appears in the small hours, while the world sleeps.",
+    "userFacingDescription": "Vesperitt belongs to the deep night — the hours after midnight when you were still up and the world had gone quiet. Rare, like the small hours themselves.",
+    "motivationalQuote": "The quietest hours hold their own clarity.",
+    "baseRarity": "uncommon",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "late night",
+      "small hours",
+      "night owl",
+      "after midnight"
+    ],
+    "sourceExamples": [
+      "a night that ran past midnight",
+      "the small, quiet hours",
+      "being awake while the world slept"
+    ],
+    "visualTone": "deep luminous midnight",
+    "visualMotifs": [
+      "moon-disc eyes",
+      "star-fleck cloak",
+      "midnight glow"
+    ],
+    "visualDescription": "Vesperitt is a cute spirit tied to small hours moments, with moon-disc eyes, star-fleck cloak, midnight glow, a deep luminous midnight mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute night-owl creature with wide moon-disc eyes, a star-fleck cloak and a soft midnight glow",
+      "moon-disc eyes",
+      "star-fleck cloak",
+      "midnight glow",
+      "deep luminous midnight",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Vesperitt is a cute spirit tied to small hours moments, with moon-disc eyes, star-fleck cloak, midnight glow, a deep luminous midnight mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute night-owl creature with wide moon-disc eyes, a star-fleck cloak and a soft midnight glow. Include moon-disc eyes, star-fleck cloak, midnight glow. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Vesperitt reflects the strange, clear stillness of the hours that belong only to you.",
+    "unlockLine": "You were still awake when the world had gone quiet, and Vesperitt blinked open in the dark beside you.",
+    "repeatLine": "Vesperitt knows your small hours by now. It keeps you company in the quiet you keep returning to.",
+    "rareLine": "Vesperitt is rare by nature — the small hours rarely belong to anyone, but tonight they were yours.",
+    "restorativeLine": "Vesperitt makes the late quiet feel like a gift rather than a cost.",
+    "progressLine": "Vesperitt keeps finding you after midnight — the quiet hours have become part of who you are.",
+    "storySeed": "Long after the lights went out elsewhere, a pair of moon-bright eyes opened in the dark and decided the night was good company."
+  },
+  {
+    "id": "state_first_light_dawnle",
+    "seedId": "first_light",
+    "topLevelType": "state",
+    "triggerCategory": "time",
+    "triggerSubtype": "dawn",
+    "theme": "serene early light",
+    "creatureKind": "spirit",
+    "name": "Dawnle",
+    "caption": "A serene early-riser spirit that greets the day before most of the world wakes.",
+    "userFacingDescription": "Dawnle shows up on the mornings you were out before first light — the still, golden hour when the day is brand new and entirely yours.",
+    "motivationalQuote": "The first light belongs to whoever shows up for it.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "dawn",
+      "early riser",
+      "first light",
+      "sunrise start"
+    ],
+    "sourceExamples": [
+      "out before sunrise",
+      "an early-morning start",
+      "catching the first gold light"
+    ],
+    "visualTone": "soft luminous golden",
+    "visualMotifs": [
+      "sunrise-gradient crest",
+      "dew sparkle",
+      "soft gold rim"
+    ],
+    "visualDescription": "Dawnle is a cute spirit tied to dawn moments, with sunrise-gradient crest, dew sparkle, soft gold rim, a soft luminous golden mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute dawn creature with a sunrise-gradient crest, dew sparkles and a soft gold morning rim-light",
+      "sunrise-gradient crest",
+      "dew sparkle",
+      "soft gold rim",
+      "soft luminous golden",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Dawnle is a cute spirit tied to dawn moments, with sunrise-gradient crest, dew sparkle, soft gold rim, a soft luminous golden mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute dawn creature with a sunrise-gradient crest, dew sparkles and a soft gold morning rim-light. Include sunrise-gradient crest, dew sparkle, soft gold rim. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Dawnle reflects the quiet head start of meeting the day before it fully begins.",
+    "unlockLine": "You met the morning before it fully arrived, and Dawnle rose with the first gold light beside you.",
+    "repeatLine": "Dawnle keeps greeting you at sunrise. The early hours are becoming a habit that suits you.",
+    "rareLine": "A rarer Dawnle appears on the dawns that feel especially still and golden.",
+    "restorativeLine": "Dawnle makes an early start feel less like effort and more like a calm, private gift.",
+    "progressLine": "Dawnle is not a rare sight anymore — the first light has become part of how you begin.",
+    "storySeed": "As the sky turned from grey to gold, a small warm glow lifted its head, stretched, and decided mornings were worth getting up for."
+  },
+  {
+    "id": "subject_storm_day_tempesto",
+    "seedId": "storm_day",
+    "topLevelType": "subject",
+    "triggerCategory": "weather",
+    "triggerSubtype": "storm",
+    "theme": "thrilling wild weather",
+    "creatureKind": "beast",
+    "name": "Tempesto",
+    "caption": "A thrilled little storm-watcher that rides in on the days the sky really opened up.",
+    "userFacingDescription": "Tempesto appears on stormy days — thunder, downpour, the kind of weather that makes the world feel charged. Rare, because the big storms are.",
+    "motivationalQuote": "Some days are meant to feel electric.",
+    "baseRarity": "uncommon",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "storm",
+      "thunder",
+      "downpour",
+      "wild weather"
+    ],
+    "sourceExamples": [
+      "a day the storm rolled through",
+      "thunder and heavy rain",
+      "a sky that really opened up"
+    ],
+    "visualTone": "dramatic electric stormy",
+    "visualMotifs": [
+      "thundercloud mane",
+      "lightning-zag tail",
+      "rain-sheen body"
+    ],
+    "visualDescription": "Tempesto is a cute beast tied to storm moments, with thundercloud mane, lightning-zag tail, rain-sheen body, a dramatic electric stormy mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute storm creature with a billowing thundercloud mane, a lightning-zag tail and a rain-slicked sheen",
+      "thundercloud mane",
+      "lightning-zag tail",
+      "rain-sheen body",
+      "dramatic electric stormy",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Tempesto is a cute beast tied to storm moments, with thundercloud mane, lightning-zag tail, rain-sheen body, a dramatic electric stormy mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute storm creature with a billowing thundercloud mane, a lightning-zag tail and a rain-slicked sheen. Include thundercloud mane, lightning-zag tail, rain-sheen body. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Tempesto reflects the strange thrill of a day the weather refused to be ignored.",
+    "unlockLine": "The sky cracked open today, and Tempesto came charging in on the front of the storm.",
+    "repeatLine": "Tempesto keeps riding back in with the weather. The wild days have started to feel like yours.",
+    "rareLine": "Tempesto is rare by nature — only the biggest storms are strong enough to carry it in.",
+    "restorativeLine": "Tempesto turns a day stuck inside the storm into something cozy and a little wondrous.",
+    "progressLine": "Tempesto keeps finding the storm-days with you — proof you can love the wild weather too.",
+    "storySeed": "In the middle of the thunder, something small and delighted leapt between the raindrops and decided the storm was the best part of the day."
+  },
+  {
+    "id": "subject_foggy_day_mistle",
+    "seedId": "foggy_day",
+    "topLevelType": "subject",
+    "triggerCategory": "weather",
+    "triggerSubtype": "fog",
+    "theme": "hushed half-seen calm",
+    "creatureKind": "spirit",
+    "name": "Mistle",
+    "caption": "A hushed, half-seen wisp that drifts in on the foggy, muffled days.",
+    "userFacingDescription": "Mistle appears when fog settled over the day — that quiet, soft-edged world where everything slows and softens. It carries the calm of the half-seen.",
+    "motivationalQuote": "Not every day needs to be clear to be good.",
+    "baseRarity": "common",
+    "variantSupport": [
+      "timeOfDay",
+      "repeatDepth"
+    ],
+    "lifestyleSignals": [
+      "fog",
+      "mist",
+      "low cloud",
+      "soft grey day"
+    ],
+    "sourceExamples": [
+      "a morning swallowed by fog",
+      "a soft, muffled grey day",
+      "mist over everything"
+    ],
+    "visualTone": "soft grey dreamlike",
+    "visualMotifs": [
+      "fog-veil body",
+      "dim lantern",
+      "grey-pearl glow"
+    ],
+    "visualDescription": "Mistle is a cute spirit tied to fog moments, with fog-veil body, dim lantern, grey-pearl glow, a soft grey dreamlike mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence",
+    "promptHooks": [
+      "cute fog creature with a soft veil-like body, a dim lantern and a grey-pearl half-seen glow",
+      "fog-veil body",
+      "dim lantern",
+      "grey-pearl glow",
+      "soft grey dreamlike",
+      "premium stylized 3D mascot creature render"
+    ],
+    "imagePrompt": "Mistle is a cute spirit tied to fog moments, with fog-veil body, dim lantern, grey-pearl glow, a soft grey dreamlike mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence cute fog creature with a soft veil-like body, a dim lantern and a grey-pearl half-seen glow. Include fog-veil body, dim lantern, grey-pearl glow. Premium stylized 3D mascot creature render, premium stylized game mascot CGI, Fortnite-inspired silhouette clarity without combat energy, Royal Match-inspired facial readability and charm, dramatically oversized glossy luminous eyes, visible inner glow core, head-dominant rounded mascot silhouette, exaggerated chunky readable proportions, top-heavy body design, short simplified limbs, oversized paws and feet, tiny compressed mouth and nose, one overscaled signature encounter motif, expressive cartoony facial acting, bold color blocking, clean simplified material rendering, clean stylized lighting, grounded contact shadows, polished mobile-game render quality, single creature, three-quarter view, simple premium habitat hint only, no text, no frame, no extra creatures, no human, no weapon, no UI overlay, no extreme chibi proportions, no photorealism, no moody cinematic realism, no cheap toy-commercial plastic look, no aggressive monster face.",
+    "identityInsight": "Mistle reflects the gentle hush of a day the world chose to soften.",
+    "unlockLine": "Fog wrapped the day in quiet, and Mistle drifted out of it carrying a small dim lantern.",
+    "repeatLine": "Mistle keeps surfacing from the grey. The soft, hushed days have become a kind of comfort.",
+    "rareLine": "A rarer Mistle gathers on the mornings the fog turns the world genuinely dreamlike.",
+    "restorativeLine": "Mistle makes a grey day feel like a held breath — soft, slow, and quietly restful.",
+    "progressLine": "Mistle is not a stranger in the fog anymore. The hushed days have become yours to keep.",
+    "storySeed": "Somewhere in the soft grey, a little lantern glowed, and a half-seen wisp drifted close enough to keep you company."
   }
 ]

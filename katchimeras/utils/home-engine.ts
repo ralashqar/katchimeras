@@ -54,6 +54,8 @@ import type {
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { deriveDayMapSummary } from '@/utils/day-map-engine';
 import { buildEncounterCreature, recordEncounterHatch } from '@/utils/encounter-engine';
+import { selectHatch, makeSeededRng } from '@/utils/hatch-selection';
+import { resolveDayLifecycleState } from '@/utils/day-state';
 import { curatePhotos } from '@/utils/photo-curation';
 import { buildReflectionContext } from '@/utils/reflection-context';
 import { resolveVariantCellId } from '@/utils/creature-variant';
@@ -140,8 +142,13 @@ type Version4StoredHomeState = Omit<StoredHomeState, 'version' | 'encounterHisto
   archivedDays: Version5StoredHomeDayRecord[];
   today: Version5StoredHomeDayRecord;
 };
+// v6 → v7 only added optional fields (storedNonce on days; pickProbability /
+// fieldEchoes / birthSignals on creatures), so the stored shape is otherwise
+// identical — the migration is a version bump.
+type Version6StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 6 };
 type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version6StoredHomeState
   | Version5StoredHomeState
   | Version4StoredHomeState
   | Version3StoredHomeState
@@ -240,7 +247,7 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
   });
 
   return {
-    version: 6,
+    version: 7,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -804,7 +811,12 @@ function recordHatchedEncounter(history: EncounterHistoryMap, day: StoredHomeDay
 // days only merge in extra steps/locations they were missing.
 export function applyBackfilledDays(
   state: StoredHomeState,
-  backfilled: { isoDate: string; stepsCount: number; locations: StoredHomeLocationPoint[] }[],
+  backfilled: {
+    isoDate: string;
+    stepsCount: number;
+    locations: StoredHomeLocationPoint[];
+    vision?: DayVisionSummary | null;
+  }[],
   profile: OnboardingProfile,
   now: Date
 ): StoredHomeState {
@@ -824,6 +836,10 @@ export function applyBackfilledDays(
         ...day,
         stepsCount: Math.max(day.stepsCount, incoming.stepsCount),
         locations: day.locations.length > 0 ? day.locations : incoming.locations,
+        // Carry the on-device vision read so a later hatch picks the creature the
+        // photos actually showed (and the quote can name it) — without it the
+        // reconstructed day falls back to a generic step/place creature.
+        vision: day.vision ?? incoming.vision ?? undefined,
       };
     });
 
@@ -846,6 +862,7 @@ export function applyBackfilledDays(
       promptAnswers: [],
       heroPhoto: null,
       creature: null,
+      vision: day.vision ?? undefined,
     }));
 
   const mergedArchived = [...keptArchived, ...newDays].sort((left, right) =>
@@ -1155,7 +1172,7 @@ function normalizeStoredHomeState(
       : undefined;
 
   return {
-    version: 6,
+    version: 7,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
@@ -1207,13 +1224,23 @@ function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHome
     promptAnswers: [],
     heroPhoto: null,
     creature: null,
+    storedNonce: makeStoredNonce(now),
   };
 }
 
+// A stable per-day nonce, generated once at day creation, that seeds the hatch
+// RNG so the probabilistic draw differs day to day yet stays reproducible.
+function makeStoredNonce(now: Date): string {
+  return `${now.getTime().toString(36)}-${toLocalDateId(now)}`;
+}
+
 function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
-  if ('version' in inputState && inputState.version === 6) {
+  // v7 passthrough and the v6 → v7 bump share a body: the shape is identical
+  // apart from the version number (only optional fields were added).
+  if ('version' in inputState && (inputState.version === 7 || inputState.version === 6)) {
     return {
       ...inputState,
+      version: 7,
       encounterHistory: inputState.encounterHistory ?? {},
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
@@ -1224,7 +1251,7 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
   if ('version' in inputState && inputState.version === 5) {
     return {
       ...inputState,
-      version: 6,
+      version: 7,
       encounterHistory: inputState.encounterHistory ?? {},
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
@@ -1234,7 +1261,7 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
-      version: 6,
+      version: 7,
       encounterHistory: {},
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
@@ -1243,7 +1270,7 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 6,
+      version: 7,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
@@ -1255,7 +1282,7 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 6,
+      version: 7,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
@@ -1268,7 +1295,7 @@ function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredH
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 6,
+    version: 7,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -1705,28 +1732,14 @@ export function resolveHatchHour(profile: OnboardingProfile) {
 }
 
 function resolveDayState(day: StoredHomeDayRecord, now: Date, hatchHour: number): HomeDayState {
-  if (day.creature) {
-    return 'hatched';
-  }
-
-  if (day.state === 'ready_to_hatch') {
-    return 'ready_to_hatch';
-  }
-
-  if (!dayHasShape(day)) {
-    return 'forming';
-  }
-
-  const sameDay = day.isoDate === toLocalDateId(now);
-  if (sameDay && now.getHours() >= hatchHour) {
-    return 'ready_to_hatch';
-  }
-
-  if (!sameDay) {
-    return 'ready_to_hatch';
-  }
-
-  return 'forming';
+  return resolveDayLifecycleState({
+    hasCreature: Boolean(day.creature),
+    storedState: day.state,
+    hasShape: dayHasShape(day),
+    isSameDay: day.isoDate === toLocalDateId(now),
+    hour: now.getHours(),
+    hatchHour,
+  });
 }
 
 function computeDayScores(day: StoredHomeDayRecord) {
@@ -1902,8 +1915,21 @@ function finalizeDayHatch(
   const primaryTrait = sortedTraits[0] ?? 'calm';
   const secondaryTrait = sortedTraits[1] ?? 'focus';
 
-  const encounterCreature = buildEncounterCreature(day, encounterHistory, primaryTrait, secondaryTrait);
-  if (encounterCreature) {
+  // Hatch Engine v2: the day's candidate field is drawn probabilistically (not
+  // argmax), seeded so the draw is reproducible across re-derivations. The
+  // previously-hatched day is demoted so two days rarely hatch the same creature.
+  const yesterdayProfileId = resolveYesterdayProfileId(day, pastDays);
+  const seed = `${day.isoDate}|${dayInputSignature(day)}|${day.storedNonce ?? ''}`;
+  const selection = selectHatch({
+    day,
+    history: encounterHistory,
+    yesterdayProfileId,
+    rng: makeSeededRng(seed),
+    primaryTrait,
+    secondaryTrait,
+  });
+  if (selection) {
+    const encounterCreature = selection.creature;
     // The same mood × bond-depth read that drives the words also selects the
     // creature's expression cutout — computed once here, at hatch, and persisted.
     const context = buildReflectionContext({ ...day, creature: encounterCreature }, pastDays);
@@ -1955,6 +1981,24 @@ function finalizeDayHatch(
       repeatDepth: 0,
     },
   };
+}
+
+// The encounterProfileId of the most recent hatched day before this one — fed
+// to the v2 selector so consecutive days lean away from repeating a creature.
+function resolveYesterdayProfileId(
+  day: StoredHomeDayRecord,
+  pastDays: readonly StoredHomeDayRecord[]
+): string | null {
+  let best: StoredHomeDayRecord | null = null;
+  for (const candidate of pastDays) {
+    if (candidate.isoDate >= day.isoDate || !candidate.creature?.encounterProfileId) {
+      continue;
+    }
+    if (!best || candidate.isoDate > best.isoDate) {
+      best = candidate;
+    }
+  }
+  return best?.creature?.encounterProfileId ?? null;
 }
 
 function resolveRarity(scores: DayScores, moments: HomeMoment[]) {

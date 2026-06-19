@@ -79,16 +79,15 @@ export function useHomeScreenState() {
     const now = new Date();
     const profile = loadOnboardingProfile();
     const hydrated = hydrateHomeState(loadStoredHomeState() ?? storedStateRef.current, profile, now);
-    const latestReadyArchived = [...hydrated.timelineDays]
-      .reverse()
-      .find((day) => day.kind === 'day' && !day.isToday && day.state === 'ready_to_hatch');
 
     setStoredState((current) => (areStoredStatesEqual(current, hydrated.state) ? current : hydrated.state));
     setSelectedDayId((current) => {
-      if (latestReadyArchived) {
-        return latestReadyArchived.id;
-      }
-
+      // Always land on TODAY (and keep an explicit selection when it's still a
+      // real day in the timeline). We deliberately do NOT auto-jump to an
+      // unhatched past day: backfilled/missed days resolve to "ready_to_hatch",
+      // so auto-selecting one made the app open on a "Reveal hatch" screen that
+      // read as today even before the hatch hour. Past days are reached via the
+      // timeline instead.
       if (hydrated.timelineDays.some((day) => day.id === current)) {
         return current;
       }
@@ -111,6 +110,19 @@ export function useHomeScreenState() {
     });
 
     return () => subscription.remove();
+  }, [syncState]);
+
+  // Re-derive on a minute tick so a continuously-open app crosses its hatch hour
+  // (forming → ready) and the midnight rollover on its own — without it, the
+  // derived day state only refreshes on focus / foreground / a state mutation,
+  // which is what made "today" look hatchable (or not) until you reselected it.
+  // syncState no-ops when nothing actually changed, so this stays cheap.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      syncState();
+    }, 60_000);
+
+    return () => clearInterval(interval);
   }, [syncState]);
 
   useEffect(() => {
@@ -429,7 +441,10 @@ export function useHomeScreenState() {
 
     void (async () => {
       const profile = loadOnboardingProfile();
-      const days = await collectBackfillDays(new Date(), 3);
+      // Reconstruct the last 5 days, reading each day's photos on-device so the
+      // stored day carries its vision — that's what lets a later hatch pick the
+      // creature the photos showed and write a specific (non-generic) quote.
+      const days = await collectBackfillDays(new Date(), 5, { analyzeVision: true });
       const now = new Date();
       setStoredState((currentState) => {
         const hydrated = hydrateHomeState(currentState, profile, now);

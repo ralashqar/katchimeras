@@ -33,6 +33,8 @@ const visualKeys = [
   'pagelet', 'hooplet', 'serveling', 'petalimp', 'fernip',
   'drizzlet', 'amberleaf', 'blossle', 'peakle', 'stillo', 'twinklet', 'feastle',
   'museling', 'tasklet', 'cheerlet', 'voyagle', 'skylo', 'flexel',
+  'mendle', 'pixooka',
+  'snoozle', 'encora', 'vesperitt', 'dawnle', 'tempesto', 'mistle',
 ];
 const homeCreatureVisualsStub = Object.fromEntries(
   visualKeys.map((key) => [key, { source: 0, accentColor: '#FFFFFF' }])
@@ -438,6 +440,27 @@ check('sunset day hatches Duskle', engine.buildEncounterCreature(subjectDay('sun
   check(`${concept} day hatches ${name}`, creature?.name === name, JSON.stringify(creature?.name));
 });
 
+// 8t. Wave D — embody newly-tracked inputs (hobby, sleep, mood, time, weather).
+check('gaming vision hatches Pixooka', engine.buildEncounterCreature(subjectDay('gaming'), {}, 'focus', 'energy')?.name === 'Pixooka');
+check('concert vision hatches Encora', engine.buildEncounterCreature(subjectDay('concert'), {}, 'social', 'calm')?.name === 'Encora');
+
+const stormDay = makeDay({ weather: { condition: 'storm', source: 'forecast' } });
+check('storm weather hatches Tempesto', engine.buildEncounterCreature(stormDay, {}, 'energy', 'calm')?.name === 'Tempesto', JSON.stringify(engine.buildEncounterCreature(stormDay, {}, 'energy', 'calm')?.name));
+const fogDay = makeDay({ weather: { condition: 'fog', source: 'forecast' } });
+check('fog weather hatches Mistle', engine.buildEncounterCreature(fogDay, {}, 'calm', 'focus')?.name === 'Mistle');
+
+const nightDay = makeDay({ locations: [makeLocation(40, -74, '2026-06-12T02:00:00')] });
+check('small-hours day hatches Vesperitt', engine.buildEncounterCreature(nightDay, {}, 'calm', 'focus')?.name === 'Vesperitt', JSON.stringify(engine.buildEncounterCreature(nightDay, {}, 'calm', 'focus')?.name));
+const dawnDay = makeDay({ locations: [makeLocation(40, -74, '2026-06-12T05:00:00')] });
+check('dawn day hatches Dawnle', engine.buildEncounterCreature(dawnDay, {}, 'energy', 'calm')?.name === 'Dawnle', JSON.stringify(engine.buildEncounterCreature(dawnDay, {}, 'energy', 'calm')?.name));
+
+const sleepGreatDay = makeDay({ promptAnswers: [makePromptAnswer('sleep', ['great'], ['Great'], ['sleep:great'], { energy: 0.2, calm: 0.1 }, [{ seedId: 'well_rested', intensity: 0.36 }])] });
+check('great sleep hatches Snoozle', engine.buildEncounterCreature(sleepGreatDay, {}, 'energy', 'calm')?.name === 'Snoozle');
+
+const tenderDay = makeDay({ promptAnswers: [makePromptAnswer('meaning', ['got_through_it'], ['Got through it'], ['meaning:got_through_it', 'tender_day'], { calm: 0.16, focus: 0.1 }, [{ seedId: 'tender_day', intensity: 0.36 }])] });
+const tenderCreature = engine.buildEncounterCreature(tenderDay, {}, 'calm', 'focus');
+check('got-through-it day hatches Mendle as rare (uncommon floor)', tenderCreature?.name === 'Mendle' && tenderCreature?.rarity === 'rare', JSON.stringify({ n: tenderCreature?.name, r: tenderCreature?.rarity }));
+
 // 8n. A real run still outranks an incidental vision label (intensity ordering).
 const runWithVisionDay = makeDay({
   stepsCount: 9800,
@@ -527,6 +550,12 @@ const repeatPast = hatchPast.buildHatchYourPast([
 check('HP: repeat days bond into one creature', repeatPast.creatures.length === 1 && repeatPast.creatures[0].name === 'Baristabbit', JSON.stringify(repeatPast.creatures.map((c) => c.name)));
 check('HP: bond visit count accumulates', repeatPast.creatures[0].visitCount === 3, String(repeatPast.creatures[0]?.visitCount));
 check('HP: days hatched counted', repeatPast.daysHatched === 3, String(repeatPast.daysHatched));
+check(
+  'HP: hatchedDays carries a real hatched record per day (so Home can persist them)',
+  repeatPast.hatchedDays.length === repeatPast.daysHatched &&
+    repeatPast.hatchedDays.every((day) => day.creature != null && day.state === 'hatched'),
+  JSON.stringify(repeatPast.hatchedDays.map((day) => ({ d: day.isoDate, c: day.creature?.name, s: day.state })))
+);
 
 // HP2. Varied days yield distinct creatures.
 const variedPast = hatchPast.buildHatchYourPast([
@@ -554,6 +583,33 @@ const rarePast = hatchPast.buildHatchYourPast([
 ]);
 const climax = rarePast.creatures[rarePast.creatures.length - 1];
 check('HP: rarer creature revealed last', climax.rarity !== 'common', JSON.stringify(rarePast.creatures.map((c) => ({ n: c.name, r: c.rarity }))));
+
+// HP6. Vision carried through toHatchablePastDay hatches the photo's actual
+// subject (a dog day → Waglet), not a generic step/place creature — the fix that
+// makes reconstructed past days specific instead of generic.
+const dogVisionPast = hatchPast.buildHatchYourPast([
+  hatchPast.toHatchablePastDay(
+    {
+      isoDate: '2026-06-12',
+      stepsCount: 3000,
+      locations: [],
+      vision: {
+        concepts: [{ name: 'dog', salience: 2.4, coverage: 0.8, count: 4, peakConfidence: 0.9 }],
+        details: [],
+        maxFaceCount: 0,
+        faceCoverage: 0,
+        textTokens: [],
+        analyzedPhotoCount: 5,
+      },
+    },
+    []
+  ),
+]);
+check(
+  'HP: vision-carrying past day hatches its subject (Waglet), not a generic creature',
+  dogVisionPast.creatures.some((c) => c.name === 'Waglet'),
+  JSON.stringify(dogVisionPast.creatures.map((c) => c.name))
+);
 
 console.log(failures === 0 ? '\nAll encounter-engine checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -43,6 +43,7 @@ Module._resolveFilename = function (request, ...rest) {
 };
 
 const promptEngine = require(enginePath);
+const dayPrompts = require(promptsPath);
 
 function makeDay(overrides = {}) {
   return {
@@ -191,6 +192,40 @@ const menuDay = makeDay();
 const menuKinds = promptEngine.listAvailableDayPrompts(menuDay, new Date('2026-06-17T08:00:00')).map((p) => p.id);
 check('menu lists multiple categories', menuKinds.length >= 2, menuKinds.join(','));
 check('menu excludes non-launched prompts', !menuKinds.includes('intention'), menuKinds.join(','));
+
+// --- Daylio-style expansion: new categories + icon coverage ---
+check('menu offers Sleep and Hobby', menuKinds.includes('sleep') && menuKinds.includes('hobby'), menuKinds.join(','));
+const launched = dayPrompts.launchedDayPrompts;
+check('sleep + hobby are launched', launched.some((p) => p.id === 'sleep') && launched.some((p) => p.id === 'hobby'), launched.map((p) => p.id).join(','));
+check(
+  'every launched prompt has a category icon',
+  launched.every((p) => typeof p.categoryIcon === 'string' && p.categoryIcon.length > 0),
+  launched.filter((p) => !p.categoryIcon).map((p) => p.id).join(',')
+);
+check(
+  'every launched option carries an icon',
+  launched.every((p) => p.options.every((o) => typeof o.icon === 'string' && o.icon.length > 0)),
+  launched.flatMap((p) => p.options.filter((o) => !o.icon).map((o) => `${p.id}:${o.id}`)).join(',')
+);
+// The hobby options carry their encounter seeds (movie → cinema, reading →
+// bookstore, sport → gym) so a logged hobby can hatch its creature.
+const hobby = launched.find((p) => p.id === 'hobby');
+const hobbySeed = (id) => hobby.options.find((o) => o.id === id)?.encounterSeedBias?.[0]?.seedId;
+check(
+  'hobby options map to encounter seeds (incl. gaming + live music)',
+  hobbySeed('movie') === 'cinema' &&
+    hobbySeed('reading') === 'bookstore' &&
+    hobbySeed('gaming') === 'gaming_session' &&
+    hobbySeed('music') === 'live_music',
+  JSON.stringify(hobby.options.map((o) => ({ id: o.id, seed: o.encounterSeedBias?.[0]?.seedId })))
+);
+const sleep = launched.find((p) => p.id === 'sleep');
+const sleepSeed = (id) => sleep.options.find((o) => o.id === id)?.encounterSeedBias?.[0]?.seedId;
+check(
+  'sleep maps great→well_rested and barely→tender_day',
+  sleepSeed('great') === 'well_rested' && sleepSeed('barely') === 'tender_day',
+  JSON.stringify(sleep.options.map((o) => ({ id: o.id, seed: o.encounterSeedBias?.[0]?.seedId })))
+);
 
 // No photos → no Photo option in the menu.
 check('no Photo option without photo candidates', !menuKinds.includes('meaningful_photo'), menuKinds.join(','));

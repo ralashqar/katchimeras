@@ -1,55 +1,31 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { presenceEnter } from '@/components/katchadeck/motion';
-import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import { encounterCastByProfileId } from '@/constants/encounter-cast';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import type { StoredHomeState } from '@/types/home';
+import { bondStageLabel } from '@/utils/bond';
+import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
 import { hydrateHomeState } from '@/utils/home-engine';
 import { loadStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 const auroraRing = require('../../assets/images/katchimeras/aurora-ring.png');
 
-type MetCharacter = {
-  profileId: string;
-  name: string;
-  count: number;
-  visualSource: ReturnType<typeof resolveVisualSource>;
+const RARITY_COLOR: Record<string, string> = {
+  common: Lantern.moon500,
+  rare: '#7DE8CD',
+  epic: '#A78BFA',
+  legendary: '#FFC36B',
 };
-
-function resolveVisualSource(profileId: string) {
-  const castEntry = encounterCastByProfileId.get(profileId);
-  return castEntry ? homeCreatureVisuals[castEntry.visualKey].source : null;
-}
-
-function buildMetCharacters(state: StoredHomeState): MetCharacter[] {
-  return Object.entries(state.encounterHistory)
-    .map(([profileId, entry]) => {
-      const castEntry = encounterCastByProfileId.get(profileId);
-      if (!castEntry) {
-        return null;
-      }
-      const name = profileId.split('_').slice(-1)[0];
-      return {
-        profileId,
-        name: name.charAt(0).toUpperCase() + name.slice(1),
-        count: entry.count,
-        visualSource: resolveVisualSource(profileId),
-      };
-    })
-    .filter((entry): entry is MetCharacter => entry !== null)
-    .sort((left, right) => right.count - left.count);
-}
 
 export default function CollectionScreen() {
   const router = useRouter();
@@ -63,11 +39,13 @@ export default function CollectionScreen() {
     }, [])
   );
 
-  const met = state ? buildMetCharacters(state) : [];
-  const hatchedDays = state
-    ? [...state.archivedDays, state.today].filter((day) => day.creature !== null)
-    : [];
-  const deepest = met[0] ?? null;
+  const dex: Dex | null = useMemo(() => {
+    if (!state) return null;
+    const hatchedDays = [...state.archivedDays, state.today].filter((day) => day.creature !== null);
+    return buildDex(state.encounterHistory, hatchedDays);
+  }, [state]);
+
+  const completion = dex && dex.total > 0 ? Math.round((dex.collected / dex.total) * 100) : 0;
 
   return (
     <View style={styles.screen}>
@@ -82,14 +60,13 @@ export default function CollectionScreen() {
         showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter()}>
           <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            Your collection
+            The Dex
           </ThemedText>
           <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            The days you kept.
+            Every kind of day.
           </ThemedText>
           <ThemedText style={styles.subtitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            {hatchedDays.length} {hatchedDays.length === 1 ? 'day' : 'days'} hatched · {met.length}{' '}
-            {met.length === 1 ? 'character' : 'characters'} met
+            {dex ? `${dex.collected} of ${dex.total} met · ${completion}% complete` : 'Loading…'}
           </ThemedText>
         </Animated.View>
 
@@ -97,57 +74,60 @@ export default function CollectionScreen() {
           <KatchaButton label="Open the life map" onPress={() => router.push('/life-map')} variant="secondary" />
         </Animated.View>
 
-        {met.length > 0 ? (
-          <Animated.View entering={presenceEnter(80)} style={styles.grid}>
-            {met.map((character) => (
-              <View key={character.profileId} style={styles.gridItem}>
-                <View style={styles.orb}>
-                  <Image contentFit="contain" source={auroraRing} style={StyleSheet.absoluteFill} transition={0} />
-                  {character.visualSource ? (
-                    <Image contentFit="contain" source={character.visualSource} style={styles.orbImage} transition={0} />
-                  ) : null}
-                </View>
-                <ThemedText style={styles.orbName} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                  {character.name}
+        {dex?.categories.map((category, sectionIndex) => {
+          const entries = dex.entries.filter((entry) => entry.category === category.category);
+          return (
+            <Animated.View key={category.category} entering={presenceEnter(80 + sectionIndex * 40)} style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <ThemedText type="onboardingLabel" style={styles.sectionTitle} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                  {dexCategoryLabel[category.category]}
                 </ThemedText>
-                <ThemedText style={styles.orbCount} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  {character.count} {character.count === 1 ? 'visit' : 'visits'}
+                <ThemedText style={styles.sectionCount} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                  {category.collected}/{category.total}
                 </ThemedText>
               </View>
-            ))}
-          </Animated.View>
-        ) : (
-          <Animated.View entering={presenceEnter(80)}>
-            <GlassPanel contentStyle={styles.emptyPanel}>
-              <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Still forming
-              </ThemedText>
-              <ThemedText style={styles.emptyBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                Your first hatches will gather here. Live a day, reveal it tonight, and the collection
-                begins itself.
-              </ThemedText>
-            </GlassPanel>
-          </Animated.View>
-        )}
-
-        {deepest && deepest.visualSource ? (
-          <Animated.View entering={presenceEnter(160)}>
-            <GlassPanel contentStyle={styles.bondPanel} fillColor={Lantern.ink800}>
-              <View style={styles.bondPortrait}>
-                <Image contentFit="contain" source={deepest.visualSource} style={styles.bondImage} transition={0} />
+              <View style={styles.grid}>
+                {entries.map((entry) => (
+                  <DexCell key={entry.speciesId} entry={entry} />
+                ))}
               </View>
-              <View style={styles.bondCopy}>
-                <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                  Deepest bond
-                </ThemedText>
-                <ThemedText style={styles.bondName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {deepest.name} · {deepest.count} {deepest.count === 1 ? 'visit' : 'visits'}
-                </ThemedText>
-              </View>
-            </GlassPanel>
-          </Animated.View>
-        ) : null}
+            </Animated.View>
+          );
+        })}
       </ScrollView>
+    </View>
+  );
+}
+
+function DexCell({ entry }: { entry: DexEntry }) {
+  const source = homeCreatureVisuals[entry.visualKey]?.source ?? null;
+  const rarityColor = entry.highestRaritySeen ? RARITY_COLOR[entry.highestRaritySeen] ?? Lantern.moon500 : Lantern.moon500;
+
+  return (
+    <View style={styles.gridItem}>
+      <View style={styles.orb}>
+        <Image contentFit="contain" source={auroraRing} style={StyleSheet.absoluteFill} transition={0} />
+        {source ? (
+          <Image
+            contentFit="contain"
+            source={source}
+            style={[styles.orbImage, entry.locked ? styles.lockedImage : null]}
+            transition={0}
+          />
+        ) : null}
+      </View>
+      <ThemedText style={styles.orbName} lightColor={entry.locked ? Lantern.moon500 : Lantern.moon50} darkColor={entry.locked ? Lantern.moon500 : Lantern.moon50}>
+        {entry.locked ? '???' : entry.name}
+      </ThemedText>
+      {entry.locked ? (
+        <ThemedText style={styles.orbMeta} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          Not yet met
+        </ThemedText>
+      ) : (
+        <ThemedText style={[styles.orbMeta, { color: rarityColor }]}>
+          {entry.highestRaritySeen ?? 'common'} · {bondStageLabel(entry.bondStage)}
+        </ThemedText>
+      )}
     </View>
   );
 }
@@ -176,6 +156,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 10,
   },
+  section: {
+    gap: 14,
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: {
+    fontSize: 12,
+  },
+  sectionCount: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -196,41 +191,18 @@ const styles = StyleSheet.create({
     height: 62,
     width: 62,
   },
+  lockedImage: {
+    opacity: 0.12,
+  },
   orbName: {
     fontSize: 13,
     fontWeight: '700',
     marginTop: 8,
   },
-  orbCount: {
+  orbMeta: {
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
-  },
-  emptyPanel: {
-    gap: 8,
-  },
-  emptyBody: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  bondPanel: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 16,
-  },
-  bondPortrait: {
-    height: 64,
-    width: 64,
-  },
-  bondImage: {
-    height: '100%',
-    width: '100%',
-  },
-  bondCopy: {
-    gap: 4,
-  },
-  bondName: {
-    fontSize: 16,
-    fontWeight: '700',
+    textTransform: 'capitalize',
   },
 });

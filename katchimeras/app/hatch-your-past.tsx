@@ -8,12 +8,11 @@ import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
-import { collectBackfillDays } from '@/utils/day-backfill';
-import { applyBackfilledDays, getCreatureVisual, hydrateHomeState } from '@/utils/home-engine';
-import { buildHatchYourPast, toHatchablePastDay, type HatchedPastCreature } from '@/utils/hatch-your-past';
-import { loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
+import { enrichBackfillReflections, runBackfillFoundation } from '@/utils/day-backfill';
+import { getCreatureVisual, hydrateHomeState } from '@/utils/home-engine';
+import { buildHatchYourPast, type HatchedPastCreature } from '@/utils/hatch-your-past';
+import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
-import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
 
 type Phase = 'scanning' | 'reveal' | 'empty';
 
@@ -22,47 +21,60 @@ export default function HatchYourPastRoute() {
   const [phase, setPhase] = useState<Phase>('scanning');
   const [creatures, setCreatures] = useState<HatchedPastCreature[]>([]);
   const [daysHatched, setDaysHatched] = useState(0);
+  const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
     let active = true;
 
     (async () => {
-      const now = new Date();
-      const backfilled = await collectBackfillDays(now, 5, { requestPhotoPermission: true });
-
-      // Resolve each day's place categories so cafes/parks/museums hatch, not
-      // just step-based creatures. Best-effort: empty seeds on any failure.
-      const priorDays = [];
-      const pastDays = [];
-      for (const day of backfilled) {
-        const seeds = await resolvePlaceSeedsForDay(toHatchablePastDay(day, []), priorDays);
-        const record = toHatchablePastDay(day, seeds);
-        pastDays.push(record);
-        priorDays.push(record);
-      }
-
-      const result = buildHatchYourPast(pastDays);
-
-      // Persist so the collection + life map are genuinely owned from day one.
+      // Start from a CLEAN slate. The normal backfill deliberately preserves any
+      // day that already has a creature (so it never clobbers days you actually
+      // lived) — which is why a previous session's katchimeras stayed put and
+      // nothing updated. This screen is the "start as if today is day one"
+      // simulation, so we wipe the current session first: a fresh forming today
+      // and no prior days, letting the reconstruction fully own the last few days.
       try {
         const profile = loadOnboardingProfile();
-        const hydrated = hydrateHomeState(loadStoredHomeState(), profile, now);
-        const withDays = applyBackfilledDays(hydrated.state, backfilled, profile, now);
-        saveStoredHomeState({
-          ...withDays,
-          encounterHistory: { ...withDays.encounterHistory, ...result.encounterHistory },
-        });
+        const now = new Date();
+        clearStoredHomeState();
+        const fresh = hydrateHomeState(null, profile, now).state;
+        saveStoredHomeState({ ...fresh, archivedDays: [], backfilledAt: undefined });
       } catch {
-        // Persistence is best-effort; the reveal still stands.
+        // If the reset fails, the backfill below still runs against whatever
+        // state exists (it just won't overwrite already-hatched days).
       }
+
+      // Persist through the SAME proven pipeline the "Backfill real history" dev
+      // button uses: scan → curate → cluster photos into pins (saved first), then
+      // HATCH each past day, then defer the LLM quotes. This writes real hatched
+      // days (creature + vision + map pins) to storage, so landing on Home shows
+      // them. We then build the reveal from what was actually persisted, so the
+      // animation and Home always agree.
+      let summary = '';
+      try {
+        const result = await runBackfillFoundation();
+        summary = result.summary;
+        if (result.pendingReflectionDayIds.length > 0) {
+          void enrichBackfillReflections(result.pendingReflectionDayIds);
+        }
+      } catch (error) {
+        summary = `Backfill failed: ${String((error as { message?: string })?.message ?? error)}`;
+      }
+
+      // Reveal from the persisted hatched past days (re-deriving the collection is
+      // deterministic), so the reveal can never diverge from what's on Home.
+      const stored = loadStoredHomeState();
+      const hatchedPastDays = (stored?.archivedDays ?? []).filter((day) => day.creature != null);
+      const reveal = buildHatchYourPast(hatchedPastDays);
 
       if (!active) {
         return;
       }
-      setCreatures(result.creatures);
-      setDaysHatched(result.daysHatched);
-      setPhase(result.creatures.length > 0 ? 'reveal' : 'empty');
+      setDiagnostic(summary);
+      setCreatures(reveal.creatures);
+      setDaysHatched(hatchedPastDays.length);
+      setPhase(reveal.creatures.length > 0 ? 'reveal' : 'empty');
     })();
 
     return () => {
@@ -108,6 +120,11 @@ export default function HatchYourPastRoute() {
             We couldn’t find enough of your recent days to read yet. Live one, reveal it at your hatch
             hour, and the collection begins itself.
           </ThemedText>
+          {__DEV__ && diagnostic ? (
+            <ThemedText style={styles.diagnostic} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              {diagnostic}
+            </ThemedText>
+          ) : null}
           <View style={styles.cta}>
             <KatchaButton label="Begin" onPress={finish} variant="primary" />
           </View>
@@ -132,6 +149,11 @@ export default function HatchYourPastRoute() {
             Hatched from {daysHatched} {daysHatched === 1 ? 'day' : 'days'} you already lived. They’re in
             your collection now — and they’ll remember you.
           </ThemedText>
+          {__DEV__ && diagnostic ? (
+            <ThemedText style={styles.diagnostic} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              {diagnostic}
+            </ThemedText>
+          ) : null}
           <View style={styles.summaryRow}>
             {creatures.map((creature) => {
               const visual = getCreatureVisual(creature.visualKey);
@@ -210,6 +232,13 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 15,
     lineHeight: 22,
+    maxWidth: 340,
+    textAlign: 'center',
+  },
+  diagnostic: {
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 15,
     maxWidth: 340,
     textAlign: 'center',
   },

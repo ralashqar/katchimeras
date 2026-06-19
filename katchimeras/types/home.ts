@@ -71,7 +71,15 @@ export type HomeVisualKey =
   | 'cheerlet'
   | 'voyagle'
   | 'skylo'
-  | 'flexel';
+  | 'flexel'
+  | 'mendle'
+  | 'pixooka'
+  | 'snoozle'
+  | 'encora'
+  | 'vesperitt'
+  | 'dawnle'
+  | 'tempesto'
+  | 'mistle';
 
 export type DayScores = Record<HomeScoreKey, number>;
 
@@ -82,6 +90,8 @@ export type DayPromptKind =
   | 'meaning'
   | 'day_word'
   | 'meaningful_photo'
+  | 'sleep'
+  | 'hobby'
   | 'intention'
   | 'energy'
   | 'inner_weather'
@@ -193,6 +203,22 @@ export type HomeMomentMetadata = {
   locationType?: HomeLocationType;
   latitude?: number;
   longitude?: number;
+};
+
+// A single weighted signal the day surfaced, unified across every input source
+// for the orbiting field around the egg. `weight` (0..1) drives orbit radius +
+// size + glow; `feedsSpecies` links the tag to the candidate creature(s) it
+// pushes, so tapping a tag can glow them. See utils/day-tags.ts.
+export type DayTagSource = 'moment' | 'prompt' | 'vision' | 'place' | 'steps' | 'capture' | 'weather';
+
+export type DayTag = {
+  id: string;
+  label: string;
+  icon: IconSymbolName;
+  accentColor: string;
+  weight: number;
+  feedsSpecies: string[]; // encounterProfileIds
+  source: DayTagSource;
 };
 
 export type StoredHomeLocationPoint = {
@@ -439,6 +465,12 @@ export type LocalCreatureRecord = {
   mood?: string;
   bondDepth?: string;
   variantCell?: string;
+  // Hatch Engine v2: the probability this creature had of being drawn from the
+  // day's candidate field, the candidates it beat ("echoes"), and the seed
+  // signals that formed it. Fixed at hatch. See utils/hatch-selection.ts.
+  pickProbability?: number;
+  fieldEchoes?: KatchimeraFieldEcho[];
+  birthSignals?: string[];
 };
 
 export type EncounterHistoryEntry = {
@@ -447,6 +479,19 @@ export type EncounterHistoryEntry = {
 };
 
 export type EncounterHistoryMap = Record<string, EncounterHistoryEntry>;
+
+// A candidate the day's field surfaced that the hatch did NOT pick — the
+// "almost caught" echo. Persisted on the winning creature so the reveal/share
+// can say "you beat Ironette (Epic), 12%" without recomputation. See
+// utils/hatch-selection.ts.
+export type KatchimeraFieldEcho = {
+  speciesId: string; // the losing creature's encounterProfileId
+  name: string;
+  visualKey: HomeVisualKey;
+  rarity: HomeRarityTier;
+  probability: number; // its share of the softmax this day (0..1)
+  reason: string | null; // the day's living reason, when it would have been rare+
+};
 
 export type StoredHomeDayRecord = {
   id: string;
@@ -478,10 +523,15 @@ export type StoredHomeDayRecord = {
   // Cheap signature of the inputs the derived fields (dayMap, place counts)
   // depend on — lets normalize skip re-deriving settled archived days.
   derivedSignature?: string;
+  // Stable per-day nonce, generated once when the forming day is created. Seeds
+  // the hatch RNG (with isoDate + input signature) so the probabilistic draw is
+  // reproducible across re-derivations yet differs day to day. See
+  // utils/hatch-selection.ts.
+  storedNonce?: string;
 };
 
 export type StoredHomeState = {
-  version: 6;
+  version: 7;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

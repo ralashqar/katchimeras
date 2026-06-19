@@ -1,7 +1,8 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { DayMapPreview } from '@/components/katchadeck/home/day-map-preview';
+import { EggTagField } from '@/components/katchadeck/home/egg-tag-field';
 import type { HomeDayRecord, HomeMoment } from '@/types/home';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { ThemedText } from '@/components/themed-text';
@@ -9,6 +10,8 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import type { ImportedHealthRoutesPayload } from '@/utils/home-engine';
+import { buildDayTags } from '@/utils/day-tags';
+import { previewLeadingCandidate } from '@/utils/hatch-selection';
 import { Lantern } from '@/constants/theme';
 
 type DayContextProps = {
@@ -38,6 +41,8 @@ export function DayContext({
 }: DayContextProps) {
   if (day.isToday && day.state !== 'hatched') {
     const passiveSignals = buildPassiveSignals(day);
+    const tags = buildDayTags(day);
+    const forecast = buildEggForecast(day);
 
     return (
       <View style={styles.stack}>
@@ -47,20 +52,16 @@ export function DayContext({
               Today
             </ThemedText>
             <ThemedText style={styles.microCopy} lightColor="#C6D2F2" darkColor="#C6D2F2">
-              Moments shape the hatch.
+              {forecast}
             </ThemedText>
           </View>
           <KatchaButton icon="sparkles" label="Add moment" onPress={onAddMoment} variant="primary" />
         </View>
 
-        {day.moments.length > 0 ? (
-          <ScrollView horizontal contentContainerStyle={styles.chipRow} showsHorizontalScrollIndicator={false}>
-            {day.moments.map((moment, index) => (
-              <Animated.View entering={presenceEnter(index * 50)} key={moment.id}>
-                <MomentChip moment={moment} />
-              </Animated.View>
-            ))}
-          </ScrollView>
+        {tags.length > 0 ? (
+          <Animated.View entering={presenceEnter(40)}>
+            <EggTagField tags={tags} />
+          </Animated.View>
         ) : (
           <ThemedText style={styles.helperCompact} lightColor="#DCE6FF" darkColor="#DCE6FF">
             Photo, inspiration, one small moment.
@@ -153,15 +154,14 @@ export function DayContext({
   );
 }
 
-function MomentChip({ moment }: { moment: HomeMoment }) {
-  return (
-    <View style={styles.momentChip}>
-      <View style={[styles.chipDot, { backgroundColor: moment.accentColor, boxShadow: `0 0 12px ${moment.accentColor}AA` }]} />
-      <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {moment.label}
-      </ThemedText>
-    </View>
-  );
+// Pre-hatch egg copy: hint at the *kind of day* leading the hidden candidate
+// field, without naming the creature (it stays a surprise until the hatch).
+function buildEggForecast(day: HomeDayRecord): string {
+  const leading = previewLeadingCandidate({ day, history: {} });
+  if (leading) {
+    return `A ${leading.categoryLabel.toLowerCase()} day is taking shape.`;
+  }
+  return 'Moments shape the hatch.';
 }
 
 function MomentRow({ moment }: { moment: HomeMoment }) {
@@ -179,10 +179,6 @@ function MomentRow({ moment }: { moment: HomeMoment }) {
 
 function buildPassiveSignals(day: HomeDayRecord) {
   const signals: { id: string; label: string }[] = [];
-
-  if (day.stepsCount > 0) {
-    signals.push({ id: 'steps', label: `${day.stepsCount.toLocaleString()} steps` });
-  }
 
   if (day.visitedPlaceCount > 0) {
     signals.push({
@@ -229,29 +225,6 @@ const styles = StyleSheet.create({
   },
   helperCompact: {
     fontSize: 13,
-    lineHeight: 18,
-  },
-  chipRow: {
-    gap: 10,
-    paddingRight: 20,
-  },
-  momentChip: {
-    alignItems: 'center',
-    backgroundColor: Lantern.dusk700,
-    borderCurve: 'continuous',
-    borderRadius: 999,
-    flexDirection: 'row',
-    gap: 9,
-    paddingHorizontal: 15,
-    paddingVertical: 11,
-  },
-  chipDot: {
-    borderRadius: 999,
-    height: 8,
-    width: 8,
-  },
-  chipLabel: {
-    fontSize: 14,
     lineHeight: 18,
   },
   revealPanel: {
