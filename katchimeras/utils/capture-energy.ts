@@ -9,12 +9,197 @@ import { resolvePhotoCategory } from '@/utils/photo-category';
 
 export type MeaningTag = 'calm' | 'energy' | 'together' | 'meaningful';
 
-export const CAPTURE_MEANINGS: readonly { id: MeaningTag; emoji: string; label: string }[] = [
+export type CaptureMeaning = { id: MeaningTag; emoji: string; label: string };
+
+export const CAPTURE_MEANINGS: readonly CaptureMeaning[] = [
   { id: 'calm', emoji: '🌿', label: 'Calm' },
   { id: 'energy', emoji: '⚡', label: 'Energy' },
   { id: 'together', emoji: '🧑‍🤝‍🧑', label: 'Together' },
   { id: 'meaningful', emoji: '✨', label: 'Meaningful' },
 ];
+
+// Contextual "what did this mean?" options, chosen from the photo's on-device
+// essence — no LLM. Each still maps to one of the four energy archetypes (so
+// buildCaptureEnergy is unchanged); only the wording adapts to what was seen.
+// Keyed by the photo's resolved display category (utils/photo-category.ts).
+const MEANINGS_BY_CATEGORY: Record<string, readonly CaptureMeaning[]> = {
+  people: [
+    { id: 'together', emoji: '🧑‍🤝‍🧑', label: 'Time together' },
+    { id: 'meaningful', emoji: '💛', label: 'People I love' },
+    { id: 'calm', emoji: '🤍', label: 'A warm moment' },
+    { id: 'energy', emoji: '🎉', label: 'Good times' },
+  ],
+  pet: [
+    { id: 'meaningful', emoji: '🐾', label: 'My companion' },
+    { id: 'calm', emoji: '🤍', label: 'Comfort' },
+    { id: 'together', emoji: '💛', label: 'Good company' },
+    { id: 'energy', emoji: '✨', label: 'Playful' },
+  ],
+  food: [
+    { id: 'calm', emoji: '🍵', label: 'Comfort' },
+    { id: 'energy', emoji: '🍰', label: 'A treat' },
+    { id: 'together', emoji: '🍽️', label: 'Shared' },
+    { id: 'meaningful', emoji: '✨', label: 'Worth savoring' },
+  ],
+  drink: [
+    { id: 'calm', emoji: '🍵', label: 'A slow sip' },
+    { id: 'energy', emoji: '⚡', label: 'A pick-me-up' },
+    { id: 'together', emoji: '🫶', label: 'Caught up' },
+    { id: 'meaningful', emoji: '✨', label: 'My ritual' },
+  ],
+  nature: [
+    { id: 'calm', emoji: '🌿', label: 'Peaceful' },
+    { id: 'meaningful', emoji: '🌸', label: 'Beautiful' },
+    { id: 'energy', emoji: '💨', label: 'Fresh air' },
+    { id: 'together', emoji: '🧑‍🤝‍🧑', label: 'Shared it' },
+  ],
+  water: [
+    { id: 'calm', emoji: '🌊', label: 'Calm water' },
+    { id: 'meaningful', emoji: '✨', label: 'Beautiful' },
+    { id: 'energy', emoji: '💧', label: 'Alive' },
+    { id: 'together', emoji: '🧑‍🤝‍🧑', label: 'Shared view' },
+  ],
+  mountains: [
+    { id: 'meaningful', emoji: '⛰️', label: 'Worth the climb' },
+    { id: 'energy', emoji: '🔥', label: 'Exhilarating' },
+    { id: 'calm', emoji: '🌌', label: 'Big quiet' },
+    { id: 'together', emoji: '🤝', label: 'Made it together' },
+  ],
+  culture: [
+    { id: 'meaningful', emoji: '✨', label: 'Inspiring' },
+    { id: 'calm', emoji: '📖', label: 'Absorbed' },
+    { id: 'energy', emoji: '👀', label: 'Curious' },
+    { id: 'together', emoji: '🎟️', label: 'Shared it' },
+  ],
+  active: [
+    { id: 'energy', emoji: '💪', label: 'Strong' },
+    { id: 'meaningful', emoji: '🏆', label: 'Proud' },
+    { id: 'calm', emoji: '😮‍💨', label: 'Earned rest' },
+    { id: 'together', emoji: '🤝', label: 'With others' },
+  ],
+  landmark: [
+    { id: 'meaningful', emoji: '🗺️', label: 'A milestone' },
+    { id: 'energy', emoji: '✈️', label: 'Adventure' },
+    { id: 'calm', emoji: '🌆', label: 'Taking it in' },
+    { id: 'together', emoji: '🧳', label: 'Shared trip' },
+  ],
+  light: [
+    { id: 'calm', emoji: '🌇', label: 'Serene' },
+    { id: 'meaningful', emoji: '✨', label: 'Beautiful' },
+    { id: 'energy', emoji: '🌟', label: 'Glowing' },
+    { id: 'together', emoji: '🌙', label: 'Shared sky' },
+  ],
+  night: [
+    { id: 'calm', emoji: '🌙', label: 'Quiet wonder' },
+    { id: 'meaningful', emoji: '✨', label: 'Beautiful' },
+    { id: 'energy', emoji: '🌟', label: 'Magic' },
+    { id: 'together', emoji: '🧑‍🤝‍🧑', label: 'Shared it' },
+  ],
+  celebration: [
+    { id: 'energy', emoji: '🎉', label: 'Celebrating' },
+    { id: 'together', emoji: '🥂', label: 'With everyone' },
+    { id: 'meaningful', emoji: '✨', label: 'Special' },
+    { id: 'calm', emoji: '💛', label: 'Joyful' },
+  ],
+  creative: [
+    { id: 'meaningful', emoji: '🎨', label: 'Made this' },
+    { id: 'energy', emoji: '⚡', label: 'In flow' },
+    { id: 'calm', emoji: '🌙', label: 'Lost in it' },
+    { id: 'together', emoji: '🤝', label: 'Shared craft' },
+  ],
+};
+
+// Broader coverage: many photos resolve to a raw label (laptop, controller, TV,
+// car…) that the display-category taxonomy doesn't cover. These keyword rules
+// scan the photo's concept names AND raw detail labels so those still get fitting
+// meanings. Each set still maps only to the four energy archetypes.
+const WORK_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'meaningful', emoji: '✅', label: 'Productive' },
+  { id: 'calm', emoji: '🎯', label: 'In the zone' },
+  { id: 'energy', emoji: '⚡', label: 'Grinding' },
+  { id: 'together', emoji: '🤝', label: 'Teamwork' },
+];
+const GAMES_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'energy', emoji: '🎮', label: 'Gaming' },
+  { id: 'calm', emoji: '🕹️', label: 'Unwinding' },
+  { id: 'together', emoji: '👾', label: 'With friends' },
+  { id: 'meaningful', emoji: '🏆', label: 'Hooked' },
+];
+const MUSIC_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'energy', emoji: '🎶', label: 'Vibing' },
+  { id: 'calm', emoji: '🎧', label: 'Lost in it' },
+  { id: 'together', emoji: '🎤', label: 'Shared it' },
+  { id: 'meaningful', emoji: '✨', label: 'Moved' },
+];
+const WATCHING_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'calm', emoji: '📺', label: 'Unwinding' },
+  { id: 'together', emoji: '🍿', label: 'Watched together' },
+  { id: 'energy', emoji: '🎬', label: 'Gripping' },
+  { id: 'meaningful', emoji: '✨', label: 'Stayed with me' },
+];
+const READING_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'calm', emoji: '📖', label: 'Absorbed' },
+  { id: 'meaningful', emoji: '✨', label: 'Inspiring' },
+  { id: 'energy', emoji: '👀', label: "Couldn't stop" },
+  { id: 'together', emoji: '📚', label: 'Shared a passage' },
+];
+const SHOPPING_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'energy', emoji: '🛍️', label: 'A find' },
+  { id: 'calm', emoji: '🧺', label: 'Errands done' },
+  { id: 'together', emoji: '🤝', label: 'Shopping trip' },
+  { id: 'meaningful', emoji: '✨', label: 'A treat' },
+];
+const COMMUTE_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'calm', emoji: '🚉', label: 'In transit' },
+  { id: 'meaningful', emoji: '🪟', label: 'Window thoughts' },
+  { id: 'energy', emoji: '🚗', label: 'On the move' },
+  { id: 'together', emoji: '🧑‍🤝‍🧑', label: 'Along for the ride' },
+];
+const HOME_MEANINGS: readonly CaptureMeaning[] = [
+  { id: 'calm', emoji: '🛋️', label: 'Cozy' },
+  { id: 'meaningful', emoji: '🤍', label: 'My space' },
+  { id: 'together', emoji: '💛', label: 'Home together' },
+  { id: 'energy', emoji: '✨', label: 'Recharged' },
+];
+
+const KEYWORD_MEANING_RULES: { pattern: RegExp; meanings: readonly CaptureMeaning[] }[] = [
+  { pattern: /focus_work|laptop|computer|keyboard|monitor|\bdesk\b|office|workspace|spreadsheet|meeting/, meanings: WORK_MEANINGS },
+  { pattern: /gaming|game ?controller|gamepad|console|joystick|arcade|video game/, meanings: GAMES_MEANINGS },
+  { pattern: /live_music|concert|\bgig\b|\bstage\b|guitar|piano|violin|instrument|microphone|\bband\b|vinyl|headphones?|turntable|\bdrum/, meanings: MUSIC_MEANINGS },
+  { pattern: /television|\btv\b|remote control/, meanings: WATCHING_MEANINGS },
+  { pattern: /\bbook\b|reading|novel|paperback|bookshelf/, meanings: READING_MEANINGS },
+  { pattern: /shopping|\bstore\b|\bmall\b|retail|boutique|grocery|supermarket/, meanings: SHOPPING_MEANINGS },
+  { pattern: /\bcar\b|vehicle|driving|\broad\b|highway|traffic|\btrain\b|subway|\bbus\b|commute|bicycle|\bbike\b|motorcycle/, meanings: COMMUTE_MEANINGS },
+  { pattern: /couch|sofa|blanket|bedroom|living room|fireplace|\bcozy\b|pajamas/, meanings: HOME_MEANINGS },
+];
+
+function matchKeywordMeanings(word: string): readonly CaptureMeaning[] | null {
+  for (const rule of KEYWORD_MEANING_RULES) {
+    if (rule.pattern.test(word)) {
+      return rule.meanings;
+    }
+  }
+  return null;
+}
+
+// The meaning options to offer for a freshly captured photo, adapted to its
+// essence. Three layers, widest coverage first: (1) keyword rules over the
+// photo's concepts + raw detail labels in salience order, (2) the display
+// category (handles faces / food / nature / etc.), (3) the generic four.
+export function selectCaptureMeanings(vision: DayVisionSummary | null): readonly CaptureMeaning[] {
+  if (!vision) {
+    return CAPTURE_MEANINGS;
+  }
+  const essenceWords = [...vision.concepts.map((concept) => concept.name), ...vision.details];
+  for (const word of essenceWords) {
+    const keyworded = matchKeywordMeanings(word.toLowerCase());
+    if (keyworded) {
+      return keyworded;
+    }
+  }
+  const category = resolvePhotoCategory(vision).id;
+  return MEANINGS_BY_CATEGORY[category] ?? CAPTURE_MEANINGS;
+}
 
 const SCORE_KEYS: HomeScoreKey[] = ['energy', 'calm', 'social', 'exploration', 'focus'];
 

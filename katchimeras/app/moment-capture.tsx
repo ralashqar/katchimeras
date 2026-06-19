@@ -21,7 +21,13 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Lantern } from '@/constants/theme';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
-import { buildCaptureEnergy, CAPTURE_MEANINGS, type MeaningTag } from '@/utils/capture-energy';
+import {
+  buildCaptureEnergy,
+  CAPTURE_MEANINGS,
+  selectCaptureMeanings,
+  type CaptureMeaning,
+  type MeaningTag,
+} from '@/utils/capture-energy';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
@@ -78,6 +84,7 @@ export default function MomentCaptureScreen() {
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [tags, setTags] = useState<EssenceTag[]>([]);
+  const [meanings, setMeanings] = useState<readonly CaptureMeaning[]>(CAPTURE_MEANINGS);
   const visionRef = useRef<DayVisionSummary | null>(null);
 
   // Two timelines drive the tag chips: `intro` (0→1) floats them in when the
@@ -105,6 +112,7 @@ export default function MomentCaptureScreen() {
       const vision = result ? aggregatePhotoVision([result]) : null;
       visionRef.current = vision;
       setTags(buildEssenceTags(vision));
+      setMeanings(selectCaptureMeanings(vision));
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
     })();
@@ -253,7 +261,7 @@ export default function MomentCaptureScreen() {
             What did this mean?
           </ThemedText>
           <View style={styles.meaningGrid}>
-            {CAPTURE_MEANINGS.map((option, index) => (
+            {meanings.map((option, index) => (
               <Animated.View key={option.id} entering={FadeInDown.delay(280 + index * 50).duration(280)}>
                 <Pressable onPress={() => handleMeaning(option.id)} style={styles.meaningChip} accessibilityRole="button">
                   <ThemedText style={styles.meaningEmoji}>{option.emoji}</ThemedText>

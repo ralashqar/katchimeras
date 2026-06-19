@@ -40,7 +40,7 @@ Module._resolveFilename = function (request, ...rest) {
   return originalResolve.call(this, request, ...rest);
 };
 
-const { buildCaptureEnergy, mergeCaptureEnergy, CAPTURE_MEANINGS } = require(energyPath);
+const { buildCaptureEnergy, mergeCaptureEnergy, CAPTURE_MEANINGS, selectCaptureMeanings } = require(energyPath);
 
 function vision(conceptNames, maxFaceCount = 0) {
   return {
@@ -78,6 +78,32 @@ const food = buildCaptureEnergy('calm', vision(['food']));
 check('food photo nudges calm further', (food.calm ?? 0) > 0.26, JSON.stringify(food));
 const faces = buildCaptureEnergy('calm', vision(['food'], 2));
 check('faces in frame add social', (faces.social ?? 0) > 0, JSON.stringify(faces));
+
+// --- Essence-aware meaning options (no LLM) ---
+const labelsOf = (v) => selectCaptureMeanings(v).map((m) => m.label);
+check('null vision → generic 4 meanings', selectCaptureMeanings(null) === CAPTURE_MEANINGS);
+check('food photo → contextual food meanings', labelsOf(vision(['food'])).includes('A treat') && labelsOf(vision(['food'])).includes('Shared'), labelsOf(vision(['food'])).join(','));
+check('people photo → togetherness meanings', labelsOf(vision([], 2)).includes('Time together'), labelsOf(vision([], 2)).join(','));
+check('dog photo → companion meanings', labelsOf(vision(['dog'])).includes('My companion'), labelsOf(vision(['dog'])).join(','));
+check('active photo → effort meanings', labelsOf(vision(['gym'])).includes('Strong'), labelsOf(vision(['gym'])).join(','));
+check('sunset photo → light meanings', labelsOf(vision(['sunset'])).includes('Serene'), labelsOf(vision(['sunset'])).join(','));
+check('unknown concept → generic fallback', selectCaptureMeanings(vision(['totally_unknown'])) === CAPTURE_MEANINGS);
+
+// Broad keyword coverage over concepts + raw detail labels.
+check('laptop → work meanings', labelsOf(vision(['laptop'])).includes('Productive'), labelsOf(vision(['laptop'])).join(','));
+check('gaming → games meanings', labelsOf(vision(['gaming'])).includes('Gaming'), labelsOf(vision(['gaming'])).join(','));
+check('guitar → music meanings', labelsOf(vision(['guitar'])).includes('Vibing'), labelsOf(vision(['guitar'])).join(','));
+check('television → watching meanings', labelsOf(vision(['television'])).includes('Unwinding'), labelsOf(vision(['television'])).join(','));
+check('book → reading meanings', labelsOf(vision(['book'])).includes('Absorbed'), labelsOf(vision(['book'])).join(','));
+check('mall → shopping meanings', labelsOf(vision(['mall'])).includes('A find'), labelsOf(vision(['mall'])).join(','));
+check('car → commute meanings', labelsOf(vision(['car'])).includes('On the move'), labelsOf(vision(['car'])).join(','));
+check('couch → home meanings', labelsOf(vision(['couch'])).includes('Cozy'), labelsOf(vision(['couch'])).join(','));
+
+// Raw detail labels are scanned too (not just canonical concepts).
+const detailVision = { concepts: [{ name: 'outdoor', salience: 1, coverage: 1, count: 1, peakConfidence: 0.9 }], details: ['laptop'], maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1 };
+check('raw detail label (laptop) is matched', selectCaptureMeanings(detailVision).some((m) => m.label === 'Productive'), JSON.stringify(selectCaptureMeanings(detailVision).map((m) => m.label)));
+
+check('every contextual option maps to a valid energy archetype', ['food', 'people', 'dog', 'gym', 'sunset', 'museum', 'beach', 'city', 'laptop', 'gaming', 'guitar', 'television', 'book', 'mall', 'car', 'couch'].every((c) => selectCaptureMeanings(vision([c], c === 'people' ? 2 : 0)).every((m) => ['calm', 'energy', 'together', 'meaningful'].includes(m.id))));
 
 // merge sums + clamps to 1.
 const merged = mergeCaptureEnergy({ calm: 0.6 }, { calm: 0.6, energy: 0.2 });
