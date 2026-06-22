@@ -193,6 +193,19 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
     });
   }
 
+  // A located point at the user's tagged home means they were home — a gentle
+  // home read regardless of how the rest of the day moved. Kept low (generic) so
+  // any specific place / activity still outranks it.
+  if (day.locations.some((point) => point.type === 'home')) {
+    signals.push({
+      seedId: 'home_evening',
+      intensity: 0.42,
+      sourceMomentIds: [],
+      isRecovery: true,
+      source: 'passive',
+    });
+  }
+
   // The weather the day actually had: the wild (storm) and the hushed (fog) days
   // get their own companions. Rain/snow already arrive via vision concepts.
   if (day.weather?.condition === 'storm') {

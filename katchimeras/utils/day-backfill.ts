@@ -891,6 +891,21 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
       }),
     };
   }
+  // Tag any reconstructed point within the home radius as 'home', so the day map
+  // shows a home pin and the hatch can tell you were home (the current-location
+  // fallback above is at home when the user set home during onboarding).
+  const { loadHomeAnchor, tagHomeLocations } = await import('@/utils/home-location');
+  const homeAnchor = loadHomeAnchor();
+  if (homeAnchor) {
+    locationedState = {
+      ...locationedState,
+      archivedDays: locationedState.archivedDays.map((day) =>
+        isReconstructedPastDay(day.isoDate)
+          ? { ...day, locations: tagHomeLocations(day.locations, homeAnchor) }
+          : day
+      ),
+    };
+  }
   saveStoredHomeState(locationedState);
 
   // STEP 2 — HATCH PAST DAYS (best-effort). Today is the live day and is never

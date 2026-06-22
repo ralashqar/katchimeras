@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { preferenceOptions } from '@/constants/katchadeck';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
+import { saveHomeAnchor } from '@/utils/home-location';
 import { defaultOnboardingProfile, loadOnboardingProfile, saveOnboardingProfile } from '@/utils/onboarding-state';
 
 const totalSteps = 5;
@@ -85,6 +86,35 @@ export default function OnboardingScreen() {
   const [selectedToneId, setSelectedToneId] = useState<string>(storedProfile.preferenceIds[0] ?? 'cozy');
   const [selectedHatchHour, setSelectedHatchHour] = useState<number>(storedProfile.hatchHour ?? 20);
   const [primingPermissions, setPrimingPermissions] = useState(false);
+  const [homeAnchorSet, setHomeAnchorSet] = useState(false);
+  const [settingHome, setSettingHome] = useState(false);
+
+  async function handleUseCurrentAsHome() {
+    if (homeAnchorSet || settingHome) {
+      return;
+    }
+    setSettingHome(true);
+    try {
+      const Location = await import('expo-location');
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.granted) {
+        const known = await Location.getLastKnownPositionAsync();
+        const position = known ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+        if (position) {
+          saveHomeAnchor({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            source: 'manual',
+            setAt: new Date().toISOString(),
+          });
+          setHomeAnchorSet(true);
+        }
+      }
+    } catch {
+      // Best-effort — the home spot can be set later from the map.
+    }
+    setSettingHome(false);
+  }
 
   const currentPreference =
     preferenceOptions.find((option) => option.id === selectedToneId) ?? preferenceOptions[0];
@@ -301,6 +331,22 @@ export default function OnboardingScreen() {
           <PermissionRow
             body="Quick tags, photos, and inspiration moments stay available either way."
             title="Manual moments"
+          />
+        </GlassPanel>
+
+        <GlassPanel contentStyle={styles.homePanel}>
+          <ThemedText type="onboardingLabel" style={styles.privacyLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
+            Mark home (optional)
+          </ThemedText>
+          <ThemedText style={styles.privacyBody} lightColor="#E8EEFF" darkColor="#E8EEFF">
+            Are you home right now? Tag this spot so your map can show a home pin and know which days you
+            were home. Only if you&apos;re home — otherwise skip and it learns over time.
+          </ThemedText>
+          <KatchaButton
+            disabled={homeAnchorSet || settingHome}
+            label={homeAnchorSet ? 'Home set' : settingHome ? 'Setting…' : 'Use my current spot'}
+            onPress={handleUseCurrentAsHome}
+            variant="secondary"
           />
         </GlassPanel>
 
@@ -709,6 +755,9 @@ const styles = StyleSheet.create({
   },
   privacyPanel: {
     gap: 6,
+  },
+  homePanel: {
+    gap: 10,
   },
   privacyLabel: {
     fontSize: 11,

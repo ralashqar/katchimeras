@@ -136,5 +136,26 @@ check('merge keeps existing concept', merged.concepts.some((c) => c.name === 'co
 check('merge adds new concept', merged.concepts.some((c) => c.name === 'pizza'));
 check('merge into empty returns incoming', mergeDayVision(undefined, snapped) === snapped);
 
+// 8. A generic "child" (e.g. kids at a party) must NOT become the baby concept
+// or hatch the tender little-one creature — only genuine infant cues do.
+const childAgg = aggregatePhotoVision([photo([['child', 0.9], ['children', 0.8]])]);
+check('child label is not the baby concept', !childAgg.concepts.some((c) => c.name === 'baby'), JSON.stringify(childAgg.concepts.map((c) => c.name)));
+check('child does not hatch little_one', !buildVisionSignals(childAgg).some((s) => s.seedId === 'little_one'), JSON.stringify(buildVisionSignals(childAgg)));
+
+// 8b. A real infant cue still hatches the little one.
+const babyAgg = aggregatePhotoVision([photo([['baby', 0.9]])]);
+check('baby still hatches little_one', buildVisionSignals(babyAgg).some((s) => s.seedId === 'little_one'), JSON.stringify(buildVisionSignals(babyAgg)));
+
+// 8c. A crowd (a party) reads as social, not an intimate little-one moment — even
+// if an infant is in frame.
+const partyWithBaby = buildVisionSignals(
+  summary([{ name: 'baby', salience: 1, coverage: 0.5, count: 1, peakConfidence: 0.8 }], {
+    maxFaceCount: 5,
+    faceCoverage: 0.9,
+  })
+);
+check('crowd suppresses little_one', !partyWithBaby.some((s) => s.seedId === 'little_one'), JSON.stringify(partyWithBaby));
+check('crowd keeps social_gathering', partyWithBaby.some((s) => s.seedId === 'social_gathering'), JSON.stringify(partyWithBaby));
+
 console.log(failures === 0 ? '\nAll vision-signals checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

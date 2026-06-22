@@ -66,13 +66,26 @@ const OPENING_EGG_VISUAL: EggVisualState = {
 const OPENING_REVEAL_ART = require('../../../assets/images/katchimeras/cutouts/baristabbit.png');
 const OPENING_REVEAL_ACCENT = '#E3B68C';
 
-// Feed pacing: the first moment is drawn in a beat after the egg appears, then
-// each following one launches sooner than the last — a slow start that
-// accelerates so the rest get thrown in quickly (motes overlap in flight).
-const FEED_FIRST_DELAY_MS = 600;
-const FEED_START_GAP_MS = 520;
-const FEED_MIN_GAP_MS = 130;
-const FEED_RAMP_MS = 78;
+// Feed pacing: a clear pause first (so the "Moments shape your day" title reads),
+// then the first moments drift in slowly and each following one launches sooner
+// than the last — speeding up as it goes (motes overlap in flight near the end).
+const FEED_FIRST_DELAY_MS = 900;
+const FEED_START_GAP_MS = 560;
+const FEED_MIN_GAP_MS = 110;
+const FEED_RAMP_MS = 95;
+
+// Moments sit ABOVE and BELOW the egg (never on its sides), spaced out. Each slot
+// is the static label's position (corner-anchored) plus the matching launch
+// anchor (its centre in stage fractions) the mote flies in from.
+const MOMENT_SLOTS = [
+  { style: { left: '33%', top: '0%' }, anchor: { x: 0.5, y: 0.04 } },
+  { style: { left: '3%', top: '10%' }, anchor: { x: 0.17, y: 0.15 } },
+  { style: { right: '3%', top: '10%' }, anchor: { x: 0.83, y: 0.15 } },
+  { style: { left: '3%', bottom: '24%' }, anchor: { x: 0.17, y: 0.73 } },
+  { style: { right: '3%', bottom: '24%' }, anchor: { x: 0.83, y: 0.73 } },
+  { style: { left: '19%', bottom: '10%' }, anchor: { x: 0.34, y: 0.88 } },
+  { style: { right: '19%', bottom: '10%' }, anchor: { x: 0.66, y: 0.88 } },
+] as const;
 // LanternEgg's internal stage height — the host box that centers the egg.
 const EGG_HOST_HEIGHT = 258;
 const CREATURE_SIZE = 172;
@@ -414,7 +427,7 @@ function OpeningSequenceStage({
       return;
     }
     const chip = chips[index];
-    const anchor = getChipZoneAnchor(chip.zone);
+    const anchor = MOMENT_SLOTS[index % MOMENT_SLOTS.length].anchor;
     feedNonceRef.current += 1;
     const feed: EggFeed = {
       nonce: feedNonceRef.current,
@@ -455,32 +468,46 @@ function OpeningSequenceStage({
   // Launches are scheduled on an ACCELERATING timeline — each gap is shorter than
   // the last — so the first moment drifts in slowly, then the rest pour in.
   useEffect(() => {
-    if (scene.eggState !== 'forming' || startedRef.current === restartToken) {
+    // Start at the first moments beat — the egg has already scaled in by now (it
+    // appears a scene earlier, during "they're made of moments").
+    if (scene.chipBehavior !== 'slow' || startedRef.current === restartToken) {
       return;
     }
     startedRef.current = restartToken;
-    let at = reduceMotionEnabled ? 200 : FEED_FIRST_DELAY_MS;
+    let at = reduceMotionEnabled ? 160 : FEED_FIRST_DELAY_MS;
     for (let index = 0; index < chips.length; index += 1) {
       const launchAt = at;
       timersRef.current.push(setTimeout(() => launchMote(index), launchAt));
       const gap = reduceMotionEnabled
-        ? 110
+        ? 100
         : Math.max(FEED_MIN_GAP_MS, FEED_START_GAP_MS - index * FEED_RAMP_MS);
       at += gap;
     }
     // launchMote closes over this render's metrics, which are stable for the run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.eggState, restartToken, reduceMotionEnabled, chips.length]);
+  }, [scene.chipBehavior, restartToken, reduceMotionEnabled, chips.length]);
 
   // Hatch choreography: the egg rattles (gently while building, violently at the
   // moment of hatch), then shrinks away just as the creature pops up in its place.
   const eggOpacity = useSharedValue(0);
+  const eggEnter = useSharedValue(0);
   const eggShake = useSharedValue(0);
   const eggHatch = useSharedValue(0);
   const creatureProgress = useSharedValue(0);
   const creatureScale = useSharedValue(0.4);
 
   const isBuilding = scene.eggState === 'build';
+
+  // Scale the egg in the moment it first appears (during "they're made of
+  // moments"), with a little overshoot.
+  useEffect(() => {
+    if (eggShown) {
+      eggEnter.value = withTiming(1, {
+        duration: reduceMotionEnabled ? 150 : 520,
+        easing: Easing.out(Easing.back(1.5)),
+      });
+    }
+  }, [eggEnter, eggShown, reduceMotionEnabled]);
 
   useEffect(() => {
     eggOpacity.value = withTiming(eggShown && !hatched ? 1 : 0, {
@@ -538,7 +565,7 @@ function OpeningSequenceStage({
     transform: [
       { translateX: eggShake.value * 7 },
       { rotateZ: `${eggShake.value * 4}deg` },
-      { scale: 1 - eggHatch.value * 0.82 },
+      { scale: (0.62 + 0.38 * eggEnter.value) * (1 - eggHatch.value * 0.82) },
     ],
   }));
   const creatureStyle = useAnimatedStyle(() => ({
@@ -560,7 +587,7 @@ function OpeningSequenceStage({
         </Animated.View>
       ) : null}
 
-      {eggShown && !hatched
+      {eggShown && !hatched && scene.chipBehavior !== 'hidden'
         ? chips.map((chip, index) => {
             if (index < launchedCount) {
               return null;
@@ -573,7 +600,7 @@ function OpeningSequenceStage({
                 pointerEvents="none"
                 style={[
                   styles.momentLabel,
-                  getChipZoneStyle(chip.zone),
+                  MOMENT_SLOTS[index % MOMENT_SLOTS.length].style,
                   { backgroundColor: `${chip.accent}1A`, borderColor: `${chip.accent}55` },
                 ]}>
                 <IconSymbol color={chip.accent} name={chip.icon} size={13} />
@@ -699,58 +726,6 @@ function TomorrowStage({ entry }: { entry: TimelineDayEntry }) {
 
 // Where each moment label sits around the egg (corner-anchored), and the point
 // its mote launches from when drawn into the egg. The two are tuned to coincide.
-function getChipZoneStyle(zone: OpeningMomentChip['zone']) {
-  if (zone === 'top-left') {
-    return { left: '2%', top: '8%' } as const;
-  }
-  if (zone === 'top-center') {
-    return { left: '32%', top: '3%' } as const;
-  }
-  if (zone === 'top-right') {
-    return { right: '2%', top: '10%' } as const;
-  }
-  if (zone === 'mid-left') {
-    return { left: '0%', top: '36%' } as const;
-  }
-  if (zone === 'mid-right') {
-    return { right: '0%', top: '38%' } as const;
-  }
-  if (zone === 'bottom-left') {
-    return { left: '4%', bottom: '20%' } as const;
-  }
-  if (zone === 'bottom-center') {
-    return { left: '30%', bottom: '8%' } as const;
-  }
-
-  return { right: '4%', bottom: '20%' } as const;
-}
-
-function getChipZoneAnchor(zone: OpeningMomentChip['zone']) {
-  if (zone === 'top-left') {
-    return { x: 0.18, y: 0.13 };
-  }
-  if (zone === 'top-center') {
-    return { x: 0.5, y: 0.08 };
-  }
-  if (zone === 'top-right') {
-    return { x: 0.82, y: 0.15 };
-  }
-  if (zone === 'mid-left') {
-    return { x: 0.15, y: 0.42 };
-  }
-  if (zone === 'mid-right') {
-    return { x: 0.85, y: 0.44 };
-  }
-  if (zone === 'bottom-left') {
-    return { x: 0.2, y: 0.74 };
-  }
-  if (zone === 'bottom-center') {
-    return { x: 0.5, y: 0.84 };
-  }
-
-  return { x: 0.8, y: 0.74 };
-}
-
 function getOpeningStageMetrics(stageWidth: number, stageHeight: number) {
   const scale = Math.max(
     0.92,
@@ -798,7 +773,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 140,
     justifyContent: 'center',
-    overflow: 'hidden',
+    // Unmasked so the headline/subtext animate in and out at full height instead
+    // of being clipped to a tight band.
+    overflow: 'visible',
     paddingTop: 6,
   },
   copyBlock: {
@@ -835,7 +812,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   openingStage: {
-    overflow: 'hidden',
+    // Not clipped — moment labels/motes near the top edge (and the egg) must show
+    // in full as they fly in, instead of being masked at the stage border.
+    overflow: 'visible',
     position: 'relative',
     width: '100%',
   },

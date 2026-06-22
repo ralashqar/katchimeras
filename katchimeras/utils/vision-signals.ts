@@ -45,7 +45,9 @@ const CONCEPT_RULES: { concept: string; pattern: RegExp }[] = [
   // word, but a sakura/cherry-blossom day is its own seasonal creature.)
   { concept: 'dog', pattern: /dog|puppy|canine|retriever|terrier|poodle|labrador|hound|corgi/i },
   { concept: 'cat', pattern: /\bcat\b|kitten|feline|tabby/i },
-  { concept: 'baby', pattern: /baby|infant|toddler|child|newborn/i },
+  // Only genuine infant cues map to the tender "little one" — a generic "child"
+  // (e.g. kids at a party) must NOT hatch Snuglet; that reads as social instead.
+  { concept: 'baby', pattern: /baby|infant|newborn|\bcrib\b|stroller|pram/i },
   { concept: 'blossom', pattern: /cherry blossom|sakura|spring flower|blossom branch/i },
   { concept: 'flowers', pattern: /flower|bloom|blossom|bouquet|floral|\brose\b|tulip/i },
   { concept: 'food', pattern: /food|meal|dish|burger|sandwich|breakfast|lunch|dinner|cuisine/i },
@@ -140,6 +142,9 @@ const GENERIC_VISION_LABELS = new Set([
 // Two or more faces in a frame reads as time spent with people — the one
 // encounter passive sensors (GPS, steps) genuinely cannot infer.
 const SOCIAL_FACE_MIN = 2;
+// A frame with this many faces is a gathering/party — it reads as social, not an
+// intimate "little one" moment, so the baby read is suppressed at this point.
+const CROWD_FACE_MIN = 3;
 const PER_PHOTO_CONFIDENCE_FLOOR = 0.2;
 
 export function aggregatePhotoVision(results: PhotoVisionResult[]): DayVisionSummary {
@@ -304,6 +309,12 @@ export function buildVisionSignals(vision: DayVisionSummary): VisionSignal[] {
       'social_gathering',
       0.5 + 0.25 * vision.faceCoverage + Math.min((vision.maxFaceCount - SOCIAL_FACE_MIN) * 0.05, 0.2)
     );
+  }
+
+  // A crowd in frame is a gathering, not a tender baby moment — drop the little
+  // one read so the day hatches its social/celebration character instead.
+  if (vision.maxFaceCount >= CROWD_FACE_MIN) {
+    bySeed.delete('little_one');
   }
 
   return [...bySeed.values()];

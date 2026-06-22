@@ -8,6 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI } from '@/constants/theme';
 import type { DayMapNode, DayMapNodePhoto, HomeDayRecord, HomeLocationType, HomeMoment } from '@/types/home';
 import { getCreatureVisual } from '@/utils/home-engine';
+import { isPointAtHome, loadHomeAnchor } from '@/utils/home-location';
 
 type DayMapSurfaceProps = {
   day: HomeDayRecord;
@@ -106,15 +107,25 @@ export function DayMapSurface({
   const MapView = nativeMaps.default;
   const { Marker, Polyline } = nativeMaps;
   const mapTheme = resolveMapTheme(accentColor);
+  // Re-type any node within the saved home radius as 'home', so the map shows the
+  // home pin (and the detail reads "Home") wherever you actually were home.
+  const homeAnchor = loadHomeAnchor();
+  const nodes = homeAnchor
+    ? day.dayMap.nodes.map((node) =>
+        node.type !== 'home' && isPointAtHome(node.latitude, node.longitude, homeAnchor)
+          ? { ...node, type: 'home' as const }
+          : node
+      )
+    : day.dayMap.nodes;
   const selectedNode =
-    day.dayMap.nodes.find((node) => node.id === selectedNodeId) ??
-    day.dayMap.nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ??
-    day.dayMap.nodes[0] ??
+    nodes.find((node) => node.id === selectedNodeId) ??
+    nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ??
+    nodes[0] ??
     null;
   const selectedMoment = selectedNode?.linkedMomentId ? momentIndex.get(selectedNode.linkedMomentId) ?? null : null;
   const selectedThumbnailUri = selectedMoment?.metadata?.thumbnailUri ?? selectedNode?.photoThumbnailUri ?? null;
   const selectedAlbum = selectedNode?.photos ?? [];
-  const primaryNode = day.dayMap.nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ?? null;
+  const primaryNode = nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ?? null;
   const creatureVisual = day.creature ? getCreatureVisual(day.creature.visualKey) : null;
   const creatureMarkerCoordinate =
     day.creature && primaryNode && day.dayMap.viewport
@@ -175,7 +186,7 @@ export function DayMapSurface({
             strokeWidth={interactive ? 5 : 4}
           />
         ) : null}
-        {day.dayMap.nodes.map((node) => (
+        {nodes.map((node) => (
           <Marker
             anchor={{ x: 0.5, y: 0.5 }}
             coordinate={{ latitude: node.latitude, longitude: node.longitude }}

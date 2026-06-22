@@ -1,6 +1,7 @@
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -12,28 +13,43 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
+import { EssenceReview } from '@/components/katchadeck/capture/essence-review';
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
-import { dayPromptRegistry } from '@/constants/day-prompts';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { hatchPastPrompts } from '@/constants/hatch-past-prompts';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
-import type { DayPromptKind, EggVisualState } from '@/types/home';
+import type { DayPromptKind, DayVisionSummary, EggVisualState } from '@/types/home';
+import type { MeaningTag } from '@/utils/capture-energy';
 import { enrichBackfillReflections, runBackfillFoundation } from '@/utils/day-backfill';
 import { getCreatureVisual, hydrateHomeState } from '@/utils/home-engine';
 import { buildHatchYourPast, type HatchedPastCreature } from '@/utils/hatch-your-past';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { saveOnboardingRecap } from '@/utils/onboarding-recap';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { analyzePhoto } from '@/utils/photo-vision';
+import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals';
 
-type Phase = 'questions' | 'hatching' | 'reveal' | 'empty';
+type Phase = 'questions' | 'capture' | 'hatching' | 'reveal' | 'empty';
 
-// The few reads we ask before hatching, in the same one-at-a-time prompt format
-// the main app uses. Their answers (encounter seeds) steer the first hatches.
-const QUESTION_KINDS: readonly DayPromptKind[] = ['feeling', 'activity', 'hobby'];
+// While capturing: the camera is open, the shot is taken, then its essence is
+// reviewed (same flow as the main-app camera button).
+type CaptureStage = 'intro' | 'live' | 'capturing' | 'review';
+
+// A captured photo's chosen meaning nudges the first hatches toward a fitting
+// creature even when the on-device vision finds no specific subject.
+const MEANING_SEED: Record<MeaningTag, string> = {
+  calm: 'home_evening',
+  energy: 'high_steps_day',
+  together: 'social_gathering',
+  meaningful: 'creative_day',
+};
 
 const PAST_EGG_VISUAL: EggVisualState = {
   accentColor: '#A78BFA',
@@ -51,6 +67,7 @@ const MIN_SHAKE_MS = 1400;
 
 export default function HatchYourPastRoute() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>('questions');
   const [creatures, setCreatures] = useState<HatchedPastCreature[]>([]);
   const [daysHatched, setDaysHatched] = useState(0);
@@ -73,13 +90,20 @@ export default function HatchYourPastRoute() {
   const feedNonce = useRef(0);
   const mountedRef = useRef(true);
 
+  // Capture phase: open the camera, take a photo, read its essence, fold the
+  // resulting seeds into the recap so a real surrounding shapes a first hatch.
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [captureStage, setCaptureStage] = useState<CaptureStage>('intro');
+  const [capturePhotoUri, setCapturePhotoUri] = useState<string | null>(null);
+  const cameraRef = useRef<CameraView | null>(null);
+
   useEffect(() => () => {
     mountedRef.current = false;
   }, []);
 
   const currentPrompt =
-    questionIndex < QUESTION_KINDS.length
-      ? { ...dayPromptRegistry[QUESTION_KINDS[questionIndex]], photoCandidates: [] }
+    questionIndex < hatchPastPrompts.length
+      ? { ...hatchPastPrompts[questionIndex], photoCandidates: [] }
       : null;
 
   // The scan + hatch + reveal, run once the questions are answered (so the recap
@@ -125,8 +149,13 @@ export default function HatchYourPastRoute() {
   }
 
   function finishQuestions() {
-    // Persist the answers as the recap the backfill reads (de-duped seeds), then
-    // run the scan + hatch.
+    // After the prompts, offer to capture a real moment before hatching.
+    setCaptureStage('intro');
+    setPhase('capture');
+  }
+
+  // Save the recap (prompt answers + any capture seeds), then run the scan + hatch.
+  function proceedToHatch() {
     saveOnboardingRecap({
       moodId: null,
       activityIds: [],
@@ -142,9 +171,62 @@ export default function HatchYourPastRoute() {
     setPhase(revealOutcomeRef.current);
   }
 
+  async function handleOpenCamera() {
+    if (cameraPermission?.granted) {
+      setCaptureStage('live');
+      return;
+    }
+    const result = await requestCameraPermission();
+    if (result.granted) {
+      setCaptureStage('live');
+    }
+    // If denied, stay on the intro — the user can still skip.
+  }
+
+  async function handleCapturePhoto() {
+    if (!cameraRef.current || captureStage !== 'live') {
+      return;
+    }
+    setCaptureStage('capturing');
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.6, skipProcessing: true });
+      if (photo?.uri) {
+        setCapturePhotoUri(photo.uri);
+        setCaptureStage('review');
+      } else {
+        setCaptureStage('intro');
+      }
+    } catch {
+      setCaptureStage('intro');
+    }
+  }
+
+  const analyzeCapture = useCallback(async (): Promise<DayVisionSummary | null> => {
+    if (!capturePhotoUri) {
+      return null;
+    }
+    const result = await analyzePhoto(capturePhotoUri);
+    return result ? aggregatePhotoVision([result]) : null;
+  }, [capturePhotoUri]);
+
+  function commitCapture(meaning: MeaningTag, vision: DayVisionSummary | null) {
+    // The photo's real subject (vision concepts) plus its chosen meaning become
+    // preferred seeds, so a first hatch reflects the captured surrounding.
+    const seeds: string[] = [];
+    if (vision) {
+      for (const signal of buildVisionSignals(vision)) {
+        seeds.push(signal.seedId);
+      }
+    }
+    seeds.push(MEANING_SEED[meaning]);
+    collectedSeeds.current.push(...seeds);
+    collectedTags.current.push(`capture:${meaning}`);
+    proceedToHatch();
+  }
+
   function advanceQuestions() {
     const next = questionIndex + 1;
-    if (next >= QUESTION_KINDS.length) {
+    if (next >= hatchPastPrompts.length) {
       finishQuestions();
       return;
     }
@@ -163,7 +245,8 @@ export default function HatchYourPastRoute() {
   // Answering a prompt launches a mote from the tapped chip into the egg (exactly
   // the main-app feed); the egg pulses on arrival and the next question appears.
   function handleAnswerQuestion(kind: DayPromptKind, choiceIds: string[], from: FeedSourceRect) {
-    const option = dayPromptRegistry[kind].options.find((candidate) => candidate.id === choiceIds[0]);
+    const prompt = hatchPastPrompts.find((candidate) => candidate.id === kind);
+    const option = prompt?.options.find((candidate) => candidate.id === choiceIds[0]);
     pendingFeed.current = {
       seeds: option?.encounterSeedBias?.map((bias) => bias.seedId) ?? [],
       tags: option?.semanticTags ?? [],
@@ -240,10 +323,78 @@ export default function HatchYourPastRoute() {
             ) : null}
 
             <ThemedText style={styles.questionHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              {Math.min(questionIndex + 1, QUESTION_KINDS.length)} of {QUESTION_KINDS.length}
+              {Math.min(questionIndex + 1, hatchPastPrompts.length)} of {hatchPastPrompts.length}
             </ThemedText>
           </ScrollView>
         </Animated.View>
+      ) : null}
+
+      {phase === 'capture' ? (
+        captureStage === 'review' && capturePhotoUri ? (
+          <EssenceReview
+            analyze={analyzeCapture}
+            onClose={proceedToHatch}
+            onCommit={commitCapture}
+            photoUri={capturePhotoUri}
+          />
+        ) : captureStage === 'live' || captureStage === 'capturing' ? (
+          <View style={StyleSheet.absoluteFill}>
+            <CameraView facing="back" ref={cameraRef} style={StyleSheet.absoluteFill} />
+            {captureStage === 'capturing' ? (
+              <Animated.View
+                entering={FadeIn.duration(120)}
+                exiting={FadeOut.duration(360)}
+                pointerEvents="none"
+                style={styles.flash}
+              />
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setCaptureStage('intro')}
+              style={[styles.cameraClose, { top: insets.top + 12 }]}>
+              <IconSymbol color={Lantern.moon50} name="xmark" size={18} />
+            </Pressable>
+            <View style={[styles.cameraPrompt, { top: insets.top + 18 }]}>
+              <ThemedText style={styles.cameraPromptText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                What stands out around you?
+              </ThemedText>
+            </View>
+            {captureStage === 'live' ? (
+              <View style={[styles.shutterRow, { bottom: insets.bottom + 36 }]}>
+                <Pressable
+                  accessibilityLabel="Capture moment"
+                  accessibilityRole="button"
+                  onPress={handleCapturePhoto}
+                  style={styles.shutter}>
+                  <View style={styles.shutterInner} />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <Animated.View entering={FadeIn.duration(240)} style={styles.center}>
+            <IconSymbol color={Lantern.ember300} name="camera.fill" size={34} />
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+              One more thing
+            </ThemedText>
+            <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              Capture where you are.
+            </ThemedText>
+            <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              Snap your surroundings — we read its essence on your device and fold it into your first hatches.
+              This is how the camera works in the app.
+            </ThemedText>
+            {cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain ? (
+              <ThemedText style={styles.permNote} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                Camera access is off — enable it in Settings to capture, or skip for now.
+              </ThemedText>
+            ) : null}
+            <View style={styles.captureCta}>
+              <KatchaButton label="Capture a moment" onPress={handleOpenCamera} variant="primary" />
+              <KatchaButton label="Skip for now" onPress={proceedToHatch} variant="secondary" />
+            </View>
+          </Animated.View>
+        )
       ) : null}
 
       {phase === 'hatching' ? (
@@ -468,6 +619,63 @@ const styles = StyleSheet.create({
   cta: {
     marginTop: 18,
     width: '100%',
+  },
+  captureCta: {
+    gap: 10,
+    marginTop: 18,
+    width: '100%',
+  },
+  permNote: {
+    fontSize: 13,
+    lineHeight: 18,
+    maxWidth: 320,
+    textAlign: 'center',
+  },
+  flash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,243,224,0.85)',
+  },
+  cameraClose: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(8,6,16,0.5)',
+    borderRadius: 999,
+    height: 38,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 18,
+    width: 38,
+    zIndex: 5,
+  },
+  cameraPrompt: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    position: 'absolute',
+  },
+  cameraPromptText: {
+    fontSize: 15,
+    fontWeight: '700',
+    opacity: 0.9,
+  },
+  shutterRow: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    position: 'absolute',
+  },
+  shutter: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 999,
+    borderWidth: 3,
+    height: 78,
+    justifyContent: 'center',
+    width: 78,
+  },
+  shutterInner: {
+    backgroundColor: Lantern.moon50,
+    borderRadius: 999,
+    height: 60,
+    width: 60,
   },
   revealCard: {
     alignItems: 'center',
