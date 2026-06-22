@@ -16,7 +16,7 @@ import { buildCaptureEnergy, type MeaningTag } from '@/utils/capture-energy';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
-import { aggregatePhotoVision } from '@/utils/vision-signals';
+import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 import type { DayVisionSummary } from '@/types/home';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
@@ -67,7 +67,7 @@ export default function MomentCaptureScreen() {
       return null;
     }
     const result = await analyzePhoto(photoUri);
-    return result ? aggregatePhotoVision([result]) : null;
+    return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
   }, [photoUri]);
 
   const commit = useCallback(

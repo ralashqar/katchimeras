@@ -160,7 +160,9 @@ function buildEssenceTags(vision: DayVisionSummary | null): EssenceTag[] {
   if (vision && vision.maxFaceCount >= 2) {
     tags.push({ id: 'together', label: 'Together', accent: '#F2C2A8' });
   }
-  const names = vision ? pickProminentTags(vision, 4) : [];
+  // Lower confidence bar than the nightly line: a single snapped photo's weaker
+  // reads (a soda can, a plate) are still worth surfacing as essence tags.
+  const names = vision ? pickProminentTags(vision, 4, 0.16) : [];
   names.forEach((name) => {
     tags.push({ id: name, label: humanizeTag(name), accent: TAG_PALETTE[tags.length % TAG_PALETTE.length] });
   });

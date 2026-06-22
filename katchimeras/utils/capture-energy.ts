@@ -187,8 +187,8 @@ const BUCKETS: { key: string; pattern: RegExp; meanings: readonly CaptureMeaning
   { key: 'reading', pattern: /\bbook\b|reading|novel|paperback|bookshelf|\bmagazine\b/, meanings: READING_MEANINGS },
   { key: 'creative', pattern: /creative|paint|drawing|sketch|canvas|easel|pottery|\bcraft|knitting|sewing|origami/, meanings: MEANINGS_BY_CATEGORY.creative },
   { key: 'active', pattern: /\bgym\b|fitness|workout|\bsport|basketball|tennis|soccer|football|baseball|\brun(ning)?\b|\bjog|cycl|\byoga\b|exercise|athletic|stadium|treadmill|dumbbell|skate|swim/, meanings: MEANINGS_BY_CATEGORY.active },
-  { key: 'food', pattern: /\bfood\b|\bmeal\b|\bdish\b|restaurant|burger|pizza|sushi|ramen|noodle|dessert|\bcake\b|bakery|\bbread\b|pastry|\bplate\b|cuisine|\bsnack\b|breakfast|\blunch\b|dinner|\bfruit\b|vegetable|\bfarm\b|barbecue|\bsalad\b/, meanings: MEANINGS_BY_CATEGORY.food },
-  { key: 'drink', pattern: /coffee|espresso|latte|cappuccino|\bcaf[eé]\b|\btea\b|boba|bubble tea|cocktail|\bbeer\b|\bwine\b|\bjuice\b|smoothie|beverage|\bdrink\b/, meanings: MEANINGS_BY_CATEGORY.drink },
+  { key: 'food', pattern: /\bfood\b|\bmeal\b|\bdish\b|restaurant|burger|pizza|sushi|ramen|noodles?|dessert|\bcake\b|bakery|\bbread\b|pastry|\bplate\b|cuisine|\bsnack\b|breakfast|\blunch\b|dinner|\bfruit\b|vegetable|\bfarm\b|barbecue|\bsalad\b|sandwich|taco|burrito|\bfries\b|\bpasta\b|\brice\b|donut|doughnut|ice ?cream|popcorn|chocolate|\bcandy\b|hot ?dog|\bsoup\b|\bsteak\b|seafood|brunch|\bbowl\b|\bcurry\b|sausage|\bbacon\b|pancakes?|waffles?|cookie|croissant|\bmeat\b|tableware|\bdining\b|cutlery/, meanings: MEANINGS_BY_CATEGORY.food },
+  { key: 'drink', pattern: /coffee|espresso|latte|cappuccino|\bcaf[eé]\b|\btea\b|boba|bubble tea|cocktail|\bbeer\b|\bwine\b|\bjuice\b|smoothie|beverage|\bdrink\b|drinking|drinkware|glassware|\bglass\b|soda|\bcola\b|soft ?drink|energy ?drink|lemonade|\bcan\b|\bbottle\b|\bcup\b|\bmug\b|tumbler|champagne|stemware|goblet|\bpint\b|milkshake|matcha|mocha|americano|fizzy|carbonat/, meanings: MEANINGS_BY_CATEGORY.drink },
   { key: 'shopping', pattern: /shopping|\bstore\b|\bmall\b|retail|boutique|grocery|supermarket|\bmarket\b/, meanings: SHOPPING_MEANINGS },
   { key: 'commute', pattern: /\bcar\b|vehicle|driving|\broad\b|highway|traffic|\btrain\b|subway|\bbus\b|commute|bicycle|\bbike\b|motorcycle|scooter|\bmetro\b/, meanings: COMMUTE_MEANINGS },
   { key: 'culture', pattern: /museum|gallery|\bart\b|sculpture|painting|exhibit|architecture|monument|cinema|theat(er|re)|library|cathedral|\btemple\b/, meanings: MEANINGS_BY_CATEGORY.culture },
@@ -224,8 +224,15 @@ export function selectCaptureMeanings(vision: DayVisionSummary | null): readonly
   };
 
   // A recognised concept is the reliable signal and always outweighs raw detail
-  // labels (which are supplementary, and noisier).
-  vision.concepts.forEach((concept) => score(concept.name, Math.max(concept.peakConfidence ?? 0.5, 0.4)));
+  // labels (which are supplementary, and noisier). Concepts arrive pre-sorted by
+  // salience, so the most prominent subject in the frame weighs the most — the
+  // dominant thing drives the meaning rather than a pile of minor background tags
+  // (a clear cup reads as "drink", not whatever else happens to be on the table).
+  vision.concepts.forEach((concept, index) => {
+    const base = Math.max(concept.peakConfidence ?? 0.5, 0.4);
+    const rankBoost = index === 0 ? 1.6 : index === 1 ? 1.25 : 1;
+    score(concept.name, base * rankBoost);
+  });
   vision.details.forEach((detail, index) => score(detail, Math.max(0.3 - index * 0.05, 0.15)));
   if (vision.maxFaceCount >= 2) {
     scores.set('people', (scores.get('people') ?? 0) + 0.8);

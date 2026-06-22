@@ -97,6 +97,23 @@ check('active photo → effort meanings', labelsOf(vision(['gym'])).includes('St
 check('sunset photo → light meanings', labelsOf(vision(['sunset'])).includes('Serene'), labelsOf(vision(['sunset'])).join(','));
 check('unknown concept → generic fallback', selectCaptureMeanings(vision(['totally_unknown'])) === CAPTURE_MEANINGS);
 
+// Broadened food/drink buckets: Apple Vision returns these object labels for a
+// soda can / plate of food, and they must now reach the right meanings.
+check('soda can (soft drink) → drink meanings', labelsOf(vision(['soft drink'])).includes('A pick-me-up'), labelsOf(vision(['soft drink'])).join(','));
+check('soda label → drink meanings', labelsOf(vision(['soda'])).includes('A slow sip'), labelsOf(vision(['soda'])).join(','));
+check('bottle → drink meanings', labelsOf(vision(['bottle'])).includes('A pick-me-up'), labelsOf(vision(['bottle'])).join(','));
+check('sandwich → food meanings', labelsOf(vision(['sandwich'])).includes('A treat'), labelsOf(vision(['sandwich'])).join(','));
+check('fries → food meanings', labelsOf(vision(['fries'])).includes('Shared'), labelsOf(vision(['fries'])).join(','));
+// The user's exact case: a "drinking glass" tag must reach the drink meanings
+// (which include "A slow sip"), not fall through to the generic four.
+check('drinking glass → drink meanings (A slow sip)', labelsOf(vision(['drinking glass'])).includes('A slow sip'), labelsOf(vision(['drinking glass'])).join(','));
+check('wine glass → drink meanings', labelsOf(vision(['wine glass'])).includes('A slow sip'), labelsOf(vision(['wine glass'])).join(','));
+
+// Saliency: the MOST salient concept (sorted first) drives the meaning. A coffee
+// photographed next to a laptop reads as a drink moment, not a work one — without
+// the rank boost this tie would fall to the earlier 'work' bucket.
+check('salient drink beats a secondary work tag', labelsOf(vision(['coffee', 'laptop'])).includes('A slow sip') && !labelsOf(vision(['coffee', 'laptop'])).includes('Productive'), labelsOf(vision(['coffee', 'laptop'])).join(','));
+
 // Broad keyword coverage over concepts + raw detail labels.
 check('laptop → work meanings', labelsOf(vision(['laptop'])).includes('Productive'), labelsOf(vision(['laptop'])).join(','));
 check('gaming → games meanings', labelsOf(vision(['gaming'])).includes('Gaming'), labelsOf(vision(['gaming'])).join(','));

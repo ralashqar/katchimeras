@@ -8,7 +8,7 @@ import { buildCaptureEnergy, type MeaningTag } from '@/utils/capture-energy';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
-import { aggregatePhotoVision } from '@/utils/vision-signals';
+import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 import type { DayVisionSummary } from '@/types/home';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
@@ -46,7 +46,7 @@ export default function PhotoEssenceRoute() {
         return null;
       }
       const result = await analyzePhoto(localUri);
-      return result ? aggregatePhotoVision([result]) : null;
+      return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
     } catch {
       return null;
     }

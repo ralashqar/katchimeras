@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Image } from 'expo-image';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeOut, runOnJS } from 'react-native-reanimated';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { captureRef } from 'react-native-view-shot';
 
@@ -287,6 +288,23 @@ export default function HomeScreen() {
   const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
   const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
   const formingActivePrompt = onTomorrowForming ? tomorrowActivePrompt : activeDayPrompt;
+  // While a prompt is showing, the page collapses to just the egg + prompt: the
+  // forming quote and the add/camera buttons hide until it's answered/dismissed.
+  const hasActivePrompt = isForming && Boolean(formingActivePrompt);
+
+  // Swipe left/right to move between days, as an alternative to tapping the
+  // timeline at the top.
+  function goToAdjacentDay(direction: number) {
+    const index = timelineDays.findIndex((day) => day.id === selectedDayId);
+    if (index < 0) {
+      return;
+    }
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= timelineDays.length) {
+      return;
+    }
+    selectTimelineDay(timelineDays[nextIndex].id);
+  }
 
   // Launch a mote from the tapped item into the egg, deferring the actual
   // answer until it lands so the egg's pulse lands with it. Guards against
@@ -379,7 +397,22 @@ export default function HomeScreen() {
     }, [windowWidth, windowHeight])
   );
 
+  // Horizontal swipe changes the selected day. activeOffsetX/failOffsetY let the
+  // vertical ScrollView keep working — only a clearly sideways drag flips days.
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([-24, 24])
+    .failOffsetY([-18, 18])
+    .enabled(!isHatching && !promptSheetOpen && !comicGen)
+    .onEnd((event) => {
+      if (event.translationX > 60) {
+        runOnJS(goToAdjacentDay)(-1);
+      } else if (event.translationX < -60) {
+        runOnJS(goToAdjacentDay)(1);
+      }
+    });
+
   return (
+    <GestureDetector gesture={swipeGesture}>
     <View style={styles.screen}>
       <AmbientBackground
         accentColor={backgroundAccent}
@@ -470,13 +503,17 @@ export default function HomeScreen() {
           </Animated.View>
         ) : (
           <Animated.View entering={presenceEnter(120)} style={styles.formingCopy}>
-            <ThemedText style={styles.formingTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              {onTomorrowForming ? 'Tomorrow is already forming' : formingTitle}
-            </ThemedText>
-            {!onTomorrowForming && signalLine ? (
-              <ThemedText style={styles.signalLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                {signalLine}
-              </ThemedText>
+            {!hasActivePrompt ? (
+              <>
+                <ThemedText style={styles.formingTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  {onTomorrowForming ? 'Tomorrow is already forming' : formingTitle}
+                </ThemedText>
+                {!onTomorrowForming && signalLine ? (
+                  <ThemedText style={styles.signalLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    {signalLine}
+                  </ThemedText>
+                ) : null}
+              </>
             ) : null}
             {isForming && formingDay && formingDay.moments.length > 0 ? (
               <View style={styles.chipRow}>
@@ -512,7 +549,7 @@ export default function HomeScreen() {
         <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
           {isDay && selectedDay.canHatch ? (
             <KatchaButton label="Reveal the hatch" onPress={handleReveal} variant="primary" />
-          ) : isForming ? (
+          ) : isForming && !hasActivePrompt ? (
             <View style={styles.addRow}>
               <KatchaButton
                 label={onTomorrowForming ? 'Add to tomorrow' : 'Add to today'}
@@ -611,6 +648,7 @@ export default function HomeScreen() {
         </Animated.View>
       ) : null}
     </View>
+    </GestureDetector>
   );
 }
 

@@ -49,24 +49,32 @@ public final class KatchimeraFoundationModule: Module {
 
     let instructions = Instructions(
       """
-      You help a gentle journaling app label what a photo meant to the person who took it.
-      You receive the things an on-device vision model detected in the photo.
+      You help a gentle journaling app name what a photo meant to the person who took it.
+      You receive what an on-device vision model detected, with the MAIN subject listed first.
+      Anchor every option to that main subject — it is what the photo is mostly about.
       Return exactly four options, one for each feeling: calm, energy, together, meaningful.
-      Each option's label is 1–3 warm everyday words that fit BOTH the photo and that feeling
-      (e.g. for a meal: "Comfort"/calm, "A treat"/energy, "Shared"/together, "Worth savoring"/meaningful).
-      No punctuation, no emoji, no hashtags. Keep it human and specific to the photo.
+      Each label is a short present-tense phrase (2–4 words) for what the person is doing or
+      savouring in the moment, fitting BOTH the main subject and that feeling.
+      Examples for a cup of coffee: "A slow sip"/calm, "A quick pick-me-up"/energy,
+      "Catching up"/together, "My little ritual"/meaningful.
+      Examples for a trail: "Soaking in the calm"/calm, "Pushing onward"/energy,
+      "Walking it together"/together, "Worth the climb"/meaningful.
+      Keep each label under 24 characters. No punctuation, no emoji, no hashtags. Be specific.
       """
     )
     let session = LanguageModelSession(instructions: instructions)
 
-    var described = tags.filter { !$0.isEmpty }.joined(separator: ", ")
-    if described.isEmpty { described = "an everyday moment" }
+    let cleaned = tags.filter { !$0.isEmpty }
+    let primary = cleaned.first ?? "an everyday moment"
+    let rest = cleaned.dropFirst().prefix(6).joined(separator: ", ")
+    var described = "mainly \(primary)"
+    if !rest.isEmpty { described += " (also in frame: \(rest))" }
     if faceCount >= 2 {
       described += "; people are together in the photo"
     } else if faceCount == 1 {
       described += "; a person is in the photo"
     }
-    let prompt = Prompt("The photo shows: \(described). Suggest the four options now.")
+    let prompt = Prompt("The photo is \(described). Suggest the four options now, each anchored to \(primary).")
 
     do {
       let response = try await session.respond(to: prompt, generating: MeaningOptionList.self)
@@ -82,7 +90,7 @@ public final class KatchimeraFoundationModule: Module {
 @available(iOS 26.0, *)
 @Generable
 struct MeaningOption {
-  @Guide(description: "A warm 1–3 word label for what the moment meant")
+  @Guide(description: "A short present-tense phrase (2–4 words, under 24 characters) for what the person is doing or savouring in the moment, anchored to the photo's main subject")
   let label: String
 
   @Guide(description: "The feeling this option expresses", .anyOf(["calm", "energy", "together", "meaningful"]))

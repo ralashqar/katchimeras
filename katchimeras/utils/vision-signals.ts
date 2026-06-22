@@ -146,8 +146,15 @@ const SOCIAL_FACE_MIN = 2;
 // intimate "little one" moment, so the baby read is suppressed at this point.
 const CROWD_FACE_MIN = 3;
 const PER_PHOTO_CONFIDENCE_FLOOR = 0.2;
+// A single, deliberately-snapped photo (the camera capture / essence flow) gets a
+// lower floor than the day rollup: the user pointed the lens at one subject, so we
+// trust weaker reads (a cropped soda can, a plate of food) we'd skip in a bulk scan.
+export const CAPTURE_PHOTO_CONFIDENCE_FLOOR = 0.12;
 
-export function aggregatePhotoVision(results: PhotoVisionResult[]): DayVisionSummary {
+export function aggregatePhotoVision(
+  results: PhotoVisionResult[],
+  confidenceFloor: number = PER_PHOTO_CONFIDENCE_FLOOR
+): DayVisionSummary {
   const totals = new Map<string, { salience: number; count: number; peak: number }>();
   // Raw, un-canonicalised labels kept in parallel for specific narration.
   const rawTotals = new Map<string, number>();
@@ -169,7 +176,7 @@ export function aggregatePhotoVision(results: PhotoVisionResult[]): DayVisionSum
     const perPhoto = new Map<string, number>();
     const perPhotoRaw = new Map<string, number>();
     for (const label of result.labels ?? []) {
-      if ((label.confidence ?? 0) < PER_PHOTO_CONFIDENCE_FLOOR) {
+      if ((label.confidence ?? 0) < confidenceFloor) {
         continue;
       }
       const rawKey = label.name.trim().toLowerCase();
@@ -322,9 +329,9 @@ export function buildVisionSignals(vision: DayVisionSummary): VisionSignal[] {
 
 // The day's most prominent, specific subjects (already canonical + generic-free),
 // salience-ranked, for the nightly line. Returns the concept names directly.
-export function pickProminentTags(vision: DayVisionSummary, limit = 3): string[] {
+export function pickProminentTags(vision: DayVisionSummary, limit = 3, minConfidence = 0.25): string[] {
   return vision.concepts
-    .filter((concept) => concept.peakConfidence >= 0.25)
+    .filter((concept) => concept.peakConfidence >= minConfidence)
     .slice(0, limit)
     .map((concept) => concept.name);
 }

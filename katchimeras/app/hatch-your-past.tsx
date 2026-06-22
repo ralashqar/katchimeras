@@ -34,7 +34,7 @@ import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '
 import { saveOnboardingRecap } from '@/utils/onboarding-recap';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { analyzePhoto } from '@/utils/photo-vision';
-import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals';
+import { aggregatePhotoVision, buildVisionSignals, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 
 type Phase = 'questions' | 'capture' | 'hatching' | 'reveal' | 'empty';
 
@@ -206,7 +206,7 @@ export default function HatchYourPastRoute() {
       return null;
     }
     const result = await analyzePhoto(capturePhotoUri);
-    return result ? aggregatePhotoVision([result]) : null;
+    return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
   }, [capturePhotoUri]);
 
   function commitCapture(meaning: MeaningTag, vision: DayVisionSummary | null) {

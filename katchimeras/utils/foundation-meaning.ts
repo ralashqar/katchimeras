@@ -67,9 +67,24 @@ export async function suggestFoundationMeanings(
   if (!nativeFoundation?.suggestMeaningsAsync || !isFoundationMeaningAvailable()) {
     return null;
   }
-  const tags = [...vision.concepts.map((concept) => concept.name), ...vision.details]
-    .slice(0, 8)
-    .map((tag) => tag.replace(/_/g, ' '));
+  // Concepts are salience-sorted, so the most prominent subject leads; details
+  // follow as supporting context. Dedupe (a detail can echo a concept) so the
+  // model gets a clean ranked list with the main subject unmistakably first.
+  const ordered = [...vision.concepts.map((concept) => concept.name), ...vision.details].map((tag) =>
+    tag.replace(/_/g, ' ').trim()
+  );
+  const seen = new Set<string>();
+  const tags: string[] = [];
+  for (const tag of ordered) {
+    const key = tag.toLowerCase();
+    if (tag && !seen.has(key)) {
+      seen.add(key);
+      tags.push(tag);
+    }
+    if (tags.length >= 8) {
+      break;
+    }
+  }
   if (tags.length === 0 && vision.maxFaceCount < 1) {
     return null;
   }
