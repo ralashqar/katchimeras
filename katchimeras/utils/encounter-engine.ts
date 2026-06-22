@@ -502,7 +502,10 @@ export function buildDistinctEncounterCreature(
   history: EncounterHistoryMap,
   excludeProfileIds: ReadonlySet<string>,
   primaryTrait: HomeScoreKey,
-  secondaryTrait: HomeScoreKey
+  secondaryTrait: HomeScoreKey,
+  // Seeds to try BEFORE the generic floor — e.g. the onboarding recap's answers,
+  // so the first hatches reflect what the user said their recent days held.
+  preferredFloorSeeds: readonly string[] = []
 ): LocalCreatureRecord {
   // 1. The day's real candidates, scored exactly like matchEncounterForDay, best
   //    first — skipping any species already hatched this run.
@@ -535,21 +538,45 @@ export function buildDistinctEncounterCreature(
       );
     });
 
-  const best = scored[0];
-  if (best) {
+  const buildFromScored = (candidate: (typeof scored)[number]): LocalCreatureRecord => {
     const livingRarity = computeLivingRarity(day);
     const match: EncounterMatch = {
-      castEntry: best.castEntry,
-      profile: best.profile,
-      signal: best.signal,
-      repeatDepth: best.repeatDepth,
-      rarity: maxRarity(speciesRarityFloor(best.profile.baseRarity), livingRarity.tier),
+      castEntry: candidate.castEntry,
+      profile: candidate.profile,
+      signal: candidate.signal,
+      repeatDepth: candidate.repeatDepth,
+      rarity: maxRarity(speciesRarityFloor(candidate.profile.baseRarity), livingRarity.tier),
       livingRarity,
     };
     return buildCreatureFromMatch(day, match, primaryTrait, secondaryTrait);
+  };
+
+  // 1a. Best unused SPECIFIC real candidate (a resolved place / vision / moment).
+  //     Real evidence always wins — it beats a merely stated preference.
+  const specific = scored.find((candidate) => !GENERIC_FALLBACK_SEEDS.has(candidate.signal.seedId));
+  if (specific) {
+    return buildFromScored(specific);
   }
 
-  // 2. No unused real candidate — rotate generic floor species for variety.
+  // 1b. No specific signal — lead with the recap's preferred seeds (the user told
+  //     us what their days held), so the first hatches reflect their answers
+  //     instead of a generic "you walked / stayed in" floor.
+  for (const seedId of preferredFloorSeeds) {
+    const castEntry = encounterCastBySeedId.get(seedId);
+    if (castEntry && !excludeProfileIds.has(castEntry.profileId)) {
+      const creature = floorCreatureFromSeed(day, seedId, history, primaryTrait, secondaryTrait);
+      if (creature) {
+        return creature;
+      }
+    }
+  }
+
+  // 1c. Otherwise the day's best GENERIC real candidate (you-walked / stayed-in).
+  if (scored[0]) {
+    return buildFromScored(scored[0]);
+  }
+
+  // 2. Nothing at all — rotate generic floor species for variety.
   const floorSeeds = day.stepsCount >= 1500 ? DISTINCT_FLOOR_SEEDS_ACTIVE : DISTINCT_FLOOR_SEEDS_QUIET;
   for (const seedId of floorSeeds) {
     const castEntry = encounterCastBySeedId.get(seedId);

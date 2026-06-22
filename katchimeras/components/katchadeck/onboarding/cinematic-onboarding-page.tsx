@@ -66,10 +66,13 @@ const OPENING_EGG_VISUAL: EggVisualState = {
 const OPENING_REVEAL_ART = require('../../../assets/images/katchimeras/cutouts/baristabbit.png');
 const OPENING_REVEAL_ACCENT = '#E3B68C';
 
-// One-by-one feed pacing: the first moment is drawn in a beat after the egg
-// appears, then each following one after the previous lands.
-const FEED_FIRST_DELAY_MS = 650;
-const FEED_GAP_MS = 320;
+// Feed pacing: the first moment is drawn in a beat after the egg appears, then
+// each following one launches sooner than the last — a slow start that
+// accelerates so the rest get thrown in quickly (motes overlap in flight).
+const FEED_FIRST_DELAY_MS = 600;
+const FEED_START_GAP_MS = 520;
+const FEED_MIN_GAP_MS = 130;
+const FEED_RAMP_MS = 78;
 // LanternEgg's internal stage height — the host box that centers the egg.
 const EGG_HOST_HEIGHT = 258;
 const CREATURE_SIZE = 172;
@@ -397,12 +400,13 @@ function OpeningSequenceStage({
   const hatched = scene.eggState === 'hatch' || scene.eggState === 'revealed';
   const crackStage: 0 | 1 | 2 = scene.eggState === 'build' ? 1 : hatched ? 2 : 0;
 
-  const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
+  // Multiple motes can be in flight at once (the cadence accelerates), so the
+  // overlay renders a list rather than a single feed.
+  const [activeFeeds, setActiveFeeds] = useState<EggFeed[]>([]);
   const [feedKey, setFeedKey] = useState(0);
-  const [fedCount, setFedCount] = useState(0);
-  const [flyingIndex, setFlyingIndex] = useState<number | null>(null);
+  const [launchedCount, setLaunchedCount] = useState(0);
   const startedRef = useRef<number | null>(null);
-  const landedIndexRef = useRef(0);
+  const feedNonceRef = useRef(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   function launchMote(index: number) {
@@ -411,40 +415,34 @@ function OpeningSequenceStage({
     }
     const chip = chips[index];
     const anchor = getChipZoneAnchor(chip.zone);
-    landedIndexRef.current = index;
-    setFlyingIndex(index);
-    setEggFeed({
-      nonce: index + 1,
+    feedNonceRef.current += 1;
+    const feed: EggFeed = {
+      nonce: feedNonceRef.current,
       fromX: anchor.x * metrics.stageWidth,
       fromY: anchor.y * stageHeight,
       toX: eggCenter.x,
       toY: eggCenter.y - 18 * metrics.scale,
       label: chip.label,
       tint: chip.accent,
-    });
+    };
+    setActiveFeeds((current) => [...current, feed]);
+    // Hide the static label the moment its mote launches.
+    setLaunchedCount((current) => Math.max(current, index + 1));
   }
 
-  function handleFeedArrive() {
-    const landed = landedIndexRef.current;
-    setEggFeed(null);
-    setFlyingIndex(null);
+  function handleFeedArrive(nonce: number) {
+    setActiveFeeds((current) => current.filter((feed) => feed.nonce !== nonce));
+    // Each landing pulses the egg.
     setFeedKey((key) => key + 1);
-    setFedCount(landed + 1);
-    const next = landed + 1;
-    if (next < chips.length) {
-      const timer = setTimeout(() => launchMote(next), reduceMotionEnabled ? 140 : FEED_GAP_MS);
-      timersRef.current.push(timer);
-    }
   }
 
   // Reset the feed whenever the opening restarts; clear pending timers on unmount.
   useEffect(() => {
-    setEggFeed(null);
+    setActiveFeeds([]);
     setFeedKey(0);
-    setFedCount(0);
-    setFlyingIndex(null);
+    setLaunchedCount(0);
     startedRef.current = null;
-    landedIndexRef.current = 0;
+    feedNonceRef.current = 0;
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
     return () => {
@@ -454,40 +452,98 @@ function OpeningSequenceStage({
   }, [restartToken]);
 
   // Begin feeding once the egg first appears (the "Moments shape your day" beat).
-  // Self-perpetuates via handleFeedArrive, so it spans the moments beats.
+  // Launches are scheduled on an ACCELERATING timeline — each gap is shorter than
+  // the last — so the first moment drifts in slowly, then the rest pour in.
   useEffect(() => {
     if (scene.eggState !== 'forming' || startedRef.current === restartToken) {
       return;
     }
     startedRef.current = restartToken;
-    const timer = setTimeout(() => launchMote(0), reduceMotionEnabled ? 220 : FEED_FIRST_DELAY_MS);
-    timersRef.current.push(timer);
+    let at = reduceMotionEnabled ? 200 : FEED_FIRST_DELAY_MS;
+    for (let index = 0; index < chips.length; index += 1) {
+      const launchAt = at;
+      timersRef.current.push(setTimeout(() => launchMote(index), launchAt));
+      const gap = reduceMotionEnabled
+        ? 110
+        : Math.max(FEED_MIN_GAP_MS, FEED_START_GAP_MS - index * FEED_RAMP_MS);
+      at += gap;
+    }
     // launchMote closes over this render's metrics, which are stable for the run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.eggState, restartToken, reduceMotionEnabled]);
+  }, [scene.eggState, restartToken, reduceMotionEnabled, chips.length]);
 
-  // Hatch transition: fade the egg out, fade the creature in.
+  // Hatch choreography: the egg rattles (gently while building, violently at the
+  // moment of hatch), then shrinks away just as the creature pops up in its place.
   const eggOpacity = useSharedValue(0);
+  const eggShake = useSharedValue(0);
+  const eggHatch = useSharedValue(0);
   const creatureProgress = useSharedValue(0);
+  const creatureScale = useSharedValue(0.4);
+
+  const isBuilding = scene.eggState === 'build';
 
   useEffect(() => {
     eggOpacity.value = withTiming(eggShown && !hatched ? 1 : 0, {
-      duration: reduceMotionEnabled ? 140 : 420,
+      duration: reduceMotionEnabled ? 140 : hatched ? 240 : 420,
       easing: Easing.out(Easing.cubic),
     });
-  }, [eggOpacity, eggShown, hatched, reduceMotionEnabled]);
+    // Shrink the egg out of existence at the hatch.
+    eggHatch.value = withTiming(hatched ? 1 : 0, {
+      duration: reduceMotionEnabled ? 140 : 300,
+      easing: Easing.in(Easing.cubic),
+    });
+  }, [eggHatch, eggOpacity, eggShown, hatched, reduceMotionEnabled]);
+
+  useEffect(() => {
+    if (reduceMotionEnabled) {
+      eggShake.value = withTiming(0, { duration: 120 });
+      return;
+    }
+    if (isBuilding) {
+      // Aggressive, continuous rattle while the day takes shape.
+      eggShake.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 55, easing: Easing.linear }),
+          withTiming(-1, { duration: 55, easing: Easing.linear })
+        ),
+        -1,
+        true
+      );
+    } else if (hatched) {
+      // One last violent jolt as it bursts.
+      eggShake.value = withSequence(
+        withTiming(1.8, { duration: 45, easing: Easing.linear }),
+        withTiming(-1.8, { duration: 50, easing: Easing.linear }),
+        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) })
+      );
+    } else {
+      eggShake.value = withTiming(0, { duration: 160, easing: Easing.out(Easing.cubic) });
+    }
+  }, [eggShake, hatched, isBuilding, reduceMotionEnabled]);
 
   useEffect(() => {
     creatureProgress.value = withTiming(hatched ? 1 : 0, {
-      duration: reduceMotionEnabled ? 160 : 520,
+      duration: reduceMotionEnabled ? 160 : 460,
       easing: Easing.out(Easing.cubic),
     });
-  }, [creatureProgress, hatched, reduceMotionEnabled]);
+    // Scale up with an overshoot so the new katchimera springs into being.
+    creatureScale.value = withTiming(hatched ? 1 : 0.4, {
+      duration: reduceMotionEnabled ? 160 : 520,
+      easing: hatched ? Easing.out(Easing.back(1.7)) : Easing.out(Easing.cubic),
+    });
+  }, [creatureProgress, creatureScale, hatched, reduceMotionEnabled]);
 
-  const eggStyle = useAnimatedStyle(() => ({ opacity: eggOpacity.value }));
+  const eggStyle = useAnimatedStyle(() => ({
+    opacity: eggOpacity.value,
+    transform: [
+      { translateX: eggShake.value * 7 },
+      { rotateZ: `${eggShake.value * 4}deg` },
+      { scale: 1 - eggHatch.value * 0.82 },
+    ],
+  }));
   const creatureStyle = useAnimatedStyle(() => ({
     opacity: creatureProgress.value,
-    transform: [{ translateY: 18 - creatureProgress.value * 18 }, { scale: 0.82 + creatureProgress.value * 0.18 }],
+    transform: [{ translateY: 14 - creatureProgress.value * 14 }, { scale: creatureScale.value }],
   }));
   const creatureGlowStyle = useAnimatedStyle(() => ({
     opacity: creatureProgress.value * 0.85,
@@ -500,13 +556,13 @@ function OpeningSequenceStage({
         <Animated.View
           pointerEvents="none"
           style={[styles.openingEggHost, { top: eggCenter.y - EGG_HOST_HEIGHT / 2 }, eggStyle]}>
-          <LanternEgg egg={OPENING_EGG_VISUAL} crackStage={crackStage} feedKey={feedKey} reactionKey={fedCount} />
+          <LanternEgg egg={OPENING_EGG_VISUAL} crackStage={crackStage} feedKey={feedKey} reactionKey={feedKey} />
         </Animated.View>
       ) : null}
 
       {eggShown && !hatched
         ? chips.map((chip, index) => {
-            if (index < fedCount || index === flyingIndex) {
+            if (index < launchedCount) {
               return null;
             }
             return (
@@ -563,7 +619,9 @@ function OpeningSequenceStage({
         </Animated.View>
       ) : null}
 
-      <EggFeedOverlay feed={eggFeed} onArrive={handleFeedArrive} />
+      {activeFeeds.map((feed) => (
+        <EggFeedOverlay feed={feed} key={feed.nonce} onArrive={() => handleFeedArrive(feed.nonce)} />
+      ))}
     </View>
   );
 }

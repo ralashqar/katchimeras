@@ -1,86 +1,203 @@
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
+import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
+import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
+import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
+import { dayPromptRegistry } from '@/constants/day-prompts';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
+import type { DayPromptKind, EggVisualState } from '@/types/home';
 import { enrichBackfillReflections, runBackfillFoundation } from '@/utils/day-backfill';
 import { getCreatureVisual, hydrateHomeState } from '@/utils/home-engine';
 import { buildHatchYourPast, type HatchedPastCreature } from '@/utils/hatch-your-past';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
+import { saveOnboardingRecap } from '@/utils/onboarding-recap';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
-type Phase = 'scanning' | 'reveal' | 'empty';
+type Phase = 'questions' | 'hatching' | 'reveal' | 'empty';
+
+// The few reads we ask before hatching, in the same one-at-a-time prompt format
+// the main app uses. Their answers (encounter seeds) steer the first hatches.
+const QUESTION_KINDS: readonly DayPromptKind[] = ['feeling', 'activity', 'hobby'];
+
+const PAST_EGG_VISUAL: EggVisualState = {
+  accentColor: '#A78BFA',
+  haloColor: '#C9B8FF',
+  coreColor: '#EAE2FF',
+  intensity: 0.62,
+  shimmer: true,
+  swirl: 0.4,
+  label: 'Reading your week',
+};
+
+// Minimum time the egg rattles before it can burst, so the shake always reads
+// even when the scan finishes quickly.
+const MIN_SHAKE_MS = 1400;
 
 export default function HatchYourPastRoute() {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>('scanning');
+  const [phase, setPhase] = useState<Phase>('questions');
   const [creatures, setCreatures] = useState<HatchedPastCreature[]>([]);
   const [daysHatched, setDaysHatched] = useState(0);
-  const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
+  // The hatch (scan + backfill) runs while the egg shakes; this flips true once
+  // the creatures are ready, letting the egg finish its burst and hand off to the
+  // reveal sequence.
+  const [revealReady, setRevealReady] = useState(false);
+  const revealOutcomeRef = useRef<'reveal' | 'empty'>('reveal');
 
-  useEffect(() => {
-    let active = true;
+  // Questions phase: a prompt at a time feeds the egg, and the chosen seeds are
+  // saved as the recap the backfill reads to steer the first hatches.
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
+  const [eggFeedKey, setEggFeedKey] = useState(0);
+  const eggRef = useRef<View | null>(null);
+  const collectedSeeds = useRef<string[]>([]);
+  const collectedTags = useRef<string[]>([]);
+  const pendingFeed = useRef<{ seeds: string[]; tags: string[] } | null>(null);
+  const feedNonce = useRef(0);
+  const mountedRef = useRef(true);
 
-    (async () => {
-      // Start from a CLEAN slate. The normal backfill deliberately preserves any
-      // day that already has a creature (so it never clobbers days you actually
-      // lived) — which is why a previous session's katchimeras stayed put and
-      // nothing updated. This screen is the "start as if today is day one"
-      // simulation, so we wipe the current session first: a fresh forming today
-      // and no prior days, letting the reconstruction fully own the last few days.
-      try {
-        const profile = loadOnboardingProfile();
-        const now = new Date();
-        clearStoredHomeState();
-        const fresh = hydrateHomeState(null, profile, now).state;
-        saveStoredHomeState({ ...fresh, archivedDays: [], backfilledAt: undefined });
-      } catch {
-        // If the reset fails, the backfill below still runs against whatever
-        // state exists (it just won't overwrite already-hatched days).
-      }
-
-      // Persist through the SAME proven pipeline the "Backfill real history" dev
-      // button uses: scan → curate → cluster photos into pins (saved first), then
-      // HATCH each past day, then defer the LLM quotes. This writes real hatched
-      // days (creature + vision + map pins) to storage, so landing on Home shows
-      // them. We then build the reveal from what was actually persisted, so the
-      // animation and Home always agree.
-      let summary = '';
-      try {
-        const result = await runBackfillFoundation();
-        summary = result.summary;
-        if (result.pendingReflectionDayIds.length > 0) {
-          void enrichBackfillReflections(result.pendingReflectionDayIds);
-        }
-      } catch (error) {
-        summary = `Backfill failed: ${String((error as { message?: string })?.message ?? error)}`;
-      }
-
-      // Reveal from the persisted hatched past days (re-deriving the collection is
-      // deterministic), so the reveal can never diverge from what's on Home.
-      const stored = loadStoredHomeState();
-      const hatchedPastDays = (stored?.archivedDays ?? []).filter((day) => day.creature != null);
-      const reveal = buildHatchYourPast(hatchedPastDays);
-
-      if (!active) {
-        return;
-      }
-      setDiagnostic(summary);
-      setCreatures(reveal.creatures);
-      setDaysHatched(hatchedPastDays.length);
-      setPhase(reveal.creatures.length > 0 ? 'reveal' : 'empty');
-    })();
-
-    return () => {
-      active = false;
-    };
+  useEffect(() => () => {
+    mountedRef.current = false;
   }, []);
+
+  const currentPrompt =
+    questionIndex < QUESTION_KINDS.length
+      ? { ...dayPromptRegistry[QUESTION_KINDS[questionIndex]], photoCandidates: [] }
+      : null;
+
+  // The scan + hatch + reveal, run once the questions are answered (so the recap
+  // they produce is already saved when the backfill reads it).
+  async function runReveal() {
+    // Start from a CLEAN slate so the reconstruction fully owns the last few days
+    // (the normal backfill preserves already-hatched days, which is not what this
+    // "start as if today is day one" simulation wants).
+    try {
+      const profile = loadOnboardingProfile();
+      const now = new Date();
+      clearStoredHomeState();
+      const fresh = hydrateHomeState(null, profile, now).state;
+      saveStoredHomeState({ ...fresh, archivedDays: [], backfilledAt: undefined });
+    } catch {
+      // If the reset fails, the backfill below still runs against whatever exists.
+    }
+
+    try {
+      const result = await runBackfillFoundation();
+      if (result.pendingReflectionDayIds.length > 0) {
+        void enrichBackfillReflections(result.pendingReflectionDayIds);
+      }
+    } catch {
+      // Backfill failed — fall through; the reveal just shows whatever persisted.
+    }
+
+    // Reveal from the persisted hatched past days, so the reveal can never diverge
+    // from what's on Home.
+    const stored = loadStoredHomeState();
+    const hatchedPastDays = (stored?.archivedDays ?? []).filter((day) => day.creature != null);
+    const reveal = buildHatchYourPast(hatchedPastDays);
+
+    if (!mountedRef.current) {
+      return;
+    }
+    setCreatures(reveal.creatures);
+    setDaysHatched(hatchedPastDays.length);
+    // The egg keeps shaking until this flips; the egg's burst then advances the
+    // phase to the reveal sequence (or the empty state).
+    revealOutcomeRef.current = reveal.creatures.length > 0 ? 'reveal' : 'empty';
+    setRevealReady(true);
+  }
+
+  function finishQuestions() {
+    // Persist the answers as the recap the backfill reads (de-duped seeds), then
+    // run the scan + hatch.
+    saveOnboardingRecap({
+      moodId: null,
+      activityIds: [],
+      preferredSeedIds: [...new Set(collectedSeeds.current)],
+      semanticTags: [...collectedTags.current],
+      savedAt: new Date().toISOString(),
+    });
+    setPhase('hatching');
+    void runReveal();
+  }
+
+  function handleHatchBurstDone() {
+    setPhase(revealOutcomeRef.current);
+  }
+
+  function advanceQuestions() {
+    const next = questionIndex + 1;
+    if (next >= QUESTION_KINDS.length) {
+      finishQuestions();
+      return;
+    }
+    setQuestionIndex(next);
+  }
+
+  function commitPending() {
+    const pending = pendingFeed.current;
+    if (pending) {
+      collectedSeeds.current.push(...pending.seeds);
+      collectedTags.current.push(...pending.tags);
+      pendingFeed.current = null;
+    }
+  }
+
+  // Answering a prompt launches a mote from the tapped chip into the egg (exactly
+  // the main-app feed); the egg pulses on arrival and the next question appears.
+  function handleAnswerQuestion(kind: DayPromptKind, choiceIds: string[], from: FeedSourceRect) {
+    const option = dayPromptRegistry[kind].options.find((candidate) => candidate.id === choiceIds[0]);
+    pendingFeed.current = {
+      seeds: option?.encounterSeedBias?.map((bias) => bias.seedId) ?? [],
+      tags: option?.semanticTags ?? [],
+    };
+    if (eggRef.current) {
+      eggRef.current.measureInWindow((x, y, w, h) => {
+        feedNonce.current += 1;
+        setEggFeed({
+          nonce: feedNonce.current,
+          fromX: from.x + from.w / 2,
+          fromY: from.y + from.h / 2,
+          toX: x + w / 2,
+          toY: y + h / 2,
+          label: option?.label,
+          tint: Lantern.ember300,
+        });
+      });
+    } else {
+      commitPending();
+      advanceQuestions();
+    }
+  }
+
+  function handleFeedArrive() {
+    commitPending();
+    setEggFeed(null);
+    setEggFeedKey((key) => key + 1);
+    advanceQuestions();
+  }
+
+  function handleSkipQuestion(_kind: DayPromptKind) {
+    pendingFeed.current = null;
+    advanceQuestions();
+  }
 
   function finish() {
     router.replace('/(tabs)');
@@ -97,16 +214,43 @@ export default function HatchYourPastRoute() {
         meshColors={['rgba(167,139,250,0.14)', 'rgba(125,232,205,0.1)', 'rgba(255,195,107,0.1)', 'rgba(20,17,31,0.2)']}
       />
 
-      {phase === 'scanning' ? (
+      {phase === 'questions' ? (
+        <Animated.View entering={FadeIn.duration(240)} style={styles.flex}>
+          <ScrollView contentContainerStyle={styles.questionsContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.questionHeader}>
+              <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                Hatch your past
+              </ThemedText>
+              <ThemedText style={styles.questionLead} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                A few quick reads on your last few days — your taps shape the first characters that hatch.
+              </ThemedText>
+            </View>
+
+            <View collapsable={false} ref={eggRef} style={styles.questionEgg}>
+              <LanternEgg egg={PAST_EGG_VISUAL} feedKey={eggFeedKey} reactionKey={questionIndex} />
+            </View>
+
+            {currentPrompt ? (
+              <DayPromptStrip
+                onAnswer={handleAnswerQuestion}
+                onDismiss={handleSkipQuestion}
+                onSelectHeroPhoto={() => {}}
+                prompt={currentPrompt}
+              />
+            ) : null}
+
+            <ThemedText style={styles.questionHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              {Math.min(questionIndex + 1, QUESTION_KINDS.length)} of {QUESTION_KINDS.length}
+            </ThemedText>
+          </ScrollView>
+        </Animated.View>
+      ) : null}
+
+      {phase === 'hatching' ? (
         <Animated.View entering={FadeIn.duration(240)} style={styles.center}>
-          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            Hatch your past
-          </ThemedText>
+          <HatchingEgg egg={PAST_EGG_VISUAL} onBurstDone={handleHatchBurstDone} ready={revealReady} />
           <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            Reading your last few days…
-          </ThemedText>
-          <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            Finding the characters your days have already been.
+            Reading your days…
           </ThemedText>
         </Animated.View>
       ) : null}
@@ -120,11 +264,6 @@ export default function HatchYourPastRoute() {
             We couldn’t find enough of your recent days to read yet. Live one, reveal it at your hatch
             hour, and the collection begins itself.
           </ThemedText>
-          {__DEV__ && diagnostic ? (
-            <ThemedText style={styles.diagnostic} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              {diagnostic}
-            </ThemedText>
-          ) : null}
           <View style={styles.cta}>
             <KatchaButton label="Begin" onPress={finish} variant="primary" />
           </View>
@@ -149,11 +288,6 @@ export default function HatchYourPastRoute() {
             Hatched from {daysHatched} {daysHatched === 1 ? 'day' : 'days'} you already lived. They’re in
             your collection now — and they’ll remember you.
           </ThemedText>
-          {__DEV__ && diagnostic ? (
-            <ThemedText style={styles.diagnostic} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              {diagnostic}
-            </ThemedText>
-          ) : null}
           <View style={styles.summaryRow}>
             {creatures.map((creature) => {
               const visual = getCreatureVisual(creature.visualKey);
@@ -170,7 +304,73 @@ export default function HatchYourPastRoute() {
           </View>
         </Animated.View>
       ) : null}
+
+      <EggFeedOverlay feed={eggFeed} onArrive={handleFeedArrive} />
     </View>
+  );
+}
+
+// The bridge between answering the prompts and the reveal: the same egg rattles
+// aggressively and cracks while the days are scanned, then bursts and hands off
+// to the 3-creature reveal sequence.
+function HatchingEgg({ egg, ready, onBurstDone }: { egg: EggVisualState; ready: boolean; onBurstDone: () => void }) {
+  const [crackStage, setCrackStage] = useState<0 | 1 | 2>(0);
+  const burstStartedRef = useRef(false);
+  const startRef = useRef(Date.now());
+  const shake = useSharedValue(0);
+  const burst = useSharedValue(0);
+
+  useEffect(() => {
+    shake.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 55, easing: Easing.linear }),
+        withTiming(-1, { duration: 55, easing: Easing.linear })
+      ),
+      -1,
+      true
+    );
+  }, [shake]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setCrackStage((current) => (current < 1 ? 1 : current)), 650);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || burstStartedRef.current) {
+      return;
+    }
+    const wait = Math.max(0, MIN_SHAKE_MS - (Date.now() - startRef.current));
+    const startTimer = setTimeout(() => {
+      burstStartedRef.current = true;
+      setCrackStage(2);
+      shake.value = withSequence(
+        withTiming(1.8, { duration: 45, easing: Easing.linear }),
+        withTiming(-1.8, { duration: 50, easing: Easing.linear }),
+        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) })
+      );
+      burst.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) });
+    }, wait);
+    const doneTimer = setTimeout(onBurstDone, wait + 480);
+    return () => {
+      clearTimeout(startTimer);
+      clearTimeout(doneTimer);
+    };
+  }, [burst, onBurstDone, ready, shake]);
+
+  const eggStyle = useAnimatedStyle(() => ({
+    opacity: 1 - burst.value,
+    transform: [
+      { translateX: shake.value * 7 },
+      { rotateZ: `${shake.value * 4}deg` },
+      { scale: 1 + burst.value * 0.45 },
+    ],
+  }));
+
+  return (
+    <Animated.View pointerEvents="none" style={eggStyle}>
+      <LanternEgg crackStage={crackStage} egg={egg} />
+    </Animated.View>
   );
 }
 
@@ -221,6 +421,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
+  flex: {
+    flex: 1,
+  },
+  questionsContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 56,
+  },
+  questionHeader: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  questionLead: {
+    fontSize: 16,
+    lineHeight: 22,
+    maxWidth: 320,
+    textAlign: 'center',
+  },
+  questionEgg: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  questionHint: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 12,
+    textAlign: 'center',
+  },
   kicker: {
     fontSize: 11,
   },
@@ -232,13 +462,6 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 15,
     lineHeight: 22,
-    maxWidth: 340,
-    textAlign: 'center',
-  },
-  diagnostic: {
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 15,
     maxWidth: 340,
     textAlign: 'center',
   },

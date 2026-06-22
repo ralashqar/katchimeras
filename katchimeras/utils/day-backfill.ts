@@ -774,6 +774,7 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
   const { loadStoredHomeState, saveStoredHomeState } = await import('@/utils/home-storage');
   const { applyBackfilledDays, hydrateHomeState } = await import('@/utils/home-engine');
   const { loadOnboardingProfile } = await import('@/utils/onboarding-state');
+  const { loadOnboardingRecap } = await import('@/utils/onboarding-recap');
 
   const stored = loadStoredHomeState();
   if (!stored) {
@@ -781,6 +782,9 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
   }
 
   const profile = loadOnboardingProfile();
+  // The onboarding recap's answers (how the week felt + what it held) steer the
+  // first hatches when a reconstructed day has no real signal of its own.
+  const preferredFloorSeeds = loadOnboardingRecap()?.preferredSeedIds ?? [];
   const now = new Date();
   const todayIso = toLocalDateId(now);
   // includeToday so the user's newest photos (dated today) are captured too.
@@ -943,7 +947,14 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
       // other backfilled days: the day's best unused candidate, or a rotating
       // generic floor when it has no specific signal. Never null, never a repeat —
       // so a 3-day backfill is always 3 different creatures.
-      const creature = buildDistinctEncounterCreature(enriched, history, usedProfileIds, primary, secondary);
+      const creature = buildDistinctEncounterCreature(
+        enriched,
+        history,
+        usedProfileIds,
+        primary,
+        secondary,
+        preferredFloorSeeds
+      );
 
       if (creature?.encounterProfileId) {
         hatchedCount += 1;

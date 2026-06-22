@@ -695,5 +695,40 @@ check(
   `${coffeeA.name} / ${coffeeB.name}`
 );
 
+// Recap-preferred floor: the onboarding answers lead the hatches for blank days
+// (which otherwise floor to a generic stay-in creature), but never override a
+// real specific signal.
+const recapUsed = new Set();
+const recapNames = [];
+for (let i = 0; i < 2; i += 1) {
+  const blank = makeDay({ isoDate: `2026-07-0${i + 1}`, stepsCount: 0 });
+  const creature = engine.buildDistinctEncounterCreature(blank, {}, recapUsed, 'calm', 'focus', [
+    'coffee_shop',
+    'run_session',
+  ]);
+  recapUsed.add(creature.encounterProfileId);
+  recapNames.push(creature.name);
+}
+check(
+  'recap floor: preferred seeds lead blank-day hatches',
+  recapNames[0] === 'Baristabbit' && recapNames[1] === 'Sprintail',
+  JSON.stringify(recapNames)
+);
+
+// A real specific signal still beats a recap preference (evidence > stated).
+const realCoffeeOverRecap = engine.buildDistinctEncounterCreature(
+  makeDay({ placeCategorySeeds: ['park'], stepsCount: 1200 }),
+  {},
+  new Set(),
+  'calm',
+  'focus',
+  ['coffee_shop']
+);
+check(
+  'recap floor: a real place still wins over the recap',
+  realCoffeeOverRecap.name === 'Mossprout',
+  realCoffeeOverRecap.name
+);
+
 console.log(failures === 0 ? '\nAll encounter-engine checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

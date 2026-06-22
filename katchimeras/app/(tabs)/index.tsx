@@ -8,7 +8,7 @@ import { captureRef } from 'react-native-view-shot';
 
 import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { HatchSequence, type HatchSequencePhase } from '@/components/katchadeck/home/hatch-sequence';
+import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
@@ -33,7 +33,7 @@ import { useDayStepCapture } from '@/hooks/use-day-step-capture';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useRecentPhotoMapSeeding } from '@/hooks/use-recent-photo-map-seeding';
 import { useBackfillStatus } from '@/utils/backfill-status';
-import type { HomeDayRecord, HomeMoment } from '@/types/home';
+import type { EggVisualState, HomeDayRecord, HomeMoment } from '@/types/home';
 
 const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 
@@ -66,8 +66,11 @@ export default function HomeScreen() {
     resetHomeState,
   } = useHomeScreenState();
   const backfillStatus = useBackfillStatus();
-  const [hatchTargetId, setHatchTargetId] = useState<string | null>(null);
-  const [hatchPhase, setHatchPhase] = useState<HatchSequencePhase>('recap');
+  // In-place hatch reveal on the hero stage: while hatching, the egg already on
+  // the page rattles, cracks, and shrinks as the creature scales up — the rest of
+  // the page chrome hides for the moment, then restores into the hatched layout.
+  const [isHatching, setIsHatching] = useState(false);
+  const [hatchingEgg, setHatchingEgg] = useState<EggVisualState | null>(null);
   const [sharingDayId, setSharingDayId] = useState<string | null>(null);
   // The "feed the egg" flight: a mote launched from a tapped prompt option that
   // arcs into the egg, where it lands and fires an absorb pulse (feedKey). The
@@ -106,8 +109,6 @@ export default function HomeScreen() {
     selectedDay?.kind === 'day'
       ? selectedDay.highlight ?? 'Small moments change the shape of the day.'
       : (selectedDay?.subtitle ?? 'Another day is waiting in the wings.');
-  const hatchDay =
-    hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId ? selectedDay : null;
   const shareableDay =
     selectedDay?.kind === 'day' && selectedDay.state === 'hatched' && selectedDay.creature
       ? (selectedDay as HomeDayRecord & { creature: NonNullable<HomeDayRecord['creature']> })
@@ -136,41 +137,6 @@ export default function HomeScreen() {
   });
 
   useEffect(() => {
-    if (!hatchTargetId || !hatchDay) {
-      return;
-    }
-
-    const recapTimer = setTimeout(() => setHatchPhase('converging'), 700);
-    const revealTimer = setTimeout(() => setHatchPhase('revealing'), 1450);
-    const finalizeTimer = setTimeout(() => {
-      triggerHatchIfReady();
-    }, 1700);
-    const cleanupTimer = setTimeout(() => {
-      setHatchTargetId(null);
-      setHatchPhase('recap');
-      refreshState();
-    }, 2350);
-
-    return () => {
-      clearTimeout(recapTimer);
-      clearTimeout(revealTimer);
-      clearTimeout(finalizeTimer);
-      clearTimeout(cleanupTimer);
-    };
-  }, [hatchDay, hatchTargetId, refreshState, triggerHatchIfReady]);
-
-  useEffect(() => {
-    if (hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId && selectedDay.state === 'hatched') {
-      const timer = setTimeout(() => {
-        setHatchTargetId(null);
-        setHatchPhase('recap');
-      }, 520);
-
-      return () => clearTimeout(timer);
-    }
-  }, [hatchTargetId, selectedDay]);
-
-  useEffect(() => {
     setPromptSheetOpen(false);
     setOrbitIcons([]);
   }, [selectedDayId]);
@@ -183,19 +149,24 @@ export default function HomeScreen() {
     }
   }, [backfillStatus.completedVersion, refreshState]);
 
-  const handleReveal = () => {
+  const handleReveal = async () => {
     if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) {
       return;
     }
 
-    setHatchTargetId(selectedDay.id);
-    setHatchPhase('recap');
+    // Play the in-place reveal on the egg already on screen: capture its forming
+    // visual, hide the page chrome, finalize the hatch (so the creature exists),
+    // and let HatchReveal run the shake → crack → shrink → scale-up.
+    setHatchingEgg(selectedDay.egg);
+    setIsHatching(true);
+    await triggerHatchIfReady();
+    refreshState();
   };
 
-  const handleSkipHatch = () => {
-    triggerHatchIfReady();
-    setHatchTargetId(null);
-    setHatchPhase('recap');
+  const handleHatchComplete = () => {
+    // Animation done — drop back to the normal (now hatched) layout in place.
+    setIsHatching(false);
+    setHatchingEgg(null);
     refreshState();
   };
 
@@ -427,12 +398,20 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        <Animated.View entering={presenceEnter(20)}>
-          <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
-        </Animated.View>
+        {isHatching ? null : (
+          <Animated.View entering={presenceEnter(20)}>
+            <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
+          </Animated.View>
+        )}
 
         <Animated.View ref={heroStageRef} entering={presenceEnter(70)} style={styles.heroStage}>
-          {isDay ? (
+          {isHatching && hatchingEgg ? (
+            <HatchReveal
+              creature={selectedDay?.kind === 'day' ? selectedDay.creature ?? null : null}
+              egg={hatchingEgg}
+              onComplete={handleHatchComplete}
+            />
+          ) : isDay ? (
             isHatched ? (
               <CreatureHero creature={selectedDay.creature!} weather={selectedDay.weather} hideSubtitle />
             ) : (
@@ -463,10 +442,10 @@ export default function HomeScreen() {
               }}
             />
           )}
-          {isForming ? <EggOrbitIcons icons={orbitIcons} /> : null}
+          {isForming && !isHatching ? <EggOrbitIcons icons={orbitIcons} /> : null}
         </Animated.View>
 
-        {isHatched ? (
+        {isHatching ? null : isHatched ? (
           <Animated.View entering={presenceEnter(120)} style={styles.sectionGap}>
             <View style={styles.actionDock}>
               <IconAction
@@ -529,6 +508,7 @@ export default function HomeScreen() {
 
         <View style={styles.spacer} />
 
+        {isHatching ? null : (
         <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
           {isDay && selectedDay.canHatch ? (
             <KatchaButton label="Reveal the hatch" onPress={handleReveal} variant="primary" />
@@ -550,6 +530,7 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </Animated.View>
+        )}
       </ScrollView>
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
@@ -561,17 +542,6 @@ export default function HomeScreen() {
           onSelectHeroPhoto={handleSelectHeroPhoto}
           onClose={closePromptSheet}
         />
-      ) : null}
-      {hatchDay ? <HatchSequence day={hatchDay} onSkip={handleSkipHatch} phase={hatchPhase} /> : null}
-      {hatchTargetId && selectedDay?.kind === 'day' && selectedDay.id === hatchTargetId && selectedDay.state === 'hatched' ? (
-        <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(260)} style={styles.revealFlash}>
-          <ThemedText type="onboardingLabel" style={styles.flashLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            Hatched
-          </ThemedText>
-          <ThemedText type="subtitle" style={styles.flashTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {selectedDay.creature?.name}
-          </ThemedText>
-        </Animated.View>
       ) : null}
       {backfillStatus.active ? (
         <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(220)} pointerEvents="none" style={styles.backfillTag}>
@@ -815,29 +785,6 @@ const styles = StyleSheet.create({
     height: 54,
     justifyContent: 'center',
     width: 54,
-  },
-  revealFlash: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(8, 7, 15, 0.9)',
-    borderRadius: 26,
-    bottom: '44%',
-    gap: 6,
-    left: 36,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    position: 'absolute',
-    right: 36,
-    zIndex: 30,
-  },
-  flashLabel: {
-    fontSize: 11,
-  },
-  flashTitle: {
-    fontFamily: AppFontFamilies.instrumentSerif,
-    fontSize: 30,
-    fontStyle: 'italic',
-    fontWeight: '400',
-    textAlign: 'center',
   },
   captureCardWrap: {
     left: -2000,

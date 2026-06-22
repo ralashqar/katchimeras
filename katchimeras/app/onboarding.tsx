@@ -125,7 +125,8 @@ export default function OnboardingScreen() {
       hatchHour: selectedHatchHour,
     });
     // End on the emotional peak: reveal the collection already hidden in their
-    // recent days, then drop into the app.
+    // recent days (the recap prompts that steer those hatches are asked there),
+    // then drop into the app.
     router.replace('/hatch-your-past');
   }
 
