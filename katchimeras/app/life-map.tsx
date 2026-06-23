@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
-import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
 import { ThemedText } from '@/components/themed-text';
 import { loadStoredHomeState } from '@/utils/home-storage';
 import { getCreatureVisual } from '@/utils/home-engine';
 import { buildLifeMap, type LifeMapPin } from '@/utils/life-map-engine';
+import { requestSelectedDay } from '@/utils/selected-day-signal';
 
 type NativeMapsModule = typeof import('react-native-maps');
 
@@ -48,7 +49,10 @@ export default function LifeMapRoute() {
           nativeMaps={nativeMaps}
           pins={lifeMap.pins}
           viewport={lifeMap.viewport}
-          onOpenDay={(dayId) => router.push({ pathname: '/day-map/[dayId]', params: { dayId } })}
+          onOpenDay={(dayId) => {
+            requestSelectedDay(dayId);
+            router.replace('/(tabs)');
+          }}
         />
       ) : (
         <View style={styles.emptyWrap}>
@@ -65,9 +69,7 @@ export default function LifeMapRoute() {
         </View>
       )}
 
-      <View style={styles.topBar}>
-        <KatchaButton icon="xmark" label="Close" onPress={() => router.back()} style={styles.closeButton} variant="secondary" />
-      </View>
+      <ScreenCloseButton onPress={() => router.back()} />
 
       <View pointerEvents="none" style={styles.captionWrap}>
         <GlassPanel contentStyle={styles.captionPanel} fillColor="rgba(10, 15, 28, 0.82)">
@@ -152,16 +154,6 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: '#090B12',
     flex: 1,
-  },
-  topBar: {
-    left: 16,
-    position: 'absolute',
-    right: 16,
-    top: 16,
-  },
-  closeButton: {
-    alignSelf: 'flex-start',
-    minHeight: 48,
   },
   captionWrap: {
     bottom: 24,

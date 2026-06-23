@@ -9,6 +9,8 @@ import { captureRef } from 'react-native-view-shot';
 
 import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
+import { CreatureProvenance } from '@/components/katchadeck/home/creature-provenance';
+import { DayJournalSections } from '@/components/katchadeck/home/day-journal-sections';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
@@ -20,6 +22,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { renderDayComic } from '@/utils/day-comic-render';
 import { ensureDayVision } from '@/utils/photo-vision';
 import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
+import { consumeSelectedDay } from '@/utils/selected-day-signal';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
@@ -160,8 +163,16 @@ export default function HomeScreen() {
     // and let HatchReveal run the shake → crack → shrink → scale-up.
     setHatchingEgg(selectedDay.egg);
     setIsHatching(true);
-    await triggerHatchIfReady();
-    refreshState();
+    try {
+      // Finalizes the hatch (always produces a creature) and updates state itself.
+      // HatchReveal keeps the egg shaking until that creature lands, then plays the
+      // crack + scale-up. We must NOT refreshState() here: triggerHatchIfReady's
+      // state update hasn't flushed/persisted yet, so re-hydrating from the stale
+      // saved state would overwrite (revert) the just-finalized hatch.
+      await triggerHatchIfReady();
+    } catch (error) {
+      console.warn('Hatch reveal failed to finalize', error);
+    }
   };
 
   const handleHatchComplete = () => {
@@ -397,6 +408,17 @@ export default function HomeScreen() {
     }, [windowWidth, windowHeight])
   );
 
+  // A day tapped in the calendar / life-map asks the Home tab to open it. Consume
+  // that request on focus and select the day so the regular Home page shows it.
+  useFocusEffect(
+    useCallback(() => {
+      const pendingDayId = consumeSelectedDay();
+      if (pendingDayId) {
+        selectTimelineDay(pendingDayId);
+      }
+    }, [selectTimelineDay])
+  );
+
   // Horizontal swipe changes the selected day. activeOffsetX/failOffsetY let the
   // vertical ScrollView keep working — only a clearly sideways drag flips days.
   const swipeGesture = Gesture.Pan()
@@ -431,11 +453,9 @@ export default function HomeScreen() {
           </Pressable>
         ) : null}
 
-        {isHatching ? null : (
-          <Animated.View entering={presenceEnter(20)}>
-            <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
-          </Animated.View>
-        )}
+        <Animated.View entering={presenceEnter(20)}>
+          <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
+        </Animated.View>
 
         <Animated.View ref={heroStageRef} entering={presenceEnter(70)} style={styles.heroStage}>
           {isHatching && hatchingEgg ? (
@@ -499,6 +519,8 @@ export default function HomeScreen() {
                 onPress={handleMakeComic}
               />
             </View>
+            <CreatureProvenance creature={selectedDay.creature!} />
+            <DayJournalSections day={selectedDay} />
             <ReflectionCard creature={selectedDay.creature!} />
           </Animated.View>
         ) : (
@@ -568,6 +590,12 @@ export default function HomeScreen() {
           ) : null}
         </Animated.View>
         )}
+
+        {isDay && !isHatched && !isHatching ? (
+          <Animated.View entering={presenceEnter(200)} style={styles.sectionGap}>
+            <DayJournalSections day={selectedDay} />
+          </Animated.View>
+        ) : null}
       </ScrollView>
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
@@ -730,6 +758,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   sectionGap: {
+    gap: 16,
     marginTop: 12,
   },
   formingCopy: {

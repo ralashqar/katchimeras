@@ -13,8 +13,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import {
   CAPTURE_MEANINGS,
@@ -44,7 +44,7 @@ type EssenceReviewProps = {
   // prompt loads the chosen asset). Null when nothing could be read.
   analyze: () => Promise<DayVisionSummary | null>;
   // Feed the day with the chosen meaning + the photo's essence, then leave.
-  onCommit: (meaning: MeaningTag, vision: DayVisionSummary | null) => void;
+  onCommit: (meaning: MeaningTag, vision: DayVisionSummary | null, label: string) => void;
   onClose: () => void;
 };
 
@@ -87,10 +87,11 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
     if (state !== 'essence') {
       return;
     }
+    const label = meanings.find((option) => option.id === meaning)?.label ?? '';
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setState('absorbing');
     absorb.value = withTiming(1, { duration: 680, easing: Easing.in(Easing.cubic) });
-    setTimeout(() => onCommit(meaning, visionRef.current), 740);
+    setTimeout(() => onCommit(meaning, visionRef.current, label), 740);
   };
 
   return (
@@ -102,9 +103,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
       )}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim]} />
 
-      <Pressable onPress={onClose} style={[styles.close, { top: insets.top + 12 }]} accessibilityRole="button">
-        <IconSymbol name="xmark" size={18} color={Lantern.moon50} />
-      </Pressable>
+      <ScreenCloseButton onPress={onClose} />
 
       {state === 'analyzing' ? (
         <Animated.View entering={FadeIn.duration(260)} style={styles.center} pointerEvents="none">
@@ -222,17 +221,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   darkFill: { backgroundColor: '#06040D' },
   scrim: { backgroundColor: 'rgba(6,4,13,0.5)' },
-  close: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(8,6,16,0.5)',
-    borderRadius: 999,
-    height: 38,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 18,
-    width: 38,
-    zIndex: 5,
-  },
   center: {
     alignItems: 'center',
     bottom: 0,

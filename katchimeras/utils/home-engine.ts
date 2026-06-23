@@ -16,6 +16,7 @@ import { timelineDemoEntries } from '@/constants/timeline-demo';
 import type {
   AddMomentInput,
   ActivityPermissionState,
+  CapturedMeaning,
   DayInputTarget,
   DayScores,
   DayMapSummary,
@@ -282,6 +283,24 @@ export function hydrateHomeState(
     timelineDays: [...archivedDays, today, createTomorrowRecord(now)],
     todayId: normalized.today.id,
   };
+}
+
+// Every persisted day (today + ALL archived days) hydrated to HomeDayRecord,
+// sorted oldest → newest. The timeline only hydrates a recent window; the
+// calendar + journal need to resolve any past day, so this hydrates the lot.
+export function hydrateAllDays(
+  storedState: UpgradeableStoredHomeState | null,
+  profile: OnboardingProfile,
+  now: Date
+): HomeDayRecord[] {
+  const baseState = storedState ?? createInitialHomeState(profile, now);
+  const normalized = normalizeStoredHomeState(baseState, profile, now);
+  const weekProfile = computeWeekProfile([...normalized.archivedDays.slice(-4), normalized.today]);
+  return [...normalized.archivedDays, normalized.today]
+    .map((day) =>
+      deriveHomeDayRecord(day, profile, day.id === normalized.today.id, weekProfile, now)
+    )
+    .sort((left, right) => left.isoDate.localeCompare(right.isoDate));
 }
 
 export function updateLocationPermissionState(
@@ -906,7 +925,11 @@ export function setPlaceCategorySeedsForDay(
 // Best-effort no-op once the day has hatched.
 export function applyCapturedMomentForToday(
   state: StoredHomeState,
-  capture: { energy: Partial<DayScores>; vision: DayVisionSummary | null },
+  capture: {
+    energy: Partial<DayScores>;
+    vision: DayVisionSummary | null;
+    meaning?: { archetype: string; label: string; thumbnailUri?: string | null };
+  },
   profile: OnboardingProfile,
   now: Date,
   target: DayInputTarget = 'today'
@@ -915,12 +938,29 @@ export function applyCapturedMomentForToday(
   if (base.state === 'hatched') {
     return state;
   }
+  const meaning = capture.meaning;
   const nextDay: StoredHomeDayRecord = {
     ...base,
     capturedEnergy: mergeCaptureEnergy(base.capturedEnergy, capture.energy),
+    capturedMeanings:
+      meaning && meaning.label.trim()
+        ? appendCapturedMeaning(base.capturedMeanings, {
+            archetype: meaning.archetype,
+            label: meaning.label.trim(),
+            thumbnailUri: meaning.thumbnailUri ?? null,
+            createdAt: now.toISOString(),
+          })
+        : base.capturedMeanings,
     vision: capture.vision ? mergeDayVision(base.vision, capture.vision) : base.vision,
   };
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// Append a captured meaning, de-duplicated by label (latest wins) and capped so
+// a day's list can't grow without bound.
+function appendCapturedMeaning(existing: CapturedMeaning[] | undefined, entry: CapturedMeaning): CapturedMeaning[] {
+  const filtered = (existing ?? []).filter((item) => item.label.toLowerCase() !== entry.label.toLowerCase());
+  return [...filtered, entry].slice(-12);
 }
 
 export function setDayWeatherForDay(

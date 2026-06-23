@@ -2,21 +2,26 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
+import { CalendarMonth } from '@/components/katchadeck/collection/calendar-month';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
+import { useAllDays } from '@/hooks/use-all-days';
 import type { StoredHomeState } from '@/types/home';
 import { bondStageLabel } from '@/utils/bond';
 import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
 import { hydrateHomeState } from '@/utils/home-engine';
 import { loadStoredHomeState } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { requestSelectedDay } from '@/utils/selected-day-signal';
+
+type CollectionView = 'calendar' | 'dex';
 
 const auroraRing = require('../../assets/images/katchimeras/aurora-ring.png');
 
@@ -30,6 +35,8 @@ const RARITY_COLOR: Record<string, string> = {
 export default function CollectionScreen() {
   const router = useRouter();
   const [state, setState] = useState<StoredHomeState | null>(null);
+  const [view, setView] = useState<CollectionView>('calendar');
+  const { days } = useAllDays();
 
   useFocusEffect(
     useCallback(() => {
@@ -45,6 +52,7 @@ export default function CollectionScreen() {
     return buildDex(state.encounterHistory, hatchedDays);
   }, [state]);
 
+  const hatchedTotal = days.filter((day) => day.creature !== null).length;
   const completion = dex && dex.total > 0 ? Math.round((dex.collected / dex.total) * 100) : 0;
 
   return (
@@ -60,21 +68,45 @@ export default function CollectionScreen() {
         showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter()}>
           <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            The Dex
+            {view === 'calendar' ? 'Your days' : 'The Dex'}
           </ThemedText>
           <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            Every kind of day.
+            {view === 'calendar' ? 'Every day, a creature.' : 'Every kind of day.'}
           </ThemedText>
           <ThemedText style={styles.subtitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            {dex ? `${dex.collected} of ${dex.total} met · ${completion}% complete` : 'Loading…'}
+            {view === 'calendar'
+              ? `${hatchedTotal} ${hatchedTotal === 1 ? 'day' : 'days'} hatched · tap one to open its journal`
+              : dex
+                ? `${dex.collected} of ${dex.total} met · ${completion}% complete`
+                : 'Loading…'}
           </ThemedText>
+        </Animated.View>
+
+        <Animated.View entering={presenceEnter(30)} style={styles.segment}>
+          <SegmentTab active={view === 'calendar'} label="Calendar" onPress={() => setView('calendar')} />
+          <SegmentTab active={view === 'dex'} label="Dex" onPress={() => setView('dex')} />
         </Animated.View>
 
         <Animated.View entering={presenceEnter(40)}>
           <KatchaButton label="Open the life map" onPress={() => router.push('/life-map')} variant="secondary" />
         </Animated.View>
 
-        {dex?.categories.map((category, sectionIndex) => {
+        {view === 'calendar' ? (
+          <Animated.View entering={presenceEnter(80)}>
+            <CalendarMonth
+              days={days}
+              onSelectDay={(dayId) => {
+                // Show the regular Home page for the chosen day instead of a
+                // separate page: hand the day to the Today tab and switch to it.
+                requestSelectedDay(dayId);
+                router.replace('/(tabs)');
+              }}
+            />
+          </Animated.View>
+        ) : null}
+
+        {view === 'dex'
+          ? dex?.categories.map((category, sectionIndex) => {
           const entries = dex.entries.filter((entry) => entry.category === category.category);
           return (
             <Animated.View key={category.category} entering={presenceEnter(80 + sectionIndex * 40)} style={styles.section}>
@@ -93,9 +125,23 @@ export default function CollectionScreen() {
               </View>
             </Animated.View>
           );
-        })}
+        })
+          : null}
       </ScrollView>
     </View>
+  );
+}
+
+function SegmentTab({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.segmentTab, active ? styles.segmentTabActive : null]}>
+      <ThemedText
+        style={styles.segmentLabel}
+        lightColor={active ? Lantern.ink900 : Lantern.moon300}
+        darkColor={active ? Lantern.ink900 : Lantern.moon300}>
+        {label}
+      </ThemedText>
+    </Pressable>
   );
 }
 
@@ -155,6 +201,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 10,
+  },
+  segment: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(215, 228, 255, 0.12)',
+    borderCurve: 'continuous',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 4,
+    padding: 4,
+  },
+  segmentTab: {
+    alignItems: 'center',
+    borderCurve: 'continuous',
+    borderRadius: 10,
+    flex: 1,
+    paddingVertical: 9,
+  },
+  segmentTabActive: {
+    backgroundColor: Lantern.moon50,
+  },
+  segmentLabel: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   section: {
     gap: 14,

@@ -22,6 +22,7 @@ import {
   applyGeneratedReflection,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
+  hydrateAllDays,
   hydrateHomeState,
   importHealthRoutesForDay as applyHealthRoutesForDay,
   type ImportedHealthRoutesPayload,
@@ -80,13 +81,14 @@ export function useHomeScreenState() {
 
     setStoredState((current) => (areStoredStatesEqual(current, hydrated.state) ? current : hydrated.state));
     setSelectedDayId((current) => {
-      // Always land on TODAY (and keep an explicit selection when it's still a
-      // real day in the timeline). We deliberately do NOT auto-jump to an
-      // unhatched past day: backfilled/missed days resolve to "ready_to_hatch",
-      // so auto-selecting one made the app open on a "Reveal hatch" screen that
-      // read as today even before the hatch hour. Past days are reached via the
-      // timeline instead.
-      if (hydrated.timelineDays.some((day) => day.id === current)) {
+      // Keep an explicit selection when it's still a real day — either in the
+      // recent timeline window OR anywhere in the archive (so a day opened from
+      // the calendar / life-map survives re-derives). We deliberately do NOT
+      // auto-jump to an unhatched past day; only an explicit selection sticks.
+      if (
+        hydrated.timelineDays.some((day) => day.id === current) ||
+        hydrated.state.archivedDays.some((day) => day.id === current)
+      ) {
         return current;
       }
 
@@ -135,12 +137,16 @@ export function useHomeScreenState() {
     const now = new Date();
     const profile = loadOnboardingProfile();
     const hydrated = hydrateHomeState(storedState, profile, now);
-    return hydrated;
+    const allDays = hydrateAllDays(storedState, profile, now);
+    return { ...hydrated, allDays };
   }, [storedState]);
 
   const timelineDays = viewModel.timelineDays;
   const selectedDay =
     timelineDays.find((day) => day.id === selectedDayId) ??
+    // Fall back to the full archive so a day chosen from the calendar / life-map
+    // (outside the recent window) still resolves and shows on the Home page.
+    viewModel.allDays.find((day) => day.id === selectedDayId) ??
     timelineDays.find((day) => day.kind === 'day' && day.isToday) ??
     timelineDays[0] ??
     null;
@@ -300,7 +306,14 @@ export function useHomeScreenState() {
   // Fold a camera capture into today: its captured energy (score deltas) and the
   // detected subject (vision) both contribute to the hatch + reflection.
   const applyCapturedMoment = useCallback(
-    (capture: { energy: Partial<DayScores>; vision: DayVisionSummary | null }, target: DayInputTarget = 'today') => {
+    (
+      capture: {
+        energy: Partial<DayScores>;
+        vision: DayVisionSummary | null;
+        meaning?: { archetype: string; label: string; thumbnailUri?: string | null };
+      },
+      target: DayInputTarget = 'today'
+    ) => {
       const now = new Date();
       const profile = loadOnboardingProfile();
       setStoredState((currentState) => {
@@ -505,18 +518,25 @@ export function useHomeScreenState() {
         ? baseState.today
         : baseState.archivedDays.find((day) => day.id === selectedDay.id) ?? null;
 
+    // Place seeds + weather are best-effort enrichment that runs BEFORE the
+    // hatch. They must never block or break the hatch itself — a thrown native /
+    // network call here used to abort the whole reveal, so each is isolated.
     if (targetDay && targetDay.placeCategorySeeds === undefined && targetDay.locations.length > 0) {
-      const seeds = await Promise.race([
-        resolvePlaceSeedsForDay(
-          targetDay,
-          baseState.archivedDays.filter((day) => day.id !== targetDay.id)
-        ),
-        new Promise<string[]>((resolve) => {
-          setTimeout(() => resolve([]), 2500);
-        }),
-      ]);
-      now = new Date();
-      baseState = setPlaceCategorySeedsForDay(baseState, selectedDay.id, seeds, profile, now);
+      try {
+        const seeds = await Promise.race([
+          resolvePlaceSeedsForDay(
+            targetDay,
+            baseState.archivedDays.filter((day) => day.id !== targetDay.id)
+          ),
+          new Promise<string[]>((resolve) => {
+            setTimeout(() => resolve([]), 2500);
+          }),
+        ]);
+        now = new Date();
+        baseState = setPlaceCategorySeedsForDay(baseState, selectedDay.id, seeds, profile, now);
+      } catch {
+        // Hatch proceeds without resolved place seeds.
+      }
     }
 
     // Resolve the day's weather before hatching so the mood read (and the
@@ -527,10 +547,14 @@ export function useHomeScreenState() {
         ? baseState.today
         : baseState.archivedDays.find((day) => day.id === selectedDay.id) ?? null;
     if (weatherTarget && weatherTarget.weather === undefined && weatherTarget.locations.length > 0) {
-      const weather = await ensureDayWeather(weatherTarget);
-      if (weather) {
-        now = new Date();
-        baseState = setDayWeatherForDay(baseState, selectedDay.id, weather, profile, now);
+      try {
+        const weather = await ensureDayWeather(weatherTarget);
+        if (weather) {
+          now = new Date();
+          baseState = setDayWeatherForDay(baseState, selectedDay.id, weather, profile, now);
+        }
+      } catch {
+        // Hatch proceeds without resolved weather.
       }
     }
 

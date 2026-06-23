@@ -7,6 +7,7 @@ import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EssenceReview } from '@/components/katchadeck/capture/essence-review';
+import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -71,10 +72,13 @@ export default function MomentCaptureScreen() {
   }, [photoUri]);
 
   const commit = useCallback(
-    (meaning: MeaningTag, vision: DayVisionSummary | null) => {
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string) => {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined);
       const category = vision ? resolvePhotoCategory(vision) : { icon: 'sparkles' as const, accent: '#F1D4B4' };
-      applyCapturedMoment({ energy, vision }, captureTarget);
+      applyCapturedMoment(
+        { energy, vision, meaning: { archetype: meaning, label, thumbnailUri: photoUri ?? null } },
+        captureTarget
+      );
       if (photoUri) {
         queueCaptureFeed({ photoUri, icon: category.icon, accent: category.accent });
       }
@@ -120,9 +124,7 @@ export default function MomentCaptureScreen() {
         <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(360)} pointerEvents="none" style={styles.flash} />
       ) : null}
 
-      <Pressable onPress={() => router.back()} style={[styles.close, { top: insets.top + 12 }]} accessibilityRole="button">
-        <IconSymbol name="xmark" size={18} color={Lantern.moon50} />
-      </Pressable>
+      <ScreenCloseButton onPress={() => router.back()} />
 
       {state === 'live' ? (
         <Animated.View entering={FadeInDown.duration(320)} style={[styles.prompt, { top: insets.top + 18 }]}>
@@ -151,17 +153,6 @@ const styles = StyleSheet.create({
   permTitle: { fontSize: 30, fontStyle: 'italic', lineHeight: 36, textAlign: 'center' },
   permBody: { fontSize: 15, lineHeight: 22, textAlign: 'center' },
   permButtons: { alignSelf: 'stretch', gap: 10, marginTop: 8 },
-  close: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(8,6,16,0.5)',
-    borderRadius: 999,
-    height: 38,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: 18,
-    width: 38,
-    zIndex: 5,
-  },
   prompt: { alignItems: 'center', alignSelf: 'center', position: 'absolute' },
   promptText: { fontSize: 15, fontWeight: '700', opacity: 0.9 },
   shutterRow: { alignItems: 'center', alignSelf: 'center', position: 'absolute' },

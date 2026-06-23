@@ -493,6 +493,16 @@ export type KatchimeraFieldEcho = {
   reason: string | null; // the day's living reason, when it would have been rare+
 };
 
+// A meaning the user chose for a captured / essence photo. `archetype` is the
+// capture-energy MeaningTag (calm/energy/together/meaningful); `label` is the
+// human phrase they picked ("Working", "A slow sip").
+export type CapturedMeaning = {
+  archetype: string;
+  label: string;
+  thumbnailUri: string | null;
+  createdAt: string;
+};
+
 export type StoredHomeDayRecord = {
   id: string;
   isoDate: string;
@@ -520,6 +530,10 @@ export type StoredHomeDayRecord = {
   // into the day's scores alongside moments + prompt answers. See
   // utils/capture-energy.ts.
   capturedEnergy?: Partial<DayScores>;
+  // What the user said a captured/essence photo meant ("Working", "A slow sip").
+  // Display-only: surfaced in the day's "Photos · what they meant" section. The
+  // archetype (calm/energy/together/meaningful) drives the chip icon + colour.
+  capturedMeanings?: CapturedMeaning[];
   // Cheap signature of the inputs the derived fields (dayMap, place counts)
   // depend on — lets normalize skip re-deriving settled archived days.
   derivedSignature?: string;

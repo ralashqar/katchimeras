@@ -53,7 +53,7 @@ export default function PhotoEssenceRoute() {
   }, [assetId]);
 
   const commit = useCallback(
-    (meaning: MeaningTag, vision: DayVisionSummary | null) => {
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string) => {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined);
       const category = vision ? resolvePhotoCategory(vision) : { icon: 'sparkles' as const, accent: '#F1D4B4' };
       if (assetId) {
@@ -69,7 +69,10 @@ export default function PhotoEssenceRoute() {
           captureTarget
         );
       }
-      applyCapturedMoment({ energy, vision }, captureTarget);
+      applyCapturedMoment(
+        { energy, vision, meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null } },
+        captureTarget
+      );
       queueCaptureFeed({ photoUri: thumbnailUri || localUriRef.current || '', icon: category.icon, accent: category.accent });
       router.back();
     },

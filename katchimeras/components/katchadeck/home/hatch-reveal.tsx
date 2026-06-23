@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -48,16 +48,32 @@ export function HatchReveal({ egg, creature, onComplete }: HatchRevealProps) {
   const creatureProgress = useSharedValue(0);
   const creatureScale = useSharedValue(0.4);
 
-  // Timeline: rattle + crack, then hatch (egg shrinks, creature pops), then settle.
+  // Keep the latest onComplete without re-running the hatch timers each time the
+  // parent re-renders (the creature arriving triggers several re-renders).
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  // Build: rattle + a first crack while we WAIT for the hatch to be determined.
   useEffect(() => {
+    const t = setTimeout(() => setCrackStage((stage) => (stage < 1 ? 1 : stage)), 480);
+    return () => clearTimeout(t);
+  }, []);
+
+  // The egg keeps shaking until the creature is determined from the day. Once it
+  // arrives → full crack → hatch → settle → done. A safety timeout completes even
+  // if determination never lands, so the egg never shakes forever.
+  useEffect(() => {
+    if (!creature) {
+      const safety = setTimeout(() => onCompleteRef.current(), 9000);
+      return () => clearTimeout(safety);
+    }
     const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => setCrackStage(1), 480));
-    timers.push(setTimeout(() => setCrackStage(2), 960));
-    timers.push(setTimeout(() => setPhase('hatch'), 1180));
-    timers.push(setTimeout(() => setPhase('settle'), 1680));
-    timers.push(setTimeout(() => onComplete(), 2200));
+    setCrackStage(2);
+    timers.push(setTimeout(() => setPhase('hatch'), 240));
+    timers.push(setTimeout(() => setPhase('settle'), 740));
+    timers.push(setTimeout(() => onCompleteRef.current(), 1300));
     return () => timers.forEach(clearTimeout);
-  }, [onComplete]);
+  }, [creature]);
 
   // Aggressive continuous rattle while building, one violent jolt at the hatch.
   useEffect(() => {
@@ -153,7 +169,7 @@ export function HatchReveal({ egg, creature, onComplete }: HatchRevealProps) {
         ) : (
           <Animated.View entering={FadeIn.duration(320)} key="building">
             <ThemedText style={styles.captionBuild} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              Your day is taking shape…
+              Hatching your day…
             </ThemedText>
           </Animated.View>
         )}
