@@ -179,5 +179,30 @@ check('sprites painter-sorted back-to-front', sorted);
 const anchorSprite = scene.sprites.find((s) => s.kind === 'anchor');
 check('anchor sprite is the largest class', anchorSprite && anchorSprite.size >= 128, anchorSprite && String(anchorSprite.size));
 
+// 11. Every catalog key the engine can emit has a real bundled cutout on disk.
+const { ARCHETYPE_ANCHORS, PROP_POOL, MEMORY_NODE_ASSET, ARCHETYPE_THEME } = require(path.join(tempDir, 'world-const.js'));
+const assetsRoot = path.join(projectRoot, 'assets', 'images', 'katchimeras', 'world');
+function assetExists(folder, key) {
+  return fs.existsSync(path.join(assetsRoot, folder, `${key}.png`));
+}
+const anchorKeys = Object.values(ARCHETYPE_ANCHORS).flat().map((a) => a.key);
+const missingAnchors = anchorKeys.filter((k) => !assetExists('anchors', k));
+check('every anchor key has art', missingAnchors.length === 0, missingAnchors.join(', '));
+const missingProps = PROP_POOL.map((p) => p.key).filter((k) => !assetExists('props', k));
+check('every prop key has art', missingProps.length === 0, missingProps.join(', '));
+const missingMemories = Object.values(MEMORY_NODE_ASSET).map((m) => m.key).filter((k) => !assetExists('memory-nodes', k));
+check('every memory-node key has art', missingMemories.length === 0, missingMemories.join(', '));
+const decalKeys = [...new Set(Object.values(ARCHETYPE_THEME).flatMap((t) => [t.groundTile, ...t.decals]))];
+const missingDecals = decalKeys.filter((k) => !assetExists('decals', k));
+check('every ground + accent tile has art', missingDecals.length === 0, missingDecals.join(', '));
+const missingVariants = decalKeys.filter((k) => !assetExists('decals', `${k}_2`));
+check('every decal has a _2 variant', missingVariants.length === 0, missingVariants.join(', '));
+check('decal sprite atlas exists', fs.existsSync(path.join(assetsRoot, 'decals', '_atlas.png')));
+
+// 12. Scene decals (if the sampled world produced any) are finite + positioned.
+check('scene exposes a decals layer', Array.isArray(scene.decals));
+const decalsOk = scene.decals.every((d) => Number.isFinite(d.x) && Number.isFinite(d.y) && d.size > 0 && d.x >= 0 && d.y >= 0);
+check('all decals have finite, sized geometry', decalsOk, String(scene.decals.length));
+
 console.log(failures === 0 ? '\nAll world checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -10,7 +10,13 @@ import { Lantern } from '@/constants/theme';
 import type { MemoryNode, WorldPatch } from '@/types/world';
 import { layoutWorld, type SceneSprite } from '@/utils/world-scene';
 import type { IsoPoint } from '@/utils/world-iso';
-import { worldAssetSource } from '@/utils/world-visuals';
+import {
+  DECAL_ATLAS,
+  DECAL_ATLAS_COLS,
+  DECAL_ATLAS_ROWS,
+  worldAssetSource,
+  worldDecalCell,
+} from '@/utils/world-visuals';
 
 type Props = {
   patches: WorldPatch[];
@@ -93,7 +99,6 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
           face: polyPath(slab.topCorners),
           rimLeft: segPath(top, left),
           rimRight: segPath(top, right),
-          seams: slab.seams.map(([a, b]) => segPath(a, b)),
         };
       }),
     [scene]
@@ -118,11 +123,6 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
             {groundPaths.map((g) => (
               <Path key={`${g.id}-f`} path={g.face} color={g.theme.groundTop} />
             ))}
-            {groundPaths.map((g) =>
-              g.seams.map((seam, i) => (
-                <Path key={`${g.id}-s${i}`} path={seam} color="rgba(255,255,255,0.12)" style="stroke" strokeWidth={1} />
-              ))
-            )}
             {groundPaths.map((g) => (
               <Path key={`${g.id}-rim`} path={g.rimLeft} color={g.theme.rim} style="stroke" strokeWidth={2} />
             ))}
@@ -131,17 +131,33 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
             ))}
           </Canvas>
 
-          {/* Contact shadows, all behind every sprite. */}
-          {scene.sprites.map((s) => (
-            <View
-              key={`${s.id}-sh`}
-              pointerEvents="none"
-              style={[
-                styles.shadow,
-                { left: s.x - s.size * 0.3, top: s.y - s.size * 0.09, width: s.size * 0.6, height: s.size * 0.18 },
-              ]}
-            />
-          ))}
+          {/* Flat ground decals — between the slab and the props. Each is a
+              clipped sub-region of one shared atlas texture (single GPU upload). */}
+          {scene.decals.map((d) => {
+            const cell = worldDecalCell(d.decal);
+            if (!cell) return null;
+            const w = d.size;
+            const h = d.size / 2;
+            return (
+              <View
+                key={d.id}
+                pointerEvents="none"
+                style={[styles.decal, { left: d.x - w / 2, top: d.y - h / 2, width: w, height: h }]}>
+                <Image
+                  source={DECAL_ATLAS}
+                  pointerEvents="none"
+                  contentFit="fill"
+                  style={{
+                    position: 'absolute',
+                    width: w * DECAL_ATLAS_COLS,
+                    height: h * DECAL_ATLAS_ROWS,
+                    left: -cell.col * w,
+                    top: -cell.row * h,
+                  }}
+                />
+              </View>
+            );
+          })}
 
           {/* Object / memory / creature sprites. */}
           {scene.sprites.map((s) => (
@@ -181,7 +197,7 @@ function SpriteView({ sprite, onPress }: { sprite: SceneSprite; onPress: () => v
       hitSlop={6}
       style={[
         styles.sprite,
-        { left: sprite.x - sprite.size / 2, top: sprite.y - sprite.size * 0.78, width: sprite.size, height: sprite.size },
+        { left: sprite.x - sprite.size / 2, top: sprite.y - sprite.size / 2, width: sprite.size, height: sprite.size },
       ]}>
       {source ? (
         <Image source={source} style={styles.spriteImage} contentFit="contain" />
@@ -212,9 +228,9 @@ function shade(hex: string): string {
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
   world: { position: 'relative' },
-  sprite: { position: 'absolute', alignItems: 'center', justifyContent: 'flex-end' },
+  decal: { position: 'absolute', opacity: 0.95, overflow: 'hidden' },
+  sprite: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   spriteImage: { width: '100%', height: '100%' },
-  shadow: { position: 'absolute', borderRadius: 999, backgroundColor: 'rgba(12,18,12,0.28)' },
   placeholder: {
     width: '78%',
     height: '78%',

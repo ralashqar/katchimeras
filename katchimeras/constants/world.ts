@@ -22,6 +22,9 @@ export type ArchetypeTheme = {
   groundSide: string;
   rim: string;
   accent: string;
+  // The base ground tile (atlas key) every cell is floored with, plus the accent
+  // tiles scattered on top. Both resolve through the decal sprite atlas.
+  groundTile: string;
   decals: string[];
   adjectives: string[];
   nouns: string[];
@@ -35,6 +38,7 @@ export const ARCHETYPE_THEME: Record<WorldArchetype, ArchetypeTheme> = {
     groundSide: '#4F7A4A',
     rim: '#D4ECB6',
     accent: '#7DE8CD',
+    groundTile: 'grass',
     decals: ['flowers', 'moss'],
     adjectives: ['Quiet', 'Still', 'Soft', 'Hushed'],
     nouns: ['Hollow', 'Meadow', 'Nook', 'Glade'],
@@ -46,7 +50,8 @@ export const ARCHETYPE_THEME: Record<WorldArchetype, ArchetypeTheme> = {
     groundSide: '#7A6A45',
     rim: '#EEDFAE',
     accent: '#FFC36B',
-    decals: ['path', 'grass'],
+    groundTile: 'grass',
+    decals: ['path', 'rock'],
     adjectives: ['Bright', 'Open', 'Sunlit', 'Roaming'],
     nouns: ['Trailhead', 'Run', 'Crossing', 'Field'],
   },
@@ -57,7 +62,8 @@ export const ARCHETYPE_THEME: Record<WorldArchetype, ArchetypeTheme> = {
     groundSide: '#73583F',
     rim: '#EAD3B8',
     accent: '#F49AC1',
-    decals: ['cobble', 'grass'],
+    groundTile: 'cobble',
+    decals: ['grass', 'flowers'],
     adjectives: ['Warm', 'Gathered', 'Lantern', 'Shared'],
     nouns: ['Circle', 'Plaza', 'Hearth', 'Commons'],
   },
@@ -68,7 +74,8 @@ export const ARCHETYPE_THEME: Record<WorldArchetype, ArchetypeTheme> = {
     groundSide: '#5C6650',
     rim: '#D2DBC4',
     accent: '#A9D7FF',
-    decals: ['rock', 'grass'],
+    groundTile: 'grass',
+    decals: ['rock', 'path'],
     adjectives: ['Far', 'Frontier', 'Wandering', 'Distant'],
     nouns: ['Lookout', 'Frontier', 'Ridge', 'Reach'],
   },
@@ -79,7 +86,8 @@ export const ARCHETYPE_THEME: Record<WorldArchetype, ArchetypeTheme> = {
     groundSide: '#6B5238',
     rim: '#E0CAA8',
     accent: '#D5C4FF',
-    decals: ['wood', 'moss'],
+    groundTile: 'wood',
+    decals: ['moss', 'grass'],
     adjectives: ['Steady', 'Quiet', 'Lamplit', 'Tucked'],
     nouns: ['Corner', 'Workshop', 'Study', 'Desk'],
   },
@@ -90,6 +98,7 @@ export const ARCHETYPE_THEME: Record<WorldArchetype, ArchetypeTheme> = {
     groundSide: '#5E5680',
     rim: '#E6DFFA',
     accent: '#A78BFA',
+    groundTile: 'cobble',
     decals: ['glow', 'flowers'],
     adjectives: ['Sacred', 'Still', 'Golden', 'Held'],
     nouns: ['Shrine', 'Grove', 'Memory', 'Altar'],

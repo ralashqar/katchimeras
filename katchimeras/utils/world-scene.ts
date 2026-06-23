@@ -1,3 +1,4 @@
+import { ARCHETYPE_THEME } from '@/constants/world';
 import type { MemoryNode, WorldArchetype, WorldObject, WorldPatch } from '@/types/world';
 import {
   cellCenter,
@@ -28,6 +29,17 @@ export type SceneSprite = {
   memory?: MemoryNode;
 };
 
+export type SceneDecal = {
+  id: string;
+  patchId: string;
+  decal: string;
+  archetype: WorldArchetype;
+  x: number; // tile centre, absolute scene coords
+  y: number;
+  size: number;
+  depth: number;
+};
+
 export type SceneSlab = {
   patchId: string;
   archetype: WorldArchetype;
@@ -43,22 +55,42 @@ export type WorldScene = {
   width: number;
   height: number;
   slabs: SceneSlab[];
+  decals: SceneDecal[];
   sprites: SceneSprite[];
 };
 
 const PATCH_DEPTH_STRIDE = 1000;
 
+// Sprites are centred on their cell, so size encodes how much of the footprint
+// the object should cover. Multi-cell anchors scale up to occupy both tiles.
 function spriteSize(object: WorldObject): number {
   switch (object.kind) {
     case 'anchor':
-      return object.footprint >= 2 ? TILE_W * 1.45 : TILE_W * 1.05;
+      return object.footprint >= 2 ? TILE_W * 1.6 : TILE_W * 1.05;
     case 'creature':
-      return TILE_W * 0.66;
+      return TILE_W * 0.7;
     case 'memory':
-      return TILE_W * 0.6;
+      return TILE_W * 0.66;
     default:
-      return TILE_W * 0.62;
+      return TILE_W * 0.66;
   }
+}
+
+// Every cell is floored with a diamond tile from the atlas — the archetype's
+// base ground tile by default, an accent tile on some free cells. Rendered at
+// exactly one tile width so the diamonds tile seamlessly (shared edges). Derived
+// at render time, so density/look changes apply to existing patches too.
+const TILE_RENDER_W = TILE_W * 1.02; // slight overlap seals the seams
+const ACCENT_DENSITY = 0.4; // share of free cells that get an accent tile
+
+// Stable per-cell hash so decal placement is deterministic per patch + tile.
+function cellHash(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
 }
 
 // Centre of an object's footprint (handles the 2-wide anchor).
@@ -74,6 +106,7 @@ function footprintCentre(object: WorldObject): IsoPoint {
 export function layoutWorld(patches: WorldPatch[]): WorldScene {
   const rawSlabs: SceneSlab[] = [];
   const rawSprites: SceneSprite[] = [];
+  const rawDecals: SceneDecal[] = [];
 
   for (const patch of patches) {
     const origin = patchWorldOrigin(patch.gridCol, patch.gridRow);
@@ -114,6 +147,41 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
         size: spriteSize(object),
         depth: patchDepth + drawDepth(object.col, object.row) * 2 + (object.kind === 'creature' ? 1 : 0),
       });
+    }
+    // Decals grow on the cells NOT taken by an object/memory. Occupied = every
+    // footprint cell of each object plus each memory node.
+    const occupied = new Set<string>();
+    for (const object of patch.objects) {
+      for (let f = 0; f < Math.max(1, object.footprint); f += 1) {
+        occupied.add(`${object.col + f},${object.row}`);
+      }
+    }
+    for (const node of patch.memoryNodes) occupied.add(`${node.col},${node.row}`);
+
+    const theme = ARCHETYPE_THEME[patch.primaryArchetype];
+    for (let row = 0; row < PATCH_SIZE; row += 1) {
+      for (let col = 0; col < PATCH_SIZE; col += 1) {
+        const h = cellHash(`${patch.id}:${col},${row}`);
+        const isFree = !occupied.has(`${col},${row}`);
+        // Accent tile on some free cells; the base ground tile everywhere else
+        // (including under objects, so they sit on real ground).
+        const key =
+          isFree && (h % 1000) / 1000 < ACCENT_DENSITY
+            ? theme.decals[(h >>> 10) % theme.decals.length]
+            : theme.groundTile;
+        const c = shift(cellCenter(col, row));
+        rawDecals.push({
+          id: `${patch.id}-tile-${col}-${row}`,
+          patchId: patch.id,
+          // Each tile type has a _2 variant from the grid; pick one per cell.
+          decal: (h >>> 16) & 1 ? `${key}_2` : key,
+          archetype: patch.primaryArchetype,
+          x: c.x,
+          y: c.y,
+          size: TILE_RENDER_W,
+          depth: patchDepth + drawDepth(col, row) * 2 - 1,
+        });
+      }
     }
     for (const node of patch.memoryNodes) {
       const c = shift(cellCenter(node.col, node.row));
@@ -166,11 +234,15 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
   const sprites = rawSprites
     .map((sprite) => ({ ...sprite, x: sprite.x + dx, y: sprite.y + dy }))
     .sort((a, b) => a.depth - b.depth);
+  const decals = rawDecals
+    .map((decal) => ({ ...decal, x: decal.x + dx, y: decal.y + dy }))
+    .sort((a, b) => a.depth - b.depth);
 
   return {
     width: maxX - minX + pad * 2,
     height: maxY - minY + pad * 2,
     slabs: slabs.sort((a, b) => a.depth - b.depth),
+    decals,
     sprites,
   };
 }

@@ -237,14 +237,13 @@ export function generatePatch(input: PatchInput, rng: () => number): WorldPatch 
     });
   }
 
-  // Tiles — logical grid + flat decals scattered on free ground cells.
+  // Tiles — the logical 4×4 grid. Decals are derived at render time from the
+  // patch id + archetype (utils/world-scene.ts), so density/look can change
+  // retroactively without a stored migration; tiles stay pure ground here.
   const tiles: WorldTile[] = [];
   for (let row = 0; row < 4; row += 1) {
     for (let col = 0; col < 4; col += 1) {
-      const occupied = usedCells.has(`${col},${row}`);
-      const decal =
-        !occupied && rng() < 0.35 ? theme.decals[Math.floor(rng() * theme.decals.length)] : null;
-      tiles.push({ col, row, kind: 'ground', decal });
+      tiles.push({ col, row, kind: 'ground', decal: null });
     }
   }
 
