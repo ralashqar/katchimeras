@@ -176,8 +176,10 @@ const positive = scene.sprites.every((s) => s.x >= 0 && s.y >= 0);
 check('scene normalised to positive coords', positive);
 const sorted = scene.sprites.every((s, i) => i === 0 || scene.sprites[i - 1].depth <= s.depth);
 check('sprites painter-sorted back-to-front', sorted);
+// Objects are 1:2 frames = one slot (2 stacked cells) of the 4x4 line grid; the
+// frame width == one grid column == one tile.
 const anchorSprite = scene.sprites.find((s) => s.kind === 'anchor');
-check('anchor sprite is the largest class', anchorSprite && anchorSprite.size >= 128, anchorSprite && String(anchorSprite.size));
+check('anchor sprite frame == one tile', anchorSprite && anchorSprite.size >= 120 && anchorSprite.size <= 130, anchorSprite && String(anchorSprite.size));
 
 // 11. Every catalog key the engine can emit has a real bundled cutout on disk.
 const { ARCHETYPE_ANCHORS, PROP_POOL, MEMORY_NODE_ASSET, ARCHETYPE_THEME } = require(path.join(tempDir, 'world-const.js'));
@@ -198,6 +200,7 @@ check('every ground + accent tile has art', missingDecals.length === 0, missingD
 const missingVariants = decalKeys.filter((k) => !assetExists('decals', `${k}_2`));
 check('every decal has a _2 variant', missingVariants.length === 0, missingVariants.join(', '));
 check('decal sprite atlas exists', fs.existsSync(path.join(assetsRoot, 'decals', '_atlas.png')));
+check('fence strip art exists', fs.existsSync(path.join(assetsRoot, 'props', 'fence_strip.png')));
 
 // 12. Scene decals (if the sampled world produced any) are finite + positioned.
 check('scene exposes a decals layer', Array.isArray(scene.decals));

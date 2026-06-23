@@ -40,6 +40,8 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   prop_rock: require('../assets/images/katchimeras/world/props/prop_rock.png'),
   prop_log: require('../assets/images/katchimeras/world/props/prop_log.png'),
   prop_fence: require('../assets/images/katchimeras/world/props/prop_fence.png'),
+  // Front-facing fence strip; the renderer skews it onto each 2:1 perimeter edge.
+  fence_strip: require('../assets/images/katchimeras/world/props/fence_strip.png'),
   prop_coffee_table: require('../assets/images/katchimeras/world/props/prop_coffee_table.png'),
   // Memory nodes
   memory_photo_bloom: require('../assets/images/katchimeras/world/memory-nodes/memory_photo_bloom.png'),

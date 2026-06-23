@@ -51,29 +51,82 @@ export type SceneSlab = {
   depth: number;
 };
 
+// A perimeter fence: a straight front-facing strip skewed onto one front edge.
+// `angle` is the skewY in degrees that shears the strip to the 2:1 edge slope
+// (pickets stay vertical). `x,y,w,h` is the un-skewed box; skew is about centre.
+export type SceneFence = {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  angle: number;
+  depth: number;
+  // Which horizontal slice of the fence strip this segment shows (so the 4
+  // segments of a side together form one continuous fence, not 4 squashed copies).
+  sliceIndex: number;
+  sliceCount: number;
+};
+
+// Split a front edge (a→b, with corner grid-sums sumA/sumB) into 4 tile-edge
+// fence segments. Each segment's baseline midpoint sits on the edge (skewY shears
+// it to the slope) and its depth interpolates the grid-sum, so it sorts with the
+// objects. H = picket height above the edge.
+function buildFenceSide(
+  idBase: string,
+  a: IsoPoint,
+  b: IsoPoint,
+  angle: number,
+  patchDepth: number,
+  sumA: number,
+  sumB: number
+): SceneFence[] {
+  // Picket height above the edge. Kept low (a short cottage fence) so the
+  // perimeter frames the plot without blocking the view of objects behind it.
+  const H = 38;
+  const segs: SceneFence[] = [];
+  for (let k = 0; k < 4; k += 1) {
+    const t0 = k / 4;
+    const t1 = (k + 1) / 4;
+    const tc = (k + 0.5) / 4;
+    const x0 = a.x + t0 * (b.x - a.x);
+    const x1 = a.x + t1 * (b.x - a.x);
+    const cy = a.y + tc * (b.y - a.y);
+    const gridSum = sumA + tc * (sumB - sumA);
+    segs.push({
+      id: `${idBase}-${k}`,
+      x: Math.min(x0, x1),
+      y: cy - H,
+      w: Math.abs(x1 - x0),
+      h: H,
+      angle,
+      depth: patchDepth + gridSum * 2,
+      // The strip runs a→b; slice index follows screen-x (left→right).
+      sliceIndex: x0 < x1 ? k : 3 - k,
+      sliceCount: 4,
+    });
+  }
+  return segs;
+}
+
 export type WorldScene = {
   width: number;
   height: number;
   slabs: SceneSlab[];
   decals: SceneDecal[];
+  fences: SceneFence[];
   sprites: SceneSprite[];
 };
 
 const PATCH_DEPTH_STRIDE = 1000;
 
-// Sprites are centred on their cell, so size encodes how much of the footprint
-// the object should cover. Multi-cell anchors scale up to occupy both tiles.
+// Objects are 1:2 frames = one SLOT of the 4x4 line grid (world-tile-edit.py
+// object-grid): two stacked square cells, the LOWER is the base tile, the UPPER is
+// headroom. The frame width == one grid column == one tile, so size = TILE_W and
+// the base cell maps onto the world tile. See OBJECT_BASE in world-canvas for the
+// vertical mapping. Creatures are square + centre-anchored (not tile-art).
 function spriteSize(object: WorldObject): number {
-  switch (object.kind) {
-    case 'anchor':
-      return object.footprint >= 2 ? TILE_W * 1.6 : TILE_W * 1.05;
-    case 'creature':
-      return TILE_W * 0.7;
-    case 'memory':
-      return TILE_W * 0.66;
-    default:
-      return TILE_W * 0.66;
-  }
+  return object.kind === 'creature' ? TILE_W * 0.6 : TILE_W;
 }
 
 // Every cell is floored with a diamond tile from the atlas — the archetype's
@@ -93,20 +146,11 @@ function cellHash(seed: string): number {
   return h >>> 0;
 }
 
-// Centre of an object's footprint (handles the 2-wide anchor).
-function footprintCentre(object: WorldObject): IsoPoint {
-  if (object.footprint >= 2) {
-    const a = cellCenter(object.col, object.row);
-    const b = cellCenter(object.col + object.footprint - 1, object.row);
-    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  }
-  return cellCenter(object.col, object.row);
-}
-
 export function layoutWorld(patches: WorldPatch[]): WorldScene {
   const rawSlabs: SceneSlab[] = [];
   const rawSprites: SceneSprite[] = [];
   const rawDecals: SceneDecal[] = [];
+  const rawFences: SceneFence[] = [];
 
   for (const patch of patches) {
     const origin = patchWorldOrigin(patch.gridCol, patch.gridRow);
@@ -133,8 +177,21 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
       depth: patchDepth - 1,
     });
 
+    // A fence prop becomes a perimeter border along the two FRONT edges
+    // (right→bottom + bottom→left), one sprite per side spanning the full edge.
+    const hasFence = patch.objects.some((o) => o.assetKey === 'prop_fence');
+    if (hasFence) {
+      // Each front side is split into 4 tile-edge segments with their own depth
+      // (interpolated from the corner grid-sums), so fences depth-sort WITH the
+      // objects — a segment behind an object renders under it, the front over it.
+      rawFences.push(...buildFenceSide(`${patch.id}-fr`, right, bottom, -26.565, patchDepth, 4, 8));
+      rawFences.push(...buildFenceSide(`${patch.id}-fl`, bottom, left, 26.565, patchDepth, 8, 4));
+    }
+
     for (const object of patch.objects) {
-      const c = shift(footprintCentre(object));
+      if (object.assetKey === 'prop_fence') continue; // rendered as perimeter
+      // Always on a single cell — objects are 1-tile, never spanning two.
+      const c = shift(cellCenter(object.col, object.row));
       rawSprites.push({
         id: object.id,
         patchId: patch.id,
@@ -152,6 +209,7 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
     // footprint cell of each object plus each memory node.
     const occupied = new Set<string>();
     for (const object of patch.objects) {
+      if (object.assetKey === 'prop_fence') continue; // perimeter, not a cell
       for (let f = 0; f < Math.max(1, object.footprint); f += 1) {
         occupied.add(`${object.col + f},${object.row}`);
       }
@@ -213,7 +271,8 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
   }
   for (const sprite of rawSprites) {
     xs.push(sprite.x - sprite.size / 2, sprite.x + sprite.size / 2);
-    ys.push(sprite.y - sprite.size, sprite.y);
+    // 1:2 objects rise ~1.9× their width above the cell, ~0.1× below.
+    ys.push(sprite.y - sprite.size * 1.95, sprite.y + sprite.size * 0.15);
   }
   const minX = xs.length ? Math.min(...xs) : 0;
   const minY = ys.length ? Math.min(...ys) : 0;
@@ -237,12 +296,16 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
   const decals = rawDecals
     .map((decal) => ({ ...decal, x: decal.x + dx, y: decal.y + dy }))
     .sort((a, b) => a.depth - b.depth);
+  const fences = rawFences
+    .map((fence) => ({ ...fence, x: fence.x + dx, y: fence.y + dy }))
+    .sort((a, b) => a.depth - b.depth);
 
   return {
     width: maxX - minX + pad * 2,
     height: maxY - minY + pad * 2,
     slabs: slabs.sort((a, b) => a.depth - b.depth),
     decals,
+    fences,
     sprites,
   };
 }

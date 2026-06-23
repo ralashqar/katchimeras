@@ -10,6 +10,39 @@ const corsHeaders = {
 const bucketName = 'katchimera-art-dev';
 const defaultModelId = 'fal-ai/nano-banana-2';
 
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// Some edit endpoints (GPT Image 2) drop data: URIs and need real fetchable URLs.
+// Upload any data-URI inputs to a temp path and hand FAL the public URLs.
+async function resolveInputImageUrls(
+  imageUrls: string[],
+  supabaseAdmin: ReturnType<typeof createClient>
+): Promise<string[]> {
+  const out: string[] = [];
+  for (const value of imageUrls) {
+    if (typeof value !== 'string' || !value.startsWith('data:')) {
+      out.push(value);
+      continue;
+    }
+    const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!match) continue;
+    const contentType = match[1];
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+    const path = `edit-inputs/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabaseAdmin.storage
+      .from(bucketName)
+      .upload(path, base64ToBytes(match[2]), { contentType, upsert: false });
+    if (error) continue;
+    out.push(supabaseAdmin.storage.from(bucketName).getPublicUrl(path).data.publicUrl);
+  }
+  return out;
+}
+
 // Different FAL model families take different size params, so build them by
 // family (mirrors generate-day-comic's buildFalInput). Nano-Banana 2 (Gemini):
 // aspect_ratio + resolution. GPT Image 2: image_size (a NAMED preset, never a
@@ -142,6 +175,11 @@ Deno.serve(async (req) => {
         { error: 'renderProfile.id and renderProfile.imagePrompt are required.' },
         400
       );
+    }
+
+    // GPT Image 2 (and other edit endpoints) need fetchable URLs, not data: URIs.
+    if (Array.isArray(input.image_urls)) {
+      input.image_urls = await resolveInputImageUrls(input.image_urls as string[], supabaseAdmin);
     }
 
     const { data: inserted, error: insertError } = await supabaseAdmin

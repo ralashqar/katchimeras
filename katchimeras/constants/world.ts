@@ -173,7 +173,7 @@ export const MEMORY_NODE_ASSET: Record<MemoryNodeKind, CatalogEntry> = {
   lantern_shrine: { key: 'memory_lantern_shrine', label: 'Lantern Shrine' },
 };
 
-// Slot template for a 4×4 patch. P=prop, A=anchor (2-wide), K=creature, M=memory.
-// MVP uses one template; the field is here so archetype-specific layouts can be
-// added without touching the generator.
-export const PATCH_TEMPLATE: string[] = ['PPPP', 'PAAP', 'PKMP', 'PPPP'];
+// Slot template for a 4×4 patch. P=prop, A=anchor (single tile), K=creature,
+// M=memory. Every object occupies exactly one tile. The field is here so
+// archetype-specific layouts can be added without touching the generator.
+export const PATCH_TEMPLATE: string[] = ['PPPP', 'PAPP', 'PKMP', 'PPPP'];

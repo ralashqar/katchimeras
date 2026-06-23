@@ -62,6 +62,7 @@ const MAPPING = {
   'cart.fill': 'shopping-cart',
   'fork.knife.circle.fill': 'restaurant',
   'globe.americas.fill': 'public',
+  'scope': 'center-focus-strong',
 } as IconMapping;
 
 /**
