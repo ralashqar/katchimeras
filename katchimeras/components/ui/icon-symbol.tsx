@@ -61,6 +61,7 @@ const MAPPING = {
   'briefcase.fill': 'work',
   'cart.fill': 'shopping-cart',
   'fork.knife.circle.fill': 'restaurant',
+  'globe.americas.fill': 'public',
 } as IconMapping;
 
 /**
