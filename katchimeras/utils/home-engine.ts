@@ -496,6 +496,28 @@ export function answerDayPromptForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+// Today Patch V2 — mark a Daily Seed done (the gentle one-tap path). Idempotent:
+// re-completing a seed is a no-op. The earned seed grows its reward object on the
+// next patch derivation (utils/today-patch-engine.ts).
+export function completeSeedForToday(
+  state: StoredHomeState,
+  seedId: string,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  if ((base.seedCompletions ?? []).includes(seedId)) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    seedCompletions: [...(base.seedCompletions ?? []), seedId],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
 export function dismissDayPromptForToday(
   state: StoredHomeState,
   kind: DayPromptKind,

@@ -90,7 +90,7 @@ function shuffle<T>(items: T[], rng: () => number): T[] {
   return copy;
 }
 
-const ARCHETYPE_SOURCE_LABEL: Record<string, string> = {
+export const ARCHETYPE_SOURCE_LABEL: Record<string, string> = {
   calm: '🌿 Calm',
   active: '🚶 Active',
   social: '🧑‍🤝‍🧑 People',
@@ -99,14 +99,15 @@ const ARCHETYPE_SOURCE_LABEL: Record<string, string> = {
   meaningful: '✨ Meaningful',
 };
 
-type EarnedMemory = {
+export type EarnedMemory = {
   kind: MemoryNodeKind;
   payload: Omit<MemoryNode, 'id' | 'kind' | 'assetKey' | 'label' | 'col' | 'row'>;
 };
 
 // Which memory nodes the day earns, richest first. Each carries its retrieval
-// payload so tapping the node in-world surfaces the real moment.
-function deriveMemoryNodes(input: PatchInput): EarnedMemory[] {
+// payload so tapping the node in-world surfaces the real moment. Shared with the
+// live Today-patch engine (utils/today-patch-engine.ts).
+export function deriveMemoryNodes(input: PatchInput): EarnedMemory[] {
   const out: EarnedMemory[] = [];
   if (input.heroPhotoThumb) {
     out.push({

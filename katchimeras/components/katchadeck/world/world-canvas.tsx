@@ -1,9 +1,11 @@
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { MotiView } from 'moti';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
   cancelAnimation,
   useAnimatedStyle,
@@ -15,9 +17,12 @@ import Animated, {
 import { ARCHETYPE_THEME } from '@/constants/world';
 import { Lantern } from '@/constants/theme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
+import type { EggVisualState } from '@/types/home';
 import type { MemoryNode, WorldPatch } from '@/types/world';
 import { layoutWorld, type SceneFence, type SceneSprite } from '@/utils/world-scene';
-import { TILE_H, type IsoPoint } from '@/utils/world-iso';
+import { cellCenter, TILE_H, type IsoPoint } from '@/utils/world-iso';
 import {
   DECAL_ATLAS,
   DECAL_ATLAS_COLS,
@@ -30,6 +35,44 @@ type Props = {
   patches: WorldPatch[];
   onSelectPatch: (patchId: string) => void;
   onSelectMemory: (memory: MemoryNode, patchId: string) => void;
+  // Tapping a cell object on today's patch opens that cell's detail view.
+  onSelectCell?: (cellType: NonNullable<SceneSprite['category']>) => void;
+  // Draw a glowing ring under this cell's object (the last one tapped).
+  highlightedCell?: SceneSprite['category'] | null;
+  // Today's live patch: the egg is composited over its centre cell and the view
+  // auto-centres on it. Absent once the day has hatched.
+  eggPatchId?: string | null;
+  eggVisual?: EggVisualState | null;
+  eggReady?: boolean;
+  eggFeedKey?: number;
+  onPressEgg?: () => void;
+};
+
+// The egg sits on the patch's CENTRE tile (cells live at the four corners). The
+// slab centre returned by layoutWorld already corresponds to cell (1,1), so the
+// egg lands exactly at the patch centre.
+const EGG_CELL = { col: 1, row: 1 };
+const SLAB_CENTRE_CELL = { col: 1, row: 1 };
+const EGG_STAGE_WIDTH = 200;
+const EGG_STAGE_HEIGHT = 258;
+// The LanternEgg art is fixed-pixel, so shrink the whole stage with a transform
+// (scales about its centre) to sit small and centred on a single tile. Tunable.
+const EGG_SCALE = 0.5;
+const EGG_RISE = 24;
+// How far below the egg's tile the countdown pill sits (scene units) — tucked up
+// close under the small egg.
+const COUNTDOWN_DROP = 6;
+
+// Feathered radial glow (the same soft texture the egg uses) — tinted + faded
+// under the last-tapped object as a soft circular highlight.
+const HIGHLIGHT_GLOW = require('../../../assets/images/katchimeras/soft-glow.png');
+
+// What an empty cell hints it could hold (Diorama Time Capsule ghost spots).
+const GHOST_HINT: Record<string, { emoji: string; label: string }> = {
+  memory: { emoji: '📷', label: 'memory' },
+  places: { emoji: '🧭', label: 'places' },
+  journey: { emoji: '🚶', label: 'journey' },
+  reflection: { emoji: '🌿', label: 'reflection' },
 };
 
 function polyPath(points: IsoPoint[]) {
@@ -48,8 +91,47 @@ function segPath(a: IsoPoint, b: IsoPoint) {
   return path;
 }
 
-export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
+export function WorldCanvas({
+  patches,
+  onSelectPatch,
+  onSelectMemory,
+  onSelectCell,
+  eggPatchId,
+  eggVisual,
+  eggReady = false,
+  eggFeedKey = 0,
+  highlightedCell,
+  onPressEgg,
+}: Props) {
   const scene = useMemo(() => layoutWorld(patches), [patches]);
+
+  // The slab the camera focuses on: today's egg patch when present, else the
+  // newest patch. Its centre also anchors the composited egg.
+  const focusSlab = useMemo(() => {
+    if (eggPatchId) {
+      const found = scene.slabs.find((s) => s.patchId === eggPatchId);
+      if (found) return found;
+    }
+    return scene.slabs[scene.slabs.length - 1] ?? null;
+  }, [scene, eggPatchId]);
+
+  // Egg sits on the patch's reserved centre cell (1,2); recover its scene point
+  // from the slab centre (cell 1,1) so it pans/zooms glued to the tile.
+  const eggPoint = useMemo(() => {
+    if (!focusSlab || !eggPatchId) return null;
+    const slab = scene.slabs.find((s) => s.patchId === eggPatchId);
+    if (!slab) return null;
+    return {
+      x: slab.centre.x + (cellCenter(EGG_CELL.col, EGG_CELL.row).x - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).x),
+      y: slab.centre.y + (cellCenter(EGG_CELL.col, EGG_CELL.row).y - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y),
+    };
+  }, [scene, focusSlab, eggPatchId]);
+
+  // The object to draw a highlight ring under — the last cell the user tapped.
+  const highlightSprite = useMemo(() => {
+    if (!highlightedCell || !eggPatchId) return null;
+    return scene.sprites.find((s) => s.category === highlightedCell && s.patchId === eggPatchId) ?? null;
+  }, [scene, highlightedCell, eggPatchId]);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const centred = useRef(false);
   const tabBarHeight = useBottomTabBarHeight();
@@ -74,12 +156,30 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
   // Centre the newest patch (drawn last / front-most) in the viewport once we
   // know both sizes.
   useEffect(() => {
-    if (centred.current || !viewport.width || !scene.slabs.length) return;
-    const focus = scene.slabs[scene.slabs.length - 1].centre;
+    if (centred.current || !viewport.width || !focusSlab) return;
+    const focus = focusSlab.centre;
     tx.value = viewport.width / 2 - focus.x;
     ty.value = viewport.height / 2 - focus.y;
     centred.current = true;
-  }, [viewport, scene, tx, ty]);
+  }, [viewport, focusSlab, tx, ty]);
+
+  // Re-centre on today's egg every time the World tab regains focus (exit + come
+  // back). Reads the latest viewport/focus through a ref so the focus effect's
+  // deps stay stable — it must NOT re-fire when the patch grows mid-session.
+  const focusRef = useRef({ viewport, focusSlab });
+  focusRef.current = { viewport, focusSlab };
+  const recentreOnFocus = useCallback(() => {
+    const { viewport: vp, focusSlab: fs } = focusRef.current;
+    if (!vp.width || !fs) return; // first mount: layout not measured yet — the effect above handles it
+    cancelAnimation(tx);
+    cancelAnimation(ty);
+    scale.value = 1;
+    startScale.value = 1;
+    tx.value = vp.width / 2 - fs.centre.x;
+    ty.value = vp.height / 2 - fs.centre.y;
+    centred.current = true;
+  }, [tx, ty, scale, startScale]);
+  useFocusEffect(recentreOnFocus);
 
   const pan = Gesture.Pan()
     .onBegin(() => {
@@ -129,12 +229,28 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
     });
   const gesture = Gesture.Simultaneous(pan, pinch);
 
+  // Bounce in objects that appear AFTER the first paint (a grown seed/memory),
+  // but never the whole map on open. `seen` is updated post-commit in an effect;
+  // anything missing from it on a later render is freshly grown → animate.
+  const seenSpriteIds = useRef<Set<string>>(new Set());
+  const spritesInitialised = useRef(false);
+  const animateInIds = useMemo(() => {
+    if (!spritesInitialised.current) return new Set<string>();
+    const fresh = new Set<string>();
+    for (const sprite of scene.sprites) if (!seenSpriteIds.current.has(sprite.id)) fresh.add(sprite.id);
+    return fresh;
+  }, [scene]);
+  useEffect(() => {
+    scene.sprites.forEach((sprite) => seenSpriteIds.current.add(sprite.id));
+    spritesInitialised.current = true;
+  }, [scene]);
+
   // Recenter on the newest patch — the escape hatch if the user ever pans away.
   const recenter = () => {
-    if (!scene.slabs.length || !viewport.width) return;
+    if (!focusSlab || !viewport.width) return;
     cancelAnimation(tx);
     cancelAnimation(ty);
-    const focus = scene.slabs[scene.slabs.length - 1].centre;
+    const focus = focusSlab.centre;
     const s = scale.value;
     tx.value = withTiming(viewport.width / 2 - sceneW / 2 - (focus.x - sceneW / 2) * s, { duration: 320 });
     ty.value = withTiming(viewport.height / 2 - sceneH / 2 - (focus.y - sceneH / 2) * s, { duration: 320 });
@@ -227,16 +343,58 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
             );
           })}
 
+          {/* Empty slot ghosts — faint, gently breathing placeholders that hint
+              what could grow there, drawn under the objects. */}
+          {scene.ghosts.map((ghost) => {
+            const hint = GHOST_HINT[ghost.slotType];
+            if (!hint) return null;
+            const size = ghost.size * 0.6;
+            return (
+              <MotiView
+                key={ghost.id}
+                pointerEvents="none"
+                from={{ opacity: 0.32, scale: 0.9 }}
+                animate={{ opacity: 0.6, scale: 1 }}
+                transition={{ loop: true, type: 'timing', duration: 1500 }}
+                style={[styles.ghost, { left: ghost.x - size / 2, top: ghost.y - size / 2, width: size, height: size }]}>
+                <Text style={styles.ghostEmoji}>{hint.emoji}</Text>
+              </MotiView>
+            );
+          })}
+
+          {/* Soft circular glow under the last-tapped object — a feathered radial
+              wash that fades off at the edges (no hard ring). */}
+          {highlightSprite ? (
+            <MotiView
+              pointerEvents="none"
+              from={{ opacity: 0.3, scale: 0.92 }}
+              animate={{ opacity: 0.6, scale: 1.06 }}
+              transition={{ loop: true, type: 'timing', duration: 1300 }}
+              style={[
+                styles.highlight,
+                {
+                  left: highlightSprite.x - highlightSprite.size * 0.6,
+                  top: highlightSprite.y - highlightSprite.size * 0.6,
+                  width: highlightSprite.size * 1.2,
+                  height: highlightSprite.size * 1.2,
+                },
+              ]}>
+              <Image source={HIGHLIGHT_GLOW} tintColor="#7DE8CD" contentFit="contain" style={StyleSheet.absoluteFill} />
+            </MotiView>
+          ) : null}
+
           {/* Objects + perimeter-fence segments, depth-sorted together. */}
           {renderables.map((item) =>
             item.sprite ? (
               <SpriteView
                 key={item.sprite.id}
                 sprite={item.sprite}
+                animateIn={animateInIds.has(item.sprite.id)}
                 onPress={() => {
                   if (dragged.value) return; // released after a drag — not a tap
                   const s = item.sprite!;
                   if (s.kind === 'memory' && s.memory) onSelectMemory(s.memory, s.patchId);
+                  else if (s.category && s.patchId === eggPatchId && onSelectCell) onSelectCell(s.category);
                   else onSelectPatch(s.patchId);
                 }}
               />
@@ -245,20 +403,33 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
             )
           )}
 
-          {/* Patch name chips — the patch-inspection entry point. */}
-          {scene.slabs.map((slab) => (
-            <Pressable
-              key={`${slab.patchId}-name`}
-              onPress={() => {
-                if (dragged.value) return;
-                onSelectPatch(slab.patchId);
-              }}
-              style={[styles.nameChip, { left: slab.centre.x - 54, top: slab.topCorners[0].y - 26 }]}>
-              <Text style={styles.nameChipText} numberOfLines={1}>
-                {patchName(patches, slab.patchId)}
-              </Text>
-            </Pressable>
-          ))}
+          {/* Today's egg, seated on its patch — pans/zooms with the world. The
+              real LanternEgg (never a lookalike); tapping it opens the prompts. */}
+          {eggPoint && eggVisual ? (
+            <View
+              style={[
+                styles.eggLayer,
+                {
+                  left: eggPoint.x - EGG_STAGE_WIDTH / 2,
+                  top: eggPoint.y - EGG_STAGE_HEIGHT / 2 - EGG_RISE,
+                  width: EGG_STAGE_WIDTH,
+                  height: EGG_STAGE_HEIGHT,
+                  transform: [{ scale: EGG_SCALE }],
+                },
+              ]}>
+              <LanternEgg egg={eggVisual} onPress={onPressEgg} feedKey={eggFeedKey} />
+            </View>
+          ) : null}
+
+          {/* Hatch countdown, glued just below the egg's tile (pans/zooms with
+              the world). */}
+          {eggPoint && eggVisual ? (
+            <View
+              pointerEvents="none"
+              style={[styles.countdownLayer, { left: eggPoint.x - 110, top: eggPoint.y + COUNTDOWN_DROP, width: 220 }]}>
+              <HatchCountdown isReady={eggReady} compact />
+            </View>
+          ) : null}
         </Animated.View>
       </GestureDetector>
 
@@ -279,24 +450,44 @@ export function WorldCanvas({ patches, onSelectPatch, onSelectMemory }: Props) {
 const OBJECT_BOTTOM_FRAC = 0.96; // object's bottom pixel down the 1:2 frame (matches py)
 const OBJECT_SEAT = TILE_H * 0.25; // how far below the tile centre the bottom sits (padding)
 
-function SpriteView({ sprite, onPress }: { sprite: SceneSprite; onPress: () => void }) {
+function SpriteView({
+  sprite,
+  animateIn,
+  onPress,
+}: {
+  sprite: SceneSprite;
+  animateIn: boolean;
+  onPress: () => void;
+}) {
   const source = worldAssetSource(sprite.assetKey);
   const theme = ARCHETYPE_THEME[sprite.archetype];
   const isCreature = sprite.kind === 'creature';
   const w = sprite.size;
   const h = isCreature ? w : w * 2;
   const left = sprite.x - w / 2;
-  const top = isCreature ? sprite.y - h / 2 : sprite.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC;
+  // Creatures are centre-anchored; lift them by 35% of a tile so they stand ON
+  // the tile rather than sinking into it.
+  const top = isCreature
+    ? sprite.y - h / 2 - TILE_H * 0.35
+    : sprite.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC;
   return (
-    <Pressable onPress={onPress} hitSlop={6} style={[styles.sprite, { left, top, width: w, height: h }]}>
-      {source ? (
-        <Image source={source} style={styles.spriteImage} contentFit="contain" />
-      ) : (
-        <View style={[styles.placeholder, { borderColor: theme.accent }]}>
-          <Text style={styles.placeholderText}>{sprite.label.slice(0, 1)}</Text>
-        </View>
-      )}
-    </Pressable>
+    <MotiView
+      // New objects spring up from their base with a little overshoot; existing
+      // ones mount at rest (from = undefined → no entrance).
+      from={animateIn ? { opacity: 0, scale: 0.2, translateY: 10 } : undefined}
+      animate={{ opacity: 1, scale: 1, translateY: 0 }}
+      transition={{ type: 'spring', damping: 8, stiffness: 175, mass: 0.85 }}
+      style={[styles.sprite, styles.spriteOrigin, { left, top, width: w, height: h }]}>
+      <Pressable onPress={onPress} hitSlop={6} style={StyleSheet.absoluteFill}>
+        {source ? (
+          <Image source={source} style={styles.spriteImage} contentFit="contain" />
+        ) : (
+          <View style={[styles.placeholder, { borderColor: theme.accent }]}>
+            <Text style={styles.placeholderText}>{sprite.label.slice(0, 1)}</Text>
+          </View>
+        )}
+      </Pressable>
+    </MotiView>
   );
 }
 
@@ -331,10 +522,6 @@ function FenceView({ fence }: { fence: SceneFence }) {
   );
 }
 
-function patchName(patches: WorldPatch[], patchId: string): string {
-  return patches.find((p) => p.id === patchId)?.name ?? '';
-}
-
 // Slightly darken a hex colour for the second (shadowed) slab face.
 function shade(hex: string): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -351,6 +538,22 @@ const styles = StyleSheet.create({
   world: { position: 'relative' },
   decal: { position: 'absolute', opacity: 0.95, overflow: 'hidden' },
   sprite: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  // Grow/bounce from the planted base, not the centre.
+  spriteOrigin: { transformOrigin: 'bottom' },
+  highlight: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  ghost: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(214,236,182,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  ghostEmoji: { fontSize: 17, opacity: 0.85 },
+  eggLayer: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  countdownLayer: { position: 'absolute', alignItems: 'center' },
   spriteImage: { width: '100%', height: '100%' },
   placeholder: {
     width: '78%',
@@ -362,16 +565,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   placeholderText: { color: Lantern.moon50, fontSize: 18, fontWeight: '700' },
-  nameChip: {
-    position: 'absolute',
-    width: 108,
-    alignItems: 'center',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(20,17,31,0.82)',
-  },
-  nameChipText: { color: Lantern.moon50, fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
   recenter: {
     position: 'absolute',
     right: 16,

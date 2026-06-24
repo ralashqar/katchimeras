@@ -534,6 +534,10 @@ export type StoredHomeDayRecord = {
   // Display-only: surfaced in the day's "Photos · what they meant" section. The
   // archetype (calm/energy/together/meaningful) drives the chip icon + colour.
   capturedMeanings?: CapturedMeaning[];
+  // Today Patch V2 — Daily Seed ids the user has completed (manual one-tap).
+  // Passive seeds are satisfied from signals, not stored here. Each earned seed
+  // grows its reward object on the Today patch. See utils/daily-seeds-engine.ts.
+  seedCompletions?: string[];
   // Cheap signature of the inputs the derived fields (dayMap, place counts)
   // depend on — lets normalize skip re-deriving settled archived days.
   derivedSignature?: string;

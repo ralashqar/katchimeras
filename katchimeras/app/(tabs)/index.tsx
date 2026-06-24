@@ -13,6 +13,7 @@ import { CreatureProvenance } from '@/components/katchadeck/home/creature-proven
 import { DayJournalSections } from '@/components/katchadeck/home/day-journal-sections';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
@@ -496,6 +497,12 @@ export default function HomeScreen() {
             />
           )}
           {isForming && !isHatching ? <EggOrbitIcons icons={orbitIcons} /> : null}
+          {isFormingToday && !isHatching ? (
+            <HatchCountdown
+              isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'}
+              style={styles.heroCountdown}
+            />
+          ) : null}
         </Animated.View>
 
         {isHatching ? null : isHatched ? (
@@ -756,6 +763,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 6,
+  },
+  heroCountdown: {
+    marginTop: -18,
   },
   sectionGap: {
     gap: 16,

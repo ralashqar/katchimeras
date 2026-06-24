@@ -1,5 +1,5 @@
 import { ARCHETYPE_THEME } from '@/constants/world';
-import type { MemoryNode, WorldArchetype, WorldObject, WorldPatch } from '@/types/world';
+import type { MemoryNode, PatchCellType, WorldArchetype, WorldObject, WorldPatch } from '@/types/world';
 import {
   cellCenter,
   drawDepth,
@@ -27,6 +27,7 @@ export type SceneSprite = {
   size: number;
   depth: number; // global painter order
   memory?: MemoryNode;
+  category?: WorldObject['category']; // which time-capsule cell this sprite is
 };
 
 export type SceneDecal = {
@@ -35,6 +36,18 @@ export type SceneDecal = {
   decal: string;
   archetype: WorldArchetype;
   x: number; // tile centre, absolute scene coords
+  y: number;
+  size: number;
+  depth: number;
+};
+
+// An empty typed slot on a forming patch — drawn as a faint placeholder "spot"
+// the day can fill (Today Patch V2). Positioned at the slot's tile centre.
+export type SceneGhost = {
+  id: string;
+  patchId: string;
+  slotType: PatchCellType;
+  x: number;
   y: number;
   size: number;
   depth: number;
@@ -116,6 +129,7 @@ export type WorldScene = {
   decals: SceneDecal[];
   fences: SceneFence[];
   sprites: SceneSprite[];
+  ghosts: SceneGhost[];
 };
 
 const PATCH_DEPTH_STRIDE = 1000;
@@ -151,6 +165,7 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
   const rawSprites: SceneSprite[] = [];
   const rawDecals: SceneDecal[] = [];
   const rawFences: SceneFence[] = [];
+  const rawGhosts: SceneGhost[] = [];
 
   for (const patch of patches) {
     const origin = patchWorldOrigin(patch.gridCol, patch.gridRow);
@@ -203,6 +218,7 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
         y: c.y,
         size: spriteSize(object),
         depth: patchDepth + drawDepth(object.col, object.row) * 2 + (object.kind === 'creature' ? 1 : 0),
+        category: object.category,
       });
     }
     // Decals grow on the cells NOT taken by an object/memory. Occupied = every
@@ -217,6 +233,11 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
     for (const node of patch.memoryNodes) occupied.add(`${node.col},${node.row}`);
 
     const theme = ARCHETYPE_THEME[patch.primaryArchetype];
+    // Today's forming plot is intentionally a bare, uniform field: one fixed
+    // ground decal on every cell, no scattered accents — so it reads as "nothing
+    // yet" until real moments grow on it. Hatched/legacy patches keep the
+    // accent-scattered, archetype-themed ground.
+    const isForming = patch.status === 'forming' || patch.status === 'readyToHatch';
     for (let row = 0; row < PATCH_SIZE; row += 1) {
       for (let col = 0; col < PATCH_SIZE; col += 1) {
         const h = cellHash(`${patch.id}:${col},${row}`);
@@ -224,15 +245,16 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
         // Accent tile on some free cells; the base ground tile everywhere else
         // (including under objects, so they sit on real ground).
         const key =
-          isFree && (h % 1000) / 1000 < ACCENT_DENSITY
+          !isForming && isFree && (h % 1000) / 1000 < ACCENT_DENSITY
             ? theme.decals[(h >>> 10) % theme.decals.length]
             : theme.groundTile;
         const c = shift(cellCenter(col, row));
         rawDecals.push({
           id: `${patch.id}-tile-${col}-${row}`,
           patchId: patch.id,
-          // Each tile type has a _2 variant from the grid; pick one per cell.
-          decal: (h >>> 16) & 1 ? `${key}_2` : key,
+          // Each tile type has a _2 variant from the grid; pick one per cell —
+          // but the forming plot stays on the single base tile for uniformity.
+          decal: !isForming && (h >>> 16) & 1 ? `${key}_2` : key,
           archetype: patch.primaryArchetype,
           x: c.x,
           y: c.y,
@@ -255,6 +277,21 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
         size: TILE_W * 0.6,
         depth: patchDepth + drawDepth(node.col, node.row) * 2,
         memory: node,
+      });
+    }
+    // Empty cells (level 0) → faint ghost placeholders the day can fill. Only on
+    // the live forming patch — a finalized day is complete, no empty spots shown.
+    for (const cell of isForming ? patch.cells ?? [] : []) {
+      if (cell.level > 0) continue;
+      const c = shift(cellCenter(cell.col, cell.row));
+      rawGhosts.push({
+        id: `${patch.id}-ghost-${cell.type}`,
+        patchId: patch.id,
+        slotType: cell.type,
+        x: c.x,
+        y: c.y,
+        size: TILE_W,
+        depth: patchDepth + drawDepth(cell.col, cell.row) * 2 - 1,
       });
     }
   }
@@ -299,6 +336,9 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
   const fences = rawFences
     .map((fence) => ({ ...fence, x: fence.x + dx, y: fence.y + dy }))
     .sort((a, b) => a.depth - b.depth);
+  const ghosts = rawGhosts
+    .map((ghost) => ({ ...ghost, x: ghost.x + dx, y: ghost.y + dy }))
+    .sort((a, b) => a.depth - b.depth);
 
   return {
     width: maxX - minX + pad * 2,
@@ -307,5 +347,6 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
     decals,
     fences,
     sprites,
+    ghosts,
   };
 }

@@ -81,6 +81,12 @@ CATALOG = {
     'prop_log': ('props', 'a short fallen mossy wooden log'),
     'prop_fence': ('props', 'a short section of low wooden picket fence'),
     'prop_coffee_table': ('props', 'a small round wooden coffee table with a steaming mug on top'),
+    # --- Seed-object rewards (Daily Seeds, Today Patch V2) ---
+    'seed_water_lily': ('props', 'a single cozy water lily with a round green lily pad and a soft pink blooming lotus flower resting on a small still pool of calm water'),
+    # --- Memory Vault chest stages (Diorama Time Capsule, Today Patch V2) ---
+    'vault_chest_small': ('props', 'a small cute closed wooden treasure chest with rounded lid and warm brass trim and corners'),
+    'vault_chest': ('props', 'a cozy wooden treasure chest with the lid slightly open and a soft warm golden glow spilling out'),
+    'vault_chest_treasure': ('props', 'an ornate open treasure chest overflowing with glowing gems, gold coins and soft magical sparkles rising out'),
     # --- Memory nodes (slightly magical, glowing) ---
     'memory_photo_bloom': ('memory-nodes', 'a magical glowing flower bloom with a softly floating glassy photo-frame petal and gentle sparkles'),
     'memory_landmark_stone': ('memory-nodes', 'a carved standing landmark stone with a smooth softly glowing face beside a small cairn of pebbles'),

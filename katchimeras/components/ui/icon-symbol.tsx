@@ -63,6 +63,7 @@ const MAPPING = {
   'fork.knife.circle.fill': 'restaurant',
   'globe.americas.fill': 'public',
   'scope': 'center-focus-strong',
+  'timer': 'timer',
 } as IconMapping;
 
 /**

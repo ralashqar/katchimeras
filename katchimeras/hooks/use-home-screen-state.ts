@@ -20,6 +20,7 @@ import {
   answerHeroPhotoMeaningForToday,
   applyCapturedMomentForToday,
   applyGeneratedReflection,
+  completeSeedForToday,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
   hydrateAllDays,
@@ -48,6 +49,7 @@ import {
   loadProductionDayPromptPhotoCandidates,
   loadStoredDevPromptPhotoCandidates,
 } from '@/utils/day-prompt-photos';
+import { earnedSeeds, selectDailySeeds, type DailySeed } from '@/utils/daily-seeds-engine';
 import { requestDayReflection } from '@/utils/day-reflection';
 import { ensureDayVision } from '@/utils/photo-vision';
 import { ensureDayWeather } from '@/utils/day-weather';
@@ -168,6 +170,15 @@ export function useHomeScreenState() {
   // Once today has hatched, the Add/Camera controls feed a forming "tomorrow"
   // (until the rollover makes a fresh egg). Expose that day + its prompts.
   const isTodayHatched = viewModel.state.today.state === 'hatched';
+
+  // Today Patch V2 — the ≤3 Daily Seeds suggested for today, each flagged with
+  // whether it has been earned (manually completed or passively satisfied).
+  const todaySeedRecord = viewModel.state.today;
+  const dailySeeds = useMemo<(DailySeed & { earned: boolean })[]>(() => {
+    if (todaySeedRecord.state === 'hatched') return [];
+    const earnedIds = new Set(earnedSeeds(todaySeedRecord).map((seed) => seed.id));
+    return selectDailySeeds(todaySeedRecord).map((seed) => ({ ...seed, earned: earnedIds.has(seed.id) }));
+  }, [todaySeedRecord]);
   const tomorrowDay = useMemo(
     () => deriveTomorrowDayRecord(viewModel.state, loadOnboardingProfile(), new Date()),
     [viewModel.state]
@@ -227,6 +238,16 @@ export function useHomeScreenState() {
     setStoredState((currentState) => {
       const hydrated = hydrateHomeState(currentState, profile, now);
       return addMomentToDay(hydrated.state, profile, momentInput, now, target);
+    });
+  }, []);
+
+  const completeSeed = useCallback((seedId: string, target: DayInputTarget = 'today') => {
+    const now = new Date();
+    const profile = loadOnboardingProfile();
+
+    setStoredState((currentState) => {
+      const hydrated = hydrateHomeState(currentState, profile, now);
+      return completeSeedForToday(hydrated.state, seedId, profile, now, target);
     });
   }, []);
 
@@ -661,6 +682,8 @@ export function useHomeScreenState() {
     activeDayPrompt,
     availableDayPrompts,
     applyCapturedMoment,
+    dailySeeds,
+    completeSeed,
     isTodayHatched,
     tomorrowDay,
     tomorrowActivePrompt,

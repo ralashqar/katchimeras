@@ -43,6 +43,12 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   // Front-facing fence strip; the renderer skews it onto each 2:1 perimeter edge.
   fence_strip: require('../assets/images/katchimeras/world/props/fence_strip.png'),
   prop_coffee_table: require('../assets/images/katchimeras/world/props/prop_coffee_table.png'),
+  // Seed-object reward (Daily Seeds, Today Patch V2).
+  seed_water_lily: require('../assets/images/katchimeras/world/props/seed_water_lily.png'),
+  // Memory Vault chest stages (Diorama Time Capsule).
+  vault_chest_small: require('../assets/images/katchimeras/world/props/vault_chest_small.png'),
+  vault_chest: require('../assets/images/katchimeras/world/props/vault_chest.png'),
+  vault_chest_treasure: require('../assets/images/katchimeras/world/props/vault_chest_treasure.png'),
   // Memory nodes
   memory_photo_bloom: require('../assets/images/katchimeras/world/memory-nodes/memory_photo_bloom.png'),
   memory_landmark_stone: require('../assets/images/katchimeras/world/memory-nodes/memory_landmark_stone.png'),
