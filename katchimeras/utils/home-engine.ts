@@ -16,7 +16,9 @@ import { timelineDemoEntries } from '@/constants/timeline-demo';
 import type {
   AddMomentInput,
   ActivityPermissionState,
+  BigMomentType,
   CapturedMeaning,
+  DayNote,
   DayInputTarget,
   DayScores,
   DayMapSummary,
@@ -513,6 +515,58 @@ export function completeSeedForToday(
   const nextDay: StoredHomeDayRecord = {
     ...base,
     seedCompletions: [...(base.seedCompletions ?? []), seedId],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// Today Patch V3 — attach a written/voice note to the day: a time-capsule entry
+// (feeds the Memory Vault + Reflection cells via its inferred mood) plus, when
+// the user has confirmed one, a Big Moment that grows a centre landmark.
+export function applyNoteForToday(
+  state: StoredHomeState,
+  input: {
+    kind: 'text' | 'voice';
+    text: string;
+    audioUri?: string | null;
+    durationMs?: number | null;
+    archetype: string;
+    label: string;
+    bigMoment?: { type: BigMomentType; subject?: string | null };
+  },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const createdAt = now.toISOString();
+  const stamp = `${now.getTime().toString(36)}-${base.notes?.length ?? 0}`;
+  const note: DayNote = {
+    id: `note-${stamp}`,
+    kind: input.kind,
+    text: input.text,
+    audioUri: input.audioUri ?? null,
+    durationMs: input.durationMs ?? null,
+    archetype: input.archetype,
+    label: input.label,
+    createdAt,
+  };
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    notes: [...(base.notes ?? []), note],
+    bigMoments: input.bigMoment
+      ? [
+          ...(base.bigMoments ?? []),
+          {
+            id: `bm-${stamp}`,
+            type: input.bigMoment.type,
+            label: input.label,
+            subject: input.bigMoment.subject ?? null,
+            noteId: note.id,
+            createdAt,
+          },
+        ]
+      : base.bigMoments,
   };
 
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);

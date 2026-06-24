@@ -188,6 +188,7 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feed
         />
         <AnimatedImage
           contentFit="contain"
+          allowDownscaling={false}
           pointerEvents="none"
           source={glassDome}
           style={[styles.dome, membraneStyle]}

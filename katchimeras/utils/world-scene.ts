@@ -24,10 +24,14 @@ export type SceneSprite = {
   archetype: WorldArchetype;
   x: number; // bottom-centre anchor point, absolute scene coords
   y: number;
+  col: number; // the tile this sprite OCCUPIES (for tile-based tap hit-testing)
+  row: number;
   size: number;
   depth: number; // global painter order
   memory?: MemoryNode;
   category?: WorldObject['category']; // which time-capsule cell this sprite is
+  badge?: number; // small count/metric tag for the cell object
+  badgeIcon?: string; // override the badge icon
 };
 
 export type SceneDecal = {
@@ -216,9 +220,13 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
         archetype: patch.primaryArchetype,
         x: c.x,
         y: c.y,
+        col: object.col,
+        row: object.row,
         size: spriteSize(object),
         depth: patchDepth + drawDepth(object.col, object.row) * 2 + (object.kind === 'creature' ? 1 : 0),
         category: object.category,
+        badge: object.badge,
+        badgeIcon: object.badgeIcon,
       });
     }
     // Decals grow on the cells NOT taken by an object/memory. Occupied = every
@@ -274,6 +282,8 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
         archetype: patch.primaryArchetype,
         x: c.x,
         y: c.y,
+        col: node.col,
+        row: node.row,
         size: TILE_W * 0.6,
         depth: patchDepth + drawDepth(node.col, node.row) * 2,
         memory: node,

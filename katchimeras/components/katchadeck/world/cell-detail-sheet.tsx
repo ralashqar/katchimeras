@@ -1,22 +1,28 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { PatchCell } from '@/types/world';
+import { resolvePlaceName } from '@/utils/place-names';
 
-// The "tap a cell" detail view — a small time-capsule reader for one cell of the
-// day's patch. Memory Vault shows the day's photos + meanings, Journey shows
-// movement (never punishing), Reflection shows mood + what stood out. Places is
-// handled by the caller (it routes to the full day map).
+// The "tap a chest" detail view — a small time-capsule reader. The photos vault
+// shows the day's photos + their meanings; the notes reader (NotesDetailSheet)
+// shows voice/text notes + the moments they grew. Journey/Reflection bodies stay
+// for when those cells are re-enabled. Places routes to the full day map.
 type CellDetailSheetProps = {
   day: HomeDayRecord;
   cell: PatchCell;
   recentAvgSteps: number | null;
   onClose: () => void;
+  // Memory Vault only — opens the live camera capture flow to add a new photo.
+  onAddPhoto?: () => void;
 };
 
 const MEANING_TINT: Record<string, string> = {
@@ -25,10 +31,18 @@ const MEANING_TINT: Record<string, string> = {
   together: '#F49AC1',
   meaningful: '#A78BFA',
 };
+const BIG_MOMENT_EMOJI: Record<string, string> = {
+  birthday: '🎂',
+  anniversary: '💛',
+  firstTime: '⭐️',
+  holiday: '🎏',
+  trip: '🧳',
+  achievement: '🏆',
+  milestone: '🗿',
+};
 
-export function CellDetailSheet({ day, cell, recentAvgSteps, onClose }: CellDetailSheetProps) {
+function SheetShell({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   const tabBarHeight = useBottomTabBarHeight();
-
   return (
     <View style={styles.overlay}>
       <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
@@ -40,18 +54,7 @@ export function CellDetailSheet({ day, cell, recentAvgSteps, onClose }: CellDeta
         exiting={SlideOutDown.duration(200)}
         style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
         <View style={styles.grabber} />
-
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          {cell.sourceLabel}
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          {cell.summaryLabel}
-        </ThemedText>
-
-        {cell.type === 'memory' ? <MemoryBody day={day} /> : null}
-        {cell.type === 'journey' ? <JourneyBody day={day} recentAvgSteps={recentAvgSteps} /> : null}
-        {cell.type === 'reflection' ? <ReflectionBody day={day} /> : null}
-
+        {children}
         <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
           <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
             Close
@@ -62,19 +65,75 @@ export function CellDetailSheet({ day, cell, recentAvgSteps, onClose }: CellDeta
   );
 }
 
-function MemoryBody({ day }: { day: HomeDayRecord }) {
+export function CellDetailSheet({ day, cell, recentAvgSteps, onClose, onAddPhoto }: CellDetailSheetProps) {
+  return (
+    <SheetShell onClose={onClose}>
+      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+        {cell.sourceLabel}
+      </ThemedText>
+      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        {cell.summaryLabel}
+      </ThemedText>
+
+      {cell.type === 'memory' ? <MemoryBody day={day} onAddPhoto={onAddPhoto} /> : null}
+      {cell.type === 'journey' ? <JourneyBody day={day} recentAvgSteps={recentAvgSteps} /> : null}
+      {cell.type === 'reflection' ? <ReflectionBody day={day} /> : null}
+    </SheetShell>
+  );
+}
+
+// The notes chest reader — voice/text notes + the Big Moments they grew.
+export function NotesDetailSheet({
+  day,
+  onClose,
+  onAddNote,
+}: {
+  day: HomeDayRecord;
+  onClose: () => void;
+  onAddNote?: () => void;
+}) {
+  const notes = day.notes ?? [];
+  return (
+    <SheetShell onClose={onClose}>
+      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+        Notes
+      </ThemedText>
+      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        {notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} & moments` : 'Your notes'}
+      </ThemedText>
+      <NotesBody day={day} onAddNote={onAddNote} />
+    </SheetShell>
+  );
+}
+
+function MemoryBody({ day, onAddPhoto }: { day: HomeDayRecord; onAddPhoto?: () => void }) {
   const photos = [
     day.heroPhoto?.thumbnailUri,
     ...(day.capturedMeanings ?? []).map((meaning) => meaning.thumbnailUri),
   ].filter((uri): uri is string => !!uri);
   const meanings = day.capturedMeanings ?? [];
-
-  if (photos.length === 0 && meanings.length === 0) {
-    return <EmptyBody label="No memories captured yet. Snap a moment to fill the vault." />;
-  }
+  const empty = photos.length === 0 && meanings.length === 0;
 
   return (
     <View style={styles.body}>
+      {onAddPhoto ? (
+        <View style={styles.addRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onAddPhoto}
+            style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
+            <IconSymbol name="camera.fill" size={18} color={Lantern.ember300} />
+            <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              Capture
+            </ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
+      {empty ? (
+        <ThemedText style={styles.bodyLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          No photos yet — capture one to fill the vault.
+        </ThemedText>
+      ) : null}
       {photos.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
           {photos.map((uri, index) => (
@@ -93,8 +152,99 @@ function MemoryBody({ day }: { day: HomeDayRecord }) {
   );
 }
 
+function NotesBody({ day, onAddNote }: { day: HomeDayRecord; onAddNote?: () => void }) {
+  const notes = day.notes ?? [];
+  const voiceNotes = notes.filter((note) => note.kind === 'voice' && note.audioUri);
+  const textNotes = notes.filter((note) => note.kind !== 'voice');
+  const moments = day.bigMoments ?? [];
+  const empty = notes.length === 0 && moments.length === 0;
+
+  const player = useAudioPlayer();
+  const status = useAudioPlayerStatus(player);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const isPlaying = (id: string) => playingId === id && status.playing;
+  const togglePlay = (id: string, uri: string) => {
+    if (isPlaying(id)) {
+      player.pause();
+      return;
+    }
+    player.replace({ uri });
+    player.play();
+    setPlayingId(id);
+  };
+
+  return (
+    <View style={styles.body}>
+      {onAddNote ? (
+        <View style={styles.addRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onAddNote}
+            style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
+            <IconSymbol name="mic.fill" size={18} color={Lantern.ember300} />
+            <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              Add a note
+            </ThemedText>
+          </Pressable>
+        </View>
+      ) : null}
+      {empty ? (
+        <ThemedText style={styles.bodyLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          No notes yet — tap “Add a note” to record or write one.
+        </ThemedText>
+      ) : null}
+      {voiceNotes.length > 0 ? (
+        <View style={styles.voiceList}>
+          {voiceNotes.map((note) => (
+            <Pressable key={note.id} onPress={() => togglePlay(note.id, note.audioUri ?? '')} style={styles.voiceRow}>
+              <View style={styles.voicePlay}>
+                <IconSymbol name={isPlaying(note.id) ? 'pause.fill' : 'play.fill'} size={13} color={Lantern.ink900} />
+              </View>
+              <ThemedText style={styles.voiceLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {note.label}
+              </ThemedText>
+              {note.durationMs ? (
+                <ThemedText style={styles.voiceDur} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                  {Math.max(1, Math.round(note.durationMs / 1000))}s
+                </ThemedText>
+              ) : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {textNotes.length > 0 ? (
+        <View style={styles.chipWrap}>
+          {textNotes.map((note) => (
+            <Chip key={note.id} label={note.label} tint={MEANING_TINT[note.archetype] ?? Lantern.moon300} />
+          ))}
+        </View>
+      ) : null}
+      {moments.length > 0 ? (
+        <View style={styles.momentList}>
+          <ThemedText style={styles.momentHeader} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            Moments
+          </ThemedText>
+          {moments.map((moment) => (
+            <View key={moment.id} style={styles.momentRow}>
+              <ThemedText style={styles.momentEmoji}>{BIG_MOMENT_EMOJI[moment.type] ?? '✨'}</ThemedText>
+              <ThemedText style={styles.momentLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {moment.label}
+                {moment.subject ? ` · ${moment.subject}` : ''}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+type NamedPlace = { id: string; primary: string; locality: string | null };
+
 function JourneyBody({ day, recentAvgSteps }: { day: HomeDayRecord; recentAvgSteps: number | null }) {
   const steps = day.stepsCount ?? 0;
+  const mapNodes = day.dayMap?.nodes;
+  const placeCount = day.visitedPlaceCount ?? mapNodes?.length ?? 0;
   // Always non-judgmental: a quiet day is cozy, never a failure.
   let comparison = 'Every step left a mark on the path.';
   if (steps === 0) comparison = 'A restful day — the path is cozy and still.';
@@ -103,6 +253,31 @@ function JourneyBody({ day, recentAvgSteps }: { day: HomeDayRecord; recentAvgSte
     else if (steps < recentAvgSteps * 0.6) comparison = 'A gentler day than usual — a good rest.';
     else comparison = 'About your usual pace today.';
   }
+
+  // Resolve location names through the persisted resolver so they stay stable.
+  const [places, setPlaces] = useState<NamedPlace[] | null>(null);
+  useEffect(() => {
+    const nodes = mapNodes ?? [];
+    if (nodes.length === 0) {
+      setPlaces([]);
+      return;
+    }
+    let active = true;
+    setPlaces(null);
+    void (async () => {
+      const resolved = await Promise.all(
+        nodes.slice(0, 8).map(async (node) => ({
+          id: node.id,
+          ...(await resolvePlaceName(node.latitude, node.longitude)),
+        }))
+      );
+      if (active) setPlaces(resolved);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [mapNodes]);
+
   return (
     <View style={styles.body}>
       <ThemedText style={styles.bigStat} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
@@ -114,6 +289,35 @@ function JourneyBody({ day, recentAvgSteps }: { day: HomeDayRecord; recentAvgSte
       <ThemedText style={styles.bodyLine} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
         {comparison}
       </ThemedText>
+
+      {placeCount > 0 ? (
+        <View style={styles.momentList}>
+          <ThemedText style={styles.momentHeader} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            {placeCount} {placeCount === 1 ? 'place' : 'places'}
+          </ThemedText>
+          {places === null ? (
+            <ThemedText style={styles.bodyLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Reading the map…
+            </ThemedText>
+          ) : (
+            places.map((place) => (
+              <View key={place.id} style={styles.placeRow}>
+                <IconSymbol name="mappin.and.ellipse" size={14} color={Lantern.ember300} />
+                <View style={styles.placeText}>
+                  <ThemedText style={styles.placePrimary} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {place.primary}
+                  </ThemedText>
+                  {place.locality ? (
+                    <ThemedText style={styles.placeSecondary} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                      {place.locality}
+                    </ThemedText>
+                  ) : null}
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -200,6 +404,59 @@ const styles = StyleSheet.create({
   },
   chipDot: { width: 7, height: 7, borderRadius: 999 },
   chipLabel: { fontSize: 12.5, fontWeight: '700' },
+  voiceList: { gap: 8 },
+  voiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  voicePlay: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Lantern.ember300,
+  },
+  voiceLabel: { flex: 1, fontSize: 13.5, fontWeight: '700' },
+  voiceDur: { fontSize: 12, fontWeight: '700' },
+  momentList: { gap: 8 },
+  momentHeader: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
+  momentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,195,107,0.4)',
+    backgroundColor: 'rgba(255,195,107,0.1)',
+  },
+  momentEmoji: { fontSize: 18 },
+  momentLabel: { flex: 1, fontSize: 13.5, fontWeight: '700' },
+  placeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  placeText: { flex: 1, gap: 1 },
+  placePrimary: { fontSize: 14, fontWeight: '700' },
+  placeSecondary: { fontSize: 12, fontWeight: '600' },
+  addRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  addPhoto: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,195,107,0.5)',
+    backgroundColor: 'rgba(255,195,107,0.12)',
+  },
+  addPhotoPressed: { backgroundColor: 'rgba(255,195,107,0.22)' },
+  addPhotoLabel: { fontSize: 13.5, fontWeight: '800' },
   bigStat: { fontSize: 40, fontWeight: '900', lineHeight: 44 },
   statUnit: { fontSize: 13, fontWeight: '700', marginTop: -4 },
   bodyLine: { fontSize: 14, fontWeight: '600', lineHeight: 20 },

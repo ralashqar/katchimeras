@@ -503,6 +503,40 @@ export type CapturedMeaning = {
   createdAt: string;
 };
 
+// A written or spoken note attached to the day — a time-capsule entry. The
+// transcript (for voice) + an inferred mood feed the patch's cells; an optional
+// detected Big Moment grows a special landmark. Voice notes also keep their audio.
+export type DayNote = {
+  id: string;
+  kind: 'text' | 'voice';
+  text: string;
+  audioUri: string | null; // local file uri for voice notes
+  durationMs: number | null;
+  archetype: string; // calm | energy | together | meaningful
+  label: string;
+  createdAt: string;
+};
+
+export type BigMomentType =
+  | 'birthday'
+  | 'anniversary'
+  | 'firstTime'
+  | 'holiday'
+  | 'trip'
+  | 'achievement'
+  | 'milestone';
+
+// A special event a note revealed (always user-confirmed) — grows a rare
+// landmark object in the patch's centre.
+export type BigMoment = {
+  id: string;
+  type: BigMomentType;
+  label: string;
+  subject: string | null; // e.g. "son"
+  noteId: string | null;
+  createdAt: string;
+};
+
 export type StoredHomeDayRecord = {
   id: string;
   isoDate: string;
@@ -538,6 +572,10 @@ export type StoredHomeDayRecord = {
   // Passive seeds are satisfied from signals, not stored here. Each earned seed
   // grows its reward object on the Today patch. See utils/daily-seeds-engine.ts.
   seedCompletions?: string[];
+  // Voice/text notes for the day (time-capsule entries) + any confirmed Big
+  // Moments they revealed. See utils/note-meaning.ts + today-patch-engine.ts.
+  notes?: DayNote[];
+  bigMoments?: BigMoment[];
   // Cheap signature of the inputs the derived fields (dayMap, place counts)
   // depend on — lets normalize skip re-deriving settled archived days.
   derivedSignature?: string;

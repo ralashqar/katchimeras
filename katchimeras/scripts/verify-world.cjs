@@ -38,6 +38,7 @@ transpile('utils/world-patch-engine.ts', 'world-patch-engine.js');
 transpile('utils/world-build.ts', 'world-build.js');
 transpile('utils/world-scene.ts', 'world-scene.js');
 transpile('utils/daily-seeds-engine.ts', 'daily-seeds-engine.js');
+transpile('utils/note-meaning.ts', 'note-meaning.js');
 transpile('utils/today-patch-engine.ts', 'today-patch-engine.js');
 
 const { deriveArchetypes } = require(path.join(tempDir, 'world-archetype.js'));
@@ -47,6 +48,7 @@ const { spiralCoord } = require(path.join(tempDir, 'world-iso.js'));
 const { layoutWorld } = require(path.join(tempDir, 'world-scene.js'));
 const { deriveTodayPatch, computeCells } = require(path.join(tempDir, 'today-patch-engine.js'));
 const { selectDailySeeds, earnedSeeds, seedCompletionRatio } = require(path.join(tempDir, 'daily-seeds-engine.js'));
+const { interpretNoteText } = require(path.join(tempDir, 'note-meaning.js'));
 
 let failures = 0;
 function check(label, condition, detail) {
@@ -175,7 +177,7 @@ check('a new hatched day appends one patch', w3.patches.length === 3 && w3.patch
 const finalizedPatch = w3.patches[0];
 check('finalized patches carry the four cells', Array.isArray(finalizedPatch.cells) && finalizedPatch.cells.length === 4, finalizedPatch.cells && String(finalizedPatch.cells.length));
 check('finalized patch is hatched', finalizedPatch.status === 'hatched', finalizedPatch.status);
-check('finalized patch seats the creature on the centre tile', finalizedPatch.objects.some((o) => o.kind === 'creature' && o.col === 1 && o.row === 1));
+check('finalized patch seats the creature on the front corner tile', finalizedPatch.objects.some((o) => o.kind === 'creature' && o.col === 3 && o.row === 3));
 check('a finalized day shows no ghost cells', layoutWorld([finalizedPatch]).ghosts.length === 0, String(layoutWorld([finalizedPatch]).ghosts.length));
 
 // 10. Scene layout (renderer core) produces sane, finite geometry.
@@ -259,15 +261,23 @@ check('every morning cell is empty (level 0)', morning.cells.every((c) => c.leve
 const morningScene = layoutWorld([morning]);
 check('forming plot uses one fixed decal on every tile', morningScene.decals.length > 0 && morningScene.decals.every((d) => d.decal === 'grass'), [...new Set(morningScene.decals.map((d) => d.decal))].join(','));
 check('morning scene shows 4 ghost cells', morningScene.ghosts.length === 4, String(morningScene.ghosts.length));
-check('cells sit at the four corners (centre free for the egg)', morning.cells.every((c) => (c.col === 0 || c.col === 3) && (c.row === 0 || c.row === 3)));
-check('no cell occupies the egg centre tile', morning.cells.every((c) => !(c.col === 1 && c.row === 1)));
+const cellAt = (t) => morning.cells.find((c) => c.type === t);
+check(
+  'chests line the back-right row (memory/places/journey on row 0, steps far corner)',
+  cellAt('memory').col === 0 && cellAt('memory').row === 0 &&
+    cellAt('places').col === 2 && cellAt('places').row === 0 &&
+    cellAt('journey').col === 3 && cellAt('journey').row === 0
+);
+check('the egg front-corner tile (3,3) is free of cells', morning.cells.every((c) => !(c.col === 3 && c.row === 3)));
 
 // Memory Vault levels up with captured media; a fuller vault shows a richer asset.
 const onePhoto = deriveTodayPatch(tday({ heroPhoto: { thumbnailUri: 'file://p.jpg' }, capturedMeanings: [{ archetype: 'calm', label: 'x' }] }), null);
 check('captured media levels the Memory Vault', cellOf(onePhoto, 'memory').level >= 1, String(cellOf(onePhoto, 'memory').level));
-check('Memory Vault grows a vault object', onePhoto.objects.some((o) => o.category === 'memory' && /vault_/.test(o.assetKey)));
+check('Memory Vault grows a memory-tree object', onePhoto.objects.some((o) => o.category === 'memory' && /memory_tree_/.test(o.assetKey)));
+check('Memory Vault badge counts the media', cellOf(onePhoto, 'memory').count === 2, String(cellOf(onePhoto, 'memory').count));
+check('the vault object carries its badge count', onePhoto.objects.find((o) => o.category === 'memory').badge === 2);
 const fullVault = computeCells(tday({ capturedMeanings: [{ archetype: 'calm' }, { archetype: 'calm' }, { archetype: 'calm' }, { archetype: 'calm' }] }));
-check('more media → a higher Memory Vault level + asset', fullVault.find((c) => c.type === 'memory').level >= 3 && fullVault.find((c) => c.type === 'memory').assetKey === 'vault_chest_treasure');
+check('more media → a higher Memory Vault level + asset', fullVault.find((c) => c.type === 'memory').level >= 3 && fullVault.find((c) => c.type === 'memory').assetKey === 'memory_tree_3');
 
 // Places — a new place raises the cell to a watchtower.
 const newPlaceDay = deriveTodayPatch(tday({ visitedPlaceCount: 1, newPlaceCount: 1 }), null);
@@ -276,6 +286,7 @@ check('a new place lifts Places to a watchtower', cellOf(newPlaceDay, 'places').
 // Journey — a big walk reads as a bridge; no steps reads as a restful (level 0) cell.
 const bigWalk = deriveTodayPatch(tday({ stepsCount: 8000 }), null);
 check('a big walk levels the Journey cell', cellOf(bigWalk, 'journey').level >= 3, String(cellOf(bigWalk, 'journey').level));
+check('Journey badge is the raw step count', cellOf(bigWalk, 'journey').count === 8000, String(cellOf(bigWalk, 'journey').count));
 check('a still day leaves Journey empty', cellOf(deriveTodayPatch(tday(), null), 'journey').level === 0);
 
 // Reflection — mood drives the cell's object (calm pond vs social campfire).
@@ -335,11 +346,48 @@ check('a filled cell drops its ghost', layoutWorld([socialSeed]).ghosts.length =
 
 // New cutouts are on disk (others reuse existing world art).
 check('water-lily seed asset has art', assetExists('props', 'seed_water_lily'));
-check('Memory Vault chest stages have art', ['vault_chest_small', 'vault_chest', 'vault_chest_treasure'].every((k) => assetExists('props', k)));
+check('Memory tree stages have art', ['memory_tree_1', 'memory_tree_2', 'memory_tree_3', 'memory_tree_4'].every((k) => assetExists('props', k)));
 
 // Completion ratio rises as offered seeds are earned.
 check('completion ratio is 0 on a still morning', seedCompletionRatio(tday()) === 0);
 check('completion ratio rises once an offered seed is earned', seedCompletionRatio(tday({ seedCompletions: [seedsOffered[0].id] })) > 0, String(seedsOffered[0] && seedsOffered[0].id));
+
+// 15. Notes + Big Moments (Today Patch V3).
+const bday = interpretNoteText("It's my son's birthday today");
+check('a birthday note is a Big Moment', bday.bigMoment && bday.bigMoment.type === 'birthday', JSON.stringify(bday.bigMoment));
+check('the birthday note names the subject', bday.bigMoment && bday.bigMoment.subject === 'son', bday.bigMoment && String(bday.bigMoment.subject));
+check('the birthday note labels it nicely', /birthday/i.test(bday.label), bday.label);
+check('a plain calm note is no Big Moment', !interpretNoteText('a calm quiet morning').bigMoment);
+check('a plain calm note reads as calm', interpretNoteText('a calm quiet morning').archetype === 'calm');
+check('an achievement note is detected', interpretNoteText('I finally got the promotion at work').bigMoment?.type === 'achievement');
+
+// A note grows a SEPARATE notes object (not the photos tree) + lifts Reflection.
+const noteDay = deriveTodayPatch(tday({ notes: [{ id: 'n1', kind: 'text', text: 'x', audioUri: null, durationMs: null, archetype: 'calm', label: 'A calm note', createdAt: '' }] }), null);
+const notesObj = noteDay.objects.find((o) => o.category === 'notes');
+check('a note grows a separate notes object', !!notesObj && notesObj.assetKey === 'notes_journal_1', notesObj && notesObj.assetKey);
+check('the notes object has a count + pencil badge', !!notesObj && notesObj.badge === 1 && notesObj.badgeIcon === 'square.and.pencil');
+check('a text note does NOT fill the photos tree', cellOf(noteDay, 'memory').level === 0, String(cellOf(noteDay, 'memory').level));
+check('a note lifts the Reflection cell', cellOf(noteDay, 'reflection').level >= 1, String(cellOf(noteDay, 'reflection').level));
+
+// More notes level the journaling family up (one family for text + voice).
+const manyNotes = deriveTodayPatch(tday({ notes: Array.from({ length: 5 }, (_, i) => ({ id: `n${i}`, kind: 'text', text: 'x', audioUri: null, durationMs: null, archetype: 'calm', label: 'note', createdAt: '' })) }), null);
+check('more notes raise the journaling level', manyNotes.objects.find((o) => o.category === 'notes')?.assetKey === 'notes_journal_3', manyNotes.objects.find((o) => o.category === 'notes')?.assetKey);
+check('the notes family has art', ['notes_journal_1', 'notes_journal_2', 'notes_journal_3', 'notes_journal_4'].every((k) => assetExists('props', k)));
+
+// Big Moment landmark art per type.
+const anniv = deriveTodayPatch(tday({ bigMoments: [{ id: 'a1', type: 'anniversary', label: 'Anniversary', subject: null, noteId: null, createdAt: '' }] }), null);
+check('an anniversary grows the golden arch', anniv.objects.find((o) => o.kind === 'landmark')?.assetKey === 'landmark_arch');
+const trip = deriveTodayPatch(tday({ bigMoments: [{ id: 't1', type: 'trip', label: 'A trip', subject: null, noteId: null, createdAt: '' }] }), null);
+check('a trip grows the travel gate', trip.objects.find((o) => o.kind === 'landmark')?.assetKey === 'landmark_gate');
+check('new Slice-4 assets have art', ['vault_crystal_archive', 'landmark_arch', 'landmark_gate'].every((k) => assetExists('props', k)));
+
+// A confirmed Big Moment grows a centre landmark, leaving the four cells intact.
+const bmDay = deriveTodayPatch(tday({ bigMoments: [{ id: 'b1', type: 'birthday', label: "Son's birthday", subject: 'son', noteId: 'n1', createdAt: '' }] }), null);
+const landmark = bmDay.objects.find((o) => o.kind === 'landmark');
+check('a Big Moment grows the festival landmark', !!landmark && landmark.assetKey === 'landmark_festival', landmark && landmark.assetKey);
+check('the landmark sits in a centre tile', !!landmark && (landmark.col === 1 || landmark.col === 2) && (landmark.row === 1 || landmark.row === 2));
+check('the four cells survive alongside the landmark', bmDay.cells.length === 4);
+check('the festival landmark asset has art', assetExists('props', 'landmark_festival'));
 
 console.log(failures === 0 ? '\nAll world checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

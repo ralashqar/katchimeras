@@ -111,9 +111,11 @@ export function EggShell({ egg: _egg, motion, reactionKey = 0, crackStage = 0 }:
 
   return (
     <Animated.View pointerEvents="none" style={[styles.eggWrap, shellStyle]}>
-      <Image contentFit="contain" source={eggBase} style={styles.eggImage} transition={0} />
-      <AnimatedImage contentFit="contain" source={eggCrackOne} style={[styles.eggImage, crackOneStyle]} transition={0} />
-      <AnimatedImage contentFit="contain" source={eggCrackTwo} style={[styles.eggImage, crackTwoStyle]} transition={0} />
+      {/* allowDownscaling=false keeps the full-res texture, so the egg stays crisp
+          when the World view shrinks it then zooms back in (it's drawn small there). */}
+      <Image contentFit="contain" allowDownscaling={false} source={eggBase} style={styles.eggImage} transition={0} />
+      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackOne} style={[styles.eggImage, crackOneStyle]} transition={0} />
+      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackTwo} style={[styles.eggImage, crackTwoStyle]} transition={0} />
     </Animated.View>
   );
 }

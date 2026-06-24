@@ -4,10 +4,11 @@ import { MotiView } from 'moti';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useFocusEffect } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import Animated, {
   cancelAnimation,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDecay,
@@ -16,13 +17,13 @@ import Animated, {
 
 import { ARCHETYPE_THEME } from '@/constants/world';
 import { Lantern } from '@/constants/theme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import type { EggVisualState } from '@/types/home';
 import type { MemoryNode, WorldPatch } from '@/types/world';
 import { layoutWorld, type SceneFence, type SceneSprite } from '@/utils/world-scene';
-import { cellCenter, TILE_H, type IsoPoint } from '@/utils/world-iso';
+import { cellCenter, cellFromPoint, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
 import {
   DECAL_ATLAS,
   DECAL_ATLAS_COLS,
@@ -39,6 +40,8 @@ type Props = {
   onSelectCell?: (cellType: NonNullable<SceneSprite['category']>) => void;
   // Draw a glowing ring under this cell's object (the last one tapped).
   highlightedCell?: SceneSprite['category'] | null;
+  // A captured photo flying into a cell's object (e.g. into the Memory chest).
+  captureFly?: { nonce: number; cellType: NonNullable<SceneSprite['category']>; photoUri?: string } | null;
   // Today's live patch: the egg is composited over its centre cell and the view
   // auto-centres on it. Absent once the day has hatched.
   eggPatchId?: string | null;
@@ -46,26 +49,62 @@ type Props = {
   eggReady?: boolean;
   eggFeedKey?: number;
   onPressEgg?: () => void;
+  // Hide the recenter button so a status pill (e.g. "Reading…") can take its slot.
+  hideRecenter?: boolean;
 };
 
 // The egg sits on the patch's CENTRE tile (cells live at the four corners). The
 // slab centre returned by layoutWorld already corresponds to cell (1,1), so the
 // egg lands exactly at the patch centre.
-const EGG_CELL = { col: 1, row: 1 };
+// The egg/creature sits on the front-most corner tile (must match CENTRE_CELL in
+// utils/today-patch-engine.ts). SLAB_CENTRE_CELL stays the geometric slab centre.
+const EGG_CELL = { col: 3, row: 3 };
 const SLAB_CENTRE_CELL = { col: 1, row: 1 };
 const EGG_STAGE_WIDTH = 200;
 const EGG_STAGE_HEIGHT = 258;
 // The LanternEgg art is fixed-pixel, so shrink the whole stage with a transform
 // (scales about its centre) to sit small and centred on a single tile. Tunable.
-const EGG_SCALE = 0.5;
-const EGG_RISE = 24;
+// Shrunk by the same 0.75 factor as the node objects (world map only); EGG_RISE
+// trimmed to keep the smaller egg seated on its tile instead of floating.
+const EGG_SCALE = 0.375;
+const EGG_RISE = 16;
 // How far below the egg's tile the countdown pill sits (scene units) — tucked up
 // close under the small egg.
 const COUNTDOWN_DROP = 6;
 
+// Global down-scale for every node object (chests, steps, notes, creatures,
+// memories) + a small downward nudge so the smaller art still seats on its tile.
+const SPRITE_SCALE = 0.75;
+const SPRITE_DROP = TILE_H * 0.18;
+
 // Feathered radial glow (the same soft texture the egg uses) — tinted + faded
 // under the last-tapped object as a soft circular highlight.
 const HIGHLIGHT_GLOW = require('../../../assets/images/katchimeras/soft-glow.png');
+
+// Per-cell badge icon + count formatting (memory ×5, journey 3.2k steps, etc.).
+const BADGE_ICON: Record<string, IconSymbolName> = {
+  memory: 'camera.fill',
+  places: 'mappin.and.ellipse',
+  journey: 'figure.walk',
+  reflection: 'sparkles',
+};
+function formatBadge(category: string, count: number): string {
+  if (category === 'journey') {
+    if (count >= 10000) return `${Math.round(count / 1000)}k`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+    return `${count}`;
+  }
+  return `×${count}`;
+}
+
+// Cell tile positions (must match CELL_LAYOUT in utils/today-patch-engine).
+const CELL_POS: Record<string, { col: number; row: number }> = {
+  memory: { col: 0, row: 0 },
+  notes: { col: 1, row: 0 },
+  places: { col: 2, row: 0 },
+  journey: { col: 3, row: 0 },
+  reflection: { col: 0, row: 3 },
+};
 
 // What an empty cell hints it could hold (Diorama Time Capsule ghost spots).
 const GHOST_HINT: Record<string, { emoji: string; label: string }> = {
@@ -101,7 +140,9 @@ export function WorldCanvas({
   eggReady = false,
   eggFeedKey = 0,
   highlightedCell,
+  captureFly,
   onPressEgg,
+  hideRecenter = false,
 }: Props) {
   const scene = useMemo(() => layoutWorld(patches), [patches]);
 
@@ -132,6 +173,19 @@ export function WorldCanvas({
     if (!highlightedCell || !eggPatchId) return null;
     return scene.sprites.find((s) => s.category === highlightedCell && s.patchId === eggPatchId) ?? null;
   }, [scene, highlightedCell, eggPatchId]);
+
+  // Where a captured photo should fly to — the target cell's tile centre, in scene
+  // coords (so the flight pans/zooms with the world).
+  const captureTarget = useMemo(() => {
+    if (!captureFly || !eggPatchId) return null;
+    const slab = scene.slabs.find((s) => s.patchId === eggPatchId);
+    const pos = CELL_POS[captureFly.cellType];
+    if (!slab || !pos) return null;
+    return {
+      x: slab.centre.x + (cellCenter(pos.col, pos.row).x - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).x),
+      y: slab.centre.y + (cellCenter(pos.col, pos.row).y - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y),
+    };
+  }, [scene, captureFly, eggPatchId]);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const centred = useRef(false);
   const tabBarHeight = useBottomTabBarHeight();
@@ -181,6 +235,45 @@ export function WorldCanvas({
   }, [tx, ty, scale, startScale]);
   useFocusEffect(recentreOnFocus);
 
+  // Tile-based tap: snap the tap point to the NEAREST tile (not a raycast against
+  // tall transparent sprite frames), then act on whatever OCCUPIES that tile — a
+  // chest, a memory, the creature, or the egg. Predictable + no z-fighting.
+  const handleTap = useCallback(
+    (wx: number, wy: number) => {
+      const offX = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).x;
+      const offY = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y;
+      let best: { patchId: string; col: number; row: number; dist: number } | null = null;
+      for (const slab of scene.slabs) {
+        const frac = cellFromPoint(wx - slab.centre.x + offX, wy - slab.centre.y + offY);
+        const col = Math.min(3, Math.max(0, Math.round(frac.col)));
+        const row = Math.min(3, Math.max(0, Math.round(frac.row)));
+        const tcx = slab.centre.x + (cellCenter(col, row).x - offX);
+        const tcy = slab.centre.y + (cellCenter(col, row).y - offY);
+        const dist = Math.hypot(wx - tcx, wy - tcy);
+        if (!best || dist < best.dist) best = { patchId: slab.patchId, col, row, dist };
+      }
+      if (!best || best.dist > TILE_W * 0.8) return; // tapped empty space, far from any tile
+
+      // The egg/creature tile on today's patch opens the prompts.
+      if (eggPoint && best.patchId === eggPatchId && best.col === EGG_CELL.col && best.row === EGG_CELL.row) {
+        onPressEgg?.();
+        return;
+      }
+      const occupant = scene.sprites.find(
+        (s) => s.patchId === best!.patchId && s.col === best!.col && s.row === best!.row
+      );
+      if (occupant) {
+        if (occupant.kind === 'memory' && occupant.memory) onSelectMemory(occupant.memory, occupant.patchId);
+        else if (occupant.category && occupant.patchId === eggPatchId && onSelectCell) onSelectCell(occupant.category);
+        else onSelectPatch(occupant.patchId);
+        return;
+      }
+      // An empty tile on a finalized diorama still opens that patch.
+      if (best.patchId !== eggPatchId) onSelectPatch(best.patchId);
+    },
+    [scene, eggPatchId, eggPoint, onPressEgg, onSelectMemory, onSelectCell, onSelectPatch]
+  );
+
   const pan = Gesture.Pan()
     .onBegin(() => {
       cancelAnimation(tx); // stop any momentum glide so a new grab takes over
@@ -227,7 +320,17 @@ export function WorldCanvas({
       tx.value = withTiming(Math.min(Math.max(tx.value, vw / 2 - sceneW / 2 - hw), vw / 2 - sceneW / 2 + hw), { duration: 160 });
       ty.value = withTiming(Math.min(Math.max(ty.value, vh / 2 - sceneH / 2 - hh), vh / 2 - sceneH / 2 + hh), { duration: 160 });
     });
-  const gesture = Gesture.Simultaneous(pan, pinch);
+  const tap = Gesture.Tap()
+    .maxDistance(14)
+    .onEnd((e, success) => {
+      'worklet';
+      if (!success || dragged.value) return;
+      const s = scale.value;
+      const wx = (e.x - sceneW / 2 - tx.value) / s + sceneW / 2;
+      const wy = (e.y - sceneH / 2 - ty.value) / s + sceneH / 2;
+      runOnJS(handleTap)(wx, wy);
+    });
+  const gesture = Gesture.Simultaneous(pan, pinch, tap);
 
   // Bounce in objects that appear AFTER the first paint (a grown seed/memory),
   // but never the whole map on open. `seen` is updated post-commit in an effect;
@@ -296,6 +399,9 @@ export function WorldCanvas({
   return (
     <View style={styles.root} onLayout={onLayout}>
       <GestureDetector gesture={gesture}>
+        {/* Full-viewport, UNtransformed surface — taps land here in stable screen
+            coords, which we invert through the pan/zoom to a world point. */}
+        <View style={styles.tapSurface}>
         <Animated.View style={[styles.world, { width: scene.width, height: scene.height }, worldStyle]}>
           <Canvas style={{ width: scene.width, height: scene.height }}>
             {groundPaths.map((g) => (
@@ -373,10 +479,10 @@ export function WorldCanvas({
               style={[
                 styles.highlight,
                 {
-                  left: highlightSprite.x - highlightSprite.size * 0.6,
-                  top: highlightSprite.y - highlightSprite.size * 0.6,
-                  width: highlightSprite.size * 1.2,
-                  height: highlightSprite.size * 1.2,
+                  left: highlightSprite.x - highlightSprite.size * 0.6 * SPRITE_SCALE,
+                  top: highlightSprite.y - highlightSprite.size * 0.6 * SPRITE_SCALE + SPRITE_DROP,
+                  width: highlightSprite.size * 1.2 * SPRITE_SCALE,
+                  height: highlightSprite.size * 1.2 * SPRITE_SCALE,
                 },
               ]}>
               <Image source={HIGHLIGHT_GLOW} tintColor="#7DE8CD" contentFit="contain" style={StyleSheet.absoluteFill} />
@@ -390,13 +496,7 @@ export function WorldCanvas({
                 key={item.sprite.id}
                 sprite={item.sprite}
                 animateIn={animateInIds.has(item.sprite.id)}
-                onPress={() => {
-                  if (dragged.value) return; // released after a drag — not a tap
-                  const s = item.sprite!;
-                  if (s.kind === 'memory' && s.memory) onSelectMemory(s.memory, s.patchId);
-                  else if (s.category && s.patchId === eggPatchId && onSelectCell) onSelectCell(s.category);
-                  else onSelectPatch(s.patchId);
-                }}
+                showBadge={item.sprite.patchId === eggPatchId}
               />
             ) : (
               <FenceView key={item.fence!.id} fence={item.fence!} />
@@ -407,6 +507,7 @@ export function WorldCanvas({
               real LanternEgg (never a lookalike); tapping it opens the prompts. */}
           {eggPoint && eggVisual ? (
             <View
+              pointerEvents="none"
               style={[
                 styles.eggLayer,
                 {
@@ -421,6 +522,28 @@ export function WorldCanvas({
             </View>
           ) : null}
 
+          {/* A captured photo flying from the centre into its cell's object. */}
+          {captureFly && captureTarget && eggPoint ? (
+            <MotiView
+              key={captureFly.nonce}
+              pointerEvents="none"
+              from={{ opacity: 1, translateX: 0, translateY: 0, scale: 1 }}
+              animate={{
+                opacity: 0.15,
+                translateX: captureTarget.x - eggPoint.x,
+                translateY: captureTarget.y - eggPoint.y,
+                scale: 0.3,
+              }}
+              transition={{ type: 'timing', duration: 720 }}
+              style={[styles.captureMote, { left: eggPoint.x - 28, top: eggPoint.y - 28 }]}>
+              {captureFly.photoUri ? (
+                <Image source={{ uri: captureFly.photoUri }} style={styles.spriteImage} contentFit="cover" />
+              ) : (
+                <View style={styles.captureSpark} />
+              )}
+            </MotiView>
+          ) : null}
+
           {/* Hatch countdown, glued just below the egg's tile (pans/zooms with
               the world). */}
           {eggPoint && eggVisual ? (
@@ -431,12 +554,16 @@ export function WorldCanvas({
             </View>
           ) : null}
         </Animated.View>
+        </View>
       </GestureDetector>
 
-      {/* Recenter button — fixed on screen, anchored above the tab bar. */}
-      <Pressable onPress={recenter} hitSlop={10} style={[styles.recenter, { bottom: tabBarHeight + 16 }]}>
-        <IconSymbol name="scope" size={24} color={Lantern.moon50} />
-      </Pressable>
+      {/* Recenter button — sits just above the "Add to today" bar. Hidden while a
+          status pill (e.g. "Reading…") takes its slot. */}
+      {!hideRecenter ? (
+        <Pressable onPress={recenter} hitSlop={10} style={[styles.recenter, { bottom: tabBarHeight + 130 }]}>
+          <IconSymbol name="scope" size={24} color={Lantern.moon50} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -453,32 +580,35 @@ const OBJECT_SEAT = TILE_H * 0.25; // how far below the tile centre the bottom s
 function SpriteView({
   sprite,
   animateIn,
-  onPress,
+  showBadge,
 }: {
   sprite: SceneSprite;
   animateIn: boolean;
-  onPress: () => void;
+  showBadge?: boolean;
 }) {
   const source = worldAssetSource(sprite.assetKey);
   const theme = ARCHETYPE_THEME[sprite.archetype];
   const isCreature = sprite.kind === 'creature';
-  const w = sprite.size;
+  const w = sprite.size * SPRITE_SCALE;
   const h = isCreature ? w : w * 2;
   const left = sprite.x - w / 2;
   // Creatures are centre-anchored; lift them by 35% of a tile so they stand ON
-  // the tile rather than sinking into it.
-  const top = isCreature
-    ? sprite.y - h / 2 - TILE_H * 0.35
-    : sprite.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC;
+  // the tile rather than sinking into it. SPRITE_DROP lowers everything a touch so
+  // the down-scaled art still seats on its tile instead of floating.
+  const top =
+    (isCreature ? sprite.y - h / 2 - TILE_H * 0.35 : sprite.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
   return (
     <MotiView
+      // Display-only: taps are handled globally by the tile hit-test, so sprites
+      // never intercept touches (no z-fighting between tall transparent frames).
+      pointerEvents="none"
       // New objects spring up from their base with a little overshoot; existing
       // ones mount at rest (from = undefined → no entrance).
       from={animateIn ? { opacity: 0, scale: 0.2, translateY: 10 } : undefined}
       animate={{ opacity: 1, scale: 1, translateY: 0 }}
       transition={{ type: 'spring', damping: 8, stiffness: 175, mass: 0.85 }}
       style={[styles.sprite, styles.spriteOrigin, { left, top, width: w, height: h }]}>
-      <Pressable onPress={onPress} hitSlop={6} style={StyleSheet.absoluteFill}>
+      <View pointerEvents="none" style={styles.spriteDisplay}>
         {source ? (
           <Image source={source} style={styles.spriteImage} contentFit="contain" />
         ) : (
@@ -486,7 +616,15 @@ function SpriteView({
             <Text style={styles.placeholderText}>{sprite.label.slice(0, 1)}</Text>
           </View>
         )}
-      </Pressable>
+      </View>
+      {showBadge && sprite.category && (sprite.badge ?? 0) > 0 ? (
+        <View pointerEvents="none" style={[styles.badgeWrap, { top: h * OBJECT_BOTTOM_FRAC - 4 }]}>
+          <View style={styles.badge}>
+            <IconSymbol name={(sprite.badgeIcon ?? BADGE_ICON[sprite.category]) as IconSymbolName} size={9} color={Lantern.moon50} />
+            <Text style={styles.badgeText}>{formatBadge(sprite.category, sprite.badge ?? 0)}</Text>
+          </View>
+        </View>
+      ) : null}
     </MotiView>
   );
 }
@@ -535,12 +673,39 @@ function shade(hex: string): string {
 
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
+  tapSurface: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
   world: { position: 'relative' },
   decal: { position: 'absolute', opacity: 0.95, overflow: 'hidden' },
   sprite: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  spriteDisplay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   // Grow/bounce from the planted base, not the centre.
   spriteOrigin: { transformOrigin: 'bottom' },
   highlight: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  captureMote: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,241,228,0.6)',
+    boxShadow: '0 0 22px rgba(255,195,107,0.7)',
+  },
+  captureSpark: { width: '100%', height: '100%', borderRadius: 999, backgroundColor: 'rgba(255,195,107,0.9)' },
+  // Centred just beneath the object, above the tile + object graphics.
+  badgeWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 3 },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(20,17,31,0.88)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  badgeText: { color: Lantern.moon50, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.2 },
   ghost: {
     position: 'absolute',
     alignItems: 'center',

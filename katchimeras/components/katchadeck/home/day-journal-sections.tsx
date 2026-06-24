@@ -332,6 +332,17 @@ function buildDayTimeline(day: HomeDayRecord): TimelineEntry[] {
     const meta = MEANING_META[captured.archetype] ?? MEANING_FALLBACK;
     pushAt(captured.createdAt, `c-${index}`, meta.icon, meta.accent, captured.label);
   });
+  for (const note of day.notes ?? []) {
+    const meta = MEANING_META[note.archetype] ?? MEANING_FALLBACK;
+    pushAt(
+      note.createdAt,
+      `n-${note.id}`,
+      note.kind === 'voice' ? 'mic.fill' : 'square.and.pencil',
+      meta.accent,
+      note.label,
+      note.kind === 'voice' ? 'Voice note' : 'Note'
+    );
+  }
   return entries.sort((left, right) => left.time - right.time);
 }
 

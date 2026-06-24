@@ -87,6 +87,12 @@ CATALOG = {
     'vault_chest_small': ('props', 'a small cute closed wooden treasure chest with rounded lid and warm brass trim and corners'),
     'vault_chest': ('props', 'a cozy wooden treasure chest with the lid slightly open and a soft warm golden glow spilling out'),
     'vault_chest_treasure': ('props', 'an ornate open treasure chest overflowing with glowing gems, gold coins and soft magical sparkles rising out'),
+    'vault_crystal_archive': ('props', 'a magical glowing crystal archive: a small ornate wooden chest topped with several floating luminous violet memory crystals and soft sparkles rising up'),
+    'vault_notes_chest': ('props', 'a cozy small wooden writing chest overflowing with rolled parchment scrolls, a few folded letters and an upright feather quill, warm and inviting'),
+    # --- Big Moment landmarks (Today Patch V3) ---
+    'landmark_festival': ('props', 'a small joyful cluster of colorful paper lanterns and warm string festival lights on slender poles with a few floating balloons, celebratory and cozy'),
+    'landmark_arch': ('props', 'an elegant cozy golden ceremonial arch decorated with soft flowers and ribbons, warm and celebratory'),
+    'landmark_gate': ('props', 'a charming little travel gate, a torii-style wooden archway with a small directional signpost and a hanging lantern, inviting and adventurous'),
     # --- Memory nodes (slightly magical, glowing) ---
     'memory_photo_bloom': ('memory-nodes', 'a magical glowing flower bloom with a softly floating glassy photo-frame petal and gentle sparkles'),
     'memory_landmark_stone': ('memory-nodes', 'a carved standing landmark stone with a smooth softly glowing face beside a small cairn of pebbles'),

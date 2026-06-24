@@ -22,14 +22,17 @@ export type WorldTile = {
   decal?: string | null;
 };
 
-export type WorldObjectKind = 'anchor' | 'prop' | 'memory' | 'creature';
+export type WorldObjectKind = 'anchor' | 'prop' | 'memory' | 'creature' | 'landmark';
 
 // Diorama Time Capsule — the four semantic cells a day's patch is built from.
 // Each cell stores one facet of the day and levels its visual up from real
 // contribution: 'memory' (photos/media), 'places' (where), 'journey' (movement),
 // 'reflection' (mood/meaning). The creature/egg sits separately at the centre.
-export type WorldObjectCategory = 'memory' | 'places' | 'journey' | 'reflection';
-export type PatchCellType = WorldObjectCategory;
+// Cell categories drive the four leveling cells. 'notes' is NOT a cell — it's a
+// standalone chest object (see notesObject) that taps into its own notes reader,
+// so it lives in the object-category union but not in PatchCellType.
+export type WorldObjectCategory = 'memory' | 'places' | 'journey' | 'reflection' | 'notes';
+export type PatchCellType = 'memory' | 'places' | 'journey' | 'reflection';
 
 // A single cell: its fixed grid position, current level (0 = empty ghost), the
 // asset its level resolves to, and the labels that explain "built from …".
@@ -41,6 +44,7 @@ export type PatchCell = {
   assetKey: string | null; // null while empty (rendered as a ghost spot)
   summaryLabel: string; // "5 memories captured"
   sourceLabel: string; // "Memory Vault"
+  count: number; // the raw metric shown as a badge (photos / steps / moments / places)
 };
 
 // A placed thing sitting on a tile slot. `assetKey` resolves to a bundled cutout
@@ -57,6 +61,8 @@ export type WorldObject = {
   footprint: number;
   sourceLabel?: string | null;
   category?: WorldObjectCategory;
+  badge?: number; // small count/metric tag shown at the object's corner
+  badgeIcon?: string; // override the badge's icon (SF symbol name)
 };
 
 // A memory node is an interactive structure that stores one real moment for

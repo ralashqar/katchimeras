@@ -593,6 +593,13 @@ export default function HomeScreen() {
                 style={styles.cameraButton}>
                 <IconSymbol name="camera.fill" size={22} color={Lantern.ink900} />
               </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Add a voice or written note"
+                onPress={() => router.push('/note-capture')}
+                style={styles.cameraButton}>
+                <IconSymbol name="mic.fill" size={22} color={Lantern.ink900} />
+              </Pressable>
             </View>
           ) : null}
         </Animated.View>

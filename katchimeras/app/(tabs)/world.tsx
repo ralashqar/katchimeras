@@ -1,7 +1,15 @@
 import { useRouter } from 'expo-router';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+} from 'expo-audio';
+import { File } from 'expo-file-system';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
@@ -9,27 +17,47 @@ import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
 import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
-import { CellDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
+import { CellDetailSheet, NotesDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
+import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note';
 import { PatchInspector } from '@/components/katchadeck/world/patch-inspector';
 import { WorldCanvas } from '@/components/katchadeck/world/world-canvas';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
+import { interpretNote, type InterpretedNote } from '@/utils/note-interpret';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import type { DayPromptKind, HomeDayRecord } from '@/types/home';
-import type { MemoryNode, PatchCellType, WorldState } from '@/types/world';
+import type { MemoryNode, PatchCellType, WorldObjectCategory, WorldPatch, WorldState } from '@/types/world';
+import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
 import type { DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 import { deriveTodayPatch } from '@/utils/today-patch-engine';
 import { loadTodayPatch, saveTodayPatch } from '@/utils/today-patch-storage';
 import { spiralCoord } from '@/utils/world-iso';
 import { syncWorldFromDays } from '@/utils/world-engine';
 
+// TEMP: simplify every patch to the photos chest, the notes chest, the steps
+// object (which now also holds the day's places), and the creature/egg — Reflection
+// + the separate Places map object + Big-Moment landmarks are hidden for now. Flip
+// to false to bring the full diorama back.
+const MEMORY_CHESTS_ONLY = true;
+const VISIBLE_CATEGORIES = new Set(['memory', 'notes', 'journey']);
+function simplifyPatch(patch: WorldPatch): WorldPatch {
+  if (!MEMORY_CHESTS_ONLY) return patch;
+  return {
+    ...patch,
+    objects: patch.objects.filter((o) => o.kind === 'creature' || (o.category && VISIBLE_CATEGORIES.has(o.category))),
+    cells: (patch.cells ?? []).filter((cell) => cell.type === 'memory' || cell.type === 'journey'),
+  };
+}
+
 export default function WorldScreen() {
   const router = useRouter();
   const { days } = useAllDays();
   // Drives today's live patch + the egg's prompts (the same engine Home uses, so
   // answering here feeds the very same day).
-  const { timelineDays, availableDayPrompts, answerDayPrompt, answerPhotoMeaning, dailySeeds, completeSeed } =
+  const { timelineDays, availableDayPrompts, answerDayPrompt, answerPhotoMeaning, dailySeeds, completeSeed, addNote } =
     useHomeScreenState();
 
   const [world, setWorld] = useState<WorldState | null>(null);
@@ -39,21 +67,46 @@ export default function WorldScreen() {
   const [eggFeedKey, setEggFeedKey] = useState(0);
   const [microcopy, setMicrocopy] = useState<string | null>(null);
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
-  const [selectedCell, setSelectedCell] = useState<PatchCellType | null>(null);
+  // A photo flying into a cell's object after a capture (in-scene mote).
+  const [captureFly, setCaptureFly] = useState<{ nonce: number; cellType: PatchCellType; photoUri?: string } | null>(null);
+  const captureNonce = useRef(0);
+  const [selectedCell, setSelectedCell] = useState<WorldObjectCategory | null>(null);
   // The most-recently tapped cell — keeps a highlight ring under it.
-  const [lastSelectedCell, setLastSelectedCell] = useState<PatchCellType | null>(null);
+  const [lastSelectedCell, setLastSelectedCell] = useState<WorldObjectCategory | null>(null);
   const feedNonce = useRef(0);
   // The commit to run when the flying mote lands in the egg (answer / seed).
   const pendingAction = useRef<(() => void) | null>(null);
   const { width: screenW, height: screenH } = useWindowDimensions();
   const isFocused = useIsFocused();
+  const tabBarHeight = useBottomTabBarHeight();
   const autoOpenedRef = useRef(false);
+
+  // Inline voice note (hold the add-bar mic): record → analyse → accept/discard.
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [recPhase, setRecPhase] = useState<'idle' | 'recording' | 'analyzing' | 'confirm'>('idle');
+  const [recElapsed, setRecElapsed] = useState(0);
+  const [recResult, setRecResult] = useState<InterpretedNote | null>(null);
+  const [recMarkBig, setRecMarkBig] = useState(true);
+  const recAudioRef = useRef<string | null>(null);
+  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingRef = useRef(false);
 
   // Fold any newly-hatched days into the persisted world on focus.
   useFocusEffect(
     useCallback(() => {
       setWorld(syncWorldFromDays(days));
     }, [days])
+  );
+
+  // Returning from the camera flow (launched from the Memory Vault): the photo
+  // already folded into today; here we fly it into the chest as a celebration.
+  useFocusEffect(
+    useCallback(() => {
+      const feed = consumeCaptureFeed();
+      if (!feed) return;
+      captureNonce.current += 1;
+      setCaptureFly({ nonce: captureNonce.current, cellType: 'memory', photoUri: feed.photoUri });
+    }, [])
   );
 
   // Today, while it is still forming, is the live patch the egg sits on.
@@ -95,10 +148,10 @@ export default function WorldScreen() {
   // Render the hatched world plus today's live patch, placed on the next free
   // spiral cell — exactly where buildWorld will seat it once it hatches.
   const renderPatches = useMemo(() => {
-    const base = world?.patches ?? [];
+    const base = (world?.patches ?? []).map(simplifyPatch);
     if (!todayPatch) return base;
     const coord = spiralCoord(base.length);
-    return [...base, { ...todayPatch, gridCol: coord.gridCol, gridRow: coord.gridRow }];
+    return [...base, simplifyPatch({ ...todayPatch, gridCol: coord.gridCol, gridRow: coord.gridRow })];
   }, [world, todayPatch]);
 
   const selectedPatch = useMemo(
@@ -109,9 +162,111 @@ export default function WorldScreen() {
   const livedCount = world?.patches.length ?? 0;
   const hasAnything = renderPatches.length > 0;
 
-  // The egg's approximate on-screen spot (the view auto-centres on its patch, so
-  // it sits a little below centre). The chosen mote flies here, then lands.
-  const eggTarget = { x: screenW / 2, y: screenH * 0.54 };
+  // --- Inline voice note (hold the add-bar mic) ---
+  const stopInlineRecording = async () => {
+    if (!recordingRef.current) return;
+    recordingRef.current = false;
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+    recTimerRef.current = null;
+    let uri: string | null = null;
+    try {
+      await recorder.stop();
+      uri = recorder.uri ?? null;
+    } catch {
+      // keep whatever we have
+    }
+    recAudioRef.current = uri;
+    if (!uri) {
+      setRecPhase('idle');
+      return;
+    }
+    setRecPhase('analyzing');
+    // Fly the captured note into the egg while it's read.
+    feedNonce.current += 1;
+    setEggFeed({
+      nonce: feedNonce.current,
+      fromX: screenW - 50,
+      fromY: screenH - tabBarHeight - 110,
+      toX: screenW / 2,
+      toY: screenH * 0.64,
+      label: '🎤',
+      tint: '#7DE8CD',
+    });
+    try {
+      const base64 = await new File(uri).base64();
+      const interpreted = await interpretNote({ audioBase64: base64, mimeType: 'audio/m4a' });
+      setRecResult(interpreted);
+      setRecMarkBig(true);
+      setRecPhase('confirm');
+    } catch {
+      setRecPhase('idle');
+    }
+  };
+
+  const startInlineRecording = async () => {
+    if (recordingRef.current || recPhase !== 'idle') return;
+    recordingRef.current = true;
+    setRecElapsed(0);
+    setRecPhase('recording');
+    const permission = await requestRecordingPermissionsAsync();
+    if (!permission.granted) {
+      recordingRef.current = false;
+      setRecPhase('idle');
+      return;
+    }
+    try {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      if (!recordingRef.current) return;
+      await recorder.prepareToRecordAsync();
+      if (!recordingRef.current) return;
+      recorder.record();
+    } catch {
+      recordingRef.current = false;
+      setRecPhase('idle');
+      return;
+    }
+    recTimerRef.current = setInterval(() => {
+      setRecElapsed((prev) => {
+        if (prev + 1 >= 30) {
+          void stopInlineRecording();
+          return 30;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+  };
+
+  const acceptInlineNote = () => {
+    if (!recResult) return;
+    addNote({
+      kind: 'voice',
+      text: recResult.transcript,
+      audioUri: recAudioRef.current,
+      durationMs: recElapsed * 1000,
+      archetype: recResult.archetype,
+      label: recResult.label,
+      bigMoment: recResult.bigMoment && recMarkBig ? recResult.bigMoment : undefined,
+    });
+    setEggFeedKey((key) => key + 1);
+    setMicrocopy(`${recResult.label} took root`);
+    setRecResult(null);
+    recAudioRef.current = null;
+    setRecPhase('idle');
+  };
+
+  const discardInlineNote = () => {
+    setRecResult(null);
+    recAudioRef.current = null;
+    setRecPhase('idle');
+  };
+
+  useEffect(() => () => {
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+  }, []);
+
+  // The egg's approximate on-screen spot. The view auto-centres on the patch's
+  // geometric centre, and the egg now sits on the front corner — well below it.
+  const eggTarget = { x: screenW / 2, y: screenH * 0.64 };
 
   // Fly the tapped choice as a glowing mote into the egg (same comet flight as
   // Home), deferring the real commit until it lands so the growth lands with it.
@@ -204,8 +359,9 @@ export default function WorldScreen() {
     return Math.round(recent.reduce((sum, day) => sum + (day.stepsCount ?? 0), 0) / recent.length);
   }, [days]);
 
-  // Tapping a cell opens its time-capsule reader; Places routes to the full map.
-  const handleSelectCell = (cellType: PatchCellType) => {
+  // Tapping a chest opens its reader: the photos vault, the notes reader, or (when
+  // enabled) Places → the full day map.
+  const handleSelectCell = (cellType: WorldObjectCategory) => {
     setLastSelectedCell(cellType);
     if (cellType === 'places') {
       if (todayForming) router.push({ pathname: '/day-map/[dayId]', params: { dayId: todayForming.id } });
@@ -213,9 +369,10 @@ export default function WorldScreen() {
     }
     setSelectedCell(cellType);
   };
-  const selectedCellData = selectedCell
-    ? todayPatch?.cells?.find((cell) => cell.type === selectedCell) ?? null
-    : null;
+  const selectedCellData =
+    selectedCell && selectedCell !== 'notes'
+      ? todayPatch?.cells?.find((cell) => cell.type === selectedCell) ?? null
+      : null;
 
   return (
     <GestureHandlerRootView style={styles.screen}>
@@ -247,6 +404,8 @@ export default function WorldScreen() {
             eggReady={todayForming?.state === 'ready_to_hatch'}
             eggFeedKey={eggFeedKey}
             highlightedCell={lastSelectedCell}
+            captureFly={captureFly}
+            hideRecenter={recPhase === 'analyzing'}
             onPressEgg={() => setPromptOpen(true)}
             onSelectCell={handleSelectCell}
             onSelectPatch={(id) => {
@@ -297,12 +456,72 @@ export default function WorldScreen() {
         />
       ) : null}
 
+      {selectedCell === 'notes' && todayForming ? (
+        <NotesDetailSheet
+          day={todayForming}
+          onClose={() => setSelectedCell(null)}
+          onAddNote={() => {
+            setSelectedCell(null);
+            router.push('/note-capture');
+          }}
+        />
+      ) : null}
+
       {selectedCell && selectedCellData && todayForming ? (
         <CellDetailSheet
           day={todayForming}
           cell={selectedCellData}
           recentAvgSteps={recentAvgSteps}
           onClose={() => setSelectedCell(null)}
+          onAddPhoto={() => {
+            setSelectedCell(null);
+            router.push('/moment-capture');
+          }}
+        />
+      ) : null}
+
+      {todayForming && !promptOpen && !selectedCell && recPhase !== 'confirm' ? (
+        <View style={[styles.addBar, { bottom: tabBarHeight + 70 }]}>
+          <KatchaButton
+            label="Add to today"
+            onPress={() => setPromptOpen(true)}
+            variant="primary"
+            style={styles.addMain}
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Capture a moment with the camera"
+            onPress={() => router.push('/moment-capture')}
+            style={styles.iconButton}>
+            <IconSymbol name="camera.fill" size={20} color={Lantern.ink900} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tap to write a note, hold to record a voice note"
+            onPress={() => {
+              if (recPhase === 'idle') router.push('/note-capture');
+            }}
+            onLongPress={startInlineRecording}
+            delayLongPress={250}
+            onPressOut={() => {
+              if (recordingRef.current) void stopInlineRecording();
+            }}
+            style={[styles.iconButton, recPhase === 'recording' && styles.iconButtonRec]}>
+            <IconSymbol name="mic.fill" size={20} color={Lantern.ink900} />
+          </Pressable>
+        </View>
+      ) : null}
+
+      {recPhase !== 'idle' ? (
+        <InlineVoiceNote
+          phase={recPhase}
+          elapsed={recElapsed}
+          result={recResult}
+          markBig={recMarkBig}
+          onToggleBig={() => setRecMarkBig((value) => !value)}
+          onAccept={acceptInlineNote}
+          onDiscard={discardInlineNote}
+          bottom={tabBarHeight}
         />
       ) : null}
 
@@ -330,4 +549,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(125,232,205,0.4)',
   },
   microcopyText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  addBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  addMain: { flex: 1 },
+  iconButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 50,
+    height: 50,
+    borderRadius: 999,
+    backgroundColor: Lantern.ember300,
+    boxShadow: '0 10px 24px rgba(255,195,107,0.32)',
+  },
+  iconButtonRec: { backgroundColor: '#F49AC1' },
 });

@@ -64,6 +64,10 @@ const MAPPING = {
   'globe.americas.fill': 'public',
   'scope': 'center-focus-strong',
   'timer': 'timer',
+  'mic.fill': 'mic',
+  'square.and.pencil': 'edit',
+  'play.fill': 'play-arrow',
+  'pause.fill': 'pause',
 } as IconMapping;
 
 /**

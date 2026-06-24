@@ -85,7 +85,13 @@
         }
       ],
       "expo-sqlite",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Katchimeras uses the microphone so you can record a short voice note about your day and fold it into today's world."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

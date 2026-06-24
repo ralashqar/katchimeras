@@ -17,6 +17,14 @@ export function cellCenter(col: number, row: number): IsoPoint {
   return { x: (col - row) * (TILE_W / 2), y: (col + row + 1) * (TILE_H / 2) };
 }
 
+// Inverse of cellCenter: a patch-local point → its (fractional) cell col/row.
+// Round + clamp to land on the nearest tile when hit-testing taps.
+export function cellFromPoint(x: number, y: number): { col: number; row: number } {
+  const a = x / (TILE_W / 2); // col - row
+  const b = y / (TILE_H / 2) - 1; // col + row
+  return { col: (a + b) / 2, row: (b - a) / 2 };
+}
+
 // A grid-corner (not cell-centre) — corners run 0..size on each axis.
 export function gridCorner(c: number, r: number): IsoPoint {
   return { x: (c - r) * (TILE_W / 2), y: (c + r) * (TILE_H / 2) };

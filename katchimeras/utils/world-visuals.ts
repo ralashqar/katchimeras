@@ -49,6 +49,22 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   vault_chest_small: require('../assets/images/katchimeras/world/props/vault_chest_small.png'),
   vault_chest: require('../assets/images/katchimeras/world/props/vault_chest.png'),
   vault_chest_treasure: require('../assets/images/katchimeras/world/props/vault_chest_treasure.png'),
+  vault_crystal_archive: require('../assets/images/katchimeras/world/props/vault_crystal_archive.png'),
+  vault_notes_chest: require('../assets/images/katchimeras/world/props/vault_notes_chest.png'),
+  // Photos object — a cozy "memory tree" hung with glowing framed photos (levels).
+  memory_tree_1: require('../assets/images/katchimeras/world/props/memory_tree_1.png'),
+  memory_tree_2: require('../assets/images/katchimeras/world/props/memory_tree_2.png'),
+  memory_tree_3: require('../assets/images/katchimeras/world/props/memory_tree_3.png'),
+  memory_tree_4: require('../assets/images/katchimeras/world/props/memory_tree_4.png'),
+  // Notes object — a journaling family growing into a little writing-desk shrine.
+  notes_journal_1: require('../assets/images/katchimeras/world/props/notes_journal_1.png'),
+  notes_journal_2: require('../assets/images/katchimeras/world/props/notes_journal_2.png'),
+  notes_journal_3: require('../assets/images/katchimeras/world/props/notes_journal_3.png'),
+  notes_journal_4: require('../assets/images/katchimeras/world/props/notes_journal_4.png'),
+  // Big Moment landmarks (Today Patch V3).
+  landmark_festival: require('../assets/images/katchimeras/world/props/landmark_festival.png'),
+  landmark_arch: require('../assets/images/katchimeras/world/props/landmark_arch.png'),
+  landmark_gate: require('../assets/images/katchimeras/world/props/landmark_gate.png'),
   // Memory nodes
   memory_photo_bloom: require('../assets/images/katchimeras/world/memory-nodes/memory_photo_bloom.png'),
   memory_landmark_stone: require('../assets/images/katchimeras/world/memory-nodes/memory_landmark_stone.png'),

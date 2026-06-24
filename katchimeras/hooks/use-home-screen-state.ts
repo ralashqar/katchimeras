@@ -20,6 +20,7 @@ import {
   answerHeroPhotoMeaningForToday,
   applyCapturedMomentForToday,
   applyGeneratedReflection,
+  applyNoteForToday,
   completeSeedForToday,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
@@ -250,6 +251,19 @@ export function useHomeScreenState() {
       return completeSeedForToday(hydrated.state, seedId, profile, now, target);
     });
   }, []);
+
+  const addNote = useCallback(
+    (note: Parameters<typeof applyNoteForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return applyNoteForToday(hydrated.state, note, profile, now, target);
+      });
+    },
+    []
+  );
 
   const answerDayPrompt = useCallback(
     (
@@ -684,6 +698,7 @@ export function useHomeScreenState() {
     applyCapturedMoment,
     dailySeeds,
     completeSeed,
+    addNote,
     isTodayHatched,
     tomorrowDay,
     tomorrowActivePrompt,
