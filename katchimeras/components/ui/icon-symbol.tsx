@@ -68,6 +68,13 @@ const MAPPING = {
   'square.and.pencil': 'edit',
   'play.fill': 'play-arrow',
   'pause.fill': 'pause',
+  'plus': 'add',
+  'gearshape.fill': 'settings',
+  'pencil': 'edit',
+  'diamond.fill': 'diamond',
+  'flame.fill': 'local-fire-department',
+  'chevron.down': 'keyboard-arrow-down',
+  'book.closed.fill': 'auto-stories',
 } as IconMapping;
 
 /**

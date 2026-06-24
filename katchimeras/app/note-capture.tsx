@@ -7,7 +7,6 @@ import {
   useAudioPlayerStatus,
   useAudioRecorder,
 } from 'expo-audio';
-import { File } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -83,12 +82,11 @@ export default function NoteCaptureScreen() {
     } catch {
       // keep whatever uri we have
     }
-    // Transcribe the clip straight into the editable text box.
+    // Transcribe the clip straight into the editable text box (on-device first).
     if (uri) {
       setTranscribing(true);
       try {
-        const base64 = await new File(uri).base64();
-        const transcript = await transcribeAudioNote(base64, 'audio/m4a');
+        const transcript = await transcribeAudioNote(uri);
         if (transcript) setText(transcript);
       } catch {
         // leave the box for the user to type
@@ -162,7 +160,7 @@ export default function NoteCaptureScreen() {
       const interpreted = text.trim()
         ? await interpretNote({ text: text.trim() })
         : audioUri
-          ? await interpretNote({ audioBase64: await new File(audioUri).base64(), mimeType: 'audio/m4a' })
+          ? await interpretNote({ audioUri })
           : null;
       if (!interpreted) {
         setPhase('input');

@@ -38,7 +38,55 @@ public final class KatchimeraFoundationModule: Module {
       #endif
       promise.resolve([[String: String]]())
     }
+
+    // Title + feeling for a voice-note transcript, fully on-device. Returns
+    // { "label": ..., "archetype": ... } or {} on any failure → JS falls back.
+    AsyncFunction("interpretNoteAsync") { (transcript: String, promise: Promise) in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        Task {
+          let result = await Self.interpretNote(transcript: transcript)
+          promise.resolve(result)
+        }
+        return
+      }
+      #endif
+      promise.resolve([String: String]())
+    }
   }
+
+  #if canImport(FoundationModels)
+  @available(iOS 26.0, *)
+  private static func interpretNote(transcript: String) async -> [String: String] {
+    guard case .available = SystemLanguageModel.default.availability else {
+      return [:]
+    }
+    let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      return [:]
+    }
+
+    let instructions = Instructions(
+      """
+      You title and classify a short personal voice note for a gentle journaling app.
+      Return:
+      - title: a short, warm 2-4 word title for the moment (under 24 characters),
+        specific to what the person said. No punctuation, no emoji, no quotes.
+      - feeling: the single dominant feeling of the note, one of:
+        calm, energy, together, meaningful.
+      """
+    )
+    let session = LanguageModelSession(instructions: instructions)
+    let prompt = Prompt("The voice note says: \"\(trimmed)\". Give the title and feeling now.")
+
+    do {
+      let response = try await session.respond(to: prompt, generating: NoteRead.self)
+      return ["label": response.content.title, "archetype": response.content.feeling]
+    } catch {
+      return [:]
+    }
+  }
+  #endif
 
   #if canImport(FoundationModels)
   @available(iOS 26.0, *)
@@ -102,5 +150,15 @@ struct MeaningOption {
 struct MeaningOptionList {
   @Guide(description: "Exactly four options, one per feeling", .count(4))
   let options: [MeaningOption]
+}
+
+@available(iOS 26.0, *)
+@Generable
+struct NoteRead {
+  @Guide(description: "A short warm 2-4 word title for the moment (under 24 characters), specific to the note. No punctuation, no emoji, no quotes")
+  let title: String
+
+  @Guide(description: "The dominant feeling of the note", .anyOf(["calm", "energy", "together", "meaningful"]))
+  let feeling: String
 }
 #endif

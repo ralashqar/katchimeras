@@ -7,10 +7,37 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-nati
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { PLACE_CATEGORIES } from '@/components/katchadeck/world/place-prompt-sheet';
 import { Lantern } from '@/constants/theme';
-import type { HomeDayRecord } from '@/types/home';
+import type { DayMapNode, HomeDayRecord } from '@/types/home';
 import type { PatchCell } from '@/types/world';
 import { resolvePlaceName } from '@/utils/place-names';
+
+// category id → emoji / label, for confirmed places.
+const PLACE_CATEGORY_EMOJI: Record<string, string> = Object.fromEntries(
+  PLACE_CATEGORIES.map((category) => [category.id, category.emoji])
+);
+const PLACE_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
+  PLACE_CATEGORIES.map((category) => [category.id, category.label])
+);
+
+function formatClock(iso?: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours %= 12;
+  if (hours === 0) hours = 12;
+  return `${hours}:${minutes} ${ampm}`;
+}
+function formatDwell(start?: string, end?: string): string | null {
+  const startLabel = formatClock(start);
+  const endLabel = formatClock(end);
+  if (startLabel && endLabel && startLabel !== endLabel) return `${startLabel} – ${endLabel}`;
+  return startLabel ?? endLabel ?? null;
+}
 
 // The "tap a chest" detail view — a small time-capsule reader. The photos vault
 // shows the day's photos + their meanings; the notes reader (NotesDetailSheet)
@@ -30,6 +57,7 @@ const MEANING_TINT: Record<string, string> = {
   energy: '#FFC36B',
   together: '#F49AC1',
   meaningful: '#A78BFA',
+  focus: '#92D7FF',
 };
 const BIG_MOMENT_EMOJI: Record<string, string> = {
   birthday: '🎂',
@@ -102,6 +130,138 @@ export function NotesDetailSheet({
         {notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} & moments` : 'Your notes'}
       </ThemedText>
       <NotesBody day={day} onAddNote={onAddNote} />
+    </SheetShell>
+  );
+}
+
+// The Places Vault reader — the day's stops with their time range, what they
+// were + meant (once confirmed), and the photos taken there. Tapping an
+// unconfirmed place opens the "what was it?" prompt for it.
+export function PlacesDetailSheet({
+  day,
+  onClose,
+  onAddPlace,
+  onOpenMap,
+  onConfirmPlace,
+}: {
+  day: HomeDayRecord;
+  onClose: () => void;
+  onAddPlace?: () => void;
+  onOpenMap?: () => void;
+  onConfirmPlace?: (node: DayMapNode, name: string) => void;
+}) {
+  const mapSummary = day.dayMap;
+  const nodes = mapSummary?.nodes ?? [];
+  const confirmedById = new Map((day.confirmedPlaces ?? []).map((place) => [place.id, place]));
+  const [names, setNames] = useState<Record<string, { primary: string; locality: string | null }>>({});
+
+  useEffect(() => {
+    const list = mapSummary?.nodes ?? [];
+    if (list.length === 0) return;
+    let active = true;
+    void (async () => {
+      const entries = await Promise.all(
+        list.slice(0, 6).map(async (node) => [node.id, await resolvePlaceName(node.latitude, node.longitude)] as const)
+      );
+      if (active) setNames(Object.fromEntries(entries));
+    })();
+    return () => {
+      active = false;
+    };
+  }, [mapSummary]);
+
+  return (
+    <SheetShell onClose={onClose}>
+      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+        Places
+      </ThemedText>
+      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        {nodes.length > 0 ? `${nodes.length} ${nodes.length === 1 ? 'place' : 'places'} today` : 'Your places'}
+      </ThemedText>
+
+      <View style={styles.body}>
+        <View style={styles.addRow}>
+          {onAddPlace ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onAddPlace}
+              style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
+              <IconSymbol name="mappin.and.ellipse" size={18} color={Lantern.ember300} />
+              <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Add place
+              </ThemedText>
+            </Pressable>
+          ) : null}
+          {onOpenMap && nodes.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onOpenMap}
+              style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
+              <IconSymbol name="globe.americas.fill" size={16} color={Lantern.ember300} />
+              <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                View map
+              </ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {nodes.length === 0 ? (
+          <ThemedText style={styles.bodyLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            No places yet — add where you are, or they’ll appear as your day moves.
+          </ThemedText>
+        ) : null}
+
+        {nodes.map((node) => {
+          const confirmed = confirmedById.get(node.id);
+          const name = names[node.id]?.primary ?? 'A place';
+          const locality = names[node.id]?.locality ?? null;
+          const dwell = formatDwell(node.startedAt, node.endedAt);
+          const photos = (node.photos ?? []).map((photo) => photo.thumbnailUri).filter((uri): uri is string => !!uri);
+          return (
+            <Pressable
+              key={node.id}
+              disabled={!!confirmed || !onConfirmPlace}
+              onPress={() => onConfirmPlace?.(node, name)}
+              style={styles.placeCard}>
+              <View style={styles.placeHeader}>
+                <ThemedText style={styles.placeCardEmoji}>
+                  {confirmed ? PLACE_CATEGORY_EMOJI[confirmed.category] ?? '📍' : '📍'}
+                </ThemedText>
+                <View style={styles.placeText}>
+                  <ThemedText style={styles.placePrimary} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {name}
+                  </ThemedText>
+                  <ThemedText style={styles.placeSecondary} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    {[locality, dwell].filter(Boolean).join(' · ') || 'A stop on your day'}
+                  </ThemedText>
+                </View>
+                {confirmed ? (
+                  <View style={[styles.placeMeaning, { borderColor: `${MEANING_TINT[confirmed.archetype] ?? Lantern.moon300}66` }]}>
+                    <View style={[styles.chipDot, { backgroundColor: MEANING_TINT[confirmed.archetype] ?? Lantern.moon300 }]} />
+                    <ThemedText style={styles.placeMeaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                      {PLACE_CATEGORY_LABEL[confirmed.category] ?? confirmed.label}
+                    </ThemedText>
+                  </View>
+                ) : onConfirmPlace ? (
+                  <View style={styles.placeAdd}>
+                    <ThemedText style={styles.placeAddLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                      Add
+                    </ThemedText>
+                    <IconSymbol name="chevron.right" size={12} color={Lantern.ember300} />
+                  </View>
+                ) : null}
+              </View>
+              {photos.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placePhotoRow}>
+                  {photos.map((uri, index) => (
+                    <Image key={`${uri}-${index}`} source={{ uri }} style={styles.placePhoto} contentFit="cover" transition={120} />
+                  ))}
+                </ScrollView>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
     </SheetShell>
   );
 }
@@ -196,19 +356,26 @@ function NotesBody({ day, onAddNote }: { day: HomeDayRecord; onAddNote?: () => v
       {voiceNotes.length > 0 ? (
         <View style={styles.voiceList}>
           {voiceNotes.map((note) => (
-            <Pressable key={note.id} onPress={() => togglePlay(note.id, note.audioUri ?? '')} style={styles.voiceRow}>
-              <View style={styles.voicePlay}>
-                <IconSymbol name={isPlaying(note.id) ? 'pause.fill' : 'play.fill'} size={13} color={Lantern.ink900} />
-              </View>
-              <ThemedText style={styles.voiceLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {note.label}
-              </ThemedText>
-              {note.durationMs ? (
-                <ThemedText style={styles.voiceDur} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  {Math.max(1, Math.round(note.durationMs / 1000))}s
+            <View key={note.id} style={styles.voiceItem}>
+              <Pressable onPress={() => togglePlay(note.id, note.audioUri ?? '')} style={styles.voiceRow}>
+                <View style={styles.voicePlay}>
+                  <IconSymbol name={isPlaying(note.id) ? 'pause.fill' : 'play.fill'} size={13} color={Lantern.ink900} />
+                </View>
+                <ThemedText style={styles.voiceLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  {note.label}
+                </ThemedText>
+                {note.durationMs ? (
+                  <ThemedText style={styles.voiceDur} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    {Math.max(1, Math.round(note.durationMs / 1000))}s
+                  </ThemedText>
+                ) : null}
+              </Pressable>
+              {note.text ? (
+                <ThemedText style={styles.voiceTranscript} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                  {note.text}
                 </ThemedText>
               ) : null}
-            </Pressable>
+            </View>
           ))}
         </View>
       ) : null}
@@ -405,15 +572,16 @@ const styles = StyleSheet.create({
   chipDot: { width: 7, height: 7, borderRadius: 999 },
   chipLabel: { fontSize: 12.5, fontWeight: '700' },
   voiceList: { gap: 8 },
-  voiceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
+  voiceItem: {
+    gap: 7,
+    paddingVertical: 9,
     paddingHorizontal: 10,
     borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
+  voiceRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  // The transcript, indented to sit under the label (past the play button).
+  voiceTranscript: { fontSize: 13, fontWeight: '500', lineHeight: 18, fontStyle: 'italic', paddingLeft: 38 },
   voicePlay: {
     width: 28,
     height: 28,
@@ -443,6 +611,30 @@ const styles = StyleSheet.create({
   placeText: { flex: 1, gap: 1 },
   placePrimary: { fontSize: 14, fontWeight: '700' },
   placeSecondary: { fontSize: 12, fontWeight: '600' },
+  placeCard: {
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  placeHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  placeCardEmoji: { fontSize: 20 },
+  placeMeaning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    backgroundColor: 'rgba(12,10,20,0.6)',
+  },
+  placeMeaningLabel: { fontSize: 12, fontWeight: '700' },
+  placeAdd: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  placeAddLabel: { fontSize: 12.5, fontWeight: '800' },
+  placePhotoRow: { gap: 8, paddingTop: 2 },
+  placePhoto: { width: 72, height: 72, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)' },
   addRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   addPhoto: {
     flexDirection: 'row',

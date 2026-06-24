@@ -30,7 +30,7 @@ export function selectActiveDayPrompt(
 
   const daypart = resolveDaypart(now);
   const answeredOrDismissed = new Set(day.promptAnswers.map((answer) => answer.kind));
-  const photoCandidates = options.photoCandidates ?? collectDayPromptPhotoCandidates(day);
+  const photoCandidates = excludeUsedPhotos(options.photoCandidates ?? collectDayPromptPhotoCandidates(day), day);
   const eligiblePhotoCount = countEligiblePhotoCandidatesForDay(photoCandidates, day.isoDate, options.forceMeaningfulPhoto === true);
   const order = rankPromptKinds(day, now, eligiblePhotoCount, options.forceMeaningfulPhoto === true);
 
@@ -92,7 +92,7 @@ export function buildDayPromptByKind(
   if (!options.includeAnswered && day.promptAnswers.some((answer) => answer.kind === kind)) {
     return null;
   }
-  const photoCandidates = options.photoCandidates ?? collectDayPromptPhotoCandidates(day);
+  const photoCandidates = excludeUsedPhotos(options.photoCandidates ?? collectDayPromptPhotoCandidates(day), day);
   const eligiblePhotoCount = countEligiblePhotoCandidatesForDay(
     photoCandidates,
     day.isoDate,
@@ -119,7 +119,7 @@ export function listAvailableDayPrompts(
   if (day.state === 'hatched') {
     return [];
   }
-  const photoCandidates = options.photoCandidates ?? collectDayPromptPhotoCandidates(day);
+  const photoCandidates = excludeUsedPhotos(options.photoCandidates ?? collectDayPromptPhotoCandidates(day), day);
   const available: ActiveDayPrompt[] = [];
   for (const prompt of launchedDayPrompts) {
     // "Photo meaning" is never a standalone button — it always follows a photo
@@ -252,6 +252,24 @@ export function collectDayPromptPhotoCandidates(day: StoredHomeDayRecord): DayPr
   }
 
   return candidates.slice(0, 8);
+}
+
+// Drop candidates the user has ALREADY added to the vault, so only NEW photos
+// surface in the photo prompt / the world's golden "!". Uses the persistent
+// usedPhotoAssetIds list (every committed photo), plus the current hero photo and
+// any answer's related asset id as belt-and-suspenders.
+function excludeUsedPhotos(
+  candidates: DayPromptPhotoCandidate[],
+  day: StoredHomeDayRecord
+): DayPromptPhotoCandidate[] {
+  const used = new Set<string>();
+  if (day.heroPhoto?.assetId) used.add(day.heroPhoto.assetId);
+  for (const id of day.usedPhotoAssetIds ?? []) used.add(id);
+  for (const answer of day.promptAnswers ?? []) {
+    if (answer.relatedAssetId) used.add(answer.relatedAssetId);
+  }
+  if (used.size === 0) return candidates;
+  return candidates.filter((candidate) => !used.has(candidate.assetId));
 }
 
 function countEligiblePhotoCandidatesForDay(

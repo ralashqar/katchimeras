@@ -4,7 +4,6 @@ import {
   cellCenter,
   drawDepth,
   gridCorner,
-  patchTopCorners,
   patchWorldOrigin,
   PATCH_SIZE,
   SLAB_THICKNESS,
@@ -164,25 +163,37 @@ function cellHash(seed: string): number {
   return h >>> 0;
 }
 
-export function layoutWorld(patches: WorldPatch[]): WorldScene {
+// `ring` extends the ground slab by N rings of EMPTY cells around the 4×4 content
+// (objects/memories still live on the inner 0..PATCH_SIZE grid). It frames the
+// day's patch with a margin of bare ground so it reads as an island, and is used
+// by the single-patch home view. ring = 0 reproduces the original tight slab.
+export function layoutWorld(patches: WorldPatch[], ring = 0): WorldScene {
   const rawSlabs: SceneSlab[] = [];
   const rawSprites: SceneSprite[] = [];
   const rawDecals: SceneDecal[] = [];
   const rawFences: SceneFence[] = [];
   const rawGhosts: SceneGhost[] = [];
 
+  // Slab + decals span the content grid grown by `ring` on every side.
+  const lo = -ring;
+  const hi = PATCH_SIZE + ring;
+
   for (const patch of patches) {
     const origin = patchWorldOrigin(patch.gridCol, patch.gridRow);
     const patchDepth = (patch.gridCol + patch.gridRow) * PATCH_DEPTH_STRIDE;
     const shift = (p: IsoPoint): IsoPoint => ({ x: origin.x + p.x, y: origin.y + p.y });
 
-    const [top, right, bottom, left] = patchTopCorners().map(shift);
+    // The slab's four top-face corners over the (possibly ring-extended) grid.
+    const top = shift(gridCorner(lo, lo));
+    const right = shift(gridCorner(hi, lo));
+    const bottom = shift(gridCorner(hi, hi));
+    const left = shift(gridCorner(lo, hi));
     const leftFace = [left, bottom, { x: bottom.x, y: bottom.y + SLAB_THICKNESS }, { x: left.x, y: left.y + SLAB_THICKNESS }];
     const rightFace = [bottom, right, { x: right.x, y: right.y + SLAB_THICKNESS }, { x: bottom.x, y: bottom.y + SLAB_THICKNESS }];
     const seams: [IsoPoint, IsoPoint][] = [];
-    for (let i = 1; i < PATCH_SIZE; i += 1) {
-      seams.push([shift(gridCorner(i, 0)), shift(gridCorner(i, PATCH_SIZE))]);
-      seams.push([shift(gridCorner(0, i)), shift(gridCorner(PATCH_SIZE, i))]);
+    for (let i = lo + 1; i < hi; i += 1) {
+      seams.push([shift(gridCorner(i, lo)), shift(gridCorner(i, hi))]);
+      seams.push([shift(gridCorner(lo, i)), shift(gridCorner(hi, i))]);
     }
 
     rawSlabs.push({
@@ -246,23 +257,25 @@ export function layoutWorld(patches: WorldPatch[]): WorldScene {
     // yet" until real moments grow on it. Hatched/legacy patches keep the
     // accent-scattered, archetype-themed ground.
     const isForming = patch.status === 'forming' || patch.status === 'readyToHatch';
-    for (let row = 0; row < PATCH_SIZE; row += 1) {
-      for (let col = 0; col < PATCH_SIZE; col += 1) {
+    for (let row = lo; row < hi; row += 1) {
+      for (let col = lo; col < hi; col += 1) {
+        const inContent = col >= 0 && col < PATCH_SIZE && row >= 0 && row < PATCH_SIZE;
         const h = cellHash(`${patch.id}:${col},${row}`);
         const isFree = !occupied.has(`${col},${row}`);
-        // Accent tile on some free cells; the base ground tile everywhere else
-        // (including under objects, so they sit on real ground).
+        // Ring cells are always bare ground (a calm margin around the plot).
+        // Inside the content grid: accent tile on some free cells, base ground
+        // tile everywhere else (including under objects, so they sit on land).
         const key =
-          !isForming && isFree && (h % 1000) / 1000 < ACCENT_DENSITY
+          inContent && !isForming && isFree && (h % 1000) / 1000 < ACCENT_DENSITY
             ? theme.decals[(h >>> 10) % theme.decals.length]
             : theme.groundTile;
         const c = shift(cellCenter(col, row));
         rawDecals.push({
           id: `${patch.id}-tile-${col}-${row}`,
           patchId: patch.id,
-          // Each tile type has a _2 variant from the grid; pick one per cell —
-          // but the forming plot stays on the single base tile for uniformity.
-          decal: !isForming && (h >>> 16) & 1 ? `${key}_2` : key,
+          // Each tile type has a _2 variant from the grid; pick one per content
+          // cell — the forming plot and the ring stay on the single base tile.
+          decal: inContent && !isForming && (h >>> 16) & 1 ? `${key}_2` : key,
           archetype: patch.primaryArchetype,
           x: c.x,
           y: c.y,

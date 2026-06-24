@@ -24,6 +24,11 @@ type MomentPromptSheetProps = {
   // Today Patch V2 — Daily Seeds shown above the prompt categories (World only).
   seeds?: (DailySeed & { earned: boolean })[];
   onCompleteSeed?: (seedId: string, from: FeedSourceRect) => void;
+  // Open straight into a specific prompt (e.g. the photos prompt from the world's
+  // golden "!"), skipping the category list.
+  initialPrompt?: ActiveDayPrompt | null;
+  // Fired when a prompt is dismissed via its "Later" button (passes the prompt id).
+  onPromptDismiss?: (promptId: string) => void;
 };
 
 const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#FFB4A2'];
@@ -35,8 +40,10 @@ export function MomentPromptSheet({
   onSelectHeroPhoto,
   seeds,
   onCompleteSeed,
+  initialPrompt = null,
+  onPromptDismiss,
 }: MomentPromptSheetProps) {
-  const [selected, setSelected] = useState<ActiveDayPrompt | null>(null);
+  const [selected, setSelected] = useState<ActiveDayPrompt | null>(initialPrompt);
   // Float the sheet just above the (absolute, pill-shaped) tab bar so the bar
   // never overlaps it.
   const tabBarHeight = useBottomTabBarHeight();
@@ -67,7 +74,10 @@ export function MomentPromptSheet({
               // this mean?"); the parent closes this sheet and navigates.
               onSelectHeroPhoto(photo, from);
             }}
-            onDismiss={() => setSelected(null)}
+            onDismiss={() => {
+              onPromptDismiss?.(selected.id);
+              setSelected(null);
+            }}
           />
         ) : (
           <>

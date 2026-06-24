@@ -10,6 +10,8 @@ type KatchimeraFoundationModuleShape = {
     tags: string[],
     faceCount: number
   ) => Promise<{ label?: unknown; archetype?: unknown }[]>;
+  // Title + feeling for a voice-note transcript. {} on failure / unavailability.
+  interpretNoteAsync: (transcript: string) => Promise<{ label?: unknown; archetype?: unknown }>;
 };
 
 export default requireOptionalNativeModule<KatchimeraFoundationModuleShape>('KatchimeraFoundation');

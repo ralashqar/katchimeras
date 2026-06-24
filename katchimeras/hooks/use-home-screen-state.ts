@@ -22,6 +22,7 @@ import {
   applyGeneratedReflection,
   applyNoteForToday,
   completeSeedForToday,
+  confirmPlaceForToday,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
   hydrateAllDays,
@@ -60,6 +61,7 @@ import {
   syncHatchNotification,
 } from '@/utils/hatch-notification';
 import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
+import { markPhotoProcessed } from '@/utils/processed-photos';
 import { syncWidgetState } from '@/utils/widget-state';
 import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
 import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
@@ -265,6 +267,19 @@ export function useHomeScreenState() {
     []
   );
 
+  const confirmPlace = useCallback(
+    (input: Parameters<typeof confirmPlaceForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return confirmPlaceForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
   const answerDayPrompt = useCallback(
     (
       input: { kind: DayPromptKind; choiceIds: string[]; noteText?: string | null },
@@ -314,6 +329,10 @@ export function useHomeScreenState() {
     (photo: DayPromptPhotoCandidate, target: DayInputTarget = 'today') => {
       const now = new Date();
       const profile = loadOnboardingProfile();
+
+      // Remember this asset globally so it never prompts again (survives restart),
+      // independent of the day record.
+      markPhotoProcessed(photo.assetId);
 
       if (forceMeaningfulPhotoPrompt) {
         clearStoredDevPromptPhotoCandidates();
@@ -699,6 +718,7 @@ export function useHomeScreenState() {
     dailySeeds,
     completeSeed,
     addNote,
+    confirmPlace,
     isTodayHatched,
     tomorrowDay,
     tomorrowActivePrompt,

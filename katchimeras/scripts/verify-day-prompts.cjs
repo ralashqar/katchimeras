@@ -186,6 +186,30 @@ check(
 const photoPrompt = promptEngine.selectActiveDayPrompt(photoRichDay, new Date('2026-06-17T19:00:00'));
 check('photo prompt carries candidates', photoPrompt?.photoCandidates.length === 4, String(photoPrompt?.photoCandidates.length));
 
+// Photos already added to the vault (usedPhotoAssetIds) drop out of candidates —
+// only NEW photos keep prompting. photoPoint(i) → candidate assetId `asset-i`.
+const usedPhotosDay = makeDay({
+  locations: [photoPoint(0), photoPoint(1), photoPoint(2), photoPoint(3), photoPoint(4)],
+  usedPhotoAssetIds: ['asset-0'],
+});
+const usedPhotoPrompt = promptEngine.selectActiveDayPrompt(usedPhotosDay, new Date('2026-06-17T19:00:00'));
+check(
+  'already-vaulted photos are excluded from candidates',
+  usedPhotoPrompt?.photoCandidates.length === 4 &&
+    usedPhotoPrompt.photoCandidates.every((c) => c.assetId !== 'asset-0'),
+  String(usedPhotoPrompt?.photoCandidates.length)
+);
+check(
+  'no photo prompt once every photo is already vaulted',
+  promptEngine.selectActiveDayPrompt(
+    makeDay({
+      locations: [photoPoint(0), photoPoint(1), photoPoint(2)],
+      usedPhotoAssetIds: ['asset-0', 'asset-1', 'asset-2'],
+    }),
+    new Date('2026-06-17T19:00:00')
+  )?.id !== 'meaningful_photo'
+);
+
 const devForcedDay = makeDay();
 const devForcedPrompt = promptEngine.selectActiveDayPrompt(devForcedDay, new Date('2026-06-17T09:00:00'), {
   forceMeaningfulPhoto: true,

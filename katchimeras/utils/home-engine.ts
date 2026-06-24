@@ -520,6 +520,35 @@ export function completeSeedForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+// Confirm a detected place: the user picks what it was (category) + what it meant
+// (archetype). Stored per day-map node id so each place is confirmed once; a
+// re-confirm of the same node overwrites. Drives the Places cell + clears its "!".
+export function confirmPlaceForToday(
+  state: StoredHomeState,
+  input: { id: string; category: string; archetype: string; label: string },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const existing = (base.confirmedPlaces ?? []).filter((place) => place.id !== input.id);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    confirmedPlaces: [
+      ...existing,
+      {
+        id: input.id,
+        category: input.category,
+        archetype: input.archetype,
+        label: input.label,
+        confirmedAt: now.toISOString(),
+      },
+    ],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
 // Today Patch V3 — attach a written/voice note to the day: a time-capsule entry
 // (feeds the Memory Vault + Reflection cells via its inferred mood) plus, when
 // the user has confirmed one, a Big Moment that grows a centre landmark.
@@ -637,6 +666,8 @@ export function selectHeroPhotoForToday(
   const nextDay: StoredHomeDayRecord = {
     ...base,
     heroPhoto,
+    // Remember this asset so it stops surfacing as a "new photo" prompt.
+    usedPhotoAssetIds: Array.from(new Set([...(base.usedPhotoAssetIds ?? []), input.assetId])),
     promptAnswers: [
       ...base.promptAnswers.filter((candidate) => candidate.kind !== 'meaningful_photo'),
       photoAnswer,

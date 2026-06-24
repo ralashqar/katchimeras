@@ -4,6 +4,7 @@ import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-sto
 import { curatePhotos } from '@/utils/photo-curation';
 import { analyzePhotoLuminance } from '@/utils/photo-vision';
 import { computePhotoSignature } from '@/utils/photo-similarity';
+import { buildProcessedPhotoFilter } from '@/utils/processed-photos';
 import type { DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 
 export const DEV_PROMPT_PHOTO_CANDIDATES_KEY = 'katchadeck.dev_prompt_photo_candidates_v1';
@@ -124,7 +125,12 @@ async function loadDayPromptPhotoCandidates({
       });
     }
 
-    const keepers = curatePhotos(scanned).keepers;
+    // Drop photos the user has already added to a day (by asset id, or by
+    // perceptual hash for re-saved duplicates) — these never prompt again, even
+    // after an app restart. Dev mode keeps everything for testing.
+    const processed = buildProcessedPhotoFilter();
+    const usable = mode === 'production' ? scanned.filter((asset) => !processed.has(asset.id, asset.similarityHash)) : scanned;
+    const keepers = curatePhotos(usable).keepers;
     const ordered = keepers.sort((left, right) => right.createdAt - left.createdAt);
     return ordered.slice(0, limit).map((asset) => ({
       assetId: asset.id,

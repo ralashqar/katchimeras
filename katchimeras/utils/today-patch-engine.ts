@@ -163,13 +163,15 @@ export function computeCells(day: HomeDayRecord): PatchCell[] {
     count: photoCount,
   };
 
-  // Places — where the day happened.
+  // Places — where the day happened. Confirming a place (its meaning) grows the
+  // cell faster than a passive visit, since the user has said it mattered.
   const visited = day.visitedPlaceCount ?? 0;
   const newPlaces = day.newPlaceCount ?? 0;
+  const confirmedPlaces = day.confirmedPlaces?.length ?? 0;
   let placesLevel: 0 | 1 | 2 | 3 | 4 = 0;
-  if (newPlaces >= 2) placesLevel = 4;
-  else if (newPlaces >= 1) placesLevel = 3;
-  else if (visited >= 2) placesLevel = 2;
+  if (newPlaces >= 2 || confirmedPlaces >= 3) placesLevel = 4;
+  else if (newPlaces >= 1 || confirmedPlaces >= 2) placesLevel = 3;
+  else if (visited >= 2 || confirmedPlaces >= 1) placesLevel = 2;
   else if (visited >= 1 || seedCount('places') > 0) placesLevel = 1;
   const places: PatchCell = {
     type: 'places',
@@ -177,15 +179,17 @@ export function computeCells(day: HomeDayRecord): PatchCell[] {
     level: placesLevel,
     assetKey: placesLevel > 0 ? PLACES_ASSET[placesLevel] : null,
     summaryLabel:
-      newPlaces > 0
-        ? 'A new place today'
-        : visited > 0
-          ? `${plural(visited, 'place', 'places')} shaped today`
-          : placesLevel > 0
-            ? 'Close to home'
-            : 'No places yet',
+      confirmedPlaces > 0
+        ? `${plural(confirmedPlaces, 'place', 'places')} remembered`
+        : newPlaces > 0
+          ? 'A new place today'
+          : visited > 0
+            ? `${plural(visited, 'place', 'places')} shaped today`
+            : placesLevel > 0
+              ? 'Close to home'
+              : 'No places yet',
     sourceLabel: 'Places',
-    count: visited > 0 ? visited : placesLevel > 0 ? 1 : 0,
+    count: confirmedPlaces > 0 ? confirmedPlaces : visited > 0 ? visited : placesLevel > 0 ? 1 : 0,
   };
 
   // Journey — movement. Low movement is cozy, never failure.

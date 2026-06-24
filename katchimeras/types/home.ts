@@ -503,6 +503,17 @@ export type CapturedMeaning = {
   createdAt: string;
 };
 
+// A place the user confirmed for the day — the "where" (category) + the "why"
+// (meaning). Location gives the spot; the user gives the meaning. Keyed by the
+// day-map node id so each detected place is confirmed at most once.
+export type ConfirmedPlace = {
+  id: string; // the day-map node id this confirmation belongs to
+  category: string; // 'cafe' | 'park' | 'work' | 'home' | 'food' | ... (the "where")
+  archetype: string; // calm | energy | together | meaningful | focus (the "why")
+  label: string; // display label (the category's friendly name)
+  confirmedAt: string;
+};
+
 // A written or spoken note attached to the day — a time-capsule entry. The
 // transcript (for voice) + an inferred mood feed the patch's cells; an optional
 // detected Big Moment grows a special landmark. Voice notes also keep their audio.
@@ -568,6 +579,12 @@ export type StoredHomeDayRecord = {
   // Display-only: surfaced in the day's "Photos · what they meant" section. The
   // archetype (calm/energy/together/meaningful) drives the chip icon + colour.
   capturedMeanings?: CapturedMeaning[];
+  // Camera-roll asset ids the user has already added to the vault, so they're
+  // excluded from future photo prompts / the "!" (only NEW photos prompt).
+  usedPhotoAssetIds?: string[];
+  // Places the user confirmed (category + meaning) for the day — drives the
+  // Places cell + clears the places "!" once every detected place is confirmed.
+  confirmedPlaces?: ConfirmedPlace[];
   // Today Patch V2 — Daily Seed ids the user has completed (manual one-tap).
   // Passive seeds are satisfied from signals, not stored here. Each earned seed
   // grows its reward object on the Today patch. See utils/daily-seeds-engine.ts.

@@ -7,6 +7,12 @@ import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { Lantern } from '@/constants/theme';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
+// The World is now the app's home: it lands here on launch (the Today tab
+// remains available alongside it).
+export const unstable_settings = {
+  initialRouteName: 'world',
+};
+
 export default function TabLayout() {
   const onboardingProfile = loadOnboardingProfile();
 

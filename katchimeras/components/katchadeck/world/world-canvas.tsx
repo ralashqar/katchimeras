@@ -49,8 +49,23 @@ type Props = {
   eggReady?: boolean;
   eggFeedKey?: number;
   onPressEgg?: () => void;
+  // A golden "!" hovering over the photos (memory) cell — shown when the phone
+  // has photos that could be added. Tapping the cell fires onPressMemoryAlert.
+  memoryAlert?: boolean;
+  onPressMemoryAlert?: () => void;
+  // The same guidance over the Places cell — a detected place to confirm.
+  placesAlert?: boolean;
+  onPressPlacesAlert?: () => void;
   // Hide the recenter button so a status pill (e.g. "Reading…") can take its slot.
   hideRecenter?: boolean;
+  // Rings of empty ground cells framing the patch (single-patch home view).
+  ring?: number;
+  // Bounce every object in on the first paint (so switching days animates).
+  animateOnMount?: boolean;
+  // Lock the camera: tap still works, but pan/pinch are disabled so the canvas
+  // can live inside a vertical ScrollView without fighting it. Also hides the
+  // recenter control (the single patch is always centred).
+  lockCamera?: boolean;
 };
 
 // The egg sits on the patch's CENTRE tile (cells live at the four corners). The
@@ -76,6 +91,11 @@ const COUNTDOWN_DROP = 6;
 // memories) + a small downward nudge so the smaller art still seats on its tile.
 const SPRITE_SCALE = 0.75;
 const SPRITE_DROP = TILE_H * 0.18;
+
+// Embedded (single-patch home) camera defaults: zoom in a bit past pure fit, and
+// lift the patch up so it sits high in the hero (leaving room for the bottom UI).
+const DEFAULT_ZOOM = 1.34;
+const LIFT_FRAC = 0.1;
 
 // Feathered radial glow (the same soft texture the egg uses) — tinted + faded
 // under the last-tapped object as a soft circular highlight.
@@ -108,7 +128,8 @@ const CELL_POS: Record<string, { col: number; row: number }> = {
 
 // What an empty cell hints it could hold (Diorama Time Capsule ghost spots).
 const GHOST_HINT: Record<string, { emoji: string; label: string }> = {
-  memory: { emoji: '📷', label: 'memory' },
+  // The photos spot when empty: an empty frame (no camera), i.e. "no photos yet".
+  memory: { emoji: '🖼️', label: 'photos' },
   places: { emoji: '🧭', label: 'places' },
   journey: { emoji: '🚶', label: 'journey' },
   reflection: { emoji: '🌿', label: 'reflection' },
@@ -142,9 +163,16 @@ export function WorldCanvas({
   highlightedCell,
   captureFly,
   onPressEgg,
+  memoryAlert = false,
+  onPressMemoryAlert,
+  placesAlert = false,
+  onPressPlacesAlert,
   hideRecenter = false,
+  ring = 0,
+  animateOnMount = false,
+  lockCamera = false,
 }: Props) {
-  const scene = useMemo(() => layoutWorld(patches), [patches]);
+  const scene = useMemo(() => layoutWorld(patches, ring), [patches, ring]);
 
   // The slab the camera focuses on: today's egg patch when present, else the
   // newest patch. Its centre also anchors the composited egg.
@@ -186,6 +214,22 @@ export function WorldCanvas({
       y: slab.centre.y + (cellCenter(pos.col, pos.row).y - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y),
     };
   }, [scene, captureFly, eggPatchId]);
+
+  // A cell's scene point — anchors a hovering golden "!" alert over that cell.
+  const cellPoint = useCallback(
+    (pos: { col: number; row: number }) => {
+      if (!eggPatchId) return null;
+      const slab = scene.slabs.find((s) => s.patchId === eggPatchId);
+      if (!slab) return null;
+      return {
+        x: slab.centre.x + (cellCenter(pos.col, pos.row).x - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).x),
+        y: slab.centre.y + (cellCenter(pos.col, pos.row).y - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y),
+      };
+    },
+    [scene, eggPatchId]
+  );
+  const memoryPoint = useMemo(() => (memoryAlert ? cellPoint(CELL_POS.memory) : null), [memoryAlert, cellPoint]);
+  const placesPoint = useMemo(() => (placesAlert ? cellPoint(CELL_POS.places) : null), [placesAlert, cellPoint]);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const centred = useRef(false);
   const tabBarHeight = useBottomTabBarHeight();
@@ -207,15 +251,33 @@ export function WorldCanvas({
   const vw = viewport.width;
   const vh = viewport.height;
 
-  // Centre the newest patch (drawn last / front-most) in the viewport once we
-  // know both sizes.
+  // Embedded single-patch view: pure fit is the smallest the patch shrinks to;
+  // the DEFAULT is a bit zoomed-in past that. Free roam stays at 1:1.
+  const pureFit = lockCamera && vw && vh ? Math.min(1, Math.min(vw / sceneW, vh / sceneH)) : 1;
+  const baseScale = lockCamera ? pureFit * DEFAULT_ZOOM : 1;
+  const minScale = lockCamera ? pureFit : 0.55;
+  const maxScale = lockCamera ? baseScale * 1.9 : 2.4;
+
+  // Translate that centres the focus point at scale `s`, lifted up in lock mode.
+  const centreFor = useCallback(
+    (s: number, fx: number, fy: number, vpW: number, vpH: number) => ({
+      x: vpW / 2 - sceneW / 2 - (fx - sceneW / 2) * s,
+      y: vpH / 2 - sceneH / 2 - (fy - sceneH / 2) * s - (lockCamera ? vpH * LIFT_FRAC : 0),
+    }),
+    [sceneW, sceneH, lockCamera]
+  );
+
+  // Centre the focus patch in the viewport once we know both sizes.
   useEffect(() => {
     if (centred.current || !viewport.width || !focusSlab) return;
     const focus = focusSlab.centre;
-    tx.value = viewport.width / 2 - focus.x;
-    ty.value = viewport.height / 2 - focus.y;
+    const c = centreFor(baseScale, focus.x, focus.y, viewport.width, viewport.height);
+    scale.value = baseScale;
+    startScale.value = baseScale;
+    tx.value = c.x;
+    ty.value = c.y;
     centred.current = true;
-  }, [viewport, focusSlab, tx, ty]);
+  }, [viewport, focusSlab, tx, ty, centreFor, baseScale, scale, startScale]);
 
   // Re-centre on today's egg every time the World tab regains focus (exit + come
   // back). Reads the latest viewport/focus through a ref so the focus effect's
@@ -227,12 +289,13 @@ export function WorldCanvas({
     if (!vp.width || !fs) return; // first mount: layout not measured yet — the effect above handles it
     cancelAnimation(tx);
     cancelAnimation(ty);
-    scale.value = 1;
-    startScale.value = 1;
-    tx.value = vp.width / 2 - fs.centre.x;
-    ty.value = vp.height / 2 - fs.centre.y;
+    const c = centreFor(baseScale, fs.centre.x, fs.centre.y, vp.width, vp.height);
+    scale.value = baseScale;
+    startScale.value = baseScale;
+    tx.value = c.x;
+    ty.value = c.y;
     centred.current = true;
-  }, [tx, ty, scale, startScale]);
+  }, [tx, ty, scale, startScale, centreFor, baseScale]);
   useFocusEffect(recentreOnFocus);
 
   // Tile-based tap: snap the tap point to the NEAREST tile (not a raycast against
@@ -259,6 +322,26 @@ export function WorldCanvas({
         onPressEgg?.();
         return;
       }
+      // The photos cell while the golden "!" is up → the "add photos" prompt.
+      if (
+        memoryAlert &&
+        best.patchId === eggPatchId &&
+        best.col === CELL_POS.memory.col &&
+        best.row === CELL_POS.memory.row
+      ) {
+        onPressMemoryAlert?.();
+        return;
+      }
+      // The places cell while its "!" is up → the "confirm this place" prompt.
+      if (
+        placesAlert &&
+        best.patchId === eggPatchId &&
+        best.col === CELL_POS.places.col &&
+        best.row === CELL_POS.places.row
+      ) {
+        onPressPlacesAlert?.();
+        return;
+      }
       const occupant = scene.sprites.find(
         (s) => s.patchId === best!.patchId && s.col === best!.col && s.row === best!.row
       );
@@ -271,7 +354,19 @@ export function WorldCanvas({
       // An empty tile on a finalized diorama still opens that patch.
       if (best.patchId !== eggPatchId) onSelectPatch(best.patchId);
     },
-    [scene, eggPatchId, eggPoint, onPressEgg, onSelectMemory, onSelectCell, onSelectPatch]
+    [
+      scene,
+      eggPatchId,
+      eggPoint,
+      onPressEgg,
+      memoryAlert,
+      onPressMemoryAlert,
+      placesAlert,
+      onPressPlacesAlert,
+      onSelectMemory,
+      onSelectCell,
+      onSelectPatch,
+    ]
   );
 
   const pan = Gesture.Pan()
@@ -306,9 +401,15 @@ export function WorldCanvas({
         clamp: [vh / 2 - sceneH / 2 - hh, vh / 2 - sceneH / 2 + hh],
       });
     });
+  // A drag that starts ON the patch pans the patch in 2D and claims the touch,
+  // so the page ScrollView does NOT scroll underneath it. The page only scrolls
+  // when the drag starts on UI outside the patch (the dashboard below, or the
+  // top bar) — those win via zIndex / sibling order. `activeOffset` lets a still
+  // tap through to open the egg / a cell before the pan takes over.
+  pan.activeOffsetX([-6, 6]).activeOffsetY([-6, 6]);
   const pinch = Gesture.Pinch()
     .onUpdate((e) => {
-      scale.value = Math.max(0.55, Math.min(2.4, startScale.value * e.scale));
+      scale.value = Math.max(minScale, Math.min(maxScale, startScale.value * e.scale));
       dragged.value = true;
     })
     .onEnd(() => {
@@ -330,19 +431,24 @@ export function WorldCanvas({
       const wy = (e.y - sceneH / 2 - ty.value) / s + sceneH / 2;
       runOnJS(handleTap)(wx, wy);
     });
+  // Pan (limited), pinch-zoom and tap all run together. In embedded mode the pan
+  // is constrained to horizontal so the page can still scroll vertically.
   const gesture = Gesture.Simultaneous(pan, pinch, tap);
 
-  // Bounce in objects that appear AFTER the first paint (a grown seed/memory),
-  // but never the whole map on open. `seen` is updated post-commit in an effect;
-  // anything missing from it on a later render is freshly grown → animate.
+  // Bounce in objects that appear AFTER the first paint (a grown seed/memory).
+  // With `animateOnMount` (the single-patch home, remounted per day) the FIRST
+  // paint also bounces every object in, so switching days animates rather than
+  // popping. `seen` is updated post-commit; anything missing later is fresh.
   const seenSpriteIds = useRef<Set<string>>(new Set());
   const spritesInitialised = useRef(false);
   const animateInIds = useMemo(() => {
-    if (!spritesInitialised.current) return new Set<string>();
+    if (!spritesInitialised.current) {
+      return animateOnMount ? new Set(scene.sprites.map((s) => s.id)) : new Set<string>();
+    }
     const fresh = new Set<string>();
     for (const sprite of scene.sprites) if (!seenSpriteIds.current.has(sprite.id)) fresh.add(sprite.id);
     return fresh;
-  }, [scene]);
+  }, [scene, animateOnMount]);
   useEffect(() => {
     scene.sprites.forEach((sprite) => seenSpriteIds.current.add(sprite.id));
     spritesInitialised.current = true;
@@ -553,13 +659,42 @@ export function WorldCanvas({
               <HatchCountdown isReady={eggReady} compact />
             </View>
           ) : null}
+
+          {/* Golden "!" hovering over the photos cell — the phone has photos to
+              add. Tap is handled by the tile hit-test (onPressMemoryAlert). */}
+          {memoryPoint ? (
+            <MotiView
+              pointerEvents="none"
+              from={{ translateY: 2, scale: 0.92 }}
+              animate={{ translateY: -6, scale: 1 }}
+              transition={{ loop: true, type: 'timing', duration: 900 }}
+              style={[styles.alertLayer, { left: memoryPoint.x - 15, top: memoryPoint.y - 74 }]}>
+              <View style={styles.alertBubble}>
+                <Text style={styles.alertMark}>!</Text>
+              </View>
+            </MotiView>
+          ) : null}
+
+          {/* Golden "!" over the Places cell — a detected place to confirm. */}
+          {placesPoint ? (
+            <MotiView
+              pointerEvents="none"
+              from={{ translateY: 2, scale: 0.92 }}
+              animate={{ translateY: -6, scale: 1 }}
+              transition={{ loop: true, type: 'timing', duration: 900 }}
+              style={[styles.alertLayer, { left: placesPoint.x - 15, top: placesPoint.y - 74 }]}>
+              <View style={styles.alertBubble}>
+                <Text style={styles.alertMark}>!</Text>
+              </View>
+            </MotiView>
+          ) : null}
         </Animated.View>
         </View>
       </GestureDetector>
 
       {/* Recenter button — sits just above the "Add to today" bar. Hidden while a
           status pill (e.g. "Reading…") takes its slot. */}
-      {!hideRecenter ? (
+      {!hideRecenter && !lockCamera ? (
         <Pressable onPress={recenter} hitSlop={10} style={[styles.recenter, { bottom: tabBarHeight + 130 }]}>
           <IconSymbol name="scope" size={24} color={Lantern.moon50} />
         </Pressable>
@@ -672,8 +807,10 @@ function shade(hex: string): string {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, overflow: 'hidden' },
-  tapSurface: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  // No overflow clipping: the patch (egg, tall sprites, the framing ring) is free
+  // to extend past the canvas bounds without being masked.
+  root: { flex: 1, overflow: 'visible' },
+  tapSurface: { ...StyleSheet.absoluteFillObject, overflow: 'visible' },
   world: { position: 'relative' },
   decal: { position: 'absolute', opacity: 0.95, overflow: 'hidden' },
   sprite: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
@@ -681,6 +818,19 @@ const styles = StyleSheet.create({
   // Grow/bounce from the planted base, not the centre.
   spriteOrigin: { transformOrigin: 'bottom' },
   highlight: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  alertLayer: { position: 'absolute', alignItems: 'center', justifyContent: 'center', zIndex: 6 },
+  alertBubble: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Lantern.ember300,
+    borderWidth: 2,
+    borderColor: '#FFF1E4',
+    boxShadow: '0 0 16px rgba(255,195,107,0.85)',
+  },
+  alertMark: { color: Lantern.emberInk, fontSize: 18, fontWeight: '900', lineHeight: 20 },
   captureMote: {
     position: 'absolute',
     width: 56,
