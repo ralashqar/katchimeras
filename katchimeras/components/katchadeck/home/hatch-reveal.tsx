@@ -33,12 +33,15 @@ type HatchRevealProps = {
   // egg keeps shaking until it arrives).
   creature: LocalCreatureRecord | null;
   onComplete: () => void;
+  // Hide the built-in "Today became / name" caption — used when the host renders
+  // its own header (e.g. the World page's "You hatched X" banner).
+  hideCaption?: boolean;
 };
 
 // In-place hatch: the SAME egg widget already on the page rattles, cracks, then
 // shrinks away exactly as the hatched katchimera scales up in its spot — matching
 // the onboarding cinematic. No page change, no moved egg.
-export function HatchReveal({ egg, creature, onComplete }: HatchRevealProps) {
+export function HatchReveal({ egg, creature, onComplete, hideCaption = false }: HatchRevealProps) {
   const [phase, setPhase] = useState<HatchRevealPhase>('build');
   const [crackStage, setCrackStage] = useState<0 | 1 | 2>(0);
 
@@ -156,6 +159,7 @@ export function HatchReveal({ egg, creature, onComplete }: HatchRevealProps) {
         ) : null}
       </View>
 
+      {hideCaption ? null : (
       <View style={styles.captionWrap}>
         {settled && creature ? (
           <Animated.View entering={FadeIn.duration(320)} style={styles.caption} key="settled">
@@ -174,6 +178,7 @@ export function HatchReveal({ egg, creature, onComplete }: HatchRevealProps) {
           </Animated.View>
         )}
       </View>
+      )}
     </View>
   );
 }

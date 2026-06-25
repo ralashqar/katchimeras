@@ -20,7 +20,11 @@ import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-str
 import { CellDetailSheet, NotesDetailSheet, PlacesDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
 import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note';
 import { PatchInspector } from '@/components/katchadeck/world/patch-inspector';
+import { BigMomentPickerSheet } from '@/components/katchadeck/world/big-moment-picker-sheet';
+import { ChronicleSheet } from '@/components/katchadeck/world/chronicle-sheet';
+import { FoodMomentSheet, FoodVaultSheet } from '@/components/katchadeck/world/food-vault-sheet';
 import { PlacePromptSheet, type PlaceCategory, type PlaceMeaning } from '@/components/katchadeck/world/place-prompt-sheet';
+import { SleepSheet } from '@/components/katchadeck/world/sleep-sheet';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { WorldCanvas } from '@/components/katchadeck/world/world-canvas';
 import { WorldDashboard } from '@/components/katchadeck/world/world-dashboard';
@@ -30,11 +34,16 @@ import { interpretNote, type InterpretedNote } from '@/utils/note-interpret';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
-import type { DayMapNode, DayPromptKind, HomeDayRecord } from '@/types/home';
+import type { BigMomentType, DayMapNode, DayPromptKind, HomeDayRecord } from '@/types/home';
 import type { MemoryNode, WorldObjectCategory, WorldPatch, WorldState } from '@/types/world';
 import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 import { resolvePlaceName } from '@/utils/place-names';
+import { deriveDayChronicle, type CalendarEventContext } from '@/utils/chronicle-engine';
+import { loadCalendarEventsForDay } from '@/utils/calendar-events';
+import { selectMemoryQuests, type MemoryQuestType } from '@/utils/memory-quests-engine';
+import { detectFoodInVision } from '@/utils/food-detect';
+import { loadSleepForDay } from '@/utils/sleep-health';
 import { deriveTodayPatch } from '@/utils/today-patch-engine';
 import { loadTodayPatch, saveTodayPatch } from '@/utils/today-patch-storage';
 import { syncWorldFromDays } from '@/utils/world-engine';
@@ -67,13 +76,15 @@ function formatTimeRange(start?: string, end?: string): string | null {
 }
 
 const MEMORY_CHESTS_ONLY = true;
-const VISIBLE_CATEGORIES = new Set(['memory', 'notes', 'journey', 'places']);
+const VISIBLE_CATEGORIES = new Set(['memory', 'notes', 'journey', 'places', 'sleep', 'food']);
 const VISIBLE_CELLS = new Set(['memory', 'journey', 'places']);
 function simplifyPatch(patch: WorldPatch): WorldPatch {
   if (!MEMORY_CHESTS_ONLY) return patch;
   return {
     ...patch,
-    objects: patch.objects.filter((o) => o.kind === 'creature' || (o.category && VISIBLE_CATEGORIES.has(o.category))),
+    objects: patch.objects.filter(
+      (o) => o.kind === 'creature' || o.kind === 'landmark' || (o.category && VISIBLE_CATEGORIES.has(o.category))
+    ),
     cells: (patch.cells ?? []).filter((cell) => VISIBLE_CELLS.has(cell.type)),
   };
 }
@@ -92,10 +103,13 @@ export default function WorldScreen() {
     availableDayPrompts,
     answerDayPrompt,
     answerPhotoMeaning,
-    dailySeeds,
-    completeSeed,
     addNote,
     confirmPlace,
+    markBigMoment,
+    setSleep,
+    addFoodMoment,
+    triggerHatchIfReady,
+    refreshState,
   } = useHomeScreenState();
 
   const [world, setWorld] = useState<WorldState | null>(null);
@@ -122,7 +136,8 @@ export default function WorldScreen() {
   const { width: screenW, height: screenH } = useWindowDimensions();
   const isFocused = useIsFocused();
   const tabBarHeight = useBottomTabBarHeight();
-  const autoOpenedRef = useRef(false);
+  // The day we've already run the morning sleep prompt for (once per day).
+  const sleepPromptedRef = useRef<string | null>(null);
 
   // Inline voice note (hold the add-bar mic): record → analyse → accept/discard.
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -170,6 +185,13 @@ export default function WorldScreen() {
         todayForming.newPlaceCount,
         todayForming.seedCompletions?.length ?? 0,
         todayForming.egg.intensity,
+        // Inputs that grow their own patch objects but don't touch the fields
+        // above — without these the tile never re-derives when they change.
+        todayForming.sleep?.quality ?? '',
+        todayForming.confirmedPlaces?.length ?? 0,
+        todayForming.bigMoments?.length ?? 0,
+        todayForming.notes?.length ?? 0,
+        todayForming.foodMoments?.length ?? 0,
       ].join('|')
     : null;
   const todayPatch = useMemo(() => {
@@ -189,6 +211,26 @@ export default function WorldScreen() {
   // The day the world is currently showing (the day-switcher / timeline pick).
   const selectedDayRecord = selectedDay?.kind === 'day' ? selectedDay : null;
   const selectedIsTodayForming = !!(selectedDayRecord?.isToday && selectedDayRecord.state !== 'hatched');
+  const eggReady = selectedIsTodayForming && todayForming?.state === 'ready_to_hatch';
+
+  // In-place egg hatch on the World page: tapping a ready egg plays the reveal
+  // right where the egg sits (handled inside WorldCanvas), then settles into the
+  // creature. The creature is read off the re-derived day once the hatch lands.
+  const [isHatching, setIsHatching] = useState(false);
+  const hatchedCreature = isHatching ? selectedDayRecord?.creature ?? null : null;
+  const handleEggPress = () => {
+    if (isHatching) return;
+    if (eggReady) {
+      setIsHatching(true);
+      void triggerHatchIfReady();
+      return;
+    }
+    openSheet(null);
+  };
+  const handleHatchComplete = () => {
+    setIsHatching(false);
+    refreshState();
+  };
 
   // Which patch to centre the world on: today's live patch when today is showing,
   // otherwise the finalized patch for the selected (hatched) day.
@@ -370,15 +412,6 @@ export default function WorldScreen() {
     });
   };
 
-  const handleCompleteSeed = (seedId: string, from: FeedSourceRect) => {
-    const seed = dailySeeds.find((candidate) => candidate.id === seedId);
-    flyToEgg(from, seed?.emoji ?? '🌱', () => {
-      completeSeed(seedId);
-      setEggFeedKey((key) => key + 1);
-      if (seed) setMicrocopy(`${seed.reward.label} took root`);
-    });
-  };
-
   // Open the "add to today" sheet, optionally straight into a specific prompt.
   const openSheet = (initial: ActiveDayPrompt | null = null) => {
     if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
@@ -511,22 +544,39 @@ export default function WorldScreen() {
   };
   const handleConfirmPlace = (category: PlaceCategory, meaning: PlaceMeaning) => {
     if (activePlace) {
-      confirmPlace({ id: activePlace.id, category: category.id, archetype: meaning.id, label: category.label });
+      confirmPlace({ id: activePlace.id, category: category.id, archetype: meaning.id, label: category.label, meaningLabel: meaning.label });
       setEggFeedKey((key) => key + 1);
       setMicrocopy(`${category.emoji} ${category.label} · ${meaning.label}`);
     }
     closePlacePrompt();
   };
 
-  // Auto-surface the "things that could shape today" sheet ONCE, the first time
-  // the World is entered on a forming day.
+  // Morning sleep: the first time the World is entered on a forming day, try Apple
+  // Health for the night's sleep; if it has it, record it; otherwise auto-ask
+  // "how was your sleep?" once (so it greets you first thing). The user can also
+  // tap the sleep tile any time to check or change it.
+  // Depend on STABLE primitives, not the whole todayForming object — that object
+  // gets a new reference on every content change (hydration, each new moment), and
+  // re-running this effect mid-await would cancel the in-flight Health read while
+  // the ref-guard blocked any retry, so the prompt never opened.
+  const todayFormingId = todayForming?.id ?? null;
+  const todayFormingIso = todayForming?.isoDate ?? null;
+  const todayHasSleep = !!todayForming?.sleep;
   useEffect(() => {
-    if (!isFocused) return;
-    if (todayForming && !autoOpenedRef.current) {
-      autoOpenedRef.current = true;
-      setPromptOpen(true);
-    }
-  }, [isFocused, todayForming]);
+    if (!isFocused || !todayFormingId || !todayFormingIso || todayHasSleep) return;
+    if (sleepPromptedRef.current === todayFormingId) return;
+    sleepPromptedRef.current = todayFormingId;
+    let active = true;
+    void (async () => {
+      const health = await loadSleepForDay(todayFormingIso);
+      if (!active) return;
+      if (health) setSleep(health);
+      else setSleepSheetOpen(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isFocused, todayFormingId, todayFormingIso, todayHasSleep, setSleep]);
 
   // Auto-dismiss the growth microcopy after a beat.
   useEffect(() => {
@@ -551,6 +601,14 @@ export default function WorldScreen() {
       setPlacesVaultOpen(true);
       return;
     }
+    if (cellType === 'sleep') {
+      setSleepSheetOpen(true);
+      return;
+    }
+    if (cellType === 'food') {
+      setFoodVaultOpen(true);
+      return;
+    }
     setSelectedCell(cellType);
   };
   const selectedCellData =
@@ -560,6 +618,109 @@ export default function WorldScreen() {
 
   // A short date label shown under the day buttons (Today / May 10).
   const dayLabel = selectedDayRecord ? (selectedDayRecord.isToday ? 'Today' : selectedDayRecord.dayLabel) : null;
+
+  // Chronicle — the selected day's story ("what was today about?"), from existing
+  // signals plus (best-effort, on-device) calendar events. Shown as a tappable
+  // card in the dashboard + a full reader.
+  const [chronicleOpen, setChronicleOpen] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEventContext[]>([]);
+  useEffect(() => {
+    if (!selectedDayRecord) {
+      setCalendarEvents([]);
+      return;
+    }
+    let active = true;
+    setCalendarEvents([]);
+    void (async () => {
+      const events = await loadCalendarEventsForDay(selectedDayRecord.isoDate);
+      if (active) setCalendarEvents(events);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [selectedDayRecord]);
+  const chronicle = useMemo(
+    () => (selectedDayRecord ? deriveDayChronicle(selectedDayRecord, calendarEvents) : null),
+    [selectedDayRecord, calendarEvents]
+  );
+
+  // Memory Quests — contextual, optional captures that grow real patch objects
+  // (they replace the generic Daily Seeds). Completion is derived from signals.
+  const memoryQuests = useMemo(() => (todayForming ? selectMemoryQuests(todayForming, new Date()) : []), [todayForming]);
+  const [bigMomentPickerOpen, setBigMomentPickerOpen] = useState(false);
+  const handlePickBigMoment = (type: BigMomentType) => {
+    markBigMoment({ type });
+    setBigMomentPickerOpen(false);
+    setEggFeedKey((key) => key + 1);
+    setMicrocopy('A big moment, marked');
+  };
+  const [foodPickerOpen, setFoodPickerOpen] = useState(false);
+  const [foodVaultOpen, setFoodVaultOpen] = useState(false);
+  const [sleepSheetOpen, setSleepSheetOpen] = useState(false);
+  // Opening the sleep tile is also a chance to pull last night's HOURS from Apple
+  // Health — the morning read only runs once, and a manual answer carries no hours.
+  // If Health knows the duration and we don't have it yet, backfill it (keeping the
+  // user's own quality answer when they gave one). Needs the native sleep build to
+  // return anything; until then this safely no-ops.
+  useEffect(() => {
+    if (!sleepSheetOpen || !selectedIsTodayForming) return;
+    const iso = selectedDayRecord?.isoDate;
+    const current = selectedDayRecord?.sleep;
+    if (!iso || current?.totalSleepMinutes) return; // already have the hours
+    let active = true;
+    void (async () => {
+      const health = await loadSleepForDay(iso);
+      if (!active || !health?.totalSleepMinutes) return;
+      setSleep({
+        quality: current?.source === 'manual' ? current.quality : health.quality,
+        source: current?.source === 'manual' ? 'manual' : 'appleHealth',
+        totalSleepMinutes: health.totalSleepMinutes,
+      });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [sleepSheetOpen, selectedIsTodayForming, selectedDayRecord?.isoDate, selectedDayRecord?.sleep, setSleep]);
+  // If Vision detected a specific food today, pre-fill the picker's "what".
+  const foodSuggestion = useMemo(() => {
+    const detection = detectFoodInVision(todayForming?.vision);
+    return detection.label && detection.emoji ? { label: detection.label, emoji: detection.emoji } : null;
+  }, [todayForming]);
+  const handleAddFood = (input: Parameters<typeof addFoodMoment>[0]) => {
+    if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
+    addFoodMoment(input);
+    setFoodPickerOpen(false);
+    setEggFeedKey((key) => key + 1);
+    setMicrocopy(`${input.emoji} ${input.label} · saved`);
+  };
+  const handleQuest = (type: MemoryQuestType) => {
+    if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
+    switch (type) {
+      case 'captureMoment':
+        router.push('/moment-capture');
+        break;
+      case 'recordVoiceMemory':
+        router.push('/note-capture');
+        break;
+      case 'answerReflection': {
+        const reflectionPrompt = availableDayPrompts.find((prompt) =>
+          ['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight'].includes(prompt.id)
+        );
+        openSheet(reflectionPrompt ?? null);
+        break;
+      }
+      case 'markPlace':
+        if (unconfirmedPlace) handlePressPlacesAlert();
+        else void handleAddCurrentPlace();
+        break;
+      case 'markBigMoment':
+        setBigMomentPickerOpen(true);
+        break;
+      case 'saveFoodMemory':
+        setFoodPickerOpen(true);
+        break;
+    }
+  };
 
   const heroHeight = Math.max(300, Math.round(screenH * 0.46));
   const showActions = !!todayForming && recPhase !== 'confirm';
@@ -597,7 +758,10 @@ export default function WorldScreen() {
               hideRecenter
               eggPatchId={selectedIsTodayForming ? todayPatch?.id ?? null : null}
               eggVisual={selectedIsTodayForming ? todayPatch?.eggVisual ?? null : null}
-              eggReady={selectedIsTodayForming && todayForming?.state === 'ready_to_hatch'}
+              eggReady={eggReady}
+              hatching={isHatching}
+              hatchingCreature={hatchedCreature}
+              onHatchComplete={handleHatchComplete}
               eggFeedKey={eggFeedKey}
               highlightedCell={lastSelectedCell}
               captureFly={selectedIsTodayForming ? captureFly : null}
@@ -605,7 +769,7 @@ export default function WorldScreen() {
               onPressMemoryAlert={handlePressMemoryAlert}
               placesAlert={placesAlert}
               onPressPlacesAlert={handlePressPlacesAlert}
-              onPressEgg={() => openSheet(null)}
+              onPressEgg={handleEggPress}
               onSelectCell={handleSelectCell}
               onSelectPatch={(id) => {
                 setFocusMemory(null);
@@ -658,10 +822,43 @@ export default function WorldScreen() {
               </ThemedText>
             </Animated.View>
           ) : null}
+
+          {/* "You hatched X" — the reveal headline, dropping in once the hatch
+              settles and the katchimera's name is known. */}
+          {isHatching && hatchedCreature ? (
+            <Animated.View
+              entering={FadeInDown.duration(380)}
+              exiting={FadeOut.duration(260)}
+              pointerEvents="none"
+              style={styles.hatchHeader}>
+              <ThemedText
+                type="onboardingLabel"
+                style={styles.hatchHeaderKicker}
+                lightColor={Lantern.ember300}
+                darkColor={Lantern.ember300}>
+                You hatched
+              </ThemedText>
+              <ThemedText
+                type="display"
+                style={styles.hatchHeaderName}
+                lightColor={Lantern.moon50}
+                darkColor={Lantern.moon50}>
+                {hatchedCreature.name}
+              </ThemedText>
+            </Animated.View>
+          ) : null}
         </View>
 
         <View style={styles.dashboardWrap}>
-          <WorldDashboard days={days} seeds={dailySeeds} onCompleteSeed={handleCompleteSeed} />
+          <WorldDashboard
+            days={days}
+            quests={memoryQuests}
+            onQuest={handleQuest}
+            chronicle={chronicle}
+            onOpenChronicle={() => setChronicleOpen(true)}
+            foodMoments={selectedDayRecord?.foodMoments ?? []}
+            onOpenFood={() => setFoodVaultOpen(true)}
+          />
         </View>
       </ScrollView>
 
@@ -682,6 +879,45 @@ export default function WorldScreen() {
             setPromptOpen(false);
             setInitialPrompt(null);
           }}
+        />
+      ) : null}
+
+      {chronicleOpen && chronicle && selectedDayRecord ? (
+        <ChronicleSheet chronicle={chronicle} day={selectedDayRecord} onClose={() => setChronicleOpen(false)} />
+      ) : null}
+
+      {bigMomentPickerOpen ? (
+        <BigMomentPickerSheet onPick={handlePickBigMoment} onClose={() => setBigMomentPickerOpen(false)} />
+      ) : null}
+
+      {sleepSheetOpen ? (
+        <SleepSheet
+          sleep={selectedDayRecord?.sleep ?? null}
+          onSet={(quality) => {
+            setSleep({ quality, source: 'manual' });
+            setMicrocopy('Your morning, remembered');
+            setSleepSheetOpen(false);
+          }}
+          onClose={() => setSleepSheetOpen(false)}
+        />
+      ) : null}
+
+      {foodPickerOpen ? (
+        <FoodMomentSheet onConfirm={handleAddFood} onClose={() => setFoodPickerOpen(false)} suggested={foodSuggestion} />
+      ) : null}
+
+      {foodVaultOpen && selectedDayRecord ? (
+        <FoodVaultSheet
+          foodMoments={selectedDayRecord.foodMoments ?? []}
+          onAddFood={
+            selectedIsTodayForming
+              ? () => {
+                  setFoodVaultOpen(false);
+                  setFoodPickerOpen(true);
+                }
+              : undefined
+          }
+          onClose={() => setFoodVaultOpen(false)}
         />
       ) : null}
 
@@ -781,4 +1017,16 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(125,232,205,0.4)',
   },
   microcopyText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.2 },
+  hatchHeader: {
+    position: 'absolute',
+    top: 18,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    gap: 2,
+    zIndex: 30,
+    elevation: 30,
+  },
+  hatchHeaderKicker: { fontSize: 12 },
+  hatchHeaderName: { fontSize: 32, fontStyle: 'italic', lineHeight: 38, textAlign: 'center' },
 });

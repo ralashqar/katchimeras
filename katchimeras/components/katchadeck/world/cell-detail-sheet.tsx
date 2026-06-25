@@ -239,7 +239,7 @@ export function PlacesDetailSheet({
                   <View style={[styles.placeMeaning, { borderColor: `${MEANING_TINT[confirmed.archetype] ?? Lantern.moon300}66` }]}>
                     <View style={[styles.chipDot, { backgroundColor: MEANING_TINT[confirmed.archetype] ?? Lantern.moon300 }]} />
                     <ThemedText style={styles.placeMeaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                      {PLACE_CATEGORY_LABEL[confirmed.category] ?? confirmed.label}
+                      {confirmed.meaningLabel ?? PLACE_CATEGORY_LABEL[confirmed.category] ?? confirmed.label}
                     </ThemedText>
                   </View>
                 ) : onConfirmPlace ? (

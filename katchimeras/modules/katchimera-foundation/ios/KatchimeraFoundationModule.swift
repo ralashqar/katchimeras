@@ -53,6 +53,23 @@ public final class KatchimeraFoundationModule: Module {
       #endif
       promise.resolve([String: String]())
     }
+
+    // Hierarchical scene read: from the photo's on-device vision tags, classify
+    // the single best top-level scene type + a specific subject phrase. Returns
+    // { "type": ..., "subject": ... } or {} on any failure → JS falls back to the
+    // rule-based classifier. Tags never leave the device.
+    AsyncFunction("classifySceneAsync") { (tags: [String], faceCount: Int, promise: Promise) in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        Task {
+          let result = await Self.classifyScene(tags: tags, faceCount: faceCount)
+          promise.resolve(result)
+        }
+        return
+      }
+      #endif
+      promise.resolve([String: String]())
+    }
   }
 
   #if canImport(FoundationModels)
@@ -132,6 +149,57 @@ public final class KatchimeraFoundationModule: Module {
     }
   }
   #endif
+
+  #if canImport(FoundationModels)
+  @available(iOS 26.0, *)
+  private static func classifyScene(tags: [String], faceCount: Int) async -> [String: String] {
+    guard case .available = SystemLanguageModel.default.availability else {
+      return [:]
+    }
+    let cleaned = tags.filter { !$0.isEmpty }
+    guard !cleaned.isEmpty else {
+      return [:]
+    }
+
+    let instructions = Instructions(
+      """
+      You classify what a personal photo is mainly about, for a gentle journaling app.
+      You receive what an on-device vision model detected, with the MAIN subject first.
+      Choose the single best top-level category:
+      - food: a meal, drink, snack, dessert, or cooking
+      - social: people together — a gathering, party, friends, or family
+      - screen: a TV, monitor, phone, laptop, or video game shown in the photo
+      - nature: the outdoors — landscapes, plants, sky, water, weather, wild animals
+      - pet: a pet cat, dog, or companion animal
+      - activity: a sport, concert, workout, hobby, or performance
+      - place: a notable building, interior, street, or venue (no clear people or food)
+      - document: text, a sign, a menu, a screenshot, or a page
+      - other: anything that does not fit the above
+      Then give a short, specific 2-5 word 'subject' phrase for the main thing
+      (e.g. "a bowl of ramen", "friends at dinner", "a match on TV"). No emoji, no quotes.
+      """
+    )
+    let session = LanguageModelSession(instructions: instructions)
+
+    let primary = cleaned.first ?? "an everyday moment"
+    let rest = cleaned.dropFirst().prefix(8).joined(separator: ", ")
+    var described = "mainly \(primary)"
+    if !rest.isEmpty { described += " (also in frame: \(rest))" }
+    if faceCount >= 2 {
+      described += "; multiple people are in the photo"
+    } else if faceCount == 1 {
+      described += "; one person is in the photo"
+    }
+    let prompt = Prompt("The photo shows \(described). Classify it now.")
+
+    do {
+      let response = try await session.respond(to: prompt, generating: SceneClassification.self)
+      return ["type": response.content.type, "subject": response.content.subject]
+    } catch {
+      return [:]
+    }
+  }
+  #endif
 }
 
 #if canImport(FoundationModels)
@@ -160,5 +228,18 @@ struct NoteRead {
 
   @Guide(description: "The dominant feeling of the note", .anyOf(["calm", "energy", "together", "meaningful"]))
   let feeling: String
+}
+
+@available(iOS 26.0, *)
+@Generable
+struct SceneClassification {
+  @Guide(
+    description: "The single best top-level category for what the photo is mainly about",
+    .anyOf(["food", "social", "screen", "nature", "pet", "activity", "place", "document", "other"])
+  )
+  let type: String
+
+  @Guide(description: "A short specific 2-5 word phrase naming the main subject (e.g. 'a bowl of ramen', 'friends at dinner'). No punctuation, no emoji, no quotes")
+  let subject: String
 }
 #endif

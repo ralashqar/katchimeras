@@ -86,6 +86,52 @@ function posOf(type: PatchCellType): { col: number; row: number } {
   return { col: cell.col, row: cell.row };
 }
 
+// Sleep is a small block on its own tile — the graphic varies by how the day
+// began (sunny garden / stone lantern / misty moon lantern). Only present once
+// the day's sleep is known (Health or manual).
+const SLEEP_CELL = { col: 1, row: 3 };
+const SLEEP_ASSET: Record<string, string> = {
+  good: 'sleep_good',
+  normal: 'sleep_normal',
+  low: 'sleep_low',
+};
+function sleepObject(day: HomeDayRecord): WorldObject | null {
+  const sleep = day.sleep;
+  if (!sleep) return null;
+  return {
+    id: `${day.id}-sleep-${sleep.quality}`,
+    kind: 'prop',
+    assetKey: SLEEP_ASSET[sleep.quality] ?? 'prop_lantern',
+    label: 'Sleep',
+    col: SLEEP_CELL.col,
+    row: SLEEP_CELL.row,
+    footprint: 1,
+    sourceLabel: 'Sleep',
+    category: 'sleep',
+  };
+}
+
+// Food Vault — a little food stall on its own tile, present once the day has any
+// food memory (auto-detected from a snapped photo / note, or saved manually). The
+// badge counts the day's memories; tapping opens the Food Vault reader.
+const FOOD_CELL = { col: 2, row: 3 };
+function foodObject(day: HomeDayRecord): WorldObject | null {
+  const foods = day.foodMoments ?? [];
+  if (foods.length === 0) return null;
+  return {
+    id: `${day.id}-food-${foods.length}`,
+    kind: 'prop',
+    assetKey: 'food_stall',
+    label: 'Food',
+    col: FOOD_CELL.col,
+    row: FOOD_CELL.row,
+    footprint: 1,
+    sourceLabel: `${foods.length} food ${foods.length === 1 ? 'memory' : 'memories'}`,
+    category: 'food',
+    badge: foods.length,
+  };
+}
+
 // Each cell's visual per level. Memory Vault has a bespoke chest set (new art);
 // the others reuse existing world anchors/memory-nodes as their level rungs.
 // Photos object — a cozy "memory tree" that grows fuller (hung with glowing framed
@@ -302,6 +348,10 @@ export function deriveTodayPatch(day: HomeDayRecord, _prev?: WorldPatch | null):
   objects.push(...bigMomentObjects(day));
   const notes = notesObject(day);
   if (notes) objects.push(notes);
+  const sleep = sleepObject(day);
+  if (sleep) objects.push(sleep);
+  const food = foodObject(day);
+  if (food) objects.push(food);
   const tiles = groundTiles();
   const status = day.state === 'ready_to_hatch' ? 'readyToHatch' : 'forming';
 
@@ -363,6 +413,10 @@ export function finalizeDayPatch(day: HomeDayRecord): WorldPatch {
   objects.push(...bigMomentObjects(day));
   const notes = notesObject(day);
   if (notes) objects.push(notes);
+  const sleep = sleepObject(day);
+  if (sleep) objects.push(sleep);
+  const food = foodObject(day);
+  if (food) objects.push(food);
   const input = buildPatchInputFromDay(day);
   const { primary, secondary } = deriveArchetypes(input.signals);
   const rng = mulberry32(hashSeed(`${input.nonce}:${day.id}`));

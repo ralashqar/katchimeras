@@ -8,10 +8,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import Animated, {
   cancelAnimation,
+  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDecay,
+  withDelay,
+  withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -20,7 +24,8 @@ import { Lantern } from '@/constants/theme';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
-import type { EggVisualState } from '@/types/home';
+import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
+import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
 import type { MemoryNode, WorldPatch } from '@/types/world';
 import { layoutWorld, type SceneFence, type SceneSprite } from '@/utils/world-scene';
 import { cellCenter, cellFromPoint, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
@@ -48,6 +53,12 @@ type Props = {
   eggVisual?: EggVisualState | null;
   eggReady?: boolean;
   eggFeedKey?: number;
+  // In-place hatch reveal, anchored to the egg's spot and panning with the world.
+  // While it plays, the canvas hides its own static egg + countdown and shows the
+  // HatchReveal (the same egg cracks → the katchimera scales up in its place).
+  hatching?: boolean;
+  hatchingCreature?: LocalCreatureRecord | null;
+  onHatchComplete?: () => void;
   onPressEgg?: () => void;
   // A golden "!" hovering over the photos (memory) cell — shown when the phone
   // has photos that could be added. Tapping the cell fires onPressMemoryAlert.
@@ -77,6 +88,8 @@ const EGG_CELL = { col: 3, row: 3 };
 const SLAB_CENTRE_CELL = { col: 1, row: 1 };
 const EGG_STAGE_WIDTH = 200;
 const EGG_STAGE_HEIGHT = 258;
+// The hatch reveal needs room for the egg AND the creature's glow halo (~274).
+const HATCH_STAGE_SIZE = 288;
 // The LanternEgg art is fixed-pixel, so shrink the whole stage with a transform
 // (scales about its centre) to sit small and centred on a single tile. Tunable.
 // Shrunk by the same 0.75 factor as the node objects (world map only); EGG_RISE
@@ -159,6 +172,9 @@ export function WorldCanvas({
   eggPatchId,
   eggVisual,
   eggReady = false,
+  hatching = false,
+  hatchingCreature = null,
+  onHatchComplete,
   eggFeedKey = 0,
   highlightedCell,
   captureFly,
@@ -230,6 +246,45 @@ export function WorldCanvas({
   );
   const memoryPoint = useMemo(() => (memoryAlert ? cellPoint(CELL_POS.memory) : null), [memoryAlert, cellPoint]);
   const placesPoint = useMemo(() => (placesAlert ? cellPoint(CELL_POS.places) : null), [placesAlert, cellPoint]);
+
+  // When the egg is ready to hatch it gives a little impatient shudder every few
+  // seconds (a burst of rattle, then still) to invite the tap. Stops during the
+  // actual hatch (the reveal has its own, fiercer rattle).
+  const readyShake = useSharedValue(0);
+  useEffect(() => {
+    if (!eggReady || hatching) {
+      cancelAnimation(readyShake);
+      readyShake.value = withTiming(0, { duration: 140 });
+      return;
+    }
+    readyShake.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 55, easing: Easing.linear }),
+        withTiming(-1, { duration: 55, easing: Easing.linear }),
+        withTiming(1, { duration: 55, easing: Easing.linear }),
+        withTiming(-1, { duration: 55, easing: Easing.linear }),
+        withTiming(0.5, { duration: 55, easing: Easing.linear }),
+        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) }),
+        withDelay(2600, withTiming(0, { duration: 1 }))
+      ),
+      -1,
+      false
+    );
+    return () => cancelAnimation(readyShake);
+  }, [eggReady, hatching, readyShake]);
+  const readyShakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: readyShake.value * 5 }, { rotateZ: `${readyShake.value * 3.2}deg` }],
+  }));
+
+  // The hatch flips the day to 'hatched', so the parent stops sending eggPatchId /
+  // eggVisual mid-animation. Freeze the last egg spot + visual so the reveal stays
+  // anchored to where the egg sat right up until it finishes.
+  const lastEggPointRef = useRef<IsoPoint | null>(null);
+  if (eggPoint) lastEggPointRef.current = eggPoint;
+  const lastEggVisualRef = useRef<EggVisualState | null>(null);
+  if (eggVisual) lastEggVisualRef.current = eggVisual;
+  const hatchAnchor = eggPoint ?? lastEggPointRef.current;
+  const hatchEgg = eggVisual ?? lastEggVisualRef.current;
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const centred = useRef(false);
   const tabBarHeight = useBottomTabBarHeight();
@@ -611,7 +666,7 @@ export function WorldCanvas({
 
           {/* Today's egg, seated on its patch — pans/zooms with the world. The
               real LanternEgg (never a lookalike); tapping it opens the prompts. */}
-          {eggPoint && eggVisual ? (
+          {eggPoint && eggVisual && !hatching ? (
             <View
               pointerEvents="none"
               style={[
@@ -624,7 +679,29 @@ export function WorldCanvas({
                   transform: [{ scale: EGG_SCALE }],
                 },
               ]}>
-              <LanternEgg egg={eggVisual} onPress={onPressEgg} feedKey={eggFeedKey} />
+              <Animated.View style={readyShakeStyle}>
+                <LanternEgg egg={eggVisual} feedKey={eggFeedKey} />
+              </Animated.View>
+            </View>
+          ) : null}
+
+          {/* The in-place hatch reveal — seated on the egg's exact tile, panning
+              and zooming with the world. The same egg rattles, cracks, then the
+              katchimera scales up in its place. */}
+          {hatching && hatchAnchor && hatchEgg ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.eggLayer,
+                {
+                  left: hatchAnchor.x - HATCH_STAGE_SIZE / 2,
+                  top: hatchAnchor.y - HATCH_STAGE_SIZE / 2 - EGG_RISE,
+                  width: HATCH_STAGE_SIZE,
+                  height: HATCH_STAGE_SIZE,
+                  transform: [{ scale: EGG_SCALE }],
+                },
+              ]}>
+              <HatchReveal egg={hatchEgg} creature={hatchingCreature} hideCaption onComplete={onHatchComplete ?? (() => {})} />
             </View>
           ) : null}
 
@@ -652,7 +729,7 @@ export function WorldCanvas({
 
           {/* Hatch countdown, glued just below the egg's tile (pans/zooms with
               the world). */}
-          {eggPoint && eggVisual ? (
+          {eggPoint && eggVisual && !hatching ? (
             <View
               pointerEvents="none"
               style={[styles.countdownLayer, { left: eggPoint.x - 110, top: eggPoint.y + COUNTDOWN_DROP, width: 220 }]}>
@@ -737,11 +814,17 @@ function SpriteView({
       // Display-only: taps are handled globally by the tile hit-test, so sprites
       // never intercept touches (no z-fighting between tall transparent frames).
       pointerEvents="none"
-      // New objects spring up from their base with a little overshoot; existing
-      // ones mount at rest (from = undefined → no entrance).
-      from={animateIn ? { opacity: 0, scale: 0.2, translateY: 10 } : undefined}
-      animate={{ opacity: 1, scale: 1, translateY: 0 }}
-      transition={{ type: 'spring', damping: 8, stiffness: 175, mass: 0.85 }}
+      // New objects spring up from their base; existing ones mount at rest
+      // (from = undefined → no entrance). We animate ONLY the transform — NO
+      // opacity fade. A fading view with >1 child forces iOS/Android to rasterise
+      // the subtree to a low-res offscreen texture, which the scale (+ world zoom +
+      // spring overshoot) then magnifies → the blur seen during the bounce. Pure
+      // transform animations keep the image vector-crisp the whole way in.
+      renderToHardwareTextureAndroid={false}
+      shouldRasterizeIOS={false}
+      from={animateIn ? { scale: 0.35, translateY: 9 } : undefined}
+      animate={{ scale: 1, translateY: 0 }}
+      transition={{ type: 'spring', damping: 11, stiffness: 180, mass: 0.85 }}
       style={[styles.sprite, styles.spriteOrigin, { left, top, width: w, height: h }]}>
       <View pointerEvents="none" style={styles.spriteDisplay}>
         {source ? (

@@ -18,6 +18,7 @@ import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
+import { resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
 import type { DayVisionSummary } from '@/types/home';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
@@ -37,6 +38,9 @@ export default function MomentCaptureScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  // The on-device LLM scene read, resolved in the background while the user picks a
+  // meaning; read at commit (falls back to the engine's rule classifier if absent).
+  const sceneRef = useRef<SceneRead | null>(null);
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -68,7 +72,16 @@ export default function MomentCaptureScreen() {
       return null;
     }
     const result = await analyzePhoto(photoUri);
-    return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
+    const vision = result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
+    sceneRef.current = null;
+    if (vision) {
+      void resolveSceneRead(vision)
+        .then((scene) => {
+          sceneRef.current = scene;
+        })
+        .catch(() => {});
+    }
+    return vision;
   }, [photoUri]);
 
   const commit = useCallback(
@@ -76,7 +89,7 @@ export default function MomentCaptureScreen() {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined);
       const category = vision ? resolvePhotoCategory(vision) : { icon: 'sparkles' as const, accent: '#F1D4B4' };
       applyCapturedMoment(
-        { energy, vision, meaning: { archetype: meaning, label, thumbnailUri: photoUri ?? null } },
+        { energy, vision, meaning: { archetype: meaning, label, thumbnailUri: photoUri ?? null }, scene: sceneRef.current ?? undefined },
         captureTarget
       );
       if (photoUri) {

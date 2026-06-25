@@ -17,6 +17,7 @@ import type {
   AddMomentInput,
   ActivityPermissionState,
   BigMomentType,
+  DaySleep,
   CapturedMeaning,
   DayNote,
   DayInputTarget,
@@ -33,6 +34,9 @@ import type {
   HomeScoreKey,
   DayVisionSummary,
   DayWeather,
+  FoodMeaning,
+  FoodMoment,
+  FoodSource,
   HomeTimelineDay,
   HomeTomorrowRecord,
   InspirationCategory,
@@ -64,6 +68,8 @@ import { buildReflectionContext } from '@/utils/reflection-context';
 import { resolveVariantCellId } from '@/utils/creature-variant';
 import { aggregatePhotoVision, mergeDayVision } from '@/utils/vision-signals';
 import { mergeCaptureEnergy } from '@/utils/capture-energy';
+import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
+import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 
 import type { EncounterHistoryMap } from '@/types/home';
 
@@ -525,7 +531,7 @@ export function completeSeedForToday(
 // re-confirm of the same node overwrites. Drives the Places cell + clears its "!".
 export function confirmPlaceForToday(
   state: StoredHomeState,
-  input: { id: string; category: string; archetype: string; label: string },
+  input: { id: string; category: string; archetype: string; label: string; meaningLabel?: string },
   profile: OnboardingProfile,
   now: Date,
   target: DayInputTarget = 'today'
@@ -541,9 +547,147 @@ export function confirmPlaceForToday(
         category: input.category,
         archetype: input.archetype,
         label: input.label,
+        meaningLabel: input.meaningLabel,
         confirmedAt: now.toISOString(),
       },
     ],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// Friendly default label per Big Moment type (manual marking — no note text).
+const MANUAL_BIG_MOMENT_LABEL: Record<BigMomentType, string> = {
+  birthday: 'Birthday',
+  anniversary: 'Anniversary',
+  firstTime: 'A first',
+  holiday: 'Holiday',
+  trip: 'A trip',
+  achievement: 'An achievement',
+  milestone: 'A milestone',
+};
+
+// Manually mark today as a Big Moment (the Big Moment quest). Appends a Big
+// Moment (one per type/day) — which grows a rare landmark on the patch and lifts
+// the day's Chronicle. No note required.
+export function markBigMomentForToday(
+  state: StoredHomeState,
+  input: { type: BigMomentType; subject?: string | null },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const moment = {
+    id: `big-${now.getTime().toString(36)}-${input.type}`,
+    type: input.type,
+    label: MANUAL_BIG_MOMENT_LABEL[input.type],
+    subject: input.subject ?? null,
+    noteId: null,
+    createdAt: now.toISOString(),
+  };
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    bigMoments: [...(base.bigMoments ?? []).filter((existing) => existing.type !== input.type), moment],
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// Add a food memory (the Food quest / manual add) — grows the Food Vault. Not a
+// tracker: just what was tasted/shared, with a meaning. Capped per day.
+// Append a food moment, de-duplicated by its source reference (same note or same
+// photo never doubles up) and capped. Returns the existing list unchanged if it's
+// a duplicate, so callers can append unconditionally.
+function appendFoodMoment(existing: FoodMoment[] | undefined, moment: FoodMoment): FoodMoment[] {
+  const list = existing ?? [];
+  const dupe = list.some(
+    (m) =>
+      (!!moment.noteId && m.noteId === moment.noteId) ||
+      (!!moment.thumbnailUri && m.thumbnailUri === moment.thumbnailUri)
+  );
+  if (dupe) return list;
+  return [...list, moment].slice(-12);
+}
+
+// A food's "meaning" inferred from the moment/note's mood archetype, so an
+// auto-detected food still lands with a sensible why (the user can add a precise
+// one via the manual picker).
+function foodMeaningFromArchetype(archetype: string | undefined | null): FoodMeaning {
+  switch (archetype) {
+    case 'together':
+    case 'social':
+      return 'sharedMeal';
+    case 'meaningful':
+      return 'discovery';
+    case 'calm':
+      return 'comfort';
+    case 'energy':
+    case 'focus':
+      return 'fuel';
+    default:
+      return 'treat';
+  }
+}
+
+// Build an auto-detected food moment from a detection + its source reference.
+function buildAutoFoodMoment(
+  detection: FoodDetection,
+  opts: { source: FoodSource; now: Date; archetype?: string | null; thumbnailUri?: string | null; noteId?: string | null; detail?: string | null }
+): FoodMoment {
+  return {
+    id: `food-${opts.now.getTime().toString(36)}-${opts.source}`,
+    label: detection.label ?? 'Food',
+    emoji: detection.emoji ?? '🍽',
+    meaning: foodMeaningFromArchetype(opts.archetype),
+    thumbnailUri: opts.thumbnailUri ?? null,
+    source: opts.source,
+    noteId: opts.noteId ?? null,
+    detail: opts.detail ?? null,
+    createdAt: opts.now.toISOString(),
+  };
+}
+
+export function addFoodMomentForToday(
+  state: StoredHomeState,
+  input: { label: string; emoji: string; meaning: FoodMeaning; thumbnailUri?: string | null },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const moment: FoodMoment = {
+    id: `food-${now.getTime().toString(36)}`,
+    label: input.label,
+    emoji: input.emoji,
+    meaning: input.meaning,
+    thumbnailUri: input.thumbnailUri ?? null,
+    source: 'manual',
+    noteId: null,
+    detail: null,
+    createdAt: now.toISOString(),
+  };
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    foodMoments: appendFoodMoment(base.foodMoments, moment),
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// Set how the day began (sleep atmosphere) — from a one-tap "how was it?" answer
+// (source 'manual') or an Apple Health read (source 'appleHealth' + minutes).
+export function setSleepForToday(
+  state: StoredHomeState,
+  sleep: DaySleep,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    sleep,
   };
 
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
@@ -580,9 +724,24 @@ export function applyNoteForToday(
     label: input.label,
     createdAt,
   };
+  // If the note talks about food, fold it into the Food Vault, keeping a back-
+  // reference to the note (so the reader can show where it came from).
+  const foodDetection = detectFoodInText(input.text);
   const nextDay: StoredHomeDayRecord = {
     ...base,
     notes: [...(base.notes ?? []), note],
+    foodMoments: foodDetection.detected
+      ? appendFoodMoment(
+          base.foodMoments,
+          buildAutoFoodMoment(foodDetection, {
+            source: 'note',
+            now,
+            archetype: input.archetype,
+            noteId: note.id,
+            detail: input.text.trim().slice(0, 120),
+          })
+        )
+      : base.foodMoments,
     bigMoments: input.bigMoment
       ? [
           ...(base.bigMoments ?? []),
@@ -1036,6 +1195,9 @@ export function applyCapturedMomentForToday(
     energy: Partial<DayScores>;
     vision: DayVisionSummary | null;
     meaning?: { archetype: string; label: string; thumbnailUri?: string | null };
+    // Optional pre-resolved hierarchical scene (Apple Foundation Models LLM) from
+    // the capture screen. When absent we classify with the rule engine here.
+    scene?: SceneRead;
   },
   profile: OnboardingProfile,
   now: Date,
@@ -1046,6 +1208,12 @@ export function applyCapturedMomentForToday(
     return state;
   }
   const meaning = capture.meaning;
+  // Hierarchical read of the snapped photo: classify the scene (LLM if the screen
+  // resolved one, else the rule engine), then act on the branch. Food scenes fold
+  // straight into the Food Vault (referencing the photo's thumbnail) — no prompt.
+  const scene = capture.scene ?? classifyScene(capture.vision);
+  const foodDetection: FoodDetection =
+    scene.type === 'food' ? scene.food ?? detectFoodInVision(capture.vision) : { detected: false };
   const nextDay: StoredHomeDayRecord = {
     ...base,
     capturedEnergy: mergeCaptureEnergy(base.capturedEnergy, capture.energy),
@@ -1059,6 +1227,17 @@ export function applyCapturedMomentForToday(
           })
         : base.capturedMeanings,
     vision: capture.vision ? mergeDayVision(base.vision, capture.vision) : base.vision,
+    foodMoments: foodDetection.detected
+      ? appendFoodMoment(
+          base.foodMoments,
+          buildAutoFoodMoment(foodDetection, {
+            source: 'photo',
+            now,
+            archetype: meaning?.archetype,
+            thumbnailUri: meaning?.thumbnailUri ?? null,
+          })
+        )
+      : base.foodMoments,
   };
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
@@ -1935,6 +2114,16 @@ function computeDayScores(day: StoredHomeDayRecord) {
   nextScores.exploration = clampScore(nextScores.exploration + explorationFromPlaces);
   nextScores.calm = clampScore(nextScores.calm + calmFromSteadyDay);
   nextScores.focus = clampScore(nextScores.focus + focusFromSteadyDay);
+
+  // Sleep atmosphere gently colours the day's mood (and so the egg glow + hatch).
+  // Never a punishment: good sleep lifts calm + energy; low sleep is just a
+  // softer, calmer morning.
+  if (day.sleep?.quality === 'good') {
+    nextScores.calm = clampScore(nextScores.calm + 0.05);
+    nextScores.energy = clampScore(nextScores.energy + 0.05);
+  } else if (day.sleep?.quality === 'low') {
+    nextScores.calm = clampScore(nextScores.calm + 0.05);
+  }
 
   const pathDelta = getPathDelta(day.selectedPathId);
   scoreOrder.forEach((key) => {

@@ -7,8 +7,6 @@ import type {
   ActivityPermissionState,
   DayInputTarget,
   DayPromptKind,
-  DayScores,
-  DayVisionSummary,
   HealthPermissionState,
   LocationPermissionState,
   RecentPhotoAsset,
@@ -21,8 +19,11 @@ import {
   applyCapturedMomentForToday,
   applyGeneratedReflection,
   applyNoteForToday,
+  addFoodMomentForToday,
   completeSeedForToday,
   confirmPlaceForToday,
+  markBigMomentForToday,
+  setSleepForToday,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
   hydrateAllDays,
@@ -280,6 +281,45 @@ export function useHomeScreenState() {
     []
   );
 
+  const markBigMoment = useCallback(
+    (input: Parameters<typeof markBigMomentForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return markBigMomentForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const setSleep = useCallback(
+    (sleep: Parameters<typeof setSleepForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return setSleepForToday(hydrated.state, sleep, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const addFoodMoment = useCallback(
+    (input: Parameters<typeof addFoodMomentForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return addFoodMomentForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
   const answerDayPrompt = useCallback(
     (
       input: { kind: DayPromptKind; choiceIds: string[]; noteText?: string | null },
@@ -361,11 +401,7 @@ export function useHomeScreenState() {
   // detected subject (vision) both contribute to the hatch + reflection.
   const applyCapturedMoment = useCallback(
     (
-      capture: {
-        energy: Partial<DayScores>;
-        vision: DayVisionSummary | null;
-        meaning?: { archetype: string; label: string; thumbnailUri?: string | null };
-      },
+      capture: Parameters<typeof applyCapturedMomentForToday>[1],
       target: DayInputTarget = 'today'
     ) => {
       const now = new Date();
@@ -719,6 +755,9 @@ export function useHomeScreenState() {
     completeSeed,
     addNote,
     confirmPlace,
+    markBigMoment,
+    setSleep,
+    addFoodMoment,
     isTodayHatched,
     tomorrowDay,
     tomorrowActivePrompt,

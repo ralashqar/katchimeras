@@ -45,6 +45,12 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   prop_coffee_table: require('../assets/images/katchimeras/world/props/prop_coffee_table.png'),
   // Seed-object reward (Daily Seeds, Today Patch V2).
   seed_water_lily: require('../assets/images/katchimeras/world/props/seed_water_lily.png'),
+  // Sleep Atmosphere tile — graphic varies by how the day began.
+  sleep_good: require('../assets/images/katchimeras/world/props/sleep_good.png'),
+  sleep_normal: require('../assets/images/katchimeras/world/props/sleep_normal.png'),
+  sleep_low: require('../assets/images/katchimeras/world/props/sleep_low.png'),
+  // Food Vault tile — a little food stall; grows as food memories are saved.
+  food_stall: require('../assets/images/katchimeras/world/props/food_stall.png'),
   // Memory Vault chest stages (Diorama Time Capsule).
   vault_chest_small: require('../assets/images/katchimeras/world/props/vault_chest_small.png'),
   vault_chest: require('../assets/images/katchimeras/world/props/vault_chest.png'),

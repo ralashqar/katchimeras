@@ -33,6 +33,34 @@ export const PLACE_MEANINGS: PlaceMeaning[] = [
   { id: 'focus', emoji: '🎯', label: 'Focus', tint: '#92D7FF' },
 ];
 
+// Tint per underlying mood archetype (the `id` every meaning still maps to, so the
+// patch + scores stay driven by the same 5 archetypes).
+const TINT: Record<string, string> = {
+  calm: '#7DE8CD',
+  energy: '#FFC36B',
+  together: '#F49AC1',
+  meaningful: '#A78BFA',
+  focus: '#92D7FF',
+};
+const m = (id: string, emoji: string, label: string): PlaceMeaning => ({ id, emoji, label, tint: TINT[id] ?? '#C4BAF0' });
+
+// "What did it mean?" tailored to WHAT the place was — each option still resolves
+// to one of the 5 archetypes, but the wording fits the category. Falls back to the
+// generic PLACE_MEANINGS for 'other'/unknown.
+export const PLACE_MEANINGS_BY_CATEGORY: Record<string, PlaceMeaning[]> = {
+  cafe: [m('calm', '🌿', 'Calm'), m('together', '🧑‍🤝‍🧑', 'Caught up'), m('focus', '🎯', 'Got work done'), m('energy', '☕', 'A treat'), m('meaningful', '🕊', 'Me-time')],
+  food: [m('together', '🧑‍🤝‍🧑', 'Shared meal'), m('energy', '🎁', 'A treat'), m('calm', '💛', 'Comfort'), m('meaningful', '✨', 'Discovery'), m('focus', '⚡', 'Quick bite')],
+  park: [m('calm', '🌿', 'Peaceful'), m('energy', '⚡', 'Active'), m('together', '🧑‍🤝‍🧑', 'Together'), m('meaningful', '🍃', 'Fresh air'), m('focus', '🧠', 'Cleared my head')],
+  cinema: [m('meaningful', '🎭', 'Moving'), m('energy', '🍿', 'Fun'), m('together', '🧑‍🤝‍🧑', 'Together'), m('calm', '🌙', 'An escape')],
+  museum: [m('meaningful', '🏛', 'Inspiring'), m('calm', '🌿', 'Reflective'), m('focus', '🔍', 'Curious'), m('together', '🧑‍🤝‍🧑', 'Together')],
+  shopping: [m('energy', '🎁', 'A treat'), m('focus', '🎯', 'Errands'), m('meaningful', '✨', 'Found something'), m('together', '🧑‍🤝‍🧑', 'Together')],
+  work: [m('focus', '🎯', 'Focused'), m('energy', '⚡', 'Productive'), m('meaningful', '🏆', 'A win'), m('together', '🧑‍🤝‍🧑', 'With the team'), m('calm', '🌿', 'Routine')],
+  home: [m('calm', '🛋', 'Restful'), m('together', '🧑‍🤝‍🧑', 'Family time'), m('meaningful', '💛', 'Cozy'), m('focus', '🎯', 'Got things done'), m('energy', '✨', 'Lively')],
+};
+export function meaningsForCategory(categoryId: string): PlaceMeaning[] {
+  return PLACE_MEANINGS_BY_CATEGORY[categoryId] ?? PLACE_MEANINGS;
+}
+
 type PlacePromptSheetProps = {
   // Shown for context — the detected place's name + time range.
   placeName: string;
@@ -95,9 +123,9 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, onConfirm, onClo
               {`${category.emoji} ${category.label} · what did it mean?`}
             </ThemedText>
             <View style={styles.grid}>
-              {PLACE_MEANINGS.map((option) => (
+              {meaningsForCategory(category.id).map((option) => (
                 <Pressable
-                  key={option.id}
+                  key={`${option.id}-${option.label}`}
                   onPress={() => onConfirm(category, option)}
                   style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>

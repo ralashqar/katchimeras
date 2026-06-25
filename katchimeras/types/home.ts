@@ -503,6 +503,34 @@ export type CapturedMeaning = {
   createdAt: string;
 };
 
+// Food memories — what you tasted, shared, or enjoyed (never calorie tracking).
+// Created only when food is actually part of the day (a food quest / manual add).
+export type FoodMeaning = 'treat' | 'sharedMeal' | 'comfort' | 'fuel' | 'discovery';
+// How a food memory entered the vault: a manual two-step add, an auto-detect from
+// a snapped photo (Apple Vision), or an auto-detect from a note's text.
+export type FoodSource = 'manual' | 'photo' | 'note';
+export type FoodMoment = {
+  id: string;
+  label: string; // "Coffee", "Dinner", "Dessert"
+  emoji: string;
+  meaning: FoodMeaning;
+  thumbnailUri?: string | null;
+  source?: FoodSource;
+  noteId?: string | null; // the note this food was detected in (source 'note')
+  detail?: string | null; // a short snippet for the reader (e.g. note excerpt)
+  createdAt: string;
+};
+
+// How the day began, atmospherically. Never a score or a failure — low sleep is
+// just a softer, mistier morning. Manual for now (a one-tap "how was your
+// sleep?"); Apple Health can fill it passively later.
+export type SleepQuality = 'good' | 'normal' | 'low';
+export type DaySleep = {
+  quality: SleepQuality;
+  source: 'manual' | 'appleHealth';
+  totalSleepMinutes?: number;
+};
+
 // A place the user confirmed for the day — the "where" (category) + the "why"
 // (meaning). Location gives the spot; the user gives the meaning. Keyed by the
 // day-map node id so each detected place is confirmed at most once.
@@ -511,6 +539,7 @@ export type ConfirmedPlace = {
   category: string; // 'cafe' | 'park' | 'work' | 'home' | 'food' | ... (the "where")
   archetype: string; // calm | energy | together | meaningful | focus (the "why")
   label: string; // display label (the category's friendly name)
+  meaningLabel?: string; // the category-specific "what it meant" phrase ("Focused", "A treat")
   confirmedAt: string;
 };
 
@@ -585,6 +614,10 @@ export type StoredHomeDayRecord = {
   // Places the user confirmed (category + meaning) for the day — drives the
   // Places cell + clears the places "!" once every detected place is confirmed.
   confirmedPlaces?: ConfirmedPlace[];
+  // How the day began (sleep atmosphere) — manual one-tap for now.
+  sleep?: DaySleep;
+  // Food memories — populate the Food Vault when food is part of the day.
+  foodMoments?: FoodMoment[];
   // Today Patch V2 — Daily Seed ids the user has completed (manual one-tap).
   // Passive seeds are satisfied from signals, not stored here. Each earned seed
   // grows its reward object on the Today patch. See utils/daily-seeds-engine.ts.

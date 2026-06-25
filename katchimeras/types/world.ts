@@ -30,8 +30,9 @@ export type WorldObjectKind = 'anchor' | 'prop' | 'memory' | 'creature' | 'landm
 // 'reflection' (mood/meaning). The creature/egg sits separately at the centre.
 // Cell categories drive the four leveling cells. 'notes' is NOT a cell — it's a
 // standalone chest object (see notesObject) that taps into its own notes reader,
-// so it lives in the object-category union but not in PatchCellType.
-export type WorldObjectCategory = 'memory' | 'places' | 'journey' | 'reflection' | 'notes';
+// so it lives in the object-category union but not in PatchCellType. 'sleep' is
+// the same kind of standalone object (sleepObject) — a tappable tile, no cell.
+export type WorldObjectCategory = 'memory' | 'places' | 'journey' | 'reflection' | 'notes' | 'sleep' | 'food';
 export type PatchCellType = 'memory' | 'places' | 'journey' | 'reflection';
 
 // A single cell: its fixed grid position, current level (0 = empty ghost), the

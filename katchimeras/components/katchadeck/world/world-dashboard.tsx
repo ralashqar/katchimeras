@@ -1,19 +1,20 @@
-import { useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
-import type { HomeDayRecord } from '@/types/home';
-import type { DailySeed } from '@/utils/daily-seeds-engine';
-
-type SeedWithEarned = DailySeed & { earned: boolean };
+import type { FoodMoment, HomeDayRecord } from '@/types/home';
+import type { DayChronicle } from '@/utils/chronicle-engine';
+import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
 
 type WorldDashboardProps = {
   days: HomeDayRecord[];
-  seeds: SeedWithEarned[];
-  onCompleteSeed?: (seedId: string, from: FeedSourceRect) => void;
+  quests: MemoryQuest[];
+  onQuest?: (type: MemoryQuestType) => void;
+  chronicle?: DayChronicle | null;
+  onOpenChronicle?: () => void;
+  foodMoments?: FoodMoment[];
+  onOpenFood?: () => void;
 };
 
 // Consecutive calendar days (ending most-recently) that have hatched a creature.
@@ -73,26 +74,67 @@ function computeWeek(days: HomeDayRecord[]): { key: string; label: string; value
   }));
 }
 
-// The dashboard below the diorama: Today's Seeds, then World Streak / This Week /
+// The dashboard below the diorama: Memory Quests, then World Streak / This Week /
 // World Mood cards. Mirrors the reference home layout.
-export function WorldDashboard({ days, seeds, onCompleteSeed }: WorldDashboardProps) {
+export function WorldDashboard({
+  days,
+  quests,
+  onQuest,
+  chronicle,
+  onOpenChronicle,
+  foodMoments,
+  onOpenFood,
+}: WorldDashboardProps) {
   const streak = computeStreak(days);
   const mood = computeMood(days);
   const week = computeWeek(days);
 
   return (
     <View style={styles.root}>
-      {seeds.length > 0 ? (
+      {chronicle?.hasStory ? (
+        <Pressable onPress={onOpenChronicle} style={styles.chronicleCard}>
+          <View style={styles.sectionHead}>
+            <IconSymbol name="book.closed.fill" size={13} color={Lantern.ember300} />
+            <ThemedText style={styles.chronicleKicker} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Chronicle
+            </ThemedText>
+            <IconSymbol name="chevron.right" size={13} color={Lantern.moon500} style={styles.chronicleChevron} />
+          </View>
+          <ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            {chronicle.title}
+          </ThemedText>
+          <ThemedText style={styles.chronicleSummary} numberOfLines={2} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            {chronicle.summary}
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
+      {foodMoments && foodMoments.length > 0 ? (
+        <Pressable onPress={onOpenFood} style={styles.chronicleCard}>
+          <View style={styles.sectionHead}>
+            <ThemedText style={styles.sleepEmoji}>🍽</ThemedText>
+            <ThemedText style={styles.chronicleKicker} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Food Vault
+            </ThemedText>
+            <IconSymbol name="chevron.right" size={13} color={Lantern.moon500} style={styles.chronicleChevron} />
+          </View>
+          <ThemedText style={styles.foodCardRow}>
+            {foodMoments.slice(0, 8).map((moment) => moment.emoji).join('  ')}
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
+      {quests.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHead}>
-            <IconSymbol name="leaf.fill" size={13} color={Lantern.auroraTeal} />
+            <IconSymbol name="sparkles" size={13} color={Lantern.auroraTeal} />
             <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Today’s Seeds
+              Memory Quests
             </ThemedText>
           </View>
           <View style={styles.seedRow}>
-            {seeds.map((seed) => (
-              <SeedCard key={seed.id} seed={seed} onComplete={onCompleteSeed} />
+            {quests.map((quest) => (
+              <QuestCard key={quest.id} quest={quest} onPress={onQuest} />
             ))}
           </View>
         </View>
@@ -153,31 +195,26 @@ export function WorldDashboard({ days, seeds, onCompleteSeed }: WorldDashboardPr
   );
 }
 
-function SeedCard({ seed, onComplete }: { seed: SeedWithEarned; onComplete?: (seedId: string, from: FeedSourceRect) => void }) {
-  const ref = useRef<View>(null);
+function QuestCard({ quest, onPress }: { quest: MemoryQuest; onPress?: (type: MemoryQuestType) => void }) {
   const handlePress = () => {
-    if (seed.earned || !onComplete) return;
-    if (ref.current) {
-      ref.current.measureInWindow((x, y, w, h) => onComplete(seed.id, { x, y, w, h }));
-    } else {
-      onComplete(seed.id, { x: 0, y: 0, w: 0, h: 0 });
-    }
+    if (quest.completed || !onPress) return;
+    onPress(quest.type);
   };
   return (
-    <Pressable ref={ref} onPress={handlePress} style={styles.seedCard} disabled={seed.earned}>
-      <ThemedText style={styles.seedEmoji}>{seed.emoji}</ThemedText>
-      <ThemedText style={styles.seedLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50} numberOfLines={2}>
-        {seed.label}
+    <Pressable onPress={handlePress} style={styles.seedCard} disabled={quest.completed}>
+      <ThemedText style={styles.seedEmoji}>{quest.emoji}</ThemedText>
+      <ThemedText style={styles.seedLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50} numberOfLines={3}>
+        {quest.title}
       </ThemedText>
       <View style={styles.seedFootRow}>
         <ThemedText style={styles.seedReward} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal} numberOfLines={1}>
-          {`+ ${seed.reward.label}`}
+          {quest.completed ? 'Done' : `+ ${quest.rewardLabel}`}
         </ThemedText>
-        <View style={[styles.seedCheck, seed.earned ? styles.seedCheckDone : null]}>
+        <View style={[styles.seedCheck, quest.completed ? styles.seedCheckDone : null]}>
           <IconSymbol
-            name={seed.earned ? 'sparkles' : 'arrow.right'}
+            name={quest.completed ? 'sparkles' : 'arrow.right'}
             size={12}
-            color={seed.earned ? Lantern.emberInk : Lantern.moon300}
+            color={quest.completed ? Lantern.emberInk : Lantern.moon300}
           />
         </View>
       </View>
@@ -197,6 +234,42 @@ const styles = StyleSheet.create({
   },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   sectionTitle: { fontSize: 14, fontWeight: '800', letterSpacing: 0.2 },
+  chronicleCard: {
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(20,17,31,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,195,107,0.22)',
+    gap: 5,
+  },
+  chronicleKicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+  chronicleChevron: { marginLeft: 'auto' },
+  chronicleSummary: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  sleepCard: {
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(20,17,31,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.2)',
+    gap: 8,
+  },
+  sleepEmoji: { fontSize: 15 },
+  sleepChips: { flexDirection: 'row', gap: 8 },
+  sleepChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(28,24,48,0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(196,186,240,0.14)',
+  },
+  sleepChipEmoji: { fontSize: 15 },
+  sleepChipLabel: { fontSize: 13, fontWeight: '700' },
+  foodCardRow: { fontSize: 20, letterSpacing: 2 },
   seedRow: { flexDirection: 'row', gap: 8 },
   seedCard: {
     flex: 1,
