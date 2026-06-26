@@ -13,7 +13,8 @@ export type MemoryQuestType =
   | 'answerReflection'
   | 'markPlace'
   | 'markBigMoment'
-  | 'saveFoodMemory';
+  | 'saveFoodMemory'
+  | 'namePatch';
 
 export type MemoryQuestTargetCell = 'memory' | 'reflection' | 'places' | 'chronicle' | 'foodVault';
 
@@ -24,6 +25,10 @@ export type MemoryQuest = {
   title: string;
   rewardLabel: string;
   targetCell: MemoryQuestTargetCell;
+  // Essence shown as the quest's incentive — equals the value of its target event
+  // (the actual credit flows through the essence ledger, not the quest, so there's
+  // no double-pay). See docs/progression-customisation-design.md §3.2.
+  essenceReward: number;
   completed: boolean;
 };
 
@@ -40,6 +45,7 @@ type QuestDayInput = Pick<
   | 'visitedPlaceCount'
   | 'bigMoments'
   | 'foodMoments'
+  | 'dayName'
   | 'vision'
 >;
 
@@ -52,6 +58,7 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
     title: 'Capture something that stood out',
     rewardLabel: 'a memory',
     targetCell: 'memory',
+    essenceReward: 5,
   },
   recordVoiceMemory: {
     type: 'recordVoiceMemory',
@@ -59,6 +66,7 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
     title: 'Record a voice memory',
     rewardLabel: 'a voice crystal',
     targetCell: 'memory',
+    essenceReward: 8,
   },
   answerReflection: {
     type: 'answerReflection',
@@ -66,6 +74,7 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
     title: 'Give today a meaning',
     rewardLabel: 'your reflection',
     targetCell: 'reflection',
+    essenceReward: 4,
   },
   markPlace: {
     type: 'markPlace',
@@ -73,6 +82,7 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
     title: 'Mark a place from today',
     rewardLabel: 'a place',
     targetCell: 'places',
+    essenceReward: 6,
   },
   markBigMoment: {
     type: 'markBigMoment',
@@ -80,6 +90,7 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
     title: 'Mark today as a big moment',
     rewardLabel: 'a landmark',
     targetCell: 'chronicle',
+    essenceReward: 15,
   },
   saveFoodMemory: {
     type: 'saveFoodMemory',
@@ -87,6 +98,15 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
     title: 'Save a food memory',
     rewardLabel: 'the food vault',
     targetCell: 'foodVault',
+    essenceReward: 5,
+  },
+  namePatch: {
+    type: 'namePatch',
+    emoji: '🏷',
+    title: "Name today's patch",
+    rewardLabel: 'a story banner',
+    targetCell: 'chronicle',
+    essenceReward: 3,
   },
 };
 
@@ -109,6 +129,8 @@ export function isQuestComplete(type: MemoryQuestType, day: QuestDayInput): bool
       return (day.bigMoments?.length ?? 0) > 0;
     case 'saveFoodMemory':
       return (day.foodMoments?.length ?? 0) > 0;
+    case 'namePatch':
+      return !!day.dayName && day.dayName.trim().length > 0;
     default:
       return false;
   }
@@ -138,6 +160,15 @@ export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3): Memo
   if (hour >= 17) offered.push('recordVoiceMemory');
   // A big moment can be marked any time (optional, lower priority).
   offered.push('markBigMoment');
+  // Once the day has something worth naming, offer to name the patch (low priority).
+  const hasContent =
+    (day.capturedMeanings?.length ?? 0) > 0 ||
+    !!day.heroPhoto ||
+    (day.notes?.length ?? 0) > 0 ||
+    (day.confirmedPlaces?.length ?? 0) > 0 ||
+    (day.bigMoments?.length ?? 0) > 0 ||
+    (day.foodMoments?.length ?? 0) > 0;
+  if (hasContent) offered.push('namePatch');
   // Fill the slate with a voice memory if nothing else made the cut.
   if (!offered.includes('recordVoiceMemory') && offered.length < max) offered.push('recordVoiceMemory');
 

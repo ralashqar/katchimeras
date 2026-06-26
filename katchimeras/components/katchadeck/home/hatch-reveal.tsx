@@ -36,12 +36,14 @@ type HatchRevealProps = {
   // Hide the built-in "Today became / name" caption — used when the host renders
   // its own header (e.g. the World page's "You hatched X" banner).
   hideCaption?: boolean;
+  // Optional cosmetic lantern-colour override for the egg's glow during the reveal.
+  lanternColor?: string;
 };
 
 // In-place hatch: the SAME egg widget already on the page rattles, cracks, then
 // shrinks away exactly as the hatched katchimera scales up in its spot — matching
 // the onboarding cinematic. No page change, no moved egg.
-export function HatchReveal({ egg, creature, onComplete, hideCaption = false }: HatchRevealProps) {
+export function HatchReveal({ egg, creature, onComplete, hideCaption = false, lanternColor }: HatchRevealProps) {
   const [phase, setPhase] = useState<HatchRevealPhase>('build');
   const [crackStage, setCrackStage] = useState<0 | 1 | 2>(0);
 
@@ -142,7 +144,7 @@ export function HatchReveal({ egg, creature, onComplete, hideCaption = false }: 
     <View style={styles.stage}>
       <View style={styles.eggArea}>
         <Animated.View pointerEvents="none" style={eggStyle}>
-          <LanternEgg crackStage={crackStage} egg={egg} />
+          <LanternEgg crackStage={crackStage} egg={egg} lanternColor={lanternColor} />
         </Animated.View>
 
         {heroSource ? (

@@ -51,6 +51,15 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   sleep_low: require('../assets/images/katchimeras/world/props/sleep_low.png'),
   // Food Vault tile — a little food stall; grows as food memories are saved.
   food_stall: require('../assets/images/katchimeras/world/props/food_stall.png'),
+  // Discovery artefacts — permanent monuments unlocked by life milestones.
+  artefact_museum_banner: require('../assets/images/katchimeras/world/props/artefact_museum_banner.png'),
+  artefact_voice_crystal: require('../assets/images/katchimeras/world/props/artefact_voice_crystal.png'),
+  artefact_festival_tree: require('../assets/images/katchimeras/world/props/artefact_festival_tree.png'),
+  artefact_golden_arch: require('../assets/images/katchimeras/world/props/artefact_golden_arch.png'),
+  artefact_life_monument: require('../assets/images/katchimeras/world/props/artefact_life_monument.png'),
+  artefact_journey_monument: require('../assets/images/katchimeras/world/props/artefact_journey_monument.png'),
+  artefact_trail_bridge: require('../assets/images/katchimeras/world/props/artefact_trail_bridge.png'),
+  artefact_memory_lantern: require('../assets/images/katchimeras/world/props/artefact_memory_lantern.png'),
   // Memory Vault chest stages (Diorama Time Capsule).
   vault_chest_small: require('../assets/images/katchimeras/world/props/vault_chest_small.png'),
   vault_chest: require('../assets/images/katchimeras/world/props/vault_chest.png'),

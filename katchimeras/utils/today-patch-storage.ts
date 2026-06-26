@@ -1,6 +1,6 @@
 import type { HomeDayRecord } from '@/types/home';
 import type { WorldPatch } from '@/types/world';
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 import { deriveTodayPatch } from '@/utils/today-patch-engine';
 
 // Stored separately from the world (utils/world-storage) so growing today's live
@@ -16,6 +16,11 @@ export function loadTodayPatch(): WorldPatch | null {
 
 export function saveTodayPatch(patch: WorldPatch) {
   setStoredJson(TODAY_PATCH_STORAGE_KEY, patch);
+}
+
+// Dev-only: drop the stored live patch so today's tile rebuilds from a bare patch.
+export function clearTodayPatch() {
+  removeStoredValue(TODAY_PATCH_STORAGE_KEY);
 }
 
 // The one call the app makes: grow today's live patch from the day and persist

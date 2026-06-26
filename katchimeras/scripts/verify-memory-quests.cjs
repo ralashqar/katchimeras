@@ -98,8 +98,15 @@ check('Big Moment completes once a big moment is marked', engine.isQuestComplete
 check('Food completes once a food memory is saved', engine.isQuestComplete('saveFoodMemory', day({ foodMoments: [{ id: 'f', meaning: 'treat' }] })));
 check('Big Moment is offered on a bare day', engine.selectMemoryQuests(day(), morning).some((q) => q.type === 'markBigMoment'));
 
+// --- namePatch (Phase B) ---
+check('namePatch completes once the day is named', engine.isQuestComplete('namePatch', day({ dayName: 'A slow Sunday' })));
+check('namePatch is incomplete when unnamed', !engine.isQuestComplete('namePatch', day()));
+check('namePatch is offered once the day has content', engine.selectMemoryQuests(day({ capturedMeanings: [meaning] }), morning, 7).some((q) => q.type === 'namePatch'));
+check('namePatch is NOT offered on an empty day', !engine.selectMemoryQuests(day(), morning, 7).some((q) => q.type === 'namePatch'));
+check('every quest carries an essence reward', engine.selectMemoryQuests(day({ capturedMeanings: [meaning] }), morning, 7).every((q) => typeof q.essenceReward === 'number' && q.essenceReward > 0));
+
 // --- ordering: completed quests sink below incomplete ones ---
-const mixed = engine.selectMemoryQuests(day({ capturedMeanings: [meaning] }), morning);
+const mixed = engine.selectMemoryQuests(day({ capturedMeanings: [meaning] }), morning, 7);
 check('a completed quest is marked completed', mixed.find((q) => q.type === 'captureMoment')?.completed === true);
 const firstCompleted = mixed.findIndex((q) => q.completed);
 check(

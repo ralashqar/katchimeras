@@ -15,6 +15,11 @@ type WorldDashboardProps = {
   onOpenChronicle?: () => void;
   foodMoments?: FoodMoment[];
   onOpenFood?: () => void;
+  discoveriesUnlocked?: number;
+  discoveriesTotal?: number;
+  onOpenDiscoveries?: () => void;
+  onOpenCosmetics?: () => void;
+  essenceBalance?: number;
 };
 
 // Consecutive calendar days (ending most-recently) that have hatched a creature.
@@ -84,6 +89,11 @@ export function WorldDashboard({
   onOpenChronicle,
   foodMoments,
   onOpenFood,
+  discoveriesUnlocked = 0,
+  discoveriesTotal = 0,
+  onOpenDiscoveries,
+  onOpenCosmetics,
+  essenceBalance,
 }: WorldDashboardProps) {
   const streak = computeStreak(days);
   const mood = computeMood(days);
@@ -91,6 +101,20 @@ export function WorldDashboard({
 
   return (
     <View style={styles.root}>
+      {typeof essenceBalance === 'number' ? (
+        <View style={styles.essenceChip}>
+          <ThemedText style={styles.essenceChipMark} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+            ✦
+          </ThemedText>
+          <ThemedText style={styles.essenceChipValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            {essenceBalance}
+          </ThemedText>
+          <ThemedText style={styles.essenceChipLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            Essence
+          </ThemedText>
+        </View>
+      ) : null}
+
       {chronicle?.hasStory ? (
         <Pressable onPress={onOpenChronicle} style={styles.chronicleCard}>
           <View style={styles.sectionHead}>
@@ -120,6 +144,36 @@ export function WorldDashboard({
           </View>
           <ThemedText style={styles.foodCardRow}>
             {foodMoments.slice(0, 8).map((moment) => moment.emoji).join('  ')}
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
+      {onOpenDiscoveries && discoveriesTotal > 0 ? (
+        <Pressable onPress={onOpenDiscoveries} style={styles.chronicleCard}>
+          <View style={styles.sectionHead}>
+            <ThemedText style={styles.sleepEmoji}>🏛</ThemedText>
+            <ThemedText style={styles.chronicleKicker} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Discoveries
+            </ThemedText>
+            <IconSymbol name="chevron.right" size={13} color={Lantern.moon500} style={styles.chronicleChevron} />
+          </View>
+          <ThemedText style={styles.chronicleSummary} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            {discoveriesUnlocked} of {discoveriesTotal} found — milestones from your life.
+          </ThemedText>
+        </Pressable>
+      ) : null}
+
+      {onOpenCosmetics ? (
+        <Pressable onPress={onOpenCosmetics} style={styles.chronicleCard}>
+          <View style={styles.sectionHead}>
+            <ThemedText style={styles.sleepEmoji}>🎨</ThemedText>
+            <ThemedText style={styles.chronicleKicker} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Customize
+            </ThemedText>
+            <IconSymbol name="chevron.right" size={13} color={Lantern.moon500} style={styles.chronicleChevron} />
+          </View>
+          <ThemedText style={styles.chronicleSummary} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            Lantern colours unlocked by your discoveries.
           </ThemedText>
         </Pressable>
       ) : null}
@@ -202,6 +256,13 @@ function QuestCard({ quest, onPress }: { quest: MemoryQuest; onPress?: (type: Me
   };
   return (
     <Pressable onPress={handlePress} style={styles.seedCard} disabled={quest.completed}>
+      {!quest.completed ? (
+        <View style={styles.essenceBadge}>
+          <ThemedText style={styles.essenceBadgeText} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+            ✦{quest.essenceReward}
+          </ThemedText>
+        </View>
+      ) : null}
       <ThemedText style={styles.seedEmoji}>{quest.emoji}</ThemedText>
       <ThemedText style={styles.seedLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50} numberOfLines={3}>
         {quest.title}
@@ -281,7 +342,35 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 92,
     justifyContent: 'space-between',
+    overflow: 'hidden',
   },
+  essenceBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(125,232,205,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.3)',
+  },
+  essenceBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.2 },
+  essenceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(125,232,205,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.28)',
+  },
+  essenceChipMark: { fontSize: 13, fontWeight: '900' },
+  essenceChipValue: { fontSize: 14, fontWeight: '800' },
+  essenceChipLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' },
   seedEmoji: { fontSize: 18 },
   seedLabel: { fontSize: 11.5, fontWeight: '700', lineHeight: 15 },
   seedFootRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 },

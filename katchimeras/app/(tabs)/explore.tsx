@@ -32,7 +32,8 @@ import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals
 import { requestComicBeats } from '@/utils/day-reflection';
 import { encounterLiveCast } from '@/constants/encounter-cast';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual, resetTodayInState } from '@/utils/home-engine';
+import { clearTodayPatch } from '@/utils/today-patch-storage';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 
 export default function ExploreScreen() {
@@ -92,6 +93,28 @@ export default function ExploreScreen() {
           onPress: () => {
             clearAllStoredValues();
             router.replace('/onboarding');
+          },
+        },
+      ]
+    );
+  }
+
+  function handleResetToday() {
+    Alert.alert(
+      'Reset today only?',
+      'Clears just TODAY back to a blank day. Keeps onboarding, past days, discoveries, and essence.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset today',
+          style: 'destructive',
+          onPress: () => {
+            const state = loadStoredHomeState();
+            if (state) {
+              saveStoredHomeState(resetTodayInState(state, loadOnboardingProfile(), new Date()));
+            }
+            clearTodayPatch();
+            router.replace('/(tabs)');
           },
         },
       ]
@@ -287,6 +310,7 @@ export default function ExploreScreen() {
               <SectionHeader label="Fast actions" title="Reset and debug" />
               <View style={styles.devActions}>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
+                <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
                 <KatchaButton label="Analyze a photo (vision)" onPress={handleAnalyzePickedPhoto} variant="secondary" />
                 <KatchaButton

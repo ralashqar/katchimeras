@@ -13,6 +13,7 @@ import { CreatureProvenance } from '@/components/katchadeck/home/creature-proven
 import { DayJournalSections } from '@/components/katchadeck/home/day-journal-sections';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import { currentLanternColour } from '@/utils/cosmetics-storage';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
@@ -296,6 +297,9 @@ export default function HomeScreen() {
   // + which day/prompts to use are unified here so the same UI drives both.
   const onTomorrowForming = selectedDay?.kind === 'tomorrow' && isTodayHatched;
   const isForming = isFormingToday || onTomorrowForming;
+  // Cosmetic lantern-colour override (Discovery-unlocked), read from storage so the
+  // today page reflects the same choice as the World tab. Undefined = natural.
+  const lanternColour = currentLanternColour();
   const formingTarget = onTomorrowForming ? 'tomorrow' : 'today';
   const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
   const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
@@ -463,6 +467,7 @@ export default function HomeScreen() {
             <HatchReveal
               creature={selectedDay?.kind === 'day' ? selectedDay.creature ?? null : null}
               egg={hatchingEgg}
+              lanternColor={lanternColour}
               onComplete={handleHatchComplete}
             />
           ) : isDay ? (
@@ -474,6 +479,7 @@ export default function HomeScreen() {
                 onPress={selectedDay.canAddMoments ? openPromptSheet : undefined}
                 reactionKey={selectedDay.moments.length}
                 feedKey={eggFeedKey}
+                lanternColor={lanternColour}
               />
             )
           ) : onTomorrowForming ? (
@@ -482,6 +488,7 @@ export default function HomeScreen() {
               onPress={openPromptSheet}
               reactionKey={tomorrowDay.moments.length}
               feedKey={eggFeedKey}
+              lanternColor={lanternColour}
             />
           ) : (
             <LanternEgg

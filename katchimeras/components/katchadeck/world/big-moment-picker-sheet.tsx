@@ -21,6 +21,14 @@ const OPTIONS: BigMomentOption[] = [
   { type: 'holiday', emoji: '🎏', label: 'Holiday' },
 ];
 
+// Shared emoji/label per big-moment type — reused by the reader (BigMomentSheet)
+// and anywhere a big moment is shown. 'celebration' isn't a picker option but can
+// arrive from note interpretation, so give it a friendly default too.
+export const BIG_MOMENT_META: Record<string, { emoji: string; label: string }> = {
+  ...Object.fromEntries(OPTIONS.map((option) => [option.type, { emoji: option.emoji, label: option.label }])),
+  celebration: { emoji: '🎉', label: 'Celebration' },
+};
+
 type BigMomentPickerSheetProps = {
   onPick: (type: BigMomentType) => void;
   onClose: () => void;

@@ -27,6 +27,7 @@ import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
 import type { MemoryNode, WorldPatch } from '@/types/world';
+import type { PlacedArtefact } from '@/utils/discoveries-artefacts';
 import { layoutWorld, type SceneFence, type SceneSprite } from '@/utils/world-scene';
 import { cellCenter, cellFromPoint, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
 import {
@@ -43,6 +44,14 @@ type Props = {
   onSelectMemory: (memory: MemoryNode, patchId: string) => void;
   // Tapping a cell object on today's patch opens that cell's detail view.
   onSelectCell?: (cellType: NonNullable<SceneSprite['category']>) => void;
+  // Tapping a Big Moment landmark (celebration/milestone/trip…) opens its bespoke
+  // reader instead of the generic patch inspector.
+  onSelectBigMoment?: () => void;
+  // Permanent Discovery artefacts placed on the patch's outer ring (decorative —
+  // they frame every day the same way). Pre-placed by utils/discoveries-artefacts.
+  artefacts?: PlacedArtefact[];
+  // Cosmetic lantern-colour override for the egg's glow (Discovery-unlocked).
+  lanternColor?: string;
   // Draw a glowing ring under this cell's object (the last one tapped).
   highlightedCell?: SceneSprite['category'] | null;
   // A captured photo flying into a cell's object (e.g. into the Memory chest).
@@ -169,12 +178,15 @@ export function WorldCanvas({
   onSelectPatch,
   onSelectMemory,
   onSelectCell,
+  onSelectBigMoment,
   eggPatchId,
   eggVisual,
   eggReady = false,
   hatching = false,
   hatchingCreature = null,
   onHatchComplete,
+  artefacts,
+  lanternColor,
   eggFeedKey = 0,
   highlightedCell,
   captureFly,
@@ -211,6 +223,21 @@ export function WorldCanvas({
       y: slab.centre.y + (cellCenter(EGG_CELL.col, EGG_CELL.row).y - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y),
     };
   }, [scene, focusSlab, eggPatchId]);
+
+  // Discovery artefacts seated on the outer ring of the rendered patch — projected
+  // from that slab's centre so they pan/zoom with the world and frame whichever day
+  // is shown. Decorative only (pointerEvents none).
+  const artefactPoints = useMemo(() => {
+    if (!artefacts || artefacts.length === 0) return [];
+    const slab = scene.slabs.find((s) => s.patchId === eggPatchId) ?? scene.slabs[0];
+    if (!slab) return [];
+    const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
+    return artefacts.map((artefact) => ({
+      ...artefact,
+      x: slab.centre.x + (cellCenter(artefact.col, artefact.row).x - origin.x),
+      y: slab.centre.y + (cellCenter(artefact.col, artefact.row).y - origin.y),
+    }));
+  }, [artefacts, scene, eggPatchId]);
 
   // The object to draw a highlight ring under — the last cell the user tapped.
   const highlightSprite = useMemo(() => {
@@ -353,6 +380,41 @@ export function WorldCanvas({
   }, [tx, ty, scale, startScale, centreFor, baseScale]);
   useFocusEffect(recentreOnFocus);
 
+  // During an in-place hatch: glide-zoom in and centre on the egg; on completion,
+  // glide back to the resting framing. Reads the latest geometry via a ref so the
+  // effect only fires on the `hatching` edge (not on every patch growth). A
+  // wasHatching guard keeps it from animating on first mount.
+  const hatchCamRef = useRef({ viewport, focusSlab, hatchAnchor, baseScale, maxScale, centreFor });
+  hatchCamRef.current = { viewport, focusSlab, hatchAnchor, baseScale, maxScale, centreFor };
+  const wasHatchingRef = useRef(false);
+  useEffect(() => {
+    const { viewport: vp, focusSlab: fs, hatchAnchor: anchor, baseScale: bs, maxScale: ms, centreFor: cf } =
+      hatchCamRef.current;
+    if (!vp.width) return;
+    const timing = { duration: 480, easing: Easing.inOut(Easing.cubic) };
+    if (hatching && anchor) {
+      wasHatchingRef.current = true;
+      const s = Math.min(ms, bs * 1.6);
+      const c = cf(s, anchor.x, anchor.y, vp.width, vp.height);
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      scale.value = withTiming(s, timing);
+      startScale.value = s;
+      tx.value = withTiming(c.x, timing);
+      ty.value = withTiming(c.y, timing);
+    } else if (wasHatchingRef.current && fs) {
+      wasHatchingRef.current = false;
+      const c = cf(bs, fs.centre.x, fs.centre.y, vp.width, vp.height);
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      scale.value = withTiming(bs, timing);
+      startScale.value = bs;
+      tx.value = withTiming(c.x, timing);
+      ty.value = withTiming(c.y, timing);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hatching]);
+
   // Tile-based tap: snap the tap point to the NEAREST tile (not a raycast against
   // tall transparent sprite frames), then act on whatever OCCUPIES that tile — a
   // chest, a memory, the creature, or the egg. Predictable + no z-fighting.
@@ -402,7 +464,11 @@ export function WorldCanvas({
       );
       if (occupant) {
         if (occupant.kind === 'memory' && occupant.memory) onSelectMemory(occupant.memory, occupant.patchId);
-        else if (occupant.category && occupant.patchId === eggPatchId && onSelectCell) onSelectCell(occupant.category);
+        // A cell object (photos/notes/places/journey/sleep/food) opens its bespoke
+        // reader for WHICHEVER day is shown — not just today's forming patch. The
+        // world only renders one patch at a time, so this is always the selected day.
+        else if (occupant.category && onSelectCell) onSelectCell(occupant.category);
+        else if (occupant.kind === 'landmark' && onSelectBigMoment) onSelectBigMoment();
         else onSelectPatch(occupant.patchId);
         return;
       }
@@ -420,6 +486,7 @@ export function WorldCanvas({
       onPressPlacesAlert,
       onSelectMemory,
       onSelectCell,
+      onSelectBigMoment,
       onSelectPatch,
     ]
   );
@@ -629,6 +696,26 @@ export function WorldCanvas({
             );
           })}
 
+          {/* Permanent Discovery artefacts on the outer ring (decorative). Drawn
+              before objects/egg so the patch reads in front of its framing ring. */}
+          {artefactPoints.map((artefact) => {
+            const source = worldAssetSource(artefact.assetKey);
+            if (!source) return null;
+            const w = TILE_W * SPRITE_SCALE;
+            const h = w * 2;
+            return (
+              <View
+                key={artefact.rewardId}
+                pointerEvents="none"
+                style={[
+                  styles.artefactLayer,
+                  { left: artefact.x - w / 2, top: artefact.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC + SPRITE_DROP, width: w, height: h },
+                ]}>
+                <Image source={source} style={StyleSheet.absoluteFill} contentFit="contain" />
+              </View>
+            );
+          })}
+
           {/* Soft circular glow under the last-tapped object — a feathered radial
               wash that fades off at the edges (no hard ring). */}
           {highlightSprite ? (
@@ -680,7 +767,7 @@ export function WorldCanvas({
                 },
               ]}>
               <Animated.View style={readyShakeStyle}>
-                <LanternEgg egg={eggVisual} feedKey={eggFeedKey} />
+                <LanternEgg egg={eggVisual} feedKey={eggFeedKey} lanternColor={lanternColor} />
               </Animated.View>
             </View>
           ) : null}
@@ -701,7 +788,7 @@ export function WorldCanvas({
                   transform: [{ scale: EGG_SCALE }],
                 },
               ]}>
-              <HatchReveal egg={hatchEgg} creature={hatchingCreature} hideCaption onComplete={onHatchComplete ?? (() => {})} />
+              <HatchReveal egg={hatchEgg} creature={hatchingCreature} hideCaption lanternColor={lanternColor} onComplete={onHatchComplete ?? (() => {})} />
             </View>
           ) : null}
 
@@ -951,6 +1038,7 @@ const styles = StyleSheet.create({
   },
   ghostEmoji: { fontSize: 17, opacity: 0.85 },
   eggLayer: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  artefactLayer: { position: 'absolute', alignItems: 'center', justifyContent: 'center', opacity: 0.96 },
   countdownLayer: { position: 'absolute', alignItems: 'center' },
   spriteImage: { width: '100%', height: '100%' },
   placeholder: {

@@ -24,6 +24,7 @@ import {
   confirmPlaceForToday,
   markBigMomentForToday,
   setSleepForToday,
+  setDayNameForToday,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
   hydrateAllDays,
@@ -302,6 +303,19 @@ export function useHomeScreenState() {
       setStoredState((currentState) => {
         const hydrated = hydrateHomeState(currentState, profile, now);
         return setSleepForToday(hydrated.state, sleep, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const setDayName = useCallback(
+    (name: string, target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return setDayNameForToday(hydrated.state, name, profile, now, target);
       });
     },
     []
@@ -757,6 +771,7 @@ export function useHomeScreenState() {
     confirmPlace,
     markBigMoment,
     setSleep,
+    setDayName,
     addFoodMoment,
     isTodayHatched,
     tomorrowDay,

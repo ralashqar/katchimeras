@@ -626,6 +626,8 @@ export type StoredHomeDayRecord = {
   // Moments they revealed. See utils/note-meaning.ts + today-patch-engine.ts.
   notes?: DayNote[];
   bigMoments?: BigMoment[];
+  // A user-given name for the day/patch (the namePatch quest). Display-only.
+  dayName?: string;
   // Cheap signature of the inputs the derived fields (dayMap, place counts)
   // depend on — lets normalize skip re-deriving settled archived days.
   derivedSignature?: string;

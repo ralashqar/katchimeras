@@ -21,13 +21,22 @@ import { CellDetailSheet, NotesDetailSheet, PlacesDetailSheet } from '@/componen
 import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note';
 import { PatchInspector } from '@/components/katchadeck/world/patch-inspector';
 import { BigMomentPickerSheet } from '@/components/katchadeck/world/big-moment-picker-sheet';
+import { BigMomentSheet } from '@/components/katchadeck/world/big-moment-sheet';
 import { ChronicleSheet } from '@/components/katchadeck/world/chronicle-sheet';
 import { FoodMomentSheet, FoodVaultSheet } from '@/components/katchadeck/world/food-vault-sheet';
-import { PlacePromptSheet, type PlaceCategory, type PlaceMeaning } from '@/components/katchadeck/world/place-prompt-sheet';
+import { PlacePromptSheet, PLACE_CATEGORIES, type PlaceCategory, type PlaceMeaning } from '@/components/katchadeck/world/place-prompt-sheet';
 import { SleepSheet } from '@/components/katchadeck/world/sleep-sheet';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { WorldCanvas } from '@/components/katchadeck/world/world-canvas';
 import { WorldDashboard } from '@/components/katchadeck/world/world-dashboard';
+import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
+import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
+import { useDiscoveries } from '@/hooks/use-discoveries';
+import { collectUnlockedArtefacts, placeArtefacts } from '@/utils/discoveries-artefacts';
+import { CosmeticsSheet } from '@/components/katchadeck/world/cosmetics-sheet';
+import { NameDaySheet } from '@/components/katchadeck/world/name-day-sheet';
+import { useCosmetics } from '@/hooks/use-cosmetics';
+import { useEssence } from '@/hooks/use-essence';
 import { WorldDaySwitcher } from '@/components/katchadeck/world/world-day-switcher';
 import { ThemedText } from '@/components/themed-text';
 import { interpretNote, type InterpretedNote } from '@/utils/note-interpret';
@@ -39,6 +48,7 @@ import type { MemoryNode, WorldObjectCategory, WorldPatch, WorldState } from '@/
 import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 import { resolvePlaceName } from '@/utils/place-names';
+import { isPointAtHome, loadHomeAnchor, saveHomeAnchor } from '@/utils/home-location';
 import { deriveDayChronicle, type CalendarEventContext } from '@/utils/chronicle-engine';
 import { loadCalendarEventsForDay } from '@/utils/calendar-events';
 import { selectMemoryQuests, type MemoryQuestType } from '@/utils/memory-quests-engine';
@@ -77,6 +87,8 @@ function formatTimeRange(start?: string, end?: string): string | null {
 
 const MEMORY_CHESTS_ONLY = true;
 const VISIBLE_CATEGORIES = new Set(['memory', 'notes', 'journey', 'places', 'sleep', 'food']);
+// Highest-rarity-first ordering for picking which pending discovery to celebrate.
+const DISCOVERY_RARITY_ORDER: Record<string, number> = { legendary: 3, epic: 2, rare: 1, common: 0 };
 const VISIBLE_CELLS = new Set(['memory', 'journey', 'places']);
 function simplifyPatch(patch: WorldPatch): WorldPatch {
   if (!MEMORY_CHESTS_ONLY) return patch;
@@ -108,9 +120,69 @@ export default function WorldScreen() {
     markBigMoment,
     setSleep,
     addFoodMoment,
+    setDayName,
     triggerHatchIfReady,
     refreshState,
+    isTodayHatched,
+    tomorrowDay,
+    tomorrowAvailablePrompts,
   } = useHomeScreenState();
+
+  // Discoveries (life milestones) — evaluates all of history, persists unlocks.
+  const {
+    entries: discoveryEntries,
+    unlockedCount: discoveriesUnlocked,
+    totalCount: discoveriesTotal,
+    pending: pendingDiscoveries,
+    backfillCount: discoveryBackfillCount,
+    dismissBackfillNotice,
+    markSeen: markDiscoverySeen,
+  } = useDiscoveries();
+  const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
+  // One reveal at a time — celebrate the highest-rarity pending discovery first.
+  const celebrateDiscovery = useMemo(
+    () => [...pendingDiscoveries].sort((a, b) => DISCOVERY_RARITY_ORDER[b.rarity] - DISCOVERY_RARITY_ORDER[a.rarity])[0] ?? null,
+    [pendingDiscoveries]
+  );
+  // Permanent artefacts earned, placed on the world's outer ring.
+  const worldArtefacts = useMemo(() => placeArtefacts(collectUnlockedArtefacts(discoveryEntries)), [discoveryEntries]);
+
+  // Unlock currency for cosmetics = unlocked discovery ids.
+  const unlockedDiscoveryIds = useMemo(
+    () => new Set(discoveryEntries.filter((entry) => entry.record).map((entry) => entry.def.id)),
+    [discoveryEntries]
+  );
+
+  // Essence (cosmetic currency). earned is derived from history; show a "+N" toast
+  // whenever it grows from a real event (skip the initial baseline read).
+  const { earned: essenceEarned, balance: essenceBalance, purchases: essencePurchases, spend: spendEssence } = useEssence();
+  const prevEssenceRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevEssenceRef.current;
+    prevEssenceRef.current = essenceEarned;
+    if (prev !== null && essenceEarned > prev) {
+      setMicrocopy(`✦ +${essenceEarned - prev} Essence`);
+    }
+  }, [essenceEarned]);
+
+  // Cosmetics (Discovery-unlocked or Essence-bought; purely expressive). The only
+  // rendered output is the egg's lantern-colour override.
+  const { entries: cosmeticEntries, lanternColour, worldThemeAccent, select: selectCosmetic } = useCosmetics(
+    unlockedDiscoveryIds,
+    essencePurchases,
+    essenceBalance
+  );
+  const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
+  const [nameSheetOpen, setNameSheetOpen] = useState(false);
+  // Buy a cosmetic with Essence, then auto-apply it.
+  const handleBuyCosmetic = (id: string, cost: number) => {
+    const def = cosmeticEntries.find((entry) => entry.def.id === id)?.def;
+    if (!def) return;
+    if (spendEssence(id, cost)) {
+      selectCosmetic(def.type, id);
+      setMicrocopy(`✦ ${def.name} unlocked`);
+    }
+  };
 
   const [world, setWorld] = useState<WorldState | null>(null);
   const [selectedPatchId, setSelectedPatchId] = useState<string | null>(null);
@@ -173,45 +245,62 @@ export default function WorldScreen() {
     return today && today.state !== 'hatched' ? today : null;
   }, [timelineDays]);
 
-  // Re-derive the live patch only when the day's inputs actually change.
-  const todaySignature = todayForming
+  // Where new moments go: once today has HATCHED the live day is TOMORROW; until
+  // then it's today (matches the camera capture's target). `onTomorrowForming` is
+  // whether the user is currently VIEWING that tomorrow patch.
+  const formingDay: HomeDayRecord | null = isTodayHatched ? tomorrowDay ?? null : todayForming;
+  const formingTarget: 'today' | 'tomorrow' = isTodayHatched ? 'tomorrow' : 'today';
+  const onTomorrowForming = !!(isTodayHatched && tomorrowDay && selectedDayId === tomorrowDay.id);
+  // The day-switcher list: archived + today, plus a Tomorrow button once today hatched.
+  const switcherDays = useMemo(
+    () => (isTodayHatched && tomorrowDay ? [...days, tomorrowDay] : days),
+    [days, isTodayHatched, tomorrowDay]
+  );
+  // Prompts for the forming day — tomorrow's once today has hatched, else today's.
+  const formingPrompts = isTodayHatched ? tomorrowAvailablePrompts : availableDayPrompts;
+
+  // Re-derive the live patch only when the forming day's inputs actually change.
+  const todaySignature = formingDay
     ? [
-        todayForming.id,
-        todayForming.state,
-        todayForming.moments.length,
-        todayForming.promptAnswers?.length ?? 0,
-        todayForming.capturedMeanings?.length ?? 0,
-        todayForming.stepsCount,
-        todayForming.newPlaceCount,
-        todayForming.seedCompletions?.length ?? 0,
-        todayForming.egg.intensity,
+        formingDay.id,
+        formingDay.state,
+        formingDay.moments.length,
+        formingDay.promptAnswers?.length ?? 0,
+        formingDay.capturedMeanings?.length ?? 0,
+        formingDay.stepsCount,
+        formingDay.newPlaceCount,
+        formingDay.seedCompletions?.length ?? 0,
+        formingDay.egg.intensity,
         // Inputs that grow their own patch objects but don't touch the fields
         // above — without these the tile never re-derives when they change.
-        todayForming.sleep?.quality ?? '',
-        todayForming.confirmedPlaces?.length ?? 0,
-        todayForming.bigMoments?.length ?? 0,
-        todayForming.notes?.length ?? 0,
-        todayForming.foodMoments?.length ?? 0,
+        formingDay.sleep?.quality ?? '',
+        formingDay.confirmedPlaces?.length ?? 0,
+        formingDay.bigMoments?.length ?? 0,
+        formingDay.notes?.length ?? 0,
+        formingDay.foodMoments?.length ?? 0,
       ].join('|')
     : null;
   const todayPatch = useMemo(() => {
-    if (!todayForming) return null;
+    if (!formingDay) return null;
+    // Persist + reuse only today's patch (canonical-at-hatch); tomorrow derives fresh.
     const stored = loadTodayPatch();
-    const prev = stored && stored.dayId === todayForming.id ? stored : null;
-    return deriveTodayPatch(todayForming, prev);
+    const prev = !isTodayHatched && stored && stored.dayId === formingDay.id ? stored : null;
+    return deriveTodayPatch(formingDay, prev);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todaySignature]);
 
-  // Persist each growth so placements carry across re-renders, and so the patch
-  // lands on the same spiral cell the canonical tile gets when the day hatches.
+  // Persist today's growth (not tomorrow's) so placements carry across re-renders.
   useEffect(() => {
-    if (todayPatch) saveTodayPatch(todayPatch);
-  }, [todayPatch]);
+    if (todayPatch && !isTodayHatched) saveTodayPatch(todayPatch);
+  }, [todayPatch, isTodayHatched]);
 
-  // The day the world is currently showing (the day-switcher / timeline pick).
-  const selectedDayRecord = selectedDay?.kind === 'day' ? selectedDay : null;
+  // The day the world is currently showing (the day-switcher pick). Tomorrow isn't
+  // in timelineDays, so resolve it explicitly.
+  const selectedDayRecord = onTomorrowForming ? tomorrowDay : selectedDay?.kind === 'day' ? selectedDay : null;
   const selectedIsTodayForming = !!(selectedDayRecord?.isToday && selectedDayRecord.state !== 'hatched');
-  const eggReady = selectedIsTodayForming && todayForming?.state === 'ready_to_hatch';
+  // The selected day shows the live forming egg/patch when it IS the forming day.
+  const selectedIsForming = !!(formingDay && selectedDayRecord?.id === formingDay.id);
+  const eggReady = selectedIsForming && formingDay?.state === 'ready_to_hatch';
 
   // In-place egg hatch on the World page: tapping a ready egg plays the reveal
   // right where the egg sits (handled inside WorldCanvas), then settles into the
@@ -236,16 +325,22 @@ export default function WorldScreen() {
   // otherwise the finalized patch for the selected (hatched) day.
   const selectedPatch = useMemo(() => {
     if (!selectedDayRecord) return null;
-    if (todayPatch && selectedDayRecord.id === todayForming?.id) return todayPatch;
+    if (todayPatch && selectedDayRecord.id === formingDay?.id) return todayPatch;
     return world?.patches.find((patch) => patch.dayId === selectedDayRecord.id) ?? null;
-  }, [selectedDayRecord, todayPatch, todayForming, world]);
+  }, [selectedDayRecord, todayPatch, formingDay, world]);
+
+  // Hold the last shown patch so an in-place hatch never blanks the canvas mid-reveal
+  // (during a hatch the today-patch stops matching before the finalized patch syncs).
+  const lastShownPatchRef = useRef<WorldPatch | null>(null);
+  if (selectedPatch) lastShownPatchRef.current = selectedPatch;
+  const shownPatch = selectedPatch ?? (isHatching ? lastShownPatchRef.current : null);
 
   // The world shows a SINGLE patch, placed at the origin and framed by a ring of
   // empty ground. Switching days swaps the patch under the camera.
   const renderPatches = useMemo(() => {
-    if (!selectedPatch) return [];
-    return [simplifyPatch({ ...selectedPatch, gridCol: 0, gridRow: 0 })];
-  }, [selectedPatch]);
+    if (!shownPatch) return [];
+    return [simplifyPatch({ ...shownPatch, gridCol: 0, gridRow: 0 })];
+  }, [shownPatch]);
 
   const inspectedPatch = useMemo(
     () => renderPatches.find((patch) => patch.id === selectedPatchId) ?? null,
@@ -328,15 +423,18 @@ export default function WorldScreen() {
 
   const acceptInlineNote = () => {
     if (!recResult) return;
-    addNote({
-      kind: 'voice',
-      text: recResult.transcript,
-      audioUri: recAudioRef.current,
-      durationMs: recElapsed * 1000,
-      archetype: recResult.archetype,
-      label: recResult.label,
-      bigMoment: recResult.bigMoment && recMarkBig ? recResult.bigMoment : undefined,
-    });
+    addNote(
+      {
+        kind: 'voice',
+        text: recResult.transcript,
+        audioUri: recAudioRef.current,
+        durationMs: recElapsed * 1000,
+        archetype: recResult.archetype,
+        label: recResult.label,
+        bigMoment: recResult.bigMoment && recMarkBig ? recResult.bigMoment : undefined,
+      },
+      formingTarget
+    );
     setEggFeedKey((key) => key + 1);
     setMicrocopy(`${recResult.label} took root`);
     setRecResult(null);
@@ -385,12 +483,12 @@ export default function WorldScreen() {
   };
 
   const handleAnswer = (kind: DayPromptKind, choiceIds: string[], from: FeedSourceRect) => {
-    const isPhotoMeaning = kind === 'meaning' && !!todayForming?.heroPhoto;
+    const isPhotoMeaning = kind === 'meaning' && !!formingDay?.heroPhoto;
     flyToEgg(from, '✨', () => {
       if (isPhotoMeaning) {
-        answerPhotoMeaning({ choiceIds });
+        answerPhotoMeaning({ choiceIds }, formingTarget);
       } else {
-        answerDayPrompt({ kind, choiceIds });
+        answerDayPrompt({ kind, choiceIds }, formingTarget);
       }
       setEggFeedKey((key) => key + 1);
     });
@@ -414,7 +512,7 @@ export default function WorldScreen() {
 
   // Open the "add to today" sheet, optionally straight into a specific prompt.
   const openSheet = (initial: ActiveDayPrompt | null = null) => {
-    if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
     setInitialPrompt(initial);
     setPromptOpen(true);
   };
@@ -443,8 +541,8 @@ export default function WorldScreen() {
   // The category list shown by the "+" sheet — the photos prompt is removed there
   // because the world's photos tile (golden "!") already surfaces it.
   const popupPrompts = useMemo(
-    () => availableDayPrompts.filter((prompt) => prompt.id !== 'meaningful_photo'),
-    [availableDayPrompts]
+    () => formingPrompts.filter((prompt) => prompt.id !== 'meaningful_photo'),
+    [formingPrompts]
   );
 
   // Places guidance: the first detected place the user hasn't confirmed yet. A
@@ -465,9 +563,17 @@ export default function WorldScreen() {
   const [placeName, setPlaceName] = useState<string | null>(null);
   // A place the user is adding by hand right now (when passive missed it / they
   // want control). Takes precedence over the detected place while the sheet's up.
-  const [manualPlace, setManualPlace] = useState<{ id: string; name: string } | null>(null);
+  const [manualPlace, setManualPlace] = useState<{ id: string; name: string; latitude: number; longitude: number } | null>(
+    null
+  );
   // A specific place picked from the Places Vault to give meaning to.
-  const [placeTarget, setPlaceTarget] = useState<{ id: string; name: string; timeLabel: string | null } | null>(null);
+  const [placeTarget, setPlaceTarget] = useState<{
+    id: string;
+    name: string;
+    timeLabel: string | null;
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   // Resolve the detected place's name (reverse-geocode, cached) for the header.
   useEffect(() => {
@@ -490,7 +596,15 @@ export default function WorldScreen() {
   // the vault, else the detected unconfirmed stop. Normalised so the sheet +
   // confirm don't care which it is.
   const activePlace = useMemo(() => {
-    if (manualPlace) return { id: manualPlace.id, name: manualPlace.name, timeLabel: 'Just now', isNew: true };
+    if (manualPlace)
+      return {
+        id: manualPlace.id,
+        name: manualPlace.name,
+        timeLabel: 'Just now',
+        isNew: true,
+        latitude: manualPlace.latitude,
+        longitude: manualPlace.longitude,
+      };
     if (placeTarget) return { ...placeTarget, isNew: false };
     if (unconfirmedPlace) {
       return {
@@ -498,13 +612,23 @@ export default function WorldScreen() {
         name: placeName ?? 'A place you visited',
         timeLabel: formatTimeRange(unconfirmedPlace.startedAt, unconfirmedPlace.endedAt),
         isNew: (selectedDayRecord?.newPlaceCount ?? 0) > 0,
+        latitude: unconfirmedPlace.latitude,
+        longitude: unconfirmedPlace.longitude,
       };
     }
     return null;
   }, [manualPlace, placeTarget, unconfirmedPlace, placeName, selectedDayRecord]);
 
+  // If the place is at the saved home anchor, skip "what is it?" — it's already home;
+  // jump straight to "what's happening there?".
+  const placePreset = useMemo(() => {
+    if (!activePlace) return undefined;
+    const atHome = isPointAtHome(activePlace.latitude, activePlace.longitude, loadHomeAnchor());
+    return atHome ? PLACE_CATEGORIES.find((category) => category.id === 'home') : undefined;
+  }, [activePlace]);
+
   const handlePressPlacesAlert = () => {
-    if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
     setManualPlace(null);
     setPlacePromptOpen(true);
   };
@@ -512,7 +636,7 @@ export default function WorldScreen() {
   // Manual "Add current place": grab the current location, name it, and open the
   // same prompt so the user picks what it was + what it meant.
   const handleAddCurrentPlace = async () => {
-    if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -523,7 +647,7 @@ export default function WorldScreen() {
       const { latitude, longitude } = position.coords;
       const resolved = await resolvePlaceName(latitude, longitude);
       const name = resolved.locality ? `${resolved.primary} · ${resolved.locality}` : resolved.primary;
-      setManualPlace({ id: `manual-${Math.round(position.timestamp ?? 0)}-${Math.round(latitude * 1000)}`, name });
+      setManualPlace({ id: `manual-${Math.round(position.timestamp ?? 0)}-${Math.round(latitude * 1000)}`, name, latitude, longitude });
       setPlacePromptOpen(true);
     } catch {
       setMicrocopy("Couldn't read your location");
@@ -539,12 +663,17 @@ export default function WorldScreen() {
   const handleConfirmPlaceFromVault = (node: DayMapNode, name: string) => {
     setPlacesVaultOpen(false);
     setManualPlace(null);
-    setPlaceTarget({ id: node.id, name, timeLabel: formatTimeRange(node.startedAt, node.endedAt) });
+    setPlaceTarget({ id: node.id, name, timeLabel: formatTimeRange(node.startedAt, node.endedAt), latitude: node.latitude, longitude: node.longitude });
     setPlacePromptOpen(true);
   };
   const handleConfirmPlace = (category: PlaceCategory, meaning: PlaceMeaning) => {
     if (activePlace) {
-      confirmPlace({ id: activePlace.id, category: category.id, archetype: meaning.id, label: category.label, meaningLabel: meaning.label });
+      confirmPlace({ id: activePlace.id, category: category.id, archetype: meaning.id, label: category.label, meaningLabel: meaning.label }, formingTarget);
+      // Tagging a place as Home remembers it as the home anchor, so future visits
+      // there skip "what is it?" and ask straight away what's happening.
+      if (category.id === 'home') {
+        saveHomeAnchor({ lat: activePlace.latitude, lng: activePlace.longitude, source: 'manual', setAt: new Date().toISOString() });
+      }
       setEggFeedKey((key) => key + 1);
       setMicrocopy(`${category.emoji} ${category.label} · ${meaning.label}`);
     }
@@ -585,6 +714,15 @@ export default function WorldScreen() {
     return () => clearTimeout(id);
   }, [microcopy]);
 
+  // One quiet summary the first time history is backfilled into the Hall (no
+  // retro-barrage of celebrations).
+  useEffect(() => {
+    if (discoveryBackfillCount > 0) {
+      setMicrocopy(`${discoveryBackfillCount} ${discoveryBackfillCount === 1 ? 'discovery' : 'discoveries'} from your past are in your Hall`);
+      dismissBackfillNotice();
+    }
+  }, [discoveryBackfillCount, dismissBackfillNotice]);
+
   // The Journey cell compares to the recent average — non-judgmentally.
   const recentAvgSteps = useMemo(() => {
     const withSteps = days.filter((day) => day.state === 'hatched' && (day.stepsCount ?? 0) > 0);
@@ -611,13 +749,17 @@ export default function WorldScreen() {
     }
     setSelectedCell(cellType);
   };
+  // Read cells from the SELECTED patch (any day — today, tomorrow, or a past day),
+  // so hatched/past-day object taps open the same readers as today.
   const selectedCellData =
     selectedCell && selectedCell !== 'notes'
-      ? todayPatch?.cells?.find((cell) => cell.type === selectedCell) ?? null
+      ? selectedPatch?.cells?.find((cell) => cell.type === selectedCell) ?? null
       : null;
 
   // A short date label shown under the day buttons (Today / May 10).
-  const dayLabel = selectedDayRecord ? (selectedDayRecord.isToday ? 'Today' : selectedDayRecord.dayLabel) : null;
+  const dayLabel = selectedDayRecord
+    ? selectedDayRecord.dayName ?? (selectedDayRecord.isToday ? 'Today' : selectedDayRecord.dayLabel)
+    : null;
 
   // Chronicle — the selected day's story ("what was today about?"), from existing
   // signals plus (best-effort, on-device) calendar events. Shown as a tappable
@@ -646,10 +788,12 @@ export default function WorldScreen() {
 
   // Memory Quests — contextual, optional captures that grow real patch objects
   // (they replace the generic Daily Seeds). Completion is derived from signals.
-  const memoryQuests = useMemo(() => (todayForming ? selectMemoryQuests(todayForming, new Date()) : []), [todayForming]);
+  const memoryQuests = useMemo(() => (formingDay ? selectMemoryQuests(formingDay, new Date()) : []), [formingDay]);
   const [bigMomentPickerOpen, setBigMomentPickerOpen] = useState(false);
+  const [bigMomentSheetOpen, setBigMomentSheetOpen] = useState(false);
   const handlePickBigMoment = (type: BigMomentType) => {
-    markBigMoment({ type });
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
+    markBigMoment({ type }, formingTarget);
     setBigMomentPickerOpen(false);
     setEggFeedKey((key) => key + 1);
     setMicrocopy('A big moment, marked');
@@ -683,18 +827,18 @@ export default function WorldScreen() {
   }, [sleepSheetOpen, selectedIsTodayForming, selectedDayRecord?.isoDate, selectedDayRecord?.sleep, setSleep]);
   // If Vision detected a specific food today, pre-fill the picker's "what".
   const foodSuggestion = useMemo(() => {
-    const detection = detectFoodInVision(todayForming?.vision);
+    const detection = detectFoodInVision(formingDay?.vision);
     return detection.label && detection.emoji ? { label: detection.label, emoji: detection.emoji } : null;
-  }, [todayForming]);
+  }, [formingDay]);
   const handleAddFood = (input: Parameters<typeof addFoodMoment>[0]) => {
-    if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
-    addFoodMoment(input);
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
+    addFoodMoment(input, formingTarget);
     setFoodPickerOpen(false);
     setEggFeedKey((key) => key + 1);
     setMicrocopy(`${input.emoji} ${input.label} · saved`);
   };
   const handleQuest = (type: MemoryQuestType) => {
-    if (todayForming && selectedDayId !== todayForming.id) selectTimelineDay(todayForming.id);
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
     switch (type) {
       case 'captureMoment':
         router.push('/moment-capture');
@@ -703,7 +847,7 @@ export default function WorldScreen() {
         router.push('/note-capture');
         break;
       case 'answerReflection': {
-        const reflectionPrompt = availableDayPrompts.find((prompt) =>
+        const reflectionPrompt = formingPrompts.find((prompt) =>
           ['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight'].includes(prompt.id)
         );
         openSheet(reflectionPrompt ?? null);
@@ -719,11 +863,14 @@ export default function WorldScreen() {
       case 'saveFoodMemory':
         setFoodPickerOpen(true);
         break;
+      case 'namePatch':
+        setNameSheetOpen(true);
+        break;
     }
   };
 
   const heroHeight = Math.max(300, Math.round(screenH * 0.46));
-  const showActions = !!todayForming && recPhase !== 'confirm';
+  const showActions = !!formingDay && recPhase !== 'confirm';
 
   return (
     <GestureHandlerRootView style={styles.screen}>
@@ -739,7 +886,7 @@ export default function WorldScreen() {
         showsVerticalScrollIndicator={false}>
         {/* Top bar is just the day picker — Today (right) + a creature per day. */}
         <View style={styles.switcher}>
-          <WorldDaySwitcher days={days} selectedId={selectedDayId} onSelect={selectTimelineDay} />
+          <WorldDaySwitcher days={switcherDays} selectedId={selectedDayId} onSelect={selectTimelineDay} />
         </View>
         {dayLabel ? (
           <ThemedText style={styles.dayLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
@@ -748,29 +895,35 @@ export default function WorldScreen() {
         ) : null}
 
         <View style={[styles.hero, { height: heroHeight }]}>
-          {selectedPatch ? (
+          {shownPatch ? (
             <WorldCanvas
-              key={selectedPatch.id}
+              // Key by DAY, not patch id — so a day hatching (today-patch → finalized
+              // patch, different id) does NOT remount the canvas and kill the in-place
+              // hatch reveal mid-animation. Switching to a different day still remounts.
+              key={shownPatch.dayId ?? shownPatch.id}
               patches={renderPatches}
               ring={PATCH_RING}
               animateOnMount
               lockCamera
               hideRecenter
-              eggPatchId={selectedIsTodayForming ? todayPatch?.id ?? null : null}
-              eggVisual={selectedIsTodayForming ? todayPatch?.eggVisual ?? null : null}
+              eggPatchId={selectedIsForming ? todayPatch?.id ?? null : null}
+              eggVisual={selectedIsForming ? todayPatch?.eggVisual ?? null : null}
               eggReady={eggReady}
               hatching={isHatching}
               hatchingCreature={hatchedCreature}
               onHatchComplete={handleHatchComplete}
+              artefacts={worldArtefacts}
+              lanternColor={lanternColour}
               eggFeedKey={eggFeedKey}
               highlightedCell={lastSelectedCell}
-              captureFly={selectedIsTodayForming ? captureFly : null}
+              captureFly={selectedIsForming ? captureFly : null}
               memoryAlert={memoryAlert}
               onPressMemoryAlert={handlePressMemoryAlert}
               placesAlert={placesAlert}
               onPressPlacesAlert={handlePressPlacesAlert}
               onPressEgg={handleEggPress}
               onSelectCell={handleSelectCell}
+              onSelectBigMoment={() => setBigMomentSheetOpen(true)}
               onSelectPatch={(id) => {
                 setFocusMemory(null);
                 setSelectedPatchId(id);
@@ -787,6 +940,12 @@ export default function WorldScreen() {
               </ThemedText>
             </View>
           )}
+
+          {/* World theme ambient — a gentle accent wash over the diorama (cosmetic,
+              non-interactive). Default theme = none. Opacity is device-tunable. */}
+          {worldThemeAccent ? (
+            <View pointerEvents="none" style={[styles.themeWash, { backgroundColor: worldThemeAccent }]} />
+          ) : null}
 
           {/* Capture controls float over the world's lower-right. */}
           {showActions ? (
@@ -858,6 +1017,11 @@ export default function WorldScreen() {
             onOpenChronicle={() => setChronicleOpen(true)}
             foodMoments={selectedDayRecord?.foodMoments ?? []}
             onOpenFood={() => setFoodVaultOpen(true)}
+            discoveriesUnlocked={discoveriesUnlocked}
+            discoveriesTotal={discoveriesTotal}
+            onOpenDiscoveries={() => setDiscoveriesOpen(true)}
+            onOpenCosmetics={() => setCosmeticsOpen(true)}
+            essenceBalance={essenceBalance}
           />
         </View>
       </ScrollView>
@@ -890,14 +1054,58 @@ export default function WorldScreen() {
         <BigMomentPickerSheet onPick={handlePickBigMoment} onClose={() => setBigMomentPickerOpen(false)} />
       ) : null}
 
+      {bigMomentSheetOpen && selectedDayRecord ? (
+        <BigMomentSheet
+          bigMoments={selectedDayRecord.bigMoments ?? []}
+          notes={selectedDayRecord.notes ?? []}
+          onClose={() => setBigMomentSheetOpen(false)}
+        />
+      ) : null}
+
+      {discoveriesOpen ? (
+        <DiscoveriesHallSheet
+          entries={discoveryEntries}
+          unlockedCount={discoveriesUnlocked}
+          totalCount={discoveriesTotal}
+          onClose={() => setDiscoveriesOpen(false)}
+        />
+      ) : null}
+
+      {cosmeticsOpen ? (
+        <CosmeticsSheet
+          entries={cosmeticEntries}
+          balance={essenceBalance}
+          onSelect={selectCosmetic}
+          onBuy={handleBuyCosmetic}
+          onClose={() => setCosmeticsOpen(false)}
+        />
+      ) : null}
+
+      {nameSheetOpen ? (
+        <NameDaySheet
+          initialName={selectedDayRecord?.dayName ?? null}
+          suggestion={chronicle?.title ?? null}
+          onSave={(name) => {
+            if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
+            setDayName(name, formingTarget);
+            setMicrocopy('Today, named');
+          }}
+          onClose={() => setNameSheetOpen(false)}
+        />
+      ) : null}
+
       {sleepSheetOpen ? (
         <SleepSheet
           sleep={selectedDayRecord?.sleep ?? null}
-          onSet={(quality) => {
-            setSleep({ quality, source: 'manual' });
-            setMicrocopy('Your morning, remembered');
-            setSleepSheetOpen(false);
-          }}
+          onSet={
+            selectedIsForming
+              ? (quality) => {
+                  setSleep({ quality, source: 'manual' }, formingTarget);
+                  setMicrocopy('Your morning, remembered');
+                  setSleepSheetOpen(false);
+                }
+              : undefined
+          }
           onClose={() => setSleepSheetOpen(false)}
         />
       ) : null}
@@ -910,7 +1118,7 @@ export default function WorldScreen() {
         <FoodVaultSheet
           foodMoments={selectedDayRecord.foodMoments ?? []}
           onAddFood={
-            selectedIsTodayForming
+            selectedIsForming
               ? () => {
                   setFoodVaultOpen(false);
                   setFoodPickerOpen(true);
@@ -925,7 +1133,7 @@ export default function WorldScreen() {
         <PlacesDetailSheet
           day={selectedDayRecord}
           onClose={() => setPlacesVaultOpen(false)}
-          onAddPlace={selectedIsTodayForming ? () => {
+          onAddPlace={selectedIsForming ? () => {
             setPlacesVaultOpen(false);
             void handleAddCurrentPlace();
           } : undefined}
@@ -933,41 +1141,52 @@ export default function WorldScreen() {
             setPlacesVaultOpen(false);
             router.push({ pathname: '/day-map/[dayId]', params: { dayId: selectedDayRecord.id } });
           }}
-          onConfirmPlace={selectedIsTodayForming ? handleConfirmPlaceFromVault : undefined}
+          onConfirmPlace={selectedIsForming ? handleConfirmPlaceFromVault : undefined}
         />
       ) : null}
 
       {placePromptOpen && activePlace ? (
         <PlacePromptSheet
-          placeName={activePlace.name}
+          // For a remembered place (home), don't show the generic "A place you
+          // visited" — name it Home when we don't have a nicer resolved name.
+          placeName={placePreset && activePlace.name === 'A place you visited' ? 'Welcome back' : activePlace.name}
           timeLabel={activePlace.timeLabel}
           isNew={activePlace.isNew}
+          presetCategory={placePreset}
           onConfirm={handleConfirmPlace}
           onClose={closePlacePrompt}
         />
       ) : null}
 
-      {selectedCell === 'notes' && todayForming ? (
+      {selectedCell === 'notes' && selectedDayRecord ? (
         <NotesDetailSheet
-          day={todayForming}
+          day={selectedDayRecord}
           onClose={() => setSelectedCell(null)}
-          onAddNote={() => {
-            setSelectedCell(null);
-            router.push('/note-capture');
-          }}
+          onAddNote={
+            selectedIsForming
+              ? () => {
+                  setSelectedCell(null);
+                  router.push('/note-capture');
+                }
+              : undefined
+          }
         />
       ) : null}
 
-      {selectedCell && selectedCellData && todayForming ? (
+      {selectedCell && selectedCellData && selectedDayRecord ? (
         <CellDetailSheet
-          day={todayForming}
+          day={selectedDayRecord}
           cell={selectedCellData}
           recentAvgSteps={recentAvgSteps}
           onClose={() => setSelectedCell(null)}
-          onAddPhoto={() => {
-            setSelectedCell(null);
-            router.push('/moment-capture');
-          }}
+          onAddPhoto={
+            selectedIsForming
+              ? () => {
+                  setSelectedCell(null);
+                  router.push('/moment-capture');
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -985,6 +1204,10 @@ export default function WorldScreen() {
       ) : null}
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
+
+      {celebrateDiscovery ? (
+        <DiscoveryReveal discovery={celebrateDiscovery} onDismiss={() => markDiscoverySeen(celebrateDiscovery.id)} />
+      ) : null}
     </GestureHandlerRootView>
   );
 }
@@ -1000,6 +1223,7 @@ const styles = StyleSheet.create({
   switcher: { zIndex: 20, elevation: 20 },
   dayLabel: { paddingHorizontal: 20, marginTop: 6, fontSize: 14, fontWeight: '700', letterSpacing: 0.2, zIndex: 20, elevation: 20 },
   hero: { position: 'relative', marginTop: 4, zIndex: 1 },
+  themeWash: { ...StyleSheet.absoluteFillObject, opacity: 0.07 },
   heroEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36 },
   heroEmptyText: { textAlign: 'center' },
   // Capture controls float over the lower-right of the world patch.

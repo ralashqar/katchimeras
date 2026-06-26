@@ -22,7 +22,8 @@ const OPTIONS: { quality: SleepQuality; emoji: string; label: string }[] = [
 
 type SleepSheetProps = {
   sleep: DaySleep | null;
-  onSet: (quality: SleepQuality) => void;
+  // Absent → read-only (a past/hatched day): show the atmosphere + hours, no chips.
+  onSet?: (quality: SleepQuality) => void;
   onClose: () => void;
 };
 
@@ -74,25 +75,29 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
           </View>
         ) : null}
 
-        <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-          {atmosphere ? 'How did it really feel?' : 'How was your sleep?'}
-        </ThemedText>
-        <View style={styles.row}>
-          {OPTIONS.map((option) => {
-            const selected = sleep?.quality === option.quality;
-            return (
-              <Pressable
-                key={option.quality}
-                onPress={() => onSet(option.quality)}
-                style={[styles.chip, selected ? styles.chipSelected : null]}>
-                <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {option.label}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
+        {onSet ? (
+          <>
+            <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              {atmosphere ? 'How did it really feel?' : 'How was your sleep?'}
+            </ThemedText>
+            <View style={styles.row}>
+              {OPTIONS.map((option) => {
+                const selected = sleep?.quality === option.quality;
+                return (
+                  <Pressable
+                    key={option.quality}
+                    onPress={() => onSet(option.quality)}
+                    style={[styles.chip, selected ? styles.chipSelected : null]}>
+                    <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                    <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                      {option.label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
 
         <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
           <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>

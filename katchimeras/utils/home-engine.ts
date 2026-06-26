@@ -693,6 +693,25 @@ export function setSleepForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+// Give the day/patch a user-chosen name (the namePatch quest). Display-only — never
+// affects scores or hatch. Trimmed + capped; empty clears it.
+export function setDayNameForToday(
+  state: StoredHomeState,
+  name: string,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const trimmed = name.trim().slice(0, 40);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    dayName: trimmed.length > 0 ? trimmed : undefined,
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
 // Today Patch V3 — attach a written/voice note to the day: a time-capsule entry
 // (feeds the Memory Vault + Reflection cells via its inferred mood) plus, when
 // the user has confirmed one, a Big Moment that grows a centre landmark.
@@ -1530,6 +1549,12 @@ function resolveRolledPastDay(day: StoredHomeDayRecord, profile: OnboardingProfi
     ...day,
     state: 'ready_to_hatch',
   };
+}
+
+// Dev-only: reset just TODAY to a fresh empty day, preserving onboarding, archived
+// days, tomorrow, and encounter history. Powers the Dev tab "Reset Today only".
+export function resetTodayInState(state: StoredHomeState, profile: OnboardingProfile, now: Date): StoredHomeState {
+  return { ...state, today: createEmptyStoredDay(now, profile) };
 }
 
 function createEmptyStoredDay(now: Date, profile: OnboardingProfile): StoredHomeDayRecord {

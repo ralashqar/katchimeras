@@ -66,13 +66,16 @@ type PlacePromptSheetProps = {
   placeName: string;
   timeLabel?: string | null;
   isNew?: boolean;
+  // When the place is already known (e.g. it's the saved Home), skip "what is it?"
+  // and go straight to "what's happening there?" with the category locked.
+  presetCategory?: PlaceCategory;
   onConfirm: (category: PlaceCategory, meaning: PlaceMeaning) => void;
   onClose: () => void;
 };
 
-export function PlacePromptSheet({ placeName, timeLabel, isNew, onConfirm, onClose }: PlacePromptSheetProps) {
+export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, onConfirm, onClose }: PlacePromptSheetProps) {
   const tabBarHeight = useBottomTabBarHeight();
-  const [category, setCategory] = useState<PlaceCategory | null>(null);
+  const [category, setCategory] = useState<PlaceCategory | null>(presetCategory ?? null);
 
   return (
     <View style={styles.overlay}>
@@ -87,7 +90,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, onConfirm, onClo
         <View style={styles.grabber} />
 
         <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          {isNew ? 'A new place' : 'A place you visited'}
+          {presetCategory ? `${presetCategory.emoji} ${presetCategory.label}` : isNew ? 'A new place' : 'A place you visited'}
         </ThemedText>
         <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           {placeName}
@@ -120,7 +123,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, onConfirm, onClo
         ) : (
           <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
             <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              {`${category.emoji} ${category.label} · what did it mean?`}
+              {presetCategory ? "What's happening there?" : `${category.emoji} ${category.label} · what did it mean?`}
             </ThemedText>
             <View style={styles.grid}>
               {meaningsForCategory(category.id).map((option) => (
@@ -135,11 +138,13 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, onConfirm, onClo
                 </Pressable>
               ))}
             </View>
-            <Pressable accessibilityRole="button" onPress={() => setCategory(null)} style={styles.back}>
-              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Back
-              </ThemedText>
-            </Pressable>
+            {presetCategory ? null : (
+              <Pressable accessibilityRole="button" onPress={() => setCategory(null)} style={styles.back}>
+                <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                  Back
+                </ThemedText>
+              </Pressable>
+            )}
           </Animated.View>
         )}
 

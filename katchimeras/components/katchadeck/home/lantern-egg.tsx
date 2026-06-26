@@ -25,6 +25,9 @@ type LanternEggProps = {
   // Bumps each time the egg is "fed" an answer; fires an absorb pulse — a glow
   // flash, a swallow-pop of the shell, and an outward energy ring.
   feedKey?: number;
+  // Optional cosmetic override for the halo glow tint (a Discovery-unlocked lantern
+  // colour). Absent → the egg keeps its natural day colour. Purely cosmetic.
+  lanternColor?: string;
 };
 
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
@@ -39,7 +42,7 @@ const DRAG_LIMIT = 60;
 // soft membrane ring that materializes under the finger and springs the shell
 // back on release. (Feathered glow/ring are generated textures - RN views
 // can't blur, so softness is baked into the asset and tinted per day.)
-export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feedKey = 0 }: LanternEggProps) {
+export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feedKey = 0, lanternColor }: LanternEggProps) {
   const pressProgress = useSharedValue(0);
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
@@ -183,7 +186,7 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feed
           pointerEvents="none"
           source={softGlow}
           style={[styles.glow, glowStyle]}
-          tintColor={egg.haloColor}
+          tintColor={lanternColor ?? egg.haloColor}
           transition={0}
         />
         <AnimatedImage
