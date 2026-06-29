@@ -14,6 +14,7 @@ export const ESSENCE_AWARD = {
   place: 6,
   newPlaceBonus: 4, // makes the first `newPlaceCount` confirmed places effectively +10
   food: 5,
+  studio: 5,
   bigMoment: 15,
   weeklyRecap: 25,
 } as const;
@@ -49,6 +50,7 @@ export function essenceAwardsForDay(day: HomeDayRecord): number {
   total += places * ESSENCE_AWARD.place;
   total += Math.min(day.newPlaceCount ?? 0, places) * ESSENCE_AWARD.newPlaceBonus;
   total += (day.foodMoments?.length ?? 0) * ESSENCE_AWARD.food;
+  total += (day.studioMoments?.length ?? 0) * ESSENCE_AWARD.studio;
   total += (day.bigMoments?.length ?? 0) * ESSENCE_AWARD.bigMoment;
   return total;
 }

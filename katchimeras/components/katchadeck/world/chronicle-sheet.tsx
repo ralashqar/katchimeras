@@ -1,5 +1,4 @@
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
@@ -8,6 +7,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { DayChronicle, ChronicleTimeOfDay } from '@/utils/chronicle-engine';
+import { DayMemoryStrip } from '@/components/katchadeck/world/day-memory-strip';
 
 // The Chronicle reader — "what was this day about?". A day theme + story summary,
 // what shaped the day, a light timeline, and linked memories. NOT a calendar list.
@@ -23,15 +23,12 @@ const TIME_ORDER: ChronicleTimeOfDay[] = ['morning', 'afternoon', 'evening', 'ni
 type ChronicleSheetProps = {
   chronicle: DayChronicle;
   day: HomeDayRecord;
+  onViewMemories?: () => void;
   onClose: () => void;
 };
 
-export function ChronicleSheet({ chronicle, day, onClose }: ChronicleSheetProps) {
+export function ChronicleSheet({ chronicle, day, onViewMemories, onClose }: ChronicleSheetProps) {
   const tabBarHeight = useBottomTabBarHeight();
-  const photos = [
-    day.heroPhoto?.thumbnailUri,
-    ...(day.capturedMeanings ?? []).map((meaning) => meaning.thumbnailUri),
-  ].filter((uri): uri is string => !!uri);
 
   const grouped = TIME_ORDER.map((slot) => ({
     slot,
@@ -98,18 +95,9 @@ export function ChronicleSheet({ chronicle, day, onClose }: ChronicleSheetProps)
             </View>
           ) : null}
 
-          {photos.length > 0 ? (
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Linked memories
-              </ThemedText>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
-                {photos.map((uri, index) => (
-                  <Image key={`${uri}-${index}`} source={{ uri }} style={styles.photo} contentFit="cover" transition={120} />
-                ))}
-              </ScrollView>
-            </View>
-          ) : null}
+          <View style={styles.section}>
+            <DayMemoryStrip day={day} title="Linked memories" onViewAll={onViewMemories} />
+          </View>
 
           {day.creature ? (
             <View style={styles.creatureRow}>

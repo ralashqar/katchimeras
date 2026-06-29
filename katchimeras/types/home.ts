@@ -209,7 +209,7 @@ export type HomeMomentMetadata = {
 // for the orbiting field around the egg. `weight` (0..1) drives orbit radius +
 // size + glow; `feedsSpecies` links the tag to the candidate creature(s) it
 // pushes, so tapping a tag can glow them. See utils/day-tags.ts.
-export type DayTagSource = 'moment' | 'prompt' | 'vision' | 'place' | 'steps' | 'capture' | 'weather';
+export type DayTagSource = 'moment' | 'prompt' | 'vision' | 'place' | 'steps' | 'studio' | 'capture' | 'weather';
 
 export type DayTag = {
   id: string;
@@ -521,6 +521,38 @@ export type FoodMoment = {
   createdAt: string;
 };
 
+// Inspiration archive (the Studio) — books, films, shows, games, music, art you
+// took in. NOT a review/rating tracker: a keepsake of what you experienced and how
+// it landed, kept for later. Created from a note that mentions it, a photo (a book
+// cover / poster), or a manual two-step add.
+export type StudioMediaType = 'book' | 'film' | 'show' | 'game' | 'music' | 'art' | 'other';
+// How it landed — a graded scale, most positive first. "inspired" sits alongside
+// "loved" so a thing can be cherished for moving you, not just for being enjoyed.
+export type StudioRating = 'loved' | 'inspired' | 'liked' | 'meh';
+export type StudioSource = 'manual' | 'photo' | 'note';
+export type StudioMoment = {
+  id: string;
+  label: string; // the title if known ("Dune"), else the media kind ("A book")
+  mediaType: StudioMediaType;
+  emoji: string;
+  rating: StudioRating;
+  thumbnailUri?: string | null;
+  source?: StudioSource;
+  noteId?: string | null; // the note this was detected in (source 'note')
+  detail?: string | null; // a short snippet for the reader (e.g. note excerpt)
+  createdAt: string;
+};
+
+// The Featured Memory Board (docs/world-structures-cozy-direction.md §9.3) — the
+// day's "cover": one user-chosen photo shown billboard-style by the Memory Vault,
+// or an illustrated card when there's no photo. Display-only.
+export type FeaturedMemory = {
+  kind: 'photo' | 'card';
+  assetId?: string; // camera-roll / capture asset id, when a photo
+  thumbnailUri?: string; // the displayed image
+  createdAt: string;
+};
+
 // How the day began, atmospherically. Never a score or a failure — low sleep is
 // just a softer, mistier morning. Manual for now (a one-tap "how was your
 // sleep?"); Apple Health can fill it passively later.
@@ -529,6 +561,18 @@ export type DaySleep = {
   quality: SleepQuality;
   source: 'manual' | 'appleHealth';
   totalSleepMinutes?: number;
+};
+
+// How a notably active day MOVED — the steps tell us "a lot happened", the user
+// tells us what it WAS (a hike, a long walk, a run...). Read-only interpretation
+// that colours the day's story; never a goal or a score. One-tap, from the "!" on
+// the Steps structure when the day's steps spike.
+export type DayMovementKind = 'hike' | 'walk' | 'run' | 'cycle' | 'workout' | 'errands' | 'travel';
+export type StepsInterpretation = {
+  movement: DayMovementKind;
+  label: string; // "A hike", "A long walk"
+  emoji: string;
+  createdAt: string;
 };
 
 // A place the user confirmed for the day — the "where" (category) + the "why"
@@ -616,8 +660,16 @@ export type StoredHomeDayRecord = {
   confirmedPlaces?: ConfirmedPlace[];
   // How the day began (sleep atmosphere) — manual one-tap for now.
   sleep?: DaySleep;
+  // What a notably active day's steps MEANT (hike / walk / run...) — one-tap from
+  // the "!" on the Steps structure. Read-only colour, never a goal.
+  stepsInterpretation?: StepsInterpretation;
   // Food memories — populate the Food Vault when food is part of the day.
   foodMoments?: FoodMoment[];
+  // Inspiration archive — books/films/shows/games you took in (the Studio).
+  studioMoments?: StudioMoment[];
+  // The day's "cover" memory shown on the Featured Memory Board (user-chosen photo,
+  // or an illustrated card). See utils/day-memories.ts + the Memory cluster.
+  featuredMemory?: FeaturedMemory;
   // Today Patch V2 — Daily Seed ids the user has completed (manual one-tap).
   // Passive seeds are satisfied from signals, not stored here. Each earned seed
   // grows its reward object on the Today patch. See utils/daily-seeds-engine.ts.

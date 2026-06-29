@@ -32,7 +32,32 @@ export type WorldObjectKind = 'anchor' | 'prop' | 'memory' | 'creature' | 'landm
 // standalone chest object (see notesObject) that taps into its own notes reader,
 // so it lives in the object-category union but not in PatchCellType. 'sleep' is
 // the same kind of standalone object (sleepObject) — a tappable tile, no cell.
-export type WorldObjectCategory = 'memory' | 'places' | 'journey' | 'reflection' | 'notes' | 'sleep' | 'food';
+export type WorldObjectCategory =
+  | 'memory'
+  | 'places'
+  | 'journey'
+  | 'reflection'
+  | 'notes'
+  | 'sleep'
+  | 'food'
+  // The Studio: the inspiration archive — tapping it opens the reader of books/
+  // films/shows/games the day took in (utils/today-patch-engine.ts studioObject).
+  | 'studio'
+  // The Town Hall: a standalone structure that keeps the day's story — tapping it
+  // opens the Chronicle reader (utils/chronicle-engine.ts). Not a leveling cell.
+  | 'chronicle'
+  // The Quest Board: today-only notice board — tapping it opens the day's Memory
+  // Quests (utils/memory-quests-engine.ts). Not a leveling cell.
+  | 'quests'
+  // A user-planted decorative object (tree/plant/flower) — earned from the day's
+  // living, placed freely in Decorate mode. Expressive only; no reader.
+  | 'decor'
+  // The Featured Memory Board — a billboard by the Memory Vault showing the day's
+  // cover photo; tapping opens the cover-photo picker.
+  | 'featured'
+  // The Photos stack — a Memory Vault satellite (its own category so it drags
+  // independently); tapping opens the Vault on the Photos tab.
+  | 'photos';
 export type PatchCellType = 'memory' | 'places' | 'journey' | 'reflection';
 
 // A single cell: its fixed grid position, current level (0 = empty ghost), the
@@ -64,6 +89,7 @@ export type WorldObject = {
   category?: WorldObjectCategory;
   badge?: number; // small count/metric tag shown at the object's corner
   badgeIcon?: string; // override the badge's icon (SF symbol name)
+  sizeScale?: number; // per-object render-size multiplier (e.g. big structures)
 };
 
 // A memory node is an interactive structure that stores one real moment for

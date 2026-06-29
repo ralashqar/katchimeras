@@ -9,8 +9,9 @@ import {
 } from 'expo-audio';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
+import { Gesture, GestureDetector, GestureHandlerRootView, type GestureType } from 'react-native-gesture-handler';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
@@ -23,12 +24,17 @@ import { PatchInspector } from '@/components/katchadeck/world/patch-inspector';
 import { BigMomentPickerSheet } from '@/components/katchadeck/world/big-moment-picker-sheet';
 import { BigMomentSheet } from '@/components/katchadeck/world/big-moment-sheet';
 import { ChronicleSheet } from '@/components/katchadeck/world/chronicle-sheet';
+import { QuestBoardSheet } from '@/components/katchadeck/world/quest-board-sheet';
 import { FoodMomentSheet, FoodVaultSheet } from '@/components/katchadeck/world/food-vault-sheet';
+import { StudioMomentSheet, StudioVaultSheet } from '@/components/katchadeck/world/studio-vault-sheet';
+import { StepsPromptSheet } from '@/components/katchadeck/world/steps-prompt-sheet';
+import { SanctuarySheet } from '@/components/katchadeck/world/sanctuary-sheet';
+import { FeaturedBoardSheet } from '@/components/katchadeck/world/featured-board-sheet';
+import { MemoryVaultSheet, type MemoryVaultTab } from '@/components/katchadeck/world/memory-vault-sheet';
 import { PlacePromptSheet, PLACE_CATEGORIES, type PlaceCategory, type PlaceMeaning } from '@/components/katchadeck/world/place-prompt-sheet';
 import { SleepSheet } from '@/components/katchadeck/world/sleep-sheet';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { WorldCanvas } from '@/components/katchadeck/world/world-canvas';
-import { WorldDashboard } from '@/components/katchadeck/world/world-dashboard';
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
 import { useDiscoveries } from '@/hooks/use-discoveries';
@@ -53,10 +59,22 @@ import { deriveDayChronicle, type CalendarEventContext } from '@/utils/chronicle
 import { loadCalendarEventsForDay } from '@/utils/calendar-events';
 import { selectMemoryQuests, type MemoryQuestType } from '@/utils/memory-quests-engine';
 import { detectFoodInVision } from '@/utils/food-detect';
+import { detectStudioInVision } from '@/utils/studio-detect';
 import { loadSleepForDay } from '@/utils/sleep-health';
 import { deriveTodayPatch } from '@/utils/today-patch-engine';
+import {
+  addDecor,
+  bloomBudget,
+  decorObjects,
+  decorPalette,
+  loadDayDecor,
+  moveDecor,
+  removeDecor,
+  type DecorItem,
+} from '@/utils/world-decor';
 import { loadTodayPatch, saveTodayPatch } from '@/utils/today-patch-storage';
 import { syncWorldFromDays } from '@/utils/world-engine';
+import { worldAssetSource } from '@/utils/world-visuals';
 
 // One ring of empty ground cells frames the day's patch in the home view.
 const PATCH_RING = 1;
@@ -86,7 +104,7 @@ function formatTimeRange(start?: string, end?: string): string | null {
 }
 
 const MEMORY_CHESTS_ONLY = true;
-const VISIBLE_CATEGORIES = new Set(['memory', 'notes', 'journey', 'places', 'sleep', 'food']);
+const VISIBLE_CATEGORIES = new Set(['memory', 'notes', 'journey', 'places', 'sleep', 'food', 'studio', 'chronicle', 'quests', 'reflection', 'featured', 'photos']);
 // Highest-rarity-first ordering for picking which pending discovery to celebrate.
 const DISCOVERY_RARITY_ORDER: Record<string, number> = { legendary: 3, epic: 2, rare: 1, common: 0 };
 const VISIBLE_CELLS = new Set(['memory', 'journey', 'places']);
@@ -119,7 +137,10 @@ export default function WorldScreen() {
     confirmPlace,
     markBigMoment,
     setSleep,
+    setStepsInterpretation,
+    setFeaturedMemory,
     addFoodMoment,
+    addStudioMoment,
     setDayName,
     triggerHatchIfReady,
     refreshState,
@@ -278,6 +299,7 @@ export default function WorldScreen() {
         formingDay.bigMoments?.length ?? 0,
         formingDay.notes?.length ?? 0,
         formingDay.foodMoments?.length ?? 0,
+        formingDay.studioMoments?.length ?? 0,
       ].join('|')
     : null;
   const todayPatch = useMemo(() => {
@@ -335,12 +357,46 @@ export default function WorldScreen() {
   if (selectedPatch) lastShownPatchRef.current = selectedPatch;
   const shownPatch = selectedPatch ?? (isHatching ? lastShownPatchRef.current : null);
 
+  // Decorate-your-day: user-planted decorations on the shown day's patch. Earned
+  // from the day's living (bloomBudget), placed/dragged in Customise mode.
+  const decorDayId = shownPatch?.dayId ?? null;
+  const [decorItems, setDecorItems] = useState<DecorItem[]>([]);
+  useEffect(() => {
+    setDecorItems(decorDayId ? loadDayDecor(decorDayId) : []);
+  }, [decorDayId]);
+  // Customise / Decorate mode is owned here so the plant tray can live at the
+  // screen bottom (clear of the world patch). The toggle button is on the canvas.
+  const [customising, setCustomising] = useState(false);
+  // Ref to the canvas's camera-pan gesture, so the capture buttons that float over
+  // the patch can BLOCK a pan when a drag starts on them (don't move the world).
+  const panRef = useRef<GestureType | undefined>(undefined);
+  // Filled by the canvas with a getter for the cell at the screen centre.
+  const getCenterCellRef = useRef<(() => { col: number; row: number } | null) | null>(null);
+  const decorBudget = selectedDayRecord ? bloomBudget(selectedDayRecord) : 0;
+  const bloomsLeft = Math.max(0, decorBudget - decorItems.length);
+  // TESTING: planting is currently unlimited (no budget gate) — re-enable the
+  // `bloomsLeft > 0` check to tie it to earned blooms / essence later. New decor is
+  // planted wherever the camera is centred (drag the world, then tap a plant).
+  const handleAddDecor = (assetKey: string) => {
+    if (!decorDayId) return;
+    const at = getCenterCellRef.current?.();
+    setDecorItems((items) => addDecor(decorDayId, items, assetKey, at?.col, at?.row));
+  };
+  const handleMoveDecor = (id: string, col: number, row: number) => {
+    if (decorDayId) setDecorItems((items) => moveDecor(decorDayId, items, id, col, row));
+  };
+  const handleRemoveDecor = (id: string) => {
+    if (decorDayId) setDecorItems((items) => removeDecor(decorDayId, items, id));
+  };
+
   // The world shows a SINGLE patch, placed at the origin and framed by a ring of
-  // empty ground. Switching days swaps the patch under the camera.
+  // empty ground. Switching days swaps the patch under the camera. Decorations are
+  // merged in so they render + drag like any other object.
   const renderPatches = useMemo(() => {
     if (!shownPatch) return [];
-    return [simplifyPatch({ ...shownPatch, gridCol: 0, gridRow: 0 })];
-  }, [shownPatch]);
+    const patch = simplifyPatch({ ...shownPatch, gridCol: 0, gridRow: 0 });
+    return [{ ...patch, objects: [...patch.objects, ...decorObjects(decorItems)] }];
+  }, [shownPatch, decorItems]);
 
   const inspectedPatch = useMemo(
     () => renderPatches.find((patch) => patch.id === selectedPatchId) ?? null,
@@ -691,10 +747,17 @@ export default function WorldScreen() {
   const todayFormingId = todayForming?.id ?? null;
   const todayFormingIso = todayForming?.isoDate ?? null;
   const todayHasSleep = !!todayForming?.sleep;
+  // Key the once-per-day guard on the day's INSTANCE (id + storedNonce), not just
+  // its date id. "Reset today" rebuilds the day with the SAME date id but a NEW
+  // storedNonce and no sleep — keying on the nonce re-arms the prompt so the
+  // SleepSheet re-opens after a reset (otherwise sleep can never be set again,
+  // since the sleep tile only exists once sleep is set). A plain dismiss keeps the
+  // same nonce, so it still won't nag.
+  const todayFormingKey = todayForming ? `${todayForming.id}:${todayForming.storedNonce ?? ''}` : null;
   useEffect(() => {
     if (!isFocused || !todayFormingId || !todayFormingIso || todayHasSleep) return;
-    if (sleepPromptedRef.current === todayFormingId) return;
-    sleepPromptedRef.current = todayFormingId;
+    if (sleepPromptedRef.current === todayFormingKey) return;
+    sleepPromptedRef.current = todayFormingKey;
     let active = true;
     void (async () => {
       const health = await loadSleepForDay(todayFormingIso);
@@ -705,7 +768,7 @@ export default function WorldScreen() {
     return () => {
       active = false;
     };
-  }, [isFocused, todayFormingId, todayFormingIso, todayHasSleep, setSleep]);
+  }, [isFocused, todayFormingId, todayFormingIso, todayFormingKey, todayHasSleep, setSleep]);
 
   // Auto-dismiss the growth microcopy after a beat.
   useEffect(() => {
@@ -731,10 +794,45 @@ export default function WorldScreen() {
     return Math.round(recent.reduce((sum, day) => sum + (day.stepsCount ?? 0), 0) / recent.length);
   }, [days]);
 
+  // Steps guidance: when today's steps SPIKE (an unmistakably active day, or well
+  // above the recent norm) and the day hasn't been interpreted yet, a golden "!"
+  // on the Steps structure invites "what kind of day was it? (hike / walk / ...)".
+  const stepsAlert = useMemo(() => {
+    if (!selectedIsTodayForming || !selectedDayRecord) return false;
+    if (selectedDayRecord.stepsInterpretation) return false; // already interpreted
+    const steps = selectedDayRecord.stepsCount ?? 0;
+    const spike = recentAvgSteps ? steps >= Math.max(4500, recentAvgSteps * 1.6) : false;
+    return steps >= 7000 || spike; // 7k = clearly active; or a big jump vs. the norm
+  }, [selectedIsTodayForming, selectedDayRecord, recentAvgSteps]);
+  const [stepsSheetOpen, setStepsSheetOpen] = useState(false);
+  const handlePressStepsAlert = () => setStepsSheetOpen(true);
+  const handleConfirmSteps = (input: Parameters<typeof setStepsInterpretation>[0]) => {
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
+    setStepsInterpretation(input, formingTarget);
+    setStepsSheetOpen(false);
+    setEggFeedKey((key) => key + 1);
+    setMicrocopy(`${input.emoji} ${input.label} · noted`);
+  };
+  const handlePickFeatured = (photo: { assetId?: string; thumbnailUri: string }) => {
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
+    setFeaturedMemory({ kind: 'photo', assetId: photo.assetId, thumbnailUri: photo.thumbnailUri }, formingTarget);
+    setFeaturedPickerOpen(false);
+    setMicrocopy('Featured memory set 🖼️');
+  };
+
   // Tapping a chest opens its reader: the photos vault, the notes reader, or (when
   // enabled) Places → the full day map. Only the live (today) patch has cells.
   const handleSelectCell = (cellType: WorldObjectCategory) => {
+    if (cellType === 'decor') return; // decorations are expressive only — no reader
     setLastSelectedCell(cellType);
+    if (cellType === 'chronicle') {
+      setChronicleOpen(true);
+      return;
+    }
+    if (cellType === 'quests') {
+      setQuestBoardOpen(true);
+      return;
+    }
     if (cellType === 'places') {
       setPlacesVaultOpen(true);
       return;
@@ -745,6 +843,30 @@ export default function WorldScreen() {
     }
     if (cellType === 'food') {
       setFoodVaultOpen(true);
+      return;
+    }
+    if (cellType === 'studio') {
+      setStudioVaultOpen(true);
+      return;
+    }
+    if (cellType === 'reflection') {
+      setSanctuaryOpen(true); // 🌿 Sanctuary — how today felt
+      return;
+    }
+    if (cellType === 'featured') {
+      setFeaturedPickerOpen(true); // 🖼️ pick the day's cover photo
+      return;
+    }
+    // 📸 Memory Vault owns all captured media — the Vault + Photos stack open the
+    // unified reader (Photos tab); the Notes stack opens it on the Notes tab.
+    if (cellType === 'memory' || cellType === 'photos') {
+      setMemoryVaultTab('photos');
+      setMemoryVaultOpen(true);
+      return;
+    }
+    if (cellType === 'notes') {
+      setMemoryVaultTab('notes');
+      setMemoryVaultOpen(true);
       return;
     }
     setSelectedCell(cellType);
@@ -765,6 +887,8 @@ export default function WorldScreen() {
   // signals plus (best-effort, on-device) calendar events. Shown as a tappable
   // card in the dashboard + a full reader.
   const [chronicleOpen, setChronicleOpen] = useState(false);
+  // Quest Board reader — the day's Memory Quests, opened from the world structure.
+  const [questBoardOpen, setQuestBoardOpen] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventContext[]>([]);
   useEffect(() => {
     if (!selectedDayRecord) {
@@ -800,6 +924,12 @@ export default function WorldScreen() {
   };
   const [foodPickerOpen, setFoodPickerOpen] = useState(false);
   const [foodVaultOpen, setFoodVaultOpen] = useState(false);
+  const [studioPickerOpen, setStudioPickerOpen] = useState(false);
+  const [studioVaultOpen, setStudioVaultOpen] = useState(false);
+  const [sanctuaryOpen, setSanctuaryOpen] = useState(false);
+  const [featuredPickerOpen, setFeaturedPickerOpen] = useState(false);
+  const [memoryVaultOpen, setMemoryVaultOpen] = useState(false);
+  const [memoryVaultTab, setMemoryVaultTab] = useState<MemoryVaultTab>('photos');
   const [sleepSheetOpen, setSleepSheetOpen] = useState(false);
   // Opening the sleep tile is also a chance to pull last night's HOURS from Apple
   // Health — the morning read only runs once, and a manual answer carries no hours.
@@ -837,6 +967,20 @@ export default function WorldScreen() {
     setEggFeedKey((key) => key + 1);
     setMicrocopy(`${input.emoji} ${input.label} · saved`);
   };
+  // If Vision detected a book/screen/poster today, pre-fill the Studio picker's "what".
+  const studioSuggestion = useMemo(() => {
+    const detection = detectStudioInVision(formingDay?.vision);
+    return detection.detected && detection.mediaType && detection.label && detection.emoji
+      ? { mediaType: detection.mediaType, label: detection.label, emoji: detection.emoji }
+      : null;
+  }, [formingDay]);
+  const handleAddStudio = (input: Parameters<typeof addStudioMoment>[0]) => {
+    if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
+    addStudioMoment(input, formingTarget);
+    setStudioPickerOpen(false);
+    setEggFeedKey((key) => key + 1);
+    setMicrocopy(`${input.emoji} ${input.label} · kept`);
+  };
   const handleQuest = (type: MemoryQuestType) => {
     if (formingDay && selectedDayId !== formingDay.id) selectTimelineDay(formingDay.id);
     switch (type) {
@@ -862,6 +1006,9 @@ export default function WorldScreen() {
         break;
       case 'saveFoodMemory':
         setFoodPickerOpen(true);
+        break;
+      case 'saveStudioMemory':
+        setStudioPickerOpen(true);
         break;
       case 'namePatch':
         setNameSheetOpen(true);
@@ -905,7 +1052,16 @@ export default function WorldScreen() {
               ring={PATCH_RING}
               animateOnMount
               lockCamera
+              imageBase
               hideRecenter
+              customising={customising}
+              onToggleCustomising={() => setCustomising((v) => !v)}
+              onMoveDecor={handleMoveDecor}
+              onRemoveDecor={handleRemoveDecor}
+              questCount={memoryQuests.filter((quest) => !quest.completed).length}
+              panRef={panRef}
+              getCenterCellRef={getCenterCellRef}
+              featuredThumb={shownPatch ? selectedDayRecord?.featuredMemory?.thumbnailUri ?? null : null}
               eggPatchId={selectedIsForming ? todayPatch?.id ?? null : null}
               eggVisual={selectedIsForming ? todayPatch?.eggVisual ?? null : null}
               eggReady={eggReady}
@@ -921,6 +1077,8 @@ export default function WorldScreen() {
               onPressMemoryAlert={handlePressMemoryAlert}
               placesAlert={placesAlert}
               onPressPlacesAlert={handlePressPlacesAlert}
+              stepsAlert={stepsAlert}
+              onPressStepsAlert={handlePressStepsAlert}
               onPressEgg={handleEggPress}
               onSelectCell={handleSelectCell}
               onSelectBigMoment={() => setBigMomentSheetOpen(true)}
@@ -947,8 +1105,11 @@ export default function WorldScreen() {
             <View pointerEvents="none" style={[styles.themeWash, { backgroundColor: worldThemeAccent }]} />
           ) : null}
 
-          {/* Capture controls float over the world's lower-right. */}
+          {/* Capture controls float over the world's lower-right. A drag starting
+              here blocks the camera pan (Native gesture — doesn't steal the button
+              presses / hold-to-record). */}
           {showActions ? (
+            <GestureDetector gesture={Gesture.Native().blocksExternalGesture(panRef)}>
             <View style={styles.actionWrap} pointerEvents="box-none">
               <WorldActionStack
                 onCamera={() => {
@@ -967,6 +1128,7 @@ export default function WorldScreen() {
                 recording={recPhase === 'recording'}
               />
             </View>
+            </GestureDetector>
           ) : null}
 
           {microcopy ? (
@@ -1008,22 +1170,6 @@ export default function WorldScreen() {
           ) : null}
         </View>
 
-        <View style={styles.dashboardWrap}>
-          <WorldDashboard
-            days={days}
-            quests={memoryQuests}
-            onQuest={handleQuest}
-            chronicle={chronicle}
-            onOpenChronicle={() => setChronicleOpen(true)}
-            foodMoments={selectedDayRecord?.foodMoments ?? []}
-            onOpenFood={() => setFoodVaultOpen(true)}
-            discoveriesUnlocked={discoveriesUnlocked}
-            discoveriesTotal={discoveriesTotal}
-            onOpenDiscoveries={() => setDiscoveriesOpen(true)}
-            onOpenCosmetics={() => setCosmeticsOpen(true)}
-            essenceBalance={essenceBalance}
-          />
-        </View>
       </ScrollView>
 
       {inspectedPatch ? (
@@ -1047,7 +1193,27 @@ export default function WorldScreen() {
       ) : null}
 
       {chronicleOpen && chronicle && selectedDayRecord ? (
-        <ChronicleSheet chronicle={chronicle} day={selectedDayRecord} onClose={() => setChronicleOpen(false)} />
+        <ChronicleSheet
+          chronicle={chronicle}
+          day={selectedDayRecord}
+          onViewMemories={() => {
+            setChronicleOpen(false);
+            setMemoryVaultTab('photos');
+            setMemoryVaultOpen(true);
+          }}
+          onClose={() => setChronicleOpen(false)}
+        />
+      ) : null}
+
+      {questBoardOpen ? (
+        <QuestBoardSheet
+          quests={memoryQuests}
+          onQuest={(type) => {
+            setQuestBoardOpen(false);
+            handleQuest(type);
+          }}
+          onClose={() => setQuestBoardOpen(false)}
+        />
       ) : null}
 
       {bigMomentPickerOpen ? (
@@ -1129,6 +1295,65 @@ export default function WorldScreen() {
         />
       ) : null}
 
+      {studioPickerOpen ? (
+        <StudioMomentSheet onConfirm={handleAddStudio} onClose={() => setStudioPickerOpen(false)} suggested={studioSuggestion} />
+      ) : null}
+
+      {studioVaultOpen && selectedDayRecord ? (
+        <StudioVaultSheet
+          studioMoments={selectedDayRecord.studioMoments ?? []}
+          onAddStudio={
+            selectedIsForming
+              ? () => {
+                  setStudioVaultOpen(false);
+                  setStudioPickerOpen(true);
+                }
+              : undefined
+          }
+          onClose={() => setStudioVaultOpen(false)}
+        />
+      ) : null}
+
+      {stepsSheetOpen ? (
+        <StepsPromptSheet
+          stepsCount={selectedDayRecord?.stepsCount ?? null}
+          onConfirm={handleConfirmSteps}
+          onClose={() => setStepsSheetOpen(false)}
+        />
+      ) : null}
+
+      {sanctuaryOpen && selectedDayRecord ? (
+        <SanctuarySheet
+          day={selectedDayRecord}
+          onReflect={selectedIsForming ? () => { setSanctuaryOpen(false); openPrompts(); } : undefined}
+          onClose={() => setSanctuaryOpen(false)}
+        />
+      ) : null}
+
+      {featuredPickerOpen && selectedDayRecord ? (
+        <FeaturedBoardSheet
+          day={selectedDayRecord}
+          onPick={handlePickFeatured}
+          onClose={() => setFeaturedPickerOpen(false)}
+        />
+      ) : null}
+
+      {memoryVaultOpen && selectedDayRecord ? (
+        <MemoryVaultSheet
+          day={selectedDayRecord}
+          initialTab={memoryVaultTab}
+          onChangeFeatured={
+            selectedIsForming
+              ? () => {
+                  setMemoryVaultOpen(false);
+                  setFeaturedPickerOpen(true);
+                }
+              : undefined
+          }
+          onClose={() => setMemoryVaultOpen(false)}
+        />
+      ) : null}
+
       {placesVaultOpen && selectedDayRecord ? (
         <PlacesDetailSheet
           day={selectedDayRecord}
@@ -1187,6 +1412,11 @@ export default function WorldScreen() {
                 }
               : undefined
           }
+          onViewMemories={() => {
+            setSelectedCell(null);
+            setMemoryVaultTab('photos');
+            setMemoryVaultOpen(true);
+          }}
         />
       ) : null}
 
@@ -1204,6 +1434,26 @@ export default function WorldScreen() {
       ) : null}
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
+
+      {/* Decorate tray — sits at the SCREEN BOTTOM (clear of the world patch) while
+          customising. Tap a plant to drop it on the patch, then drag it to place. */}
+      {customising && shownPatch ? (
+        <View style={[styles.decorTray, { bottom: tabBarHeight + 12 }]}>
+          <ThemedText style={styles.decorTrayHint} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            🌱 Tap to plant · drag to place {bloomsLeft > 0 ? `· ${bloomsLeft} blooms` : ''}
+          </ThemedText>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.decorTrayRow}>
+            {decorPalette(shownPatch.primaryArchetype).map((assetKey) => {
+              const source = worldAssetSource(assetKey);
+              return (
+                <Pressable key={assetKey} onPress={() => handleAddDecor(assetKey)} style={styles.decorChip}>
+                  {source ? <ExpoImage source={source} style={styles.decorChipImg} contentFit="contain" /> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {celebrateDiscovery ? (
         <DiscoveryReveal discovery={celebrateDiscovery} onDismiss={() => markDiscoverySeen(celebrateDiscovery.id)} />
@@ -1228,7 +1478,33 @@ const styles = StyleSheet.create({
   heroEmptyText: { textAlign: 'center' },
   // Capture controls float over the lower-right of the world patch.
   actionWrap: { position: 'absolute', right: 14, bottom: 16 },
-  dashboardWrap: { paddingHorizontal: 20, marginTop: 6, zIndex: 10, elevation: 10 },
+  // Decorate tray — pinned to the screen bottom while customising.
+  decorTray: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    zIndex: 40,
+    elevation: 40,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(20,17,31,0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.3)',
+  },
+  decorTrayHint: { fontSize: 12, fontWeight: '700', marginBottom: 8 },
+  decorTrayRow: { gap: 10, paddingRight: 8 },
+  decorChip: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  decorChipImg: { width: 46, height: 46 },
   microcopy: {
     position: 'absolute',
     top: 12,

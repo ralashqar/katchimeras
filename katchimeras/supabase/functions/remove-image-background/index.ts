@@ -48,7 +48,16 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Missing FAL_KEY or Supabase service configuration.' }, 500);
   }
 
-  let body: { imageUrl?: string; imageBase64?: string; outputName?: string };
+  let body: {
+    imageUrl?: string;
+    imageBase64?: string;
+    outputName?: string;
+    // BiRefNet variant, e.g. 'General Use (Heavy)' (more accurate, fewer chunks cut
+    // out of light objects) vs the default 'General Use (Light)'. Optional.
+    model?: string;
+    operatingResolution?: string; // '1024x1024' | '2048x2048'
+    refineForeground?: boolean;
+  };
   try {
     body = await req.json();
   } catch {
@@ -78,6 +87,13 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         image_url: sourceUrl,
         output_format: 'png',
+        ...(typeof body.model === 'string' ? { model: body.model } : {}),
+        ...(typeof body.operatingResolution === 'string'
+          ? { operating_resolution: body.operatingResolution }
+          : {}),
+        ...(typeof body.refineForeground === 'boolean'
+          ? { refine_foreground: body.refineForeground }
+          : {}),
       }),
     });
 

@@ -20,10 +20,13 @@ import {
   applyGeneratedReflection,
   applyNoteForToday,
   addFoodMomentForToday,
+  addStudioMomentForToday,
   completeSeedForToday,
   confirmPlaceForToday,
   markBigMomentForToday,
   setSleepForToday,
+  setStepsInterpretationForToday,
+  setFeaturedMemoryForToday,
   setDayNameForToday,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
@@ -308,6 +311,32 @@ export function useHomeScreenState() {
     []
   );
 
+  const setStepsInterpretation = useCallback(
+    (input: Parameters<typeof setStepsInterpretationForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return setStepsInterpretationForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const setFeaturedMemory = useCallback(
+    (input: Parameters<typeof setFeaturedMemoryForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return setFeaturedMemoryForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
   const setDayName = useCallback(
     (name: string, target: DayInputTarget = 'today') => {
       const now = new Date();
@@ -329,6 +358,19 @@ export function useHomeScreenState() {
       setStoredState((currentState) => {
         const hydrated = hydrateHomeState(currentState, profile, now);
         return addFoodMomentForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const addStudioMoment = useCallback(
+    (input: Parameters<typeof addStudioMomentForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return addStudioMomentForToday(hydrated.state, input, profile, now, target);
       });
     },
     []
@@ -771,8 +813,11 @@ export function useHomeScreenState() {
     confirmPlace,
     markBigMoment,
     setSleep,
+    setStepsInterpretation,
+    setFeaturedMemory,
     setDayName,
     addFoodMoment,
+    addStudioMoment,
     isTodayHatched,
     tomorrowDay,
     tomorrowActivePrompt,

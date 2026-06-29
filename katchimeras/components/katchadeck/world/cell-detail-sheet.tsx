@@ -8,6 +8,7 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-nati
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { PLACE_CATEGORIES } from '@/components/katchadeck/world/place-prompt-sheet';
+import { DayMemoryStrip } from '@/components/katchadeck/world/day-memory-strip';
 import { Lantern } from '@/constants/theme';
 import type { DayMapNode, HomeDayRecord } from '@/types/home';
 import type { PatchCell } from '@/types/world';
@@ -50,6 +51,8 @@ type CellDetailSheetProps = {
   onClose: () => void;
   // Memory Vault only — opens the live camera capture flow to add a new photo.
   onAddPhoto?: () => void;
+  // Surfaces a "View memories" link (Journey reader → the shared Memory Vault).
+  onViewMemories?: () => void;
 };
 
 const MEANING_TINT: Record<string, string> = {
@@ -93,7 +96,7 @@ function SheetShell({ children, onClose }: { children: ReactNode; onClose: () =>
   );
 }
 
-export function CellDetailSheet({ day, cell, recentAvgSteps, onClose, onAddPhoto }: CellDetailSheetProps) {
+export function CellDetailSheet({ day, cell, recentAvgSteps, onClose, onAddPhoto, onViewMemories }: CellDetailSheetProps) {
   return (
     <SheetShell onClose={onClose}>
       <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
@@ -104,7 +107,7 @@ export function CellDetailSheet({ day, cell, recentAvgSteps, onClose, onAddPhoto
       </ThemedText>
 
       {cell.type === 'memory' ? <MemoryBody day={day} onAddPhoto={onAddPhoto} /> : null}
-      {cell.type === 'journey' ? <JourneyBody day={day} recentAvgSteps={recentAvgSteps} /> : null}
+      {cell.type === 'journey' ? <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} /> : null}
       {cell.type === 'reflection' ? <ReflectionBody day={day} /> : null}
     </SheetShell>
   );
@@ -408,7 +411,7 @@ function NotesBody({ day, onAddNote }: { day: HomeDayRecord; onAddNote?: () => v
 
 type NamedPlace = { id: string; primary: string; locality: string | null };
 
-function JourneyBody({ day, recentAvgSteps }: { day: HomeDayRecord; recentAvgSteps: number | null }) {
+function JourneyBody({ day, recentAvgSteps, onViewMemories }: { day: HomeDayRecord; recentAvgSteps: number | null; onViewMemories?: () => void }) {
   const steps = day.stepsCount ?? 0;
   const mapNodes = day.dayMap?.nodes;
   const placeCount = day.visitedPlaceCount ?? mapNodes?.length ?? 0;
@@ -485,6 +488,8 @@ function JourneyBody({ day, recentAvgSteps }: { day: HomeDayRecord; recentAvgSte
           )}
         </View>
       ) : null}
+
+      <DayMemoryStrip day={day} title="Memories from today" onViewAll={onViewMemories} />
     </View>
   );
 }

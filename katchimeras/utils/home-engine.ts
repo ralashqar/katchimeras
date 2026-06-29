@@ -18,6 +18,8 @@ import type {
   ActivityPermissionState,
   BigMomentType,
   DaySleep,
+  StepsInterpretation,
+  FeaturedMemory,
   CapturedMeaning,
   DayNote,
   DayInputTarget,
@@ -37,6 +39,9 @@ import type {
   FoodMeaning,
   FoodMoment,
   FoodSource,
+  StudioMoment,
+  StudioRating,
+  StudioSource,
   HomeTimelineDay,
   HomeTomorrowRecord,
   InspirationCategory,
@@ -69,6 +74,7 @@ import { resolveVariantCellId } from '@/utils/creature-variant';
 import { aggregatePhotoVision, mergeDayVision } from '@/utils/vision-signals';
 import { mergeCaptureEnergy } from '@/utils/capture-energy';
 import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
+import { detectStudioInText, detectStudioInVision, type StudioDetection } from '@/utils/studio-detect';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 
 import type { EncounterHistoryMap } from '@/types/home';
@@ -675,6 +681,86 @@ export function addFoodMomentForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+// --- Studio (inspiration archive) — mirrors the Food Vault. Books/films/shows/
+// games you took in, kept with how they landed. Created from notes, photos, or a
+// manual add. Never a review tracker. ---
+
+// Append a studio moment, de-duplicated by source reference (same note or photo
+// never doubles up) and capped. Returns the list unchanged on a duplicate.
+function appendStudioMoment(existing: StudioMoment[] | undefined, moment: StudioMoment): StudioMoment[] {
+  const list = existing ?? [];
+  const dupe = list.some(
+    (m) =>
+      (!!moment.noteId && m.noteId === moment.noteId) ||
+      (!!moment.thumbnailUri && m.thumbnailUri === moment.thumbnailUri)
+  );
+  if (dupe) return list;
+  return [...list, moment].slice(-12);
+}
+
+// An auto-detected item's rating inferred from the note/photo mood — a warm note
+// reads as "loved", a meaningful one as "inspired", else a neutral "liked". The
+// user can give a precise rating via the manual picker or the Studio reader.
+function studioRatingFromArchetype(archetype: string | undefined | null): StudioRating {
+  switch (archetype) {
+    case 'meaningful':
+      return 'inspired';
+    case 'together':
+    case 'social':
+    case 'calm':
+      return 'loved';
+    default:
+      return 'liked';
+  }
+}
+
+// Build an auto-detected studio moment from a detection + its source reference.
+function buildAutoStudioMoment(
+  detection: StudioDetection,
+  opts: { source: StudioSource; now: Date; archetype?: string | null; thumbnailUri?: string | null; noteId?: string | null; detail?: string | null }
+): StudioMoment {
+  return {
+    id: `studio-${opts.now.getTime().toString(36)}-${opts.source}`,
+    label: detection.label ?? 'Something',
+    mediaType: detection.mediaType ?? 'other',
+    emoji: detection.emoji ?? '✨',
+    rating: studioRatingFromArchetype(opts.archetype),
+    thumbnailUri: opts.thumbnailUri ?? null,
+    source: opts.source,
+    noteId: opts.noteId ?? null,
+    detail: opts.detail ?? null,
+    createdAt: opts.now.toISOString(),
+  };
+}
+
+export function addStudioMomentForToday(
+  state: StoredHomeState,
+  input: { label: string; mediaType: StudioMoment['mediaType']; emoji: string; rating: StudioRating; thumbnailUri?: string | null },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const moment: StudioMoment = {
+    id: `studio-${now.getTime().toString(36)}`,
+    label: input.label,
+    mediaType: input.mediaType,
+    emoji: input.emoji,
+    rating: input.rating,
+    thumbnailUri: input.thumbnailUri ?? null,
+    source: 'manual',
+    noteId: null,
+    detail: null,
+    createdAt: now.toISOString(),
+  };
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    studioMoments: appendStudioMoment(base.studioMoments, moment),
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
 // Set how the day began (sleep atmosphere) — from a one-tap "how was it?" answer
 // (source 'manual') or an Apple Health read (source 'appleHealth' + minutes).
 export function setSleepForToday(
@@ -688,6 +774,52 @@ export function setSleepForToday(
   const nextDay: StoredHomeDayRecord = {
     ...base,
     sleep,
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// Interpret a notably active day's steps (hike / walk / run...) — one-tap from the
+// "!" on the Steps structure. Read-only colour for the day's story.
+export function setStepsInterpretationForToday(
+  state: StoredHomeState,
+  input: { movement: StepsInterpretation['movement']; label: string; emoji: string },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    stepsInterpretation: {
+      movement: input.movement,
+      label: input.label,
+      emoji: input.emoji,
+      createdAt: now.toISOString(),
+    },
+  };
+
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// Set the day's Featured Memory (the cover on the Memory Board) — a chosen photo or
+// an illustrated card. Display-only; never affects scores or hatch.
+export function setFeaturedMemoryForToday(
+  state: StoredHomeState,
+  featured: { kind: FeaturedMemory['kind']; assetId?: string; thumbnailUri?: string },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    featuredMemory: {
+      kind: featured.kind,
+      assetId: featured.assetId,
+      thumbnailUri: featured.thumbnailUri,
+      createdAt: now.toISOString(),
+    },
   };
 
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
@@ -746,6 +878,8 @@ export function applyNoteForToday(
   // If the note talks about food, fold it into the Food Vault, keeping a back-
   // reference to the note (so the reader can show where it came from).
   const foodDetection = detectFoodInText(input.text);
+  // Likewise, a note about a book/film/show/game lands in the Studio archive.
+  const studioDetection = detectStudioInText(input.text);
   const nextDay: StoredHomeDayRecord = {
     ...base,
     notes: [...(base.notes ?? []), note],
@@ -761,6 +895,18 @@ export function applyNoteForToday(
           })
         )
       : base.foodMoments,
+    studioMoments: studioDetection.detected
+      ? appendStudioMoment(
+          base.studioMoments,
+          buildAutoStudioMoment(studioDetection, {
+            source: 'note',
+            now,
+            archetype: input.archetype,
+            noteId: note.id,
+            detail: input.text.trim().slice(0, 120),
+          })
+        )
+      : base.studioMoments,
     bigMoments: input.bigMoment
       ? [
           ...(base.bigMoments ?? []),
@@ -1233,6 +1379,10 @@ export function applyCapturedMomentForToday(
   const scene = capture.scene ?? classifyScene(capture.vision);
   const foodDetection: FoodDetection =
     scene.type === 'food' ? scene.food ?? detectFoodInVision(capture.vision) : { detected: false };
+  // A snapped book cover / poster / screen folds into the Studio archive.
+  const studioDetection: StudioDetection = foodDetection.detected
+    ? { detected: false }
+    : detectStudioInVision(capture.vision);
   const nextDay: StoredHomeDayRecord = {
     ...base,
     capturedEnergy: mergeCaptureEnergy(base.capturedEnergy, capture.energy),
@@ -1257,6 +1407,17 @@ export function applyCapturedMomentForToday(
           })
         )
       : base.foodMoments,
+    studioMoments: studioDetection.detected
+      ? appendStudioMoment(
+          base.studioMoments,
+          buildAutoStudioMoment(studioDetection, {
+            source: 'photo',
+            now,
+            archetype: meaning?.archetype,
+            thumbnailUri: meaning?.thumbnailUri ?? null,
+          })
+        )
+      : base.studioMoments,
   };
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }

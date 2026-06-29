@@ -143,7 +143,8 @@ const PATCH_DEPTH_STRIDE = 1000;
 // the base cell maps onto the world tile. See OBJECT_BASE in world-canvas for the
 // vertical mapping. Creatures are square + centre-anchored (not tile-art).
 function spriteSize(object: WorldObject): number {
-  return object.kind === 'creature' ? TILE_W * 0.6 : TILE_W;
+  const base = object.kind === 'creature' ? TILE_W * 0.6 : TILE_W;
+  return base * (object.sizeScale ?? 1);
 }
 
 // Every cell is floored with a diamond tile from the atlas — the archetype's
@@ -167,7 +168,11 @@ function cellHash(seed: string): number {
 // (objects/memories still live on the inner 0..PATCH_SIZE grid). It frames the
 // day's patch with a margin of bare ground so it reads as an island, and is used
 // by the single-patch home view. ring = 0 reproduces the original tight slab.
-export function layoutWorld(patches: WorldPatch[], ring = 0): WorldScene {
+// `stableBounds` makes the coordinate space depend ONLY on the fixed slab geometry
+// (plus a constant object-rise margin), never on where the objects currently sit. So
+// adding / moving / removing objects can't re-normalise the scene — the camera stays
+// put instead of snapping (used by the image-base home view where objects are draggable).
+export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = false): WorldScene {
   const rawSlabs: SceneSlab[] = [];
   const rawSprites: SceneSprite[] = [];
   const rawDecals: SceneDecal[] = [];
@@ -329,15 +334,26 @@ export function layoutWorld(patches: WorldPatch[], ring = 0): WorldScene {
       ys.push(p.y);
     }
   }
-  for (const sprite of rawSprites) {
-    xs.push(sprite.x - sprite.size / 2, sprite.x + sprite.size / 2);
-    // 1:2 objects rise ~1.9× their width above the cell, ~0.1× below.
-    ys.push(sprite.y - sprite.size * 1.95, sprite.y + sprite.size * 0.15);
+  if (!stableBounds) {
+    for (const sprite of rawSprites) {
+      xs.push(sprite.x - sprite.size / 2, sprite.x + sprite.size / 2);
+      // Square (1:1) objects rise ~1× their width above the cell, ~0.1× below.
+      ys.push(sprite.y - sprite.size * 1.05, sprite.y + sprite.size * 0.15);
+    }
   }
-  const minX = xs.length ? Math.min(...xs) : 0;
-  const minY = ys.length ? Math.min(...ys) : 0;
-  const maxX = xs.length ? Math.max(...xs) : 0;
-  const maxY = ys.length ? Math.max(...ys) : 0;
+  let minX = xs.length ? Math.min(...xs) : 0;
+  let minY = ys.length ? Math.min(...ys) : 0;
+  let maxX = xs.length ? Math.max(...xs) : 0;
+  let maxY = ys.length ? Math.max(...ys) : 0;
+  if (stableBounds) {
+    // Constant margins (NOT derived from object positions) so the space is fixed:
+    // enough headroom for a tall object to rise above its cell, plus side breathing
+    // room. Objects beyond this still render (the world surface overflows visibly).
+    minY -= TILE_W * 2.4;
+    minX -= TILE_W * 0.8;
+    maxX += TILE_W * 0.8;
+    maxY += TILE_W * 0.3;
+  }
   const dx = -minX + pad;
   const dy = -minY + pad;
 

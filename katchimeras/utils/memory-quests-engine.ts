@@ -1,5 +1,6 @@
 import type { StoredHomeDayRecord } from '@/types/home';
 import { detectFoodInVision } from '@/utils/food-detect';
+import { detectStudioInVision } from '@/utils/studio-detect';
 
 // Memory Quests (Patch Systems V3) — they replace the generic "Daily Seeds".
 // Quests are never chores: each one is a meaningful capture/reflection that grows
@@ -14,9 +15,10 @@ export type MemoryQuestType =
   | 'markPlace'
   | 'markBigMoment'
   | 'saveFoodMemory'
+  | 'saveStudioMemory'
   | 'namePatch';
 
-export type MemoryQuestTargetCell = 'memory' | 'reflection' | 'places' | 'chronicle' | 'foodVault';
+export type MemoryQuestTargetCell = 'memory' | 'reflection' | 'places' | 'chronicle' | 'foodVault' | 'studioVault';
 
 export type MemoryQuest = {
   id: string;
@@ -45,6 +47,7 @@ type QuestDayInput = Pick<
   | 'visitedPlaceCount'
   | 'bigMoments'
   | 'foodMoments'
+  | 'studioMoments'
   | 'dayName'
   | 'vision'
 >;
@@ -100,6 +103,14 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
     targetCell: 'foodVault',
     essenceReward: 5,
   },
+  saveStudioMemory: {
+    type: 'saveStudioMemory',
+    emoji: '📖',
+    title: 'Keep an inspiration',
+    rewardLabel: 'the studio',
+    targetCell: 'studioVault',
+    essenceReward: 5,
+  },
   namePatch: {
     type: 'namePatch',
     emoji: '🏷',
@@ -129,6 +140,8 @@ export function isQuestComplete(type: MemoryQuestType, day: QuestDayInput): bool
       return (day.bigMoments?.length ?? 0) > 0;
     case 'saveFoodMemory':
       return (day.foodMoments?.length ?? 0) > 0;
+    case 'saveStudioMemory':
+      return (day.studioMoments?.length ?? 0) > 0;
     case 'namePatch':
       return !!day.dayName && day.dayName.trim().length > 0;
     default:
@@ -154,9 +167,12 @@ export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3): Memo
   // for "food in the day" until on-device food detection lands).
   const mealtime = (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 21);
   const foodDetected = detectFoodInVision(day.vision).detected;
+  const studioDetected = detectStudioInVision(day.vision).detected;
   if (visited > 0) offered.push('markPlace');
   // Detected food (Vision) is a strong trigger; otherwise nudge at meal times.
   if (foodDetected || mealtime) offered.push('saveFoodMemory');
+  // A detected book/screen/poster invites keeping it in the Studio archive.
+  if (studioDetected) offered.push('saveStudioMemory');
   if (hour >= 17) offered.push('recordVoiceMemory');
   // A big moment can be marked any time (optional, lower priority).
   offered.push('markBigMoment');
@@ -167,7 +183,8 @@ export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3): Memo
     (day.notes?.length ?? 0) > 0 ||
     (day.confirmedPlaces?.length ?? 0) > 0 ||
     (day.bigMoments?.length ?? 0) > 0 ||
-    (day.foodMoments?.length ?? 0) > 0;
+    (day.foodMoments?.length ?? 0) > 0 ||
+    (day.studioMoments?.length ?? 0) > 0;
   if (hasContent) offered.push('namePatch');
   // Fill the slate with a voice memory if nothing else made the cut.
   if (!offered.includes('recordVoiceMemory') && offered.length < max) offered.push('recordVoiceMemory');

@@ -51,15 +51,16 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   sleep_low: require('../assets/images/katchimeras/world/props/sleep_low.png'),
   // Food Vault tile — a little food stall; grows as food memories are saved.
   food_stall: require('../assets/images/katchimeras/world/props/food_stall.png'),
-  // Discovery artefacts — permanent monuments unlocked by life milestones.
-  artefact_museum_banner: require('../assets/images/katchimeras/world/props/artefact_museum_banner.png'),
-  artefact_voice_crystal: require('../assets/images/katchimeras/world/props/artefact_voice_crystal.png'),
-  artefact_festival_tree: require('../assets/images/katchimeras/world/props/artefact_festival_tree.png'),
-  artefact_golden_arch: require('../assets/images/katchimeras/world/props/artefact_golden_arch.png'),
-  artefact_life_monument: require('../assets/images/katchimeras/world/props/artefact_life_monument.png'),
-  artefact_journey_monument: require('../assets/images/katchimeras/world/props/artefact_journey_monument.png'),
-  artefact_trail_bridge: require('../assets/images/katchimeras/world/props/artefact_trail_bridge.png'),
-  artefact_memory_lantern: require('../assets/images/katchimeras/world/props/artefact_memory_lantern.png'),
+  // Discovery artefacts — permanent monuments unlocked by life milestones (cozy
+  // collectible re-skin; --ref base_env2, auto-split 4×4).
+  artefact_museum_banner: require('../assets/images/katchimeras/world/objects/artefact/artefact_01.png'),
+  artefact_voice_crystal: require('../assets/images/katchimeras/world/objects/artefact/artefact_02.png'),
+  artefact_festival_tree: require('../assets/images/katchimeras/world/objects/artefact/artefact_03.png'),
+  artefact_golden_arch: require('../assets/images/katchimeras/world/objects/artefact/artefact_04.png'),
+  artefact_life_monument: require('../assets/images/katchimeras/world/objects/artefact/artefact_05.png'),
+  artefact_journey_monument: require('../assets/images/katchimeras/world/objects/artefact/artefact_06.png'),
+  artefact_trail_bridge: require('../assets/images/katchimeras/world/objects/artefact/artefact_07.png'),
+  artefact_memory_lantern: require('../assets/images/katchimeras/world/objects/artefact/artefact_08.png'),
   // Memory Vault chest stages (Diorama Time Capsule).
   vault_chest_small: require('../assets/images/katchimeras/world/props/vault_chest_small.png'),
   vault_chest: require('../assets/images/katchimeras/world/props/vault_chest.png'),
@@ -76,10 +77,95 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   notes_journal_2: require('../assets/images/katchimeras/world/props/notes_journal_2.png'),
   notes_journal_3: require('../assets/images/katchimeras/world/props/notes_journal_3.png'),
   notes_journal_4: require('../assets/images/katchimeras/world/props/notes_journal_4.png'),
-  // Big Moment landmarks (Today Patch V3).
+  // Big Moment landmarks (Today Patch V3) — legacy, superseded by milestone_* below.
   landmark_festival: require('../assets/images/katchimeras/world/props/landmark_festival.png'),
   landmark_arch: require('../assets/images/katchimeras/world/props/landmark_arch.png'),
   landmark_gate: require('../assets/images/katchimeras/world/props/landmark_gate.png'),
+  // Big Moment MILESTONES — cozy collectible celebratory monuments (one per type).
+  milestone_birthday: require('../assets/images/katchimeras/world/objects/milestone/milestone_01.png'), // 🎂 cake
+  milestone_anniversary: require('../assets/images/katchimeras/world/objects/milestone/milestone_02.png'), // 💍 heart + rings
+  milestone_firsttime: require('../assets/images/katchimeras/world/objects/milestone/milestone_03.png'), // ⭐ gold star
+  milestone_holiday: require('../assets/images/katchimeras/world/objects/milestone/milestone_04.png'), // 🎄 festive tree
+  milestone_trip: require('../assets/images/katchimeras/world/objects/milestone/milestone_05.png'), // 🧳 suitcase + signpost
+  milestone_achievement: require('../assets/images/katchimeras/world/objects/milestone/milestone_06.png'), // 🏆 trophy
+  milestone_monument: require('../assets/images/katchimeras/world/objects/milestone/milestone_07.png'), // 🗿 standing stone
+  // Restyled level sets (scripts/generate-world-object-grid.py, --mode progression).
+  // Image-memories: photo display growing into a full photo tree (1→4).
+  memory_photos_1: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_01.png'),
+  memory_photos_2: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_02.png'),
+  memory_photos_3: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_03.png'),
+  memory_photos_4: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_04.png'),
+  // Locations: waypoint marker growing signpost → tall signpost → tower → lookout (1→4).
+  place_marker_1: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_01.png'),
+  place_marker_2: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_02.png'),
+  place_marker_3: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_03.png'),
+  place_marker_4: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_04.png'),
+  // Journey/steps: trail marker → signpost → footbridge → journey monument (1→4).
+  journey_1: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_01.png'),
+  journey_2: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_02.png'),
+  journey_3: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_03.png'),
+  journey_4: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_04.png'),
+  // Notes: open diary → journal+quill → writing desk → writing-desk shrine (1→4).
+  notes_1: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_01.png'),
+  notes_2: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_02.png'),
+  notes_3: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_03.png'),
+  notes_4: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_04.png'),
+  // Food: a cozy market food stall (square scene tile).
+  food_market: require('../assets/images/katchimeras/world/objects/food_market/food_market_02.png'),
+  // Studio: the inspiration archive — a library/easel nook; tapping opens the reader.
+  studio_shelf: require('../assets/images/katchimeras/world/objects/studio_shelf/studio_shelf_01.png'),
+  // Town Hall: keeps the day's story; tapping it opens the Chronicle reader.
+  // User-supplied house cottage (BiRefNet-matted + tight-framed from world/house.png).
+  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_01.png'),
+  // Quest Board: today's notice board; tapping it opens the day's Memory Quests.
+  quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_01.png'),
+
+  // --- Cozy Collectible buildings (docs/world-structures-cozy-direction.md) ---
+  // The 7 domains in one designer-toy style, on the new base_env2 island.
+  home: require('../assets/images/katchimeras/world/objects/home/home_01.png'), // 🏠 the day's story (chronicle)
+  memory_vault: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'), // 📸 owns all captured media
+  // Memory Vault GROWS 1→4 (same identity, richer): small safe → grand multi-tier vault.
+  memory_vault_1: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
+  memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.png'),
+  memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.png'),
+  memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.png'),
+  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 where I went (places)
+  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 how I moved (steps)
+  sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'), // 🌿 how today felt (mood)
+  study: require('../assets/images/katchimeras/world/objects/study/study_01.png'), // 📚 what inspired me
+  food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_01.png'), // 🍽 what I savoured
+  // Memory cluster satellites + the Featured Memory Board (the day's cover).
+  featured_board: require('../assets/images/katchimeras/world/objects/featured_board/featured_board_01.png'),
+  photos_stack: require('../assets/images/katchimeras/world/objects/photos_stack/photos_stack_01.png'),
+  notes_stack: require('../assets/images/katchimeras/world/objects/notes_stack/notes_stack_01.png'),
+  // 😴 Sleep nook (Sanctuary satellite) — how the day began; cozy bed + moon by quality.
+  sleep_nook_good: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_01.png'),
+  sleep_nook_normal: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_11.png'),
+  sleep_nook_low: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_04.png'),
+
+  // Decorate-your-day plant palette (earned blooms, planted freely on the patch).
+  // 16-prop decoration set (trees incl. cone pine, shrubs, flowers, crates, barrel,
+  // lantern, signpost, boulder, mushrooms, hay bale) — planted freely in Decorate mode.
+  decor_1: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_01.png'), // cone pine
+  decor_2: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_02.png'), // oak
+  decor_3: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_03.png'), // blossom tree
+  decor_4: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_04.png'), // birch
+  decor_5: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_05.png'), // shrub
+  decor_6: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_06.png'), // fern
+  decor_7: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_07.png'), // wildflowers
+  decor_8: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_08.png'), // potted plant
+  decor_9: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_09.png'), // crate
+  decor_10: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_10.png'), // crate stack
+  decor_11: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_11.png'), // barrel
+  decor_12: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_12.png'), // lantern post
+  decor_13: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_13.png'), // signpost
+  decor_14: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_14.png'), // boulder
+  decor_15: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_15.png'), // mushrooms
+  decor_16: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_16.png'), // hay bale
+  // Sleep atmosphere by quality: sundial garden (good) · stone lantern (normal) · moon (low).
+  sleep_tile_good: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_01.png'),
+  sleep_tile_normal: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_02.png'),
+  sleep_tile_low: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_03.png'),
   // Memory nodes
   memory_photo_bloom: require('../assets/images/katchimeras/world/memory-nodes/memory_photo_bloom.png'),
   memory_landmark_stone: require('../assets/images/katchimeras/world/memory-nodes/memory_landmark_stone.png'),
@@ -118,4 +204,30 @@ export function worldAssetSource(assetKey: string): ImageSourcePropType | null {
     return homeCreatureVisuals[key]?.source ?? null;
   }
   return WORLD_OBJECT_SOURCES[assetKey] ?? null;
+}
+
+// Large isometric ground-island BASES (Phase 0 of the iso-graphics redesign): the
+// whole patch ground is ONE image, and POI objects get planted on top via the
+// normalised anchors in utils/world-base-layout.ts. Produced by
+// scripts/generate-world-base.py (generate → matte → alpha verify).
+const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
+  base_meadow: require('../assets/images/katchimeras/world/base/base_meadow.png'), // original (kept as backup)
+  base_env2: require('../assets/images/katchimeras/world/base/base_env2.png'), // floating-island base (current)
+};
+
+export function worldBaseSource(baseId: string): ImageSourcePropType | null {
+  return WORLD_BASE_SOURCES[baseId] ?? null;
+}
+
+// Egg pedestal variants (scripts/generate-world-object-grid.py splits a 4×4 grid
+// into objects/egg_pedestal/egg_pedestal_NN.png). The egg/creature is layered ON
+// TOP of this; the default sits under the egg at the base-tile centre. Only the
+// default is bundled for now; add more keys here to offer them as drag/customise
+// variants later.
+const EGG_PEDESTAL_SOURCES: Record<string, ImageSourcePropType> = {
+  egg_pedestal_01: require('../assets/images/katchimeras/world/objects/egg_pedestal/egg_pedestal_01.png'),
+};
+export const DEFAULT_EGG_PEDESTAL = 'egg_pedestal_01';
+export function eggPedestalSource(id: string = DEFAULT_EGG_PEDESTAL): ImageSourcePropType | null {
+  return EGG_PEDESTAL_SOURCES[id] ?? null;
 }

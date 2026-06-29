@@ -21,6 +21,7 @@ const SOURCE_ACCENT: Record<DayTag['source'], string> = {
   vision: '#7DE8CD',
   place: '#FFC36B',
   steps: '#9AE6B4',
+  studio: '#C7B8FF',
   capture: '#F5A6C8',
   weather: '#BFD3FF',
 };
@@ -97,18 +98,38 @@ export function buildDayTags(day: StoredHomeDayRecord): DayTag[] {
     });
   });
 
-  if (day.stepsCount >= STEPS_TAG_THRESHOLD) {
+  if (day.stepsCount >= STEPS_TAG_THRESHOLD || day.stepsInterpretation) {
     const stepsSeed = day.stepsCount >= 6500 ? 'high_steps_day' : null;
+    // An interpreted day leads with WHAT it was (a hike), steps as colour.
+    const interp = day.stepsInterpretation;
+    const stepsLabel = day.stepsCount >= STEPS_TAG_THRESHOLD ? `${day.stepsCount.toLocaleString()} steps` : null;
     tags.push({
       id: 'tag-steps',
-      label: `${day.stepsCount.toLocaleString()} steps`,
+      label: interp ? (stepsLabel ? `${interp.label} · ${stepsLabel}` : interp.label) : (stepsLabel ?? 'A walk'),
       icon: homeMomentOptions.walk.icon,
       accentColor: SOURCE_ACCENT.steps,
-      weight: clamp01((day.stepsCount / STEPS_FULL) * 0.8),
+      // An interpreted active day is a stronger signal than raw steps alone.
+      weight: clamp01(Math.max((day.stepsCount / STEPS_FULL) * 0.8, interp ? 0.6 : 0)),
       feedsSpecies: feedsFor(stepsSeed),
       source: 'steps',
     });
   }
+
+  // The Studio — one chip per inspiration the day took in (most recent first, capped).
+  (day.studioMoments ?? [])
+    .slice(-3)
+    .reverse()
+    .forEach((item) => {
+      tags.push({
+        id: `tag-studio-${item.id}`,
+        label: item.label,
+        icon: item.mediaType === 'film' || item.mediaType === 'show' ? 'film.fill' : 'book.fill',
+        accentColor: SOURCE_ACCENT.studio,
+        weight: item.rating === 'loved' || item.rating === 'inspired' ? 0.6 : 0.46,
+        feedsSpecies: [],
+        source: 'studio',
+      });
+    });
 
   if (day.capturedEnergy && Object.keys(day.capturedEnergy).length > 0) {
     const peak = Math.max(0, ...Object.values(day.capturedEnergy));
