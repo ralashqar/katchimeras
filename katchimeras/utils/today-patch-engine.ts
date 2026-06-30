@@ -4,6 +4,7 @@ import type { PatchCell, PatchCellType, WorldObject, WorldPatch } from '@/types/
 import { earnedSeeds } from '@/utils/daily-seeds-engine';
 import { deriveArchetypes } from '@/utils/world-archetype';
 import { buildPatchInputFromDay } from '@/utils/world-patch-engine';
+import { deriveWorldStructureObjects, WORLD_STRUCTURE_CELLS } from '@/utils/world-structures';
 
 // The live patch for TODAY as a DIORAMA TIME CAPSULE: four semantic cells —
 // Memory Vault (photos), Places (where), Journey (movement), Reflection (mood) —
@@ -21,16 +22,10 @@ import { buildPatchInputFromDay } from '@/utils/world-patch-engine';
 // Cozy Collectible layout (docs/world-structures-cozy-direction.md §9). The memory
 // cluster sits back-left; the domains ring the central plaza (egg). All draggable, so
 // these are sensible defaults the user can rearrange.
-const CELL_LAYOUT: { type: PatchCellType; col: number; row: number }[] = [
-  { type: 'memory', col: 0, row: 0 }, // 📸 Memory Vault — owns all captured media
-  { type: 'journey', col: 3, row: 0 }, // 🛤 Journey Hall — steps only now (un-merged)
-  { type: 'places', col: 2, row: 0 }, // 🗺 Crossroads — where I went (its own building again)
-  { type: 'reflection', col: 3, row: 2 }, // 🌿 Sanctuary — how today felt (its own cell, off the quest board)
-];
+const CELL_LAYOUT = WORLD_STRUCTURE_CELLS;
 
 // Cutouts are now tightly cropped (each fills its square), so a level set would
 // otherwise render at one size — growth is conveyed by render SIZE per level.
-const LEVEL_SCALE: Record<number, number> = { 1: 0.78, 2: 0.92, 3: 1.05, 4: 1.2 };
 
 // The egg (forming) and creature (hatched) occupy the CENTRE of the base tile
 // (must match EGG_CELL in components/.../world-canvas.tsx). The egg/creature is
@@ -55,77 +50,6 @@ const BIG_MOMENT_ASSET: Record<string, string> = {
   milestone: 'milestone_monument',
 };
 
-// Memory cluster satellites — small VIEWS that flank the Memory Vault (which owns the
-// data). The Notes stack sits to one side, the Photos stack to the other; tapping
-// either opens the relevant memory reader. Not separate data domains (§9.3).
-const NOTES_CELL = { col: 1, row: 0 }; // beside the vault (0,0)
-function notesObject(day: HomeDayRecord): WorldObject | null {
-  const notes = day.notes ?? [];
-  if (notes.length === 0) return null;
-  return {
-    id: `${day.id}-notes-${notes.length}`,
-    kind: 'prop',
-    assetKey: 'notes_stack', // cozy stack of note cards (text + voice)
-    label: 'Notes',
-    col: NOTES_CELL.col,
-    row: NOTES_CELL.row,
-    footprint: 1,
-    sourceLabel: `${notes.length} ${notes.length === 1 ? 'note' : 'notes'}`,
-    category: 'notes', // taps open the notes + voice reader
-    badge: notes.length,
-    badgeIcon: 'square.and.pencil',
-    sizeScale: 0.95,
-  };
-}
-
-// Photos stack — the other Memory Vault satellite (front-left of the vault).
-const PHOTOS_STACK_CELL = { col: 0, row: 1 };
-function photosStackObject(day: HomeDayRecord): WorldObject | null {
-  const photoCount = (day.capturedMeanings?.length ?? 0) + (day.heroPhoto ? 1 : 0);
-  if (photoCount === 0) return null;
-  return {
-    id: `${day.id}-photos-${photoCount}`,
-    kind: 'prop',
-    assetKey: 'photos_stack',
-    label: 'Photos',
-    col: PHOTOS_STACK_CELL.col,
-    row: PHOTOS_STACK_CELL.row,
-    footprint: 1,
-    sourceLabel: `${photoCount} ${photoCount === 1 ? 'photo' : 'photos'}`,
-    category: 'photos', // its OWN category so it drags independently of the Vault
-    badge: photoCount,
-    sizeScale: 0.95,
-  };
-}
-
-// Featured Memory Board — the day's "cover" billboard by the vault. Always present on
-// a day that has anything to feature (a photo) or already has one pinned.
-const FEATURED_CELL = { col: 1, row: 1 };
-function featuredBoardObject(day: HomeDayRecord): WorldObject | null {
-  const photoCount = (day.capturedMeanings?.length ?? 0) + (day.heroPhoto ? 1 : 0);
-  if (photoCount === 0 && !day.featuredMemory) return null;
-  return {
-    id: `${day.id}-featured`,
-    kind: 'prop',
-    assetKey: 'featured_board',
-    label: 'Featured',
-    col: FEATURED_CELL.col,
-    row: FEATURED_CELL.row,
-    footprint: 1,
-    sourceLabel: 'Featured memory',
-    category: 'featured', // taps open the cover-photo picker
-    sizeScale: 1.25,
-  };
-}
-
-// The Memory cluster's satellites (Notes stack + Photos stack + Featured Board) that
-// surround the Memory Vault. The Vault itself is a normal cell object.
-function memoryClusterObjects(day: HomeDayRecord): WorldObject[] {
-  return [notesObject(day), photosStackObject(day), featuredBoardObject(day)].filter(
-    (o): o is WorldObject => !!o
-  );
-}
-
 function bigMomentObjects(day: HomeDayRecord): WorldObject[] {
   return (day.bigMoments ?? []).slice(0, LANDMARK_CELLS.length).map((moment, index) => ({
     id: `${day.id}-bigmoment-${moment.id}`,
@@ -145,111 +69,6 @@ function posOf(type: PatchCellType): { col: number; row: number } {
   return { col: cell.col, row: cell.row };
 }
 
-// Sleep is a small block on its own tile — the graphic varies by how the day
-// began (sunny garden / stone lantern / misty moon lantern). Only present once
-// the day's sleep is known (Health or manual).
-const SLEEP_CELL = { col: 3, row: 1 }; // a small satellite beside the Sanctuary (3,2)
-const SLEEP_ASSET: Record<string, string> = {
-  good: 'sleep_nook_good',
-  normal: 'sleep_nook_normal',
-  low: 'sleep_nook_low',
-};
-function sleepObject(day: HomeDayRecord): WorldObject | null {
-  const sleep = day.sleep;
-  if (!sleep) return null;
-  return {
-    id: `${day.id}-sleep-${sleep.quality}`,
-    kind: 'prop',
-    assetKey: SLEEP_ASSET[sleep.quality] ?? 'prop_lantern',
-    label: 'Sleep',
-    col: SLEEP_CELL.col,
-    row: SLEEP_CELL.row,
-    footprint: 1,
-    sourceLabel: 'Sleep',
-    category: 'sleep',
-    sizeScale: 1.0, // cozy bed satellite
-  };
-}
-
-// Food Vault — a little food stall on its own tile, present once the day has any
-// food memory (auto-detected from a snapped photo / note, or saved manually). The
-// badge counts the day's memories; tapping opens the Food Vault reader.
-const FOOD_CELL = { col: 2, row: 3 };
-function foodObject(day: HomeDayRecord): WorldObject | null {
-  const foods = day.foodMoments ?? [];
-  if (foods.length === 0) return null;
-  return {
-    id: `${day.id}-food-${foods.length}`,
-    kind: 'prop',
-    assetKey: 'food_pavilion', // 🍽 cozy café kiosk — what you savoured
-    label: 'Food Pavilion',
-    col: FOOD_CELL.col,
-    row: FOOD_CELL.row,
-    footprint: 1,
-    sourceLabel: `${foods.length} food ${foods.length === 1 ? 'memory' : 'memories'}`,
-    category: 'food',
-    badge: foods.length,
-    sizeScale: 1.6, // a building, not a stall
-  };
-}
-
-// Studio — the inspiration archive (books, films, shows, games you took in),
-// present once the day has any studio memory (auto-detected from a note/photo, or
-// saved manually). The badge counts the day's items; tapping opens the reader.
-const STUDIO_CELL = { col: 0, row: 2 };
-function studioObject(day: HomeDayRecord): WorldObject | null {
-  const items = day.studioMoments ?? [];
-  if (items.length === 0) return null;
-  return {
-    id: `${day.id}-studio-${items.length}`,
-    kind: 'prop',
-    assetKey: 'study', // 📚 cozy library kiosk — what inspired you
-    label: 'Study',
-    col: STUDIO_CELL.col,
-    row: STUDIO_CELL.row,
-    footprint: 1,
-    sourceLabel: `${items.length} ${items.length === 1 ? 'inspiration' : 'inspirations'}`,
-    category: 'studio',
-    badge: items.length,
-    sizeScale: 1.6, // a small library-nook structure (bigger than a chest, smaller than the Town Hall)
-  };
-}
-
-// Town Hall — a permanent structure on every patch that keeps the day's STORY.
-// Always present (every day has a chronicle); tapping it opens the Chronicle reader.
-const TOWN_HALL_CELL = { col: 3, row: 3 };
-function townHallObject(day: HomeDayRecord): WorldObject {
-  return {
-    id: `${day.id}-townhall`,
-    kind: 'prop',
-    assetKey: 'home', // 🏠 cozy cottage — the day's story (Chronicle reader)
-    label: 'Home',
-    col: TOWN_HALL_CELL.col,
-    row: TOWN_HALL_CELL.row,
-    footprint: 1,
-    sourceLabel: 'The day’s story',
-    category: 'chronicle',
-    sizeScale: 2.1, // the Town Hall is a big landmark structure
-  };
-}
-
-// Quest Board — TODAY ONLY: tapping it opens the day's Memory Quests. Not added to
-// finalized patches (quests are forward-looking, only meaningful for the live day).
-const QUEST_BOARD_CELL = { col: 0, row: 3 };
-function questBoardObject(day: HomeDayRecord): WorldObject {
-  return {
-    id: `${day.id}-questboard`,
-    kind: 'prop',
-    assetKey: 'quest_board',
-    label: 'Quest Board',
-    col: QUEST_BOARD_CELL.col,
-    row: QUEST_BOARD_CELL.row,
-    footprint: 1,
-    sourceLabel: 'Ways to grow today',
-    category: 'quests',
-  };
-}
-
 // Each cell's visual per level. Memory Vault has a bespoke chest set (new art);
 // the others reuse existing world anchors/memory-nodes as their level rungs.
 // Photos object — a cozy "memory tree" that grows fuller (hung with glowing framed
@@ -264,36 +83,23 @@ const VAULT_ASSET: Record<number, string> = {
   3: 'memory_vault_3',
   4: 'memory_vault_4',
 };
-// Notes object — one journaling family that grows from a single open diary into a
-// little writing-desk shrine.
-const NOTES_ASSET: Record<number, string> = {
-  1: 'notes_1',
-  2: 'notes_2',
-  3: 'notes_3',
-  4: 'notes_4',
-};
+// Places = the OBSERVATORY tower (a real structure for "where I went"); one building,
+// badge shows the place count.
 const PLACES_ASSET: Record<number, string> = {
-  1: 'crossroads',
-  2: 'crossroads',
-  3: 'crossroads',
-  4: 'crossroads',
+  1: 'observatory',
+  2: 'observatory',
+  3: 'observatory',
+  4: 'observatory',
 };
+// Journey = the STEPS PATH — a small engraved trail that grows its stone count by
+// level (3 → 5 → 7 → winding), like the original. NOT a building.
 const JOURNEY_ASSET: Record<number, string> = {
-  1: 'journey_hall',
-  2: 'journey_hall',
-  3: 'journey_hall',
-  4: 'journey_hall',
+  1: 'steps_path_1',
+  2: 'steps_path_2',
+  3: 'steps_path_3',
+  4: 'steps_path_4',
 };
-// Cell-based domains are now BUILDINGS, not chests — scale them up to read as such
-// (multiplied by the per-level LEVEL_SCALE so they still grow a touch as they fill).
-const CELL_BUILDING_SCALE: Record<string, number> = { memory: 1.6, journey: 1.6, places: 1.5, reflection: 1.95 };
 type Mood = 'calm' | 'energetic' | 'social' | 'meaningful';
-const MOOD_ASSET: Record<Mood, string> = {
-  calm: 'calm_pond',
-  energetic: 'active_windmill',
-  social: 'social_campfire',
-  meaningful: 'meaningful_shrine',
-};
 const MOOD_WORD: Record<Mood, string> = {
   calm: 'calm',
   energetic: 'lively',
@@ -439,25 +245,6 @@ function dominantMood(day: HomeDayRecord, seeds: ReturnType<typeof earnedSeeds>)
   return best;
 }
 
-// Project a non-empty cell into a renderable object. Keyed by level so an upgrade
-// (chest → treasure chest) mounts a fresh sprite and bounces in.
-function cellObject(dayId: string, cell: PatchCell): WorldObject | null {
-  if (!cell.assetKey || cell.level === 0) return null;
-  return {
-    id: `${dayId}-cell-${cell.type}-l${cell.level}`,
-    kind: 'prop',
-    assetKey: cell.assetKey,
-    label: cell.sourceLabel,
-    col: cell.col,
-    row: cell.row,
-    footprint: 1,
-    sourceLabel: cell.summaryLabel,
-    category: cell.type,
-    badge: cell.count,
-    sizeScale: (LEVEL_SCALE[cell.level] ?? 1) * (CELL_BUILDING_SCALE[cell.type] ?? 1),
-  };
-}
-
 // Derive today's live patch. Cells are recomputed from the day each time (they
 // only ever level UP as inputs accumulate); `prev` is unused now that growth is
 // driven by deterministic per-cell levels rather than carried placements.
@@ -473,17 +260,8 @@ function groundTiles() {
 
 export function deriveTodayPatch(day: HomeDayRecord, _prev?: WorldPatch | null): WorldPatch {
   const cells = computeCells(day);
-  const objects = cells.map((cell) => cellObject(day.id, cell)).filter((o): o is WorldObject => !!o);
+  const objects = deriveWorldStructureObjects(day, cells, { includeQuestBoard: true });
   objects.push(...bigMomentObjects(day));
-  objects.push(...memoryClusterObjects(day));
-  const sleep = sleepObject(day);
-  if (sleep) objects.push(sleep);
-  const food = foodObject(day);
-  if (food) objects.push(food);
-  const studio = studioObject(day);
-  if (studio) objects.push(studio);
-  objects.push(townHallObject(day));
-  objects.push(questBoardObject(day));
   const tiles = groundTiles();
   const status = day.state === 'ready_to_hatch' ? 'readyToHatch' : 'forming';
 
@@ -541,16 +319,8 @@ function pickOne<T>(items: T[], rng: () => number): T {
 // whole world reads as one consistent set of time-capsule dioramas.
 export function finalizeDayPatch(day: HomeDayRecord): WorldPatch {
   const cells = computeCells(day);
-  const objects = cells.map((cell) => cellObject(day.id, cell)).filter((o): o is WorldObject => !!o);
+  const objects = deriveWorldStructureObjects(day, cells, { includeQuestBoard: false });
   objects.push(...bigMomentObjects(day));
-  objects.push(...memoryClusterObjects(day));
-  const sleep = sleepObject(day);
-  if (sleep) objects.push(sleep);
-  const food = foodObject(day);
-  if (food) objects.push(food);
-  const studio = studioObject(day);
-  if (studio) objects.push(studio);
-  objects.push(townHallObject(day));
   const input = buildPatchInputFromDay(day);
   const { primary, secondary } = deriveArchetypes(input.signals);
   const rng = mulberry32(hashSeed(`${input.nonce}:${day.id}`));

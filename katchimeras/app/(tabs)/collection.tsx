@@ -7,12 +7,14 @@ import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { CalendarMonth } from '@/components/katchadeck/collection/calendar-month';
+import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
+import { useDiscoveries } from '@/hooks/use-discoveries';
 import type { StoredHomeState } from '@/types/home';
 import { bondStageLabel } from '@/utils/bond';
 import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
@@ -36,7 +38,9 @@ export default function CollectionScreen() {
   const router = useRouter();
   const [state, setState] = useState<StoredHomeState | null>(null);
   const [view, setView] = useState<CollectionView>('calendar');
+  const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
   const { days } = useAllDays();
+  const { entries: discoveryEntries, unlockedCount: discoveriesUnlocked, totalCount: discoveriesTotal } = useDiscoveries();
 
   useFocusEffect(
     useCallback(() => {
@@ -91,6 +95,14 @@ export default function CollectionScreen() {
           <KatchaButton label="Open the life map" onPress={() => router.push('/life-map')} variant="secondary" />
         </Animated.View>
 
+        <Animated.View entering={presenceEnter(50)}>
+          <KatchaButton
+            label={`Discoveries · ${discoveriesUnlocked}/${discoveriesTotal}`}
+            onPress={() => setDiscoveriesOpen(true)}
+            variant="secondary"
+          />
+        </Animated.View>
+
         {view === 'calendar' ? (
           <Animated.View entering={presenceEnter(80)}>
             <CalendarMonth
@@ -99,7 +111,7 @@ export default function CollectionScreen() {
                 // Show the regular Home page for the chosen day instead of a
                 // separate page: hand the day to the Today tab and switch to it.
                 requestSelectedDay(dayId);
-                router.replace('/(tabs)');
+                router.replace('/today');
               }}
             />
           </Animated.View>
@@ -128,6 +140,15 @@ export default function CollectionScreen() {
         })
           : null}
       </ScrollView>
+
+      {discoveriesOpen ? (
+        <DiscoveriesHallSheet
+          entries={discoveryEntries}
+          unlockedCount={discoveriesUnlocked}
+          totalCount={discoveriesTotal}
+          onClose={() => setDiscoveriesOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }

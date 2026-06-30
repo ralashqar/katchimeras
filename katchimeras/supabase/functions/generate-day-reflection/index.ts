@@ -64,7 +64,7 @@ type ReflectionRequestPayload = {
     dayWord?: string | null;
     intention?: string | null;
     heroPhotoMeaning?: string[];
-    userNoteSummary?: string | null;
+    hasUserWrittenNote?: boolean;
   };
   // The day's actual weather (abstract label). Present only when resolved; the
   // line may name it truthfully, and must never invent weather when it is absent.
@@ -92,7 +92,7 @@ Reading the day with context (this is what makes the line feel watched-over, not
 - If context.recoveryAfterBusy is true, this quiet day follows a busy stretch — lean into the exhale ("after all that running, today you finally landed").
 - context.priorVisits lists earlier meetings (weekday, rarity, a subject each). When a real pattern is there (e.g. several on the same weekday, or the same subject), you may name it specifically ("our fourth quiet Sunday"). Never fabricate a pattern that the visits do not show.
 - Avoid reciting exact counts unless it falls naturally.
-- promptFacts are explicit one-tap reflections from the user. Treat feelings as the strongest emotional truth of the day, use peopleLabels/meaningLabels to make the line warmer and more specific, and let dayWord colour the summary. If userNoteSummary is present, it is user-written context and may be referenced carefully without inventing details beyond it.
+- promptFacts are explicit one-tap reflections from the user. Treat feelings as the strongest emotional truth of the day, use peopleLabels/meaningLabels to make the line warmer and more specific, and let dayWord colour the summary. If hasUserWrittenNote is true, you may acknowledge that the user wrote something down, but do not invent or quote its contents.
 
 Weather:
 - If weather is present, you MAY name it truthfully and let it colour the line (e.g. rain making a stay-in cozy, a clear day that was still spent quietly). If weather is absent, never invent any.

@@ -2,7 +2,7 @@ import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
 import { MotiView } from 'moti';
 import { Fragment, type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { InteractionManager, type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -26,7 +26,7 @@ import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
-import type { MemoryNode, WorldPatch } from '@/types/world';
+import type { MemoryNode, WorldObjectCategory, WorldPatch } from '@/types/world';
 import type { PlacedArtefact } from '@/utils/discoveries-artefacts';
 import { layoutWorld, type SceneFence, type SceneSprite } from '@/utils/world-scene';
 import { cellCenter, cellFromPoint, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
@@ -43,6 +43,7 @@ import {
   saveBaseCustomisation,
   type BaseCustomisation,
 } from '@/utils/world-base-customisation';
+import { WORLD_STRUCTURE_POSITIONS } from '@/utils/world-structures';
 
 type Props = {
   patches: WorldPatch[];
@@ -86,6 +87,8 @@ type Props = {
   // interpret ("was this a hike or a walk?"). Tapping it fires onPressStepsAlert.
   stepsAlert?: boolean;
   onPressStepsAlert?: () => void;
+  moodAlert?: boolean;
+  structureAttention?: Partial<Record<WorldObjectCategory, boolean>>;
   // Hide the recenter button so a status pill (e.g. "Reading…") can take its slot.
   hideRecenter?: boolean;
   // Rings of empty ground cells framing the patch (single-patch home view).
@@ -104,6 +107,7 @@ type Props = {
   // dragging one routes to onMoveDecor, the ✕ badge to onRemoveDecor.
   customising?: boolean;
   onToggleCustomising?: () => void;
+  showCustomiseButton?: boolean;
   onMoveDecor?: (id: string, col: number, row: number) => void;
   onRemoveDecor?: (id: string) => void;
   // Count shown on the Quest Board's tag (incomplete quests today).
@@ -134,7 +138,7 @@ const HATCH_STAGE_SIZE = 288;
 // The LanternEgg art is fixed-pixel, so scale the whole stage with a transform
 // (scales about its centre) to sit centred on the plaza. Tunable — egg made
 // significantly larger; EGG_RISE lifts it so it stays seated, not sunk.
-const EGG_SCALE = 0.62;
+const EGG_SCALE = 0.56;
 const EGG_RISE = 26;
 // How far below the egg's tile the countdown pill sits (scene units). Just beneath
 // the egg's visual bottom — scales with the egg so it stays close as size changes.
@@ -172,6 +176,11 @@ const BASE_OFFSET_X = 0;
 const BASE_OFFSET_Y = TILE_H * 0.6;
 // Start the camera zoomed in (you see a region of the bigger base, can pan around).
 const BASE_DEFAULT_ZOOM = 1.5;
+const INITIAL_SPRITE_BATCH = 3;
+const SPRITE_REVEAL_BATCH = 3;
+const SPRITE_REVEAL_INTERVAL_MS = 70;
+const SPRITE_REVEAL_START_DELAY_MS = 90;
+const SPRITE_STAGGER_MS = 35;
 
 // The stable customisation key for a sprite. Cells share a key by category (their
 // id changes as they level up); the creature is 'creature'; landmarks / memory
@@ -180,6 +189,10 @@ function slotKey(s: SceneSprite): string {
   if (s.kind === 'creature') return 'creature';
   if (s.category === 'decor') return s.id; // each decoration keyed individually
   return s.category ?? s.id;
+}
+
+function spriteAnimationKey(s: SceneSprite): string {
+  return `${s.id}:${s.assetKey}`;
 }
 
 // Feathered radial glow (the same soft texture the egg uses) — tinted + faded
@@ -202,14 +215,7 @@ function formatBadge(category: string, count: number): string {
   return `×${count}`;
 }
 
-// Cell tile positions (must match CELL_LAYOUT in utils/today-patch-engine).
-const CELL_POS: Record<string, { col: number; row: number }> = {
-  memory: { col: 0, row: 0 },
-  notes: { col: 1, row: 0 },
-  places: { col: 2, row: 0 },
-  journey: { col: 3, row: 0 },
-  reflection: { col: 0, row: 3 },
-};
+const CELL_POS = WORLD_STRUCTURE_POSITIONS;
 
 // What an empty cell hints it could hold (Diorama Time Capsule ghost spots).
 const GHOST_HINT: Record<string, { emoji: string; label: string }> = {
@@ -260,6 +266,8 @@ export function WorldCanvas({
   onPressPlacesAlert,
   stepsAlert = false,
   onPressStepsAlert,
+  moodAlert = false,
+  structureAttention,
   hideRecenter = false,
   ring = 0,
   animateOnMount = false,
@@ -267,6 +275,7 @@ export function WorldCanvas({
   imageBase = false,
   customising = false,
   onToggleCustomising,
+  showCustomiseButton = true,
   onMoveDecor,
   onRemoveDecor,
   questCount = 0,
@@ -327,6 +336,63 @@ export function WorldCanvas({
       };
     });
   }, [imgBase, focusSlab, scene.sprites, custom]);
+
+  const sceneSpriteSignature = useMemo(() => scene.sprites.map((sprite) => sprite.id).join('|'), [scene.sprites]);
+  const [visibleSpriteCount, setVisibleSpriteCount] = useState(() =>
+    animateOnMount ? Math.min(INITIAL_SPRITE_BATCH, scene.sprites.length) : Number.POSITIVE_INFINITY
+  );
+  const revealCompleteRef = useRef(!animateOnMount);
+
+  useEffect(() => {
+    const spriteCount = scene.sprites.length;
+    if (!animateOnMount) {
+      revealCompleteRef.current = true;
+      setVisibleSpriteCount(Number.POSITIVE_INFINITY);
+      return;
+    }
+    if (spriteCount <= INITIAL_SPRITE_BATCH) {
+      revealCompleteRef.current = true;
+      setVisibleSpriteCount(spriteCount);
+      return;
+    }
+    if (revealCompleteRef.current) {
+      setVisibleSpriteCount(spriteCount);
+      return;
+    }
+
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    setVisibleSpriteCount(Math.min(INITIAL_SPRITE_BATCH, spriteCount));
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      const revealNext = (nextCount: number) => {
+        if (cancelled) return;
+        const clamped = Math.min(nextCount, spriteCount);
+        setVisibleSpriteCount(clamped);
+        if (clamped >= spriteCount) {
+          revealCompleteRef.current = true;
+          return;
+        }
+        timers.push(setTimeout(() => revealNext(clamped + SPRITE_REVEAL_BATCH), SPRITE_REVEAL_INTERVAL_MS));
+      };
+      timers.push(setTimeout(() => revealNext(INITIAL_SPRITE_BATCH + SPRITE_REVEAL_BATCH), SPRITE_REVEAL_START_DELAY_MS));
+    });
+
+    return () => {
+      cancelled = true;
+      task.cancel();
+      timers.forEach(clearTimeout);
+    };
+  }, [animateOnMount, scene.sprites.length, sceneSpriteSignature]);
+
+  const visiblePositionedSprites = useMemo(() => {
+    if (!animateOnMount || visibleSpriteCount >= positionedSprites.length) return positionedSprites;
+    return positionedSprites.slice(0, Math.max(0, visibleSpriteCount));
+  }, [animateOnMount, positionedSprites, visibleSpriteCount]);
+  const spriteStaggerIndex = useMemo(
+    () => new Map(visiblePositionedSprites.map((sprite, index) => [sprite.id, index])),
+    [visiblePositionedSprites]
+  );
 
   // The egg/creature centre tile — its default, or where the user dragged it.
   const eggCell = useMemo(() => custom.egg ?? EGG_CELL, [custom]);
@@ -411,7 +477,7 @@ export function WorldCanvas({
         });
       }
     },
-    [focusSlab, baseRect, onMoveDecor, dragOX, dragOY]
+    [focusSlab, baseRect, onMoveDecor]
   );
   const dragOverlayStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: dragOX.value }, { translateY: dragOY.value }],
@@ -447,8 +513,8 @@ export function WorldCanvas({
   // The object to draw a highlight ring under — the last cell the user tapped.
   const highlightSprite = useMemo(() => {
     if (!highlightedCell || !eggPatchId) return null;
-    return positionedSprites.find((s) => s.category === highlightedCell && s.patchId === eggPatchId) ?? null;
-  }, [positionedSprites, highlightedCell, eggPatchId]);
+    return visiblePositionedSprites.find((s) => s.category === highlightedCell && s.patchId === eggPatchId) ?? null;
+  }, [visiblePositionedSprites, highlightedCell, eggPatchId]);
 
   // Where a captured photo should fly to — the target cell's tile centre, in scene
   // coords (so the flight pans/zooms with the world).
@@ -494,18 +560,28 @@ export function WorldCanvas({
     },
     [imgBase, positionedSprites, eggPatchId, cellPoint]
   );
-  const memoryPoint = useMemo(
-    () => (memoryAlert ? categoryPoint('memory', CELL_POS.memory) : null),
-    [memoryAlert, categoryPoint]
+  const attention = useMemo<Partial<Record<WorldObjectCategory, boolean>>>(
+    () => ({
+      ...structureAttention,
+      memory: structureAttention?.memory ?? memoryAlert,
+      places: structureAttention?.places ?? placesAlert,
+      journey: structureAttention?.journey ?? stepsAlert,
+      mood: structureAttention?.mood ?? moodAlert,
+    }),
+    [memoryAlert, moodAlert, placesAlert, stepsAlert, structureAttention]
   );
-  const placesPoint = useMemo(
-    () => (placesAlert ? categoryPoint('places', CELL_POS.places) : null),
-    [placesAlert, categoryPoint]
+  const pointForAttention = useCallback(
+    (category: WorldObjectCategory) => {
+      const fallbackPos = CELL_POS[category];
+      return attention[category] && fallbackPos ? categoryPoint(category, fallbackPos) : null;
+    },
+    [attention, categoryPoint]
   );
-  const stepsPoint = useMemo(
-    () => (stepsAlert ? categoryPoint('journey', CELL_POS.journey) : null),
-    [stepsAlert, categoryPoint]
-  );
+  const memoryPoint = pointForAttention('memory');
+  const placesPoint = pointForAttention('places');
+  const stepsPoint = pointForAttention('journey');
+  const moodPoint = pointForAttention('mood');
+  const sleepPoint = pointForAttention('sleep');
 
   // When the egg is ready to hatch it gives a little impatient shudder every few
   // seconds (a burst of rattle, then still) to invite the tap. Stops during the
@@ -744,8 +820,8 @@ export function WorldCanvas({
       if (
         memoryAlert &&
         best.patchId === eggPatchId &&
-        best.col === CELL_POS.memory.col &&
-        best.row === CELL_POS.memory.row
+        best.col === CELL_POS.memory!.col &&
+        best.row === CELL_POS.memory!.row
       ) {
         onPressMemoryAlert?.();
         return;
@@ -754,8 +830,8 @@ export function WorldCanvas({
       if (
         placesAlert &&
         best.patchId === eggPatchId &&
-        best.col === CELL_POS.places.col &&
-        best.row === CELL_POS.places.row
+        best.col === CELL_POS.places!.col &&
+        best.row === CELL_POS.places!.row
       ) {
         onPressPlacesAlert?.();
         return;
@@ -764,8 +840,8 @@ export function WorldCanvas({
       if (
         stepsAlert &&
         best.patchId === eggPatchId &&
-        best.col === CELL_POS.journey.col &&
-        best.row === CELL_POS.journey.row
+        best.col === CELL_POS.journey!.col &&
+        best.row === CELL_POS.journey!.row
       ) {
         onPressStepsAlert?.();
         return;
@@ -886,16 +962,19 @@ export function WorldCanvas({
   const spritesInitialised = useRef(false);
   const animateInIds = useMemo(() => {
     if (!spritesInitialised.current) {
-      return animateOnMount ? new Set(scene.sprites.map((s) => s.id)) : new Set<string>();
+      return animateOnMount ? new Set(visiblePositionedSprites.map(spriteAnimationKey)) : new Set<string>();
     }
     const fresh = new Set<string>();
-    for (const sprite of scene.sprites) if (!seenSpriteIds.current.has(sprite.id)) fresh.add(sprite.id);
+    for (const sprite of visiblePositionedSprites) {
+      const key = spriteAnimationKey(sprite);
+      if (!seenSpriteIds.current.has(key)) fresh.add(key);
+    }
     return fresh;
-  }, [scene, animateOnMount]);
+  }, [visiblePositionedSprites, animateOnMount]);
   useEffect(() => {
-    scene.sprites.forEach((sprite) => seenSpriteIds.current.add(sprite.id));
+    visiblePositionedSprites.forEach((sprite) => seenSpriteIds.current.add(spriteAnimationKey(sprite)));
     spritesInitialised.current = true;
-  }, [scene]);
+  }, [visiblePositionedSprites]);
 
   // Recenter on the newest patch — the escape hatch if the user ever pans away.
   const recenter = () => {
@@ -934,12 +1013,12 @@ export function WorldCanvas({
   // correctly relative to the objects in front of / behind them.
   const renderables = useMemo(() => {
     const items: { depth: number; sprite?: SceneSprite; fence?: SceneFence }[] = [
-      ...positionedSprites.map((s) => ({ depth: s.depth, sprite: s })),
+      ...visiblePositionedSprites.map((s) => ({ depth: s.depth, sprite: s })),
       // The image base has no procedural perimeter fence; skip fences in that mode.
       ...(imgBase ? [] : scene.fences).map((f) => ({ depth: f.depth, fence: f })),
     ];
     return items.sort((a, b) => a.depth - b.depth);
-  }, [positionedSprites, scene.fences, imgBase]);
+  }, [visiblePositionedSprites, scene.fences, imgBase]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -984,7 +1063,7 @@ export function WorldCanvas({
           {/* Soft contact shadows under every object — drawn on the ground, beneath
               the objects, so each reads as grounded (not floating). */}
           {imgBase
-            ? positionedSprites.map((s) => {
+            ? visiblePositionedSprites.map((s) => {
                 // Anchor the shadow at the object's CONTACT POINT (its bottom pixel),
                 // matching the SpriteView seating — not the cell centre — so it reads
                 // as planted rather than floating up around the object's body.
@@ -1128,9 +1207,10 @@ export function WorldCanvas({
             item.sprite ? (
               slotKey(item.sprite) === dragKey ? null : (
                 <SpriteView
-                  key={item.sprite.id}
+                  key={spriteAnimationKey(item.sprite)}
                   sprite={item.sprite}
-                  animateIn={animateInIds.has(item.sprite.id)}
+                  animateIn={animateInIds.has(spriteAnimationKey(item.sprite))}
+                  animationDelay={Math.min(220, (spriteStaggerIndex.get(item.sprite.id) ?? 0) * SPRITE_STAGGER_MS)}
                   showBadge={item.sprite.patchId === eggPatchId}
                 />
               )
@@ -1166,7 +1246,7 @@ export function WorldCanvas({
               frame sits in the upper-centre of the easel art (offsets are tunable). */}
           {imgBase && featuredThumb
             ? (() => {
-                const s = positionedSprites.find((sp) => sp.category === 'featured');
+                const s = visiblePositionedSprites.find((sp) => sp.category === 'featured');
                 if (!s) return null;
                 const w = s.size * SPRITE_SCALE;
                 const h = w;
@@ -1189,7 +1269,7 @@ export function WorldCanvas({
 
           {/* Tags under the hub structures — the Town Hall (day summary) and the
               Quest Board (quest count). A dark pill with an icon, like a map label. */}
-          {positionedSprites.map((s) => {
+          {visiblePositionedSprites.map((s) => {
             if (s.category !== 'chronicle' && s.category !== 'quests') return null;
             const isChronicle = s.category === 'chronicle';
             const label = isChronicle ? 'Day summary' : questCount > 0 ? `${questCount} quests` : 'Quests';
@@ -1206,7 +1286,7 @@ export function WorldCanvas({
           {/* Customise mode: a drag handle over each draggable object. Pan moves
               the object within the grass (clamped); release persists it. */}
           {imgBase && customising
-            ? positionedSprites.map((s) => {
+            ? visiblePositionedSprites.map((s) => {
                 const isCreature = s.kind === 'creature';
                 const w = s.size * SPRITE_SCALE;
                 const h = w; // square frame (1:1) — object bottom-anchored at OBJECT_BOTTOM_FRAC
@@ -1407,6 +1487,33 @@ export function WorldCanvas({
               </View>
             </MotiView>
           ) : null}
+
+          {/* Golden "!" over the Mood Monument until today's mood is set. */}
+          {moodPoint ? (
+            <MotiView
+              pointerEvents="none"
+              from={{ translateY: 2, scale: 0.92 }}
+              animate={{ translateY: -6, scale: 1 }}
+              transition={{ loop: true, type: 'timing', duration: 900 }}
+              style={[styles.alertLayer, { left: moodPoint.x - 15, top: moodPoint.y - 88 }]}>
+              <View style={styles.alertBubble}>
+                <Text style={styles.alertMark}>!</Text>
+              </View>
+            </MotiView>
+          ) : null}
+
+          {sleepPoint ? (
+            <MotiView
+              pointerEvents="none"
+              from={{ translateY: 2, scale: 0.92 }}
+              animate={{ translateY: -6, scale: 1 }}
+              transition={{ loop: true, type: 'timing', duration: 900 }}
+              style={[styles.alertLayer, { left: sleepPoint.x - 15, top: sleepPoint.y - 74 }]}>
+              <View style={styles.alertBubble}>
+                <Text style={styles.alertMark}>!</Text>
+              </View>
+            </MotiView>
+          ) : null}
         </Animated.View>
         </View>
       </GestureDetector>
@@ -1423,7 +1530,7 @@ export function WorldCanvas({
       ) : null}
 
       {/* Customise: toggle drag-to-rearrange + Decorate of the day's patch. */}
-      {imgBase ? (
+      {imgBase && showCustomiseButton ? (
         <GestureDetector gesture={Gesture.Pan().activeOffsetX([-6, 6]).activeOffsetY([-6, 6]).blocksExternalGesture(pan)}>
         <Pressable
           onPress={() => onToggleCustomising?.()}
@@ -1449,15 +1556,18 @@ const OBJECT_SEAT = TILE_H * 0.25; // how far below the tile centre the bottom s
 function SpriteView({
   sprite,
   animateIn,
+  animationDelay,
   showBadge,
 }: {
   sprite: SceneSprite;
   animateIn: boolean;
+  animationDelay: number;
   showBadge?: boolean;
 }) {
   const source = worldAssetSource(sprite.assetKey);
   const theme = ARCHETYPE_THEME[sprite.archetype];
   const isCreature = sprite.kind === 'creature';
+  const isMood = sprite.category === 'mood';
   const w = sprite.size * SPRITE_SCALE;
   const h = w; // square frame (1:1) — object bottom-anchored at OBJECT_BOTTOM_FRAC
   const left = sprite.x - w / 2;
@@ -1479,9 +1589,15 @@ function SpriteView({
       // transform animations keep the image vector-crisp the whole way in.
       renderToHardwareTextureAndroid={false}
       shouldRasterizeIOS={false}
-      from={animateIn ? { scale: 0.35, translateY: 9 } : undefined}
+      from={animateIn ? (isMood ? { scale: 0.48, translateY: 14 } : { scale: 0.35, translateY: 9 }) : undefined}
       animate={{ scale: 1, translateY: 0 }}
-      transition={{ type: 'spring', damping: 11, stiffness: 180, mass: 0.85 }}
+      transition={{
+        type: 'spring',
+        damping: isMood ? 7 : 11,
+        stiffness: isMood ? 230 : 180,
+        mass: isMood ? 0.72 : 0.85,
+        delay: animateIn ? animationDelay : 0,
+      }}
       style={[styles.sprite, styles.spriteOrigin, { left, top, width: w, height: h }]}>
       <View pointerEvents="none" style={styles.spriteDisplay}>
         {source ? (

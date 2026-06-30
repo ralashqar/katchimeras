@@ -28,11 +28,17 @@ export function MemoryVaultSheet({
   day,
   initialTab = 'featured',
   onChangeFeatured,
+  onAddPhoto,
+  onRecordVoice,
+  onAddNote,
   onClose,
 }: {
   day: HomeDayRecord;
   initialTab?: MemoryVaultTab;
   onChangeFeatured?: () => void;
+  onAddPhoto?: () => void;
+  onRecordVoice?: () => void;
+  onAddNote?: () => void;
   onClose: () => void;
 }) {
   const tabBarHeight = useBottomTabBarHeight();
@@ -102,7 +108,16 @@ export function MemoryVaultSheet({
 
             {tab === 'photos' ? (
               memories.photos.length === 0 ? (
-                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No photos yet.</ThemedText>
+                <View style={styles.emptyActionCard}>
+                  <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    No photos yet.
+                  </ThemedText>
+                  {onAddPhoto ? (
+                    <Pressable onPress={onAddPhoto} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Add photo</ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
                   {memories.photos.map((photo) => (
@@ -114,7 +129,14 @@ export function MemoryVaultSheet({
 
             {tab === 'voice' ? (
               memories.voice.length === 0 ? (
-                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No voice memories yet.</ThemedText>
+                <View style={styles.emptyActionCard}>
+                  <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No voice memories yet.</ThemedText>
+                  {onRecordVoice ? (
+                    <Pressable onPress={onRecordVoice} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Record voice</ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : (
                 memories.voice.map((note) => (
                   <View key={note.id} style={styles.row}>
@@ -134,7 +156,14 @@ export function MemoryVaultSheet({
 
             {tab === 'notes' ? (
               memories.notes.length === 0 ? (
-                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No notes yet.</ThemedText>
+                <View style={styles.emptyActionCard}>
+                  <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No notes yet.</ThemedText>
+                  {onAddNote ? (
+                    <Pressable onPress={onAddNote} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Add note</ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
               ) : (
                 memories.notes.map((note) => (
                   <View key={note.id} style={styles.row}>
@@ -203,6 +232,7 @@ const styles = StyleSheet.create({
   tabLabelActive: { color: Lantern.moon50 },
   scroll: { paddingBottom: 6, paddingTop: 8 },
   body: { gap: 10 },
+  emptyActionCard: { alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
   featuredWrap: { gap: 10, alignItems: 'flex-start' },
   featured: { width: '100%', aspectRatio: 4 / 3, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)' },
   featuredEmpty: { gap: 10, paddingVertical: 8 },

@@ -124,14 +124,25 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   // The 7 domains in one designer-toy style, on the new base_env2 island.
   home: require('../assets/images/katchimeras/world/objects/home/home_01.png'), // 🏠 the day's story (chronicle)
   memory_vault: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'), // 📸 owns all captured media
+  memory_vault_empty: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
   // Memory Vault GROWS 1→4 (same identity, richer): small safe → grand multi-tier vault.
   memory_vault_1: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
   memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.png'),
   memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.png'),
   memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.png'),
-  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 where I went (places)
-  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 how I moved (steps)
+  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 (legacy signpost)
+  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 (legacy)
+  // 🔭 Observatory tower (Places / where I went) — a proper structure with a telescope.
+  observatory: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
+  observatory_empty: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
+  // 👣 Steps path (Journey / how I moved) — a small engraved stepping-stone trail that
+  // GROWS its stone count by level (3 → 5 → 7 → winding path).
+  steps_path_1: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_01.png'),
+  steps_path_2: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_02.png'),
+  steps_path_3: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_03.png'),
+  steps_path_4: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_04.png'),
   sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'), // 🌿 how today felt (mood)
+  sanctuary_empty: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'),
   study: require('../assets/images/katchimeras/world/objects/study/study_01.png'), // 📚 what inspired me
   food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_01.png'), // 🍽 what I savoured
   // Memory cluster satellites + the Featured Memory Board (the day's cover).
@@ -139,9 +150,18 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   photos_stack: require('../assets/images/katchimeras/world/objects/photos_stack/photos_stack_01.png'),
   notes_stack: require('../assets/images/katchimeras/world/objects/notes_stack/notes_stack_01.png'),
   // 😴 Sleep nook (Sanctuary satellite) — how the day began; cozy bed + moon by quality.
+  sleep_nook_empty: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_empty.png'),
   sleep_nook_good: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_01.png'),
   sleep_nook_normal: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_11.png'),
   sleep_nook_low: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_04.png'),
+  // Mood Monument states: one generated structure family with consistent frame
+  // and state-specific face/emblem panels.
+  mood_monument_empty: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_empty.png'),
+  mood_monument_radiant: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_radiant.png'),
+  mood_monument_light: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_light.png'),
+  mood_monument_meh: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_meh.png'),
+  mood_monument_heavy: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_heavy.png'),
+  mood_monument_stormy: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_stormy.png'),
 
   // Decorate-your-day plant palette (earned blooms, planted freely on the patch).
   // 16-prop decoration set (trees incl. cone pine, shrubs, flowers, crates, barrel,

@@ -1,10 +1,12 @@
 import { useIsFocused } from '@react-navigation/native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 import type { ActivityPermissionState } from '@/types/home';
 
 type UseDayStepCaptureOptions = {
   enabled: boolean;
+  requireFocus?: boolean;
   permissionState: ActivityPermissionState;
   onPermissionResolved: (permission: ActivityPermissionState) => void;
   onStepCount: (stepsCount: number) => void;
@@ -12,14 +14,23 @@ type UseDayStepCaptureOptions = {
 
 export function useDayStepCapture({
   enabled,
+  requireFocus = true,
   permissionState,
   onPermissionResolved,
   onStepCount,
 }: UseDayStepCaptureOptions) {
   const isFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(() => AppState.currentState === 'active');
 
   useEffect(() => {
-    if (process.env.EXPO_OS === 'web' || !enabled || !isFocused) {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setAppActive(nextState === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (process.env.EXPO_OS === 'web' || !enabled || !appActive || (requireFocus && !isFocused)) {
       return;
     }
 
@@ -100,5 +111,5 @@ export function useDayStepCapture({
       active = false;
       watchSubscription?.remove();
     };
-  }, [enabled, isFocused, onPermissionResolved, onStepCount, permissionState]);
+  }, [appActive, enabled, isFocused, onPermissionResolved, onStepCount, permissionState, requireFocus]);
 }

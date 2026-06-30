@@ -12,10 +12,12 @@ import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine'
 // never nagging: completed ones read as done, the rest are gentle invitations.
 export function QuestBoardSheet({
   quests,
+  placeRecovery,
   onQuest,
   onClose,
 }: {
   quests: MemoryQuest[];
+  placeRecovery?: { stepsCount: number; onAddPlace: () => void; onEnableTravelMemory?: () => void; travelMemoryLabel?: string } | null;
   onQuest?: (type: MemoryQuestType) => void;
   onClose: () => void;
 }) {
@@ -43,6 +45,44 @@ export function QuestBoardSheet({
           </ThemedText>
 
           <View style={styles.list}>
+            {placeRecovery ? (
+              <View style={styles.recoveryCard}>
+                <View style={styles.recoveryHead}>
+                  <View style={styles.recoveryIcon}>
+                    <IconSymbol name="mappin.and.ellipse" size={18} color={Lantern.ember300} />
+                  </View>
+                  <View style={styles.rowText}>
+                    <ThemedText style={styles.rowTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                      Add places from today
+                    </ThemedText>
+                    <ThemedText style={styles.recoveryBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                      {`${placeRecovery.stepsCount.toLocaleString()} steps, but no places were caught yet.`}
+                    </ThemedText>
+                  </View>
+                </View>
+                <View style={styles.recoveryActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={placeRecovery.onAddPlace}
+                    style={({ pressed }) => [styles.primaryRecoveryAction, pressed ? styles.rowPressed : null]}>
+                    <ThemedText style={styles.primaryRecoveryText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
+                      Add current place
+                    </ThemedText>
+                  </Pressable>
+                  {placeRecovery.onEnableTravelMemory ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={placeRecovery.onEnableTravelMemory}
+                      style={({ pressed }) => [styles.secondaryRecoveryAction, pressed ? styles.rowPressed : null]}>
+                      <IconSymbol name="mappin.and.ellipse" size={12} color={Lantern.ember300} />
+                      <ThemedText style={styles.secondaryRecoveryText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                        {placeRecovery.travelMemoryLabel ?? 'Travel Memory'}
+                      </ThemedText>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
             {quests.map((quest) => {
               const handlePress = () => {
                 if (quest.completed || !onQuest) return;
@@ -113,6 +153,49 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '800', lineHeight: 23, marginTop: 2 },
   sub: { fontSize: 13, fontWeight: '600', lineHeight: 18, marginBottom: 4 },
   list: { gap: 8, paddingTop: 4 },
+  recoveryCard: {
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    borderWidth: 1,
+    borderColor: 'rgba(255,195,107,0.28)',
+    backgroundColor: 'rgba(255,195,107,0.09)',
+  },
+  recoveryHead: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  recoveryActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingLeft: 44 },
+  primaryRecoveryAction: {
+    borderRadius: 999,
+    backgroundColor: Lantern.ember300,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  primaryRecoveryText: { fontSize: 12, fontWeight: '900' },
+  secondaryRecoveryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,195,107,0.28)',
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+  },
+  secondaryRecoveryText: { fontSize: 12, fontWeight: '900' },
+  recoveryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,195,107,0.12)',
+  },
+  recoveryBody: { fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

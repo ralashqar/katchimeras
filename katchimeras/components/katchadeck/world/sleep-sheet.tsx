@@ -73,7 +73,16 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
               {atmosphere.blurb}
             </ThemedText>
           </View>
-        ) : null}
+        ) : (
+          <View style={styles.emptyDetail}>
+            <ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              Sleep not set yet
+            </ThemedText>
+            <ThemedText style={styles.blurb} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              Add how the day began and the empty nook will settle into its morning atmosphere.
+            </ThemedText>
+          </View>
+        )}
 
         {onSet ? (
           <>
@@ -130,6 +139,7 @@ const styles = StyleSheet.create({
   grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 4, width: 38 },
   kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   detail: { gap: 4 },
+  emptyDetail: { gap: 6 },
   detailHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailEmoji: { fontSize: 18 },
   hoursRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 2 },

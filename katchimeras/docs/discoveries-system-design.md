@@ -44,7 +44,7 @@ system is mostly a *reading* layer over data we already persist — not new capt
 |---|---|
 | Exploration (places) | `StoredHomeDayRecord.confirmedPlaces[]` (category + meaning), `dayMap` nodes, `newPlaceCount`, `place-categories.ts` (Apple Maps categories), home anchor |
 | Memory (photos/voice) | `heroPhoto`, `capturedMeanings[]`, `moments[]`, `notes[]` (kind `voice`), `vision` concepts, `foodMoments[]`, `usedPhotoAssetIds[]` |
-| Life (milestones) | `bigMoments[]` (+ calendar once `expo-calendar` is activated — currently a build-safe stub in `utils/calendar-events.ts`) |
+| Life (milestones) | `bigMoments[]` plus on-device calendar events from `utils/calendar-events.ts` when permission is granted |
 | Journey (movement) | `stepsCount`, HealthKit routes (`katchimera-health-routes` → `importRoutesForDayAsync`), sleep (`getSleepForDayAsync`) |
 | Reflection | `promptAnswers[]` (feeling / inner_weather / day_word / gratitude / highlight), `notes` (voice), `bigMoments`, day `scores` (calm) |
 | World | `WorldState.patches[]` (finalised dioramas), patch `rarity`, `status` |
@@ -335,8 +335,7 @@ gameplay advantage.** Deferred to Phase 4; the data model already carries
 2. **Journey aggregates** — max-steps and calm-day counts are in day records, but
    *total distance* and *walking streaks* may need a small HealthKit aggregate
    addition (native → rebuild). Phase those defs in once the read exists.
-3. **Calendar-driven Life discoveries** — depend on activating `expo-calendar`
-   (currently stubbed). Big-moment-driven Life discoveries work today.
+3. **Calendar-driven Life discoveries** - calendar events are available for Chronicle; discovery definitions still need a V1 decision on which event categories should unlock Life milestones. Big-moment-driven Life discoveries work today.
 4. **Artefact placement** — confirm whether artefacts render on the single-day world
    view, a dedicated "home region", or only in the Hall for v1 (recommended: Hall
    first).

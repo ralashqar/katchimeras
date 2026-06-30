@@ -1,10 +1,12 @@
 import { useIsFocused } from '@react-navigation/native';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 import type { LocationPermissionState } from '@/types/home';
 
 type UseDayLocationCaptureOptions = {
   enabled: boolean;
+  requireFocus?: boolean;
   permissionState: LocationPermissionState;
   onPermissionResolved: (permission: LocationPermissionState) => void;
   onSample: (sample: {
@@ -17,14 +19,23 @@ type UseDayLocationCaptureOptions = {
 
 export function useDayLocationCapture({
   enabled,
+  requireFocus = true,
   permissionState,
   onPermissionResolved,
   onSample,
 }: UseDayLocationCaptureOptions) {
   const isFocused = useIsFocused();
+  const [appActive, setAppActive] = useState(() => AppState.currentState === 'active');
 
   useEffect(() => {
-    if (process.env.EXPO_OS === 'web' || !enabled || !isFocused) {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      setAppActive(nextState === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (process.env.EXPO_OS === 'web' || !enabled || !appActive || (requireFocus && !isFocused)) {
       return;
     }
 
@@ -114,5 +125,5 @@ export function useDayLocationCapture({
       active = false;
       subscription?.remove();
     };
-  }, [enabled, isFocused, onPermissionResolved, onSample, permissionState]);
+  }, [appActive, enabled, isFocused, onPermissionResolved, onSample, permissionState, requireFocus]);
 }

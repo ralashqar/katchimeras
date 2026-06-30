@@ -27,6 +27,9 @@ type MomentPromptSheetProps = {
   // Open straight into a specific prompt (e.g. the photos prompt from the world's
   // golden "!"), skipping the category list.
   initialPrompt?: ActiveDayPrompt | null;
+  // Let a parent replace a category with a richer domain-specific surface while
+  // still keeping the category in this menu.
+  onSelectPrompt?: (prompt: ActiveDayPrompt) => boolean | void;
   // Fired when a prompt is dismissed via its "Later" button (passes the prompt id).
   onPromptDismiss?: (promptId: string) => void;
 };
@@ -41,6 +44,7 @@ export function MomentPromptSheet({
   seeds,
   onCompleteSeed,
   initialPrompt = null,
+  onSelectPrompt,
   onPromptDismiss,
 }: MomentPromptSheetProps) {
   const [selected, setSelected] = useState<ActiveDayPrompt | null>(initialPrompt);
@@ -116,7 +120,10 @@ export function MomentPromptSheet({
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={dayPromptMenuLabels[prompt.id]}
-                        onPress={() => setSelected(prompt)}
+                        onPress={() => {
+                          if (onSelectPrompt?.(prompt)) return;
+                          setSelected(prompt);
+                        }}
                         style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
                         <View style={[styles.categoryIcon, { backgroundColor: `${accent}22`, borderColor: `${accent}55` }]}>
                           <IconSymbol name={prompt.categoryIcon} size={20} color={accent} />

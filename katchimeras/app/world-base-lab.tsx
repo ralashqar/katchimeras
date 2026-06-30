@@ -33,6 +33,7 @@ const REP_ASSET: Record<BaseSlot, string> = {
   journey: 'active_bridge',
   places: 'exploration_tower',
   sleep: 'sleep_good',
+  mood: 'mood_monument_empty',
   food: 'food_stall',
   reflection: 'calm_pond',
   egg: 'meaningful_crystal',
@@ -140,7 +141,6 @@ export default function WorldBaseLabScreen() {
       )
       .join('\n');
     const text = `const DEFAULT_ANCHORS: Record<BaseSlot, BaseAnchor> = {\n${lines}\n};`;
-    // eslint-disable-next-line no-console
     console.log('\n' + text + '\n');
     setDump(text);
   };
@@ -160,7 +160,7 @@ export default function WorldBaseLabScreen() {
           Dev tool · {baseId}
         </ThemedText>
         <ThemedText type="bodyLarge" style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
-          Drag each POI so its base ring seats on the island. Then "Dump anchors" → paste into
+          Drag each POI so its base ring seats on the island. Then &quot;Dump anchors&quot; and paste into
           utils/world-base-layout.ts.
         </ThemedText>
 

@@ -20,9 +20,14 @@ function transpileToTemp(relativeSourcePath, outName) {
   return outPath;
 }
 
-// memory-quests-engine imports @/utils/food-detect; transpile + alias it.
+// memory-quests-engine imports the food + studio detectors; transpile + alias
+// them so the Node-only harness can load the pure quest engine.
 const foodDetectPath = transpileToTemp('utils/food-detect.ts', 'food-detect.js');
-const stubs = { '@/utils/food-detect': foodDetectPath };
+const studioDetectPath = transpileToTemp('utils/studio-detect.ts', 'studio-detect.js');
+const stubs = {
+  '@/utils/food-detect': foodDetectPath,
+  '@/utils/studio-detect': studioDetectPath,
+};
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
   if (request in stubs) return stubs[request];
@@ -56,6 +61,7 @@ function day(overrides = {}) {
     visitedPlaceCount: 0,
     bigMoments: [],
     foodMoments: [],
+    studioMoments: [],
     ...overrides,
   };
 }
@@ -79,6 +85,12 @@ check(
     .selectMemoryQuests(day({ vision: { concepts: [{ name: 'coffee' }], details: [], textTokens: [] } }), lateNight)
     .some((q) => q.type === 'saveFoodMemory')
 );
+check(
+  'detected inspiration offers the studio quest',
+  engine
+    .selectMemoryQuests(day({ vision: { concepts: [{ name: 'books' }], details: [], textTokens: [] } }), morning)
+    .some((q) => q.type === 'saveStudioMemory')
+);
 check('no Place quest until a place was visited', !engine.selectMemoryQuests(day(), evening).some((q) => q.type === 'markPlace'));
 check(
   'Place quest appears once a place was visited',
@@ -96,6 +108,7 @@ check('Reflection ignores a dismissed answer', !engine.isQuestComplete('answerRe
 check('Place completes with a confirmed place', engine.isQuestComplete('markPlace', day({ confirmedPlaces: [{ id: 'p' }] })));
 check('Big Moment completes once a big moment is marked', engine.isQuestComplete('markBigMoment', day({ bigMoments: [{ type: 'birthday' }] })));
 check('Food completes once a food memory is saved', engine.isQuestComplete('saveFoodMemory', day({ foodMoments: [{ id: 'f', meaning: 'treat' }] })));
+check('Studio completes once an inspiration is saved', engine.isQuestComplete('saveStudioMemory', day({ studioMoments: [{ id: 's', label: 'Dune' }] })));
 check('Big Moment is offered on a bare day', engine.selectMemoryQuests(day(), morning).some((q) => q.type === 'markBigMoment'));
 
 // --- namePatch (Phase B) ---

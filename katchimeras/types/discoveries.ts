@@ -30,8 +30,10 @@ export type DiscoveryContext = {
   meaningfulMomentCount: number;
   voiceMemoryCount: number;
   foodMemoryCount: number;
+  studioMemoryCount: number;
   // Life
   bigMomentCount: number;
+  achievementMomentCount: number;
   bigMomentTypes: Set<string>;
   // Journey
   maxStepsInADay: number;

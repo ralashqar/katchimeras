@@ -8,10 +8,8 @@ import { supabase } from '@/utils/supabase';
 import { pickProminentTags } from '@/utils/vision-signals';
 
 // Per-creature character bible: a persona paragraph plus one short voice note
-// for each mood (the day's emotional read) and each bond depth (how it fits your
-// history). The narrator composes within these instead of inventing freely, so
-// the character never drifts. Creatures without an entry fall back to the cast's
-// one-line voice.
+// for each mood and each bond depth. The narrator composes within these instead
+// of inventing freely, so the character never drifts.
 type CreaturePersona = {
   persona: string;
   moods: Record<string, string>;
@@ -31,11 +29,10 @@ const FALLBACK_VOICE = 'a gentle companion who notices small true things';
 
 const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Privacy contract: the request carries place categories, moment labels, step
-// bands, and abstract photo subject words only — never coordinates, photo URIs,
-// place names, free text, or identifiers. `pastDays` (earlier day records) stays
-// on-device: only the derived temporal context (streak counts, weekday/rarity of
-// prior visits) is sent, never the raw days.
+// Privacy contract: the default reflection request carries labels, categories,
+// counts, weather labels, creature metadata, and abstract photo subject words -
+// never coordinates, photo URIs, place names, raw OCR, freeform user text, or
+// identifiers. `pastDays` stays on-device: only derived temporal context is sent.
 export function buildReflectionRequest(
   day: StoredHomeDayRecord,
   profile: OnboardingProfile,
@@ -62,36 +59,23 @@ export function buildReflectionRequest(
     stepsBand: resolveStepsBand(day.stepsCount),
     visitedPlaceCount: day.visitedPlaceCount,
     newPlaceCount: day.newPlaceCount,
-    // The recurring photo subjects of the day (e.g. "dog", "coffee", "water"),
-    // so the line can name something specific. Abstract content words only.
     prominentTags: day.vision ? pickProminentTags(day.vision) : [],
-    // The specific raw things the camera saw ("marble sculpture", "ramen
-    // bowl") — more evocative than the grouped concepts above.
+    // Specific camera-derived object descriptions are allowed; OCR text is not
+    // sent in the default nightly reflection.
     photoDetails: day.vision?.details ?? [],
-    // Actual words read off signs/placards/menus/tickets (OCR). The single most
-    // specific signal — it lets the line name the real exhibit or dish. NOTE:
-    // this is free text and loosens the "labels not text" privacy contract.
-    signText: day.vision ? day.vision.textTokens.slice(0, 12) : [],
     character: {
       name: creature.name,
       encounterCue: castEntry?.categoryLabel ?? null,
       repeatDepth: creature.repeatDepth,
       voice: castEntry?.voice ?? FALLBACK_VOICE,
       rarity: creature.rarity,
-      // Two independent axes the narrator can lean on: why this day was rare
-      // (living conditions) and how deep the bond has grown (return visits).
       rarityReason: creature.rarityReason ?? null,
       bondStage: creature.bondStage ?? 0,
       bondVisitCount: creature.bondVisitCount ?? creature.repeatDepth + 1,
-      // The character bible: persona + the voice notes for THIS day's mood and
-      // THIS relationship's depth, so the line stays in character.
       persona: persona?.persona ?? null,
       moodGuidance: persona?.moods[context.mood] ?? null,
       bondGuidance: persona?.bond[context.bondDepth] ?? null,
     },
-    // Temporal + relational read of the day (see utils/reflection-context.ts).
-    // This is what lets the line notice a streak, a recovery after a busy
-    // stretch, or a specific shared history instead of treating each day alone.
     context: {
       mood: context.mood,
       bondDepth: context.bondDepth,
@@ -104,8 +88,6 @@ export function buildReflectionRequest(
       dayShape: context.dayShape,
     },
     promptFacts: promptSummary,
-    // The day's actual weather (abstract label only). When present the line MAY
-    // name it truthfully; when absent it must not invent any.
     weather: day.weather
       ? { condition: day.weather.condition, label: weatherLabel(day.weather.condition), tempMaxC: day.weather.tempMaxC ?? null }
       : null,
@@ -121,10 +103,6 @@ function buildPromptReflectionSummary(day: StoredHomeDayRecord) {
       .flatMap((answer) => answer.labels)
       .slice(0, 8);
   const dayWord = labelsFor('day_word')[0] ?? null;
-  const noteText =
-    activeAnswers
-      .map((answer) => answer.noteText?.trim())
-      .find((text): text is string => Boolean(text)) ?? null;
 
   return {
     feelings: labelsFor('feeling'),
@@ -134,7 +112,7 @@ function buildPromptReflectionSummary(day: StoredHomeDayRecord) {
     dayWord,
     intention: labelsFor('intention')[0] ?? null,
     heroPhotoMeaning: day.heroPhoto?.meaningLabels ?? [],
-    userNoteSummary: noteText,
+    hasUserWrittenNote: activeAnswers.some((answer) => Boolean(answer.noteText?.trim())),
   };
 }
 
@@ -175,9 +153,9 @@ export async function requestDayReflection(
   }
 }
 
-// On-demand LLM panel captions for the 4-panel comic (open, scene, turn,
-// close). Same privacy-clean payload as the reflection, plus wantComic. Returns
-// null on any failure → the comic falls back to local templated beats.
+// On-demand LLM panel captions for the 4-panel comic. Uses the same default
+// privacy-clean payload as reflection, plus opt-in OCR detail for this explicit
+// story/comic request. Failure falls back to local templated beats.
 export async function requestComicBeats(
   day: StoredHomeDayRecord,
   profile: OnboardingProfile,
@@ -190,7 +168,7 @@ export async function requestComicBeats(
 
   try {
     const invocation = supabase.functions.invoke('generate-day-reflection', {
-      body: { ...payload, wantComic: true },
+      body: { ...payload, signText: day.vision ? day.vision.textTokens.slice(0, 12) : [], wantComic: true },
     });
     const timeout = new Promise<null>((resolve) => {
       setTimeout(() => resolve(null), REQUEST_TIMEOUT_MS);

@@ -1,41 +1,32 @@
-import type { CalendarEventContext } from '@/utils/chronicle-engine';
-
-// Calendar → Chronicle is wired end-to-end (the engine folds events into the
-// day's title/summary/timeline), but the on-device FETCH is disabled until
-// expo-calendar is installed — importing it before then breaks the bundle/build.
-//
-// TO ENABLE CALENDAR:
-//   1. npx expo install expo-calendar
-//   2. add the plugin back to app.json "plugins":
-//        ["expo-calendar", { "calendarPermission": "Katchimeras reads your
-//          calendar on your device to understand what your day was about — events
-//          stay on your phone and only shape your day's Chronicle." }]
-//   3. replace the stub body below with the REAL IMPLEMENTATION block.
-//
-// Until then this returns [] and the Chronicle builds from the day's other
-// signals (photos, places, notes, big moments, mood, hatch).
-export async function loadCalendarEventsForDay(_isoDate: string): Promise<CalendarEventContext[]> {
-  return [];
-}
-
-/* ───────────────────────── REAL IMPLEMENTATION (paste in once expo-calendar is installed) ─────────────────────────
 import { requireOptionalNativeModule } from 'expo-modules-core';
-import type { CalendarEventCategory } from '@/utils/chronicle-engine';
+
+import type { CalendarEventCategory, CalendarEventContext } from '@/utils/chronicle-engine';
 
 type ExpoCalendarApi = {
-  EntityTypes: { EVENT: unknown };
+  EntityTypes: { EVENT: string };
   getCalendarPermissionsAsync: () => Promise<{ granted: boolean; canAskAgain?: boolean }>;
   requestCalendarPermissionsAsync: () => Promise<{ granted: boolean }>;
-  getCalendarsAsync: (entityType: unknown) => Promise<{ id: string; title?: string }[]>;
+  getCalendarsAsync: (entityType?: string) => Promise<{ id: string; title?: string }[]>;
   getEventsAsync: (
     calendarIds: string[],
     startDate: Date,
     endDate: Date
   ) => Promise<
-    { id: string; title?: string | null; startDate: string | Date; endDate: string | Date; allDay?: boolean; location?: string | null; calendarId?: string }[]
+    {
+      id: string;
+      title?: string | null;
+      startDate: string | Date;
+      endDate: string | Date;
+      allDay?: boolean;
+      location?: string | null;
+      calendarId?: string;
+    }[]
   >;
 };
 
+// Calendar -> Chronicle is best-effort and local-first. The client fetches
+// events on device, reduces them to small title/time/category facts, and passes
+// them to the pure Chronicle engine. No raw calendar store is persisted here.
 const CATEGORY_RULES: { category: CalendarEventCategory; re: RegExp }[] = [
   { category: 'health', re: /\b(dentist|doctor|gp|clinic|hospital|therapy|appointment|checkup|check-up|gym|workout)\b/i },
   { category: 'travel', re: /\b(flight|airport|train|trip|drive to|hotel|holiday|vacation)\b/i },
@@ -43,11 +34,15 @@ const CATEGORY_RULES: { category: CalendarEventCategory; re: RegExp }[] = [
   { category: 'social', re: /\b(dinner|lunch|brunch|coffee|drinks|party|catch ?up|hangout|date|wedding|birthday)\b/i },
   { category: 'work', re: /\b(meeting|standup|stand-up|1:1|review|interview|call|sync|deadline|work|office|client)\b/i },
 ];
+
 function categorize(title: string, calendarName?: string): CalendarEventCategory {
   const haystack = `${title} ${calendarName ?? ''}`;
-  for (const rule of CATEGORY_RULES) if (rule.re.test(haystack)) return rule.category;
+  for (const rule of CATEGORY_RULES) {
+    if (rule.re.test(haystack)) return rule.category;
+  }
   return 'unknown';
 }
+
 function dayRange(isoDate: string): { start: Date; end: Date } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
   if (!match) return null;
@@ -62,19 +57,29 @@ export async function loadCalendarEventsForDay(isoDate: string): Promise<Calenda
   if (!requireOptionalNativeModule('ExpoCalendar')) return [];
   const range = dayRange(isoDate);
   if (!range) return [];
+
   try {
     const Calendar = (await import('expo-calendar')) as unknown as ExpoCalendarApi;
     const permission = await Calendar.getCalendarPermissionsAsync();
     let granted = permission.granted;
-    if (!granted && permission.canAskAgain) granted = (await Calendar.requestCalendarPermissionsAsync()).granted;
+    if (!granted && permission.canAskAgain) {
+      granted = (await Calendar.requestCalendarPermissionsAsync()).granted;
+    }
     if (!granted) return [];
+
     const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
     if (!calendars.length) return [];
-    const events = await Calendar.getEventsAsync(calendars.map((c) => c.id), range.start, range.end);
+
+    const events = await Calendar.getEventsAsync(
+      calendars.map((calendar) => calendar.id),
+      range.start,
+      range.end
+    );
+
     return events
       .filter((event) => !event.allDay)
       .map((event): CalendarEventContext => {
-        const calendarName = calendars.find((c) => c.id === event.calendarId)?.title;
+        const calendarName = calendars.find((calendar) => calendar.id === event.calendarId)?.title;
         const title = (event.title ?? 'Event').trim() || 'Event';
         return {
           id: event.id,
@@ -93,4 +98,3 @@ export async function loadCalendarEventsForDay(isoDate: string): Promise<Calenda
     return [];
   }
 }
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────── */

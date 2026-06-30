@@ -5,6 +5,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { FoodMoment, HomeDayRecord } from '@/types/home';
 import type { DayChronicle } from '@/utils/chronicle-engine';
+import type { ContinuityMotif, WorldGuideActionType, WorldGuideMessage } from '@/utils/continuity-engine';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
 
 type WorldDashboardProps = {
@@ -20,6 +21,10 @@ type WorldDashboardProps = {
   onOpenDiscoveries?: () => void;
   onOpenCosmetics?: () => void;
   essenceBalance?: number;
+  continuityMotifs?: ContinuityMotif[];
+  guideMessage?: WorldGuideMessage | null;
+  onGuideAction?: (actionType: WorldGuideActionType) => void;
+  onOpenObservatory?: (motifId?: string) => void;
 };
 
 // Consecutive calendar days (ending most-recently) that have hatched a creature.
@@ -94,6 +99,10 @@ export function WorldDashboard({
   onOpenDiscoveries,
   onOpenCosmetics,
   essenceBalance,
+  continuityMotifs = [],
+  guideMessage,
+  onGuideAction,
+  onOpenObservatory,
 }: WorldDashboardProps) {
   const streak = computeStreak(days);
   const mood = computeMood(days);
@@ -115,6 +124,8 @@ export function WorldDashboard({
         </View>
       ) : null}
 
+      {guideMessage ? <GuideCard message={guideMessage} onAction={onGuideAction} /> : null}
+
       {chronicle?.hasStory ? (
         <Pressable onPress={onOpenChronicle} style={styles.chronicleCard}>
           <View style={styles.sectionHead}>
@@ -131,6 +142,33 @@ export function WorldDashboard({
             {chronicle.summary}
           </ThemedText>
         </Pressable>
+      ) : null}
+
+      {continuityMotifs.length > 0 ? (
+        <View style={styles.motifSection}>
+          <View style={styles.sectionHead}>
+            <IconSymbol name="sparkles" size={13} color={Lantern.auroraTeal} />
+            <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              Observatory
+            </ThemedText>
+            {onOpenObservatory ? <IconSymbol name="chevron.right" size={13} color={Lantern.moon500} style={styles.chronicleChevron} /> : null}
+          </View>
+          <Pressable
+            accessibilityRole={onOpenObservatory ? 'button' : undefined}
+            disabled={!onOpenObservatory}
+            onPress={() => onOpenObservatory?.()}
+            style={styles.observatoryCard}>
+            <ThemedText style={styles.chronicleKicker} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+              Becoming important
+            </ThemedText>
+            <ThemedText style={styles.chronicleSummary} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              Patterns, rituals, and places Katchimera has started to notice.
+            </ThemedText>
+          </Pressable>
+          {continuityMotifs.slice(0, 3).map((motif) => (
+            <MotifCard key={motif.id} motif={motif} onPress={onOpenObservatory} />
+          ))}
+        </View>
       ) : null}
 
       {foodMoments && foodMoments.length > 0 ? (
@@ -249,6 +287,68 @@ export function WorldDashboard({
   );
 }
 
+function GuideCard({
+  message,
+  onAction,
+}: {
+  message: WorldGuideMessage;
+  onAction?: (actionType: WorldGuideActionType) => void;
+}) {
+  const actionType = message.actionType ?? 'none';
+  const canAct = !!message.actionLabel && actionType !== 'none' && !!onAction;
+  const handlePress = () => {
+    if (canAct) onAction(actionType);
+  };
+  return (
+    <Pressable accessibilityRole={canAct ? 'button' : undefined} disabled={!canAct} onPress={handlePress} style={styles.guideCard}>
+      <View style={styles.sectionHead}>
+        <IconSymbol name="leaf.fill" size={13} color={Lantern.auroraTeal} />
+        <ThemedText style={styles.chronicleKicker} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+          World Guide
+        </ThemedText>
+        {canAct ? <IconSymbol name="chevron.right" size={13} color={Lantern.moon500} style={styles.chronicleChevron} /> : null}
+      </View>
+      <ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        {message.title}
+      </ThemedText>
+      <ThemedText style={styles.chronicleSummary} numberOfLines={2} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+        {message.body}
+      </ThemedText>
+      {message.actionLabel ? (
+        <ThemedText style={styles.guideAction} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+          {message.actionLabel}
+        </ThemedText>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function MotifCard({ motif, onPress }: { motif: ContinuityMotif; onPress?: (motifId: string) => void }) {
+  return (
+    <Pressable
+      accessibilityRole={onPress ? 'button' : undefined}
+      disabled={!onPress}
+      onPress={() => onPress?.(motif.id)}
+      style={styles.motifCard}>
+      <View style={styles.motifHead}>
+        <View style={styles.motifMark}>
+          <ThemedText style={styles.motifMarkText} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+            {motif.strength}
+          </ThemedText>
+        </View>
+        <View style={styles.motifCopy}>
+          <ThemedText style={styles.motifTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50} numberOfLines={2}>
+            {motif.title}
+          </ThemedText>
+          <ThemedText style={styles.motifBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300} numberOfLines={2}>
+            {motif.body}
+          </ThemedText>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function QuestCard({ quest, onPress }: { quest: MemoryQuest; onPress?: (type: MemoryQuestType) => void }) {
   const handlePress = () => {
     if (quest.completed || !onPress) return;
@@ -306,6 +406,49 @@ const styles = StyleSheet.create({
   chronicleKicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   chronicleChevron: { marginLeft: 'auto' },
   chronicleSummary: { fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  guideCard: {
+    padding: 14,
+    borderRadius: 20,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(14,28,34,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.26)',
+    gap: 5,
+  },
+  guideAction: { fontSize: 12, fontWeight: '900', letterSpacing: 0.2, paddingTop: 2 },
+  motifSection: { gap: 8 },
+  observatoryCard: {
+    padding: 12,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(14,28,34,0.64)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.2)',
+    gap: 4,
+  },
+  motifCard: {
+    padding: 12,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(20,17,31,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.16)',
+  },
+  motifHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  motifMark: {
+    width: 30,
+    height: 30,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(125,232,205,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.32)',
+  },
+  motifMarkText: { fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  motifCopy: { flex: 1, gap: 2 },
+  motifTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 },
+  motifBody: { fontSize: 12.5, fontWeight: '500', lineHeight: 17 },
   sleepCard: {
     padding: 14,
     borderRadius: 20,

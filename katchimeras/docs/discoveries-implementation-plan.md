@@ -122,7 +122,7 @@ art; native rebuild only if placement touches native.)
 |---|---|---|
 | Place categories (museum/cafe/park…) | partial — `place-categories.ts` Apple Maps cats + `confirmedPlaces.category` | ship defs for categories we already detect; **"First Country/Airport"** need reverse-geocode → defer those defs |
 | Big-moment Life discoveries | available now (`bigMoments[]`) | ship |
-| Calendar Life discoveries | blocked — `expo-calendar` stubbed | unblock per [[patch-systems-v3]] (install + plugin + paste real impl), then add defs |
+| Calendar Life discoveries | calendar access available for Chronicle | add discovery defs once V1 decides which event categories should unlock Life milestones |
 | Steps / max-steps / calm days | available now (day records) | ship |
 | Total distance / walking streak | needs HealthKit aggregate | small native add to `katchimera-health-routes` (sum distances / streak) → **rebuild**; phase those defs in after |
 | World patch count / rarity | available now (`WorldState`) | ship |

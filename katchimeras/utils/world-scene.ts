@@ -311,6 +311,7 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
     // the live forming patch — a finalized day is complete, no empty spots shown.
     for (const cell of isForming ? patch.cells ?? [] : []) {
       if (cell.level > 0) continue;
+      if (occupied.has(`${cell.col},${cell.row}`)) continue;
       const c = shift(cellCenter(cell.col, cell.row));
       rawGhosts.push({
         id: `${patch.id}-ghost-${cell.type}`,

@@ -61,6 +61,7 @@ function day(overrides = {}) {
     heroPhoto: null,
     notes: [],
     foodMoments: [],
+    studioMoments: [],
     bigMoments: [],
     promptAnswers: [],
     moments: [],
@@ -90,11 +91,13 @@ check('uniquePlaceCount sums confirmed places', mc.uniquePlaceCount === 2, Strin
 check('photoCount = capturedMeanings + heroPhoto', ctx([day({ capturedMeanings: [{}, {}], heroPhoto: { assetId: 'a' } })]).photoCount === 3);
 check('voiceMemoryCount counts only voice notes', ctx([day({ notes: [{ kind: 'voice' }, { kind: 'text' }, { kind: 'voice' }] })]).voiceMemoryCount === 2);
 check('foodMemoryCount sums food moments', ctx([day({ foodMoments: [{}, {}] })]).foodMemoryCount === 2);
+check('studioMemoryCount sums studio moments', ctx([day({ studioMoments: [{}, {}, {}] })]).studioMemoryCount === 3);
 check(
   'meaningfulMomentCount sums meaning-tagged entries',
   ctx([day({ capturedMeanings: [{}], confirmedPlaces: [place('cafe')], foodMoments: [{}], bigMoments: [{ type: 'trip' }], notes: [{ kind: 'voice' }] })]).meaningfulMomentCount === 5
 );
 check('bigMomentTypes collects types', ctx([day({ bigMoments: [{ type: 'birthday' }] })]).bigMomentTypes.has('birthday'));
+check('achievementMomentCount counts achievement big moments', ctx([day({ bigMoments: [{ type: 'achievement' }, { type: 'trip' }] })]).achievementMomentCount === 1);
 check('maxStepsInADay takes the peak', ctx([day({ stepsCount: 8000 }), day({ stepsCount: 21000 })]).maxStepsInADay === 21000);
 check('reflectionCount ignores dismissed + non-reflection kinds', ctx([day({ promptAnswers: [{ kind: 'feeling' }, { kind: 'feeling', dismissed: true }, { kind: 'meaningful_photo' }] })]).reflectionCount === 1);
 check('calm day = dominant calm facet', ctx([day({ scores: CALM }), day({ scores: FLAT })]).calmDayCount === 1);
@@ -114,15 +117,33 @@ check('a walk moment counts as a walking day', ctx([day({ stepsCount: 0, moments
 // ───────────────────────── thresholds fire correctly ─────────────────────────
 check('first_museum fires at 1 museum', passes([day({ confirmedPlaces: [place('museum')] })], 'first_museum'));
 check('first_museum does NOT fire at 0', !passes([day()], 'first_museum'));
+check('museums_3 fires at 3', passes([day({ confirmedPlaces: Array.from({ length: 3 }, () => place('museum')) })], 'museums_3'));
 check('museums_5 (hidden) fires at 5', passes([day({ confirmedPlaces: Array.from({ length: 5 }, () => place('museum')) })], 'museums_5'));
+check('cafes_3 fires at 3 cafe visits', passes([day({ confirmedPlaces: Array.from({ length: 3 }, () => place('cafe')) })], 'cafes_3'));
+check('parks_3 fires at 3 park visits', passes([day({ confirmedPlaces: Array.from({ length: 3 }, () => place('park')) })], 'parks_3'));
+check('places_10 fires at 10 marked places', passes([day({ confirmedPlaces: Array.from({ length: 10 }, () => place('cafe')) })], 'places_10'));
 check('first_voice_memory fires', passes([day({ notes: [{ kind: 'voice' }] })], 'first_voice_memory'));
+check('voice_5 fires at 5 voice memories', passes([day({ notes: Array.from({ length: 5 }, () => ({ kind: 'voice' })) })], 'voice_5'));
+check('photos_10 and photos_50 fire at the right thresholds', passes([day({ capturedMeanings: Array.from({ length: 10 }, () => ({})) })], 'photos_10') && !passes([day({ capturedMeanings: Array.from({ length: 10 }, () => ({})) })], 'photos_50'));
+check('photos_50 fires at 50', passes([day({ capturedMeanings: Array.from({ length: 50 }, () => ({})) })], 'photos_50'));
 check('photos_100 fires at 100', passes([day({ capturedMeanings: Array.from({ length: 100 }, () => ({})) })], 'photos_100'));
+check('food_10 fires at 10 food memories', passes([day({ foodMoments: Array.from({ length: 10 }, () => ({})) })], 'food_10'));
+check('studio_10 fires at 10 studio memories', passes([day({ studioMoments: Array.from({ length: 10 }, () => ({})) })], 'studio_10'));
+check('steps_15k fires at 16k', passes([day({ stepsCount: 16000 })], 'steps_15k'));
 check('steps_20k fires at 21k, steps_10k too', passingDiscoveryIds(ctx([day({ stepsCount: 21000 })])).includes('steps_20k'));
 check('steps_20k does NOT fire at 12k', !passes([day({ stepsCount: 12000 })], 'steps_20k'));
+check('steps_30k fires at 31k', passes([day({ stepsCount: 31000 })], 'steps_30k'));
+check('walk_streak_3 fires on a 3-day streak', passes(consecutive(3, { stepsCount: 6000 }), 'walk_streak_3'));
 check('walk_streak_7 fires on a 7-day streak', passes(consecutive(7, { stepsCount: 6000 }), 'walk_streak_7'));
+check('reflections_3 fires at 3 reflections', passes([day({ promptAnswers: Array.from({ length: 3 }, () => ({ kind: 'feeling' })) })], 'reflections_3'));
+check('calm_7 fires at 7 calm days', passes(consecutive(7, { scores: CALM }), 'calm_7'));
 check('calm_30 fires at 30 calm days', passes(consecutive(30, { scores: CALM }), 'calm_30'));
 check('first_birthday fires only with a birthday', passes([day({ bigMoments: [{ type: 'birthday' }] })], 'big_birthday') && !passes([day({ bigMoments: [{ type: 'trip' }] })], 'big_birthday'));
+check('goal_achieved fires on an achievement big moment', passes([day({ bigMoments: [{ type: 'achievement' }] })], 'goal_achieved'));
 check('first_patch fires on a hatched day', passes([day({ state: 'hatched' })], 'first_patch'));
+check('first_3_patches fires on 3 hatched days', passes(consecutive(3, { state: 'hatched' }), 'first_3_patches'));
+check('first_week_village fires on 7 hatched days', passes(consecutive(7, { state: 'hatched' }), 'first_week_village'));
+check('patches_30 fires on 30 hatched days', passes(consecutive(30, { state: 'hatched' }), 'patches_30'));
 check('first_legendary (hidden) fires on a legendary hatch', passes([day({ state: 'hatched', creature: { rarity: 'legendary' } })], 'first_legendary'));
 
 // ───────────────────────── evaluate: diff + monotonicity ─────────────────────────

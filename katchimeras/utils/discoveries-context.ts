@@ -66,7 +66,9 @@ export function buildDiscoveryContext(
   let meaningfulMomentCount = 0;
   let voiceMemoryCount = 0;
   let foodMemoryCount = 0;
+  let studioMemoryCount = 0;
   let bigMomentCount = 0;
+  let achievementMomentCount = 0;
   const bigMomentTypes = new Set<string>();
   let maxStepsInADay = 0;
   let reflectionCount = 0;
@@ -91,11 +93,15 @@ export function buildDiscoveryContext(
     voiceMemoryCount += voice;
     const foods = (day.foodMoments ?? []).length;
     foodMemoryCount += foods;
+    studioMemoryCount += (day.studioMoments ?? []).length;
 
     // Life
     const bigs = day.bigMoments ?? [];
     bigMomentCount += bigs.length;
-    for (const big of bigs) bigMomentTypes.add(big.type);
+    for (const big of bigs) {
+      bigMomentTypes.add(big.type);
+      if (big.type === 'achievement') achievementMomentCount += 1;
+    }
 
     // "Meaningful moments" = every meaning-tagged entry the user chose to keep.
     meaningfulMomentCount += meanings.length + places.length + foods + bigs.length + voice;
@@ -126,7 +132,9 @@ export function buildDiscoveryContext(
     meaningfulMomentCount,
     voiceMemoryCount,
     foodMemoryCount,
+    studioMemoryCount,
     bigMomentCount,
+    achievementMomentCount,
     bigMomentTypes,
     maxStepsInADay,
     walkingStreak: longestWalkingStreak(days),

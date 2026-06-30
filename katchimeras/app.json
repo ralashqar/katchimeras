@@ -18,6 +18,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Katchimeras uses the camera so you can snap a photo of a moment and feed it into today's egg.",
         "NSLocationWhenInUseUsageDescription": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Katchimeras can remember meaningful places even when the app is not open, so travel days can become landmarks in your world.",
+        "NSLocationAlwaysUsageDescription": "Katchimeras can remember meaningful places even when the app is not open, so travel days can become landmarks in your world.",
         "NSHealthShareUsageDescription": "Katchimeras can read your workout routes from Apple Health when you choose to import a walk into a memory map.",
         "NSSpeechRecognitionUsageDescription": "Katchimeras transcribes your voice notes on your device so you can keep a written copy of the moment — the audio never leaves your phone."
       },
@@ -57,8 +59,12 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps.",
-          "locationWhenInUsePermission": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps."
+          "locationAlwaysAndWhenInUsePermission": "Katchimeras can remember meaningful places even when the app is not open, so travel days can become landmarks in your world.",
+          "locationAlwaysPermission": "Katchimeras can remember meaningful places even when the app is not open, so travel days can become landmarks in your world.",
+          "locationWhenInUsePermission": "Katchimeras uses your location while the app is open so it can remember where your day happened and build gentle day maps.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [
@@ -70,6 +76,12 @@
           "granularPermissions": [
             "photo"
           ]
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Katchimeras reads your calendar on your device to understand what your day was about. Events stay on your phone and only shape your day's Chronicle."
         }
       ],
       "./plugins/with-katchimera-healthkit",

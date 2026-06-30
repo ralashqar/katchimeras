@@ -16,6 +16,7 @@ const SPECIFIER_MAP = {
   '@/utils/world-patch-engine': './world-patch-engine',
   '@/utils/world-build': './world-build',
   '@/utils/today-patch-engine': './today-patch-engine',
+  '@/utils/world-structures': './world-structures',
   '@/utils/daily-seeds-engine': './daily-seeds-engine',
 };
 
@@ -37,6 +38,7 @@ transpile('utils/world-archetype.ts', 'world-archetype.js');
 transpile('utils/world-patch-engine.ts', 'world-patch-engine.js');
 transpile('utils/world-build.ts', 'world-build.js');
 transpile('utils/world-scene.ts', 'world-scene.js');
+transpile('utils/world-structures.ts', 'world-structures.js');
 transpile('utils/daily-seeds-engine.ts', 'daily-seeds-engine.js');
 transpile('utils/note-meaning.ts', 'note-meaning.js');
 transpile('utils/today-patch-engine.ts', 'today-patch-engine.js');
@@ -177,7 +179,7 @@ check('a new hatched day appends one patch', w3.patches.length === 3 && w3.patch
 const finalizedPatch = w3.patches[0];
 check('finalized patches carry the four cells', Array.isArray(finalizedPatch.cells) && finalizedPatch.cells.length === 4, finalizedPatch.cells && String(finalizedPatch.cells.length));
 check('finalized patch is hatched', finalizedPatch.status === 'hatched', finalizedPatch.status);
-check('finalized patch seats the creature on the front corner tile', finalizedPatch.objects.some((o) => o.kind === 'creature' && o.col === 3 && o.row === 3));
+check('finalized patch seats the creature in the central plaza', finalizedPatch.objects.some((o) => o.kind === 'creature' && o.col === 1.5 && o.row === 1.5));
 check('a finalized day shows no ghost cells', layoutWorld([finalizedPatch]).ghosts.length === 0, String(layoutWorld([finalizedPatch]).ghosts.length));
 
 // 10. Scene layout (renderer core) produces sane, finite geometry.
@@ -193,13 +195,16 @@ check('sprites painter-sorted back-to-front', sorted);
 // Objects are 1:2 frames = one slot (2 stacked cells) of the 4x4 line grid; the
 // frame width == one grid column == one tile.
 const propSprite = scene.sprites.find((s) => s.kind === 'prop');
-check('a cell object frame == one tile', propSprite && propSprite.size >= 120 && propSprite.size <= 130, propSprite && String(propSprite.size));
+check('a structure frame is in the expected object range', propSprite && propSprite.size >= 80 && propSprite.size <= 190, propSprite && String(propSprite.size));
 
 // 11. Every catalog key the engine can emit has a real bundled cutout on disk.
 const { ARCHETYPE_ANCHORS, PROP_POOL, MEMORY_NODE_ASSET, ARCHETYPE_THEME } = require(path.join(tempDir, 'world-const.js'));
 const assetsRoot = path.join(projectRoot, 'assets', 'images', 'katchimeras', 'world');
 function assetExists(folder, key) {
   return fs.existsSync(path.join(assetsRoot, folder, `${key}.png`));
+}
+function objectAssetExists(folder, file) {
+  return fs.existsSync(path.join(assetsRoot, 'objects', folder, file));
 }
 const anchorKeys = Object.values(ARCHETYPE_ANCHORS).flat().map((a) => a.key);
 const missingAnchors = anchorKeys.filter((k) => !assetExists('anchors', k));
@@ -222,7 +227,7 @@ const decalsOk = scene.decals.every((d) => Number.isFinite(d.x) && Number.isFini
 check('all decals have finite, sized geometry', decalsOk, String(scene.decals.length));
 
 // 13. Today (live) patch engine — grows monotonically through the day.
-const EGG = '1,1';
+const EGG = '1.5,1.5';
 function tday(overrides = {}) {
   return {
     id: 'today-1',
@@ -249,7 +254,11 @@ const cellOf = (patch, type) => patch.cells.find((c) => c.type === type);
 
 // Bare morning: four EMPTY cells (ghost spots), egg only, neutral ground.
 const morning = deriveTodayPatch(tday(), null);
-check('morning patch has no objects', morning.objects.length === 0, String(morning.objects.length));
+check('morning patch has the always-visible core structures', ['memory', 'places', 'journey', 'reflection', 'sleep', 'mood', 'chronicle', 'quests'].every((category) => morning.objects.some((o) => o.category === category)), morning.objects.map((o) => o.category).join(','));
+check('empty morning shows an empty Memory Vault', morning.objects.find((o) => o.category === 'memory')?.assetKey === 'memory_vault_empty');
+check('empty morning shows an empty Sleep Nook', morning.objects.find((o) => o.category === 'sleep')?.assetKey === 'sleep_nook_empty');
+check('empty morning shows the idle Journey path with 0 steps', morning.objects.find((o) => o.category === 'journey')?.assetKey === 'steps_path_1' && morning.objects.find((o) => o.category === 'journey')?.badge === 0);
+check('empty morning shows the Mood Monument', morning.objects.find((o) => o.category === 'mood')?.assetKey === 'mood_monument_empty');
 check('morning patch is forming', morning.status === 'forming', morning.status);
 check('forming patch is named Today', morning.name === 'Today', morning.name);
 check('today patch carries the egg visual', morning.eggVisual && morning.eggVisual.label === 'Still forming');
@@ -260,7 +269,7 @@ check('every morning cell is empty (level 0)', morning.cells.every((c) => c.leve
 // Forming ground is uniform; empty cells render as ghost spots (egg has none).
 const morningScene = layoutWorld([morning]);
 check('forming plot uses one fixed decal on every tile', morningScene.decals.length > 0 && morningScene.decals.every((d) => d.decal === 'grass'), [...new Set(morningScene.decals.map((d) => d.decal))].join(','));
-check('morning scene shows 4 ghost cells', morningScene.ghosts.length === 4, String(morningScene.ghosts.length));
+check('morning scene replaces ghost cells with empty structures', morningScene.ghosts.length === 0, String(morningScene.ghosts.length));
 const cellAt = (t) => morning.cells.find((c) => c.type === t);
 check(
   'chests line the back-right row (memory/places/journey on row 0, steps far corner)',
@@ -268,20 +277,20 @@ check(
     cellAt('places').col === 2 && cellAt('places').row === 0 &&
     cellAt('journey').col === 3 && cellAt('journey').row === 0
 );
-check('the egg front-corner tile (3,3) is free of cells', morning.cells.every((c) => !(c.col === 3 && c.row === 3)));
+check('the central egg plaza is free of cells', morning.cells.every((c) => !(c.col === 1.5 && c.row === 1.5)));
 
 // Memory Vault levels up with captured media; a fuller vault shows a richer asset.
 const onePhoto = deriveTodayPatch(tday({ heroPhoto: { thumbnailUri: 'file://p.jpg' }, capturedMeanings: [{ archetype: 'calm', label: 'x' }] }), null);
 check('captured media levels the Memory Vault', cellOf(onePhoto, 'memory').level >= 1, String(cellOf(onePhoto, 'memory').level));
-check('Memory Vault grows a memory-tree object', onePhoto.objects.some((o) => o.category === 'memory' && /memory_tree_/.test(o.assetKey)));
+check('Memory Vault grows a vault object', onePhoto.objects.some((o) => o.category === 'memory' && /memory_vault_/.test(o.assetKey)));
 check('Memory Vault badge counts the media', cellOf(onePhoto, 'memory').count === 2, String(cellOf(onePhoto, 'memory').count));
 check('the vault object carries its badge count', onePhoto.objects.find((o) => o.category === 'memory').badge === 2);
-const fullVault = computeCells(tday({ capturedMeanings: [{ archetype: 'calm' }, { archetype: 'calm' }, { archetype: 'calm' }, { archetype: 'calm' }] }));
-check('more media → a higher Memory Vault level + asset', fullVault.find((c) => c.type === 'memory').level >= 3 && fullVault.find((c) => c.type === 'memory').assetKey === 'memory_tree_3');
+const fullVault = computeCells(tday({ capturedMeanings: Array.from({ length: 6 }, () => ({ archetype: 'calm' })) }));
+check('more media raises the Memory Vault level + asset', fullVault.find((c) => c.type === 'memory').level >= 3 && fullVault.find((c) => c.type === 'memory').assetKey === 'memory_vault_3');
 
 // Places — a new place raises the cell to a watchtower.
 const newPlaceDay = deriveTodayPatch(tday({ visitedPlaceCount: 1, newPlaceCount: 1 }), null);
-check('a new place lifts Places to a watchtower', cellOf(newPlaceDay, 'places').assetKey === 'exploration_tower', cellOf(newPlaceDay, 'places').assetKey);
+check('a new place lifts Places to the Observatory', cellOf(newPlaceDay, 'places').assetKey === 'observatory', cellOf(newPlaceDay, 'places').assetKey);
 
 // Journey — a big walk reads as a bridge; no steps reads as a restful (level 0) cell.
 const bigWalk = deriveTodayPatch(tday({ stepsCount: 8000 }), null);
@@ -289,18 +298,23 @@ check('a big walk levels the Journey cell', cellOf(bigWalk, 'journey').level >= 
 check('Journey badge is the raw step count', cellOf(bigWalk, 'journey').count === 8000, String(cellOf(bigWalk, 'journey').count));
 check('a still day leaves Journey empty', cellOf(deriveTodayPatch(tday(), null), 'journey').level === 0);
 
+// Mood Monument — a lightweight daily mood marker that also feeds earned seeds.
+const radiantDay = deriveTodayPatch(tday({ promptAnswers: [{ id: 'feel1', kind: 'feeling', choiceIds: ['energized'], labels: ['Radiant'], createdAt: '2026-06-24T12:00:00Z', source: 'prompt_chip', semanticTags: ['feeling:energized'], scoreBias: { energy: 0.34 } }] }), null);
+check('radiant mood lights the Mood Monument', radiantDay.objects.find((o) => o.category === 'mood')?.assetKey === 'mood_monument_radiant');
+
 // Reflection — mood drives the cell's object (calm pond vs social campfire).
 const calmDay = deriveTodayPatch(tday({ capturedMeanings: [{ archetype: 'calm', label: 'Quiet' }] }), null);
-check('a calm day reflects as a pond', cellOf(calmDay, 'reflection').assetKey === 'calm_pond', cellOf(calmDay, 'reflection').assetKey);
+check('a calm day grows the Sanctuary', cellOf(calmDay, 'reflection').assetKey === 'sanctuary', cellOf(calmDay, 'reflection').assetKey);
 const socialDay = deriveTodayPatch(tday({ capturedMeanings: [{ archetype: 'together', label: 'Friends' }, { archetype: 'together', label: 'More' }] }), null);
-check('a social day reflects as a campfire', cellOf(socialDay, 'reflection').assetKey === 'social_campfire', cellOf(socialDay, 'reflection').assetKey);
+check('a social day still uses the Sanctuary structure', cellOf(socialDay, 'reflection').assetKey === 'sanctuary', cellOf(socialDay, 'reflection').assetKey);
 
 // Every grown object is tagged with its cell and carries a "built from" line.
 const richDay = deriveTodayPatch(tday({ heroPhoto: { thumbnailUri: 'file://p.jpg' }, capturedMeanings: [{ archetype: 'calm', label: 'x' }], visitedPlaceCount: 1, stepsCount: 8000 }), null);
-check('objects are tagged with their cell type', richDay.objects.every((o) => ['memory', 'places', 'journey', 'reflection'].includes(o.category)));
+const cellObjects = richDay.objects.filter((o) => ['memory', 'places', 'journey', 'reflection'].includes(o.category));
+check('cell objects are tagged with their cell type', cellObjects.length === 4);
 check('grown objects are traceable (carry a source)', richDay.objects.every((o) => !!o.sourceLabel));
-check('at most four cell objects', richDay.objects.length <= 4, String(richDay.objects.length));
-check('no object sits on the egg cell', ![...richDay.objects].some((c) => `${c.col},${c.row}` === EGG));
+check('at most four leveling cell objects', cellObjects.length <= 4, String(cellObjects.length));
+check('no object sits on the central egg cell', ![...richDay.objects].some((c) => `${c.col},${c.row}` === EGG));
 
 // Monotonic: as the day accumulates, no cell ever drops a level.
 const steps = [
@@ -342,11 +356,13 @@ const socialSeed = deriveTodayPatch(tday({ seedCompletions: ['social'] }), null)
 check('a social seed lifts the Reflection cell', cellOf(socialSeed, 'reflection').level >= 1, String(cellOf(socialSeed, 'reflection').level));
 const waterSeed = deriveTodayPatch(tday({ seedCompletions: ['water'] }), null);
 check('a water seed lifts the Journey cell', cellOf(waterSeed, 'journey').level >= 1, String(cellOf(waterSeed, 'journey').level));
-check('a filled cell drops its ghost', layoutWorld([socialSeed]).ghosts.length === 3, String(layoutWorld([socialSeed]).ghosts.length));
+check('filled cells keep the no-ghost structure model', layoutWorld([socialSeed]).ghosts.length === 0, String(layoutWorld([socialSeed]).ghosts.length));
 
 // New cutouts are on disk (others reuse existing world art).
 check('water-lily seed asset has art', assetExists('props', 'seed_water_lily'));
-check('Memory tree stages have art', ['memory_tree_1', 'memory_tree_2', 'memory_tree_3', 'memory_tree_4'].every((k) => assetExists('props', k)));
+check('Memory Vault stages have art', ['memory_vault_01.png', 'memory_vault_02.png', 'memory_vault_03.png', 'memory_vault_04.png'].every((k) => objectAssetExists('memory_vault', k)));
+check('Sleep Nook empty state has art', objectAssetExists('sleep_nook', 'sleep_nook_empty.png'));
+check('Mood Monument states have art', ['mood_monument_empty.png', 'mood_monument_radiant.png', 'mood_monument_light.png', 'mood_monument_meh.png', 'mood_monument_heavy.png', 'mood_monument_stormy.png'].every((k) => objectAssetExists('mood_monument', k)));
 
 // Completion ratio rises as offered seeds are earned.
 check('completion ratio is 0 on a still morning', seedCompletionRatio(tday()) === 0);
@@ -364,30 +380,30 @@ check('an achievement note is detected', interpretNoteText('I finally got the pr
 // A note grows a SEPARATE notes object (not the photos tree) + lifts Reflection.
 const noteDay = deriveTodayPatch(tday({ notes: [{ id: 'n1', kind: 'text', text: 'x', audioUri: null, durationMs: null, archetype: 'calm', label: 'A calm note', createdAt: '' }] }), null);
 const notesObj = noteDay.objects.find((o) => o.category === 'notes');
-check('a note grows a separate notes object', !!notesObj && notesObj.assetKey === 'notes_journal_1', notesObj && notesObj.assetKey);
+check('a note grows a separate notes object', !!notesObj && notesObj.assetKey === 'notes_stack', notesObj && notesObj.assetKey);
 check('the notes object has a count + pencil badge', !!notesObj && notesObj.badge === 1 && notesObj.badgeIcon === 'square.and.pencil');
-check('a text note does NOT fill the photos tree', cellOf(noteDay, 'memory').level === 0, String(cellOf(noteDay, 'memory').level));
+check('a text note fills the Memory Vault', cellOf(noteDay, 'memory').level >= 1, String(cellOf(noteDay, 'memory').level));
 check('a note lifts the Reflection cell', cellOf(noteDay, 'reflection').level >= 1, String(cellOf(noteDay, 'reflection').level));
 
 // More notes level the journaling family up (one family for text + voice).
 const manyNotes = deriveTodayPatch(tday({ notes: Array.from({ length: 5 }, (_, i) => ({ id: `n${i}`, kind: 'text', text: 'x', audioUri: null, durationMs: null, archetype: 'calm', label: 'note', createdAt: '' })) }), null);
-check('more notes raise the journaling level', manyNotes.objects.find((o) => o.category === 'notes')?.assetKey === 'notes_journal_3', manyNotes.objects.find((o) => o.category === 'notes')?.assetKey);
-check('the notes family has art', ['notes_journal_1', 'notes_journal_2', 'notes_journal_3', 'notes_journal_4'].every((k) => assetExists('props', k)));
+check('more notes update the notes stack badge', manyNotes.objects.find((o) => o.category === 'notes')?.badge === 5, String(manyNotes.objects.find((o) => o.category === 'notes')?.badge));
+check('the notes stack has art', objectAssetExists('notes_stack', 'notes_stack_01.png'));
 
 // Big Moment landmark art per type.
 const anniv = deriveTodayPatch(tday({ bigMoments: [{ id: 'a1', type: 'anniversary', label: 'Anniversary', subject: null, noteId: null, createdAt: '' }] }), null);
-check('an anniversary grows the golden arch', anniv.objects.find((o) => o.kind === 'landmark')?.assetKey === 'landmark_arch');
+check('an anniversary grows the anniversary milestone', anniv.objects.find((o) => o.kind === 'landmark')?.assetKey === 'milestone_anniversary');
 const trip = deriveTodayPatch(tday({ bigMoments: [{ id: 't1', type: 'trip', label: 'A trip', subject: null, noteId: null, createdAt: '' }] }), null);
-check('a trip grows the travel gate', trip.objects.find((o) => o.kind === 'landmark')?.assetKey === 'landmark_gate');
-check('new Slice-4 assets have art', ['vault_crystal_archive', 'landmark_arch', 'landmark_gate'].every((k) => assetExists('props', k)));
+check('a trip grows the trip milestone', trip.objects.find((o) => o.kind === 'landmark')?.assetKey === 'milestone_trip');
+check('milestone assets have art', ['milestone_01.png', 'milestone_02.png', 'milestone_05.png', 'milestone_07.png'].every((k) => objectAssetExists('milestone', k)));
 
 // A confirmed Big Moment grows a centre landmark, leaving the four cells intact.
 const bmDay = deriveTodayPatch(tday({ bigMoments: [{ id: 'b1', type: 'birthday', label: "Son's birthday", subject: 'son', noteId: 'n1', createdAt: '' }] }), null);
 const landmark = bmDay.objects.find((o) => o.kind === 'landmark');
-check('a Big Moment grows the festival landmark', !!landmark && landmark.assetKey === 'landmark_festival', landmark && landmark.assetKey);
+check('a Big Moment grows the birthday milestone', !!landmark && landmark.assetKey === 'milestone_birthday', landmark && landmark.assetKey);
 check('the landmark sits in a centre tile', !!landmark && (landmark.col === 1 || landmark.col === 2) && (landmark.row === 1 || landmark.row === 2));
 check('the four cells survive alongside the landmark', bmDay.cells.length === 4);
-check('the festival landmark asset has art', assetExists('props', 'landmark_festival'));
+check('the birthday milestone asset has art', objectAssetExists('milestone', 'milestone_01.png'));
 
 console.log(failures === 0 ? '\nAll world checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

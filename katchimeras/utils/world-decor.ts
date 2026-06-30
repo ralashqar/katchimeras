@@ -8,7 +8,16 @@ import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 // Positions live here (col,row, fractional cells); placing/dragging happens in
 // world-canvas Decorate mode, clamped to the grass and kept off the real objects.
 
-export type DecorItem = { id: string; assetKey: string; col: number; row: number };
+export type DecorItem = {
+  id: string;
+  assetKey: string;
+  col: number;
+  row: number;
+  propId?: string;
+  sourceLabel?: string;
+  earnedFrom?: string;
+  sizeScale?: number;
+};
 
 const STORAGE_KEY = 'katchadeck.world-decor-v1';
 const MAX_BLOOMS = 8;
@@ -52,10 +61,11 @@ export function addDecor(
   items: DecorItem[],
   assetKey: string,
   col: number = DROP_CELL.col,
-  row: number = DROP_CELL.row
+  row: number = DROP_CELL.row,
+  meta: Pick<DecorItem, 'propId' | 'sourceLabel' | 'earnedFrom' | 'sizeScale'> = {}
 ): DecorItem[] {
   const id = `decor-${dayId}-${items.length}-${assetKey}`;
-  const next = [...items, { id, assetKey, col, row }];
+  const next = [...items, { id, assetKey, col, row, ...meta }];
   saveDayDecor(dayId, next);
   return next;
 }
@@ -122,11 +132,12 @@ export function decorObjects(items: DecorItem[]): WorldObject[] {
     id: item.id,
     kind: 'prop' as const,
     assetKey: item.assetKey,
-    label: 'Decor',
+    label: item.earnedFrom ?? 'Decor',
     col: item.col,
     row: item.row,
     footprint: 1,
+    sourceLabel: item.sourceLabel ?? null,
     category: 'decor',
-    sizeScale: DECOR_SCALE[item.assetKey] ?? 1,
+    sizeScale: item.sizeScale ?? DECOR_SCALE[item.assetKey] ?? 1,
   }));
 }

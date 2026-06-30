@@ -39,6 +39,7 @@ export type WorldObjectCategory =
   | 'reflection'
   | 'notes'
   | 'sleep'
+  | 'mood'
   | 'food'
   // The Studio: the inspiration archive — tapping it opens the reader of books/
   // films/shows/games the day took in (utils/today-patch-engine.ts studioObject).
@@ -153,7 +154,7 @@ export type WorldPatch = {
 };
 
 export type WorldState = {
-  version: 2;
+  version: 6;
   patches: WorldPatch[];
   // dayIds already turned into patches, so we only ever build each day once.
   builtDayIds: string[];

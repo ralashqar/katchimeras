@@ -1,16 +1,18 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useEffect, useRef } from 'react';
+import { InteractionManager } from 'react-native';
 
 import type { RecentPhotoAsset } from '@/types/home';
+import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
-import { computePhotoSignature } from '@/utils/photo-similarity';
-import { analyzePhoto, analyzePhotoLuminance, isVisionAvailable } from '@/utils/photo-vision';
 
 // Scan a multi-day window so photos land on the days they were actually taken
 // (today and recent past), not just the newest handful that might all be old.
-const MAX_RECENT_PHOTO_SEEDS = 40;
-const RECENT_PHOTO_SCAN_SIZE = 120;
+const LAST_SEEDED_DAY_KEY = 'katchadeck.recent-photo-map-seeded-day-v1';
+const MAX_RECENT_PHOTO_SEEDS = 24;
+const RECENT_PHOTO_SCAN_SIZE = 60;
 const RECENT_PHOTO_WINDOW_DAYS = 6;
+const inFlightSeedDays = new Set<string>();
 
 type UseRecentPhotoMapSeedingOptions = {
   enabled: boolean;
@@ -25,25 +27,35 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
     if (!enabled || !dayId) {
       return;
     }
+    const seedDayId = dayId;
 
-    if (lastSeededDayIdRef.current === dayId) {
+    if (
+      lastSeededDayIdRef.current === seedDayId ||
+      getStoredJson<string | null>(LAST_SEEDED_DAY_KEY, null) === seedDayId ||
+      inFlightSeedDays.has(seedDayId)
+    ) {
       return;
     }
 
     let active = true;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
 
     async function seedRecentPhotos() {
+      inFlightSeedDays.add(seedDayId);
       const mediaLibraryNative = requireOptionalNativeModule('ExpoMediaLibrary');
       if (!mediaLibraryNative) {
-        lastSeededDayIdRef.current = dayId;
+        lastSeededDayIdRef.current = seedDayId;
+        setStoredJson(LAST_SEEDED_DAY_KEY, seedDayId);
+        inFlightSeedDays.delete(seedDayId);
         return;
       }
 
       try {
         const MediaLibrary = await import('expo-media-library');
-        const permission = await MediaLibrary.requestPermissionsAsync(false);
+        const permission = await MediaLibrary.getPermissionsAsync(false);
         if (!permission.granted) {
-          lastSeededDayIdRef.current = dayId;
+          lastSeededDayIdRef.current = seedDayId;
+          inFlightSeedDays.delete(seedDayId);
           return;
         }
 
@@ -75,17 +87,6 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
             }
 
             const isScreenshot = asset.mediaSubtypes?.includes('screenshot');
-            // Perceptual hash + brightness signals (one Skia decode) + vision read
-            // all run on the decodable local file (ph:// asset URIs aren't directly
-            // decodable). Skipped for screenshots, which curation drops anyway. All
-            // best-effort: they no-op when the native modules aren't in the build.
-            const hashSource = info.localUri ?? asset.uri;
-            // Brightness from the reliable native read (local thumbnail); Skia
-            // only for the dedup hash. Both best-effort.
-            const luminance = isScreenshot ? null : await analyzePhotoLuminance(asset.id);
-            const signature = isScreenshot ? null : await computePhotoSignature(hashSource);
-            const vision =
-              isScreenshot || !isVisionAvailable() ? undefined : (await analyzePhoto(hashSource)) ?? undefined;
 
             recentGeotaggedPhotos.push({
               createdAt: asset.creationTime,
@@ -94,10 +95,6 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
               isScreenshot,
               latitude,
               longitude,
-              similarityHash: signature?.hash ?? undefined,
-              meanLuminance: luminance?.meanLuminance ?? signature?.meanLuminance ?? undefined,
-              luminanceRange: luminance?.luminanceRange ?? signature?.luminanceRange ?? undefined,
-              vision,
               thumbnailUri: asset.uri,
               uri: asset.uri,
               width: asset.width,
@@ -111,19 +108,30 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
           return;
         }
 
-        lastSeededDayIdRef.current = dayId;
+        lastSeededDayIdRef.current = seedDayId;
+        setStoredJson(LAST_SEEDED_DAY_KEY, seedDayId);
         if (recentGeotaggedPhotos.length > 0) {
           onSeed(recentGeotaggedPhotos);
         }
       } catch {
-        lastSeededDayIdRef.current = dayId;
+        lastSeededDayIdRef.current = seedDayId;
+      } finally {
+        inFlightSeedDays.delete(seedDayId);
       }
     }
 
-    void seedRecentPhotos();
+    const interactionTask = InteractionManager.runAfterInteractions(() => {
+      timeout = setTimeout(() => {
+        void seedRecentPhotos();
+      }, 650);
+    });
 
     return () => {
       active = false;
+      interactionTask.cancel();
+      if (timeout) {
+        clearTimeout(timeout);
+      }
     };
   }, [dayId, enabled, onSeed]);
 }

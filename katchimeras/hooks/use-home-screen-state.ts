@@ -69,7 +69,7 @@ import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
 import { markPhotoProcessed } from '@/utils/processed-photos';
 import { syncWidgetState } from '@/utils/widget-state';
 import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
-import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
+import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState, subscribeHomeStateChanges } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 export function useHomeScreenState() {
@@ -121,6 +121,8 @@ export function useHomeScreenState() {
 
     return () => subscription.remove();
   }, [syncState]);
+
+  useEffect(() => subscribeHomeStateChanges(syncState), [syncState]);
 
   // Re-derive on a minute tick so a continuously-open app crosses its hatch hour
   // (forming → ready) and the midnight rollover on its own — without it, the

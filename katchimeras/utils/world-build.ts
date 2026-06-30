@@ -3,10 +3,10 @@ import type { WorldPatch, WorldState } from '@/types/world';
 import { finalizeDayPatch } from '@/utils/today-patch-engine';
 import { spiralCoord } from '@/utils/world-iso';
 
-// v2: patches are the unified DIORAMA TIME CAPSULE (four leveling cells +
+// v6: patches use the shared world-structures catalog (four leveling cells +
 // creature). Bumping the version migrates any v1 (archetype-anchor) world — the
 // loader discards it and buildWorld re-derives every day fresh, deterministically.
-export const WORLD_VERSION = 2;
+export const WORLD_VERSION = 6;
 export const EMPTY_WORLD: WorldState = { version: WORLD_VERSION, patches: [], builtDayIds: [] };
 
 // Fold any newly-hatched days into the world: one patch per day, placed on the

@@ -5,7 +5,7 @@ import { EMPTY_WORLD, WORLD_VERSION } from '@/utils/world-build';
 
 export function loadWorldState(): WorldState {
   const state = getStoredJson<WorldState>(WORLD_STORAGE_KEY, EMPTY_WORLD);
-  // A stale-version world (v1 archetype-anchor patches) is discarded so buildWorld
+  // A stale-version world is discarded so buildWorld
   // re-derives every day as a unified cell-based capsule on next sync.
   if (!state || state.version !== WORLD_VERSION || !Array.isArray(state.patches)) {
     return EMPTY_WORLD;

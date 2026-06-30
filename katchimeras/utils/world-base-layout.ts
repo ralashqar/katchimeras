@@ -43,6 +43,7 @@ export type BaseSlot =
   | 'journey'
   | 'places'
   | 'sleep'
+  | 'mood'
   | 'food'
   | 'reflection'
   | 'egg'
@@ -72,6 +73,7 @@ const DEFAULT_ANCHORS: Record<BaseSlot, BaseAnchor> = {
   places: { id: 'places', nx: 0.60, ny: 0.30, scale: 0.95, z: 28 },
   journey: { id: 'journey', nx: 0.72, ny: 0.36, scale: 1.0, z: 34 },
   sleep: { id: 'sleep', nx: 0.32, ny: 0.56, scale: 0.85, z: 56 },
+  mood: { id: 'mood', nx: 0.42, ny: 0.68, scale: 0.78, z: 68 },
   food: { id: 'food', nx: 0.68, ny: 0.58, scale: 0.85, z: 58 },
   reflection: { id: 'reflection', nx: 0.5, ny: 0.64, scale: 0.85, z: 64 },
   egg: { id: 'egg', nx: 0.5, ny: 0.5, scale: 1.0, z: 50 },
