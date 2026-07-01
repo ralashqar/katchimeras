@@ -36,10 +36,12 @@ export function patchTopCorners(size: number = PATCH_SIZE): IsoPoint[] {
   return [gridCorner(0, 0), gridCorner(size, 0), gridCorner(size, size), gridCorner(0, size)];
 }
 
-// Painter's order key: lower (col+row) draws first (further back). Objects that
-// span 2 tiles anchor on their front-most cell, so callers pass that cell.
+// Painter's order key: lower screen-y draws first (further back). If two seats
+// share the same vertical baseline, the left-most seat draws later, matching the
+// isometric read where lower/left objects sit in front of upper/right objects.
+// Objects that span 2 tiles anchor on their front-most cell, so callers pass that cell.
 export function drawDepth(col: number, row: number): number {
-  return col + row;
+  return col + row - (col - row) * 0.001;
 }
 
 const PATCH_SPAN_X = (PATCH_SIZE * TILE_W) / 2; // 256 — half the diorama width

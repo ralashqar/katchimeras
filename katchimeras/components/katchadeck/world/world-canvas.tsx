@@ -27,9 +27,10 @@ import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
 import type { MemoryNode, WorldObjectCategory, WorldPatch } from '@/types/world';
+import * as worldStructureLayout from '@/data/world-structure-layout.json';
 import type { PlacedArtefact } from '@/utils/discoveries-artefacts';
 import { layoutWorld, type SceneFence, type SceneSprite } from '@/utils/world-scene';
-import { cellCenter, cellFromPoint, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
+import { cellCenter, cellFromPoint, drawDepth, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
 import {
   DECAL_ATLAS,
   DECAL_ATLAS_COLS,
@@ -43,6 +44,13 @@ import {
   saveBaseCustomisation,
   type BaseCustomisation,
 } from '@/utils/world-base-customisation';
+import {
+  editorScaleToAppScale,
+  IMAGE_BASE_FACTOR,
+  IMAGE_BASE_OFFSET_X,
+  IMAGE_BASE_OFFSET_Y,
+  normalisedBaseToCell,
+} from '@/utils/world-base-projection';
 import { WORLD_STRUCTURE_POSITIONS } from '@/utils/world-structures';
 
 type Props = {
@@ -138,11 +146,10 @@ const HATCH_STAGE_SIZE = 288;
 // The LanternEgg art is fixed-pixel, so scale the whole stage with a transform
 // (scales about its centre) to sit centred on the plaza. Tunable — egg made
 // significantly larger; EGG_RISE lifts it so it stays seated, not sunk.
-const EGG_SCALE = 0.56;
+const EGG_BASE_SCALE = 0.56;
 const EGG_RISE = 26;
 // How far below the egg's tile the countdown pill sits (scene units). Just beneath
 // the egg's visual bottom — scales with the egg so it stays close as size changes.
-const COUNTDOWN_DROP = EGG_STAGE_HEIGHT * EGG_SCALE * 0.34;
 
 // Global scale for every node object (chests, steps, notes, creatures, memories) +
 // a small downward nudge so the art still seats on its tile. Tunable.
@@ -170,10 +177,10 @@ const LIFT_FRAC = 0.1;
 const IMAGE_BASE_ID = 'base_env2';
 // The base is drawn as a square centred on the patch's grass diamond, enlarged by
 // BASE_FACTOR so the day's objects read SMALL on an expansive ground.
-const BASE_FACTOR = 2.2;
-const BASE_OFFSET_X = 0;
+const BASE_FACTOR = IMAGE_BASE_FACTOR;
+const BASE_OFFSET_X = IMAGE_BASE_OFFSET_X;
 // Nudge the base down so its painted grass-top seats under the objects.
-const BASE_OFFSET_Y = TILE_H * 0.6;
+const BASE_OFFSET_Y = IMAGE_BASE_OFFSET_Y;
 // Start the camera zoomed in (you see a region of the bigger base, can pan around).
 const BASE_DEFAULT_ZOOM = 1.5;
 const INITIAL_SPRITE_BATCH = 3;
@@ -181,6 +188,40 @@ const SPRITE_REVEAL_BATCH = 3;
 const SPRITE_REVEAL_INTERVAL_MS = 70;
 const SPRITE_REVEAL_START_DELAY_MS = 90;
 const SPRITE_STAGGER_MS = 35;
+
+type EggLayout = {
+  bounds?: { mode?: unknown };
+  positions?: { egg?: { col?: unknown; row?: unknown; nx?: unknown; ny?: unknown } };
+  scaleByAssetKey?: Record<string, unknown>;
+};
+
+const EGG_LAYOUT = worldStructureLayout as EggLayout;
+
+function finiteLayoutNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function defaultEggCell(): { col: number; row: number } {
+  const position = EGG_LAYOUT.positions?.egg;
+  if (position && finiteLayoutNumber(position.nx) && finiteLayoutNumber(position.ny)) {
+    return normalisedBaseToCell(position.nx, position.ny);
+  }
+  if (position && finiteLayoutNumber(position.col) && finiteLayoutNumber(position.row)) {
+    return { col: position.col, row: position.row };
+  }
+  return EGG_CELL;
+}
+
+function defaultEggScale(): number {
+  const scale = EGG_LAYOUT.scaleByAssetKey?.egg;
+  if (finiteLayoutNumber(scale) && scale > 0) {
+    if (EGG_LAYOUT.bounds?.mode === 'backplate') {
+      return editorScaleToAppScale(scale) * (TILE_W / EGG_STAGE_WIDTH);
+    }
+    return scale;
+  }
+  return EGG_BASE_SCALE;
+}
 
 // The stable customisation key for a sprite. Cells share a key by category (their
 // id changes as they level up); the creature is 'creature'; landmarks / memory
@@ -323,6 +364,8 @@ export function WorldCanvas({
     return scene.sprites.map((s) => {
       const c = custom[slotKey(s)];
       if (!c) return s;
+      const currentLocalDepth = drawDepth(s.col, s.row) * 2 + (s.kind === 'creature' ? 1 : 0);
+      const patchDepth = s.depth - currentLocalDepth;
       return {
         ...s,
         x: focusSlab.centre.x + (cellCenter(c.col, c.row).x - origin.x),
@@ -332,7 +375,7 @@ export function WorldCanvas({
         // Recompute paint order from the LIVE position so a dragged object that
         // moves more to the front (higher col+row, i.e. lower / bottom-left) draws
         // on top of those behind it — updates every drag frame.
-        depth: (c.col + c.row) * 2 + (s.kind === 'creature' ? 1 : 0),
+        depth: patchDepth + drawDepth(c.col, c.row) * 2 + (s.kind === 'creature' ? 1 : 0),
       };
     });
   }, [imgBase, focusSlab, scene.sprites, custom]);
@@ -395,7 +438,10 @@ export function WorldCanvas({
   );
 
   // The egg/creature centre tile — its default, or where the user dragged it.
-  const eggCell = useMemo(() => custom.egg ?? EGG_CELL, [custom]);
+  const eggDefaultCell = useMemo(() => defaultEggCell(), []);
+  const eggScale = useMemo(() => defaultEggScale(), []);
+  const countdownDrop = EGG_STAGE_HEIGHT * eggScale * 0.34;
+  const eggCell = useMemo(() => custom.egg ?? eggDefaultCell, [custom, eggDefaultCell]);
 
   // Live drag: convert a sprite's accumulated screen translation into a cell, then
   // clamp the SEAT to the base IMAGE rect (the greater world-patch image) — generous
@@ -615,6 +661,12 @@ export function WorldCanvas({
   const readyShakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: readyShake.value * 5 }, { rotateZ: `${readyShake.value * 3.2}deg` }],
   }));
+  const readyEggLayerStyle = useAnimatedStyle(() => {
+    const hoverScale = 1 + Math.abs(readyShake.value) * 0.025;
+    return {
+      transform: [{ scale: eggScale * hoverScale }],
+    };
+  }, [eggScale]);
 
   // The hatch flips the day to 'hatched', so the parent stops sending eggPatchId /
   // eggVisual mid-animation. Freeze the last egg spot + visual so the reveal stays
@@ -697,6 +749,9 @@ export function WorldCanvas({
   const focusRef = useRef({ viewport, focusSlab });
   focusRef.current = { viewport, focusSlab };
   const recentreOnFocus = useCallback(() => {
+    if (imageBase) {
+      setCustom(loadBaseCustomisation());
+    }
     const { viewport: vp, focusSlab: fs } = focusRef.current;
     if (!vp.width || !fs) return; // first mount: layout not measured yet — the effect above handles it
     cancelAnimation(tx);
@@ -707,7 +762,7 @@ export function WorldCanvas({
     tx.value = c.x;
     ty.value = c.y;
     centred.current = true;
-  }, [tx, ty, scale, startScale, centreFor, baseScale]);
+  }, [imageBase, tx, ty, scale, startScale, centreFor, baseScale]);
   useFocusEffect(recentreOnFocus);
 
   // During an in-place hatch: glide-zoom in and centre on the egg; on completion,
@@ -754,8 +809,8 @@ export function WorldCanvas({
       // open the right object wherever it's been dragged (no 4×4 grid snap).
       if (imgBase) {
         if (eggPoint && eggPatchId) {
-          const ew = EGG_STAGE_WIDTH * EGG_SCALE;
-          const eh = EGG_STAGE_HEIGHT * EGG_SCALE;
+          const ew = EGG_STAGE_WIDTH * eggScale;
+          const eh = EGG_STAGE_HEIGHT * eggScale;
           const el = eggPoint.x - ew / 2;
           const et = eggPoint.y - eh / 2 - EGG_RISE;
           if (wx >= el && wx <= el + ew && wy >= et && wy <= et + eh) {
@@ -873,6 +928,7 @@ export function WorldCanvas({
       eggCell,
       eggPatchId,
       eggPoint,
+      eggScale,
       onPressEgg,
       memoryAlert,
       onPressMemoryAlert,
@@ -1103,7 +1159,7 @@ export function WorldCanvas({
               // A soft contact shadow under the egg itself (no pedestal anymore), so it
               // reads as resting on the ground.
               const baseY = eggPoint.y + 4;
-              const sw = EGG_STAGE_WIDTH * EGG_SCALE * 0.8;
+              const sw = EGG_STAGE_WIDTH * eggScale * 0.8;
               const sh = sw * SHADOW_FLATTEN;
               return (
                 <Image
@@ -1379,8 +1435,8 @@ export function WorldCanvas({
                 .onEnd(() => {
                   runOnJS(endDrag)();
                 });
-              const w = EGG_STAGE_WIDTH * EGG_SCALE;
-              const h = EGG_STAGE_HEIGHT * EGG_SCALE;
+              const w = EGG_STAGE_WIDTH * eggScale;
+              const h = EGG_STAGE_HEIGHT * eggScale;
               return (
                 <GestureDetector gesture={drag}>
                   <View
@@ -1397,7 +1453,7 @@ export function WorldCanvas({
           {/* Today's egg, seated on its patch — pans/zooms with the world. The
               real LanternEgg (never a lookalike); tapping it opens the prompts. */}
           {eggPoint && eggVisual && !hatching ? (
-            <View
+            <Animated.View
               pointerEvents="none"
               style={[
                 styles.eggLayer,
@@ -1406,13 +1462,13 @@ export function WorldCanvas({
                   top: eggPoint.y - EGG_STAGE_HEIGHT / 2 - EGG_RISE,
                   width: EGG_STAGE_WIDTH,
                   height: EGG_STAGE_HEIGHT,
-                  transform: [{ scale: EGG_SCALE }],
                 },
+                readyEggLayerStyle,
               ]}>
               <Animated.View style={readyShakeStyle}>
                 <LanternEgg egg={eggVisual} feedKey={eggFeedKey} lanternColor={lanternColor} />
               </Animated.View>
-            </View>
+            </Animated.View>
           ) : null}
 
           {/* The in-place hatch reveal — seated on the egg's exact tile, panning
@@ -1428,7 +1484,7 @@ export function WorldCanvas({
                   top: hatchAnchor.y - HATCH_STAGE_SIZE / 2 - EGG_RISE,
                   width: HATCH_STAGE_SIZE,
                   height: HATCH_STAGE_SIZE,
-                  transform: [{ scale: EGG_SCALE }],
+                  transform: [{ scale: eggScale }],
                 },
               ]}>
               <HatchReveal egg={hatchEgg} creature={hatchingCreature} hideCaption lanternColor={lanternColor} onComplete={onHatchComplete ?? (() => {})} />
@@ -1462,7 +1518,7 @@ export function WorldCanvas({
           {eggPoint && eggVisual && !hatching ? (
             <View
               pointerEvents="none"
-              style={[styles.countdownLayer, { left: eggPoint.x - 110, top: eggPoint.y + COUNTDOWN_DROP, width: 220 }]}>
+              style={[styles.countdownLayer, { left: eggPoint.x - 110, top: eggPoint.y + countdownDrop, width: 220 }]}>
               <HatchCountdown isReady={eggReady} compact />
             </View>
           ) : null}

@@ -14,10 +14,12 @@ const SPECIFIER_MAP = {
   '@/utils/world-iso': './world-iso',
   '@/utils/world-archetype': './world-archetype',
   '@/utils/world-patch-engine': './world-patch-engine',
+  '@/utils/world-base-projection': './world-base-projection',
   '@/utils/world-build': './world-build',
   '@/utils/today-patch-engine': './today-patch-engine',
   '@/utils/world-structures': './world-structures',
   '@/utils/daily-seeds-engine': './daily-seeds-engine',
+  '@/data/world-structure-layout.json': './world-structure-layout.json',
 };
 
 function transpile(rel, out) {
@@ -34,6 +36,7 @@ function transpile(rel, out) {
 // Order matters only for filenames; require() resolves lazily at call time.
 transpile('constants/world.ts', 'world-const.js');
 transpile('utils/world-iso.ts', 'world-iso.js');
+transpile('utils/world-base-projection.ts', 'world-base-projection.js');
 transpile('utils/world-archetype.ts', 'world-archetype.js');
 transpile('utils/world-patch-engine.ts', 'world-patch-engine.js');
 transpile('utils/world-build.ts', 'world-build.js');
@@ -42,6 +45,7 @@ transpile('utils/world-structures.ts', 'world-structures.js');
 transpile('utils/daily-seeds-engine.ts', 'daily-seeds-engine.js');
 transpile('utils/note-meaning.ts', 'note-meaning.js');
 transpile('utils/today-patch-engine.ts', 'today-patch-engine.js');
+fs.copyFileSync(path.join(projectRoot, 'data/world-structure-layout.json'), path.join(tempDir, 'world-structure-layout.json'));
 
 const { deriveArchetypes } = require(path.join(tempDir, 'world-archetype.js'));
 const { generatePatch } = require(path.join(tempDir, 'world-patch-engine.js'));

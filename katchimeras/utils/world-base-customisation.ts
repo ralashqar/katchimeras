@@ -1,4 +1,4 @@
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 
 // User customisation for the image-base world patch: per-slot positions the user
 // has dragged objects to, stored as FRACTIONAL grid cells (col,row) in the same
@@ -20,6 +20,10 @@ export function loadBaseCustomisation(): BaseCustomisation {
 
 export function saveBaseCustomisation(value: BaseCustomisation) {
   setStoredJson(STORAGE_KEY, value);
+}
+
+export function clearBaseCustomisation() {
+  removeStoredValue(STORAGE_KEY);
 }
 
 // Clamp a fractional cell to the patch's grass diamond (the slab incl. its ring),

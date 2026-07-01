@@ -1,0 +1,412 @@
+{
+  "version": 1,
+  "families": [
+    {
+      "id": "memory-vault",
+      "category": "memory",
+      "label": "Memory Vault",
+      "enabled": true,
+      "prompt": "a premium cozy collectible memory vault structure, small magical safe and archive for saved life memories, rounded designer-toy proportions, warm cream and honey palette, one iconic camera/photo motif, no text",
+      "generator": {
+        "type": "grid",
+        "name": "memory_vault",
+        "mode": "progression",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "memory_vault_empty",
+          "label": "Empty",
+          "state": "empty",
+          "path": "assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png"
+        },
+        {
+          "assetKey": "memory_vault_1",
+          "label": "Level 1",
+          "state": "level-1",
+          "path": "assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png"
+        },
+        {
+          "assetKey": "memory_vault_2",
+          "label": "Level 2",
+          "state": "level-2",
+          "path": "assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.png"
+        },
+        {
+          "assetKey": "memory_vault_3",
+          "label": "Level 3",
+          "state": "level-3",
+          "path": "assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.png"
+        },
+        {
+          "assetKey": "memory_vault_4",
+          "label": "Level 4",
+          "state": "level-4",
+          "path": "assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.png"
+        }
+      ]
+    },
+    {
+      "id": "observatory",
+      "category": "places",
+      "label": "Observatory",
+      "enabled": true,
+      "prompt": "a premium cozy collectible observatory tower with a telescope, represents places visited and patterns noticed, rounded toy-like silhouette, warm cream and soft blue accents, no text",
+      "generator": {
+        "type": "grid",
+        "name": "observatory",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "observatory_empty",
+          "label": "Empty",
+          "state": "empty",
+          "path": "assets/images/katchimeras/world/objects/observatory/observatory_01.png"
+        },
+        {
+          "assetKey": "observatory",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/observatory/observatory_01.png"
+        }
+      ]
+    },
+    {
+      "id": "journey",
+      "category": "journey",
+      "label": "Journey",
+      "enabled": true,
+      "prompt": "a premium cozy collectible stepping-stone journey path, small engraved stones growing into a winding trail, warm natural materials, readable at small size, no text",
+      "generator": {
+        "type": "grid",
+        "name": "steps_path",
+        "mode": "progression",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "steps_path_1",
+          "label": "Level 1",
+          "state": "level-1",
+          "path": "assets/images/katchimeras/world/objects/steps_path/steps_path_01.png"
+        },
+        {
+          "assetKey": "steps_path_2",
+          "label": "Level 2",
+          "state": "level-2",
+          "path": "assets/images/katchimeras/world/objects/steps_path/steps_path_02.png"
+        },
+        {
+          "assetKey": "steps_path_3",
+          "label": "Level 3",
+          "state": "level-3",
+          "path": "assets/images/katchimeras/world/objects/steps_path/steps_path_03.png"
+        },
+        {
+          "assetKey": "steps_path_4",
+          "label": "Level 4",
+          "state": "level-4",
+          "path": "assets/images/katchimeras/world/objects/steps_path/steps_path_04.png"
+        }
+      ]
+    },
+    {
+      "id": "sanctuary",
+      "category": "reflection",
+      "label": "Sanctuary",
+      "enabled": true,
+      "prompt": "a premium cozy collectible sanctuary for reflections, peaceful little garden shrine with soft leaf motif, rounded minimalist forms, warm glow, no text",
+      "generator": {
+        "type": "grid",
+        "name": "sanctuary",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "sanctuary_empty",
+          "label": "Empty",
+          "state": "empty",
+          "path": "assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png"
+        },
+        {
+          "assetKey": "sanctuary",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png"
+        }
+      ]
+    },
+    {
+      "id": "sleep-nook",
+      "category": "sleep",
+      "label": "Sleep Nook",
+      "enabled": true,
+      "prompt": "a consistent premium cozy sleep nook structure family, small bed and moon symbol, same base frame across states, clear quality variation, rounded designer-toy proportions, no text",
+      "generator": {
+        "type": "grid",
+        "name": "sleep_nook",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "sleep_nook_empty",
+          "label": "Empty",
+          "state": "empty",
+          "path": "assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_empty.png"
+        },
+        {
+          "assetKey": "sleep_nook_good",
+          "label": "Good",
+          "state": "good",
+          "path": "assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_01.png"
+        },
+        {
+          "assetKey": "sleep_nook_normal",
+          "label": "Normal",
+          "state": "normal",
+          "path": "assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_11.png"
+        },
+        {
+          "assetKey": "sleep_nook_low",
+          "label": "Low",
+          "state": "low",
+          "path": "assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_04.png"
+        }
+      ]
+    },
+    {
+      "id": "mood-monument",
+      "category": "mood",
+      "label": "Mood Monument",
+      "enabled": true,
+      "prompt": "a consistent premium cozy mood monument structure family, same base frame with clear face symbol panels for each mood, very happy through stormy sad, rounded collectible style, no text",
+      "generator": {
+        "type": "grid",
+        "name": "mood_monument",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "mood_monument_empty",
+          "label": "Empty",
+          "state": "empty",
+          "path": "assets/images/katchimeras/world/objects/mood_monument/mood_monument_empty.png"
+        },
+        {
+          "assetKey": "mood_monument_radiant",
+          "label": "Radiant",
+          "state": "radiant",
+          "path": "assets/images/katchimeras/world/objects/mood_monument/mood_monument_radiant.png"
+        },
+        {
+          "assetKey": "mood_monument_light",
+          "label": "Light",
+          "state": "light",
+          "path": "assets/images/katchimeras/world/objects/mood_monument/mood_monument_light.png"
+        },
+        {
+          "assetKey": "mood_monument_meh",
+          "label": "Meh",
+          "state": "meh",
+          "path": "assets/images/katchimeras/world/objects/mood_monument/mood_monument_meh.png"
+        },
+        {
+          "assetKey": "mood_monument_heavy",
+          "label": "Heavy",
+          "state": "heavy",
+          "path": "assets/images/katchimeras/world/objects/mood_monument/mood_monument_heavy.png"
+        },
+        {
+          "assetKey": "mood_monument_stormy",
+          "label": "Stormy",
+          "state": "stormy",
+          "path": "assets/images/katchimeras/world/objects/mood_monument/mood_monument_stormy.png"
+        }
+      ]
+    },
+    {
+      "id": "food-pavilion",
+      "category": "food",
+      "label": "Food Pavilion",
+      "enabled": true,
+      "prompt": "a premium cozy collectible food pavilion for meals and tastes, small market stall with one iconic plate motif, rounded warm materials, no text",
+      "generator": {
+        "type": "grid",
+        "name": "food_pavilion",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "food_pavilion",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_01.png"
+        }
+      ]
+    },
+    {
+      "id": "study",
+      "category": "studio",
+      "label": "Study",
+      "enabled": true,
+      "prompt": "a premium cozy collectible study shelf for books films games and inspirations, tiny archive nook with one iconic book/easel motif, rounded designer-toy style, no text",
+      "generator": {
+        "type": "grid",
+        "name": "study",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "study",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/study/study_01.png"
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "category": "chronicle",
+      "label": "Chronicle Home",
+      "enabled": true,
+      "prompt": "a premium cozy collectible home/town hall that holds the day's story, warm windows, rounded cottage silhouette, one iconic storybook detail, no text",
+      "generator": {
+        "type": "grid",
+        "name": "home",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "home",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/home/home_01.png"
+        },
+        {
+          "assetKey": "home_home_09",
+          "label": "Variant 2",
+          "state": "variant-2",
+          "path": "assets/images/katchimeras/world/objects/home/home_09.png"
+        }
+      ]
+    },
+    {
+      "id": "quest-board",
+      "category": "quests",
+      "label": "Quest Board",
+      "enabled": true,
+      "prompt": "a premium cozy collectible quest board notice structure, blank board surfaces with no readable text, warm wood, rounded toy-like proportions, no letters or numbers",
+      "generator": {
+        "type": "grid",
+        "name": "quest_board",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "quest_board",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/quest_board/quest_board_01.png"
+        }
+      ]
+    },
+    {
+      "id": "photos-stack",
+      "category": "photos",
+      "label": "Photos Stack",
+      "enabled": true,
+      "prompt": "a premium cozy collectible stack of photo memories, small framed photos and album shapes, readable camera/photo motif, rounded warm style, no text",
+      "generator": {
+        "type": "grid",
+        "name": "photos_stack",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "photos_stack",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/photos_stack/photos_stack_01.png"
+        }
+      ]
+    },
+    {
+      "id": "notes-stack",
+      "category": "notes",
+      "label": "Notes Stack",
+      "enabled": true,
+      "prompt": "a premium cozy collectible notes stack, journal and quill archive, rounded warm style, clear writing motif without readable text",
+      "generator": {
+        "type": "grid",
+        "name": "notes_stack",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "notes_stack",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/notes_stack/notes_stack_01.png"
+        }
+      ]
+    },
+    {
+      "id": "featured-board",
+      "category": "featured",
+      "label": "Featured Board",
+      "enabled": true,
+      "prompt": "a premium cozy collectible featured memory board with a blank framed display area, easel-like silhouette, warm wood and cream, no text",
+      "generator": {
+        "type": "grid",
+        "name": "featured_board",
+        "mode": "variants",
+        "frame": "iso",
+        "style": "collectible",
+        "ref": "base_env2"
+      },
+      "assets": [
+        {
+          "assetKey": "featured_board",
+          "label": "Default",
+          "state": "default",
+          "path": "assets/images/katchimeras/world/objects/featured_board/featured_board_01.png"
+        }
+      ]
+    }
+  ]
+}

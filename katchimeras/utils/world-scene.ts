@@ -248,8 +248,10 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
     // Decals grow on the cells NOT taken by an object/memory. Occupied = every
     // footprint cell of each object plus each memory node.
     const occupied = new Set<string>();
+    const occupiedCellTypes = new Set<string>();
     for (const object of patch.objects) {
       if (object.assetKey === 'prop_fence') continue; // perimeter, not a cell
+      if (object.category) occupiedCellTypes.add(object.category);
       for (let f = 0; f < Math.max(1, object.footprint); f += 1) {
         occupied.add(`${object.col + f},${object.row}`);
       }
@@ -311,6 +313,7 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
     // the live forming patch — a finalized day is complete, no empty spots shown.
     for (const cell of isForming ? patch.cells ?? [] : []) {
       if (cell.level > 0) continue;
+      if (occupiedCellTypes.has(cell.type)) continue;
       if (occupied.has(`${cell.col},${cell.row}`)) continue;
       const c = shift(cellCenter(cell.col, cell.row));
       rawGhosts.push({

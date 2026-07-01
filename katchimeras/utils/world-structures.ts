@@ -1,5 +1,7 @@
+import * as worldStructureLayout from '@/data/world-structure-layout.json';
 import type { HomeDayRecord } from '@/types/home';
 import type { PatchCell, PatchCellType, WorldObject, WorldObjectCategory } from '@/types/world';
+import { editorScaleToAppScale, normalisedBaseToCell } from '@/utils/world-base-projection';
 
 export const WORLD_STRUCTURE_CELLS: { type: PatchCellType; col: number; row: number }[] = [
   { type: 'memory', col: 0, row: 0 },
@@ -71,6 +73,62 @@ const MOOD_MONUMENT_LABEL: Record<MoodMonumentState, string> = {
   heavy: 'Heavy',
   stormy: 'Stormy',
 };
+
+const FAMILY_SCALE_FALLBACK_ASSET: Partial<Record<WorldObjectCategory, string>> = {
+  memory: 'memory_vault_empty',
+  places: 'observatory_empty',
+  journey: 'steps_path_1',
+  reflection: 'sanctuary_empty',
+  sleep: 'sleep_nook_empty',
+  mood: 'mood_monument_empty',
+  food: 'food_pavilion',
+  studio: 'study',
+  chronicle: 'home',
+  quests: 'quest_board',
+  notes: 'notes_stack',
+  photos: 'photos_stack',
+  featured: 'featured_board',
+};
+
+type LayoutPosition = { col?: unknown; row?: unknown; nx?: unknown; ny?: unknown };
+type WorldStructureLayout = {
+  bounds?: { mode?: unknown };
+  positions?: Partial<Record<WorldObjectCategory, LayoutPosition>>;
+  scaleByCategory?: Partial<Record<WorldObjectCategory, unknown>>;
+  scaleByAssetKey?: Record<string, unknown>;
+};
+
+const STRUCTURE_LAYOUT = worldStructureLayout as WorldStructureLayout;
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function resolveStructurePosition(category: WorldObjectCategory): { col: number; row: number } | null {
+  const configured = STRUCTURE_LAYOUT.positions?.[category];
+  if (configured && finiteNumber(configured.nx) && finiteNumber(configured.ny)) {
+    return normalisedBaseToCell(configured.nx, configured.ny);
+  }
+  if (configured && finiteNumber(configured.col) && finiteNumber(configured.row)) {
+    return { col: configured.col, row: configured.row };
+  }
+  return WORLD_STRUCTURE_POSITIONS[category] ?? null;
+}
+
+function resolveStructureScale(category: WorldObjectCategory, assetKey: string, fallback: number): number {
+  const usesBackplateScale = STRUCTURE_LAYOUT.bounds?.mode === 'backplate';
+  const assetScale = STRUCTURE_LAYOUT.scaleByAssetKey?.[assetKey];
+  if (finiteNumber(assetScale) && assetScale > 0) return usesBackplateScale ? editorScaleToAppScale(assetScale) : assetScale;
+  const familyFallbackAssetKey = FAMILY_SCALE_FALLBACK_ASSET[category];
+  const familyAssetScale =
+    familyFallbackAssetKey && familyFallbackAssetKey !== assetKey ? STRUCTURE_LAYOUT.scaleByAssetKey?.[familyFallbackAssetKey] : null;
+  if (finiteNumber(familyAssetScale) && familyAssetScale > 0) {
+    return usesBackplateScale ? editorScaleToAppScale(familyAssetScale) : familyAssetScale;
+  }
+  const categoryScale = STRUCTURE_LAYOUT.scaleByCategory?.[category];
+  if (finiteNumber(categoryScale) && categoryScale > 0) return usesBackplateScale ? editorScaleToAppScale(categoryScale) : categoryScale;
+  return fallback;
+}
 
 function cell(cells: PatchCell[], type: PatchCellType): PatchCell {
   const found = cells.find((item) => item.type === type);
@@ -276,10 +334,11 @@ export function deriveWorldStructureObjects(
 ): WorldObject[] {
   return STRUCTURES.flatMap((definition) => {
     if (definition.category === 'quests' && !options.includeQuestBoard) return [];
-    const pos = WORLD_STRUCTURE_POSITIONS[definition.category];
+    const pos = resolveStructurePosition(definition.category);
     if (!pos) return [];
     const state = definition.resolve(day, cells);
     if (!state) return [];
+    const fallbackScale = state.sizeScale ?? definition.defaultScale ?? 1;
     return [
       {
         id: `${day.id}-structure-${definition.category}-${state.assetKey}`,
@@ -293,7 +352,7 @@ export function deriveWorldStructureObjects(
         category: definition.category,
         badge: state.badge,
         badgeIcon: state.badgeIcon,
-        sizeScale: state.sizeScale ?? definition.defaultScale ?? 1,
+        sizeScale: resolveStructureScale(definition.category, state.assetKey, fallbackScale),
       },
     ];
   });

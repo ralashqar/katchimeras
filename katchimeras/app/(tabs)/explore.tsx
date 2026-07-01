@@ -34,6 +34,7 @@ import { encounterLiveCast } from '@/constants/encounter-cast';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
 import { getCreatureVisual, resetTodayInState } from '@/utils/home-engine';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
+import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 
 export default function ExploreScreen() {
@@ -92,6 +93,7 @@ export default function ExploreScreen() {
           style: 'destructive',
           onPress: () => {
             clearAllStoredValues();
+            clearBaseCustomisation();
             router.replace('/onboarding');
           },
         },
@@ -114,6 +116,7 @@ export default function ExploreScreen() {
               saveStoredHomeState(resetTodayInState(state, loadOnboardingProfile(), new Date()));
             }
             clearTodayPatch();
+            clearBaseCustomisation();
             router.replace('/(tabs)');
           },
         },
