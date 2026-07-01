@@ -1,4 +1,5 @@
 import type { StoredHomeDayRecord } from '@/types/home';
+import type { CalendarEventContext } from '@/utils/chronicle-engine';
 import { detectFoodInVision } from '@/utils/food-detect';
 import { detectStudioInVision } from '@/utils/studio-detect';
 
@@ -32,6 +33,7 @@ export type MemoryQuest = {
   // no double-pay). See docs/progression-customisation-design.md §3.2.
   essenceReward: number;
   completed: boolean;
+  contextLabel?: string;
 };
 
 // Only the fields a quest reads — keeps the engine testable with plain objects.
@@ -121,6 +123,8 @@ const CATALOG: Record<MemoryQuestType, Omit<MemoryQuest, 'id' | 'completed'>> = 
   },
 };
 
+type QuestOverride = Partial<Pick<MemoryQuest, 'title' | 'rewardLabel' | 'contextLabel'>>;
+
 // A quest is "complete" once its real-life signal exists for the day.
 export function isQuestComplete(type: MemoryQuestType, day: QuestDayInput): boolean {
   switch (type) {
@@ -149,19 +153,66 @@ export function isQuestComplete(type: MemoryQuestType, day: QuestDayInput): bool
   }
 }
 
-function makeQuest(type: MemoryQuestType, day: QuestDayInput): MemoryQuest {
-  return { ...CATALOG[type], id: `quest-${day.isoDate}-${type}`, completed: isQuestComplete(type, day) };
+function makeQuest(type: MemoryQuestType, day: QuestDayInput, override?: QuestOverride): MemoryQuest {
+  return { ...CATALOG[type], ...override, id: `quest-${day.isoDate}-${type}`, completed: isQuestComplete(type, day) };
+}
+
+function calendarQuest(events: CalendarEventContext[]): { type: MemoryQuestType; override: QuestOverride } | null {
+  const event = events.find((item) => item.category && item.category !== 'unknown');
+  if (!event) return null;
+  const contextLabel = 'Inspired by today';
+  switch (event.category) {
+    case 'celebration':
+    case 'connection':
+      return {
+        type: 'captureMoment',
+        override: { title: `Keep one moment from ${event.title}`, rewardLabel: 'a linked memory', contextLabel },
+      };
+    case 'journey':
+      return {
+        type: 'markPlace',
+        override: { title: 'Mark where the journey took you', rewardLabel: 'a journey marker', contextLabel },
+      };
+    case 'care':
+      return {
+        type: 'answerReflection',
+        override: { title: 'Notice how your body felt', rewardLabel: 'a care reflection', contextLabel },
+      };
+    case 'focus':
+      return {
+        type: 'answerReflection',
+        override: { title: 'What moved forward today?', rewardLabel: 'a focus reflection', contextLabel },
+      };
+    case 'ritual':
+      return {
+        type: 'answerReflection',
+        override: { title: 'What made this routine worth keeping?', rewardLabel: 'a ritual note', contextLabel },
+      };
+    case 'quiet':
+      return {
+        type: 'answerReflection',
+        override: { title: 'Name the quiet part of today', rewardLabel: 'a calm reflection', contextLabel },
+      };
+    default:
+      return null;
+  }
 }
 
 // Up to `max` contextual quests for the day — "what could make today worth
 // remembering?". Capture + reflection are always offered; Place when a place was
 // visited; Voice in the evening (or as a fallback to fill the slate). Incomplete
 // quests sort first so the next meaningful action is always on top.
-export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3): MemoryQuest[] {
+export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3, calendarEvents: CalendarEventContext[] = []): MemoryQuest[] {
   const hour = now.getHours();
   const visited = day.visitedPlaceCount ?? 0;
 
   const offered: MemoryQuestType[] = ['captureMoment', 'answerReflection'];
+  const overrides = new Map<MemoryQuestType, QuestOverride>();
+  const calendarOffer = calendarQuest(calendarEvents);
+  if (calendarOffer) {
+    if (!offered.includes(calendarOffer.type)) offered.unshift(calendarOffer.type);
+    overrides.set(calendarOffer.type, calendarOffer.override);
+  }
   // Contextual quests, in priority order: where you went, then a meal-time food
   // memory, then an evening voice note. Around meal times nudges food (a proxy
   // for "food in the day" until on-device food detection lands).
@@ -189,7 +240,8 @@ export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3): Memo
   // Fill the slate with a voice memory if nothing else made the cut.
   if (!offered.includes('recordVoiceMemory') && offered.length < max) offered.push('recordVoiceMemory');
 
-  const quests = offered.map((type) => makeQuest(type, day));
+  const uniqueOffered = offered.filter((type, index) => offered.indexOf(type) === index);
+  const quests = uniqueOffered.map((type) => makeQuest(type, day, overrides.get(type)));
   // Incomplete first (so the next thing to do leads), stable otherwise.
   quests.sort((a, b) => Number(a.completed) - Number(b.completed));
   return quests.slice(0, max);

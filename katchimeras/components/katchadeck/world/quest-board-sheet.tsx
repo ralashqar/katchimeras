@@ -103,6 +103,11 @@ export function QuestBoardSheet({
                     <ThemedText style={styles.rowTitle} numberOfLines={2} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                       {quest.title}
                     </ThemedText>
+                    {quest.contextLabel ? (
+                      <ThemedText style={styles.rowContext} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                        {quest.contextLabel}
+                      </ThemedText>
+                    ) : null}
                     <ThemedText style={styles.rowReward} numberOfLines={1} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
                       {quest.completed ? 'Done' : `+ ${quest.rewardLabel} · ✦${quest.essenceReward}`}
                     </ThemedText>
@@ -212,6 +217,7 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 22, width: 28, textAlign: 'center' },
   rowText: { flex: 1, gap: 2 },
   rowTitle: { fontSize: 14.5, fontWeight: '700', lineHeight: 19 },
+  rowContext: { fontSize: 11.5, fontWeight: '700', lineHeight: 15 },
   rowReward: { fontSize: 12, fontWeight: '700' },
   check: {
     width: 28,

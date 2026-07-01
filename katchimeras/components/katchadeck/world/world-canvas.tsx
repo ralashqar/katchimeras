@@ -582,6 +582,10 @@ export function WorldCanvas({
   const stepsPoint = pointForAttention('journey');
   const moodPoint = pointForAttention('mood');
   const sleepPoint = pointForAttention('sleep');
+  const chronicleAttentionSprite = useMemo(() => {
+    if (!attention.chronicle || !eggPatchId) return null;
+    return visiblePositionedSprites.find((s) => s.category === 'chronicle' && s.patchId === eggPatchId) ?? null;
+  }, [attention.chronicle, visiblePositionedSprites, eggPatchId]);
 
   // When the egg is ready to hatch it gives a little impatient shudder every few
   // seconds (a burst of rattle, then still) to invite the tap. Stops during the
@@ -1198,6 +1202,25 @@ export function WorldCanvas({
                 },
               ]}>
               <Image source={HIGHLIGHT_GLOW} tintColor="#7DE8CD" contentFit="contain" style={StyleSheet.absoluteFill} />
+            </MotiView>
+          ) : null}
+
+          {chronicleAttentionSprite ? (
+            <MotiView
+              pointerEvents="none"
+              from={{ opacity: 0.22, scale: 0.9 }}
+              animate={{ opacity: 0.5, scale: 1.1 }}
+              transition={{ loop: true, type: 'timing', duration: 1500 }}
+              style={[
+                styles.highlight,
+                {
+                  left: chronicleAttentionSprite.x - chronicleAttentionSprite.size * 0.62 * SPRITE_SCALE,
+                  top: chronicleAttentionSprite.y - chronicleAttentionSprite.size * 0.62 * SPRITE_SCALE + SPRITE_DROP,
+                  width: chronicleAttentionSprite.size * 1.24 * SPRITE_SCALE,
+                  height: chronicleAttentionSprite.size * 1.24 * SPRITE_SCALE,
+                },
+              ]}>
+              <Image source={HIGHLIGHT_GLOW} tintColor="#FFC36B" contentFit="contain" style={StyleSheet.absoluteFill} />
             </MotiView>
           ) : null}
 

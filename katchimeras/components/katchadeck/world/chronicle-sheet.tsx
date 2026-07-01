@@ -56,6 +56,14 @@ export function ChronicleSheet({ chronicle, day, onViewMemories, onClose }: Chro
           <ThemedText style={styles.summary} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
             {chronicle.summary}
           </ThemedText>
+          {chronicle.contextNote ? (
+            <View style={styles.contextPill}>
+              <IconSymbol name="calendar" size={12} color={Lantern.ember300} />
+              <ThemedText style={styles.contextText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                {chronicle.contextNote}
+              </ThemedText>
+            </View>
+          ) : null}
 
           {chronicle.shaped.length > 0 ? (
             <View style={styles.section}>
@@ -141,6 +149,20 @@ const styles = StyleSheet.create({
   scroll: { gap: 10, paddingBottom: 4 },
   kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   summary: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  contextPill: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,195,107,0.08)',
+    borderColor: 'rgba(255,195,107,0.24)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  contextText: { flexShrink: 1, fontSize: 11.5, fontWeight: '700', lineHeight: 15 },
   section: { gap: 8, marginTop: 6 },
   sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
   shapedRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

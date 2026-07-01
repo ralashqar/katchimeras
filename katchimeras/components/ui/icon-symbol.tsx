@@ -19,6 +19,7 @@ const MAPPING = {
   'chevron.left': 'chevron-left',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'calendar': 'calendar-month',
   'arrow.right': 'arrow-forward',
   'star.fill': 'star',
   'sparkles': 'auto-awesome',

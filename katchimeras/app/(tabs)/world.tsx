@@ -64,7 +64,7 @@ import { isPointAtHome, loadHomeAnchor, saveHomeAnchor } from '@/utils/home-loca
 import { deriveDayChronicle, type CalendarEventContext } from '@/utils/chronicle-engine';
 import { deriveContinuityMotifs } from '@/utils/continuity-engine';
 import { deriveObservations } from '@/utils/observations-engine';
-import { loadCalendarEventsForDay } from '@/utils/calendar-events';
+import { loadCalendarContextForDay, type CalendarPermissionState } from '@/utils/calendar-events';
 import { selectMemoryQuests, type MemoryQuestType } from '@/utils/memory-quests-engine';
 import { detectFoodInVision } from '@/utils/food-detect';
 import { detectStudioInVision } from '@/utils/studio-detect';
@@ -177,6 +177,7 @@ function hatchSources(day: HomeDayRecord, chronicle: ReturnType<typeof deriveDay
   if ((day.bigMoments?.length ?? 0) > 0) sources.push(day.bigMoments?.[0]?.label ?? 'A big moment');
   if ((day.foodMoments?.length ?? 0) > 0) sources.push('A food memory joined the patch');
   if ((day.studioMoments?.length ?? 0) > 0) sources.push('An inspiration joined the Study');
+  if (chronicle?.calendarHighlights.length && sources.length < 3) sources.push(chronicle.calendarHighlights[0]);
   if (sources.length === 0 && chronicle?.shaped.length) sources.push(...chronicle.shaped.slice(0, 2));
   return sources.slice(0, 3);
 }
@@ -1074,16 +1075,21 @@ export default function WorldScreen() {
   // Quest Board reader — the day's Memory Quests, opened from the world structure.
   const [questBoardOpen, setQuestBoardOpen] = useState(false);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventContext[]>([]);
+  const [calendarPermissionState, setCalendarPermissionState] = useState<CalendarPermissionState>('unknown');
   useEffect(() => {
     if (!selectedDayRecord) {
       setCalendarEvents([]);
+      setCalendarPermissionState('unknown');
       return;
     }
     let active = true;
     setCalendarEvents([]);
+    setCalendarPermissionState('unknown');
     void (async () => {
-      const events = await loadCalendarEventsForDay(selectedDayRecord.isoDate);
-      if (active) setCalendarEvents(events);
+      const context = await loadCalendarContextForDay(selectedDayRecord.isoDate);
+      if (!active) return;
+      setCalendarEvents(context.events);
+      setCalendarPermissionState(context.permissionState);
     })();
     return () => {
       active = false;
@@ -1092,6 +1098,14 @@ export default function WorldScreen() {
   const chronicle = useMemo(
     () => (selectedDayRecord ? deriveDayChronicle(selectedDayRecord, calendarEvents) : null),
     [selectedDayRecord, calendarEvents]
+  );
+  const currentDayCalendarEvents = useMemo(
+    () => (formingDay?.isoDate === selectedDayRecord?.isoDate && calendarPermissionState === 'granted' ? calendarEvents : []),
+    [calendarEvents, calendarPermissionState, formingDay?.isoDate, selectedDayRecord?.isoDate]
+  );
+  const worldStructureAttention = useMemo(
+    () => ({ ...structureAttention, chronicle: (chronicle?.calendarSourceCount ?? 0) > 0 }),
+    [chronicle?.calendarSourceCount, structureAttention]
   );
 
   // Memory Quests — contextual, optional captures that grow real patch objects
@@ -1107,7 +1121,10 @@ export default function WorldScreen() {
     });
     setPendingHatchPayoffDayId(null);
   }, [pendingHatchPayoffDayId, isHatching, selectedDayRecord, chronicle]);
-  const memoryQuests = useMemo(() => (formingDay ? selectMemoryQuests(formingDay, new Date()) : []), [formingDay]);
+  const memoryQuests = useMemo(
+    () => (formingDay ? selectMemoryQuests(formingDay, new Date(), 3, currentDayCalendarEvents) : []),
+    [currentDayCalendarEvents, formingDay]
+  );
   const continuityMotifs = useMemo(() => deriveContinuityMotifs(days, 6), [days]);
   const observations = useMemo(
     () => deriveObservations({ days, selectedDay: selectedDayRecord, motifs: continuityMotifs }),
@@ -1303,7 +1320,7 @@ export default function WorldScreen() {
               stepsAlert={stepsAlert}
               onPressStepsAlert={handlePressStepsAlert}
               moodAlert={moodAlert}
-              structureAttention={structureAttention}
+              structureAttention={worldStructureAttention}
               onPressEgg={handleEggPress}
               onSelectCell={handleSelectCell}
               onSelectBigMoment={() => setBigMomentSheetOpen(true)}

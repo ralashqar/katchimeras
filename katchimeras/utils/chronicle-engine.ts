@@ -8,7 +8,7 @@ import type { BigMomentType, CapturedMeaning, DayNote, DayScores, HomeDayRecord 
 
 export type ChronicleTimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
 
-export type CalendarEventCategory = 'work' | 'social' | 'family' | 'health' | 'travel' | 'personal' | 'unknown';
+export type CalendarEventCategory = 'focus' | 'connection' | 'care' | 'journey' | 'celebration' | 'ritual' | 'quiet' | 'unknown';
 
 export type CalendarEventContext = {
   id: string;
@@ -33,6 +33,9 @@ export type DayChronicle = {
   summary: string;
   timeline: ChronicleTimelineItem[];
   shaped: string[];
+  calendarHighlights: string[];
+  calendarSourceCount: number;
+  contextNote?: string;
   hasStory: boolean;
 };
 
@@ -74,12 +77,13 @@ const FACET: Record<string, string> = {
 
 // Calendar category → its facet word (drives the calendar-informed title).
 const CATEGORY_FACET: Record<CalendarEventCategory, string | null> = {
-  health: 'Care',
-  social: 'Connection',
-  family: 'Connection',
-  work: 'Focus',
-  travel: 'Travel',
-  personal: 'Meaning',
+  care: 'Care',
+  celebration: 'Celebration',
+  connection: 'Connection',
+  focus: 'Focus',
+  journey: 'Travel',
+  quiet: 'Calm',
+  ritual: 'Ritual',
   unknown: null,
 };
 
@@ -99,34 +103,36 @@ function calendarFacets(events: CalendarEventContext[]): string[] {
   return facets;
 }
 
+function addFacet(scores: Map<string, number>, facet: string | null, amount: number) {
+  if (!facet) return;
+  scores.set(facet, (scores.get(facet) ?? 0) + amount);
+}
+
 function rankFacets(day: ChronicleDayInput, events: CalendarEventContext[]): string[] {
   const scores = (day.scores ?? {}) as Partial<DayScores>;
-  const ranked = (Object.keys(FACET) as string[])
-    .map((key) => [FACET[key], (scores as Record<string, number>)[key] ?? 0] as const)
-    .sort((a, b) => b[1] - a[1]);
-
-  const facets: string[] = [];
-  // Calendar facets lead — the day's commitments shape what it was about.
-  for (const facet of calendarFacets(events)) if (!facets.includes(facet)) facets.push(facet);
+  const facetScores = new Map<string, number>();
+  // Calendar is one narrative signal; captured memories and interpreted movement can outrank it.
+  for (const facet of calendarFacets(events)) addFacet(facetScores, facet, 1.2);
   const meaningful =
     (day.bigMoments?.length ?? 0) > 0 || countArchetype(day.capturedMeanings, day.notes, 'meaningful') > 0;
-  if (meaningful && !facets.includes('Meaning')) facets.push('Meaning');
-  if (countArchetype(day.capturedMeanings, day.notes, 'together') > 0 && !facets.includes('Connection')) {
-    facets.push('Connection');
-  }
+  if (meaningful) addFacet(facetScores, 'Meaning', 1.8);
+  if (countArchetype(day.capturedMeanings, day.notes, 'together') > 0) addFacet(facetScores, 'Connection', 1.7);
   // An interpreted active day reads as Adventure (a hike / travel) or Movement.
   const movement = day.stepsInterpretation;
   if (movement) {
     const facet = movement.movement === 'hike' || movement.movement === 'travel' ? 'Adventure' : 'Movement';
-    if (!facets.includes(facet)) facets.push(facet);
+    addFacet(facetScores, facet, 1.7);
   }
   // Books/films/shows the day took in read as Stories.
-  if ((day.studioMoments?.length ?? 0) > 0 && !facets.includes('Stories')) facets.push('Stories');
-  for (const [name, value] of ranked) {
-    if (facets.length >= 2) break;
-    if (value > 0 && !facets.includes(name)) facets.push(name);
+  if ((day.studioMoments?.length ?? 0) > 0) addFacet(facetScores, 'Stories', 1.4);
+  for (const key of Object.keys(FACET)) {
+    const value = (scores as Record<string, number>)[key] ?? 0;
+    if (value > 0) addFacet(facetScores, FACET[key], value / 2);
   }
-  return facets;
+  return [...facetScores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([facet]) => facet)
+    .slice(0, 2);
 }
 
 function chronicleTitle(day: ChronicleDayInput, events: CalendarEventContext[]): string {
@@ -150,7 +156,7 @@ function voiceCount(day: ChronicleDayInput): number {
 
 function chronicleShaped(day: ChronicleDayInput, events: CalendarEventContext[]): string[] {
   const shaped: string[] = [];
-  for (const event of events.slice(0, 3)) shaped.push(event.title);
+  for (const event of events.slice(0, 2)) shaped.push(calendarHighlightForEvent(event));
   for (const moment of day.bigMoments ?? []) {
     shaped.push(moment.subject ? `${moment.label} · ${moment.subject}` : moment.label);
   }
@@ -175,7 +181,6 @@ function chronicleShaped(day: ChronicleDayInput, events: CalendarEventContext[])
 
 function chronicleSummary(day: ChronicleDayInput, events: CalendarEventContext[]): string {
   const lead: string[] = [];
-  for (const event of events.slice(0, 2)) lead.push(event.title.toLowerCase());
   const big = day.bigMoments?.[0];
   if (big && lead.length < 2) lead.push(big.subject ? `${big.label.toLowerCase()} with ${big.subject}` : big.label.toLowerCase());
   // A named active day (a hike, a travel day) is a strong day-shaper.
@@ -188,6 +193,9 @@ function chronicleSummary(day: ChronicleDayInput, events: CalendarEventContext[]
   if (studio > 0 && lead.length < 2) lead.push(`${studio} ${studio === 1 ? 'inspiration' : 'inspirations'}`);
   const voices = voiceCount(day);
   if (voices > 0 && lead.length < 2) lead.push(`${voices} voice ${voices === 1 ? 'note' : 'notes'}`);
+  for (const event of events.slice(0, 2)) {
+    if (lead.length < 2) lead.push(event.title.toLowerCase());
+  }
 
   if (lead.length === 0) return 'A quiet day, still finding its shape.';
   const sentence = `Today was shaped by ${lead.slice(0, 2).join(' and ')}.`;
@@ -202,6 +210,23 @@ function timeOfDayFromHour(hour: number): ChronicleTimeOfDay {
   if (hour < 21) return 'evening';
   return 'night';
 }
+
+const TIME_LABEL: Record<ChronicleTimeOfDay, string> = {
+  morning: 'morning',
+  afternoon: 'afternoon',
+  evening: 'evening',
+  night: 'night',
+};
+
+function calendarHighlightForEvent(event: CalendarEventContext): string {
+  const slot = TIME_LABEL[timeOfDayFromHour(new Date(event.startTime).getHours())];
+  return `${event.title} shaped the ${slot}`;
+}
+
+function calendarHighlights(events: CalendarEventContext[]): string[] {
+  return events.slice(0, 2).map(calendarHighlightForEvent);
+}
+
 function chronicleTimeline(day: ChronicleDayInput, events: CalendarEventContext[]): ChronicleTimelineItem[] {
   const raw: { id: string; label: string; ms: number }[] = [];
   for (const event of events) raw.push({ id: `e-${event.id}`, label: event.title, ms: event.startTime });
@@ -226,6 +251,7 @@ function chronicleTimeline(day: ChronicleDayInput, events: CalendarEventContext[
 
 export function deriveDayChronicle(day: ChronicleDayInput, calendarEvents: CalendarEventContext[] = []): DayChronicle {
   const events = [...calendarEvents].sort((a, b) => a.startTime - b.startTime);
+  const highlights = calendarHighlights(events);
   const shaped = chronicleShaped(day, events);
   const hasStory = shaped.length > 0 || !!day.creature || events.length > 0;
   return {
@@ -234,6 +260,9 @@ export function deriveDayChronicle(day: ChronicleDayInput, calendarEvents: Calen
     summary: chronicleSummary(day, events),
     timeline: chronicleTimeline(day, events),
     shaped,
+    calendarHighlights: highlights,
+    calendarSourceCount: events.length,
+    contextNote: events.length > 0 ? 'Planned moments helped Katchimera read the shape of this day.' : undefined,
     hasStory,
   };
 }
