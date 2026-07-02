@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 
 import type { HomeDayRecord } from '@/types/home';
 import type { DiscoveryCategory, DiscoveryDef, DiscoveryRecord, DiscoveryState } from '@/types/discoveries';
@@ -48,8 +49,17 @@ function resolveSourceDayId(category: DiscoveryCategory, days: HomeDayRecord[]):
 // already earned (seenAnimation:true) + surfaces ONE quiet summary; only unlocks
 // AFTER baseline celebrate (seenAnimation:false → `pending`).
 export function useDiscoveries() {
-  const { days, getDayById } = useAllDays();
+  const { days, getDayById, refresh } = useAllDays();
   const [state, setState] = useState<DiscoveryState>(() => loadDiscoveryState());
+
+  // Every mutation saves immediately, so a focus re-read is always safe — and it
+  // keeps two live instances (Today + World tabs) agreeing on what's been
+  // celebrated, so an unlock never plays its reveal twice.
+  useFocusEffect(
+    useCallback(() => {
+      setState(loadDiscoveryState());
+    }, [])
+  );
   // The one-time "N discoveries from your past" notice count (transient; 0 = none).
   const [backfillCount, setBackfillCount] = useState(0);
   // Mirror so the eval effect reads the freshest state without re-running on every
@@ -119,5 +129,7 @@ export function useDiscoveries() {
     dismissBackfillNotice,
     markSeen,
     getDayById,
+    // Re-read the day archive + re-evaluate now (for same-screen additions).
+    refresh,
   };
 }

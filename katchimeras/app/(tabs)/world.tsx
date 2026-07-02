@@ -1,12 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import {
-  RecordingPresets,
-  requestRecordingPermissionsAsync,
-  setAudioModeAsync,
-  useAudioRecorder,
-} from 'expo-audio';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -50,10 +44,10 @@ import { useCosmetics } from '@/hooks/use-cosmetics';
 import { useEssence } from '@/hooks/use-essence';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { interpretNote, type InterpretedNote } from '@/utils/note-interpret';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
+import { useInlineVoiceNote } from '@/hooks/use-inline-voice-note';
 import { useTravelMemoryMode } from '@/hooks/use-travel-memory-mode';
 import type { BigMomentType, DayMapNode, DayPromptKind, HomeDayRecord } from '@/types/home';
 import type { MemoryNode, WorldObjectCategory, WorldPatch, WorldState } from '@/types/world';
@@ -303,15 +297,6 @@ export default function WorldScreen() {
   // The day we've already run the morning sleep prompt for (once per day).
   const sleepPromptedRef = useRef<string | null>(null);
 
-  // Inline voice note (hold the add-bar mic): record → analyse → accept/discard.
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const [recPhase, setRecPhase] = useState<'idle' | 'recording' | 'analyzing' | 'confirm'>('idle');
-  const [recElapsed, setRecElapsed] = useState(0);
-  const [recResult, setRecResult] = useState<InterpretedNote | null>(null);
-  const [recMarkBig, setRecMarkBig] = useState(true);
-  const recAudioRef = useRef<string | null>(null);
-  const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const recordingRef = useRef(false);
 
   // Fold any newly-hatched days into the persisted world on focus.
   useFocusEffect(
@@ -520,112 +505,28 @@ export default function WorldScreen() {
   );
 
   // --- Inline voice note (hold the add-bar mic) ---
-  const stopInlineRecording = async () => {
-    if (!recordingRef.current) return;
-    recordingRef.current = false;
-    if (recTimerRef.current) clearInterval(recTimerRef.current);
-    recTimerRef.current = null;
-    let uri: string | null = null;
-    try {
-      await recorder.stop();
-      uri = recorder.uri ?? null;
-    } catch {
-      // keep whatever we have
-    }
-    recAudioRef.current = uri;
-    if (!uri) {
-      setRecPhase('idle');
-      return;
-    }
-    setRecPhase('analyzing');
-    // Fly the captured note into the egg while it's read.
-    feedNonce.current += 1;
-    setEggFeed({
-      nonce: feedNonce.current,
-      fromX: screenW - 50,
-      fromY: screenH - tabBarHeight - 110,
-      toX: screenW / 2,
-      toY: screenH * 0.5,
-      label: '🎤',
-      tint: '#7DE8CD',
-    });
-    try {
-      // On-device transcription happens inside interpretNote (audio stays local).
-      const interpreted = await interpretNote({ audioUri: uri });
-      setRecResult(interpreted);
-      setRecMarkBig(true);
-      setRecPhase('confirm');
-    } catch {
-      setRecPhase('idle');
-    }
-  };
-
-  const startInlineRecording = async () => {
-    if (recordingRef.current || recPhase !== 'idle') return;
-    recordingRef.current = true;
-    setRecElapsed(0);
-    setRecPhase('recording');
-    const permission = await requestRecordingPermissionsAsync();
-    if (!permission.granted) {
-      recordingRef.current = false;
-      setRecPhase('idle');
-      return;
-    }
-    try {
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      if (!recordingRef.current) return;
-      await recorder.prepareToRecordAsync();
-      if (!recordingRef.current) return;
-      recorder.record();
-    } catch {
-      recordingRef.current = false;
-      setRecPhase('idle');
-      return;
-    }
-    recTimerRef.current = setInterval(() => {
-      setRecElapsed((prev) => {
-        if (prev + 1 >= 30) {
-          void stopInlineRecording();
-          return 30;
-        }
-        return prev + 1;
+  // The recorder + phase machine live in the shared hook; this screen supplies
+  // the save target and the egg-feed flight.
+  const voiceNote = useInlineVoiceNote({
+    saveNote: (note) => addNote(note, formingTarget),
+    onAnalyzing: () => {
+      // Fly the captured note into the egg while it's read.
+      feedNonce.current += 1;
+      setEggFeed({
+        nonce: feedNonce.current,
+        fromX: screenW - 50,
+        fromY: screenH - tabBarHeight - 110,
+        toX: screenW / 2,
+        toY: screenH * 0.5,
+        label: '🎤',
+        tint: '#7DE8CD',
       });
-    }, 1000);
-  };
-
-  const acceptInlineNote = () => {
-    if (!recResult) return;
-    addNote(
-      {
-        kind: 'voice',
-        text: recResult.transcript,
-        audioUri: recAudioRef.current,
-        durationMs: recElapsed * 1000,
-        archetype: recResult.archetype,
-        label: recResult.label,
-        bigMoment: recResult.bigMoment && recMarkBig ? recResult.bigMoment : undefined,
-      },
-      formingTarget
-    );
-    setEggFeedKey((key) => key + 1);
-    setMicrocopy(`${recResult.label} took root`);
-    setRecResult(null);
-    recAudioRef.current = null;
-    setRecPhase('idle');
-  };
-
-  const discardInlineNote = () => {
-    setRecResult(null);
-    recAudioRef.current = null;
-    setRecPhase('idle');
-  };
-
-  useEffect(
-    () => () => {
-      if (recTimerRef.current) clearInterval(recTimerRef.current);
     },
-    []
-  );
+    onSaved: (interpreted) => {
+      setEggFeedKey((key) => key + 1);
+      setMicrocopy(`${interpreted.label} took root`);
+    },
+  });
 
   // The egg's approximate on-screen spot — the diorama centres in the hero band.
   const eggTarget = { x: screenW / 2, y: screenH * 0.42 };
@@ -1018,8 +919,9 @@ export default function WorldScreen() {
       return;
     }
     if (cellType === 'places') {
-      setFocusedObservationId(null);
-      setObservatoryOpen(true);
+      // 🗺 Crossroads — where did I go? Opens the places reader; the Observatory
+      // (pattern noticing) stays reachable from the dashboard card.
+      setPlacesVaultOpen(true);
       return;
     }
     if (cellType === 'sleep') {
@@ -1266,7 +1168,7 @@ export default function WorldScreen() {
         break;
     }
   };
-  const showActions = !!formingDay && recPhase !== 'confirm';
+  const showActions = !!formingDay && voiceNote.phase !== 'confirm';
 
   return (
     <GestureHandlerRootView style={styles.screen}>
@@ -1367,15 +1269,15 @@ export default function WorldScreen() {
                     router.push('/moment-capture');
                   }}
                   onMicTap={() => {
-                    if (recPhase === 'idle') router.push('/note-capture');
+                    if (voiceNote.phase === 'idle') router.push('/note-capture');
                   }}
-                  onMicPressIn={startInlineRecording}
+                  onMicPressIn={voiceNote.start}
                   onMicPressOut={() => {
-                    if (recordingRef.current) void stopInlineRecording();
+                    void voiceNote.stop();
                   }}
                   onAddPlace={handleAddCurrentPlace}
                   onAdd={openPrompts}
-                  recording={recPhase === 'recording'}
+                  recording={voiceNote.isRecording}
                 />
               </View>
             </GestureDetector>
@@ -1700,6 +1602,11 @@ export default function WorldScreen() {
             router.push({ pathname: '/day-map/[dayId]', params: { dayId: selectedDayRecord.id } });
           }}
           onConfirmPlace={selectedIsForming ? handleConfirmPlaceFromVault : undefined}
+          onOpenObservatory={() => {
+            setPlacesVaultOpen(false);
+            setFocusedObservationId(null);
+            setObservatoryOpen(true);
+          }}
         />
       ) : null}
 
@@ -1753,15 +1660,15 @@ export default function WorldScreen() {
         />
       ) : null}
 
-      {recPhase !== 'idle' ? (
+      {voiceNote.phase !== 'idle' ? (
         <InlineVoiceNote
-          phase={recPhase}
-          elapsed={recElapsed}
-          result={recResult}
-          markBig={recMarkBig}
-          onToggleBig={() => setRecMarkBig((value) => !value)}
-          onAccept={acceptInlineNote}
-          onDiscard={discardInlineNote}
+          phase={voiceNote.phase}
+          elapsed={voiceNote.elapsed}
+          result={voiceNote.result}
+          markBig={voiceNote.markBig}
+          onToggleBig={voiceNote.toggleMarkBig}
+          onAccept={voiceNote.accept}
+          onDiscard={voiceNote.discard}
           bottom={tabBarHeight}
         />
       ) : null}

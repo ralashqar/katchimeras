@@ -681,6 +681,25 @@ export function addFoodMomentForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+// An auto-detected food moment carries a GUESSED meaning (foodMeaningFromArchetype)
+// — this replaces it with the user's own answer from the follow-up prompt.
+export function setFoodMomentMeaningForToday(
+  state: StoredHomeState,
+  input: { momentId: string; meaning: FoodMeaning },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    foodMoments: (base.foodMoments ?? []).map((moment) =>
+      moment.id === input.momentId ? { ...moment, meaning: input.meaning } : moment
+    ),
+  };
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
 // --- Studio (inspiration archive) — mirrors the Food Vault. Books/films/shows/
 // games you took in, kept with how they landed. Created from notes, photos, or a
 // manual add. Never a review tracker. ---
@@ -758,6 +777,25 @@ export function addStudioMomentForToday(
     studioMoments: appendStudioMoment(base.studioMoments, moment),
   };
 
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+// An auto-detected inspiration carries a GUESSED rating (studioRatingFromArchetype)
+// — this replaces it with the user's own answer from the follow-up prompt.
+export function setStudioMomentRatingForToday(
+  state: StoredHomeState,
+  input: { momentId: string; rating: StudioRating },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const nextDay: StoredHomeDayRecord = {
+    ...base,
+    studioMoments: (base.studioMoments ?? []).map((moment) =>
+      moment.id === input.momentId ? { ...moment, rating: input.rating } : moment
+    ),
+  };
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 

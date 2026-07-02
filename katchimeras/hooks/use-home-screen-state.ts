@@ -21,6 +21,8 @@ import {
   applyNoteForToday,
   addFoodMomentForToday,
   addStudioMomentForToday,
+  setFoodMomentMeaningForToday,
+  setStudioMomentRatingForToday,
   completeSeedForToday,
   confirmPlaceForToday,
   markBigMomentForToday,
@@ -373,6 +375,32 @@ export function useHomeScreenState() {
       setStoredState((currentState) => {
         const hydrated = hydrateHomeState(currentState, profile, now);
         return addStudioMomentForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const setFoodMomentMeaning = useCallback(
+    (input: Parameters<typeof setFoodMomentMeaningForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return setFoodMomentMeaningForToday(hydrated.state, input, profile, now, target);
+      });
+    },
+    []
+  );
+
+  const setStudioMomentRating = useCallback(
+    (input: Parameters<typeof setStudioMomentRatingForToday>[1], target: DayInputTarget = 'today') => {
+      const now = new Date();
+      const profile = loadOnboardingProfile();
+
+      setStoredState((currentState) => {
+        const hydrated = hydrateHomeState(currentState, profile, now);
+        return setStudioMomentRatingForToday(hydrated.state, input, profile, now, target);
       });
     },
     []
@@ -820,6 +848,8 @@ export function useHomeScreenState() {
     setDayName,
     addFoodMoment,
     addStudioMoment,
+    setFoodMomentMeaning,
+    setStudioMomentRating,
     isTodayHatched,
     tomorrowDay,
     tomorrowActivePrompt,

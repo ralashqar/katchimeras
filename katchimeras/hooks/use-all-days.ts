@@ -19,6 +19,10 @@ export function useAllDays() {
     }, [])
   );
 
+  // Manual re-read for consumers that mutate the day WITHOUT leaving the screen
+  // (Today's inline adds) and need dependents (e.g. Discoveries) to see it now.
+  const refresh = useCallback(() => setVersion((current) => current + 1), []);
+
   const days = useMemo(() => {
     const now = new Date();
     const profile = loadOnboardingProfile();
@@ -41,5 +45,5 @@ export function useAllDays() {
     [days]
   );
 
-  return { days, byIsoDate, getDayById };
+  return { days, byIsoDate, getDayById, refresh };
 }

@@ -113,6 +113,48 @@ export function CellDetailSheet({ day, cell, recentAvgSteps, onClose, onAddPhoto
   );
 }
 
+// The Journey reader — today's movement (steps vs the usual pace + the places
+// the path passed through). When the day hasn't been interpreted yet, a quiet
+// "what kind of journey was it?" action opens the interpretation prompt — the
+// question itself only leads when the steps "!" fires.
+export function JourneyDetailSheet({
+  day,
+  recentAvgSteps,
+  onClose,
+  onViewMemories,
+  onInterpret,
+}: {
+  day: HomeDayRecord;
+  recentAvgSteps: number | null;
+  onClose: () => void;
+  onViewMemories?: () => void;
+  onInterpret?: () => void;
+}) {
+  const interpretation = day.stepsInterpretation;
+  return (
+    <SheetShell onClose={onClose}>
+      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+        Journey
+      </ThemedText>
+      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        {interpretation ? `${interpretation.emoji} ${interpretation.label}` : 'How the day moved'}
+      </ThemedText>
+      <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} />
+      {!interpretation && onInterpret ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onInterpret}
+          style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
+          <IconSymbol name="figure.walk" size={16} color={Lantern.ember300} />
+          <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            What kind of journey was it?
+          </ThemedText>
+        </Pressable>
+      ) : null}
+    </SheetShell>
+  );
+}
+
 // The notes chest reader — voice/text notes + the Big Moments they grew.
 export function NotesDetailSheet({
   day,
@@ -146,12 +188,16 @@ export function PlacesDetailSheet({
   onAddPlace,
   onOpenMap,
   onConfirmPlace,
+  onOpenObservatory,
 }: {
   day: HomeDayRecord;
   onClose: () => void;
   onAddPlace?: () => void;
   onOpenMap?: () => void;
   onConfirmPlace?: (node: DayMapNode, name: string) => void;
+  // Temporary cross-link: until the Observatory gets its own Kingdom building,
+  // the noticing layer stays reachable from the Crossroads reader.
+  onOpenObservatory?: () => void;
 }) {
   const mapSummary = day.dayMap;
   const nodes = mapSummary?.nodes ?? [];
@@ -176,10 +222,10 @@ export function PlacesDetailSheet({
   return (
     <SheetShell onClose={onClose}>
       <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        Places
+        Crossroads
       </ThemedText>
       <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {nodes.length > 0 ? `${nodes.length} ${nodes.length === 1 ? 'place' : 'places'} today` : 'Your places'}
+        {nodes.length > 0 ? `${nodes.length} ${nodes.length === 1 ? 'place' : 'places'} today` : 'Where did you go?'}
       </ThemedText>
 
       <View style={styles.body}>
@@ -203,6 +249,17 @@ export function PlacesDetailSheet({
               <IconSymbol name="globe.americas.fill" size={16} color={Lantern.ember300} />
               <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                 View map
+              </ThemedText>
+            </Pressable>
+          ) : null}
+          {onOpenObservatory ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onOpenObservatory}
+              style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
+              <IconSymbol name="sparkles" size={16} color={Lantern.ember300} />
+              <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Observatory
               </ThemedText>
             </Pressable>
           ) : null}

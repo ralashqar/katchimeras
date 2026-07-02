@@ -36,8 +36,24 @@ const STAT_ICON: Record<string, IconSymbolName> = {
   photos: 'camera.fill',
   moments: 'sparkles',
 };
+const ATTENTION_GOLD = '#FFC36B';
 
-export function DayJournalSections({ day }: { day: HomeDayRecord }) {
+export type DayStatKey = 'steps' | 'places' | 'photos' | 'moments';
+
+export function DayJournalSections({
+  day,
+  onStatPress,
+  statAttention,
+}: {
+  day: HomeDayRecord;
+  // When set, every stat tile becomes a door into its category surface (steps →
+  // journey sheet, places → Crossroads reader, …) instead of the built-in
+  // places modal. Absent → legacy behaviour (hatched/archive views).
+  onStatPress?: (key: DayStatKey) => void;
+  // Golden highlight per tile when its category is asking a contextual question
+  // (same read as utils/today-categories needsAttention).
+  statAttention?: Partial<Record<DayStatKey, boolean>>;
+}) {
   const photos = collectPhotos(day);
   const meanings = collectMeanings(day);
   // A photo/meaning record can exist while its thumbnail is stale / yields no
@@ -95,38 +111,66 @@ export function DayJournalSections({ day }: { day: HomeDayRecord }) {
   const accent = day.creature?.accentColor ?? day.egg?.accentColor ?? '#A7D5FF';
   const [placesOpen, setPlacesOpen] = useState(false);
 
-  const stats: { key: string; label: string; value: string; onPress?: () => void }[] = [
-    { key: 'steps', label: 'steps', value: formatCompact(day.stepsCount) },
+  const stats: { key: DayStatKey; label: string; value: string; onPress?: () => void }[] = [
+    {
+      key: 'steps',
+      label: 'steps',
+      value: formatCompact(day.stepsCount),
+      onPress: onStatPress ? () => onStatPress('steps') : undefined,
+    },
     {
       key: 'places',
       label: day.visitedPlaceCount === 1 ? 'place' : 'places',
       value: `${day.visitedPlaceCount}`,
-      onPress: placeNodes.length > 0 ? () => setPlacesOpen(true) : undefined,
+      onPress: onStatPress
+        ? () => onStatPress('places')
+        : placeNodes.length > 0
+          ? () => setPlacesOpen(true)
+          : undefined,
     },
-    { key: 'photos', label: 'photos', value: `${day.vision?.analyzedPhotoCount ?? photos.length}` },
+    {
+      key: 'photos',
+      label: 'photos',
+      value: `${day.vision?.analyzedPhotoCount ?? photos.length}`,
+      onPress: onStatPress ? () => onStatPress('photos') : undefined,
+    },
     // "moments" = everything logged today (prompts, captures, meanings) — the
     // timeline entries. The legacy day.moments list is no longer written to.
-    { key: 'moments', label: 'moments', value: `${timeline.length}` },
+    {
+      key: 'moments',
+      label: 'moments',
+      value: `${timeline.length}`,
+      onPress: onStatPress ? () => onStatPress('moments') : undefined,
+    },
   ];
 
   return (
     <View style={styles.wrap}>
       <View style={styles.statsRow}>
-        {stats.map((stat) => (
-          <Pressable
-            key={stat.key}
-            disabled={!stat.onPress}
-            onPress={stat.onPress}
-            style={[styles.statTile, stat.onPress ? { borderColor: `${accent}66`, borderWidth: 1 } : null]}>
-            <IconSymbol color={stat.onPress ? accent : Lantern.moon300} name={STAT_ICON[stat.label] ?? 'sparkles'} size={16} />
-            <ThemedText style={styles.statValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              {stat.value}
-            </ThemedText>
-            <ThemedText style={styles.statLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              {stat.label}
-            </ThemedText>
-          </Pressable>
-        ))}
+        {stats.map((stat) => {
+          const attention = !!statAttention?.[stat.key];
+          const tint = attention ? ATTENTION_GOLD : accent;
+          return (
+            <Pressable
+              key={stat.key}
+              disabled={!stat.onPress}
+              onPress={stat.onPress}
+              style={[
+                styles.statTile,
+                stat.onPress ? { borderColor: `${tint}66`, borderWidth: 1 } : null,
+                attention ? styles.statTileAttention : null,
+              ]}>
+              <IconSymbol color={stat.onPress ? tint : Lantern.moon300} name={STAT_ICON[stat.label] ?? 'sparkles'} size={16} />
+              <ThemedText style={styles.statValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {stat.value}
+              </ThemedText>
+              <ThemedText style={styles.statLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                {stat.label}
+              </ThemedText>
+              {attention ? <View style={styles.statAlertDot} /> : null}
+            </Pressable>
+          );
+        })}
       </View>
 
       <PlacesModal accentColor={accent} nodes={placeNodes} onClose={() => setPlacesOpen(false)} visible={placesOpen} />
@@ -431,6 +475,19 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  statTileAttention: {
+    backgroundColor: 'rgba(255,195,107,0.10)',
+    boxShadow: '0 0 14px rgba(255,195,107,0.28)',
+  },
+  statAlertDot: {
+    backgroundColor: ATTENTION_GOLD,
+    borderRadius: 999,
+    height: 8,
+    position: 'absolute',
+    right: 8,
+    top: 8,
+    width: 8,
   },
   sectionCard: {
     backgroundColor: 'rgba(255,255,255,0.04)',

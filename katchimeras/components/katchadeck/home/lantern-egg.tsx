@@ -28,6 +28,15 @@ type LanternEggProps = {
   // Optional cosmetic override for the halo glow tint (a Discovery-unlocked lantern
   // colour). Absent → the egg keeps its natural day colour. Purely cosmetic.
   lanternColor?: string;
+  // Shrinks/grows the whole stage (glow, dome, shell) around its centre; the
+  // stage's layout height shrinks with it so surrounding content stays tight.
+  scale?: number;
+  // Scales ONLY the egg shell graphic, leaving the glow/dome/membrane at their
+  // stage size — for when the egg reads too large inside the glass.
+  shellScale?: number;
+  // Vertical lift of the shell inside the dome/membrane (negative = up). The
+  // default centres it; a smaller magnitude sits the egg lower in the glass.
+  shellOffsetY?: number;
 };
 
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
@@ -42,7 +51,17 @@ const DRAG_LIMIT = 60;
 // soft membrane ring that materializes under the finger and springs the shell
 // back on release. (Feathered glow/ring are generated textures - RN views
 // can't blur, so softness is baked into the asset and tinted per day.)
-export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feedKey = 0, lanternColor }: LanternEggProps) {
+export function LanternEgg({
+  egg,
+  onPress,
+  reactionKey = 0,
+  crackStage = 0,
+  feedKey = 0,
+  lanternColor,
+  scale = 1,
+  shellScale = 1,
+  shellOffsetY = -26,
+}: LanternEggProps) {
   const pressProgress = useSharedValue(0);
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
@@ -80,8 +99,10 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feed
     onPress?.();
   };
 
-  // The egg drinks in the answer: a quick glow swell and shell pop, then an
-  // outward ring of released energy as it settles.
+  // The egg drinks in the answer: a quick glow swell and shell pop, a single
+  // happy rattle (one cycle of the ready-to-hatch shudder), then an outward
+  // ring of released energy as it settles.
+  const feedShake = useSharedValue(0);
   useEffect(() => {
     if (feedKey <= 0) {
       return;
@@ -90,9 +111,18 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feed
       withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) }),
       withTiming(0, { duration: 680, easing: Easing.out(Easing.cubic) })
     );
+    feedShake.value = 0;
+    feedShake.value = withSequence(
+      withTiming(1, { duration: 55, easing: Easing.linear }),
+      withTiming(-1, { duration: 55, easing: Easing.linear }),
+      withTiming(1, { duration: 55, easing: Easing.linear }),
+      withTiming(-1, { duration: 55, easing: Easing.linear }),
+      withTiming(0.5, { duration: 55, easing: Easing.linear }),
+      withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) })
+    );
     ripple.value = 0;
     ripple.value = withDelay(160, withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) }));
-  }, [absorb, feedKey, ripple]);
+  }, [absorb, feedKey, feedShake, ripple]);
 
   const tapGesture = Gesture.Tap()
     .maxDeltaX(12)
@@ -148,8 +178,10 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feed
   // dropped within the surrounding membrane/dome — lift it to sit centered.
   const liftStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: -26 - absorb.value * 6 },
-      { scale: 1.08 + absorb.value * 0.1 },
+      { translateX: feedShake.value * 5 },
+      { translateY: shellOffsetY - absorb.value * 6 },
+      { rotateZ: `${feedShake.value * 3.2}deg` },
+      { scale: shellScale * (1.08 + absorb.value * 0.1) },
     ],
   }));
 
@@ -180,7 +212,7 @@ export function LanternEgg({ egg, onPress, reactionKey = 0, crackStage = 0, feed
 
   return (
     <GestureDetector gesture={gesture}>
-      <View style={styles.stage}>
+      <View style={[styles.stage, scale !== 1 ? { height: 258 * scale, transform: [{ scale }] } : null]}>
         <AnimatedImage
           contentFit="contain"
           pointerEvents="none"

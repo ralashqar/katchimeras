@@ -12,6 +12,9 @@ type WorldActionStackProps = {
   // Manually mark where you are right now as a place (when passive missed it).
   onAddPlace?: () => void;
   recording?: boolean;
+  // 'vertical' floats beside the world canvas; 'horizontal' sits inline as a
+  // row (Today's add-to-today area).
+  orientation?: 'vertical' | 'horizontal';
 };
 
 // The floating vertical controls on the right: capture a photo, add a note (tap)
@@ -25,9 +28,10 @@ export function WorldActionStack({
   onAdd,
   onAddPlace,
   recording = false,
+  orientation = 'vertical',
 }: WorldActionStackProps) {
   return (
-    <View style={styles.root}>
+    <View style={orientation === 'horizontal' ? styles.rootRow : styles.root}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Capture a moment with the camera"
@@ -67,6 +71,7 @@ export function WorldActionStack({
 
 const styles = StyleSheet.create({
   root: { alignItems: 'center', gap: 12 },
+  rootRow: { alignItems: 'center', flexDirection: 'row', gap: 14, justifyContent: 'center' },
   secondary: {
     width: 44,
     height: 44,

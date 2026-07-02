@@ -115,7 +115,7 @@ function resolveStructurePosition(category: WorldObjectCategory): { col: number;
   return WORLD_STRUCTURE_POSITIONS[category] ?? null;
 }
 
-function resolveStructureScale(category: WorldObjectCategory, assetKey: string, fallback: number): number {
+export function resolveStructureScale(category: WorldObjectCategory, assetKey: string, fallback: number): number {
   const usesBackplateScale = STRUCTURE_LAYOUT.bounds?.mode === 'backplate';
   const assetScale = STRUCTURE_LAYOUT.scaleByAssetKey?.[assetKey];
   if (finiteNumber(assetScale) && assetScale > 0) return usesBackplateScale ? editorScaleToAppScale(assetScale) : assetScale;
@@ -182,8 +182,11 @@ const STRUCTURES: StructureDefinition[] = [
     resolve: (_day, cells) => {
       const item = cell(cells, 'places');
       return {
+        // Asset keys stay 'observatory*' (stored patches reference them); the
+        // building itself is the Crossroads — "where did I go?". Observatory is
+        // reserved for the AI noticing layer (observations-engine).
         assetKey: item.assetKey ?? 'observatory_empty',
-        label: 'Observatory',
+        label: 'Crossroads',
         sourceLabel: item.summaryLabel || 'No places yet',
         badge: item.count,
         sizeScale: item.level === 0 ? 1.18 : (LEVEL_SCALE[item.level] ?? 1) * CELL_BUILDING_SCALE.places,
