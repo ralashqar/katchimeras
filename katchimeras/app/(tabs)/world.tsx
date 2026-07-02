@@ -23,15 +23,30 @@ import {
   loadKingdomDecor,
   moveKingdomDecor,
   plantKingdomGift,
+  keepsakeAlmanac,
   syncKingdomDecorFromDays,
   unplantKingdomDecor,
   type KingdomDecorItem,
 } from '@/utils/kingdom-decor';
+import { deriveContinuityMotifs } from '@/utils/continuity-engine';
+import { deriveObservations } from '@/utils/observations-engine';
+import { deriveWorldPropInventory } from '@/utils/world-props-engine';
+import { loadWorldPropsState } from '@/utils/world-props-storage';
 import { deriveKingdomArrivals, witnessKingdom, type KingdomArrivals } from '@/utils/kingdom-arrival';
+import { KeepsakesSheet } from '@/components/katchadeck/world/keepsakes-sheet';
+import { KeepsakeAlmanacSheet } from '@/components/katchadeck/world/keepsake-almanac-sheet';
+import { consumeKeepsakesShelfRequest } from '@/utils/kingdom-decorate-signal';
+import { worldAssetSource } from '@/utils/world-visuals';
+import { Image } from 'expo-image';
 import { KingdomArrivalCeremony } from '@/components/katchadeck/world/kingdom-arrival-ceremony';
 import { useCosmetics } from '@/hooks/use-cosmetics';
 import { useEssence } from '@/hooks/use-essence';
-import { buildingIdForCategory, deriveKingdomPatch } from '@/utils/kingdom-patch';
+import { buildingIdForCategory, deriveKingdomPatch, deriveKingdomPlotPatch } from '@/utils/kingdom-patch';
+import { deriveKingdomPlots } from '@/utils/kingdom-engine';
+import { ARCHIVE_BUILDINGS, buildKingdomArchive, collectKingdomArchiveEntries } from '@/utils/kingdom-archive';
+import { KingdomArchiveModal } from '@/components/katchadeck/world/kingdom-archive-modal';
+import { requestSelectedDay } from '@/utils/selected-day-signal';
+import { useRouter } from 'expo-router';
 import { collectUnlockedArtefacts, placeArtefacts } from '@/utils/discoveries-artefacts';
 import type { KingdomBuilding } from '@/types/kingdom';
 import type { WorldObjectCategory } from '@/types/world';
@@ -47,49 +62,81 @@ const PATCH_RING = 1;
 const DISCOVERY_RARITY_ORDER: Record<string, number> = { legendary: 3, epic: 2, rare: 1, common: 0 };
 
 export default function KingdomScreen() {
+  const router = useRouter();
   const { kingdom } = useKingdom();
   const { days } = useAllDays();
   const tabBarHeight = useBottomTabBarHeight();
   const kingdomPatch = useMemo(() => deriveKingdomPatch(kingdom), [kingdom]);
 
   // Kingdom decoration — earned by living, planted forever (kingdom-decor.ts).
-  // Sync on focus grants anything new days have earned (+ one-time legacy
-  // hoist), then the morning ceremony diffs the freshly-synced kingdom against
-  // the witnessed snapshot: yesterday's creature, new keepsakes, level-ups.
-  // First run baselines silently inside deriveKingdomArrivals.
+  // The sync effect lives below (it also needs the discoveries + noticed
+  // patterns for the achievement lane); the ceremony then diffs the
+  // freshly-synced kingdom against the witnessed snapshot.
   const [decorState, setDecorState] = useState(() => loadKingdomDecor());
   const [arrivals, setArrivals] = useState<KingdomArrivals | null>(null);
-  useFocusEffect(
-    useCallback(() => {
-      const next = syncKingdomDecorFromDays(days);
-      setDecorState(next);
-      setArrivals((current) => current ?? deriveKingdomArrivals(kingdom, next));
-    }, [days, kingdom])
+  // Gifts live-granted from the still-forming day land on the shelf silently —
+  // they're held out of the ceremony (and the witnessed snapshot) so any left
+  // unplanted still parade with tomorrow's arrival.
+  const formingDayIds = useMemo(
+    () => days.filter((day) => day.state !== 'hatched').map((day) => day.id),
+    [days]
   );
   const handleCeremonyDone = (options?: { openDecorate?: boolean }) => {
-    witnessKingdom(kingdom, decorState);
+    witnessKingdom(kingdom, decorState, { holdGiftDayIds: formingDayIds });
     setArrivals(null);
-    if (options?.openDecorate) setCustomising(true);
+    if (options?.openDecorate) setKeepsakesOpen(true);
   };
 
   const [customising, setCustomising] = useState(false);
+  // The keepsake shelf (gift crate / Today's chip / ceremony all open it).
+  const [keepsakesOpen, setKeepsakesOpen] = useState(false);
+  const [almanacOpen, setAlmanacOpen] = useState(false);
+  // Freshly planted keepsake — ringed for a beat so the eye finds it to drag.
+  const [justPlantedId, setJustPlantedId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!justPlantedId) return;
+    const id = setTimeout(() => setJustPlantedId(null), 5000);
+    return () => clearTimeout(id);
+  }, [justPlantedId]);
+  // Iso snap: planted items settle onto half-cell steps so they line up with
+  // the path grid. Toggleable from the decorate tray.
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const snap = (value: number) => (snapEnabled ? Math.round(value * 2) / 2 : value);
   const panRef = useRef<GestureType | undefined>(undefined);
   const getCenterCellRef = useRef<(() => { col: number; row: number } | null) | null>(null);
   // Provenance card for a tapped decoration.
   const [provenanceItem, setProvenanceItem] = useState<KingdomDecorItem | null>(null);
 
-  const renderPatch = useMemo(
-    () => ({ ...kingdomPatch, objects: [...kingdomPatch.objects, ...kingdomDecorObjects(decorState)] }),
-    [kingdomPatch, decorState]
-  );
+  const renderPatch = useMemo(() => {
+    const objects = [...kingdomPatch.objects, ...kingdomDecorObjects(decorState)];
+    // Keepsakes waiting on the shelf show as a glowing gift crate by the plaza —
+    // tapping it opens decorate mode.
+    if (decorState.unplanted.length > 0) {
+      objects.push({
+        id: 'kingdom-gift-crate',
+        kind: 'prop' as const,
+        assetKey: 'gift_crate',
+        label: 'Keepsakes',
+        col: 2.2,
+        row: 2.55,
+        footprint: 1,
+        sourceLabel: `${decorState.unplanted.length} waiting`,
+        category: 'decor' as const,
+        badge: decorState.unplanted.length,
+        sizeScale: 0.95,
+      });
+    }
+    return { ...kingdomPatch, objects };
+  }, [kingdomPatch, decorState]);
 
   const handlePlantGift = (giftId: string, name: string) => {
     const at = getCenterCellRef.current?.();
-    setDecorState((state) => plantKingdomGift(state, giftId, at?.col, at?.row));
-    setMicrocopy(`${name} planted`);
+    setDecorState((state) => plantKingdomGift(state, giftId, at ? snap(at.col) : undefined, at ? snap(at.row) : undefined));
+    setJustPlantedId(`placed-${giftId}`);
+    setMicrocopy(`${name} planted — drag it into place`);
   };
   const handleMoveDecor = (id: string, col: number, row: number) => {
-    setDecorState((state) => moveKingdomDecor(state, id, col, row));
+    setDecorState((state) => moveKingdomDecor(state, id, snap(col), snap(row)));
   };
   const handleRemoveDecor = (id: string) => {
     setDecorState((state) => unplantKingdomDecor(state, id));
@@ -131,6 +178,63 @@ export default function KingdomScreen() {
     }
   }, [discoveryBackfillCount, dismissBackfillNotice]);
 
+  // Earning inputs for the achievement lane: unlocked discoveries + the
+  // observation/mood props the pattern engine says have fired.
+  const unlockedDiscoveries = useMemo(
+    () =>
+      discoveryEntries
+        .filter((entry) => entry.record)
+        .map((entry) => ({
+          id: entry.def.id,
+          name: entry.def.name,
+          rarity: entry.def.rarity,
+          unlockedAt: entry.record?.unlockedAt ?? null,
+        })),
+    [discoveryEntries]
+  );
+  const patternProps = useMemo(() => {
+    const observations = deriveObservations({ days, selectedDay: null, motifs: deriveContinuityMotifs(days, 6) });
+    const inventory = deriveWorldPropInventory({ propsState: loadWorldPropsState(), discoveryEntries, observations, days });
+    return inventory.owned
+      .filter((entry) => entry.def.unlockKind === 'observation' || entry.def.unlockKind === 'mood')
+      .map((entry) => ({
+        id: entry.def.id,
+        assetKey: entry.def.assetKey,
+        name: entry.def.name,
+        sourceLabel: entry.def.sourceLabel,
+        sizeScale: entry.def.sizeScale,
+      }));
+  }, [days, discoveryEntries]);
+
+  // Sync on focus: grant whatever new days + achievements have earned (and the
+  // one-time legacy hoist), then derive the morning ceremony from the result.
+  useFocusEffect(
+    useCallback(() => {
+      const next = syncKingdomDecorFromDays(days, { unlockedDiscoveries, patternProps });
+      setDecorState(next);
+      setArrivals((current) => current ?? deriveKingdomArrivals(kingdom, next, { holdGiftDayIds: formingDayIds }));
+      if (consumeKeepsakesShelfRequest()) setKeepsakesOpen(true);
+    }, [days, kingdom, unlockedDiscoveries, patternProps, formingDayIds])
+  );
+
+  // Expansion plots (K4): milestone-earned garden islets docked around the
+  // island, each plantable ground with its own decor.
+  const legendaryCount = useMemo(
+    () => discoveryEntries.filter((entry) => entry.record && entry.def.rarity === 'legendary').length,
+    [discoveryEntries]
+  );
+  const plots = useMemo(() => deriveKingdomPlots(kingdom.totals, legendaryCount), [kingdom.totals, legendaryCount]);
+  const renderPatches = useMemo(
+    () => [
+      renderPatch,
+      ...plots.map((plot) => ({
+        ...deriveKingdomPlotPatch(plot),
+        objects: kingdomDecorObjects(decorState, plot.id),
+      })),
+    ],
+    [renderPatch, plots, decorState]
+  );
+
   // Essence (cosmetic currency) + cosmetics. "+N" toast when it grows.
   const { earned: essenceEarned, balance: essenceBalance, purchases: essencePurchases, spend: spendEssence } = useEssence();
   const prevEssenceRef = useRef<number | null>(null);
@@ -159,8 +263,15 @@ export default function KingdomScreen() {
   // Tapping a building opens its card (question, lifetime count, level);
   // tapping a decoration opens its provenance card (where life earned it).
   const [selectedBuilding, setSelectedBuilding] = useState<KingdomBuilding | null>(null);
+  // The full-screen collection (the Shelf / the Menu / the Grove).
+  const [collectionBuilding, setCollectionBuilding] = useState<KingdomBuilding | null>(null);
   const handleSelectCell = (category: WorldObjectCategory, objectId?: string) => {
     if (category === 'decor') {
+      // The gift crate is the door into planting; other decor shows its story.
+      if (objectId === 'kingdom-gift-crate') {
+        setKeepsakesOpen(true);
+        return;
+      }
       if (!customising && objectId) setProvenanceItem(findKingdomDecor(decorState, objectId));
       return;
     }
@@ -193,28 +304,30 @@ export default function KingdomScreen() {
 
       <View style={styles.stage}>
         <WorldCanvas
-          patches={[renderPatch]}
+          patches={renderPatches}
           ring={PATCH_RING}
           animateOnMount
-          lockCamera
           imageBase
-          hideRecenter
           artefacts={worldArtefacts}
           customising={customising}
           onToggleCustomising={() => setCustomising((value) => !value)}
           showCustomiseButton={false}
           onMoveDecor={handleMoveDecor}
           onRemoveDecor={handleRemoveDecor}
+          snapCell={snap}
           panRef={panRef}
           getCenterCellRef={getCenterCellRef}
           onSelectPatch={() => {}}
           onSelectMemory={() => {}}
           onSelectCell={handleSelectCell}
+          highlightObjectId={justPlantedId}
         />
 
-        {/* Header chrome — the Kingdom's name + what a life has built so far. */}
-        <View pointerEvents="box-none" style={styles.header}>
-          <View style={styles.headerCopy} pointerEvents="none">
+        {/* Header chrome — the Kingdom's name + what a life has built so far.
+            The copy stays top-left; the actions live on their own right-edge
+            rail below so long subtitles can never push them off screen. */}
+        <View pointerEvents="none" style={styles.header}>
+          <View style={styles.headerCopy}>
             <ThemedText type="onboardingLabel" style={styles.headerKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
               Your Kingdom
             </ThemedText>
@@ -222,51 +335,66 @@ export default function KingdomScreen() {
               {subtitle}
             </ThemedText>
           </View>
-          <View style={styles.headerActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Hall of Discoveries"
-              onPress={() => setDiscoveriesOpen(true)}
-              style={styles.headerButton}>
-              <IconSymbol name="star.fill" size={18} color={Lantern.moon50} />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Cosmetics"
-              onPress={() => setCosmeticsOpen(true)}
-              style={styles.headerButton}>
-              <IconSymbol name="diamond.fill" size={18} color={Lantern.moon50} />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={customising ? 'Finish decorating' : 'Decorate your Kingdom'}
-              onPress={() => setCustomising((value) => !value)}
-              style={[styles.headerButton, customising ? styles.headerButtonOn : null]}>
-              <IconSymbol
-                name={customising ? 'checkmark' : 'pencil'}
-                size={18}
-                color={customising ? Lantern.ink950 : Lantern.moon50}
-              />
-              {!customising && decorState.unplanted.length > 0 ? (
-                <View style={styles.giftBadge} pointerEvents="none">
-                  <ThemedText style={styles.giftBadgeLabel} lightColor={Lantern.ink950} darkColor={Lantern.ink950}>
-                    {decorState.unplanted.length}
-                  </ThemedText>
-                </View>
-              ) : null}
-            </Pressable>
-          </View>
+        </View>
+
+        {/* Action rail — vertical, anchored to the right edge. */}
+        <View pointerEvents="box-none" style={styles.actionRail}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Hall of Discoveries"
+            onPress={() => setDiscoveriesOpen(true)}
+            style={styles.headerButton}>
+            <IconSymbol name="star.fill" size={18} color={Lantern.moon50} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cosmetics"
+            onPress={() => setCosmeticsOpen(true)}
+            style={styles.headerButton}>
+            <IconSymbol name="diamond.fill" size={18} color={Lantern.moon50} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={customising ? 'Finish decorating' : 'Decorate your Kingdom'}
+            onPress={() => setCustomising((value) => !value)}
+            style={[styles.headerButton, customising ? styles.headerButtonOn : null]}>
+            <IconSymbol
+              name={customising ? 'checkmark' : 'pencil'}
+              size={18}
+              color={customising ? Lantern.ink950 : Lantern.moon50}
+            />
+            {!customising && decorState.unplanted.length > 0 ? (
+              <View style={styles.giftBadge} pointerEvents="none">
+                <ThemedText style={styles.giftBadgeLabel} lightColor={Lantern.ink950} darkColor={Lantern.ink950}>
+                  {decorState.unplanted.length}
+                </ThemedText>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
 
         {/* Keepsake tray — gifts life has earned, waiting to be planted. Tap one
             to plant it where the camera is centred, then drag it into place. */}
         {customising ? (
           <View style={[styles.decorTray, { bottom: tabBarHeight + 12 }]}>
-            <ThemedText style={styles.decorTrayHint} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              {decorState.unplanted.length > 0
-                ? 'Plant your keepsakes · drag to place · ✕ returns them here'
-                : 'Live more days to earn keepsakes · drag placed ones to rearrange'}
-            </ThemedText>
+            <View style={styles.decorTrayHeader}>
+              <ThemedText style={styles.decorTrayHint} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                {decorState.unplanted.length > 0
+                  ? `${decorState.unplanted.length} ${decorState.unplanted.length === 1 ? 'keepsake' : 'keepsakes'} to plant · drag to place`
+                  : 'Drag placed keepsakes to rearrange'}
+              </ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setSnapEnabled((value) => !value)}
+                style={[styles.snapChip, snapEnabled ? styles.snapChipOn : null]}>
+                <ThemedText
+                  style={styles.snapLabel}
+                  lightColor={snapEnabled ? Lantern.ink950 : Lantern.moon300}
+                  darkColor={snapEnabled ? Lantern.ink950 : Lantern.moon300}>
+                  Snap {snapEnabled ? 'on' : 'off'}
+                </ThemedText>
+              </Pressable>
+            </View>
             {decorState.unplanted.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.giftRow}>
                 {decorState.unplanted.map((gift) => (
@@ -275,12 +403,17 @@ export default function KingdomScreen() {
                     accessibilityRole="button"
                     onPress={() => handlePlantGift(gift.id, gift.name)}
                     style={({ pressed }) => [styles.giftChip, pressed && styles.giftChipPressed]}>
-                    <ThemedText style={styles.giftName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                      {gift.name}
-                    </ThemedText>
-                    <ThemedText numberOfLines={1} style={styles.giftSource} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                      {gift.provenance.label}
-                    </ThemedText>
+                    {worldAssetSource(gift.assetKey) ? (
+                      <Image contentFit="contain" source={worldAssetSource(gift.assetKey)} style={styles.giftThumb} transition={120} />
+                    ) : null}
+                    <View style={styles.giftChipBody}>
+                      <ThemedText style={styles.giftName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                        {gift.name}
+                      </ThemedText>
+                      <ThemedText numberOfLines={1} style={styles.giftSource} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                        {gift.provenance.label}
+                      </ThemedText>
+                    </View>
                   </Pressable>
                 ))}
               </ScrollView>
@@ -302,8 +435,56 @@ export default function KingdomScreen() {
         ) : null}
       </View>
 
+      {keepsakesOpen ? (
+        <KeepsakesSheet
+          gifts={decorState.unplanted}
+          onPlant={(gift) => {
+            setKeepsakesOpen(false);
+            handlePlantGift(gift.id, gift.name);
+            setCustomising(true);
+          }}
+          onDecorate={() => {
+            setKeepsakesOpen(false);
+            setCustomising(true);
+          }}
+          onOpenAlmanac={() => {
+            setKeepsakesOpen(false);
+            setAlmanacOpen(true);
+          }}
+          onClose={() => setKeepsakesOpen(false)}
+        />
+      ) : null}
+
+      {almanacOpen ? <KeepsakeAlmanacSheet sections={keepsakeAlmanac(decorState)} onClose={() => setAlmanacOpen(false)} /> : null}
+
       {selectedBuilding ? (
-        <KingdomBuildingSheet building={selectedBuilding} onClose={() => setSelectedBuilding(null)} />
+        <KingdomBuildingSheet
+          building={selectedBuilding}
+          archive={buildKingdomArchive(days, selectedBuilding.id)}
+          onOpenCollection={
+            ARCHIVE_BUILDINGS.includes(selectedBuilding.id)
+              ? () => {
+                  setCollectionBuilding(selectedBuilding);
+                  setSelectedBuilding(null);
+                }
+              : undefined
+          }
+          onClose={() => setSelectedBuilding(null)}
+        />
+      ) : null}
+
+      {collectionBuilding ? (
+        <KingdomArchiveModal
+          building={collectionBuilding}
+          entries={collectKingdomArchiveEntries(days, collectionBuilding.id)}
+          onOpenDay={(dayId) => {
+            // Relive the day this came from — hand off to the Today tab.
+            setCollectionBuilding(null);
+            requestSelectedDay(dayId);
+            router.push('/today');
+          }}
+          onClose={() => setCollectionBuilding(null)}
+        />
       ) : null}
 
       {/* Provenance card — what a planted keepsake remembers. */}
@@ -321,6 +502,9 @@ export default function KingdomScreen() {
                 {provenanceItem.provenance.isoDate}
               </ThemedText>
             ) : null}
+            <ThemedText style={styles.provenanceHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Hold & drag to move it
+            </ThemedText>
           </Animated.View>
         </Pressable>
       ) : null}
@@ -345,9 +529,9 @@ export default function KingdomScreen() {
       ) : null}
 
       {/* Morning ceremony — plays before anything else asks for attention. */}
-      {arrivals && !customising ? <KingdomArrivalCeremony arrivals={arrivals} onDone={handleCeremonyDone} /> : null}
+      {arrivals && !customising && !keepsakesOpen && !almanacOpen ? <KingdomArrivalCeremony arrivals={arrivals} onDone={handleCeremonyDone} /> : null}
 
-      {celebrateDiscovery && !arrivals && !selectedBuilding && !discoveriesOpen && !cosmeticsOpen && !customising && !provenanceItem ? (
+      {celebrateDiscovery && !arrivals && !selectedBuilding && !discoveriesOpen && !cosmeticsOpen && !customising && !keepsakesOpen && !provenanceItem ? (
         <DiscoveryReveal discovery={celebrateDiscovery} onDismiss={() => markDiscoverySeen(celebrateDiscovery.id)} />
       ) : null}
     </GestureHandlerRootView>
@@ -358,18 +542,22 @@ const styles = StyleSheet.create({
   screen: { backgroundColor: Lantern.ink950, flex: 1 },
   stage: { flex: 1 },
   header: {
-    alignItems: 'flex-start',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     left: 20,
     position: 'absolute',
-    right: 20,
+    right: 76,
     top: 64,
   },
   headerCopy: { gap: 3 },
   headerKicker: { fontSize: 13, letterSpacing: 1.2 },
   headerSubtitle: { fontSize: 12, fontWeight: '600' },
-  headerActions: { flexDirection: 'row', gap: 10 },
+  actionRail: {
+    alignItems: 'center',
+    gap: 12,
+    position: 'absolute',
+    right: 14,
+    top: 64,
+    zIndex: 30,
+  },
   headerButton: {
     alignItems: 'center',
     backgroundColor: 'rgba(28,24,48,0.86)',
@@ -416,19 +604,35 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 40,
   },
-  decorTrayHint: { fontSize: 11.5, fontWeight: '700', textAlign: 'center' },
+  decorTrayHeader: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' },
+  decorTrayHint: { flexShrink: 1, fontSize: 11.5, fontWeight: '700', textAlign: 'center' },
+  snapChip: {
+    backgroundColor: 'rgba(28,24,48,0.86)',
+    borderColor: 'rgba(196,186,240,0.3)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  snapChipOn: { backgroundColor: Lantern.ember300, borderColor: Lantern.ember300 },
+  snapLabel: { fontSize: 11, fontWeight: '900' },
   giftRow: { gap: 8, paddingHorizontal: 2 },
   giftChip: {
+    alignItems: 'center',
     backgroundColor: 'rgba(28,24,48,0.92)',
     borderColor: 'rgba(255,195,107,0.4)',
     borderCurve: 'continuous',
     borderRadius: 14,
     borderWidth: 1,
-    gap: 2,
-    maxWidth: 190,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flexDirection: 'row',
+    gap: 8,
+    maxWidth: 220,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
   },
+  giftThumb: { height: 34, width: 34 },
+  giftChipBody: { flexShrink: 1, gap: 1 },
   giftChipPressed: { backgroundColor: 'rgba(40,34,60,0.95)' },
   giftName: { fontSize: 13, fontWeight: '800' },
   giftSource: { fontSize: 11, fontWeight: '600' },
@@ -450,4 +654,5 @@ const styles = StyleSheet.create({
   provenanceName: { fontSize: 15, fontWeight: '800' },
   provenanceLabel: { fontSize: 12.5, fontWeight: '700' },
   provenanceDate: { fontSize: 11.5, fontWeight: '600' },
+  provenanceHint: { fontSize: 11, fontWeight: '600', marginTop: 4, opacity: 0.8 },
 });

@@ -67,6 +67,16 @@ export type KingdomTotals = {
   bigMoments: number;
 };
 
+// An expansion plot — a small garden islet docked beside the main island,
+// earned by milestones (days lived / legendary discoveries). Plantable ground.
+export type KingdomPlot = {
+  id: string; // 'plot-1', 'plot-2', … (stable — decor placements reference it)
+  index: number;
+  label: string;
+  // What earned it ("30 days lived", "A legendary discovery").
+  earnedFrom: string;
+};
+
 export type KingdomState = {
   version: 1;
   builtFromDayCount: number;

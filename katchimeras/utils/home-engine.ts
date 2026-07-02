@@ -74,7 +74,7 @@ import { resolveVariantCellId } from '@/utils/creature-variant';
 import { aggregatePhotoVision, mergeDayVision } from '@/utils/vision-signals';
 import { mergeCaptureEnergy } from '@/utils/capture-energy';
 import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
-import { detectStudioInText, detectStudioInVision, type StudioDetection } from '@/utils/studio-detect';
+import { detectStudioInText, detectStudioInVision, extractStudioTitle, isGenericStudioLabel, studioDetectionFromMedia, type StudioDetection } from '@/utils/studio-detect';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 
 import type { EncounterHistoryMap } from '@/types/home';
@@ -917,7 +917,15 @@ export function applyNoteForToday(
   // reference to the note (so the reader can show where it came from).
   const foodDetection = detectFoodInText(input.text);
   // Likewise, a note about a book/film/show/game lands in the Studio archive.
-  const studioDetection = detectStudioInText(input.text);
+  // Title enforcement: when the regex read of the note text can't find a real
+  // title, fall back to the note's interpreted label (the on-device LLM often
+  // titles the note after the work itself).
+  const studioDetection = (() => {
+    const detection = detectStudioInText(input.text);
+    if (!detection.detected || !isGenericStudioLabel(detection.label)) return detection;
+    const fromLabel = extractStudioTitle(input.label) ?? (isGenericStudioLabel(input.label) ? null : input.label.trim());
+    return fromLabel ? { ...detection, label: fromLabel } : detection;
+  })();
   const nextDay: StoredHomeDayRecord = {
     ...base,
     notes: [...(base.notes ?? []), note],
@@ -1417,10 +1425,16 @@ export function applyCapturedMomentForToday(
   const scene = capture.scene ?? classifyScene(capture.vision);
   const foodDetection: FoodDetection =
     scene.type === 'food' ? scene.food ?? detectFoodInVision(capture.vision) : { detected: false };
-  // A snapped book cover / poster / screen folds into the Studio archive.
+  // A snapped book cover / poster / screen folds into the Studio archive. The
+  // scene read is the arbiter: a media scene carries the identified work (LLM
+  // title + creator, or the OCR heuristic); any other scene still gets the
+  // direct vision check as a safety net (legacy LLM builds have no media type).
   const studioDetection: StudioDetection = foodDetection.detected
     ? { detected: false }
-    : detectStudioInVision(capture.vision);
+    : scene.type === 'media' && scene.media
+      ? studioDetectionFromMedia(scene.media.mediaType, scene.media.title)
+      : detectStudioInVision(capture.vision);
+  const studioDetail = scene.type === 'media' && scene.media?.creator ? `by ${scene.media.creator}` : null;
   const nextDay: StoredHomeDayRecord = {
     ...base,
     capturedEnergy: mergeCaptureEnergy(base.capturedEnergy, capture.energy),
@@ -1453,6 +1467,7 @@ export function applyCapturedMomentForToday(
             now,
             archetype: meaning?.archetype,
             thumbnailUri: meaning?.thumbnailUri ?? null,
+            detail: studioDetail,
           })
         )
       : base.studioMoments,

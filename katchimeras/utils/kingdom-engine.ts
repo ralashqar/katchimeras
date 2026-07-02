@@ -5,6 +5,7 @@ import type {
   KingdomBuildingLevel,
   KingdomCreature,
   KingdomLandmark,
+  KingdomPlot,
   KingdomState,
   KingdomTotals,
 } from '@/types/kingdom';
@@ -155,4 +156,30 @@ export function deriveKingdom(days: HomeDayRecord[]): KingdomState {
     landmarks,
     totals,
   };
+}
+
+// --- Expansion plots (K4) ---------------------------------------------------
+// Cadence (docs §2/§8 default): the first islet at 30 days lived, another every
+// 60 after, plus one per legendary discovery. Pure derivation — plots can never
+// be lost, only gained; capped by the dock ring around the island.
+
+export const MAX_KINGDOM_PLOTS = 8;
+const FIRST_PLOT_AT_DAYS = 30;
+const PLOT_EVERY_DAYS = 60;
+
+export function deriveKingdomPlots(totals: KingdomTotals, legendaryDiscoveries = 0): KingdomPlot[] {
+  const fromDays =
+    totals.daysLived < FIRST_PLOT_AT_DAYS ? 0 : 1 + Math.floor((totals.daysLived - FIRST_PLOT_AT_DAYS) / PLOT_EVERY_DAYS);
+  const earned = Math.min(MAX_KINGDOM_PLOTS, fromDays + Math.max(0, legendaryDiscoveries));
+  return Array.from({ length: earned }, (_, index) => {
+    const fromDay = index < fromDays;
+    return {
+      id: `plot-${index + 1}`,
+      index,
+      label: `Garden ${index + 1}`,
+      earnedFrom: fromDay
+        ? `${index === 0 ? FIRST_PLOT_AT_DAYS : FIRST_PLOT_AT_DAYS + index * PLOT_EVERY_DAYS} days lived`
+        : 'A legendary discovery',
+    };
+  });
 }

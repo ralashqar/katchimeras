@@ -1,4 +1,4 @@
-import type { KingdomBuilding, KingdomBuildingId, KingdomState } from '@/types/kingdom';
+import type { KingdomBuilding, KingdomBuildingId, KingdomPlot, KingdomState } from '@/types/kingdom';
 import type { WorldObject, WorldObjectCategory, WorldPatch, WorldTile } from '@/types/world';
 import { resolveStructurePosition, resolveStructureScale } from '@/utils/world-structures';
 
@@ -37,9 +37,9 @@ function buildingAssetKey(building: KingdomBuilding): string {
     case 'memoryLibrary':
       return building.level === 0 ? 'memory_vault_empty' : `memory_vault_${building.level}`;
     case 'journeyHall':
-      return `steps_path_${Math.max(1, building.level)}`;
+      return 'journey_hall';
     case 'crossroads':
-      return building.level === 0 ? 'observatory_empty' : 'observatory';
+      return 'crossroads';
     case 'sanctuary':
       return building.level === 0 ? 'sanctuary_empty' : 'sanctuary';
     case 'study':
@@ -73,6 +73,48 @@ function groundTiles(size: number): WorldTile[] {
     }
   }
   return tiles;
+}
+
+// Where earned plots dock around the centre island (patch-grid offsets, in
+// unlock order) and which islet base each draws.
+const PLOT_DOCKS: { col: number; row: number }[] = [
+  { col: 1, row: 0 },
+  { col: 0, row: 1 },
+  { col: -1, row: 0 },
+  { col: 0, row: -1 },
+  { col: 1, row: 1 },
+  { col: -1, row: 1 },
+  { col: 1, row: -1 },
+  { col: -1, row: -1 },
+];
+// Islet art (plot_base_1/2) is parked until it matches the cozy style —
+// plots reuse the main island base for cohesion meanwhile.
+const PLOT_BASES = ['base_env2'];
+
+// An expansion plot as a render patch: an empty islet (its decor merges in at
+// the screen, same as the centre island's).
+export function deriveKingdomPlotPatch(plot: KingdomPlot): WorldPatch {
+  const dock = PLOT_DOCKS[plot.index % PLOT_DOCKS.length];
+  return {
+    id: plot.id,
+    dayId: plot.id,
+    baseId: PLOT_BASES[plot.index % PLOT_BASES.length],
+    isoDate: '',
+    name: plot.label,
+    primaryArchetype: 'calm',
+    secondaryArchetype: null,
+    creatureId: null,
+    creatureVisualKey: null,
+    creatureName: null,
+    rarity: null,
+    size: 4,
+    tiles: groundTiles(4),
+    objects: [],
+    memoryNodes: [],
+    gridCol: dock.col,
+    gridRow: dock.row,
+    connectorSides: [],
+  };
 }
 
 export function deriveKingdomPatch(kingdom: KingdomState): WorldPatch {
@@ -120,6 +162,7 @@ export function deriveKingdomPatch(kingdom: KingdomState): WorldPatch {
   return {
     id: 'kingdom',
     dayId: 'kingdom',
+    baseId: 'base_env3',
     isoDate: newest?.isoDate ?? '',
     name: 'Your Kingdom',
     primaryArchetype: 'meaningful',

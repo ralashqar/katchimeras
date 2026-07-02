@@ -120,6 +120,15 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   // Quest Board: today's notice board; tapping it opens the day's Memory Quests.
   quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_01.png'),
 
+  // --- Kingdom keepsakes (K5 wave 2 — earned decorations, kingdom-decor.ts) ---
+  trail_stone: require('../assets/images/katchimeras/world/objects/trail_stones/trail_stone_pick.png'), // 👣 journeys
+  picnic_basket: require('../assets/images/katchimeras/world/objects/picnic_set/picnic_basket_pick.png'), // 🍽 food days
+  book_stack: require('../assets/images/katchimeras/world/objects/keepsake_set/book_stack_pick.png'), // 📚 inspirations
+  festival_bunting: require('../assets/images/katchimeras/world/objects/festival_set/festival_bunting_pick.png'), // 🎉 big moments
+  gift_crate: require('../assets/images/katchimeras/world/objects/gift_crate/gift_crate_pick.png'), // 🎁 keepsakes waiting
+  monument_stone: require('../assets/images/katchimeras/world/objects/monument_shard/monument_stone_pick.png'), // epic discovery
+  monument_shard: require('../assets/images/katchimeras/world/objects/monument_shard/monument_shard_pick.png'), // legendary discovery
+
   // --- Cozy Collectible buildings (docs/world-structures-cozy-direction.md) ---
   // The 7 domains in one designer-toy style, on the new base_env2 island.
   home: require('../assets/images/katchimeras/world/objects/home/home_01.png'), // 🏠 the day's story (chronicle)
@@ -130,8 +139,8 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.png'),
   memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.png'),
   memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.png'),
-  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 (legacy signpost)
-  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 (legacy)
+  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 where did I go? (cozy signpost + lantern)
+  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 how did I move? (cozy footprint stele)
   // 🔭 Observatory tower (Places / where I went) — a proper structure with a telescope.
   observatory: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
   observatory_empty: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
@@ -232,7 +241,12 @@ export function worldAssetSource(assetKey: string): ImageSourcePropType | null {
 // scripts/generate-world-base.py (generate → matte → alpha verify).
 const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
   base_meadow: require('../assets/images/katchimeras/world/base/base_meadow.png'), // original (kept as backup)
-  base_env2: require('../assets/images/katchimeras/world/base/base_env2.png'), // floating-island base (current)
+  base_env2: require('../assets/images/katchimeras/world/base/base_env2.png'), // cozy island (kept as backup)
+  // Kingdom iso set: diamond islands aligned to the isometric axes, cream paths
+  // along both iso diagonals (docs/kingdom-world-design.md §2).
+  base_env3: require('../assets/images/katchimeras/world/base/base_env3.png'), // Kingdom centre island (current)
+  plot_base_1: require('../assets/images/katchimeras/world/base/plot_base_1.png'), // expansion islet A
+  plot_base_2: require('../assets/images/katchimeras/world/base/plot_base_2.png'), // expansion islet B
 };
 
 export function worldBaseSource(baseId: string): ImageSourcePropType | null {

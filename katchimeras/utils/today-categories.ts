@@ -21,7 +21,7 @@ export type TodayCategoryId =
   | 'food'
   | 'studio'
   | 'sleep'
-  | 'bigMoment'
+  | 'mood'
   | 'quests';
 
 export type TodayCategoryState = {
@@ -80,6 +80,27 @@ function hasFeelingAnswer(day: HomeDayRecord): boolean {
   );
 }
 
+// The day's LAST logged mood → icon + accent for the mood orbit icon (same
+// faces/tints as the Mood Monument sheet's choices).
+const MOOD_META: Record<string, { icon: IconSymbolName; accent: string }> = {
+  energized: { icon: 'face.very_happy', accent: '#FFC36B' },
+  good: { icon: 'face.happy', accent: '#FFE08A' },
+  calm: { icon: 'face.happy', accent: '#91D8C7' },
+  loved: { icon: 'face.happy', accent: '#F49AC1' },
+  meh: { icon: 'face.neutral', accent: '#A7D5FF' },
+  drained: { icon: 'face.sad', accent: '#91D8C7' },
+  low: { icon: 'face.sad', accent: '#91D8C7' },
+  stressed: { icon: 'face.very_sad', accent: '#C77DFF' },
+};
+
+function latestMoodMeta(day: HomeDayRecord): { icon: IconSymbolName; accent: string } | null {
+  const latest = [...(day.promptAnswers ?? [])]
+    .reverse()
+    .find((answer) => !answer.dismissed && answer.kind === 'feeling' && answer.choiceIds.length > 0);
+  const choice = latest?.choiceIds[0];
+  return (choice && MOOD_META[choice]) || null;
+}
+
 const REFLECTIVE_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'gratitude', 'highlight', 'intention']);
 
 function formatSteps(steps: number): string {
@@ -100,7 +121,6 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
   ).length;
   const foodCount = day.foodMoments?.length ?? 0;
   const studioCount = day.studioMoments?.length ?? 0;
-  const bigMomentCount = day.bigMoments?.length ?? 0;
   const questsLeft = quests.filter((quest) => !quest.completed).length;
 
   const foodSuggestion = foodCount === 0 ? detectFoodInVision(day.vision) : null;
@@ -154,8 +174,8 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
       accent: '#A78BFA',
       count: reflectionCount,
       hasContent: reflectionCount > 0,
-      needsAttention: !hasFeelingAnswer(day),
-      glowReason: 'How did today feel?',
+      // The mood icon carries the "how does it feel?" ask — this stays a reader.
+      needsAttention: false,
     },
     {
       id: 'food',
@@ -188,13 +208,16 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
       glowReason: 'How did the night treat you?',
     },
     {
-      id: 'bigMoment',
-      label: 'Big Moment',
-      icon: 'star.fill',
-      accent: '#FFD98E',
-      count: bigMomentCount,
-      hasContent: bigMomentCount > 0,
-      needsAttention: false,
+      id: 'mood',
+      label: 'Mood',
+      // No mood yet → a neutral smiling face asking; logged → the mood's own
+      // face + tint, so the icon IS the day's current mood.
+      icon: latestMoodMeta(day)?.icon ?? 'face.smiling',
+      accent: latestMoodMeta(day)?.accent ?? '#C9C2E8',
+      count: 0,
+      hasContent: hasFeelingAnswer(day),
+      needsAttention: !hasFeelingAnswer(day),
+      glowReason: 'How does it feel right now?',
     },
     {
       id: 'quests',

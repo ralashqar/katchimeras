@@ -54,6 +54,24 @@ public final class KatchimeraFoundationModule: Module {
       promise.resolve([String: String]())
     }
 
+    // Deep hierarchical scene read: classify the photo into ONE top-level scene
+    // type, and — only when the photo is OF a work of media (a book cover, a
+    // film poster, an album) — also identify the work from the OCR'd cover text
+    // plus the model's own knowledge. Returns { type, subject, mediaKind, title,
+    // creator } or {} on any failure → JS falls back. Nothing leaves the device.
+    AsyncFunction("readSceneAsync") { (tags: [String], ocrLines: [String], faceCount: Int, promise: Promise) in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        Task {
+          let result = await Self.readScene(tags: tags, ocrLines: ocrLines, faceCount: faceCount)
+          promise.resolve(result)
+        }
+        return
+      }
+      #endif
+      promise.resolve([String: String]())
+    }
+
     // Hierarchical scene read: from the photo's on-device vision tags, classify
     // the single best top-level scene type + a specific subject phrase. Returns
     // { "type": ..., "subject": ... } or {} on any failure → JS falls back to the
@@ -152,6 +170,82 @@ public final class KatchimeraFoundationModule: Module {
 
   #if canImport(FoundationModels)
   @available(iOS 26.0, *)
+  private static func readScene(tags: [String], ocrLines: [String], faceCount: Int) async -> [String: String] {
+    guard case .available = SystemLanguageModel.default.availability else {
+      return [:]
+    }
+    let cleaned = tags.filter { !$0.isEmpty }
+    guard !cleaned.isEmpty else {
+      return [:]
+    }
+
+    let instructions = Instructions(
+      """
+      You classify what a personal photo is mainly about, for a gentle journaling app.
+      You receive what an on-device vision model detected (MAIN subject first) and any
+      text it read in the photo. Decide what the photo is MAINLY OF — the thing the
+      person pointed the camera at — not incidental textures or background objects.
+      Choose the single best top-level category:
+      - media: the photo is OF a work — a book cover, a film or TV poster, a screen
+        showing an identifiable film/show, a video game box or gameplay, an album
+        cover or vinyl, artwork in a gallery
+      - food: a meal, drink, snack, dessert, or cooking (still food when packaging
+        or a menu is partly visible)
+      - social: people together — a gathering, party, friends, or family
+      - screen: a device itself — TV, monitor, phone, laptop — with no identifiable work on it
+      - nature: the outdoors — landscapes, plants, sky, water, weather, wild animals
+      - pet: a pet cat, dog, or companion animal
+      - activity: a sport, concert, workout, hobby, or performance
+      - place: a notable building, interior, street, or venue (no clear people or food)
+      - document: plain text — a receipt, a menu, a sign, a screenshot, a page of writing
+      - other: anything that does not fit the above
+      Then give a short, specific 2-5 word 'subject' phrase for the main thing
+      (e.g. "a bowl of ramen", "friends at dinner", "a worn paperback"). No emoji, no quotes.
+      Only when the category is media, also identify the work:
+      - mediaKind: book, film, show, game, music, or art
+      - title: the work's full official title. Use the text read in the photo plus your
+        own knowledge of the work — cover text is often partial or split across lines
+        (author, title fragments, publisher). Only name a title the photo's text actually
+        supports; if you cannot tell which work it is, leave title empty.
+      - creator: the work's author / director / artist, if you are confident.
+      When the category is not media, set mediaKind to none and leave title and creator empty.
+      """
+    )
+    let session = LanguageModelSession(instructions: instructions)
+
+    let primary = cleaned.first ?? "an everyday moment"
+    let rest = cleaned.dropFirst().prefix(8).joined(separator: ", ")
+    var described = "mainly \(primary)"
+    if !rest.isEmpty { described += " (also in frame: \(rest))" }
+    if faceCount >= 2 {
+      described += "; multiple people are in the photo"
+    } else if faceCount == 1 {
+      described += "; one person is in the photo"
+    }
+    let text = ocrLines.filter { !$0.isEmpty }.prefix(12).joined(separator: " / ")
+    var prompt = "The photo shows \(described)."
+    if !text.isEmpty {
+      prompt += " Text read in the photo: \"\(text)\"."
+    }
+    prompt += " Classify it now."
+
+    do {
+      let response = try await session.respond(to: Prompt(prompt), generating: SceneDeepRead.self)
+      return [
+        "type": response.content.type,
+        "subject": response.content.subject,
+        "mediaKind": response.content.mediaKind,
+        "title": response.content.title,
+        "creator": response.content.creator,
+      ]
+    } catch {
+      return [:]
+    }
+  }
+  #endif
+
+  #if canImport(FoundationModels)
+  @available(iOS 26.0, *)
   private static func classifyScene(tags: [String], faceCount: Int) async -> [String: String] {
     guard case .available = SystemLanguageModel.default.availability else {
       return [:]
@@ -228,6 +322,31 @@ struct NoteRead {
 
   @Guide(description: "The dominant feeling of the note", .anyOf(["calm", "energy", "together", "meaningful"]))
   let feeling: String
+}
+
+@available(iOS 26.0, *)
+@Generable
+struct SceneDeepRead {
+  @Guide(
+    description: "The single best top-level category for what the photo is mainly about",
+    .anyOf(["media", "food", "social", "screen", "nature", "pet", "activity", "place", "document", "other"])
+  )
+  let type: String
+
+  @Guide(description: "A short specific 2-5 word phrase naming the main subject (e.g. 'a bowl of ramen', 'friends at dinner'). No punctuation, no emoji, no quotes")
+  let subject: String
+
+  @Guide(
+    description: "The kind of work when type is media, otherwise none",
+    .anyOf(["none", "book", "film", "show", "game", "music", "art"])
+  )
+  let mediaKind: String
+
+  @Guide(description: "The work's full official title when type is media and the photo's text identifies it (complete partial cover text using knowledge of the work). Empty otherwise. No quotes")
+  let title: String
+
+  @Guide(description: "The work's author, director, or artist when confidently known. Empty otherwise. No quotes")
+  let creator: String
 }
 
 @available(iOS 26.0, *)

@@ -1,8 +1,9 @@
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { MotiView } from 'moti';
-import { Fragment, type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { InteractionManager, type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Fragment, type MutableRefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { InteractionManager, type LayoutChangeEvent, Pressable, StyleSheet, type StyleProp, Text, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
@@ -10,6 +11,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   runOnJS,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDecay,
@@ -71,6 +73,9 @@ type Props = {
   lanternColor?: string;
   // Draw a glowing ring under this cell's object (the last one tapped).
   highlightedCell?: SceneSprite['category'] | null;
+  // Draw the same ring under a SPECIFIC object by id (e.g. a freshly planted
+  // keepsake, so the eye finds it to drag). Takes precedence over the cell.
+  highlightObjectId?: string | null;
   // A captured photo flying into a cell's object (e.g. into the Memory chest).
   captureFly?: { nonce: number; cellType: NonNullable<SceneSprite['category']>; photoUri?: string } | null;
   // Today's live patch: the egg is composited over its centre cell and the view
@@ -120,6 +125,9 @@ type Props = {
   showCustomiseButton?: boolean;
   onMoveDecor?: (id: string, col: number, row: number) => void;
   onRemoveDecor?: (id: string) => void;
+  // Cell snapping applied to a released decor drag (the screen owns the snap
+  // setting) — the canvas uses it to GLIDE the piece to its settled cell.
+  snapCell?: (value: number) => number;
   // Count shown on the Quest Board's tag (incomplete quests today).
   questCount?: number;
   // The parent passes a ref to the camera-pan gesture so its OWN over-patch UI
@@ -176,7 +184,7 @@ const LIFT_FRAC = 0.1;
 // When `imageBase` is on, the ground is ONE base PNG (utils/world-visuals) drawn
 // under the existing grid-placed objects, instead of the Skia slab + decal tiles.
 // Objects keep their placements; only the ground art changes. Device-tune these:
-const IMAGE_BASE_ID = 'base_env2';
+const IMAGE_BASE_ID = 'base_env3';
 // The base is drawn as a square centred on the patch's grass diamond, enlarged by
 // BASE_FACTOR so the day's objects read SMALL on an expansive ground.
 const BASE_FACTOR = IMAGE_BASE_FACTOR;
@@ -226,10 +234,12 @@ function defaultEggScale(): number {
 }
 
 // The stable customisation key for a sprite. Cells share a key by category (their
-// id changes as they level up); the creature is 'creature'; landmarks / memory
-// nodes key by their stable id. The egg is handled separately under key 'egg'.
+// id changes as they level up); creatures key by their stable id (the Kingdom
+// hosts a whole roster — a shared 'creature' slot would collide keys and drag
+// them all together); landmarks / memory nodes key by their stable id. The egg
+// is handled separately under key 'egg'.
 function slotKey(s: SceneSprite): string {
-  if (s.kind === 'creature') return 'creature';
+  if (s.kind === 'creature') return `creature:${s.id}`;
   if (s.category === 'decor') return s.id; // each decoration keyed individually
   return s.category ?? s.id;
 }
@@ -301,6 +311,7 @@ export function WorldCanvas({
   lanternColor,
   eggFeedKey = 0,
   highlightedCell,
+  highlightObjectId,
   captureFly,
   onPressEgg,
   memoryAlert = false,
@@ -321,6 +332,7 @@ export function WorldCanvas({
   showCustomiseButton = true,
   onMoveDecor,
   onRemoveDecor,
+  snapCell,
   questCount = 0,
   panRef,
   getCenterCellRef,
@@ -486,26 +498,52 @@ export function WorldCanvas({
 
   // Smooth OBJECT / DECOR drag: the live position rides reanimated shared values, so
   // NOTHING re-renders mid-drag — the gesture can never be interrupted by a re-render
-  // and nothing gets in the way. The move is committed (clamped to the image) on
-  // release. The dragged object renders as an overlay that follows the finger.
-  const [dragKey, setDragKey] = useState<string | null>(null);
+  // and nothing gets in the way. The dragged sprite is transformed IN PLACE (its
+  // SpriteView reads dragKeySV — no hide/remount, so no first-frame flicker), and on
+  // release the move is committed immediately while the sprite GLIDES from the finger
+  // to its settled (snapped) cell instead of teleporting.
+  const dragKeySV = useSharedValue('');
   const dragOX = useSharedValue(0);
   const dragOY = useSharedValue(0);
   const objDragRef = useRef<{ key: string; startX: number; startY: number; isDecor: boolean } | null>(null);
-  const beginObjDrag = useCallback((key: string, x: number, y: number, isDecor: boolean) => {
-    objDragRef.current = { key, startX: x, startY: y, isDecor };
-    setDragKey(key);
-  }, []);
+  // Set by the commit; consumed by the settle layout-effect in the SAME React
+  // commit that moves the sprite's base position, so the rebased transform and
+  // the new base land on the same frame.
+  const settleRef = useRef<{ key: string; dx: number; dy: number } | null>(null);
+  // IMPORTANT: the lift path must never touch React state — a re-render here
+  // swaps the active GestureDetector's gesture instance and can CANCEL the
+  // in-flight drag (cancelled gestures never fire onEnd, stranding the camera
+  // lock). Everything during the drag rides shared values only.
+  const beginObjDrag = useCallback(
+    (key: string, x: number, y: number, isDecor: boolean) => {
+      objDragRef.current = { key, startX: x, startY: y, isDecor };
+      dragOX.value = 0;
+      dragOY.value = 0;
+      dragKeySV.value = key;
+    },
+    [dragKeySV, dragOX, dragOY]
+  );
+  // Set while the release glide is animating — guards spurious commit calls
+  // (the pan's universal touch-end failsafe) from clearing the drag transform
+  // mid-glide.
+  const settlingKeyRef = useRef<string | null>(null);
+  const finishSettle = useCallback(
+    (key: string) => {
+      settlingKeyRef.current = null;
+      if (dragKeySV.value === key) dragKeySV.value = '';
+    },
+    [dragKeySV]
+  );
   const commitObjDrag = useCallback(
     (offX: number, offY: number) => {
       const drag = objDragRef.current;
       objDragRef.current = null;
-      // NOTE: do NOT reset dragOX/dragOY here — the overlay is still mounted for the
-      // frame between this commit and the re-render that hides it; resetting the
-      // offset would snap it back to the object's OLD spot for that frame. The next
-      // drag's onBegin resets them. The committed position lands via state below.
-      setDragKey(null);
-      if (!drag || !focusSlab) return;
+      if (!drag || !focusSlab) {
+        // Only clear when no settle glide is (or is about to be) running —
+        // duplicate end-of-touch calls must not pop the piece mid-glide.
+        if (!settleRef.current && !settlingKeyRef.current) dragKeySV.value = '';
+        return;
+      }
       const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
       let sx = drag.startX + offX;
       let sy = drag.startY + offY;
@@ -515,21 +553,58 @@ export function WorldCanvas({
         sy = Math.min(baseRect.top + baseRect.size - inset, Math.max(baseRect.top + inset, sy));
       }
       const frac = cellFromPoint(sx - focusSlab.centre.x + origin.x, sy - focusSlab.centre.y + origin.y);
+      const col = drag.isDecor && snapCell ? snapCell(frac.col) : frac.col;
+      const row = drag.isDecor && snapCell ? snapCell(frac.row) : frac.row;
+      // Where the settled cell sits in scene space — the glide's destination.
+      const settled = cellCenter(col, row);
+      const targetX = focusSlab.centre.x + (settled.x - origin.x);
+      const targetY = focusSlab.centre.y + (settled.y - origin.y);
+      settleRef.current = { key: drag.key, dx: sx - targetX, dy: sy - targetY };
       if (drag.isDecor) {
-        onMoveDecor?.(drag.key, frac.col, frac.row);
+        onMoveDecor?.(drag.key, col, row);
       } else {
         setCustom((prev) => {
-          const next = { ...prev, [drag.key]: { col: frac.col, row: frac.row } };
+          const next = { ...prev, [drag.key]: { col, row } };
           saveBaseCustomisation(next);
           return next;
         });
       }
     },
-    [focusSlab, baseRect, onMoveDecor]
+    [focusSlab, baseRect, onMoveDecor, snapCell, dragKeySV]
   );
-  const dragOverlayStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dragOX.value }, { translateY: dragOY.value }],
-  }));
+  // A cancelled gesture fires onFinalize but NOT onEnd — without this failsafe
+  // a cancellation mid-drag would strand the piece and the camera lock.
+  const finalizeObjDrag = useCallback(
+    (offX: number, offY: number) => {
+      if (objDragRef.current) commitObjDrag(offX, offY);
+    },
+    [commitObjDrag]
+  );
+  // Universal end-of-touch commit for the hold-to-move flow: the piece's live
+  // offset already lives in dragOX/OY, so no event payload is needed. Guarded —
+  // a no-op unless a piece is actually in hand.
+  const commitFromPan = useCallback(() => {
+    if (objDragRef.current) commitObjDrag(dragOX.value, dragOY.value);
+  }, [commitObjDrag, dragOX, dragOY]);
+  // Settle pass: the commit above re-renders with the sprite's base at its new
+  // cell. Before that frame paints, rebase the live transform so the sprite is
+  // still exactly under the finger, then glide it home.
+  useLayoutEffect(() => {
+    const settle = settleRef.current;
+    if (!settle) return;
+    settleRef.current = null;
+    const settleKey = settle.key;
+    settlingKeyRef.current = settleKey;
+    dragOX.value = settle.dx;
+    dragOY.value = settle.dy;
+    dragOX.value = withTiming(0, { duration: 170, easing: Easing.out(Easing.quad) });
+    dragOY.value = withTiming(0, { duration: 170, easing: Easing.out(Easing.quad) }, () => {
+      // Runs on the UI thread — MUST be a worklet, or it never executes and the
+      // camera stays locked forever.
+      'worklet';
+      runOnJS(finishSettle)(settleKey);
+    });
+  });
 
   // Egg sits on the patch's reserved centre cell (1,2); recover its scene point
   // from the slab centre (cell 1,1) so it pans/zooms glued to the tile.
@@ -558,11 +633,15 @@ export function WorldCanvas({
     }));
   }, [artefacts, scene, eggPatchId]);
 
-  // The object to draw a highlight ring under — the last cell the user tapped.
+  // The object to draw a highlight ring under — a specific id (freshly planted
+  // keepsake) first, else the last cell the user tapped.
   const highlightSprite = useMemo(() => {
+    if (highlightObjectId) {
+      return visiblePositionedSprites.find((s) => s.id === highlightObjectId) ?? null;
+    }
     if (!highlightedCell || !eggPatchId) return null;
     return visiblePositionedSprites.find((s) => s.category === highlightedCell && s.patchId === eggPatchId) ?? null;
-  }, [visiblePositionedSprites, highlightedCell, eggPatchId]);
+  }, [visiblePositionedSprites, highlightObjectId, highlightedCell, eggPatchId]);
 
   // Where a captured photo should fly to — the target cell's tile centre, in scene
   // coords (so the flight pans/zooms with the world).
@@ -687,6 +766,53 @@ export function WorldCanvas({
   const ty = useSharedValue(0);
   const scale = useSharedValue(1);
   const startScale = useSharedValue(1);
+
+  // Hold-to-move (outside customise mode): pick the keepsake under the finger
+  // with EXACTLY the single-tap hit-test — the actual rendered sprite
+  // rectangles, front-most on overlap — so a hold grabs precisely what a tap
+  // would open. Only when nothing is under the finger does a forgiveness pass
+  // take the nearest box within a zoom-aware thumb allowance. Holding
+  // genuinely empty ground lifts nothing (no haptic) and the camera pans as
+  // usual. Lives after the camera shared values because it reads the zoom at
+  // call time.
+  const liftNearestDecor = useCallback(
+    (wx: number, wy: number) => {
+      const liftable: { s: SceneSprite; left: number; top: number; w: number; h: number }[] = [];
+      for (const s of visiblePositionedSprites) {
+        if (s.category !== 'decor' || s.kind === 'creature') continue;
+        if (!s.id.startsWith('placed-') && !s.id.startsWith('legacy-')) continue;
+        const w = s.size * SPRITE_SCALE;
+        const h = w;
+        liftable.push({ s, left: s.x - w / 2, top: s.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC + SPRITE_DROP, w, h });
+      }
+      // Pass 1 — the tap's hit-test: inside the sprite box, front-most wins.
+      let hit: SceneSprite | null = null;
+      for (const { s, left, top, w, h } of liftable) {
+        if (wx >= left && wx <= left + w && wy >= top && wy <= top + h) {
+          if (!hit || s.depth > hit.depth) hit = s;
+        }
+      }
+      // Pass 2 — forgiveness: nearest box edge within thumb reach (the same
+      // finger slop covers more scene distance when zoomed out).
+      if (!hit) {
+        let bestDist = Infinity;
+        for (const { s, left, top, w, h } of liftable) {
+          const dx = Math.max(0, left - wx, wx - (left + w));
+          const dy = Math.max(0, top - wy, wy - (top + h));
+          const dist = dx * dx + dy * dy;
+          if (dist < bestDist) {
+            bestDist = dist;
+            hit = s;
+          }
+        }
+        const allowance = 48 / Math.max(0.4, scale.value);
+        if (!hit || bestDist > allowance * allowance) return;
+      }
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      beginObjDrag(slotKey(hit), hit.x, hit.y, true);
+    },
+    [visiblePositionedSprites, beginObjDrag, scale]
+  );
   // True once a touch moves past the tap threshold, so a drag/pinch release is
   // not mistaken for a tap (which would open the inspector). Reset on each touch.
   const dragged = useSharedValue(false);
@@ -952,6 +1078,20 @@ export function WorldCanvas({
       dragged.value = false;
     })
     .onChange((e) => {
+      // While a piece is in hand (hold-to-move), THIS pan is the drag engine:
+      // its deltas move the PIECE, not the camera. The pan gesture is the one
+      // touch pipeline in this canvas that never drops mid-interaction, so the
+      // piece follows for exactly as long as the finger is down. (Customise
+      // handles run their own pan and write absolute offsets — skip feeding
+      // increments on top of those.)
+      if (dragKeySV.value !== '') {
+        if (!customising) {
+          const sc = scale.value;
+          dragOX.value = dragOX.value + e.changeX / sc;
+          dragOY.value = dragOY.value + e.changeY / sc;
+        }
+        return;
+      }
       const s = scale.value;
       const hw = (boundsW * s) / 2;
       const hh = (boundsH * s) / 2;
@@ -961,7 +1101,13 @@ export function WorldCanvas({
         dragged.value = true;
       }
     })
+    .onFinalize(() => {
+      // Fires at the end of EVERY touch (even ones this pan never activated
+      // for) — the one guaranteed drop signal for a held piece.
+      runOnJS(commitFromPan)();
+    })
     .onEnd((e) => {
+      if (dragKeySV.value !== '') return; // no momentum fling off an object drag
       // Momentum: let the map glide and decelerate, clamped to the same bounds.
       const s = scale.value;
       const hw = (boundsW * s) / 2;
@@ -989,6 +1135,7 @@ export function WorldCanvas({
   if (panRef) pan.withRef(panRef); // exposed so the parent's UI can block the pan
   const pinch = Gesture.Pinch()
     .onUpdate((e) => {
+      if (dragKeySV.value !== '') return; // camera stays put during an object drag
       scale.value = Math.max(minScale, Math.min(maxScale, startScale.value * e.scale));
       dragged.value = true;
     })
@@ -1094,14 +1241,26 @@ export function WorldCanvas({
             coords, which we invert through the pan/zoom to a world point. */}
         <View style={styles.tapSurface}>
         <Animated.View style={[styles.world, { width: scene.width, height: scene.height }, worldStyle]}>
-          {/* Ground: ONE base PNG (image mode) OR the procedural Skia slab. */}
+          {/* Ground (image mode): one base PNG PER PATCH — the main island plus
+              any docked expansion plots (patch.baseId picks the art). */}
           {imgBase && baseRect && baseSource ? (
-            <Image
-              source={baseSource}
-              pointerEvents="none"
-              contentFit="contain"
-              style={{ position: 'absolute', left: baseRect.left, top: baseRect.top, width: baseRect.size, height: baseRect.size }}
-            />
+            scene.slabs.map((slab) => {
+              const patch = patches.find((candidate) => candidate.id === slab.patchId);
+              const source = (patch?.baseId ? worldBaseSource(patch.baseId) : null) ?? baseSource;
+              const [top, right, bottom, left] = slab.topCorners;
+              const span = (right.x - left.x) * BASE_FACTOR;
+              const cx = (left.x + right.x) / 2 + BASE_OFFSET_X;
+              const cy = (top.y + bottom.y) / 2 + BASE_OFFSET_Y;
+              return (
+                <Image
+                  key={`base-${slab.patchId}`}
+                  source={source}
+                  pointerEvents="none"
+                  contentFit="contain"
+                  style={{ position: 'absolute', left: cx - span / 2, top: cy - span / 2, width: span, height: span }}
+                />
+              );
+            })
           ) : (
             <Canvas style={{ width: scene.width, height: scene.height }}>
               {groundPaths.map((g) => (
@@ -1139,20 +1298,18 @@ export function WorldCanvas({
                 const sh = sw * SHADOW_FLATTEN;
                 const box = { position: 'absolute' as const, left: s.x - sw / 2 + SHADOW_DX, top: footY - sh / 2 + SHADOW_DY, width: sw, height: sh, opacity: SHADOW_OPACITY };
                 // While this object is being dragged, its shadow rides the same
-                // translate as the object overlay so it stays planted under it.
-                return slotKey(s) === dragKey ? (
-                  <Animated.View key={`shadow-${s.id}`} pointerEvents="none" style={[box, dragOverlayStyle]}>
-                    <Image source={HIGHLIGHT_GLOW} tintColor="#05060B" contentFit="fill" style={StyleSheet.absoluteFill} />
-                  </Animated.View>
-                ) : (
-                  <Image
+                // translate (UI-thread only — no React state involved) so it
+                // stays planted under it.
+                return (
+                  <DragFollower
                     key={`shadow-${s.id}`}
-                    source={HIGHLIGHT_GLOW}
-                    tintColor="#05060B"
-                    pointerEvents="none"
-                    contentFit="fill"
-                    style={box}
-                  />
+                    myKey={slotKey(s)}
+                    dragKeySV={dragKeySV}
+                    dragOX={dragOX}
+                    dragOY={dragOY}
+                    boxStyle={box}>
+                    <Image source={HIGHLIGHT_GLOW} tintColor="#05060B" contentFit="fill" style={StyleSheet.absoluteFill} />
+                  </DragFollower>
                 );
               })
             : null}
@@ -1283,45 +1440,25 @@ export function WorldCanvas({
           ) : null}
 
           {/* Objects + perimeter-fence segments, depth-sorted together. The object
-              currently being dragged is hidden here and drawn as the overlay below. */}
+              currently being dragged is transformed IN PLACE (SpriteView reads
+              dragKeySV) — never hidden or remounted, so lifting/dropping can't
+              flicker. */}
           {renderables.map((item) =>
             item.sprite ? (
-              slotKey(item.sprite) === dragKey ? null : (
-                <SpriteView
-                  key={spriteAnimationKey(item.sprite)}
-                  sprite={item.sprite}
-                  animateIn={animateInIds.has(spriteAnimationKey(item.sprite))}
-                  animationDelay={Math.min(220, (spriteStaggerIndex.get(item.sprite.id) ?? 0) * SPRITE_STAGGER_MS)}
-                  showBadge={item.sprite.patchId === eggPatchId}
-                />
-              )
+              <SpriteView
+                key={spriteAnimationKey(item.sprite)}
+                sprite={item.sprite}
+                animateIn={animateInIds.has(spriteAnimationKey(item.sprite))}
+                animationDelay={Math.min(220, (spriteStaggerIndex.get(item.sprite.id) ?? 0) * SPRITE_STAGGER_MS)}
+                showBadge={item.sprite.patchId === eggPatchId}
+                dragKeySV={dragKeySV}
+                dragOX={dragOX}
+                dragOY={dragOY}
+              />
             ) : (
               <FenceView key={item.fence!.id} fence={item.fence!} />
             )
           )}
-
-          {/* The dragged object — follows the finger via a shared-value translate,
-              so the drag is smooth and never interrupted (no mid-drag re-render). */}
-          {dragKey
-            ? (() => {
-                const s = positionedSprites.find((sp) => slotKey(sp) === dragKey);
-                const src = s ? worldAssetSource(s.assetKey) : null;
-                if (!s || !src) return null;
-                const isCreature = s.kind === 'creature';
-                const w = s.size * SPRITE_SCALE;
-                const h = w;
-                const left = s.x - w / 2;
-                const top =
-                  (isCreature ? s.y - h / 2 - TILE_H * 0.35 : s.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
-                return (
-                  <Animated.View
-                    pointerEvents="none"
-                    style={[{ position: 'absolute', left, top, width: w, height: h }, dragOverlayStyle]}>
-                    <Image source={src} style={StyleSheet.absoluteFill} contentFit="contain" />
-                  </Animated.View>
-                );
-              })()
-            : null}
 
           {/* The day's Featured Memory, painted into the Featured Board's frame. The
               frame sits in the upper-centre of the easel art (offsets are tunable). */}
@@ -1377,7 +1514,10 @@ export function WorldCanvas({
                 const key = slotKey(s);
                 const isDecor = s.category === 'decor';
                 const drag = Gesture.Pan()
-                  .blocksExternalGesture(pan) // moving an object never also pans the camera
+                  // Runs simultaneous with the camera; the dragKeySV gate in the
+                  // pan/pinch worklets is what actually holds the camera still
+                  // (an arena block is unreliable inside Gesture.Simultaneous).
+                  .simultaneousWithExternalGesture(pan, pinch)
                   .onBegin(() => {
                     // Reset the live offset in the worklet (before any onUpdate) so the
                     // overlay starts AT the object — never reset on release, or the
@@ -1395,19 +1535,27 @@ export function WorldCanvas({
                   .onEnd((e) => {
                     const sc = scale.value;
                     runOnJS(commitObjDrag)(e.translationX / sc, e.translationY / sc);
+                  })
+                  .onFinalize((e) => {
+                    // Cancellation (no onEnd) must still plant the piece and
+                    // release the camera; a no-op after a clean end.
+                    const sc = scale.value;
+                    runOnJS(finalizeObjDrag)(e.translationX / sc, e.translationY / sc);
                   });
-                const isDragging = key === dragKey;
                 return (
                   <Fragment key={`drag-${key}`}>
                     <GestureDetector gesture={drag}>
-                      <Animated.View
-                        style={[
-                          styles.dragHandle,
-                          isDecor ? styles.dragHandleDecor : null,
-                          { left, top, width: w, height: h },
-                          isDragging ? dragOverlayStyle : null,
-                        ]}
-                      />
+                      {/* The gesture host stays put (a moving touch target can
+                          drop the gesture); the dashed visual inside follows. */}
+                      <Animated.View style={[styles.dragHost, { left, top, width: w, height: h }]}>
+                        <DragFollower
+                          myKey={key}
+                          dragKeySV={dragKeySV}
+                          dragOX={dragOX}
+                          dragOY={dragOY}
+                          boxStyle={[StyleSheet.absoluteFill, styles.dragHandle, isDecor ? styles.dragHandleDecor : null]}
+                        />
+                      </Animated.View>
                     </GestureDetector>
                     {isDecor && onRemoveDecor ? (
                       <Pressable
@@ -1596,6 +1744,38 @@ export function WorldCanvas({
             </MotiView>
           ) : null}
         </Animated.View>
+
+        {/* Quiet rearrange (no customise mode, no boxes): HOLD a planted
+            keepsake to lift it — a haptic marks the pickup — then drag and let
+            go to set it down. Division of labour, battle-tested primitives:
+            - This LongPress does ONE thing: the lift (300ms, still finger).
+              Moving early fails it (a camera pan can never grab a piece); its
+              later lifecycle is IGNORED entirely. It sits on the UNtransformed
+              tap surface so its coordinates go through the exact same
+              screen→world inversion as a single tap — the selection therefore
+              hits precisely what a tap would hit.
+            - The camera pan is the drag engine: while a piece is in hand its
+              deltas feed the piece instead of the camera (see pan.onChange),
+              and its onFinalize is the guaranteed drop signal at finger-up.
+            A hold on empty ground lifts nothing (no haptic) and pans as usual;
+            a quick tap still opens cards. */}
+        {imgBase && !customising && onMoveDecor ? (
+          <GestureDetector
+            gesture={Gesture.LongPress()
+              .minDuration(300)
+              .maxDistance(24)
+              .simultaneousWithExternalGesture(pan, pinch)
+              .onStart((e) => {
+                'worklet';
+                // Same inversion as the tap gesture: screen point → world point.
+                const s = scale.value;
+                const wx = (e.x - sceneW / 2 - tx.value) / s + sceneW / 2;
+                const wy = (e.y - sceneH / 2 - ty.value) / s + sceneH / 2;
+                runOnJS(liftNearestDecor)(wx, wy);
+              })}>
+            <Animated.View style={StyleSheet.absoluteFill} />
+          </GestureDetector>
+        ) : null}
         </View>
       </GestureDetector>
 
@@ -1634,16 +1814,58 @@ export function WorldCanvas({
 const OBJECT_BOTTOM_FRAC = 0.96; // object's bottom pixel down the 1:2 frame (matches py)
 const OBJECT_SEAT = TILE_H * 0.25; // how far below the tile centre the bottom sits (padding)
 
+// A view that rides the live drag offset when (and only when) its slot is the
+// one being dragged — evaluated entirely on the UI thread, so following a drag
+// never involves React state (a lift-time re-render can cancel the gesture).
+function DragFollower({
+  myKey,
+  dragKeySV,
+  dragOX,
+  dragOY,
+  boxStyle,
+  children,
+}: {
+  myKey: string;
+  dragKeySV: SharedValue<string>;
+  dragOX: SharedValue<number>;
+  dragOY: SharedValue<number>;
+  boxStyle: StyleProp<ViewStyle>;
+  children?: React.ReactNode;
+}) {
+  const anim = useAnimatedStyle(() => {
+    const active = dragKeySV.value === myKey;
+    return {
+      transform: [
+        { translateX: active ? dragOX.value : 0 },
+        { translateY: active ? dragOY.value : 0 },
+      ],
+    };
+  });
+  return (
+    <Animated.View pointerEvents="none" style={[boxStyle, anim]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 function SpriteView({
   sprite,
   animateIn,
   animationDelay,
   showBadge,
+  dragKeySV,
+  dragOX,
+  dragOY,
 }: {
   sprite: SceneSprite;
   animateIn: boolean;
   animationDelay: number;
   showBadge?: boolean;
+  // Drag-in-place: when dragKeySV matches this sprite's slot, the drag offset
+  // rides this wrapper — the sprite itself follows the finger, no overlay copy.
+  dragKeySV?: SharedValue<string>;
+  dragOX?: SharedValue<number>;
+  dragOY?: SharedValue<number>;
 }) {
   const source = worldAssetSource(sprite.assetKey);
   const theme = ARCHETYPE_THEME[sprite.archetype];
@@ -1657,47 +1879,63 @@ function SpriteView({
   // the down-scaled art still seats on its tile instead of floating.
   const top =
     (isCreature ? sprite.y - h / 2 - TILE_H * 0.35 : sprite.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
+  const myKey = slotKey(sprite);
+  const dragStyle = useAnimatedStyle(() => {
+    const active = !!dragKeySV && dragKeySV.value === myKey;
+    return {
+      transform: [
+        { translateX: active && dragOX ? dragOX.value : 0 },
+        { translateY: active && dragOY ? dragOY.value : 0 },
+      ],
+      zIndex: active ? 60 : 0,
+    };
+  });
   return (
-    <MotiView
-      // Display-only: taps are handled globally by the tile hit-test, so sprites
-      // never intercept touches (no z-fighting between tall transparent frames).
-      pointerEvents="none"
-      // New objects spring up from their base; existing ones mount at rest
-      // (from = undefined → no entrance). We animate ONLY the transform — NO
-      // opacity fade. A fading view with >1 child forces iOS/Android to rasterise
-      // the subtree to a low-res offscreen texture, which the scale (+ world zoom +
-      // spring overshoot) then magnifies → the blur seen during the bounce. Pure
-      // transform animations keep the image vector-crisp the whole way in.
-      renderToHardwareTextureAndroid={false}
-      shouldRasterizeIOS={false}
-      from={animateIn ? (isMood ? { scale: 0.48, translateY: 14 } : { scale: 0.35, translateY: 9 }) : undefined}
-      animate={{ scale: 1, translateY: 0 }}
-      transition={{
-        type: 'spring',
-        damping: isMood ? 7 : 11,
-        stiffness: isMood ? 230 : 180,
-        mass: isMood ? 0.72 : 0.85,
-        delay: animateIn ? animationDelay : 0,
-      }}
-      style={[styles.sprite, styles.spriteOrigin, { left, top, width: w, height: h }]}>
-      <View pointerEvents="none" style={styles.spriteDisplay}>
-        {source ? (
-          <Image source={source} style={styles.spriteImage} contentFit="contain" />
-        ) : (
-          <View style={[styles.placeholder, { borderColor: theme.accent }]}>
-            <Text style={styles.placeholderText}>{sprite.label.slice(0, 1)}</Text>
-          </View>
-        )}
-      </View>
-      {showBadge && sprite.category && (sprite.badge ?? 0) > 0 ? (
-        <View pointerEvents="none" style={[styles.badgeWrap, { top: h * OBJECT_BOTTOM_FRAC - 4 }]}>
-          <View style={styles.badge}>
-            <IconSymbol name={(sprite.badgeIcon ?? BADGE_ICON[sprite.category]) as IconSymbolName} size={9} color={Lantern.moon50} />
-            <Text style={styles.badgeText}>{formatBadge(sprite.category, sprite.badge ?? 0)}</Text>
-          </View>
+    // The outer wrapper owns positioning + the drag-in-place transform; the
+    // MotiView inside keeps its entrance spring. Splitting them means a drag
+    // never touches Moti's animator (and vice versa).
+    <Animated.View pointerEvents="none" style={[styles.sprite, { left, top, width: w, height: h }, dragStyle]}>
+      <MotiView
+        // Display-only: taps are handled globally by the tile hit-test, so sprites
+        // never intercept touches (no z-fighting between tall transparent frames).
+        pointerEvents="none"
+        // New objects spring up from their base; existing ones mount at rest
+        // (from = undefined → no entrance). We animate ONLY the transform — NO
+        // opacity fade. A fading view with >1 child forces iOS/Android to rasterise
+        // the subtree to a low-res offscreen texture, which the scale (+ world zoom +
+        // spring overshoot) then magnifies → the blur seen during the bounce. Pure
+        // transform animations keep the image vector-crisp the whole way in.
+        renderToHardwareTextureAndroid={false}
+        shouldRasterizeIOS={false}
+        from={animateIn ? (isMood ? { scale: 0.48, translateY: 14 } : { scale: 0.35, translateY: 9 }) : undefined}
+        animate={{ scale: 1, translateY: 0 }}
+        transition={{
+          type: 'spring',
+          damping: isMood ? 7 : 11,
+          stiffness: isMood ? 230 : 180,
+          mass: isMood ? 0.72 : 0.85,
+          delay: animateIn ? animationDelay : 0,
+        }}
+        style={[StyleSheet.absoluteFill, styles.spriteInner, styles.spriteOrigin]}>
+        <View pointerEvents="none" style={styles.spriteDisplay}>
+          {source ? (
+            <Image source={source} style={styles.spriteImage} contentFit="contain" />
+          ) : (
+            <View style={[styles.placeholder, { borderColor: theme.accent }]}>
+              <Text style={styles.placeholderText}>{sprite.label.slice(0, 1)}</Text>
+            </View>
+          )}
         </View>
-      ) : null}
-    </MotiView>
+        {showBadge && sprite.category && (sprite.badge ?? 0) > 0 ? (
+          <View pointerEvents="none" style={[styles.badgeWrap, { top: h * OBJECT_BOTTOM_FRAC - 4 }]}>
+            <View style={styles.badge}>
+              <IconSymbol name={(sprite.badgeIcon ?? BADGE_ICON[sprite.category]) as IconSymbolName} size={9} color={Lantern.moon50} />
+              <Text style={styles.badgeText}>{formatBadge(sprite.category, sprite.badge ?? 0)}</Text>
+            </View>
+          </View>
+        ) : null}
+      </MotiView>
+    </Animated.View>
   );
 }
 
@@ -1750,7 +1988,8 @@ const styles = StyleSheet.create({
   tapSurface: { ...StyleSheet.absoluteFillObject, overflow: 'visible' },
   world: { position: 'relative' },
   decal: { position: 'absolute', opacity: 0.95, overflow: 'hidden' },
-  sprite: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  sprite: { position: 'absolute' },
+  spriteInner: { alignItems: 'center', justifyContent: 'center' },
   spriteDisplay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   // Grow/bounce from the planted base, not the centre.
   spriteOrigin: { transformOrigin: 'bottom' },
@@ -1850,6 +2089,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,195,107,0.12)',
   },
   dragHandleDecor: { borderColor: 'rgba(125,232,205,0.9)', backgroundColor: 'rgba(125,232,205,0.12)' },
+  // Static gesture host for a customise drag handle — the dashed visual inside
+  // follows the drag; the touch target itself never moves.
+  dragHost: { position: 'absolute' },
   decorRemove: {
     position: 'absolute',
     width: 20,

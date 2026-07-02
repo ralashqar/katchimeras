@@ -52,8 +52,45 @@ NO_TEXT = (
     'no signage anywhere in the image.'
 )
 
+# Cozy Collectible ISO bases (Kingdom): unlike the organic meadow, these are
+# crisp DIAMOND islands aligned to the isometric axes with cream stone paths
+# running along the iso diagonals, so planted structures line up neatly.
+ISO_BASE_STYLE = (
+    ' three-quarter top-down isometric aerial view, premium stylized 3D mobile-game world render, '
+    'cozy magical designer-toy mood — the same rich polished style as a city-builder hero island. '
+    'ONE VAST floating island that FILLS the square frame edge to edge, seen from high above so the '
+    'land reads expansive and objects placed on it later will look small. The island is a large '
+    'rounded DIAMOND aligned to the isometric axes, its rim a ring of smooth rounded sandstone '
+    'boulders dotted with small shrubs and tiny flower clusters, a few waterfalls spilling off the '
+    'edges, and a soft rocky sandstone underside so it reads as a floating world. The surface: '
+    'saturated warm lime-green grass lawns with a subtle mottled hand-painted texture, tiny grass '
+    'tufts and small flower specks. A DENSE NETWORK of cream sandstone paved paths with visible '
+    'individual paving stones runs PERFECTLY STRAIGHT along the two isometric diagonal directions '
+    '— three or four straight paths in each diagonal direction — dividing the island into many '
+    'separate garden lawn cells like tidy blocks, with a large round paved plaza at the central '
+    'crossing, smaller round and square paved nodes at the other crossings, a few short stone '
+    'steps between subtle terrace levels, one narrow bright-blue stream crossed by a tiny stone '
+    'bridge, and one small ring pond. Golden-hour warm sunlight from the upper-left, saturated '
+    'warm palette (lime-green grass, sandy-gold paving, cream stone), soft ambient occlusion, '
+    'crisp clean detail, polished mobile-game hero-quality render. The lawns are EMPTY: no '
+    'buildings, no trees, no characters, no props — only ground, paths, water and rim rocks, with '
+    'lots of clear room to place objects later. Single isolated island centered on a plain dark '
+    'neutral studio background.'
+)
+ISO_PLOT_STYLE = ISO_BASE_STYLE.replace(
+    'ONE VAST floating island that FILLS the square frame edge to edge',
+    'ONE SMALL floating garden islet that fills most of the square frame',
+).replace(
+    'three or four straight paths in each diagonal direction',
+    'one or two straight paths in each diagonal direction',
+)
+
+# key -> (subject, style override or None for the organic BASE_STYLE)
 BASES = {
-    'base_meadow': 'a vast expansive natural floating island of smooth bare grassy ground, a winding river and small ponds, with an organic irregular coastline and bare dirt paths',
+    'base_meadow': ('a vast expansive natural floating island of smooth bare grassy ground, a winding river and small ponds, with an organic irregular coastline and bare dirt paths', None),
+    'base_env3': ('a cozy designer-toy isometric diamond island with straight cream stone paths along both isometric diagonals crossing at a round central plaza', ISO_BASE_STYLE),
+    'plot_base_1': ('a small cozy designer-toy isometric diamond garden islet with one straight cream stone path along one isometric diagonal', ISO_PLOT_STYLE),
+    'plot_base_2': ('a small cozy designer-toy isometric diamond garden islet with a tiny round cream plaza at its centre and short paths along both isometric diagonals', ISO_PLOT_STYLE),
 }
 
 # Model families. nano-banana-2 (Gemini): aspect_ratio + resolution (up to 4K).
@@ -102,7 +139,7 @@ def call(fn, payload, timeout=300):
         return json.load(resp)
 
 
-def generate(key, subject, model, resolution, size):
+def generate(key, subject, model, resolution, size, style=None):
     model_id, input_fn = MODELS[model]
     payload = {
         'modelId': model_id,
@@ -118,7 +155,7 @@ def generate(key, subject, model, resolution, size):
             'theme': 'asset',
             'creatureKind': 'asset',
             'caption': 'world base',
-            'imagePrompt': f'Expansive game world ground base: {subject}.{BASE_STYLE}{NO_TEXT}',
+            'imagePrompt': f'Expansive game world ground base: {subject}.{style or BASE_STYLE}{NO_TEXT}',
         },
     }
     rec = call('generate-katchimera-art', payload).get('record', {})
@@ -180,7 +217,8 @@ def main():
         print(f'{name}: exists (use --force to regenerate) -> {out_path}')
         return
     print(f'generating "{name}" via {args.model} ({args.resolution if args.model == "nano" else args.size})...')
-    url = generate(args.key, BASES[args.key], args.model, args.resolution, args.size)
+    subject, style = BASES[args.key]
+    url = generate(args.key, subject, args.model, args.resolution, args.size, style)
     print(f'  generated: {url}')
     matte(name, url, out_path)
     print(f'  matted -> {out_path}  [{verify_alpha(out_path)}]')

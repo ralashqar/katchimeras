@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -39,6 +39,30 @@ const STAT_ICON: Record<string, IconSymbolName> = {
 const ATTENTION_GOLD = '#FFC36B';
 
 export type DayStatKey = 'steps' | 'places' | 'photos' | 'moments';
+
+// A stat value that COUNTS to its new number instead of snapping — so live
+// step updates roll up. Eased over ~0.7s; formatting is applied per frame.
+function CountingValue({ value, format }: { value: number; format: (value: number) => string }) {
+  const [display, setDisplay] = useState(value);
+  const prevRef = useRef(value);
+  useEffect(() => {
+    const from = prevRef.current;
+    if (from === value) return;
+    prevRef.current = value;
+    const started = Date.now();
+    const duration = 700;
+    let raf = 0;
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - started) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (value - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{format(display)}</>;
+}
 
 export function DayJournalSections({
   day,
@@ -111,17 +135,20 @@ export function DayJournalSections({
   const accent = day.creature?.accentColor ?? day.egg?.accentColor ?? '#A7D5FF';
   const [placesOpen, setPlacesOpen] = useState(false);
 
-  const stats: { key: DayStatKey; label: string; value: string; onPress?: () => void }[] = [
+  const plain = (value: number) => `${value}`;
+  const stats: { key: DayStatKey; label: string; value: number; format: (value: number) => string; onPress?: () => void }[] = [
     {
       key: 'steps',
       label: 'steps',
-      value: formatCompact(day.stepsCount),
+      value: day.stepsCount,
+      format: formatCompact,
       onPress: onStatPress ? () => onStatPress('steps') : undefined,
     },
     {
       key: 'places',
       label: day.visitedPlaceCount === 1 ? 'place' : 'places',
-      value: `${day.visitedPlaceCount}`,
+      value: day.visitedPlaceCount,
+      format: plain,
       onPress: onStatPress
         ? () => onStatPress('places')
         : placeNodes.length > 0
@@ -131,7 +158,8 @@ export function DayJournalSections({
     {
       key: 'photos',
       label: 'photos',
-      value: `${day.vision?.analyzedPhotoCount ?? photos.length}`,
+      value: day.vision?.analyzedPhotoCount ?? photos.length,
+      format: plain,
       onPress: onStatPress ? () => onStatPress('photos') : undefined,
     },
     // "moments" = everything logged today (prompts, captures, meanings) — the
@@ -139,7 +167,8 @@ export function DayJournalSections({
     {
       key: 'moments',
       label: 'moments',
-      value: `${timeline.length}`,
+      value: timeline.length,
+      format: plain,
       onPress: onStatPress ? () => onStatPress('moments') : undefined,
     },
   ];
@@ -162,7 +191,7 @@ export function DayJournalSections({
               ]}>
               <IconSymbol color={stat.onPress ? tint : Lantern.moon300} name={STAT_ICON[stat.label] ?? 'sparkles'} size={16} />
               <ThemedText style={styles.statValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {stat.value}
+                <CountingValue value={stat.value} format={stat.format} />
               </ThemedText>
               <ThemedText style={styles.statLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
                 {stat.label}

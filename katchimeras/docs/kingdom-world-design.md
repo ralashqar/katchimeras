@@ -84,29 +84,74 @@ a one-time hoist: every legacy per-day placement becomes a Kingdom item with
 `provenance.kind='day'` + its day's date (placed items keep their positions on
 the centre island; overflow beyond sensible density goes to `unplanted`).
 
-### 3.2 Earning engine (evolves `world-props-engine`)
+### 3.2 Earning economy — three lanes (v2, replaces the single daily-rules lane)
 
-The prop catalog keeps its unlock kinds and grows a fifth:
+Everything still lands in `unplanted` (the gift shelf) with provenance, and
+**Essence never earns a prop** — it only unlocks alternate styles of families
+already held. What changes: earning now flows through THREE lanes so the shelf
+fills from everyday living, from distinctive days, AND from achievements — with
+the early days deliberately generous.
 
-- `starter` / `discovery` / `observation` / `mood` — as today, but each unlock
-  now *emits an earned prop with provenance* instead of just flipping
-  availability.
-- **new `daily`** — signal-driven rules evaluated at hatch (one pass per day,
-  deterministic, in the same place the day folds into history):
-  | day signal | earned prop family |
-  |---|---|
-  | 8k+ steps / hike interpreted | trail stone / cairn |
-  | a confirmed new place | wayfinder post |
-  | food moment | picnic / market basket |
-  | studio moment | bookstand / film reel |
-  | 3+ reflections | meditation stone / wind chime |
-  | night owl / dawn signals | lantern / sunrise banner |
-  | big moment | its Legacy Landmark (already modelled) |
-  Cap: max 2 daily props/day so the Kingdom doesn't turn into clutter;
-  `bloomBudget` (per-day cap) retires — accumulation replaces the daily reset.
-- Earned props land in `unplanted` (the gift queue). **Essence never earns a
-  prop; it unlocks alternate `assetKey` styles** for prop families you already
-  hold (blossom colour, stone material, lantern shape).
+**Grant timing: live.** All three lanes grant the moment they're earned — the
+still-forming day grants as it goes (deterministic grant ids make the later
+hatch pass a no-op), so anything unlocked today is plantable today. Live gifts
+land on the shelf silently; the morning ceremony only parades what arrived with
+a hatch (live-granted gifts left unplanted are held out of the witnessed
+snapshot so they still join tomorrow's parade).
+
+**Lane A — Everyday blooms (commons: trees, shrubs, flowers).**
+Every real signal earns bloom points; every **3 points → 1 common green gift**
+(first 7 days: every **2 points** — the founding boost). Cap **3 gifts/day**.
+| signal | points |
+|---|---|
+| photo given meaning | 1 |
+| note (voice/text) | 1 |
+| place confirmed | 2 |
+| reflection answered | 1 |
+| food / studio moment | 1 each |
+| 4k steps / 8k steps | 1 / 2 |
+| quest completed · sleep answered | 1 each |
+The gift is drawn deterministically (seeded by dayId) from the commons pool —
+`decor_1` pine, `decor_2` oak, `decor_4` birch, `decor_3` blossom, `decor_5`
+shrub, `decor_6` fern, `decor_7` wildflowers, `decor_15` mushrooms, `decor_8`
+planter — biased by the day's mood (calm→wildflowers, active→pine, social→oak,
+meaningful→blossom; same leads as `decorPalette`). Provenance: "A day of N
+moments · <date>". A typical engaged day (4–8 pts) yields 1–2 commons.
+
+**Lane B — Signature day earns (uncommons, themed).** The existing
+`DAILY_RULES` unchanged: big moment→blossom tree, 8k/hike→trail stone,
+place→wayfinder post, food→market crate, studio→study planter, 3
+reflections→wildflowers, 2 notes→keeper's lantern. Priority order, cap
+**2/day**. (Bespoke prop families replace the `decor_*` stand-ins in art wave 2
+behind the same rule ids.)
+
+**Lane C — Achievement earns (discoveries + observations + moods).** Every
+Discovery unlock grants its prop gift, reusing `EARNED_WORLD_PROPS`' existing
+`unlockSourceId` mappings (first_memory→Memory Flowers, first_voice→Voice
+Crystal, first_museum→Museum Banner, cafes_3→Cafe Table, food_10→Feast Stall,
+steps_20k→Trail Marker, walk_streak_7→Trail Bridge, goal_achieved→Trophy
+Stone, first_week_village→Village Lantern…). Discoveries without an explicit
+mapping fall back by rarity tier: common→a nature prop, rare→a ritual/ornament
+prop, epic→a landmark piece, legendary→a monument shard (new art, wave 2).
+Observation/mood unlocks (Quiet Ferns, Sunbud, Breezegrass, Ritual Table,
+Walking Signpost…) grant **once each** when their pattern first fires.
+Historical backfill: achievement props ARE granted as shelf gifts on first sync
+(achievements feel owed; the catalog bounds it at ~46) — only lanes A/B
+baseline silently. Because the discovery catalog is front-loaded with
+`first_*` entries, week one naturally showers 3–5 achievement gifts without
+any special-casing.
+
+**No planting cap (retired 2026-07-02).** Planting is limited only by what the
+shelf holds — the earning caps above are the pacing lever; placing is always
+free, as is unplanting/rearranging. The shelf is unlimited and nothing expires.
+Density guard: ~80 placed items on the centre island; past that, planting
+nudges toward expansion plots (K4).
+
+**First-week feel (simulated):** day 1 = First Seed + 2–3 `first_*` discovery
+gifts + 1–2 blooms → plant them all, or shelve some. Days 2–7 ≈ 2–3 earns/day
+(boosted lane A + trickling firsts). Steady state (month 3+) ≈ 1–2/day on
+engaged days, a signature or achievement gift a few times a week, quiet days
+earn nothing — restful, never punished.
 
 ### 3.3 Planting UX
 
@@ -148,7 +193,8 @@ big-moment landmark set · egg pedestal (unused in Kingdom) · creature renders.
    pipeline.
 3. **Daily-prop families** — 4 new families × 3–4 variants: trail stones/cairns,
    picnic/food props, study/keepsake props, lanterns/banners. (The existing
-   nature palette covers trees/flowers.)
+   nature palette covers trees/flowers.) Plus a **monument-shard set** (3
+   tiers) for epic/legendary discovery earns that lack bespoke art.
 4. **Gift crate** — one sprite + a subtle glow state.
 5. **Style variants** (Essence): 2–3 recolour/reshape variants for the two most
    planted families first; expand by usage.

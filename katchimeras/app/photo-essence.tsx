@@ -9,7 +9,7 @@ import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
-import { resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
+import type { SceneRead } from '@/utils/scene-classify';
 import type { DayVisionSummary } from '@/types/home';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
@@ -31,8 +31,6 @@ export default function PhotoEssenceRoute() {
   const { selectedDay, applyCapturedMoment, selectHeroPhoto } = useHomeScreenState();
   const dayScores = selectedDay?.kind === 'day' ? selectedDay.scores : null;
   const localUriRef = useRef<string | null>(null);
-  // On-device LLM scene read, resolved in the background; read at commit.
-  const sceneRef = useRef<SceneRead | null>(null);
 
   // Load the asset's decodable local file (camera-roll candidates only carry a
   // thumbnail), then read it on-device. Best-effort — null degrades gracefully.
@@ -49,23 +47,15 @@ export default function PhotoEssenceRoute() {
         return null;
       }
       const result = await analyzePhoto(localUri);
-      const vision = result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
-      sceneRef.current = null;
-      if (vision) {
-        void resolveSceneRead(vision)
-          .then((scene) => {
-            sceneRef.current = scene;
-          })
-          .catch(() => {});
-      }
-      return vision;
+      return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
     } catch {
       return null;
     }
   }, [assetId]);
 
   const commit = useCallback(
-    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string) => {
+    // `scene` is the hierarchical read EssenceReview resolved (and showed).
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null) => {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined);
       const category = vision ? resolvePhotoCategory(vision) : { icon: 'sparkles' as const, accent: '#F1D4B4' };
       if (assetId) {
@@ -86,7 +76,7 @@ export default function PhotoEssenceRoute() {
           energy,
           vision,
           meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null },
-          scene: sceneRef.current ?? undefined,
+          scene: scene ?? undefined,
         },
         captureTarget
       );

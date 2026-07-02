@@ -17,6 +17,10 @@ type TodayCategoryRingProps = {
   radius?: number;
   // Vertical nudge so the ring centers on the (lifted) egg, not the stage box.
   centerOffsetY?: number;
+  // Centre on the top `anchorHeight` px of the container instead of the whole
+  // box — the hero stages (egg AND creature) are a fixed 258px art box with
+  // variable text below, so anchoring keeps the ring identical on both.
+  anchorHeight?: number;
 };
 
 // Icons sit in two tight vertical fans beside the egg — the first half of the
@@ -26,11 +30,20 @@ type TodayCategoryRingProps = {
 const VERTICAL_SPAN = 72; // max |y| of a side's top/bottom icon
 const ARC_INSET = 12; // how much the top/bottom icons curve in toward the egg
 
-export function TodayCategoryRing({ categories, onPress, radius = 136, centerOffsetY = -18 }: TodayCategoryRingProps) {
+export function TodayCategoryRing({
+  categories,
+  onPress,
+  radius = 136,
+  centerOffsetY = -18,
+  anchorHeight,
+}: TodayCategoryRingProps) {
   if (categories.length === 0) return null;
   const rightCount = Math.ceil(categories.length / 2);
+  const container = anchorHeight
+    ? { position: 'absolute' as const, top: 0, left: 0, right: 0, height: anchorHeight }
+    : StyleSheet.absoluteFill;
   return (
-    <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, styles.center, { marginTop: centerOffsetY }]}>
+    <View pointerEvents="box-none" style={[container, styles.center, { marginTop: centerOffsetY }]}>
       {categories.map((category, index) => {
         const onRight = index < rightCount;
         const sideIndex = onRight ? index : index - rightCount;

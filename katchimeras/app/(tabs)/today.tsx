@@ -22,7 +22,6 @@ import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
-import { EggOrbitIcons, type OrbitIcon } from '@/components/katchadeck/home/egg-orbit-icons';
 import { TodayCategoryRing } from '@/components/katchadeck/home/today-category-ring';
 import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
@@ -78,6 +77,9 @@ import { deriveContinuityMotifs } from '@/utils/continuity-engine';
 import { deriveObservations } from '@/utils/observations-engine';
 import { loadSleepForDay } from '@/utils/sleep-health';
 import { markArrivalPending } from '@/utils/kingdom-arrival';
+import { BloomMeter } from '@/components/katchadeck/home/bloom-meter';
+import { loadKingdomDecor } from '@/utils/kingdom-decor';
+import { requestKeepsakesShelf } from '@/utils/kingdom-decorate-signal';
 import { resolvePlaceName } from '@/utils/place-names';
 import { isPointAtHome, loadHomeAnchor, saveHomeAnchor } from '@/utils/home-location';
 import type {
@@ -186,9 +188,6 @@ export default function HomeScreen() {
     setPromptSheetOpen(false);
     setInitialPrompt(null);
   };
-  // Category icons orbiting the egg, one per fed photo (capture / photo prompt).
-  const [orbitIcons, setOrbitIcons] = useState<OrbitIcon[]>([]);
-  const orbitNonce = useRef(0);
 
   const backgroundAccent =
     selectedDay?.kind === 'day'
@@ -204,7 +203,6 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setPromptSheetOpen(false);
-    setOrbitIcons([]);
   }, [selectedDayId]);
 
   // Each time a background backfill reflection is written, pull it into view so
@@ -370,6 +368,12 @@ export default function HomeScreen() {
   // forming quote and the add/camera buttons hide until it's answered/dismissed.
   const hasActivePrompt = isForming && Boolean(formingActivePrompt);
 
+  // The day the page is LOOKING AT — the forming day while it forms, or a
+  // hatched day being revisited. Sheets/readers bind to this; write handlers
+  // only exist while it's forming.
+  const viewedDay: HomeDayRecord | null = isDay ? selectedDay : onTomorrowForming ? (tomorrowDay ?? null) : null;
+  const viewedIsForming = isForming;
+
   // --- Today-as-daily-hub: category ring, sheets, capture actions ---
   // (the same daily intelligence the World patch had, orbiting the egg instead)
 
@@ -441,22 +445,31 @@ export default function HomeScreen() {
     [formingDay]
   );
 
-  // The single source of category state for the ring around the egg.
-  const categories = useMemo(
-    () =>
-      formingDay
-        ? deriveTodayCategories(formingDay, {
-            prompts: formingPrompts,
-            quests: memoryQuests,
-            recentAvgSteps,
-            handledPhotoSig,
-          })
-        : [],
-    [formingDay, formingPrompts, memoryQuests, recentAvgSteps, handledPhotoSig]
-  );
+  // The single source of category state for the ring around the egg/creature.
+  // Hatched days get the same ring, read-only: no attention glows, no quests —
+  // each icon just opens that day's reader.
+  const categories = useMemo(() => {
+    if (!viewedDay) return [];
+    const derived = deriveTodayCategories(viewedDay, {
+      prompts: viewedIsForming ? formingPrompts : [],
+      quests: viewedIsForming ? memoryQuests : [],
+      recentAvgSteps,
+      handledPhotoSig,
+    });
+    if (viewedIsForming) return derived;
+    return derived
+      .filter((category) => category.id !== 'quests')
+      .map((category) => ({ ...category, needsAttention: false }));
+  }, [viewedDay, viewedIsForming, formingPrompts, memoryQuests, recentAvgSteps, handledPhotoSig]);
 
   // Places: the first detected-but-unconfirmed stop, plus manual "add this place".
   const unconfirmedPlace = useMemo(() => (formingDay ? findUnconfirmedPlace(formingDay) : null), [formingDay]);
+  // How many detected stops still wait for a name (badge on the place button).
+  const unconfirmedPlaceCount = useMemo(() => {
+    if (!formingDay) return 0;
+    const confirmed = new Set((formingDay.confirmedPlaces ?? []).map((place) => place.id));
+    return (formingDay.dayMap?.nodes ?? []).filter((node) => !confirmed.has(node.id) && node.type !== 'home').length;
+  }, [formingDay]);
   const [placeName, setPlaceName] = useState<string | null>(null);
   const [manualPlace, setManualPlace] = useState<{ id: string; name: string; latitude: number; longitude: number } | null>(
     null
@@ -563,6 +576,19 @@ export default function HomeScreen() {
     setStepsSheetOpen(false);
     setEggFeedKey((key) => key + 1);
     setMicrocopy(`${input.emoji} ${input.label} · noted`);
+  };
+
+  // Keepsakes waiting on the Kingdom shelf — surfaced as a chip by the bloom
+  // meter; tapping it jumps to the Kingdom with the shelf open.
+  const [keepsakesWaiting, setKeepsakesWaiting] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setKeepsakesWaiting(loadKingdomDecor().unplanted.length);
+    }, [])
+  );
+  const handleOpenKeepsakes = () => {
+    requestKeepsakesShelf();
+    router.push('/world');
   };
 
   // Morning sleep: the first time Today is entered on a forming day, try Apple
@@ -772,6 +798,16 @@ export default function HomeScreen() {
   const ringCategories = useMemo(() => categories.filter((category) => !STRIP_CATEGORIES.has(category.id)), [categories]);
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
   const handleStatPress = (key: DayStatKey) => {
+    // Revisiting a hatched day: every tile is a read-only door into that day.
+    if (!viewedIsForming) {
+      if (key === 'steps') setJourneySheetOpen(true);
+      else if (key === 'places') setPlacesVaultOpen(true);
+      else if (key === 'photos') {
+        setMemoryVaultTab('photos');
+        setMemoryVaultOpen(true);
+      } else setSanctuaryOpen(true);
+      return;
+    }
     switch (key) {
       case 'steps':
         // The journey reader by default; the "what kind of day was it?"
@@ -806,8 +842,43 @@ export default function HomeScreen() {
   );
 
   // A tapped category opens the right surface: its question when it glows, its
-  // reader when it holds content, its add-flow when it's empty.
+  // reader when it holds content, its add-flow when it's empty. On a hatched
+  // day everything routes to that day's reader — no prompts, no add-flows.
   const handleCategoryPress = (category: TodayCategoryState) => {
+    if (!viewedIsForming) {
+      switch (category.id) {
+        case 'photos':
+          setMemoryVaultTab('photos');
+          setMemoryVaultOpen(true);
+          break;
+        case 'notes':
+          setMemoryVaultTab('notes');
+          setMemoryVaultOpen(true);
+          break;
+        case 'places':
+          setPlacesVaultOpen(true);
+          break;
+        case 'journey':
+          setJourneySheetOpen(true);
+          break;
+        case 'reflection':
+          setSanctuaryOpen(true);
+          break;
+        case 'food':
+          setFoodVaultOpen(true);
+          break;
+        case 'studio':
+          setStudioVaultOpen(true);
+          break;
+        case 'sleep':
+          setSleepSheetOpen(true);
+          break;
+        case 'mood':
+          setMoodSheetOpen(true);
+          break;
+      }
+      return;
+    }
     switch (category.id) {
       case 'photos':
         if (category.needsAttention && photoPrompt) {
@@ -845,8 +916,8 @@ export default function HomeScreen() {
       case 'sleep':
         setSleepSheetOpen(true);
         break;
-      case 'bigMoment':
-        setBigMomentPickerOpen(true);
+      case 'mood':
+        setMoodSheetOpen(true);
         break;
       case 'quests':
         setQuestBoardOpen(true);
@@ -949,9 +1020,6 @@ export default function HomeScreen() {
       if (!feed) {
         return;
       }
-      orbitNonce.current += 1;
-      const key = `orbit-${orbitNonce.current}`;
-      setOrbitIcons((prev) => [...prev, { key, icon: feed.icon, accent: feed.accent }].slice(-6));
       const from: FeedSourceRect = { x: windowWidth / 2 - 30, y: windowHeight - 150, w: 60, h: 60 };
       startEggFeed(from, { photoUri: feed.photoUri }, () => {});
       // startEggFeed only touches refs + setState; the focus run reliably has no
@@ -1091,9 +1159,11 @@ export default function HomeScreen() {
               shellOffsetY={-16}
             />
           )}
-          {isForming && !isHatching ? <EggOrbitIcons icons={orbitIcons} /> : null}
-          {isForming && !isHatching && !hasActivePrompt ? (
-            <TodayCategoryRing categories={ringCategories} onPress={handleCategoryPress} />
+          {/* The same category ring circles the hatched creature when revisiting
+              a day — read-only doors into that day's memories. Anchored to the
+              258px art box so egg and creature days match exactly. */}
+          {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
+            <TodayCategoryRing categories={ringCategories} onPress={handleCategoryPress} anchorHeight={258} />
           ) : null}
           {isFormingToday && !isHatching ? (
             <HatchCountdown
@@ -1125,7 +1195,7 @@ export default function HomeScreen() {
               />
             </View>
             <CreatureProvenance creature={selectedDay.creature!} />
-            <DayJournalSections day={selectedDay} />
+            <DayJournalSections day={selectedDay} onStatPress={handleStatPress} />
             <ReflectionCard creature={selectedDay.creature!} />
           </Animated.View>
         ) : (
@@ -1179,7 +1249,14 @@ export default function HomeScreen() {
               <WorldActionStack
                 orientation="horizontal"
                 onCamera={() => {
-                  dismissPhotoAlert();
+                  // New roll photos waiting? The "what did these mean?" window
+                  // leads — the badge clears only when one is chosen or Later
+                  // is pressed. The live camera opens when nothing is waiting.
+                  if (categoryById.get('photos')?.needsAttention && photoPrompt) {
+                    setInitialPrompt(photoPrompt);
+                    setPromptSheetOpen(true);
+                    return;
+                  }
                   router.push('/moment-capture');
                 }}
                 onMicTap={() => {
@@ -1190,10 +1267,17 @@ export default function HomeScreen() {
                   void voiceNote.stop();
                 }}
                 onAddPlace={() => {
-                  void handleAddCurrentPlace();
+                  // A detected stop waiting for a name takes priority over
+                  // manually marking the current location.
+                  if (unconfirmedPlace) setPlacePromptOpen(true);
+                  else void handleAddCurrentPlace();
                 }}
                 onAdd={openPromptSheet}
                 recording={voiceNote.isRecording}
+                cameraBadge={
+                  categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined
+                }
+                placeBadge={unconfirmedPlaceCount > 0 ? unconfirmedPlaceCount : undefined}
               />
             </View>
           ) : null}
@@ -1202,6 +1286,9 @@ export default function HomeScreen() {
 
         {isDay && !isHatched && !isHatching ? (
           <Animated.View entering={presenceEnter(200)} style={styles.sectionGap}>
+            {isFormingToday ? (
+              <BloomMeter day={selectedDay} keepsakesWaiting={keepsakesWaiting} onOpenKeepsakes={handleOpenKeepsakes} />
+            ) : null}
             <DayJournalSections
               day={selectedDay}
               onStatPress={isFormingToday ? handleStatPress : undefined}
@@ -1219,31 +1306,49 @@ export default function HomeScreen() {
           initialPrompt={initialPrompt}
           onAnswer={handleAnswerDayPrompt}
           onSelectHeroPhoto={handleSelectHeroPhoto}
+          onPromptDismiss={(promptId) => {
+            // "Later" on the photos prompt clears the camera/tile badge until
+            // NEW photos arrive (sig-based re-arm).
+            if (promptId === 'meaningful_photo') dismissPhotoAlert();
+          }}
           onClose={closePromptSheet}
         />
       ) : null}
 
-      {/* Category sheets — the same readers/add-flows the World patch used, now
-          opened from the ring around the egg. Only the forming day captures. */}
-      {formingDay ? (
+      {/* Category sheets — readers for whichever day is being viewed; the
+          add-flows/write handlers only exist while the day is still forming. */}
+      {viewedDay ? (
         <>
           {memoryVaultOpen ? (
             <MemoryVaultSheet
-              day={formingDay}
+              day={viewedDay}
               initialTab={memoryVaultTab}
-              onAddPhoto={() => {
-                setMemoryVaultOpen(false);
-                dismissPhotoAlert();
-                router.push('/moment-capture');
-              }}
-              onRecordVoice={() => {
-                setMemoryVaultOpen(false);
-                router.push('/note-capture');
-              }}
-              onAddNote={() => {
-                setMemoryVaultOpen(false);
-                router.push('/note-capture');
-              }}
+              onAddPhoto={
+                viewedIsForming
+                  ? () => {
+                      // Taking a NEW photo doesn't review the waiting roll
+                      // batch — that badge clears on selection or Later only.
+                      setMemoryVaultOpen(false);
+                      router.push('/moment-capture');
+                    }
+                  : undefined
+              }
+              onRecordVoice={
+                viewedIsForming
+                  ? () => {
+                      setMemoryVaultOpen(false);
+                      router.push('/note-capture');
+                    }
+                  : undefined
+              }
+              onAddNote={
+                viewedIsForming
+                  ? () => {
+                      setMemoryVaultOpen(false);
+                      router.push('/note-capture');
+                    }
+                  : undefined
+              }
               onClose={() => setMemoryVaultOpen(false)}
             />
           ) : null}
@@ -1276,11 +1381,15 @@ export default function HomeScreen() {
           ) : null}
           {foodVaultOpen ? (
             <FoodVaultSheet
-              foodMoments={formingDay.foodMoments ?? []}
-              onAddFood={() => {
-                setFoodVaultOpen(false);
-                setFoodPickerOpen(true);
-              }}
+              foodMoments={viewedDay.foodMoments ?? []}
+              onAddFood={
+                viewedIsForming
+                  ? () => {
+                      setFoodVaultOpen(false);
+                      setFoodPickerOpen(true);
+                    }
+                  : undefined
+              }
               onClose={() => setFoodVaultOpen(false)}
             />
           ) : null}
@@ -1289,28 +1398,36 @@ export default function HomeScreen() {
           ) : null}
           {studioVaultOpen ? (
             <StudioVaultSheet
-              studioMoments={formingDay.studioMoments ?? []}
-              onAddStudio={() => {
-                setStudioVaultOpen(false);
-                setStudioPickerOpen(true);
-              }}
+              studioMoments={viewedDay.studioMoments ?? []}
+              onAddStudio={
+                viewedIsForming
+                  ? () => {
+                      setStudioVaultOpen(false);
+                      setStudioPickerOpen(true);
+                    }
+                  : undefined
+              }
               onClose={() => setStudioVaultOpen(false)}
             />
           ) : null}
           {sanctuaryOpen ? (
             <SanctuarySheet
-              day={formingDay}
-              onReflect={() => {
-                setSanctuaryOpen(false);
-                openPromptSheet();
-              }}
+              day={viewedDay}
+              onReflect={
+                viewedIsForming
+                  ? () => {
+                      setSanctuaryOpen(false);
+                      openPromptSheet();
+                    }
+                  : undefined
+              }
               onClose={() => setSanctuaryOpen(false)}
             />
           ) : null}
           {moodSheetOpen ? (
             <MoodMonumentSheet
-              day={formingDay}
-              onChoose={handleConfirmMood}
+              day={viewedDay}
+              onChoose={viewedIsForming ? handleConfirmMood : undefined}
               onOpenSanctuary={() => {
                 setMoodSheetOpen(false);
                 setSanctuaryOpen(true);
@@ -1320,12 +1437,16 @@ export default function HomeScreen() {
           ) : null}
           {sleepSheetOpen ? (
             <SleepSheet
-              sleep={formingDay.sleep ?? null}
-              onSet={(quality) => {
-                setSleep({ quality, source: 'manual' }, formingTarget);
-                setMicrocopy('Your morning, remembered');
-                setSleepSheetOpen(false);
-              }}
+              sleep={viewedDay.sleep ?? null}
+              onSet={
+                viewedIsForming
+                  ? (quality) => {
+                      setSleep({ quality, source: 'manual' }, formingTarget);
+                      setMicrocopy('Your morning, remembered');
+                      setSleepSheetOpen(false);
+                    }
+                  : undefined
+              }
               onClose={() => setSleepSheetOpen(false)}
             />
           ) : null}
@@ -1337,14 +1458,14 @@ export default function HomeScreen() {
           ) : null}
           {stepsSheetOpen ? (
             <StepsPromptSheet
-              stepsCount={formingDay.stepsCount ?? null}
+              stepsCount={viewedDay.stepsCount ?? null}
               onConfirm={handleConfirmSteps}
               onClose={() => setStepsSheetOpen(false)}
             />
           ) : null}
           {journeySheetOpen ? (
             <JourneyDetailSheet
-              day={formingDay}
+              day={viewedDay}
               recentAvgSteps={recentAvgSteps}
               onClose={() => setJourneySheetOpen(false)}
               onViewMemories={() => {
@@ -1352,25 +1473,33 @@ export default function HomeScreen() {
                 setMemoryVaultTab('photos');
                 setMemoryVaultOpen(true);
               }}
-              onInterpret={() => {
-                setJourneySheetOpen(false);
-                setStepsSheetOpen(true);
-              }}
+              onInterpret={
+                viewedIsForming
+                  ? () => {
+                      setJourneySheetOpen(false);
+                      setStepsSheetOpen(true);
+                    }
+                  : undefined
+              }
             />
           ) : null}
           {placesVaultOpen ? (
             <PlacesDetailSheet
-              day={formingDay}
+              day={viewedDay}
               onClose={() => setPlacesVaultOpen(false)}
-              onAddPlace={() => {
-                setPlacesVaultOpen(false);
-                void handleAddCurrentPlace();
-              }}
+              onAddPlace={
+                viewedIsForming
+                  ? () => {
+                      setPlacesVaultOpen(false);
+                      void handleAddCurrentPlace();
+                    }
+                  : undefined
+              }
               onOpenMap={() => {
                 setPlacesVaultOpen(false);
-                handleOpenDayMap(formingDay.id);
+                handleOpenDayMap(viewedDay.id);
               }}
-              onConfirmPlace={handleConfirmPlaceFromVault}
+              onConfirmPlace={viewedIsForming ? handleConfirmPlaceFromVault : undefined}
               onOpenObservatory={() => {
                 setPlacesVaultOpen(false);
                 setObservatoryOpen(true);
@@ -1379,7 +1508,7 @@ export default function HomeScreen() {
           ) : null}
           {observatoryOpen ? (
             <ObservatorySheet
-              day={formingDay}
+              day={viewedDay}
               observations={observations}
               focusedObservationId={null}
               travelMemory={{
@@ -1396,10 +1525,14 @@ export default function HomeScreen() {
                 setObservatoryOpen(false);
                 setPlacesVaultOpen(true);
               }}
-              onReflect={() => {
-                setObservatoryOpen(false);
-                openPromptSheet();
-              }}
+              onReflect={
+                viewedIsForming
+                  ? () => {
+                      setObservatoryOpen(false);
+                      openPromptSheet();
+                    }
+                  : undefined
+              }
               onClose={() => setObservatoryOpen(false)}
             />
           ) : null}
@@ -1415,7 +1548,7 @@ export default function HomeScreen() {
           ) : null}
           {nameSheetOpen ? (
             <NameDaySheet
-              initialName={formingDay.dayName ?? null}
+              initialName={viewedDay.dayName ?? null}
               suggestion={null}
               onSave={(name) => {
                 setDayName(name, formingTarget);

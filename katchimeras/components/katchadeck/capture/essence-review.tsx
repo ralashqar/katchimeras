@@ -18,11 +18,15 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import {
   CAPTURE_MEANINGS,
+  meaningsForMediaKind,
   selectCaptureMeanings,
+  selectStudioMeanings,
   type CaptureMeaning,
   type MeaningTag,
 } from '@/utils/capture-energy';
 import { suggestFoundationMeanings } from '@/utils/foundation-meaning';
+import { resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
+import { detectStudioInVision, isGenericStudioLabel, studioDetectionFromMedia } from '@/utils/studio-detect';
 import { pickProminentTags } from '@/utils/vision-signals';
 import type { DayVisionSummary } from '@/types/home';
 
@@ -44,9 +48,21 @@ type EssenceReviewProps = {
   // prompt loads the chosen asset). Null when nothing could be read.
   analyze: () => Promise<DayVisionSummary | null>;
   // Feed the day with the chosen meaning + the photo's essence, then leave.
-  onCommit: (meaning: MeaningTag, vision: DayVisionSummary | null, label: string) => void;
+  // `scene` is the hierarchical scene read resolved here (null if it wasn't
+  // ready / available) — pass it through to applyCapturedMoment so the whole
+  // pipeline acts on ONE classification.
+  onCommit: (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null) => void;
   onClose: () => void;
 };
+
+// UI wait cap for the scene read: the LLM usually answers well under this, but
+// an old/busy device must not stall the essence screen. A late result still
+// lands in the ref, so the commit gets it even when the UI didn't wait.
+const SCENE_READ_UI_TIMEOUT_MS = 3500;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([promise, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
+}
 
 export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceReviewProps) {
   const insets = useSafeAreaInsets();
@@ -55,6 +71,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
   const [tags, setTags] = useState<EssenceTag[]>([]);
   const [meanings, setMeanings] = useState<readonly CaptureMeaning[]>(CAPTURE_MEANINGS);
   const visionRef = useRef<DayVisionSummary | null>(null);
+  const sceneRef = useRef<SceneRead | null>(null);
   const intro = useSharedValue(0);
   const absorb = useSharedValue(0);
   const fallDistance = height * 0.5;
@@ -67,14 +84,35 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
         return;
       }
       visionRef.current = vision;
-      setTags(buildEssenceTags(vision));
-      // Prefer the on-device Foundation Models phrasing where available; it
-      // returns null fast otherwise and we use the rule-based set.
-      const llm = vision ? await suggestFoundationMeanings(vision) : null;
+      sceneRef.current = null;
+      // ONE hierarchical scene read drives everything: the essence chips, the
+      // meaning options, and (via onCommit) the day's food/studio moments.
+      // Kick the FM meaning suggestion in parallel so a non-media scene isn't
+      // paying two LLM round-trips back to back.
+      const scenePromise = vision ? resolveSceneRead(vision) : Promise.resolve(null);
+      void scenePromise.then((read) => {
+        sceneRef.current = read;
+      }).catch(() => {});
+      const llmPromise = vision ? suggestFoundationMeanings(vision) : Promise.resolve(null);
+      const scene = await withTimeout(scenePromise.catch(() => null), SCENE_READ_UI_TIMEOUT_MS);
       if (!active) {
         return;
       }
-      setMeanings(llm ?? selectCaptureMeanings(vision));
+      setTags(buildEssenceTags(vision, scene));
+      // A recognised piece of media (a book cover, a TV) owns the meaning
+      // options outright; any other scene prefers the Foundation Models
+      // phrasing where available and falls back to the rule-based set.
+      const mediaMeanings =
+        scene?.type === 'media' && scene.media
+          ? meaningsForMediaKind(scene.media.mediaType)
+          : scene
+            ? null // scene read says it's NOT media — trust it over the heuristic
+            : selectStudioMeanings(vision);
+      const llm = mediaMeanings ? null : await llmPromise.catch(() => null);
+      if (!active) {
+        return;
+      }
+      setMeanings(mediaMeanings ?? llm ?? selectCaptureMeanings(vision));
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
     })();
@@ -91,7 +129,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setState('absorbing');
     absorb.value = withTiming(1, { duration: 680, easing: Easing.in(Easing.cubic) });
-    setTimeout(() => onCommit(meaning, visionRef.current, label), 740);
+    setTimeout(() => onCommit(meaning, visionRef.current, label, sceneRef.current), 740);
   };
 
   return (
@@ -154,8 +192,21 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
 
 // The photo's essence = what the on-device vision read in it, as tags the user
 // can watch being captured into the day.
-function buildEssenceTags(vision: DayVisionSummary | null): EssenceTag[] {
+function buildEssenceTags(vision: DayVisionSummary | null, scene: SceneRead | null): EssenceTag[] {
   const tags: EssenceTag[] = [];
+  // When the work was identified (a cover/poster read as a real title), it
+  // leads — the user sees '📖 Norwegian Wood', not just scene labels. The
+  // scene read is the arbiter; the direct vision check only fills in when no
+  // scene resolved in time.
+  const studio =
+    scene?.type === 'media' && scene.media
+      ? studioDetectionFromMedia(scene.media.mediaType, scene.media.title)
+      : !scene && vision
+        ? detectStudioInVision(vision)
+        : null;
+  if (studio?.detected && studio.label && !isGenericStudioLabel(studio.label)) {
+    tags.push({ id: 'studio-title', label: `${studio.emoji ?? '📖'} ${studio.label}`, accent: '#E8C87A' });
+  }
   if (vision && vision.maxFaceCount >= 2) {
     tags.push({ id: 'together', label: 'Together', accent: '#F2C2A8' });
   }

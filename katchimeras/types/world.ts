@@ -142,6 +142,10 @@ export type WorldPatch = {
   // Patch-grid coordinates assigned at placement (utils/world-placement.ts).
   gridCol: number;
   gridRow: number;
+  // Which ground PNG this patch draws in image-base mode (world-visuals
+  // WORLD_BASE_SOURCES). Absent → the canvas default. Lets Kingdom expansion
+  // plots dock smaller islet bases beside the main island.
+  baseId?: string | null;
   // Deferred (post-MVP): which sides have neighbours for edge-blending/biomes.
   connectorSides: WorldDirection[];
   // Live-patch fields. Absent on archived/legacy patches (treated as 'hatched').

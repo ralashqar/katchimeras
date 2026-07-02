@@ -1,5 +1,6 @@
 import type { DayScores, DayVisionSummary, HomeScoreKey } from '@/types/home';
 import { resolvePhotoCategory } from '@/utils/photo-category';
+import { detectStudioInVision } from '@/utils/studio-detect';
 
 // The four "what stood out" choices a capture offers, and how each + the photo's
 // detected subject translate into captured energy (our HomeScoreKey axes). Pure,
@@ -172,6 +173,32 @@ const TECH_MEANINGS: readonly CaptureMeaning[] = [
   { id: 'calm', emoji: '📱', label: 'Scrolling' },
 ];
 
+// When the classifier recognised a piece of MEDIA (a book cover, a TV, a
+// console), that owns the moment: the meaning options speak to it directly.
+// Bucket scoring below can be hijacked by texture labels (a red cover reads
+// 'raw glass' → drink outvotes 'book'), so this check runs first.
+const STUDIO_MEANINGS: Partial<Record<string, readonly CaptureMeaning[]>> = {
+  book: READING_MEANINGS,
+  film: WATCHING_MEANINGS,
+  show: WATCHING_MEANINGS,
+  game: GAMES_MEANINGS,
+  music: MUSIC_MEANINGS,
+  art: MEANINGS_BY_CATEGORY.culture,
+};
+
+export function selectStudioMeanings(vision: DayVisionSummary | null): readonly CaptureMeaning[] | null {
+  if (!vision) return null;
+  const studio = detectStudioInVision(vision);
+  if (!studio.detected || !studio.mediaType) return null;
+  return STUDIO_MEANINGS[studio.mediaType] ?? null;
+}
+
+// Same lookup keyed by an already-classified media kind (the hierarchical scene
+// read's media branch) — no re-detection.
+export function meaningsForMediaKind(mediaType: string): readonly CaptureMeaning[] | null {
+  return STUDIO_MEANINGS[mediaType] ?? null;
+}
+
 // Every meaning bucket with the vocabulary that votes for it. Order is the
 // tiebreak when two buckets score equally — earlier = more specific/intentional.
 // The patterns are deliberately broad (Apple Vision's labels are noisy) and are
@@ -212,6 +239,9 @@ export function selectCaptureMeanings(vision: DayVisionSummary | null): readonly
   if (!vision) {
     return CAPTURE_MEANINGS;
   }
+
+  const studioMeanings = selectStudioMeanings(vision);
+  if (studioMeanings) return studioMeanings;
 
   const scores = new Map<string, number>();
   const score = (word: string, weight: number) => {

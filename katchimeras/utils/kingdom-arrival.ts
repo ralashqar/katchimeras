@@ -35,18 +35,29 @@ export type KingdomArrivals = {
   levelUps: { building: KingdomBuilding; from: number }[];
 };
 
+// Gifts granted LIVE from a still-forming day go straight to the shelf — they
+// shouldn't pop a ceremony on every mid-day visit, and they shouldn't be marked
+// witnessed either, so any left unplanted still parade with tomorrow's arrival.
+function isHeld(gift: KingdomGift, holdGiftDayIds?: string[]): boolean {
+  return !!gift.provenance.dayId && (holdGiftDayIds ?? []).includes(gift.provenance.dayId);
+}
+
 // Everything that arrived since the last witnessed snapshot, or null when the
 // morning is quiet. The very first run initializes silently (no retro-parade).
-export function deriveKingdomArrivals(kingdom: KingdomState, decor: KingdomDecorState): KingdomArrivals | null {
+export function deriveKingdomArrivals(
+  kingdom: KingdomState,
+  decor: KingdomDecorState,
+  options: { holdGiftDayIds?: string[] } = {}
+): KingdomArrivals | null {
   const witnessed = loadWitnessed();
   if (!witnessed.initialized) {
-    witnessKingdom(kingdom, decor);
+    witnessKingdom(kingdom, decor, options);
     return null;
   }
   const seenCreatures = new Set(witnessed.creatureDayIds);
   const seenGifts = new Set(witnessed.giftIds);
   const creatures = kingdom.creatures.filter((creature) => !seenCreatures.has(creature.dayId));
-  const gifts = decor.unplanted.filter((gift) => !seenGifts.has(gift.id));
+  const gifts = decor.unplanted.filter((gift) => !seenGifts.has(gift.id) && !isHeld(gift, options.holdGiftDayIds));
   const levelUps = kingdom.buildings
     .filter((building) => {
       const prev = witnessed.levels[building.id];
@@ -58,14 +69,21 @@ export function deriveKingdomArrivals(kingdom: KingdomState, decor: KingdomDecor
 }
 
 // Record the current kingdom as seen (ceremony finished / first run) and clear
-// the tab badge.
-export function witnessKingdom(kingdom: KingdomState, decor: KingdomDecorState) {
+// the tab badge. Held (live-granted, still-forming-day) gifts stay unwitnessed.
+export function witnessKingdom(
+  kingdom: KingdomState,
+  decor: KingdomDecorState,
+  options: { holdGiftDayIds?: string[] } = {}
+) {
   const next: WitnessedState = {
     version: 1,
     initialized: true,
     creatureDayIds: kingdom.creatures.map((creature) => creature.dayId).slice(0, MAX_CREATURE_IDS),
     levels: Object.fromEntries(kingdom.buildings.map((building) => [building.id, building.level])),
-    giftIds: decor.unplanted.map((gift) => gift.id).slice(0, MAX_GIFT_IDS),
+    giftIds: decor.unplanted
+      .filter((gift) => !isHeld(gift, options.holdGiftDayIds))
+      .map((gift) => gift.id)
+      .slice(0, MAX_GIFT_IDS),
   };
   setStoredJson(WITNESSED_KEY, next);
   clearArrivalPending();
