@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import * as Location from 'expo-location';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -71,6 +71,13 @@ import { detectFoodInVision } from '@/utils/food-detect';
 import { detectStudioInVision } from '@/utils/studio-detect';
 import { useDiscoveries } from '@/hooks/use-discoveries';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
+import { ObservatorySheet } from '@/components/katchadeck/world/observatory-sheet';
+import { useTravelMemoryMode } from '@/hooks/use-travel-memory-mode';
+import { travelMemoryBody, travelMemoryStatusLabel } from '@/utils/travel-memory-mode';
+import { deriveContinuityMotifs } from '@/utils/continuity-engine';
+import { deriveObservations } from '@/utils/observations-engine';
+import { loadSleepForDay } from '@/utils/sleep-health';
+import { markArrivalPending } from '@/utils/kingdom-arrival';
 import { resolvePlaceName } from '@/utils/place-names';
 import { isPointAtHome, loadHomeAnchor, saveHomeAnchor } from '@/utils/home-location';
 import type {
@@ -235,6 +242,9 @@ export default function HomeScreen() {
     setIsHatching(false);
     setHatchingEgg(null);
     refreshState();
+    // The creature now has a Kingdom to walk into — badge the tab until the
+    // arrival is witnessed there.
+    markArrivalPending();
   };
 
   function handleOpenDayMap(dayId: string) {
@@ -554,6 +564,76 @@ export default function HomeScreen() {
     setEggFeedKey((key) => key + 1);
     setMicrocopy(`${input.emoji} ${input.label} · noted`);
   };
+
+  // Morning sleep: the first time Today is entered on a forming day, try Apple
+  // Health for the night's sleep; if it has it, record it; otherwise auto-ask
+  // "how was your sleep?" once. Keyed on the day's INSTANCE (id + storedNonce)
+  // so "reset today" re-arms the prompt while a plain dismiss doesn't nag.
+  const isFocused = useIsFocused();
+  const sleepPromptedRef = useRef<string | null>(null);
+  const todayForming = useMemo(() => {
+    const today = timelineDays.find((day) => day.kind === 'day' && day.isToday) as HomeDayRecord | undefined;
+    return today && today.state !== 'hatched' ? today : null;
+  }, [timelineDays]);
+  const todayFormingId = todayForming?.id ?? null;
+  const todayFormingIso = todayForming?.isoDate ?? null;
+  const todayHasSleep = !!todayForming?.sleep;
+  const todayFormingKey = todayForming ? `${todayForming.id}:${todayForming.storedNonce ?? ''}` : null;
+  useEffect(() => {
+    if (!isFocused || !todayFormingId || !todayFormingIso || todayHasSleep) return;
+    if (sleepPromptedRef.current === todayFormingKey) return;
+    sleepPromptedRef.current = todayFormingKey;
+    let active = true;
+    void (async () => {
+      const health = await loadSleepForDay(todayFormingIso);
+      if (!active) return;
+      if (health) setSleep(health);
+      else setSleepSheetOpen(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [isFocused, todayFormingId, todayFormingIso, todayFormingKey, todayHasSleep, setSleep]);
+
+  // The Observatory (what Katchimera has noticed) + Travel Memory controls —
+  // reached through the Crossroads reader until it gets its own Kingdom home.
+  const [observatoryOpen, setObservatoryOpen] = useState(false);
+  const {
+    state: travelMemoryState,
+    isActive: travelMemoryActive,
+    enable: enableTravelMemory,
+    pauseToday: pauseTravelMemoryToday,
+    disable: disableTravelMemory,
+    deleteTodayPlaces: deleteTodayTravelMemoryPlaces,
+  } = useTravelMemoryMode();
+  const backgroundPlaceCount = useMemo(
+    () => formingDay?.locations.filter((point) => point.source === 'background').length ?? 0,
+    [formingDay?.locations]
+  );
+  const observations = useMemo(
+    () => deriveObservations({ days: allDays, selectedDay: formingDay ?? null, motifs: deriveContinuityMotifs(allDays, 6) }),
+    [allDays, formingDay]
+  );
+  const handleEnableTravelMemory = useCallback(async () => {
+    setMicrocopy('Asking for Travel Memory permission...');
+    const next = await enableTravelMemory();
+    if (next.status === 'enabled') setMicrocopy('Travel Memory Mode is on');
+    else if (next.status === 'denied') setMicrocopy('Background location permission is needed');
+    else if (next.status === 'unavailable') setMicrocopy('Travel Memory is not available here');
+  }, [enableTravelMemory]);
+  const handlePauseTravelMemoryToday = useCallback(async () => {
+    await pauseTravelMemoryToday();
+    setMicrocopy('Travel Memory paused for today');
+  }, [pauseTravelMemoryToday]);
+  const handleDisableTravelMemory = useCallback(async () => {
+    await disableTravelMemory();
+    setMicrocopy('Travel Memory turned off');
+  }, [disableTravelMemory]);
+  const handleDeleteTodayTravelMemoryPlaces = useCallback(() => {
+    deleteTodayTravelMemoryPlaces();
+    refreshState();
+    setMicrocopy("Today's background places deleted");
+  }, [deleteTodayTravelMemoryPlaces, refreshState]);
 
   // Discoveries (life milestones): whatever is added on Today re-evaluates the
   // catalog right away, and a fresh unlock plays its reveal here too — but only
@@ -910,6 +990,7 @@ export default function HomeScreen() {
     bigMomentPickerOpen ||
     placePromptOpen ||
     placesVaultOpen ||
+    observatoryOpen ||
     stepsSheetOpen ||
     journeySheetOpen ||
     nameSheetOpen ||
@@ -1290,6 +1371,36 @@ export default function HomeScreen() {
                 handleOpenDayMap(formingDay.id);
               }}
               onConfirmPlace={handleConfirmPlaceFromVault}
+              onOpenObservatory={() => {
+                setPlacesVaultOpen(false);
+                setObservatoryOpen(true);
+              }}
+            />
+          ) : null}
+          {observatoryOpen ? (
+            <ObservatorySheet
+              day={formingDay}
+              observations={observations}
+              focusedObservationId={null}
+              travelMemory={{
+                statusLabel: travelMemoryStatusLabel(travelMemoryState),
+                body: travelMemoryBody(travelMemoryState),
+                enabled: travelMemoryActive,
+                backgroundPlaceCount,
+                onEnable: handleEnableTravelMemory,
+                onPauseToday: travelMemoryActive ? handlePauseTravelMemoryToday : undefined,
+                onDisable: travelMemoryActive ? handleDisableTravelMemory : undefined,
+                onDeleteTodayPlaces: backgroundPlaceCount > 0 ? handleDeleteTodayTravelMemoryPlaces : undefined,
+              }}
+              onViewPlaces={() => {
+                setObservatoryOpen(false);
+                setPlacesVaultOpen(true);
+              }}
+              onReflect={() => {
+                setObservatoryOpen(false);
+                openPromptSheet();
+              }}
+              onClose={() => setObservatoryOpen(false)}
             />
           ) : null}
           {placePromptOpen && activePlace ? (

@@ -266,3 +266,29 @@ export function deleteTodayTravelMemoryPlaces() {
   const normalized = hydrateHomeState({ ...hydrated.state, today: nextToday }, profile, now).state;
   saveStoredHomeState(normalized);
 }
+
+// --- UI copy for the Travel Memory controls (Observatory reader) ---
+
+export function travelMemoryStatusLabel(state: TravelMemoryModeState): string {
+  if (state.status === 'enabled') return 'Remembering meaningful stops';
+  if (state.status === 'paused_today') return 'Paused for today';
+  if (state.status === 'denied') return 'Permission needed';
+  if (state.status === 'unavailable') return 'Not available on this device';
+  return 'Off by default';
+}
+
+export function travelMemoryBody(state: TravelMemoryModeState): string {
+  if (state.status === 'enabled') {
+    return 'When you travel, Katchimera can add coarse background stops to today so the patch does not depend on photos or opening the app.';
+  }
+  if (state.status === 'paused_today') return 'Background place capture is paused until tomorrow. You can resume it any time.';
+  if (state.status === 'denied') return 'Allow background location if you want travel days to become places even when the app was not open.';
+  if (state.status === 'unavailable') return 'This build or platform cannot run background place capture yet.';
+  return 'Optional. Turn it on after you trust the app, especially for days when you move between places.';
+}
+
+export function travelMemoryEnableLabel(state: TravelMemoryModeState): string {
+  if (state.status === 'paused_today') return 'Resume Travel Memory';
+  if (state.status === 'denied') return 'Try Travel Memory';
+  return 'Travel Memory';
+}

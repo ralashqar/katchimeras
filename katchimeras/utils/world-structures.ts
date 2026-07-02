@@ -104,7 +104,7 @@ function finiteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function resolveStructurePosition(category: WorldObjectCategory): { col: number; row: number } | null {
+export function resolveStructurePosition(category: WorldObjectCategory): { col: number; row: number } | null {
   const configured = STRUCTURE_LAYOUT.positions?.[category];
   if (configured && finiteNumber(configured.nx) && finiteNumber(configured.ny)) {
     return normalisedBaseToCell(configured.nx, configured.ny);

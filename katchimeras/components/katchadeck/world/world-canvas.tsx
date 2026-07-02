@@ -57,8 +57,10 @@ type Props = {
   patches: WorldPatch[];
   onSelectPatch: (patchId: string) => void;
   onSelectMemory: (memory: MemoryNode, patchId: string) => void;
-  // Tapping a cell object on today's patch opens that cell's detail view.
-  onSelectCell?: (cellType: NonNullable<SceneSprite['category']>) => void;
+  // Tapping a cell object on today's patch opens that cell's detail view. The
+  // object's id comes along so per-item categories (decor) can identify which
+  // one was tapped (e.g. the Kingdom's provenance card).
+  onSelectCell?: (cellType: NonNullable<SceneSprite['category']>, objectId?: string) => void;
   // Tapping a Big Moment landmark (celebration/milestone/trip…) opens its bespoke
   // reader instead of the generic patch inspector.
   onSelectBigMoment?: () => void;
@@ -844,7 +846,7 @@ export function WorldCanvas({
           return;
         }
         if (hit.kind === 'memory' && hit.memory) onSelectMemory(hit.memory, hit.patchId);
-        else if (hit.category && onSelectCell) onSelectCell(hit.category);
+        else if (hit.category && onSelectCell) onSelectCell(hit.category, hit.id);
         else if (hit.kind === 'landmark' && onSelectBigMoment) onSelectBigMoment();
         else onSelectPatch(hit.patchId);
         return;
@@ -913,7 +915,7 @@ export function WorldCanvas({
         // A cell object (photos/notes/places/journey/sleep/food) opens its bespoke
         // reader for WHICHEVER day is shown — not just today's forming patch. The
         // world only renders one patch at a time, so this is always the selected day.
-        else if (occupant.category && onSelectCell) onSelectCell(occupant.category);
+        else if (occupant.category && onSelectCell) onSelectCell(occupant.category, occupant.id);
         else if (occupant.kind === 'landmark' && onSelectBigMoment) onSelectBigMoment();
         else onSelectPatch(occupant.patchId);
         return;

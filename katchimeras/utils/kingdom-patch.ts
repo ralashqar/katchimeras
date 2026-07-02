@@ -1,6 +1,6 @@
 import type { KingdomBuilding, KingdomBuildingId, KingdomState } from '@/types/kingdom';
 import type { WorldObject, WorldObjectCategory, WorldPatch, WorldTile } from '@/types/world';
-import { WORLD_STRUCTURE_POSITIONS, resolveStructureScale } from '@/utils/world-structures';
+import { resolveStructurePosition, resolveStructureScale } from '@/utils/world-structures';
 
 // deriveKingdomPatch — maps the derived KingdomState onto the existing
 // WorldPatch/WorldObject render model, so the Kingdom scene reuses WorldCanvas
@@ -10,7 +10,7 @@ import { WORLD_STRUCTURE_POSITIONS, resolveStructureScale } from '@/utils/world-
 
 // Which render category each Kingdom building maps to — categories drive
 // position + scale lookups in the world layout, and tap routing in the scene.
-const BUILDING_CATEGORY: Record<KingdomBuildingId, WorldObjectCategory> = {
+export const BUILDING_CATEGORY: Record<KingdomBuildingId, WorldObjectCategory> = {
   home: 'chronicle',
   memoryLibrary: 'memory',
   crossroads: 'places',
@@ -19,6 +19,15 @@ const BUILDING_CATEGORY: Record<KingdomBuildingId, WorldObjectCategory> = {
   study: 'studio',
   foodPavilion: 'food',
 };
+
+// Reverse lookup for the scene's tap routing: a tapped render category → the
+// Kingdom building standing there.
+export function buildingIdForCategory(category: WorldObjectCategory): KingdomBuildingId | null {
+  for (const [id, cat] of Object.entries(BUILDING_CATEGORY) as [KingdomBuildingId, WorldObjectCategory][]) {
+    if (cat === category) return id;
+  }
+  return null;
+}
 
 // Existing art, reused at Kingdom scale: leveled sets where they exist
 // (Memory Vault, Journey), one iconic building + badge otherwise. The cozy
@@ -71,7 +80,10 @@ export function deriveKingdomPatch(kingdom: KingdomState): WorldPatch {
 
   for (const building of kingdom.buildings) {
     const category = BUILDING_CATEGORY[building.id];
-    const pos = WORLD_STRUCTURE_POSITIONS[category];
+    // Placement comes from the Base Lab webtool layout (world-structure-layout
+    // .json) first, falling back to the hardcoded defaults — same resolution the
+    // day patch used, so tuned positions carry straight over to the Kingdom.
+    const pos = resolveStructurePosition(category);
     if (!pos) continue;
     const assetKey = buildingAssetKey(building);
     objects.push({
