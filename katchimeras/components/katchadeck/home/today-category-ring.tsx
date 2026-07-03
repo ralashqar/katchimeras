@@ -1,9 +1,11 @@
+import { BlurView } from 'expo-blur';
+import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { MotiView } from 'moti';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
-import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 import type { TodayCategoryState } from '@/utils/today-categories';
 
 // The Today screen's life categories, arranged in a fixed ring around the egg.
@@ -27,13 +29,15 @@ type TodayCategoryRingProps = {
 // list down its right, the rest down its left. The fans hug the horizontal
 // axis (small vertical span, wide horizontal reach) so nothing crowds the UI
 // directly above or below the egg (hatch countdown, stats strip).
-const VERTICAL_SPAN = 72; // max |y| of a side's top/bottom icon
-const ARC_INSET = 12; // how much the top/bottom icons curve in toward the egg
+const VERTICAL_SPAN = 76; // max |y| of a side's top/bottom chip (snug stack)
+// Chips stack in straight vertical columns (no arc) — every chip on a side
+// shares the same x, flanking the egg left and right.
+const ARC_INSET = 0;
 
 export function TodayCategoryRing({
   categories,
   onPress,
-  radius = 136,
+  radius = 134,
   centerOffsetY = -18,
   anchorHeight,
 }: TodayCategoryRingProps) {
@@ -67,8 +71,22 @@ export function TodayCategoryRing({
   );
 }
 
-const GLOW = '#FFC36B';
+const GLOW = Meadow.gold;
 
+// Generated 3D icon art per category (FAL grid → sliced + matted). Categories
+// without art fall back to their IconSymbol glyph.
+const CATEGORY_ART: Partial<Record<string, number>> = {
+  sleep: require('@/assets/images/katchimeras/today-icons/sleep.png'),
+  mood: require('@/assets/images/katchimeras/today-icons/mood.png'),
+  quests: require('@/assets/images/katchimeras/today-icons/quests.png'),
+  reflection: require('@/assets/images/katchimeras/today-icons/reflection.png'),
+  food: require('@/assets/images/katchimeras/today-icons/food.png'),
+  studio: require('@/assets/images/katchimeras/today-icons/inspo.png'),
+};
+
+// Glassy squircle chips (the pedestal mockup): a frosted-glass rounded panel
+// with the icon, category label AND count stacked inside, plus the solid gold
+// count badge on the top-right corner. Attention = gold ring + slow pulse.
 function CategoryMote({
   category,
   onPress,
@@ -81,42 +99,49 @@ function CategoryMote({
   translateY: number;
 }) {
   const active = category.hasContent || category.needsAttention;
-  const tint = category.needsAttention ? GLOW : active ? category.accent : 'rgba(201,194,232,0.45)';
   const badge = category.countLabel ?? (category.count > 0 ? `${category.count}` : null);
 
   return (
     <View pointerEvents="box-none" style={[styles.slot, { transform: [{ translateX }, { translateY }] }]}>
-      {category.needsAttention ? (
-        <MotiView
-          from={{ opacity: 0.35, scale: 1 }}
-          animate={{ opacity: 0.0, scale: 1.7 }}
-          transition={{ loop: true, type: 'timing', duration: 1600 }}
-          pointerEvents="none"
-          style={[styles.pulse, { backgroundColor: GLOW }]}
-        />
-      ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${category.label}${badge ? ` (${badge})` : ''}${category.needsAttention ? ' — needs a look' : ''}`}
-        hitSlop={6}
-        onPress={onPress}
-        style={[
-          styles.mote,
-          {
-            borderColor: `${tint}AA`,
-            boxShadow: category.needsAttention ? `0 0 16px ${GLOW}99` : active ? `0 0 12px ${category.accent}66` : 'none',
-            opacity: active ? 1 : 0.55,
-          },
-        ]}>
-        <IconSymbol name={category.icon} size={16} color={tint} />
-      </Pressable>
-      {badge ? (
-        <View style={[styles.badge, { borderColor: `${tint}66` }]} pointerEvents="none">
-          <ThemedText style={styles.badgeLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {badge}
+      <View style={styles.chipWrap} pointerEvents="box-none">
+        {category.needsAttention ? (
+          <MotiView
+            from={{ opacity: 0.35, scale: 1 }}
+            animate={{ opacity: 0.0, scale: 1.35 }}
+            transition={{ loop: true, type: 'timing', duration: 1600 }}
+            pointerEvents="none"
+            style={[styles.pulse, { backgroundColor: GLOW }]}
+          />
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${category.label}${badge ? ` (${badge})` : ''}${category.needsAttention ? ' — needs a look' : ''}`}
+          hitSlop={6}
+          onPress={onPress}
+          style={[
+            styles.mote,
+            category.needsAttention ? styles.moteAttention : null,
+            { opacity: active ? 1 : 0.62 },
+          ]}>
+          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={[StyleSheet.absoluteFill, styles.moteTint]} pointerEvents="none" />
+          {CATEGORY_ART[category.id] ? (
+            <Image source={CATEGORY_ART[category.id]} style={styles.chipArt} contentFit="contain" />
+          ) : (
+            <IconSymbol name={category.icon} size={24} color={Meadow.chipLabel} />
+          )}
+          <ThemedText numberOfLines={1} style={styles.chipName} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
+            {category.label}
           </ThemedText>
-        </View>
-      ) : null}
+        </Pressable>
+        {badge ? (
+          <View style={styles.badge} pointerEvents="none">
+            <ThemedText style={styles.badgeLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+              {badge}
+            </ThemedText>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -131,35 +156,67 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'absolute',
   },
+  chipWrap: {
+    height: 66,
+    width: 66,
+  },
   pulse: {
-    borderRadius: 999,
-    height: 36,
-    position: 'absolute',
-    width: 36,
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 22,
   },
   mote: {
     alignItems: 'center',
-    backgroundColor: 'rgba(12,10,20,0.86)',
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 36,
+    borderColor: 'rgba(255, 245, 220, 0.38)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1.2,
+    // Inner top-light — the glassy bevel the target panels have.
+    boxShadow: 'inset 0 1px 0 rgba(255, 248, 230, 0.35)',
+    gap: 3,
+    height: 66,
     justifyContent: 'center',
-    width: 36,
+    overflow: 'hidden',
+    paddingHorizontal: 5,
+    width: 66,
   },
+  moteTint: {
+    backgroundColor: 'rgba(40, 32, 22, 0.22)',
+  },
+  moteAttention: {
+    borderColor: GLOW,
+    boxShadow: `0 0 14px ${GLOW}88`,
+  },
+  chipArt: {
+    height: 30,
+    width: 30,
+  },
+  chipName: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    maxWidth: 62,
+    textAlign: 'center',
+  },
+
   badge: {
-    backgroundColor: 'rgba(12,10,20,0.92)',
+    alignItems: 'center',
+    backgroundColor: Meadow.gold,
+    borderColor: Meadow.goldDeep,
     borderRadius: 999,
-    borderWidth: 1,
-    bottom: -7,
-    minWidth: 18,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
+    borderWidth: 1.5,
+    boxShadow: '0 2px 6px rgba(40, 26, 8, 0.35)',
+    justifyContent: 'center',
+    minWidth: 21,
+    height: 21,
+    paddingHorizontal: 5,
     position: 'absolute',
+    right: -6,
+    top: -6,
   },
   badgeLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: '800',
-    lineHeight: 12,
+    lineHeight: 13.5,
     textAlign: 'center',
   },
 });

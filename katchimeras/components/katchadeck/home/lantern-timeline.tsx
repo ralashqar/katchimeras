@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 import type { HomeDayRecord, HomeTimelineDay } from '@/types/home';
 import { getCreatureVisual } from '@/utils/home-engine';
 
@@ -34,6 +34,9 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
             <View style={[styles.orb, selected ? styles.orbSelected : null]}>
               {hatched ? (
                 <>
+                  {/* Warm backing disc so the portrait + ring read against the
+                      bright sky (they washed out on the raw painting). */}
+                  <View style={styles.orbBack} />
                   <Image contentFit="contain" source={auroraRing} style={StyleSheet.absoluteFill} transition={0} />
                   <Image
                     contentFit="contain"
@@ -50,8 +53,8 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
             </View>
             <ThemedText
               style={styles.label}
-              lightColor={day.isToday ? Lantern.ember300 : selected ? Lantern.moon300 : Lantern.moon500}
-              darkColor={day.isToday ? Lantern.ember300 : selected ? Lantern.moon300 : Lantern.moon500}>
+              lightColor={day.isToday ? Meadow.gold : selected ? Meadow.chipLabel : 'rgba(251,243,228,0.75)'}
+              darkColor={day.isToday ? Meadow.gold : selected ? Meadow.chipLabel : 'rgba(251,243,228,0.75)'}>
               {label}
             </ThemedText>
           </Pressable>
@@ -63,7 +66,7 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
           <View style={[styles.orb, tomorrow.id === selectedId ? styles.orbSelected : null]}>
             <View style={styles.emptyRing} />
           </View>
-          <ThemedText style={styles.label} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          <ThemedText style={styles.label} lightColor="rgba(251,243,228,0.75)" darkColor="rgba(251,243,228,0.75)">
             TMRW
           </ThemedText>
         </Pressable>
@@ -90,16 +93,29 @@ const styles = StyleSheet.create({
     width: 58,
   },
   orbSelected: {
+    borderColor: Meadow.gold,
+    borderRadius: 999,
+    borderWidth: 2,
+    boxShadow: `0 0 12px ${Meadow.goldSoft}`,
     transform: [{ scale: 1.08 }],
   },
   creature: {
     height: 42,
     width: 42,
   },
+  orbBack: {
+    backgroundColor: Meadow.chip,
+    borderRadius: 999,
+    bottom: 5,
+    left: 5,
+    position: 'absolute',
+    right: 5,
+    top: 5,
+  },
   eggRing: {
     alignItems: 'center',
-    backgroundColor: Lantern.ink800,
-    borderColor: 'rgba(201,194,232,0.28)',
+    backgroundColor: Meadow.chip,
+    borderColor: Meadow.chipBorder,
     borderRadius: 999,
     borderStyle: 'dashed',
     borderWidth: 1.5,
@@ -112,7 +128,7 @@ const styles = StyleSheet.create({
     width: 30,
   },
   emptyRing: {
-    borderColor: 'rgba(201,194,232,0.15)',
+    borderColor: 'rgba(251,243,228,0.35)',
     borderRadius: 999,
     borderStyle: 'dashed',
     borderWidth: 1.5,
@@ -120,8 +136,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     letterSpacing: 0.8,
+    textShadowColor: 'rgba(20, 12, 4, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 });

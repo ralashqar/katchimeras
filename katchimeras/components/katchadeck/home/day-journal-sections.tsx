@@ -1,12 +1,12 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { PlacesModal } from '@/components/katchadeck/home/places-modal';
 import { dayPromptRegistry } from '@/constants/day-prompts';
-import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 import type { DayPromptKind, HomeDayRecord } from '@/types/home';
 
 // Meaning archetypes (calm/energy/together/meaningful) → icon + colour so the
@@ -37,6 +37,10 @@ const STAT_ICON: Record<string, IconSymbolName> = {
   moments: 'sparkles',
 };
 const ATTENTION_GOLD = '#FFC36B';
+// The 'Through the day' card is parked while the v3 layout settles.
+const SHOW_TIMELINE_SECTION = false;
+// The photos card is parked too (v5 mockup slims Today to egg + numbers).
+const SHOW_PHOTOS_SECTION = false;
 
 export type DayStatKey = 'steps' | 'places' | 'photos' | 'moments';
 
@@ -175,63 +179,82 @@ export function DayJournalSections({
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.statsRow}>
+      <View style={styles.sectionCard}>
+        <ThemedText style={styles.sectionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+          Today in numbers
+        </ThemedText>
+        <View style={styles.statsRow}>
         {stats.map((stat) => {
           const attention = !!statAttention?.[stat.key];
-          const tint = attention ? ATTENTION_GOLD : accent;
           return (
             <Pressable
               key={stat.key}
               disabled={!stat.onPress}
               onPress={stat.onPress}
-              style={[
-                styles.statTile,
-                stat.onPress ? { borderColor: `${tint}66`, borderWidth: 1 } : null,
-                attention ? styles.statTileAttention : null,
-              ]}>
-              <IconSymbol color={stat.onPress ? tint : Lantern.moon300} name={STAT_ICON[stat.label] ?? 'sparkles'} size={16} />
-              <ThemedText style={styles.statValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              style={[styles.statTile, attention ? styles.statTileAttention : null]}>
+              {/* Warm brown, never the creature accent — pastels vanish on cream. */}
+              <IconSymbol
+                color={attention ? Meadow.goldDeep : Meadow.iconOnCard}
+                name={STAT_ICON[stat.label] ?? 'sparkles'}
+                size={16}
+              />
+              <ThemedText style={styles.statValue} lightColor={Meadow.ink} darkColor={Meadow.ink}>
                 <CountingValue value={stat.value} format={stat.format} />
               </ThemedText>
-              <ThemedText style={styles.statLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              <ThemedText style={styles.statLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
                 {stat.label}
               </ThemedText>
               {attention ? <View style={styles.statAlertDot} /> : null}
             </Pressable>
           );
         })}
+        </View>
       </View>
 
       <PlacesModal accentColor={accent} nodes={placeNodes} onClose={() => setPlacesOpen(false)} visible={placesOpen} />
 
-      {meanings.length > 0 || visiblePhotos.length > 0 ? (
+      {SHOW_PHOTOS_SECTION && (meanings.length > 0 || visiblePhotos.length > 0) ? (
         <View style={styles.sectionCard}>
-          <ThemedText type="onboardingLabel" style={styles.sectionLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            Photos · what they meant
-          </ThemedText>
+          <View style={styles.sectionHeader}>
+            <ThemedText style={styles.sectionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+              Photos · what they meant
+            </ThemedText>
+            {onStatPress ? (
+              <Pressable accessibilityRole="button" onPress={() => onStatPress('photos')} style={styles.seeAll}>
+                <ThemedText style={styles.seeAllLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                  See all
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
           {meanings.length > 0 ? (
-            <View style={styles.meaningGrid}>
+            // The mockup's photo tiles: the photo IS the card, with the meaning
+            // as a caption on a dark scrim along the bottom edge.
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.meaningRow}>
               {meanings.map((meaning) => (
-                <View key={meaning.key} style={[styles.meaningCard, { borderColor: `${meaning.accent}44` }]}>
+                <View key={meaning.key} style={styles.meaningTile}>
                   {canShowUri(meaning.thumbnailUri) ? (
                     <Image
                       contentFit="cover"
                       onError={() => markUriFailed(meaning.thumbnailUri as string)}
                       source={meaning.thumbnailUri}
-                      style={styles.meaningCardThumb}
+                      style={StyleSheet.absoluteFill}
                       transition={120}
                     />
                   ) : (
-                    <View style={[styles.meaningCardThumb, styles.meaningCardIcon, { backgroundColor: `${meaning.accent}22` }]}>
-                      <IconSymbol color={meaning.accent} name={meaning.icon} size={18} />
+                    <View style={[StyleSheet.absoluteFill, styles.meaningTileEmpty]}>
+                      <IconSymbol color={Meadow.iconOnCard} name={meaning.icon} size={26} />
                     </View>
                   )}
-                  <ThemedText style={[styles.meaningCardLabel, { color: meaning.accent }]} numberOfLines={2}>
-                    {meaning.label}
-                  </ThemedText>
+                  <View style={styles.meaningCaption}>
+                    <IconSymbol color={meaning.accent} name={meaning.icon} size={10} />
+                    <ThemedText style={styles.meaningCaptionLabel} numberOfLines={1} lightColor="#FBF3E4" darkColor="#FBF3E4">
+                      {meaning.label}
+                    </ThemedText>
+                  </View>
                 </View>
               ))}
-            </View>
+            </ScrollView>
           ) : null}
           {extraPhotos.length > 0 ? (
             <View style={styles.photoGrid}>
@@ -250,19 +273,19 @@ export function DayJournalSections({
         </View>
       ) : null}
 
-      {timelineGroups.length > 0 ? (
+      {SHOW_TIMELINE_SECTION && timelineGroups.length > 0 ? (
         <View style={styles.sectionCard}>
-          <ThemedText type="onboardingLabel" style={styles.sectionLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+          <ThemedText type="onboardingLabel" style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
             Through the day
           </ThemedText>
           {timelineGroups.map((group) => (
             <View key={group.part} style={styles.timelineGroup}>
-              <ThemedText style={styles.timelinePart} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              <ThemedText style={styles.timelinePart} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
                 {group.part}
               </ThemedText>
               {group.buckets.map((bucket) => (
                 <View key={bucket.id} style={styles.timelineRow}>
-                  <ThemedText style={styles.timelineTime} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                  <ThemedText style={styles.timelineTime} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
                     {bucket.timeLabel}
                   </ThemedText>
                   <View style={styles.timelineChips}>
@@ -272,7 +295,7 @@ export function DayJournalSections({
                         style={[styles.timelineChip, { borderColor: `${item.accent}44`, backgroundColor: `${item.accent}14` }]}>
                         <IconSymbol color={item.accent} name={item.icon} size={12} />
                         {item.category ? (
-                          <ThemedText style={styles.timelineChipCategory} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                          <ThemedText style={styles.timelineChipCategory} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
                             {item.category}
                           </ThemedText>
                         ) : null}
@@ -490,24 +513,29 @@ const styles = StyleSheet.create({
   },
   statTile: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: Meadow.cardSoft,
+    borderColor: Meadow.cardBorder,
     borderCurve: 'continuous',
-    borderRadius: 12,
+    borderRadius: Meadow.radius.tile,
+    borderWidth: 1,
+    // Bottom-LEFT drop shadow (light from the upper right) lifts each tile
+    // off the card; the inset line is a soft top bevel.
+    boxShadow: '-3px 4px 8px rgba(58, 38, 18, 0.20), inset 0 1px 0 rgba(255, 248, 230, 0.55)',
     flex: 1,
     gap: 3,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   statValue: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
   },
   statLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   statTileAttention: {
-    backgroundColor: 'rgba(255,195,107,0.10)',
-    boxShadow: '0 0 14px rgba(255,195,107,0.28)',
+    backgroundColor: '#F9EBC9',
+    boxShadow: '0 0 14px rgba(233,185,78,0.35)',
   },
   statAlertDot: {
     backgroundColor: ATTENTION_GOLD,
@@ -519,46 +547,69 @@ const styles = StyleSheet.create({
     width: 8,
   },
   sectionCard: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderColor: 'rgba(215, 228, 255, 0.1)',
+    backgroundColor: Meadow.card,
+    borderColor: Meadow.cardBorder,
     borderCurve: 'continuous',
-    borderRadius: 16,
+    borderRadius: Meadow.radius.card,
     borderWidth: 1,
-    gap: 12,
-    padding: 16,
+    boxShadow: `${Meadow.cardShadow}, inset 0 1px 0 rgba(255, 248, 230, 0.5)`,
+    gap: 10,
+    padding: 14,
   },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: Meadow.type.kicker,
   },
-  meaningGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  sectionTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
   },
-  meaningCard: {
+  sectionHeader: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  seeAll: {
+    backgroundColor: Meadow.cardSoft,
+    borderColor: Meadow.cardBorder,
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  seeAllLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  meaningRow: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  meaningTile: {
+    backgroundColor: Meadow.cardSoft,
     borderCurve: 'continuous',
     borderRadius: 12,
-    borderWidth: 1,
-    flexBasis: '47%',
-    flexDirection: 'row',
-    flexGrow: 1,
-    gap: 10,
-    padding: 8,
+    boxShadow: '-3px 4px 8px rgba(58, 38, 18, 0.20)',
+    height: 104,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+    width: 82,
   },
-  meaningCardThumb: {
-    borderRadius: 9,
-    height: 40,
-    width: 40,
-  },
-  meaningCardIcon: {
+  meaningTileEmpty: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  meaningCardLabel: {
+  meaningCaption: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 20, 10, 0.62)',
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  meaningCaptionLabel: {
     flexShrink: 1,
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '700',
   },
   photoGrid: {

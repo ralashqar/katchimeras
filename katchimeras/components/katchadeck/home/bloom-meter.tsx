@@ -6,6 +6,7 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-nati
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 import type { HomeDayRecord } from '@/types/home';
 import {
   BLOOM_POINTS_PER_GIFT,
@@ -47,8 +48,11 @@ export function BloomMeter({ day, keepsakesWaiting, onOpenKeepsakes }: BloomMete
         <Pressable accessibilityRole="button" onPress={() => setSheetOpen(true)} style={styles.meter}>
           <ThemedText style={styles.meterEmoji}>🌱</ThemedText>
           <View style={styles.meterBody}>
-            <ThemedText style={styles.meterLine} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            <ThemedText style={styles.meterLine} lightColor={Meadow.ink} darkColor={Meadow.ink}>
               {line}
+            </ThemedText>
+            <ThemedText style={styles.meterSub} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+              {maxed ? 'A full day of growing' : 'Keep going, you’re growing'}
             </ThemedText>
             <View style={styles.track}>
               <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
@@ -69,7 +73,7 @@ export function BloomMeter({ day, keepsakesWaiting, onOpenKeepsakes }: BloomMete
             onPress={onOpenKeepsakes}
             style={styles.chip}>
             <ThemedText style={styles.chipEmoji}>🎁</ThemedText>
-            <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            <ThemedText style={styles.chipLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
               {keepsakesWaiting}
             </ThemedText>
           </Pressable>
@@ -174,43 +178,48 @@ const styles = StyleSheet.create({
   row: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   meter: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(168,201,154,0.35)',
+    backgroundColor: Meadow.card,
+    borderColor: Meadow.cardBorder,
     borderCurve: 'continuous',
-    borderRadius: 14,
+    borderRadius: Meadow.radius.card,
     borderWidth: 1,
+    boxShadow: Meadow.cardShadow,
     flex: 1,
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: Meadow.space.cardPad,
+    paddingVertical: 12,
   },
-  meterEmoji: { fontSize: 16 },
-  meterBody: { flex: 1, gap: 5 },
-  meterLine: { fontSize: 12, fontWeight: '700' },
-  track: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, height: 5, overflow: 'hidden' },
-  fill: { backgroundColor: '#A8C99A', borderRadius: 999, height: 5 },
+  meterEmoji: { fontSize: 18 },
+  meterBody: { flex: 1, gap: 6 },
+  meterLine: { fontSize: 13.5, fontWeight: '800' },
+  track: { backgroundColor: Meadow.trackOnCard, borderRadius: 999, height: 6, overflow: 'hidden' },
+  meterSub: { fontSize: 11.5, fontWeight: '600' },
+  fill: { backgroundColor: Meadow.leaf, borderRadius: 999, height: 6 },
   sigBadge: {
     alignItems: 'center',
-    backgroundColor: Lantern.ember300,
+    backgroundColor: Meadow.gold,
+    borderColor: Meadow.goldDeep,
     borderRadius: 999,
-    height: 18,
+    borderWidth: 1,
+    height: 20,
     justifyContent: 'center',
-    minWidth: 18,
-    paddingHorizontal: 4,
+    minWidth: 20,
+    paddingHorizontal: 5,
   },
   sigBadgeLabel: { fontSize: 10, fontWeight: '900', lineHeight: 12 },
   chip: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,195,107,0.12)',
-    borderColor: 'rgba(255,195,107,0.5)',
+    backgroundColor: Meadow.card,
+    borderColor: Meadow.cardBorder,
     borderCurve: 'continuous',
-    borderRadius: 14,
+    borderRadius: Meadow.radius.card,
     borderWidth: 1,
+    boxShadow: Meadow.cardShadow,
     flexDirection: 'row',
     gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   chipEmoji: { fontSize: 14 },
   chipLabel: { fontSize: 13, fontWeight: '800' },

@@ -11,7 +11,6 @@ import { captureRef } from 'react-native-view-shot';
 
 import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { CreatureProvenance } from '@/components/katchadeck/home/creature-provenance';
 import { DayJournalSections, type DayStatKey } from '@/components/katchadeck/home/day-journal-sections';
 import { JourneyDetailSheet, PlacesDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
@@ -49,11 +48,11 @@ import { consumeSelectedDay } from '@/utils/selected-day-signal';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
-import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useInlineVoiceNote } from '@/hooks/use-inline-voice-note';
@@ -77,11 +76,10 @@ import { deriveContinuityMotifs } from '@/utils/continuity-engine';
 import { deriveObservations } from '@/utils/observations-engine';
 import { loadSleepForDay } from '@/utils/sleep-health';
 import { markArrivalPending } from '@/utils/kingdom-arrival';
-import { BloomMeter } from '@/components/katchadeck/home/bloom-meter';
-import { loadKingdomDecor } from '@/utils/kingdom-decor';
-import { requestKeepsakesShelf } from '@/utils/kingdom-decorate-signal';
 import { resolvePlaceName } from '@/utils/place-names';
 import { isPointAtHome, loadHomeAnchor, saveHomeAnchor } from '@/utils/home-location';
+// Background framing (zoom + vertical offset) — tuned in data/today-scene.json.
+import todayScene from '@/data/today-scene.json';
 import type {
   BigMomentType,
   DayMapNode,
@@ -90,6 +88,11 @@ import type {
   HomeMoment,
   StudioMediaType,
 } from '@/types/home';
+
+// The Meadow scene background (scripts/generate-today-scene.py — style-anchored
+// to the world base). The pedestal asset exists too (today_pedestal.png) but is
+// hidden for now — the scene got too busy.
+const TODAY_BG = require('@/assets/images/katchimeras/world/today/today_bg.png');
 
 const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 
@@ -123,6 +126,11 @@ function formatTimeRange(start?: string, end?: string): string | null {
 export default function HomeScreen() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // Background framing from data/today-scene.json: a gentle zoom plus a
+  // vertical shift, clamped so the scaled image always fills the frame.
+  const bgScale = Math.max(1, todayScene.background?.scale ?? 1);
+  const bgSlack = ((bgScale - 1) * windowHeight) / 2;
+  const bgOffsetY = Math.min(bgSlack, Math.max(-bgSlack, todayScene.background?.offsetY ?? 0));
   const {
     activeDayPrompt,
     availableDayPrompts,
@@ -149,7 +157,6 @@ export default function HomeScreen() {
     timelineDays,
     triggerHatchIfReady,
     refreshState,
-    resetHomeState,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
   const tabBarHeight = useBottomTabBarHeight();
@@ -188,13 +195,6 @@ export default function HomeScreen() {
     setPromptSheetOpen(false);
     setInitialPrompt(null);
   };
-
-  const backgroundAccent =
-    selectedDay?.kind === 'day'
-      ? selectedDay.state === 'hatched' && selectedDay.creature
-        ? `${selectedDay.creature.accentColor}16`
-        : `${selectedDay.egg.haloColor}14`
-      : 'rgba(167,139,250,0.12)';
 
   const shareableDay =
     selectedDay?.kind === 'day' && selectedDay.state === 'hatched' && selectedDay.creature
@@ -576,19 +576,6 @@ export default function HomeScreen() {
     setStepsSheetOpen(false);
     setEggFeedKey((key) => key + 1);
     setMicrocopy(`${input.emoji} ${input.label} · noted`);
-  };
-
-  // Keepsakes waiting on the Kingdom shelf — surfaced as a chip by the bloom
-  // meter; tapping it jumps to the Kingdom with the shelf open.
-  const [keepsakesWaiting, setKeepsakesWaiting] = useState(0);
-  useFocusEffect(
-    useCallback(() => {
-      setKeepsakesWaiting(loadKingdomDecor().unplanted.length);
-    }, [])
-  );
-  const handleOpenKeepsakes = () => {
-    requestKeepsakesShelf();
-    router.push('/world');
   };
 
   // Morning sleep: the first time Today is entered on a forming day, try Apple
@@ -1091,23 +1078,20 @@ export default function HomeScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
     <View style={styles.screen}>
-      <AmbientBackground
-        accentColor={backgroundAccent}
-        colors={['#0C0A14', '#14111F', '#1A1430']}
-        meshColors={['rgba(167,139,250,0.12)', 'rgba(125,232,205,0.06)', 'rgba(255,195,107,0.08)', 'rgba(20,17,31,0.2)']}
+      {/* The Meadow scene — a painted golden-hour backdrop (FAL, style-anchored
+          to the world base) with a warm scrim so the light-on-dark UI stays
+          readable until the full Meadow restyle lands. */}
+      <Image
+        source={TODAY_BG}
+        style={[StyleSheet.absoluteFill, { transform: [{ translateY: bgOffsetY }, { scale: bgScale }] }]}
+        contentFit="cover"
+        pointerEvents="none"
       />
+      <View pointerEvents="none" style={styles.meadowScrim} />
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}>
-        {__DEV__ ? (
-          <Pressable onPress={resetHomeState} style={styles.devReset}>
-            <ThemedText style={styles.devResetLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              reset
-            </ThemedText>
-          </Pressable>
-        ) : null}
-
         <Animated.View entering={presenceEnter(20)}>
           <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
         </Animated.View>
@@ -1131,7 +1115,7 @@ export default function HomeScreen() {
                 feedKey={eggFeedKey}
                 lanternColor={lanternColour}
                 shellScale={0.72}
-              shellOffsetY={-16}
+              shellOffsetY={0}
               />
             )
           ) : onTomorrowForming ? (
@@ -1142,7 +1126,7 @@ export default function HomeScreen() {
               feedKey={eggFeedKey}
               lanternColor={lanternColour}
               shellScale={0.72}
-              shellOffsetY={-16}
+              shellOffsetY={0}
             />
           ) : (
             <LanternEgg
@@ -1156,14 +1140,14 @@ export default function HomeScreen() {
                 label: 'Not yet formed',
               }}
               shellScale={0.72}
-              shellOffsetY={-16}
+              shellOffsetY={0}
             />
           )}
           {/* The same category ring circles the hatched creature when revisiting
               a day — read-only doors into that day's memories. Anchored to the
               258px art box so egg and creature days match exactly. */}
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
-            <TodayCategoryRing categories={ringCategories} onPress={handleCategoryPress} anchorHeight={258} />
+            <TodayCategoryRing categories={ringCategories} onPress={handleCategoryPress} anchorHeight={258} centerOffsetY={24} />
           ) : null}
           {isFormingToday && !isHatching ? (
             <HatchCountdown
@@ -1194,7 +1178,6 @@ export default function HomeScreen() {
                 onPress={handleMakeComic}
               />
             </View>
-            <CreatureProvenance creature={selectedDay.creature!} />
             <DayJournalSections day={selectedDay} onStatPress={handleStatPress} />
             <ReflectionCard creature={selectedDay.creature!} />
           </Animated.View>
@@ -1243,7 +1226,11 @@ export default function HomeScreen() {
         {isHatching ? null : (
         <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
           {isDay && selectedDay.canHatch ? (
-            <KatchaButton label="Reveal the hatch" onPress={handleReveal} variant="primary" />
+            <Pressable accessibilityRole="button" onPress={handleReveal} style={styles.hatchCta}>
+              <ThemedText style={styles.hatchCtaLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                Reveal the hatch
+              </ThemedText>
+            </Pressable>
           ) : isForming && !hasActivePrompt ? (
             <View style={styles.addRow}>
               <WorldActionStack
@@ -1286,9 +1273,6 @@ export default function HomeScreen() {
 
         {isDay && !isHatched && !isHatching ? (
           <Animated.View entering={presenceEnter(200)} style={styles.sectionGap}>
-            {isFormingToday ? (
-              <BloomMeter day={selectedDay} keepsakesWaiting={keepsakesWaiting} onOpenKeepsakes={handleOpenKeepsakes} />
-            ) : null}
             <DayJournalSections
               day={selectedDay}
               onStatPress={isFormingToday ? handleStatPress : undefined}
@@ -1711,18 +1695,35 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    paddingBottom: 112,
+    // Sits the last card just above the floating tab bar (bottom 20 + h 76).
+    paddingBottom: 118,
     paddingHorizontal: 24,
     paddingTop: 6,
   },
-  devReset: {
-    alignSelf: 'flex-end',
-    paddingBottom: 2,
+  meadowScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(30, 20, 10, 0.34)',
   },
-  devResetLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+  eggPedestal: {
+    // 4:3 squat pedestal — wider than the egg so the nest cradles it.
+    alignSelf: 'center',
+    height: 218,
+    position: 'absolute',
+    top: 100,
+    width: 290,
   },
+  hatchCta: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: Meadow.gold,
+    borderColor: Meadow.goldDeep,
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    boxShadow: '0 6px 18px rgba(233,185,78,0.35)',
+    paddingVertical: 15,
+  },
+  hatchCtaLabel: { fontSize: 16, fontWeight: '800' },
   heroStage: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -101,7 +101,21 @@ function latestMoodMeta(day: HomeDayRecord): { icon: IconSymbolName; accent: str
   return (choice && MOOD_META[choice]) || null;
 }
 
-const REFLECTIVE_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'gratitude', 'highlight', 'intention']);
+// MUST mirror sanctuary-sheet's REFLECTION_KINDS — the Reflection badge is a
+// promise of what the Sanctuary reader will list.
+const REFLECTIVE_KINDS = new Set([
+  'feeling',
+  'inner_weather',
+  'day_word',
+  'meaning',
+  'gratitude',
+  'highlight',
+  'people',
+  'for_who',
+  'body',
+  'intention',
+  'energy',
+]);
 
 function formatSteps(steps: number): string {
   if (steps >= 1000) return `${(steps / 1000).toFixed(steps >= 10000 ? 0 : 1)}k`;
@@ -116,9 +130,16 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
   const noteCount = day.notes?.length ?? 0;
   const placeCount = day.confirmedPlaces?.length ?? day.visitedPlaceCount ?? 0;
   const steps = day.stepsCount ?? 0;
-  const reflectionCount = (day.promptAnswers ?? []).filter(
-    (answer) => !answer.dismissed && REFLECTIVE_KINDS.has(answer.kind) && answer.choiceIds.length > 0
-  ).length;
+  // The count = the number of entries the Sanctuary reader will show when this
+  // chip is pressed (its four feeds: reflective prompt answers, hero-photo
+  // meanings, captured-moment meanings, voice/written notes).
+  const reflectionCount =
+    (day.promptAnswers ?? []).filter(
+      (answer) => !answer.dismissed && REFLECTIVE_KINDS.has(answer.kind) && answer.labels.length > 0
+    ).length +
+    (day.heroPhoto?.meaningLabels.length ?? 0) +
+    (day.capturedMeanings?.length ?? 0) +
+    (day.notes?.length ?? 0);
   const foodCount = day.foodMoments?.length ?? 0;
   const studioCount = day.studioMoments?.length ?? 0;
   const questsLeft = quests.filter((quest) => !quest.completed).length;
@@ -189,7 +210,7 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
     },
     {
       id: 'studio',
-      label: 'Study',
+      label: 'Inspo',
       icon: 'book.fill',
       accent: '#E8C272',
       count: studioCount,
@@ -202,7 +223,9 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
       label: 'Sleep',
       icon: 'bed.double.fill',
       accent: '#C9C2E8',
-      count: day.sleep ? 1 : 0,
+      // Sleep is one record per day, not a log — a "1" badge is noise. The lit
+      // chip already says "recorded"; pressing it shows the night.
+      count: 0,
       hasContent: !!day.sleep,
       needsAttention: !day.sleep,
       glowReason: 'How did the night treat you?',

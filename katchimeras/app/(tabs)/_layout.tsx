@@ -1,8 +1,8 @@
 import { Redirect, Tabs } from 'expo-router';
 import React, { useSyncExternalStore } from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
 import { DayCaptureSession } from '@/components/katchadeck/home/day-capture-session';
+import { MeadowTabBar } from '@/components/katchadeck/ui/meadow-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { Lantern } from '@/constants/theme';
@@ -29,32 +29,12 @@ export default function TabLayout() {
     <>
       <DayCaptureSession />
       <Tabs
+        // The carved-wood Meadow bar (generated art + centre capture button)
+        // replaces the stock bar entirely.
+        tabBar={(props) => <MeadowTabBar {...props} />}
         screenOptions={{
-          tabBarActiveTintColor: Lantern.ember300,
-          tabBarInactiveTintColor: Lantern.moon500,
           headerShown: false,
-          tabBarButton: HapticTab,
           tabBarHideOnKeyboard: true,
-          tabBarStyle: {
-            backgroundColor: 'rgba(28, 24, 48, 0.94)',
-            borderTopWidth: 0,
-            borderRadius: 999,
-            bottom: 24,
-            boxShadow: '0 18px 40px rgba(0,0,0,0.5)',
-            height: 68,
-            left: 24,
-            marginHorizontal: 24,
-            paddingBottom: 8,
-            paddingTop: 10,
-            position: 'absolute',
-            right: 24,
-          },
-          tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: '700',
-            letterSpacing: 0.8,
-            textTransform: 'uppercase',
-          },
         }}>
         <Tabs.Screen
           name="index"
