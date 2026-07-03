@@ -222,7 +222,7 @@ export function useHomeScreenState() {
   const selectedPromptDayState = selectedDay?.kind === 'day' ? selectedDay.state : null;
 
   useEffect(() => {
-    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') {
+    if (!selectedPromptDayId || !selectedPromptDayIsToday || selectedPromptDayState === 'hatched') {
       setPromptPhotoCandidates([]);
       setForceMeaningfulPhotoPrompt(false);
       return;
@@ -250,7 +250,10 @@ export function useHomeScreenState() {
     return () => {
       active = false;
     };
-  }, [selectedDay, selectedPromptDayId, selectedPromptDayIsToday, selectedPromptDayState]);
+    // Deliberately keyed on the day's IDENTITY, not the recreated day object —
+    // every passive capture (steps, location) used to retrigger a full photo
+    // scan on foreground.
+  }, [selectedPromptDayId, selectedPromptDayIsToday, selectedPromptDayState]);
 
   const addMoment = useCallback((momentInput: AddMomentInput, target: DayInputTarget = 'today') => {
     const now = new Date();

@@ -35,6 +35,10 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,
+          // Kingdom (and every other tab) mounts on FIRST visit only, and stops
+          // re-rendering while blurred — Today stays the only live screen.
+          lazy: true,
+          freezeOnBlur: true,
         }}>
         <Tabs.Screen
           name="index"

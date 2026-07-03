@@ -196,7 +196,7 @@ export const homeCreatureVisuals: Record<
     accentColor: '#D5C4FF',
   },
   skysette: {
-    source: require('../assets/images/katchimeras/cutouts/skysette.png'),
+    source: require('../assets/images/katchimeras/cutouts/skysette.webp'),
     accentColor: '#A9D7FF',
   },
   creamalume: {
@@ -204,7 +204,7 @@ export const homeCreatureVisuals: Record<
     accentColor: '#F3B788',
   },
   pulsepounce: {
-    source: require('../assets/images/katchimeras/cutouts/hayhorn.png'),
+    source: require('../assets/images/katchimeras/cutouts/hayhorn.webp'),
     accentColor: '#AEB6FF',
   },
   gatherglow: {
@@ -232,7 +232,7 @@ export const homeCreatureVisuals: Record<
     accentColor: '#F2C2A8',
   },
   hayhorn: {
-    source: require('../assets/images/katchimeras/cutouts/hayhorn.png'),
+    source: require('../assets/images/katchimeras/cutouts/hayhorn.webp'),
     accentColor: '#AEB6FF',
   },
   ironette: {
@@ -248,7 +248,7 @@ export const homeCreatureVisuals: Record<
     accentColor: '#92D7FF',
   },
   errandimp: {
-    source: require('../assets/images/katchimeras/cutouts/errandimp.png'),
+    source: require('../assets/images/katchimeras/cutouts/errandimp.webp'),
     accentColor: '#EF9F6E',
   },
   quietome: {
@@ -292,7 +292,7 @@ export const homeCreatureVisuals: Record<
     accentColor: '#F0A94E',
   },
   crustling: {
-    source: require('../assets/images/katchimeras/cutouts/crustling.png'),
+    source: require('../assets/images/katchimeras/cutouts/crustling.webp'),
     accentColor: '#E6A862',
   },
   nigirimp: {
@@ -312,7 +312,7 @@ export const homeCreatureVisuals: Record<
     accentColor: '#C9A06E',
   },
   pagelet: {
-    source: require('../assets/images/katchimeras/cutouts/pagelet.png'),
+    source: require('../assets/images/katchimeras/cutouts/pagelet.webp'),
     accentColor: '#E2C49A',
   },
   hooplet: {

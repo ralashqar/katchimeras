@@ -12,7 +12,7 @@ import type {
 import { curatePhotos, type CuratablePhoto } from '@/utils/photo-curation';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
 import { computePhotoSignature } from '@/utils/photo-similarity';
-import { analyzePhoto, analyzePhotoLuminance, isVisionAvailable } from '@/utils/photo-vision';
+import { analyzePhoto, analyzePhotoLuminance, getPhotoThumbnailDataUri, isVisionAvailable } from '@/utils/photo-vision';
 import { aggregatePhotoVision } from '@/utils/vision-signals';
 import {
   beginBackfillEnrichment,
@@ -375,7 +375,8 @@ async function buildDayPhotos(
         // Skia signature only for the dedup HASH (best-effort, capped); fall back
         // to its brightness only if the native read was unavailable.
         if (signaturesComputed < MAX_SIGNATURE_PER_DAY) {
-          const signature = await computePhotoSignature(localUri);
+          const thumbForHash = await getPhotoThumbnailDataUri(asset.id, 256);
+          const signature = thumbForHash ? await computePhotoSignature(thumbForHash) : null;
           if (signature) {
             similarityHash = signature.hash;
             if (meanLuminance == null) meanLuminance = signature.meanLuminance;

@@ -41,16 +41,16 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   prop_log: require('../assets/images/katchimeras/world/props/prop_log.png'),
   prop_fence: require('../assets/images/katchimeras/world/props/prop_fence.png'),
   // Front-facing fence strip; the renderer skews it onto each 2:1 perimeter edge.
-  fence_strip: require('../assets/images/katchimeras/world/props/fence_strip.png'),
+  fence_strip: require('../assets/images/katchimeras/world/props/fence_strip.webp'),
   prop_coffee_table: require('../assets/images/katchimeras/world/props/prop_coffee_table.png'),
   // Seed-object reward (Daily Seeds, Today Patch V2).
   seed_water_lily: require('../assets/images/katchimeras/world/props/seed_water_lily.png'),
   // Sleep Atmosphere tile — graphic varies by how the day began.
-  sleep_good: require('../assets/images/katchimeras/world/props/sleep_good.png'),
+  sleep_good: require('../assets/images/katchimeras/world/props/sleep_good.webp'),
   sleep_normal: require('../assets/images/katchimeras/world/props/sleep_normal.png'),
   sleep_low: require('../assets/images/katchimeras/world/props/sleep_low.png'),
   // Food Vault tile — a little food stall; grows as food memories are saved.
-  food_stall: require('../assets/images/katchimeras/world/props/food_stall.png'),
+  food_stall: require('../assets/images/katchimeras/world/props/food_stall.webp'),
   // Discovery artefacts — permanent monuments unlocked by life milestones (cozy
   // collectible re-skin; --ref base_env2, auto-split 4×4).
   artefact_museum_banner: require('../assets/images/katchimeras/world/objects/artefact/artefact_01.png'),
@@ -92,31 +92,31 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   // Restyled level sets (scripts/generate-world-object-grid.py, --mode progression).
   // Image-memories: photo display growing into a full photo tree (1→4).
   memory_photos_1: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_01.png'),
-  memory_photos_2: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_02.png'),
-  memory_photos_3: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_03.png'),
-  memory_photos_4: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_04.png'),
+  memory_photos_2: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_02.webp'),
+  memory_photos_3: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_03.webp'),
+  memory_photos_4: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_04.webp'),
   // Locations: waypoint marker growing signpost → tall signpost → tower → lookout (1→4).
   place_marker_1: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_01.png'),
   place_marker_2: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_02.png'),
-  place_marker_3: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_03.png'),
-  place_marker_4: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_04.png'),
+  place_marker_3: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_03.webp'),
+  place_marker_4: require('../assets/images/katchimeras/world/objects/place_marker/place_marker_04.webp'),
   // Journey/steps: trail marker → signpost → footbridge → journey monument (1→4).
   journey_1: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_01.png'),
-  journey_2: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_02.png'),
-  journey_3: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_03.png'),
-  journey_4: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_04.png'),
+  journey_2: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_02.webp'),
+  journey_3: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_03.webp'),
+  journey_4: require('../assets/images/katchimeras/world/objects/journey_marker/journey_marker_04.webp'),
   // Notes: open diary → journal+quill → writing desk → writing-desk shrine (1→4).
-  notes_1: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_01.png'),
-  notes_2: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_02.png'),
-  notes_3: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_03.png'),
-  notes_4: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_04.png'),
+  notes_1: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_01.webp'),
+  notes_2: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_02.webp'),
+  notes_3: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_03.webp'),
+  notes_4: require('../assets/images/katchimeras/world/objects/notes_desk/notes_desk_04.webp'),
   // Food: a cozy market food stall (square scene tile).
-  food_market: require('../assets/images/katchimeras/world/objects/food_market/food_market_02.png'),
+  food_market: require('../assets/images/katchimeras/world/objects/food_market/food_market_02.webp'),
   // Studio: the inspiration archive — a library/easel nook; tapping opens the reader.
-  studio_shelf: require('../assets/images/katchimeras/world/objects/studio_shelf/studio_shelf_01.png'),
+  studio_shelf: require('../assets/images/katchimeras/world/objects/studio_shelf/studio_shelf_01.webp'),
   // Town Hall: keeps the day's story; tapping it opens the Chronicle reader.
   // User-supplied house cottage (BiRefNet-matted + tight-framed from world/house.png).
-  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_01.png'),
+  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_01.webp'),
   // Quest Board: today's notice board; tapping it opens the day's Memory Quests.
   quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_01.png'),
 
@@ -131,14 +131,14 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
 
   // --- Cozy Collectible buildings (docs/world-structures-cozy-direction.md) ---
   // The 7 domains in one designer-toy style, on the new base_env2 island.
-  home: require('../assets/images/katchimeras/world/objects/home/home_01.png'), // 🏠 the day's story (chronicle)
+  home: require('../assets/images/katchimeras/world/objects/home/home_01.webp'), // 🏠 the day's story (chronicle)
   memory_vault: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'), // 📸 owns all captured media
   memory_vault_empty: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
   // Memory Vault GROWS 1→4 (same identity, richer): small safe → grand multi-tier vault.
   memory_vault_1: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
-  memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.png'),
-  memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.png'),
-  memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.png'),
+  memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.webp'),
+  memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.webp'),
+  memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.webp'),
   crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 where did I go? (cozy signpost + lantern)
   journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 how did I move? (cozy footprint stele)
   // 🔭 Observatory tower (Places / where I went) — a proper structure with a telescope.
@@ -146,10 +146,10 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   observatory_empty: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
   // 👣 Steps path (Journey / how I moved) — a small engraved stepping-stone trail that
   // GROWS its stone count by level (3 → 5 → 7 → winding path).
-  steps_path_1: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_01.png'),
-  steps_path_2: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_02.png'),
-  steps_path_3: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_03.png'),
-  steps_path_4: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_04.png'),
+  steps_path_1: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_01.webp'),
+  steps_path_2: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_02.webp'),
+  steps_path_3: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_03.webp'),
+  steps_path_4: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_04.webp'),
   sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'), // 🌿 how today felt (mood)
   sanctuary_empty: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'),
   study: require('../assets/images/katchimeras/world/objects/study/study_01.png'), // 📚 what inspired me
@@ -192,9 +192,9 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   decor_15: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_15.png'), // mushrooms
   decor_16: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_16.png'), // hay bale
   // Sleep atmosphere by quality: sundial garden (good) · stone lantern (normal) · moon (low).
-  sleep_tile_good: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_01.png'),
-  sleep_tile_normal: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_02.png'),
-  sleep_tile_low: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_03.png'),
+  sleep_tile_good: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_01.webp'),
+  sleep_tile_normal: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_02.webp'),
+  sleep_tile_low: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_03.webp'),
   // Memory nodes
   memory_photo_bloom: require('../assets/images/katchimeras/world/memory-nodes/memory_photo_bloom.png'),
   memory_landmark_stone: require('../assets/images/katchimeras/world/memory-nodes/memory_landmark_stone.png'),
@@ -208,7 +208,7 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
 // decal as a clipped sub-region using its cell coords below. Two variants per
 // type (suffix _2) come free from the 4×4 grid generation, so the ground reads
 // less repetitively. Cell coords MUST match the atlas builder's LAYOUT.
-export const DECAL_ATLAS: ImageSourcePropType = require('../assets/images/katchimeras/world/decals/_atlas.png');
+export const DECAL_ATLAS: ImageSourcePropType = require('../assets/images/katchimeras/world/decals/_atlas.webp');
 export const DECAL_ATLAS_COLS = 4;
 export const DECAL_ATLAS_ROWS = 4;
 
@@ -240,13 +240,13 @@ export function worldAssetSource(assetKey: string): ImageSourcePropType | null {
 // normalised anchors in utils/world-base-layout.ts. Produced by
 // scripts/generate-world-base.py (generate → matte → alpha verify).
 const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
-  base_meadow: require('../assets/images/katchimeras/world/base/base_meadow.png'), // original (kept as backup)
-  base_env2: require('../assets/images/katchimeras/world/base/base_env2.png'), // cozy island (kept as backup)
+  base_meadow: require('../assets/images/katchimeras/world/base/base_meadow.webp'), // original (kept as backup)
+  base_env2: require('../assets/images/katchimeras/world/base/base_env2.webp'), // cozy island (kept as backup)
   // Kingdom iso set: diamond islands aligned to the isometric axes, cream paths
   // along both iso diagonals (docs/kingdom-world-design.md §2).
-  base_env3: require('../assets/images/katchimeras/world/base/base_env3.png'), // Kingdom centre island (current)
-  plot_base_1: require('../assets/images/katchimeras/world/base/plot_base_1.png'), // expansion islet A
-  plot_base_2: require('../assets/images/katchimeras/world/base/plot_base_2.png'), // expansion islet B
+  base_env3: require('../assets/images/katchimeras/world/base/base_env3.webp'), // Kingdom centre island (current)
+  plot_base_1: require('../assets/images/katchimeras/world/base/plot_base_1.webp'), // expansion islet A
+  plot_base_2: require('../assets/images/katchimeras/world/base/plot_base_2.webp'), // expansion islet B
 };
 
 export function worldBaseSource(baseId: string): ImageSourcePropType | null {

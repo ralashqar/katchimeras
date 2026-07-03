@@ -2,7 +2,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 
 import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 import { curatePhotos } from '@/utils/photo-curation';
-import { analyzePhotoLuminance } from '@/utils/photo-vision';
+import { analyzePhotoLuminance, getPhotoThumbnailDataUri } from '@/utils/photo-vision';
 import { computePhotoSignature } from '@/utils/photo-similarity';
 import { buildProcessedPhotoFilter } from '@/utils/processed-photos';
 import type { DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
@@ -36,10 +36,22 @@ const PRODUCTION_SCAN_SIZE = 80;
 const PRODUCTION_CANDIDATE_LIMIT = 8;
 const DEV_SCAN_SIZE = 80;
 
+// Scan throttle: a candidate scan decodes thumbnails for dozens of photos —
+// re-running within a few minutes can't surface anything new, so foreground
+// churn is served from the last result.
+let scanCache: { key: string; at: number; result: DayPromptPhotoCandidate[] } | null = null;
+const SCAN_TTL_MS = 3 * 60_000;
+
 export async function loadProductionDayPromptPhotoCandidates(
   now: Date = new Date()
 ): Promise<DayPromptPhotoCandidate[]> {
-  return loadDayPromptPhotoCandidates({ mode: 'production', now, limit: PRODUCTION_CANDIDATE_LIMIT });
+  const key = now.toDateString();
+  if (scanCache && scanCache.key === key && Date.now() - scanCache.at < SCAN_TTL_MS) {
+    return scanCache.result;
+  }
+  const result = await loadDayPromptPhotoCandidates({ mode: 'production', now, limit: PRODUCTION_CANDIDATE_LIMIT });
+  scanCache = { key, at: Date.now(), result };
+  return result;
 }
 
 export async function loadDevRecentDayPromptPhotoCandidates(limit = 12): Promise<DayPromptPhotoCandidate[]> {
@@ -106,7 +118,13 @@ async function loadDayPromptPhotoCandidates({
 
       if (!isScreenshot) {
         luminance = await analyzePhotoLuminance(asset.id);
-        signature = await computePhotoSignature(localUri ?? asset.uri);
+        // MEMORY: hash a small native thumbnail, NEVER the full-res original —
+        // decoding dozens of 12-48MP photos on foreground is what used to get
+        // the app jetsam-killed. No thumbnail (older build) → no signature.
+        const thumb = await getPhotoThumbnailDataUri(asset.id, 256);
+        signature = thumb ? await computePhotoSignature(thumb) : null;
+        // Let the UI breathe between photos.
+        await new Promise((resolve) => setTimeout(resolve, 8));
       }
 
       scanned.push({

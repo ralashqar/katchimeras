@@ -47,7 +47,7 @@ export function WorldActionStack({
         accessibilityLabel={`Capture a moment with the camera${cameraBadge ? ` (${cameraBadge} new photos to review)` : ''}`}
         onPress={onCamera}
         style={styles.secondary}>
-        <IconSymbol name="camera.fill" size={18} color={Lantern.moon50} />
+        <IconSymbol name="camera.fill" size={22} color={Lantern.moon50} />
         <ActionBadge count={cameraBadge} />
       </Pressable>
       {onAddPlace ? (
@@ -56,7 +56,7 @@ export function WorldActionStack({
           accessibilityLabel={`Add the place you're at now${placeBadge ? ' (a new place was detected)' : ''}`}
           onPress={onAddPlace}
           style={styles.secondary}>
-          <IconSymbol name="mappin.and.ellipse" size={18} color={Lantern.moon50} />
+          <IconSymbol name="mappin.and.ellipse" size={22} color={Lantern.moon50} />
           <ActionBadge count={placeBadge} />
         </Pressable>
       ) : null}
@@ -65,7 +65,7 @@ export function WorldActionStack({
         accessibilityLabel="Add to today"
         onPress={onAdd}
         style={styles.primary}>
-        <IconSymbol name="plus" size={28} color={Meadow.ink} />
+        <IconSymbol name="plus" size={34} color={Meadow.ink} />
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -75,11 +75,11 @@ export function WorldActionStack({
         delayLongPress={250}
         onPressOut={onMicPressOut}
         style={[styles.secondary, recording ? styles.recording : null]}>
-        <IconSymbol name="mic.fill" size={18} color={Lantern.moon50} />
+        <IconSymbol name="mic.fill" size={22} color={Lantern.moon50} />
       </Pressable>
       {onSparkle ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Today's quests" onPress={onSparkle} style={styles.secondary}>
-          <IconSymbol name="sparkles" size={18} color={Lantern.moon50} />
+          <IconSymbol name="sparkles" size={22} color={Lantern.moon50} />
         </Pressable>
       ) : null}
     </View>
@@ -98,43 +98,48 @@ function ActionBadge({ count }: { count?: number }) {
 
 const styles = StyleSheet.create({
   root: { alignItems: 'center', gap: 12 },
-  rootRow: { alignItems: 'center', flexDirection: 'row', gap: 15, justifyContent: 'center' },
+  rootRow: { alignItems: 'center', flexDirection: 'row', gap: 18, justifyContent: 'center' },
   badge: {
     alignItems: 'center',
     backgroundColor: Meadow.gold,
     borderColor: Meadow.goldDeep,
     borderRadius: 999,
     borderWidth: 1.5,
-    height: 20,
+    boxShadow: '0 2px 6px rgba(30, 20, 8, 0.35)',
+    height: 23,
     justifyContent: 'center',
-    minWidth: 20,
-    paddingHorizontal: 5,
+    minWidth: 23,
+    paddingHorizontal: 6,
     position: 'absolute',
-    right: -5,
-    top: -5,
+    right: -4,
+    top: -4,
   },
-  badgeLabel: { color: '#3A2517', fontSize: 11, fontWeight: '900', lineHeight: 13 },
+  badgeLabel: { color: '#3A2517', fontSize: 12.5, fontWeight: '900', lineHeight: 15 },
+  // Dense warm glass discs that visibly POP off the path (crop reference:
+  // darker fill, crisp light ring, real drop shadow, bigger glyphs).
   secondary: {
-    width: 52,
-    height: 52,
+    width: 58,
+    height: 58,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(40, 32, 22, 0.40)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 245, 220, 0.38)',
+    backgroundColor: 'rgba(38, 32, 22, 0.58)',
+    borderWidth: 1.4,
+    borderColor: 'rgba(255, 248, 230, 0.45)',
+    boxShadow: '0 6px 14px rgba(20, 12, 4, 0.32), inset 0 1px 0 rgba(255, 248, 230, 0.25)',
   },
   recording: { backgroundColor: Lantern.auroraRose, borderColor: Lantern.auroraRose },
-  // The glowing cream "+" — the row's centrepiece on the path (v5 mockup).
+  // The big matte-ivory "+" — a physical button resting on the path: soft
+  // top bevel, real shadow, thin dark glyph (no glow halo).
   primary: {
-    width: 64,
-    height: 64,
+    width: 72,
+    height: 72,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F6E7B8',
-    borderWidth: 1.5,
-    borderColor: '#E8D194',
-    boxShadow: '0 0 26px rgba(246, 226, 160, 0.8), 0 8px 20px rgba(20, 12, 4, 0.35)',
+    backgroundColor: '#F0DA9E',
+    borderWidth: 1,
+    borderColor: 'rgba(178, 142, 74, 0.6)',
+    boxShadow: '0 10px 22px rgba(20, 12, 4, 0.38), inset 0 2px 0 rgba(255, 246, 220, 0.9), inset 0 -3px 6px rgba(170, 130, 60, 0.4)',
   },
 });

@@ -35,18 +35,27 @@ export type PhotoSignature = {
 // (unsupported URI, transient failure). Callers treat null as "no signal" and
 // fall back to time-based heuristics / never drop on a guess.
 export async function computePhotoSignature(uri: string): Promise<PhotoSignature | null> {
+  // MEMORY: a decoded full-resolution photo is 50-190MB of RGBA. Callers should
+  // pass a small thumbnail (data: URI) whenever possible; and every Skia object
+  // is disposed EXPLICITLY below — JS GC lags behind native allocations, and a
+  // burst of undisposed decodes is exactly what gets the app jetsam-killed.
+  let data: ReturnType<typeof Skia.Data.fromBase64> | null = null;
+  let image: ReturnType<typeof Skia.Image.MakeImageFromEncoded> = null;
+  let surface: ReturnType<typeof Skia.Surface.MakeOffscreen> = null;
   try {
-    const data = await Skia.Data.fromURI(uri);
+    data = uri.startsWith('data:')
+      ? Skia.Data.fromBase64(uri.slice(uri.indexOf(',') + 1))
+      : await Skia.Data.fromURI(uri);
     if (!data) {
       return null;
     }
 
-    const image = Skia.Image.MakeImageFromEncoded(data);
+    image = Skia.Image.MakeImageFromEncoded(data);
     if (!image) {
       return null;
     }
 
-    const surface = Skia.Surface.MakeOffscreen(HASH_WIDTH, HASH_HEIGHT);
+    surface = Skia.Surface.MakeOffscreen(HASH_WIDTH, HASH_HEIGHT);
     if (!surface) {
       return null;
     }
@@ -61,12 +70,14 @@ export async function computePhotoSignature(uri: string): Promise<PhotoSignature
     );
     surface.flush();
 
-    const pixels = surface.makeImageSnapshot().readPixels(0, 0, {
+    const snapshot = surface.makeImageSnapshot();
+    const pixels = snapshot.readPixels(0, 0, {
       width: HASH_WIDTH,
       height: HASH_HEIGHT,
       colorType: ColorType.RGBA_8888,
       alphaType: AlphaType.Unpremul,
     });
+    snapshot.dispose();
     if (!pixels) {
       return null;
     }
@@ -74,6 +85,10 @@ export async function computePhotoSignature(uri: string): Promise<PhotoSignature
     return signatureFromRgba(pixels, HASH_WIDTH, HASH_HEIGHT);
   } catch {
     return null;
+  } finally {
+    surface?.dispose();
+    image?.dispose();
+    data?.dispose();
   }
 }
 
