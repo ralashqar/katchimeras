@@ -1,7 +1,14 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import {
+  AccessibilityInfo,
+  Pressable,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Animated, {
   Easing,
   FadeInRight,
@@ -13,9 +20,16 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
+import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import {
+  HOME_EGG_SHELL_SCALE,
+  HOME_EGG_STAGE_TOP,
+  todayEggFraming,
+} from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -28,7 +42,7 @@ import {
   type OpeningScene,
 } from '@/constants/onboarding-cinematic';
 import { KatchaDeckUI } from '@/constants/theme';
-import type { EggVisualState } from '@/types/home';
+import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
 import type { TimelineDayEntry, TimelineTomorrowState } from '@/types/timeline';
 
 type CinematicOnboardingPageProps = {
@@ -40,13 +54,6 @@ type CinematicOnboardingPageProps = {
 
 const FINAL_BEAT_INDEX = onboardingCinematicBeats.length - 1;
 const FOLLOW_UP_BEAT_INDEX = 1;
-const OPENING_BASE_STAGE_WIDTH = 390;
-const OPENING_BASE_STAGE_HEIGHT = 392;
-
-// The soft glow texture the Home egg uses — reused only behind the hatched
-// creature so the reveal glows like the real app, no opaque shapes.
-const openingGlowTex = require('../../../assets/images/katchimeras/soft-glow.png');
-const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 // The forming egg shown during the opening is the EXACT egg widget from the
 // Today page (LanternEgg). EggShell ignores the color fields (its glow is baked
@@ -62,9 +69,23 @@ const OPENING_EGG_VISUAL: EggVisualState = {
 };
 
 // What the opening day hatches into — a real, used cast member (the coffee-shop
-// companion), matching the coffee/cafe moments that feed the egg.
-const OPENING_REVEAL_ART = require('../../../assets/images/katchimeras/cutouts/baristabbit.png');
-const OPENING_REVEAL_ACCENT = '#E3B68C';
+// companion), matching the coffee/cafe moments that feed the egg. A minimal
+// creature record so the REAL HatchReveal (the home page's hatch) runs it.
+const OPENING_REVEAL_CREATURE: LocalCreatureRecord = {
+  id: 'onboarding-baristabbit',
+  name: 'Baristabbit',
+  primaryTrait: 'social',
+  secondaryTrait: 'calm',
+  rarity: 'common',
+  visualKey: 'baristabbit',
+  accentColor: '#E3B68C',
+  highlightMomentId: null,
+  highlight: 'A coffee ritual kept',
+  reflection: '',
+  motifTags: [],
+  encounterProfileId: null,
+  repeatDepth: 0,
+};
 
 // Feed pacing: a clear pause first (so the "Moments shape your day" title reads),
 // then the first moments drift in slowly and each following one launches sooner
@@ -74,21 +95,8 @@ const FEED_START_GAP_MS = 560;
 const FEED_MIN_GAP_MS = 110;
 const FEED_RAMP_MS = 95;
 
-// Moments sit ABOVE and BELOW the egg (never on its sides), spaced out. Each slot
-// is the static label's position (corner-anchored) plus the matching launch
-// anchor (its centre in stage fractions) the mote flies in from.
-const MOMENT_SLOTS = [
-  { style: { left: '33%', top: '0%' }, anchor: { x: 0.5, y: 0.04 } },
-  { style: { left: '3%', top: '10%' }, anchor: { x: 0.17, y: 0.15 } },
-  { style: { right: '3%', top: '10%' }, anchor: { x: 0.83, y: 0.15 } },
-  { style: { left: '3%', bottom: '24%' }, anchor: { x: 0.17, y: 0.73 } },
-  { style: { right: '3%', bottom: '24%' }, anchor: { x: 0.83, y: 0.73 } },
-  { style: { left: '19%', bottom: '10%' }, anchor: { x: 0.34, y: 0.88 } },
-  { style: { right: '19%', bottom: '10%' }, anchor: { x: 0.66, y: 0.88 } },
-] as const;
 // LanternEgg's internal stage height — the host box that centers the egg.
 const EGG_HOST_HEIGHT = 258;
-const CREATURE_SIZE = 172;
 
 export function CinematicOnboardingPage({
   entries,
@@ -108,7 +116,6 @@ export function CinematicOnboardingPage({
   const lastHapticKeyRef = useRef<string | null>(null);
   const dockProgress = useSharedValue(currentBeat.showCta ? 1 : 0);
   const stageMinHeight = height < 760 ? 302 : 360;
-  const openingStageHeight = height < 760 ? 340 : 392;
   const entryMap = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
   const finalBeatIndex = stopAfterOpening ? 0 : FINAL_BEAT_INDEX;
 
@@ -238,6 +245,24 @@ export function CinematicOnboardingPage({
   const hasCopy = displayedHeadline.length > 0 || displayedSubtext.length > 0;
   const copyKey = isOpeningBeat ? currentOpeningScene?.id ?? `opening-${restartToken}` : currentBeat.id;
 
+  // The opening is a FULL-SCREEN fixed composition on the Meadow scene: the
+  // real egg pinned exactly where it lives on the home page, copy above it,
+  // moment rows below flying up into it, then the normal in-place hatch.
+  if (isOpeningBeat && openingSequence && currentOpeningScene) {
+    return (
+      <OpeningScenePage
+        chips={openingSequence.chips}
+        copyKey={`${copyKey}-${restartToken}`}
+        headline={displayedHeadline}
+        subtext={displayedSubtext}
+        onRestart={handleRestart}
+        reduceMotionEnabled={reduceMotionEnabled}
+        restartToken={restartToken}
+        scene={currentOpeningScene}
+      />
+    );
+  }
+
   return (
     <Pressable onPress={handleSurfacePress} style={styles.page}>
       <View style={styles.topRow}>
@@ -281,14 +306,7 @@ export function CinematicOnboardingPage({
 
       <View style={[styles.stageViewport, { minHeight: stageMinHeight }]}>
         <View style={styles.stageFrame}>
-          <StageVisual
-            beat={currentBeat}
-            entryMap={entryMap}
-            openingScene={currentOpeningScene}
-            openingStageHeight={openingStageHeight}
-            reduceMotionEnabled={reduceMotionEnabled}
-            restartToken={restartToken}
-          />
+          <StageVisual beat={currentBeat} entryMap={entryMap} />
         </View>
       </View>
 
@@ -327,37 +345,11 @@ export function CinematicOnboardingPage({
   );
 }
 
-function StageVisual({
-  beat,
-  entryMap,
-  openingScene,
-  openingStageHeight,
-  reduceMotionEnabled,
-  restartToken,
-}: {
-  beat: OnboardingCinematicBeat;
-  entryMap: Map<string, TimelineDayEntry>;
-  openingScene: OpeningScene | null;
-  openingStageHeight: number;
-  reduceMotionEnabled: boolean;
-  restartToken: number;
-}) {
+function StageVisual({ beat, entryMap }: { beat: OnboardingCinematicBeat; entryMap: Map<string, TimelineDayEntry> }) {
   const morningCoffee = entryMap.get('morning-coffee');
   const gymSession = entryMap.get('gym-session');
   const familyDinner = entryMap.get('family-dinner');
   const todayCafe = entryMap.get('today-cafe');
-
-  if (beat.openingSequence && openingScene) {
-    return (
-      <OpeningSequenceStage
-        chips={beat.openingSequence.chips}
-        reduceMotionEnabled={reduceMotionEnabled}
-        restartToken={restartToken}
-        scene={openingScene}
-        stageHeight={openingStageHeight}
-      />
-    );
-  }
 
   if (beat.id === 'variety') {
     const varietyEntries = [morningCoffee, gymSession, familyDinner].filter(
@@ -389,29 +381,43 @@ function StageVisual({
   return <View style={styles.emptyStage} />;
 }
 
-// The opening stage: the real Today-page egg widget sits centered while the
-// day's moments fly into it one by one (a labelled mote with a trail that lands
-// and pulses the egg — exactly the Home "answer a prompt" feed), then it hatches.
-function OpeningSequenceStage({
+// The opening scene: a FULL-SCREEN fixed composition. The real Today-page egg
+// widget is pinned at the exact home-page position (same framing, same anchor),
+// copy lives above it, and the day's moments sit in rows BELOW the egg — each
+// launches UP into the egg (the Home "answer a prompt" feed), then the normal
+// in-place HatchReveal runs where the egg stands.
+function OpeningScenePage({
   chips,
   scene,
-  stageHeight,
+  copyKey,
+  headline,
+  subtext,
+  onRestart,
   reduceMotionEnabled,
   restartToken,
 }: {
   chips: readonly OpeningMomentChip[];
   scene: OpeningScene;
-  stageHeight: number;
+  copyKey: string;
+  headline: string;
+  subtext: string;
+  onRestart: () => void;
   reduceMotionEnabled: boolean;
   restartToken: number;
 }) {
   const { width } = useWindowDimensions();
-  const metrics = useMemo(() => getOpeningStageMetrics(width, stageHeight), [stageHeight, width]);
-  const eggCenter = { x: metrics.stageWidth / 2, y: metrics.eggCenterY };
+  const insets = useSafeAreaInsets();
+  const eggFraming = useMemo(() => todayEggFraming(), []);
+
+  // The exact home-page anchor: stage top below the safe area, egg centered in
+  // the 258px host, plus the JSON vertical offset.
+  const eggStageTop = insets.top + HOME_EGG_STAGE_TOP;
+  const eggCenter = { x: width / 2, y: eggStageTop + EGG_HOST_HEIGHT / 2 + eggFraming.offsetY };
+  const rowsTop = eggStageTop + EGG_HOST_HEIGHT + 16;
 
   const eggShown = scene.eggState !== 'hidden';
   const hatched = scene.eggState === 'hatch' || scene.eggState === 'revealed';
-  const crackStage: 0 | 1 | 2 = scene.eggState === 'build' ? 1 : hatched ? 2 : 0;
+  const crackStage: 0 | 1 | 2 = scene.eggState === 'build' ? 1 : 0;
 
   // Multiple motes can be in flight at once (the cadence accelerates), so the
   // overlay renders a list rather than a single feed.
@@ -421,20 +427,24 @@ function OpeningSequenceStage({
   const startedRef = useRef<number | null>(null);
   const feedNonceRef = useRef(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Each chip's measured box (relative to the rows container) — the mote
+  // launches from the chip's real centre, straight up into the egg. Launched
+  // chips go invisible but KEEP their space so the rows never reflow.
+  const chipLayoutsRef = useRef<Record<number, { x: number; y: number; width: number; height: number }>>({});
 
   function launchMote(index: number) {
     if (index >= chips.length) {
       return;
     }
     const chip = chips[index];
-    const anchor = MOMENT_SLOTS[index % MOMENT_SLOTS.length].anchor;
+    const layout = chipLayoutsRef.current[index];
     feedNonceRef.current += 1;
     const feed: EggFeed = {
       nonce: feedNonceRef.current,
-      fromX: anchor.x * metrics.stageWidth,
-      fromY: anchor.y * stageHeight,
+      fromX: layout ? layout.x + layout.width / 2 : width / 2,
+      fromY: rowsTop + (layout ? layout.y + layout.height / 2 : 24),
       toX: eggCenter.x,
-      toY: eggCenter.y - 18 * metrics.scale,
+      toY: eggCenter.y - 18,
       label: chip.label,
       tint: chip.accent,
     };
@@ -456,6 +466,7 @@ function OpeningSequenceStage({
     setLaunchedCount(0);
     startedRef.current = null;
     feedNonceRef.current = 0;
+    chipLayoutsRef.current = {};
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
     return () => {
@@ -483,50 +494,29 @@ function OpeningSequenceStage({
         : Math.max(FEED_MIN_GAP_MS, FEED_START_GAP_MS - index * FEED_RAMP_MS);
       at += gap;
     }
-    // launchMote closes over this render's metrics, which are stable for the run.
+    // launchMote closes over this render's geometry, which is stable for the run
+    // (chip positions come from the layout ref at launch time).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.chipBehavior, restartToken, reduceMotionEnabled, chips.length]);
 
-  // Hatch choreography: the egg rattles (gently while building, violently at the
-  // moment of hatch), then shrinks away just as the creature pops up in its place.
-  const eggOpacity = useSharedValue(0);
-  const eggEnter = useSharedValue(0);
+  // The egg fades in at its FIXED spot (no scale-in, no travel — it lives where
+  // the home page keeps it) and rattles while the day builds. The hatch itself
+  // is the real HatchReveal, swapped into the same host exactly like home.
+  const eggFade = useSharedValue(0);
   const eggShake = useSharedValue(0);
-  const eggHatch = useSharedValue(0);
-  const creatureProgress = useSharedValue(0);
-  const creatureScale = useSharedValue(0.4);
-
   const isBuilding = scene.eggState === 'build';
 
-  // Scale the egg in the moment it first appears (during "they're made of
-  // moments"), with a little overshoot.
   useEffect(() => {
     if (eggShown) {
-      eggEnter.value = withTiming(1, {
+      eggFade.value = withTiming(1, {
         duration: reduceMotionEnabled ? 150 : 520,
-        easing: Easing.out(Easing.back(1.5)),
+        easing: Easing.out(Easing.cubic),
       });
     }
-  }, [eggEnter, eggShown, reduceMotionEnabled]);
+  }, [eggFade, eggShown, reduceMotionEnabled]);
 
   useEffect(() => {
-    eggOpacity.value = withTiming(eggShown && !hatched ? 1 : 0, {
-      duration: reduceMotionEnabled ? 140 : hatched ? 240 : 420,
-      easing: Easing.out(Easing.cubic),
-    });
-    // Shrink the egg out of existence at the hatch.
-    eggHatch.value = withTiming(hatched ? 1 : 0, {
-      duration: reduceMotionEnabled ? 140 : 300,
-      easing: Easing.in(Easing.cubic),
-    });
-  }, [eggHatch, eggOpacity, eggShown, hatched, reduceMotionEnabled]);
-
-  useEffect(() => {
-    if (reduceMotionEnabled) {
-      eggShake.value = withTiming(0, { duration: 120 });
-      return;
-    }
-    if (isBuilding) {
+    if (isBuilding && !reduceMotionEnabled) {
       // Aggressive, continuous rattle while the day takes shape.
       eggShake.value = withRepeat(
         withSequence(
@@ -536,99 +526,108 @@ function OpeningSequenceStage({
         -1,
         true
       );
-    } else if (hatched) {
-      // One last violent jolt as it bursts.
-      eggShake.value = withSequence(
-        withTiming(1.8, { duration: 45, easing: Easing.linear }),
-        withTiming(-1.8, { duration: 50, easing: Easing.linear }),
-        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) })
-      );
     } else {
       eggShake.value = withTiming(0, { duration: 160, easing: Easing.out(Easing.cubic) });
     }
-  }, [eggShake, hatched, isBuilding, reduceMotionEnabled]);
-
-  useEffect(() => {
-    creatureProgress.value = withTiming(hatched ? 1 : 0, {
-      duration: reduceMotionEnabled ? 160 : 460,
-      easing: Easing.out(Easing.cubic),
-    });
-    // Scale up with an overshoot so the new katchimera springs into being.
-    creatureScale.value = withTiming(hatched ? 1 : 0.4, {
-      duration: reduceMotionEnabled ? 160 : 520,
-      easing: hatched ? Easing.out(Easing.back(1.7)) : Easing.out(Easing.cubic),
-    });
-  }, [creatureProgress, creatureScale, hatched, reduceMotionEnabled]);
+  }, [eggShake, isBuilding, reduceMotionEnabled]);
 
   const eggStyle = useAnimatedStyle(() => ({
-    opacity: eggOpacity.value,
-    transform: [
-      { translateX: eggShake.value * 7 },
-      { rotateZ: `${eggShake.value * 4}deg` },
-      { scale: (0.62 + 0.38 * eggEnter.value) * (1 - eggHatch.value * 0.82) },
-    ],
+    opacity: eggFade.value,
+    transform: [{ translateX: eggShake.value * 7 }, { rotateZ: `${eggShake.value * 4}deg` }],
   }));
-  const creatureStyle = useAnimatedStyle(() => ({
-    opacity: creatureProgress.value,
-    transform: [{ translateY: 14 - creatureProgress.value * 14 }, { scale: creatureScale.value }],
-  }));
-  const creatureGlowStyle = useAnimatedStyle(() => ({
-    opacity: creatureProgress.value * 0.85,
-    transform: [{ scale: 0.7 + creatureProgress.value * 0.5 }],
-  }));
+
+  const chipsVisible = eggShown && !hatched && scene.chipBehavior !== 'hidden';
 
   return (
-    <View style={[styles.openingStage, { height: stageHeight }]}>
-      {eggShown ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.openingEggHost, { top: eggCenter.y - EGG_HOST_HEIGHT / 2 }, eggStyle]}>
-          <LanternEgg egg={OPENING_EGG_VISUAL} crackStage={crackStage} feedKey={feedKey} reactionKey={feedKey} />
-        </Animated.View>
-      ) : null}
+    <View style={styles.openingPage}>
+      <Pressable hitSlop={16} onPress={onRestart} style={[styles.openingRestart, { top: insets.top + 10 }]}>
+        <IconSymbol color="#FBF3E4" name="arrow.counterclockwise" size={14} />
+        <ThemedText style={styles.restartLabel} lightColor="#FBF3E4" darkColor="#FBF3E4">
+          Restart
+        </ThemedText>
+      </Pressable>
 
-      {eggShown && !hatched && scene.chipBehavior !== 'hidden'
-        ? chips.map((chip, index) => {
-            if (index < launchedCount) {
-              return null;
-            }
-            return (
+      {/* Copy band ABOVE the egg (where home keeps its week strip). */}
+      <View pointerEvents="none" style={[styles.openingCopyBand, { height: HOME_EGG_STAGE_TOP - 6, top: insets.top + 30 }]}>
+        {headline || subtext ? (
+          <Animated.View key={`copy-${copyKey}`} style={styles.openingCopyBlock}>
+            {headline ? (
               <Animated.View
-                key={`${chip.id}-${restartToken}`}
-                entering={FadeInUp.duration(reduceMotionEnabled ? 120 : 420)}
-                exiting={FadeOutDown.duration(reduceMotionEnabled ? 100 : 200)}
-                pointerEvents="none"
-                style={[
-                  styles.momentLabel,
-                  MOMENT_SLOTS[index % MOMENT_SLOTS.length].style,
-                  { backgroundColor: `${chip.accent}1A`, borderColor: `${chip.accent}55` },
-                ]}>
-                <IconSymbol color={chip.accent} name={chip.icon} size={13} />
-                <ThemedText
-                  style={styles.momentLabelText}
-                  lightColor="#F4F8FF"
-                  darkColor="#F4F8FF"
-                  numberOfLines={1}>
-                  {chip.label}
+                entering={FadeInUp.duration(reduceMotionEnabled ? 140 : 620)}
+                exiting={FadeOutDown.duration(reduceMotionEnabled ? 120 : 220)}>
+                <ThemedText type="onboardingDisplay" style={styles.openingTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
+                  {headline}
                 </ThemedText>
               </Animated.View>
-            );
-          })
-        : null}
+            ) : null}
+            {subtext ? (
+              <Animated.View
+                entering={FadeInUp.delay(
+                  scene.id === 'scene-1-opening-line' && !reduceMotionEnabled ? 900 : 120
+                ).duration(reduceMotionEnabled ? 140 : 520)}
+                exiting={FadeOutDown.duration(reduceMotionEnabled ? 120 : 220)}>
+                <ThemedText style={styles.openingBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
+                  {subtext}
+                </ThemedText>
+              </Animated.View>
+            ) : null}
+          </Animated.View>
+        ) : null}
+      </View>
 
-      {hatched ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.creatureWrap, { top: eggCenter.y - CREATURE_SIZE / 2 }, creatureStyle]}>
-          <AnimatedImage
-            contentFit="contain"
-            source={openingGlowTex}
-            style={[styles.creatureGlow, creatureGlowStyle]}
-            tintColor={OPENING_REVEAL_ACCENT}
-            transition={0}
+      {/* The egg host — the exact home-page anchor. HatchReveal swaps in place
+          at hatch time, exactly as it does on the Today page. */}
+      <View pointerEvents="none" style={[styles.openingEggHost, { top: eggStageTop }]}>
+        {hatched ? (
+          <HatchReveal
+            creature={OPENING_REVEAL_CREATURE}
+            egg={OPENING_EGG_VISUAL}
+            hideCaption
+            onComplete={() => {}}
           />
-          <Image contentFit="contain" source={OPENING_REVEAL_ART} style={styles.creatureImage} transition={0} />
-        </Animated.View>
+        ) : eggShown ? (
+          <Animated.View style={eggStyle}>
+            <LanternEgg
+              egg={OPENING_EGG_VISUAL}
+              crackStage={crackStage}
+              feedKey={feedKey}
+              reactionKey={feedKey}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
+              shellScale={HOME_EGG_SHELL_SCALE}
+              shellOffsetY={0}
+            />
+          </Animated.View>
+        ) : null}
+      </View>
+
+      {/* The day's moments, in rows BELOW the egg — each flies UP into it.
+          Launched chips go invisible but keep their slot (no reflow). */}
+      {chipsVisible ? (
+        <View pointerEvents="none" style={[styles.momentRows, { top: rowsTop }]}>
+          {chips.map((chip, index) => (
+            <Animated.View
+              key={`${chip.id}-${restartToken}`}
+              entering={FadeInUp.delay(reduceMotionEnabled ? 0 : Math.min(index * 90, 540)).duration(
+                reduceMotionEnabled ? 120 : 420
+              )}
+              onLayout={(event: LayoutChangeEvent) => {
+                chipLayoutsRef.current[index] = event.nativeEvent.layout;
+              }}
+              style={[
+                styles.momentLabel,
+                { backgroundColor: `${chip.accent}1A`, borderColor: `${chip.accent}55` },
+                index < launchedCount ? styles.momentLabelLaunched : null,
+              ]}>
+              <IconSymbol color={chip.accent} name={chip.icon} size={13} />
+              <ThemedText style={styles.momentLabelText} lightColor="#FBF3E4" darkColor="#FBF3E4" numberOfLines={1}>
+                {chip.label}
+              </ThemedText>
+            </Animated.View>
+          ))}
+        </View>
       ) : null}
 
       {scene.bottomCopy ? (
@@ -636,11 +635,11 @@ function OpeningSequenceStage({
           entering={FadeInUp.duration(reduceMotionEnabled ? 140 : 500)}
           exiting={FadeOutDown.duration(reduceMotionEnabled ? 120 : 240)}
           key={`opening-bottom-${scene.id}-${restartToken}`}
-          style={styles.bottomCopyWrap}>
+          style={[styles.bottomCopyWrap, { bottom: insets.bottom + 56 }]}>
           <ThemedText
             style={[styles.bottomCopy, scene.bottomCopy.tone === 'locked' ? styles.bottomCopyLocked : null]}
-            lightColor="#DCE6FF"
-            darkColor="#DCE6FF">
+            lightColor="rgba(251,243,228,0.88)"
+            darkColor="rgba(251,243,228,0.88)">
             {scene.bottomCopy.text}
           </ThemedText>
         </Animated.View>
@@ -724,26 +723,6 @@ function TomorrowStage({ entry }: { entry: TimelineDayEntry }) {
   );
 }
 
-// Where each moment label sits around the egg (corner-anchored), and the point
-// its mote launches from when drawn into the egg. The two are tuned to coincide.
-function getOpeningStageMetrics(stageWidth: number, stageHeight: number) {
-  const scale = Math.max(
-    0.92,
-    Math.min(1.32, Math.min(stageWidth / OPENING_BASE_STAGE_WIDTH, stageHeight / OPENING_BASE_STAGE_HEIGHT))
-  );
-  const eggSize = 102 * scale;
-  const eggTop = stageHeight * 0.311;
-
-  return {
-    eggCenterY: eggTop + eggSize / 2,
-    eggSize,
-    eggTop,
-    scale,
-    stageHeight,
-    stageWidth,
-  };
-}
-
 const styles = StyleSheet.create({
   page: {
     flex: 1,
@@ -811,20 +790,68 @@ const styles = StyleSheet.create({
     height: 1,
     width: '100%',
   },
-  openingStage: {
-    // Not clipped — moment labels/motes near the top edge (and the egg) must show
-    // in full as they fly in, instead of being masked at the stage border.
+  // The full-screen opening composition — everything anchors to the SCREEN so
+  // the egg sits exactly where the home page keeps it.
+  openingPage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  openingRestart: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    position: 'absolute',
+    right: 20,
+    zIndex: 5,
+  },
+  openingCopyBand: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    left: 20,
     overflow: 'visible',
-    position: 'relative',
-    width: '100%',
+    position: 'absolute',
+    right: 20,
+  },
+  openingCopyBlock: {
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: 336,
+    position: 'absolute',
+  },
+  openingTitle: {
+    fontSize: 30,
+    lineHeight: 34,
+    textAlign: 'center',
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  openingBody: {
+    fontSize: 15,
+    lineHeight: 21,
+    maxWidth: 300,
+    textAlign: 'center',
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
   // Full-width host that vertically centers the real LanternEgg widget on the
-  // egg point; left/right unset so its content centers horizontally.
+  // egg point; left/right 0 so its content centers horizontally.
   openingEggHost: {
     height: EGG_HOST_HEIGHT,
     left: 0,
     position: 'absolute',
     right: 0,
+  },
+  // The moment chips, wrapped into centred rows under the egg.
+  momentRows: {
+    columnGap: 10,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    left: 20,
+    position: 'absolute',
+    right: 20,
+    rowGap: 10,
   },
   momentLabel: {
     alignItems: 'center',
@@ -836,32 +863,18 @@ const styles = StyleSheet.create({
     maxWidth: 170,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    position: 'absolute',
+  },
+  // Launched chips vanish but KEEP their slot so the rows never reflow (the
+  // remaining chips' measured launch anchors stay valid).
+  momentLabelLaunched: {
+    opacity: 0,
   },
   momentLabelText: {
     fontSize: 13,
     lineHeight: 16,
   },
-  creatureWrap: {
-    alignItems: 'center',
-    height: CREATURE_SIZE,
-    justifyContent: 'center',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-  },
-  creatureGlow: {
-    height: CREATURE_SIZE * 1.4,
-    position: 'absolute',
-    width: CREATURE_SIZE * 1.4,
-  },
-  creatureImage: {
-    height: CREATURE_SIZE,
-    width: CREATURE_SIZE,
-  },
   bottomCopyWrap: {
     alignItems: 'center',
-    bottom: 0,
     left: 0,
     position: 'absolute',
     right: 0,

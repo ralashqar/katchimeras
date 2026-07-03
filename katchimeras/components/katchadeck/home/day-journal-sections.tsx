@@ -5,9 +5,11 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { PlacesModal } from '@/components/katchadeck/home/places-modal';
+import { CATEGORY_ART, VARIANT_ART } from '@/components/katchadeck/home/today-category-ring';
 import { dayPromptRegistry } from '@/constants/day-prompts';
 import { Meadow } from '@/constants/meadow-theme';
 import type { DayPromptKind, HomeDayRecord } from '@/types/home';
+import type { TodayCategoryState } from '@/utils/today-categories';
 
 // Meaning archetypes (calm/energy/together/meaningful) → icon + colour so the
 // "what it meant" chips read like the chips shown when the photo was prompted.
@@ -72,6 +74,8 @@ export function DayJournalSections({
   day,
   onStatPress,
   statAttention,
+  categories,
+  onCategoryPress,
 }: {
   day: HomeDayRecord;
   // When set, every stat tile becomes a door into its category surface (steps →
@@ -81,6 +85,10 @@ export function DayJournalSections({
   // Golden highlight per tile when its category is asking a contextual question
   // (same read as utils/today-categories needsAttention).
   statAttention?: Partial<Record<DayStatKey, boolean>>;
+  // Category doors (Inspo / Mood / Sleep / Food) rendered as a row ABOVE the
+  // stats, inside the same panel — the ring around the egg keeps only quests.
+  categories?: TodayCategoryState[];
+  onCategoryPress?: (category: TodayCategoryState) => void;
 }) {
   const photos = collectPhotos(day);
   const meanings = collectMeanings(day);
@@ -180,9 +188,44 @@ export function DayJournalSections({
   return (
     <View style={styles.wrap}>
       <View style={styles.sectionCard}>
-        <ThemedText style={styles.sectionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          Today in numbers
-        </ThemedText>
+        {categories && categories.length > 0 ? (
+          <>
+            <View style={styles.categoryRow}>
+              {categories.map((category) => {
+                const art =
+                  (category.variant ? VARIANT_ART[category.id]?.[category.variant] : undefined) ??
+                  CATEGORY_ART[category.id];
+                const badge = category.countLabel ?? (category.count > 0 ? `${category.count}` : null);
+                return (
+                  <Pressable
+                    key={category.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${category.label}${badge ? ` (${badge})` : ''}`}
+                    disabled={!onCategoryPress}
+                    onPress={() => onCategoryPress?.(category)}
+                    style={[styles.categoryTile, category.needsAttention ? styles.categoryTileAttention : null]}>
+                    {art ? (
+                      <Image source={art} style={styles.categoryArt} contentFit="contain" />
+                    ) : (
+                      <IconSymbol name={category.icon} size={30} color={Meadow.iconOnCard} />
+                    )}
+                    <ThemedText numberOfLines={1} style={styles.categoryLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                      {category.label}
+                    </ThemedText>
+                    {badge ? (
+                      <View style={styles.categoryBadge} pointerEvents="none">
+                        <ThemedText style={styles.categoryBadgeLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                          {badge}
+                        </ThemedText>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+            <View style={styles.panelDivider} />
+          </>
+        ) : null}
         <View style={styles.statsRow}>
         {stats.map((stat) => {
           const attention = !!statAttention?.[stat.key];
@@ -510,6 +553,63 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  // Category doors row (mockup panel): the same 3D icon art the ring chips
+  // used, on light tiles with the label tight beneath.
+  categoryRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  categoryTile: {
+    alignItems: 'center',
+    backgroundColor: Meadow.cardSoft,
+    borderColor: Meadow.cardBorder,
+    borderCurve: 'continuous',
+    borderRadius: Meadow.radius.tile,
+    borderWidth: 1,
+    boxShadow: '-3px 4px 8px rgba(58, 38, 18, 0.20), inset 0 1px 0 rgba(255, 248, 230, 0.55)',
+    flex: 1,
+    gap: 4,
+    paddingVertical: 9,
+  },
+  categoryTileAttention: {
+    backgroundColor: '#F9EBC9',
+    boxShadow: '0 0 14px rgba(233,185,78,0.35)',
+  },
+  categoryArt: {
+    height: 34,
+    width: 34,
+  },
+  categoryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 13,
+  },
+  categoryBadge: {
+    alignItems: 'center',
+    backgroundColor: Meadow.gold,
+    borderColor: Meadow.goldDeep,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    boxShadow: '0 2px 6px rgba(40, 26, 8, 0.35)',
+    height: 20,
+    justifyContent: 'center',
+    minWidth: 20,
+    paddingHorizontal: 5,
+    position: 'absolute',
+    right: -5,
+    top: -5,
+  },
+  categoryBadgeLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    lineHeight: 13,
+    textAlign: 'center',
+  },
+  panelDivider: {
+    backgroundColor: 'rgba(122, 84, 44, 0.18)',
+    height: 1,
+    marginVertical: 1,
   },
   statTile: {
     alignItems: 'center',

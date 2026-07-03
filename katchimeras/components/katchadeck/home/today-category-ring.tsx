@@ -53,8 +53,10 @@ export function TodayCategoryRing({
         const onRight = index < rightCount;
         const sideIndex = onRight ? index : index - rightCount;
         const sideCount = onRight ? rightCount : categories.length - rightCount;
-        // Even spacing top→bottom within the side's fan.
-        const t = sideCount === 1 ? 0.5 : sideIndex / (sideCount - 1);
+        // Even spacing top→bottom within the side's fan. A LONE chip (the
+        // quests compass, since the other categories moved into the numbers
+        // panel) sits at the egg's bottom-right instead of mid-height.
+        const t = sideCount === 1 ? (categories.length === 1 ? 1 : 0.5) : sideIndex / (sideCount - 1);
         const y = (t - 0.5) * 2 * VERTICAL_SPAN;
         // The middle icon reaches furthest out; top/bottom tuck slightly in.
         const x = (radius - (Math.abs(y) / VERTICAL_SPAN) * ARC_INSET) * (onRight ? 1 : -1);
@@ -76,9 +78,10 @@ export function TodayCategoryRing({
 const GLOW = Meadow.gold;
 
 // Generated 3D icon art per category (FAL grid → sliced + matted). Categories
-// without art fall back to their IconSymbol glyph.
+// without art fall back to their IconSymbol glyph. Exported: the Today-in-
+// numbers panel renders the same art for its category row.
 // Per-state art — the chip becomes the day's current mood / logged night.
-const VARIANT_ART: Partial<Record<string, Record<string, number>>> = {
+export const VARIANT_ART: Partial<Record<string, Record<string, number>>> = {
   mood: {
     radiant: require('@/assets/images/katchimeras/today-icons/moods/radiant.webp'),
     light: require('@/assets/images/katchimeras/today-icons/moods/light.webp'),
@@ -93,7 +96,7 @@ const VARIANT_ART: Partial<Record<string, Record<string, number>>> = {
   },
 };
 
-const CATEGORY_ART: Partial<Record<string, number>> = {
+export const CATEGORY_ART: Partial<Record<string, number>> = {
   sleep: require('@/assets/images/katchimeras/today-icons/sleep.png'),
   mood: require('@/assets/images/katchimeras/today-icons/mood.png'),
   quests: require('@/assets/images/katchimeras/today-icons/quests.png'),

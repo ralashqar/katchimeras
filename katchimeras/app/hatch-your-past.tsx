@@ -15,16 +15,22 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { EssenceReview } from '@/components/katchadeck/capture/essence-review';
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import {
+  HOME_EGG_SHELL_SCALE,
+  HOME_EGG_STAGE_TOP,
+  MeadowSceneBackdrop,
+  todayEggFraming,
+} from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { hatchPastPrompts } from '@/constants/hatch-past-prompts';
-import { KatchaDeckUI, Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
+import { Lantern } from '@/constants/theme';
 import type { DayPromptKind, DayVisionSummary, EggVisualState } from '@/types/home';
 import type { MeaningTag } from '@/utils/capture-energy';
 import { enrichBackfillReflections, runBackfillFoundation } from '@/utils/day-backfill';
@@ -61,6 +67,10 @@ const PAST_EGG_VISUAL: EggVisualState = {
   label: 'Reading your week',
 };
 
+// The home page's egg stage is 258px tall (LanternEgg's natural height); the
+// content band on this screen starts right below it.
+const EGG_STAGE_HEIGHT = 258;
+
 // Minimum time the egg rattles before it can burst, so the shake always reads
 // even when the scan finishes quickly.
 const MIN_SHAKE_MS = 1400;
@@ -77,6 +87,13 @@ export default function HatchYourPastRoute() {
   // reveal sequence.
   const [revealReady, setRevealReady] = useState(false);
   const revealOutcomeRef = useRef<'reveal' | 'empty'>('reveal');
+
+  // The egg sits EXACTLY where the home page's egg lives (same backdrop, same
+  // framing, same stage anchor) and never moves between phases — only the
+  // prompts and copy below it change.
+  const eggFraming = todayEggFraming();
+  const eggStageTop = insets.top + HOME_EGG_STAGE_TOP;
+  const contentTop = eggStageTop + EGG_STAGE_HEIGHT;
 
   // Questions phase: a prompt at a time feeds the egg, and the chosen seeds are
   // saved as the recap the backfill reads to steer the first hatches.
@@ -287,45 +304,70 @@ export default function HatchYourPastRoute() {
   }
 
   const onSummary = index >= creatures.length;
+  // The egg stage stays mounted (at the SAME anchor) through the questions, the
+  // capture intro, and the hatch — the camera/review take the full screen, and
+  // the reveal replaces the burst egg in place.
+  const showEggStage =
+    phase === 'questions' || phase === 'hatching' || (phase === 'capture' && captureStage === 'intro');
 
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ animation: 'fade', headerShown: false, title: 'Hatch your past' }} />
-      <AmbientBackground
-        accentColor="rgba(167,139,250,0.16)"
-        colors={KatchaDeckUI.gradients.world}
-        meshColors={['rgba(167,139,250,0.14)', 'rgba(125,232,205,0.1)', 'rgba(255,195,107,0.1)', 'rgba(20,17,31,0.2)']}
-      />
+      {/* The Meadow scene — the same golden-hour backdrop as the home page, so
+          the egg's world never changes. */}
+      <MeadowSceneBackdrop />
+
+      {showEggStage ? (
+        <View
+          collapsable={false}
+          pointerEvents="none"
+          ref={eggRef}
+          style={[styles.eggStage, { top: eggStageTop }]}>
+          {phase === 'hatching' ? (
+            <HatchingEgg egg={PAST_EGG_VISUAL} onBurstDone={handleHatchBurstDone} ready={revealReady} />
+          ) : (
+            <LanternEgg
+              egg={PAST_EGG_VISUAL}
+              feedKey={eggFeedKey}
+              reactionKey={questionIndex}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
+              shellScale={HOME_EGG_SHELL_SCALE}
+              shellOffsetY={0}
+            />
+          )}
+        </View>
+      ) : null}
 
       {phase === 'questions' ? (
         <Animated.View entering={FadeIn.duration(240)} style={styles.flex}>
-          <ScrollView contentContainerStyle={styles.questionsContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.questionHeader}>
-              <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                Hatch your past
-              </ThemedText>
-              <ThemedText style={styles.questionLead} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                A few quick reads on your last few days — your taps shape the first characters that hatch.
-              </ThemedText>
-            </View>
-
-            <View collapsable={false} ref={eggRef} style={styles.questionEgg}>
-              <LanternEgg egg={PAST_EGG_VISUAL} feedKey={eggFeedKey} reactionKey={questionIndex} />
-            </View>
-
-            {currentPrompt ? (
-              <DayPromptStrip
-                onAnswer={handleAnswerQuestion}
-                onDismiss={handleSkipQuestion}
-                onSelectHeroPhoto={() => {}}
-                prompt={currentPrompt}
-              />
-            ) : null}
-
-            <ThemedText style={styles.questionHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              {Math.min(questionIndex + 1, hatchPastPrompts.length)} of {hatchPastPrompts.length}
+          <View pointerEvents="none" style={[styles.questionHeader, { top: insets.top + 14 }]}>
+            <ThemedText type="onboardingLabel" style={[styles.kicker, styles.onScene]} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+              Hatch your past
             </ThemedText>
-          </ScrollView>
+            <ThemedText style={[styles.questionLead, styles.onScene]} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              A few quick reads on your last few days — your taps shape the first characters that hatch.
+            </ThemedText>
+          </View>
+
+          <View style={[styles.belowStage, { top: contentTop }]}>
+            <ScrollView contentContainerStyle={styles.questionsContent} showsVerticalScrollIndicator={false}>
+              {currentPrompt ? (
+                <DayPromptStrip
+                  onAnswer={handleAnswerQuestion}
+                  onDismiss={handleSkipQuestion}
+                  onSelectHeroPhoto={() => {}}
+                  prompt={currentPrompt}
+                />
+              ) : null}
+
+              <ThemedText style={[styles.questionHint, styles.onScene]} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                {Math.min(questionIndex + 1, hatchPastPrompts.length)} of {hatchPastPrompts.length}
+              </ThemedText>
+            </ScrollView>
+          </View>
         </Animated.View>
       ) : null}
 
@@ -372,87 +414,103 @@ export default function HatchYourPastRoute() {
             ) : null}
           </View>
         ) : (
-          <Animated.View entering={FadeIn.duration(240)} style={styles.center}>
-            <IconSymbol color={Lantern.ember300} name="camera.fill" size={34} />
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-              One more thing
-            </ThemedText>
-            <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Capture where you are.
-            </ThemedText>
-            <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              Snap your surroundings — we read its essence on your device and fold it into your first hatches.
-              This is how the camera works in the app.
-            </ThemedText>
-            {cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain ? (
-              <ThemedText style={styles.permNote} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Camera access is off — enable it in Settings to capture, or skip for now.
-              </ThemedText>
-            ) : null}
-            <View style={styles.captureCta}>
-              <KatchaButton label="Capture a moment" onPress={handleOpenCamera} variant="primary" />
-              <KatchaButton label="Skip for now" onPress={proceedToHatch} variant="secondary" />
-            </View>
+          <Animated.View entering={FadeIn.duration(240)} style={[styles.belowStage, { top: contentTop }]}>
+            <ScrollView contentContainerStyle={styles.panelScroll} showsVerticalScrollIndicator={false}>
+              <View style={styles.panel}>
+                <IconSymbol color={Lantern.ember300} name="camera.fill" size={34} />
+                <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                  One more thing
+                </ThemedText>
+                <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  Capture where you are.
+                </ThemedText>
+                <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                  Snap your surroundings — we read its essence on your device and fold it into your first hatches.
+                  This is how the camera works in the app.
+                </ThemedText>
+                {cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain ? (
+                  <ThemedText style={styles.permNote} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    Camera access is off — enable it in Settings to capture, or skip for now.
+                  </ThemedText>
+                ) : null}
+                <View style={styles.captureCta}>
+                  <KatchaButton label="Capture a moment" onPress={handleOpenCamera} variant="primary" />
+                  <KatchaButton label="Skip for now" onPress={proceedToHatch} variant="secondary" />
+                </View>
+              </View>
+            </ScrollView>
           </Animated.View>
         )
       ) : null}
 
       {phase === 'hatching' ? (
-        <Animated.View entering={FadeIn.duration(240)} style={styles.center}>
-          <HatchingEgg egg={PAST_EGG_VISUAL} onBurstDone={handleHatchBurstDone} ready={revealReady} />
-          <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            Reading your days…
-          </ThemedText>
+        <Animated.View
+          entering={FadeIn.duration(240)}
+          pointerEvents="none"
+          style={[styles.belowStage, { top: contentTop }]}>
+          <View style={styles.hatchingCopy}>
+            <ThemedText type="display" style={[styles.title, styles.onScene]} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              Reading your days…
+            </ThemedText>
+          </View>
         </Animated.View>
       ) : null}
 
       {phase === 'empty' ? (
-        <Animated.View entering={FadeIn.duration(240)} style={styles.center}>
-          <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            Your collection starts tonight.
-          </ThemedText>
-          <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            We couldn’t find enough of your recent days to read yet. Live one, reveal it at your hatch
-            hour, and the collection begins itself.
-          </ThemedText>
-          <View style={styles.cta}>
-            <KatchaButton label="Begin" onPress={finish} variant="primary" />
-          </View>
+        <Animated.View entering={FadeIn.duration(240)} style={[styles.belowStage, { top: contentTop }]}>
+          <ScrollView contentContainerStyle={styles.panelScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.panel}>
+              <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Your collection starts tonight.
+              </ThemedText>
+              <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                We couldn’t find enough of your recent days to read yet. Live one, reveal it at your hatch
+                hour, and the collection begins itself.
+              </ThemedText>
+              <View style={styles.cta}>
+                <KatchaButton label="Begin" onPress={finish} variant="primary" />
+              </View>
+            </View>
+          </ScrollView>
         </Animated.View>
       ) : null}
 
       {phase === 'reveal' && !onSummary ? (
-        <Pressable style={styles.center} onPress={() => setIndex((current) => current + 1)}>
-          <CreatureReveal creature={creatures[index]} index={index} total={creatures.length} />
+        <Pressable style={styles.revealScreen} onPress={() => setIndex((current) => current + 1)}>
+          <CreatureReveal creature={creatures[index]} index={index} stageTop={eggStageTop} total={creatures.length} />
         </Pressable>
       ) : null}
 
       {phase === 'reveal' && onSummary ? (
-        <Animated.View entering={FadeIn.duration(300)} style={styles.center}>
-          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            Already yours
-          </ThemedText>
-          <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {creatures.length} {creatures.length === 1 ? 'character' : 'characters'} from your past.
-          </ThemedText>
-          <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            Hatched from {daysHatched} {daysHatched === 1 ? 'day' : 'days'} you already lived. They’re in
-            your collection now — and they’ll remember you.
-          </ThemedText>
-          <View style={styles.summaryRow}>
-            {creatures.map((creature) => {
-              const visual = getCreatureVisual(creature.visualKey);
-              return (
-                <View key={creature.profileId} style={styles.summaryOrb}>
-                  <View style={[styles.summaryHalo, { backgroundColor: `${creature.accentColor}2A` }]} />
-                  <Image contentFit="contain" source={visual.source} style={styles.summaryImage} transition={0} />
-                </View>
-              );
-            })}
-          </View>
-          <View style={styles.cta}>
-            <KatchaButton label="Begin" onPress={finish} variant="primary" />
-          </View>
+        <Animated.View entering={FadeIn.duration(300)} style={[styles.belowStage, { top: contentTop }]}>
+          <ScrollView contentContainerStyle={styles.panelScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.panel}>
+              <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                Already yours
+              </ThemedText>
+              <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {creatures.length} {creatures.length === 1 ? 'character' : 'characters'} from your past.
+              </ThemedText>
+              <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                Hatched from {daysHatched} {daysHatched === 1 ? 'day' : 'days'} you already lived. They’re in
+                your collection now — and they’ll remember you.
+              </ThemedText>
+              <View style={styles.summaryRow}>
+                {creatures.map((creature) => {
+                  const visual = getCreatureVisual(creature.visualKey);
+                  return (
+                    <View key={creature.profileId} style={styles.summaryOrb}>
+                      <View style={[styles.summaryHalo, { backgroundColor: `${creature.accentColor}2A` }]} />
+                      <Image contentFit="contain" source={visual.source} style={styles.summaryImage} transition={0} />
+                    </View>
+                  );
+                })}
+              </View>
+              <View style={styles.cta}>
+                <KatchaButton label="Begin" onPress={finish} variant="primary" />
+              </View>
+            </View>
+          </ScrollView>
         </Animated.View>
       ) : null}
 
@@ -470,6 +528,9 @@ function HatchingEgg({ egg, ready, onBurstDone }: { egg: EggVisualState; ready: 
   const startRef = useRef(Date.now());
   const shake = useSharedValue(0);
   const burst = useSharedValue(0);
+  // The same framing the home page (and the questions phase) applies, so the
+  // egg does not shift when the hatch takes over.
+  const eggFraming = todayEggFraming();
 
   useEffect(() => {
     shake.value = withRepeat(
@@ -520,12 +581,31 @@ function HatchingEgg({ egg, ready, onBurstDone }: { egg: EggVisualState; ready: 
 
   return (
     <Animated.View pointerEvents="none" style={eggStyle}>
-      <LanternEgg crackStage={crackStage} egg={egg} />
+      <LanternEgg
+        crackStage={crackStage}
+        egg={egg}
+        scale={eggFraming.scale}
+        offsetY={eggFraming.offsetY}
+        membraneScale={eggFraming.membraneScale}
+        membraneOffsetY={eggFraming.membraneOffsetY}
+        shellScale={HOME_EGG_SHELL_SCALE}
+        shellOffsetY={0}
+      />
     </Animated.View>
   );
 }
 
-function CreatureReveal({ creature, index, total }: { creature: HatchedPastCreature; index: number; total: number }) {
+function CreatureReveal({
+  creature,
+  index,
+  stageTop,
+  total,
+}: {
+  creature: HatchedPastCreature;
+  index: number;
+  stageTop: number;
+  total: number;
+}) {
   const visual = getCreatureVisual(creature.visualKey);
   const isRare = creature.rarity !== 'common';
   const subline = isRare
@@ -537,19 +617,25 @@ function CreatureReveal({ creature, index, total }: { creature: HatchedPastCreat
       : 'A day, kept';
 
   return (
-    <Animated.View entering={FadeIn.duration(360)} exiting={FadeOut.duration(160)} key={creature.profileId} style={styles.revealCard}>
+    <Animated.View
+      entering={FadeIn.duration(360)}
+      exiting={FadeOut.duration(160)}
+      key={creature.profileId}
+      // The creature's portrait (280px) is centred over the 258px egg stage, so
+      // each reveal takes the burst egg's exact place.
+      style={[styles.revealCard, { marginTop: stageTop - (280 - EGG_STAGE_HEIGHT) / 2 }]}>
       <View style={[styles.revealHalo, { backgroundColor: `${creature.accentColor}24` }]} />
       <Image contentFit="contain" source={visual.source} style={styles.revealImage} transition={0} />
-      <ThemedText type="onboardingLabel" style={styles.revealKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+      <ThemedText type="onboardingLabel" style={[styles.revealKicker, styles.onScene]} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
         {index + 1} of {total}
       </ThemedText>
-      <ThemedText type="display" style={styles.revealName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+      <ThemedText type="display" style={[styles.revealName, styles.onScene]} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
         {creature.name}
       </ThemedText>
-      <ThemedText style={styles.revealSub} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+      <ThemedText style={[styles.revealSub, styles.onScene]} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
         {subline}
       </ThemedText>
-      <ThemedText style={styles.tapHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+      <ThemedText style={[styles.tapHint, styles.onScene]} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
         Tap to continue
       </ThemedText>
     </Animated.View>
@@ -565,25 +651,40 @@ const styles = StyleSheet.create({
     backgroundColor: Lantern.ink950,
     flex: 1,
   },
-  center: {
-    alignItems: 'center',
-    flex: 1,
-    gap: 14,
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
   flex: {
     flex: 1,
   },
+  eggStage: {
+    alignItems: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  belowStage: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  // Warm dark shadow behind copy sitting directly on the painting (the
+  // backdrop's scrim only darkens the bottom of the scene).
+  onScene: {
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
   questionsContent: {
     flexGrow: 1,
-    justifyContent: 'center',
+    paddingBottom: 32,
     paddingHorizontal: 24,
-    paddingVertical: 56,
+    paddingTop: 10,
   },
   questionHeader: {
     alignItems: 'center',
     gap: 8,
+    left: 24,
+    position: 'absolute',
+    right: 24,
   },
   questionLead: {
     fontSize: 16,
@@ -591,16 +692,32 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     textAlign: 'center',
   },
-  questionEgg: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-  },
   questionHint: {
     fontSize: 11,
     fontWeight: '700',
     marginTop: 12,
     textAlign: 'center',
+  },
+  hatchingCopy: {
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 12,
+  },
+  panelScroll: {
+    flexGrow: 1,
+    paddingBottom: 32,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+  },
+  panel: {
+    alignItems: 'center',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 14,
+    padding: 24,
+    width: '100%',
   },
   kicker: {
     fontSize: 11,
@@ -617,12 +734,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cta: {
-    marginTop: 18,
+    marginTop: 4,
     width: '100%',
   },
   captureCta: {
     gap: 10,
-    marginTop: 18,
+    marginTop: 4,
     width: '100%',
   },
   permNote: {
@@ -637,7 +754,7 @@ const styles = StyleSheet.create({
   },
   cameraClose: {
     alignItems: 'center',
-    backgroundColor: 'rgba(8,6,16,0.5)',
+    backgroundColor: 'rgba(34, 27, 16, 0.55)',
     borderRadius: 999,
     height: 38,
     justifyContent: 'center',
@@ -676,6 +793,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     height: 60,
     width: 60,
+  },
+  revealScreen: {
+    alignItems: 'center',
+    flex: 1,
   },
   revealCard: {
     alignItems: 'center',

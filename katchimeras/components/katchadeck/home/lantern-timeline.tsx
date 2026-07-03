@@ -26,6 +26,9 @@ const POINTER_HALF = 7; // half the triangle base
 export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineProps) {
   const dayRecords = days.filter((day): day is HomeDayRecord => day.kind === 'day').slice(-4);
   const tomorrow = days.find((day) => day.kind === 'tomorrow');
+  // Tomorrow unlocks once today hatches: its orb becomes a forming egg and it
+  // turns tappable. Until then it's a locked "?" that can't be selected.
+  const todayHatched = dayRecords.some((day) => day.isToday && day.state === 'hatched');
 
   // Each item's centre X (in row coordinates) so the pointer can glide to the
   // selected one. First placement snaps (layout isn't animated); later
@@ -107,9 +110,21 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
       })}
 
       {tomorrow ? (
-        <Pressable onPress={() => onSelect(tomorrow.id)} onLayout={handleItemLayout(tomorrow.id)} style={styles.item}>
+        <Pressable
+          disabled={!todayHatched}
+          onPress={() => onSelect(tomorrow.id)}
+          onLayout={handleItemLayout(tomorrow.id)}
+          style={styles.item}>
           <View style={[styles.orb, tomorrow.id === selectedId ? styles.orbSelected : null]}>
-            <View style={styles.emptyRing} />
+            <View style={styles.emptyRing}>
+              {todayHatched ? (
+                <Image contentFit="contain" source={eggBase} style={styles.egg} transition={0} />
+              ) : (
+                <ThemedText style={styles.emptyMark} lightColor="rgba(251,243,228,0.75)" darkColor="rgba(251,243,228,0.75)">
+                  ?
+                </ThemedText>
+              )}
+            </View>
           </View>
           <ThemedText
             style={[styles.label, tomorrow.id === selectedId ? styles.labelSelected : null]}
@@ -186,13 +201,20 @@ const styles = StyleSheet.create({
     width: 30,
   },
   emptyRing: {
+    alignItems: 'center',
     backgroundColor: 'rgba(28, 22, 13, 0.5)',
     borderColor: 'rgba(251,243,228,0.35)',
     borderRadius: 999,
     borderStyle: 'dashed',
     borderWidth: 1.5,
     height: '100%',
+    justifyContent: 'center',
     width: '100%',
+  },
+  emptyMark: {
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 24,
   },
   label: {
     fontSize: 11,

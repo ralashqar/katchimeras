@@ -73,7 +73,7 @@ export function HatchCountdown({ isReady = false, tint = Lantern.ember300, compa
       ) : (
         <>
           <View style={styles.kickerRow}>
-            <IconSymbol name="hourglass" size={12} color={CREAM} />
+            <IconSymbol name="hourglass" size={11} color={CREAM} />
             <ThemedText style={styles.kicker} lightColor={CREAM} darkColor={CREAM}>
               Hatches in
             </ThemedText>
@@ -94,21 +94,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(40, 32, 22, 0.6)',
     borderColor: 'rgba(255, 245, 220, 0.3)',
     borderCurve: 'continuous',
-    borderRadius: 22,
+    borderRadius: 18,
     borderWidth: 1.2,
     gap: 1,
     overflow: 'hidden',
-    paddingHorizontal: 24,
-    paddingVertical: 9,
+    paddingHorizontal: 18,
+    paddingVertical: 6,
   },
-  kickerRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
+  kickerRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
   kicker: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     letterSpacing: 0.2,
   },
   value: {
-    fontSize: 21,
+    fontSize: 17,
     fontWeight: '800',
     letterSpacing: 0.4,
   },

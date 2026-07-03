@@ -207,7 +207,10 @@ public final class KatchimeraFoundationModule: Module {
       Choose the single best top-level category:
       - media: the photo is OF a work — a book cover, a film or TV poster, a screen
         showing an identifiable film/show, a video game box or gameplay, an album
-        cover or vinyl, artwork in a gallery
+        cover or vinyl, artwork in a gallery. ONLY when the work is the main subject
+        the camera was pointed at (a close-up that fills much of the frame). A book,
+        screen, or poster that merely appears somewhere in a wider scene is NOT
+        media — classify the scene by its real subject instead.
       - food: a meal, drink, snack, dessert, or cooking (still food when packaging
         or a menu is partly visible)
       - social: people together — a gathering, party, friends, or family
@@ -225,7 +228,9 @@ public final class KatchimeraFoundationModule: Module {
       - title: the work's full official title. Use the text read in the photo plus your
         own knowledge of the work — cover text is often partial or split across lines
         (author, title fragments, publisher). Only name a title the photo's text actually
-        supports; if you cannot tell which work it is, leave title empty.
+        supports; if the text is fragmentary, unrelated to any work you know, or reads
+        like random scene text rather than a cover, leave title empty — never assemble
+        a title by guessing.
       - creator: the work's author / director / artist, if you are confident.
       When the category is not media, set mediaKind to none and leave title and creator empty.
       """

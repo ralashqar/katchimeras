@@ -23,11 +23,14 @@ type CreatureHeroProps = {
   subtitle?: string;
   hideSubtitle?: boolean;
   weather?: DayWeather | null;
+  // Compact: the art plus ONE tight card (tag over name) sitting exactly where
+  // the forming egg's "Hatches in" card sits — no weather, no rarity line.
+  compact?: boolean;
 };
 
 // Lantern hero: the creature floats free over the ink - no membrane ring, no
 // plate, no motif orbits. Halo and float are the only ornament.
-export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather }: CreatureHeroProps) {
+export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather, compact = false }: CreatureHeroProps) {
   const visual = getCreatureVisual(creature.visualKey);
   // Prefer the day's expression cutout (mood × bond depth) when one exists for
   // this creature; otherwise fall back to the single base cutout.
@@ -64,6 +67,27 @@ export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather
     opacity: 0.26 + glow.value * 0.22,
     transform: [{ scale: 0.94 + glow.value * 0.08 }],
   }));
+
+  if (compact) {
+    return (
+      <View style={styles.shellCompact}>
+        <View style={styles.stage}>
+          <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
+          <Animated.View style={visualStyle}>
+            <Image contentFit="contain" source={heroSource} style={styles.image} transition={0} />
+          </Animated.View>
+        </View>
+        <View style={styles.compactCard}>
+          <ThemedText type="onboardingLabel" style={styles.compactKicker} lightColor="rgba(251, 243, 228, 0.88)" darkColor="rgba(251, 243, 228, 0.88)">
+            {buildCreatureKicker(creature)}
+          </ThemedText>
+          <ThemedText type="display" style={styles.compactName} lightColor="#F2D48A" darkColor="#F2D48A">
+            {creature.name}
+          </ThemedText>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.shell}>
@@ -151,6 +175,34 @@ const styles = StyleSheet.create({
   shell: {
     alignItems: 'center',
     gap: 14,
+  },
+  shellCompact: {
+    alignItems: 'center',
+  },
+  // Same skin as the HatchCountdown card, but LARGER and LOWER — the hatched
+  // name is the day's headline, while the forming clock stays a small tucked
+  // pill (user-tuned pair).
+  compactCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(40, 32, 22, 0.6)',
+    borderColor: 'rgba(255, 245, 220, 0.3)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1.2,
+    gap: 0,
+    marginTop: -14,
+    overflow: 'hidden',
+    paddingHorizontal: 26,
+    paddingVertical: 9,
+  },
+  compactKicker: {
+    fontSize: 11,
+    letterSpacing: 0.6,
+  },
+  compactName: {
+    fontSize: 27,
+    fontStyle: 'italic',
+    lineHeight: 33,
   },
   stage: {
     alignItems: 'center',

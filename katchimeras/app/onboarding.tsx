@@ -12,8 +12,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import {
+  HOME_EGG_SHELL_SCALE,
+  MeadowSceneBackdrop,
+  todayEggFraming,
+} from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { presenceEnter, useFloatingMotion, usePressMotion, usePulseMotion } from '@/components/katchadeck/motion';
 import { CinematicOnboardingPage } from '@/components/katchadeck/onboarding/cinematic-onboarding-page';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
@@ -161,30 +165,17 @@ export default function OnboardingScreen() {
   }
 
   function renderContent() {
-    if (step === 0) {
-      return (
-        <View style={styles.cinematicWrap}>
-          <CinematicOnboardingPage
-            entries={timelineDemoEntries}
-            onAdvance={() => setStep(1)}
-            stopAfterOpening
-            tomorrowState={timelineTomorrowState}
-          />
-        </View>
-      );
-    }
-
     if (step === 1) {
       return (
         <View style={styles.stepStack}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#D7E4FF" darkColor="#D7E4FF">
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
               Meet a few of them
             </ThemedText>
-            <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            <ThemedText type="display" style={styles.title} lightColor="#FBF3E4" darkColor="#FBF3E4">
               Your days become characters.
             </ThemedText>
-            <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
               Each one appears because of something you actually did — a coffee stop, a park walk, a
               day with real distance in it.
             </ThemedText>
@@ -198,7 +189,7 @@ export default function OnboardingScreen() {
 
           <Animated.View entering={presenceEnter(280)}>
             <GlassPanel contentStyle={styles.panelBody}>
-              <ThemedText style={styles.panelCopy} lightColor="#E8EEFF" darkColor="#E8EEFF">
+              <ThemedText style={styles.panelCopy} lightColor="rgba(251,243,228,0.9)" darkColor="rgba(251,243,228,0.9)">
                 Return to a ritual and the same character comes back — and remembers. The bond is the
                 collection.
               </ThemedText>
@@ -209,29 +200,40 @@ export default function OnboardingScreen() {
     }
 
     if (step === 2) {
+      const eggFraming = todayEggFraming();
       return (
         <View style={styles.stepStack}>
+          {/* The egg leads, seated at (near) its home-page anchor — copy and
+              controls live BELOW it, like the rest of the redesign. */}
+          <Animated.View entering={presenceEnter(90)} style={styles.ritualEggStage}>
+            <LanternEgg
+              egg={sampleEgg}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
+              shellScale={HOME_EGG_SHELL_SCALE}
+              shellOffsetY={0}
+            />
+          </Animated.View>
+
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#FFE7D7" darkColor="#FFE7D7">
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
               The evening ritual
             </ThemedText>
-            <ThemedText type="title" style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
               A day gathers, then hatches.
             </ThemedText>
-            <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
               Steps and places quietly shape the egg. Quick tags, photos, and little reflections feed it
               by hand. When your evening arrives, the day is revealed.
             </ThemedText>
           </Animated.View>
 
-          <Animated.View entering={presenceEnter(90)}>
-            <LanternEgg egg={sampleEgg} />
-          </Animated.View>
-
           <View style={styles.momentRow}>
             {sampleMoments.map((moment) => (
               <View key={moment.id} style={styles.momentChip}>
-                <ThemedText style={styles.momentChipLabel} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                <ThemedText style={styles.momentChipLabel} lightColor="#FBF3E4" darkColor="#FBF3E4">
                   {moment.label}
                 </ThemedText>
               </View>
@@ -240,10 +242,10 @@ export default function OnboardingScreen() {
 
           <Animated.View entering={presenceEnter(140)}>
             <GlassPanel contentStyle={styles.hatchHourPanel}>
-              <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#FFE7D7" darkColor="#FFE7D7">
+              <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
                 Your hatch time
               </ThemedText>
-              <ThemedText style={styles.panelCopy} lightColor="#E8EEFF" darkColor="#E8EEFF">
+              <ThemedText style={styles.panelCopy} lightColor="rgba(251,243,228,0.9)" darkColor="rgba(251,243,228,0.9)">
                 When should the day be ready to reveal?
               </ThemedText>
               <View style={styles.hatchHourRow}>
@@ -266,13 +268,13 @@ export default function OnboardingScreen() {
       return (
         <View style={styles.stepStack}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#D7E4FF" darkColor="#D7E4FF">
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
               Set the tone
             </ThemedText>
-            <ThemedText type="title" style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
               What kind of atmosphere should your memories lean toward?
             </ThemedText>
-            <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
               This only changes the emotional color of the app. The day still comes from what actually happened.
             </ThemedText>
           </Animated.View>
@@ -295,13 +297,13 @@ export default function OnboardingScreen() {
     return (
       <View style={styles.stepStack}>
         <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#FFE7D7" darkColor="#FFE7D7">
+          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
             Let the day take shape
           </ThemedText>
-          <ThemedText type="title" style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
             Allow the two passive signals that make the loop feel earned.
           </ThemedText>
-          <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
+          <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
             You can still use the app without them. These only make the egg feel more like your real day.
           </ThemedText>
         </Animated.View>
@@ -335,10 +337,10 @@ export default function OnboardingScreen() {
         </GlassPanel>
 
         <GlassPanel contentStyle={styles.homePanel}>
-          <ThemedText type="onboardingLabel" style={styles.privacyLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
+          <ThemedText type="onboardingLabel" style={styles.privacyLabel} lightColor="#F2D48A" darkColor="#F2D48A">
             Mark home (optional)
           </ThemedText>
-          <ThemedText style={styles.privacyBody} lightColor="#E8EEFF" darkColor="#E8EEFF">
+          <ThemedText style={styles.privacyBody} lightColor="rgba(251,243,228,0.9)" darkColor="rgba(251,243,228,0.9)">
             Are you home right now? Tag this spot so your map can show a home pin and know which days you
             were home. Only if you&apos;re home — otherwise skip and it learns over time.
           </ThemedText>
@@ -354,10 +356,10 @@ export default function OnboardingScreen() {
           <ThemedText type="onboardingLabel" style={styles.previewLabel} lightColor={currentPreference.palette[1]} darkColor={currentPreference.palette[1]}>
             Your setup
           </ThemedText>
-          <ThemedText type="subtitle" style={styles.previewTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          <ThemedText type="subtitle" style={styles.previewTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
             {currentPreference.title}
           </ThemedText>
-          <ThemedText style={styles.previewBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+          <ThemedText style={styles.previewBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
             {currentPreference.description}. Your day hatches around {formatHatchHour(selectedHatchHour)} each
             evening — you can change both later.
           </ThemedText>
@@ -370,18 +372,29 @@ export default function OnboardingScreen() {
     return <Redirect href="/(tabs)" />;
   }
 
+  // Step 0 is the full-screen cinematic — the meadow scene with the egg pinned
+  // exactly where the home page keeps it. No chrome; it advances itself.
+  if (step === 0) {
+    return (
+      <View style={styles.screen}>
+        <MeadowSceneBackdrop />
+        <CinematicOnboardingPage
+          entries={timelineDemoEntries}
+          onAdvance={() => setStep(1)}
+          stopAfterOpening
+          tomorrowState={timelineTomorrowState}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
-      <AmbientBackground
-        accentColor={step === 1 ? 'rgba(227,160,110,0.14)' : 'rgba(200,216,255,0.14)'}
-        colors={['#090B12', '#11192C', '#191F35']}
-        meshColors={['rgba(200,216,255,0.14)', 'rgba(95,168,123,0.08)', 'rgba(227,160,110,0.08)', 'rgba(106,95,232,0.1)']}
-        showOrbs={false}
-      />
+      <MeadowSceneBackdrop />
 
       <View style={[styles.safeArea, { paddingBottom: insets.bottom + 12, paddingTop: insets.top + 12 }]}>
         <View style={styles.progressRow}>
-          <ThemedText type="onboardingLabel" style={styles.progressLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
+          <ThemedText type="onboardingLabel" style={styles.progressLabel} lightColor="#F2D48A" darkColor="#F2D48A">
             {step + 1} / {totalSteps}
           </ThemedText>
           <View style={styles.progressTrack}>
@@ -395,34 +408,26 @@ export default function OnboardingScreen() {
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}>
-          {step === 0 ? (
-            renderContent()
-          ) : (
-            <Animated.View entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))} key={step}>
-              {renderContent()}
-            </Animated.View>
-          )}
+          <Animated.View entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))} key={step}>
+            {renderContent()}
+          </Animated.View>
         </ScrollView>
 
-        {step === 0 ? null : (
-          <View style={styles.footer}>
-            <KatchaButton
-              disabled={primingPermissions}
-              icon={step === totalSteps - 1 ? 'sparkles' : 'arrow.right'}
-              label={primingPermissions ? 'Preparing...' : primaryActionLabel}
-              onPress={handlePrimaryAction}
-              variant={step === totalSteps - 1 ? 'primary' : 'secondary'}
-            />
-            {step > 0 ? (
-              <KatchaButton
-                disabled={primingPermissions}
-                label={step === totalSteps - 1 ? 'Continue for now' : 'Back'}
-                onPress={handleSecondaryAction}
-                variant="secondary"
-              />
-            ) : null}
-          </View>
-        )}
+        <View style={styles.footer}>
+          <KatchaButton
+            disabled={primingPermissions}
+            icon={step === totalSteps - 1 ? 'sparkles' : 'arrow.right'}
+            label={primingPermissions ? 'Preparing...' : primaryActionLabel}
+            onPress={handlePrimaryAction}
+            variant={step === totalSteps - 1 ? 'primary' : 'secondary'}
+          />
+          <KatchaButton
+            disabled={primingPermissions}
+            label={step === totalSteps - 1 ? 'Continue for now' : 'Back'}
+            onPress={handleSecondaryAction}
+            variant="secondary"
+          />
+        </View>
       </View>
     </View>
   );
@@ -433,10 +438,10 @@ function PermissionRow({ title, body }: { title: string; body: string }) {
     <View style={styles.permissionRow}>
       <View style={styles.permissionDot} />
       <View style={styles.permissionCopy}>
-        <ThemedText type="subtitle" style={styles.permissionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+        <ThemedText type="subtitle" style={styles.permissionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
           {title}
         </ThemedText>
-        <ThemedText style={styles.permissionBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+        <ThemedText style={styles.permissionBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
           {body}
         </ThemedText>
       </View>
@@ -483,10 +488,10 @@ function CastIntroCard({ item, index }: { item: (typeof castIntroItems)[number];
           </Animated.View>
         </View>
         <View style={styles.castCopy}>
-          <ThemedText type="subtitle" style={styles.castName} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          <ThemedText type="subtitle" style={styles.castName} lightColor="#FBF3E4" darkColor="#FBF3E4">
             {item.name}
           </ThemedText>
-          <ThemedText style={styles.castLine} lightColor="#DCE6FF" darkColor="#DCE6FF">
+          <ThemedText style={styles.castLine} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
             {item.line}
           </ThemedText>
         </View>
@@ -537,10 +542,10 @@ function PreferenceCard({
             animatedStyle,
           ]}>
           <View style={styles.preferenceCopy}>
-            <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
               {option.title}
             </ThemedText>
-            <ThemedText style={styles.preferenceBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+            <ThemedText style={styles.preferenceBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
               {option.description}
             </ThemedText>
           </View>
@@ -618,14 +623,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   progressSegment: {
-    backgroundColor: 'rgba(216,228,255,0.1)',
+    backgroundColor: 'rgba(244,222,180,0.18)',
     borderRadius: 999,
     flex: 1,
     height: 6,
     overflow: 'hidden',
   },
   progressSegmentFill: {
-    backgroundColor: '#D7E4FF',
+    backgroundColor: '#E5BE6A',
     borderRadius: 999,
     bottom: 0,
     left: 0,
@@ -639,30 +644,44 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     paddingTop: 24,
   },
-  cinematicWrap: {
-    minHeight: 720,
-  },
   stepStack: {
     gap: 22,
+  },
+  // Seats the ritual egg at (approximately) the home-page anchor: safe-area +
+  // progress row + content padding ≈ 68dp of flow above, egg stage top at ~120.
+  ritualEggStage: {
+    marginTop: 52,
   },
   copyBlock: {
     gap: 10,
   },
   kicker: {
     fontSize: 11,
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   title: {
     fontSize: 50,
     lineHeight: 52,
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   sectionTitle: {
     fontSize: 34,
     lineHeight: 38,
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   body: {
     fontSize: 16,
     lineHeight: 24,
     maxWidth: 340,
+    textShadowColor: 'rgba(30, 20, 10, 0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
   panelBody: {
     gap: 8,

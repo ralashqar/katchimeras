@@ -13,7 +13,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 import type { DayPromptKind } from '@/types/home';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 
@@ -34,6 +34,9 @@ const motionEasing = Easing.bezier(0.22, 1, 0.36, 1);
 // A few warm lantern hues so the option dots feel alive without shouting.
 const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#FFB4A2'];
 
+// Secondary cream — matches the shared Meadow sheet's muted copy.
+const CREAM_SOFT = 'rgba(251,243,228,0.75)';
+
 export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto }: DayPromptStripProps) {
   if (!prompt) {
     return null;
@@ -49,17 +52,17 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
       style={styles.wrap}>
       <View style={styles.header}>
         <Animated.View entering={FadeInDown.duration(280).easing(motionEasing)} style={styles.titleBlock}>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+          <ThemedText style={styles.title} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
             {prompt.title}
           </ThemedText>
           {prompt.body ? (
-            <ThemedText style={styles.body} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            <ThemedText style={styles.body} lightColor={CREAM_SOFT} darkColor={CREAM_SOFT}>
               {prompt.body}
             </ThemedText>
           ) : null}
         </Animated.View>
         <Pressable accessibilityRole="button" onPress={() => onDismiss(prompt.id)} style={styles.dismiss}>
-          <ThemedText style={styles.dismissLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          <ThemedText style={styles.dismissLabel} lightColor={CREAM_SOFT} darkColor={CREAM_SOFT}>
             Later
           </ThemedText>
         </Pressable>
@@ -127,9 +130,9 @@ function PromptChip({
           scale.value = withSpring(1, { damping: 14, stiffness: 240 });
         }}
         onPress={pick}
-        style={[styles.chip, { borderColor: `${accent}40` }, animatedStyle]}>
+        style={[styles.chip, animatedStyle]}>
         <IconSymbol name={icon} size={15} color={accent} />
-        <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        <ThemedText style={styles.chipLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
           {label}
         </ThemedText>
       </AnimatedPressable>
@@ -176,8 +179,8 @@ function PromptPhoto({
 const styles = StyleSheet.create({
   wrap: {
     alignSelf: 'stretch',
-    backgroundColor: 'rgba(255,255,255,0.055)',
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(34,27,16,0.94)',
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 22,
     borderWidth: 1,
@@ -197,9 +200,9 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   title: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    lineHeight: 19,
+    lineHeight: 20,
   },
   body: {
     fontSize: 12,
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   dismiss: {
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 999,
     borderWidth: 1,
@@ -228,8 +231,8 @@ const styles = StyleSheet.create({
   },
   chip: {
     alignItems: 'center',
-    backgroundColor: 'rgba(12,10,20,0.72)',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.chip,
+    borderColor: Meadow.chipBorder,
     borderCurve: 'continuous',
     borderRadius: 999,
     borderWidth: 1,
@@ -250,8 +253,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   photoButton: {
-    backgroundColor: 'rgba(12,10,20,0.72)',
-    borderColor: 'rgba(255,241,228,0.28)',
+    backgroundColor: Meadow.chip,
+    borderColor: Meadow.chipBorder,
     borderCurve: 'continuous',
     borderRadius: 18,
     borderWidth: 1,

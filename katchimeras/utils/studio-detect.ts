@@ -318,15 +318,32 @@ function matchVisionMedia(haystack: string): StudioMediaType | null {
 // classifier only said 'text' or 'document'.
 const OCR_BOOK_HINT = /\b(a novel|a memoir|(inter)?national bestseller|bestselling author|winner of the|shortlisted for)\b/;
 
-// Detect from the on-device Apple Vision read — a bookcase, a television, a
-// poster, a games console. Classification comes FIRST from the classifier's
-// own labels (concepts + details), then an OCR-furniture hint, then the prose
-// matcher as a last resort. When the photo IS the work (a book cover, a film
-// poster), the OCR read supplies the actual title.
+// A media concept must be one of the photo's LEADING reads to count — within
+// the top ranks (concepts arrive salience-sorted) and confidently seen. A book
+// spotted across the room ranks low / reads weak and must NOT hijack the photo
+// into a Studio entry with a garbage OCR title.
+const MEDIA_CONCEPT_TOP_RANKS = 3;
+const MEDIA_CONCEPT_MIN_CONFIDENCE = 0.45;
+
+// Detect from the on-device Apple Vision read — a book cover, a television, a
+// poster, a games console. Classification requires the work to be the photo's
+// SUBJECT: a dominant classifier concept (top-ranked + confident), a compound
+// media detail ("book cover", "movie poster" — specific enough to imply a
+// close-up), or cover furniture in the OCR. Incidental media in a wider scene
+// stays undetected. When the photo IS the work, the OCR supplies the title.
 export function detectStudioInVision(vision: DayVisionSummary | undefined | null): StudioDetection {
   if (!vision) return { detected: false };
-  const labelTerms = [...(vision.concepts ?? []).map((concept) => concept.name), ...(vision.details ?? [])]
+  const leadingTerms = (vision.concepts ?? [])
+    .slice(0, MEDIA_CONCEPT_TOP_RANKS)
+    .filter((concept) => (concept.peakConfidence ?? 0) >= MEDIA_CONCEPT_MIN_CONFIDENCE)
+    .map((concept) => concept.name)
     .filter((term): term is string => typeof term === 'string')
+    .map((term) => term.toLowerCase())
+    .join(' ');
+  // Details are the salient SPECIFIC labels; only multi-word media objects
+  // ("book cover") are decisive there — a bare "book" detail can be background.
+  const compoundDetails = (vision.details ?? [])
+    .filter((term): term is string => typeof term === 'string' && term.trim().includes(' '))
     .map((term) => term.toLowerCase())
     .join(' ');
   const ocrText = (vision.textTokens ?? [])
@@ -334,9 +351,9 @@ export function detectStudioInVision(vision: DayVisionSummary | undefined | null
     .map((term) => term.toLowerCase())
     .join(' ');
   const mediaType =
-    matchVisionMedia(` ${labelTerms} `) ??
-    (OCR_BOOK_HINT.test(` ${ocrText} `) ? 'book' : null) ??
-    matchMedia(` ${labelTerms} ${ocrText} `);
+    matchVisionMedia(` ${leadingTerms} `) ??
+    matchVisionMedia(` ${compoundDetails} `) ??
+    (OCR_BOOK_HINT.test(` ${ocrText} `) ? 'book' : null);
   if (!mediaType) return { detected: false };
   const ocrTitle = extractTitleFromVisionText(vision.textTokens);
   return { detected: true, mediaType, label: ocrTitle ?? MEDIA_LABEL[mediaType], emoji: emojiFor(mediaType) };

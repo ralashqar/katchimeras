@@ -11,9 +11,9 @@ export const Meadow = {
   // PIXEL-SAMPLED from design/today-mockup.jpeg (flat regions averaged, text
   // via darkest-decile) — see the redesign pipeline Stage 1.
   // Warm latte-parchment surfaces over the painted background.
-  card: '#EBD4B2', // main card fill — lifted above the panel so tiles visibly pop
-  cardSoft: '#E3C7A3', // inner tiles (Today-in-Numbers cells)
-  cardBorder: 'rgba(122, 84, 44, 0.22)',
+  card: '#DFC49B', // main card fill — a step darker so it sits INTO the scene
+  cardSoft: '#D4B384', // inner tiles (Today-in-Numbers cells)
+  cardBorder: 'rgba(122, 84, 44, 0.26)',
   iconOnCard: '#9C6B3F', // icon brown on cream tiles (accents wash out here)
   trackOnCard: '#EBD8B8', // progress track — LIGHTER than the card, not darker
   // The big parchment panel the sections sit ON — DARKER than the cards, so

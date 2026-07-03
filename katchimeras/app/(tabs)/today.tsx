@@ -3,7 +3,6 @@ import { useFocusEffect, useIsFocused, useNavigation, type ParamListBase } from 
 import { useBottomTabBarHeight, type BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import * as Location from 'expo-location';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -80,8 +79,7 @@ import { loadSleepForDay } from '@/utils/sleep-health';
 import { markArrivalPending } from '@/utils/kingdom-arrival';
 import { resolvePlaceName } from '@/utils/place-names';
 import { isPointAtHome, loadHomeAnchor, saveHomeAnchor } from '@/utils/home-location';
-// Background framing (zoom + vertical offset) — tuned in data/today-scene.json.
-import todayScene from '@/data/today-scene.json';
+import { MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import type {
   BigMomentType,
   DayMapNode,
@@ -91,19 +89,17 @@ import type {
   StudioMediaType,
 } from '@/types/home';
 
-// The Meadow scene background (scripts/generate-today-scene.py — style-anchored
-// to the world base). The pedestal asset exists too (today_pedestal.png) but is
-// hidden for now — the scene got too busy.
-const TODAY_BG = require('@/assets/images/katchimeras/world/today/today_bg.webp');
 
 const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
+
+// Hatched-day extras, parked so the numbers card stays at its usual anchor
+// (same pattern as the photos/timeline sections in day-journal-sections).
+const SHOW_HATCHED_ACTION_DOCK = false;
+const SHOW_HATCHED_REFLECTION_CARD = false;
 
 // Highest-rarity-first ordering for picking which pending discovery to celebrate.
 const DISCOVERY_RARITY_ORDER: Record<string, number> = { legendary: 3, epic: 2, rare: 1, common: 0 };
 
-// The stats strip beneath the egg covers these categories, so the orbit ring
-// doesn't repeat them — it keeps only the categories with no strip tile.
-const STRIP_CATEGORIES = new Set(['photos', 'notes', 'places', 'journey']);
 
 // Short "h:mm am – h:mm pm" dwell window for a place picked from the reader
 // (same manual format as World, no Intl dependency).
@@ -129,18 +125,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // Background framing from data/today-scene.json: a gentle zoom plus a
-  // vertical shift, clamped so the scaled image always fills the frame.
-  const bgScale = Math.max(1, todayScene.background?.scale ?? 1);
-  const bgSlack = ((bgScale - 1) * windowHeight) / 2;
-  const bgOffsetY = Math.min(bgSlack, Math.max(-bgSlack, todayScene.background?.offsetY ?? 0));
-  // Egg + membrane framing, same JSON (neutral by default).
-  const eggFraming = {
-    scale: todayScene.egg?.scale ?? 1,
-    offsetY: todayScene.egg?.offsetY ?? 0,
-    membraneScale: todayScene.membrane?.scale ?? 1,
-    membraneOffsetY: todayScene.membrane?.offsetY ?? 0,
-  };
+  // Egg + membrane framing from data/today-scene.json (neutral by default) —
+  // shared with onboarding/Hatch Your Past via meadow-scene-backdrop.
+  const eggFraming = todayEggFraming();
   const {
     activeDayPrompt,
     availableDayPrompts,
@@ -790,9 +777,16 @@ export default function HomeScreen() {
     }
   };
 
-  // The stats strip beneath the egg is the door into steps / places / photos /
-  // moments — the ring only carries the categories the strip doesn't.
-  const ringCategories = useMemo(() => categories.filter((category) => !STRIP_CATEGORIES.has(category.id)), [categories]);
+  // Around the egg only QUESTS remains (the lone actionable satellite, at the
+  // egg's bottom-right); the other category doors moved into the numbers panel.
+  const ringCategories = useMemo(() => categories.filter((category) => category.id === 'quests'), [categories]);
+  // The panel's category row: Inspo · Mood · Sleep · Food, in that order.
+  const panelCategories = useMemo(() => {
+    const order = ['studio', 'mood', 'sleep', 'food'];
+    return order
+      .map((id) => categories.find((category) => category.id === id))
+      .filter((category): category is TodayCategoryState => !!category);
+  }, [categories]);
   const categoryById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
   const handleStatPress = (key: DayStatKey) => {
     // Revisiting a hatched day: every tile is a read-only door into that day.
@@ -931,6 +925,10 @@ export default function HomeScreen() {
     }
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= timelineDays.length) {
+      return;
+    }
+    // Tomorrow is locked until today hatches (same rule as the week strip).
+    if (timelineDays[nextIndex].kind === 'tomorrow' && !isTodayHatched) {
       return;
     }
     selectTimelineDay(timelineDays[nextIndex].id);
@@ -1097,21 +1095,9 @@ export default function HomeScreen() {
   return (
     <GestureDetector gesture={swipeGesture}>
     <View style={styles.screen}>
-      {/* The Meadow scene — a painted golden-hour backdrop (FAL, style-anchored
-          to the world base) with a warm scrim so the light-on-dark UI stays
-          readable until the full Meadow restyle lands. */}
-      <Image
-        source={TODAY_BG}
-        style={[StyleSheet.absoluteFill, { transform: [{ translateY: bgOffsetY }, { scale: bgScale }] }]}
-        contentFit="cover"
-        pointerEvents="none"
-      />
-      <LinearGradient
-        pointerEvents="none"
-        colors={['rgba(30, 20, 10, 0.04)', 'rgba(30, 20, 10, 0.12)', 'rgba(30, 20, 10, 0.42)']}
-        locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+      {/* The Meadow scene — the shared golden-hour backdrop (also behind
+          onboarding + Hatch Your Past, so the egg's world never changes). */}
+      <MeadowSceneBackdrop />
       {/* Today is a FIXED composition — no page scrolling; everything anchors.
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
           for layout parity but is locked. */}
@@ -1135,7 +1121,7 @@ export default function HomeScreen() {
             />
           ) : isDay ? (
             isHatched ? (
-              <CreatureHero creature={selectedDay.creature!} weather={selectedDay.weather} hideSubtitle />
+              <CreatureHero creature={selectedDay.creature!} compact />
             ) : (
               <LanternEgg
                 egg={selectedDay.egg}
@@ -1200,47 +1186,11 @@ export default function HomeScreen() {
         </Animated.View>
 
         {isHatching ? null : isHatched ? (
-          <Animated.View entering={presenceEnter(120)} style={styles.sectionGap}>
-            <View style={styles.actionDock}>
-              <Animated.View entering={popEnter(140)}>
-                <IconAction
-                  icon="mappin.and.ellipse"
-                  label="Map"
-                  onPress={() => handleOpenDayMap(selectedDay.id)}
-                />
-              </Animated.View>
-              <Animated.View entering={popEnter(185)}>
-                <IconAction
-                  icon="paperplane.fill"
-                  label="Card"
-                  busy={sharingDayId === selectedDay.id}
-                  onPress={handleShareDay}
-                />
-              </Animated.View>
-              <Animated.View entering={popEnter(230)}>
-                <IconAction
-                  icon="sparkles"
-                  label="Comic"
-                  busy={comicGen?.status === 'generating'}
-                  onPress={handleMakeComic}
-                />
-              </Animated.View>
-            </View>
-            <DayJournalSections day={selectedDay} onStatPress={handleStatPress} />
-            <ReflectionCard creature={selectedDay.creature!} />
-          </Animated.View>
+          null
         ) : (
           <Animated.View entering={presenceEnter(120)} style={styles.formingCopy}>
-            {!hasActivePrompt ? (
-              // The forming quote ("Places have started settling into the egg…")
-              // is hidden for now — the stats strip below tells the same story.
-              // Tomorrow keeps its one-line label so the pre-feed egg reads.
-              onTomorrowForming ? (
-                <ThemedText style={styles.formingTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  Tomorrow is already forming
-                </ThemedText>
-              ) : null
-            ) : null}
+            {/* The forming quote AND tomorrow's one-liner are hidden — the week
+                strip's egg orb + the panel below already tell the story. */}
             {isForming && formingDay && formingDay.moments.length > 0 ? (
               <View style={styles.chipRow}>
                 {dedupeMoments(formingDay.moments).map((moment) => (
@@ -1269,59 +1219,82 @@ export default function HomeScreen() {
           </Animated.View>
         )}
 
-        <View style={styles.spacer} />
+      </ScrollView>
 
-        {isHatching ? null : (
-        <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
-          {isDay && selectedDay.canHatch ? (
-            <Pressable accessibilityRole="button" onPress={handleReveal} style={styles.hatchCta}>
-              <ThemedText style={styles.hatchCtaLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                Reveal the hatch
-              </ThemedText>
-            </Pressable>
-          ) : isForming && !hasActivePrompt ? (
-            <View style={styles.addRow}>
-              <WorldActionStack
-                orientation="horizontal"
-                onCamera={() => {
-                  // New roll photos waiting? The "what did these mean?" window
-                  // leads — the badge clears only when one is chosen or Later
-                  // is pressed. The live camera opens when nothing is waiting.
-                  if (categoryById.get('photos')?.needsAttention && photoPrompt) {
-                    setInitialPrompt(photoPrompt);
-                    setPromptSheetOpen(true);
-                    return;
+      {/* Bottom dock — the +/camera/mic row (or hatch CTA) with the category/
+          stats panel beneath, PINNED above the tab bar (absolute, not flow) so
+          content above can never push it around. Hidden while a prompt has the
+          page collapsed and during the hatch reveal. The panel also shows on
+          the TOMORROW view once today has hatched (viewedDay resolves it);
+          before the hatch, tomorrow stays a locked egg with no panel. */}
+      {!isHatching && !hasActivePrompt ? (
+        <View pointerEvents="box-none" style={styles.bottomDock}>
+          <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
+            {isDay && selectedDay.canHatch ? (
+              <Pressable accessibilityRole="button" onPress={handleReveal} style={styles.hatchCta}>
+                <ThemedText style={styles.hatchCtaLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                  Reveal the hatch
+                </ThemedText>
+              </Pressable>
+            ) : isForming ? (
+              <View style={styles.addRow}>
+                <WorldActionStack
+                  orientation="horizontal"
+                  onCamera={() => {
+                    // New roll photos waiting? The "what did these mean?" window
+                    // leads — the badge clears only when one is chosen or Later
+                    // is pressed. The live camera opens when nothing is waiting.
+                    if (categoryById.get('photos')?.needsAttention && photoPrompt) {
+                      setInitialPrompt(photoPrompt);
+                      setPromptSheetOpen(true);
+                      return;
+                    }
+                    router.push('/moment-capture');
+                  }}
+                  onMicTap={() => {
+                    if (voiceNote.phase === 'idle') router.push('/note-capture');
+                  }}
+                  onMicPressIn={voiceNote.start}
+                  onMicPressOut={() => {
+                    void voiceNote.stop();
+                  }}
+                  onAdd={openPromptSheet}
+                  recording={voiceNote.isRecording}
+                  cameraBadge={
+                    categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined
                   }
-                  router.push('/moment-capture');
-                }}
-                onMicTap={() => {
-                  if (voiceNote.phase === 'idle') router.push('/note-capture');
-                }}
-                onMicPressIn={voiceNote.start}
-                onMicPressOut={() => {
-                  void voiceNote.stop();
-                }}
-                onAdd={openPromptSheet}
-                recording={voiceNote.isRecording}
-                cameraBadge={
-                  categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined
-                }
-              />
+                />
+              </View>
+            ) : null}
+          </Animated.View>
+
+          {isHatched && SHOW_HATCHED_ACTION_DOCK ? (
+            <View style={styles.actionDock}>
+              <Animated.View entering={popEnter(140)}>
+                <IconAction icon="mappin.and.ellipse" label="Map" onPress={() => handleOpenDayMap(selectedDay.id)} />
+              </Animated.View>
+              <Animated.View entering={popEnter(185)}>
+                <IconAction icon="paperplane.fill" label="Card" busy={sharingDayId === selectedDay.id} onPress={handleShareDay} />
+              </Animated.View>
+              <Animated.View entering={popEnter(230)}>
+                <IconAction icon="sparkles" label="Comic" busy={comicGen?.status === 'generating'} onPress={handleMakeComic} />
+              </Animated.View>
             </View>
           ) : null}
-        </Animated.View>
-        )}
-
-        {isDay && !isHatched && !isHatching ? (
-          <Animated.View entering={presenceEnter(200)} style={styles.sectionGap}>
-            <DayJournalSections
-              day={selectedDay}
-              onStatPress={isFormingToday ? handleStatPress : undefined}
-              statAttention={isFormingToday ? statAttention : undefined}
-            />
-          </Animated.View>
-        ) : null}
-      </ScrollView>
+          {isHatched && SHOW_HATCHED_REFLECTION_CARD ? <ReflectionCard creature={selectedDay.creature!} /> : null}
+          {viewedDay ? (
+            <Animated.View entering={presenceEnter(200)}>
+              <DayJournalSections
+                day={viewedDay}
+                onStatPress={handleStatPress}
+                statAttention={isFormingToday ? statAttention : undefined}
+                categories={panelCategories}
+                onCategoryPress={handleCategoryPress}
+              />
+            </Animated.View>
+          ) : null}
+        </View>
+      ) : null}
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
 
@@ -1767,7 +1740,17 @@ const styles = StyleSheet.create({
     marginTop: 26,
   },
   heroCountdown: {
-    marginTop: -18,
+    marginTop: -32,
+  },
+  // Pinned above the floating tab bar (bar top = bottom 20 + 76 tall = 96):
+  // the action row + panel live HERE, outside the page flow, so content above
+  // can never push them off their anchor.
+  bottomDock: {
+    bottom: 106,
+    gap: 12,
+    left: 16,
+    position: 'absolute',
+    right: 16,
   },
   sectionGap: {
     gap: 16,
