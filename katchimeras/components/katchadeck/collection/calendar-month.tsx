@@ -8,7 +8,7 @@ import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 // The glassy membrane that sits over the egg on the Today page (LanternEgg).
 const glassDome = require('../../../assets/images/katchimeras/glass-dome.png');
 

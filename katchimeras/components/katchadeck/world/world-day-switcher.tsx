@@ -8,7 +8,7 @@ import type { HomeDayRecord } from '@/types/home';
 import { getCreatureVisual } from '@/utils/home-engine';
 
 const auroraRing = require('../../../assets/images/katchimeras/aurora-ring.png');
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 // Feathered radial glow (same texture the world canvas uses) — fades smoothly so
 // the selected state never shows a hard, aliased ring.
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');

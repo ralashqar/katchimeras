@@ -7,7 +7,7 @@ import type { HomeDayRecord, HomeTimelineDay } from '@/types/home';
 import { getCreatureVisual } from '@/utils/home-engine';
 
 const auroraRing = require('../../../assets/images/katchimeras/aurora-ring.png');
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 
 type LanternTimelineProps = {
   days: HomeTimelineDay[];

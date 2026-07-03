@@ -20,7 +20,6 @@ import {
   CAPTURE_MEANINGS,
   meaningsForMediaKind,
   selectCaptureMeanings,
-  selectStudioMeanings,
   type CaptureMeaning,
   type MeaningTag,
 } from '@/utils/capture-energy';
@@ -55,15 +54,6 @@ type EssenceReviewProps = {
   onClose: () => void;
 };
 
-// UI wait cap for the scene read: the LLM usually answers well under this, but
-// an old/busy device must not stall the essence screen. A late result still
-// lands in the ref, so the commit gets it even when the UI didn't wait.
-const SCENE_READ_UI_TIMEOUT_MS = 3500;
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  return Promise.race([promise, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
-}
-
 export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceReviewProps) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -72,6 +62,8 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
   const [meanings, setMeanings] = useState<readonly CaptureMeaning[]>(CAPTURE_MEANINGS);
   const visionRef = useRef<DayVisionSummary | null>(null);
   const sceneRef = useRef<SceneRead | null>(null);
+  // Once the user picks a meaning, late LLM upgrades must not reshuffle the UI.
+  const committedRef = useRef(false);
   const intro = useSharedValue(0);
   const absorb = useSharedValue(0);
   const fallDistance = height * 0.5;
@@ -85,36 +77,39 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
       }
       visionRef.current = vision;
       sceneRef.current = null;
-      // ONE hierarchical scene read drives everything: the essence chips, the
-      // meaning options, and (via onCommit) the day's food/studio moments.
-      // Kick the FM meaning suggestion in parallel so a non-media scene isn't
-      // paying two LLM round-trips back to back.
-      const scenePromise = vision ? resolveSceneRead(vision) : Promise.resolve(null);
-      void scenePromise.then((read) => {
-        sceneRef.current = read;
-      }).catch(() => {});
-      const llmPromise = vision ? suggestFoundationMeanings(vision) : Promise.resolve(null);
-      const scene = await withTimeout(scenePromise.catch(() => null), SCENE_READ_UI_TIMEOUT_MS);
-      if (!active) {
-        return;
-      }
-      setTags(buildEssenceTags(vision, scene));
-      // A recognised piece of media (a book cover, a TV) owns the meaning
-      // options outright; any other scene prefers the Foundation Models
-      // phrasing where available and falls back to the rule-based set.
-      const mediaMeanings =
-        scene?.type === 'media' && scene.media
-          ? meaningsForMediaKind(scene.media.mediaType)
-          : scene
-            ? null // scene read says it's NOT media — trust it over the heuristic
-            : selectStudioMeanings(vision);
-      const llm = mediaMeanings ? null : await llmPromise.catch(() => null);
-      if (!active) {
-        return;
-      }
-      setMeanings(mediaMeanings ?? llm ?? selectCaptureMeanings(vision));
+      committedRef.current = false;
+      // PROGRESSIVE reveal: the rule engine answers in microseconds — show the
+      // screen NOW with its chips + meanings, then let the on-device LLM reads
+      // upgrade them in place when they land (typically ~1s later). The commit
+      // still gets whatever scene has resolved by then (engine falls back to
+      // rules when it hasn't).
+      setTags(buildEssenceTags(vision, null));
+      setMeanings(selectCaptureMeanings(vision));
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
+      if (!vision) return;
+      // Upgrade 1 — the hierarchical scene read (chips + media-owned options).
+      void resolveSceneRead(vision)
+        .then((read) => {
+          sceneRef.current = read;
+          if (!active || !read || committedRef.current) return;
+          setTags(buildEssenceTags(vision, read));
+          if (read.type === 'media' && read.media) {
+            const mediaMeanings = meaningsForMediaKind(read.media.mediaType);
+            if (mediaMeanings) setMeanings(mediaMeanings);
+          }
+        })
+        .catch(() => {});
+      // Upgrade 2 — Foundation Models phrasing for the meaning options (media
+      // scenes keep their owned options; see the guard).
+      void suggestFoundationMeanings(vision)
+        .then((llm) => {
+          if (!active || !llm || committedRef.current) return;
+          const scene = sceneRef.current;
+          if (scene?.type === 'media' && scene.media && meaningsForMediaKind(scene.media.mediaType)) return;
+          setMeanings(llm);
+        })
+        .catch(() => {});
     })();
     return () => {
       active = false;
@@ -125,6 +120,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
     if (state !== 'essence') {
       return;
     }
+    committedRef.current = true;
     const label = meanings.find((option) => option.id === meaning)?.label ?? '';
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setState('absorbing');

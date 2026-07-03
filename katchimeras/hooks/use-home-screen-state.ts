@@ -150,17 +150,26 @@ export function useHomeScreenState() {
   const viewModel = useMemo(() => {
     const now = new Date();
     const profile = loadOnboardingProfile();
-    const hydrated = hydrateHomeState(storedState, profile, now);
-    const allDays = hydrateAllDays(storedState, profile, now);
-    return { ...hydrated, allDays };
+    return hydrateHomeState(storedState, profile, now);
   }, [storedState]);
 
   const timelineDays = viewModel.timelineDays;
+  const selectedInTimeline = timelineDays.find((day) => day.id === selectedDayId) ?? null;
+  // Fall back to the full archive so a day chosen from the calendar / life-map
+  // (outside the recent window) still resolves and shows on the Home page.
+  // PERF: hydrating EVERY archived day is ~100x the work of the timeline and
+  // used only for this rare path — so it runs only when the timeline missed,
+  // never on the everyday today-mutation hot path.
+  const selectedInArchive = useMemo(() => {
+    if (!selectedDayId || selectedInTimeline) return null;
+    return (
+      hydrateAllDays(storedState, loadOnboardingProfile(), new Date()).find((day) => day.id === selectedDayId) ?? null
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDayId, selectedInTimeline === null, storedState]);
   const selectedDay =
-    timelineDays.find((day) => day.id === selectedDayId) ??
-    // Fall back to the full archive so a day chosen from the calendar / life-map
-    // (outside the recent window) still resolves and shows on the Home page.
-    viewModel.allDays.find((day) => day.id === selectedDayId) ??
+    selectedInTimeline ??
+    selectedInArchive ??
     timelineDays.find((day) => day.kind === 'day' && day.isToday) ??
     timelineDays[0] ??
     null;

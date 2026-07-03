@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { BlurView } from 'expo-blur';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -65,8 +64,6 @@ export function HatchCountdown({ isReady = false, tint = Lantern.ember300, compa
 
   return (
     <View style={[styles.card, style]}>
-      <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, styles.cardTint]} pointerEvents="none" />
       {ready ? (
         <ThemedText style={styles.value} lightColor={GOLD} darkColor={GOLD}>
           Ready to hatch
@@ -89,6 +86,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
     alignSelf: 'center',
+    backgroundColor: 'rgba(40, 32, 22, 0.6)',
     borderColor: 'rgba(255, 245, 220, 0.3)',
     borderCurve: 'continuous',
     borderRadius: 22,
@@ -97,9 +95,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 24,
     paddingVertical: 9,
-  },
-  cardTint: {
-    backgroundColor: 'rgba(40, 32, 22, 0.42)',
   },
   kicker: {
     fontSize: 12,

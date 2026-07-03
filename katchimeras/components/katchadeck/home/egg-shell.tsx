@@ -38,9 +38,9 @@ type EggShellProps = {
 const DRAG_TILT_RANGE = 60;
 const MAX_TILT_DEG = 9;
 
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
-const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
-const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
+const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.webp');
+const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.webp');
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 

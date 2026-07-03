@@ -94,7 +94,7 @@ import type {
 // The Meadow scene background (scripts/generate-today-scene.py — style-anchored
 // to the world base). The pedestal asset exists too (today_pedestal.png) but is
 // hidden for now — the scene got too busy.
-const TODAY_BG = require('@/assets/images/katchimeras/world/today/today_bg.png');
+const TODAY_BG = require('@/assets/images/katchimeras/world/today/today_bg.webp');
 
 const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 
@@ -627,9 +627,14 @@ export default function HomeScreen() {
     () => formingDay?.locations.filter((point) => point.source === 'background').length ?? 0,
     [formingDay?.locations]
   );
+  // PERF: motif + observation derivation walks the whole archive — only pay
+  // for it while the Observatory sheet is actually open.
   const observations = useMemo(
-    () => deriveObservations({ days: allDays, selectedDay: formingDay ?? null, motifs: deriveContinuityMotifs(allDays, 6) }),
-    [allDays, formingDay]
+    () =>
+      observatoryOpen
+        ? deriveObservations({ days: allDays, selectedDay: formingDay ?? null, motifs: deriveContinuityMotifs(allDays, 6) })
+        : [],
+    [observatoryOpen, allDays, formingDay]
   );
   const handleEnableTravelMemory = useCallback(async () => {
     setMicrocopy('Asking for Travel Memory permission...');

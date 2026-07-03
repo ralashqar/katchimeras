@@ -1,4 +1,4 @@
-import { getStoredJson, removeStoredValue, setStoredJson } from '@/utils/app-storage';
+import { getStoredJson, getStoredRaw, removeStoredValue, setStoredJson } from '@/utils/app-storage';
 import { HOME_STORAGE_KEY } from '@/constants/home-mvp';
 import type { StoredHomeState } from '@/types/home';
 
@@ -6,6 +6,12 @@ const listeners = new Set<() => void>();
 
 export function loadStoredHomeState() {
   return getStoredJson<StoredHomeState | null>(HOME_STORAGE_KEY, null);
+}
+
+// The raw persisted JSON string — a cheap identity check for caches (same
+// string ⇒ same state) without paying the parse.
+export function loadStoredHomeStateRaw(): string | null {
+  return getStoredRaw(HOME_STORAGE_KEY);
 }
 
 export function saveStoredHomeState(state: StoredHomeState) {

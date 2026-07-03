@@ -3,8 +3,15 @@ import { useCallback, useMemo, useState } from 'react';
 
 import type { HomeDayRecord } from '@/types/home';
 import { hydrateAllDays } from '@/utils/home-engine';
-import { loadStoredHomeState } from '@/utils/home-storage';
+import { loadStoredHomeState, loadStoredHomeStateRaw } from '@/utils/home-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+
+// Module-level hydration cache: focus events fire constantly but the persisted
+// state rarely changes between them — same raw JSON (and same calendar day, so
+// day-rollover still refreshes) means the previous derivation is still valid.
+// This also keeps the returned array REFERENCE stable, so downstream useMemos
+// (observations, step averages) skip too.
+let hydrationCache: { raw: string | null; dayKey: string; days: HomeDayRecord[] } | null = null;
 
 // Every persisted day hydrated to a HomeDayRecord — the data source for the
 // calendar and the per-day journal, which (unlike the Home timeline) must be able
@@ -25,8 +32,15 @@ export function useAllDays() {
 
   const days = useMemo(() => {
     const now = new Date();
+    const raw = loadStoredHomeStateRaw();
+    const dayKey = now.toDateString();
+    if (hydrationCache && hydrationCache.raw === raw && hydrationCache.dayKey === dayKey) {
+      return hydrationCache.days;
+    }
     const profile = loadOnboardingProfile();
-    return hydrateAllDays(loadStoredHomeState(), profile, now);
+    const days = hydrateAllDays(loadStoredHomeState(), profile, now);
+    hydrationCache = { raw, dayKey, days };
+    return days;
     // version bumps on focus to force a re-hydrate from storage.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);

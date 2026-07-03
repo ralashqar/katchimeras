@@ -24,6 +24,16 @@ export function getStoredJson<T>(key: string, fallback: T): T {
   }
 }
 
+export function getStoredRaw(key: string): string | null {
+  const storage = getStorage();
+  if (!storage) return null;
+  try {
+    return storage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 export function setStoredJson<T>(key: string, value: T) {
   const storage = getStorage();
 

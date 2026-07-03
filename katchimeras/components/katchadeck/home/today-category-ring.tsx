@@ -1,4 +1,3 @@
-import { BlurView } from 'expo-blur';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { MotiView } from 'moti';
@@ -123,8 +122,6 @@ function CategoryMote({
             category.needsAttention ? styles.moteAttention : null,
             { opacity: active ? 1 : 0.62 },
           ]}>
-          <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, styles.moteTint]} pointerEvents="none" />
           <View style={styles.chipArtWrap} pointerEvents="none">
             {CATEGORY_ART[category.id] ? (
               <Image source={CATEGORY_ART[category.id]} style={styles.chipArt} contentFit="contain" />
@@ -168,6 +165,7 @@ const styles = StyleSheet.create({
   },
   mote: {
     alignItems: 'center',
+    backgroundColor: 'rgba(43, 34, 22, 0.52)',
     borderColor: 'rgba(255, 245, 220, 0.38)',
     borderCurve: 'continuous',
     borderRadius: 22,
@@ -179,9 +177,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 5,
     width: 66,
-  },
-  moteTint: {
-    backgroundColor: 'rgba(40, 32, 22, 0.22)',
   },
   moteAttention: {
     borderColor: GLOW,
