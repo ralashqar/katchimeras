@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
@@ -5,6 +6,13 @@ import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-nati
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { DaySleep, SleepQuality } from '@/types/home';
+
+// Generated 3D sleep-quality icons (FAL row, style-anchored to the sleep moon).
+const SLEEP_ART: Record<string, number> = {
+  good: require('@/assets/images/katchimeras/today-icons/sleep/good.webp'),
+  normal: require('@/assets/images/katchimeras/today-icons/sleep/normal.webp'),
+  low: require('@/assets/images/katchimeras/today-icons/sleep/low.webp'),
+};
 
 // Sleep — how the day began. Never a score or a failure; low sleep is just a
 // softer, mistier morning. Shows the atmosphere (+ hours if Health knows them)
@@ -97,7 +105,11 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
                     key={option.quality}
                     onPress={() => onSet(option.quality)}
                     style={[styles.chip, selected ? styles.chipSelected : null]}>
-                    <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                    {SLEEP_ART[option.quality] ? (
+                      <Image source={SLEEP_ART[option.quality]} style={{ height: 30, width: 30 }} contentFit="contain" />
+                    ) : (
+                      <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                    )}
                     <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                       {option.label}
                     </ThemedText>

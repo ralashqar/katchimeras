@@ -4,10 +4,20 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { Image } from 'expo-image';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
+
+// Generated 3D mood faces (FAL grid, style-anchored to the mood chip smiley).
+const MOOD_ART: Record<string, number> = {
+  radiant: require('@/assets/images/katchimeras/today-icons/moods/radiant.webp'),
+  light: require('@/assets/images/katchimeras/today-icons/moods/light.webp'),
+  meh: require('@/assets/images/katchimeras/today-icons/moods/meh.webp'),
+  heavy: require('@/assets/images/katchimeras/today-icons/moods/heavy.webp'),
+  stormy: require('@/assets/images/katchimeras/today-icons/moods/stormy.webp'),
+};
 
 export type MoodMonumentChoiceId = 'energized' | 'good' | 'meh' | 'drained' | 'stressed';
 
@@ -113,7 +123,11 @@ function MoodChoiceButton({
           pressed && !disabled ? styles.choicePressed : null,
         ]}>
         <View style={[styles.choiceIcon, { backgroundColor: `${choice.accent}22`, borderColor: `${choice.accent}55` }]}>
-          <IconSymbol name={choice.icon} size={20} color={choice.accent} />
+          {MOOD_ART[choice.state] ? (
+            <Image source={MOOD_ART[choice.state]} style={{ height: 26, width: 26 }} contentFit="contain" />
+          ) : (
+            <IconSymbol name={choice.icon} size={20} color={choice.accent} />
+          )}
         </View>
         <ThemedText style={styles.choiceLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           {choice.label}

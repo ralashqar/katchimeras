@@ -74,6 +74,22 @@ const GLOW = Meadow.gold;
 
 // Generated 3D icon art per category (FAL grid → sliced + matted). Categories
 // without art fall back to their IconSymbol glyph.
+// Per-state art — the chip becomes the day's current mood / logged night.
+const VARIANT_ART: Partial<Record<string, Record<string, number>>> = {
+  mood: {
+    radiant: require('@/assets/images/katchimeras/today-icons/moods/radiant.webp'),
+    light: require('@/assets/images/katchimeras/today-icons/moods/light.webp'),
+    meh: require('@/assets/images/katchimeras/today-icons/moods/meh.webp'),
+    heavy: require('@/assets/images/katchimeras/today-icons/moods/heavy.webp'),
+    stormy: require('@/assets/images/katchimeras/today-icons/moods/stormy.webp'),
+  },
+  sleep: {
+    good: require('@/assets/images/katchimeras/today-icons/sleep/good.webp'),
+    normal: require('@/assets/images/katchimeras/today-icons/sleep/normal.webp'),
+    low: require('@/assets/images/katchimeras/today-icons/sleep/low.webp'),
+  },
+};
+
 const CATEGORY_ART: Partial<Record<string, number>> = {
   sleep: require('@/assets/images/katchimeras/today-icons/sleep.png'),
   mood: require('@/assets/images/katchimeras/today-icons/mood.png'),
@@ -123,11 +139,16 @@ function CategoryMote({
             { opacity: active ? 1 : 0.62 },
           ]}>
           <View style={styles.chipArtWrap} pointerEvents="none">
-            {CATEGORY_ART[category.id] ? (
-              <Image source={CATEGORY_ART[category.id]} style={styles.chipArt} contentFit="contain" />
-            ) : (
-              <IconSymbol name={category.icon} size={24} color={Meadow.chipLabel} />
-            )}
+            {(() => {
+              const art =
+                (category.variant ? VARIANT_ART[category.id]?.[category.variant] : undefined) ??
+                CATEGORY_ART[category.id];
+              return art ? (
+                <Image source={art} style={styles.chipArt} contentFit="contain" />
+              ) : (
+                <IconSymbol name={category.icon} size={24} color={Meadow.chipLabel} />
+              );
+            })()}
           </View>
           <ThemedText numberOfLines={1} style={styles.chipName} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
             {category.label}

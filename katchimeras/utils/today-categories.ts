@@ -36,6 +36,9 @@ export type TodayCategoryState = {
   // The category is asking a contextual question (golden glow on its icon).
   needsAttention: boolean;
   glowReason?: string;
+  // Mood only: the logged mood's state key (radiant/light/meh/heavy/stormy) —
+  // drives the chip's face art.
+  variant?: string;
 };
 
 type DeriveOptions = {
@@ -92,6 +95,25 @@ const MOOD_META: Record<string, { icon: IconSymbolName; accent: string }> = {
   low: { icon: 'face.sad', accent: '#91D8C7' },
   stressed: { icon: 'face.very_sad', accent: '#C77DFF' },
 };
+
+// Choice id → mood STATE (must mirror mood-monument-sheet's MOOD_CHOICES).
+const MOOD_STATE: Record<string, string> = {
+  energized: 'radiant',
+  good: 'light',
+  calm: 'light',
+  loved: 'light',
+  meh: 'meh',
+  drained: 'heavy',
+  low: 'heavy',
+  stressed: 'stormy',
+};
+
+function latestMoodChoice(day: HomeDayRecord): string | null {
+  const latest = [...(day.promptAnswers ?? [])]
+    .reverse()
+    .find((answer) => !answer.dismissed && answer.kind === 'feeling' && answer.choiceIds.length > 0);
+  return latest?.choiceIds[0] ?? null;
+}
 
 function latestMoodMeta(day: HomeDayRecord): { icon: IconSymbolName; accent: string } | null {
   const latest = [...(day.promptAnswers ?? [])]
@@ -227,6 +249,7 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
       // chip already says "recorded"; pressing it shows the night.
       count: 0,
       hasContent: !!day.sleep,
+      variant: day.sleep?.quality,
       needsAttention: !day.sleep,
       glowReason: 'How did the night treat you?',
     },
@@ -241,6 +264,10 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
       hasContent: hasFeelingAnswer(day),
       needsAttention: !hasFeelingAnswer(day),
       glowReason: 'How does it feel right now?',
+      variant: (() => {
+        const choice = latestMoodChoice(day);
+        return choice ? MOOD_STATE[choice] : undefined;
+      })(),
     },
     {
       id: 'quests',
