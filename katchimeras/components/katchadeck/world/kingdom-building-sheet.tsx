@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
@@ -6,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { KingdomBuilding } from '@/types/kingdom';
 import { formatArchiveDate, type KingdomArchiveSection } from '@/utils/kingdom-archive';
+import { Meadow } from '@/constants/meadow-theme';
 
 // A Kingdom building's card: the human question it answers, how far a lifetime
 // of living has grown it, and what grows it next. The deep readers stay on
@@ -37,7 +37,6 @@ export function KingdomBuildingSheet({ building, archive = [], onOpenCollection,
     }
     return out;
   })();
-  const tabBarHeight = useBottomTabBarHeight();
   const progress =
     building.nextLevelAt !== null ? Math.min(1, building.count / building.nextLevelAt) : 1;
 
@@ -50,7 +49,7 @@ export function KingdomBuildingSheet({ building, archive = [], onOpenCollection,
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
         <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
           {building.emoji} {building.label}
@@ -131,8 +130,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 24,
     borderWidth: 1,

@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { InterpretedNote } from '@/utils/note-interpret';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The seamless inline voice-note UI on the World screen: a recording capsule while
 // held, an "analysing" pill while it transcribes + interprets, then an accept /
@@ -164,9 +165,9 @@ const styles = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderRadius: 22,
-    backgroundColor: '#161226',
+    backgroundColor: Meadow.overlay.sheetBg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: Meadow.overlay.sheetBorder,
     boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
   },
   transcript: { fontSize: 15, fontWeight: '600', lineHeight: 21, fontStyle: 'italic' },

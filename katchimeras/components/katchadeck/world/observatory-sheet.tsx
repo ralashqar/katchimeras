@@ -1,9 +1,8 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { Observation, ObservationKind } from '@/utils/observations-engine';
@@ -120,7 +119,6 @@ export function ObservatorySheet({
   onReflect,
   onClose,
 }: ObservatorySheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
   const ordered = orderedObservations(observations, focusedObservationId);
   const strongest = ordered[0] ?? null;
   const prompt = strongest?.prompt ?? null;
@@ -128,208 +126,161 @@ export function ObservatorySheet({
   const constellationRows = constellations(ordered);
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
+    <MeadowSheet onClose={onClose} kicker="The Observatory" title="What Katchimera has noticed" maxHeight="80%">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {strongest ? (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              {"Today's observation"}
+            </ThemedText>
+            <ObservationCard observation={strongest} />
+          </View>
+        ) : (
+          <View style={styles.emptyCard}>
+            <IconSymbol name="sparkles" size={17} color={Lantern.auroraTeal} />
+            <ThemedText style={styles.emptyTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              The lens is warming up
+            </ThemedText>
+            <ThemedText style={styles.emptyBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              A few more memories, places, walks, or reflections will give the Observatory something real to notice.
+            </ThemedText>
+          </View>
+        )}
 
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <ThemedText style={styles.kicker} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
-            The Observatory
-          </ThemedText>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            What Katchimera has noticed
-          </ThemedText>
-          <ThemedText style={styles.summary} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            Patterns, places, rituals, and emotional signals forming across your world.
-          </ThemedText>
-
-          {strongest ? (
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                {"Today's observation"}
+        {placeCount > 0 || onViewPlaces ? (
+          <View style={styles.placesRow}>
+            <View style={styles.placesCopy}>
+              <ThemedText style={styles.placesLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                {"Today's places"}
               </ThemedText>
-              <ObservationCard observation={strongest} />
-            </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <IconSymbol name="sparkles" size={17} color={Lantern.auroraTeal} />
-              <ThemedText style={styles.emptyTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                The lens is warming up
-              </ThemedText>
-              <ThemedText style={styles.emptyBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                A few more memories, places, walks, or reflections will give the Observatory something real to notice.
+              <ThemedText style={styles.placesValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {placeCount > 0 ? `${placeCount} ${placeCount === 1 ? 'place' : 'places'} on this patch` : 'No places marked yet'}
               </ThemedText>
             </View>
-          )}
+            {onViewPlaces ? (
+              <Pressable accessibilityRole="button" onPress={onViewPlaces} style={styles.smallAction}>
+                <ThemedText style={styles.smallActionText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                  View
+                </ThemedText>
+                <IconSymbol name="chevron.right" size={12} color={Lantern.ember300} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
-          {placeCount > 0 || onViewPlaces ? (
-            <View style={styles.placesRow}>
-              <View style={styles.placesCopy}>
-                <ThemedText style={styles.placesLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  {"Today's places"}
-                </ThemedText>
-                <ThemedText style={styles.placesValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {placeCount > 0 ? `${placeCount} ${placeCount === 1 ? 'place' : 'places'} on this patch` : 'No places marked yet'}
-                </ThemedText>
+        {travelMemory ? (
+          <View style={styles.travelCard}>
+            <View style={styles.travelHead}>
+              <View style={styles.travelIcon}>
+                <IconSymbol name="mappin.and.ellipse" size={15} color={Lantern.ember300} />
               </View>
-              {onViewPlaces ? (
-                <Pressable accessibilityRole="button" onPress={onViewPlaces} style={styles.smallAction}>
-                  <ThemedText style={styles.smallActionText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                    View
+              <View style={styles.travelCopy}>
+                <ThemedText style={styles.travelLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                  Travel Memory Mode
+                </ThemedText>
+                <ThemedText style={styles.travelStatus} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  {travelMemory.statusLabel}
+                </ThemedText>
+                <ThemedText style={styles.travelBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                  {travelMemory.body}
+                </ThemedText>
+                {travelMemory.backgroundPlaceCount > 0 ? (
+                  <ThemedText style={styles.travelCount} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    {`${travelMemory.backgroundPlaceCount} ${travelMemory.backgroundPlaceCount === 1 ? 'place' : 'places'} remembered in the background today.`}
                   </ThemedText>
-                  <IconSymbol name="chevron.right" size={12} color={Lantern.ember300} />
+                ) : null}
+              </View>
+            </View>
+            <View style={styles.travelActions}>
+              {travelMemory.enabled ? (
+                <>
+                  {travelMemory.onPauseToday ? (
+                    <Pressable accessibilityRole="button" onPress={travelMemory.onPauseToday} style={styles.travelSecondaryAction}>
+                      <ThemedText style={styles.travelSecondaryText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                        Pause today
+                      </ThemedText>
+                    </Pressable>
+                  ) : null}
+                  {travelMemory.onDisable ? (
+                    <Pressable accessibilityRole="button" onPress={travelMemory.onDisable} style={styles.travelSecondaryAction}>
+                      <ThemedText style={styles.travelSecondaryText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                        Turn off
+                      </ThemedText>
+                    </Pressable>
+                  ) : null}
+                </>
+              ) : travelMemory.onEnable ? (
+                <Pressable accessibilityRole="button" onPress={travelMemory.onEnable} style={styles.travelPrimaryAction}>
+                  <ThemedText style={styles.travelPrimaryText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
+                    Enable
+                  </ThemedText>
+                </Pressable>
+              ) : null}
+              {travelMemory.backgroundPlaceCount > 0 && travelMemory.onDeleteTodayPlaces ? (
+                <Pressable accessibilityRole="button" onPress={travelMemory.onDeleteTodayPlaces} style={styles.travelDangerAction}>
+                  <ThemedText style={styles.travelDangerText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                    Delete today
+                  </ThemedText>
                 </Pressable>
               ) : null}
             </View>
-          ) : null}
+          </View>
+        ) : null}
 
-          {travelMemory ? (
-            <View style={styles.travelCard}>
-              <View style={styles.travelHead}>
-                <View style={styles.travelIcon}>
-                  <IconSymbol name="mappin.and.ellipse" size={15} color={Lantern.ember300} />
-                </View>
-                <View style={styles.travelCopy}>
-                  <ThemedText style={styles.travelLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                    Travel Memory Mode
-                  </ThemedText>
-                  <ThemedText style={styles.travelStatus} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                    {travelMemory.statusLabel}
-                  </ThemedText>
-                  <ThemedText style={styles.travelBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                    {travelMemory.body}
-                  </ThemedText>
-                  {travelMemory.backgroundPlaceCount > 0 ? (
-                    <ThemedText style={styles.travelCount} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                      {`${travelMemory.backgroundPlaceCount} ${travelMemory.backgroundPlaceCount === 1 ? 'place' : 'places'} remembered in the background today.`}
-                    </ThemedText>
-                  ) : null}
-                </View>
-              </View>
-              <View style={styles.travelActions}>
-                {travelMemory.enabled ? (
-                  <>
-                    {travelMemory.onPauseToday ? (
-                      <Pressable accessibilityRole="button" onPress={travelMemory.onPauseToday} style={styles.travelSecondaryAction}>
-                        <ThemedText style={styles.travelSecondaryText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                          Pause today
-                        </ThemedText>
-                      </Pressable>
-                    ) : null}
-                    {travelMemory.onDisable ? (
-                      <Pressable accessibilityRole="button" onPress={travelMemory.onDisable} style={styles.travelSecondaryAction}>
-                        <ThemedText style={styles.travelSecondaryText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                          Turn off
-                        </ThemedText>
-                      </Pressable>
-                    ) : null}
-                  </>
-                ) : travelMemory.onEnable ? (
-                  <Pressable accessibilityRole="button" onPress={travelMemory.onEnable} style={styles.travelPrimaryAction}>
-                    <ThemedText style={styles.travelPrimaryText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
-                      Enable
-                    </ThemedText>
-                  </Pressable>
-                ) : null}
-                {travelMemory.backgroundPlaceCount > 0 && travelMemory.onDeleteTodayPlaces ? (
-                  <Pressable accessibilityRole="button" onPress={travelMemory.onDeleteTodayPlaces} style={styles.travelDangerAction}>
-                    <ThemedText style={styles.travelDangerText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                      Delete today
-                    </ThemedText>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-          ) : null}
+        {ordered.length > 1 ? (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Patterns forming
+            </ThemedText>
+            {ordered.slice(1).map((observation) => (
+              <ObservationCard key={observation.id} observation={observation} />
+            ))}
+          </View>
+        ) : null}
 
-          {ordered.length > 1 ? (
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Patterns forming
-              </ThemedText>
-              {ordered.slice(1).map((observation) => (
-                <ObservationCard key={observation.id} observation={observation} />
+        {constellationRows.length > 0 ? (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Constellations
+            </ThemedText>
+            <View style={styles.constellationGrid}>
+              {constellationRows.map((item) => (
+                <View key={item.id} style={styles.constellationChip}>
+                  <IconSymbol name={KIND_ICON[item.id] ?? 'sparkles'} size={13} color={Lantern.auroraTeal} />
+                  <ThemedText style={styles.constellationText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {item.title} x {item.count}
+                  </ThemedText>
+                </View>
               ))}
             </View>
-          ) : null}
+          </View>
+        ) : null}
 
-          {constellationRows.length > 0 ? (
-            <View style={styles.section}>
-              <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Constellations
-              </ThemedText>
-              <View style={styles.constellationGrid}>
-                {constellationRows.map((item) => (
-                  <View key={item.id} style={styles.constellationChip}>
-                    <IconSymbol name={KIND_ICON[item.id] ?? 'sparkles'} size={13} color={Lantern.auroraTeal} />
-                    <ThemedText style={styles.constellationText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                      {item.title} x {item.count}
-                    </ThemedText>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
-          {prompt ? (
-            <View style={styles.promptCard}>
-              <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Look closer
-              </ThemedText>
-              <ThemedText style={styles.promptText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {prompt}
-              </ThemedText>
-              {onReflect ? (
-                <Pressable accessibilityRole="button" onPress={onReflect} style={styles.reflectAction}>
-                  <IconSymbol name="square.and.pencil" size={14} color={Lantern.emberInk} />
-                  <ThemedText style={styles.reflectActionText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
-                    Reflect
-                  </ThemedText>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-        </ScrollView>
-
-        <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-          <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            Close
-          </ThemedText>
-        </Pressable>
-      </Animated.View>
-    </View>
+        {prompt ? (
+          <View style={styles.promptCard}>
+            <ThemedText style={styles.sectionTitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Look closer
+            </ThemedText>
+            <ThemedText style={styles.promptText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              {prompt}
+            </ThemedText>
+            {onReflect ? (
+              <Pressable accessibilityRole="button" onPress={onReflect} style={styles.reflectAction}>
+                <IconSymbol name="square.and.pencil" size={14} color={Lantern.emberInk} />
+                <ThemedText style={styles.reflectActionText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
+                  Reflect
+                </ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </ScrollView>
+    </MeadowSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    left: 12,
-    maxHeight: '80%',
-    paddingBottom: 14,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 6, width: 38 },
   scroll: { gap: 10, paddingBottom: 6 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 20, fontWeight: '900', lineHeight: 25 },
-  summary: { fontSize: 13.5, fontWeight: '500', lineHeight: 20 },
   section: { gap: 8, paddingTop: 4 },
   sectionTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
   observationCard: {
@@ -468,6 +419,4 @@ const styles = StyleSheet.create({
     backgroundColor: Lantern.ember300,
   },
   reflectActionText: { fontSize: 13, fontWeight: '900' },
-  close: { alignSelf: 'center', paddingTop: 8 },
-  closeLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
 });

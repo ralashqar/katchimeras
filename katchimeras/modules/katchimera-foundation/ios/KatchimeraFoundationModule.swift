@@ -103,20 +103,39 @@ public final class KatchimeraFoundationModule: Module {
 
     let instructions = Instructions(
       """
-      You title and classify a short personal voice note for a gentle journaling app.
+      You read a short personal journal note (typed or a voice transcript) for a gentle journaling app.
       Return:
       - title: a short, warm 2-4 word title for the moment (under 24 characters),
         specific to what the person said. No punctuation, no emoji, no quotes.
       - feeling: the single dominant feeling of the note, one of:
         calm, energy, together, meaningful.
+      - mediaKind: when the note mentions taking in a work of media — reading a book,
+        watching a film or show, playing a video game, listening to an album, seeing
+        art — the kind of work: book, film, show, game, music, or art. Otherwise none.
+        Booking a table, reading emails or the news, or watching people are NOT media.
+      - mediaTitle: the mentioned work's full official title with correct capitalization.
+        Transcripts are often lowercase — use your knowledge of the work to restore the
+        real title (for example "the way of kings" is the book "The Way of Kings").
+        Empty when no work was named or mediaKind is none.
+      - mediaCreator: that work's author, director, or artist when you are confident.
+        Empty otherwise.
+      - food: when the note is about eating or drinking something specific, a short
+        1-4 word name of the dish or drink (for example "a bowl of ramen"). Empty otherwise.
       """
     )
     let session = LanguageModelSession(instructions: instructions)
-    let prompt = Prompt("The voice note says: \"\(trimmed)\". Give the title and feeling now.")
+    let prompt = Prompt("The note says: \"\(trimmed)\". Give the title, feeling, and classification now.")
 
     do {
       let response = try await session.respond(to: prompt, generating: NoteRead.self)
-      return ["label": response.content.title, "archetype": response.content.feeling]
+      return [
+        "label": response.content.title,
+        "archetype": response.content.feeling,
+        "mediaKind": response.content.mediaKind,
+        "mediaTitle": response.content.mediaTitle,
+        "mediaCreator": response.content.mediaCreator,
+        "food": response.content.food,
+      ]
     } catch {
       return [:]
     }
@@ -322,6 +341,21 @@ struct NoteRead {
 
   @Guide(description: "The dominant feeling of the note", .anyOf(["calm", "energy", "together", "meaningful"]))
   let feeling: String
+
+  @Guide(
+    description: "The kind of media work the note mentions taking in (reading a book, watching a film or show, playing a game, listening to an album, seeing art), or none",
+    .anyOf(["none", "book", "film", "show", "game", "music", "art"])
+  )
+  let mediaKind: String
+
+  @Guide(description: "The mentioned work's full official title with correct capitalization, completed from knowledge of the work when the transcript is lowercase or partial. Empty when no work was named or mediaKind is none. No quotes")
+  let mediaTitle: String
+
+  @Guide(description: "That work's author, director, or artist when confidently known. Empty otherwise. No quotes")
+  let mediaCreator: String
+
+  @Guide(description: "A short 1-4 word name of the dish or drink when the note is about eating or drinking something specific. Empty otherwise. No quotes")
+  let food: String
 }
 
 @available(iOS 26.0, *)

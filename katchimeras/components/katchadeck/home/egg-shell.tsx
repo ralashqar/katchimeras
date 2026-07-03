@@ -126,6 +126,14 @@ const styles = StyleSheet.create({
     height: 224,
     justifyContent: 'center',
     width: 196,
+    // iOS derives this shadow from the RENDERED ALPHA (no background, no
+    // shadowPath) — a true silhouette drop-shadow, like CSS drop-shadow().
+    // Biased downward so it reads as contact with the nest, and it rides the
+    // shell's every transform (drag, breathe, shake) for free.
+    shadowColor: '#170F06',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
   },
   eggImage: {
     height: '100%',

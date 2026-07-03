@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { popEnter } from '@/components/katchadeck/motion';
 import { Lantern } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
 
@@ -42,45 +44,55 @@ export function WorldActionStack({
 }: WorldActionStackProps) {
   return (
     <View style={orientation === 'horizontal' ? styles.rootRow : styles.root}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Capture a moment with the camera${cameraBadge ? ` (${cameraBadge} new photos to review)` : ''}`}
-        onPress={onCamera}
-        style={styles.secondary}>
-        <IconSymbol name="camera.fill" size={22} color={Lantern.moon50} />
-        <ActionBadge count={cameraBadge} />
-      </Pressable>
-      {onAddPlace ? (
+      <Animated.View entering={popEnter(140)}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Add the place you're at now${placeBadge ? ' (a new place was detected)' : ''}`}
-          onPress={onAddPlace}
+          accessibilityLabel={`Capture a moment with the camera${cameraBadge ? ` (${cameraBadge} new photos to review)` : ''}`}
+          onPress={onCamera}
           style={styles.secondary}>
-          <IconSymbol name="mappin.and.ellipse" size={22} color={Lantern.moon50} />
-          <ActionBadge count={placeBadge} />
+          <IconSymbol name="camera.fill" size={22} color={Lantern.moon50} />
+          <ActionBadge count={cameraBadge} />
         </Pressable>
+      </Animated.View>
+      {onAddPlace ? (
+        <Animated.View entering={popEnter(180)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Add the place you're at now${placeBadge ? ' (a new place was detected)' : ''}`}
+            onPress={onAddPlace}
+            style={styles.secondary}>
+            <IconSymbol name="mappin.and.ellipse" size={22} color={Lantern.moon50} />
+            <ActionBadge count={placeBadge} />
+          </Pressable>
+        </Animated.View>
       ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Add to today"
-        onPress={onAdd}
-        style={styles.primary}>
-        <IconSymbol name="plus" size={34} color={Meadow.ink} />
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Tap to write a note, hold to record a voice note"
-        onPress={onMicTap}
-        onLongPress={onMicPressIn}
-        delayLongPress={250}
-        onPressOut={onMicPressOut}
-        style={[styles.secondary, recording ? styles.recording : null]}>
-        <IconSymbol name="mic.fill" size={22} color={Lantern.moon50} />
-      </Pressable>
-      {onSparkle ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Today's quests" onPress={onSparkle} style={styles.secondary}>
-          <IconSymbol name="sparkles" size={22} color={Lantern.moon50} />
+      <Animated.View entering={popEnter(100)}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Add to today"
+          onPress={onAdd}
+          style={styles.primary}>
+          <IconSymbol name="plus" size={34} color={Meadow.ink} />
         </Pressable>
+      </Animated.View>
+      <Animated.View entering={popEnter(180)}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Tap to write a note, hold to record a voice note"
+          onPress={onMicTap}
+          onLongPress={onMicPressIn}
+          delayLongPress={250}
+          onPressOut={onMicPressOut}
+          style={[styles.secondary, recording ? styles.recording : null]}>
+          <IconSymbol name="mic.fill" size={22} color={Lantern.moon50} />
+        </Pressable>
+      </Animated.View>
+      {onSparkle ? (
+        <Animated.View entering={popEnter(220)}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Today's quests" onPress={onSparkle} style={styles.secondary}>
+            <IconSymbol name="sparkles" size={22} color={Lantern.moon50} />
+          </Pressable>
+        </Animated.View>
       ) : null}
     </View>
   );

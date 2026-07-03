@@ -23,6 +23,10 @@ export type InlineVoiceNotePayload = {
   archetype: InterpretedNote['archetype'];
   label: string;
   bigMoment?: InterpretedNote['bigMoment'];
+  // On-device LLM classification, passed through to the engine verbatim.
+  media?: InterpretedNote['media'];
+  food?: InterpretedNote['food'];
+  llmClassified?: boolean;
 };
 
 type Options = {
@@ -119,6 +123,9 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved }: Options) 
       archetype: result.archetype,
       label: result.label,
       bigMoment: result.bigMoment && markBig ? result.bigMoment : undefined,
+      media: result.media,
+      food: result.food,
+      llmClassified: result.llmClassified,
     });
     onSaved?.(result);
     setResult(null);

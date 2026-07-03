@@ -1,10 +1,10 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { FoodMeaning, FoodMoment } from '@/types/home';
 
@@ -52,61 +52,51 @@ export function FoodMomentSheet({
   // Pre-fill the "what" from on-device food detection — user still gives the why.
   suggested?: { label: string; emoji: string } | null;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
   const [food, setFood] = useState<FoodType | null>(suggested ?? null);
 
   return (
-    <SheetShell onClose={onClose} bottom={tabBarHeight + 10}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        A food memory
-      </ThemedText>
-      {!food ? (
-        <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            What did you have?
-          </ThemedText>
-          <View style={styles.grid}>
-            {FOOD_TYPES.map((option) => (
-              <Pressable key={option.label} onPress={() => setFood(option)} style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
-                <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {option.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        </Animated.View>
-      ) : (
-        <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {`${food.emoji} ${food.label} · what did it mean?`}
-          </ThemedText>
-          <View style={styles.grid}>
-            {FOOD_MEANINGS.map((option) => (
-              <Pressable
-                key={option.id}
-                onPress={() => onConfirm({ label: food.label, emoji: food.emoji, meaning: option.id })}
-                style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
-                <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {option.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable accessibilityRole="button" onPress={() => setFood(null)} style={styles.back}>
-            <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              Back
-            </ThemedText>
-          </Pressable>
-        </Animated.View>
-      )}
-      <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-        <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-          Later
-        </ThemedText>
-      </Pressable>
-    </SheetShell>
+    <MeadowSheet
+      onClose={onClose}
+      kicker="A food memory"
+      title={food ? `${food.emoji} ${food.label} · what did it mean?` : 'What did you have?'}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {!food ? (
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
+            <View style={styles.grid}>
+              {FOOD_TYPES.map((option) => (
+                <Pressable key={option.label} onPress={() => setFood(option)} style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
+                  <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {option.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+        ) : (
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
+            <View style={styles.grid}>
+              {FOOD_MEANINGS.map((option) => (
+                <Pressable
+                  key={option.id}
+                  onPress={() => onConfirm({ label: food.label, emoji: food.emoji, meaning: option.id })}
+                  style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
+                  <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {option.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => setFood(null)} style={styles.back}>
+              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                Back
+              </ThemedText>
+            </Pressable>
+          </Animated.View>
+        )}
+      </ScrollView>
+    </MeadowSheet>
   );
 }
 
@@ -120,98 +110,59 @@ export function FoodVaultSheet({
   onAddFood?: () => void;
   onClose: () => void;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
   return (
-    <SheetShell onClose={onClose} bottom={tabBarHeight + 10}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        Food Vault
-      </ThemedText>
-      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {foodMoments.length > 0 ? 'Today’s food memories' : 'Your food memories'}
-      </ThemedText>
-
-      <View style={styles.body}>
-        {onAddFood ? (
-          <Pressable accessibilityRole="button" onPress={onAddFood} style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}>
-            <ThemedText style={styles.addBtnEmoji}>🍽</ThemedText>
-            <ThemedText style={styles.addBtnLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Save a food memory
+    <MeadowSheet
+      onClose={onClose}
+      kicker="Food Vault"
+      title={foodMoments.length > 0 ? 'Today’s food memories' : 'Your food memories'}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <View style={styles.body}>
+          {onAddFood ? (
+            <Pressable accessibilityRole="button" onPress={onAddFood} style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}>
+              <ThemedText style={styles.addBtnEmoji}>🍽</ThemedText>
+              <ThemedText style={styles.addBtnLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Save a food memory
+              </ThemedText>
+            </Pressable>
+          ) : null}
+          {foodMoments.length === 0 ? (
+            <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              No food memories yet — save a coffee, a meal, a treat.
             </ThemedText>
-          </Pressable>
-        ) : null}
-        {foodMoments.length === 0 ? (
-          <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            No food memories yet — save a coffee, a meal, a treat.
-          </ThemedText>
-        ) : null}
-        {foodMoments.map((moment) => (
-          <View key={moment.id} style={styles.foodRow}>
-            {moment.thumbnailUri ? (
-              <Image source={{ uri: moment.thumbnailUri }} style={styles.foodPhoto} contentFit="cover" transition={120} />
-            ) : (
-              <ThemedText style={styles.foodEmoji}>{moment.emoji}</ThemedText>
-            )}
-            <View style={styles.foodText}>
-              <ThemedText style={styles.foodLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {moment.label}
-              </ThemedText>
-              {moment.detail || moment.source ? (
-                <ThemedText style={styles.foodDetail} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  {moment.detail ? `“${moment.detail}”` : SOURCE_LABEL[moment.source ?? 'manual']}
+          ) : null}
+          {foodMoments.map((moment) => (
+            <View key={moment.id} style={styles.foodRow}>
+              {moment.thumbnailUri ? (
+                <Image source={{ uri: moment.thumbnailUri }} style={styles.foodPhoto} contentFit="cover" transition={120} />
+              ) : (
+                <ThemedText style={styles.foodEmoji}>{moment.emoji}</ThemedText>
+              )}
+              <View style={styles.foodText}>
+                <ThemedText style={styles.foodLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  {moment.label}
                 </ThemedText>
-              ) : null}
+                {moment.detail || moment.source ? (
+                  <ThemedText style={styles.foodDetail} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    {moment.detail ? `“${moment.detail}”` : SOURCE_LABEL[moment.source ?? 'manual']}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <View style={[styles.meaningChip, { borderColor: `${MEANING_TINT[moment.meaning] ?? Lantern.moon300}66` }]}>
+                <View style={[styles.meaningDot, { backgroundColor: MEANING_TINT[moment.meaning] ?? Lantern.moon300 }]} />
+                <ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  {MEANING_LABEL[moment.meaning] ?? moment.meaning}
+                </ThemedText>
+              </View>
             </View>
-            <View style={[styles.meaningChip, { borderColor: `${MEANING_TINT[moment.meaning] ?? Lantern.moon300}66` }]}>
-              <View style={[styles.meaningDot, { backgroundColor: MEANING_TINT[moment.meaning] ?? Lantern.moon300 }]} />
-              <ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {MEANING_LABEL[moment.meaning] ?? moment.meaning}
-              </ThemedText>
-            </View>
-          </View>
-        ))}
-      </View>
-    </SheetShell>
-  );
-}
-
-function SheetShell({ children, onClose, bottom }: { children: React.ReactNode; onClose: () => void; bottom: number }) {
-  return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View entering={SlideInDown.duration(260)} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { bottom }]}>
-        <View style={styles.grabber} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          {children}
-        </ScrollView>
-      </Animated.View>
-    </View>
+          ))}
+        </View>
+      </ScrollView>
+    </MeadowSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    left: 12,
-    maxHeight: '74%',
-    paddingBottom: 14,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 6, width: 38 },
   scroll: { gap: 8, paddingBottom: 4 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
   section: { gap: 10, paddingTop: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
@@ -273,6 +224,4 @@ const styles = StyleSheet.create({
   },
   meaningDot: { width: 7, height: 7, borderRadius: 999 },
   meaningLabel: { fontSize: 12, fontWeight: '700' },
-  close: { alignSelf: 'center', paddingTop: 6 },
-  closeLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
 });

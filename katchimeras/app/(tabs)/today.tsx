@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useFocusEffect, useIsFocused } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useFocusEffect, useIsFocused, useNavigation, type ParamListBase } from '@react-navigation/native';
+import { useBottomTabBarHeight, type BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import * as Location from 'expo-location';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,7 +50,7 @@ import { consumeSelectedDay } from '@/utils/selected-day-signal';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
-import { presenceEnter } from '@/components/katchadeck/motion';
+import { popEnter, presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
@@ -169,6 +169,7 @@ export default function HomeScreen() {
     refreshState,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
+  const navigation = useNavigation<BottomTabNavigationProp<ParamListBase>>();
   const tabBarHeight = useBottomTabBarHeight();
   const backfillStatus = useBackfillStatus();
   // In-place hatch reveal on the hero stage: while hatching, the egg already on
@@ -1035,6 +1036,15 @@ export default function HomeScreen() {
     }, [selectTimelineDay])
   );
 
+  // Re-pressing the HOME tab while already on it snaps the strip back to today.
+  useEffect(() => {
+    return navigation.addListener('tabPress', () => {
+      if (!navigation.isFocused()) return;
+      const todayId = timelineDays.find((day) => day.kind === 'day' && day.isToday)?.id;
+      if (todayId && todayId !== selectedDayId) selectTimelineDay(todayId);
+    });
+  }, [navigation, timelineDays, selectedDayId, selectTimelineDay]);
+
   // A discovery reveal waits until nothing else is mid-flow: no sheet, prompt,
   // follow-up, recording, or hatch on screen. It then celebrates the
   // highest-rarity pending unlock first (same order as the World page).
@@ -1106,7 +1116,7 @@ export default function HomeScreen() {
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
           for layout parity but is locked. */}
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 26 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
         contentInsetAdjustmentBehavior="never"
         scrollEnabled={false}
         bounces={false}
@@ -1131,6 +1141,7 @@ export default function HomeScreen() {
                 egg={selectedDay.egg}
                 onPress={selectedDay.canAddMoments ? openPromptSheet : undefined}
                 reactionKey={selectedDay.moments.length}
+                isReady={selectedDay.state === 'ready_to_hatch'}
                 feedKey={eggFeedKey}
                 lanternColor={lanternColour}
                 scale={eggFraming.scale}
@@ -1191,23 +1202,29 @@ export default function HomeScreen() {
         {isHatching ? null : isHatched ? (
           <Animated.View entering={presenceEnter(120)} style={styles.sectionGap}>
             <View style={styles.actionDock}>
-              <IconAction
-                icon="mappin.and.ellipse"
-                label="Map"
-                onPress={() => handleOpenDayMap(selectedDay.id)}
-              />
-              <IconAction
-                icon="paperplane.fill"
-                label="Card"
-                busy={sharingDayId === selectedDay.id}
-                onPress={handleShareDay}
-              />
-              <IconAction
-                icon="sparkles"
-                label="Comic"
-                busy={comicGen?.status === 'generating'}
-                onPress={handleMakeComic}
-              />
+              <Animated.View entering={popEnter(140)}>
+                <IconAction
+                  icon="mappin.and.ellipse"
+                  label="Map"
+                  onPress={() => handleOpenDayMap(selectedDay.id)}
+                />
+              </Animated.View>
+              <Animated.View entering={popEnter(185)}>
+                <IconAction
+                  icon="paperplane.fill"
+                  label="Card"
+                  busy={sharingDayId === selectedDay.id}
+                  onPress={handleShareDay}
+                />
+              </Animated.View>
+              <Animated.View entering={popEnter(230)}>
+                <IconAction
+                  icon="sparkles"
+                  label="Comic"
+                  busy={comicGen?.status === 'generating'}
+                  onPress={handleMakeComic}
+                />
+              </Animated.View>
             </View>
             <DayJournalSections day={selectedDay} onStatPress={handleStatPress} />
             <ReflectionCard creature={selectedDay.creature!} />
@@ -1747,7 +1764,7 @@ const styles = StyleSheet.create({
   heroStage: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
+    marginTop: 26,
   },
   heroCountdown: {
     marginTop: -18,

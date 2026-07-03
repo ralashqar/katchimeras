@@ -10,8 +10,17 @@ type KatchimeraFoundationModuleShape = {
     tags: string[],
     faceCount: number
   ) => Promise<{ label?: unknown; archetype?: unknown }[]>;
-  // Title + feeling for a voice-note transcript. {} on failure / unavailability.
-  interpretNoteAsync: (transcript: string) => Promise<{ label?: unknown; archetype?: unknown }>;
+  // Title + feeling + classification (media work / food) for a note. New builds
+  // include mediaKind ('none' when not media) + mediaTitle/mediaCreator/food;
+  // old builds return just { label, archetype }. {} on failure / unavailability.
+  interpretNoteAsync: (transcript: string) => Promise<{
+    label?: unknown;
+    archetype?: unknown;
+    mediaKind?: unknown;
+    mediaTitle?: unknown;
+    mediaCreator?: unknown;
+    food?: unknown;
+  }>;
 };
 
 export default requireOptionalNativeModule<KatchimeraFoundationModuleShape>('KatchimeraFoundation');

@@ -1,9 +1,8 @@
 import { Image } from 'expo-image';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { DaySleep, SleepQuality } from '@/types/home';
 
@@ -17,10 +16,10 @@ const SLEEP_ART: Record<string, number> = {
 // Sleep — how the day began. Never a score or a failure; low sleep is just a
 // softer, mistier morning. Shows the atmosphere (+ hours if Health knows them)
 // and always lets you answer / re-answer "how was it?".
-const ATMOSPHERE: Record<SleepQuality, { emoji: string; title: string; blurb: string }> = {
-  good: { emoji: '☀️', title: 'Warm light', blurb: 'Your world woke to a bright morning.' },
-  normal: { emoji: '🌤️', title: 'A clear start', blurb: 'A steady, settled morning.' },
-  low: { emoji: '🌙', title: 'Soft & misty', blurb: 'A gentle, dreamy start to the day.' },
+const ATMOSPHERE: Record<SleepQuality, { emoji: string; title: string }> = {
+  good: { emoji: '☀️', title: 'Warm light' },
+  normal: { emoji: '🌤️', title: 'A clear start' },
+  low: { emoji: '🌙', title: 'Soft & misty' },
 };
 const OPTIONS: { quality: SleepQuality; emoji: string; label: string }[] = [
   { quality: 'good', emoji: '☀️', label: 'Good' },
@@ -36,7 +35,6 @@ type SleepSheetProps = {
 };
 
 export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
   const atmosphere = sleep ? ATMOSPHERE[sleep.quality] : null;
   const hours =
     sleep?.totalSleepMinutes && sleep.totalSleepMinutes > 0
@@ -44,120 +42,56 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
       : null;
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          Sleep
-        </ThemedText>
-
-        {atmosphere ? (
-          <View style={styles.detail}>
-            <View style={styles.detailHead}>
-              <ThemedText style={styles.detailEmoji}>{atmosphere.emoji}</ThemedText>
-              <ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {atmosphere.title}
-              </ThemedText>
-            </View>
-            {hours ? (
-              <View style={styles.hoursRow}>
-                <ThemedText style={styles.hoursValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {hours}
-                </ThemedText>
-                <ThemedText style={styles.hoursCaption} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  last night · Apple Health
-                </ThemedText>
-              </View>
-            ) : null}
-            <ThemedText style={styles.blurb} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              {atmosphere.blurb}
-            </ThemedText>
-          </View>
-        ) : (
-          <View style={styles.emptyDetail}>
-            <ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Sleep not set yet
-            </ThemedText>
-            <ThemedText style={styles.blurb} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              Add how the day began and the empty nook will settle into its morning atmosphere.
-            </ThemedText>
-          </View>
-        )}
-
-        {onSet ? (
-          <>
-            <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              {atmosphere ? 'How did it really feel?' : 'How was your sleep?'}
-            </ThemedText>
-            <View style={styles.row}>
-              {OPTIONS.map((option) => {
-                const selected = sleep?.quality === option.quality;
-                return (
-                  <Pressable
-                    key={option.quality}
-                    onPress={() => onSet(option.quality)}
-                    style={[styles.chip, selected ? styles.chipSelected : null]}>
-                    {SLEEP_ART[option.quality] ? (
-                      <Image source={SLEEP_ART[option.quality]} style={{ height: 30, width: 30 }} contentFit="contain" />
-                    ) : (
-                      <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                    )}
-                    <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                      {option.label}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        ) : null}
-
-        <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-          <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            {atmosphere ? 'Close' : 'Later'}
+    <MeadowSheet
+      onClose={onClose}
+      kicker="Sleep"
+      title={atmosphere ? `${atmosphere.emoji} ${atmosphere.title}` : 'Sleep not set yet'}>
+      {hours ? (
+        <View style={styles.hoursRow}>
+          <ThemedText style={styles.hoursValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            {hours}
           </ThemedText>
-        </Pressable>
-      </Animated.View>
-    </View>
+          <ThemedText style={styles.hoursCaption} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            last night · Apple Health
+          </ThemedText>
+        </View>
+      ) : null}
+
+      {onSet ? (
+        <>
+          <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            {atmosphere ? 'How did it really feel?' : 'How was your sleep?'}
+          </ThemedText>
+          <View style={styles.row}>
+            {OPTIONS.map((option) => {
+              const selected = sleep?.quality === option.quality;
+              return (
+                <Pressable
+                  key={option.quality}
+                  onPress={() => onSet(option.quality)}
+                  style={[styles.chip, selected ? styles.chipSelected : null]}>
+                  {SLEEP_ART[option.quality] ? (
+                    <Image source={SLEEP_ART[option.quality]} style={{ height: 30, width: 30 }} contentFit="contain" />
+                  ) : (
+                    <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                  )}
+                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {option.label}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+    </MeadowSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    gap: 10,
-    left: 12,
-    paddingBottom: 16,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 4, width: 38 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  detail: { gap: 4 },
-  emptyDetail: { gap: 6 },
-  detailHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailEmoji: { fontSize: 18 },
   hoursRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 2 },
   hoursValue: { fontSize: 26, fontWeight: '800', letterSpacing: 0.2 },
   hoursCaption: { fontSize: 12, fontWeight: '700' },
-  blurb: { fontSize: 13.5, fontWeight: '500', lineHeight: 19 },
   question: { fontSize: 13, fontWeight: '700', marginTop: 2 },
   row: { flexDirection: 'row', gap: 8 },
   chip: {
@@ -175,6 +109,4 @@ const styles = StyleSheet.create({
   chipSelected: { borderColor: Lantern.ember300, backgroundColor: 'rgba(255,195,107,0.12)' },
   chipEmoji: { fontSize: 15 },
   chipLabel: { fontSize: 13, fontWeight: '700' },
-  close: { alignSelf: 'center', paddingTop: 4 },
-  closeLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
 });

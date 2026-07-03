@@ -185,6 +185,9 @@ export default function NoteCaptureScreen() {
       archetype: result.archetype,
       label: result.label,
       bigMoment: result.bigMoment && markBig ? result.bigMoment : undefined,
+      media: result.media,
+      food: result.food,
+      llmClassified: result.llmClassified,
     });
     // Celebratory flight into the Memory Vault (World consumes this on focus).
     queueCaptureFeed({ photoUri: '', icon: 'square.and.pencil', accent: MEANING_TINT[result.archetype] ?? '#7DE8CD' });

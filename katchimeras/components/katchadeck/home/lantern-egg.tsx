@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   Easing,
   runOnJS,
   useAnimatedStyle,
@@ -22,6 +23,9 @@ type LanternEggProps = {
   onPress?: () => void;
   reactionKey?: number;
   crackStage?: 0 | 1 | 2;
+  // Ready to hatch: the shell gives an impatient shudder every few seconds
+  // (same burst the world patch egg had) to invite the tap.
+  isReady?: boolean;
   // Bumps each time the egg is "fed" an answer; fires an absorb pulse — a glow
   // flash, a swallow-pop of the shell, and an outward energy ring.
   feedKey?: number;
@@ -52,6 +56,7 @@ const glassDome = require('../../../assets/images/katchimeras/glass-dome.png');
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const DRAG_LIMIT = 60;
 
+
 // The Lantern egg stage. The egg artwork breathes over a pulsing tinted glow;
 // tapping squeezes it and sends ripple rings out; dragging pulls it against a
 // soft membrane ring that materializes under the finger and springs the shell
@@ -62,6 +67,7 @@ export function LanternEgg({
   onPress,
   reactionKey = 0,
   crackStage = 0,
+  isReady = false,
   feedKey = 0,
   lanternColor,
   scale = 1,
@@ -133,6 +139,45 @@ export function LanternEgg({
     ripple.value = withDelay(160, withTiming(1, { duration: 720, easing: Easing.out(Easing.cubic) }));
   }, [absorb, feedKey, feedShake, ripple]);
 
+  // Ready-to-hatch: a burst of rattle then stillness, repeating every ~2.6s —
+  // ported verbatim from the world patch egg.
+  const readyShake = useSharedValue(0);
+  useEffect(() => {
+    if (!isReady) {
+      cancelAnimation(readyShake);
+      readyShake.value = withTiming(0, { duration: 140 });
+      return;
+    }
+    readyShake.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 55, easing: Easing.linear }),
+        withTiming(-1, { duration: 55, easing: Easing.linear }),
+        withTiming(1, { duration: 55, easing: Easing.linear }),
+        withTiming(-1, { duration: 55, easing: Easing.linear }),
+        withTiming(0.5, { duration: 55, easing: Easing.linear }),
+        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) }),
+        withDelay(2600, withTiming(0, { duration: 1 }))
+      ),
+      -1,
+      false
+    );
+    return () => cancelAnimation(readyShake);
+  }, [isReady, readyShake]);
+
+  // A quick rattle of the shell (same axis pair the feed shake uses), scaled
+  // by `strength` — 0.8 for a tap, up to ~1.2 for an energetic drag release.
+  const fireShake = (strength: number) => {
+    'worklet';
+    feedShake.value = 0;
+    feedShake.value = withSequence(
+      withTiming(strength, { duration: 55, easing: Easing.linear }),
+      withTiming(-strength, { duration: 55, easing: Easing.linear }),
+      withTiming(strength * 0.55, { duration: 55, easing: Easing.linear }),
+      withTiming(-strength * 0.35, { duration: 55, easing: Easing.linear }),
+      withTiming(0, { duration: 80, easing: Easing.out(Easing.cubic) })
+    );
+  };
+
   const tapGesture = Gesture.Tap()
     .maxDeltaX(12)
     .maxDeltaY(12)
@@ -143,6 +188,7 @@ export function LanternEgg({
       pressProgress.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) });
     })
     .onEnd(() => {
+      fireShake(0.8);
       runOnJS(fireRipple)();
     });
 
@@ -159,9 +205,12 @@ export function LanternEgg({
       interactionEnergy.value = Math.min(1, Math.hypot(clampedX, clampedY) / DRAG_LIMIT);
     })
     .onEnd((event) => {
+      // Shake on top of the spring-back, harder the further it was pulled.
+      const energy = interactionEnergy.value;
       dragX.value = withSpring(0, { damping: 11, stiffness: 220, velocity: event.velocityX * 0.4 });
       dragY.value = withSpring(0, { damping: 11, stiffness: 220, velocity: event.velocityY * 0.4 });
       interactionEnergy.value = withTiming(0, { duration: 420, easing: Easing.out(Easing.cubic) });
+      fireShake(0.5 + energy * 0.7);
     })
     .onFinalize(() => {
       pressProgress.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) });
@@ -185,14 +234,17 @@ export function LanternEgg({
 
   // The egg's visible body sits low inside its padded cutout, so it read as
   // dropped within the surrounding membrane/dome — lift it to sit centered.
-  const liftStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: feedShake.value * 5 },
-      { translateY: shellOffsetY - absorb.value * 6 },
-      { rotateZ: `${feedShake.value * 3.2}deg` },
-      { scale: shellScale * (1.08 + absorb.value * 0.1) },
-    ],
-  }));
+  const liftStyle = useAnimatedStyle(() => {
+    const shake = feedShake.value + readyShake.value;
+    return {
+      transform: [
+        { translateX: shake * 5 },
+        { translateY: shellOffsetY - absorb.value * 6 },
+        { rotateZ: `${shake * 3.2}deg` },
+        { scale: shellScale * (1.08 + absorb.value * 0.1) },
+      ],
+    };
+  });
 
   // The glass dome sits faintly over the egg at rest, brightens under the
   // finger, and stretches elastically with the drag.

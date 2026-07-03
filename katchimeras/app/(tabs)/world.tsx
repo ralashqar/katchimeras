@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { GestureHandlerRootView, type GestureType } from 'react-native-gesture-handler';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
@@ -50,6 +49,7 @@ import { useRouter } from 'expo-router';
 import { collectUnlockedArtefacts, placeArtefacts } from '@/utils/discoveries-artefacts';
 import type { KingdomBuilding } from '@/types/kingdom';
 import type { WorldObjectCategory } from '@/types/world';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The Kingdom — the ONE persistent world every day of living builds (see
 // docs/kingdom-world-design.md). No day switcher, no egg: buildings stand at
@@ -65,7 +65,6 @@ export default function KingdomScreen() {
   const router = useRouter();
   const { kingdom } = useKingdom();
   const { days } = useAllDays();
-  const tabBarHeight = useBottomTabBarHeight();
   const kingdomPatch = useMemo(() => deriveKingdomPatch(kingdom), [kingdom]);
 
   // Kingdom decoration — earned by living, planted forever (kingdom-decor.ts).
@@ -376,7 +375,7 @@ export default function KingdomScreen() {
         {/* Keepsake tray — gifts life has earned, waiting to be planted. Tap one
             to plant it where the camera is centred, then drag it into place. */}
         {customising ? (
-          <View style={[styles.decorTray, { bottom: tabBarHeight + 12 }]}>
+          <View style={[styles.decorTray, { bottom: Meadow.overlay.bottomClearance }]}>
             <View style={styles.decorTrayHeader}>
               <ThemedText style={styles.decorTrayHint} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
                 {decorState.unplanted.length > 0
@@ -490,7 +489,7 @@ export default function KingdomScreen() {
       {/* Provenance card — what a planted keepsake remembers. */}
       {provenanceItem ? (
         <Pressable style={styles.provenanceBackdrop} onPress={() => setProvenanceItem(null)}>
-          <Animated.View entering={FadeInDown.duration(240)} style={[styles.provenanceCard, { bottom: tabBarHeight + 24 }]}>
+          <Animated.View entering={FadeInDown.duration(240)} style={[styles.provenanceCard, { bottom: Meadow.overlay.bottomClearance }]}>
             <ThemedText style={styles.provenanceName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
               {provenanceItem.name}
             </ThemedText>
@@ -639,8 +638,8 @@ const styles = StyleSheet.create({
   provenanceBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 55 },
   provenanceCard: {
     alignSelf: 'center',
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 18,
     borderWidth: 1,

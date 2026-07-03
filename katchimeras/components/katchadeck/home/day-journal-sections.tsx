@@ -196,7 +196,7 @@ export function DayJournalSections({
               <IconSymbol
                 color={attention ? Meadow.goldDeep : Meadow.iconOnCard}
                 name={STAT_ICON[stat.label] ?? 'sparkles'}
-                size={16}
+                size={27}
               />
               <ThemedText style={styles.statValue} lightColor={Meadow.ink} darkColor={Meadow.ink}>
                 <CountingValue value={stat.value} format={stat.format} />
@@ -522,16 +522,22 @@ const styles = StyleSheet.create({
     // off the card; the inset line is a soft top bevel.
     boxShadow: '-3px 4px 8px rgba(58, 38, 18, 0.20), inset 0 1px 0 rgba(255, 248, 230, 0.55)',
     flex: 1,
-    gap: 3,
-    paddingVertical: 10,
+    gap: 4,
+    paddingVertical: 8,
   },
+  // Value + label sit as one tight caption block under the big icon.
   statValue: {
-    fontSize: 18,
+    fontSize: 15.5,
     fontWeight: '800',
+    lineHeight: 18,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 9.5,
     fontWeight: '700',
+    lineHeight: 11,
+    marginTop: -3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   statTileAttention: {
     backgroundColor: '#F9EBC9',
@@ -553,8 +559,8 @@ const styles = StyleSheet.create({
     borderRadius: Meadow.radius.card,
     borderWidth: 1,
     boxShadow: `${Meadow.cardShadow}, inset 0 1px 0 rgba(255, 248, 230, 0.5)`,
-    gap: 10,
-    padding: 14,
+    gap: 8,
+    padding: 11,
   },
   sectionLabel: {
     fontSize: Meadow.type.kicker,

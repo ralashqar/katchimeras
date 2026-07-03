@@ -1,18 +1,18 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { PLACE_CATEGORIES } from '@/components/katchadeck/world/place-prompt-sheet';
 import { DayMemoryStrip } from '@/components/katchadeck/world/day-memory-strip';
 import { Lantern } from '@/constants/theme';
 import type { DayMapNode, HomeDayRecord } from '@/types/home';
 import type { PatchCell } from '@/types/world';
 import { resolvePlaceName } from '@/utils/place-names';
+import { Meadow } from '@/constants/meadow-theme';
 
 // category id → emoji / label, for confirmed places.
 const PLACE_CATEGORY_EMOJI: Record<string, string> = Object.fromEntries(
@@ -72,44 +72,14 @@ const BIG_MOMENT_EMOJI: Record<string, string> = {
   milestone: '🗿',
 };
 
-function SheetShell({ children, onClose }: { children: ReactNode; onClose: () => void }) {
-  const tabBarHeight = useBottomTabBarHeight();
-  return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-        {children}
-        <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-          <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            Close
-          </ThemedText>
-        </Pressable>
-      </Animated.View>
-    </View>
-  );
-}
-
 export function CellDetailSheet({ day, cell, recentAvgSteps, onClose, onAddPhoto, onViewMemories }: CellDetailSheetProps) {
   return (
-    <SheetShell onClose={onClose}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        {cell.sourceLabel}
-      </ThemedText>
-      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {cell.summaryLabel}
-      </ThemedText>
+    <MeadowSheet onClose={onClose} kicker={cell.sourceLabel} title={cell.summaryLabel}>
 
       {cell.type === 'memory' ? <MemoryBody day={day} onAddPhoto={onAddPhoto} /> : null}
       {cell.type === 'journey' ? <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} /> : null}
       {cell.type === 'reflection' ? <ReflectionBody day={day} /> : null}
-    </SheetShell>
+    </MeadowSheet>
   );
 }
 
@@ -132,13 +102,10 @@ export function JourneyDetailSheet({
 }) {
   const interpretation = day.stepsInterpretation;
   return (
-    <SheetShell onClose={onClose}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        Journey
-      </ThemedText>
-      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {interpretation ? `${interpretation.emoji} ${interpretation.label}` : 'How the day moved'}
-      </ThemedText>
+    <MeadowSheet
+      onClose={onClose}
+      kicker="Journey"
+      title={interpretation ? `${interpretation.emoji} ${interpretation.label}` : 'How the day moved'}>
       <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} />
       {!interpretation && onInterpret ? (
         <Pressable
@@ -151,7 +118,7 @@ export function JourneyDetailSheet({
           </ThemedText>
         </Pressable>
       ) : null}
-    </SheetShell>
+    </MeadowSheet>
   );
 }
 
@@ -167,15 +134,12 @@ export function NotesDetailSheet({
 }) {
   const notes = day.notes ?? [];
   return (
-    <SheetShell onClose={onClose}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        Notes
-      </ThemedText>
-      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} & moments` : 'Your notes'}
-      </ThemedText>
+    <MeadowSheet
+      onClose={onClose}
+      kicker="Notes"
+      title={notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} & moments` : 'Your notes'}>
       <NotesBody day={day} onAddNote={onAddNote} />
-    </SheetShell>
+    </MeadowSheet>
   );
 }
 
@@ -220,50 +184,27 @@ export function PlacesDetailSheet({
   }, [mapSummary]);
 
   return (
-    <SheetShell onClose={onClose}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        Crossroads
-      </ThemedText>
-      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {nodes.length > 0 ? `${nodes.length} ${nodes.length === 1 ? 'place' : 'places'} today` : 'Where did you go?'}
-      </ThemedText>
-
+    <MeadowSheet
+      onClose={onClose}
+      kicker="Crossroads"
+      title={nodes.length > 0 ? `${nodes.length} ${nodes.length === 1 ? 'place' : 'places'} today` : 'Where did you go?'}>
       <View style={styles.body}>
-        <View style={styles.addRow}>
-          {onAddPlace ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onAddPlace}
-              style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
-              <IconSymbol name="mappin.and.ellipse" size={18} color={Lantern.ember300} />
-              <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                Add place
-              </ThemedText>
-            </Pressable>
-          ) : null}
+        <View style={styles.tileRow}>
+          {onAddPlace ? <ActionTile icon="mappin.and.ellipse" title="Add place" tint="#E8C06A" onPress={onAddPlace} /> : null}
           {onOpenMap && nodes.length > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onOpenMap}
-              style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
-              <IconSymbol name="globe.americas.fill" size={16} color={Lantern.ember300} />
-              <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                View map
-              </ThemedText>
-            </Pressable>
+            <ActionTile icon="globe.americas.fill" title="View map" tint="#7FB98A" onPress={onOpenMap} />
           ) : null}
-          {onOpenObservatory ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onOpenObservatory}
-              style={({ pressed }) => [styles.addPhoto, pressed && styles.addPhotoPressed]}>
-              <IconSymbol name="sparkles" size={16} color={Lantern.ember300} />
-              <ThemedText style={styles.addPhotoLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                Observatory
-              </ThemedText>
-            </Pressable>
-          ) : null}
+          {onOpenObservatory ? <ActionTile icon="sparkles" title="Observatory" tint="#A78BFA" onPress={onOpenObservatory} /> : null}
         </View>
+
+        {nodes.length > 0 ? (
+          <View style={styles.sectionRow}>
+            <IconSymbol name="clock" size={12} color={Lantern.ember300} />
+            <ThemedText style={styles.sectionKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+              {"TODAY'S PLACES"}
+            </ThemedText>
+          </View>
+        ) : null}
 
         {nodes.length === 0 ? (
           <ThemedText style={styles.bodyLine} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
@@ -277,6 +218,7 @@ export function PlacesDetailSheet({
           const locality = names[node.id]?.locality ?? null;
           const dwell = formatDwell(node.startedAt, node.endedAt);
           const photos = (node.photos ?? []).map((photo) => photo.thumbnailUri).filter((uri): uri is string => !!uri);
+          const arrived = formatClock(node.startedAt);
           return (
             <Pressable
               key={node.id}
@@ -284,21 +226,41 @@ export function PlacesDetailSheet({
               onPress={() => onConfirmPlace?.(node, name)}
               style={styles.placeCard}>
               <View style={styles.placeHeader}>
-                <ThemedText style={styles.placeCardEmoji}>
-                  {confirmed ? PLACE_CATEGORY_EMOJI[confirmed.category] ?? '📍' : '📍'}
-                </ThemedText>
+                {photos.length > 0 ? (
+                  <Image source={{ uri: photos[0] }} style={styles.placeThumb} contentFit="cover" transition={120} />
+                ) : (
+                  <View style={styles.placeThumbFallback}>
+                    <ThemedText style={styles.placeCardEmoji}>
+                      {confirmed ? PLACE_CATEGORY_EMOJI[confirmed.category] ?? '📍' : '📍'}
+                    </ThemedText>
+                  </View>
+                )}
                 <View style={styles.placeText}>
                   <ThemedText style={styles.placePrimary} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                     {name}
                   </ThemedText>
-                  <ThemedText style={styles.placeSecondary} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                    {[locality, dwell].filter(Boolean).join(' · ') || 'A stop on your day'}
-                  </ThemedText>
+                  <View style={styles.placeMetaRow}>
+                    {arrived ? (
+                      <>
+                        <IconSymbol name="clock" size={10} color="#B7A8F0" />
+                        <ThemedText style={styles.placeTime} lightColor="#B7A8F0" darkColor="#B7A8F0">
+                          {arrived}
+                        </ThemedText>
+                      </>
+                    ) : null}
+                    <ThemedText
+                      style={styles.placeSecondary}
+                      numberOfLines={1}
+                      lightColor={Lantern.moon500}
+                      darkColor={Lantern.moon500}>
+                      {[locality, dwell].filter(Boolean).join(' · ') || 'A stop on your day'}
+                    </ThemedText>
+                  </View>
                 </View>
                 {confirmed ? (
                   <View style={[styles.placeMeaning, { borderColor: `${MEANING_TINT[confirmed.archetype] ?? Lantern.moon300}66` }]}>
                     <View style={[styles.chipDot, { backgroundColor: MEANING_TINT[confirmed.archetype] ?? Lantern.moon300 }]} />
-                    <ThemedText style={styles.placeMeaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    <ThemedText style={styles.placeMeaningLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                       {confirmed.meaningLabel ?? PLACE_CATEGORY_LABEL[confirmed.category] ?? confirmed.label}
                     </ThemedText>
                   </View>
@@ -311,18 +273,47 @@ export function PlacesDetailSheet({
                   </View>
                 ) : null}
               </View>
-              {photos.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.placePhotoRow}>
-                  {photos.map((uri, index) => (
-                    <Image key={`${uri}-${index}`} source={{ uri }} style={styles.placePhoto} contentFit="cover" transition={120} />
-                  ))}
-                </ScrollView>
-              ) : null}
             </Pressable>
           );
         })}
       </View>
-    </SheetShell>
+    </MeadowSheet>
+  );
+}
+
+// A tinted action tile (Crossroads mockup): a prominent icon over one bold
+// title line that shrinks to fit rather than wrapping.
+function ActionTile({
+  icon,
+  title,
+  tint,
+  onPress,
+}: {
+  icon: Parameters<typeof IconSymbol>[0]['name'];
+  title: string;
+  tint: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.actionTile,
+        { backgroundColor: `${tint}1C`, borderColor: `${tint}55` },
+        pressed ? { backgroundColor: `${tint}30` } : null,
+      ]}>
+      <IconSymbol name={icon} size={26} color={tint} />
+      <ThemedText
+        style={styles.actionTileTitle}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        lightColor={Lantern.moon50}
+        darkColor={Lantern.moon50}>
+        {title}
+      </ThemedText>
+    </Pressable>
   );
 }
 
@@ -597,26 +588,6 @@ function EmptyBody({ label }: { label: string }) {
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    gap: 8,
-    left: 12,
-    paddingBottom: 16,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 4, width: 38 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
   body: { gap: 12, paddingTop: 6 },
   photoRow: { gap: 8, paddingVertical: 2 },
   photo: { width: 88, height: 88, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
@@ -672,27 +643,61 @@ const styles = StyleSheet.create({
   placeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
   placeText: { flex: 1, gap: 1 },
   placePrimary: { fontSize: 14, fontWeight: '700' },
-  placeSecondary: { fontSize: 12, fontWeight: '600' },
+  placeSecondary: { flexShrink: 1, fontSize: 12, fontWeight: '600' },
   placeCard: {
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 14,
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 13,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   placeHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  placeCardEmoji: { fontSize: 20 },
+  tileRow: { flexDirection: 'row', gap: 8 },
+  actionTile: {
+    alignItems: 'center',
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 10,
+  },
+  actionTileTitle: { fontSize: 12, fontWeight: '800' },
+  sectionRow: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 4 },
+  sectionKicker: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
+  placeThumb: {
+    borderCurve: 'continuous',
+    borderRadius: 11,
+    height: 44,
+    width: 44,
+  },
+  placeThumbFallback: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(244, 222, 180, 0.08)',
+    borderColor: 'rgba(244, 222, 180, 0.18)',
+    borderCurve: 'continuous',
+    borderRadius: 11,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  placeMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 4, marginTop: 1 },
+  placeTime: { fontSize: 11.5, fontWeight: '700' },
+  placeCardEmoji: { fontSize: 17 },
   placeMeaning: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    gap: 5,
+    maxWidth: 120,
+    paddingVertical: 4,
+    paddingHorizontal: 9,
     borderRadius: 999,
     borderWidth: 1,
     backgroundColor: 'rgba(12,10,20,0.6)',
   },
-  placeMeaningLabel: { fontSize: 12, fontWeight: '700' },
+  placeMeaningLabel: { flexShrink: 1, fontSize: 11, fontWeight: '700' },
   placeAdd: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   placeAddLabel: { fontSize: 12.5, fontWeight: '800' },
   placePhotoRow: { gap: 8, paddingTop: 2 },
@@ -714,6 +719,4 @@ const styles = StyleSheet.create({
   bigStat: { fontSize: 40, fontWeight: '900', lineHeight: 44 },
   statUnit: { fontSize: 13, fontWeight: '700', marginTop: -4 },
   bodyLine: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  close: { alignSelf: 'center', paddingTop: 8 },
-  closeLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
 });

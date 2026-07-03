@@ -12,6 +12,7 @@ import {
   withSequence,
   withSpring,
   withTiming,
+  type EntryExitAnimationFunction,
 } from 'react-native-reanimated';
 
 import { KatchaDeckUI } from '@/constants/theme';
@@ -24,6 +25,22 @@ export function presenceEnter(delay = 0) {
 
 export function presenceExit(delay = 0) {
   return FadeOutDown.duration(KatchaDeckUI.motion.quick).delay(delay).easing(motionEasing);
+}
+
+// Scale + fade intro for individual chrome elements (buttons, chips, pills) —
+// the sibling of presenceEnter, which handles whole sections.
+export function popEnter(delay = 0): EntryExitAnimationFunction {
+  const duration = KatchaDeckUI.motion.base;
+  return () => {
+    'worklet';
+    return {
+      initialValues: { opacity: 0, transform: [{ scale: 0.86 }] },
+      animations: {
+        opacity: withDelay(delay, withTiming(1, { duration, easing: motionEasing })),
+        transform: [{ scale: withDelay(delay, withTiming(1, { duration, easing: motionEasing })) }],
+      },
+    };
+  };
 }
 
 export function rewardEnter(delay = 0) {

@@ -8,6 +8,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Lantern } from '@/constants/theme';
 import type { KingdomArrivals } from '@/utils/kingdom-arrival';
 import { worldAssetSource } from '@/utils/world-visuals';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The morning ceremony — yesterday joins the Kingdom, witnessed one card at a
 // time: the creature(s) walking in, the keepsakes life earned, any building
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.62)' },
   card: {
     alignItems: 'center',
-    backgroundColor: '#161226',
+    backgroundColor: Meadow.overlay.sheetBg,
     borderColor: 'rgba(255,195,107,0.28)',
     borderCurve: 'continuous',
     borderRadius: 26,

@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
@@ -8,6 +7,7 @@ import { Lantern } from '@/constants/theme';
 import type { DiscoveryCategory, DiscoveryRarity } from '@/types/discoveries';
 import type { DiscoveryEntry } from '@/hooks/use-discoveries';
 import { artefactForReward } from '@/utils/discoveries-artefacts';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The Hall of Discoveries — the collection reader. Grouped by category; unlocked
 // discoveries show their icon/name/date/reward, locked ones a silhouette (hidden
@@ -59,7 +59,6 @@ type DiscoveriesHallSheetProps = {
 };
 
 export function DiscoveriesHallSheet({ entries, unlockedCount, totalCount, onClose }: DiscoveriesHallSheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
   const [filter, setFilter] = useState<HallFilter>('all');
   const visibleEntries = useMemo(() => entries.filter((entry) => matchesFilter(entry, filter)), [entries, filter]);
   const worldRewards = useMemo(() => {
@@ -83,7 +82,7 @@ export function DiscoveriesHallSheet({ entries, unlockedCount, totalCount, onClo
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
         <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
           Hall of Discoveries
@@ -257,8 +256,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 28,
     borderWidth: 1,

@@ -1,16 +1,17 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { dayPromptMenuLabels } from '@/constants/day-prompts';
 import { Lantern } from '@/constants/theme';
 import type { DayPromptKind } from '@/types/home';
 import type { DailySeed } from '@/utils/daily-seeds-engine';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The "Add to today" sheet — replaces the old radial. A bottom panel of prompt
 // category buttons (Feeling, Photo, People…); tapping one opens that prompt's
@@ -48,104 +49,82 @@ export function MomentPromptSheet({
   onPromptDismiss,
 }: MomentPromptSheetProps) {
   const [selected, setSelected] = useState<ActiveDayPrompt | null>(initialPrompt);
-  // Float the sheet just above the (absolute, pill-shaped) tab bar so the bar
-  // never overlaps it.
-  const tabBarHeight = useBottomTabBarHeight();
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-
-        {selected ? (
-          <DayPromptStrip
-            prompt={selected}
-            // Answering or picking a photo feeds the egg (handled by the parent),
-            // then the sheet closes; "Later" just returns to the category list.
-            onAnswer={(kind, choiceIds, from) => {
-              onAnswer(kind, choiceIds, from);
-              onClose();
-            }}
-            onSelectHeroPhoto={(photo, from) => {
-              // Picking a photo opens the full-screen essence flow ("what did
-              // this mean?"); the parent closes this sheet and navigates.
-              onSelectHeroPhoto(photo, from);
-            }}
-            onDismiss={() => {
-              onPromptDismiss?.(selected.id);
-              setSelected(null);
-            }}
-          />
-        ) : (
-          <>
-            {seeds && seeds.length > 0 ? (
-              <View style={styles.seedSection}>
-                <ThemedText style={styles.seedHeading} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                  Things that could shape today
-                </ThemedText>
-                <View style={styles.seedRow}>
-                  {seeds.map((seed) => (
-                    <SeedChip key={seed.id} seed={seed} onComplete={onCompleteSeed} />
-                  ))}
-                </View>
+    <MeadowSheet onClose={onClose} title={selected ? undefined : 'Add to today'}>
+      {selected ? (
+        <DayPromptStrip
+          prompt={selected}
+          // Answering or picking a photo feeds the egg (handled by the parent),
+          // then the sheet closes; "Later" just returns to the category list.
+          onAnswer={(kind, choiceIds, from) => {
+            onAnswer(kind, choiceIds, from);
+            onClose();
+          }}
+          onSelectHeroPhoto={(photo, from) => {
+            // Picking a photo opens the full-screen essence flow ("what did
+            // this mean?"); the parent closes this sheet and navigates.
+            onSelectHeroPhoto(photo, from);
+          }}
+          onDismiss={() => {
+            onPromptDismiss?.(selected.id);
+            setSelected(null);
+          }}
+        />
+      ) : (
+        <>
+          {seeds && seeds.length > 0 ? (
+            <View style={styles.seedSection}>
+              <ThemedText style={styles.seedHeading} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                Things that could shape today
+              </ThemedText>
+              <View style={styles.seedRow}>
+                {seeds.map((seed) => (
+                  <SeedChip key={seed.id} seed={seed} onComplete={onCompleteSeed} />
+                ))}
               </View>
-            ) : null}
+            </View>
+          ) : null}
 
-            <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Add to today
+          {prompts.length === 0 ? (
+            <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              {"You've answered everything for now — the egg has what it needs today."}
             </ThemedText>
-            {prompts.length === 0 ? (
-              <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                {"You've answered everything for now — the egg has what it needs today."}
-              </ThemedText>
-            ) : (
-              <ScrollView
-                contentContainerStyle={styles.categoryGrid}
-                showsVerticalScrollIndicator={false}
-                style={styles.categoryScroll}>
-                {prompts.map((prompt, index) => {
-                  const accent = CHIP_ACCENTS[index % CHIP_ACCENTS.length];
-                  return (
-                    <Animated.View
-                      key={prompt.id}
-                      entering={FadeInDown.delay(40 + index * 35).duration(280)}
-                      style={styles.categoryCell}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={dayPromptMenuLabels[prompt.id]}
-                        onPress={() => {
-                          if (onSelectPrompt?.(prompt)) return;
-                          setSelected(prompt);
-                        }}
-                        style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
-                        <View style={[styles.categoryIcon, { backgroundColor: `${accent}22`, borderColor: `${accent}55` }]}>
-                          <IconSymbol name={prompt.categoryIcon} size={20} color={accent} />
-                        </View>
-                        <ThemedText style={styles.categoryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                          {dayPromptMenuLabels[prompt.id]}
-                        </ThemedText>
-                      </Pressable>
-                    </Animated.View>
-                  );
-                })}
-              </ScrollView>
-            )}
-            <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-              <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                Close
-              </ThemedText>
-            </Pressable>
-          </>
-        )}
-      </Animated.View>
-    </View>
+          ) : (
+            <ScrollView
+              contentContainerStyle={styles.categoryGrid}
+              showsVerticalScrollIndicator={false}
+              style={styles.categoryScroll}>
+              {prompts.map((prompt, index) => {
+                const accent = CHIP_ACCENTS[index % CHIP_ACCENTS.length];
+                return (
+                  <Animated.View
+                    key={prompt.id}
+                    entering={FadeInDown.delay(40 + index * 35).duration(280)}
+                    style={styles.categoryCell}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={dayPromptMenuLabels[prompt.id]}
+                      onPress={() => {
+                        if (onSelectPrompt?.(prompt)) return;
+                        setSelected(prompt);
+                      }}
+                      style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
+                      <View style={[styles.categoryIcon, { backgroundColor: `${accent}22`, borderColor: `${accent}55` }]}>
+                        <IconSymbol name={prompt.categoryIcon} size={20} color={accent} />
+                      </View>
+                      <ThemedText style={styles.categoryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                        {dayPromptMenuLabels[prompt.id]}
+                      </ThemedText>
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </ScrollView>
+          )}
+        </>
+      )}
+    </MeadowSheet>
   );
 }
 
@@ -186,46 +165,6 @@ function SeedChip({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    // Stack above other in-screen overlays; the position offset (above) is what
-    // clears the floating tab bar.
-    elevation: 24,
-    zIndex: 50,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(4, 7, 15, 0.42)',
-  },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    gap: 12,
-    left: 12,
-    paddingBottom: 18,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderRadius: 999,
-    height: 4,
-    marginBottom: 6,
-    width: 38,
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '800',
-    lineHeight: 22,
-    textAlign: 'center',
-  },
   seedSection: { gap: 8 },
   seedHeading: {
     fontSize: 12,
@@ -277,7 +216,7 @@ const styles = StyleSheet.create({
   category: {
     alignItems: 'center',
     backgroundColor: 'rgba(12,10,20,0.72)',
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 18,
     borderWidth: 1,
@@ -301,14 +240,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 16,
     textAlign: 'center',
-  },
-  close: {
-    alignSelf: 'center',
-    paddingTop: 4,
-  },
-  closeLabel: {
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 16,
   },
 });

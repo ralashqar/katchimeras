@@ -1,11 +1,10 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Image } from 'expo-image';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
@@ -49,49 +48,35 @@ export function MoodMonumentSheet({
   onOpenSanctuary?: () => void;
   onClose: () => void;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
   const selected = currentMoodChoice(day);
   const editable = !!onChoose;
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View entering={SlideInDown.duration(260)} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          Mood Monument
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          {editable ? 'How did today feel overall?' : 'How this day felt'}
-        </ThemedText>
-        <ThemedText style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-          Every mood leaves a seed behind.
-        </ThemedText>
+    <MeadowSheet
+      onClose={onClose}
+      kicker="Mood Monument"
+      title={editable ? 'How did today feel overall?' : 'How this day felt'}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
+        {MOOD_CHOICES.map((choice) => (
+          <MoodChoiceButton
+            key={choice.id}
+            choice={choice}
+            selected={selected?.id === choice.id}
+            disabled={!editable}
+            onChoose={onChoose}
+          />
+        ))}
+      </ScrollView>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
-          {MOOD_CHOICES.map((choice) => (
-            <MoodChoiceButton
-              key={choice.id}
-              choice={choice}
-              selected={selected?.id === choice.id}
-              disabled={!editable}
-              onChoose={onChoose}
-            />
-          ))}
-        </ScrollView>
-
-        {!editable && onOpenSanctuary ? (
-          <Pressable accessibilityRole="button" onPress={onOpenSanctuary} style={styles.secondaryButton}>
-            <IconSymbol name="sparkles" size={16} color={Lantern.moon50} />
-            <ThemedText style={styles.secondaryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              View Sanctuary history
-            </ThemedText>
-          </Pressable>
-        ) : null}
-      </Animated.View>
-    </View>
+      {!editable && onOpenSanctuary ? (
+        <Pressable accessibilityRole="button" onPress={onOpenSanctuary} style={styles.secondaryButton}>
+          <IconSymbol name="sparkles" size={16} color={Lantern.moon50} />
+          <ThemedText style={styles.secondaryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            View Sanctuary history
+          </ThemedText>
+        </Pressable>
+      ) : null}
+    </MeadowSheet>
   );
 }
 
@@ -151,28 +136,6 @@ function currentMoodChoice(day: HomeDayRecord): MoodChoice | null {
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    position: 'absolute',
-    left: 12,
-    right: 12,
-    maxHeight: '74%',
-    gap: 10,
-    paddingTop: 12,
-    paddingHorizontal: 18,
-    paddingBottom: 16,
-    borderRadius: 28,
-    borderCurve: 'continuous',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: '#161226',
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-  },
-  grabber: { alignSelf: 'center', width: 38, height: 4, marginBottom: 4, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.22)' },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 19, fontWeight: '900', lineHeight: 24 },
-  body: { fontSize: 13.5, fontWeight: '600', lineHeight: 19 },
   choiceRow: { gap: 10, paddingVertical: 4, paddingRight: 8 },
   choice: {
     width: 126,

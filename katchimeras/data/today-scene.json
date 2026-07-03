@@ -7,7 +7,7 @@
   "egg": {
     "_comment": "Whole egg stage (glow + glass + shell): scale around centre, offsetY in dp (negative = up).",
     "scale": 1,
-    "offsetY": 0
+    "offsetY": 8
   },
   "membrane": {
     "_comment": "Glass dome + ripple rings RELATIVE to the egg: scale around centre, offsetY in dp.",

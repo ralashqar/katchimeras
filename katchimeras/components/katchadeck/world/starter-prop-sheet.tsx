@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image as ExpoImage } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
@@ -7,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { WorldPropDef } from '@/utils/world-props-catalog';
 import { worldAssetSource } from '@/utils/world-visuals';
+import { Meadow } from '@/constants/meadow-theme';
 
 export function StarterPropSheet({
   choices,
@@ -17,7 +17,6 @@ export function StarterPropSheet({
   onChoose: (prop: WorldPropDef) => void;
   onClose: () => void;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
 
   return (
     <View style={styles.overlay}>
@@ -28,7 +27,7 @@ export function StarterPropSheet({
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <ThemedText style={styles.kicker} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
@@ -78,8 +77,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 28,
     borderWidth: 1,

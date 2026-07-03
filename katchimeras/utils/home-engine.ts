@@ -61,6 +61,7 @@ import type {
   StoredHomeLocationPoint,
   StoredHealthRouteImportMeta,
   StoredHomeState,
+  StudioMediaType,
   WeekProfile,
 } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
@@ -895,6 +896,13 @@ export function applyNoteForToday(
     archetype: string;
     label: string;
     bigMoment?: { type: BigMomentType; subject?: string | null };
+    // On-device LLM classification (foundation-note). When llmClassified is
+    // true these are authoritative — media null means "not about a work" and
+    // the regex rules are SKIPPED. When absent (old build, FM unavailable,
+    // cloud/rule interpretation) the deterministic detectors run instead.
+    media?: { mediaType: StudioMediaType; title: string | null; creator: string | null } | null;
+    food?: string | null;
+    llmClassified?: boolean;
   },
   profile: OnboardingProfile,
   now: Date,
@@ -914,13 +922,24 @@ export function applyNoteForToday(
     createdAt,
   };
   // If the note talks about food, fold it into the Food Vault, keeping a back-
-  // reference to the note (so the reader can show where it came from).
-  const foodDetection = detectFoodInText(input.text);
+  // reference to the note (so the reader can show where it came from). The
+  // on-device LLM read is authoritative when present; the regex is the
+  // fallback for old builds / non-Apple-Intelligence devices.
+  const foodDetection: FoodDetection = input.llmClassified
+    ? input.food
+      ? { detected: true, label: input.food }
+      : { detected: false }
+    : detectFoodInText(input.text);
   // Likewise, a note about a book/film/show/game lands in the Studio archive.
-  // Title enforcement: when the regex read of the note text can't find a real
-  // title, fall back to the note's interpreted label (the on-device LLM often
-  // titles the note after the work itself).
   const studioDetection = (() => {
+    if (input.llmClassified) {
+      return input.media
+        ? studioDetectionFromMedia(input.media.mediaType, input.media.title)
+        : ({ detected: false } as StudioDetection);
+    }
+    // Rule fallback. Title enforcement: when the regex read of the note text
+    // can't find a real title, fall back to the note's interpreted label (the
+    // on-device LLM often titles the note after the work itself).
     const detection = detectStudioInText(input.text);
     if (!detection.detected || !isGenericStudioLabel(detection.label)) return detection;
     const fromLabel = extractStudioTitle(input.label) ?? (isGenericStudioLabel(input.label) ? null : input.label.trim());

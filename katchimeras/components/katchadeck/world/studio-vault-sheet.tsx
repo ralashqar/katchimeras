@@ -1,10 +1,10 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { StudioMediaType, StudioMoment, StudioRating } from '@/types/home';
 
@@ -55,63 +55,53 @@ export function StudioMomentSheet({
   // Pre-fill the "what" from on-device detection — user still gives how it landed.
   suggested?: { mediaType: StudioMediaType; label: string; emoji: string } | null;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
   const [media, setMedia] = useState<StudioType | null>(
     suggested ? { mediaType: suggested.mediaType, label: suggested.label, emoji: suggested.emoji } : null
   );
 
   return (
-    <SheetShell onClose={onClose} bottom={tabBarHeight + 10}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        An inspiration
-      </ThemedText>
-      {!media ? (
-        <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            What did you take in?
-          </ThemedText>
-          <View style={styles.grid}>
-            {STUDIO_TYPES.map((option) => (
-              <Pressable key={option.mediaType} onPress={() => setMedia(option)} style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
-                <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {option.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        </Animated.View>
-      ) : (
-        <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {`${media.emoji} ${media.label} · how did it land?`}
-          </ThemedText>
-          <View style={styles.grid}>
-            {STUDIO_RATINGS.map((option) => (
-              <Pressable
-                key={option.id}
-                onPress={() => onConfirm({ label: media.label, mediaType: media.mediaType, emoji: media.emoji, rating: option.id })}
-                style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
-                <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {option.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-          <Pressable accessibilityRole="button" onPress={() => setMedia(null)} style={styles.back}>
-            <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              Back
-            </ThemedText>
-          </Pressable>
-        </Animated.View>
-      )}
-      <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-        <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-          Later
-        </ThemedText>
-      </Pressable>
-    </SheetShell>
+    <MeadowSheet
+      onClose={onClose}
+      kicker="An inspiration"
+      title={media ? `${media.emoji} ${media.label} · how did it land?` : 'What did you take in?'}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {!media ? (
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
+            <View style={styles.grid}>
+              {STUDIO_TYPES.map((option) => (
+                <Pressable key={option.mediaType} onPress={() => setMedia(option)} style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
+                  <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {option.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+        ) : (
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
+            <View style={styles.grid}>
+              {STUDIO_RATINGS.map((option) => (
+                <Pressable
+                  key={option.id}
+                  onPress={() => onConfirm({ label: media.label, mediaType: media.mediaType, emoji: media.emoji, rating: option.id })}
+                  style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
+                  <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {option.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => setMedia(null)} style={styles.back}>
+              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                Back
+              </ThemedText>
+            </Pressable>
+          </Animated.View>
+        )}
+      </ScrollView>
+    </MeadowSheet>
   );
 }
 
@@ -125,98 +115,59 @@ export function StudioVaultSheet({
   onAddStudio?: () => void;
   onClose: () => void;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
   return (
-    <SheetShell onClose={onClose} bottom={tabBarHeight + 10}>
-      <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-        The Studio
-      </ThemedText>
-      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-        {studioMoments.length > 0 ? 'Today’s inspirations' : 'Your inspirations'}
-      </ThemedText>
-
-      <View style={styles.body}>
-        {onAddStudio ? (
-          <Pressable accessibilityRole="button" onPress={onAddStudio} style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}>
-            <ThemedText style={styles.addBtnEmoji}>📖</ThemedText>
-            <ThemedText style={styles.addBtnLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Keep an inspiration
+    <MeadowSheet
+      onClose={onClose}
+      kicker="The Studio"
+      title={studioMoments.length > 0 ? 'Today’s inspirations' : 'Your inspirations'}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <View style={styles.body}>
+          {onAddStudio ? (
+            <Pressable accessibilityRole="button" onPress={onAddStudio} style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}>
+              <ThemedText style={styles.addBtnEmoji}>📖</ThemedText>
+              <ThemedText style={styles.addBtnLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Keep an inspiration
+              </ThemedText>
+            </Pressable>
+          ) : null}
+          {studioMoments.length === 0 ? (
+            <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              Nothing here yet — keep a book, a film, a song that stayed with you.
             </ThemedText>
-          </Pressable>
-        ) : null}
-        {studioMoments.length === 0 ? (
-          <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            Nothing here yet — keep a book, a film, a song that stayed with you.
-          </ThemedText>
-        ) : null}
-        {studioMoments.map((moment) => (
-          <View key={moment.id} style={styles.row}>
-            {moment.thumbnailUri ? (
-              <Image source={{ uri: moment.thumbnailUri }} style={styles.photo} contentFit="cover" transition={120} />
-            ) : (
-              <ThemedText style={styles.rowEmoji}>{moment.emoji}</ThemedText>
-            )}
-            <View style={styles.rowText}>
-              <ThemedText style={styles.rowLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {moment.label}
-              </ThemedText>
-              {moment.detail || moment.source ? (
-                <ThemedText style={styles.rowDetail} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  {moment.detail ? `“${moment.detail}”` : SOURCE_LABEL[moment.source ?? 'manual']}
+          ) : null}
+          {studioMoments.map((moment) => (
+            <View key={moment.id} style={styles.row}>
+              {moment.thumbnailUri ? (
+                <Image source={{ uri: moment.thumbnailUri }} style={styles.photo} contentFit="cover" transition={120} />
+              ) : (
+                <ThemedText style={styles.rowEmoji}>{moment.emoji}</ThemedText>
+              )}
+              <View style={styles.rowText}>
+                <ThemedText style={styles.rowLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  {moment.label}
                 </ThemedText>
-              ) : null}
+                {moment.detail || moment.source ? (
+                  <ThemedText style={styles.rowDetail} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                    {moment.detail ? `“${moment.detail}”` : SOURCE_LABEL[moment.source ?? 'manual']}
+                  </ThemedText>
+                ) : null}
+              </View>
+              <View style={[styles.ratingChip, { borderColor: `${RATING_TINT[moment.rating] ?? Lantern.moon300}66` }]}>
+                <View style={[styles.ratingDot, { backgroundColor: RATING_TINT[moment.rating] ?? Lantern.moon300 }]} />
+                <ThemedText style={styles.ratingLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  {RATING_LABEL[moment.rating] ?? moment.rating}
+                </ThemedText>
+              </View>
             </View>
-            <View style={[styles.ratingChip, { borderColor: `${RATING_TINT[moment.rating] ?? Lantern.moon300}66` }]}>
-              <View style={[styles.ratingDot, { backgroundColor: RATING_TINT[moment.rating] ?? Lantern.moon300 }]} />
-              <ThemedText style={styles.ratingLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {RATING_LABEL[moment.rating] ?? moment.rating}
-              </ThemedText>
-            </View>
-          </View>
-        ))}
-      </View>
-    </SheetShell>
-  );
-}
-
-function SheetShell({ children, onClose, bottom }: { children: React.ReactNode; onClose: () => void; bottom: number }) {
-  return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View entering={SlideInDown.duration(260)} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { bottom }]}>
-        <View style={styles.grabber} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          {children}
-        </ScrollView>
-      </Animated.View>
-    </View>
+          ))}
+        </View>
+      </ScrollView>
+    </MeadowSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    left: 12,
-    maxHeight: '74%',
-    paddingBottom: 14,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 6, width: 38 },
   scroll: { gap: 8, paddingBottom: 4 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
   section: { gap: 10, paddingTop: 6 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
@@ -278,6 +229,4 @@ const styles = StyleSheet.create({
   },
   ratingDot: { width: 7, height: 7, borderRadius: 999 },
   ratingLabel: { fontSize: 12, fontWeight: '700' },
-  close: { alignSelf: 'center', paddingTop: 6 },
-  closeLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
 });

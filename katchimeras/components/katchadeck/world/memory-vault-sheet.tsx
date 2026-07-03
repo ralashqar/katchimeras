@@ -1,10 +1,10 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import { dayAlbums, dayMemories } from '@/utils/day-memories';
@@ -41,7 +41,6 @@ export function MemoryVaultSheet({
   onAddNote?: () => void;
   onClose: () => void;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
   const memories = dayMemories(day);
   const albums = dayAlbums(day);
   const [tab, setTab] = useState<MemoryVaultTab>(initialTab);
@@ -56,175 +55,146 @@ export function MemoryVaultSheet({
   ];
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View entering={SlideInDown.duration(260)} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          Memory Vault
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          {memories.total > 0 ? `${memories.total} ${memories.total === 1 ? 'memory' : 'memories'} kept` : 'A quiet vault, so far'}
-        </ThemedText>
+    <MeadowSheet
+      onClose={onClose}
+      kicker="Memory Vault"
+      title={memories.total > 0 ? `${memories.total} ${memories.total === 1 ? 'memory' : 'memories'} kept` : 'A quiet vault, so far'}
+      maxHeight="78%">
+      <View style={styles.tabs}>
+        {TABS.map((t) => (
+          <Pressable key={t.id} onPress={() => setTab(t.id)} style={[styles.tab, tab === t.id && styles.tabActive]}>
+            <ThemedText style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              {t.label}
+              {t.count !== undefined && t.count > 0 ? ` ${t.count}` : ''}
+            </ThemedText>
+          </Pressable>
+        ))}
+      </View>
 
-        <View style={styles.tabs}>
-          {TABS.map((t) => (
-            <Pressable key={t.id} onPress={() => setTab(t.id)} style={[styles.tab, tab === t.id && styles.tabActive]}>
-              <ThemedText style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                {t.label}
-                {t.count !== undefined && t.count > 0 ? ` ${t.count}` : ''}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <Animated.View key={tab} entering={FadeInDown.duration(200)} style={styles.body}>
+          {tab === 'featured' ? (
+            featuredUri ? (
+              <View style={styles.featuredWrap}>
+                <Image source={{ uri: featuredUri }} style={styles.featured} contentFit="cover" transition={140} />
+                {onChangeFeatured ? (
+                  <Pressable onPress={onChangeFeatured} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                    <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Change cover</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              <View style={styles.featuredEmpty}>
+                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                  No cover yet — pick the photo that defines today.
+                </ThemedText>
+                {onChangeFeatured ? (
+                  <Pressable onPress={onChangeFeatured} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                    <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Pick a cover</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            )
+          ) : null}
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <Animated.View key={tab} entering={FadeInDown.duration(200)} style={styles.body}>
-            {tab === 'featured' ? (
-              featuredUri ? (
-                <View style={styles.featuredWrap}>
-                  <Image source={{ uri: featuredUri }} style={styles.featured} contentFit="cover" transition={140} />
-                  {onChangeFeatured ? (
-                    <Pressable onPress={onChangeFeatured} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
-                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Change cover</ThemedText>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : (
-                <View style={styles.featuredEmpty}>
-                  <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                    No cover yet — pick the photo that defines today.
-                  </ThemedText>
-                  {onChangeFeatured ? (
-                    <Pressable onPress={onChangeFeatured} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
-                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Pick a cover</ThemedText>
-                    </Pressable>
-                  ) : null}
-                </View>
-              )
-            ) : null}
+          {tab === 'photos' ? (
+            memories.photos.length === 0 ? (
+              <View style={styles.emptyActionCard}>
+                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                  No photos yet.
+                </ThemedText>
+                {onAddPhoto ? (
+                  <Pressable onPress={onAddPhoto} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                    <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Add photo</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+                {memories.photos.map((photo) => (
+                  <Image key={photo.id} source={{ uri: photo.thumbnailUri }} style={styles.stripPhoto} contentFit="cover" transition={120} />
+                ))}
+              </ScrollView>
+            )
+          ) : null}
 
-            {tab === 'photos' ? (
-              memories.photos.length === 0 ? (
-                <View style={styles.emptyActionCard}>
-                  <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                    No photos yet.
-                  </ThemedText>
-                  {onAddPhoto ? (
-                    <Pressable onPress={onAddPhoto} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
-                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Add photo</ThemedText>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-                  {memories.photos.map((photo) => (
-                    <Image key={photo.id} source={{ uri: photo.thumbnailUri }} style={styles.stripPhoto} contentFit="cover" transition={120} />
-                  ))}
-                </ScrollView>
-              )
-            ) : null}
-
-            {tab === 'voice' ? (
-              memories.voice.length === 0 ? (
-                <View style={styles.emptyActionCard}>
-                  <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No voice memories yet.</ThemedText>
-                  {onRecordVoice ? (
-                    <Pressable onPress={onRecordVoice} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
-                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Record voice</ThemedText>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : (
-                memories.voice.map((note) => (
-                  <View key={note.id} style={styles.row}>
-                    <ThemedText style={styles.rowEmoji}>🎤</ThemedText>
-                    <View style={styles.rowText}>
-                      <ThemedText style={styles.rowLabel} numberOfLines={2} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                        {note.text || note.label}
-                      </ThemedText>
-                      {formatDuration(note.durationMs) ? (
-                        <ThemedText style={styles.rowMeta} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{formatDuration(note.durationMs)}</ThemedText>
-                      ) : null}
-                    </View>
-                  </View>
-                ))
-              )
-            ) : null}
-
-            {tab === 'notes' ? (
-              memories.notes.length === 0 ? (
-                <View style={styles.emptyActionCard}>
-                  <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No notes yet.</ThemedText>
-                  {onAddNote ? (
-                    <Pressable onPress={onAddNote} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
-                      <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Add note</ThemedText>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : (
-                memories.notes.map((note) => (
-                  <View key={note.id} style={styles.row}>
-                    <ThemedText style={styles.rowEmoji}>📝</ThemedText>
-                    <ThemedText style={styles.rowLabel} numberOfLines={3} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+          {tab === 'voice' ? (
+            memories.voice.length === 0 ? (
+              <View style={styles.emptyActionCard}>
+                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No voice memories yet.</ThemedText>
+                {onRecordVoice ? (
+                  <Pressable onPress={onRecordVoice} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                    <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Record voice</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              memories.voice.map((note) => (
+                <View key={note.id} style={styles.row}>
+                  <ThemedText style={styles.rowEmoji}>🎤</ThemedText>
+                  <View style={styles.rowText}>
+                    <ThemedText style={styles.rowLabel} numberOfLines={2} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                       {note.text || note.label}
                     </ThemedText>
+                    {formatDuration(note.durationMs) ? (
+                      <ThemedText style={styles.rowMeta} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{formatDuration(note.durationMs)}</ThemedText>
+                    ) : null}
                   </View>
-                ))
-              )
-            ) : null}
+                </View>
+              ))
+            )
+          ) : null}
 
-            {tab === 'albums' ? (
-              albums.length === 0 ? (
-                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  No place albums yet — photos group by where you took them.
-                </ThemedText>
-              ) : (
-                albums.map((album) => (
-                  <View key={album.id} style={styles.album}>
-                    <ThemedText style={styles.albumName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                      {album.name} · {album.photos.length}
-                    </ThemedText>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
-                      {album.photos.map((photo) => (
-                        <Image key={photo.id} source={{ uri: photo.thumbnailUri }} style={styles.stripPhoto} contentFit="cover" transition={120} />
-                      ))}
-                    </ScrollView>
-                  </View>
-                ))
-              )
-            ) : null}
-          </Animated.View>
-        </ScrollView>
-      </Animated.View>
-    </View>
+          {tab === 'notes' ? (
+            memories.notes.length === 0 ? (
+              <View style={styles.emptyActionCard}>
+                <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>No notes yet.</ThemedText>
+                {onAddNote ? (
+                  <Pressable onPress={onAddNote} style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}>
+                    <ThemedText style={styles.pillLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Add note</ThemedText>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : (
+              memories.notes.map((note) => (
+                <View key={note.id} style={styles.row}>
+                  <ThemedText style={styles.rowEmoji}>📝</ThemedText>
+                  <ThemedText style={styles.rowLabel} numberOfLines={3} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {note.text || note.label}
+                  </ThemedText>
+                </View>
+              ))
+            )
+          ) : null}
+
+          {tab === 'albums' ? (
+            albums.length === 0 ? (
+              <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                No place albums yet — photos group by where you took them.
+              </ThemedText>
+            ) : (
+              albums.map((album) => (
+                <View key={album.id} style={styles.album}>
+                  <ThemedText style={styles.albumName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {album.name} · {album.photos.length}
+                  </ThemedText>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip}>
+                    {album.photos.map((photo) => (
+                      <Image key={photo.id} source={{ uri: photo.thumbnailUri }} style={styles.stripPhoto} contentFit="cover" transition={120} />
+                    ))}
+                  </ScrollView>
+                </View>
+              ))
+            )
+          ) : null}
+        </Animated.View>
+      </ScrollView>
+    </MeadowSheet>
   );
 }
 
 const GAP = 8;
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    left: 12,
-    maxHeight: '78%',
-    paddingBottom: 14,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 6, width: 38 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '800', lineHeight: 23, marginBottom: 10 },
   tabs: { flexDirection: 'row', gap: 6, marginBottom: 4 },
   tab: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.05)' },
   tabActive: { backgroundColor: 'rgba(146,215,255,0.18)' },

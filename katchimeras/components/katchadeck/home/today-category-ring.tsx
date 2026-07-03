@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { MotiView } from 'moti';
+import Animated from 'react-native-reanimated';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
+import { popEnter } from '@/components/katchadeck/motion';
 import { Meadow } from '@/constants/meadow-theme';
 import type { TodayCategoryState } from '@/utils/today-categories';
 
@@ -63,6 +65,7 @@ export function TodayCategoryRing({
             onPress={() => onPress(category)}
             translateX={x}
             translateY={y}
+            enterDelay={110 + index * 45}
           />
         );
       })}
@@ -107,18 +110,20 @@ function CategoryMote({
   onPress,
   translateX,
   translateY,
+  enterDelay = 0,
 }: {
   category: TodayCategoryState;
   onPress: () => void;
   translateX: number;
   translateY: number;
+  enterDelay?: number;
 }) {
   const active = category.hasContent || category.needsAttention;
   const badge = category.countLabel ?? (category.count > 0 ? `${category.count}` : null);
 
   return (
     <View pointerEvents="box-none" style={[styles.slot, { transform: [{ translateX }, { translateY }] }]}>
-      <View style={styles.chipWrap} pointerEvents="box-none">
+      <Animated.View entering={popEnter(enterDelay)} style={styles.chipWrap} pointerEvents="box-none">
         {category.needsAttention ? (
           <MotiView
             from={{ opacity: 0.35, scale: 1 }}
@@ -161,7 +166,7 @@ function CategoryMote({
             </ThemedText>
           </View>
         ) : null}
-      </View>
+      </Animated.View>
     </View>
   );
 }

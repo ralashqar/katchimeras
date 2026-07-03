@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
@@ -7,6 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { AlmanacSection } from '@/utils/kingdom-decor';
 import { worldAssetSource } from '@/utils/world-visuals';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The keepsake almanac — every way life earns a decoration, with earned pieces
 // lit and everything else a hint of what living more unlocks.
@@ -16,7 +16,6 @@ type KeepsakeAlmanacSheetProps = {
 };
 
 export function KeepsakeAlmanacSheet({ sections, onClose }: KeepsakeAlmanacSheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
   return (
     <View style={styles.overlay}>
       <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
@@ -25,7 +24,7 @@ export function KeepsakeAlmanacSheet({ sections, onClose }: KeepsakeAlmanacSheet
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
         <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
           📖 Almanac
@@ -86,8 +85,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 26, zIndex: 60 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 24,
     borderWidth: 1,

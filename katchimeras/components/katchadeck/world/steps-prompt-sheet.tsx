@@ -1,8 +1,8 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { DayMovementKind } from '@/types/home';
 
@@ -30,73 +30,32 @@ export function StepsPromptSheet({
   onConfirm: (input: { movement: DayMovementKind; label: string; emoji: string }) => void;
   onClose: () => void;
 }) {
-  const tabBarHeight = useBottomTabBarHeight();
   const stepsLine = stepsCount && stepsCount > 0 ? `${stepsCount.toLocaleString()} steps today` : 'A big day of movement';
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View entering={SlideInDown.duration(260)} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            {stepsLine}
-          </ThemedText>
-          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
-            <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              What kind of day was it?
-            </ThemedText>
-            <View style={styles.grid}>
-              {MOVEMENTS.map((option) => (
-                <Pressable
-                  key={option.movement}
-                  onPress={() => onConfirm({ movement: option.movement, label: option.label, emoji: option.emoji })}
-                  style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
-                  <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                    {option.label}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
-          </Animated.View>
-          <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-            <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              Later
-            </ThemedText>
-          </Pressable>
-        </ScrollView>
-      </Animated.View>
-    </View>
+    <MeadowSheet onClose={onClose} kicker={stepsLine} title="What kind of day was it?">
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <Animated.View entering={FadeInDown.duration(220)} style={styles.grid}>
+          {MOVEMENTS.map((option) => (
+            <Pressable
+              key={option.movement}
+              onPress={() => onConfirm({ movement: option.movement, label: option.label, emoji: option.emoji })}
+              style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
+              <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+              <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {option.label}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </Animated.View>
+      </ScrollView>
+    </MeadowSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    left: 12,
-    maxHeight: '74%',
-    paddingBottom: 14,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 6, width: 38 },
   scroll: { gap: 8, paddingBottom: 4 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
-  section: { gap: 10, paddingTop: 6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 6 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -110,6 +69,4 @@ const styles = StyleSheet.create({
   chipPressed: { backgroundColor: 'rgba(40,34,60,0.9)' },
   chipEmoji: { fontSize: 16 },
   chipLabel: { fontSize: 13, fontWeight: '700' },
-  close: { alignSelf: 'center', paddingTop: 6 },
-  closeLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
 });

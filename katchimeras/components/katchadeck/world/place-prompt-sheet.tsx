@@ -1,10 +1,10 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 
 // "Location gives the where, you give the why." A detected place is shown; the
 // user picks what it was (category), then what it meant (feeling). Confirming
@@ -74,7 +74,6 @@ type PlacePromptSheetProps = {
 };
 
 export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, onConfirm, onClose }: PlacePromptSheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
   const [category, setCategory] = useState<PlaceCategory | null>(presetCategory ?? null);
 
   return (
@@ -86,7 +85,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
 
         <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
@@ -162,8 +161,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 28,
     borderWidth: 1,

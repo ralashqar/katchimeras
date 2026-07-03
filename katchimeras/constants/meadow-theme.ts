@@ -45,6 +45,15 @@ export const Meadow = {
   // Scene scrim — behind text sitting directly on the painting.
   scrim: 'rgba(30, 20, 10, 0.35)',
 
+  // Shared overlay sheets (category readers, pickers, prompts): one warm
+  // night-parchment surface, always floating ABOVE the tab bar.
+  overlay: {
+    // Floating pill bar = bottom 20 + ~76 tall; sheets clear it with margin.
+    bottomClearance: 110,
+    sheetBg: '#221B10',
+    sheetBorder: 'rgba(244, 222, 180, 0.24)',
+  },
+
   // Bottom nav (carved wood bar).
   navWood: '#3B2F25',
   navWoodEdge: '#2A211A',

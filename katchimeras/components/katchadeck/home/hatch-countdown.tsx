@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { popEnter } from '@/components/katchadeck/motion';
 import { Lantern } from '@/constants/theme';
 import { resolveHatchHour } from '@/utils/home-engine';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
@@ -63,22 +65,25 @@ export function HatchCountdown({ isReady = false, tint = Lantern.ember300, compa
   }
 
   return (
-    <View style={[styles.card, style]}>
+    <Animated.View entering={popEnter(240)} style={[styles.card, style]}>
       {ready ? (
         <ThemedText style={styles.value} lightColor={GOLD} darkColor={GOLD}>
           Ready to hatch
         </ThemedText>
       ) : (
         <>
-          <ThemedText style={styles.kicker} lightColor={CREAM} darkColor={CREAM}>
-            Hatches in
-          </ThemedText>
+          <View style={styles.kickerRow}>
+            <IconSymbol name="hourglass" size={12} color={CREAM} />
+            <ThemedText style={styles.kicker} lightColor={CREAM} darkColor={CREAM}>
+              Hatches in
+            </ThemedText>
+          </View>
           <ThemedText style={styles.value} lightColor={GOLD} darkColor={GOLD}>
             {formatRemaining(remaining)}
           </ThemedText>
         </>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -96,6 +101,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 9,
   },
+  kickerRow: { alignItems: 'center', flexDirection: 'row', gap: 5 },
   kicker: {
     fontSize: 12,
     fontWeight: '600',

@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
@@ -8,6 +7,7 @@ import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { DayChronicle, ChronicleTimeOfDay } from '@/utils/chronicle-engine';
 import { DayMemoryStrip } from '@/components/katchadeck/world/day-memory-strip';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The Chronicle reader — "what was this day about?". A day theme + story summary,
 // what shaped the day, a light timeline, and linked memories. NOT a calendar list.
@@ -28,7 +28,6 @@ type ChronicleSheetProps = {
 };
 
 export function ChronicleSheet({ chronicle, day, onViewMemories, onClose }: ChronicleSheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
 
   const grouped = TIME_ORDER.map((slot) => ({
     slot,
@@ -44,7 +43,7 @@ export function ChronicleSheet({ chronicle, day, onViewMemories, onClose }: Chro
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
@@ -131,8 +130,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 28,
     borderWidth: 1,

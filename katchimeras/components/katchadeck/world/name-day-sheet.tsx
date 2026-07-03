@@ -1,9 +1,8 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 
 // "Name today's patch" (the namePatch quest). The user accepts a suggestion or
@@ -16,7 +15,6 @@ type NameDaySheetProps = {
 };
 
 export function NameDaySheet({ initialName, suggestion, onSave, onClose }: NameDaySheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
   const [value, setValue] = useState(initialName ?? '');
   const trimmed = value.trim();
 
@@ -28,23 +26,8 @@ export function NameDaySheet({ initialName, suggestion, onSave, onClose }: NameD
   };
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
-        <View style={styles.grabber} />
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          Name this day
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          What was today?
-        </ThemedText>
-
+    <MeadowSheet onClose={onClose} kicker="Name this day" title="What was today?">
+      <View style={styles.body}>
         <TextInput
           value={value}
           onChangeText={setValue}
@@ -74,38 +57,13 @@ export function NameDaySheet({ initialName, suggestion, onSave, onClose }: NameD
             Name it
           </ThemedText>
         </Pressable>
-
-        <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-          <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            Later
-          </ThemedText>
-        </Pressable>
-      </Animated.View>
-    </View>
+      </View>
+    </MeadowSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    gap: 10,
-    left: 12,
-    paddingBottom: 16,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 4, width: 38 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
+  body: { gap: 10 },
   input: {
     marginTop: 4,
     paddingVertical: 12,
@@ -129,6 +87,4 @@ const styles = StyleSheet.create({
   },
   saveDisabled: { opacity: 0.4 },
   saveLabel: { fontSize: 14, fontWeight: '800' },
-  close: { alignSelf: 'center', paddingTop: 2 },
-  closeLabel: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
 });

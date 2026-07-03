@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
@@ -7,6 +6,7 @@ import { Lantern } from '@/constants/theme';
 import type { CosmeticType } from '@/types/cosmetics';
 import type { CosmeticEntry } from '@/hooks/use-cosmetics';
 import { DISCOVERY_CATALOG } from '@/utils/discoveries-catalog';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The cosmetics shop — browse, buy (with Essence), and apply cosmetics (lantern
 // colours in v1). Owned → tap to apply; purchasable → tap to buy then apply; locked
@@ -32,7 +32,6 @@ type CosmeticsSheetProps = {
 };
 
 export function CosmeticsSheet({ entries, balance, onSelect, onBuy, onClose }: CosmeticsSheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
 
   return (
     <View style={styles.overlay}>
@@ -43,7 +42,7 @@ export function CosmeticsSheet({ entries, balance, onSelect, onBuy, onClose }: C
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
         <View style={styles.headRow}>
           <View style={styles.headText}>
@@ -159,8 +158,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 28,
     borderWidth: 1,

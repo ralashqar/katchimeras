@@ -14,7 +14,7 @@ type MediaSpec = { re: RegExp; mediaType: StudioMediaType; emoji: string };
 const MEDIA: MediaSpec[] = [
   {
     // Note: bare "book" (the verb — "book a table") is intentionally excluded.
-    re: /\b(books|a book|the book|good book|novel|memoir|reading|finished reading|paperback|hardback|kindle|audiobook|bookshop|bookstore|book club)\b/,
+    re: /\b(books|a book|the book|good book|new book|novel|memoir|reading|finished reading|paperback|hardback|kindle|audiobook|bookshop|bookstore|book club)\b/,
     mediaType: 'book',
     emoji: '📖',
   },
@@ -164,14 +164,90 @@ function emojiFor(mediaType: StudioMediaType): string {
   return MEDIA.find((spec) => spec.mediaType === mediaType)?.emoji ?? '✨';
 }
 
+// Media VERB + a Capitalised Title = a work, even without a media keyword —
+// "I read Dune" has no 'book/novel/reading' but is unmistakable. The capital
+// requirement is the guard: "i read the news" stays a plain note.
+const VERB_MEDIA: [RegExp, StudioMediaType][] = [
+  [/\b(read|re-?read)\b/, 'book'],
+  [/\b(watched|rewatched)\b/, 'film'],
+  [/\b(played)\b/, 'game'],
+  [/\b(listened to)\b/, 'music'],
+];
+
+// STRICT capitalised-run extraction (no lowercase fallback): the run after a
+// give-away verb, in the ORIGINAL casing. Verbs tolerate a sentence-start
+// capital ("Watched Oppenheimer") without loosening the title's capital gate.
+function extractCapitalisedTitle(text: string): string | null {
+  const verbs = GIVEAWAY_VERBS.split('|')
+    .map((verb) => verb.replace(/^[a-z]/, (ch) => `[${ch.toUpperCase()}${ch}]`))
+    .join('|');
+  const match = text.match(
+    new RegExp(`\\b(?:${verbs})\\s+([A-Z][\\w'’-]*(?:\\s+(?:[A-Z][\\w'’-]+|(?:of|the|a|an|and|to|in|on|at|for)\\b))*)`)
+  );
+  if (!match) return null;
+  // A title never ENDS on a connector ("Hollow Knight for a" → "Hollow Knight").
+  const words = match[1].split(/\s+/);
+  while (words.length > 0 && /^[a-z]/.test(words[words.length - 1])) words.pop();
+  if (words.length === 0) return null;
+  return cleanTitle(words.join(' '));
+}
+
+// A bare media noun in the sentence CONFIRMS the verb even without capitals —
+// voice transcripts are often all-lowercase ("i read the way of kings book").
+// The bare noun alone still detects nothing (that's the "book a table" guard);
+// it needs the verb too.
+const VERB_NOUN_CONFIRM: Partial<Record<StudioMediaType, RegExp>> = {
+  book: /\b(book|books)\b/,
+  film: /\b(movie|movies)\b/,
+  game: /\b(game|games)\b/,
+  music: /\b(album|albums)\b/,
+};
+
+const MEDIA_NOUN_WORD = /^(book|novel|movie|film|show|game|album)$/i;
+
+// "The Way of Kings Book" → "The Way of Kings". Only when ≥3 words remain —
+// real titles end in the noun too ("The Jungle Book" must survive).
+function stripTrailingMediaNoun(title: string): string {
+  const words = title.split(/\s+/);
+  if (words.length >= 4 && MEDIA_NOUN_WORD.test(words[words.length - 1])) {
+    return words.slice(0, -1).join(' ');
+  }
+  return title;
+}
+
 // Detect from a written/voice note's transcript. "finally finished reading Dune"
 // → { book, label: 'Dune' }.
 export function detectStudioInText(text: string | undefined | null): StudioDetection {
   if (!text || !text.trim()) return { detected: false };
   const mediaType = matchMedia(` ${text.toLowerCase()} `);
-  if (!mediaType) return { detected: false };
-  const title = extractTitle(text);
-  return { detected: true, mediaType, label: title ?? MEDIA_LABEL[mediaType], emoji: emojiFor(mediaType) };
+  if (mediaType) {
+    const title = extractTitle(text);
+    return {
+      detected: true,
+      mediaType,
+      label: title ? stripTrailingMediaNoun(title) : MEDIA_LABEL[mediaType],
+      emoji: emojiFor(mediaType),
+    };
+  }
+  // Second chance: a media verb + either a Capitalised Title ("I read Dune",
+  // "watched Oppenheimer") or a confirming bare noun ("i read the way of kings book").
+  const lower = ` ${text.toLowerCase()} `;
+  for (const [re, verbMedia] of VERB_MEDIA) {
+    if (!re.test(lower)) continue;
+    const capitalised = extractCapitalisedTitle(text);
+    if (capitalised) {
+      return { detected: true, mediaType: verbMedia, label: stripTrailingMediaNoun(capitalised), emoji: emojiFor(verbMedia) };
+    }
+    const nounConfirm = VERB_NOUN_CONFIRM[verbMedia];
+    if (nounConfirm && nounConfirm.test(lower)) {
+      const raw = extractStudioTitle(text);
+      // A "title" that STARTS with the noun is no title ("played a game of
+      // cards" → 'Game of Cards') — keep the generic label instead.
+      const title = raw && !MEDIA_NOUN_WORD.test(raw.split(/\s+/)[0]) ? stripTrailingMediaNoun(raw) : null;
+      return { detected: true, mediaType: verbMedia, label: title ?? MEDIA_LABEL[verbMedia], emoji: emojiFor(verbMedia) };
+    }
+  }
+  return { detected: false };
 }
 
 // Cover furniture that is NOT the title — author/publisher/marketing lines.

@@ -8,6 +8,7 @@ import { Lantern } from '@/constants/theme';
 import type { DiscoveryDef, DiscoveryRarity } from '@/types/discoveries';
 import { artefactForReward } from '@/utils/discoveries-artefacts';
 import { discoveryEssence } from '@/utils/essence-engine';
+import { Meadow } from '@/constants/meadow-theme';
 
 // "Discovery Recorded" — the celebration when a NEW discovery unlocks (post-baseline).
 // Tasteful, rarity-scaled, queue-safe (the host shows one at a time). Carries a
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: '#161226',
+    backgroundColor: Meadow.overlay.sheetBg,
     borderRadius: 28,
     borderCurve: 'continuous',
     borderWidth: 1,

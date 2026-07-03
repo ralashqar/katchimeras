@@ -4,6 +4,7 @@ import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 
 type HatchPayoffRevealProps = {
   creatureName: string;
@@ -84,7 +85,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderWidth: 1,
     borderColor: 'rgba(255,195,107,0.32)',
-    backgroundColor: '#161226',
+    backgroundColor: Meadow.overlay.sheetBg,
     boxShadow: '0 18px 52px rgba(0,0,0,0.58)',
     gap: 10,
   },

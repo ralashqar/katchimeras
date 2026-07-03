@@ -2,6 +2,7 @@ import { File } from 'expo-file-system';
 
 import { interpretNoteOnDevice } from '@/utils/foundation-note';
 import { interpretNoteText, type NoteInterpretation } from '@/utils/note-meaning';
+import type { StudioMediaType } from '@/types/home';
 import { transcribeOnDevice } from '@/utils/speech-transcribe';
 import { supabase } from '@/utils/supabase';
 
@@ -17,7 +18,15 @@ import { supabase } from '@/utils/supabase';
 
 const TIMEOUT_MS = 9000;
 
-export type InterpretedNote = NoteInterpretation & { transcript: string };
+export type InterpretedNote = NoteInterpretation & {
+  transcript: string;
+  // On-device LLM classification (new native builds only). When llmClassified
+  // is true the engine trusts these verbatim — media null = "not about media";
+  // when false/undefined the engine falls back to the deterministic rules.
+  media?: { mediaType: StudioMediaType; title: string | null; creator: string | null } | null;
+  food?: string | null;
+  llmClassified?: boolean;
+};
 
 type NoteInput = { text?: string; audioUri?: string; mimeType?: string };
 
@@ -99,7 +108,15 @@ export async function interpretNote(input: NoteInput): Promise<InterpretedNote> 
     const local = await interpretNoteOnDevice(transcript);
     if (local) {
       const rule = interpretNoteText(transcript);
-      return { archetype: local.archetype, label: local.label, bigMoment: rule.bigMoment, transcript };
+      return {
+        archetype: local.archetype,
+        label: local.label,
+        bigMoment: rule.bigMoment,
+        transcript,
+        media: local.media,
+        food: local.food,
+        llmClassified: local.llmClassified,
+      };
     }
     // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.
     const edge = await interpretViaEdge({ text: transcript }, transcript);

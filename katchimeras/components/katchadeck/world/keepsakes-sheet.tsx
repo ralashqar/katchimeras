@@ -1,4 +1,3 @@
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
@@ -8,6 +7,7 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { Lantern } from '@/constants/theme';
 import type { KingdomGift } from '@/utils/kingdom-decor';
 import { worldAssetSource } from '@/utils/world-visuals';
+import { Meadow } from '@/constants/meadow-theme';
 
 // The Kingdom's keepsake shelf — everything life has earned that isn't planted
 // yet, each with its art, name and provenance. Plant drops it at the camera
@@ -21,7 +21,6 @@ type KeepsakesSheetProps = {
 };
 
 export function KeepsakesSheet({ gifts, onPlant, onDecorate, onOpenAlmanac, onClose }: KeepsakesSheetProps) {
-  const tabBarHeight = useBottomTabBarHeight();
   return (
     <View style={styles.overlay}>
       <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
@@ -30,7 +29,7 @@ export function KeepsakesSheet({ gifts, onPlant, onDecorate, onOpenAlmanac, onCl
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: tabBarHeight + 10 }]}>
+        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
         <View style={styles.grabber} />
         <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
           🎁 Keepsakes
@@ -97,8 +96,8 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 55 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
   sheet: {
-    backgroundColor: '#161226',
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: Meadow.overlay.sheetBg,
+    borderColor: Meadow.overlay.sheetBorder,
     borderCurve: 'continuous',
     borderRadius: 24,
     borderWidth: 1,
