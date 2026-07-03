@@ -125,11 +125,13 @@ function CategoryMote({
           ]}>
           <BlurView intensity={30} tint="dark" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, styles.moteTint]} pointerEvents="none" />
-          {CATEGORY_ART[category.id] ? (
-            <Image source={CATEGORY_ART[category.id]} style={styles.chipArt} contentFit="contain" />
-          ) : (
-            <IconSymbol name={category.icon} size={24} color={Meadow.chipLabel} />
-          )}
+          <View style={styles.chipArtWrap} pointerEvents="none">
+            {CATEGORY_ART[category.id] ? (
+              <Image source={CATEGORY_ART[category.id]} style={styles.chipArt} contentFit="contain" />
+            ) : (
+              <IconSymbol name={category.icon} size={24} color={Meadow.chipLabel} />
+            )}
+          </View>
           <ThemedText numberOfLines={1} style={styles.chipName} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
             {category.label}
           </ThemedText>
@@ -172,7 +174,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     // Inner top-light — the glassy bevel the target panels have.
     boxShadow: 'inset 0 1px 0 rgba(255, 248, 230, 0.35)',
-    gap: 3,
     height: 66,
     justifyContent: 'center',
     overflow: 'hidden',
@@ -186,15 +187,25 @@ const styles = StyleSheet.create({
     borderColor: GLOW,
     boxShadow: `0 0 14px ${GLOW}88`,
   },
+  chipArtWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Optically centre the icon in the space above the caption.
+    paddingBottom: 13,
+  },
   chipArt: {
     height: 30,
     width: 30,
   },
   chipName: {
-    fontSize: 10.5,
+    bottom: 5,
+    fontSize: 9.5,
     fontWeight: '600',
+    left: 0,
     letterSpacing: 0.1,
-    maxWidth: 62,
+    position: 'absolute',
+    right: 0,
     textAlign: 'center',
   },
 

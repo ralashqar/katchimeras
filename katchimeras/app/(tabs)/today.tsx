@@ -3,6 +3,8 @@ import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import * as Location from 'expo-location';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeInDown, FadeOut, runOnJS } from 'react-native-reanimated';
@@ -126,11 +128,19 @@ function formatTimeRange(start?: string, end?: string): string | null {
 export default function HomeScreen() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   // Background framing from data/today-scene.json: a gentle zoom plus a
   // vertical shift, clamped so the scaled image always fills the frame.
   const bgScale = Math.max(1, todayScene.background?.scale ?? 1);
   const bgSlack = ((bgScale - 1) * windowHeight) / 2;
   const bgOffsetY = Math.min(bgSlack, Math.max(-bgSlack, todayScene.background?.offsetY ?? 0));
+  // Egg + membrane framing, same JSON (neutral by default).
+  const eggFraming = {
+    scale: todayScene.egg?.scale ?? 1,
+    offsetY: todayScene.egg?.offsetY ?? 0,
+    membraneScale: todayScene.membrane?.scale ?? 1,
+    membraneOffsetY: todayScene.membrane?.offsetY ?? 0,
+  };
   const {
     activeDayPrompt,
     availableDayPrompts,
@@ -464,12 +474,6 @@ export default function HomeScreen() {
 
   // Places: the first detected-but-unconfirmed stop, plus manual "add this place".
   const unconfirmedPlace = useMemo(() => (formingDay ? findUnconfirmedPlace(formingDay) : null), [formingDay]);
-  // How many detected stops still wait for a name (badge on the place button).
-  const unconfirmedPlaceCount = useMemo(() => {
-    if (!formingDay) return 0;
-    const confirmed = new Set((formingDay.confirmedPlaces ?? []).map((place) => place.id));
-    return (formingDay.dayMap?.nodes ?? []).filter((node) => !confirmed.has(node.id) && node.type !== 'home').length;
-  }, [formingDay]);
   const [placeName, setPlaceName] = useState<string | null>(null);
   const [manualPlace, setManualPlace] = useState<{ id: string; name: string; latitude: number; longitude: number } | null>(
     null
@@ -1087,10 +1091,20 @@ export default function HomeScreen() {
         contentFit="cover"
         pointerEvents="none"
       />
-      <View pointerEvents="none" style={styles.meadowScrim} />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(30, 20, 10, 0.04)', 'rgba(30, 20, 10, 0.12)', 'rgba(30, 20, 10, 0.42)']}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Today is a FIXED composition — no page scrolling; everything anchors.
+          (Readers/sheets keep their own scrolling.) The ScrollView shell stays
+          for layout parity but is locked. */}
       <ScrollView
-        contentContainerStyle={styles.content}
-        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 26 }]}
+        contentInsetAdjustmentBehavior="never"
+        scrollEnabled={false}
+        bounces={false}
         showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter(20)}>
           <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
@@ -1114,7 +1128,11 @@ export default function HomeScreen() {
                 reactionKey={selectedDay.moments.length}
                 feedKey={eggFeedKey}
                 lanternColor={lanternColour}
-                shellScale={0.72}
+                scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
+              shellScale={0.72}
               shellOffsetY={0}
               />
             )
@@ -1125,6 +1143,10 @@ export default function HomeScreen() {
               reactionKey={tomorrowDay.moments.length}
               feedKey={eggFeedKey}
               lanternColor={lanternColour}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
               shellScale={0.72}
               shellOffsetY={0}
             />
@@ -1139,6 +1161,10 @@ export default function HomeScreen() {
                 swirl: 0.2,
                 label: 'Not yet formed',
               }}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
               shellScale={0.72}
               shellOffsetY={0}
             />
@@ -1253,18 +1279,11 @@ export default function HomeScreen() {
                 onMicPressOut={() => {
                   void voiceNote.stop();
                 }}
-                onAddPlace={() => {
-                  // A detected stop waiting for a name takes priority over
-                  // manually marking the current location.
-                  if (unconfirmedPlace) setPlacePromptOpen(true);
-                  else void handleAddCurrentPlace();
-                }}
                 onAdd={openPromptSheet}
                 recording={voiceNote.isRecording}
                 cameraBadge={
                   categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined
                 }
-                placeBadge={unconfirmedPlaceCount > 0 ? unconfirmedPlaceCount : undefined}
               />
             </View>
           ) : null}
@@ -1695,14 +1714,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    // Sits the last card just above the floating tab bar (bottom 20 + h 76).
-    paddingBottom: 118,
+    // Fixed page (no scroll): the anchored card ends just above the floating
+    // tab bar (top edge ~96 from the screen bottom) with breathing room.
+    paddingBottom: 116,
     paddingHorizontal: 24,
-    paddingTop: 6,
-  },
-  meadowScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(30, 20, 10, 0.34)',
   },
   eggPedestal: {
     // 4:3 squat pedestal — wider than the egg so the nest cradles it.
@@ -1734,7 +1749,10 @@ const styles = StyleSheet.create({
   },
   sectionGap: {
     gap: 16,
-    marginTop: 12,
+    // 'auto' absorbs free space above, pinning the card just over the tab bar
+    // (paddingBottom on the scroll content sets the standoff).
+    marginTop: 'auto',
+    paddingTop: 12,
   },
   formingCopy: {
     alignItems: 'center',

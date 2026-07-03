@@ -31,6 +31,12 @@ type LanternEggProps = {
   // Shrinks/grows the whole stage (glow, dome, shell) around its centre; the
   // stage's layout height shrinks with it so surrounding content stays tight.
   scale?: number;
+  // Shifts the whole stage vertically (dp; negative = up) without affecting layout.
+  offsetY?: number;
+  // Membrane (glass dome + ripple rings) transform RELATIVE to the egg stage —
+  // scale around centre and vertical shift, for seating the glass on the art.
+  membraneScale?: number;
+  membraneOffsetY?: number;
   // Scales ONLY the egg shell graphic, leaving the glow/dome/membrane at their
   // stage size — for when the egg reads too large inside the glass.
   shellScale?: number;
@@ -59,6 +65,9 @@ export function LanternEgg({
   feedKey = 0,
   lanternColor,
   scale = 1,
+  offsetY = 0,
+  membraneScale = 1,
+  membraneOffsetY = 0,
   shellScale = 1,
   shellOffsetY = -26,
 }: LanternEggProps) {
@@ -193,26 +202,32 @@ export function LanternEgg({
       opacity: 0.5 + pressProgress.value * 0.22 + magnitude * 0.28,
       transform: [
         { translateX: dragX.value * 0.55 },
-        { translateY: dragY.value * 0.55 },
-        { scaleX: 1 + Math.abs(dragX.value) / 260 + pressProgress.value * 0.02 },
-        { scaleY: 1 + Math.abs(dragY.value) / 260 + pressProgress.value * 0.02 },
+        { translateY: membraneOffsetY + dragY.value * 0.55 },
+        { scaleX: (1 + Math.abs(dragX.value) / 260 + pressProgress.value * 0.02) * membraneScale },
+        { scaleY: (1 + Math.abs(dragY.value) / 260 + pressProgress.value * 0.02) * membraneScale },
       ],
     };
   });
 
   const rippleStyle = useAnimatedStyle(() => ({
     opacity: (1 - ripple.value) * 0.55,
-    transform: [{ scale: 0.62 + ripple.value * 0.85 }],
+    transform: [{ translateY: membraneOffsetY }, { scale: (0.62 + ripple.value * 0.85) * membraneScale }],
   }));
 
   const rippleEchoStyle = useAnimatedStyle(() => ({
     opacity: (1 - rippleEcho.value) * 0.35,
-    transform: [{ scale: 0.55 + rippleEcho.value * 1.0 }],
+    transform: [{ translateY: membraneOffsetY }, { scale: (0.55 + rippleEcho.value * 1.0) * membraneScale }],
   }));
 
   return (
     <GestureDetector gesture={gesture}>
-      <View style={[styles.stage, scale !== 1 ? { height: 258 * scale, transform: [{ scale }] } : null]}>
+      <View
+        style={[
+          styles.stage,
+          scale !== 1 || offsetY !== 0
+            ? { height: 258 * scale, transform: [{ translateY: offsetY }, { scale }] }
+            : null,
+        ]}>
         <AnimatedImage
           contentFit="contain"
           pointerEvents="none"
