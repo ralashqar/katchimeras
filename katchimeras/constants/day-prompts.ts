@@ -34,7 +34,10 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     categoryIcon: 'face.smiling',
     dayparts: ['morning', 'midday', 'evening'],
     maxOptions: 8,
-    launchEnabled: true,
+    // RETIRED as a strip prompt — the Mood sheet (mood-monument-sheet) owns
+    // this question now and writes the same 'feeling' answer. Definition kept:
+    // answers still resolve options/score bias through it.
+    launchEnabled: false,
     options: [
       { id: 'calm', label: 'Calm', emoji: 'Calm', icon: 'face.happy', semanticTags: ['feeling:calm'], scoreBias: { calm: 0.34 } },
       { id: 'good', label: 'Good', emoji: 'Good', icon: 'face.happy', semanticTags: ['feeling:good'], scoreBias: { calm: 0.12, energy: 0.08 } },
@@ -60,7 +63,9 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     categoryIcon: 'bed.double.fill',
     dayparts: ['morning', 'midday'],
     maxOptions: 5,
-    launchEnabled: true,
+    // RETIRED as a strip prompt — the Sleep sheet (sleep-sheet) owns this
+    // question now (day.sleep). Definition kept for old stored answers.
+    launchEnabled: false,
     options: [
       { id: 'great', label: 'Great', emoji: 'Great', icon: 'sun.max.fill', semanticTags: ['sleep:great'], scoreBias: { energy: 0.2, calm: 0.1 }, encounterSeedBias: [{ seedId: 'well_rested', intensity: 0.36 }] },
       { id: 'good', label: 'Good', emoji: 'Good', icon: 'moon.stars.fill', semanticTags: ['sleep:good'], scoreBias: { energy: 0.12, calm: 0.1 }, encounterSeedBias: [{ seedId: 'well_rested', intensity: 0.3 }] },

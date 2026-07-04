@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Image } from 'expo-image';
@@ -56,7 +56,8 @@ export function MoodMonumentSheet({
       onClose={onClose}
       kicker="Mood Monument"
       title={editable ? 'How did today feel overall?' : 'How this day felt'}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.choiceRow}>
+      {/* All five moods on one compact grid (3 + 2), no per-mood captions. */}
+      <View style={styles.choiceGrid}>
         {MOOD_CHOICES.map((choice) => (
           <MoodChoiceButton
             key={choice.id}
@@ -66,7 +67,7 @@ export function MoodMonumentSheet({
             onChoose={onChoose}
           />
         ))}
-      </ScrollView>
+      </View>
 
       {!editable && onOpenSanctuary ? (
         <Pressable accessibilityRole="button" onPress={onOpenSanctuary} style={styles.secondaryButton}>
@@ -96,9 +97,10 @@ function MoodChoiceButton({
     ref.current?.measureInWindow((x, y, w, h) => onChoose?.(choice.id, choice.label, { x, y, w, h }));
   };
   return (
-    <View ref={ref}>
+    <View ref={ref} style={styles.choiceCell}>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${choice.label} — ${choice.caption}`}
         accessibilityState={{ selected, disabled }}
         disabled={disabled}
         onPress={handlePress}
@@ -107,18 +109,13 @@ function MoodChoiceButton({
           { borderColor: selected ? choice.accent : `${choice.accent}35`, backgroundColor: selected ? `${choice.accent}22` : 'rgba(255,255,255,0.045)' },
           pressed && !disabled ? styles.choicePressed : null,
         ]}>
-        <View style={[styles.choiceIcon, { backgroundColor: `${choice.accent}22`, borderColor: `${choice.accent}55` }]}>
-          {MOOD_ART[choice.state] ? (
-            <Image source={MOOD_ART[choice.state]} style={{ height: 26, width: 26 }} contentFit="contain" />
-          ) : (
-            <IconSymbol name={choice.icon} size={20} color={choice.accent} />
-          )}
-        </View>
+        {MOOD_ART[choice.state] ? (
+          <Image source={MOOD_ART[choice.state]} style={styles.choiceArt} contentFit="contain" />
+        ) : (
+          <IconSymbol name={choice.icon} size={22} color={choice.accent} />
+        )}
         <ThemedText style={styles.choiceLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           {choice.label}
-        </ThemedText>
-        <ThemedText style={styles.choiceCaption} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-          {choice.caption}
         </ThemedText>
       </Pressable>
     </View>
@@ -136,29 +133,27 @@ function currentMoodChoice(day: HomeDayRecord): MoodChoice | null {
 }
 
 const styles = StyleSheet.create({
-  choiceRow: { gap: 10, paddingVertical: 4, paddingRight: 8 },
+  // 3 tiles up top, 2 (centered) below — one glance, one tap.
+  choiceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  choiceCell: { flexBasis: '30%', flexGrow: 0 },
   choice: {
-    width: 126,
-    minHeight: 130,
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 18,
+    gap: 3,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    borderRadius: 14,
     borderCurve: 'continuous',
     borderWidth: 1,
   },
   choicePressed: { transform: [{ scale: 0.98 }] },
-  choiceIcon: {
-    width: 42,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  choiceLabel: { fontSize: 14, fontWeight: '900', textAlign: 'center' },
-  choiceCaption: { fontSize: 11.5, fontWeight: '600', lineHeight: 15, textAlign: 'center' },
+  choiceArt: { height: 30, width: 30 },
+  choiceLabel: { fontSize: 11.5, fontWeight: '800', textAlign: 'center' },
   secondaryButton: {
     flexDirection: 'row',
     alignItems: 'center',

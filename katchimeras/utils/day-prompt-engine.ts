@@ -16,6 +16,13 @@ export type ActiveDayPrompt = DayPromptDefinition & {
   photoCandidates: DayPromptPhotoCandidate[];
 };
 
+// The only STRIP prompts that ever auto-surface: the contextual photo pair
+// (photo-gated, so they fire only when the roll has something worth keeping).
+// Sleep and mood auto-open as their own SHEETS in sequence (today.tsx morning
+// flow) — their old strip prompts are retired (launchEnabled false). Everything
+// else (activity/people/hobby/day word) lives behind the "+" menu only.
+const AUTO_SURFACED_KINDS = new Set<DayPromptKind>(['meaningful_photo', 'meaning']);
+
 export function selectActiveDayPrompt(
   day: StoredHomeDayRecord,
   now: Date = new Date(),
@@ -35,7 +42,7 @@ export function selectActiveDayPrompt(
   const order = rankPromptKinds(day, now, eligiblePhotoCount, options.forceMeaningfulPhoto === true);
 
   for (const kind of order) {
-    if (answeredOrDismissed.has(kind)) {
+    if (!AUTO_SURFACED_KINDS.has(kind) || answeredOrDismissed.has(kind)) {
       continue;
     }
     const prompt = dayPromptRegistry[kind];
@@ -56,15 +63,9 @@ export function selectActiveDayPrompt(
     };
   }
 
-  const fallback = launchedDayPrompts.find(
-    (prompt) =>
-      prompt.id !== 'meaningful_photo' &&
-      prompt.id !== 'meaning' &&
-      prompt.dayparts.includes(daypart) &&
-      !answeredOrDismissed.has(prompt.id)
-  );
-
-  return fallback ? { ...fallback, photoCandidates: [] } : null;
+  // No generic fallback: once sleep + mood are answered (or out of daypart),
+  // nothing auto-surfaces — the rest of the categories wait in the "+" menu.
+  return null;
 }
 
 // Build a specific prompt by kind, applying the same gating used for the

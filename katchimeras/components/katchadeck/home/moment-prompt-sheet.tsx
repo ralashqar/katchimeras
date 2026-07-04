@@ -4,7 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { dayPromptMenuLabels } from '@/constants/day-prompts';
 import { Lantern } from '@/constants/theme';
@@ -33,6 +33,11 @@ type MomentPromptSheetProps = {
   onSelectPrompt?: (prompt: ActiveDayPrompt) => boolean | void;
   // Fired when a prompt is dismissed via its "Later" button (passes the prompt id).
   onPromptDismiss?: (promptId: string) => void;
+  // Categories that DON'T open a strip prompt here — tapping hands off to the
+  // parent, which opens the category's own sheet (Mood / Sleep). Rendered
+  // first in the same grid so the menu still shows every category.
+  quickCategories?: { id: string; title: string; icon: IconSymbolName; accent: string }[];
+  onQuickCategory?: (id: string) => void;
 };
 
 const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#FFB4A2'];
@@ -47,6 +52,8 @@ export function MomentPromptSheet({
   initialPrompt = null,
   onSelectPrompt,
   onPromptDismiss,
+  quickCategories = [],
+  onQuickCategory,
 }: MomentPromptSheetProps) {
   const [selected, setSelected] = useState<ActiveDayPrompt | null>(initialPrompt);
 
@@ -86,7 +93,7 @@ export function MomentPromptSheet({
             </View>
           ) : null}
 
-          {prompts.length === 0 ? (
+          {prompts.length === 0 && quickCategories.length === 0 ? (
             <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
               {"You've answered everything for now — the egg has what it needs today."}
             </ThemedText>
@@ -95,12 +102,31 @@ export function MomentPromptSheet({
               contentContainerStyle={styles.categoryGrid}
               showsVerticalScrollIndicator={false}
               style={styles.categoryScroll}>
+              {quickCategories.map((category, index) => (
+                <Animated.View
+                  key={`quick-${category.id}`}
+                  entering={FadeInDown.delay(40 + index * 35).duration(280)}
+                  style={styles.categoryCell}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={category.title}
+                    onPress={() => onQuickCategory?.(category.id)}
+                    style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
+                    <View style={[styles.categoryIcon, { backgroundColor: `${category.accent}22`, borderColor: `${category.accent}55` }]}>
+                      <IconSymbol name={category.icon} size={20} color={category.accent} />
+                    </View>
+                    <ThemedText style={styles.categoryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                      {category.title}
+                    </ThemedText>
+                  </Pressable>
+                </Animated.View>
+              ))}
               {prompts.map((prompt, index) => {
                 const accent = CHIP_ACCENTS[index % CHIP_ACCENTS.length];
                 return (
                   <Animated.View
                     key={prompt.id}
-                    entering={FadeInDown.delay(40 + index * 35).duration(280)}
+                    entering={FadeInDown.delay(40 + (quickCategories.length + index) * 35).duration(280)}
                     style={styles.categoryCell}>
                     <Pressable
                       accessibilityRole="button"

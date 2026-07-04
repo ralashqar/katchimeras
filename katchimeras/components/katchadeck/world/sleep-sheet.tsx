@@ -1,10 +1,12 @@
 import { Image } from 'expo-image';
+import { useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { DaySleep, SleepQuality } from '@/types/home';
+import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 
 // Generated 3D sleep-quality icons (FAL row, style-anchored to the sleep moon).
 const SLEEP_ART: Record<string, number> = {
@@ -14,38 +16,31 @@ const SLEEP_ART: Record<string, number> = {
 };
 
 // Sleep — how the day began. Never a score or a failure; low sleep is just a
-// softer, mistier morning. Shows the atmosphere (+ hours if Health knows them)
-// and always lets you answer / re-answer "how was it?".
-const ATMOSPHERE: Record<SleepQuality, { emoji: string; title: string }> = {
-  good: { emoji: '☀️', title: 'Warm light' },
-  normal: { emoji: '🌤️', title: 'A clear start' },
-  low: { emoji: '🌙', title: 'Soft & misty' },
-};
-const OPTIONS: { quality: SleepQuality; emoji: string; label: string }[] = [
-  { quality: 'good', emoji: '☀️', label: 'Good' },
-  { quality: 'normal', emoji: '🌤️', label: 'Okay' },
-  { quality: 'low', emoji: '🌙', label: 'Low' },
+// softer, mistier morning. Just the three options (selected one highlighted)
+// plus the Health hours when known — no atmosphere tag, no extra question.
+const OPTIONS: { quality: SleepQuality; emoji: string; label: string; accent: string }[] = [
+  { quality: 'good', emoji: '☀️', label: 'Good', accent: '#FFC36B' },
+  { quality: 'normal', emoji: '🌤️', label: 'Okay', accent: '#A7D5FF' },
+  { quality: 'low', emoji: '🌙', label: 'Low', accent: '#AAB2FF' },
 ];
 
 type SleepSheetProps = {
   sleep: DaySleep | null;
-  // Absent → read-only (a past/hatched day): show the atmosphere + hours, no chips.
-  onSet?: (quality: SleepQuality) => void;
+  // Absent → read-only (a past/hatched day): options shown dimmed, no taps.
+  // `from` is the tapped tile's screen rect so the host can fly the answer
+  // into the egg (same mote flight as the mood sheet).
+  onSet?: (quality: SleepQuality, label: string, from: FeedSourceRect) => void;
   onClose: () => void;
 };
 
 export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
-  const atmosphere = sleep ? ATMOSPHERE[sleep.quality] : null;
   const hours =
     sleep?.totalSleepMinutes && sleep.totalSleepMinutes > 0
       ? `${Math.floor(sleep.totalSleepMinutes / 60)}h ${sleep.totalSleepMinutes % 60}m`
       : null;
 
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="Sleep"
-      title={atmosphere ? `${atmosphere.emoji} ${atmosphere.title}` : 'Sleep not set yet'}>
+    <MeadowSheet onClose={onClose} kicker="Sleep" title={onSet ? 'How was your sleep?' : 'How the night went'}>
       {hours ? (
         <View style={styles.hoursRow}>
           <ThemedText style={styles.hoursValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
@@ -57,34 +52,63 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
         </View>
       ) : null}
 
-      {onSet ? (
-        <>
-          <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            {atmosphere ? 'How did it really feel?' : 'How was your sleep?'}
-          </ThemedText>
-          <View style={styles.row}>
-            {OPTIONS.map((option) => {
-              const selected = sleep?.quality === option.quality;
-              return (
-                <Pressable
-                  key={option.quality}
-                  onPress={() => onSet(option.quality)}
-                  style={[styles.chip, selected ? styles.chipSelected : null]}>
-                  {SLEEP_ART[option.quality] ? (
-                    <Image source={SLEEP_ART[option.quality]} style={{ height: 30, width: 30 }} contentFit="contain" />
-                  ) : (
-                    <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  )}
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                    {option.label}
-                  </ThemedText>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
+      {/* Same tile language as the mood grid: art on top, label beneath,
+          accent-tinted when selected. */}
+      <View style={styles.row}>
+        {OPTIONS.map((option) => (
+          <SleepOptionTile
+            key={option.quality}
+            option={option}
+            selected={sleep?.quality === option.quality}
+            onSet={onSet}
+          />
+        ))}
+      </View>
     </MeadowSheet>
+  );
+}
+
+// Measures its own screen rect on tap so the answer can fly into the egg
+// (mirrors the mood sheet's choice tiles).
+function SleepOptionTile({
+  option,
+  selected,
+  onSet,
+}: {
+  option: (typeof OPTIONS)[number];
+  selected: boolean;
+  onSet?: (quality: SleepQuality, label: string, from: FeedSourceRect) => void;
+}) {
+  const ref = useRef<View | null>(null);
+  const handlePress = () => {
+    ref.current?.measureInWindow((x, y, w, h) => onSet?.(option.quality, option.label, { x, y, w, h }));
+  };
+  return (
+    <View ref={ref} style={styles.chipCell}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected, disabled: !onSet }}
+        disabled={!onSet}
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.chip,
+          {
+            borderColor: selected ? option.accent : `${option.accent}35`,
+            backgroundColor: selected ? `${option.accent}22` : 'rgba(255,255,255,0.045)',
+          },
+          pressed && onSet ? styles.chipPressed : null,
+          !onSet && !selected ? styles.chipMuted : null,
+        ]}>
+        {SLEEP_ART[option.quality] ? (
+          <Image source={SLEEP_ART[option.quality]} style={styles.chipArt} contentFit="contain" />
+        ) : (
+          <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+        )}
+        <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+          {option.label}
+        </ThemedText>
+      </Pressable>
+    </View>
   );
 }
 
@@ -92,21 +116,21 @@ const styles = StyleSheet.create({
   hoursRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 2 },
   hoursValue: { fontSize: 26, fontWeight: '800', letterSpacing: 0.2 },
   hoursCaption: { fontSize: 12, fontWeight: '700' },
-  question: { fontSize: 13, fontWeight: '700', marginTop: 2 },
-  row: { flexDirection: 'row', gap: 8 },
+  row: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
+  chipCell: { flex: 1 },
+  // Mirrors the mood grid tile exactly (size, radius, selection tint).
   chip: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 11,
+    gap: 3,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
     borderRadius: 14,
-    backgroundColor: 'rgba(12,10,20,0.7)',
+    borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: 'rgba(196,186,240,0.14)',
   },
-  chipSelected: { borderColor: Lantern.ember300, backgroundColor: 'rgba(255,195,107,0.12)' },
-  chipEmoji: { fontSize: 15 },
-  chipLabel: { fontSize: 13, fontWeight: '700' },
+  chipPressed: { transform: [{ scale: 0.98 }] },
+  chipArt: { height: 30, width: 30 },
+  chipMuted: { opacity: 0.55 },
+  chipEmoji: { fontSize: 17 },
+  chipLabel: { fontSize: 11.5, fontWeight: '800', textAlign: 'center' },
 });

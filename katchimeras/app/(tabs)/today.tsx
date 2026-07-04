@@ -41,7 +41,7 @@ import {
   type PlaceMeaning,
 } from '@/components/katchadeck/world/place-prompt-sheet';
 import { StepsPromptSheet } from '@/components/katchadeck/world/steps-prompt-sheet';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { renderDayComic } from '@/utils/day-comic-render';
 import { ensureDayVision } from '@/utils/photo-vision';
 import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
@@ -80,6 +80,8 @@ import { markArrivalPending } from '@/utils/kingdom-arrival';
 import { resolvePlaceName } from '@/utils/place-names';
 import { isPointAtHome, loadHomeAnchor, saveHomeAnchor } from '@/utils/home-location';
 import { MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
+import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
+import { interpretNote } from '@/utils/note-interpret';
 import type {
   BigMomentType,
   DayMapNode,
@@ -96,6 +98,13 @@ const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 // (same pattern as the photos/timeline sections in day-journal-sections).
 const SHOW_HATCHED_ACTION_DOCK = false;
 const SHOW_HATCHED_REFLECTION_CARD = false;
+
+// Mood + Sleep entries in the "+" menu — they open their own sheets instead of
+// the retired strip prompts (accents match those sheets' tiles).
+const QUICK_PROMPT_CATEGORIES: { id: string; title: string; icon: IconSymbolName; accent: string }[] = [
+  { id: 'mood', title: 'Mood', icon: 'face.smiling', accent: '#F5AFC6' },
+  { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF' },
+];
 
 // Highest-rarity-first ordering for picking which pending discovery to celebrate.
 const DISCOVERY_RARITY_ORDER: Record<string, number> = { legendary: 3, epic: 2, rare: 1, common: 0 };
@@ -400,6 +409,33 @@ export default function HomeScreen() {
   const [journeySheetOpen, setJourneySheetOpen] = useState(false);
   const [nameSheetOpen, setNameSheetOpen] = useState(false);
 
+  // Quick TEXT note (tap the mic): an inline text box over the page — enter
+  // interprets on-device and commits straight away, no full-screen flow.
+  const [quickNoteOpen, setQuickNoteOpen] = useState(false);
+  const handleQuickNoteSubmit = async (text: string) => {
+    const interpreted = await interpretNote({ text });
+    const from: FeedSourceRect = { x: windowWidth / 2 + 40, y: windowHeight - 260, w: 60, h: 60 };
+    startEggFeed(from, { label: interpreted.label }, () => {
+      addNote(
+        {
+          kind: 'text',
+          text: interpreted.transcript || text,
+          audioUri: null,
+          durationMs: null,
+          archetype: interpreted.archetype,
+          label: interpreted.label,
+          bigMoment: interpreted.bigMoment,
+          media: interpreted.media,
+          food: interpreted.food,
+          llmClassified: interpreted.llmClassified,
+        },
+        formingTarget
+      );
+      setEggFeedKey((key) => key + 1);
+      setMicrocopy(`${interpreted.label} took root`);
+    });
+  };
+
   // Inline voice note (hold the mic in the add row): record → analyse →
   // accept/discard.
   const voiceNote = useInlineVoiceNote({
@@ -570,10 +606,11 @@ export default function HomeScreen() {
     setMicrocopy(`${input.emoji} ${input.label} · noted`);
   };
 
-  // Morning sleep: the first time Today is entered on a forming day, try Apple
-  // Health for the night's sleep; if it has it, record it; otherwise auto-ask
-  // "how was your sleep?" once. Keyed on the day's INSTANCE (id + storedNonce)
-  // so "reset today" re-arms the prompt while a plain dismiss doesn't nag.
+  // Morning sequence — the ONLY auto prompts, as their real sheets: sleep
+  // first (Apple Health answers it silently when it can), then mood, exactly
+  // as if the user tapped the Sleep then Mood tiles. Keyed on the day's
+  // INSTANCE (id + storedNonce) so "reset today" re-arms the sequence while a
+  // plain dismiss doesn't nag.
   const isFocused = useIsFocused();
   const sleepPromptedRef = useRef<string | null>(null);
   const todayForming = useMemo(() => {
@@ -583,22 +620,36 @@ export default function HomeScreen() {
   const todayFormingId = todayForming?.id ?? null;
   const todayFormingIso = todayForming?.isoDate ?? null;
   const todayHasSleep = !!todayForming?.sleep;
+  const todayHasMood = !!todayForming?.promptAnswers?.some(
+    (answer) => !answer.dismissed && answer.kind === 'feeling' && answer.choiceIds.length > 0
+  );
   const todayFormingKey = todayForming ? `${todayForming.id}:${todayForming.storedNonce ?? ''}` : null;
   useEffect(() => {
-    if (!isFocused || !todayFormingId || !todayFormingIso || todayHasSleep) return;
+    if (!isFocused || !todayFormingId || !todayFormingIso) return;
+    if (todayHasSleep && todayHasMood) return;
     if (sleepPromptedRef.current === todayFormingKey) return;
     sleepPromptedRef.current = todayFormingKey;
     let active = true;
     void (async () => {
-      const health = await loadSleepForDay(todayFormingIso);
-      if (!active) return;
-      if (health) setSleep(health);
-      else setSleepSheetOpen(true);
+      if (!todayHasSleep) {
+        const health = await loadSleepForDay(todayFormingIso);
+        if (!active) return;
+        if (health) {
+          setSleep(health);
+          // Health answered sleep for us — mood is the next (and last) ask.
+          if (!todayHasMood) setMoodSheetOpen(true);
+        } else {
+          // The sheet's onSet chains into the mood sheet when answered.
+          setSleepSheetOpen(true);
+        }
+        return;
+      }
+      if (!todayHasMood) setMoodSheetOpen(true);
     })();
     return () => {
       active = false;
     };
-  }, [isFocused, todayFormingId, todayFormingIso, todayFormingKey, todayHasSleep, setSleep]);
+  }, [isFocused, todayFormingId, todayFormingIso, todayFormingKey, todayHasSleep, todayHasMood, setSleep]);
 
   // The Observatory (what Katchimera has noticed) + Travel Memory controls —
   // reached through the Crossroads reader until it gets its own Kingdom home.
@@ -1252,7 +1303,7 @@ export default function HomeScreen() {
                     router.push('/moment-capture');
                   }}
                   onMicTap={() => {
-                    if (voiceNote.phase === 'idle') router.push('/note-capture');
+                    if (voiceNote.phase === 'idle') setQuickNoteOpen(true);
                   }}
                   onMicPressIn={voiceNote.start}
                   onMicPressOut={() => {
@@ -1298,10 +1349,22 @@ export default function HomeScreen() {
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
 
+      {quickNoteOpen ? (
+        <QuickNoteComposer onClose={() => setQuickNoteOpen(false)} onSubmit={handleQuickNoteSubmit} />
+      ) : null}
+
       {promptSheetOpen ? (
         <MomentPromptSheet
           prompts={popupPrompts}
           initialPrompt={initialPrompt}
+          // Mood + Sleep stay in the menu but open their OWN sheets (the old
+          // strip prompts for both are retired).
+          quickCategories={QUICK_PROMPT_CATEGORIES}
+          onQuickCategory={(id) => {
+            closePromptSheet();
+            if (id === 'sleep') setSleepSheetOpen(true);
+            else if (id === 'mood') setMoodSheetOpen(true);
+          }}
           onAnswer={handleAnswerDayPrompt}
           onSelectHeroPhoto={handleSelectHeroPhoto}
           onPromptDismiss={(promptId) => {
@@ -1438,10 +1501,16 @@ export default function HomeScreen() {
               sleep={viewedDay.sleep ?? null}
               onSet={
                 viewedIsForming
-                  ? (quality) => {
-                      setSleep({ quality, source: 'manual' }, formingTarget);
-                      setMicrocopy('Your morning, remembered');
+                  ? (quality, label, from) => {
                       setSleepSheetOpen(false);
+                      // Fly the choice into the egg (same mote flight + landing
+                      // pulse as the mood sheet), committing when it lands.
+                      startEggFeed(from, { label }, () => {
+                        setSleep({ quality, source: 'manual' }, formingTarget);
+                        setMicrocopy('Your morning, remembered');
+                        // Morning sequence: sleep answered → mood is next (today only).
+                        if (isFormingToday && !todayHasMood) setMoodSheetOpen(true);
+                      });
                     }
                   : undefined
               }
