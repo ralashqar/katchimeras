@@ -6,7 +6,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
-import type { FoodMeaning, FoodMoment } from '@/types/home';
+import type { CuisineFamily, FoodMeaning, FoodMoment } from '@/types/home';
 
 // Food Vault (Patch Systems V3) — what you tasted, shared, or enjoyed. NOT a
 // calorie tracker. A two-step add (what + what it meant) and a small reader.
@@ -28,6 +28,20 @@ export const FOOD_MEANINGS: { id: FoodMeaning; emoji: string; label: string; tin
   { id: 'fuel', emoji: '⚡', label: 'Fuel', tint: '#92D7FF' },
   { id: 'discovery', emoji: '✨', label: 'Discovery', tint: '#7DE8CD' },
 ];
+// "What kind?" — the optional third step on a Meal. A cuisine family lights
+// its Cuisine Lantern the first time it's tasted; Home-made feeds the hearth
+// streak. Skipping is always fine (zero-input principle).
+export const CUISINE_OPTIONS: { id: CuisineFamily; emoji: string; label: string }[] = [
+  { id: 'italian', emoji: '🍝', label: 'Italian' },
+  { id: 'japanese', emoji: '🍣', label: 'Japanese' },
+  { id: 'chinese', emoji: '🥟', label: 'Chinese' },
+  { id: 'indian', emoji: '🍛', label: 'Indian' },
+  { id: 'mexican', emoji: '🌮', label: 'Mexican' },
+  { id: 'middle_eastern', emoji: '🧆', label: 'Middle Eastern' },
+  { id: 'french', emoji: '🥐', label: 'French' },
+  { id: 'greek', emoji: '🥙', label: 'Greek' },
+];
+
 const MEANING_LABEL: Record<FoodMeaning, string> = Object.fromEntries(
   FOOD_MEANINGS.map((meaning) => [meaning.id, meaning.label])
 ) as Record<FoodMeaning, string>;
@@ -47,18 +61,43 @@ export function FoodMomentSheet({
   onClose,
   suggested,
 }: {
-  onConfirm: (input: { label: string; emoji: string; meaning: FoodMeaning }) => void;
+  onConfirm: (input: {
+    label: string;
+    emoji: string;
+    meaning: FoodMeaning;
+    cuisine?: CuisineFamily | null;
+    homeCooked?: boolean;
+  }) => void;
   onClose: () => void;
   // Pre-fill the "what" from on-device food detection — user still gives the why.
   suggested?: { label: string; emoji: string } | null;
 }) {
   const [food, setFood] = useState<FoodType | null>(suggested ?? null);
+  const [meaning, setMeaning] = useState<FoodMeaning | null>(null);
+
+  // Meals get an optional third step ("what kind?"); everything else confirms
+  // straight from the meaning tap.
+  const asksKind = food?.label === 'Meal';
+  const handleMeaning = (id: FoodMeaning) => {
+    if (!food) return;
+    if (asksKind) {
+      setMeaning(id);
+    } else {
+      onConfirm({ label: food.label, emoji: food.emoji, meaning: id });
+    }
+  };
 
   return (
     <MeadowSheet
       onClose={onClose}
       kicker="A food memory"
-      title={food ? `${food.emoji} ${food.label} · what did it mean?` : 'What did you have?'}>
+      title={
+        !food
+          ? 'What did you have?'
+          : meaning
+            ? `${food.emoji} ${food.label} · what kind?`
+            : `${food.emoji} ${food.label} · what did it mean?`
+      }>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {!food ? (
           <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
@@ -73,13 +112,13 @@ export function FoodMomentSheet({
               ))}
             </View>
           </Animated.View>
-        ) : (
+        ) : !meaning ? (
           <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
             <View style={styles.grid}>
               {FOOD_MEANINGS.map((option) => (
                 <Pressable
                   key={option.id}
-                  onPress={() => onConfirm({ label: food.label, emoji: food.emoji, meaning: option.id })}
+                  onPress={() => handleMeaning(option.id)}
                   style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
                   <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
@@ -89,6 +128,42 @@ export function FoodMomentSheet({
               ))}
             </View>
             <Pressable accessibilityRole="button" onPress={() => setFood(null)} style={styles.back}>
+              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                Back
+              </ThemedText>
+            </Pressable>
+          </Animated.View>
+        ) : (
+          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
+            <View style={styles.grid}>
+              <Pressable
+                onPress={() => onConfirm({ label: food.label, emoji: food.emoji, meaning, homeCooked: true })}
+                style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
+                <ThemedText style={styles.chipEmoji}>🍲</ThemedText>
+                <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  Home-made
+                </ThemedText>
+              </Pressable>
+              {CUISINE_OPTIONS.map((option) => (
+                <Pressable
+                  key={option.id}
+                  onPress={() => onConfirm({ label: food.label, emoji: food.emoji, meaning, cuisine: option.id })}
+                  style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
+                  <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    {option.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+              <Pressable
+                onPress={() => onConfirm({ label: food.label, emoji: food.emoji, meaning })}
+                style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
+                <ThemedText style={styles.chipLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                  Skip
+                </ThemedText>
+              </Pressable>
+            </View>
+            <Pressable accessibilityRole="button" onPress={() => setMeaning(null)} style={styles.back}>
               <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
                 Back
               </ThemedText>

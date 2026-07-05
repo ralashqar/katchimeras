@@ -117,6 +117,33 @@ export function deriveKingdomPlotPatch(plot: KingdomPlot): WorldPatch {
   };
 }
 
+// A territory expansion tile as a render patch: same-size plantable ground in
+// the Kingdom's own base art, docked at the exact tessellation offset. Decor
+// merges in at the screen via kingdomDecorObjects(state, `exp-<index>`).
+export function deriveKingdomExpansionPatch(expansion: { index: number; side: 'ne' | 'se' | 'sw' | 'nw'; ring: number }): WorldPatch {
+  return {
+    id: `exp-${expansion.index}`,
+    dayId: `exp-${expansion.index}`,
+    baseId: null, // canvas default = the Kingdom's own tile art
+    isoDate: '',
+    name: 'New land',
+    primaryArchetype: 'calm',
+    secondaryArchetype: null,
+    creatureId: null,
+    creatureVisualKey: null,
+    creatureName: null,
+    rarity: null,
+    size: 4,
+    tiles: groundTiles(4),
+    objects: [],
+    memoryNodes: [],
+    gridCol: 0,
+    gridRow: 0,
+    expansionDock: { side: expansion.side, ring: expansion.ring },
+    connectorSides: [],
+  };
+}
+
 export function deriveKingdomPatch(kingdom: KingdomState): WorldPatch {
   const objects: WorldObject[] = [];
 

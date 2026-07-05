@@ -7,12 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
 import type { HomeDayRecord } from '@/types/home';
-import {
-  BLOOM_POINTS_PER_GIFT,
-  MAX_BLOOM_GIFTS_PER_DAY,
-  bloomPointsForDay,
-  signatureEarnsForDay,
-} from '@/utils/kingdom-decor';
+import { bloomYieldForDay, signatureEarnsForDay } from '@/utils/kingdom-decor';
 import { worldAssetSource } from '@/utils/world-visuals';
 
 // Today's earning surface: a live bloom meter ("2/3 to your next bloom"), a
@@ -28,18 +23,19 @@ type BloomMeterProps = {
 
 export function BloomMeter({ day, keepsakesWaiting, onOpenKeepsakes }: BloomMeterProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const points = bloomPointsForDay(day);
-  const earned = Math.min(MAX_BLOOM_GIFTS_PER_DAY, Math.floor(points / BLOOM_POINTS_PER_GIFT));
-  const maxed = earned >= MAX_BLOOM_GIFTS_PER_DAY;
-  const toNext = maxed ? 0 : BLOOM_POINTS_PER_GIFT - (points % BLOOM_POINTS_PER_GIFT);
-  const progress = maxed ? 1 : (points % BLOOM_POINTS_PER_GIFT) / BLOOM_POINTS_PER_GIFT;
+  // Yield ladder (world-economy.json): 1 bloom is guaranteed every day; living
+  // adds one at each points threshold.
+  const { points, count: earned, prevThreshold, nextThreshold } = bloomYieldForDay(day);
+  const maxed = nextThreshold === null;
+  const toNext = maxed ? 0 : nextThreshold - points;
+  const progress = maxed ? 1 : (points - prevThreshold) / Math.max(1, nextThreshold - prevThreshold);
   const signatures = signatureEarnsForDay(day);
 
   const line = maxed
     ? `${earned} blooms earned today`
-    : earned > 0
+    : earned > 1
       ? `${earned} earned · ${toNext} more ${toNext === 1 ? 'moment' : 'moments'} to the next bloom`
-      : `${toNext} ${toNext === 1 ? 'moment' : 'moments'} to your first bloom`;
+      : `Today’s bloom is growing · ${toNext} ${toNext === 1 ? 'moment' : 'moments'} to a second`;
 
   return (
     <>
@@ -129,8 +125,7 @@ function EarningsSheet({
               {earned} {earned === 1 ? 'bloom' : 'blooms'} · {points} {points === 1 ? 'moment' : 'moments'} lived
             </ThemedText>
             <ThemedText style={styles.earnSub} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              Every ~{BLOOM_POINTS_PER_GIFT} captured moments grow a tree, shrub or flower (up to{' '}
-              {MAX_BLOOM_GIFTS_PER_DAY} a day)
+              One bloom grows every day on its own — captured moments grow more (up to 3 a day)
             </ThemedText>
           </View>
         </View>

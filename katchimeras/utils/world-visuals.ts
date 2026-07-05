@@ -1,6 +1,8 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { homeCreatureVisuals } from '@/constants/home-mvp';
+import { PROMOTED_WORLD_SOURCES } from '@/constants/world-asset-sources.gen';
+import { getDevAssetOverrideSource, getDevKingdomBaseId } from '@/utils/dev-asset-overrides';
 import type { HomeVisualKey } from '@/types/home';
 
 // Bundled world cutouts produced by the generate → matte → verify pipeline
@@ -89,6 +91,132 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   milestone_trip: require('../assets/images/katchimeras/world/objects/milestone/milestone_05.png'), // 🧳 suitcase + signpost
   milestone_achievement: require('../assets/images/katchimeras/world/objects/milestone/milestone_06.png'), // 🏆 trophy
   milestone_monument: require('../assets/images/katchimeras/world/objects/milestone/milestone_07.png'), // 🗿 standing stone
+  // B2 celebrations batch (2026-07) - milestone/calendar keepsake art + future-type pool.
+  birthday_crown: require('../assets/images/katchimeras/world/objects/celebration/birthday_crown.webp'),
+  cake_stand: require('../assets/images/katchimeras/world/objects/celebration/cake_stand.webp'),
+  countdown_orb: require('../assets/images/katchimeras/world/objects/celebration/countdown_orb.webp'),
+  desk_bell: require('../assets/images/katchimeras/world/objects/celebration/desk_bell.webp'),
+  fireworks_fountain: require('../assets/images/katchimeras/world/objects/celebration/fireworks_fountain.webp'),
+  garland_arch: require('../assets/images/katchimeras/world/objects/celebration/garland_arch.webp'),
+  gift_stack: require('../assets/images/katchimeras/world/objects/celebration/gift_stack.webp'),
+  harmony_wreath: require('../assets/images/katchimeras/world/objects/celebration/harmony_wreath.webp'),
+  harvest_horn: require('../assets/images/katchimeras/world/objects/celebration/harvest_horn.webp'),
+  housewarming_wreath: require('../assets/images/katchimeras/world/objects/celebration/housewarming_wreath.webp'),
+  laurel_scroll: require('../assets/images/katchimeras/world/objects/celebration/laurel_scroll.webp'),
+  light_string_pole: require('../assets/images/katchimeras/world/objects/celebration/light_string_pole.webp'),
+  maypole: require('../assets/images/katchimeras/world/objects/celebration/maypole.webp'),
+  reunion_table: require('../assets/images/katchimeras/world/objects/celebration/reunion_table.webp'),
+  stork_lantern: require('../assets/images/katchimeras/world/objects/celebration/stork_lantern.webp'),
+  vow_arbor: require('../assets/images/katchimeras/world/objects/celebration/vow_arbor.webp'),
+  // B5 photo-subject + B9 body/rest/studio batches (2026-07).
+  buskers_case: require('../assets/images/katchimeras/world/objects/photo/buskers_case.webp'),
+  dusk_mirror: require('../assets/images/katchimeras/world/objects/photo/dusk_mirror.webp'),
+  echo_shell: require('../assets/images/katchimeras/world/objects/photo/echo_shell.webp'),
+  ember_ring: require('../assets/images/katchimeras/world/objects/photo/ember_ring.webp'),
+  forest_heart: require('../assets/images/katchimeras/world/objects/photo/forest_heart.webp'),
+  gathering_table: require('../assets/images/katchimeras/world/objects/photo/gathering_table.webp'),
+  golden_frame: require('../assets/images/katchimeras/world/objects/photo/golden_frame.webp'),
+  memory_prism: require('../assets/images/katchimeras/world/objects/photo/memory_prism.webp'),
+  peak_banner: require('../assets/images/katchimeras/world/objects/photo/peak_banner.webp'),
+  pet_pedestal: require('../assets/images/katchimeras/world/objects/photo/pet_pedestal.webp'),
+  rainbow_arc: require('../assets/images/katchimeras/world/objects/photo/rainbow_arc.webp'),
+  sea_glass: require('../assets/images/katchimeras/world/objects/photo/sea_glass.webp'),
+  skyline_diorama: require('../assets/images/katchimeras/world/objects/photo/skyline_diorama.webp'),
+  snow_globe: require('../assets/images/katchimeras/world/objects/photo/snow_globe.webp'),
+  star_basin: require('../assets/images/katchimeras/world/objects/photo/star_basin.webp'),
+  wheel_totem: require('../assets/images/katchimeras/world/objects/photo/wheel_totem.webp'),
+  bound_volume: require('../assets/images/katchimeras/world/objects/body_studio/bound_volume.webp'),
+  cairn_tower: require('../assets/images/katchimeras/world/objects/body_studio/cairn_tower.webp'),
+  dawn_bell: require('../assets/images/katchimeras/world/objects/body_studio/dawn_bell.webp'),
+  dream_bell: require('../assets/images/katchimeras/world/objects/body_studio/dream_bell.webp'),
+  iron_boots: require('../assets/images/katchimeras/world/objects/body_studio/iron_boots.webp'),
+  laurel_column: require('../assets/images/katchimeras/world/objects/body_studio/laurel_column.webp'),
+  library_totem: require('../assets/images/katchimeras/world/objects/body_studio/library_totem.webp'),
+  marquee_sign: require('../assets/images/katchimeras/world/objects/body_studio/marquee_sign.webp'),
+  medal_display: require('../assets/images/katchimeras/world/objects/body_studio/medal_display.webp'),
+  melody_chime: require('../assets/images/katchimeras/world/objects/body_studio/melody_chime.webp'),
+  moonpetal_bed: require('../assets/images/katchimeras/world/objects/body_studio/moonpetal_bed.webp'),
+  poseidon_buoy: require('../assets/images/katchimeras/world/objects/body_studio/poseidon_buoy.webp'),
+  reel_lantern: require('../assets/images/katchimeras/world/objects/body_studio/reel_lantern.webp'),
+  rest_hammock: require('../assets/images/katchimeras/world/objects/body_studio/rest_hammock.webp'),
+  tea_service: require('../assets/images/katchimeras/world/objects/body_studio/tea_service.webp'),
+  zen_fountain: require('../assets/images/katchimeras/world/objects/body_studio/zen_fountain.webp'),
+  // B11 hero monuments batch (2026-07).
+  aurora_column: require('../assets/images/katchimeras/world/objects/monuments/aurora_column.webp'),
+  border_arch: require('../assets/images/katchimeras/world/objects/monuments/border_arch.webp'),
+  century_pillar: require('../assets/images/katchimeras/world/objects/monuments/century_pillar.webp'),
+  harmony_prism: require('../assets/images/katchimeras/world/objects/monuments/harmony_prism.webp'),
+  leap_clock: require('../assets/images/katchimeras/world/objects/monuments/leap_clock.webp'),
+  meridian_globe: require('../assets/images/katchimeras/world/objects/monuments/meridian_globe.webp'),
+  mythic_perch: require('../assets/images/katchimeras/world/objects/monuments/mythic_perch.webp'),
+  year_monument: require('../assets/images/katchimeras/world/objects/monuments/year_monument.webp'),
+  // Grove merge upgrades — one denser cluster per bloom species (2026-07).
+  grove_birch: require('../assets/images/katchimeras/world/objects/decor_plants/grove/birch.webp'),
+  grove_bird_bath: require('../assets/images/katchimeras/world/objects/decor_plants/grove/bird_bath.webp'),
+  grove_blossom: require('../assets/images/katchimeras/world/objects/decor_plants/grove/blossom.webp'),
+  grove_butterfly_bush: require('../assets/images/katchimeras/world/objects/decor_plants/grove/butterfly_bush.webp'),
+  grove_cattails: require('../assets/images/katchimeras/world/objects/decor_plants/grove/cattails.webp'),
+  grove_fern: require('../assets/images/katchimeras/world/objects/decor_plants/grove/fern.webp'),
+  grove_lavender: require('../assets/images/katchimeras/world/objects/decor_plants/grove/lavender.webp'),
+  grove_mushrooms: require('../assets/images/katchimeras/world/objects/decor_plants/grove/mushrooms.webp'),
+  grove_oak: require('../assets/images/katchimeras/world/objects/decor_plants/grove/oak.webp'),
+  grove_pine: require('../assets/images/katchimeras/world/objects/decor_plants/grove/pine.webp'),
+  grove_planter: require('../assets/images/katchimeras/world/objects/decor_plants/grove/planter.webp'),
+  grove_pumpkin_patch: require('../assets/images/katchimeras/world/objects/decor_plants/grove/pumpkin_patch.webp'),
+  grove_shrub: require('../assets/images/katchimeras/world/objects/decor_plants/grove/shrub.webp'),
+  grove_snowdrops: require('../assets/images/katchimeras/world/objects/decor_plants/grove/snowdrops.webp'),
+  grove_stone_lantern: require('../assets/images/katchimeras/world/objects/decor_plants/grove/stone_lantern.webp'),
+  grove_wildflowers: require('../assets/images/katchimeras/world/objects/decor_plants/grove/wildflowers.webp'),
+  // B7 food journey batch (2026-07).
+  chefs_cloche: require('../assets/images/katchimeras/world/objects/food/chefs_cloche.webp'),
+  cuisine_lantern_chinese: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_chinese.webp'),
+  cuisine_lantern_french: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_french.webp'),
+  cuisine_lantern_greek: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_greek.webp'),
+  cuisine_lantern_indian: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_indian.webp'),
+  cuisine_lantern_italian: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_italian.webp'),
+  cuisine_lantern_japanese: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_japanese.webp'),
+  cuisine_lantern_mexican: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_mexican.webp'),
+  cuisine_lantern_middle_eastern: require('../assets/images/katchimeras/world/objects/food/cuisine_lantern_middle_eastern.webp'),
+  grocers_stand: require('../assets/images/katchimeras/world/objects/food/grocers_stand.webp'),
+  hearth_pot: require('../assets/images/katchimeras/world/objects/food/hearth_pot.webp'),
+  orchard_crate: require('../assets/images/katchimeras/world/objects/food/orchard_crate.webp'),
+  picnic_hamper: require('../assets/images/katchimeras/world/objects/food/picnic_hamper.webp'),
+  spice_rack: require('../assets/images/katchimeras/world/objects/food/spice_rack.webp'),
+  sugar_pagoda: require('../assets/images/katchimeras/world/objects/food/sugar_pagoda.webp'),
+  teahouse_kettle: require('../assets/images/katchimeras/world/objects/food/teahouse_kettle.webp'),
+  // B3 travel/tenure + B4 place-category batches (2026-07).
+  camp_tent: require('../assets/images/katchimeras/world/objects/travel/camp_tent.webp'),
+  chronicler_desk: require('../assets/images/katchimeras/world/objects/travel/chronicler_desk.webp'),
+  city_key: require('../assets/images/katchimeras/world/objects/travel/city_key.webp'),
+  founding_stone: require('../assets/images/katchimeras/world/objects/travel/founding_stone.webp'),
+  hometown_plaque: require('../assets/images/katchimeras/world/objects/travel/hometown_plaque.webp'),
+  journey_globe: require('../assets/images/katchimeras/world/objects/travel/journey_globe.webp'),
+  map_table: require('../assets/images/katchimeras/world/objects/travel/map_table.webp'),
+  milepost_50: require('../assets/images/katchimeras/world/objects/travel/milepost_50.webp'),
+  month_ring: require('../assets/images/katchimeras/world/objects/travel/month_ring.webp'),
+  pathfinder_post: require('../assets/images/katchimeras/world/objects/travel/pathfinder_post.webp'),
+  pilgrim_stones: require('../assets/images/katchimeras/world/objects/travel/pilgrim_stones.webp'),
+  striders_obelisk: require('../assets/images/katchimeras/world/objects/travel/striders_obelisk.webp'),
+  thinkers_bench: require('../assets/images/katchimeras/world/objects/travel/thinkers_bench.webp'),
+  travel_trunk: require('../assets/images/katchimeras/world/objects/travel/travel_trunk.webp'),
+  voyager_compass: require('../assets/images/katchimeras/world/objects/travel/voyager_compass.webp'),
+  waymarker_flags: require('../assets/images/katchimeras/world/objects/travel/waymarker_flags.webp'),
+  cinema_marquee: require('../assets/images/katchimeras/world/objects/places/cinema_marquee.webp'),
+  corner_cart: require('../assets/images/katchimeras/world/objects/places/corner_cart.webp'),
+  court_hoop: require('../assets/images/katchimeras/world/objects/places/court_hoop.webp'),
+  curio_obelisk: require('../assets/images/katchimeras/world/objects/places/curio_obelisk.webp'),
+  encore_torch: require('../assets/images/katchimeras/world/objects/places/encore_torch.webp'),
+  farm_windmill: require('../assets/images/katchimeras/world/objects/places/farm_windmill.webp'),
+  garden_arch: require('../assets/images/katchimeras/world/objects/places/garden_arch.webp'),
+  harbor_buoy: require('../assets/images/katchimeras/world/objects/places/harbor_buoy.webp'),
+  market_awning: require('../assets/images/katchimeras/world/objects/places/market_awning.webp'),
+  menagerie_topiary: require('../assets/images/katchimeras/world/objects/places/menagerie_topiary.webp'),
+  neon_jar: require('../assets/images/katchimeras/world/objects/places/neon_jar.webp'),
+  park_kite: require('../assets/images/katchimeras/world/objects/places/park_kite.webp'),
+  temple_bell: require('../assets/images/katchimeras/world/objects/places/temple_bell.webp'),
+  tidepool_basin: require('../assets/images/katchimeras/world/objects/places/tidepool_basin.webp'),
+  whisper_archive: require('../assets/images/katchimeras/world/objects/places/whisper_archive.webp'),
+  wonder_miniature: require('../assets/images/katchimeras/world/objects/places/wonder_miniature.webp'),
   // Restyled level sets (scripts/generate-world-object-grid.py, --mode progression).
   // Image-memories: photo display growing into a full photo tree (1→4).
   memory_photos_1: require('../assets/images/katchimeras/world/objects/memory_photos/memory_photos_01.png'),
@@ -116,9 +244,9 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   studio_shelf: require('../assets/images/katchimeras/world/objects/studio_shelf/studio_shelf_01.webp'),
   // Town Hall: keeps the day's story; tapping it opens the Chronicle reader.
   // User-supplied house cottage (BiRefNet-matted + tight-framed from world/house.png).
-  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_01.webp'),
+  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_02.webp'), // iso-aligned; _01 kept as backup
   // Quest Board: today's notice board; tapping it opens the day's Memory Quests.
-  quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_01.png'),
+  quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_02.webp'), // iso-aligned; _01 kept as backup
 
   // --- Kingdom keepsakes (K5 wave 2 — earned decorations, kingdom-decor.ts) ---
   trail_stone: require('../assets/images/katchimeras/world/objects/trail_stones/trail_stone_pick.png'), // 👣 journeys
@@ -131,7 +259,10 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
 
   // --- Cozy Collectible buildings (docs/world-structures-cozy-direction.md) ---
   // The 7 domains in one designer-toy style, on the new base_env2 island.
-  home: require('../assets/images/katchimeras/world/objects/home/home_01.webp'), // 🏠 the day's story (chronicle)
+  home: require('../assets/images/katchimeras/world/objects/home/home_02.webp'), // 🏠 the day's story (chronicle) — iso-aligned (scripts/iso-align-prop.py); home_01 kept as backup
+  // Round paver plaza — plantable centre platform matching base_garden_main
+  // (the main tile has NO baked plaza; this object provides it).
+  plaza_platform: require('../assets/images/katchimeras/world/objects/plaza_platform/plaza_platform_01.webp'),
   memory_vault: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'), // 📸 owns all captured media
   memory_vault_empty: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
   // Memory Vault GROWS 1→4 (same identity, richer): small safe → grand multi-tier vault.
@@ -139,8 +270,8 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.webp'),
   memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.webp'),
   memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.webp'),
-  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 where did I go? (cozy signpost + lantern)
-  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 how did I move? (cozy footprint stele)
+  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_03.webp'), // 🗺 where did I go? (cozy signpost + lantern) — iso-aligned + BiRefNet-heavy matte; _01/_02 kept as backup
+  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_02.webp'), // 🛤 how did I move? (cozy footprint stele) — iso-aligned, circle-footprint guide; _01 kept as backup
   // 🔭 Observatory tower (Places / where I went) — a proper structure with a telescope.
   observatory: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
   observatory_empty: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
@@ -150,10 +281,10 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   steps_path_2: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_02.webp'),
   steps_path_3: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_03.webp'),
   steps_path_4: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_04.webp'),
-  sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'), // 🌿 how today felt (mood)
-  sanctuary_empty: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'),
-  study: require('../assets/images/katchimeras/world/objects/study/study_01.png'), // 📚 what inspired me
-  food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_01.png'), // 🍽 what I savoured
+  sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_03.webp'), // 🌿 how today felt (mood) — solo gazebo, iso-aligned + BiRefNet-heavy matte; _01/_02 kept as backup
+  sanctuary_empty: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_03.webp'),
+  study: require('../assets/images/katchimeras/world/objects/study/study_02.webp'), // 📚 what inspired me — iso-aligned; _01 kept as backup
+  food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_02.webp'), // 🍽 what I savoured — iso-aligned; _01 kept as backup
   // Memory cluster satellites + the Featured Memory Board (the day's cover).
   featured_board: require('../assets/images/katchimeras/world/objects/featured_board/featured_board_01.png'),
   photos_stack: require('../assets/images/katchimeras/world/objects/photos_stack/photos_stack_01.png'),
@@ -178,7 +309,7 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   decor_1: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_01.png'), // cone pine
   decor_2: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_02.png'), // oak
   decor_3: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_03.png'), // blossom tree
-  decor_4: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_04.png'), // birch
+  decor_4: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_04_v3.webp'), // birch — BiRefNet-heavy matte (clears enclosed canopy gaps); _04.png/_v2 kept as backup
   decor_5: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_05.png'), // shrub
   decor_6: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_06.png'), // fern
   decor_7: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_07.png'), // wildflowers
@@ -190,7 +321,72 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   decor_13: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_13.png'), // signpost
   decor_14: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_14.png'), // boulder
   decor_15: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_15.png'), // mushrooms
-  decor_16: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_16.png'), // hay bale
+  decor_16: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_16.png'),
+  // B1 bloom variant families (4x4 grid batch, 2026-07) - see BLOOM_COMMONS.
+  bloom_birch_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/birch_v1.webp'),
+  bloom_birch_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/birch_v2.webp'),
+  bloom_birch_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/birch_v3.webp'),
+  bloom_birch_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/birch_v4.webp'),
+  bloom_bird_bath_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/bird_bath_v1.webp'),
+  bloom_bird_bath_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/bird_bath_v2.webp'),
+  bloom_bird_bath_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/bird_bath_v3.webp'),
+  bloom_bird_bath_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/bird_bath_v4.webp'),
+  bloom_blossom_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/blossom_v1.webp'),
+  bloom_blossom_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/blossom_v2.webp'),
+  bloom_blossom_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/blossom_v3.webp'),
+  bloom_blossom_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/blossom_v4.webp'),
+  bloom_butterfly_bush_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/butterfly_bush_v1.webp'),
+  bloom_butterfly_bush_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/butterfly_bush_v2.webp'),
+  bloom_butterfly_bush_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/butterfly_bush_v3.webp'),
+  bloom_butterfly_bush_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/butterfly_bush_v4.webp'),
+  bloom_cattails_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/cattails_v1.webp'),
+  bloom_cattails_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/cattails_v2.webp'),
+  bloom_cattails_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/cattails_v3.webp'),
+  bloom_cattails_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/cattails_v4.webp'),
+  bloom_fern_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/fern_v1.webp'),
+  bloom_fern_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/fern_v2.webp'),
+  bloom_fern_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/fern_v3.webp'),
+  bloom_fern_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/fern_v4.webp'),
+  bloom_lavender_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/lavender_v1.webp'),
+  bloom_lavender_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/lavender_v2.webp'),
+  bloom_lavender_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/lavender_v3.webp'),
+  bloom_lavender_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/lavender_v4.webp'),
+  bloom_mushrooms_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/mushrooms_v1.webp'),
+  bloom_mushrooms_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/mushrooms_v2.webp'),
+  bloom_mushrooms_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/mushrooms_v3.webp'),
+  bloom_mushrooms_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/mushrooms_v4.webp'),
+  bloom_oak_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/oak_v1.webp'),
+  bloom_oak_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/oak_v2.webp'),
+  bloom_oak_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/oak_v3.webp'),
+  bloom_oak_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/oak_v4.webp'),
+  bloom_pine_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pine_v1.webp'),
+  bloom_pine_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pine_v2.webp'),
+  bloom_pine_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pine_v3.webp'),
+  bloom_pine_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pine_v4.webp'),
+  bloom_planter_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/planter_v1.webp'),
+  bloom_planter_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/planter_v2.webp'),
+  bloom_planter_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/planter_v3.webp'),
+  bloom_planter_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/planter_v4.webp'),
+  bloom_pumpkin_patch_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pumpkin_patch_v1.webp'),
+  bloom_pumpkin_patch_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pumpkin_patch_v2.webp'),
+  bloom_pumpkin_patch_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pumpkin_patch_v3.webp'),
+  bloom_pumpkin_patch_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/pumpkin_patch_v4.webp'),
+  bloom_shrub_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/shrub_v1.webp'),
+  bloom_shrub_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/shrub_v2.webp'),
+  bloom_shrub_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/shrub_v3.webp'),
+  bloom_shrub_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/shrub_v4.webp'),
+  bloom_snowdrops_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/snowdrops_v1.webp'),
+  bloom_snowdrops_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/snowdrops_v2.webp'),
+  bloom_snowdrops_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/snowdrops_v3.webp'),
+  bloom_snowdrops_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/snowdrops_v4.webp'),
+  bloom_stone_lantern_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/stone_lantern_v1.webp'),
+  bloom_stone_lantern_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/stone_lantern_v2.webp'),
+  bloom_stone_lantern_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/stone_lantern_v3.webp'),
+  bloom_stone_lantern_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/stone_lantern_v4.webp'),
+  bloom_wildflowers_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/wildflowers_v1.webp'),
+  bloom_wildflowers_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/wildflowers_v2.webp'),
+  bloom_wildflowers_3: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/wildflowers_v3.webp'),
+  bloom_wildflowers_4: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/wildflowers_v4.webp'), // hay bale
   // Sleep atmosphere by quality: sundial garden (good) · stone lantern (normal) · moon (low).
   sleep_tile_good: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_01.webp'),
   sleep_tile_normal: require('../assets/images/katchimeras/world/objects/sleep_tile/sleep_tile_02.webp'),
@@ -228,11 +424,17 @@ const CREATURE_PREFIX = 'creature:';
 // Resolve an object's assetKey to a bundled image, or null when there is no art
 // (the caller draws a placeholder). Creatures reuse the existing cutouts.
 export function worldAssetSource(assetKey: string): ImageSourcePropType | null {
+  // Dev-only: an Asset Lab draft override wins (no-op in production builds).
+  const override = getDevAssetOverrideSource(assetKey);
+  if (override) {
+    return override;
+  }
   if (assetKey.startsWith(CREATURE_PREFIX)) {
     const key = assetKey.slice(CREATURE_PREFIX.length) as HomeVisualKey;
     return homeCreatureVisuals[key]?.source ?? null;
   }
-  return WORLD_OBJECT_SOURCES[assetKey] ?? null;
+  // Promoted Asset Lab variants (generated manifest) extend the hand map.
+  return WORLD_OBJECT_SOURCES[assetKey] ?? PROMOTED_WORLD_SOURCES[assetKey] ?? null;
 }
 
 // Large isometric ground-island BASES (Phase 0 of the iso-graphics redesign): the
@@ -247,10 +449,59 @@ const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
   base_env3: require('../assets/images/katchimeras/world/base/base_env3.webp'), // Kingdom centre island (current)
   plot_base_1: require('../assets/images/katchimeras/world/base/plot_base_1.webp'), // expansion islet A
   plot_base_2: require('../assets/images/katchimeras/world/base/plot_base_2.webp'), // expansion islet B
+  // Garden plaza island (GPT Image 2 edit recreation of the user's reference,
+  // flood-fill matted) — selectable as the Kingdom base from the Asset Lab.
+  base_garden: require('../assets/images/katchimeras/world/base/base_garden.webp'),
+  // Simplified sibling: two diagonal paths + plaza only, big empty lawns —
+  // a clean canvas for planting our own props.
+  base_garden_simple: require('../assets/images/katchimeras/world/base/base_garden_simple.webp'),
+  // Tessellation unit: a PERFECT diamond silhouette (no waterfalls/stairs/
+  // corner chips), paths meeting each edge's midpoint — for multi-tile worlds.
+  base_garden_uniform: require('../assets/images/katchimeras/world/base/base_garden_uniform.webp'),
+  // Sibling tessellation unit born from the grid-guide template (wildflower
+  // patches + bushes in the lawns); same canonical diamond, same offsets.
+  base_garden_wildflower: require('../assets/images/katchimeras/world/base/base_garden_wildflower.webp'),
+  // User-supplied toy-brick tile (blue-chroma matted + perspective-normalised
+  // to the canonical diamond — scratchpad brick-tile-normalize.py).
+  base_garden_bricks: require('../assets/images/katchimeras/world/base/base_garden_bricks.webp'),
+  // Best tessellation unit: generated FROM the path-lane guide alone (lanes +
+  // plaza drawn into the template), flat lawns — path crossings within ~13px
+  // of edge midpoints, roads continue seamlessly across tiles.
+  base_garden_flat: require('../assets/images/katchimeras/world/base/base_garden_flat.webp'),
+  // Grass-only canonical tile (no roads/plaza) — the GROUND tile. Roads are
+  // stamped at RUNTIME as path_cell sprites from a layout JSON (world-canvas
+  // kingdomNeighbor), never baked into base art.
+  base_garden_grass: require('../assets/images/katchimeras/world/base/base_garden_grass.webp'),
+  // Pixar-toy restyle of the uniform tile: plush lawn relief, beveled cobble
+  // paths, dished plaza, cobbled border frame. Same canonical diamond.
+  base_garden_toy: require('../assets/images/katchimeras/world/base/base_garden_toy.webp'),
+  // THE main Kingdom tile (user-picked fal generation, normalized): soft
+  // velvet lawns, plain path crossing (no baked plaza — the plaza is a
+  // separate plantable object), cobble border + wall.
+  base_garden_main: require('../assets/images/katchimeras/world/base/base_garden_main.webp'),
 };
 
+// The centre island's canonical id.
+const KINGDOM_BASE_ID = 'base_env3';
+
+// Literal per-id lookup — used by the dev labs to browse SPECIFIC arts, so the
+// dev override must never hijack it.
 export function worldBaseSource(baseId: string): ImageSourcePropType | null {
   return WORLD_BASE_SOURCES[baseId] ?? null;
+}
+
+// Default art for every Kingdom tile.
+const KINGDOM_DEFAULT_ART = 'base_garden_main';
+
+// Kingdom-view resolver: ONE art for EVERY tile in the Kingdom — centre
+// island, expansion plots, and the preview neighbor — so the world reads as a
+// uniform tessellation. The Asset Lab dev override wins over the default.
+export function kingdomBaseSource(baseId?: string | null): ImageSourcePropType | null {
+  const overrideId = getDevKingdomBaseId();
+  if (overrideId && WORLD_BASE_SOURCES[overrideId]) {
+    return WORLD_BASE_SOURCES[overrideId];
+  }
+  return WORLD_BASE_SOURCES[KINGDOM_DEFAULT_ART] ?? WORLD_BASE_SOURCES[baseId ?? KINGDOM_BASE_ID] ?? null;
 }
 
 // Egg pedestal variants (scripts/generate-world-object-grid.py splits a 4×4 grid

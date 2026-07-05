@@ -18,15 +18,21 @@ import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
 import {
   findKingdomDecor,
+  groveMergeCandidates,
   kingdomDecorObjects,
   loadKingdomDecor,
+  mergeKingdomGrove,
   moveKingdomDecor,
   plantKingdomGift,
+  expansionStatsFor,
   keepsakeAlmanac,
+  markExpansionCeremonyShown,
+  pendingExpansionCeremony,
   syncKingdomDecorFromDays,
   unplantKingdomDecor,
   type KingdomDecorItem,
 } from '@/utils/kingdom-decor';
+import { expansionProgress } from '@/utils/world-expansion';
 import { deriveContinuityMotifs } from '@/utils/continuity-engine';
 import { deriveObservations } from '@/utils/observations-engine';
 import { deriveWorldPropInventory } from '@/utils/world-props-engine';
@@ -40,7 +46,7 @@ import { Image } from 'expo-image';
 import { KingdomArrivalCeremony } from '@/components/katchadeck/world/kingdom-arrival-ceremony';
 import { useCosmetics } from '@/hooks/use-cosmetics';
 import { useEssence } from '@/hooks/use-essence';
-import { buildingIdForCategory, deriveKingdomPatch, deriveKingdomPlotPatch } from '@/utils/kingdom-patch';
+import { buildingIdForCategory, deriveKingdomExpansionPatch, deriveKingdomPatch, deriveKingdomPlotPatch } from '@/utils/kingdom-patch';
 import { deriveKingdomPlots } from '@/utils/kingdom-engine';
 import { ARCHIVE_BUILDINGS, buildKingdomArchive, collectKingdomArchiveEntries } from '@/utils/kingdom-archive';
 import { KingdomArchiveModal } from '@/components/katchadeck/world/kingdom-archive-modal';
@@ -58,6 +64,8 @@ import { Meadow } from '@/constants/meadow-theme';
 
 // One ring of empty ground cells frames the island.
 const PATCH_RING = 1;
+// Compass copy for the grow ceremony.
+const SIDE_NAMES: Record<string, string> = { ne: 'north-east', se: 'south-east', sw: 'south-west', nw: 'north-west' };
 // Highest-rarity-first ordering for picking which pending discovery to celebrate.
 const DISCOVERY_RARITY_ORDER: Record<string, number> = { legendary: 3, epic: 2, rare: 1, common: 0 };
 
@@ -102,7 +110,7 @@ export default function KingdomScreen() {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const snap = (value: number) => (snapEnabled ? Math.round(value * 2) / 2 : value);
   const panRef = useRef<GestureType | undefined>(undefined);
-  const getCenterCellRef = useRef<(() => { col: number; row: number } | null) | null>(null);
+  const getCenterCellRef = useRef<(() => { col: number; row: number; plotId: string | null } | null) | null>(null);
   // Provenance card for a tapped decoration.
   const [provenanceItem, setProvenanceItem] = useState<KingdomDecorItem | null>(null);
 
@@ -129,13 +137,23 @@ export default function KingdomScreen() {
   }, [kingdomPatch, decorState]);
 
   const handlePlantGift = (giftId: string, name: string) => {
+    // Plants on whichever tile the camera is centred over (plotId null = the
+    // main island; `exp-N` / plot ids = docked territory).
     const at = getCenterCellRef.current?.();
-    setDecorState((state) => plantKingdomGift(state, giftId, at ? snap(at.col) : undefined, at ? snap(at.row) : undefined));
+    setDecorState((state) =>
+      plantKingdomGift(state, giftId, at ? snap(at.col) : undefined, at ? snap(at.row) : undefined, at?.plotId ?? null)
+    );
     setJustPlantedId(`placed-${giftId}`);
     setMicrocopy(`${name} planted — drag it into place`);
   };
   const handleMoveDecor = (id: string, col: number, row: number) => {
     setDecorState((state) => moveKingdomDecor(state, id, snap(col), snap(row)));
+  };
+  // Grove merge — three identical unplanted commons fuse into one grove.
+  const mergeCandidates = useMemo(() => groveMergeCandidates(decorState), [decorState]);
+  const handleMergeGrove = (speciesId: string, groveName: string) => {
+    setDecorState((state) => mergeKingdomGrove(state, speciesId));
+    setMicrocopy(`Three become one — ${groveName} added to your keepsakes`);
   };
   const handleRemoveDecor = (id: string) => {
     setDecorState((state) => unplantKingdomDecor(state, id));
@@ -205,6 +223,32 @@ export default function KingdomScreen() {
       }));
   }, [days, discoveryEntries]);
 
+  // Territory growth (docs §10): the pending "Kingdom grows" ceremony, the
+  // next-land outlook for the foreshadow chip, and which expansion tiles the
+  // canvas may show (a freshly-unlocked tile stays hidden until the player
+  // taps "Watch it rise", so its entrance animation is actually witnessed).
+  const pendingExpansion = useMemo(() => pendingExpansionCeremony(decorState), [decorState]);
+  const [growAnimIndex, setGrowAnimIndex] = useState<number | null>(null);
+  const expansionOutlook = useMemo(() => {
+    const hatchedDays = days.filter((day) => day.state === 'hatched');
+    return expansionProgress(expansionStatsFor(hatchedDays, decorState, unlockedDiscoveries), (decorState.expansions ?? []).length);
+  }, [days, decorState, unlockedDiscoveries]);
+  const nextLandLine = useMemo(() => {
+    const lines = [...expansionOutlook.lines, expansionOutlook.pressure].filter((line) => line.have < line.need);
+    lines.sort((a, b) => a.have / Math.max(1, a.need) - b.have / Math.max(1, b.need));
+    return lines[0] ?? null;
+  }, [expansionOutlook]);
+  const visibleExpansions = useMemo(
+    () => (decorState.expansions ?? []).filter((expansion) => expansion.ceremonyShown || expansion.index === growAnimIndex),
+    [decorState.expansions, growAnimIndex]
+  );
+  const handleGrowWitness = () => {
+    if (!pendingExpansion) return;
+    setGrowAnimIndex(pendingExpansion.index);
+    setDecorState((state) => markExpansionCeremonyShown(state, pendingExpansion.index));
+    setMicrocopy('New land claimed — plant something on it');
+  };
+
   // Sync on focus: grant whatever new days + achievements have earned (and the
   // one-time legacy hoist), then derive the morning ceremony from the result.
   useFocusEffect(
@@ -230,8 +274,14 @@ export default function KingdomScreen() {
         ...deriveKingdomPlotPatch(plot),
         objects: kingdomDecorObjects(decorState, plot.id),
       })),
+      // Territory tiles: docked patches in the Kingdom's own art, each with
+      // its own plantable cell space (decor addressed by `exp-<index>`).
+      ...visibleExpansions.map((expansion) => ({
+        ...deriveKingdomExpansionPatch(expansion),
+        objects: kingdomDecorObjects(decorState, `exp-${expansion.index}`),
+      })),
     ],
-    [renderPatch, plots, decorState]
+    [renderPatch, plots, decorState, visibleExpansions]
   );
 
   // Essence (cosmetic currency) + cosmetics. "+N" toast when it grows.
@@ -320,6 +370,7 @@ export default function KingdomScreen() {
           onSelectMemory={() => {}}
           onSelectCell={handleSelectCell}
           highlightObjectId={justPlantedId}
+          animateExpansionIndex={growAnimIndex}
         />
 
         {/* Header chrome — the Kingdom's name + what a life has built so far.
@@ -396,6 +447,27 @@ export default function KingdomScreen() {
             </View>
             {decorState.unplanted.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.giftRow}>
+                {mergeCandidates.map((candidate) => (
+                  <Pressable
+                    key={`merge-${candidate.speciesId}`}
+                    accessibilityRole="button"
+                    onPress={() => handleMergeGrove(candidate.speciesId, candidate.name)}
+                    style={({ pressed }) => [styles.giftChip, styles.groveChip, pressed && styles.giftChipPressed]}>
+                    {worldAssetSource(candidate.assetKey) ? (
+                      <Image contentFit="contain" source={worldAssetSource(candidate.assetKey)} style={styles.giftThumb} transition={120} />
+                    ) : (
+                      <ThemedText style={styles.groveGlyph}>🌳</ThemedText>
+                    )}
+                    <View style={styles.giftChipBody}>
+                      <ThemedText style={styles.giftName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                        Merge 3 → {candidate.name}
+                      </ThemedText>
+                      <ThemedText numberOfLines={1} style={styles.giftSource} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                        {candidate.available} {candidate.speciesName} waiting
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                ))}
                 {decorState.unplanted.map((gift) => (
                   <Pressable
                     key={gift.id}
@@ -430,6 +502,34 @@ export default function KingdomScreen() {
             <ThemedText style={styles.microcopyText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
               {microcopy}
             </ThemedText>
+          </Animated.View>
+        ) : null}
+
+        {/* Land Deeds foreshadow — quiet chip once the next land is >=50% earned. */}
+        {!pendingExpansion && nextLandLine && expansionOutlook.overall >= 0.5 ? (
+          <View pointerEvents="none" style={styles.deedsChip}>
+            <ThemedText style={styles.deedsLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              🏞 New land soon · {nextLandLine.have}/{nextLandLine.need} {nextLandLine.label}
+            </ThemedText>
+          </View>
+        ) : null}
+
+        {/* The grow ceremony: announce, then reveal the rising tile on tap. */}
+        {pendingExpansion ? (
+          <Animated.View entering={FadeInDown.duration(320)} style={styles.growOverlay}>
+            <View style={styles.growCard}>
+              <ThemedText style={styles.growTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Your Kingdom grows 🌱
+              </ThemedText>
+              <ThemedText style={styles.growBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                The life you’ve lived has earned new land to the {SIDE_NAMES[pendingExpansion.side]}.
+              </ThemedText>
+              <Pressable accessibilityRole="button" onPress={handleGrowWitness} style={styles.growButton}>
+                <ThemedText style={styles.growButtonLabel} lightColor={Lantern.ink950} darkColor={Lantern.ink950}>
+                  Watch it rise
+                </ThemedText>
+              </Pressable>
+            </View>
           </Animated.View>
         ) : null}
       </View>
@@ -582,6 +682,49 @@ const styles = StyleSheet.create({
     zIndex: 45,
   },
   microcopyText: { fontSize: 13, fontWeight: '700' },
+  deedsChip: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(11,13,20,0.72)',
+    borderColor: 'rgba(216,228,255,0.16)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    position: 'absolute',
+    top: 118,
+  },
+  deedsLabel: { fontSize: 12, fontWeight: '700' },
+  growOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    backgroundColor: 'rgba(7,9,15,0.55)',
+    justifyContent: 'center',
+    zIndex: 40,
+  },
+  growCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(11,13,20,0.94)',
+    borderColor: 'rgba(255,195,107,0.35)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 10,
+    maxWidth: 320,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+  },
+  growTitle: { fontSize: 19, fontWeight: '800' },
+  growBody: { fontSize: 13.5, lineHeight: 19, textAlign: 'center' },
+  growButton: {
+    backgroundColor: '#FFC36B',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    marginTop: 4,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+  },
+  growButtonLabel: { fontSize: 14, fontWeight: '800' },
   headerButtonOn: { backgroundColor: Lantern.ember300, borderColor: Lantern.ember300 },
   giftBadge: {
     alignItems: 'center',
@@ -630,6 +773,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
+  groveChip: { borderColor: 'rgba(125,232,205,0.55)', borderStyle: 'dashed' },
+  groveGlyph: { fontSize: 22 },
   giftThumb: { height: 34, width: 34 },
   giftChipBody: { flexShrink: 1, gap: 1 },
   giftChipPressed: { backgroundColor: 'rgba(40,34,60,0.95)' },

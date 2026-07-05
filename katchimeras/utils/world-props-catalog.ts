@@ -17,7 +17,15 @@ export type WorldPropDef = {
   lockedLabel: string;
   rarity?: DiscoveryRarity;
   sizeScale?: number;
+  // Optional variant siblings (promoted Asset Lab art) — grants pick one
+  // deterministically per grant id. Absent → assetKey is the only art.
+  variants?: string[];
 };
+
+// The art pool a grant picks from (assetKey plus any promoted siblings).
+export function propArtVariants(def: WorldPropDef): string[] {
+  return def.variants && def.variants.length > 0 ? def.variants : [def.assetKey];
+}
 
 export const STARTER_WORLD_PROPS: WorldPropDef[] = [
   {

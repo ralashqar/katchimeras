@@ -1,6 +1,7 @@
 import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import tileLayout from '@/data/world-tile-layout.json';
 import { MotiView } from 'moti';
 import { Fragment, type MutableRefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, type LayoutChangeEvent, Pressable, StyleSheet, type StyleProp, Text, View, type ViewStyle } from 'react-native';
@@ -10,6 +11,7 @@ import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeInUp,
   runOnJS,
   type SharedValue,
   useAnimatedStyle,
@@ -37,8 +39,8 @@ import {
   DECAL_ATLAS,
   DECAL_ATLAS_COLS,
   DECAL_ATLAS_ROWS,
+  kingdomBaseSource,
   worldAssetSource,
-  worldBaseSource,
   worldDecalCell,
 } from '@/utils/world-visuals';
 import {
@@ -104,6 +106,9 @@ type Props = {
   onPressStepsAlert?: () => void;
   moodAlert?: boolean;
   structureAttention?: Partial<Record<WorldObjectCategory, boolean>>;
+  // Territory growth (docs §10): the freshly-unlocked docked patch (id
+  // `exp-<index>`) rises in during the grow ceremony — once, then static.
+  animateExpansionIndex?: number | null;
   // Hide the recenter button so a status pill (e.g. "Reading…") can take its slot.
   hideRecenter?: boolean;
   // Rings of empty ground cells framing the patch (single-patch home view).
@@ -135,7 +140,9 @@ type Props = {
   panRef?: MutableRefObject<GestureType | undefined>;
   // Filled with a getter for the patch cell currently at the SCREEN CENTRE, so the
   // parent can plant new decor wherever the camera is centred (not a fixed spot).
-  getCenterCellRef?: MutableRefObject<(() => { col: number; row: number } | null) | null>;
+  // Inverts the screen centre to (cell, owning tile): plotId null = the main
+  // island, otherwise the docked plot/expansion patch under the camera.
+  getCenterCellRef?: MutableRefObject<(() => { col: number; row: number; plotId: string | null } | null) | null>;
   // The day's Featured Memory thumbnail — painted into the Featured Board's frame.
   featuredThumb?: string | null;
 };
@@ -337,6 +344,7 @@ export function WorldCanvas({
   panRef,
   getCenterCellRef,
   featuredThumb,
+  animateExpansionIndex = null,
 }: Props) {
   // stableBounds (image-base mode) freezes the coordinate space to the slab geometry
   // so planting/moving objects can't snap the camera around.
@@ -349,11 +357,20 @@ export function WorldCanvas({
       const found = scene.slabs.find((s) => s.patchId === eggPatchId);
       if (found) return found;
     }
+    // Image mode: focus the MAIN island (no baseId, not a docked territory
+    // tile) — appended plots/expansions must never steal the camera anchor.
+    if (imageBase) {
+      const main = scene.slabs.find((slab) => {
+        const patch = patches.find((candidate) => candidate.id === slab.patchId);
+        return !!patch && !patch.baseId && !patch.expansionDock;
+      });
+      if (main) return main;
+    }
     return scene.slabs[scene.slabs.length - 1] ?? null;
-  }, [scene, eggPatchId]);
+  }, [scene, eggPatchId, imageBase, patches]);
 
   // --- Image base: the ground PNG + drag customisation ---------------------
-  const baseSource = imageBase ? worldBaseSource(IMAGE_BASE_ID) : null;
+  const baseSource = imageBase ? kingdomBaseSource(IMAGE_BASE_ID) : null;
   const imgBase = !!(baseSource && focusSlab);
 
   // The square rect the base PNG is drawn in: centred on the patch's grass
@@ -371,6 +388,22 @@ export function WorldCanvas({
   // so the patch looks identical to the grid layout by default.
   const [custom, setCustom] = useState<BaseCustomisation>(() => (imageBase ? loadBaseCustomisation() : {}));
 
+  // Sprite → owning slab (drag math and custom overrides are relative to the
+  // sprite's OWN tile, so decor on territory tiles positions correctly).
+  const slabByPatch = useMemo(() => new Map(scene.slabs.map((slab) => [slab.patchId, slab])), [scene.slabs]);
+  const spritePatchByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of scene.sprites) {
+      map.set(s.id, s.patchId);
+      map.set(slotKey(s), s.patchId);
+    }
+    return map;
+  }, [scene.sprites]);
+  const slabForKey = useCallback(
+    (key: string) => slabByPatch.get(spritePatchByKey.get(key) ?? '') ?? focusSlab,
+    [slabByPatch, spritePatchByKey, focusSlab]
+  );
+
   // Objects with any user customisation applied (drag overrides the grid cell).
   const positionedSprites = useMemo(() => {
     if (!imgBase || !focusSlab) return scene.sprites;
@@ -378,12 +411,13 @@ export function WorldCanvas({
     return scene.sprites.map((s) => {
       const c = custom[slotKey(s)];
       if (!c) return s;
+      const slab = slabByPatch.get(s.patchId) ?? focusSlab;
       const currentLocalDepth = drawDepth(s.col, s.row) * 2 + (s.kind === 'creature' ? 1 : 0);
       const patchDepth = s.depth - currentLocalDepth;
       return {
         ...s,
-        x: focusSlab.centre.x + (cellCenter(c.col, c.row).x - origin.x),
-        y: focusSlab.centre.y + (cellCenter(c.col, c.row).y - origin.y),
+        x: slab.centre.x + (cellCenter(c.col, c.row).x - origin.x),
+        y: slab.centre.y + (cellCenter(c.col, c.row).y - origin.y),
         col: Math.round(c.col),
         row: Math.round(c.row),
         // Recompute paint order from the LIVE position so a dragged object that
@@ -392,7 +426,7 @@ export function WorldCanvas({
         depth: patchDepth + drawDepth(c.col, c.row) * 2 + (s.kind === 'creature' ? 1 : 0),
       };
     });
-  }, [imgBase, focusSlab, scene.sprites, custom]);
+  }, [imgBase, focusSlab, slabByPatch, scene.sprites, custom]);
 
   const sceneSpriteSignature = useMemo(() => scene.sprites.map((sprite) => sprite.id).join('|'), [scene.sprites]);
   const [visibleSpriteCount, setVisibleSpriteCount] = useState(() =>
@@ -469,6 +503,7 @@ export function WorldCanvas({
     (sceneDx: number, sceneDy: number) => {
       const drag = dragRef.current;
       if (!drag || !focusSlab) return;
+      const dragSlab = slabForKey(drag.key) ?? focusSlab;
       const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
       let sx = drag.startX + sceneDx;
       let sy = drag.startY + sceneDy;
@@ -477,14 +512,14 @@ export function WorldCanvas({
         sx = Math.min(baseRect.left + baseRect.size - inset, Math.max(baseRect.left + inset, sx));
         sy = Math.min(baseRect.top + baseRect.size - inset, Math.max(baseRect.top + inset, sy));
       }
-      const frac = cellFromPoint(sx - focusSlab.centre.x + origin.x, sy - focusSlab.centre.y + origin.y);
+      const frac = cellFromPoint(sx - dragSlab.centre.x + origin.x, sy - dragSlab.centre.y + origin.y);
       if (drag.isDecor) {
         onMoveDecor?.(drag.key, frac.col, frac.row);
       } else {
         setCustom((prev) => ({ ...prev, [drag.key]: { col: frac.col, row: frac.row } }));
       }
     },
-    [focusSlab, baseRect, onMoveDecor]
+    [focusSlab, slabForKey, baseRect, onMoveDecor]
   );
   const endDrag = useCallback(() => {
     if (dragRef.current && !dragRef.current.isDecor) {
@@ -544,6 +579,7 @@ export function WorldCanvas({
         if (!settleRef.current && !settlingKeyRef.current) dragKeySV.value = '';
         return;
       }
+      const dragSlab = slabForKey(drag.key) ?? focusSlab;
       const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
       let sx = drag.startX + offX;
       let sy = drag.startY + offY;
@@ -552,13 +588,13 @@ export function WorldCanvas({
         sx = Math.min(baseRect.left + baseRect.size - inset, Math.max(baseRect.left + inset, sx));
         sy = Math.min(baseRect.top + baseRect.size - inset, Math.max(baseRect.top + inset, sy));
       }
-      const frac = cellFromPoint(sx - focusSlab.centre.x + origin.x, sy - focusSlab.centre.y + origin.y);
+      const frac = cellFromPoint(sx - dragSlab.centre.x + origin.x, sy - dragSlab.centre.y + origin.y);
       const col = drag.isDecor && snapCell ? snapCell(frac.col) : frac.col;
       const row = drag.isDecor && snapCell ? snapCell(frac.row) : frac.row;
       // Where the settled cell sits in scene space — the glide's destination.
       const settled = cellCenter(col, row);
-      const targetX = focusSlab.centre.x + (settled.x - origin.x);
-      const targetY = focusSlab.centre.y + (settled.y - origin.y);
+      const targetX = dragSlab.centre.x + (settled.x - origin.x);
+      const targetY = dragSlab.centre.y + (settled.y - origin.y);
       settleRef.current = { key: drag.key, dx: sx - targetX, dy: sy - targetY };
       if (drag.isDecor) {
         onMoveDecor?.(drag.key, col, row);
@@ -570,7 +606,7 @@ export function WorldCanvas({
         });
       }
     },
-    [focusSlab, baseRect, onMoveDecor, snapCell, dragKeySV]
+    [focusSlab, slabForKey, baseRect, onMoveDecor, snapCell, dragKeySV]
   );
   // A cancelled gesture fires onFinalize but NOT onEnd — without this failsafe
   // a cancellation mid-drag would strand the piece and the camera lock.
@@ -826,27 +862,117 @@ export function WorldCanvas({
   const vw = viewport.width;
   const vh = viewport.height;
 
+  // Multi-tile gameplay preview (data-flagged in world-tile-layout.json):
+  // ONE neighbor tile beside the centre island, seated across the diamond edge
+  // at the lab-calibrated side offsets. dy < 0 (ne/nw) renders UNDER the main
+  // base; dy > 0 (se/sw) renders over it (isometric painter's order).
+  const expansionTiles = useMemo(() => {
+    if (!imgBase || !baseSource) return [];
+    const signs: Record<string, { sx: 1 | -1; sy: 1 | -1 }> = {
+      ne: { sx: 1, sy: -1 },
+      se: { sx: 1, sy: 1 },
+      sw: { sx: -1, sy: 1 },
+      nw: { sx: -1, sy: -1 },
+    };
+    const mainSlab = scene.slabs.find((slab) => {
+      const patch = patches.find((candidate) => candidate.id === slab.patchId);
+      return !patch?.baseId || patch.baseId === IMAGE_BASE_ID;
+    });
+    if (!mainSlab) return [];
+    const [top, right, bottom, left] = mainSlab.topCorners;
+    const span = (right.x - left.x) * BASE_FACTOR;
+    const baseCx = (left.x + right.x) / 2 + BASE_OFFSET_X;
+    const baseCy = (top.y + bottom.y) / 2 + BASE_OFFSET_Y;
+
+    type Tile = {
+      key: string;
+      source: NonNullable<ReturnType<typeof kingdomBaseSource>>;
+      front: boolean;
+      animate: boolean;
+      style: { position: 'absolute'; left: number; top: number; width: number; height: number };
+    };
+    const tiles: Tile[] = [];
+    const push = (key: string, sideId: string, ringN: number, source: ReturnType<typeof kingdomBaseSource>, animate: boolean) => {
+      if (!source) return;
+      const side = signs[sideId] ?? signs.ne;
+      const magnitudes = tileLayout.sides?.[sideId as keyof typeof tileLayout.sides] ?? { w: 0.4565, h: 0.3652 };
+      const cx = baseCx + side.sx * magnitudes.w * span * ringN;
+      const cy = baseCy + side.sy * magnitudes.h * span * ringN;
+      tiles.push({
+        key,
+        source,
+        front: side.sy > 0,
+        animate,
+        style: { position: 'absolute' as const, left: cx - span / 2, top: cy - span / 2, width: span, height: span },
+      });
+    };
+
+    // Dev preview neighbor (world-tile-layout flag) — only while no real
+    // territory exists (unlocked expansions render as docked PATCHES, not
+    // overlays), so the labs keep their tessellation preview.
+    const config = tileLayout.kingdomNeighbor;
+    if (config?.enabled && !patches.some((patch) => patch.expansionDock)) {
+      push('dev-neighbor', config.side ?? 'ne', 1, kingdomBaseSource(config.baseId) ?? baseSource, false);
+    }
+    return tiles;
+  }, [imgBase, baseSource, scene.slabs, patches]);
+
   // Embedded single-patch view: pure fit is the smallest the patch shrinks to;
   // the DEFAULT is a bit zoomed-in past that. Free roam stays at 1:1.
   const pureFit = lockCamera && vw && vh ? Math.min(1, Math.min(vw / sceneW, vh / sceneH)) : 1;
   const baseScale = lockCamera ? pureFit * (imgBase ? BASE_DEFAULT_ZOOM : DEFAULT_ZOOM) : 1;
   const minScale = lockCamera ? pureFit : 0.55;
   const maxScale = lockCamera ? baseScale * 1.9 : 2.4;
-  // Pan can roam the whole (larger) base in image mode, not just the slab.
-  const boundsW = imgBase && baseRect ? Math.max(sceneW, baseRect.size) : sceneW;
-  const boundsH = imgBase && baseRect ? Math.max(sceneH, baseRect.size) : sceneH;
+  // Pan can roam the whole (larger) base in image mode, not just the slab —
+  // and the roam GROWS with every extra tile in the world: bounds are the
+  // union of the scene/base rect with each additional tile's rect (so however
+  // many tiles exist, all of them are reachable, and no further).
+  let boundsW = imgBase && baseRect ? Math.max(sceneW, baseRect.size) : sceneW;
+  let boundsH = imgBase && baseRect ? Math.max(sceneH, baseRect.size) : sceneH;
+  // Roam bounds grow with every tile's BASE IMAGE rect (the ground PNGs extend
+  // past their slabs) — union over docked territory patches and dev previews.
+  const extraRects = expansionTiles.map((tile) => tile.style);
+  if (imgBase) {
+    for (const slab of scene.slabs) {
+      const [top, right, bottom, left] = slab.topCorners;
+      const span = (right.x - left.x) * BASE_FACTOR;
+      extraRects.push({
+        position: 'absolute',
+        left: (left.x + right.x) / 2 + BASE_OFFSET_X - span / 2,
+        top: (top.y + bottom.y) / 2 + BASE_OFFSET_Y - span / 2,
+        width: span,
+        height: span,
+      });
+    }
+  }
+  for (const extra of extraRects) {
+    const extraCx = extra.left + extra.width / 2;
+    const extraCy = extra.top + extra.height / 2;
+    boundsW = Math.max(boundsW, 2 * (Math.abs(extraCx - sceneW / 2) + extra.width / 2));
+    boundsH = Math.max(boundsH, 2 * (Math.abs(extraCy - sceneH / 2) + extra.height / 2));
+  }
 
   // Keep the parent's "centre cell" getter fresh — inverts the SCREEN CENTRE through
-  // the live pan/zoom to a patch cell, so new decor plants where the camera looks.
+  // the live pan/zoom to a patch cell on the NEAREST tile, so new decor plants
+  // where the camera looks — including on docked territory tiles.
   if (getCenterCellRef) {
     getCenterCellRef.current = () => {
       if (!focusSlab || !viewport.width) return null;
       const s = scale.value;
       const wx = (viewport.width / 2 - sceneW / 2 - tx.value) / s + sceneW / 2;
       const wy = (viewport.height / 2 - sceneH / 2 - ty.value) / s + sceneH / 2;
+      let best = focusSlab;
+      let bestDistance = Infinity;
+      for (const slab of scene.slabs) {
+        const distance = (wx - slab.centre.x) ** 2 + (wy - slab.centre.y) ** 2;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = slab;
+        }
+      }
       const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
-      const frac = cellFromPoint(wx - focusSlab.centre.x + origin.x, wy - focusSlab.centre.y + origin.y);
-      return { col: frac.col, row: frac.row };
+      const frac = cellFromPoint(wx - best.centre.x + origin.x, wy - best.centre.y + origin.y);
+      return { col: frac.col, row: frac.row, plotId: best.patchId === focusSlab.patchId ? null : best.patchId };
     };
   }
 
@@ -1241,25 +1367,37 @@ export function WorldCanvas({
             coords, which we invert through the pan/zoom to a world point. */}
         <View style={styles.tapSurface}>
         <Animated.View style={[styles.world, { width: scene.width, height: scene.height }, worldStyle]}>
+          {expansionTiles
+            .filter((tile) => !tile.front)
+            .map((tile) =>
+              tile.animate ? (
+                <Animated.View key={tile.key} entering={FadeInUp.duration(900).springify().damping(15)} style={tile.style}>
+                  <Image source={tile.source} pointerEvents="none" contentFit="contain" style={StyleSheet.absoluteFill} />
+                </Animated.View>
+              ) : (
+                <Image key={tile.key} source={tile.source} pointerEvents="none" contentFit="contain" style={tile.style} />
+              )
+            )}
           {/* Ground (image mode): one base PNG PER PATCH — the main island plus
               any docked expansion plots (patch.baseId picks the art). */}
           {imgBase && baseRect && baseSource ? (
             scene.slabs.map((slab) => {
               const patch = patches.find((candidate) => candidate.id === slab.patchId);
-              const source = (patch?.baseId ? worldBaseSource(patch.baseId) : null) ?? baseSource;
+              const source = kingdomBaseSource(patch?.baseId) ?? baseSource;
               const [top, right, bottom, left] = slab.topCorners;
               const span = (right.x - left.x) * BASE_FACTOR;
               const cx = (left.x + right.x) / 2 + BASE_OFFSET_X;
               const cy = (top.y + bottom.y) / 2 + BASE_OFFSET_Y;
-              return (
-                <Image
-                  key={`base-${slab.patchId}`}
-                  source={source}
-                  pointerEvents="none"
-                  contentFit="contain"
-                  style={{ position: 'absolute', left: cx - span / 2, top: cy - span / 2, width: span, height: span }}
-                />
-              );
+              const box = { position: 'absolute' as const, left: cx - span / 2, top: cy - span / 2, width: span, height: span };
+              // The freshly-unlocked territory tile rises in (grow ceremony).
+              if (animateExpansionIndex != null && slab.patchId === `exp-${animateExpansionIndex}`) {
+                return (
+                  <Animated.View key={`base-${slab.patchId}`} entering={FadeInUp.duration(900).springify().damping(15)} style={box}>
+                    <Image source={source} pointerEvents="none" contentFit="contain" style={StyleSheet.absoluteFill} />
+                  </Animated.View>
+                );
+              }
+              return <Image key={`base-${slab.patchId}`} source={source} pointerEvents="none" contentFit="contain" style={box} />;
             })
           ) : (
             <Canvas style={{ width: scene.width, height: scene.height }}>
@@ -1280,6 +1418,17 @@ export function WorldCanvas({
               ))}
             </Canvas>
           )}
+          {expansionTiles
+            .filter((tile) => tile.front)
+            .map((tile) =>
+              tile.animate ? (
+                <Animated.View key={tile.key} entering={FadeInUp.duration(900).springify().damping(15)} style={tile.style}>
+                  <Image source={tile.source} pointerEvents="none" contentFit="contain" style={StyleSheet.absoluteFill} />
+                </Animated.View>
+              ) : (
+                <Image key={tile.key} source={tile.source} pointerEvents="none" contentFit="contain" style={tile.style} />
+              )
+            )}
 
           {/* Soft contact shadows under every object — drawn on the ground, beneath
               the objects, so each reads as grounded (not floating). */}
@@ -1917,6 +2066,26 @@ function SpriteView({
           delay: animateIn ? animationDelay : 0,
         }}
         style={[StyleSheet.absoluteFill, styles.spriteInner, styles.spriteOrigin]}>
+        {/* Contact shadow — a squashed, black-tinted feathered ellipse seated at
+            the art's foot line, UNDER the image, so every prop reads as resting
+            ON the land (runtime effect, never baked into assets). It lives
+            inside the MotiView so it springs/scales with the sprite. */}
+        {source && !isCreature ? (
+          <Image
+            source={HIGHLIGHT_GLOW}
+            tintColor="#140F08"
+            pointerEvents="none"
+            contentFit="fill"
+            style={{
+              position: 'absolute',
+              left: w * 0.19,
+              top: h * OBJECT_BOTTOM_FRAC - w * 0.095,
+              width: w * 0.62,
+              height: w * 0.17,
+              opacity: 0.3,
+            }}
+          />
+        ) : null}
         <View pointerEvents="none" style={styles.spriteDisplay}>
           {source ? (
             <Image source={source} style={styles.spriteImage} contentFit="contain" />

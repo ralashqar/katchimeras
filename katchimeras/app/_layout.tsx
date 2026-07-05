@@ -18,6 +18,12 @@ export const unstable_settings = {
 
 SplashScreen.preventAutoHideAsync();
 
+// DEV: apply any saved Asset Lab overrides at launch so draft world art
+// renders in the Kingdom without opening the lab first (no-op in production).
+if (__DEV__) {
+  void import('@/utils/asset-lab').then((lab) => lab.loadAssetLabManifest()).catch(() => {});
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme === 'light' ? 'light' : 'dark'];

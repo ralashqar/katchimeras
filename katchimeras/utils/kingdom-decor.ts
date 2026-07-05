@@ -1,8 +1,30 @@
 import type { HomeDayRecord } from '@/types/home';
 import type { WorldObject } from '@/types/world';
+import {
+  BLOOM_COMMONS,
+  CUISINE_FAMILIES,
+  DISCOVERY_TIER_KEEPSAKES,
+  GROVE_MERGE_COUNT,
+  MILESTONE_KEEPSAKES,
+  SIGNATURE_KEEPSAKES,
+  bloomSpeciesForAssetKey,
+  evaluateDayUnlock,
+  evaluateLifetimeUnlock,
+  formatUnlockLabel,
+  groveForSpecies,
+  hashSeed,
+  subjectsForSpec,
+  pickFromVariants,
+  pickVariant,
+  type DayEvalContext,
+  type WorldObjectDefinition,
+} from '@/constants/world-objects';
+import { distanceMeters, loadHomeAnchor } from '@/utils/home-location';
+import WORLD_ECONOMY from '@/data/world-economy.json';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { decorObjects, type DecorItem } from '@/utils/world-decor';
-import { EARNED_WORLD_PROPS } from '@/utils/world-props-catalog';
+import { expansionProgress, type ExpansionStats, type KingdomExpansion } from '@/utils/world-expansion';
+import { EARNED_WORLD_PROPS, propArtVariants } from '@/utils/world-props-catalog';
 
 // Kingdom decoration (docs/kingdom-world-design.md §3): decorations are earned
 // by LIVING and accumulate forever in the one Kingdom — replacing the per-day
@@ -11,7 +33,7 @@ import { EARNED_WORLD_PROPS } from '@/utils/world-props-catalog';
 // provenance — where in a real life it came from.
 
 export type KingdomProvenance = {
-  kind: 'day' | 'starter' | 'legacy' | 'discovery';
+  kind: 'day' | 'starter' | 'legacy' | 'discovery' | 'merge';
   // "A 12k-step day", "First Seed", "Earned from First Museum"
   label: string;
   isoDate: string;
@@ -47,6 +69,9 @@ export type KingdomDecorState = {
   migratedLegacy: boolean;
   placed: KingdomDecorItem[];
   unplanted: KingdomGift[];
+  // Territory growth (docs §10): unlocked expansion tiles, in unlock order.
+  // Absent on older stored states — treated as [].
+  expansions?: KingdomExpansion[];
   // Retired daily planting allowance — kept in stored data from older builds,
   // no longer read (planting is limited only by what the shelf holds).
   plantLedger?: { isoDate: string; count: number };
@@ -85,115 +110,105 @@ export function saveKingdomDecor(state: KingdomDecorState) {
 }
 
 // --- Daily earning rules --------------------------------------------------
-// Signal → prop, evaluated once per hatched day, deterministic. Assets come
-// from the existing decor palette; bespoke prop families arrive in K5 behind
-// these same rule ids. Order = priority when a day matches more than two.
+// Signal → prop, evaluated once per hatched day, deterministic. The rules
+// themselves are DATA — constants/world-objects.ts SIGNATURE_KEEPSAKES
+// (declarative unlock specs + label templates); this file only grants.
+// Registry array order = priority when a day matches more than two.
 
-type DailyRule = {
-  id: string;
-  assetKey: string;
-  name: string;
-  sizeScale?: number;
-  // Static almanac copy: how a day earns this.
-  hint: string;
-  label: (day: HomeDayRecord) => string;
-  when: (day: HomeDayRecord) => boolean;
+// Eval context for geo specs: max km the day roamed from the home anchor,
+// resolved lazily and memoized per day (anchor loaded fresh each context —
+// the user can re-anchor home at any time).
+const distanceCache = new Map<string, number>();
+export function dayEvalContext(): DayEvalContext {
+  const anchor = loadHomeAnchor();
+  return {
+    distanceFromHomeKm: (day) => {
+      if (!anchor) return 0;
+      const key = `${day.id}:${anchor.lat},${anchor.lng}:${day.locations?.length ?? 0}`;
+      const cached = distanceCache.get(key);
+      if (cached !== undefined) return cached;
+      let maxKm = 0;
+      for (const point of day.locations ?? []) {
+        maxKm = Math.max(maxKm, distanceMeters(point.lat, point.lng, anchor.lat, anchor.lng) / 1000);
+      }
+      distanceCache.set(key, maxKm);
+      return maxKm;
+    },
+  };
+}
+
+function ruleFires(definition: WorldObjectDefinition, day: HomeDayRecord, ctx: DayEvalContext): boolean {
+  return definition.unlock ? evaluateDayUnlock(definition.unlock, day, ctx) : false;
+}
+
+function ruleGift(definition: WorldObjectDefinition, grantId: string, day: HomeDayRecord): KingdomGift {
+  return {
+    id: grantId,
+    // Deterministic per grant — when a definition gains variant siblings,
+    // each grant keeps the art it was born with.
+    assetKey: pickVariant(definition, grantId),
+    name: definition.name,
+    sizeScale: definition.art.sizeScale,
+    provenance: {
+      kind: 'day',
+      label: formatUnlockLabel(definition.labelTemplate ?? definition.name, day),
+      isoDate: day.isoDate,
+      dayId: day.id,
+    },
+  };
+}
+
+function dayGrants(day: HomeDayRecord, ctx: DayEvalContext = dayEvalContext()): { grantId: string; definition: WorldObjectDefinition }[] {
+  return SIGNATURE_KEEPSAKES.filter((definition) => ruleFires(definition, day, ctx))
+    .slice(0, MAX_DAILY_GIFTS)
+    .map((definition) => ({ grantId: `${day.id}:${definition.id}`, definition }));
+}
+
+// --- Lane A: everyday blooms (docs/world-objects-expansion-design.md §9.1) --
+// RULE ZERO: a hatched day never yields nothing. Every day grants a guaranteed
+// day-bloom common; living adds one more at each points threshold. All dials
+// live in data/world-economy.json; the first archive week uses friendlier
+// thresholds so a new Kingdom greens up fast.
+
+const FOUNDING_DAYS = WORLD_ECONOMY.founding.days;
+export const MAX_BLOOM_GIFTS_PER_DAY = WORLD_ECONOMY.maxBloomGiftsPerDay;
+
+export type BloomYield = {
+  points: number;
+  count: number;
+  // The threshold band the day sits in (for progress meters):
+  prevThreshold: number;
+  nextThreshold: number | null; // null = ladder maxed
 };
 
-function reflectionCount(day: HomeDayRecord): number {
-  return (day.promptAnswers ?? []).filter((answer) => !answer.dismissed && answer.choiceIds.length > 0).length;
+export function bloomYieldForDay(day: HomeDayRecord, founding = false): BloomYield {
+  const points = bloomPointsForDay(day);
+  const t = founding ? WORLD_ECONOMY.founding : WORLD_ECONOMY;
+  let count = WORLD_ECONOMY.dayBloom;
+  let prevThreshold = 0;
+  let nextThreshold: number | null = t.lightThreshold;
+  if (points >= t.lightThreshold) {
+    count += 1;
+    prevThreshold = t.lightThreshold;
+    nextThreshold = t.engagedThreshold;
+  }
+  if (points >= t.engagedThreshold) {
+    count += 1;
+    prevThreshold = t.engagedThreshold;
+    nextThreshold = null;
+  }
+  return { points, count: Math.min(WORLD_ECONOMY.maxBloomGiftsPerDay, count), prevThreshold, nextThreshold };
 }
-
-const DAILY_RULES: DailyRule[] = [
-  {
-    id: 'big_moment_blossom',
-    hint: 'Mark a Big Moment',
-    assetKey: 'festival_bunting',
-    name: 'Festival Bunting',
-    sizeScale: 1.1,
-    label: (day) => day.bigMoments?.[0]?.label ?? 'A big moment',
-    when: (day) => (day.bigMoments?.length ?? 0) > 0,
-  },
-  {
-    id: 'journey_stone',
-    hint: '8,000+ steps, or a hike',
-    assetKey: 'trail_stone',
-    name: 'Trail Stone',
-    label: (day) => `${(day.stepsCount ?? 0).toLocaleString()} steps in one day`,
-    when: (day) => (day.stepsCount ?? 0) >= 8000 || day.stepsInterpretation?.movement === 'hike',
-  },
-  {
-    id: 'wayfinder_post',
-    hint: 'Give a place its meaning',
-    assetKey: 'decor_13',
-    name: 'Wayfinder Post',
-    label: (day) => {
-      const place = day.confirmedPlaces?.[0];
-      return place ? `${place.label} · a place given meaning` : 'A place given meaning';
-    },
-    when: (day) => (day.confirmedPlaces?.length ?? 0) > 0,
-  },
-  {
-    id: 'market_crate',
-    hint: 'Save a food memory',
-    assetKey: 'picnic_basket',
-    name: 'Picnic Basket',
-    label: (day) => {
-      const food = day.foodMoments?.[0];
-      return food ? `${food.emoji} ${food.label} · savoured` : 'A meal savoured';
-    },
-    when: (day) => (day.foodMoments?.length ?? 0) > 0,
-  },
-  {
-    id: 'study_planter',
-    hint: 'Keep an inspiration',
-    assetKey: 'book_stack',
-    name: 'Book Stack',
-    label: (day) => {
-      const studio = day.studioMoments?.[0];
-      return studio ? `${studio.emoji} ${studio.label} · an inspiration` : 'An inspiration kept';
-    },
-    when: (day) => (day.studioMoments?.length ?? 0) > 0,
-  },
-  {
-    id: 'reflection_flowers',
-    hint: 'Answer 3 reflections in a day',
-    assetKey: 'decor_7',
-    name: 'Wildflowers',
-    label: () => 'A deeply reflected day',
-    when: (day) => reflectionCount(day) >= 3,
-  },
-  {
-    id: 'keeper_lantern',
-    hint: 'Keep 2 notes in a day',
-    assetKey: 'decor_12',
-    name: 'Keeper’s Lantern',
-    sizeScale: 1.15,
-    label: (day) => `${day.notes?.length ?? 0} notes kept in one day`,
-    when: (day) => (day.notes?.length ?? 0) >= 2,
-  },
-];
-
-function dayGrants(day: HomeDayRecord): { grantId: string; rule: DailyRule }[] {
-  return DAILY_RULES.filter((rule) => rule.when(day))
-    .slice(0, MAX_DAILY_GIFTS)
-    .map((rule) => ({ grantId: `${day.id}:${rule.id}`, rule }));
-}
-
-// --- Lane A: everyday blooms (docs §3.2) -----------------------------------
-// Ordinary living accrues bloom points; every BLOOM_POINTS_PER_GIFT points is a
-// common green gift (tree/shrub/flower), capped per day. The first week of the
-// archive earns at a friendlier rate so a new Kingdom greens up fast.
-
-export const BLOOM_POINTS_PER_GIFT = 3;
-const FOUNDING_POINTS_PER_GIFT = 2;
-const FOUNDING_DAYS = 7;
-export const MAX_BLOOM_GIFTS_PER_DAY = 3;
 
 // The signature earns the day has fired so far (for Today's earnings sheet) —
 // same rules + cap the hatch grant uses.
 export function signatureEarnsForDay(day: HomeDayRecord): { id: string; name: string; assetKey: string; label: string }[] {
-  return dayGrants(day).map(({ rule }) => ({ id: rule.id, name: rule.name, assetKey: rule.assetKey, label: rule.label(day) }));
+  return dayGrants(day).map(({ grantId, definition }) => ({
+    id: definition.id,
+    name: definition.name,
+    assetKey: pickVariant(definition, grantId),
+    label: formatUnlockLabel(definition.labelTemplate ?? definition.name, day),
+  }));
 }
 
 export function bloomPointsForDay(day: HomeDayRecord): number {
@@ -212,51 +227,30 @@ export function bloomPointsForDay(day: HomeDayRecord): number {
   return points;
 }
 
-// The commons pool — existing decor art, one entry per green thing.
-const COMMONS: { assetKey: string; name: string }[] = [
-  { assetKey: 'decor_1', name: 'Pine Tree' },
-  { assetKey: 'decor_2', name: 'Oak Tree' },
-  { assetKey: 'decor_4', name: 'Birch Tree' },
-  { assetKey: 'decor_3', name: 'Blossom Tree' },
-  { assetKey: 'decor_5', name: 'Garden Shrub' },
-  { assetKey: 'decor_6', name: 'Fern' },
-  { assetKey: 'decor_7', name: 'Wildflowers' },
-  { assetKey: 'decor_15', name: 'Mushroom Cluster' },
-  { assetKey: 'decor_8', name: 'Garden Planter' },
-];
-
-// The day's mood promotes a fitting plant to its FIRST bloom (same leads as
+// The day's mood promotes a fitting SPECIES to its FIRST bloom (same leads as
 // world-decor's decorPalette).
 function commonsBias(day: HomeDayRecord): string | null {
-  if ((day.bigMoments?.length ?? 0) > 0) return 'decor_3'; // blossom — meaningful
-  if ((day.capturedMeanings ?? []).some((meaning) => meaning.archetype === 'together')) return 'decor_2'; // oak — social
-  if ((day.stepsCount ?? 0) >= 8000) return 'decor_1'; // pine — the outdoors
+  if ((day.bigMoments?.length ?? 0) > 0) return 'bloom_blossom'; // meaningful
+  if ((day.capturedMeanings ?? []).some((meaning) => meaning.archetype === 'together')) return 'bloom_oak'; // social
+  if ((day.stepsCount ?? 0) >= 8000) return 'bloom_pine'; // the outdoors
   if ((day.promptAnswers ?? []).some((answer) => !answer.dismissed && answer.choiceIds.includes('calm'))) {
-    return 'decor_7'; // wildflowers — calm
+    return 'bloom_wildflowers'; // calm
   }
   return null;
 }
 
-// Deterministic pick — no randomness, so re-syncing always grants the same gift.
-function hashString(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
 function bloomGrants(day: HomeDayRecord, foundingBoost: boolean): { grantId: string; assetKey: string; name: string; points: number }[] {
-  const points = bloomPointsForDay(day);
-  const perGift = foundingBoost ? FOUNDING_POINTS_PER_GIFT : BLOOM_POINTS_PER_GIFT;
-  const count = Math.min(MAX_BLOOM_GIFTS_PER_DAY, Math.floor(points / perGift));
+  const { points, count } = bloomYieldForDay(day, foundingBoost);
   const bias = commonsBias(day);
+  // Deterministic picks (hashSeed) — no randomness, so re-syncing always
+  // grants the same gift: species by day+index, then the VARIANT within the
+  // species' family by grant id (B1 families = 4 fresh looks each).
   return Array.from({ length: count }, (_, index) => {
-    const pick =
-      index === 0 && bias
-        ? COMMONS.find((entry) => entry.assetKey === bias) ?? COMMONS[hashString(`${day.id}:${index}`) % COMMONS.length]
-        : COMMONS[hashString(`${day.id}:${index}`) % COMMONS.length];
-    return { grantId: `${day.id}:bloom:${index}`, assetKey: pick.assetKey, name: pick.name, points };
+    const grantId = `${day.id}:bloom:${index}`;
+    const species =
+      (index === 0 && bias ? BLOOM_COMMONS.find((definition) => definition.id === bias) : undefined) ??
+      BLOOM_COMMONS[hashSeed(`${day.id}:${index}`) % BLOOM_COMMONS.length];
+    return { grantId, assetKey: pickVariant(species, grantId), name: species.name, points };
   });
 }
 
@@ -276,37 +270,41 @@ const DISCOVERY_PROP_BY_SOURCE = new Map(
   ])
 );
 
-const TIER_FALLBACK: Record<string, { assetKey: string; name: string; sizeScale?: number }> = {
-  common: { assetKey: 'decor_4', name: 'Discovery Sapling' },
-  rare: { assetKey: 'decor_12', name: 'Honour Lantern', sizeScale: 1.15 },
-  epic: { assetKey: 'monument_stone', name: 'Milestone Stone', sizeScale: 1.15 },
-  legendary: { assetKey: 'monument_shard', name: 'Monument Shard', sizeScale: 1.3 },
-};
+// Rarity-tier fallbacks come from the registry; the pickVariant seed is the
+// grant id, so when the sapling gains its 4 random variants each discovery
+// keeps the tree it was born with.
+function tierFallback(rarity: string | null | undefined): WorldObjectDefinition {
+  const tier = (rarity ?? 'common') as keyof typeof DISCOVERY_TIER_KEEPSAKES;
+  return DISCOVERY_TIER_KEEPSAKES[tier] ?? DISCOVERY_TIER_KEEPSAKES.common;
+}
 
 function discoveryGrants(unlocked: UnlockedDiscoveryInput[]): { grantId: string; gift: KingdomGift }[] {
   return unlocked.map((discovery) => {
     const isoDate = discovery.unlockedAt ? new Date(discovery.unlockedAt).toISOString().slice(0, 10) : '';
     const mapped = DISCOVERY_PROP_BY_SOURCE.get(discovery.id);
     if (mapped) {
+      const grantId = `prop:${mapped.id}`;
       return {
-        grantId: `prop:${mapped.id}`,
+        grantId,
         gift: {
-          id: `prop:${mapped.id}`,
-          assetKey: mapped.assetKey,
+          id: grantId,
+          // Deterministic across the prop's variant pool (promoted siblings).
+          assetKey: pickFromVariants(propArtVariants(mapped), grantId),
           name: mapped.name,
           sizeScale: mapped.sizeScale,
           provenance: { kind: 'discovery' as const, label: mapped.sourceLabel, isoDate },
         },
       };
     }
-    const fallback = TIER_FALLBACK[discovery.rarity ?? 'common'] ?? TIER_FALLBACK.common;
+    const fallback = tierFallback(discovery.rarity);
+    const grantId = `disc:${discovery.id}`;
     return {
-      grantId: `disc:${discovery.id}`,
+      grantId,
       gift: {
-        id: `disc:${discovery.id}`,
-        assetKey: fallback.assetKey,
+        id: grantId,
+        assetKey: pickVariant(fallback, grantId),
         name: fallback.name,
-        sizeScale: fallback.sizeScale,
+        sizeScale: fallback.art.sizeScale,
         provenance: { kind: 'discovery' as const, label: `Earned from ${discovery.name}`, isoDate },
       },
     };
@@ -366,28 +364,26 @@ export function syncKingdomDecorFromDays(
   const firstIso = days[0]?.isoDate ?? '';
   const foundingCutoff = firstIso ? addDaysIso(firstIso, FOUNDING_DAYS) : '';
   const isFounding = (day: HomeDayRecord) => !!foundingCutoff && day.isoDate < foundingCutoff;
+  // One eval context per sync (home anchor loaded once; distances memoized).
+  const evalCtx = dayEvalContext();
 
   // Cap-aware rule grants: with live granting a day is visited many times
   // before it hatches, so the "2 signature gifts a day" cap must count what
   // this day has ALREADY been granted, not just what matches right now.
-  const ruleGiftsFor = (day: HomeDayRecord): { grantId: string; rule: DailyRule }[] => {
-    const alreadyGranted = DAILY_RULES.filter((rule) => granted.has(`${day.id}:${rule.id}`)).length;
+  const ruleGiftsFor = (day: HomeDayRecord): { grantId: string; definition: WorldObjectDefinition }[] => {
+    const alreadyGranted = SIGNATURE_KEEPSAKES.filter((definition) => granted.has(`${day.id}:${definition.id}`)).length;
     const allowance = Math.max(0, MAX_DAILY_GIFTS - alreadyGranted);
-    return DAILY_RULES.filter((rule) => rule.when(day) && !granted.has(`${day.id}:${rule.id}`))
+    return SIGNATURE_KEEPSAKES.filter(
+      (definition) => ruleFires(definition, day, evalCtx) && !granted.has(`${day.id}:${definition.id}`)
+    )
       .slice(0, allowance)
-      .map((rule) => ({ grantId: `${day.id}:${rule.id}`, rule }));
+      .map((definition) => ({ grantId: `${day.id}:${definition.id}`, definition }));
   };
 
   const dayGiftsFor = (day: HomeDayRecord): { grantId: string; gift: KingdomGift }[] => [
-    ...ruleGiftsFor(day).map(({ grantId, rule }) => ({
+    ...ruleGiftsFor(day).map(({ grantId, definition }) => ({
       grantId,
-      gift: {
-        id: grantId,
-        assetKey: rule.assetKey,
-        name: rule.name,
-        sizeScale: rule.sizeScale,
-        provenance: { kind: 'day' as const, label: rule.label(day), isoDate: day.isoDate, dayId: day.id },
-      },
+      gift: ruleGift(definition, grantId, day),
     })),
     ...bloomGrants(day, isFounding(day)).map(({ grantId, assetKey, name, points }) => ({
       grantId,
@@ -397,7 +393,8 @@ export function syncKingdomDecorFromDays(
         name,
         provenance: {
           kind: 'day' as const,
-          label: `A day of ${points} ${points === 1 ? 'moment' : 'moments'}`,
+          // The guaranteed day-bloom on a quiet day reads as the day itself.
+          label: points === 0 ? 'A new day in the Kingdom' : `A day of ${points} ${points === 1 ? 'moment' : 'moments'}`,
           isoDate: day.isoDate,
           dayId: day.id,
         },
@@ -453,6 +450,100 @@ export function syncKingdomDecorFromDays(
     changed = true;
   }
 
+  // --- Lane D: milestone keepsakes (docs §5 lifetime lane) -------------------
+  // Streaks, tenure, lifetime counts, calendar windows and first-time places.
+  // Grant ids: `ms:<id>` once-ever, `ms:<id>@<year>` for perYear calendar
+  // earns — re-syncs never duplicate. Like achievements, always real gifts.
+  const milestoneGift = (
+    definition: WorldObjectDefinition,
+    grantId: string,
+    isoDate: string,
+    day?: HomeDayRecord
+  ): KingdomGift => ({
+    id: grantId,
+    assetKey: pickVariant(definition, grantId),
+    name: definition.name,
+    sizeScale: definition.art.sizeScale,
+    provenance: {
+      kind: 'discovery',
+      label: day ? formatUnlockLabel(definition.labelTemplate ?? definition.name, day) : (definition.labelTemplate ?? definition.name),
+      isoDate,
+      dayId: day?.id,
+    },
+  });
+  for (const definition of MILESTONE_KEEPSAKES) {
+    const spec = definition.unlock;
+    if (!spec) continue;
+    // perSubject earns: one grant per distinct subject (cuisine family…),
+    // dedup id `ms:<id>@<subject>`. Art variant picked BY SUBJECT (canonical
+    // CUISINE_FAMILIES order), not by hash — the lantern must match the food.
+    if (definition.repeat === 'perSubject') {
+      for (const day of hatched) {
+        for (const subject of subjectsForSpec(spec, day)) {
+          const grantId = `ms:${definition.id}@${subject}`;
+          if (granted.has(grantId)) continue;
+          granted.add(grantId);
+          const variantIndex = (CUISINE_FAMILIES as readonly string[]).indexOf(subject);
+          const gift = milestoneGift(definition, grantId, day.isoDate, day);
+          if (variantIndex >= 0) {
+            gift.assetKey = definition.art.variants[variantIndex % definition.art.variants.length];
+          }
+          gifts.push(gift);
+          changed = true;
+        }
+      }
+      continue;
+    }
+    // perYear day-lane earns (calendar windows, birthdays…) return each year.
+    if (definition.repeat === 'perYear' || spec.kind === 'calendar') {
+      for (const day of hatched) {
+        if (!evaluateDayUnlock(spec, day, evalCtx)) continue;
+        const grantId =
+          definition.repeat === 'perYear' ? `ms:${definition.id}@${day.isoDate.slice(0, 4)}` : `ms:${definition.id}`;
+        if (granted.has(grantId)) continue;
+        granted.add(grantId);
+        gifts.push(milestoneGift(definition, grantId, day.isoDate, day));
+        changed = true;
+      }
+    } else if (spec.kind === 'tenure' || spec.kind === 'streak' || spec.kind === 'lifetimeCount') {
+      const grantId = `ms:${definition.id}`;
+      if (!granted.has(grantId) && evaluateLifetimeUnlock(spec, hatched, evalCtx)) {
+        const last = hatched[hatched.length - 1];
+        granted.add(grantId);
+        gifts.push(milestoneGift(definition, grantId, last?.isoDate ?? ''));
+        changed = true;
+      }
+    } else {
+      // Day-lane spec earned once-ever (first-time places, one-off feats).
+      const grantId = `ms:${definition.id}`;
+      if (!granted.has(grantId)) {
+        const day = hatched.find((candidate) => evaluateDayUnlock(spec, candidate, evalCtx));
+        if (day) {
+          granted.add(grantId);
+          gifts.push(milestoneGift(definition, grantId, day.isoDate, day));
+          changed = true;
+        }
+      }
+    }
+  }
+
+  // --- Territory growth (docs §10) -----------------------------------------
+  // One expansion may unlock per sync: authored requirements AND the planting
+  // pressure gate, evaluated over lifetime stats. Deterministic and monotonic.
+  const stats = expansionStatsFor(hatched, state, options.unlockedDiscoveries ?? []);
+  const expansions = [...(state.expansions ?? [])];
+  const progress = expansionProgress(stats, expansions.length);
+  if (progress.met) {
+    expansions.push({
+      index: progress.target.index,
+      side: progress.target.side,
+      ring: progress.target.ring,
+      unlockedDayId: hatched[hatched.length - 1]?.id ?? days[days.length - 1]?.id ?? '',
+      ceremonyShown: false,
+    });
+    changed = true;
+  }
+
   if (!wasBaselined) changed = true;
   if (changed) {
     state = {
@@ -460,10 +551,41 @@ export function syncKingdomDecorFromDays(
       baselined: true,
       grantedIds: [...granted],
       unplanted: [...gifts, ...state.unplanted],
+      expansions,
     };
     saveKingdomDecor(state);
   }
   return state;
+}
+
+// Lifetime counters the territory system reads (docs §10.1).
+export function expansionStatsFor(
+  hatchedDays: HomeDayRecord[],
+  state: KingdomDecorState,
+  discoveries: UnlockedDiscoveryInput[]
+): ExpansionStats {
+  return {
+    daysLived: hatchedDays.length,
+    propsPlanted: state.placed.length,
+    discoveries: discoveries.length,
+    epicDiscoveries: discoveries.filter((d) => d.rarity === 'epic' || d.rarity === 'legendary').length,
+  };
+}
+
+// The pending "your Kingdom grows" ceremony, if any (shown once, then marked).
+export function pendingExpansionCeremony(state: KingdomDecorState): KingdomExpansion | null {
+  return (state.expansions ?? []).find((expansion) => !expansion.ceremonyShown) ?? null;
+}
+
+export function markExpansionCeremonyShown(state: KingdomDecorState, index: number): KingdomDecorState {
+  const next: KingdomDecorState = {
+    ...state,
+    expansions: (state.expansions ?? []).map((expansion) =>
+      expansion.index === index ? { ...expansion, ceremonyShown: true } : expansion
+    ),
+  };
+  saveKingdomDecor(next);
+  return next;
 }
 
 function addDaysIso(iso: string, days: number): string {
@@ -534,6 +656,75 @@ export function unplantKingdomDecor(state: KingdomDecorState, id: string): Kingd
   return next;
 }
 
+// --- Grove merge (docs §9.2) ------------------------------------------------
+// The tray's relief valve: three identical unplanted commons fuse into one
+// denser, uncommon grove of the same species. Purely a user action — the
+// fused gifts' grant ids stay in grantedIds, so a re-sync never refunds them.
+
+export type GroveMergeCandidate = {
+  speciesId: string;
+  speciesName: string;
+  name: string; // "Oak Tree Grove"
+  assetKey: string;
+  giftIds: string[]; // the gifts that would fuse (oldest first)
+  available: number; // total unplanted of the species
+};
+
+export function groveMergeCandidates(state: KingdomDecorState): GroveMergeCandidate[] {
+  const bySpecies = new Map<string, KingdomGift[]>();
+  for (const gift of state.unplanted) {
+    const speciesId = bloomSpeciesForAssetKey(gift.assetKey);
+    if (!speciesId) continue;
+    const gifts = bySpecies.get(speciesId) ?? [];
+    gifts.push(gift);
+    bySpecies.set(speciesId, gifts);
+  }
+  const candidates: GroveMergeCandidate[] = [];
+  for (const [speciesId, gifts] of bySpecies) {
+    if (gifts.length < GROVE_MERGE_COUNT) continue;
+    const grove = groveForSpecies(speciesId);
+    if (!grove) continue;
+    const species = BLOOM_COMMONS.find((definition) => definition.id === speciesId);
+    // The tray lists newest first — fuse from the END so the freshest keep
+    // their place on the shelf.
+    const oldest = gifts.slice(-GROVE_MERGE_COUNT);
+    candidates.push({
+      speciesId,
+      speciesName: species?.name ?? grove.name,
+      name: grove.name,
+      assetKey: grove.assetKey,
+      giftIds: oldest.map((gift) => gift.id),
+      available: gifts.length,
+    });
+  }
+  return candidates;
+}
+
+export function mergeKingdomGrove(state: KingdomDecorState, speciesId: string): KingdomDecorState {
+  const candidate = groveMergeCandidates(state).find((entry) => entry.speciesId === speciesId);
+  if (!candidate) return state;
+  const fused = new Set(candidate.giftIds);
+  const parts = state.unplanted.filter((gift) => fused.has(gift.id));
+  // The grove remembers the earliest day among what it grew from.
+  const isoDate = parts.map((gift) => gift.provenance.isoDate).sort()[0] ?? '';
+  const serial = state.grantedIds.filter((id) => id.startsWith(`grove:${speciesId}:`)).length;
+  const grantId = `grove:${speciesId}:${serial}`;
+  const gift: KingdomGift = {
+    id: grantId,
+    assetKey: candidate.assetKey,
+    name: candidate.name,
+    sizeScale: 1.15,
+    provenance: { kind: 'merge', label: `Grown from three matching keepsakes`, isoDate },
+  };
+  const next: KingdomDecorState = {
+    ...state,
+    grantedIds: [...state.grantedIds, grantId],
+    unplanted: [gift, ...state.unplanted.filter((entry) => !fused.has(entry.id))],
+  };
+  saveKingdomDecor(next);
+  return next;
+}
+
 // Render-ready patch objects (category 'decor') for the centre island.
 export function kingdomDecorObjects(state: KingdomDecorState, plotId: string | null = null): WorldObject[] {
   const items: DecorItem[] = state.placed
@@ -570,11 +761,11 @@ export function keepsakeAlmanac(state: KingdomDecorState): AlmanacSection[] {
   const bloomCount = state.grantedIds.filter((id) => id.includes(':bloom:')).length;
   const commons: AlmanacSection = {
     title: 'Everyday blooms',
-    blurb: `Photos, notes, places, reflections, meals and walks add up — every few moments grows one of these (up to ${MAX_BLOOM_GIFTS_PER_DAY} a day). ${bloomCount > 0 ? `${bloomCount} grown so far.` : ''}`,
-    entries: COMMONS.map((entry) => ({
-      id: `common-${entry.assetKey}`,
-      name: entry.name,
-      assetKey: entry.assetKey,
+    blurb: `Every day grows one of these on its own — photos, notes, places, meals and walks grow more (up to ${MAX_BLOOM_GIFTS_PER_DAY} a day). ${bloomCount > 0 ? `${bloomCount} grown so far.` : ''}`,
+    entries: BLOOM_COMMONS.map((definition) => ({
+      id: `common-${definition.id}`,
+      name: definition.name,
+      assetKey: definition.art.variants[0],
       hint: 'Grown by everyday living',
       earned: bloomCount > 0,
     })),
@@ -582,12 +773,23 @@ export function keepsakeAlmanac(state: KingdomDecorState): AlmanacSection[] {
   const signature: AlmanacSection = {
     title: 'Signature days',
     blurb: 'Distinctive days leave distinctive keepsakes (up to 2 a day).',
-    entries: DAILY_RULES.map((rule) => ({
-      id: rule.id,
-      name: rule.name,
-      assetKey: rule.assetKey,
-      hint: rule.hint,
-      earned: state.grantedIds.some((id) => id.endsWith(`:${rule.id}`)),
+    entries: SIGNATURE_KEEPSAKES.map((definition) => ({
+      id: definition.id,
+      name: definition.name,
+      assetKey: definition.art.variants[0],
+      hint: definition.hint ?? '',
+      earned: state.grantedIds.some((id) => id.endsWith(`:${definition.id}`)),
+    })),
+  };
+  const milestones: AlmanacSection = {
+    title: 'Milestones',
+    blurb: 'Streaks, seasons, tenure and first-times — each earned once (seasonal ones return every year).',
+    entries: MILESTONE_KEEPSAKES.map((definition) => ({
+      id: definition.id,
+      name: definition.name,
+      assetKey: definition.art.variants[0],
+      hint: definition.hint ?? '',
+      earned: state.grantedIds.some((id) => id === `ms:${definition.id}` || id.startsWith(`ms:${definition.id}@`)),
     })),
   };
   const achievements: AlmanacSection = {
@@ -601,5 +803,5 @@ export function keepsakeAlmanac(state: KingdomDecorState): AlmanacSection[] {
       earned: granted.has(`prop:${def.id}`),
     })),
   };
-  return [commons, signature, achievements];
+  return [commons, signature, milestones, achievements];
 }

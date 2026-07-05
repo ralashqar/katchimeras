@@ -34,6 +34,7 @@ import type {
   HomeMoment,
   HomeMomentMetadata,
   HomeScoreKey,
+  CuisineFamily,
   DayVisionSummary,
   DayWeather,
   FoodMeaning,
@@ -572,6 +573,12 @@ const MANUAL_BIG_MOMENT_LABEL: Record<BigMomentType, string> = {
   trip: 'A trip',
   achievement: 'An achievement',
   milestone: 'A milestone',
+  baby: 'A new baby',
+  wedding: 'A wedding',
+  graduation: 'A graduation',
+  newHome: 'A new home',
+  newJob: 'A new job',
+  reunion: 'A reunion',
 };
 
 // Manually mark today as a Big Moment (the Big Moment quest). Appends a Big
@@ -657,7 +664,14 @@ function buildAutoFoodMoment(
 
 export function addFoodMomentForToday(
   state: StoredHomeState,
-  input: { label: string; emoji: string; meaning: FoodMeaning; thumbnailUri?: string | null },
+  input: {
+    label: string;
+    emoji: string;
+    meaning: FoodMeaning;
+    thumbnailUri?: string | null;
+    cuisine?: CuisineFamily | null;
+    homeCooked?: boolean;
+  },
   profile: OnboardingProfile,
   now: Date,
   target: DayInputTarget = 'today'
@@ -672,6 +686,8 @@ export function addFoodMomentForToday(
     source: 'manual',
     noteId: null,
     detail: null,
+    cuisine: input.cuisine ?? null,
+    homeCooked: input.homeCooked || undefined,
     createdAt: now.toISOString(),
   };
   const nextDay: StoredHomeDayRecord = {

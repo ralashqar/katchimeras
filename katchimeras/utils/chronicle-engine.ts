@@ -64,6 +64,12 @@ const BIG_MOMENT_TITLE: Record<BigMomentType, string> = {
   trip: 'A Day of Travel',
   achievement: 'A Day of Triumph',
   milestone: 'A Milestone Day',
+  baby: 'A Day of Welcome',
+  wedding: 'A Day of Vows',
+  graduation: 'A Day of Honours',
+  newHome: 'A Day of New Walls',
+  newJob: 'A Day of Beginnings',
+  reunion: 'A Day Together Again',
 };
 
 // Score axis → a warm facet word for the title.

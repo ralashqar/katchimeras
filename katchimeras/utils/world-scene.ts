@@ -1,5 +1,6 @@
 import { ARCHETYPE_THEME } from '@/constants/world';
 import type { MemoryNode, PatchCellType, WorldArchetype, WorldObject, WorldPatch } from '@/types/world';
+import TILE_LAYOUT from '@/data/world-tile-layout.json';
 import {
   cellCenter,
   drawDepth,
@@ -10,6 +11,7 @@ import {
   TILE_W,
   type IsoPoint,
 } from '@/utils/world-iso';
+import { IMAGE_BASE_FACTOR } from '@/utils/world-base-projection';
 
 // Flattens the persisted world into absolute, render-ready geometry. Pure: the
 // Skia/RN component just paints what this returns, and this stays unit-testable.
@@ -183,8 +185,30 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
   const lo = -ring;
   const hi = PATCH_SIZE + ring;
 
+  // Territory tiles dock at EXACT tessellation offsets from the anchor patch
+  // (the first non-docked one): the base images tile seamlessly because the
+  // offset is the same side×ring step the Tile Lab calibrated.
+  const anchorPatch = patches.find((patch) => !patch.expansionDock);
+  const DOCK_SIGNS: Record<string, { sx: 1 | -1; sy: 1 | -1 }> = {
+    ne: { sx: 1, sy: -1 },
+    se: { sx: 1, sy: 1 },
+    sw: { sx: -1, sy: 1 },
+    nw: { sx: -1, sy: -1 },
+  };
+
   for (const patch of patches) {
-    const origin = patchWorldOrigin(patch.gridCol, patch.gridRow);
+    let origin = patchWorldOrigin(patch.gridCol, patch.gridRow);
+    if (patch.expansionDock && anchorPatch) {
+      const anchorOrigin = patchWorldOrigin(anchorPatch.gridCol, anchorPatch.gridRow);
+      const span = (PATCH_SIZE + ring * 2) * TILE_W * IMAGE_BASE_FACTOR;
+      const side = DOCK_SIGNS[patch.expansionDock.side] ?? DOCK_SIGNS.ne;
+      const mags =
+        TILE_LAYOUT.sides?.[patch.expansionDock.side as keyof typeof TILE_LAYOUT.sides] ?? { w: 0.4565, h: 0.3652 };
+      origin = {
+        x: anchorOrigin.x + side.sx * mags.w * span * patch.expansionDock.ring,
+        y: anchorOrigin.y + side.sy * mags.h * span * patch.expansionDock.ring,
+      };
+    }
     const patchDepth = (patch.gridCol + patch.gridRow) * PATCH_DEPTH_STRIDE;
     const shift = (p: IsoPoint): IsoPoint => ({ x: origin.x + p.x, y: origin.y + p.y });
 

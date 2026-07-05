@@ -20,6 +20,11 @@ export const PLACE_CATEGORIES: PlaceCategory[] = [
   { id: 'cinema', emoji: '🎬', label: 'Cinema' },
   { id: 'museum', emoji: '🏛', label: 'Museum' },
   { id: 'shopping', emoji: '🛍', label: 'Shopping' },
+  // Keepsake-earning categories (world-objects placeCategory unlocks).
+  { id: 'landmark', emoji: '🗼', label: 'Landmark' },
+  { id: 'beach', emoji: '🏖', label: 'Beach' },
+  { id: 'library', emoji: '📚', label: 'Library' },
+  { id: 'market', emoji: '🧺', label: 'Market' },
   { id: 'work', emoji: '💼', label: 'Work' },
   { id: 'home', emoji: '🏠', label: 'Home' },
   { id: 'other', emoji: '✨', label: 'Somewhere else' },

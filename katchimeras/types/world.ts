@@ -146,6 +146,10 @@ export type WorldPatch = {
   // WORLD_BASE_SOURCES). Absent → the canvas default. Lets Kingdom expansion
   // plots dock smaller islet bases beside the main island.
   baseId?: string | null;
+  // Territory expansion tile: docked at the EXACT tessellation offset from the
+  // main island (side × ring, world-tile-layout side magnitudes) instead of the
+  // patch grid — layoutWorld overrides the origin for these.
+  expansionDock?: { side: 'ne' | 'se' | 'sw' | 'nw'; ring: number };
   // Deferred (post-MVP): which sides have neighbours for edge-blending/biomes.
   connectorSides: WorldDirection[];
   // Live-patch fields. Absent on archived/legacy patches (treated as 'hatched').

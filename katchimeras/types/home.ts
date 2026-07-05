@@ -509,6 +509,17 @@ export type FoodMeaning = 'treat' | 'sharedMeal' | 'comfort' | 'fuel' | 'discove
 // How a food memory entered the vault: a manual two-step add, an auto-detect from
 // a snapped photo (Apple Vision), or an auto-detect from a note's text.
 export type FoodSource = 'manual' | 'photo' | 'note';
+// The optional "what kind?" tag on a Meal — a cuisine FAMILY (drives the food
+// journey keepsakes: one Cuisine Lantern per first-time family).
+export type CuisineFamily =
+  | 'italian'
+  | 'japanese'
+  | 'chinese'
+  | 'indian'
+  | 'mexican'
+  | 'middle_eastern'
+  | 'french'
+  | 'greek';
 export type FoodMoment = {
   id: string;
   label: string; // "Coffee", "Dinner", "Dessert"
@@ -518,6 +529,10 @@ export type FoodMoment = {
   source?: FoodSource;
   noteId?: string | null; // the note this food was detected in (source 'note')
   detail?: string | null; // a short snippet for the reader (e.g. note excerpt)
+  // Optional "what kind?" answer on a Meal — either a cuisine family or
+  // home-made (never both; both absent when skipped or not asked).
+  cuisine?: CuisineFamily | null;
+  homeCooked?: boolean;
   createdAt: string;
 };
 
@@ -608,7 +623,14 @@ export type BigMomentType =
   | 'holiday'
   | 'trip'
   | 'achievement'
-  | 'milestone';
+  | 'milestone'
+  // Life-event types (each lights its own celebration keepsake in the Kingdom).
+  | 'baby'
+  | 'wedding'
+  | 'graduation'
+  | 'newHome'
+  | 'newJob'
+  | 'reunion';
 
 // A special event a note revealed (always user-confirmed) — grows a rare
 // landmark object in the patch's centre.

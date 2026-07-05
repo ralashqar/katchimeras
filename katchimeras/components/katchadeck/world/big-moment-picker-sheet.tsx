@@ -18,6 +18,13 @@ const OPTIONS: BigMomentOption[] = [
   { type: 'achievement', emoji: '🏆', label: 'Achievement' },
   { type: 'anniversary', emoji: '💛', label: 'Anniversary' },
   { type: 'holiday', emoji: '🎏', label: 'Holiday' },
+  // Life events — each lights its own celebration keepsake in the Kingdom.
+  { type: 'baby', emoji: '👶', label: 'New baby' },
+  { type: 'wedding', emoji: '💍', label: 'Wedding' },
+  { type: 'graduation', emoji: '🎓', label: 'Graduation' },
+  { type: 'newHome', emoji: '🏡', label: 'New home' },
+  { type: 'newJob', emoji: '💼', label: 'New job' },
+  { type: 'reunion', emoji: '🤗', label: 'Reunion' },
 ];
 
 // Shared emoji/label per big-moment type — reused by the reader (BigMomentSheet)
