@@ -461,9 +461,26 @@ const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
   // Sibling tessellation unit born from the grid-guide template (wildflower
   // patches + bushes in the lawns); same canonical diamond, same offsets.
   base_garden_wildflower: require('../assets/images/katchimeras/world/base/base_garden_wildflower.webp'),
-  // User-supplied toy-brick tile (blue-chroma matted + perspective-normalised
-  // to the canonical diamond — scratchpad brick-tile-normalize.py).
+  // User-supplied toy-brick tile (gpt 2K re-render + BiRefNet + pure diamond
+  // warp — scratchpad brick-tile-pure.py).
   base_garden_bricks: require('../assets/images/katchimeras/world/base/base_garden_bricks.webp'),
+  // User-supplied cobble-skirt velvet tile (same pure pipeline —
+  // scratchpad cobble-tile.py).
+  base_garden_cobble: require('../assets/images/katchimeras/world/base/base_garden_cobble.webp'),
+  // Generated FROM the procedural canonical template (design/proc-tile-green
+  // + style anchor — scratchpad styled-from-template.py): velvet lawn, cobble
+  // skirt, geometry converged to 4.2px.
+  base_garden_velvet: require('../assets/images/katchimeras/world/base/base_garden_velvet.webp'),
+  // Same template pipeline, roads variant (proc-tile-roads: two crossing
+  // lanes to the edge midpoints, no plaza).
+  base_garden_velvet_roads: require('../assets/images/katchimeras/world/base/base_garden_velvet_roads.webp'),
+  // User-supplied variant set, all via scripts/tile-pipeline.py (2K re-render
+  // + BiRefNet + hole fill + canonical warp — docs/tile-pipeline.md).
+  base_garden_nest: require('../assets/images/katchimeras/world/base/base_garden_nest.webp'),
+  base_garden_winding: require('../assets/images/katchimeras/world/base/base_garden_winding.webp'),
+  base_garden_brickcross: require('../assets/images/katchimeras/world/base/base_garden_brickcross.webp'),
+  base_garden_diagonal: require('../assets/images/katchimeras/world/base/base_garden_diagonal.webp'),
+  base_garden_plaza: require('../assets/images/katchimeras/world/base/base_garden_plaza.webp'),
   // Best tessellation unit: generated FROM the path-lane guide alone (lanes +
   // plaza drawn into the template), flat lawns — path crossings within ~13px
   // of edge midpoints, roads continue seamlessly across tiles.

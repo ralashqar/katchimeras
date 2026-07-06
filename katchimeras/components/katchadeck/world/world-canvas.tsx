@@ -33,7 +33,7 @@ import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
 import type { MemoryNode, WorldObjectCategory, WorldPatch } from '@/types/world';
 import * as worldStructureLayout from '@/data/world-structure-layout.json';
 import type { PlacedArtefact } from '@/utils/discoveries-artefacts';
-import { layoutWorld, type SceneFence, type SceneSprite } from '@/utils/world-scene';
+import { layoutWorld, type SceneFence, type SceneSlab, type SceneSprite } from '@/utils/world-scene';
 import { cellCenter, cellFromPoint, drawDepth, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
 import {
   DECAL_ATLAS,
@@ -384,6 +384,21 @@ export function WorldCanvas({
     return { left: cx - span / 2, top: cy - span / 2, size: span };
   }, [imgBase, focusSlab]);
 
+  // Same rect for ANY slab — drag clamping must bound the finger to the
+  // dragged sprite's OWN tile. Clamping to the focus (main-island) rect made
+  // drags on docked territory tiles snap far away or off-tile on release.
+  const slabRectFor = useCallback(
+    (slab: SceneSlab | null) => {
+      if (!imgBase || !slab) return null;
+      const [top, right, bottom, left] = slab.topCorners;
+      const span = (right.x - left.x) * BASE_FACTOR;
+      const cx = (left.x + right.x) / 2 + BASE_OFFSET_X;
+      const cy = (top.y + bottom.y) / 2 + BASE_OFFSET_Y;
+      return { left: cx - span / 2, top: cy - span / 2, size: span };
+    },
+    [imgBase]
+  );
+
   // Per-slot drag positions (fractional cells). Empty until the user moves things,
   // so the patch looks identical to the grid layout by default.
   const [custom, setCustom] = useState<BaseCustomisation>(() => (imageBase ? loadBaseCustomisation() : {}));
@@ -507,10 +522,11 @@ export function WorldCanvas({
       const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
       let sx = drag.startX + sceneDx;
       let sy = drag.startY + sceneDy;
-      if (baseRect) {
-        const inset = baseRect.size * 0.03;
-        sx = Math.min(baseRect.left + baseRect.size - inset, Math.max(baseRect.left + inset, sx));
-        sy = Math.min(baseRect.top + baseRect.size - inset, Math.max(baseRect.top + inset, sy));
+      const clampRect = slabRectFor(dragSlab) ?? baseRect;
+      if (clampRect) {
+        const inset = clampRect.size * 0.03;
+        sx = Math.min(clampRect.left + clampRect.size - inset, Math.max(clampRect.left + inset, sx));
+        sy = Math.min(clampRect.top + clampRect.size - inset, Math.max(clampRect.top + inset, sy));
       }
       const frac = cellFromPoint(sx - dragSlab.centre.x + origin.x, sy - dragSlab.centre.y + origin.y);
       if (drag.isDecor) {
@@ -519,7 +535,7 @@ export function WorldCanvas({
         setCustom((prev) => ({ ...prev, [drag.key]: { col: frac.col, row: frac.row } }));
       }
     },
-    [focusSlab, slabForKey, baseRect, onMoveDecor]
+    [focusSlab, slabForKey, baseRect, slabRectFor, onMoveDecor]
   );
   const endDrag = useCallback(() => {
     if (dragRef.current && !dragRef.current.isDecor) {
@@ -583,10 +599,11 @@ export function WorldCanvas({
       const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
       let sx = drag.startX + offX;
       let sy = drag.startY + offY;
-      if (baseRect) {
-        const inset = baseRect.size * 0.03;
-        sx = Math.min(baseRect.left + baseRect.size - inset, Math.max(baseRect.left + inset, sx));
-        sy = Math.min(baseRect.top + baseRect.size - inset, Math.max(baseRect.top + inset, sy));
+      const clampRect = slabRectFor(dragSlab) ?? baseRect;
+      if (clampRect) {
+        const inset = clampRect.size * 0.03;
+        sx = Math.min(clampRect.left + clampRect.size - inset, Math.max(clampRect.left + inset, sx));
+        sy = Math.min(clampRect.top + clampRect.size - inset, Math.max(clampRect.top + inset, sy));
       }
       const frac = cellFromPoint(sx - dragSlab.centre.x + origin.x, sy - dragSlab.centre.y + origin.y);
       const col = drag.isDecor && snapCell ? snapCell(frac.col) : frac.col;
@@ -606,7 +623,7 @@ export function WorldCanvas({
         });
       }
     },
-    [focusSlab, slabForKey, baseRect, onMoveDecor, snapCell, dragKeySV]
+    [focusSlab, slabForKey, baseRect, slabRectFor, onMoveDecor, snapCell, dragKeySV]
   );
   // A cancelled gesture fires onFinalize but NOT onEnd — without this failsafe
   // a cancellation mid-drag would strand the piece and the camera lock.
@@ -1328,7 +1345,8 @@ export function WorldCanvas({
 
   const groundPaths = useMemo(
     () =>
-      scene.slabs.map((slab) => {
+      // Painter's order: slabs lower on screen draw later (on top).
+      [...scene.slabs].sort((a, b) => a.centre.y - b.centre.y).map((slab) => {
         const theme = ARCHETYPE_THEME[slab.archetype];
         const [top, right, , left] = slab.topCorners;
         return {
@@ -1379,9 +1397,11 @@ export function WorldCanvas({
               )
             )}
           {/* Ground (image mode): one base PNG PER PATCH — the main island plus
-              any docked expansion plots (patch.baseId picks the art). */}
+              any docked expansion plots (patch.baseId picks the art). Painter's
+              order: tiles lower on screen (sw/se fronts) draw ON TOP, so their
+              face covers the neighbor-behind's wall skirt at the seam. */}
           {imgBase && baseRect && baseSource ? (
-            scene.slabs.map((slab) => {
+            [...scene.slabs].sort((a, b) => a.centre.y - b.centre.y).map((slab) => {
               const patch = patches.find((candidate) => candidate.id === slab.patchId);
               const source = kingdomBaseSource(patch?.baseId) ?? baseSource;
               const [top, right, bottom, left] = slab.topCorners;

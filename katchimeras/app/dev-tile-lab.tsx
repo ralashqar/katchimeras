@@ -19,7 +19,7 @@ import { worldBaseSource } from '@/utils/world-visuals';
 // pair 0.53/0.4). This page is ABOUT OFFSETS: pick a side, step its W/H,
 // watch the seam close; the tile graphic itself is one cycle button.
 
-const BASE_IDS = ['base_garden_main', 'base_garden_bricks', 'base_garden_toy', 'base_garden_uniform', 'base_garden_grass', 'base_garden_flat', 'base_garden_wildflower', 'base_garden_simple', 'base_garden', 'base_env3', 'plot_base_1', 'plot_base_2', 'base_env2', 'base_meadow'];
+const BASE_IDS = ['base_garden_main', 'base_garden_bricks', 'base_garden_cobble', 'base_garden_velvet', 'base_garden_velvet_roads', 'base_garden_nest', 'base_garden_winding', 'base_garden_brickcross', 'base_garden_diagonal', 'base_garden_plaza', 'base_garden_toy', 'base_garden_uniform', 'base_garden_grass', 'base_garden_flat', 'base_garden_wildflower', 'base_garden_simple', 'base_garden', 'base_env3', 'plot_base_1', 'plot_base_2', 'base_env2', 'base_meadow'];
 const TILE_PX = 340;
 
 type SideId = 'ne' | 'se' | 'sw' | 'nw';
@@ -31,11 +31,14 @@ const SIDES: { id: SideId; label: string; sx: 1 | -1; sy: 1 | -1 }[] = [
   { id: 'nw', label: 'NW', sx: -1, sy: -1 },
 ];
 
+// Fallbacks = the CANONICAL diamond offsets (935/2048, 748/2048) — never the
+// legacy hand-tuned 0.53/0.4, which pushed neighbors ~16%/9.5% too far and
+// read as a wall+gap seam whenever a stale bundle missed `sides` in the JSON.
 const JSON_SIDES: SideOffsets = {
-  ne: { w: tileLayout.sides?.ne?.w ?? 0.53, h: tileLayout.sides?.ne?.h ?? 0.4 },
-  se: { w: tileLayout.sides?.se?.w ?? 0.53, h: tileLayout.sides?.se?.h ?? 0.4 },
-  sw: { w: tileLayout.sides?.sw?.w ?? 0.53, h: tileLayout.sides?.sw?.h ?? 0.4 },
-  nw: { w: tileLayout.sides?.nw?.w ?? 0.53, h: tileLayout.sides?.nw?.h ?? 0.4 },
+  ne: { w: tileLayout.sides?.ne?.w ?? 0.4565, h: tileLayout.sides?.ne?.h ?? 0.3652 },
+  se: { w: tileLayout.sides?.se?.w ?? 0.4565, h: tileLayout.sides?.se?.h ?? 0.3652 },
+  sw: { w: tileLayout.sides?.sw?.w ?? 0.4565, h: tileLayout.sides?.sw?.h ?? 0.3652 },
+  nw: { w: tileLayout.sides?.nw?.w ?? 0.4565, h: tileLayout.sides?.nw?.h ?? 0.3652 },
 };
 
 export default function DevTileLabScreen() {
@@ -198,17 +201,34 @@ export default function DevTileLabScreen() {
           <View style={styles.row}>
             <OffsetStepper label={`${selectedSide.toUpperCase()} W`} value={sides[selectedSide].w} onStep={(d) => stepSelected('w', d)} />
             <OffsetStepper label="H" value={sides[selectedSide].h} onStep={(d) => stepSelected('h', d)} />
-            <Pressable
-              onPress={() => {
-                setSides(JSON_SIDES);
-                setTilt(1);
-                setShear(0);
-              }}
-              style={styles.chip}>
-              <ThemedText style={styles.chipLabel} lightColor="#E8EEFF" darkColor="#E8EEFF">
-                reset
-              </ThemedText>
-            </Pressable>
+            {(() => {
+              // Loud when the stage deviates from the canonical JSON offsets —
+              // a stepped/stale value is the usual cause of "seam gaps" reports.
+              const tuned =
+                SIDES.some(
+                  (side) =>
+                    Math.abs(sides[side.id].w - JSON_SIDES[side.id].w) > 0.0005 ||
+                    Math.abs(sides[side.id].h - JSON_SIDES[side.id].h) > 0.0005
+                ) ||
+                tilt !== 1 ||
+                shear !== 0;
+              return (
+                <Pressable
+                  onPress={() => {
+                    setSides(JSON_SIDES);
+                    setTilt(1);
+                    setShear(0);
+                  }}
+                  style={[styles.chip, tuned ? styles.chipWarn : null]}>
+                  <ThemedText
+                    style={styles.chipLabel}
+                    lightColor={tuned ? '#FFC36B' : '#E8EEFF'}
+                    darkColor={tuned ? '#FFC36B' : '#E8EEFF'}>
+                    {tuned ? '⚠ tuned — reset' : 'reset'}
+                  </ThemedText>
+                </Pressable>
+              );
+            })()}
           </View>
 
           {/* Iso camera preview — tilt + shear on the whole stage; slopes shown for the 0.8-native uniform tile. */}
@@ -313,6 +333,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   chipActive: { backgroundColor: 'rgba(255,195,107,0.2)', borderColor: '#FFC36B' },
+  chipWarn: { backgroundColor: 'rgba(255,195,107,0.14)', borderColor: '#FFC36B', borderStyle: 'dashed' },
   chipLabel: { fontSize: 11.5, fontWeight: '800' },
   readout: { fontSize: 10.5, fontWeight: '600' },
   stepper: { alignItems: 'center', flexDirection: 'row', gap: 4 },

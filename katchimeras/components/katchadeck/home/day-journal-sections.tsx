@@ -1,6 +1,15 @@
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
@@ -45,6 +54,40 @@ const SHOW_TIMELINE_SECTION = false;
 const SHOW_PHOTOS_SECTION = false;
 
 export type DayStatKey = 'steps' | 'places' | 'photos' | 'moments';
+
+// Attention highlight: a gold light that TRAVELS around the tile's border —
+// a rotating gradient blade clipped to a thin ring just outside the tile
+// (replaces the old solid cream fill, which read as a white highlight).
+// Sits behind the tile content; the tile's opaque face covers the middle.
+function AttentionBorderSweep({ radius }: { radius: number }) {
+  const turn = useSharedValue(0);
+  useEffect(() => {
+    turn.value = 0;
+    turn.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.linear }), -1);
+    return () => cancelAnimation(turn);
+  }, [turn]);
+  const spin = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 360}deg` }] }));
+  return (
+    <View pointerEvents="none" style={[styles.sweepRing, { borderRadius: radius }]}>
+      <Animated.View style={[styles.sweepBlade, spin]}>
+        <LinearGradient
+          // A sharp comet: transparent for most of the sweep, a short gold
+          // tail, and a bright crisp head — packed stops keep the falloff
+          // tight instead of a long soft smear.
+          colors={['rgba(233,185,78,0)', 'rgba(233,185,78,0)', `${ATTENTION_GOLD}CC`, '#FFF0C8']}
+          locations={[0, 0.62, 0.88, 1]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+      {/* Opaque cover leaves only a thin 2px band at the tile edge — the
+          comet orbits INSIDE the tile, so no parent can ever clip it. The
+          cover's own hairline gives the band a faint constant gold base. */}
+      <View style={[styles.sweepCover, { borderRadius: Math.max(4, radius - 2) }]} />
+    </View>
+  );
+}
 
 // A stat value that COUNTS to its new number instead of snapping — so live
 // step updates roll up. Eased over ~0.7s; formatting is applied per frame.
@@ -203,7 +246,8 @@ export function DayJournalSections({
                     accessibilityLabel={`${category.label}${badge ? ` (${badge})` : ''}`}
                     disabled={!onCategoryPress}
                     onPress={() => onCategoryPress?.(category)}
-                    style={[styles.categoryTile, category.needsAttention ? styles.categoryTileAttention : null]}>
+                    style={styles.categoryTile}>
+                    {category.needsAttention ? <AttentionBorderSweep radius={Meadow.radius.tile} /> : null}
                     {art ? (
                       <Image source={art} style={styles.categoryArt} contentFit="contain" />
                     ) : (
@@ -234,7 +278,8 @@ export function DayJournalSections({
               key={stat.key}
               disabled={!stat.onPress}
               onPress={stat.onPress}
-              style={[styles.statTile, attention ? styles.statTileAttention : null]}>
+              style={styles.statTile}>
+              {attention ? <AttentionBorderSweep radius={Meadow.radius.tile} /> : null}
               {/* Warm brown, never the creature accent — pastels vanish on cream. */}
               <IconSymbol
                 color={attention ? Meadow.goldDeep : Meadow.iconOnCard}
@@ -572,9 +617,31 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 9,
   },
-  categoryTileAttention: {
-    backgroundColor: '#F9EBC9',
-    boxShadow: '0 0 14px rgba(233,185,78,0.35)',
+  // The travelling border light (AttentionBorderSweep): a huge rotating
+  // gradient blade clipped to the tile, with an opaque cover leaving only a
+  // thin 2px band at the edge — the comet orbits inside the tile.
+  sweepRing: {
+    ...StyleSheet.absoluteFillObject,
+    // Faint constant gold base so the border reads highlighted between passes.
+    borderColor: 'rgba(233, 169, 62, 0.35)',
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'absolute',
+  },
+  sweepBlade: {
+    height: '340%',
+    left: '-120%',
+    position: 'absolute',
+    top: '-120%',
+    width: '340%',
+  },
+  sweepCover: {
+    backgroundColor: Meadow.cardSoft,
+    bottom: 2,
+    left: 2,
+    position: 'absolute',
+    right: 2,
+    top: 2,
   },
   categoryArt: {
     height: 34,
@@ -639,18 +706,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
-  statTileAttention: {
-    backgroundColor: '#F9EBC9',
-    boxShadow: '0 0 14px rgba(233,185,78,0.35)',
-  },
   statAlertDot: {
-    backgroundColor: ATTENTION_GOLD,
+    // Deep gold with a darker rim — the pale gold read as a washed-out peach
+    // dot on the cream tile.
+    backgroundColor: '#E9A93E',
+    borderColor: Meadow.goldDeep,
     borderRadius: 999,
-    height: 8,
+    borderWidth: 1.5,
+    height: 9,
     position: 'absolute',
     right: 8,
     top: 8,
-    width: 8,
+    width: 9,
   },
   sectionCard: {
     backgroundColor: Meadow.card,

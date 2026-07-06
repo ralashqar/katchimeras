@@ -166,16 +166,19 @@ export function LanternEgg({
 
   // A quick rattle of the shell (same axis pair the feed shake uses), scaled
   // by `strength` — 0.8 for a tap, up to ~1.2 for an energetic drag release.
-  const fireShake = (strength: number) => {
+  // `delayMs` lets the drag release breathe: the membrane springs back first,
+  // THEN the shell rattles, instead of both firing on the same frame.
+  const fireShake = (strength: number, delayMs = 0) => {
     'worklet';
     feedShake.value = 0;
-    feedShake.value = withSequence(
+    const rattle = withSequence(
       withTiming(strength, { duration: 55, easing: Easing.linear }),
       withTiming(-strength, { duration: 55, easing: Easing.linear }),
       withTiming(strength * 0.55, { duration: 55, easing: Easing.linear }),
       withTiming(-strength * 0.35, { duration: 55, easing: Easing.linear }),
       withTiming(0, { duration: 80, easing: Easing.out(Easing.cubic) })
     );
+    feedShake.value = delayMs > 0 ? withDelay(delayMs, rattle) : rattle;
   };
 
   const tapGesture = Gesture.Tap()
@@ -210,7 +213,7 @@ export function LanternEgg({
       dragX.value = withSpring(0, { damping: 11, stiffness: 220, velocity: event.velocityX * 0.4 });
       dragY.value = withSpring(0, { damping: 11, stiffness: 220, velocity: event.velocityY * 0.4 });
       interactionEnergy.value = withTiming(0, { duration: 420, easing: Easing.out(Easing.cubic) });
-      fireShake(0.5 + energy * 0.7);
+      fireShake(0.5 + energy * 0.7, 500);
     })
     .onFinalize(() => {
       pressProgress.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) });

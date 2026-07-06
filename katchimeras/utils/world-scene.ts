@@ -137,8 +137,6 @@ export type WorldScene = {
   ghosts: SceneGhost[];
 };
 
-const PATCH_DEPTH_STRIDE = 1000;
-
 // Objects are 1:2 frames = one SLOT of the 4x4 line grid (world-tile-edit.py
 // object-grid): two stacked square cells, the LOWER is the base tile, the UPPER is
 // headroom. The frame width == one grid column == one tile, so size = TILE_W and
@@ -209,7 +207,13 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
         y: anchorOrigin.y + side.sy * mags.h * span * patch.expansionDock.ring,
       };
     }
-    const patchDepth = (patch.gridCol + patch.gridRow) * PATCH_DEPTH_STRIDE;
+    // Painter's order from the patch's SCREEN position, not its grid coords —
+    // docked territory tiles all carry gridCol/gridRow 0, so grid-based depth
+    // made every kingdom patch tie at 0 and cross-tile ordering fell to array
+    // order. Lower on screen (larger y — the sw/se front tiles) must draw on
+    // top. ×2 keeps adjacent-patch steps (~hundreds of px) far above the
+    // per-object local depth range (~tens).
+    const patchDepth = Math.round(origin.y * 2);
     const shift = (p: IsoPoint): IsoPoint => ({ x: origin.x + p.x, y: origin.y + p.y });
 
     // The slab's four top-face corners over the (possibly ring-extended) grid.
