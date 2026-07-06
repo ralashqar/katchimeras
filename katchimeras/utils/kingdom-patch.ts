@@ -192,7 +192,10 @@ export function deriveKingdomPatch(kingdom: KingdomState): WorldPatch {
     baseId: 'base_env3',
     isoDate: newest?.isoDate ?? '',
     name: 'Your Kingdom',
-    primaryArchetype: 'meaningful',
+    // 'calm' = the grass ground theme — matches the expansion/plot patches so
+    // the whole Kingdom reads as one continuous lawn ('meaningful' floored the
+    // main island in stone).
+    primaryArchetype: 'calm',
     secondaryArchetype: null,
     creatureId: newest?.creatureId ?? null,
     creatureVisualKey: newest?.visualKey ?? null,

@@ -8,6 +8,7 @@ import {
   patchWorldOrigin,
   PATCH_SIZE,
   SLAB_THICKNESS,
+  TILE_H,
   TILE_W,
   type IsoPoint,
 } from '@/utils/world-iso';
@@ -147,22 +148,10 @@ function spriteSize(object: WorldObject): number {
   return base * (object.sizeScale ?? 1);
 }
 
-// Every cell is floored with a diamond tile from the atlas — the archetype's
-// base ground tile by default, an accent tile on some free cells. Rendered at
-// exactly one tile width so the diamonds tile seamlessly (shared edges). Derived
-// at render time, so density/look changes apply to existing patches too.
+// Every cell is floored with the archetype's base diamond tile from the atlas
+// (uniform — no scattered accents). Rendered at exactly one tile width so the
+// diamonds tile seamlessly (shared edges).
 const TILE_RENDER_W = TILE_W * 1.02; // slight overlap seals the seams
-const ACCENT_DENSITY = 0.4; // share of free cells that get an accent tile
-
-// Stable per-cell hash so decal placement is deterministic per patch + tile.
-function cellHash(seed: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i += 1) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
 
 // `ring` extends the ground slab by N rings of EMPTY cells around the 4×4 content
 // (objects/memories still live on the inner 0..PATCH_SIZE grid). It frames the
@@ -198,14 +187,27 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
     let origin = patchWorldOrigin(patch.gridCol, patch.gridRow);
     if (patch.expansionDock && anchorPatch) {
       const anchorOrigin = patchWorldOrigin(anchorPatch.gridCol, anchorPatch.gridRow);
-      const span = (PATCH_SIZE + ring * 2) * TILE_W * IMAGE_BASE_FACTOR;
       const side = DOCK_SIGNS[patch.expansionDock.side] ?? DOCK_SIGNS.ne;
-      const mags =
-        TILE_LAYOUT.sides?.[patch.expansionDock.side as keyof typeof TILE_LAYOUT.sides] ?? { w: 0.4565, h: 0.3652 };
-      origin = {
-        x: anchorOrigin.x + side.sx * mags.w * span * patch.expansionDock.ring,
-        y: anchorOrigin.y + side.sy * mags.h * span * patch.expansionDock.ring,
-      };
+      if (stableBounds) {
+        // Image-base mode: offsets are fractions of the ENLARGED base PNG
+        // (Tile Lab calibration) so the baked tiles tessellate seamlessly.
+        const span = (PATCH_SIZE + ring * 2) * TILE_W * IMAGE_BASE_FACTOR;
+        const mags =
+          TILE_LAYOUT.sides?.[patch.expansionDock.side as keyof typeof TILE_LAYOUT.sides] ?? { w: 0.4565, h: 0.3652 };
+        origin = {
+          x: anchorOrigin.x + side.sx * mags.w * span * patch.expansionDock.ring,
+          y: anchorOrigin.y + side.sy * mags.h * span * patch.expansionDock.ring,
+        };
+      } else {
+        // Skia-slab mode: EXACT grid tessellation — the neighbor slab shares
+        // an edge when shifted by the slab's full cell count along the iso
+        // axes ((±w/2, ±h/2) per cell), so docked patches butt seamlessly.
+        const cells = PATCH_SIZE + ring * 2;
+        origin = {
+          x: anchorOrigin.x + side.sx * cells * (TILE_W / 2) * patch.expansionDock.ring,
+          y: anchorOrigin.y + side.sy * cells * (TILE_H / 2) * patch.expansionDock.ring,
+        };
+      }
     }
     // Painter's order from the patch's SCREEN position, not its grid coords —
     // docked territory tiles all carry gridCol/gridRow 0, so grid-based depth
@@ -287,30 +289,17 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
     for (const node of patch.memoryNodes) occupied.add(`${node.col},${node.row}`);
 
     const theme = ARCHETYPE_THEME[patch.primaryArchetype];
-    // Today's forming plot is intentionally a bare, uniform field: one fixed
-    // ground decal on every cell, no scattered accents — so it reads as "nothing
-    // yet" until real moments grow on it. Hatched/legacy patches keep the
-    // accent-scattered, archetype-themed ground.
-    const isForming = patch.status === 'forming' || patch.status === 'readyToHatch';
+    // Uniform ground: EVERY cell gets the archetype's base tile (grass) — no
+    // scattered accents or per-cell variants. The mixed random tiles read
+    // noisy at the 14-cell kingdom scale; one texture also lets the renderer
+    // batch the whole floor into a single draw.
     for (let row = lo; row < hi; row += 1) {
       for (let col = lo; col < hi; col += 1) {
-        const inContent = col >= 0 && col < PATCH_SIZE && row >= 0 && row < PATCH_SIZE;
-        const h = cellHash(`${patch.id}:${col},${row}`);
-        const isFree = !occupied.has(`${col},${row}`);
-        // Ring cells are always bare ground (a calm margin around the plot).
-        // Inside the content grid: accent tile on some free cells, base ground
-        // tile everywhere else (including under objects, so they sit on land).
-        const key =
-          inContent && !isForming && isFree && (h % 1000) / 1000 < ACCENT_DENSITY
-            ? theme.decals[(h >>> 10) % theme.decals.length]
-            : theme.groundTile;
         const c = shift(cellCenter(col, row));
         rawDecals.push({
           id: `${patch.id}-tile-${col}-${row}`,
           patchId: patch.id,
-          // Each tile type has a _2 variant from the grid; pick one per content
-          // cell — the forming plot and the ring stay on the single base tile.
-          decal: inContent && !isForming && (h >>> 16) & 1 ? `${key}_2` : key,
+          decal: theme.groundTile,
           archetype: patch.primaryArchetype,
           x: c.x,
           y: c.y,
@@ -339,6 +328,7 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
     }
     // Empty cells (level 0) → faint ghost placeholders the day can fill. Only on
     // the live forming patch — a finalized day is complete, no empty spots shown.
+    const isForming = patch.status === 'forming' || patch.status === 'readyToHatch';
     for (const cell of isForming ? patch.cells ?? [] : []) {
       if (cell.level > 0) continue;
       if (occupiedCellTypes.has(cell.type)) continue;

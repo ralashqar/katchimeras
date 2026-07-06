@@ -1,4 +1,4 @@
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
+import { Canvas, Path, Picture, Skia, useImage } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import tileLayout from '@/data/world-tile-layout.json';
@@ -357,17 +357,16 @@ export function WorldCanvas({
       const found = scene.slabs.find((s) => s.patchId === eggPatchId);
       if (found) return found;
     }
-    // Image mode: focus the MAIN island (no baseId, not a docked territory
-    // tile) — appended plots/expansions must never steal the camera anchor.
-    if (imageBase) {
-      const main = scene.slabs.find((slab) => {
-        const patch = patches.find((candidate) => candidate.id === slab.patchId);
-        return !!patch && !patch.baseId && !patch.expansionDock;
-      });
-      if (main) return main;
-    }
+    // Focus the MAIN island in BOTH ground modes — appended plots/expansions
+    // must never steal the camera. The kingdom patch carries a baseId
+    // ('base_env3'), so match it by id as well as the no-baseId heuristic.
+    const main = scene.slabs.find((slab) => {
+      const patch = patches.find((candidate) => candidate.id === slab.patchId);
+      return !!patch && !patch.expansionDock && (patch.id === 'kingdom' || !patch.baseId);
+    });
+    if (main) return main;
     return scene.slabs[scene.slabs.length - 1] ?? null;
-  }, [scene, eggPatchId, imageBase, patches]);
+  }, [scene, eggPatchId, patches]);
 
   // --- Image base: the ground PNG + drag customisation ---------------------
   const baseSource = imageBase ? kingdomBaseSource(IMAGE_BASE_ID) : null;
@@ -400,8 +399,11 @@ export function WorldCanvas({
   );
 
   // Per-slot drag positions (fractional cells). Empty until the user moves things,
-  // so the patch looks identical to the grid layout by default.
-  const [custom, setCustom] = useState<BaseCustomisation>(() => (imageBase ? loadBaseCustomisation() : {}));
+  // so the patch looks identical to the grid layout by default. Loaded for any
+  // customisable canvas (image base OR the Skia kingdom, which passes
+  // onMoveDecor) — legacy day views stay untouched.
+  const canCustomise = imageBase || !!onMoveDecor;
+  const [custom, setCustom] = useState<BaseCustomisation>(() => (canCustomise ? loadBaseCustomisation() : {}));
 
   // Sprite → owning slab (drag math and custom overrides are relative to the
   // sprite's OWN tile, so decor on territory tiles positions correctly).
@@ -421,7 +423,7 @@ export function WorldCanvas({
 
   // Objects with any user customisation applied (drag overrides the grid cell).
   const positionedSprites = useMemo(() => {
-    if (!imgBase || !focusSlab) return scene.sprites;
+    if (!canCustomise || !focusSlab) return scene.sprites;
     const origin = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row);
     return scene.sprites.map((s) => {
       const c = custom[slotKey(s)];
@@ -441,7 +443,7 @@ export function WorldCanvas({
         depth: patchDepth + drawDepth(c.col, c.row) * 2 + (s.kind === 'creature' ? 1 : 0),
       };
     });
-  }, [imgBase, focusSlab, slabByPatch, scene.sprites, custom]);
+  }, [canCustomise, focusSlab, slabByPatch, scene.sprites, custom]);
 
   const sceneSpriteSignature = useMemo(() => scene.sprites.map((sprite) => sprite.id).join('|'), [scene.sprites]);
   const [visibleSpriteCount, setVisibleSpriteCount] = useState(() =>
@@ -1343,6 +1345,36 @@ export function WorldCanvas({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
 
+  // ALL ground decals recorded into ONE Skia picture — a single draw pass
+  // instead of ~200 native views per patch (each of which was an expo-image
+  // drawing the FULL 4×4 atlas clipped to one cell: ~16× overdraw per cell and
+  // hundreds of composited layers per pan frame — the panning slowness).
+  // DECAL_ATLAS is a require() module id (a number) — the broad
+  // ImageSourcePropType annotation just hides that from useImage.
+  const decalAtlas = useImage(DECAL_ATLAS as number);
+  const decalPicture = useMemo(() => {
+    if (imgBase || !decalAtlas || scene.decals.length === 0) return null;
+    const cellW = decalAtlas.width() / DECAL_ATLAS_COLS;
+    const cellH = decalAtlas.height() / DECAL_ATLAS_ROWS;
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, scene.width, scene.height));
+    const paint = Skia.Paint();
+    paint.setAlphaf(0.95);
+    for (const d of scene.decals) {
+      const cell = worldDecalCell(d.decal);
+      if (!cell) continue;
+      const w = d.size;
+      const h = d.size / 2;
+      canvas.drawImageRect(
+        decalAtlas,
+        Skia.XYWHRect(cell.col * cellW, cell.row * cellH, cellW, cellH),
+        Skia.XYWHRect(d.x - w / 2, d.y - h / 2, w, h),
+        paint
+      );
+    }
+    return recorder.finishRecordingAsPicture();
+  }, [imgBase, decalAtlas, scene]);
+
   const groundPaths = useMemo(
     () =>
       // Painter's order: slabs lower on screen draw later (on top).
@@ -1436,6 +1468,7 @@ export function WorldCanvas({
               {groundPaths.map((g) => (
                 <Path key={`${g.id}-rim2`} path={g.rimRight} color={g.theme.rim} style="stroke" strokeWidth={2} />
               ))}
+              {decalPicture ? <Picture picture={decalPicture} /> : null}
             </Canvas>
           )}
           {expansionTiles
@@ -1501,33 +1534,8 @@ export function WorldCanvas({
             })()
           ) : null}
 
-          {/* Flat ground decals — the procedural slab's tiles; the image base has
-              its own painted ground, so they're skipped there. */}
-          {!imgBase && scene.decals.map((d) => {
-            const cell = worldDecalCell(d.decal);
-            if (!cell) return null;
-            const w = d.size;
-            const h = d.size / 2;
-            return (
-              <View
-                key={d.id}
-                pointerEvents="none"
-                style={[styles.decal, { left: d.x - w / 2, top: d.y - h / 2, width: w, height: h }]}>
-                <Image
-                  source={DECAL_ATLAS}
-                  pointerEvents="none"
-                  contentFit="fill"
-                  style={{
-                    position: 'absolute',
-                    width: w * DECAL_ATLAS_COLS,
-                    height: h * DECAL_ATLAS_ROWS,
-                    left: -cell.col * w,
-                    top: -cell.row * h,
-                  }}
-                />
-              </View>
-            );
-          })}
+          {/* Ground decals are drawn inside the Skia canvas above (one recorded
+              picture, not per-cell views) — see decalPicture. */}
 
           {/* Empty slot ghosts — faint, gently breathing placeholders that hint
               what could grow there, drawn under the objects. */}
@@ -1671,8 +1679,9 @@ export function WorldCanvas({
           })}
 
           {/* Customise mode: a drag handle over each draggable object. Pan moves
-              the object within the grass (clamped); release persists it. */}
-          {imgBase && customising
+              the object within the grass (clamped); release persists it. Works
+              in BOTH ground modes — drag math is slab-relative, not image-based. */}
+          {customising
             ? visiblePositionedSprites.map((s) => {
                 const isCreature = s.kind === 'creature';
                 const w = s.size * SPRITE_SCALE;
@@ -1928,7 +1937,7 @@ export function WorldCanvas({
               and its onFinalize is the guaranteed drop signal at finger-up.
             A hold on empty ground lifts nothing (no haptic) and pans as usual;
             a quick tap still opens cards. */}
-        {imgBase && !customising && onMoveDecor ? (
+        {!customising && onMoveDecor ? (
           <GestureDetector
             gesture={Gesture.LongPress()
               .minDuration(300)

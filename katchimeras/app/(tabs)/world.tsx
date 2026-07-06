@@ -62,8 +62,14 @@ import { Meadow } from '@/constants/meadow-theme';
 // lifetime levels, hatched creatures populate the plaza, artefacts ring the
 // island. All capture happens on Today; day-level detail lives in Collection.
 
-// One ring of empty ground cells frames the island.
-const PATCH_RING = 1;
+// Ground rendering mode: false = the procedural Skia slab + decal tiles
+// (current direction); true = the prebaked base-PNG tiles (parked for now —
+// flip back to restore them, PATCH_RING pairs below).
+const KINGDOM_IMAGE_BASE = false;
+// Rings of empty ground cells framing the island. In Skia mode the slab IS
+// the whole ground, so 5 rings (a 14-cell slab) match the footprint the
+// enlarged 2.2× base PNG used to cover; image mode kept its original 1.
+const PATCH_RING = KINGDOM_IMAGE_BASE ? 1 : 5;
 // Compass copy for the grow ceremony.
 const SIDE_NAMES: Record<string, string> = { ne: 'north-east', se: 'south-east', sw: 'south-west', nw: 'north-west' };
 // Highest-rarity-first ordering for picking which pending discovery to celebrate.
@@ -356,7 +362,7 @@ export default function KingdomScreen() {
           patches={renderPatches}
           ring={PATCH_RING}
           animateOnMount
-          imageBase
+          imageBase={KINGDOM_IMAGE_BASE}
           artefacts={worldArtefacts}
           customising={customising}
           onToggleCustomising={() => setCustomising((value) => !value)}
