@@ -244,9 +244,9 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   studio_shelf: require('../assets/images/katchimeras/world/objects/studio_shelf/studio_shelf_01.webp'),
   // Town Hall: keeps the day's story; tapping it opens the Chronicle reader.
   // User-supplied house cottage (BiRefNet-matted + tight-framed from world/house.png).
-  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_02.webp'), // iso-aligned; _01 kept as backup
+  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_01.webp'), // original perspective restored; iso-aligned _02 kept
   // Quest Board: today's notice board; tapping it opens the day's Memory Quests.
-  quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_02.webp'), // iso-aligned; _01 kept as backup
+  quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_01.png'), // original perspective restored; iso-aligned _02 kept
 
   // --- Kingdom keepsakes (K5 wave 2 — earned decorations, kingdom-decor.ts) ---
   trail_stone: require('../assets/images/katchimeras/world/objects/trail_stones/trail_stone_pick.png'), // 👣 journeys
@@ -259,7 +259,7 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
 
   // --- Cozy Collectible buildings (docs/world-structures-cozy-direction.md) ---
   // The 7 domains in one designer-toy style, on the new base_env2 island.
-  home: require('../assets/images/katchimeras/world/objects/home/home_02.webp'), // 🏠 the day's story (chronicle) — iso-aligned (scripts/iso-align-prop.py); home_01 kept as backup
+  home: require('../assets/images/katchimeras/world/objects/home/home_01.webp'), // 🏠 the day's story (chronicle) — original perspective restored; iso-aligned home_02 kept
   // Round paver plaza — plantable centre platform matching base_garden_main
   // (the main tile has NO baked plaza; this object provides it).
   plaza_platform: require('../assets/images/katchimeras/world/objects/plaza_platform/plaza_platform_01.webp'),
@@ -270,8 +270,8 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.webp'),
   memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.webp'),
   memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.webp'),
-  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_03.webp'), // 🗺 where did I go? (cozy signpost + lantern) — iso-aligned + BiRefNet-heavy matte; _01/_02 kept as backup
-  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_02.webp'), // 🛤 how did I move? (cozy footprint stele) — iso-aligned, circle-footprint guide; _01 kept as backup
+  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 where did I go? (cozy signpost + lantern) — original perspective restored; iso-aligned _02/_03 kept
+  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 how did I move? (cozy footprint stele) — original perspective restored; iso-aligned _02 kept
   // 🔭 Observatory tower (Places / where I went) — a proper structure with a telescope.
   observatory: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
   observatory_empty: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
@@ -281,10 +281,10 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   steps_path_2: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_02.webp'),
   steps_path_3: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_03.webp'),
   steps_path_4: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_04.webp'),
-  sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_03.webp'), // 🌿 how today felt (mood) — solo gazebo, iso-aligned + BiRefNet-heavy matte; _01/_02 kept as backup
+  sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'), // 🌿 how today felt (mood) — original perspective restored; iso-aligned _02/_03 kept
   sanctuary_empty: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_03.webp'),
-  study: require('../assets/images/katchimeras/world/objects/study/study_02.webp'), // 📚 what inspired me — iso-aligned; _01 kept as backup
-  food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_02.webp'), // 🍽 what I savoured — iso-aligned; _01 kept as backup
+  study: require('../assets/images/katchimeras/world/objects/study/study_01.png'), // 📚 what inspired me — original perspective restored; iso-aligned _02 kept
+  food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_01.png'), // 🍽 what I savoured — original perspective restored; iso-aligned _02 kept
   // Memory cluster satellites + the Featured Memory Board (the day's cover).
   featured_board: require('../assets/images/katchimeras/world/objects/featured_board/featured_board_01.png'),
   photos_stack: require('../assets/images/katchimeras/world/objects/photos_stack/photos_stack_01.png'),
@@ -404,6 +404,25 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
 // decal as a clipped sub-region using its cell coords below. Two variants per
 // type (suffix _2) come free from the 4×4 grid generation, so the ground reads
 // less repetitively. Cell coords MUST match the atlas builder's LAYOUT.
+// Seamless world-space ground texture (baked from the velvet tile's lawn +
+// wrap-blend tiling pass — scratchpad gen-grass-texture.py). Sampled by the
+// Skia ground shader in world coordinates so adjacent cells/patches are
+// continuous instead of per-cell repeats.
+export const GRASS_GROUND_TEXTURE: ImageSourcePropType = require('../assets/images/katchimeras/world/textures/velvet_grass.webp');
+// Tiny toy details the ground pass scatters sparsely over the lawn (matted
+// from the nest/winding tile art) — NEVER baked into the repeating texture,
+// so they never form a visible lattice.
+export const GRASS_DETAIL_FLOWER: ImageSourcePropType = require('../assets/images/katchimeras/world/textures/detail_flower.webp');
+export const GRASS_DETAIL_BERRIES: ImageSourcePropType = require('../assets/images/katchimeras/world/textures/detail_berries.webp');
+// Seamless golden cobble for the crossroads ribbons the ground pass draws
+// through the kingdom centre (from the plaza tile's paver material).
+export const COBBLE_PATH_TEXTURE: ImageSourcePropType = require('../assets/images/katchimeras/world/textures/cobble_path.webp');
+// Generated full-patch ground overlay for the main kingdom slab (guide-driven
+// gpt render fitted to the slab's exact 2:1 geometry — scratch
+// gen-kingdom-slab.py + fit-kingdom-slab.py). Drawn as ONE image in place of
+// the procedural face layers.
+export const KINGDOM_SLAB_OVERLAY: ImageSourcePropType = require('../assets/images/katchimeras/world/base/base_kingdom_slab.webp');
+
 export const DECAL_ATLAS: ImageSourcePropType = require('../assets/images/katchimeras/world/decals/_atlas.webp');
 export const DECAL_ATLAS_COLS = 4;
 export const DECAL_ATLAS_ROWS = 4;
@@ -496,7 +515,27 @@ const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
   // velvet lawns, plain path crossing (no baked plaza — the plaza is a
   // separate plantable object), cobble border + wall.
   base_garden_main: require('../assets/images/katchimeras/world/base/base_garden_main.webp'),
+  // Full-patch Skia slab overlay (guide-driven generation, TRUE 2:1 slab
+  // geometry — NOT the canonical 0.8-slope diamond the other bases use).
+  base_kingdom_slab: require('../assets/images/katchimeras/world/base/base_kingdom_slab.webp'),
 };
+
+// Bases authored directly in the Skia slab's 2:1 guide space; every other
+// base is canonical (slope 0.8) and gets y-squashed 0.625 at draw time.
+const SLAB_GUIDE_BASES = new Set(['base_kingdom_slab']);
+
+// Resolver for the Skia ground's full-patch overlay: the Asset Lab dev
+// override picks any bundled base; default is the Garden Tile. The guide tag
+// tells the renderer which source geometry to map from.
+const KINGDOM_SLAB_DEFAULT = 'base_garden_main';
+export function kingdomSlabOverlay(): { source: ImageSourcePropType; guide: 'slab' | 'canonical' } {
+  const overrideId = getDevKingdomBaseId();
+  const baseId = overrideId && WORLD_BASE_SOURCES[overrideId] ? overrideId : KINGDOM_SLAB_DEFAULT;
+  return {
+    source: WORLD_BASE_SOURCES[baseId],
+    guide: SLAB_GUIDE_BASES.has(baseId) ? 'slab' : 'canonical',
+  };
+}
 
 // The centre island's canonical id.
 const KINGDOM_BASE_ID = 'base_env3';

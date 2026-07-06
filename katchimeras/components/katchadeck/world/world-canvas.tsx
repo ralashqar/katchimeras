@@ -1,4 +1,10 @@
-import { Canvas, Path, Picture, Skia, useImage } from '@shopify/react-native-skia';
+import {
+  Canvas,
+  Picture,
+  Skia,
+  TileMode,
+  useImage,
+} from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import tileLayout from '@/data/world-tile-layout.json';
@@ -34,14 +40,11 @@ import type { MemoryNode, WorldObjectCategory, WorldPatch } from '@/types/world'
 import * as worldStructureLayout from '@/data/world-structure-layout.json';
 import type { PlacedArtefact } from '@/utils/discoveries-artefacts';
 import { layoutWorld, type SceneFence, type SceneSlab, type SceneSprite } from '@/utils/world-scene';
-import { cellCenter, cellFromPoint, drawDepth, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
+import { cellCenter, cellFromPoint, drawDepth, SLAB_THICKNESS, TILE_H, TILE_W, type IsoPoint } from '@/utils/world-iso';
 import {
-  DECAL_ATLAS,
-  DECAL_ATLAS_COLS,
-  DECAL_ATLAS_ROWS,
   kingdomBaseSource,
+  kingdomSlabOverlay,
   worldAssetSource,
-  worldDecalCell,
 } from '@/utils/world-visuals';
 import {
   loadBaseCustomisation,
@@ -156,6 +159,15 @@ type Props = {
 // in utils/today-patch-engine.ts). Fractional cell = the diorama's exact middle.
 const EGG_CELL = { col: 1.5, row: 1.5 };
 const SLAB_CENTRE_CELL = { col: 1, row: 1 };
+// Guide-space mappings for the full-patch overlay image. 'slab' = authored in
+// the slab's true 2:1 space (gen-kingdom-slab.py: diamond top y=532, left
+// x=89, width 1870). 'canonical' = the older 0.8-slope canonical-diamond bases
+// (top y=201, same x extents) — sharing x means the whole fit is a vertical
+// squash of 0.5/0.8 = 0.625 applied via a non-square dst rect.
+const KINGDOM_OVERLAY_GUIDES = {
+  slab: { size: 2048, leftX: 89, topY: 532, diamondW: 1870, ySquash: 1 },
+  canonical: { size: 2048, leftX: 89, topY: 201, diamondW: 1870, ySquash: 0.625 },
+} as const;
 const EGG_STAGE_WIDTH = 200;
 const EGG_STAGE_HEIGHT = 258;
 // The hatch reveal needs room for the egg AND the creature's glow halo (~274).
@@ -285,22 +297,6 @@ const GHOST_HINT: Record<string, { emoji: string; label: string }> = {
   journey: { emoji: '🚶', label: 'journey' },
   reflection: { emoji: '🌿', label: 'reflection' },
 };
-
-function polyPath(points: IsoPoint[]) {
-  const path = Skia.Path.Make();
-  if (!points.length) return path;
-  path.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i += 1) path.lineTo(points[i].x, points[i].y);
-  path.close();
-  return path;
-}
-
-function segPath(a: IsoPoint, b: IsoPoint) {
-  const path = Skia.Path.Make();
-  path.moveTo(a.x, a.y);
-  path.lineTo(b.x, b.y);
-  return path;
-}
 
 export function WorldCanvas({
   patches,
@@ -1078,32 +1074,33 @@ export function WorldCanvas({
   // chest, a memory, the creature, or the egg. Predictable + no z-fighting.
   const handleTap = useCallback(
     (wx: number, wy: number) => {
-      // Image-base mode: hit-test the ACTUAL rendered sprite rectangles, so taps
-      // open the right object wherever it's been dragged (no 4×4 grid snap).
-      if (imgBase) {
-        if (eggPoint && eggPatchId) {
-          const ew = EGG_STAGE_WIDTH * eggScale;
-          const eh = EGG_STAGE_HEIGHT * eggScale;
-          const el = eggPoint.x - ew / 2;
-          const et = eggPoint.y - eh / 2 - EGG_RISE;
-          if (wx >= el && wx <= el + ew && wy >= et && wy <= et + eh) {
-            onPressEgg?.();
-            return;
-          }
+      // Hit-test the ACTUAL rendered sprite rectangles (both modes), so taps
+      // open the right object wherever it sits. The old grid-snap hit test
+      // clamped to the 4×4 day-patch cells and silently missed everything on
+      // the big kingdom slab.
+      if (eggPoint && eggPatchId) {
+        const ew = EGG_STAGE_WIDTH * eggScale;
+        const eh = EGG_STAGE_HEIGHT * eggScale;
+        const el = eggPoint.x - ew / 2;
+        const et = eggPoint.y - eh / 2 - EGG_RISE;
+        if (wx >= el && wx <= el + ew && wy >= et && wy <= et + eh) {
+          onPressEgg?.();
+          return;
         }
-        let hit: SceneSprite | null = null;
-        for (const s of positionedSprites) {
-          const isCreature = s.kind === 'creature';
-          const w = s.size * SPRITE_SCALE;
-          const h = w; // square frame (1:1) — object bottom-anchored at OBJECT_BOTTOM_FRAC
-          const left = s.x - w / 2;
-          const top =
-            (isCreature ? s.y - h / 2 - TILE_H * 0.35 : s.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
-          if (wx >= left && wx <= left + w && wy >= top && wy <= top + h) {
-            if (!hit || s.depth > hit.depth) hit = s; // front-most wins on overlap
-          }
+      }
+      let hit: SceneSprite | null = null;
+      for (const s of positionedSprites) {
+        const isCreature = s.kind === 'creature';
+        const w = s.size * SPRITE_SCALE;
+        const h = w; // square frame (1:1) — object bottom-anchored at OBJECT_BOTTOM_FRAC
+        const left = s.x - w / 2;
+        const top =
+          (isCreature ? s.y - h / 2 - TILE_H * 0.35 : s.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
+        if (wx >= left && wx <= left + w && wy >= top && wy <= top + h) {
+          if (!hit || s.depth > hit.depth) hit = s; // front-most wins on overlap
         }
-        if (!hit) return;
+      }
+      if (hit) {
         if (memoryAlert && hit.patchId === eggPatchId && hit.category === 'memory') {
           onPressMemoryAlert?.();
           return;
@@ -1117,88 +1114,33 @@ export function WorldCanvas({
           return;
         }
         if (hit.kind === 'memory' && hit.memory) onSelectMemory(hit.memory, hit.patchId);
+        // A cell object (photos/notes/places/journey/sleep/food) opens its
+        // bespoke reader for WHICHEVER day is shown.
         else if (hit.category && onSelectCell) onSelectCell(hit.category, hit.id);
         else if (hit.kind === 'landmark' && onSelectBigMoment) onSelectBigMoment();
         else onSelectPatch(hit.patchId);
         return;
       }
-
-      const offX = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).x;
-      const offY = cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y;
-      let best: { patchId: string; col: number; row: number; dist: number } | null = null;
+      if (imgBase) return;
+      // Empty ground on another patch still opens it: point-in-diamond test
+      // in grid coords (the face diamond is a |s|,|t| ≤ half square there).
       for (const slab of scene.slabs) {
-        const frac = cellFromPoint(wx - slab.centre.x + offX, wy - slab.centre.y + offY);
-        const col = Math.min(3, Math.max(0, Math.round(frac.col)));
-        const row = Math.min(3, Math.max(0, Math.round(frac.row)));
-        const tcx = slab.centre.x + (cellCenter(col, row).x - offX);
-        const tcy = slab.centre.y + (cellCenter(col, row).y - offY);
-        const dist = Math.hypot(wx - tcx, wy - tcy);
-        if (!best || dist < best.dist) best = { patchId: slab.patchId, col, row, dist };
+        const [, right, , left] = slab.topCorners;
+        const half = (right.x - left.x) / (2 * TILE_W);
+        const dx = wx - slab.centre.x;
+        const dy = wy - slab.centre.y;
+        const s = dx / TILE_W + dy / TILE_H;
+        const t = dy / TILE_H - dx / TILE_W;
+        if (Math.abs(s) <= half && Math.abs(t) <= half) {
+          if (slab.patchId !== eggPatchId) onSelectPatch(slab.patchId);
+          return;
+        }
       }
-      if (!best || best.dist > TILE_W * 0.8) return; // tapped empty space, far from any tile
-
-      // The egg/creature tile on today's patch opens the prompts (follows the egg
-      // when the user has dragged it elsewhere).
-      if (
-        eggPoint &&
-        best.patchId === eggPatchId &&
-        best.col === Math.round(eggCell.col) &&
-        best.row === Math.round(eggCell.row)
-      ) {
-        onPressEgg?.();
-        return;
-      }
-      // The photos cell while the golden "!" is up → the "add photos" prompt.
-      if (
-        memoryAlert &&
-        best.patchId === eggPatchId &&
-        best.col === CELL_POS.memory!.col &&
-        best.row === CELL_POS.memory!.row
-      ) {
-        onPressMemoryAlert?.();
-        return;
-      }
-      // The places cell while its "!" is up → the "confirm this place" prompt.
-      if (
-        placesAlert &&
-        best.patchId === eggPatchId &&
-        best.col === CELL_POS.places!.col &&
-        best.row === CELL_POS.places!.row
-      ) {
-        onPressPlacesAlert?.();
-        return;
-      }
-      // The steps (journey) cell while its "!" is up → the "interpret your steps" prompt.
-      if (
-        stepsAlert &&
-        best.patchId === eggPatchId &&
-        best.col === CELL_POS.journey!.col &&
-        best.row === CELL_POS.journey!.row
-      ) {
-        onPressStepsAlert?.();
-        return;
-      }
-      const occupant = positionedSprites.find(
-        (s) => s.patchId === best!.patchId && s.col === best!.col && s.row === best!.row
-      );
-      if (occupant) {
-        if (occupant.kind === 'memory' && occupant.memory) onSelectMemory(occupant.memory, occupant.patchId);
-        // A cell object (photos/notes/places/journey/sleep/food) opens its bespoke
-        // reader for WHICHEVER day is shown — not just today's forming patch. The
-        // world only renders one patch at a time, so this is always the selected day.
-        else if (occupant.category && onSelectCell) onSelectCell(occupant.category, occupant.id);
-        else if (occupant.kind === 'landmark' && onSelectBigMoment) onSelectBigMoment();
-        else onSelectPatch(occupant.patchId);
-        return;
-      }
-      // An empty tile on a finalized diorama still opens that patch.
-      if (best.patchId !== eggPatchId) onSelectPatch(best.patchId);
     },
     [
       scene,
       imgBase,
       positionedSprites,
-      eggCell,
       eggPatchId,
       eggPoint,
       eggScale,
@@ -1345,54 +1287,86 @@ export function WorldCanvas({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
 
-  // ALL ground decals recorded into ONE Skia picture — a single draw pass
-  // instead of ~200 native views per patch (each of which was an expo-image
-  // drawing the FULL 4×4 atlas clipped to one cell: ~16× overdraw per cell and
-  // hundreds of composited layers per pan frame — the panning slowness).
-  // DECAL_ATLAS is a require() module id (a number) — the broad
-  // ImageSourcePropType annotation just hides that from useImage.
-  const decalAtlas = useImage(DECAL_ATLAS as number);
-  const decalPicture = useMemo(() => {
-    if (imgBase || !decalAtlas || scene.decals.length === 0) return null;
-    const cellW = decalAtlas.width() / DECAL_ATLAS_COLS;
-    const cellH = decalAtlas.height() / DECAL_ATLAS_ROWS;
-    const recorder = Skia.PictureRecorder();
-    const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, scene.width, scene.height));
-    const paint = Skia.Paint();
-    paint.setAlphaf(0.95);
-    for (const d of scene.decals) {
-      const cell = worldDecalCell(d.decal);
-      if (!cell) continue;
-      const w = d.size;
-      const h = d.size / 2;
-      canvas.drawImageRect(
-        decalAtlas,
-        Skia.XYWHRect(cell.col * cellW, cell.row * cellH, cellW, cellH),
-        Skia.XYWHRect(d.x - w / 2, d.y - h / 2, w, h),
-        paint
-      );
-    }
-    return recorder.finishRecordingAsPicture();
-  }, [imgBase, decalAtlas, scene]);
+  // The whole procedural ground recorded into TWO Skia pictures (one draw
+  // pass each — never per-cell views):
+  //   shadow  — a soft dark ellipse under every slab, drawn FIRST.
+  //   ground  — per slab (painter-sorted): side walls, the top face filled by
+  //             a WORLD-SPACE repeating grass shader (continuity across cells
+  //             AND patches — no per-cell repetition), a low-frequency macro
+  //             tint that breaks texture repetition, a plush "pillow" bevel
+  //             along the edges, and a soft top-light gradient — the baked
+  //             tiles' 3D-toy read, rebuilt in layers.
+  // Falls back to the flat decal-atlas tiles until the texture loads.
+  // (These are require() module ids — the ImageSourcePropType annotation just
+  // hides the number from useImage.)
+  // Full-patch overlay: Asset Lab base pick (dev override) or the generated
+  // slab art. All bundled bases are require() numbers, so useImage is safe.
+  const slabOverlayPick = kingdomSlabOverlay();
+  const kingdomOverlay = useImage(slabOverlayPick.source as number);
+  const kingdomOverlayGuide = slabOverlayPick.guide;
+  const groundArt = useMemo(() => {
+    if (imgBase || scene.slabs.length === 0) return { shadow: null, ground: null };
+    const slabs = [...scene.slabs].sort((a, b) => a.centre.y - b.centre.y);
 
-  const groundPaths = useMemo(
-    () =>
-      // Painter's order: slabs lower on screen draw later (on top).
-      [...scene.slabs].sort((a, b) => a.centre.y - b.centre.y).map((slab) => {
-        const theme = ARCHETYPE_THEME[slab.archetype];
+    // --- shadow pass ---------------------------------------------------------
+    // Soft drop shadow WITHOUT MaskFilter: a gaussian mask over a slab-sized
+    // oval re-runs on every redraw and is the single heaviest op in the whole
+    // scene. A radial-gradient disc squashed to the same ellipse reads the
+    // same and is plain per-pixel shader work.
+    const shadowRec = Skia.PictureRecorder();
+    const shadowCanvas = shadowRec.beginRecording(Skia.XYWHRect(0, 0, scene.width, scene.height));
+    const shadowPaint = Skia.Paint();
+    shadowPaint.setShader(
+      Skia.Shader.MakeRadialGradient(
+        { x: 0, y: 0 },
+        1,
+        [Skia.Color('rgba(10, 14, 8, 0.30)'), Skia.Color('rgba(10, 14, 8, 0.26)'), Skia.Color('rgba(10, 14, 8, 0)')],
+        [0, 0.55, 1],
+        TileMode.Clamp
+      )
+    );
+    for (const slab of slabs) {
+      const [, right, bottom, left] = slab.topCorners;
+      const rx = ((right.x - left.x) / 2) * 1.04;
+      const cy = bottom.y + SLAB_THICKNESS + 6;
+      shadowCanvas.save();
+      shadowCanvas.translate(slab.centre.x, cy);
+      shadowCanvas.scale(rx, rx * 0.22);
+      shadowCanvas.drawCircle(0, 0, 1, shadowPaint);
+      shadowCanvas.restore();
+    }
+    const shadow = shadowRec.finishRecordingAsPicture();
+
+    // --- ground pass ----------------------------------------------------------
+    const rec = Skia.PictureRecorder();
+    const canvas = rec.beginRecording(Skia.XYWHRect(0, 0, scene.width, scene.height));
+
+    // EVERY slab renders the same full-patch overlay art, scaled to its own
+    // width — one texture draw per slab, no procedural layers. Canonical
+    // bases squash to 2:1 via the non-square dst rect (ySquash). Until the
+    // image loads, the flat slab paths beneath keep the ground visible.
+    if (kingdomOverlay) {
+      const g = KINGDOM_OVERLAY_GUIDES[kingdomOverlayGuide];
+      const overlayPaint = Skia.Paint();
+      const src = Skia.XYWHRect(0, 0, kingdomOverlay.width(), kingdomOverlay.height());
+      for (const slab of slabs) {
         const [top, right, , left] = slab.topCorners;
-        return {
-          id: slab.patchId,
-          theme,
-          left: polyPath(slab.leftFace),
-          right: polyPath(slab.rightFace),
-          face: polyPath(slab.topCorners),
-          rimLeft: segPath(top, left),
-          rimRight: segPath(top, right),
-        };
-      }),
-    [scene]
-  );
+        const os = (right.x - left.x) / g.diamondW;
+        canvas.drawImageRect(
+          kingdomOverlay,
+          src,
+          Skia.XYWHRect(
+            left.x - g.leftX * os,
+            top.y - g.topY * g.ySquash * os,
+            g.size * os,
+            g.size * g.ySquash * os
+          ),
+          overlayPaint
+        );
+      }
+    }
+    return { shadow, ground: rec.finishRecordingAsPicture() };
+  }, [imgBase, kingdomOverlay, kingdomOverlayGuide, scene]);
 
   // Objects + fence segments rendered in one depth-sorted pass so fences occlude
   // correctly relative to the objects in front of / behind them.
@@ -1453,22 +1427,8 @@ export function WorldCanvas({
             })
           ) : (
             <Canvas style={{ width: scene.width, height: scene.height }}>
-              {groundPaths.map((g) => (
-                <Path key={`${g.id}-l`} path={g.left} color={g.theme.groundSide} />
-              ))}
-              {groundPaths.map((g) => (
-                <Path key={`${g.id}-r`} path={g.right} color={shade(g.theme.groundSide)} />
-              ))}
-              {groundPaths.map((g) => (
-                <Path key={`${g.id}-f`} path={g.face} color={g.theme.groundTop} />
-              ))}
-              {groundPaths.map((g) => (
-                <Path key={`${g.id}-rim`} path={g.rimLeft} color={g.theme.rim} style="stroke" strokeWidth={2} />
-              ))}
-              {groundPaths.map((g) => (
-                <Path key={`${g.id}-rim2`} path={g.rimRight} color={g.theme.rim} style="stroke" strokeWidth={2} />
-              ))}
-              {decalPicture ? <Picture picture={decalPicture} /> : null}
+              {groundArt.shadow ? <Picture picture={groundArt.shadow} /> : null}
+              {groundArt.ground ? <Picture picture={groundArt.ground} /> : null}
             </Canvas>
           )}
           {expansionTiles
@@ -2168,16 +2128,6 @@ function FenceView({ fence }: { fence: SceneFence }) {
   );
 }
 
-// Slightly darken a hex colour for the second (shadowed) slab face.
-function shade(hex: string): string {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return hex;
-  const n = parseInt(m[1], 16);
-  const r = Math.max(0, ((n >> 16) & 255) - 22);
-  const g = Math.max(0, ((n >> 8) & 255) - 22);
-  const b = Math.max(0, (n & 255) - 22);
-  return `rgb(${r},${g},${b})`;
-}
 
 const styles = StyleSheet.create({
   // No overflow clipping: the patch (egg, tall sprites, the framing ring) is free

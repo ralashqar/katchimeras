@@ -253,7 +253,7 @@ export default function DevAssetLabScreen() {
 
                   {selected.section === 'base' && !selected.key.startsWith('plot_') ? (
                     (() => {
-                      // No override = kingdomBaseSource falls back to base_garden_main.
+                      // No override = the Skia ground renders base_garden_main.
                       const isDefault = selected.key === 'base_garden_main';
                       const isActive = isDefault ? kingdomBase === null : kingdomBase === selected.key;
                       return (

@@ -199,6 +199,7 @@ const HAND_WORLD_ASSETS: WorldAssetEntry[] = [
   // --- World base & tiles (ALL bundled tiles stay browsable — any can be set
   // as the live Kingdom base from its detail page) -----------------------------
   { key: 'base_garden_main', name: 'Garden Tile (default)', section: 'base', unlock: 'The default Kingdom tile — velvet lawns, plain crossing (plaza is a separate plantable object).' },
+  { key: 'base_kingdom_slab', name: 'Kingdom Slab', section: 'base', unlock: 'Alternate full-patch ground — guide-generated felt lawns + cobble crossroads at the slab’s true 2:1 geometry.' },
   { key: 'base_garden_toy', name: 'Garden Tile (toy 3D)', section: 'base', unlock: 'Alternate tile — plush lawn relief, beveled cobbles, dished plaza.' },
   { key: 'base_garden_grass', name: 'Grass Tile', section: 'base', unlock: 'Alternate tile — flat empty lawn, good clean canvas.' },
   { key: 'base_garden_uniform', name: 'Garden Tile (uniform)', section: 'base', unlock: 'Alternate tile — edge-midpoint paths on the canonical diamond.' },
