@@ -515,6 +515,9 @@ const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
   // velvet lawns, plain path crossing (no baked plaza — the plaza is a
   // separate plantable object), cobble border + wall.
   base_garden_main: require('../assets/images/katchimeras/world/base/base_garden_main.webp'),
+  // Nest meadow II (user-supplied render → tile pipeline): clean lawn with a
+  // thin gold brick border, central paved circle holding a wicker nest.
+  base_garden_nest2: require('../assets/images/katchimeras/world/base/base_garden_nest2.webp'),
   // Full-patch Skia slab overlay (guide-driven generation, TRUE 2:1 slab
   // geometry — NOT the canonical 0.8-slope diamond the other bases use).
   base_kingdom_slab: require('../assets/images/katchimeras/world/base/base_kingdom_slab.webp'),
@@ -524,13 +527,21 @@ const WORLD_BASE_SOURCES: Record<string, ImageSourcePropType> = {
 // base is canonical (slope 0.8) and gets y-squashed 0.625 at draw time.
 const SLAB_GUIDE_BASES = new Set(['base_kingdom_slab']);
 
-// Resolver for the Skia ground's full-patch overlay: the Asset Lab dev
-// override picks any bundled base; default is the Garden Tile. The guide tag
-// tells the renderer which source geometry to map from.
-const KINGDOM_SLAB_DEFAULT = 'base_garden_main';
-export function kingdomSlabOverlay(): { source: ImageSourcePropType; guide: 'slab' | 'canonical' } {
+// Resolver for the Skia ground's full-patch overlay (docs/kingdom-residents-plan.md):
+// the CAPITAL (centre slab) is the nest tile — the egg sits on its paved
+// circle — while RING (expansion) tiles use the Garden Tile. The Asset Lab
+// dev override restyles the ring tiles; the capital's nest identity is fixed.
+const KINGDOM_CAPITAL_BASE = 'base_garden_nest2';
+const KINGDOM_RING_BASE = 'base_garden_main';
+export type KingdomOverlayRole = 'capital' | 'ring';
+export function kingdomSlabOverlay(role: KingdomOverlayRole): { source: ImageSourcePropType; guide: 'slab' | 'canonical' } {
   const overrideId = getDevKingdomBaseId();
-  const baseId = overrideId && WORLD_BASE_SOURCES[overrideId] ? overrideId : KINGDOM_SLAB_DEFAULT;
+  const baseId =
+    role === 'ring' && overrideId && WORLD_BASE_SOURCES[overrideId]
+      ? overrideId
+      : role === 'capital'
+        ? KINGDOM_CAPITAL_BASE
+        : KINGDOM_RING_BASE;
   return {
     source: WORLD_BASE_SOURCES[baseId],
     guide: SLAB_GUIDE_BASES.has(baseId) ? 'slab' : 'canonical',

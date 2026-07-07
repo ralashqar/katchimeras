@@ -11,6 +11,7 @@ import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
 import { CosmeticsSheet } from '@/components/katchadeck/world/cosmetics-sheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useKingdom } from '@/hooks/use-kingdom';
@@ -32,7 +33,7 @@ import {
   unplantKingdomDecor,
   type KingdomDecorItem,
 } from '@/utils/kingdom-decor';
-import { expansionProgress } from '@/utils/world-expansion';
+import { expansionProgress, nextExpansionTarget } from '@/utils/world-expansion';
 import { deriveContinuityMotifs } from '@/utils/continuity-engine';
 import { deriveObservations } from '@/utils/observations-engine';
 import { deriveWorldPropInventory } from '@/utils/world-props-engine';
@@ -48,6 +49,19 @@ import { useCosmetics } from '@/hooks/use-cosmetics';
 import { useEssence } from '@/hooks/use-essence';
 import { buildingIdForCategory, deriveKingdomExpansionPatch, deriveKingdomPatch, deriveKingdomPlotPatch } from '@/utils/kingdom-patch';
 import { deriveKingdomPlots } from '@/utils/kingdom-engine';
+import { archetypeForCreature, companionUnit, subtypeForCreature } from '@/utils/katchimera-engagement';
+import {
+  acceptQuest,
+  activeQuests,
+  evaluateCompanionQuests,
+  loadCompanionQuests,
+  questCriteria,
+  questFor,
+  saveCompanionQuests,
+} from '@/utils/katchimera-quests';
+import { resolveFactsForDay } from '@/utils/signals/resolve';
+import { ESSENCE_AWARD } from '@/utils/essence-engine';
+import { deriveResidents, residentObjects, tilesNeeded } from '@/utils/kingdom-residents';
 import { ARCHIVE_BUILDINGS, buildKingdomArchive, collectKingdomArchiveEntries } from '@/utils/kingdom-archive';
 import { KingdomArchiveModal } from '@/components/katchadeck/world/kingdom-archive-modal';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
@@ -80,6 +94,12 @@ export default function KingdomScreen() {
   const { kingdom } = useKingdom();
   const { days } = useAllDays();
   const kingdomPatch = useMemo(() => deriveKingdomPatch(kingdom), [kingdom]);
+  // Today's forming egg sits on the capital's nest (docs/kingdom-residents-
+  // plan.md); once the day hatches it disappears until tomorrow's egg forms.
+  const todayEgg = useMemo(() => {
+    const today = days.find((day) => day.isToday);
+    return today && today.state !== 'hatched' ? today.egg : null;
+  }, [days]);
 
   // Kingdom decoration — earned by living, planted forever (kingdom-decor.ts).
   // The sync effect lives below (it also needs the discoveries + noticed
@@ -119,6 +139,44 @@ export default function KingdomScreen() {
   const getCenterCellRef = useRef<(() => { col: number; row: number; plotId: string | null } | null) | null>(null);
   // Provenance card for a tapped decoration.
   const [provenanceItem, setProvenanceItem] = useState<KingdomDecorItem | null>(null);
+  // Companion card for a tapped resident (docs/katchimera-engagement-v1.md).
+  const [companion, setCompanion] = useState<{ creatureId: string; name: string } | null>(null);
+  const [companionQuests, setCompanionQuests] = useState(() => loadCompanionQuests());
+  const [questJournalOpen, setQuestJournalOpen] = useState(false);
+  const handleAcceptQuest = (offer: { questId: string; creatureId: string; title: string; hint: string }) => {
+    const next = acceptQuest(companionQuests, offer, Date.now());
+    if (!next) {
+      setMicrocopy('Quest journal is full — finish one first');
+      return;
+    }
+    setCompanionQuests(next);
+    saveCompanionQuests(next);
+    setMicrocopy('Quest accepted ✦');
+  };
+  // Today's resolved facts — shared by the auto-check on focus and the
+  // journal's manual "Check now" (utils/signals/resolve.ts).
+  const todayFacts = useMemo(() => {
+    const today = days.find((day) => day.isToday) ?? null;
+    return resolveFactsForDay(today);
+  }, [days]);
+  const runQuestCheck = useCallback(
+    (source: 'auto' | 'manual') => {
+      setCompanionQuests((current) => {
+        const result = evaluateCompanionQuests(current, todayFacts, Date.now());
+        if (result.completed.length === 0) {
+          if (source === 'manual') setMicrocopy('Nothing finished yet — keep going ✦');
+          return current;
+        }
+        saveCompanionQuests(result.state);
+        setMicrocopy(
+          `Quest complete ✦ ${result.completed[0].title} — +${result.completed.length * ESSENCE_AWARD.questComplete} essence, their home grows`
+        );
+        setJustPlantedId(`resident-${result.completed[0].creatureId}`);
+        return result.state;
+      });
+    },
+    [todayFacts]
+  );
 
   const renderPatch = useMemo(() => {
     const objects = [...kingdomPatch.objects, ...kingdomDecorObjects(decorState)];
@@ -244,10 +302,45 @@ export default function KingdomScreen() {
     lines.sort((a, b) => a.have / Math.max(1, a.need) - b.have / Math.max(1, b.need));
     return lines[0] ?? null;
   }, [expansionOutlook]);
-  const visibleExpansions = useMemo(
-    () => (decorState.expansions ?? []).filter((expansion) => expansion.ceremonyShown || expansion.index === growAnimIndex),
-    [decorState.expansions, growAnimIndex]
+  // Kingdom Residents (docs/kingdom-residents-plan.md): every unique
+  // katchimera claims a quad of a ring tile, derived from the hatch history.
+  const residents = useMemo(() => {
+    // Completed companion quests upgrade the resident's house like dupes do.
+    const credits = new Map<string, number>();
+    for (const quest of companionQuests.quests) {
+      if (quest.completedAt) credits.set(quest.creatureId, (credits.get(quest.creatureId) ?? 0) + 1);
+    }
+    return deriveResidents(
+      kingdom.creatures.map((creature) => ({
+        creatureId: creature.creatureId,
+        hatchedAt: Date.parse(creature.isoDate) || 0,
+      })),
+      credits
+    );
+  }, [kingdom.creatures, companionQuests]);
+  const residentMeta = useCallback(
+    (creatureId: string) => {
+      const creature = kingdom.creatures.find((entry) => entry.creatureId === creatureId);
+      return creature ? { name: creature.name, visualKey: creature.visualKey } : undefined;
+    },
+    [kingdom.creatures]
   );
+  const visibleExpansions = useMemo(() => {
+    const stored = (decorState.expansions ?? []).filter(
+      (expansion) => expansion.ceremonyShown || expansion.index === growAnimIndex
+    );
+    // Residents guarantee land (slice D): any tile a resident's quad needs
+    // exists even if the deeds requirements haven't granted it yet — old
+    // profiles backfill instantly, since allocation is derived from the Dex.
+    const have = new Set(stored.map((expansion) => expansion.index));
+    const guaranteed = [...stored];
+    for (let index = 0; index < tilesNeeded(residents.length); index += 1) {
+      if (have.has(index)) continue;
+      const target = nextExpansionTarget(index);
+      guaranteed.push({ index, side: target.side, ring: target.ring, unlockedDayId: '', ceremonyShown: true });
+    }
+    return guaranteed;
+  }, [decorState.expansions, growAnimIndex, residents.length]);
   const handleGrowWitness = () => {
     if (!pendingExpansion) return;
     setGrowAnimIndex(pendingExpansion.index);
@@ -261,9 +354,12 @@ export default function KingdomScreen() {
     useCallback(() => {
       const next = syncKingdomDecorFromDays(days, { unlockedDiscoveries, patternProps });
       setDecorState(next);
+      // Companion quests: check today's signals against the active ledger
+      // (docs/katchimera-engagement-v1.md — quests are signal-detectable).
+      runQuestCheck('auto');
       setArrivals((current) => current ?? deriveKingdomArrivals(kingdom, next, { holdGiftDayIds: formingDayIds }));
       if (consumeKeepsakesShelfRequest()) setKeepsakesOpen(true);
-    }, [days, kingdom, unlockedDiscoveries, patternProps, formingDayIds])
+    }, [days, kingdom, unlockedDiscoveries, patternProps, formingDayIds, runQuestCheck])
   );
 
   // Expansion plots (K4): milestone-earned garden islets docked around the
@@ -281,13 +377,17 @@ export default function KingdomScreen() {
         objects: kingdomDecorObjects(decorState, plot.id),
       })),
       // Territory tiles: docked patches in the Kingdom's own art, each with
-      // its own plantable cell space (decor addressed by `exp-<index>`).
+      // its own plantable cell space (decor addressed by `exp-<index>`) plus
+      // the katchimera residents whose quads live on that tile.
       ...visibleExpansions.map((expansion) => ({
         ...deriveKingdomExpansionPatch(expansion),
-        objects: kingdomDecorObjects(decorState, `exp-${expansion.index}`),
+        objects: [
+          ...kingdomDecorObjects(decorState, `exp-${expansion.index}`),
+          ...residentObjects(residents, expansion.index, residentMeta, PATCH_RING),
+        ],
       })),
     ],
-    [renderPatch, plots, decorState, visibleExpansions]
+    [renderPatch, plots, decorState, visibleExpansions, residents, residentMeta]
   );
 
   // Essence (cosmetic currency) + cosmetics. "+N" toast when it grows.
@@ -363,6 +463,10 @@ export default function KingdomScreen() {
           ring={PATCH_RING}
           animateOnMount
           imageBase={KINGDOM_IMAGE_BASE}
+          eggPatchId={todayEgg ? 'kingdom' : null}
+          eggVisual={todayEgg}
+          onPressEgg={() => router.push('/today')}
+          onSelectResident={(creatureId, name) => setCompanion({ creatureId, name })}
           artefacts={worldArtefacts}
           customising={customising}
           onToggleCustomising={() => setCustomising((value) => !value)}
@@ -378,6 +482,126 @@ export default function KingdomScreen() {
           highlightObjectId={justPlantedId}
           animateExpansionIndex={growAnimIndex}
         />
+
+        {/* Companion card — a tapped resident speaks (engagement T1 rules;
+            the FM voice pass replaces the phrasing in V1b). */}
+        {companion
+          ? (() => {
+              const resident = residents.find((r) => r.creatureId === companion.creatureId);
+              const meta = residentMeta(companion.creatureId);
+              const fallback = `${companion.name} ${meta?.visualKey ?? ''}`;
+              const unit = companionUnit(
+                archetypeForCreature(companion.creatureId, fallback),
+                kingdom,
+                subtypeForCreature(companion.creatureId, fallback)
+              );
+              return (
+                <Pressable
+                  onPress={() => setCompanion(null)}
+                  style={{
+                    position: 'absolute',
+                    left: 16,
+                    right: 16,
+                    bottom: 118,
+                    borderRadius: 20,
+                    padding: 16,
+                    backgroundColor: 'rgba(16, 14, 26, 0.92)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 195, 107, 0.35)',
+                  }}>
+                  <ThemedText style={{ fontSize: 15, fontWeight: '700' }} lightColor="#FFE2B8" darkColor="#FFE2B8">
+                    {companion.name}
+                    {resident ? `  ·  home Lv ${resident.houseLevel}` : ''}
+                  </ThemedText>
+                  <ThemedText style={{ marginTop: 6, fontSize: 14, lineHeight: 20 }} lightColor="#EDEAF6" darkColor="#EDEAF6">
+                    {unit.line}
+                  </ThemedText>
+                  {(() => {
+                    const active = questFor(companionQuests, companion.creatureId);
+                    if (active) {
+                      return (
+                        <ThemedText style={{ marginTop: 8, fontSize: 13 }} lightColor="#A8E2C6" darkColor="#A8E2C6">
+                          ✦ In progress: {active.title} — {active.hint}
+                        </ThemedText>
+                      );
+                    }
+                    if (!unit.quest) return null;
+                    const offer = unit.quest;
+                    return (
+                      <Pressable
+                        onPress={() =>
+                          handleAcceptQuest({
+                            questId: offer.id,
+                            creatureId: companion.creatureId,
+                            title: offer.title,
+                            hint: offer.hint,
+                          })
+                        }
+                        style={{
+                          marginTop: 10,
+                          alignSelf: 'flex-start',
+                          borderRadius: 12,
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          backgroundColor: 'rgba(168, 226, 198, 0.16)',
+                          borderWidth: 1,
+                          borderColor: 'rgba(168, 226, 198, 0.45)',
+                        }}>
+                        <ThemedText style={{ fontSize: 13, fontWeight: '600' }} lightColor="#A8E2C6" darkColor="#A8E2C6">
+                          ✦ Accept: {offer.title} — {offer.hint}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })()}
+                </Pressable>
+              );
+            })()
+          : null}
+
+        {/* Quest journal — reuses the shared MeadowSheet shell (same as the
+            Today moments/places sheets: ScrollView owns its touches, drag-to-
+            dismiss, ✕ close) so the list scrolls reliably. */}
+        {questJournalOpen ? (
+          <MeadowSheet kicker="Companions" title="Quest Journal" onClose={() => setQuestJournalOpen(false)}>
+            <Pressable onPress={() => runQuestCheck('manual')} style={styles.questCheckBtn}>
+              <ThemedText style={styles.questCheckLabel} lightColor="#A8E2C6" darkColor="#A8E2C6">
+                Check now
+              </ThemedText>
+            </Pressable>
+            <ScrollView style={styles.questList} contentContainerStyle={styles.questListContent}>
+              {activeQuests(companionQuests).length === 0 ? (
+                <ThemedText style={styles.questEmpty} lightColor="#B7B2C6" darkColor="#B7B2C6">
+                  No active quests. Tap a katchimera to hear what they need.
+                </ThemedText>
+              ) : (
+                activeQuests(companionQuests).map((quest) => {
+                  const who = residentMeta(quest.creatureId);
+                  const criteria = questCriteria(quest.questId, todayFacts);
+                  return (
+                    <View key={quest.questId + quest.creatureId} style={styles.questRow}>
+                      <ThemedText style={styles.questRowTitle} lightColor="#FFE2B8" darkColor="#FFE2B8">
+                        {quest.title}
+                        {who ? `  ·  ${who.name}` : ''}
+                      </ThemedText>
+                      <ThemedText style={styles.questRowHint} lightColor="#EDEAF6" darkColor="#EDEAF6">
+                        {quest.hint}
+                      </ThemedText>
+                      {criteria.map((c) => (
+                        <ThemedText
+                          key={c.label}
+                          style={styles.questCriterion}
+                          lightColor={c.done ? '#A8E2C6' : '#B7B2C6'}
+                          darkColor={c.done ? '#A8E2C6' : '#B7B2C6'}>
+                          {c.done ? '✓' : '○'} {c.label}
+                        </ThemedText>
+                      ))}
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+          </MeadowSheet>
+        ) : null}
 
         {/* Header chrome — the Kingdom's name + what a life has built so far.
             The copy stays top-left; the actions live on their own right-edge
@@ -408,6 +632,20 @@ export default function KingdomScreen() {
             onPress={() => setCosmeticsOpen(true)}
             style={styles.headerButton}>
             <IconSymbol name="diamond.fill" size={18} color={Lantern.moon50} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Companion quests"
+            onPress={() => setQuestJournalOpen(true)}
+            style={styles.headerButton}>
+            <IconSymbol name="checklist" size={18} color={Lantern.moon50} />
+            {activeQuests(companionQuests).length > 0 ? (
+              <View style={styles.questBadge}>
+                <ThemedText style={styles.questBadgeText} lightColor="#1B140A" darkColor="#1B140A">
+                  {activeQuests(companionQuests).length}
+                </ThemedText>
+              </View>
+            ) : null}
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -732,6 +970,43 @@ const styles = StyleSheet.create({
   },
   growButtonLabel: { fontSize: 14, fontWeight: '800' },
   headerButtonOn: { backgroundColor: Lantern.ember300, borderColor: Lantern.ember300 },
+  questBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#A8E2C6',
+  },
+  questBadgeText: { fontSize: 11, fontWeight: '800' },
+  questList: { flexGrow: 0, marginTop: 4 },
+  questListContent: { gap: 12, paddingBottom: 8 },
+  questCheckBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(168,226,198,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(168,226,198,0.45)',
+  },
+  questCheckLabel: { fontSize: 13, fontWeight: '700' },
+  questEmpty: { fontSize: 14, lineHeight: 20, paddingVertical: 8 },
+  questRow: {
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 4,
+  },
+  questRowTitle: { fontSize: 14, fontWeight: '700' },
+  questRowHint: { fontSize: 13, lineHeight: 18 },
+  questCriterion: { fontSize: 12.5, marginTop: 2 },
   giftBadge: {
     alignItems: 'center',
     backgroundColor: Lantern.ember300,

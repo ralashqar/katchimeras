@@ -19,7 +19,7 @@ import { worldBaseSource } from '@/utils/world-visuals';
 // pair 0.53/0.4). This page is ABOUT OFFSETS: pick a side, step its W/H,
 // watch the seam close; the tile graphic itself is one cycle button.
 
-const BASE_IDS = ['base_garden_main', 'base_garden_bricks', 'base_garden_cobble', 'base_garden_velvet', 'base_garden_velvet_roads', 'base_garden_nest', 'base_garden_winding', 'base_garden_brickcross', 'base_garden_diagonal', 'base_garden_plaza', 'base_garden_toy', 'base_garden_uniform', 'base_garden_grass', 'base_garden_flat', 'base_garden_wildflower', 'base_garden_simple', 'base_garden', 'base_env3', 'plot_base_1', 'plot_base_2', 'base_env2', 'base_meadow'];
+const BASE_IDS = ['base_garden_main', 'base_garden_nest2', 'base_garden_bricks', 'base_garden_cobble', 'base_garden_velvet', 'base_garden_velvet_roads', 'base_garden_nest', 'base_garden_winding', 'base_garden_brickcross', 'base_garden_diagonal', 'base_garden_plaza', 'base_garden_toy', 'base_garden_uniform', 'base_garden_grass', 'base_garden_flat', 'base_garden_wildflower', 'base_garden_simple', 'base_garden', 'base_env3', 'plot_base_1', 'plot_base_2', 'base_env2', 'base_meadow'];
 const TILE_PX = 340;
 
 type SideId = 'ne' | 'se' | 'sw' | 'nw';

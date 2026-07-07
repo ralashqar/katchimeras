@@ -26,7 +26,9 @@ export function getDevAssetOverrideSource(assetKey: string): ImageSourcePropType
 // --- Kingdom base override (dev) --------------------------------------------
 // The Asset Lab can point the CENTRE island at any registered base id for live
 // comparison. Persisted so it survives reloads; production always ignores it.
-const DEV_BASE_KEY = 'katchadeck.dev-kingdom-base-v1';
+// v2: retired the pre-residents override (it pinned every tile to one debug
+// base, hiding the nest-capital + garden-ring defaults on existing installs).
+const DEV_BASE_KEY = 'katchadeck.dev-kingdom-base-v2';
 let devKingdomBaseId: string | null | undefined;
 
 export function getDevKingdomBaseId(): string | null {

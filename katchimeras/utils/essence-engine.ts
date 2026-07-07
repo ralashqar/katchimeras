@@ -17,6 +17,7 @@ export const ESSENCE_AWARD = {
   studio: 5,
   bigMoment: 15,
   weeklyRecap: 25,
+  questComplete: 12, // a companion quest fulfilled (docs/katchimera-engagement-v1.md)
 } as const;
 
 // Discovery essence by rarity (a def may override via essenceReward).
@@ -58,12 +59,19 @@ export function essenceAwardsForDay(day: HomeDayRecord): number {
 // Total essence EARNED across all of history: per-day events + unlocked-discovery
 // rewards + weekly recaps. Deterministic — identical history always yields the same
 // total (the anti-farm / reinstall-safe guarantee).
-export function earnedTotal(days: HomeDayRecord[], unlockedDiscoveries: DiscoveryDef[]): number {
+export function earnedTotal(
+  days: HomeDayRecord[],
+  unlockedDiscoveries: DiscoveryDef[],
+  // Completed companion quests each pay once (the ledger persists completedAt,
+  // so this stays deterministic + anti-farm like the rest of `earned`).
+  completedQuestCount = 0
+): number {
   let total = 0;
   for (const day of days) total += essenceAwardsForDay(day);
   for (const def of unlockedDiscoveries) total += discoveryEssence(def);
   const finalised = days.filter((day) => day.state === 'hatched').length;
   total += Math.floor(finalised / DAYS_PER_RECAP) * ESSENCE_AWARD.weeklyRecap;
+  total += completedQuestCount * ESSENCE_AWARD.questComplete;
   return total;
 }
 

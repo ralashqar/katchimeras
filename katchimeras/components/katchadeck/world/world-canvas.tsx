@@ -87,6 +87,9 @@ type Props = {
   // auto-centres on it. Absent once the day has hatched.
   eggPatchId?: string | null;
   eggVisual?: EggVisualState | null;
+  // Tapping a resident (house/katchimera) focuses the camera on it and opens
+  // the companion card (docs/katchimera-engagement-v1.md).
+  onSelectResident?: (creatureId: string, label: string) => void;
   eggReady?: boolean;
   eggFeedKey?: number;
   // In-place hatch reveal, anchored to the egg's spot and panning with the world.
@@ -306,6 +309,7 @@ export function WorldCanvas({
   onSelectBigMoment,
   eggPatchId,
   eggVisual,
+  onSelectResident,
   eggReady = false,
   hatching = false,
   hatchingCreature = null,
@@ -663,6 +667,12 @@ export function WorldCanvas({
     if (!focusSlab || !eggPatchId) return null;
     const slab = scene.slabs.find((s) => s.patchId === eggPatchId);
     if (!slab) return null;
+    // On the Kingdom capital the egg's home is FIXED: the nest's paved circle
+    // sits at the exact slab centre (base_garden_nest2 is centred on the
+    // diamond), so the egg draws right on the nest — ignoring the fractional
+    // default cell and any old dragged position. The +y drop settles it into
+    // the nest bowl (counters part of EGG_RISE).
+    if (slab.patchId === 'kingdom') return { x: slab.centre.x, y: slab.centre.y + 18 };
     return {
       x: slab.centre.x + (cellCenter(eggCell.col, eggCell.row).x - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).x),
       y: slab.centre.y + (cellCenter(eggCell.col, eggCell.row).y - cellCenter(SLAB_CENTRE_CELL.col, SLAB_CENTRE_CELL.row).y),
@@ -1072,6 +1082,9 @@ export function WorldCanvas({
   // Tile-based tap: snap the tap point to the NEAREST tile (not a raycast against
   // tall transparent sprite frames), then act on whatever OCCUPIES that tile — a
   // chest, a memory, the creature, or the egg. Predictable + no z-fighting.
+  // Camera glide onto a tapped resident — assigned near `recenter` below.
+  const focusPointRef = useRef<((x: number, y: number) => void) | null>(null);
+
   const handleTap = useCallback(
     (wx: number, wy: number) => {
       // Hit-test the ACTUAL rendered sprite rectangles (both modes), so taps
@@ -1101,6 +1114,13 @@ export function WorldCanvas({
         }
       }
       if (hit) {
+        // A resident (house or katchimera): focus the camera on it and open
+        // the companion card (docs/katchimera-engagement-v1.md).
+        if (hit.id.startsWith('resident-') && onSelectResident) {
+          focusPointRef.current?.(hit.x, hit.y);
+          onSelectResident(hit.id.replace('resident-creature-', '').replace('resident-', ''), hit.label);
+          return;
+        }
         if (memoryAlert && hit.patchId === eggPatchId && hit.category === 'memory') {
           onPressMemoryAlert?.();
           return;
@@ -1145,6 +1165,7 @@ export function WorldCanvas({
       eggPoint,
       eggScale,
       onPressEgg,
+      onSelectResident,
       memoryAlert,
       onPressMemoryAlert,
       placesAlert,
@@ -1283,6 +1304,20 @@ export function WorldCanvas({
     ty.value = withTiming(viewport.height / 2 - sceneH / 2 - (focus.y - sceneH / 2) * s, { duration: 320 });
   };
 
+  // Companion focus: glide + zoom onto a tapped resident. Assigned to a ref
+  // so handleTap (declared earlier) can call it without dependency churn.
+  // Centres slightly above the middle so the companion card doesn't cover it.
+  focusPointRef.current = (x: number, y: number) => {
+    if (!viewport.width) return;
+    cancelAnimation(tx);
+    cancelAnimation(ty);
+    cancelAnimation(scale);
+    const zoom = Math.max(scale.value, 1.35);
+    scale.value = withTiming(zoom, { duration: 420 });
+    tx.value = withTiming(viewport.width / 2 - sceneW / 2 - (x - sceneW / 2) * zoom, { duration: 420 });
+    ty.value = withTiming(viewport.height * 0.42 - sceneH / 2 - (y - sceneH / 2) * zoom, { duration: 420 });
+  };
+
   const worldStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
@@ -1299,11 +1334,14 @@ export function WorldCanvas({
   // Falls back to the flat decal-atlas tiles until the texture loads.
   // (These are require() module ids — the ImageSourcePropType annotation just
   // hides the number from useImage.)
-  // Full-patch overlay: Asset Lab base pick (dev override) or the generated
-  // slab art. All bundled bases are require() numbers, so useImage is safe.
-  const slabOverlayPick = kingdomSlabOverlay();
-  const kingdomOverlay = useImage(slabOverlayPick.source as number);
-  const kingdomOverlayGuide = slabOverlayPick.guide;
+  // Full-patch overlays (docs/kingdom-residents-plan.md): the capital slab
+  // renders the nest tile, ring/expansion slabs render the Garden Tile (or
+  // the Asset Lab dev override). All bundled bases are require() numbers, so
+  // useImage is safe.
+  const capitalPick = kingdomSlabOverlay('capital');
+  const ringPick = kingdomSlabOverlay('ring');
+  const capitalOverlay = useImage(capitalPick.source as number);
+  const ringOverlay = useImage(ringPick.source as number);
   const groundArt = useMemo(() => {
     if (imgBase || scene.slabs.length === 0) return { shadow: null, ground: null };
     const slabs = [...scene.slabs].sort((a, b) => a.centre.y - b.centre.y);
@@ -1341,32 +1379,32 @@ export function WorldCanvas({
     const rec = Skia.PictureRecorder();
     const canvas = rec.beginRecording(Skia.XYWHRect(0, 0, scene.width, scene.height));
 
-    // EVERY slab renders the same full-patch overlay art, scaled to its own
-    // width — one texture draw per slab, no procedural layers. Canonical
-    // bases squash to 2:1 via the non-square dst rect (ySquash). Until the
-    // image loads, the flat slab paths beneath keep the ground visible.
-    if (kingdomOverlay) {
-      const g = KINGDOM_OVERLAY_GUIDES[kingdomOverlayGuide];
-      const overlayPaint = Skia.Paint();
-      const src = Skia.XYWHRect(0, 0, kingdomOverlay.width(), kingdomOverlay.height());
-      for (const slab of slabs) {
-        const [top, right, , left] = slab.topCorners;
-        const os = (right.x - left.x) / g.diamondW;
-        canvas.drawImageRect(
-          kingdomOverlay,
-          src,
-          Skia.XYWHRect(
-            left.x - g.leftX * os,
-            top.y - g.topY * g.ySquash * os,
-            g.size * os,
-            g.size * g.ySquash * os
-          ),
-          overlayPaint
-        );
-      }
+    // Each slab renders its role's full-patch overlay art, scaled to its own
+    // width — one texture draw per slab, no procedural layers. The capital
+    // (kingdom) slab is the nest tile; ring slabs are garden tiles. Canonical
+    // bases squash to 2:1 via the non-square dst rect (ySquash).
+    const overlayPaint = Skia.Paint();
+    for (const slab of slabs) {
+      const isCapital = slab.patchId === 'kingdom';
+      const image = isCapital ? capitalOverlay : ringOverlay;
+      if (!image) continue;
+      const g = KINGDOM_OVERLAY_GUIDES[isCapital ? capitalPick.guide : ringPick.guide];
+      const [top, right, , left] = slab.topCorners;
+      const os = (right.x - left.x) / g.diamondW;
+      canvas.drawImageRect(
+        image,
+        Skia.XYWHRect(0, 0, image.width(), image.height()),
+        Skia.XYWHRect(
+          left.x - g.leftX * os,
+          top.y - g.topY * g.ySquash * os,
+          g.size * os,
+          g.size * g.ySquash * os
+        ),
+        overlayPaint
+      );
     }
     return { shadow, ground: rec.finishRecordingAsPicture() };
-  }, [imgBase, kingdomOverlay, kingdomOverlayGuide, scene]);
+  }, [imgBase, capitalOverlay, ringOverlay, capitalPick.guide, ringPick.guide, scene]);
 
   // Objects + fence segments rendered in one depth-sorted pass so fences occlude
   // correctly relative to the objects in front of / behind them.

@@ -5,6 +5,7 @@ import { DISCOVERY_CATALOG } from '@/utils/discoveries-catalog';
 import { loadDiscoveryState } from '@/utils/discoveries-storage';
 import { earnedTotal, essenceBalance } from '@/utils/essence-engine';
 import { loadEssenceState, recordSpend, saveEssenceState } from '@/utils/essence-storage';
+import { loadCompanionQuests } from '@/utils/katchimera-quests';
 
 // Essence balance for the UI. Earned is re-derived from all of history (+ unlocked
 // discoveries) on every archive change; spent is read from storage. Spending lands
@@ -21,7 +22,17 @@ export function useEssence() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days]);
 
-  const earned = useMemo(() => earnedTotal(days, unlockedDiscoveries), [days, unlockedDiscoveries]);
+  // Completed companion quests each pay essence (derived from the persisted
+  // ledger, re-read on archive change — same anti-farm shape as discoveries).
+  const completedQuestCount = useMemo(() => {
+    return loadCompanionQuests().quests.filter((quest) => quest.completedAt).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days]);
+
+  const earned = useMemo(
+    () => earnedTotal(days, unlockedDiscoveries, completedQuestCount),
+    [days, unlockedDiscoveries, completedQuestCount]
+  );
   const balance = essenceBalance(earned, state.spent);
 
   // Spend on a cosmetic. Idempotent (already-owned → success, no charge); rejects

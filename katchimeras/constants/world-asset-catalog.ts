@@ -210,6 +210,7 @@ const HAND_WORLD_ASSETS: WorldAssetEntry[] = [
   { key: 'base_garden_velvet', name: 'Velvet Lawn Tile', section: 'base', unlock: 'Alternate tile — generated from the procedural canonical template: plush velvet lawn on a cobble skirt.' },
   { key: 'base_garden_velvet_roads', name: 'Velvet Crossroads Tile', section: 'base', unlock: 'Alternate tile — template-generated velvet lawn with sandy brick roads crossing at the middle (no plaza).' },
   { key: 'base_garden_nest', name: 'Nest Meadow Tile', section: 'base', unlock: 'Alternate tile — open flower meadow with a round paved plaza holding a wicker nest.' },
+  { key: 'base_garden_nest2', name: 'Nest Meadow Tile II', section: 'base', unlock: 'Alternate tile — user-supplied nest meadow: clean lawn with a thin gold brick border, central paved circle holding a wicker nest.' },
   { key: 'base_garden_winding', name: 'Winding Paths Tile', section: 'base', unlock: 'Alternate tile — organic winding paths meeting at a small roundabout crossing.' },
   { key: 'base_garden_brickcross', name: 'Brick Crossroad Tile', section: 'base', unlock: 'Alternate tile — straight paver crossroad with orange brick edging.' },
   { key: 'base_garden_diagonal', name: 'Diagonal Cross Tile', section: 'base', unlock: 'Alternate tile — corner-to-corner diagonal paths with a ring plaza and paved border.' },

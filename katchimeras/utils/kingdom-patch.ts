@@ -51,19 +51,6 @@ function buildingAssetKey(building: KingdomBuilding): string {
   }
 }
 
-// Where the roster stands: the newest creature takes the plaza centre, the
-// rest settle onto surrounding spots (newest first). Positions are in patch
-// cell coordinates, matching WORLD_STRUCTURE_POSITIONS' space.
-const CREATURE_SLOTS: { col: number; row: number; sizeScale: number }[] = [
-  { col: 1.5, row: 1.5, sizeScale: 2.1 },
-  { col: 0.7, row: 2.2, sizeScale: 1.35 },
-  { col: 2.3, row: 0.8, sizeScale: 1.35 },
-  { col: 0.9, row: 0.7, sizeScale: 1.25 },
-  { col: 2.4, row: 2.3, sizeScale: 1.25 },
-  { col: 1.7, row: 2.6, sizeScale: 1.2 },
-  { col: 2.7, row: 1.6, sizeScale: 1.2 },
-  { col: 0.4, row: 1.4, sizeScale: 1.2 },
-];
 
 function groundTiles(size: number): WorldTile[] {
   const tiles: WorldTile[] = [];
@@ -170,20 +157,8 @@ export function deriveKingdomPatch(kingdom: KingdomState): WorldPatch {
     });
   }
 
-  kingdom.creatures.slice(0, CREATURE_SLOTS.length).forEach((creature, index) => {
-    const slot = CREATURE_SLOTS[index];
-    objects.push({
-      id: `kingdom-creature-${creature.dayId}`,
-      kind: 'creature',
-      assetKey: `creature:${creature.visualKey}`,
-      label: creature.name,
-      col: slot.col,
-      row: slot.row,
-      footprint: 1,
-      sourceLabel: creature.isoDate,
-      sizeScale: slot.sizeScale,
-    });
-  });
+  // Katchimeras no longer crowd the capital: each lives at its resident quad
+  // on the ring tiles (utils/kingdom-residents.ts residentObjects).
 
   const newest = kingdom.creatures[0] ?? null;
   return {
