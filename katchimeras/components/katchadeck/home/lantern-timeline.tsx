@@ -6,7 +6,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { ThemedText } from '@/components/themed-text';
 import { Meadow } from '@/constants/meadow-theme';
 import type { HomeDayRecord, HomeTimelineDay } from '@/types/home';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 
 const auroraRing = require('../../../assets/images/katchimeras/aurora-ring.png');
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');

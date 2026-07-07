@@ -4,7 +4,7 @@ import { forwardRef, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { DayMapNode, HomeDayRecord } from '@/types/home';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 
 type MemoryPostcardProps = {
   day: HomeDayRecord & {

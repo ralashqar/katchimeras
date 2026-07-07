@@ -23,11 +23,13 @@ function transpileToTemp(relativeSourcePath, outName) {
 // scene-classify imports the real food-detect (pure) + foundation-scene (native →
 // stub it so resolveSceneRead falls back to the rule classifier in Node).
 const foodDetectPath = transpileToTemp('utils/food-detect.ts', 'food-detect.js');
+const studioDetectPath = transpileToTemp('utils/studio-detect.ts', 'studio-detect.js');
 const foundationStub = path.join(tempDir, 'foundation-scene.js');
 fs.writeFileSync(foundationStub, 'exports.classifySceneOnDevice = async () => null;\nexports.isFoundationSceneAvailable = () => false;\n');
 
 const stubs = {
   '@/utils/food-detect': foodDetectPath,
+  '@/utils/studio-detect': studioDetectPath,
   '@/utils/foundation-scene': foundationStub,
 };
 const originalResolve = Module._resolveFilename;

@@ -89,11 +89,11 @@ check('a hatched creature gives the day a story', hatched.hasStory === true);
 
 // --- calendar events shape the Chronicle ---
 const cal = engine.deriveDayChronicle(day(), [
-  { id: '1', title: 'Dentist', startTime: new Date('2026-06-17T09:00:00').getTime(), endTime: new Date('2026-06-17T09:30:00').getTime(), category: 'health' },
-  { id: '2', title: 'Dinner with Sarah', startTime: new Date('2026-06-17T19:00:00').getTime(), endTime: new Date('2026-06-17T21:00:00').getTime(), category: 'social' },
+  { id: '1', title: 'Dentist', startTime: new Date('2026-06-17T09:00:00').getTime(), endTime: new Date('2026-06-17T09:30:00').getTime(), category: 'care' },
+  { id: '2', title: 'Dinner with Sarah', startTime: new Date('2026-06-17T19:00:00').getTime(), endTime: new Date('2026-06-17T21:00:00').getTime(), category: 'connection' },
 ]);
 check('calendar events shape the title', cal.title === 'A Day of Care & Connection', cal.title);
-check('calendar events appear in "what shaped this day"', cal.shaped.includes('Dentist') && cal.shaped.includes('Dinner with Sarah'));
+check('calendar events appear in "what shaped this day"', cal.shaped.some((s) => s.includes('Dentist')) && cal.shaped.some((s) => s.includes('Dinner with Sarah')));
 check('calendar events give the day a story', cal.hasStory === true);
 check('calendar events join the timeline, time-bucketed', cal.timeline.some((i) => i.label === 'Dentist' && i.timeOfDay === 'morning') && cal.timeline.some((i) => i.label === 'Dinner with Sarah' && i.timeOfDay === 'evening'));
 

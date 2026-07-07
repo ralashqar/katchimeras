@@ -17,7 +17,6 @@ import {
   answerDayPromptForToday,
   answerHeroPhotoMeaningForToday,
   applyCapturedMomentForToday,
-  applyGeneratedReflection,
   applyNoteForToday,
   addFoodMomentForToday,
   addStudioMomentForToday,
@@ -34,53 +33,35 @@ import {
   dismissDayPromptForToday,
   hydrateAllDays,
   hydrateHomeState,
-  importHealthRoutesForDay as applyHealthRoutesForDay,
-  type ImportedHealthRoutesPayload,
   recordForegroundLocationSample,
   seedPhotoLocationsByDay,
   selectHeroPhotoForToday,
-  setDayWeatherForDay,
-  setPlaceCategorySeedsForDay,
-  triggerHatchForDay,
+  selectPathForToday,
   updateActivityPermissionState,
   updateHealthPermissionState,
   updateLocationPermissionState,
   updateTodayStepCount,
-} from '@/utils/home-engine';
+} from '@/game/days';
 import {
   listAvailableDayPrompts,
   selectActiveDayPrompt,
   type ActiveDayPrompt,
   type DayPromptPhotoCandidate,
 } from '@/utils/day-prompt-engine';
-import {
-  clearStoredDevPromptPhotoCandidates,
-  loadProductionDayPromptPhotoCandidates,
-  loadStoredDevPromptPhotoCandidates,
-} from '@/utils/day-prompt-photos';
 import { earnedSeeds, selectDailySeeds, type DailySeed } from '@/utils/daily-seeds-engine';
-import { requestDayReflection } from '@/utils/day-reflection';
-import { ensureDayVision } from '@/utils/photo-vision';
-import { ensureDayWeather } from '@/utils/day-weather';
-import {
-  getHatchNotificationPermission,
-  requestHatchNotificationPermission,
-  syncHatchNotification,
-} from '@/utils/hatch-notification';
-import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
 import { markPhotoProcessed } from '@/utils/processed-photos';
-import { syncWidgetState } from '@/utils/widget-state';
-import { getHealthRouteAvailability, importRoutesForDay, requestHealthRoutePermission } from '@/utils/health-route-import';
-import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState, subscribeHomeStateChanges } from '@/utils/home-storage';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { useHatchController } from '@/features/today/use-hatch-controller';
+import { useHealthRouteImport } from '@/features/today/use-health-route-import';
+import { usePromptPhotoCandidates } from '@/features/today/use-prompt-photo-candidates';
+import { useHomeStateMutation } from '@/features/today/use-home-state-mutation';
 
 export function useHomeScreenState() {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
-  const [importingHealthRouteDayId, setImportingHealthRouteDayId] = useState<string | null>(null);
-  const [promptPhotoCandidates, setPromptPhotoCandidates] = useState<DayPromptPhotoCandidate[]>([]);
-  const [forceMeaningfulPhotoPrompt, setForceMeaningfulPhotoPrompt] = useState(false);
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
+  const mutateHomeState = useHomeStateMutation(setStoredState);
 
   useEffect(() => {
     storedStateRef.current = storedState;
@@ -89,7 +70,7 @@ export function useHomeScreenState() {
   const syncState = useCallback(() => {
     const now = new Date();
     const profile = loadOnboardingProfile();
-    const hydrated = hydrateHomeState(loadStoredHomeState() ?? storedStateRef.current, profile, now);
+    const hydrated = hydrateHomeState(homeRepository.load() ?? storedStateRef.current, profile, now);
 
     setStoredState((current) => (areStoredStatesEqual(current, hydrated.state) ? current : hydrated.state));
     setSelectedDayId((current) => {
@@ -124,7 +105,7 @@ export function useHomeScreenState() {
     return () => subscription.remove();
   }, [syncState]);
 
-  useEffect(() => subscribeHomeStateChanges(syncState), [syncState]);
+  useEffect(() => homeRepository.subscribe(syncState), [syncState]);
 
   // Re-derive on a minute tick so a continuously-open app crosses its hatch hour
   // (forming → ready) and the midnight rollover on its own — without it, the
@@ -144,7 +125,7 @@ export function useHomeScreenState() {
       return;
     }
 
-    saveStoredHomeState(storedState);
+    homeRepository.save(storedState);
   }, [storedState]);
 
   const viewModel = useMemo(() => {
@@ -173,6 +154,29 @@ export function useHomeScreenState() {
     timelineDays.find((day) => day.kind === 'day' && day.isToday) ??
     timelineDays[0] ??
     null;
+  const selectedPromptDayId = selectedDay?.kind === 'day' ? selectedDay.id : null;
+  const selectedPromptDayIsToday = selectedDay?.kind === 'day' ? selectedDay.isToday : false;
+  const selectedPromptDayState = selectedDay?.kind === 'day' ? selectedDay.state : null;
+  const {
+    promptPhotoCandidates,
+    forceMeaningfulPhotoPrompt,
+    clearForcedMeaningfulPhotoPrompt,
+  } = usePromptPhotoCandidates({
+    dayId: selectedPromptDayId,
+    isToday: selectedPromptDayIsToday,
+    dayState: selectedPromptDayState,
+  });
+  const { triggerHatchIfReady } = useHatchController({
+    selectedDay,
+    state: viewModel.state,
+    storedStateRef,
+    setStoredState,
+  });
+  const { importingHealthRouteDayId, importHealthRoutesForDay } = useHealthRouteImport({
+    storedStateRef,
+    setStoredState,
+  });
+
   const activeDayPrompt =
     selectedDay?.kind === 'day' && selectedDay.isToday && selectedDay.state !== 'hatched'
       ? selectActiveDayPrompt(selectedDay, new Date(), {
@@ -217,205 +221,89 @@ export function useHomeScreenState() {
       })
     : [];
 
-  const selectedPromptDayId = selectedDay?.kind === 'day' ? selectedDay.id : null;
-  const selectedPromptDayIsToday = selectedDay?.kind === 'day' ? selectedDay.isToday : false;
-  const selectedPromptDayState = selectedDay?.kind === 'day' ? selectedDay.state : null;
-
-  useEffect(() => {
-    if (!selectedPromptDayId || !selectedPromptDayIsToday || selectedPromptDayState === 'hatched') {
-      setPromptPhotoCandidates([]);
-      setForceMeaningfulPhotoPrompt(false);
-      return;
-    }
-
-    let active = true;
-
-    void (async () => {
-      const devCandidates = __DEV__ ? loadStoredDevPromptPhotoCandidates() : [];
-      if (devCandidates.length > 0) {
-        if (active) {
-          setPromptPhotoCandidates(devCandidates);
-          setForceMeaningfulPhotoPrompt(true);
-        }
-        return;
-      }
-
-      const candidates = await loadProductionDayPromptPhotoCandidates(new Date());
-      if (active) {
-        setPromptPhotoCandidates(candidates);
-        setForceMeaningfulPhotoPrompt(false);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-    // Deliberately keyed on the day's IDENTITY, not the recreated day object —
-    // every passive capture (steps, location) used to retrigger a full photo
-    // scan on foreground.
-  }, [selectedPromptDayId, selectedPromptDayIsToday, selectedPromptDayState]);
-
   const addMoment = useCallback((momentInput: AddMomentInput, target: DayInputTarget = 'today') => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return addMomentToDay(hydrated.state, profile, momentInput, now, target);
-    });
-  }, []);
+    mutateHomeState((state, profile, now) => addMomentToDay(state, profile, momentInput, now, target));
+  }, [mutateHomeState]);
 
   const completeSeed = useCallback((seedId: string, target: DayInputTarget = 'today') => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return completeSeedForToday(hydrated.state, seedId, profile, now, target);
-    });
-  }, []);
+    mutateHomeState((state, profile, now) => completeSeedForToday(state, seedId, profile, now, target));
+  }, [mutateHomeState]);
 
   const addNote = useCallback(
     (note: Parameters<typeof applyNoteForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return applyNoteForToday(hydrated.state, note, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => applyNoteForToday(state, note, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const confirmPlace = useCallback(
     (input: Parameters<typeof confirmPlaceForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return confirmPlaceForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => confirmPlaceForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const markBigMoment = useCallback(
     (input: Parameters<typeof markBigMomentForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return markBigMomentForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => markBigMomentForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const setSleep = useCallback(
     (sleep: Parameters<typeof setSleepForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return setSleepForToday(hydrated.state, sleep, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => setSleepForToday(state, sleep, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const setStepsInterpretation = useCallback(
     (input: Parameters<typeof setStepsInterpretationForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return setStepsInterpretationForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => setStepsInterpretationForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const setFeaturedMemory = useCallback(
     (input: Parameters<typeof setFeaturedMemoryForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return setFeaturedMemoryForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => setFeaturedMemoryForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const setDayName = useCallback(
     (name: string, target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return setDayNameForToday(hydrated.state, name, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => setDayNameForToday(state, name, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const addFoodMoment = useCallback(
     (input: Parameters<typeof addFoodMomentForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return addFoodMomentForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => addFoodMomentForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const addStudioMoment = useCallback(
     (input: Parameters<typeof addStudioMomentForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return addStudioMomentForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => addStudioMomentForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const setFoodMomentMeaning = useCallback(
     (input: Parameters<typeof setFoodMomentMeaningForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return setFoodMomentMeaningForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => setFoodMomentMeaningForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const setStudioMomentRating = useCallback(
     (input: Parameters<typeof setStudioMomentRatingForToday>[1], target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return setStudioMomentRatingForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => setStudioMomentRatingForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const answerDayPrompt = useCallback(
@@ -423,13 +311,9 @@ export function useHomeScreenState() {
       input: { kind: DayPromptKind; choiceIds: string[]; noteText?: string | null },
       target: DayInputTarget = 'today'
     ) => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return answerDayPromptForToday(
-          hydrated.state,
+      mutateHomeState((state, profile, now) =>
+        answerDayPromptForToday(
+          state,
           {
             kind: input.kind,
             choiceIds: input.choiceIds,
@@ -438,49 +322,36 @@ export function useHomeScreenState() {
           profile,
           now,
           target
-        );
-      });
+        )
+      );
     },
-    []
+    [mutateHomeState]
   );
 
   const dismissDayPrompt = useCallback(
     (kind: DayPromptKind, target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
       if (kind === 'meaningful_photo' && forceMeaningfulPhotoPrompt) {
-        clearStoredDevPromptPhotoCandidates();
-        setForceMeaningfulPhotoPrompt(false);
-        setPromptPhotoCandidates([]);
+        clearForcedMeaningfulPhotoPrompt();
       }
 
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return dismissDayPromptForToday(hydrated.state, kind, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => dismissDayPromptForToday(state, kind, profile, now, target));
     },
-    [forceMeaningfulPhotoPrompt]
+    [clearForcedMeaningfulPhotoPrompt, forceMeaningfulPhotoPrompt, mutateHomeState]
   );
 
   const selectHeroPhoto = useCallback(
     (photo: DayPromptPhotoCandidate, target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
       // Remember this asset globally so it never prompts again (survives restart),
       // independent of the day record.
       markPhotoProcessed(photo.assetId);
 
       if (forceMeaningfulPhotoPrompt) {
-        clearStoredDevPromptPhotoCandidates();
-        setForceMeaningfulPhotoPrompt(false);
+        clearForcedMeaningfulPhotoPrompt();
       }
 
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return selectHeroPhotoForToday(
-          hydrated.state,
+      mutateHomeState((state, profile, now) =>
+        selectHeroPhotoForToday(
+          state,
           {
             assetId: photo.assetId,
             thumbnailUri: photo.thumbnailUri,
@@ -489,10 +360,10 @@ export function useHomeScreenState() {
           profile,
           now,
           target
-        );
-      });
+        )
+      );
     },
-    [forceMeaningfulPhotoPrompt]
+    [clearForcedMeaningfulPhotoPrompt, forceMeaningfulPhotoPrompt, mutateHomeState]
   );
 
   // Fold a camera capture into today: its captured energy (score deltas) and the
@@ -502,68 +373,33 @@ export function useHomeScreenState() {
       capture: Parameters<typeof applyCapturedMomentForToday>[1],
       target: DayInputTarget = 'today'
     ) => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return applyCapturedMomentForToday(hydrated.state, capture, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => applyCapturedMomentForToday(state, capture, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const answerPhotoMeaning = useCallback(
     (input: { choiceIds: string[]; noteText?: string | null }, target: DayInputTarget = 'today') => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return answerHeroPhotoMeaningForToday(hydrated.state, input, profile, now, target);
-      });
+      mutateHomeState((state, profile, now) => answerHeroPhotoMeaningForToday(state, input, profile, now, target));
     },
-    []
+    [mutateHomeState]
   );
 
   const setLocationPermission = useCallback((permission: LocationPermissionState) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return updateLocationPermissionState(hydrated.state, permission, profile, now);
-    });
-  }, []);
+    mutateHomeState((state, profile, now) => updateLocationPermissionState(state, permission, profile, now));
+  }, [mutateHomeState]);
 
   const setHealthPermission = useCallback((permission: HealthPermissionState) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return updateHealthPermissionState(hydrated.state, permission, profile, now);
-    });
-  }, []);
+    mutateHomeState((state, profile, now) => updateHealthPermissionState(state, permission, profile, now));
+  }, [mutateHomeState]);
 
   const setActivityPermission = useCallback((permission: ActivityPermissionState) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return updateActivityPermissionState(hydrated.state, permission, profile, now);
-    });
-  }, []);
+    mutateHomeState((state, profile, now) => updateActivityPermissionState(state, permission, profile, now));
+  }, [mutateHomeState]);
 
   const setTodayStepCount = useCallback((stepsCount: number) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return updateTodayStepCount(hydrated.state, stepsCount, profile, now);
-    });
-  }, []);
+    mutateHomeState((state, profile, now) => updateTodayStepCount(state, stepsCount, profile, now));
+  }, [mutateHomeState]);
 
   const addForegroundLocationSample = useCallback(
     (sample: {
@@ -572,60 +408,22 @@ export function useHomeScreenState() {
       capturedAt: string;
       accuracyMeters?: number;
     }) => {
-      const now = new Date();
-      const profile = loadOnboardingProfile();
-
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return recordForegroundLocationSample(hydrated.state, sample, profile, now);
-      });
+      mutateHomeState((state, profile, now) => recordForegroundLocationSample(state, sample, profile, now));
     },
-    []
+    [mutateHomeState]
   );
 
   const seedRecentPhotoLocations = useCallback((photos: RecentPhotoAsset[]) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return seedPhotoLocationsByDay(hydrated.state, photos, profile, now);
-    });
-  }, []);
+    mutateHomeState((state, profile, now) => seedPhotoLocationsByDay(state, photos, profile, now));
+  }, [mutateHomeState]);
 
   const selectTimelineDay = useCallback((dayId: string) => {
     setSelectedDayId(dayId);
   }, []);
 
   const selectPath = useCallback((pathId: string) => {
-    const now = new Date();
-    const profile = loadOnboardingProfile();
-
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return {
-        ...hydrated.state,
-        today: {
-          ...hydrated.state.today,
-          selectedPathId: hydrated.state.today.selectedPathId === pathId ? null : pathId,
-        },
-      };
-    });
-  }, []);
-
-  const todayId = viewModel.state.today.id;
-  const todayState = viewModel.state.today.state;
-
-  useEffect(() => {
-    const state = storedStateRef.current;
-    if (!state) {
-      return;
-    }
-
-    const profile = loadOnboardingProfile();
-    void syncHatchNotification(state, profile);
-    void syncWidgetState(state, profile);
-  }, [todayId, todayState]);
+    mutateHomeState((state, profile, now) => selectPathForToday(state, pathId, profile, now));
+  }, [mutateHomeState]);
 
   // NOTE: there is intentionally NO automatic retrospective backfill here.
   // "Hatch your past" (run from onboarding, app/hatch-your-past.tsx) is the
@@ -635,128 +433,6 @@ export function useHomeScreenState() {
   // days, which diverged from the hatch-your-past reveal; it was removed so the
   // two can never disagree.
 
-  const placeResolutionInFlight = useRef<string | null>(null);
-
-  useEffect(() => {
-    const today = viewModel.state.today;
-    if (
-      today.state !== 'ready_to_hatch' ||
-      today.placeCategorySeeds !== undefined ||
-      today.locations.length === 0 ||
-      placeResolutionInFlight.current === today.id
-    ) {
-      return;
-    }
-
-    placeResolutionInFlight.current = today.id;
-    void (async () => {
-      const seeds = await resolvePlaceSeedsForDay(today, viewModel.state.archivedDays);
-      const profile = loadOnboardingProfile();
-      const now = new Date();
-      setStoredState((currentState) => {
-        const hydrated = hydrateHomeState(currentState, profile, now);
-        return setPlaceCategorySeedsForDay(hydrated.state, today.id, seeds, profile, now);
-      });
-    })();
-  }, [viewModel]);
-
-  const enhanceDayReflection = useCallback(async (hatchedState: StoredHomeState, dayId: string) => {
-    const profile = loadOnboardingProfile();
-    const day =
-      hatchedState.today.id === dayId
-        ? hatchedState.today
-        : hatchedState.archivedDays.find((candidate) => candidate.id === dayId) ?? null;
-
-    if (!day?.creature || day.creature.reflectionSource === 'generated') {
-      return;
-    }
-
-    // Make sure the day's photos have been read so the quote can name what they
-    // actually showed; falls back to whatever vision (or none) was there.
-    const vision = await ensureDayVision(day);
-    const dayForReflection = vision ? { ...day, vision } : day;
-
-    // The days before this one give the line its temporal read (streaks,
-    // recovery after a busy stretch, shared history with this creature).
-    const pastDays = hatchedState.archivedDays.filter((candidate) => candidate.id !== dayId);
-    const generated = await requestDayReflection(dayForReflection, profile, pastDays);
-    if (!generated) {
-      return;
-    }
-
-    const now = new Date();
-    setStoredState((currentState) => {
-      const hydrated = hydrateHomeState(currentState, profile, now);
-      return applyGeneratedReflection(hydrated.state, dayId, generated, profile, now);
-    });
-  }, []);
-
-  const triggerHatchIfReady = useCallback(async () => {
-    if (!selectedDay || selectedDay.kind !== 'day') {
-      return;
-    }
-
-    const profile = loadOnboardingProfile();
-    let now = new Date();
-    const hydrated = hydrateHomeState(loadStoredHomeState() ?? storedStateRef.current, profile, now);
-    let baseState = hydrated.state;
-
-    const targetDay =
-      baseState.today.id === selectedDay.id
-        ? baseState.today
-        : baseState.archivedDays.find((day) => day.id === selectedDay.id) ?? null;
-
-    // Place seeds + weather are best-effort enrichment that runs BEFORE the
-    // hatch. They must never block or break the hatch itself — a thrown native /
-    // network call here used to abort the whole reveal, so each is isolated.
-    if (targetDay && targetDay.placeCategorySeeds === undefined && targetDay.locations.length > 0) {
-      try {
-        const seeds = await Promise.race([
-          resolvePlaceSeedsForDay(
-            targetDay,
-            baseState.archivedDays.filter((day) => day.id !== targetDay.id)
-          ),
-          new Promise<string[]>((resolve) => {
-            setTimeout(() => resolve([]), 2500);
-          }),
-        ]);
-        now = new Date();
-        baseState = setPlaceCategorySeedsForDay(baseState, selectedDay.id, seeds, profile, now);
-      } catch {
-        // Hatch proceeds without resolved place seeds.
-      }
-    }
-
-    // Resolve the day's weather before hatching so the mood read (and the
-    // persisted variant) can account for a rainy stay-in vs a fair-day choice,
-    // and so the small weather icon has something to show. Best-effort.
-    const weatherTarget =
-      baseState.today.id === selectedDay.id
-        ? baseState.today
-        : baseState.archivedDays.find((day) => day.id === selectedDay.id) ?? null;
-    if (weatherTarget && weatherTarget.weather === undefined && weatherTarget.locations.length > 0) {
-      try {
-        const weather = await ensureDayWeather(weatherTarget);
-        if (weather) {
-          now = new Date();
-          baseState = setDayWeatherForDay(baseState, selectedDay.id, weather, profile, now);
-        }
-      } catch {
-        // Hatch proceeds without resolved weather.
-      }
-    }
-
-    const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
-    setStoredState(hatchedState);
-    void enhanceDayReflection(hatchedState, selectedDay.id);
-    void (async () => {
-      const permission = await getHatchNotificationPermission();
-      if (permission === 'undetermined') {
-        await requestHatchNotificationPermission();
-      }
-      await syncHatchNotification(hatchedState, profile);
-    })();
-  }, [enhanceDayReflection, selectedDay]);
 
   const refreshState = useCallback(() => {
     syncState();
@@ -767,79 +443,9 @@ export function useHomeScreenState() {
     const profile = loadOnboardingProfile();
     const hydrated = hydrateHomeState(null, profile, now);
 
-    clearStoredHomeState();
+    homeRepository.clear();
     setStoredState(hydrated.state);
     setSelectedDayId(hydrated.todayId);
-  }, []);
-
-  const importHealthRoutesForDay = useCallback(async (dayId: string): Promise<ImportedHealthRoutesPayload> => {
-    const profile = loadOnboardingProfile();
-    const initialNow = new Date();
-    const hydrated = hydrateHomeState(loadStoredHomeState() ?? storedStateRef.current, profile, initialNow);
-    const targetDay =
-      hydrated.state.today.id === dayId
-        ? hydrated.state.today
-        : hydrated.state.archivedDays.find((day) => day.id === dayId) ?? null;
-
-    if (!targetDay) {
-        return {
-          status: 'error',
-          importedWorkoutCount: 0,
-          sampledPointCount: 0,
-          segmentCount: 0,
-        workoutIds: [],
-        message: 'That day could not be resolved from local state.',
-      };
-    }
-
-    setImportingHealthRouteDayId(dayId);
-
-    try {
-      const availability = await getHealthRouteAvailability();
-      let permissionState = availability.permissionState;
-
-      if (permissionState === 'unknown') {
-        permissionState = await requestHealthRoutePermission();
-      }
-
-      const permissionNow = new Date();
-      setStoredState((currentState) => {
-        const currentHydrated = hydrateHomeState(currentState, profile, permissionNow);
-        return updateHealthPermissionState(currentHydrated.state, permissionState, profile, permissionNow);
-      });
-
-      if (permissionState !== 'granted') {
-        return {
-          status: permissionState === 'unavailable' ? 'unavailable' : 'denied',
-          importedWorkoutCount: 0,
-          sampledPointCount: 0,
-          segmentCount: 0,
-          workoutIds: [],
-          message:
-            permissionState === 'unavailable'
-              ? 'Health route import is only available on iPhone builds with HealthKit enabled.'
-              : 'Apple Health route access was not granted.',
-        };
-      }
-
-      const result = await importRoutesForDay({ isoDate: targetDay.isoDate });
-      const resultNow = new Date();
-
-      setStoredState((currentState) => {
-        const currentHydrated = hydrateHomeState(currentState, profile, resultNow);
-        const withHealthPermission = updateHealthPermissionState(
-          currentHydrated.state,
-          'granted',
-          profile,
-          resultNow
-        );
-        return applyHealthRoutesForDay(withHealthPermission, dayId, result, profile, resultNow);
-      });
-
-      return result;
-    } finally {
-      setImportingHealthRouteDayId((current) => (current === dayId ? null : current));
-    }
   }, []);
 
   return {

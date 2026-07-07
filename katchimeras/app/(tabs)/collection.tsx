@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
@@ -10,20 +10,26 @@ import { CalendarMonth } from '@/components/katchadeck/collection/calendar-month
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
 import { ThemedText } from '@/components/themed-text';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import type { StoredHomeState } from '@/types/home';
 import { bondStageLabel } from '@/utils/bond';
 import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
-import { hydrateHomeState } from '@/utils/home-engine';
-import { loadStoredHomeState } from '@/utils/home-storage';
+import { hydrateHomeState } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
 
 type CollectionView = 'calendar' | 'dex';
+
+const collectionViewOptions = [
+  { value: 'calendar', label: 'Calendar' },
+  { value: 'dex', label: 'Dex' },
+] as const;
 
 const auroraRing = require('../../assets/images/katchimeras/aurora-ring.png');
 
@@ -45,7 +51,7 @@ export default function CollectionScreen() {
   useFocusEffect(
     useCallback(() => {
       const profile = loadOnboardingProfile();
-      const hydrated = hydrateHomeState(loadStoredHomeState(), profile, new Date());
+      const hydrated = hydrateHomeState(homeRepository.load(), profile, new Date());
       setState(hydrated.state);
     }, [])
   );
@@ -86,9 +92,13 @@ export default function CollectionScreen() {
           </ThemedText>
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(30)} style={styles.segment}>
-          <SegmentTab active={view === 'calendar'} label="Calendar" onPress={() => setView('calendar')} />
-          <SegmentTab active={view === 'dex'} label="Dex" onPress={() => setView('dex')} />
+        <Animated.View entering={presenceEnter(30)}>
+          <SegmentedControl
+            options={collectionViewOptions}
+            value={view}
+            onChange={setView}
+            variant="bar"
+          />
         </Animated.View>
 
         <Animated.View entering={presenceEnter(40)}>
@@ -153,19 +163,6 @@ export default function CollectionScreen() {
   );
 }
 
-function SegmentTab({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.segmentTab, active ? styles.segmentTabActive : null]}>
-      <ThemedText
-        style={styles.segmentLabel}
-        lightColor={active ? Lantern.ink900 : Lantern.moon300}
-        darkColor={active ? Lantern.ink900 : Lantern.moon300}>
-        {label}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
 function DexCell({ entry }: { entry: DexEntry }) {
   const source = homeCreatureVisuals[entry.visualKey]?.source ?? null;
   const rarityColor = entry.highestRaritySeen ? RARITY_COLOR[entry.highestRaritySeen] ?? Lantern.moon500 : Lantern.moon500;
@@ -222,30 +219,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginTop: 10,
-  },
-  segment: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(215, 228, 255, 0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 4,
-    padding: 4,
-  },
-  segmentTab: {
-    alignItems: 'center',
-    borderCurve: 'continuous',
-    borderRadius: 10,
-    flex: 1,
-    paddingVertical: 9,
-  },
-  segmentTabActive: {
-    backgroundColor: Lantern.moon50,
-  },
-  segmentLabel: {
-    fontSize: 13,
-    fontWeight: '700',
   },
   section: {
     gap: 14,

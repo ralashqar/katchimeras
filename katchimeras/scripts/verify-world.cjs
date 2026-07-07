@@ -19,6 +19,7 @@ const SPECIFIER_MAP = {
   '@/utils/today-patch-engine': './today-patch-engine',
   '@/utils/world-structures': './world-structures',
   '@/utils/daily-seeds-engine': './daily-seeds-engine',
+  '@/data/world-tile-layout.json': './world-tile-layout.json',
   '@/data/world-structure-layout.json': './world-structure-layout.json',
 };
 
@@ -46,6 +47,7 @@ transpile('utils/daily-seeds-engine.ts', 'daily-seeds-engine.js');
 transpile('utils/note-meaning.ts', 'note-meaning.js');
 transpile('utils/today-patch-engine.ts', 'today-patch-engine.js');
 fs.copyFileSync(path.join(projectRoot, 'data/world-structure-layout.json'), path.join(tempDir, 'world-structure-layout.json'));
+fs.copyFileSync(path.join(projectRoot, 'data/world-tile-layout.json'), path.join(tempDir, 'world-tile-layout.json'));
 
 const { deriveArchetypes } = require(path.join(tempDir, 'world-archetype.js'));
 const { generatePatch } = require(path.join(tempDir, 'world-patch-engine.js'));

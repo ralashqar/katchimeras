@@ -188,6 +188,7 @@ export default function NoteCaptureScreen() {
       media: result.media,
       food: result.food,
       llmClassified: result.llmClassified,
+      intelligenceProvider: result.intelligenceProvider,
     });
     // Celebratory flight into the Memory Vault (World consumes this on focus).
     queueCaptureFeed({ photoUri: '', icon: 'square.and.pencil', accent: MEANING_TINT[result.archetype] ?? '#7DE8CD' });

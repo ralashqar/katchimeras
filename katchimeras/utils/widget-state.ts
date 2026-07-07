@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 
 import type { StoredHomeState } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
-import { resolveHatchHour } from '@/utils/home-engine';
+import { resolveHatchHour } from '@/game/days';
 
 const APP_GROUP = 'group.com.daruk.katchimeras';
 

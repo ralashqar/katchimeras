@@ -4,14 +4,14 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import type { IconSymbolName } from '@/components/ui/icon-symbol';
+import { ActionTile } from '@/components/katchadeck/ui/action-tile';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { dayPromptMenuLabels } from '@/constants/day-prompts';
 import { Lantern } from '@/constants/theme';
 import type { DayPromptKind } from '@/types/home';
 import type { DailySeed } from '@/utils/daily-seeds-engine';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
-import { Meadow } from '@/constants/meadow-theme';
 
 // The "Add to today" sheet — replaces the old radial. A bottom panel of prompt
 // category buttons (Feeling, Photo, People…); tapping one opens that prompt's
@@ -107,18 +107,7 @@ export function MomentPromptSheet({
                   key={`quick-${category.id}`}
                   entering={FadeInDown.delay(40 + index * 35).duration(280)}
                   style={styles.categoryCell}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={category.title}
-                    onPress={() => onQuickCategory?.(category.id)}
-                    style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
-                    <View style={[styles.categoryIcon, { backgroundColor: `${category.accent}22`, borderColor: `${category.accent}55` }]}>
-                      <IconSymbol name={category.icon} size={20} color={category.accent} />
-                    </View>
-                    <ThemedText style={styles.categoryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                      {category.title}
-                    </ThemedText>
-                  </Pressable>
+                  <ActionTile icon={category.icon} title={category.title} tint={category.accent} onPress={() => onQuickCategory?.(category.id)} />
                 </Animated.View>
               ))}
               {prompts.map((prompt, index) => {
@@ -128,21 +117,15 @@ export function MomentPromptSheet({
                     key={prompt.id}
                     entering={FadeInDown.delay(40 + (quickCategories.length + index) * 35).duration(280)}
                     style={styles.categoryCell}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={dayPromptMenuLabels[prompt.id]}
+                    <ActionTile
+                      icon={prompt.categoryIcon}
+                      title={dayPromptMenuLabels[prompt.id]}
+                      tint={accent}
                       onPress={() => {
                         if (onSelectPrompt?.(prompt)) return;
                         setSelected(prompt);
                       }}
-                      style={({ pressed }) => [styles.category, pressed && styles.categoryPressed]}>
-                      <View style={[styles.categoryIcon, { backgroundColor: `${accent}22`, borderColor: `${accent}55` }]}>
-                        <IconSymbol name={prompt.categoryIcon} size={20} color={accent} />
-                      </View>
-                      <ThemedText style={styles.categoryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                        {dayPromptMenuLabels[prompt.id]}
-                      </ThemedText>
-                    </Pressable>
+                    />
                   </Animated.View>
                 );
               })}
@@ -238,33 +221,5 @@ const styles = StyleSheet.create({
     // Three across, centered — wraps to as many rows as needed (6 categories =
     // a clean 3×2 grid).
     width: '30%',
-  },
-  category: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(12,10,20,0.72)',
-    borderColor: Meadow.overlay.sheetBorder,
-    borderCurve: 'continuous',
-    borderRadius: 18,
-    borderWidth: 1,
-    gap: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 13,
-  },
-  categoryPressed: {
-    backgroundColor: 'rgba(40,34,60,0.9)',
-  },
-  categoryIcon: {
-    alignItems: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
-  categoryLabel: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    lineHeight: 16,
-    textAlign: 'center',
   },
 });

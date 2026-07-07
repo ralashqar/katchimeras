@@ -703,11 +703,11 @@ export type BackfillFoundationResult = {
 // photo, so it isolates the one thing we're verifying: do the photos land on the
 // map. Re-add hatching/cleanup/LLM once this is confirmed working.
 export async function runBackfillPhotosOnly(): Promise<string> {
-  const { loadStoredHomeState, saveStoredHomeState } = await import('@/utils/home-storage');
-  const { applyBackfilledDays, hydrateHomeState } = await import('@/utils/home-engine');
+  const { homeRepository } = await import('@/storage/repositories/home-repository');
+  const { applyBackfilledDays, hydrateHomeState } = await import('@/game/days');
   const { loadOnboardingProfile } = await import('@/utils/onboarding-state');
 
-  const stored = loadStoredHomeState();
+  const stored = homeRepository.load();
   if (!stored) {
     return 'Open Home once first so a stored day exists.';
   }
@@ -762,7 +762,7 @@ export async function runBackfillPhotosOnly(): Promise<string> {
 
   const archivedDays = baseState.archivedDays.map(mergeDay);
   const todayRecord = mergeDay(baseState.today);
-  saveStoredHomeState({ ...baseState, today: todayRecord, archivedDays });
+  homeRepository.save({ ...baseState, today: todayRecord, archivedDays });
 
   const totalPlaced = [todayRecord, ...archivedDays]
     .filter((day) => richByDate.has(day.isoDate))
@@ -772,12 +772,12 @@ export async function runBackfillPhotosOnly(): Promise<string> {
 }
 
 export async function runBackfillFoundation(): Promise<BackfillFoundationResult> {
-  const { loadStoredHomeState, saveStoredHomeState } = await import('@/utils/home-storage');
-  const { applyBackfilledDays, hydrateHomeState } = await import('@/utils/home-engine');
+  const { homeRepository } = await import('@/storage/repositories/home-repository');
+  const { applyBackfilledDays, hydrateHomeState } = await import('@/game/days');
   const { loadOnboardingProfile } = await import('@/utils/onboarding-state');
   const { loadOnboardingRecap } = await import('@/utils/onboarding-recap');
 
-  const stored = loadStoredHomeState();
+  const stored = homeRepository.load();
   if (!stored) {
     return { summary: 'Open Home once first so a stored day exists.', pendingReflectionDayIds: [] };
   }
@@ -832,7 +832,7 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
     today: todayRecord,
     archivedDays: baseState.archivedDays.map(mergeDay),
   };
-  saveStoredHomeState(photoState);
+  homeRepository.save(photoState);
 
   const visionByDate = new Map(richDays.map((day) => [day.isoDate, day.vision ?? null]));
   const isReconstructedPastDay = (isoDate: string) => richByDate.has(isoDate) && isoDate !== todayIso;
@@ -848,7 +848,7 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
   //       an empty map.
   let locationedState = photoState;
   try {
-    const { importHealthRoutesForDay } = await import('@/utils/home-engine');
+    const { importHealthRoutesForDay } = await import('@/game/days');
     const { getHealthRouteAvailability, importRoutesForDay } = await import('@/utils/health-route-import');
     const healthAvailability = await getHealthRouteAvailability();
     if (healthAvailability.platformSupported && healthAvailability.permissionState === 'granted') {
@@ -907,7 +907,7 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
       ),
     };
   }
-  saveStoredHomeState(locationedState);
+  homeRepository.save(locationedState);
 
   // STEP 2 — HATCH PAST DAYS (best-effort). Today is the live day and is never
   // hatched here.
@@ -994,7 +994,7 @@ export async function runBackfillFoundation(): Promise<BackfillFoundationResult>
     priorDays.push(hatched);
   }
 
-  saveStoredHomeState({ ...locationedState, archivedDays: archived, encounterHistory: history });
+  homeRepository.save({ ...locationedState, archivedDays: archived, encounterHistory: history });
 
   // Diagnostics.
   const totalPlaced = [locationedState.today, ...archived]
@@ -1026,8 +1026,8 @@ export async function enrichBackfillReflections(dayIds: string[]): Promise<void>
     return;
   }
 
-  const { loadStoredHomeState, saveStoredHomeState } = await import('@/utils/home-storage');
-  const { applyGeneratedReflection } = await import('@/utils/home-engine');
+  const { homeRepository } = await import('@/storage/repositories/home-repository');
+  const { applyGeneratedReflection } = await import('@/game/days');
   const { loadOnboardingProfile } = await import('@/utils/onboarding-state');
   const { requestDayReflection } = await import('@/utils/day-reflection');
   const profile = loadOnboardingProfile();
@@ -1035,7 +1035,7 @@ export async function enrichBackfillReflections(dayIds: string[]): Promise<void>
   beginBackfillEnrichment(dayIds.length);
   try {
     for (const dayId of dayIds) {
-      const stored = loadStoredHomeState();
+      const stored = homeRepository.load();
       if (!stored) {
         break;
       }
@@ -1052,8 +1052,8 @@ export async function enrichBackfillReflections(dayIds: string[]): Promise<void>
       );
       const generated = await requestDayReflection(day, profile, pastDays);
       if (generated) {
-        const fresh = loadStoredHomeState() ?? stored;
-        saveStoredHomeState(applyGeneratedReflection(fresh, dayId, generated, profile, new Date()));
+        const fresh = homeRepository.load() ?? stored;
+        homeRepository.save(applyGeneratedReflection(fresh, dayId, generated, profile, new Date()));
       }
       markBackfillDayEnriched();
     }

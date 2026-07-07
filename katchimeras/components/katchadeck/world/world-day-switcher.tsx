@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 
 const auroraRing = require('../../../assets/images/katchimeras/aurora-ring.png');
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');

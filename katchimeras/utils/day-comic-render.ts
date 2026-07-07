@@ -1,7 +1,7 @@
 import type { HomeDayRecord } from '@/types/home';
 import { buildComicStrip } from '@/utils/day-comic';
 import { requestComicBeats } from '@/utils/day-reflection';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 import { resolveBundledImageDataUri } from '@/utils/asset-data-uri';
 import { getCombinedThumbnailDataUri, getPhotoThumbnailDataUri } from '@/utils/photo-vision';
 import { supabase } from '@/utils/supabase';

@@ -28,9 +28,15 @@ const foundationPath = transpileToTemp('utils/foundation-meaning.ts', 'foundatio
 // the foundation-meaning module imports cleanly (native module reads as absent).
 const emcStub = path.join(tempDir, 'expo-modules-core.js');
 fs.writeFileSync(emcStub, 'module.exports = { requireOptionalNativeModule: () => null };');
+const studioDetectStub = path.join(tempDir, 'studio-detect.js');
+fs.writeFileSync(
+  studioDetectStub,
+  'module.exports = { detectStudioInVision: () => ({ detected: false, mediaType: null }) };'
+);
 
 const stubs = {
   '@/utils/photo-category': categoryPath,
+  '@/utils/studio-detect': studioDetectStub,
   '@/components/ui/icon-symbol': {},
   '@/types/home': {},
   'expo-modules-core': emcStub,

@@ -2,7 +2,7 @@ import { File } from 'expo-file-system';
 
 import { interpretNoteOnDevice } from '@/utils/foundation-note';
 import { interpretNoteText, type NoteInterpretation } from '@/utils/note-meaning';
-import type { StudioMediaType } from '@/types/home';
+import type { DayEvidenceProvider, StudioMediaType } from '@/types/home';
 import { transcribeOnDevice } from '@/utils/speech-transcribe';
 import { supabase } from '@/utils/supabase';
 
@@ -26,6 +26,7 @@ export type InterpretedNote = NoteInterpretation & {
   media?: { mediaType: StudioMediaType; title: string | null; creator: string | null } | null;
   food?: string | null;
   llmClassified?: boolean;
+  intelligenceProvider: DayEvidenceProvider;
 };
 
 type NoteInput = { text?: string; audioUri?: string; mimeType?: string };
@@ -63,6 +64,7 @@ async function interpretViaEdge(
         bigMoment:
           big && typeof big.type === 'string' ? { type: big.type, subject: big.subject ?? null } : undefined,
         transcript: typeof data.transcript === 'string' ? data.transcript : fallbackText,
+        intelligenceProvider: 'remoteLlm',
       };
     }
   } catch {
@@ -116,13 +118,14 @@ export async function interpretNote(input: NoteInput): Promise<InterpretedNote> 
         media: local.media,
         food: local.food,
         llmClassified: local.llmClassified,
+        intelligenceProvider: 'appleFoundation',
       };
     }
     // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.
     const edge = await interpretViaEdge({ text: transcript }, transcript);
     if (edge) return edge;
     // 2c. On-device rules.
-    return { ...interpretNoteText(transcript), transcript };
+    return { ...interpretNoteText(transcript), transcript, intelligenceProvider: 'deterministic' };
   }
 
   // 3. No transcript (on-device transcription unavailable) but we have audio →
@@ -136,5 +139,5 @@ export async function interpretNote(input: NoteInput): Promise<InterpretedNote> 
   }
 
   // 4. Nothing usable.
-  return { ...interpretNoteText(''), transcript: '' };
+  return { ...interpretNoteText(''), transcript: '', intelligenceProvider: 'deterministic' };
 }

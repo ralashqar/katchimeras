@@ -1,6 +1,6 @@
 import type { StoredHomeState } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
-import { resolveHatchHour } from '@/utils/home-engine';
+import { resolveHatchHour } from '@/game/days';
 
 // The one notification that matters: "your day is ready to hatch" at the
 // user's chosen hour. A single dated notification is scheduled for the next

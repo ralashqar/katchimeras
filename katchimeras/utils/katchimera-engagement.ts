@@ -113,7 +113,6 @@ const SUBTYPE_QUEST: Record<string, string> = {
   bookstore: 'quest-read-book',
   library: 'quest-read-book',
   cinema: 'quest-watch-film',
-  museum: 'quest-any-inspiration',
   dawn: 'quest-dawn-capture',
   small_hours: 'quest-late-capture',
   good_sleep: 'quest-early-night',
@@ -130,6 +129,15 @@ const SUBTYPE_QUEST: Record<string, string> = {
   autumn: 'quest-photo-autumn',
   baby: 'quest-photo-baby',
   city: 'quest-photo-city',
+  // Location creatures → confirm-that-place quests (place-category signal).
+  park: 'quest-new-park',
+  beach: 'quest-visit-beach',
+  forest: 'quest-visit-forest',
+  garden: 'quest-visit-garden',
+  museum: 'quest-visit-museum',
+  // Weather creatures → catch-that-weather quests.
+  storm: 'quest-weather-storm',
+  fog: 'quest-weather-fog',
 };
 const ARCHETYPE_QUEST: Record<string, string> = {
   food: 'quest-new-cafe',
@@ -196,4 +204,47 @@ function insightLine(archetype: string, kingdom: KingdomState): string {
 // a lifeless card reads as broken.
 export function companionUnit(archetype: string, kingdom: KingdomState, subtype = ''): CompanionUnit {
   return { line: insightLine(archetype, kingdom), quest: questOffer(subtype, archetype) };
+}
+
+// A gentle open question in the creature's theme — invites the user to reflect
+// (and optionally answer in a note). The FM voice pass (slice 2) rephrases
+// these in persona; this rule text is the fallback.
+export function reflectionLine(archetype: string): string {
+  switch (archetype) {
+    case 'food':
+      return `What did the last meal you truly savoured taste like — and who were you with?`;
+    case 'journey':
+    case 'active':
+      return `When did a walk last clear your head? Where did your feet take you?`;
+    case 'places':
+      return `Which place have you kept returning to lately — and what pulls you back?`;
+    case 'celebrate':
+      return `What small thing this week deserved more of a celebration than it got?`;
+    case 'craft':
+      return `What are you quietly proud of finishing lately, even if no one noticed?`;
+    case 'culture':
+      return `What's a story, film or idea that's stayed with you this week?`;
+    case 'night':
+    case 'sleep':
+      return `What helps you truly rest — and when did you last let yourself have it?`;
+    case 'memory':
+    case 'tender':
+      return `Which ordinary moment lately do you wish you'd kept a photo of?`;
+    default:
+      return `Looking back on today — what's one thing you don't want to forget?`;
+  }
+}
+
+// The opening speech-bubble line, keyed to the resident's interaction state.
+export function openingLine(name: string, state: 'offer' | 'active' | 'ready' | 'idle'): string {
+  switch (state) {
+    case 'offer':
+      return `Oh — good, you're here. I've been meaning to ask you something…`;
+    case 'active':
+      return `Still on it? No rush. Come tell me how it's going.`;
+    case 'ready':
+      return `You did it! Come here, let me hear all about it.`;
+    default:
+      return `Hey, friend. Just glad you stopped by.`;
+  }
 }

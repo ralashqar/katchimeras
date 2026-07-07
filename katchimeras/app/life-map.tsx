@@ -6,8 +6,8 @@ import { StyleSheet, View } from 'react-native';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
 import { ThemedText } from '@/components/themed-text';
-import { loadStoredHomeState } from '@/utils/home-storage';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import { buildLifeMap, type LifeMapPin } from '@/utils/life-map-engine';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
 
@@ -18,7 +18,7 @@ export default function LifeMapRoute() {
   const [nativeMaps, setNativeMaps] = useState<NativeMapsModule | null>(null);
 
   const lifeMap = useMemo(() => {
-    const stored = loadStoredHomeState();
+    const stored = homeRepository.load();
     const days = stored ? [stored.today, ...stored.archivedDays] : [];
     return buildLifeMap(days);
   }, []);

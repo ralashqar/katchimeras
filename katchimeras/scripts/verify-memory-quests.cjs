@@ -88,7 +88,7 @@ check(
 check(
   'detected inspiration offers the studio quest',
   engine
-    .selectMemoryQuests(day({ vision: { concepts: [{ name: 'books' }], details: [], textTokens: [] } }), morning)
+    .selectMemoryQuests(day({ vision: { concepts: [{ name: 'books', peakConfidence: 0.9 }], details: [], textTokens: [] } }), morning)
     .some((q) => q.type === 'saveStudioMemory')
 );
 check('no Place quest until a place was visited', !engine.selectMemoryQuests(day(), evening).some((q) => q.type === 'markPlace'));

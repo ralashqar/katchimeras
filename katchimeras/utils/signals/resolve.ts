@@ -2,8 +2,10 @@ import type { HomeDayRecord } from '@/types/home';
 
 import type { FactKey, Facts } from './facts';
 import { dayDetailProvider } from './providers/day-detail';
+import { evidenceProvider } from './providers/evidence';
 import { photoLabelsProvider } from './providers/photo-labels';
 import { sleepProvider } from './providers/sleep';
+import { weatherProvider } from './providers/weather';
 
 // Signal providers: modular producers that each turn a day's context into a
 // slice of facts (docs/katchimera-engagement-v1.md refactor). Cheap providers
@@ -31,6 +33,7 @@ const dayRecordProvider: SignalProvider = {
     'notes.added',
     'places.confirmed',
     'places.confirmedNew',
+    'places.categories',
     'food.moments',
     'moments.captured',
   ],
@@ -45,6 +48,9 @@ const dayRecordProvider: SignalProvider = {
       // confirmed place as new for now, but keep the key so quests referencing
       // it work the moment the real diff provider lands.
       'places.confirmedNew': confirmed > 0,
+      // The place category the user confirmed (park/cafe/museum…) — powers the
+      // location-creature quests without any MapKit call.
+      'places.categories': Array.from(new Set((today.confirmedPlaces ?? []).map((place) => place.category))),
       'food.moments': today.foodMoments?.length ?? 0,
       'moments.captured': today.capturedMeanings?.length ?? 0,
     };
@@ -53,7 +59,14 @@ const dayRecordProvider: SignalProvider = {
 
 // Registry — append providers here (or via registerProvider for native ones
 // that must self-register after a capability check).
-const PROVIDERS: SignalProvider[] = [dayRecordProvider, dayDetailProvider, sleepProvider, photoLabelsProvider];
+const PROVIDERS: SignalProvider[] = [
+  dayRecordProvider,
+  dayDetailProvider,
+  evidenceProvider,
+  sleepProvider,
+  photoLabelsProvider,
+  weatherProvider,
+];
 
 export function registerProvider(provider: SignalProvider): void {
   if (!PROVIDERS.some((existing) => existing.id === provider.id)) PROVIDERS.push(provider);

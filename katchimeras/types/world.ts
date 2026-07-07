@@ -91,6 +91,8 @@ export type WorldObject = {
   badge?: number; // small count/metric tag shown at the object's corner
   badgeIcon?: string; // override the badge's icon (SF symbol name)
   sizeScale?: number; // per-object render-size multiplier (e.g. big structures)
+  // Village interaction glyph floated over a resident's head (companion mode).
+  statusGlyph?: 'offer' | 'active' | 'ready';
 };
 
 // A memory node is an interactive structure that stores one real moment for

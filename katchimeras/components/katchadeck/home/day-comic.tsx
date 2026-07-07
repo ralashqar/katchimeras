@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import type { HomeDayRecord } from '@/types/home';
 import { buildComicStrip, type ComicBeats } from '@/utils/day-comic';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 
 type DayComicProps = {
   day: HomeDayRecord & {

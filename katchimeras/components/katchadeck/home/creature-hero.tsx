@@ -12,7 +12,7 @@ import { useEffect } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 import { resolveCreatureVariantSource } from '@/utils/creature-variant';
 import { weatherIconName, weatherLabel } from '@/utils/day-weather';
 import type { DayWeather, LocalCreatureRecord } from '@/types/home';

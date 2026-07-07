@@ -34,6 +34,7 @@ export type SceneSprite = {
   category?: WorldObject['category']; // which time-capsule cell this sprite is
   badge?: number; // small count/metric tag for the cell object
   badgeIcon?: string; // override the badge icon
+  statusGlyph?: WorldObject['statusGlyph']; // companion interaction glyph
 };
 
 export type SceneDecal = {
@@ -273,6 +274,7 @@ export function layoutWorld(patches: WorldPatch[], ring = 0, stableBounds = fals
         category: object.category,
         badge: object.badge,
         badgeIcon: object.badgeIcon,
+        statusGlyph: object.statusGlyph,
       });
     }
     // Decals grow on the cells NOT taken by an object/memory. Occupied = every

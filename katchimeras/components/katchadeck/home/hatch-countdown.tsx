@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { popEnter } from '@/components/katchadeck/motion';
 import { Lantern } from '@/constants/theme';
-import { resolveHatchHour } from '@/utils/home-engine';
+import { resolveHatchHour } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 // The hatch countdown (v5 mockup): a frosted-glass rounded card with a small

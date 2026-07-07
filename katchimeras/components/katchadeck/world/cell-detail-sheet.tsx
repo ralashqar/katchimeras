@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ActionTile } from '@/components/katchadeck/ui/action-tile';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { PLACE_CATEGORIES } from '@/components/katchadeck/world/place-prompt-sheet';
 import { DayMemoryStrip } from '@/components/katchadeck/world/day-memory-strip';
@@ -12,7 +13,6 @@ import { Lantern } from '@/constants/theme';
 import type { DayMapNode, HomeDayRecord } from '@/types/home';
 import type { PatchCell } from '@/types/world';
 import { resolvePlaceName } from '@/utils/place-names';
-import { Meadow } from '@/constants/meadow-theme';
 
 // category id → emoji / label, for confirmed places.
 const PLACE_CATEGORY_EMOJI: Record<string, string> = Object.fromEntries(
@@ -278,42 +278,6 @@ export function PlacesDetailSheet({
         })}
       </View>
     </MeadowSheet>
-  );
-}
-
-// A tinted action tile (Crossroads mockup): a prominent icon over one bold
-// title line that shrinks to fit rather than wrapping.
-function ActionTile({
-  icon,
-  title,
-  tint,
-  onPress,
-}: {
-  icon: Parameters<typeof IconSymbol>[0]['name'];
-  title: string;
-  tint: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.actionTile,
-        { backgroundColor: `${tint}1C`, borderColor: `${tint}55` },
-        pressed ? { backgroundColor: `${tint}30` } : null,
-      ]}>
-      <IconSymbol name={icon} size={26} color={tint} />
-      <ThemedText
-        style={styles.actionTileTitle}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-        lightColor={Lantern.moon50}
-        darkColor={Lantern.moon50}>
-        {title}
-      </ThemedText>
-    </Pressable>
   );
 }
 
@@ -653,17 +617,6 @@ const styles = StyleSheet.create({
   },
   placeHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   tileRow: { flexDirection: 'row', gap: 8 },
-  actionTile: {
-    alignItems: 'center',
-    borderCurve: 'continuous',
-    borderRadius: 16,
-    borderWidth: 1,
-    flex: 1,
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 10,
-  },
-  actionTileTitle: { fontSize: 12, fontWeight: '800' },
   sectionRow: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 4 },
   sectionKicker: { fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   placeThumb: {

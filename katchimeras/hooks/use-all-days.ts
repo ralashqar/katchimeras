@@ -2,8 +2,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { HomeDayRecord } from '@/types/home';
-import { hydrateAllDays } from '@/utils/home-engine';
-import { loadStoredHomeState, loadStoredHomeStateRaw } from '@/utils/home-storage';
+import { hydrateAllDays } from '@/game/days';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 // Module-level hydration cache: focus events fire constantly but the persisted
@@ -32,13 +32,13 @@ export function useAllDays() {
 
   const days = useMemo(() => {
     const now = new Date();
-    const raw = loadStoredHomeStateRaw();
+    const raw = homeRepository.loadRaw();
     const dayKey = now.toDateString();
     if (hydrationCache && hydrationCache.raw === raw && hydrationCache.dayKey === dayKey) {
       return hydrationCache.days;
     }
     const profile = loadOnboardingProfile();
-    const days = hydrateAllDays(loadStoredHomeState(), profile, now);
+    const days = hydrateAllDays(homeRepository.load(), profile, now);
     hydrationCache = { raw, dayKey, days };
     return days;
     // version bumps on focus to force a re-hydrate from storage.

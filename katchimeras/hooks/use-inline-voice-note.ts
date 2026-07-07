@@ -27,6 +27,7 @@ export type InlineVoiceNotePayload = {
   media?: InterpretedNote['media'];
   food?: InterpretedNote['food'];
   llmClassified?: boolean;
+  intelligenceProvider: InterpretedNote['intelligenceProvider'];
 };
 
 type Options = {
@@ -126,6 +127,7 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved }: Options) 
       media: result.media,
       food: result.food,
       llmClassified: result.llmClassified,
+      intelligenceProvider: result.intelligenceProvider,
     });
     onSaved?.(result);
     setResult(null);

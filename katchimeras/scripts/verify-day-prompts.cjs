@@ -120,36 +120,36 @@ function check(label, condition, detail) {
 }
 
 check(
-  'morning open surfaces sleep first',
-  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T08:00:00'))?.id === 'sleep',
+  'morning open surfaces no generic strip prompt',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T08:00:00')) === null,
   promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T08:00:00'))?.id
 );
 check(
-  'midday selects activity first',
-  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T13:00:00'))?.id === 'activity'
+  'midday surfaces no generic strip prompt',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T13:00:00')) === null
 );
 check(
-  'evening selects day word when no photo candidates',
-  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T19:00:00'))?.id === 'day_word'
+  'evening surfaces no prompt when there are no photo candidates',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T19:00:00')) === null
 );
 
 // --- Reactive surfacing: time of day + tracked behaviour ---
 check(
-  'a travelled day pushes the activity question up at midday',
-  promptEngine.selectActiveDayPrompt(makeDay({ newPlaceCount: 2 }), new Date('2026-06-17T13:00:00'))?.id === 'activity'
+  'a travelled day does not auto-surface the activity strip prompt',
+  promptEngine.selectActiveDayPrompt(makeDay({ newPlaceCount: 2 }), new Date('2026-06-17T13:00:00')) === null
 );
 // Travel ranks activity above the usual midday baseline (sleep/feeling/hobby).
 const travelRank = promptEngine.rankPromptKinds(makeDay({ newPlaceCount: 2 }), new Date('2026-06-17T13:00:00'), 0);
 check('travel ranks activity at the very top', travelRank[0] === 'activity', travelRank.join(','));
 check(
-  'before bed surfaces a reflection (day word)',
-  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T22:30:00'))?.id === 'day_word',
+  'before bed surfaces no generic strip prompt',
+  promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T22:30:00')) === null,
   promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T22:30:00'))?.id
 );
 // Stacking: the "Add to today" menu is ordered by the same relevance, so the
 // most relevant sits first and the rest stack behind it.
 const morningMenu = promptEngine.listAvailableDayPrompts(makeDay(), new Date('2026-06-17T08:00:00')).map((p) => p.id);
-check('menu stacks by relevance (sleep before feeling in the morning)', morningMenu.indexOf('sleep') < morningMenu.indexOf('feeling'), morningMenu.join(','));
+check('menu stacks launched prompts by relevance', morningMenu[0] === 'activity' && morningMenu.includes('hobby'), morningMenu.join(','));
 
 const noRepeatDay = makeDay({ promptAnswers: [promptAnswer('feeling')] });
 check(
@@ -238,10 +238,10 @@ const menuKinds = promptEngine.listAvailableDayPrompts(menuDay, new Date('2026-0
 check('menu lists multiple categories', menuKinds.length >= 2, menuKinds.join(','));
 check('menu excludes non-launched prompts', !menuKinds.includes('intention'), menuKinds.join(','));
 
-// --- Daylio-style expansion: new categories + icon coverage ---
-check('menu offers Sleep and Hobby', menuKinds.includes('sleep') && menuKinds.includes('hobby'), menuKinds.join(','));
+// --- Daylio-style expansion: launched categories + icon coverage ---
+check('menu offers launched Activity and Hobby categories', menuKinds.includes('activity') && menuKinds.includes('hobby'), menuKinds.join(','));
 const launched = dayPrompts.launchedDayPrompts;
-check('sleep + hobby are launched', launched.some((p) => p.id === 'sleep') && launched.some((p) => p.id === 'hobby'), launched.map((p) => p.id).join(','));
+check('hobby is launched and sleep is retired from strip prompts', !launched.some((p) => p.id === 'sleep') && launched.some((p) => p.id === 'hobby'), launched.map((p) => p.id).join(','));
 check(
   'every launched prompt has a category icon',
   launched.every((p) => typeof p.categoryIcon === 'string' && p.categoryIcon.length > 0),
@@ -264,7 +264,7 @@ check(
     hobbySeed('music') === 'live_music',
   JSON.stringify(hobby.options.map((o) => ({ id: o.id, seed: o.encounterSeedBias?.[0]?.seedId })))
 );
-const sleep = launched.find((p) => p.id === 'sleep');
+const sleep = dayPrompts.dayPromptRegistry.sleep;
 const sleepSeed = (id) => sleep.options.find((o) => o.id === id)?.encounterSeedBias?.[0]?.seedId;
 check(
   'sleep maps great→well_rested and barely→tender_day',
@@ -298,15 +298,15 @@ check('Photo option appears with photo candidates', photoMenu.includes('meaningf
 // Testing mode: answered categories stay in the menu (re-answerable) — the
 // once-per-day restriction is intentionally off for now.
 const answeredMenu = promptEngine
-  .listAvailableDayPrompts(makeDay({ promptAnswers: [promptAnswer('feeling')] }), new Date('2026-06-17T08:00:00'))
+  .listAvailableDayPrompts(makeDay({ promptAnswers: [promptAnswer('activity')] }), new Date('2026-06-17T08:00:00'))
   .map((p) => p.id);
-check('menu keeps answered category (restriction off)', answeredMenu.includes('feeling'), answeredMenu.join(','));
+check('menu keeps answered category (restriction off)', answeredMenu.includes('activity'), answeredMenu.join(','));
 
 // buildDayPromptByKind returns the requested kind (and null when answered).
-check('buildDayPromptByKind returns the kind', promptEngine.buildDayPromptByKind(menuDay, 'feeling')?.id === 'feeling');
+check('buildDayPromptByKind returns the kind', promptEngine.buildDayPromptByKind(menuDay, 'activity')?.id === 'activity');
 check(
   'buildDayPromptByKind null for answered kind',
-  promptEngine.buildDayPromptByKind(makeDay({ promptAnswers: [promptAnswer('feeling')] }), 'feeling') === null
+  promptEngine.buildDayPromptByKind(makeDay({ promptAnswers: [promptAnswer('activity')] }), 'activity') === null
 );
 check(
   'buildDayPromptByKind null for photo without candidates',

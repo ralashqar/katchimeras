@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
-import type { ImportedHealthRoutesPayload } from '@/utils/home-engine';
+import type { ImportedHealthRoutesPayload } from '@/game/days';
 import { buildDayTags } from '@/utils/day-tags';
 import { previewLeadingCandidate } from '@/utils/hatch-selection';
 import { Lantern } from '@/constants/theme';

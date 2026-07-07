@@ -2130,6 +2130,19 @@ function SpriteView({
             </View>
           </View>
         ) : null}
+        {/* Village interaction glyph over the resident's head: gold ! = quest
+            to offer, gray ? = active, gold ? = ready to report back. */}
+        {sprite.statusGlyph ? (
+          <View pointerEvents="none" style={[styles.statusGlyphWrap, { top: -h * 0.06 }]}>
+            <View
+              style={[
+                styles.statusGlyph,
+                { backgroundColor: sprite.statusGlyph === 'active' ? 'rgba(120,120,140,0.92)' : '#E9A93E' },
+              ]}>
+              <Text style={styles.statusGlyphText}>{sprite.statusGlyph === 'offer' ? '!' : '?'}</Text>
+            </View>
+          </View>
+        ) : null}
       </MotiView>
     </Animated.View>
   );
@@ -2218,6 +2231,21 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   badgeText: { color: Lantern.moon50, fontSize: 9.5, fontWeight: '800', letterSpacing: 0.2 },
+  statusGlyphWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 4 },
+  statusGlyph: {
+    width: 20,
+    height: 20,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.85)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  statusGlyphText: { color: '#1B140A', fontSize: 13, fontWeight: '900', lineHeight: 15 },
   ghost: {
     position: 'absolute',
     alignItems: 'center',

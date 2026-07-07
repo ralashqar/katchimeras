@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
-import { recordForegroundLocationSample, hydrateHomeState } from '@/utils/home-engine';
-import { loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
+import { recordForegroundLocationSample, hydrateHomeState } from '@/game/days';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
 export const TRAVEL_MEMORY_LOCATION_TASK = 'katchimera-travel-memory-location-v1';
@@ -233,7 +233,7 @@ export function recordTravelMemoryLocationObject(location: LocationObjectLike) {
 
   const now = new Date();
   const profile = loadOnboardingProfile();
-  const hydrated = hydrateHomeState(loadStoredHomeState(), profile, now);
+  const hydrated = hydrateHomeState(homeRepository.load(), profile, now);
   const capturedAt = new Date(typeof location.timestamp === 'number' ? location.timestamp : now.getTime()).toISOString();
   const next = recordForegroundLocationSample(
     hydrated.state,
@@ -247,7 +247,7 @@ export function recordTravelMemoryLocationObject(location: LocationObjectLike) {
     profile,
     now
   );
-  saveStoredHomeState(next);
+  homeRepository.save(next);
   saveTravelMemoryModeState({
     ...loadTravelMemoryModeState(),
     lastBackgroundSampleAt: capturedAt,
@@ -258,13 +258,13 @@ export function recordTravelMemoryLocationObject(location: LocationObjectLike) {
 export function deleteTodayTravelMemoryPlaces() {
   const now = new Date();
   const profile = loadOnboardingProfile();
-  const hydrated = hydrateHomeState(loadStoredHomeState(), profile, now);
+  const hydrated = hydrateHomeState(homeRepository.load(), profile, now);
   const nextToday = {
     ...hydrated.state.today,
     locations: hydrated.state.today.locations.filter((point) => point.source !== 'background'),
   };
   const normalized = hydrateHomeState({ ...hydrated.state, today: nextToday }, profile, now).state;
-  saveStoredHomeState(normalized);
+  homeRepository.save(normalized);
 }
 
 // --- UI copy for the Travel Memory controls (Observatory reader) ---

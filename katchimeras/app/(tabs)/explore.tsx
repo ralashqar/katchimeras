@@ -25,14 +25,14 @@ import {
 } from '@/utils/day-prompt-photos';
 import { clearAllStoredValues } from '@/utils/app-storage';
 import { applyDevScenario, devScenarioOptions } from '@/utils/dev-scenarios';
-import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile, resetOnboardingProfile } from '@/utils/onboarding-state';
 import { analyzePhoto, ensureDayVision, isVisionAvailable } from '@/utils/photo-vision';
 import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals';
 import { requestComicBeats } from '@/utils/day-reflection';
 import { encounterLiveCast } from '@/constants/encounter-cast';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
-import { getCreatureVisual, resetTodayInState } from '@/utils/home-engine';
+import { getCreatureVisual, resetTodayInState } from '@/game/days';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
@@ -40,7 +40,7 @@ import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@
 export default function ExploreScreen() {
   const router = useRouter();
   const [profile, setProfile] = useState(loadOnboardingProfile());
-  const [storedState, setStoredState] = useState(loadStoredHomeState());
+  const [storedState, setStoredState] = useState(homeRepository.load());
   const [pickedVision, setPickedVision] = useState<{
     uri: string;
     analyzing: boolean;
@@ -57,7 +57,7 @@ export default function ExploreScreen() {
   useFocusEffect(
     useCallback(() => {
       setProfile(loadOnboardingProfile());
-      setStoredState(loadStoredHomeState());
+      setStoredState(homeRepository.load());
     }, [])
   );
 
@@ -111,9 +111,9 @@ export default function ExploreScreen() {
           text: 'Reset today',
           style: 'destructive',
           onPress: () => {
-            const state = loadStoredHomeState();
+            const state = homeRepository.load();
             if (state) {
-              saveStoredHomeState(resetTodayInState(state, loadOnboardingProfile(), new Date()));
+              homeRepository.save(resetTodayInState(state, loadOnboardingProfile(), new Date()));
             }
             clearTodayPatch();
             clearBaseCustomisation();
@@ -131,7 +131,7 @@ export default function ExploreScreen() {
         text: 'Reset',
         style: 'destructive',
         onPress: () => {
-          clearStoredHomeState();
+          homeRepository.clear();
           router.replace('/(tabs)');
         },
       },
@@ -177,7 +177,7 @@ export default function ExploreScreen() {
       return;
     }
 
-    const stored = loadStoredHomeState();
+    const stored = homeRepository.load();
     if (!stored?.today) {
       Alert.alert('No stored day yet', 'Open Home once so a stored day exists, then come back and arm the prompt.');
       return;
@@ -200,7 +200,7 @@ export default function ExploreScreen() {
       }
 
       saveStoredDevPromptPhotoCandidates(candidates);
-      saveStoredHomeState({
+      homeRepository.save({
         ...stored,
         today: {
           ...stored.today,
@@ -210,7 +210,7 @@ export default function ExploreScreen() {
           ),
         },
       });
-      setStoredState(loadStoredHomeState());
+      setStoredState(homeRepository.load());
       Alert.alert(
         'Photo prompt armed',
         `Loaded ${candidates.length} recent valid photos. Home will force the meaningful-photo prompt once, regardless of photo date.`,
@@ -223,7 +223,7 @@ export default function ExploreScreen() {
 
   function handleClearForcedPhotoPrompt() {
     clearStoredDevPromptPhotoCandidates();
-    setStoredState(loadStoredHomeState());
+    setStoredState(homeRepository.load());
     Alert.alert('Forced photo prompt cleared', 'Home will return to the normal today-photo eligibility rules.');
   }
 
@@ -257,7 +257,7 @@ export default function ExploreScreen() {
   // Dev: fetch the LLM comic beats for the most recent hatched day, so you can
   // read the four panel captions without share-capturing the whole comic.
   async function handlePreviewComicBeats() {
-    const stored = loadStoredHomeState();
+    const stored = homeRepository.load();
     const days = stored ? [stored.today, ...stored.archivedDays] : [];
     const hatched = days
       .filter((day) => day.creature != null)

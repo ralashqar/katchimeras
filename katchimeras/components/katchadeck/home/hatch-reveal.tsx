@@ -16,7 +16,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
 import { resolveCreatureVariantSource } from '@/utils/creature-variant';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');

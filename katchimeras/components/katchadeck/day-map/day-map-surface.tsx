@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI } from '@/constants/theme';
 import type { DayMapNode, DayMapNodePhoto, HomeDayRecord, HomeLocationType, HomeMoment } from '@/types/home';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 import { isPointAtHome, loadHomeAnchor } from '@/utils/home-location';
 
 type DayMapSurfaceProps = {

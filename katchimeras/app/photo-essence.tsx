@@ -75,7 +75,8 @@ export default function PhotoEssenceRoute() {
         {
           energy,
           vision,
-          meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null },
+          sourceId: assetId,
+          meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null, sourceId: assetId },
           scene: scene ?? undefined,
         },
         captureTarget

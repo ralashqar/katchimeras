@@ -79,7 +79,13 @@ export default function MomentCaptureScreen() {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined);
       const category = vision ? resolvePhotoCategory(vision) : { icon: 'sparkles' as const, accent: '#F1D4B4' };
       applyCapturedMoment(
-        { energy, vision, meaning: { archetype: meaning, label, thumbnailUri: photoUri ?? null }, scene: scene ?? undefined },
+        {
+          energy,
+          vision,
+          sourceId: photoUri,
+          meaning: { archetype: meaning, label, thumbnailUri: photoUri ?? null, sourceId: photoUri },
+          scene: scene ?? undefined,
+        },
         captureTarget
       );
       if (photoUri) {

@@ -39,6 +39,23 @@ export function questFor(state: CompanionQuestState, creatureId: string): Compan
   return activeQuests(state).find((quest) => quest.creatureId === creatureId) ?? null;
 }
 
+// The village status glyph for a resident (docs/katchimera-engagement-v1.md):
+//   offer  → gold '!'  (a quest to accept)
+//   active → gray '?'  (accepted, not finished)
+//   ready  → gold '?'  (finished — tap to report back)
+//   idle   → nothing
+export type InteractionState = 'offer' | 'active' | 'ready' | 'idle';
+export function interactionState(
+  state: CompanionQuestState,
+  creatureId: string,
+  facts: Partial<Facts>,
+  hasOffer: boolean
+): InteractionState {
+  const active = questFor(state, creatureId);
+  if (active) return isQuestComplete(active.questId, facts) ? 'ready' : 'active';
+  return hasOffer ? 'offer' : 'idle';
+}
+
 /** Accept a quest offer; returns null (unchanged) if caps are hit. */
 export function acceptQuest(
   state: CompanionQuestState,

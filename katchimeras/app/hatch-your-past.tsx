@@ -31,12 +31,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { hatchPastPrompts } from '@/constants/hatch-past-prompts';
 import { Meadow } from '@/constants/meadow-theme';
 import { Lantern } from '@/constants/theme';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import type { DayPromptKind, DayVisionSummary, EggVisualState } from '@/types/home';
 import type { MeaningTag } from '@/utils/capture-energy';
 import { enrichBackfillReflections, runBackfillFoundation } from '@/utils/day-backfill';
-import { getCreatureVisual, hydrateHomeState } from '@/utils/home-engine';
+import { getCreatureVisual, hydrateHomeState } from '@/game/days';
 import { buildHatchYourPast, type HatchedPastCreature } from '@/utils/hatch-your-past';
-import { clearStoredHomeState, loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
 import { saveOnboardingRecap } from '@/utils/onboarding-recap';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { analyzePhoto } from '@/utils/photo-vision';
@@ -132,9 +132,9 @@ export default function HatchYourPastRoute() {
     try {
       const profile = loadOnboardingProfile();
       const now = new Date();
-      clearStoredHomeState();
+      homeRepository.clear();
       const fresh = hydrateHomeState(null, profile, now).state;
-      saveStoredHomeState({ ...fresh, archivedDays: [], backfilledAt: undefined });
+      homeRepository.save({ ...fresh, archivedDays: [], backfilledAt: undefined });
     } catch {
       // If the reset fails, the backfill below still runs against whatever exists.
     }
@@ -150,7 +150,7 @@ export default function HatchYourPastRoute() {
 
     // Reveal from the persisted hatched past days, so the reveal can never diverge
     // from what's on Home.
-    const stored = loadStoredHomeState();
+    const stored = homeRepository.load();
     const hatchedPastDays = (stored?.archivedDays ?? []).filter((day) => day.creature != null);
     const reveal = buildHatchYourPast(hatchedPastDays);
 

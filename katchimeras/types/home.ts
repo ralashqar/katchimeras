@@ -146,6 +146,45 @@ export type PhotoVisionResult = {
   faceCount: number;
 };
 
+export type DayEvidenceSourceType =
+  | 'photo'
+  | 'voice_note'
+  | 'text_note'
+  | 'place'
+  | 'weather'
+  | 'steps'
+  | 'sleep'
+  | 'studio'
+  | 'food';
+
+export type DayEvidenceProvider =
+  | 'appleVision'
+  | 'appleFoundation'
+  | 'appleSpeech'
+  | 'remoteLlm'
+  | 'deterministic'
+  | 'manual';
+
+export type DayEvidenceSignal = {
+  key: string;
+  confidence: number;
+  raw?: string | null;
+  provider: DayEvidenceProvider;
+  source: 'vision' | 'scene' | 'note' | 'manual' | 'aggregate';
+};
+
+export type DayEvidence = {
+  id: string;
+  sourceType: DayEvidenceSourceType;
+  sourceId: string;
+  observedAt: string;
+  provider: DayEvidenceProvider;
+  confidence: number;
+  signals: DayEvidenceSignal[];
+  thumbnailUri?: string | null;
+  explanation?: string | null;
+};
+
 // A canonical day-level subject, after grouping synonyms across the day's
 // photos. `salience` (sum of per-photo confidence) weights it by frequency AND
 // reliability; `coverage` (share of photos featuring it) says how much the day
@@ -500,6 +539,7 @@ export type CapturedMeaning = {
   archetype: string;
   label: string;
   thumbnailUri: string | null;
+  sourceId?: string | null;
   createdAt: string;
 };
 
@@ -664,6 +704,9 @@ export type StoredHomeDayRecord = {
   // Aggregated on-device vision read of the day's photos (optional — present
   // only once the native vision module has analysed them).
   vision?: DayVisionSummary;
+  // Per-source intelligence evidence for quest-grade verification. Aggregate
+  // fields like `vision` remain derived compatibility surfaces for older code.
+  evidence?: DayEvidence[];
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
   // Energy captured through the camera (Moment Capture): score deltas that fold

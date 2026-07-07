@@ -3,6 +3,8 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { SheetActionRow } from '@/components/katchadeck/ui/sheet-action-row';
+import { SheetEmptyState } from '@/components/katchadeck/ui/sheet-empty-state';
 import { Lantern } from '@/constants/theme';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
 
@@ -69,46 +71,21 @@ export function QuestBoardSheet({
               onQuest(quest.type);
             };
             return (
-              <Pressable
+              <SheetActionRow
                 key={quest.id}
+                emoji={quest.emoji}
+                title={quest.title}
+                context={quest.contextLabel}
+                meta={quest.completed ? 'Done' : `+ ${quest.rewardLabel} - ${quest.essenceReward} essence`}
+                completed={quest.completed}
                 onPress={handlePress}
-                disabled={quest.completed}
-                style={({ pressed }) => [
-                  styles.row,
-                  pressed && !quest.completed ? styles.rowPressed : null,
-                  quest.completed ? styles.rowDone : null,
-                ]}>
-                <ThemedText style={styles.emoji}>{quest.emoji}</ThemedText>
-                <View style={styles.rowText}>
-                  <ThemedText style={styles.rowTitle} numberOfLines={2} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                    {quest.title}
-                  </ThemedText>
-                  {quest.contextLabel ? (
-                    <ThemedText style={styles.rowContext} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                      {quest.contextLabel}
-                    </ThemedText>
-                  ) : null}
-                  <ThemedText style={styles.rowReward} numberOfLines={1} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
-                    {quest.completed ? 'Done' : `+ ${quest.rewardLabel} · ✦${quest.essenceReward}`}
-                  </ThemedText>
-                </View>
-                <View style={[styles.check, quest.completed ? styles.checkDone : null]}>
-                  <IconSymbol
-                    name={quest.completed ? 'checkmark' : 'arrow.right'}
-                    size={13}
-                    color={quest.completed ? Lantern.emberInk : Lantern.moon300}
-                  />
-                </View>
-              </Pressable>
+              />
             );
           })}
           {quests.length === 0 ? (
-            <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              Nothing on the board right now.
-            </ThemedText>
+            <SheetEmptyState title="Nothing on the board right now" body="Come back when the day has something to grow." />
           ) : null}
-        </View>
-      </ScrollView>
+        </View>      </ScrollView>
     </MeadowSheet>
   );
 }

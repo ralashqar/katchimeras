@@ -56,14 +56,22 @@ the focus auto-check and the journal's "Check now".
   "how the day began", so an early-night quest completes when a LATER day logs
   good sleep — the "next good night" behaviour.
 
+- **places.categories** (in `dayRecordProvider`) → confirmed place categories
+  (park/cafe/museum…) from `ConfirmedPlace.category` — powers location-creature
+  quests (visit a beach/forest/garden/museum, refined new-park). No MapKit.
+- **weatherProvider** (`utils/signals/providers/weather.ts`) →
+  `weather.condition` from the stored DayWeather (on-device photo vision or
+  key-less coarse forecast, already read). Powers storm/fog creature quests.
+
 ## Roadmap providers (each = one file, registered, degrades to `unknown`)
 
-- **PhotoLabelProvider** → `photo.labels` via on-device Apple Vision
-  (vision-pass scaffold). Criterion: `includes 'coffee'`.
-- **PhotoGeoProvider** → `photo.place.categories` via reverse-geocode + MapKit
-  `MKLocalSearch`. Criterion: `includes 'park'`.
 - **Sleep fallback** → a second provider producing `sleep.quality` from an
   overnight phone-idle heuristic when Health is absent.
+- **New-to-you place diff** → make `places.confirmedNew` a real history diff
+  (currently any confirmed place counts as new).
+- **`photo.place.categories`** (MapKit MKLocalSearch of a photo's geotag) is
+  still declared but now largely redundant with `places.categories` from the
+  confirm flow — only needed if we want geo category WITHOUT a confirm.
 
 Later this same facts+criteria engine can absorb the world-objects unlock and
 discoveries evaluators (three ad-hoc "did it happen" systems today).

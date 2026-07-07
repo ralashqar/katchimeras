@@ -1,4 +1,5 @@
 import type { WorldObject } from '@/types/world';
+import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { PATCH_SIZE } from '@/utils/world-iso';
 
 // Kingdom Residents (docs/kingdom-residents-plan.md): every UNIQUE katchimera
@@ -119,7 +120,8 @@ export function residentObjects(
   residents: KingdomResident[],
   tileIndex: number,
   metaOf: (creatureId: string) => ResidentMeta | undefined,
-  ring: number
+  ring: number,
+  glyphOf?: (creatureId: string) => WorldObject['statusGlyph']
 ): WorldObject[] {
   return residents
     .filter((resident) => resident.tileIndex === tileIndex)
@@ -151,9 +153,27 @@ export function residentObjects(
         row: creatureCell.row,
         footprint: 1,
         sizeScale: 1.15,
+        statusGlyph: glyphOf?.(resident.creatureId),
       };
       return [house, creature];
     });
+}
+
+// Witnessed-residents ledger: which katchimeras have already had their arrival
+// ceremony, so a newly-hatched one gets announced exactly once.
+const WITNESSED_KEY = 'katchadeck.residents-witnessed-v1';
+
+export function loadWitnessedResidents(): Set<string> {
+  return new Set(getStoredJson<string[]>(WITNESSED_KEY, []));
+}
+
+export function saveWitnessedResidents(ids: Set<string>): void {
+  setStoredJson(WITNESSED_KEY, [...ids]);
+}
+
+/** New residents not yet witnessed (arrival ceremony pending). */
+export function unwitnessedResidents(residents: KingdomResident[], witnessed: Set<string>): KingdomResident[] {
+  return residents.filter((resident) => !witnessed.has(resident.creatureId));
 }
 
 export type ArrivalPlan =

@@ -12,6 +12,7 @@ import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal'
 import { CosmeticsSheet } from '@/components/katchadeck/world/cosmetics-sheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { CompanionCard } from '@/components/katchadeck/world/companion-card';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useKingdom } from '@/hooks/use-kingdom';
@@ -49,11 +50,18 @@ import { useCosmetics } from '@/hooks/use-cosmetics';
 import { useEssence } from '@/hooks/use-essence';
 import { buildingIdForCategory, deriveKingdomExpansionPatch, deriveKingdomPatch, deriveKingdomPlotPatch } from '@/utils/kingdom-patch';
 import { deriveKingdomPlots } from '@/utils/kingdom-engine';
-import { archetypeForCreature, companionUnit, subtypeForCreature } from '@/utils/katchimera-engagement';
+import {
+  archetypeForCreature,
+  companionUnit,
+  openingLine,
+  reflectionLine,
+  subtypeForCreature,
+} from '@/utils/katchimera-engagement';
 import {
   acceptQuest,
   activeQuests,
   evaluateCompanionQuests,
+  interactionState,
   loadCompanionQuests,
   questCriteria,
   questFor,
@@ -61,7 +69,15 @@ import {
 } from '@/utils/katchimera-quests';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
 import { ESSENCE_AWARD } from '@/utils/essence-engine';
-import { deriveResidents, residentObjects, tilesNeeded } from '@/utils/kingdom-residents';
+import { voiceLine } from '@/utils/companion-voice';
+import {
+  deriveResidents,
+  loadWitnessedResidents,
+  residentObjects,
+  saveWitnessedResidents,
+  tilesNeeded,
+  unwitnessedResidents,
+} from '@/utils/kingdom-residents';
 import { ARCHIVE_BUILDINGS, buildKingdomArchive, collectKingdomArchiveEntries } from '@/utils/kingdom-archive';
 import { KingdomArchiveModal } from '@/components/katchadeck/world/kingdom-archive-modal';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
@@ -141,6 +157,16 @@ export default function KingdomScreen() {
   const [provenanceItem, setProvenanceItem] = useState<KingdomDecorItem | null>(null);
   // Companion card for a tapped resident (docs/katchimera-engagement-v1.md).
   const [companion, setCompanion] = useState<{ creatureId: string; name: string } | null>(null);
+  // Which interaction thread is open in the companion card (null = the opening
+  // bubble + the three option chips).
+  const [companionThread, setCompanionThread] = useState<'quest' | 'insight' | 'reflection' | null>(null);
+  // Persona-voiced line overrides for the open companion (Foundation Models,
+  // when available — else these stay the rule text). Keyed by thread.
+  const [companionVoiced, setCompanionVoiced] = useState<{
+    opening?: string;
+    insight?: string;
+    reflection?: string;
+  }>({});
   const [companionQuests, setCompanionQuests] = useState(() => loadCompanionQuests());
   const [questJournalOpen, setQuestJournalOpen] = useState(false);
   const handleAcceptQuest = (offer: { questId: string; creatureId: string; title: string; hint: string }) => {
@@ -152,6 +178,13 @@ export default function KingdomScreen() {
     setCompanionQuests(next);
     saveCompanionQuests(next);
     setMicrocopy('Quest accepted ✦');
+  };
+  // "Report back" — cash in a completed quest from the companion card: the
+  // essence is already derived from completedAt, so this plays the celebration.
+  const handleCashIn = (creatureId: string, questTitle: string) => {
+    setMicrocopy(`Quest complete ✦ ${questTitle} — +${ESSENCE_AWARD.questComplete} essence, their home grows`);
+    setJustPlantedId(`resident-${creatureId}`);
+    setCompanion(null);
   };
   // Today's resolved facts — shared by the auto-check on focus and the
   // journal's manual "Check now" (utils/signals/resolve.ts).
@@ -325,6 +358,69 @@ export default function KingdomScreen() {
     },
     [kingdom.creatures]
   );
+  // Arrival ceremony: a newly-hatched katchimera that has settled into a quad
+  // gets announced + glow-ringed once (docs/kingdom-residents-plan.md slice E).
+  useEffect(() => {
+    const witnessed = loadWitnessedResidents();
+    const fresh = unwitnessedResidents(residents, witnessed);
+    if (fresh.length === 0) return;
+    // First run on an existing profile: everyone's already here — witness
+    // silently so we only celebrate genuinely NEW arrivals going forward.
+    if (witnessed.size === 0 && fresh.length === residents.length) {
+      saveWitnessedResidents(new Set(residents.map((r) => r.creatureId)));
+      return;
+    }
+    const newest = fresh[fresh.length - 1];
+    const name = residentMeta(newest.creatureId)?.name ?? 'A new friend';
+    setMicrocopy(`${name} has settled into the kingdom ✦`);
+    setJustPlantedId(`resident-${newest.creatureId}`);
+    fresh.forEach((r) => witnessed.add(r.creatureId));
+    saveWitnessedResidents(witnessed);
+  }, [residents, residentMeta]);
+  // Village status glyph per resident: gold ! (offer), gray ? (active), gold ?
+  // (ready to report back). Idle → no glyph.
+  const residentGlyph = useCallback(
+    (creatureId: string): 'offer' | 'active' | 'ready' | undefined => {
+      // Every companion always has an offer, so a resident is never 'idle'
+      // unless it already holds an (incomplete or complete) active quest.
+      const state = interactionState(companionQuests, creatureId, todayFacts, true);
+      return state === 'idle' ? undefined : state;
+    },
+    [companionQuests, todayFacts]
+  );
+  // Voice the open companion's three lines through Foundation Models (persona)
+  // when available; otherwise these resolve to the rule text unchanged. Runs
+  // once per companion open (not per thread switch) so the FM call is cheap.
+  useEffect(() => {
+    if (!companion) {
+      setCompanionVoiced({});
+      return;
+    }
+    let cancelled = false;
+    const meta = residentMeta(companion.creatureId);
+    const fallback = `${companion.name} ${meta?.visualKey ?? ''}`;
+    const archetype = archetypeForCreature(companion.creatureId, fallback);
+    const subtype = subtypeForCreature(companion.creatureId, fallback);
+    const state = interactionState(companionQuests, companion.creatureId, todayFacts, true);
+    const base = {
+      opening: openingLine(companion.name, state),
+      insight: companionUnit(archetype, kingdom, subtype).line,
+      reflection: reflectionLine(archetype),
+    };
+    setCompanionVoiced(base); // show rule text immediately; FM refines below
+    (async () => {
+      const [opening, insight, reflection] = await Promise.all([
+        voiceLine(companion.creatureId, 'opening', base.opening),
+        voiceLine(companion.creatureId, 'insight', base.insight),
+        voiceLine(companion.creatureId, 'reflection', base.reflection),
+      ]);
+      if (!cancelled) setCompanionVoiced({ opening, insight, reflection });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companion?.creatureId]);
   const visibleExpansions = useMemo(() => {
     const stored = (decorState.expansions ?? []).filter(
       (expansion) => expansion.ceremonyShown || expansion.index === growAnimIndex
@@ -383,11 +479,11 @@ export default function KingdomScreen() {
         ...deriveKingdomExpansionPatch(expansion),
         objects: [
           ...kingdomDecorObjects(decorState, `exp-${expansion.index}`),
-          ...residentObjects(residents, expansion.index, residentMeta, PATCH_RING),
+          ...residentObjects(residents, expansion.index, residentMeta, PATCH_RING, residentGlyph),
         ],
       })),
     ],
-    [renderPatch, plots, decorState, visibleExpansions, residents, residentMeta]
+    [renderPatch, plots, decorState, visibleExpansions, residents, residentMeta, residentGlyph]
   );
 
   // Essence (cosmetic currency) + cosmetics. "+N" toast when it grows.
@@ -466,7 +562,10 @@ export default function KingdomScreen() {
           eggPatchId={todayEgg ? 'kingdom' : null}
           eggVisual={todayEgg}
           onPressEgg={() => router.push('/today')}
-          onSelectResident={(creatureId, name) => setCompanion({ creatureId, name })}
+          onSelectResident={(creatureId, name) => {
+            setCompanion({ creatureId, name });
+            setCompanionThread(null);
+          }}
           artefacts={worldArtefacts}
           customising={customising}
           onToggleCustomising={() => setCustomising((value) => !value)}
@@ -483,77 +582,48 @@ export default function KingdomScreen() {
           animateExpansionIndex={growAnimIndex}
         />
 
-        {/* Companion card — a tapped resident speaks (engagement T1 rules;
-            the FM voice pass replaces the phrasing in V1b). */}
+        {/* Companion card — a tapped resident speaks: opening bubble + the
+            three interaction threads (Quest / Insight / Reflection). Rule text
+            now; the FM voice pass rephrases it in persona later. */}
         {companion
           ? (() => {
               const resident = residents.find((r) => r.creatureId === companion.creatureId);
               const meta = residentMeta(companion.creatureId);
               const fallback = `${companion.name} ${meta?.visualKey ?? ''}`;
-              const unit = companionUnit(
-                archetypeForCreature(companion.creatureId, fallback),
-                kingdom,
-                subtypeForCreature(companion.creatureId, fallback)
-              );
+              const archetype = archetypeForCreature(companion.creatureId, fallback);
+              const unit = companionUnit(archetype, kingdom, subtypeForCreature(companion.creatureId, fallback));
+              const active = questFor(companionQuests, companion.creatureId);
+              const state = interactionState(companionQuests, companion.creatureId, todayFacts, true);
+              const complete = !!active && state === 'ready';
               return (
-                <Pressable
-                  onPress={() => setCompanion(null)}
-                  style={{
-                    position: 'absolute',
-                    left: 16,
-                    right: 16,
-                    bottom: 118,
-                    borderRadius: 20,
-                    padding: 16,
-                    backgroundColor: 'rgba(16, 14, 26, 0.92)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(255, 195, 107, 0.35)',
-                  }}>
-                  <ThemedText style={{ fontSize: 15, fontWeight: '700' }} lightColor="#FFE2B8" darkColor="#FFE2B8">
-                    {companion.name}
-                    {resident ? `  ·  home Lv ${resident.houseLevel}` : ''}
-                  </ThemedText>
-                  <ThemedText style={{ marginTop: 6, fontSize: 14, lineHeight: 20 }} lightColor="#EDEAF6" darkColor="#EDEAF6">
-                    {unit.line}
-                  </ThemedText>
-                  {(() => {
-                    const active = questFor(companionQuests, companion.creatureId);
-                    if (active) {
-                      return (
-                        <ThemedText style={{ marginTop: 8, fontSize: 13 }} lightColor="#A8E2C6" darkColor="#A8E2C6">
-                          ✦ In progress: {active.title} — {active.hint}
-                        </ThemedText>
-                      );
-                    }
-                    if (!unit.quest) return null;
-                    const offer = unit.quest;
-                    return (
-                      <Pressable
-                        onPress={() =>
-                          handleAcceptQuest({
-                            questId: offer.id,
-                            creatureId: companion.creatureId,
-                            title: offer.title,
-                            hint: offer.hint,
-                          })
-                        }
-                        style={{
-                          marginTop: 10,
-                          alignSelf: 'flex-start',
-                          borderRadius: 12,
-                          paddingHorizontal: 12,
-                          paddingVertical: 7,
-                          backgroundColor: 'rgba(168, 226, 198, 0.16)',
-                          borderWidth: 1,
-                          borderColor: 'rgba(168, 226, 198, 0.45)',
-                        }}>
-                        <ThemedText style={{ fontSize: 13, fontWeight: '600' }} lightColor="#A8E2C6" darkColor="#A8E2C6">
-                          ✦ Accept: {offer.title} — {offer.hint}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })()}
-                </Pressable>
+                <CompanionCard
+                  name={companion.name}
+                  houseLevel={resident?.houseLevel}
+                  openingLine={companionVoiced.opening ?? openingLine(companion.name, state)}
+                  thread={companionThread}
+                  onSelectThread={setCompanionThread}
+                  onClose={() => setCompanion(null)}
+                  activeQuest={active}
+                  questComplete={complete}
+                  offer={unit.quest}
+                  criteria={active ? questCriteria(active.questId, todayFacts) : []}
+                  onAccept={() =>
+                    unit.quest &&
+                    handleAcceptQuest({
+                      questId: unit.quest.id,
+                      creatureId: companion.creatureId,
+                      title: unit.quest.title,
+                      hint: unit.quest.hint,
+                    })
+                  }
+                  onCashIn={() => active && handleCashIn(companion.creatureId, active.title)}
+                  insightText={companionVoiced.insight ?? unit.line}
+                  reflectionText={companionVoiced.reflection ?? reflectionLine(archetype)}
+                  onAnswerReflection={() => {
+                    setCompanion(null);
+                    router.push('/today');
+                  }}
+                />
               );
             })()
           : null}
