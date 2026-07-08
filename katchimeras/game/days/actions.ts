@@ -44,11 +44,14 @@ import {
   type DayPromptAnswerInput,
 } from './moment-factories';
 import {
+  type StepCountReading,
   withActivityPermission,
   withAppendedMoment,
   withCapturedMoment,
   withConfirmedPlace,
   withDayName,
+  withDayForegroundLocationSample,
+  withDayStepCount,
   withDayWeather,
   withDismissedPrompt,
   withFeaturedMemory,
@@ -73,6 +76,7 @@ import {
 import { withSeededPhotoLocationsByDay } from './photo-locations';
 import { createEmptyStoredDay, readInputDay, writeInputDay } from './records';
 import { normalizeStoredHomeState } from './state-normalization';
+import { toLocalDateId } from './date';
 
 export type SelectHeroPhotoInput = {
   assetId: string;
@@ -109,11 +113,37 @@ export function updateActivityPermissionState(
 
 export function updateTodayStepCount(
   state: StoredHomeState,
-  stepsCount: number,
+  reading: number | StepCountReading,
   profile: OnboardingProfile,
   now: Date
 ) {
-  return normalizeStoredHomeState(withTodayStepCount(state, stepsCount), profile, now);
+  const normalizedReading: StepCountReading =
+    typeof reading === 'number'
+      ? { stepsCount: reading, dayId: toLocalDateId(now), observedAt: now.toISOString() }
+      : { ...reading, observedAt: reading.observedAt ?? now.toISOString() };
+
+  const updateMatchingDay = (day: StoredHomeState['today']) => withDayStepCount(day, normalizedReading);
+  const nextToday = state.today.isoDate === normalizedReading.dayId ? updateMatchingDay(state.today) : state.today;
+  const nextTomorrow =
+    state.tomorrow && state.tomorrow.isoDate === normalizedReading.dayId ? updateMatchingDay(state.tomorrow) : state.tomorrow;
+  const nextArchivedDays = state.archivedDays.map((day) =>
+    day.isoDate === normalizedReading.dayId ? updateMatchingDay(day) : day
+  );
+
+  if (nextToday === state.today && nextTomorrow === state.tomorrow && nextArchivedDays.every((day, index) => day === state.archivedDays[index])) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  return normalizeStoredHomeState(
+    {
+      ...state,
+      today: nextToday,
+      tomorrow: nextTomorrow,
+      archivedDays: nextArchivedDays,
+    },
+    profile,
+    now
+  );
 }
 
 export function recordForegroundLocationSample(
@@ -129,7 +159,13 @@ export function recordForegroundLocationSample(
   profile: OnboardingProfile,
   now: Date
 ) {
-  return normalizeStoredHomeState(withForegroundLocationSample(state, sample), profile, now);
+  const base = readInputDay(state, 'today', profile, now);
+  const nextDay = withDayForegroundLocationSample(base, sample);
+  if (nextDay === base) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  return normalizeStoredHomeState(writeInputDay(state, 'today', nextDay), profile, now);
 }
 
 export function addMomentToDay(
@@ -343,7 +379,7 @@ export function applyNoteForToday(
   const base = readInputDay(state, target, profile, now);
   const foodDetection: FoodDetection = input.llmClassified
     ? input.food
-      ? { detected: true, label: input.food }
+      ? { ...detectFoodInText(input.food), detected: true, label: input.food }
       : { detected: false }
     : detectFoodInText(input.text);
   const studioDetection = (() => {
@@ -454,7 +490,14 @@ export function seedPhotoLocationsByDay(
   profile: OnboardingProfile,
   now: Date
 ) {
-  return normalizeStoredHomeState(withSeededPhotoLocationsByDay(state, photos), profile, now);
+  const inputDay = readInputDay(state, 'today', profile, now);
+  return normalizeStoredHomeState(
+    withSeededPhotoLocationsByDay(state, photos, {
+      todayPhotoTarget: inputDay.id !== state.today.id ? inputDay : null,
+    }),
+    profile,
+    now
+  );
 }
 
 export function importHealthRoutesForDay(

@@ -688,6 +688,10 @@ export type StoredHomeDayRecord = {
   isoDate: string;
   state: HomeDayState;
   stepsCount: number;
+  // The local calendar day the pedometer aggregate was measured for. This keeps
+  // a late-night "today" reading from being copied into tomorrow's forming egg.
+  stepsCountDayId?: string;
+  stepsUpdatedAt?: string | null;
   visitedPlaceCount: number;
   newPlaceCount: number;
   locationSampleCount: number;

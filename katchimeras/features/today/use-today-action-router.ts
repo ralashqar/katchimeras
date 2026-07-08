@@ -2,41 +2,39 @@ import { useCallback, useMemo } from 'react';
 
 import type { DayStatKey } from '@/components/katchadeck/home/day-journal-sections';
 import type { TodaySheetController } from '@/features/today/use-today-sheet-controller';
-import type { HomeDayRecord } from '@/types/home';
 import type { ActiveDayPrompt } from '@/utils/day-prompt-engine';
 import type { MemoryQuestType } from '@/utils/memory-quests-engine';
+import type { QuestNextAction } from '@/utils/quests/runtime';
 import type { TodayCategoryState } from '@/utils/today-categories';
 
 type UseTodayActionRouterParams = {
   categories: TodayCategoryState[];
   viewedIsForming: boolean;
-  formingDay: Pick<HomeDayRecord, 'id'> | null;
   formingPrompts: ActiveDayPrompt[];
   photoPrompt: ActiveDayPrompt | null;
-  unconfirmedPlace: unknown | null;
   sheets: TodaySheetController;
   openPromptSheet: (prompt?: ActiveDayPrompt | null) => void;
   closePromptSheet: () => void;
   openCapture: () => void;
   openNoteCapture: () => void;
-  openDayMap: (dayId: string) => void;
-  addCurrentPlace: () => void;
+  openQuickNote: () => void;
+  openObservatory: () => void;
+  requestMicrophonePermission?: () => Promise<{ granted?: boolean } | null>;
 };
 
 export function useTodayActionRouter({
   categories,
   viewedIsForming,
-  formingDay,
   formingPrompts,
   photoPrompt,
-  unconfirmedPlace,
   sheets,
   openPromptSheet,
   closePromptSheet,
   openCapture,
   openNoteCapture,
-  openDayMap,
-  addCurrentPlace,
+  openQuickNote,
+  openObservatory,
+  requestMicrophonePermission,
 }: UseTodayActionRouterParams) {
   const ringCategories = useMemo(() => categories.filter((category) => category.id === 'quests'), [categories]);
 
@@ -58,13 +56,17 @@ export function useTodayActionRouter({
   );
 
   const handleQuest = useCallback(
-    (type: MemoryQuestType) => {
+    async (type: MemoryQuestType) => {
       sheets.setQuestBoardOpen(false);
       switch (type) {
         case 'captureMoment':
           openCapture();
           break;
         case 'recordVoiceMemory':
+          if (requestMicrophonePermission) {
+            const permission = await requestMicrophonePermission();
+            if (!permission?.granted) break;
+          }
           openNoteCapture();
           break;
         case 'answerReflection': {
@@ -75,8 +77,7 @@ export function useTodayActionRouter({
           break;
         }
         case 'markPlace':
-          if (unconfirmedPlace) sheets.setPlacePromptOpen(true);
-          else addCurrentPlace();
+          sheets.setPlacesVaultOpen(true);
           break;
         case 'markBigMoment':
           sheets.setBigMomentPickerOpen(true);
@@ -92,7 +93,7 @@ export function useTodayActionRouter({
           break;
       }
     },
-    [addCurrentPlace, formingPrompts, openCapture, openNoteCapture, openPromptSheet, sheets, unconfirmedPlace]
+    [formingPrompts, openCapture, openNoteCapture, openPromptSheet, requestMicrophonePermission, sheets]
   );
 
   const handleStatPress = useCallback(
@@ -184,9 +185,7 @@ export function useTodayActionRouter({
           openMemoryVault('notes');
           break;
         case 'places':
-          if (unconfirmedPlace) sheets.setPlacePromptOpen(true);
-          else if (category.hasContent && formingDay) openDayMap(formingDay.id);
-          else addCurrentPlace();
+          sheets.setPlacesVaultOpen(true);
           break;
         case 'journey':
           sheets.setStepsSheetOpen(true);
@@ -215,14 +214,10 @@ export function useTodayActionRouter({
       }
     },
     [
-      addCurrentPlace,
-      formingDay,
-      openDayMap,
       openMemoryVault,
       openPromptSheet,
       photoPrompt,
       sheets,
-      unconfirmedPlace,
       viewedIsForming,
     ]
   );
@@ -244,6 +239,56 @@ export function useTodayActionRouter({
     [closePromptSheet, sheets]
   );
 
+  const handleQuestActionIntent = useCallback(
+    async (action: QuestNextAction) => {
+      closePromptSheet();
+      switch (action) {
+        case 'take_photo':
+        case 'enable_camera':
+          openCapture();
+          break;
+        case 'enable_photos':
+          if (photoPrompt) openPromptSheet(photoPrompt);
+          else openMemoryVault('photos');
+          break;
+        case 'enable_location':
+        case 'confirm_place':
+          sheets.setPlacesVaultOpen(true);
+          break;
+        case 'enable_travel_memory':
+          openObservatory();
+          break;
+        case 'record_voice':
+          if (requestMicrophonePermission) {
+            const permission = await requestMicrophonePermission();
+            if (!permission?.granted) break;
+          }
+          openNoteCapture();
+          break;
+        case 'add_note':
+          openQuickNote();
+          break;
+        case 'open_health':
+          sheets.setStepsSheetOpen(true);
+          break;
+        case 'none':
+          break;
+      }
+    },
+    [
+      closePromptSheet,
+      openCapture,
+      openMemoryVault,
+      openNoteCapture,
+      openObservatory,
+      openPromptSheet,
+      openQuickNote,
+      photoPrompt,
+      requestMicrophonePermission,
+      sheets,
+    ]
+  );
+
   return {
     ringCategories,
     panelCategories,
@@ -254,5 +299,6 @@ export function useTodayActionRouter({
     handleCategoryPress,
     handleCameraPress,
     handleQuickCategory,
+    handleQuestActionIntent,
   };
 }

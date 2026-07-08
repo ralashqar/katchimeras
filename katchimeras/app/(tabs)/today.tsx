@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
@@ -50,7 +51,8 @@ import { useTodayNavigationController } from '@/features/today/use-today-navigat
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
 import { MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
-import type { HomeDayRecord, HomeMoment } from '@/types/home';
+import type { HomeDayRecord } from '@/types/home';
+import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -119,6 +121,7 @@ export default function HomeScreen() {
     timelineDays,
     triggerHatchIfReady,
     refreshState,
+    requestMicrophonePermission,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
   const tabBarHeight = useBottomTabBarHeight();
@@ -182,6 +185,12 @@ export default function HomeScreen() {
   const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
   const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
   const formingActivePrompt = onTomorrowForming ? tomorrowActivePrompt : activeDayPrompt;
+  const openMomentCapture = useCallback(() => {
+    router.push({ pathname: '/moment-capture', params: { target: formingTarget } });
+  }, [formingTarget, router]);
+  const openNoteCapture = useCallback(() => {
+    router.push({ pathname: '/note-capture', params: { target: formingTarget } });
+  }, [formingTarget, router]);
   // While a prompt is showing, the page collapses to just the egg + prompt: the
   // forming quote and the add/camera buttons hide until it's answered/dismissed.
   const hasActivePrompt = isForming && Boolean(formingActivePrompt);
@@ -363,23 +372,30 @@ export default function HomeScreen() {
     handleCategoryPress,
     handleCameraPress,
     handleQuickCategory,
+    handleQuestActionIntent,
   } = useTodayActionRouter({
     categories,
     viewedIsForming,
-    formingDay,
     formingPrompts,
     photoPrompt,
-    unconfirmedPlace,
     sheets,
     openPromptSheet,
     closePromptSheet,
-    openCapture: () => router.push('/moment-capture'),
-    openNoteCapture: () => router.push('/note-capture'),
-    openDayMap: handleOpenDayMap,
-    addCurrentPlace: () => {
-      void handleAddCurrentPlace();
-    },
+    openCapture: openMomentCapture,
+    openNoteCapture,
+    openQuickNote: () => setQuickNoteOpen(true),
+    openObservatory: () => setObservatoryOpen(true),
+    requestMicrophonePermission,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      const intent = consumeQuestActionIntent();
+      if (intent) {
+        void handleQuestActionIntent(intent.action);
+      }
+    }, [handleQuestActionIntent])
+  );
 
   const { swipeGesture } = useTodayNavigationController({
     windowWidth,
@@ -519,23 +535,6 @@ export default function HomeScreen() {
           <Animated.View entering={presenceEnter(120)} style={styles.formingCopy}>
             {/* The forming quote AND tomorrow's one-liner are hidden — the week
                 strip's egg orb + the panel below already tell the story. */}
-            {isForming && formingDay && formingDay.moments.length > 0 ? (
-              <View style={styles.chipRow}>
-                {dedupeMoments(formingDay.moments).map((moment) => (
-                  <View key={moment.id} style={styles.chip}>
-                    <View
-                      style={[
-                        styles.chipDot,
-                        { backgroundColor: moment.accentColor, boxShadow: `0 0 12px ${moment.accentColor}AA` },
-                      ]}
-                    />
-                    <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                      {moment.label}
-                    </ThemedText>
-                  </View>
-                ))}
-              </View>
-            ) : null}
             {isForming ? (
               <DayPromptStrip
                 onAnswer={handleAnswerDayPrompt}
@@ -661,8 +660,8 @@ export default function HomeScreen() {
         setPlacesVaultOpen={setPlacesVaultOpen}
         setObservatoryOpen={setObservatoryOpen}
         setNameSheetOpen={setNameSheetOpen}
-        onCapturePhoto={() => router.push('/moment-capture')}
-        onCaptureNote={() => router.push('/note-capture')}
+        onCapturePhoto={openMomentCapture}
+        onCaptureNote={openNoteCapture}
         openPromptSheet={openPromptSheet}
         handleAddCurrentPlace={handleAddCurrentPlace}
         handleOpenDayMap={handleOpenDayMap}
@@ -732,15 +731,6 @@ export default function HomeScreen() {
   );
 }
 
-function dedupeMoments(moments: HomeMoment[]) {
-  const seen = new Set<string>();
-  return moments.filter((moment) => {
-    if (seen.has(moment.type)) return false;
-    seen.add(moment.type);
-    return true;
-  }).slice(0, 4);
-}
-
 const styles = StyleSheet.create({
   screen: {
     backgroundColor: Lantern.ink950,
@@ -787,32 +777,6 @@ const styles = StyleSheet.create({
     lineHeight: 29,
     maxWidth: 320,
     textAlign: 'center',
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
-  },
-  chip: {
-    alignItems: 'center',
-    backgroundColor: Lantern.dusk700,
-    borderCurve: 'continuous',
-    borderRadius: 999,
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  chipDot: {
-    borderRadius: 999,
-    height: 8,
-    width: 8,
-  },
-  chipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 17,
   },
   spacer: {
     height: 6,

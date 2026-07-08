@@ -1102,15 +1102,29 @@ export function WorldCanvas({
         }
       }
       let hit: SceneSprite | null = null;
+      let hitScore = Number.POSITIVE_INFINITY;
       for (const s of positionedSprites) {
         const isCreature = s.kind === 'creature';
         const w = s.size * SPRITE_SCALE;
         const h = w; // square frame (1:1) — object bottom-anchored at OBJECT_BOTTOM_FRAC
-        const left = s.x - w / 2;
+        const residentCreature = isCreature && s.id.startsWith('resident-creature-');
+        const hitW = residentCreature ? w * 0.56 : w;
+        const hitH = residentCreature ? h * 0.7 : h;
+        const left = s.x - hitW / 2;
         const top =
-          (isCreature ? s.y - h / 2 - TILE_H * 0.35 : s.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
-        if (wx >= left && wx <= left + w && wy >= top && wy <= top + h) {
-          if (!hit || s.depth > hit.depth) hit = s; // front-most wins on overlap
+          (isCreature ? s.y - hitH / 2 - TILE_H * 0.2 : s.y + OBJECT_SEAT - hitH * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
+        if (wx >= left && wx <= left + hitW && wy >= top && wy <= top + hitH) {
+          const currentResidentCreature = hit?.id.startsWith('resident-creature-') ?? false;
+          const distance = residentCreature ? Math.hypot(wx - s.x, wy - (top + hitH / 2)) : Number.POSITIVE_INFINITY;
+          if (
+            !hit ||
+            (residentCreature && !currentResidentCreature) ||
+            (residentCreature && currentResidentCreature && distance < hitScore) ||
+            (!residentCreature && !currentResidentCreature && s.depth > hit.depth)
+          ) {
+            hit = s;
+            hitScore = distance;
+          }
         }
       }
       if (hit) {

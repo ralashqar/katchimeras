@@ -1,5 +1,5 @@
 import type { DayEvidence, DayEvidenceSourceType } from '@/types/home';
-import { signalMatches } from '@/utils/intelligence/taxonomy';
+import { scoreEvidenceMatch } from '@/utils/quests/evidence-scoring';
 
 // The normalized fact vocabulary (docs/katchimera-engagement-v1.md refactor).
 // Every input a quest can be checked against becomes a namespaced fact with a
@@ -15,6 +15,8 @@ export type FactValue = number | boolean | string | string[] | DayEvidence[] | '
 export type Facts = {
   'steps.count': number | 'unknown';
   'notes.added': number;
+  'notes.voiceAdded': number;
+  'bigMoments.marked': number;
   'places.confirmed': number;
   'places.confirmedNew': boolean | 'unknown';
   'food.moments': number;
@@ -37,7 +39,19 @@ export type FactKey = keyof Facts;
 
 // A single testable condition against one fact. The label renders the journal
 // checklist, so definitions carry their own copy — no parallel switch.
-export type Op = 'gte' | 'gt' | 'lt' | 'lte' | 'isTrue' | 'equals' | 'includes' | 'evidenceIncludes';
+export type Op =
+  | 'gte'
+  | 'gt'
+  | 'lt'
+  | 'lte'
+  | 'isTrue'
+  | 'equals'
+  | 'includes'
+  | 'evidenceIncludes'
+  | 'evidenceAny'
+  | 'evidenceAll'
+  | 'evidenceCorroborated'
+  | 'evidenceCount';
 
 export type Criterion = {
   fact: FactKey;
@@ -45,6 +59,8 @@ export type Criterion = {
   value?: number | string | boolean;
   minConfidence?: number;
   sourceTypes?: DayEvidenceSourceType[];
+  requireCount?: number;
+  withinDay?: boolean;
   label: string;
 };
 
@@ -76,6 +92,10 @@ export function evaluateCriterion(criterion: Criterion, facts: Partial<Facts>): 
     case 'includes':
       return done(isStringArray(actual) && actual.includes(String(criterion.value)));
     case 'evidenceIncludes':
+    case 'evidenceAny':
+    case 'evidenceAll':
+    case 'evidenceCorroborated':
+    case 'evidenceCount':
       return evaluateEvidenceCriterion(criterion, actual);
     default:
       return done(false);
@@ -96,30 +116,18 @@ function evaluateEvidenceCriterion(criterion: Criterion, actual: FactValue): Cri
   }
 
   const requested = String(criterion.value ?? '');
-  const minConfidence = criterion.minConfidence ?? 0.62;
-  const sourceTypes = criterion.sourceTypes;
-  let bestConfidence = 0;
-  const evidenceIds: string[] = [];
-
-  for (const item of actual) {
-    if (sourceTypes && !sourceTypes.includes(item.sourceType)) continue;
-    const match = item.signals.find(
-      (signal) => signalMatches(signal.key, requested) && signal.confidence >= minConfidence
-    );
-    if (!match) continue;
-    evidenceIds.push(item.id);
-    bestConfidence = Math.max(bestConfidence, match.confidence);
-  }
-
-  if (evidenceIds.length > 0) {
-    return { done: true, evidenceIds, confidence: bestConfidence, reason: null };
-  }
-
+  const match = scoreEvidenceMatch(actual, {
+    value: requested,
+    minConfidence: criterion.minConfidence,
+    sourceTypes: criterion.sourceTypes,
+    requireCount: criterion.op === 'evidenceCount' ? criterion.requireCount ?? 1 : criterion.requireCount,
+    allowCorroboration: criterion.op === 'evidenceCorroborated',
+  });
   return {
-    done: false,
-    evidenceIds: [],
-    confidence: bestConfidence || null,
-    reason: `No ${sourceTypes?.join('/') ?? 'evidence'} confidently matched ${requested}.`,
+    done: match.matched,
+    evidenceIds: match.evidenceIds,
+    confidence: match.confidence || null,
+    reason: match.reason,
   };
 }
 

@@ -70,7 +70,7 @@ export function WorldActionStack({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Add to today"
-          onPress={onAdd}
+          onPress={() => onAdd()}
           style={styles.primary}>
           <IconSymbol name="plus" size={34} color={Meadow.ink} />
         </Pressable>

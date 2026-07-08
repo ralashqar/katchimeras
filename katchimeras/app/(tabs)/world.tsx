@@ -13,10 +13,15 @@ import { CosmeticsSheet } from '@/components/katchadeck/world/cosmetics-sheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { CompanionCard } from '@/components/katchadeck/world/companion-card';
+import { PlacesDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
+import { ObservatorySheet } from '@/components/katchadeck/world/observatory-sheet';
+import { PlacePromptSheet } from '@/components/katchadeck/world/place-prompt-sheet';
+import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useKingdom } from '@/hooks/use-kingdom';
 import { useAllDays } from '@/hooks/use-all-days';
+import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useDiscoveries } from '@/hooks/use-discoveries';
 import {
   findKingdomDecor,
@@ -60,14 +65,18 @@ import {
 import {
   acceptQuest,
   activeQuests,
+  completeQuest,
   evaluateCompanionQuests,
+  hasCompanionQuestForDay,
   interactionState,
   loadCompanionQuests,
-  questCriteria,
   questFor,
+  reconcileCompanionQuestOffer,
   saveCompanionQuests,
 } from '@/utils/katchimera-quests';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
+import { buildQuestReportBackItems } from '@/utils/quests/report-back-evidence';
+import { evaluateQuestRuntime, type QuestRuntimeStatus } from '@/utils/quests/runtime';
 import { ESSENCE_AWARD } from '@/utils/essence-engine';
 import { voiceLine } from '@/utils/companion-voice';
 import {
@@ -83,6 +92,11 @@ import { KingdomArchiveModal } from '@/components/katchadeck/world/kingdom-archi
 import { requestSelectedDay } from '@/utils/selected-day-signal';
 import { useRouter } from 'expo-router';
 import { collectUnlockedArtefacts, placeArtefacts } from '@/utils/discoveries-artefacts';
+import { usePlacePromptController } from '@/features/today/use-place-prompt-controller';
+import { useObservatoryController } from '@/features/today/use-observatory-controller';
+import { findUnconfirmedPlace } from '@/utils/today-categories';
+import { interpretNote } from '@/utils/note-interpret';
+import type { DayInputTarget, HomeDayRecord } from '@/types/home';
 import type { KingdomBuilding } from '@/types/kingdom';
 import type { WorldObjectCategory } from '@/types/world';
 import { Meadow } from '@/constants/meadow-theme';
@@ -109,6 +123,15 @@ export default function KingdomScreen() {
   const router = useRouter();
   const { kingdom } = useKingdom();
   const { days } = useAllDays();
+  const {
+    addNote: addWorldNote,
+    confirmPlace: confirmWorldPlace,
+    isTodayHatched,
+    tomorrowDay,
+    refreshState: refreshHomeState,
+    questCapabilities,
+    requestMicrophonePermission,
+  } = useHomeScreenState();
   const kingdomPatch = useMemo(() => deriveKingdomPatch(kingdom), [kingdom]);
   // Today's forming egg sits on the capital's nest (docs/kingdom-residents-
   // plan.md); once the day hatches it disappears until tomorrow's egg forms.
@@ -169,10 +192,11 @@ export default function KingdomScreen() {
   }>({});
   const [companionQuests, setCompanionQuests] = useState(() => loadCompanionQuests());
   const [questJournalOpen, setQuestJournalOpen] = useState(false);
-  const handleAcceptQuest = (offer: { questId: string; creatureId: string; title: string; hint: string }) => {
-    const next = acceptQuest(companionQuests, offer, Date.now());
+  const handleAcceptQuest = (offer: { questId: string; creatureId: string; title: string; hint: string; dayId?: string | null }) => {
+    const dayId = questDay?.isoDate ?? null;
+    const next = acceptQuest(companionQuests, { ...offer, dayId }, Date.now());
     if (!next) {
-      setMicrocopy('Quest journal is full — finish one first');
+      setMicrocopy(dayId ? 'One quest per katchimera per day' : 'Quest journal is full — finish one first');
       return;
     }
     setCompanionQuests(next);
@@ -181,21 +205,36 @@ export default function KingdomScreen() {
   };
   // "Report back" — cash in a completed quest from the companion card: the
   // essence is already derived from completedAt, so this plays the celebration.
-  const handleCashIn = (creatureId: string, questTitle: string) => {
-    setMicrocopy(`Quest complete ✦ ${questTitle} — +${ESSENCE_AWARD.questComplete} essence, their home grows`);
-    setJustPlantedId(`resident-${creatureId}`);
-    setCompanion(null);
-  };
   // Today's resolved facts — shared by the auto-check on focus and the
   // journal's manual "Check now" (utils/signals/resolve.ts).
-  const todayFacts = useMemo(() => {
-    const today = days.find((day) => day.isToday) ?? null;
-    return resolveFactsForDay(today);
-  }, [days]);
+  const todayDay = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
+  const questDay = useMemo<HomeDayRecord | null>(
+    () => (isTodayHatched ? tomorrowDay : todayDay),
+    [isTodayHatched, todayDay, tomorrowDay]
+  );
+  const todayFacts = useMemo(() => resolveFactsForDay(questDay), [questDay]);
+  const questDayId = questDay?.isoDate ?? null;
+  const hasQuestOfferForDay = useCallback(
+    (creatureId: string) => Boolean(questDayId && !hasCompanionQuestForDay(companionQuests, creatureId, questDayId)),
+    [companionQuests, questDayId]
+  );
+  const handleCashIn = useCallback(
+    (creatureId: string, questTitle: string) => {
+      setCompanionQuests((current) => {
+        const next = completeQuest(current, creatureId, Date.now(), questDayId);
+        saveCompanionQuests(next);
+        return next;
+      });
+      setMicrocopy(`Quest complete ✦ ${questTitle} — +${ESSENCE_AWARD.questComplete} essence, their home grows`);
+      setJustPlantedId(`resident-${creatureId}`);
+      setCompanion(null);
+    },
+    [questDayId]
+  );
   const runQuestCheck = useCallback(
     (source: 'auto' | 'manual') => {
       setCompanionQuests((current) => {
-        const result = evaluateCompanionQuests(current, todayFacts, Date.now());
+        const result = evaluateCompanionQuests(current, todayFacts, Date.now(), questCapabilities, questDayId);
         if (result.completed.length === 0) {
           if (source === 'manual') setMicrocopy('Nothing finished yet — keep going ✦');
           return current;
@@ -208,7 +247,7 @@ export default function KingdomScreen() {
         return result.state;
       });
     },
-    [todayFacts]
+    [questCapabilities, questDayId, todayFacts]
   );
 
   const renderPatch = useMemo(() => {
@@ -264,6 +303,112 @@ export default function KingdomScreen() {
     const id = setTimeout(() => setMicrocopy(null), 2400);
     return () => clearTimeout(id);
   }, [microcopy]);
+
+  const [worldQuickNoteOpen, setWorldQuickNoteOpen] = useState(false);
+  const [worldPlacesVaultOpen, setWorldPlacesVaultOpen] = useState(false);
+  const [worldPlacePromptOpen, setWorldPlacePromptOpen] = useState(false);
+  const worldFormingTarget: DayInputTarget = isTodayHatched ? 'tomorrow' : 'today';
+  const worldFormingDay = useMemo<HomeDayRecord | null>(
+    () => (isTodayHatched ? tomorrowDay : todayDay),
+    [isTodayHatched, todayDay, tomorrowDay]
+  );
+  const worldUnconfirmedPlace = useMemo(
+    () => (worldFormingDay ? findUnconfirmedPlace(worldFormingDay) : null),
+    [worldFormingDay]
+  );
+  const {
+    activePlace: worldActivePlace,
+    placePreset: worldPlacePreset,
+    handleAddCurrentPlace: handleWorldAddCurrentPlace,
+    closePlacePrompt: closeWorldPlacePrompt,
+    handleConfirmPlaceFromVault: handleWorldConfirmPlaceFromVault,
+    handleConfirmPlace: handleWorldConfirmPlace,
+  } = usePlacePromptController({
+    formingDay: worldFormingDay,
+    formingTarget: worldFormingTarget,
+    unconfirmedPlace: worldUnconfirmedPlace,
+    confirmPlace: confirmWorldPlace,
+    setPlacePromptOpen: setWorldPlacePromptOpen,
+    setPlacesVaultOpen: setWorldPlacesVaultOpen,
+    pulseEgg: () => {},
+    setMicrocopy,
+    formatTimeRange: formatQuestTimeRange,
+  });
+  const {
+    observatoryOpen: worldObservatoryOpen,
+    setObservatoryOpen: setWorldObservatoryOpen,
+    observations: worldObservations,
+    travelMemory: worldTravelMemory,
+  } = useObservatoryController({
+    allDays: days,
+    formingDay: worldFormingDay,
+    refreshState: refreshHomeState,
+    setMicrocopy,
+  });
+  const handleWorldQuickNoteSubmit = useCallback(
+    async (text: string) => {
+      const interpreted = await interpretNote({ text });
+      addWorldNote(
+        {
+          kind: 'text',
+          text: interpreted.transcript || text,
+          audioUri: null,
+          durationMs: null,
+          archetype: interpreted.archetype,
+          label: interpreted.label,
+          bigMoment: interpreted.bigMoment,
+          media: interpreted.media,
+          food: interpreted.food,
+          llmClassified: interpreted.llmClassified,
+          intelligenceProvider: interpreted.intelligenceProvider,
+        },
+        worldFormingTarget
+      );
+      refreshHomeState();
+      setMicrocopy(`${interpreted.label} took root`);
+    },
+    [addWorldNote, refreshHomeState, setMicrocopy, worldFormingTarget]
+  );
+  const handleQuestRuntimeAction = useCallback(
+    async (runtime: QuestRuntimeStatus | null) => {
+      if (!runtime || runtime.nextAction === 'none') return;
+      setCompanion(null);
+
+      switch (runtime.nextAction) {
+        case 'take_photo':
+        case 'enable_camera':
+          router.push({ pathname: '/moment-capture', params: { target: worldFormingTarget } });
+          return;
+        case 'record_voice':
+          if (runtime.state === 'blocked_permission' && runtime.missingCapabilities.includes('microphone')) {
+            const permission = await requestMicrophonePermission();
+            if (!permission?.granted) {
+              setMicrocopy('Microphone access is needed to record this quest');
+              return;
+            }
+          }
+          router.push({ pathname: '/note-capture', params: { target: worldFormingTarget } });
+          return;
+        case 'enable_photos':
+          setMicrocopy(runtimeActionLabel(runtime));
+          return;
+        case 'enable_location':
+        case 'confirm_place':
+          setWorldPlacesVaultOpen(true);
+          return;
+        case 'enable_travel_memory':
+          setWorldObservatoryOpen(true);
+          return;
+        case 'add_note':
+          setWorldQuickNoteOpen(true);
+          return;
+        case 'open_health':
+          setMicrocopy(runtimeActionLabel(runtime));
+          return;
+      }
+    },
+    [requestMicrophonePermission, router, setMicrocopy, setWorldObservatoryOpen, worldFormingTarget]
+  );
 
   // Discoveries (life milestones) → the Hall, the artefact ring, and reveals.
   const {
@@ -381,12 +526,10 @@ export default function KingdomScreen() {
   // (ready to report back). Idle → no glyph.
   const residentGlyph = useCallback(
     (creatureId: string): 'offer' | 'active' | 'ready' | undefined => {
-      // Every companion always has an offer, so a resident is never 'idle'
-      // unless it already holds an (incomplete or complete) active quest.
-      const state = interactionState(companionQuests, creatureId, todayFacts, true);
+      const state = interactionState(companionQuests, creatureId, todayFacts, hasQuestOfferForDay(creatureId), questCapabilities);
       return state === 'idle' ? undefined : state;
     },
-    [companionQuests, todayFacts]
+    [companionQuests, hasQuestOfferForDay, questCapabilities, todayFacts]
   );
   // Voice the open companion's three lines through Foundation Models (persona)
   // when available; otherwise these resolve to the rule text unchanged. Runs
@@ -401,7 +544,13 @@ export default function KingdomScreen() {
     const fallback = `${companion.name} ${meta?.visualKey ?? ''}`;
     const archetype = archetypeForCreature(companion.creatureId, fallback);
     const subtype = subtypeForCreature(companion.creatureId, fallback);
-    const state = interactionState(companionQuests, companion.creatureId, todayFacts, true);
+    const state = interactionState(
+      companionQuests,
+      companion.creatureId,
+      todayFacts,
+      hasQuestOfferForDay(companion.creatureId),
+      questCapabilities
+    );
     const base = {
       opening: openingLine(companion.name, state),
       insight: companionUnit(archetype, kingdom, subtype).line,
@@ -419,8 +568,35 @@ export default function KingdomScreen() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companion?.creatureId]);
+  }, [companion, companionQuests, hasQuestOfferForDay, kingdom, questCapabilities, residentMeta, todayFacts]);
+
+  // Repair legacy active quest rows when a companion's current data-driven
+  // mapping disagrees with what was already stored on the profile.
+  useEffect(() => {
+    if (!companion) return;
+    const meta = residentMeta(companion.creatureId);
+    const fallback = `${companion.name} ${meta?.visualKey ?? ''}`;
+    const archetype = archetypeForCreature(companion.creatureId, fallback);
+    const subtype = subtypeForCreature(companion.creatureId, fallback);
+    const offer = companionUnit(archetype, kingdom, subtype).quest;
+    if (!offer) return;
+
+    setCompanionQuests((current) => {
+      const next = reconcileCompanionQuestOffer(
+        current,
+        {
+          questId: offer.id,
+          creatureId: companion.creatureId,
+          title: offer.title,
+          hint: offer.hint,
+        },
+        Date.now()
+      );
+      if (next === current) return current;
+      saveCompanionQuests(next);
+      return next;
+    });
+  }, [companion, kingdom, residentMeta]);
   const visibleExpansions = useMemo(() => {
     const stored = (decorState.expansions ?? []).filter(
       (expansion) => expansion.ceremonyShown || expansion.index === growAnimIndex
@@ -593,8 +769,13 @@ export default function KingdomScreen() {
               const archetype = archetypeForCreature(companion.creatureId, fallback);
               const unit = companionUnit(archetype, kingdom, subtypeForCreature(companion.creatureId, fallback));
               const active = questFor(companionQuests, companion.creatureId);
-              const state = interactionState(companionQuests, companion.creatureId, todayFacts, true);
-              const complete = !!active && state === 'ready';
+              const runtime = active
+                ? evaluateQuestRuntime({ questId: active.questId, day: questDay, facts: todayFacts, capabilities: questCapabilities })
+                : null;
+              const hasOffer = hasQuestOfferForDay(companion.creatureId);
+              const state = interactionState(companionQuests, companion.creatureId, todayFacts, hasOffer, questCapabilities);
+              const complete = !!runtime?.complete;
+              const reportBackItems = buildQuestReportBackItems(questDay, runtime);
               return (
                 <CompanionCard
                   name={companion.name}
@@ -605,8 +786,11 @@ export default function KingdomScreen() {
                   onClose={() => setCompanion(null)}
                   activeQuest={active}
                   questComplete={complete}
-                  offer={unit.quest}
-                  criteria={active ? questCriteria(active.questId, todayFacts) : []}
+                  questRuntime={runtime}
+                  reportBackItems={reportBackItems}
+                  offer={hasOffer ? unit.quest : undefined}
+                  criteria={runtime?.progress ?? []}
+                  onQuestAction={() => void handleQuestRuntimeAction(runtime)}
                   onAccept={() =>
                     unit.quest &&
                     handleAcceptQuest({
@@ -614,6 +798,7 @@ export default function KingdomScreen() {
                       creatureId: companion.creatureId,
                       title: unit.quest.title,
                       hint: unit.quest.hint,
+                      dayId: questDayId,
                     })
                   }
                   onCashIn={() => active && handleCashIn(companion.creatureId, active.title)}
@@ -646,25 +831,52 @@ export default function KingdomScreen() {
               ) : (
                 activeQuests(companionQuests).map((quest) => {
                   const who = residentMeta(quest.creatureId);
-                  const criteria = questCriteria(quest.questId, todayFacts);
+                  const runtime = evaluateQuestRuntime({ questId: quest.questId, day: questDay, facts: todayFacts, capabilities: questCapabilities });
                   return (
                     <View key={quest.questId + quest.creatureId} style={styles.questRow}>
                       <ThemedText style={styles.questRowTitle} lightColor="#FFE2B8" darkColor="#FFE2B8">
                         {quest.title}
                         {who ? `  ·  ${who.name}` : ''}
                       </ThemedText>
-                      <ThemedText style={styles.questRowHint} lightColor="#EDEAF6" darkColor="#EDEAF6">
-                        {quest.hint}
-                      </ThemedText>
-                      {criteria.map((c) => (
-                        <ThemedText
-                          key={c.label}
-                          style={styles.questCriterion}
-                          lightColor={c.done ? '#A8E2C6' : '#B7B2C6'}
-                          darkColor={c.done ? '#A8E2C6' : '#B7B2C6'}>
-                          {c.done ? '✓' : '○'} {c.label}
+                      <View style={styles.questStatusPill}>
+                        <ThemedText style={styles.questStatusLabel} lightColor={runtimeStatusColor(runtime)} darkColor={runtimeStatusColor(runtime)}>
+                          {runtimeStatusLabel(runtime)}
                         </ThemedText>
+                      </View>
+                      <ThemedText style={styles.questRowHint} lightColor="#EDEAF6" darkColor="#EDEAF6">
+                        {runtime.complete ? runtime.userMessage : runtime.userMessage || quest.hint}
+                      </ThemedText>
+                      {runtime.progress.map((c) => (
+                        <View key={c.label} style={styles.questCriterionBlock}>
+                          <ThemedText
+                            style={styles.questCriterion}
+                            lightColor={c.done ? '#A8E2C6' : '#B7B2C6'}
+                            darkColor={c.done ? '#A8E2C6' : '#B7B2C6'}>
+                            {c.done ? 'OK' : '--'} {c.label}
+                          </ThemedText>
+                          {c.progressLabel && c.progressRatio != null ? (
+                            <View style={styles.questProgressBlock}>
+                              <View style={styles.questProgressTrack}>
+                                <View
+                                  style={[
+                                    styles.questProgressFill,
+                                    { width: `${Math.max(4, Math.min(100, c.progressRatio * 100))}%` },
+                                    c.done ? styles.questProgressFillDone : null,
+                                  ]}
+                                />
+                              </View>
+                              <ThemedText style={styles.questProgressLabel} lightColor="#B7B2C6" darkColor="#B7B2C6">
+                                {c.progressLabel}
+                              </ThemedText>
+                            </View>
+                          ) : null}
+                        </View>
                       ))}
+                      {!runtime.complete && runtime.nextAction !== 'none' ? (
+                        <ThemedText style={styles.questActionHint} lightColor="#A8E2C6" darkColor="#A8E2C6">
+                          {runtimeActionLabel(runtime)}
+                        </ThemedText>
+                      ) : null}
                     </View>
                   );
                 })
@@ -676,6 +888,55 @@ export default function KingdomScreen() {
         {/* Header chrome — the Kingdom's name + what a life has built so far.
             The copy stays top-left; the actions live on their own right-edge
             rail below so long subtitles can never push them off screen. */}
+        {worldQuickNoteOpen ? (
+          <QuickNoteComposer onClose={() => setWorldQuickNoteOpen(false)} onSubmit={handleWorldQuickNoteSubmit} />
+        ) : null}
+
+        {worldPlacesVaultOpen && worldFormingDay ? (
+          <PlacesDetailSheet
+            day={worldFormingDay}
+            onClose={() => setWorldPlacesVaultOpen(false)}
+            onAddPlace={() => {
+              setWorldPlacesVaultOpen(false);
+              void handleWorldAddCurrentPlace();
+            }}
+            onOpenMap={() => {
+              setWorldPlacesVaultOpen(false);
+              router.push({ pathname: '/day-map/[dayId]', params: { dayId: worldFormingDay.id } });
+            }}
+            onConfirmPlace={handleWorldConfirmPlaceFromVault}
+            onOpenObservatory={() => {
+              setWorldPlacesVaultOpen(false);
+              setWorldObservatoryOpen(true);
+            }}
+          />
+        ) : null}
+
+        {worldObservatoryOpen && worldFormingDay ? (
+          <ObservatorySheet
+            day={worldFormingDay}
+            observations={worldObservations}
+            focusedObservationId={null}
+            travelMemory={worldTravelMemory}
+            onViewPlaces={() => {
+              setWorldObservatoryOpen(false);
+              setWorldPlacesVaultOpen(true);
+            }}
+            onClose={() => setWorldObservatoryOpen(false)}
+          />
+        ) : null}
+
+        {worldPlacePromptOpen && worldActivePlace ? (
+          <PlacePromptSheet
+            placeName={worldPlacePreset && worldActivePlace.name === 'A place you visited' ? 'Welcome back' : worldActivePlace.name}
+            timeLabel={worldActivePlace.timeLabel}
+            isNew={worldActivePlace.isNew}
+            presetCategory={worldPlacePreset}
+            onConfirm={handleWorldConfirmPlace}
+            onClose={closeWorldPlacePrompt}
+          />
+        ) : null}
+
         <View pointerEvents="none" style={styles.header}>
           <View style={styles.headerCopy}>
             <ThemedText type="onboardingLabel" style={styles.headerKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
@@ -951,6 +1212,71 @@ export default function KingdomScreen() {
   );
 }
 
+function runtimeStatusLabel(runtime: QuestRuntimeStatus): string {
+  if (runtime.complete) return runtime.matchedEvidenceIds.length > 0 ? 'Matched from today' : 'Ready to report';
+  switch (runtime.state) {
+    case 'blocked_permission':
+      return 'Needs permission';
+    case 'unavailable':
+      return 'Unavailable';
+    case 'impossible_today':
+      return 'Missed for today';
+    default:
+      return runtime.matchedEvidenceIds.length > 0 ? 'Partly matched' : 'Looking for signals';
+  }
+}
+
+function runtimeStatusColor(runtime: QuestRuntimeStatus): string {
+  if (runtime.complete) return '#A8E2C6';
+  if (runtime.state === 'blocked_permission' || runtime.state === 'unavailable') return '#F3B36A';
+  if (runtime.state === 'impossible_today') return '#F08C8C';
+  return '#B7B2C6';
+}
+
+function runtimeActionLabel(runtime: QuestRuntimeStatus): string {
+  switch (runtime.nextAction) {
+    case 'take_photo':
+      return 'Next: take a photo that clearly matches the quest.';
+    case 'enable_photos':
+      return 'Next: enable photo access.';
+    case 'enable_camera':
+      return 'Next: enable camera access.';
+    case 'enable_location':
+      return 'Next: enable location access or confirm a place manually.';
+    case 'enable_travel_memory':
+      return 'Next: enable Travel Memory.';
+    case 'record_voice':
+      return 'Next: record a voice note.';
+    case 'add_note':
+      return 'Next: add a note.';
+    case 'open_health':
+      return 'Next: connect Health or motion data.';
+    case 'confirm_place':
+      return 'Next: confirm where this happened.';
+    default:
+      return '';
+  }
+}
+
+function formatQuestClock(iso?: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours %= 12;
+  if (hours === 0) hours = 12;
+  return `${hours}:${minutes} ${ampm}`;
+}
+
+function formatQuestTimeRange(start?: string, end?: string): string | null {
+  const startLabel = formatQuestClock(start);
+  const endLabel = formatQuestClock(end);
+  if (startLabel && endLabel && startLabel !== endLabel) return `${startLabel} - ${endLabel}`;
+  return startLabel ?? endLabel ?? null;
+}
+
 const styles = StyleSheet.create({
   screen: { backgroundColor: Lantern.ink950, flex: 1 },
   stage: { flex: 1 },
@@ -1075,8 +1401,38 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   questRowTitle: { fontSize: 14, fontWeight: '700' },
+  questStatusPill: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  questStatusLabel: { fontSize: 11.5, fontWeight: '800' },
   questRowHint: { fontSize: 13, lineHeight: 18 },
   questCriterion: { fontSize: 12.5, marginTop: 2 },
+  questCriterionBlock: { gap: 5 },
+  questProgressBlock: { gap: 4 },
+  questProgressTrack: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 8,
+    overflow: 'hidden',
+  },
+  questProgressFill: {
+    backgroundColor: '#E9A93E',
+    borderRadius: 999,
+    height: '100%',
+  },
+  questProgressFillDone: {
+    backgroundColor: '#A8E2C6',
+  },
+  questProgressLabel: { fontSize: 11.5, fontWeight: '800', lineHeight: 15 },
+  questActionHint: { fontSize: 12, lineHeight: 16, fontWeight: '800', marginTop: 2 },
   giftBadge: {
     alignItems: 'center',
     backgroundColor: Lantern.ember300,

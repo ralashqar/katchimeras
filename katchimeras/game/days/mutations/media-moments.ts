@@ -87,6 +87,7 @@ export function buildAutoFoodMoment(
     source: opts.source,
     noteId: opts.noteId ?? null,
     detail: opts.detail ?? null,
+    cuisine: detection.cuisine ?? null,
     createdAt: opts.now.toISOString(),
   };
 }

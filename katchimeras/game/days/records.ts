@@ -8,6 +8,8 @@ export function createEmptyStoredDay(now: Date, _profile: OnboardingProfile): St
     isoDate: toLocalDateId(now),
     state: 'forming',
     stepsCount: 0,
+    stepsCountDayId: toLocalDateId(now),
+    stepsUpdatedAt: null,
     visitedPlaceCount: 0,
     newPlaceCount: 0,
     locationSampleCount: 0,
@@ -46,7 +48,7 @@ export function readInputDay(
   profile: OnboardingProfile,
   now: Date
 ): StoredHomeDayRecord {
-  return target === 'tomorrow' ? ensureTomorrowDay(state, profile, now) : state.today;
+  return resolveInputTarget(state, target) === 'tomorrow' ? ensureTomorrowDay(state, profile, now) : state.today;
 }
 
 export function writeInputDay(
@@ -54,5 +56,13 @@ export function writeInputDay(
   target: DayInputTarget,
   day: StoredHomeDayRecord
 ): StoredHomeState {
-  return target === 'tomorrow' ? { ...state, tomorrow: day } : { ...state, today: day };
+  return resolveInputTarget(state, target) === 'tomorrow' ? { ...state, tomorrow: day } : { ...state, today: day };
+}
+
+export function resolveInputTarget(state: StoredHomeState, target: DayInputTarget): DayInputTarget {
+  if (state.today.state === 'hatched') {
+    return 'tomorrow';
+  }
+
+  return target;
 }

@@ -1,5 +1,5 @@
 import type { KingdomState } from '@/types/kingdom';
-import { questDefinition } from '@/utils/quests/definitions';
+import { themedQuestOffer } from '@/utils/quests/themed';
 
 // Katchimera Engagement T1 rule engine (docs/katchimera-engagement-v1.md):
 // one engagement unit per companion-card open, computed from the user's own
@@ -17,7 +17,7 @@ export type CompanionUnit = {
 // category — cafe, movement, rest, moment, park…), which is exactly what the
 // companion should talk about. No guessing: resolve creatureId → category →
 // engagement archetype.
-const ENCOUNTER_CAST: { id: string; name: string; triggerCategory: string; triggerSubtype: string }[] = require('../data/katchimeras/encounter-katchimeras.json');
+const ENCOUNTER_CAST: { id: string; name: string; triggerCategory: string; triggerSubtype: string; visualKey?: string }[] = require('../data/katchimeras/encounter-katchimeras.json');
 
 const CATEGORY_ARCHETYPE: Record<string, string> = {
   cafe: 'food',
@@ -58,8 +58,13 @@ function resolveCategory(category: string, subtype: string): string {
   return SUBTYPE_ARCHETYPE[subtype] ?? CATEGORY_ARCHETYPE[category] ?? '';
 }
 
+function visualKeyForEntry(entry: { id: string; visualKey?: string }): string {
+  return (entry.visualKey ?? entry.id.split('_').at(-1) ?? '').toLowerCase();
+}
+
 let castIndex: Map<string, string> | null = null;
 let nameIndex: Map<string, string> | null = null;
+let visualIndex: Map<string, string> | null = null;
 export function archetypeForCreature(creatureId: string, fallbackText = ''): string {
   if (!castIndex) {
     castIndex = new Map(ENCOUNTER_CAST.map((entry) => [entry.id, resolveCategory(entry.triggerCategory, entry.triggerSubtype)]));
@@ -72,9 +77,12 @@ export function archetypeForCreature(creatureId: string, fallbackText = ''): str
   const nameKey = fallbackText.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
   if (!nameIndex) {
     nameIndex = new Map(ENCOUNTER_CAST.map((entry) => [entry.name.toLowerCase(), resolveCategory(entry.triggerCategory, entry.triggerSubtype)]));
+    visualIndex = new Map(ENCOUNTER_CAST.map((entry) => [visualKeyForEntry(entry), resolveCategory(entry.triggerCategory, entry.triggerSubtype)]));
   }
   const fromName = nameIndex.get(nameKey);
   if (fromName) return fromName;
+  const visualKey = fallbackText.trim().split(/\s+/).find((part) => visualIndex!.has(part.toLowerCase()))?.toLowerCase();
+  if (visualKey) return visualIndex!.get(visualKey) ?? '';
   // Legacy-profile creatures predate the encounter registry (old hatch-system
   // ids) — fall back to a keyword read of the name/visualKey.
   const s = `${creatureId} ${fallbackText}`.toLowerCase();
@@ -90,13 +98,16 @@ export function archetypeForCreature(creatureId: string, fallbackText = ''): str
 // a quest specific to WHY it hatched, not just its broad archetype.
 let subtypeById: Map<string, string> | null = null;
 let subtypeByName: Map<string, string> | null = null;
+let subtypeByVisual: Map<string, string> | null = null;
 export function subtypeForCreature(creatureId: string, fallbackText = ''): string {
   if (!subtypeById) {
     subtypeById = new Map(ENCOUNTER_CAST.map((entry) => [entry.id, entry.triggerSubtype]));
     subtypeByName = new Map(ENCOUNTER_CAST.map((entry) => [entry.name.toLowerCase(), entry.triggerSubtype]));
+    subtypeByVisual = new Map(ENCOUNTER_CAST.map((entry) => [visualKeyForEntry(entry), entry.triggerSubtype]));
   }
   const nameKey = fallbackText.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
-  return subtypeById.get(creatureId) ?? subtypeByName!.get(nameKey) ?? '';
+  const visualKey = fallbackText.trim().split(/\s+/).find((part) => subtypeByVisual!.has(part.toLowerCase()))?.toLowerCase();
+  return subtypeById.get(creatureId) ?? subtypeByName!.get(nameKey) ?? (visualKey ? subtypeByVisual!.get(visualKey) : undefined) ?? '';
 }
 
 // Declarative quest-offer resolution: subtype wins, else archetype default.
@@ -151,9 +162,7 @@ const ARCHETYPE_QUEST: Record<string, string> = {
 };
 
 function questOffer(subtype: string, archetype: string): CompanionUnit['quest'] {
-  const questId = SUBTYPE_QUEST[subtype] ?? ARCHETYPE_QUEST[archetype] ?? 'quest-snap-today';
-  const def = questDefinition(questId);
-  return def ? { id: def.id, title: def.title, hint: def.hint } : undefined;
+  return themedQuestOffer(subtype, archetype);
 }
 
 // The insight LINE per archetype (the quest is chosen separately by subtype →

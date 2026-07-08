@@ -5,23 +5,26 @@ const MAX_STORED_DAY_LOCATIONS = 180;
 const LOCATION_LINK_WINDOW_MS = 20 * 60 * 1000;
 
 export function withAppendedMoment(day: StoredHomeDayRecord, moment: HomeMoment): StoredHomeDayRecord {
+  const moments = day.moments ?? [];
+  const locations = day.locations ?? [];
   return {
     ...day,
-    moments: [...day.moments, moment],
-    locations: appendPhotoMomentLocation(linkMomentToLatestLocation(day.locations, moment), moment),
+    moments: [...moments, moment],
+    locations: appendPhotoMomentLocation(linkMomentToLatestLocation(locations, moment), moment),
   };
 }
 
-function linkMomentToLatestLocation(points: StoredHomeLocationPoint[], moment: HomeMoment) {
-  if (points.length === 0) {
-    return points;
+function linkMomentToLatestLocation(points: StoredHomeLocationPoint[] | undefined, moment: HomeMoment) {
+  const existingPoints = points ?? [];
+  if (existingPoints.length === 0) {
+    return existingPoints;
   }
 
   const momentTime = new Date(moment.createdAt).getTime();
   const momentType = deriveLocationTypeFromMoment(moment);
   let linked = false;
 
-  const nextPoints = points.map((point, index, collection) => {
+  const nextPoints = existingPoints.map((point, index, collection) => {
     if (linked) {
       return point;
     }
@@ -47,9 +50,10 @@ function linkMomentToLatestLocation(points: StoredHomeLocationPoint[], moment: H
   return nextPoints;
 }
 
-function appendPhotoMomentLocation(points: StoredHomeLocationPoint[], moment: HomeMoment) {
+function appendPhotoMomentLocation(points: StoredHomeLocationPoint[] | undefined, moment: HomeMoment) {
+  const existingPoints = points ?? [];
   if (moment.type !== 'photo' || !moment.metadata?.latitude || !moment.metadata?.longitude) {
-    return points;
+    return existingPoints;
   }
 
   const attachedPoint: StoredHomeLocationPoint = {
@@ -64,14 +68,14 @@ function appendPhotoMomentLocation(points: StoredHomeLocationPoint[], moment: Ho
     thumbnailUri: moment.metadata.thumbnailUri,
   };
 
-  const hasNearbyPoint = points.some((point) => {
+  const hasNearbyPoint = existingPoints.some((point) => {
     const timeDelta = Math.abs(new Date(point.capturedAt).getTime() - new Date(moment.createdAt).getTime());
     const distance = getDistanceMeters(point.lat, point.lng, attachedPoint.lat, attachedPoint.lng);
     return timeDelta <= LOCATION_LINK_WINDOW_MS && distance <= 180;
   });
 
   if (hasNearbyPoint) {
-    return points.map((point) => {
+    return existingPoints.map((point) => {
       const timeDelta = Math.abs(new Date(point.capturedAt).getTime() - new Date(moment.createdAt).getTime());
       const distance = getDistanceMeters(point.lat, point.lng, attachedPoint.lat, attachedPoint.lng);
 
@@ -88,7 +92,7 @@ function appendPhotoMomentLocation(points: StoredHomeLocationPoint[], moment: Ho
     });
   }
 
-  return [...points, attachedPoint].slice(-MAX_STORED_DAY_LOCATIONS);
+  return [...existingPoints, attachedPoint].slice(-MAX_STORED_DAY_LOCATIONS);
 }
 
 function deriveLocationTypeFromMoment(moment: HomeMoment): HomeLocationType | null {

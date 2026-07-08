@@ -31,6 +31,8 @@ const dayRecordProvider: SignalProvider = {
   produces: [
     'steps.count',
     'notes.added',
+    'notes.voiceAdded',
+    'bigMoments.marked',
     'places.confirmed',
     'places.confirmedNew',
     'places.categories',
@@ -43,6 +45,8 @@ const dayRecordProvider: SignalProvider = {
     return {
       'steps.count': today.stepsCount ?? 0,
       'notes.added': today.notes?.length ?? 0,
+      'notes.voiceAdded': (today.notes ?? []).filter((note) => note.kind === 'voice').length,
+      'bigMoments.marked': today.bigMoments?.length ?? 0,
       'places.confirmed': confirmed,
       // "New" place detection (history diff) isn't wired yet — treat any
       // confirmed place as new for now, but keep the key so quests referencing

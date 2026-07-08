@@ -1,3 +1,4 @@
+import type { QuestCapabilityId } from '@/utils/capabilities/quest-capabilities';
 import type { Criterion } from '@/utils/signals/facts';
 
 // Declarative companion-quest catalogue (docs/katchimera-engagement-v1.md
@@ -8,12 +9,21 @@ import type { Criterion } from '@/utils/signals/facts';
 
 export type QuestDefinition = {
   id: string;
+  family?: 'photo' | 'place' | 'movement' | 'note' | 'voice' | 'food' | 'studio' | 'sleep' | 'weather' | 'calendar';
+  themes?: string[];
   title: string;
   hint: string;
   criteria: Criterion[];
+  requiresCapabilities?: QuestCapabilityId[];
+  optionalCapabilities?: QuestCapabilityId[];
+  suggestedActions?: string[];
+  evidencePolicy?: {
+    minConfidence?: number;
+    allowCorroboration?: boolean;
+  };
 };
 
-export const QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
+const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
   'quest-new-place': {
     id: 'quest-new-place',
     title: 'Somewhere new',
@@ -95,9 +105,13 @@ export const QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
   },
   'quest-celebrate-note': {
     id: 'quest-celebrate-note',
+    family: 'voice',
     title: 'Worth celebrating',
     hint: 'Record a voice note about a moment worth celebrating — yours or someone you love.',
-    criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Add a note (or voice note) today' }],
+    criteria: [{ fact: 'notes.voiceAdded', op: 'gte', value: 1, label: 'Record a voice note today' }],
+    requiresCapabilities: ['microphone'],
+    optionalCapabilities: ['speech.transcription', 'appleFoundation'],
+    suggestedActions: ['record_voice', 'add_note'],
   },
   'quest-goal-note': {
     id: 'quest-goal-note',
@@ -247,6 +261,128 @@ export const QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     criteria: [{ fact: 'capture.latestHour', op: 'gte', value: 23, label: 'A moment after 11pm' }],
   },
 };
+
+export const QUEST_DEFINITIONS: Record<string, QuestDefinition> = withQuestMetadata(RAW_QUEST_DEFINITIONS);
+
+function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record<string, QuestDefinition> {
+  return Object.fromEntries(
+    Object.entries(definitions).map(([id, definition]) => {
+      const family = definition.family ?? inferFamily(definition);
+      const requiresCapabilities = definition.requiresCapabilities ?? inferRequiredCapabilities(definition, family);
+      const optionalCapabilities = definition.optionalCapabilities ?? inferOptionalCapabilities(definition, family);
+      const suggestedActions = definition.suggestedActions ?? inferSuggestedActions(family);
+      const themes = Array.from(new Set([...(definition.themes ?? []), ...inferThemes(definition, family)]));
+      const evidencePolicy = definition.evidencePolicy ?? inferEvidencePolicy(definition);
+      return [
+        id,
+        {
+          ...definition,
+          family: family ?? undefined,
+          themes,
+          requiresCapabilities,
+          optionalCapabilities,
+          suggestedActions,
+          evidencePolicy,
+        },
+      ];
+    })
+  );
+}
+
+function inferFamily(definition: QuestDefinition): QuestDefinition['family'] | undefined {
+  if (definition.criteria.some((criterion) => criterion.fact === 'places.categories' || criterion.fact === 'places.confirmed')) return 'place';
+  if (definition.criteria.some((criterion) => criterion.fact === 'evidence.items' && criterion.sourceTypes?.includes('photo'))) return 'photo';
+  if (definition.criteria.some((criterion) => criterion.fact === 'steps.count')) return 'movement';
+  if (definition.criteria.some((criterion) => criterion.fact === 'notes.added')) {
+    return definition.id.includes('celebrate') ? 'voice' : 'note';
+  }
+  if (definition.criteria.some((criterion) => criterion.fact === 'food.cuisines' || criterion.fact === 'food.moments')) return 'food';
+  if (definition.criteria.some((criterion) => criterion.fact === 'studio.media')) return 'studio';
+  if (definition.criteria.some((criterion) => criterion.fact === 'sleep.quality')) return 'sleep';
+  if (definition.criteria.some((criterion) => criterion.fact === 'weather.condition')) return 'weather';
+  if (definition.criteria.some((criterion) => criterion.fact === 'capture.earliestHour' || criterion.fact === 'capture.latestHour')) return 'photo';
+  return undefined;
+}
+
+function inferRequiredCapabilities(
+  definition: QuestDefinition,
+  family: QuestDefinition['family'] | undefined
+): QuestCapabilityId[] {
+  const required = new Set<QuestCapabilityId>();
+  if (family === 'photo') required.add('camera.capture');
+  if (family === 'place') required.add('location.foreground');
+  if (family === 'movement') required.add('health.steps');
+  if (family === 'sleep') required.add('health.sleep');
+  if (family === 'voice') {
+    required.add('microphone');
+    required.add('speech.transcription');
+  }
+  if (definition.criteria.some((criterion) => criterion.sourceTypes?.includes('photo'))) required.add('camera.capture');
+  if (definition.criteria.some((criterion) => criterion.fact === 'places.categories' || criterion.fact === 'places.confirmed')) {
+    required.add('location.foreground');
+  }
+  return [...required];
+}
+
+function inferOptionalCapabilities(
+  definition: QuestDefinition,
+  family: QuestDefinition['family'] | undefined
+): QuestCapabilityId[] {
+  const optional = new Set<QuestCapabilityId>();
+  if (family === 'photo' || definition.criteria.some((criterion) => criterion.sourceTypes?.includes('photo'))) {
+    optional.add('photos.read');
+    optional.add('appleVision');
+  }
+  if (family === 'place' || definition.criteria.some((criterion) => criterion.fact === 'places.categories' || criterion.fact === 'places.confirmed')) {
+    optional.add('location.background');
+  }
+  if (family === 'voice') optional.add('appleFoundation');
+  return [...optional];
+}
+
+function inferSuggestedActions(family: QuestDefinition['family'] | undefined): string[] {
+  switch (family) {
+    case 'photo':
+      return ['take_photo'];
+    case 'place':
+      return ['confirm_place'];
+    case 'voice':
+      return ['record_voice'];
+    case 'note':
+      return ['add_note'];
+    case 'movement':
+    case 'sleep':
+      return ['open_health'];
+    default:
+      return [];
+  }
+}
+
+function inferThemes(definition: QuestDefinition, family: QuestDefinition['family'] | undefined): string[] {
+  const themes = new Set<string>();
+  if (family) themes.add(family);
+  for (const criterion of definition.criteria) {
+    if (typeof criterion.value === 'string') themes.add(criterion.value);
+    if (criterion.fact === 'weather.condition') themes.add('weather');
+    if (criterion.fact === 'studio.media') themes.add('culture');
+  }
+  if (definition.id.includes('cuisine')) themes.add('food');
+  if (definition.id.includes('dawn')) themes.add('morning');
+  if (definition.id.includes('late')) themes.add('night');
+  return [...themes];
+}
+
+function inferEvidencePolicy(definition: QuestDefinition): QuestDefinition['evidencePolicy'] | undefined {
+  const evidenceCriteria = definition.criteria.filter((criterion) => criterion.fact === 'evidence.items');
+  if (evidenceCriteria.length === 0) return undefined;
+  const confidenceValues = evidenceCriteria
+    .map((criterion) => criterion.minConfidence)
+    .filter((value): value is number => typeof value === 'number');
+  return {
+    minConfidence: confidenceValues.length ? Math.min(...confidenceValues) : 0.6,
+    allowCorroboration: evidenceCriteria.some((criterion) => criterion.op === 'evidenceCorroborated'),
+  };
+}
 
 export function questDefinition(questId: string): QuestDefinition | null {
   return QUEST_DEFINITIONS[questId] ?? null;

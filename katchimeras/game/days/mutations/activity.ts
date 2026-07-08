@@ -4,6 +4,7 @@ import type {
   HomeLocationSource,
   HomeLocationType,
   LocationPermissionState,
+  StoredHomeDayRecord,
   StoredHomeLocationPoint,
   StoredHomeState,
 } from '@/types/home';
@@ -49,17 +50,47 @@ export function withActivityPermission(
   };
 }
 
-export function withTodayStepCount(state: StoredHomeState, stepsCount: number): StoredHomeState {
-  if (!Number.isFinite(stepsCount) || stepsCount < 0) {
+export type StepCountReading = {
+  stepsCount: number;
+  dayId: string;
+  observedAt?: string;
+};
+
+export function withTodayStepCount(state: StoredHomeState, reading: number | StepCountReading): StoredHomeState {
+  const nextToday = withDayStepCount(state.today, reading);
+  if (nextToday === state.today) {
     return state;
   }
 
   return {
     ...state,
-    today: {
-      ...state.today,
-      stepsCount: Math.max(state.today.stepsCount, Math.round(stepsCount)),
-    },
+    today: nextToday,
+  };
+}
+
+export function withDayStepCount(day: StoredHomeDayRecord, reading: number | StepCountReading): StoredHomeDayRecord {
+  const stepsCount = typeof reading === 'number' ? reading : reading.stepsCount;
+  const readingDayId = typeof reading === 'number' ? day.isoDate : reading.dayId;
+  if (!Number.isFinite(stepsCount) || stepsCount < 0) {
+    return day;
+  }
+  if (readingDayId !== day.isoDate) {
+    return day;
+  }
+
+  const storedDayId = day.stepsCountDayId ?? null;
+  const existingSteps = storedDayId === day.isoDate ? day.stepsCount : 0;
+  const nextSteps = Math.max(existingSteps, Math.round(stepsCount));
+  const nextUpdatedAt = typeof reading === 'number' ? day.stepsUpdatedAt : (reading.observedAt ?? day.stepsUpdatedAt ?? null);
+  if (nextSteps === day.stepsCount && day.stepsCountDayId === day.isoDate && nextUpdatedAt === day.stepsUpdatedAt) {
+    return day;
+  }
+
+  return {
+    ...day,
+    stepsCount: nextSteps,
+    stepsCountDayId: day.isoDate,
+    stepsUpdatedAt: nextUpdatedAt,
   };
 }
 
@@ -67,18 +98,31 @@ export function withForegroundLocationSample(
   state: StoredHomeState,
   sample: ForegroundLocationSample
 ): StoredHomeState {
-  const nextPoint = createForegroundLocationPoint(sample);
-
-  if (shouldSkipLocationSample(state.today.locations, nextPoint)) {
+  const nextToday = withDayForegroundLocationSample(state.today, sample);
+  if (nextToday === state.today) {
     return state;
   }
 
   return {
     ...state,
-    today: {
-      ...state.today,
-      locations: [...state.today.locations, nextPoint].slice(-MAX_STORED_DAY_LOCATIONS),
-    },
+    today: nextToday,
+  };
+}
+
+export function withDayForegroundLocationSample(
+  day: StoredHomeDayRecord,
+  sample: ForegroundLocationSample
+): StoredHomeDayRecord {
+  const nextPoint = createForegroundLocationPoint(sample);
+  const locations = day.locations ?? [];
+
+  if (shouldSkipLocationSample(locations, nextPoint)) {
+    return day;
+  }
+
+  return {
+    ...day,
+    locations: [...locations, nextPoint].slice(-MAX_STORED_DAY_LOCATIONS),
   };
 }
 
@@ -98,8 +142,9 @@ function createForegroundLocationPoint(sample: ForegroundLocationSample): Stored
   };
 }
 
-function shouldSkipLocationSample(existingPoints: StoredHomeLocationPoint[], nextPoint: StoredHomeLocationPoint) {
-  const latestPoint = existingPoints[existingPoints.length - 1];
+function shouldSkipLocationSample(existingPoints: StoredHomeLocationPoint[] | undefined, nextPoint: StoredHomeLocationPoint) {
+  const points = existingPoints ?? [];
+  const latestPoint = points[points.length - 1];
   if (!latestPoint) {
     return false;
   }

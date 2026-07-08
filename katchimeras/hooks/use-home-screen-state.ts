@@ -2,6 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
+import type { DayStepCountReading } from '@/hooks/use-day-step-capture';
 import type {
   AddMomentInput,
   ActivityPermissionState,
@@ -56,6 +57,7 @@ import { useHatchController } from '@/features/today/use-hatch-controller';
 import { useHealthRouteImport } from '@/features/today/use-health-route-import';
 import { usePromptPhotoCandidates } from '@/features/today/use-prompt-photo-candidates';
 import { useHomeStateMutation } from '@/features/today/use-home-state-mutation';
+import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 
 export function useHomeScreenState() {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
@@ -220,6 +222,7 @@ export function useHomeScreenState() {
         forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
       })
     : [];
+  const { capabilities: questCapabilities, requestMicrophonePermission } = useQuestCapabilities(viewModel.state);
 
   const addMoment = useCallback((momentInput: AddMomentInput, target: DayInputTarget = 'today') => {
     mutateHomeState((state, profile, now) => addMomentToDay(state, profile, momentInput, now, target));
@@ -397,8 +400,8 @@ export function useHomeScreenState() {
     mutateHomeState((state, profile, now) => updateActivityPermissionState(state, permission, profile, now));
   }, [mutateHomeState]);
 
-  const setTodayStepCount = useCallback((stepsCount: number) => {
-    mutateHomeState((state, profile, now) => updateTodayStepCount(state, stepsCount, profile, now));
+  const setTodayStepCount = useCallback((reading: DayStepCountReading) => {
+    mutateHomeState((state, profile, now) => updateTodayStepCount(state, reading, profile, now));
   }, [mutateHomeState]);
 
   const addForegroundLocationSample = useCallback(
@@ -475,6 +478,8 @@ export function useHomeScreenState() {
     locationPermission: viewModel.state.locationPermission,
     activityPermission: viewModel.state.activityPermission,
     healthPermission: viewModel.state.healthPermission,
+    questCapabilities,
+    requestMicrophonePermission,
     importingHealthRouteDayId,
     addMoment,
     answerDayPrompt,

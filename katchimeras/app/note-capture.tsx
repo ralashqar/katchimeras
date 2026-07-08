@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
@@ -17,6 +17,7 @@ import { Lantern } from '@/constants/theme';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { interpretNote, transcribeAudioNote, type InterpretedNote } from '@/utils/note-interpret';
+import type { DayInputTarget } from '@/types/home';
 
 const MAX_SECONDS = 30;
 const MEANING_TINT: Record<string, string> = {
@@ -39,8 +40,12 @@ const BIG_MOMENT_EMOJI: Record<string, string> = {
 // means (incl. a Big Moment) → fold into today and fly into the Memory Vault.
 export default function NoteCaptureScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ target?: string }>();
   const insets = useSafeAreaInsets();
-  const { addNote } = useHomeScreenState();
+  const { addNote, isTodayHatched } = useHomeScreenState();
+  const requestedTarget = parseCaptureTarget(params.target);
+  const noteTarget: DayInputTarget = requestedTarget ?? (isTodayHatched ? 'tomorrow' : 'today');
+  const targetLabel = noteTarget === 'tomorrow' ? 'tomorrow' : 'today';
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const player = useAudioPlayer();
   const playerStatus = useAudioPlayerStatus(player);
@@ -189,7 +194,7 @@ export default function NoteCaptureScreen() {
       food: result.food,
       llmClassified: result.llmClassified,
       intelligenceProvider: result.intelligenceProvider,
-    });
+    }, noteTarget);
     // Celebratory flight into the Memory Vault (World consumes this on focus).
     queueCaptureFeed({ photoUri: '', icon: 'square.and.pencil', accent: MEANING_TINT[result.archetype] ?? '#7DE8CD' });
     router.back();
@@ -210,7 +215,7 @@ export default function NoteCaptureScreen() {
       {phase === 'input' ? (
         <View style={styles.body}>
           <ThemedText style={styles.prompt} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            Speak or type what stood out today.
+            Speak or type what stood out {targetLabel}.
           </ThemedText>
 
           <View>
@@ -309,13 +314,18 @@ export default function NoteCaptureScreen() {
 
           <Pressable onPress={commit} style={styles.cta}>
             <ThemedText style={styles.ctaLabel} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>
-              Add to today
+              Add to {targetLabel}
             </ThemedText>
           </Pressable>
         </View>
       ) : null}
     </View>
   );
+}
+
+function parseCaptureTarget(value: string | string[] | undefined): DayInputTarget | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === 'tomorrow' || raw === 'today' ? raw : null;
 }
 
 const styles = StyleSheet.create({

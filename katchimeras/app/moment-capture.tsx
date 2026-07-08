@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
@@ -19,7 +19,7 @@ import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 import type { SceneRead } from '@/utils/scene-classify';
-import type { DayVisionSummary } from '@/types/home';
+import type { DayInputTarget, DayVisionSummary } from '@/types/home';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
@@ -28,12 +28,15 @@ type CaptureState = 'live' | 'capturing' | 'captured';
 
 export default function MomentCaptureScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ target?: string }>();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  const { selectedDay, applyCapturedMoment, isTodayHatched } = useHomeScreenState();
-  const dayScores = selectedDay?.kind === 'day' ? selectedDay.scores : null;
-  // Once today has hatched, a capture feeds the forming tomorrow instead.
-  const captureTarget = isTodayHatched ? 'tomorrow' : 'today';
+  const { selectedDay, applyCapturedMoment, isTodayHatched, tomorrowDay } = useHomeScreenState();
+  const requestedTarget = parseCaptureTarget(params.target);
+  // Explicit route params win. Without one, preserve the old post-hatch default.
+  const captureTarget: DayInputTarget = requestedTarget ?? (isTodayHatched ? 'tomorrow' : 'today');
+  const targetDay = captureTarget === 'tomorrow' ? tomorrowDay : selectedDay?.kind === 'day' ? selectedDay : null;
+  const dayScores = targetDay?.scores ?? null;
 
   const cameraRef = useRef<CameraView | null>(null);
   const [state, setState] = useState<CaptureState>('live');
@@ -152,6 +155,11 @@ export default function MomentCaptureScreen() {
       ) : null}
     </View>
   );
+}
+
+function parseCaptureTarget(value: string | string[] | undefined): DayInputTarget | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw === 'tomorrow' || raw === 'today' ? raw : null;
 }
 
 const styles = StyleSheet.create({

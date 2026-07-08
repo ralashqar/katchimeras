@@ -19,6 +19,7 @@ function transpileToTemp(relativeSourcePath, outName) {
 }
 
 const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'taxonomy.js');
+const scoringPath = transpileToTemp('utils/quests/evidence-scoring.ts', 'evidence-scoring.js');
 const factsPath = transpileToTemp('utils/signals/facts.ts', 'facts.js');
 const definitionsPath = transpileToTemp('utils/quests/definitions.ts', 'definitions.js');
 const evaluatePath = transpileToTemp('utils/quests/evaluate.ts', 'evaluate.js');
@@ -28,6 +29,7 @@ fs.writeFileSync(typesPath, '');
 const stubs = {
   '@/types/home': typesPath,
   '@/utils/intelligence/taxonomy': taxonomyPath,
+  '@/utils/quests/evidence-scoring': scoringPath,
   '@/utils/signals/facts': factsPath,
 };
 const originalResolve = Module._resolveFilename;
@@ -88,4 +90,3 @@ check('matched evidence exposes ids', matched.done === true && matched.evidenceI
 
 console.log(failures === 0 ? '\nAll quest evidence checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
-

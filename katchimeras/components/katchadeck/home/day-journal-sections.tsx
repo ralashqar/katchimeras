@@ -516,6 +516,21 @@ function buildDayTimeline(day: HomeDayRecord): TimelineEntry[] {
     const meta = MEANING_META[captured.archetype] ?? MEANING_FALLBACK;
     pushAt(captured.createdAt, `c-${index}`, meta.icon, meta.accent, captured.label);
   });
+  for (const food of day.foodMoments ?? []) {
+    if (food.source && food.source !== 'manual') continue;
+    pushAt(food.createdAt, `f-${food.id}`, 'fork.knife', foodMeaningAccent(food.meaning), food.label, 'Food');
+  }
+  for (const studio of day.studioMoments ?? []) {
+    if (studio.source && studio.source !== 'manual') continue;
+    pushAt(
+      studio.createdAt,
+      `s-${studio.id}`,
+      studioMediaIcon(studio.mediaType),
+      studioRatingAccent(studio.rating),
+      studio.label,
+      'Studio'
+    );
+  }
   for (const note of day.notes ?? []) {
     const meta = MEANING_META[note.archetype] ?? MEANING_FALLBACK;
     pushAt(
@@ -528,6 +543,52 @@ function buildDayTimeline(day: HomeDayRecord): TimelineEntry[] {
     );
   }
   return entries.sort((left, right) => left.time - right.time);
+}
+
+function foodMeaningAccent(meaning: string): string {
+  switch (meaning) {
+    case 'sharedMeal':
+      return '#F4BE8D';
+    case 'comfort':
+      return '#91D8C7';
+    case 'discovery':
+      return '#C77DFF';
+    case 'fuel':
+      return '#92D7FF';
+    default:
+      return '#FFC36B';
+  }
+}
+
+function studioRatingAccent(rating: string): string {
+  switch (rating) {
+    case 'loved':
+      return '#F49AC1';
+    case 'inspired':
+      return '#C77DFF';
+    case 'meh':
+      return '#A7D5FF';
+    default:
+      return '#E8C272';
+  }
+}
+
+function studioMediaIcon(mediaType: string): IconSymbolName {
+  switch (mediaType) {
+    case 'book':
+      return 'book.fill';
+    case 'film':
+    case 'show':
+      return 'film.fill';
+    case 'game':
+      return 'gamecontroller.fill';
+    case 'music':
+      return 'music.note';
+    case 'art':
+      return 'paintbrush.fill';
+    default:
+      return 'sparkles';
+  }
 }
 
 type TimelineBucket = { id: string; time: number; timeLabel: string; items: TimelineEntry[] };

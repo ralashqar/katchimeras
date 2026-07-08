@@ -42,6 +42,10 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
     return null;
   }
 
+  const options = prompt.options ?? [];
+  const maxOptions = Number.isFinite(prompt.maxOptions) ? prompt.maxOptions : options.length;
+  const photoCandidates = prompt.photoCandidates ?? [];
+
   return (
     <Animated.View
       // Re-key per prompt so the whole strip plays its intro when the question
@@ -70,7 +74,7 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
 
       {prompt.id === 'meaningful_photo' ? (
         <ScrollView contentContainerStyle={styles.photoRow} horizontal showsHorizontalScrollIndicator={false}>
-          {prompt.photoCandidates.map((photo, index) => (
+          {photoCandidates.map((photo, index) => (
             <PromptPhoto
               key={photo.assetId}
               index={index}
@@ -81,7 +85,7 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
         </ScrollView>
       ) : (
         <View style={styles.chipRow}>
-          {prompt.options.slice(0, prompt.maxOptions).map((option, index) => (
+          {options.slice(0, maxOptions).map((option, index) => (
             <PromptChip
               key={option.id}
               index={index}

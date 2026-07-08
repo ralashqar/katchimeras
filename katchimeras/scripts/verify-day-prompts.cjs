@@ -146,10 +146,32 @@ check(
   promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T22:30:00')) === null,
   promptEngine.selectActiveDayPrompt(makeDay(), new Date('2026-06-17T22:30:00'))?.id
 );
-// Stacking: the "Add to today" menu is ordered by the same relevance, so the
-// most relevant sits first and the rest stack behind it.
 const morningMenu = promptEngine.listAvailableDayPrompts(makeDay(), new Date('2026-06-17T08:00:00')).map((p) => p.id);
-check('menu stacks launched prompts by relevance', morningMenu[0] === 'activity' && morningMenu.includes('hobby'), morningMenu.join(','));
+check('manual add menu starts with ordinary action categories', morningMenu[0] === 'activity' && morningMenu[1] === 'hobby', morningMenu.join(','));
+
+const legacyShapedDay = {
+  id: 'day-legacy',
+  isoDate: '2026-06-17',
+  state: 'forming',
+  stepsCount: 0,
+  visitedPlaceCount: 0,
+  newPlaceCount: 0,
+  locationSampleCount: 0,
+  shareReadyAt: null,
+  healthRouteImport: null,
+  exactRouteSegments: [],
+  selectedPathId: null,
+  heroPhoto: null,
+  creature: null,
+};
+check(
+  'legacy-shaped day without arrays does not crash prompt selection',
+  promptEngine.selectActiveDayPrompt(legacyShapedDay, new Date('2026-06-17T19:00:00')) === null
+);
+check(
+  'legacy-shaped day without arrays still builds add menu',
+  promptEngine.listAvailableDayPrompts(legacyShapedDay, new Date('2026-06-17T19:00:00')).length > 0
+);
 
 const noRepeatDay = makeDay({ promptAnswers: [promptAnswer('feeling')] });
 check(
@@ -294,6 +316,13 @@ const photoMenu = promptEngine
   })
   .map((p) => p.id);
 check('Photo option appears with photo candidates', photoMenu.includes('meaningful_photo'), photoMenu.join(','));
+const forcedOldPhotoMenu = promptEngine
+  .listAvailableDayPrompts(menuDay, new Date('2026-06-17T19:00:00'), {
+    photoCandidates: [photoCandidate(1, '2026-06-16'), photoCandidate(2, '2026-06-16')],
+    forceMeaningfulPhoto: true,
+  })
+  .map((p) => p.id);
+check('manual add menu ignores forced old photo candidates', !forcedOldPhotoMenu.includes('meaningful_photo'), forcedOldPhotoMenu.join(','));
 
 // Testing mode: answered categories stay in the menu (re-answerable) — the
 // once-per-day restriction is intentionally off for now.
@@ -312,6 +341,14 @@ check(
   'buildDayPromptByKind null for photo without candidates',
   promptEngine.buildDayPromptByKind(menuDay, 'meaningful_photo') === null
 );
+
+const stripSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-prompt-strip.tsx'), 'utf8');
+check('DayPromptStrip guards missing prompt options', stripSource.includes('prompt.options ?? []'));
+check('DayPromptStrip guards missing photo candidates', stripSource.includes('prompt.photoCandidates ?? []'));
+const actionStackSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/world-action-stack.tsx'), 'utf8');
+check('Add button does not pass press event as prompt', actionStackSource.includes('onPress={() => onAdd()}'));
+const promptControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-prompt-sheet-controller.ts'), 'utf8');
+check('Prompt sheet controller rejects non-prompt initial values', promptControllerSource.includes('isActiveDayPrompt(prompt) ? prompt : null'));
 
 Module._resolveFilename = originalResolve;
 fs.rmSync(tempDir, { recursive: true, force: true });

@@ -22,6 +22,7 @@ export type ActiveDayPrompt = DayPromptDefinition & {
 // flow) — their old strip prompts are retired (launchEnabled false). Everything
 // else (activity/people/hobby/day word) lives behind the "+" menu only.
 const AUTO_SURFACED_KINDS = new Set<DayPromptKind>(['meaningful_photo', 'meaning']);
+const MANUAL_MENU_ORDER: DayPromptKind[] = ['activity', 'hobby', 'people', 'day_word', 'meaningful_photo'];
 
 export function selectActiveDayPrompt(
   day: StoredHomeDayRecord,
@@ -36,7 +37,7 @@ export function selectActiveDayPrompt(
   }
 
   const daypart = resolveDaypart(now);
-  const answeredOrDismissed = new Set(day.promptAnswers.map((answer) => answer.kind));
+  const answeredOrDismissed = new Set((day.promptAnswers ?? []).map((answer) => answer.kind));
   const photoCandidates = excludeUsedPhotos(options.photoCandidates ?? collectDayPromptPhotoCandidates(day), day);
   const eligiblePhotoCount = countEligiblePhotoCandidatesForDay(photoCandidates, day.isoDate, options.forceMeaningfulPhoto === true);
   const order = rankPromptKinds(day, now, eligiblePhotoCount, options.forceMeaningfulPhoto === true);
@@ -53,7 +54,7 @@ export function selectActiveDayPrompt(
     if (prompt.photoGated && eligiblePhotoCount < (prompt.minPhotoCandidates ?? 1)) {
       continue;
     }
-    if (kind === 'meaning' && !day.heroPhoto && !day.moments.some((moment) => moment.type === 'photo')) {
+    if (kind === 'meaning' && !day.heroPhoto && !(day.moments ?? []).some((moment) => moment.type === 'photo')) {
       continue;
     }
 
@@ -90,7 +91,7 @@ export function buildDayPromptByKind(
   if (!prompt?.launchEnabled) {
     return null;
   }
-  if (!options.includeAnswered && day.promptAnswers.some((answer) => answer.kind === kind)) {
+  if (!options.includeAnswered && (day.promptAnswers ?? []).some((answer) => answer.kind === kind)) {
     return null;
   }
   const photoCandidates = excludeUsedPhotos(options.photoCandidates ?? collectDayPromptPhotoCandidates(day), day);
@@ -102,7 +103,7 @@ export function buildDayPromptByKind(
   if (prompt.photoGated && eligiblePhotoCount < (prompt.minPhotoCandidates ?? 1)) {
     return null;
   }
-  if (kind === 'meaning' && !day.heroPhoto && !day.moments.some((moment) => moment.type === 'photo')) {
+  if (kind === 'meaning' && !day.heroPhoto && !(day.moments ?? []).some((moment) => moment.type === 'photo')) {
     return null;
   }
   return { ...prompt, photoCandidates: prompt.photoGated ? photoCandidates : [] };
@@ -128,9 +129,15 @@ export function listAvailableDayPrompts(
     if (prompt.id === 'meaning') {
       continue;
     }
+    if (prompt.id === 'meaningful_photo') {
+      const sameDayPhotoCount = countEligiblePhotoCandidatesForDay(photoCandidates, day.isoDate, false);
+      if (sameDayPhotoCount < (prompt.minPhotoCandidates ?? 1)) {
+        continue;
+      }
+    }
     const built = buildDayPromptByKind(day, prompt.id, {
       photoCandidates,
-      forceMeaningfulPhoto: options.forceMeaningfulPhoto,
+      forceMeaningfulPhoto: prompt.id === 'meaningful_photo' ? false : options.forceMeaningfulPhoto,
       // Testing: keep answered categories in the menu so they can be re-fed.
       includeAnswered: true,
     });
@@ -139,15 +146,10 @@ export function listAvailableDayPrompts(
     }
   }
 
-  // Stack the menu by how relevant each prompt is right now — most relevant
-  // first — so it matches the surfaced question's ordering.
-  const eligiblePhotoCount = countEligiblePhotoCandidatesForDay(
-    photoCandidates,
-    day.isoDate,
-    options.forceMeaningfulPhoto === true
-  );
-  const order = rankPromptKinds(day, now, eligiblePhotoCount, options.forceMeaningfulPhoto === true);
-  return available.sort((left, right) => order.indexOf(left.id) - order.indexOf(right.id));
+  // The manual "+" menu is a stable action picker, not the auto-surfaced
+  // contextual prompt. Keep ordinary user actions first; Photo appears only
+  // when same-day, unprocessed candidates exist.
+  return available.sort((left, right) => MANUAL_MENU_ORDER.indexOf(left.id) - MANUAL_MENU_ORDER.indexOf(right.id));
 }
 
 export function resolveDaypart(now: Date): Daypart {
@@ -186,7 +188,7 @@ export function rankPromptKinds(
   const concepts = new Set((vision?.concepts ?? []).map((concept) => concept.name));
   const traveled = day.newPlaceCount >= 1 || concepts.has('travel') || concepts.has('city');
   const moved = day.stepsCount >= 7000;
-  const social = faces >= 2 || day.moments.some((moment) => moment.type === 'social');
+  const social = faces >= 2 || (day.moments ?? []).some((moment) => moment.type === 'social');
   const minPhotos = dayPromptRegistry.meaningful_photo.minPhotoCandidates ?? 3;
   const hasPhotos = photoCandidateCount >= minPhotos;
   const hasHero = Boolean(day.heroPhoto);
@@ -226,7 +228,7 @@ export function rankPromptKinds(
 export function collectDayPromptPhotoCandidates(day: StoredHomeDayRecord): DayPromptPhotoCandidate[] {
   const seen = new Set<string>();
   const candidates: DayPromptPhotoCandidate[] = [];
-  const sorted = [...day.locations].sort(
+  const sorted = [...(day.locations ?? [])].sort(
     (left, right) => new Date(left.capturedAt).getTime() - new Date(right.capturedAt).getTime()
   );
 

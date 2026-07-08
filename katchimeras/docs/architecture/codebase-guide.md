@@ -162,6 +162,12 @@ Important areas:
 - `utils/world-*.ts`, `utils/kingdom-*.ts`: world/Kingdom scene and progression.
 - `utils/discoveries-*.ts`: discovery catalog, evaluation, artefacts, storage.
 - `utils/quests/definitions.ts`, `utils/quests/evaluate.ts`: data-driven quest rules.
+- `utils/quests/runtime.ts`, `utils/quests/today-intelligence.ts`: capability-aware
+  quest status and Today-facing quest intelligence.
+- Quest definitions are normalized on export with family, themes, capabilities,
+  suggested actions, and evidence policy; prefer extending that catalogue over
+  adding per-screen quest logic.
+- `utils/capabilities/quest-capabilities.ts`: quest capability and permission model.
 - `utils/signals/`: fact providers and signal resolution.
 - `utils/intelligence/`: provider contracts, taxonomy, and evidence builders for
   model/rule-backed photo, note, voice, and quest verification.
@@ -215,6 +221,9 @@ UI rules:
 | Add a Today category/ring item | `utils/today-categories.ts` | `features/today/use-today-category-model.ts`, `components/katchadeck/home/today-category-ring.tsx` |
 | Add a prompt category | `constants/day-prompts.ts` and `utils/day-prompt-engine.ts` | `features/today/use-today-prompt-answer-controller.ts`, verify day prompts |
 | Add a day mutation | `game/days/mutations/` | `game/days/actions.ts`, `hooks/use-home-screen-state.ts`, feature controller |
+| Add an intelligent quest | `utils/quests/definitions.ts` | `utils/intelligence/taxonomy.ts`, capture mutation evidence builders, `scripts/verify-themed-quests.cjs` |
+| Change quest permission/action behavior | `utils/quests/runtime.ts` | `utils/capabilities/quest-capabilities.ts`, `components/katchadeck/world/companion-card.tsx` |
+| Route a quest action into Today | `utils/quest-action-signal.ts` | `features/today/use-today-action-router.ts`, `app/(tabs)/world.tsx`, `app/(tabs)/today.tsx` |
 | Add a memory quest | `utils/memory-quests-engine.ts` | `scripts/verify-memory-quests.cjs` |
 | Add data-driven quest/progression rules | `utils/quests/definitions.ts` | `utils/signals/providers/`, `scripts/verify-world-objects.cjs` |
 | Add a discovery | `utils/discoveries-catalog.ts` | `utils/discoveries-engine.ts`, `scripts/verify-discoveries.cjs` |

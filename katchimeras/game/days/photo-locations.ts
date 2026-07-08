@@ -15,7 +15,8 @@ const MAX_STORED_DAY_LOCATIONS = 180;
 
 export function withSeededPhotoLocationsByDay(
   state: StoredHomeState,
-  photos: RecentPhotoAsset[]
+  photos: RecentPhotoAsset[],
+  options: { todayPhotoTarget?: StoredHomeDayRecord | null } = {}
 ): StoredHomeState {
   type NormalizedPhoto = Omit<RecentPhotoAsset, 'latitude' | 'longitude'> & {
     latitude: number;
@@ -42,16 +43,16 @@ export function withSeededPhotoLocationsByDay(
     return state;
   }
 
-  const applyToDay = (day: StoredHomeDayRecord): StoredHomeDayRecord => {
+  const applyToDay = (day: StoredHomeDayRecord, bucketOverride?: NormalizedPhoto[]): StoredHomeDayRecord => {
     if (day.creature) {
       return day;
     }
-    const bucket = geotaggedByDate.get(day.isoDate);
+    const bucket = bucketOverride ?? geotaggedByDate.get(day.isoDate);
     if (!bucket || bucket.length === 0) {
       return day;
     }
 
-    const nextLocations = [...day.locations];
+    const nextLocations = [...(day.locations ?? [])];
     [...bucket]
       .sort((left, right) => left.createdAt - right.createdAt)
       .slice(-MAX_STORED_DAY_LOCATIONS)
@@ -106,11 +107,26 @@ export function withSeededPhotoLocationsByDay(
       evidence: evidence.length > 0 ? upsertEvidence(day.evidence, evidence) : day.evidence,
     };
   };
+  const todayPhotoTarget =
+    options.todayPhotoTarget && options.todayPhotoTarget.id !== state.today.id ? options.todayPhotoTarget : null;
+  const mergeBuckets = (...buckets: Array<NormalizedPhoto[] | undefined>): NormalizedPhoto[] =>
+    buckets.flatMap((bucket) => bucket ?? []);
+  const redirectedTodayBucket = todayPhotoTarget
+    ? mergeBuckets(
+        geotaggedByDate.get(state.today.isoDate),
+        todayPhotoTarget.isoDate !== state.today.isoDate ? geotaggedByDate.get(todayPhotoTarget.isoDate) : undefined
+      )
+    : [];
 
   return {
     ...state,
-    today: applyToDay(state.today),
-    archivedDays: state.archivedDays.map(applyToDay),
+    today: todayPhotoTarget ? state.today : applyToDay(state.today),
+    tomorrow: todayPhotoTarget
+      ? applyToDay(todayPhotoTarget, redirectedTodayBucket)
+      : state.tomorrow
+        ? applyToDay(state.tomorrow)
+        : state.tomorrow,
+    archivedDays: state.archivedDays.map((day) => applyToDay(day)),
   };
 }
 

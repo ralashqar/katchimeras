@@ -85,7 +85,8 @@ export function QuestBoardSheet({
           {quests.length === 0 ? (
             <SheetEmptyState title="Nothing on the board right now" body="Come back when the day has something to grow." />
           ) : null}
-        </View>      </ScrollView>
+        </View>
+      </ScrollView>
     </MeadowSheet>
   );
 }

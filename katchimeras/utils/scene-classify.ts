@@ -1,5 +1,5 @@
 import type { DayVisionSummary, StudioMediaType } from '@/types/home';
-import { detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
+import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
 import { classifySceneOnDevice, readSceneOnDevice } from '@/utils/foundation-scene';
 import { detectStudioInVision, isGenericStudioLabel } from '@/utils/studio-detect';
 
@@ -131,6 +131,16 @@ function enrichFoodDetection(base: FoodDetection, subject: string | null): FoodD
   return { detected: true, label, emoji: base.emoji ?? '🍽️' };
 }
 
+function enrichFoodDetectionWithCuisine(base: FoodDetection, subject: string | null): FoodDetection {
+  const enriched = enrichFoodDetection(base, subject);
+  const subjectDetection = detectFoodInText(subject);
+  return {
+    ...enriched,
+    emoji: subjectDetection.emoji ?? enriched.emoji,
+    cuisine: subjectDetection.cuisine ?? base.cuisine ?? null,
+  };
+}
+
 const MEDIA_KINDS = new Set<StudioMediaType>(['book', 'film', 'show', 'game', 'music', 'art']);
 
 function normalizeMediaKind(raw: string | null): StudioMediaType | null {
@@ -179,7 +189,7 @@ export async function resolveSceneRead(vision: DayVisionSummary | undefined | nu
           type: deepType,
           label: SCENE_LABEL[deepType],
           detail: deep.subject,
-          food: deepType === 'food' ? enrichFoodDetection(detectFoodInVision(vision), deep.subject) : undefined,
+          food: deepType === 'food' ? enrichFoodDetectionWithCuisine(detectFoodInVision(vision), deep.subject) : undefined,
           source: 'llm',
         };
       }

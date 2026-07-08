@@ -7,7 +7,7 @@ export function usePromptSheetController() {
   const [initialPrompt, setInitialPrompt] = useState<ActiveDayPrompt | null>(null);
 
   const openPromptSheet = useCallback((prompt: ActiveDayPrompt | null = null) => {
-    setInitialPrompt(prompt);
+    setInitialPrompt(isActiveDayPrompt(prompt) ? prompt : null);
     setPromptSheetOpen(true);
   }, []);
 
@@ -22,4 +22,13 @@ export function usePromptSheetController() {
     openPromptSheet,
     closePromptSheet,
   };
+}
+
+function isActiveDayPrompt(value: unknown): value is ActiveDayPrompt {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<ActiveDayPrompt>;
+  return typeof candidate.id === 'string' && typeof candidate.title === 'string';
 }
