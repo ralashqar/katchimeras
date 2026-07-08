@@ -1,13 +1,13 @@
 import type { ImageSourcePropType } from 'react-native';
 
 export const heroOrbitAssets = {
-  hoodedKatcher: require('../assets/images/onboarding-hero/hooded-katcher.png'),
-  mossprout: require('../assets/images/onboarding-hero/mossprout.png'),
-  lattelet: require('../assets/images/onboarding-hero/lattelet.png'),
+  hoodedKatcher: require('../assets/images/onboarding-hero/hooded-katcher.webp'),
+  mossprout: require('../assets/images/onboarding-hero/mossprout.webp'),
+  lattelet: require('../assets/images/onboarding-hero/lattelet.webp'),
   sprintail: require('../assets/images/onboarding-hero/sprintail.png'),
   neonpoko: require('../assets/images/onboarding-hero/neonpoko.png'),
-  crumbun: require('../assets/images/onboarding-hero/crumbun.png'),
-  hayhorn: require('../assets/images/onboarding-hero/hayhorn.png'),
+  crumbun: require('../assets/images/onboarding-hero/crumbun.webp'),
+  hayhorn: require('../assets/images/onboarding-hero/hayhorn.webp'),
   ironette: require('../assets/images/onboarding-hero/ironette.png'),
 } as const satisfies Record<string, ImageSourcePropType>;
 

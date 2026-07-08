@@ -1,6 +1,6 @@
 import { homeMomentOptions } from '@/constants/home-mvp';
 import type { HomeMoment, HomeMomentType, StoredHomeState } from '@/types/home';
-import { loadStoredHomeState, saveStoredHomeState } from '@/utils/home-storage';
+import { homeRepository } from '@/storage/repositories/home-repository';
 
 export type DevScenarioId = 'coffee_day' | 'run_day' | 'thin_day' | 'repeat_park_week';
 
@@ -15,7 +15,7 @@ export const devScenarioOptions: { id: DevScenarioId; label: string }[] = [
 // scenario so encounter matching can be exercised without living the day.
 // Returns false when no stored Home state exists yet (open Home once first).
 export function applyDevScenario(scenarioId: DevScenarioId, now: Date): boolean {
-  const stored = loadStoredHomeState();
+  const stored = homeRepository.load();
   if (!stored || !('today' in stored)) {
     return false;
   }
@@ -88,7 +88,7 @@ export function applyDevScenario(scenarioId: DevScenarioId, now: Date): boolean 
     };
   }
 
-  saveStoredHomeState(nextState);
+  homeRepository.save(nextState);
   return true;
 }
 

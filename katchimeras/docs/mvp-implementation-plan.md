@@ -1,5 +1,10 @@
 # Katchimeras MVP Implementation Plan
 
+> Superseded for V1: the active product/design source of truth is now
+> `docs/katchimera-v1-living-memory-companion.md`. This document is retained as
+> historical implementation context, but its Home-first navigation plan no longer
+> defines the launch architecture. V1 is World-first.
+
 This plan sequences the convergence work needed to turn the current repo into the intended Katchimeras MVP.
 
 The app already contains most of the right building blocks. The work now is to tighten the product around one clear loop instead of growing more side surfaces.

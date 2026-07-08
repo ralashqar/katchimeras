@@ -1,11 +1,13 @@
 import type {
   DayMapCoordinate,
   DayMapNode,
+  DayMapNodePhoto,
   DayMapSummary,
   HomeLocationType,
   HomeMoment,
   StoredHomeLocationPoint,
 } from '@/types/home';
+import { curatePhotos, isBlackOrFlatFrame } from '@/utils/photo-curation';
 
 const CLUSTER_RADIUS_METERS = 150;
 const MAX_DAY_MAP_NODES = 5;
@@ -98,7 +100,12 @@ function createNode(cluster: LocationCluster): DayMapNode {
   const startedAt = sortedPoints[0]?.capturedAt ?? new Date().toISOString();
   const endedAt = sortedPoints[sortedPoints.length - 1]?.capturedAt ?? startedAt;
   const hasPhoto = sortedPoints.some((point) => point.hasPhoto);
-  const latestPhotoPoint = [...sortedPoints].reverse().find((point) => point.hasPhoto && point.thumbnailUri) ?? null;
+  // The marker's representative thumbnail must not be a black / single-colour
+  // frame — a pin should never show a black square.
+  const latestPhotoPoint =
+    [...sortedPoints]
+      .reverse()
+      .find((point) => point.hasPhoto && point.thumbnailUri && !isBlackOrFlatFrame(point)) ?? null;
   const linkedPoint =
     latestPhotoPoint ??
     [...sortedPoints].reverse().find((point) => point.hasPhoto && point.momentId) ??
@@ -122,10 +129,64 @@ function createNode(cluster: LocationCluster): DayMapNode {
     hasPhoto,
     linkedMomentId: linkedPoint?.momentId ?? null,
     photoThumbnailUri: latestPhotoPoint?.thumbnailUri ?? null,
+    photos: collectClusterPhotos(sortedPoints),
     startedAt,
     endedAt,
     sampleCount: sortedPoints.length,
   };
+}
+
+// The cluster's mini album: the keepers among this place's photo points, in
+// capture order. Seed-time curation already trims most near-duplicates, but a
+// second collapse here also tidies days that were seeded before curation (or
+// under a tighter window), since stored points are never retroactively removed.
+function collectClusterPhotos(sortedPoints: StoredHomeLocationPoint[]): DayMapNodePhoto[] {
+  const seenThumbnail = new Set<string>();
+  const candidates: DayMapNodePhoto[] = [];
+
+  sortedPoints.forEach((point) => {
+    if (!point.hasPhoto || !point.thumbnailUri || seenThumbnail.has(point.thumbnailUri)) {
+      return;
+    }
+    // DISPLAY-TIME BLACK FILTER: a black / single-colour frame is never shown on
+    // a pin, however it was stored. Skipped only when the point carries no
+    // brightness signal (older points) — re-seeding/backfill populates it.
+    if (isBlackOrFlatFrame(point)) {
+      return;
+    }
+    seenThumbnail.add(point.thumbnailUri);
+    candidates.push({
+      id: point.id,
+      thumbnailUri: point.thumbnailUri,
+      capturedAt: point.capturedAt,
+      momentId: point.momentId ?? null,
+      meanLuminance: point.meanLuminance,
+      luminanceRange: point.luminanceRange,
+    });
+  });
+
+  if (candidates.length <= 1) {
+    return candidates;
+  }
+
+  const keeperIds = new Set(
+    curatePhotos(
+      candidates.map((photo, index) => {
+        const point = sortedPoints.find((entry) => entry.id === photo.id);
+        return {
+          id: photo.id,
+          createdAt: new Date(photo.capturedAt).getTime() || index,
+          latitude: point?.lat,
+          longitude: point?.lng,
+          similarityHash: point?.similarityHash,
+          meanLuminance: point?.meanLuminance,
+          luminanceRange: point?.luminanceRange,
+        };
+      })
+    ).keepers.map((photo) => photo.id)
+  );
+
+  return candidates.filter((photo) => keeperIds.has(photo.id));
 }
 
 function pickPrimaryLocationId(nodes: DayMapNode[], moments: HomeMoment[]) {

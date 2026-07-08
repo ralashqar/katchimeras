@@ -1,0 +1,7 @@
+env: load .env.local
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_KEY
+Starting project at C:\Users\daruk\Projects\Katchimeras\katchimeras\katchimeras
+React Compiler enabled
+Starting Metro Bundler
+Waiting on http://localhost:8084
+Logs for your project will appear below.

@@ -10,23 +10,32 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect } from 'react';
 
-import { HeroAuraFrame } from '@/components/katchadeck/home/hero-aura-frame';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { getCreatureVisual } from '@/utils/home-engine';
-import type { EggVisualState, HomeMoment, LocalCreatureRecord } from '@/types/home';
-import { homeMomentOptions } from '@/constants/home-mvp';
+import { getCreatureVisual } from '@/game/days';
+import { resolveCreatureVariantSource } from '@/utils/creature-variant';
+import { weatherIconName, weatherLabel } from '@/utils/day-weather';
+import type { DayWeather, LocalCreatureRecord } from '@/types/home';
+import { Lantern } from '@/constants/theme';
 
 type CreatureHeroProps = {
   creature: LocalCreatureRecord;
-  interactive?: boolean;
-  moments: HomeMoment[];
-  onPress?: () => void;
   subtitle?: string;
+  hideSubtitle?: boolean;
+  weather?: DayWeather | null;
+  // Compact: the art plus ONE tight card (tag over name) sitting exactly where
+  // the forming egg's "Hatches in" card sits — no weather, no rarity line.
+  compact?: boolean;
 };
 
-export function CreatureHero({ creature, interactive = false, moments, onPress, subtitle }: CreatureHeroProps) {
+// Lantern hero: the creature floats free over the ink - no membrane ring, no
+// plate, no motif orbits. Halo and float are the only ornament.
+export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather, compact = false }: CreatureHeroProps) {
   const visual = getCreatureVisual(creature.visualKey);
+  // Prefer the day's expression cutout (mood × bond depth) when one exists for
+  // this creature; otherwise fall back to the single base cutout.
+  const variantSource = resolveCreatureVariantSource(creature.visualKey, creature.variantCell);
+  const heroSource = variantSource ?? visual.source;
   const float = useSharedValue(0);
   const glow = useSharedValue(0.2);
 
@@ -51,62 +60,74 @@ export function CreatureHero({ creature, interactive = false, moments, onPress, 
   }, [float, glow]);
 
   const visualStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -float.value * 10 }, { scale: 1 + glow.value * 0.03 }],
+    transform: [{ translateY: -float.value * 9 }, { scale: 1 + glow.value * 0.03 }],
   }));
 
   const haloStyle = useAnimatedStyle(() => ({
-    opacity: 0.22 + glow.value * 0.22,
+    opacity: 0.26 + glow.value * 0.22,
     transform: [{ scale: 0.94 + glow.value * 0.08 }],
   }));
 
-  const motifMoments = Array.from(new Set(moments.map((moment) => moment.type)))
-    .slice(0, 2)
-    .map((type) => homeMomentOptions[type]);
-  const aura: EggVisualState = {
-    accentColor: creature.accentColor,
-    haloColor: creature.accentColor,
-    coreColor: `${creature.accentColor}66`,
-    intensity: creature.rarity === 'legendary' ? 0.78 : creature.rarity === 'epic' ? 0.66 : creature.rarity === 'rare' ? 0.54 : 0.42,
-    shimmer: true,
-    swirl: 0.34,
-    label: creature.name,
-  };
+  if (compact) {
+    return (
+      <View style={styles.shellCompact}>
+        <View style={styles.stage}>
+          <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
+          <Animated.View style={visualStyle}>
+            <Image contentFit="contain" source={heroSource} style={styles.image} transition={0} />
+          </Animated.View>
+        </View>
+        <View style={styles.compactCard}>
+          <ThemedText type="onboardingLabel" style={styles.compactKicker} lightColor="rgba(251, 243, 228, 0.88)" darkColor="rgba(251, 243, 228, 0.88)">
+            {buildCreatureKicker(creature)}
+          </ThemedText>
+          <ThemedText type="display" style={styles.compactName} lightColor="#F2D48A" darkColor="#F2D48A">
+            {creature.name}
+          </ThemedText>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.shell}>
-      <HeroAuraFrame aura={aura} centerPressSize={112} interactive={interactive} onPress={onPress}>
-        {() => (
-          <View pointerEvents="none" style={styles.visualWrap}>
-            <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}32` }, haloStyle]} />
-            <Animated.View style={[styles.creatureWrap, visualStyle]}>
-              <View style={styles.creaturePlate}>
-                <Image contentFit="contain" source={visual.source} style={styles.image} transition={0} />
-              </View>
-            </Animated.View>
-            {motifMoments.map((moment, index) => (
-              <View
-                key={moment.id}
-                style={[
-                  styles.motifOrbit,
-                  index === 0 ? styles.motifLeft : styles.motifRight,
-                  { backgroundColor: `${moment.accentColor}22`, borderColor: `${moment.accentColor}55` },
-                ]}>
-                <IconSymbol color={moment.accentColor} name={moment.icon} size={16} />
-              </View>
-            ))}
-          </View>
-        )}
-      </HeroAuraFrame>
+      <View style={styles.stage}>
+        <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
+        <Animated.View style={visualStyle}>
+          <Image contentFit="contain" source={heroSource} style={styles.image} transition={0} />
+        </Animated.View>
+      </View>
       <View style={styles.copy}>
-        <ThemedText type="onboardingLabel" style={styles.label} lightColor="#D7E4FF" darkColor="#D7E4FF">
+        {weather ? (
+          <View style={styles.weatherRow}>
+            <IconSymbol name={weatherIconName(weather.condition)} size={13} color={Lantern.moon300} />
+            <ThemedText style={styles.weatherText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              {weather.tempMaxC != null
+                ? `${weatherLabel(weather.condition)} · ${weather.tempMaxC}°`
+                : weatherLabel(weather.condition)}
+            </ThemedText>
+          </View>
+        ) : null}
+        <ThemedText
+          type="onboardingLabel"
+          style={styles.label}
+          lightColor={Lantern.ember300}
+          darkColor={Lantern.ember300}>
           {buildCreatureKicker(creature)}
         </ThemedText>
-        <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
+        {buildRarityReason(creature) ? (
+          <ThemedText style={styles.rarityReason} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            {buildRarityReason(creature)}
+          </ThemedText>
+        ) : null}
+        <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
           {creature.name}
         </ThemedText>
-        <ThemedText style={styles.subtitle} lightColor="#E6EEFF" darkColor="#E6EEFF">
-          {subtitle ?? creature.reflection}
-        </ThemedText>
+        {hideSubtitle ? null : (
+          <ThemedText style={styles.subtitle} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            {subtitle ?? creature.reflection}
+          </ThemedText>
+        )}
       </View>
     </View>
   );
@@ -118,15 +139,27 @@ function buildCreatureKicker(creature: LocalCreatureRecord) {
     return creature.rarity;
   }
 
-  if (creature.repeatDepth > 0) {
-    return `${encounterCue} · ${formatVisitNumber(creature.repeatDepth + 1)} visit`;
-  }
-
+  // Rarity (how hard the day was to live) leads when it rises above common;
+  // bond (how often you return) carries the everyday repeat days.
   if (creature.rarity !== 'common') {
     return `${encounterCue} · ${creature.rarity}`;
   }
 
+  if (creature.repeatDepth > 0) {
+    return `${encounterCue} · ${formatVisitNumber(creature.repeatDepth + 1)} visit`;
+  }
+
   return encounterCue;
+}
+
+// The living conditions that made this creature rare, surfaced as the poetic
+// "you can only collect it by having the day" beat. Only shown when the day
+// actually earned rarity above the common floor.
+function buildRarityReason(creature: LocalCreatureRecord) {
+  if (creature.rarity === 'common' || !creature.rarityReason) {
+    return null;
+  }
+  return `Only from ${creature.rarityReason}`;
 }
 
 function formatVisitNumber(visit: number) {
@@ -141,62 +174,78 @@ function formatVisitNumber(visit: number) {
 const styles = StyleSheet.create({
   shell: {
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
   },
-  visualWrap: {
+  shellCompact: {
     alignItems: 'center',
+  },
+  // Same skin as the HatchCountdown card, but LARGER and LOWER — the hatched
+  // name is the day's headline, while the forming clock stays a small tucked
+  // pill (user-tuned pair).
+  compactCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(40, 32, 22, 0.6)',
+    borderColor: 'rgba(255, 245, 220, 0.3)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1.2,
+    gap: 0,
+    marginTop: -14,
+    overflow: 'hidden',
+    paddingHorizontal: 26,
+    paddingVertical: 9,
+  },
+  compactKicker: {
+    fontSize: 11,
+    letterSpacing: 0.6,
+  },
+  compactName: {
+    fontSize: 27,
+    fontStyle: 'italic',
+    lineHeight: 33,
+  },
+  stage: {
+    alignItems: 'center',
+    height: 258,
     justifyContent: 'center',
     width: '100%',
   },
   halo: {
     borderRadius: 999,
-    height: 270,
+    height: 240,
     position: 'absolute',
-    width: 270,
-  },
-  creatureWrap: {
-    height: 244,
-    justifyContent: 'center',
-    width: 244,
-  },
-  creaturePlate: {
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'center',
-    width: '100%',
+    width: 240,
   },
   image: {
-    height: '100%',
-    width: '100%',
-  },
-  motifOrbit: {
-    alignItems: 'center',
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: 42,
-  },
-  motifLeft: {
-    left: 44,
-    top: 64,
-  },
-  motifRight: {
-    bottom: 54,
-    right: 46,
+    height: 248,
+    width: 248,
   },
   copy: {
     alignItems: 'center',
-    gap: 8,
-    maxWidth: 300,
+    gap: 6,
+    maxWidth: 320,
+  },
+  weatherRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
+  weatherText: {
+    fontSize: 12,
   },
   label: {
     fontSize: 11,
   },
+  rarityReason: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
   title: {
-    fontSize: 44,
-    lineHeight: 46,
+    fontSize: 46,
+    fontStyle: 'italic',
+    lineHeight: 52,
     textAlign: 'center',
   },
   subtitle: {

@@ -1,0 +1,15 @@
+{
+  "comment": "Isometric tile adjacency (Tile Layout Lab). Each base image is a SQUARE with an isometric diamond top face; a neighbor sits across each diamond edge at a screen offset of (±w, ±h) × image size — EACH SIDE HAS ITS OWN magnitudes. ne = up-right, se = down-right, sw = down-left, nw = up-left. Current values are EXACT for base_garden_uniform, derived from its geometry (perspective-normalised to a perfect diamond: half-width 935px, slope 0.8, on 2048px → w=935/2048, h=748/2048). Hand-tuned values for the older bases were 0.53/0.4 — retune in the lab if switching art.",
+  "sides": {
+    "ne": { "w": 0.4565, "h": 0.3652 },
+    "se": { "w": 0.4565, "h": 0.3652 },
+    "sw": { "w": 0.4565, "h": 0.3652 },
+    "nw": { "w": 0.4565, "h": 0.3652 }
+  },
+  "kingdomNeighbor": {
+    "comment": "Gameplay preview: renders ONE neighbor tile beside the Kingdom's centre island using the side offsets above. enabled=false turns the effect off; baseId=null uses the same art as the centre island.",
+    "enabled": true,
+    "side": "ne",
+    "baseId": "base_garden_flat"
+  }
+}

@@ -1,11 +1,11 @@
 // Fallback for using MaterialIcons on Android and web.
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
+import { SymbolWeight } from 'expo-symbols';
 import { ComponentProps } from 'react';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
-type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
+type IconMapping = Record<string, ComponentProps<typeof MaterialIcons>['name']>;
 export type IconSymbolName = keyof typeof MAPPING;
 
 /**
@@ -19,6 +19,7 @@ const MAPPING = {
   'chevron.left': 'chevron-left',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'calendar': 'calendar-month',
   'arrow.right': 'arrow-forward',
   'star.fill': 'star',
   'sparkles': 'auto-awesome',
@@ -32,6 +33,55 @@ const MAPPING = {
   'heart.fill': 'favorite',
   'camera.fill': 'photo-camera',
   'bubble.left.and.bubble.right.fill': 'forum',
+  'sun.max.fill': 'wb-sunny',
+  'cloud.sun.fill': 'wb-cloudy',
+  'cloud.fill': 'cloud',
+  'cloud.fog.fill': 'foggy',
+  'cloud.rain.fill': 'water-drop',
+  'cloud.snow.fill': 'ac-unit',
+  'cloud.bolt.rain.fill': 'thunderstorm',
+  'fork.knife': 'restaurant',
+  'leaf.fill': 'park',
+  'building.columns.fill': 'museum',
+  'water.waves': 'waves',
+  'figure.run': 'directions-run',
+  'pawprint.fill': 'pets',
+  'person.2.fill': 'people',
+  'building.2.fill': 'location-city',
+  'party.popper.fill': 'celebration',
+  'paintbrush.fill': 'spa',
+  'camera.viewfinder': 'photo-camera',
+  // Daylio-style "add to today" inputs (mood / sleep / activity / hobby).
+  'film.fill': 'movie',
+  'book.fill': 'menu-book',
+  'music.note': 'music-note',
+  'gamecontroller.fill': 'sports-esports',
+  'bed.double.fill': 'bed',
+  'dumbbell.fill': 'fitness-center',
+  'face.smiling': 'mood',
+  'face.very_happy': 'sentiment-very-satisfied',
+  'face.happy': 'sentiment-satisfied',
+  'face.neutral': 'sentiment-neutral',
+  'face.sad': 'sentiment-dissatisfied',
+  'face.very_sad': 'sentiment-very-dissatisfied',
+  'briefcase.fill': 'work',
+  'cart.fill': 'shopping-cart',
+  'fork.knife.circle.fill': 'restaurant',
+  'globe.americas.fill': 'public',
+  'scope': 'center-focus-strong',
+  'timer': 'timer',
+  'mic.fill': 'mic',
+  'square.and.pencil': 'edit',
+  'play.fill': 'play-arrow',
+  'pause.fill': 'pause',
+  'plus': 'add',
+  'checkmark': 'check',
+  'gearshape.fill': 'settings',
+  'pencil': 'edit',
+  'diamond.fill': 'diamond',
+  'flame.fill': 'local-fire-department',
+  'chevron.down': 'keyboard-arrow-down',
+  'book.closed.fill': 'auto-stories',
 } as IconMapping;
 
 /**

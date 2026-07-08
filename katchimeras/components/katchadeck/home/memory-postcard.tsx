@@ -4,7 +4,7 @@ import { forwardRef, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { DayMapNode, HomeDayRecord } from '@/types/home';
-import { getCreatureVisual } from '@/utils/home-engine';
+import { getCreatureVisual } from '@/game/days';
 
 type MemoryPostcardProps = {
   day: HomeDayRecord & {
@@ -23,11 +23,13 @@ const CARD_HEIGHT = 1200;
 export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function MemoryPostcard({ day }, ref) {
   const visual = getCreatureVisual(day.creature.visualKey);
   const mapPoints = useMemo(() => buildMapPoints(day.dayMap?.nodes ?? []), [day.dayMap?.nodes]);
+  const cardPhotos = useMemo(() => collectCardPhotos(day), [day]);
+  const rarityLine = buildRarityLine(day.creature);
 
   return (
     <View collapsable={false} ref={ref} style={styles.captureFrame}>
       <LinearGradient
-        colors={['#09111E', '#101B31', '#161D37']}
+        colors={['#16112B', '#0C0A14', '#1A1226']}
         end={{ x: 1, y: 1 }}
         start={{ x: 0, y: 0 }}
         style={[styles.card, { borderColor: `${day.creature.accentColor}44` }]}>
@@ -55,7 +57,18 @@ export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function Mem
               </Text>
             </View>
           ) : null}
+          {rarityLine ? <Text style={styles.rarityLine}>{rarityLine}</Text> : null}
         </View>
+
+        {cardPhotos.length > 0 ? (
+          <View style={styles.photosRow}>
+            {cardPhotos.map((uri) => (
+              <View key={uri} style={styles.photoFrame}>
+                <Image contentFit="cover" source={uri} style={styles.photo} transition={0} />
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.mapCard}>
           <Text style={styles.mapLabel}>Where the day left its trace</Text>
@@ -104,6 +117,43 @@ export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function Mem
   );
 });
 
+// The curated keepers behind the day — the photo-journaling centerpiece of the
+// Day Card. Pulled from the day-map clusters (already deduped/curated), in the
+// order the day unfolded, capped so the collage stays clean.
+function collectCardPhotos(day: HomeDayRecord): string[] {
+  const uris: string[] = [];
+  const seen = new Set<string>();
+  if (day.heroPhoto?.thumbnailUri) {
+    seen.add(day.heroPhoto.thumbnailUri);
+    uris.push(day.heroPhoto.thumbnailUri);
+  }
+  const nodes = day.dayMap?.nodes ?? [];
+  for (const node of nodes) {
+    for (const photo of node.photos ?? []) {
+      if (seen.has(photo.thumbnailUri)) {
+        continue;
+      }
+      seen.add(photo.thumbnailUri);
+      uris.push(photo.thumbnailUri);
+      if (uris.length >= 3) {
+        return uris;
+      }
+    }
+  }
+  return uris;
+}
+
+// The rarity-from-living line: surfaces *why* this creature was rare (the lived
+// conditions), the "you can only collect it by having the day" beat. Only shown
+// when the day actually earned rarity above the common floor.
+function buildRarityLine(creature: NonNullable<HomeDayRecord['creature']>) {
+  if (creature.rarity === 'common' || !creature.rarityReason) {
+    return null;
+  }
+  const tier = creature.rarity.charAt(0).toUpperCase() + creature.rarity.slice(1);
+  return `${tier} — only from ${creature.rarityReason}`;
+}
+
 function buildEncounterCue(creature: NonNullable<HomeDayRecord['creature']>) {
   if (!creature.encounterProfileId) {
     return null;
@@ -136,9 +186,9 @@ function buildMapCaption(day: HomeDayRecord) {
 function buildMapPoints(nodes: DayMapNode[]) {
   if (nodes.length === 0) {
     const fallbackNodes = [
-      { id: 'fallback-a', x: 86, y: 120 },
-      { id: 'fallback-b', x: 196, y: 88 },
-      { id: 'fallback-c', x: 294, y: 146 },
+      { id: 'fallback-a', x: 86, y: 96 },
+      { id: 'fallback-b', x: 196, y: 60 },
+      { id: 'fallback-c', x: 294, y: 110 },
     ];
 
     return {
@@ -157,7 +207,7 @@ function buildMapPoints(nodes: DayMapNode[]) {
   const normalizedNodes = nodes.map((node) => ({
     id: node.id,
     x: 56 + ((node.longitude - minLng) / lngRange) * 268,
-    y: 48 + (1 - (node.latitude - minLat) / latRange) * 132,
+    y: 26 + (1 - (node.latitude - minLat) / latRange) * 92,
   }));
 
   return {
@@ -225,57 +275,84 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   kicker: {
-    color: '#EAF2FF',
+    color: '#C9C2E8',
     fontFamily: 'Manrope',
     fontSize: 26,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 3,
     textTransform: 'uppercase',
   },
   date: {
-    color: '#CAD8F7',
+    color: '#908AB5',
     fontFamily: 'Manrope',
     fontSize: 24,
     fontWeight: '600',
   },
   heroSection: {
     alignItems: 'center',
-    marginTop: 44,
+    marginTop: 28,
   },
   creatureHalo: {
     borderRadius: 999,
-    height: 428,
+    height: 340,
     position: 'absolute',
-    top: 18,
-    width: 428,
+    top: 14,
+    width: 340,
   },
   creaturePlate: {
     alignItems: 'center',
-    height: 408,
+    height: 324,
     justifyContent: 'center',
-    width: 408,
+    width: 324,
   },
   creatureImage: {
     height: '100%',
     width: '100%',
   },
   creatureName: {
-    color: '#F8FBFF',
+    color: '#F6F3FF',
     fontFamily: 'InstrumentSerif',
-    fontSize: 78,
-    lineHeight: 84,
-    marginTop: 24,
+    fontSize: 74,
+    fontStyle: 'italic',
+    lineHeight: 80,
+    marginTop: 16,
     textAlign: 'center',
   },
   highlight: {
     color: '#E5EEFF',
     fontFamily: 'Manrope',
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '500',
-    lineHeight: 44,
-    marginTop: 18,
+    lineHeight: 40,
+    marginTop: 14,
     maxWidth: 720,
     textAlign: 'center',
+  },
+  rarityLine: {
+    color: '#FFD9B8',
+    fontFamily: 'Manrope',
+    fontSize: 23,
+    fontStyle: 'italic',
+    fontWeight: '500',
+    lineHeight: 30,
+    marginTop: 14,
+    maxWidth: 700,
+    textAlign: 'center',
+  },
+  photosRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 36,
+  },
+  photoFrame: {
+    borderRadius: 24,
+    flex: 1,
+    height: 210,
+    overflow: 'hidden',
+  },
+  photo: {
+    height: '100%',
+    width: '100%',
   },
   cuePill: {
     borderRadius: 999,
@@ -292,13 +369,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   mapCard: {
-    backgroundColor: 'rgba(9, 14, 25, 0.7)',
-    borderColor: 'rgba(224,234,255,0.14)',
+    backgroundColor: 'rgba(20, 17, 31, 0.85)',
     borderRadius: 38,
-    borderWidth: 1,
-    marginTop: 54,
+    marginTop: 30,
     paddingHorizontal: 28,
-    paddingVertical: 28,
+    paddingVertical: 24,
   },
   mapLabel: {
     color: '#D9E7FF',
@@ -310,8 +385,8 @@ const styles = StyleSheet.create({
   mapStage: {
     backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 28,
-    height: 228,
-    marginTop: 18,
+    height: 150,
+    marginTop: 16,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -339,7 +414,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   footerText: {
-    color: '#C7D5F4',
+    color: '#908AB5',
     fontFamily: 'Manrope',
     fontSize: 24,
     fontWeight: '600',

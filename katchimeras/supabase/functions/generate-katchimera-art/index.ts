@@ -9,13 +9,57 @@ const corsHeaders = {
 
 const bucketName = 'katchimera-art-dev';
 const defaultModelId = 'fal-ai/nano-banana-2';
-const defaultFalInput = {
-  aspect_ratio: '1:1',
-  resolution: '0.5K',
-  output_format: 'png',
-  num_images: 1,
-  limit_generations: true,
-};
+
+function base64ToBytes(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// Some edit endpoints (GPT Image 2) drop data: URIs and need real fetchable URLs.
+// Upload any data-URI inputs to a temp path and hand FAL the public URLs.
+async function resolveInputImageUrls(
+  imageUrls: string[],
+  supabaseAdmin: ReturnType<typeof createClient>
+): Promise<string[]> {
+  const out: string[] = [];
+  for (const value of imageUrls) {
+    if (typeof value !== 'string' || !value.startsWith('data:')) {
+      out.push(value);
+      continue;
+    }
+    const match = value.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!match) continue;
+    const contentType = match[1];
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+    const path = `edit-inputs/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabaseAdmin.storage
+      .from(bucketName)
+      .upload(path, base64ToBytes(match[2]), { contentType, upsert: false });
+    if (error) continue;
+    out.push(supabaseAdmin.storage.from(bucketName).getPublicUrl(path).data.publicUrl);
+  }
+  return out;
+}
+
+// Different FAL model families take different size params, so build them by
+// family (mirrors generate-day-comic's buildFalInput). Nano-Banana 2 (Gemini):
+// aspect_ratio + resolution. GPT Image 2: image_size (a NAMED preset, never a
+// pixel string) + quality — square_hd is right for a 4x4 variant grid. Caller
+// `input` overrides everything (image_urls for the /edit endpoint, an image_size
+// or quality override, etc.).
+function buildFalInput(
+  modelId: string,
+  prompt: string,
+  input: Record<string, unknown>
+): Record<string, unknown> {
+  const common = { prompt, num_images: 1, output_format: 'png' };
+  if (modelId.includes('nano-banana')) {
+    return { aspect_ratio: '1:1', resolution: '0.5K', limit_generations: true, ...common, ...input };
+  }
+  return { image_size: 'square_hd', quality: 'high', ...common, ...input };
+}
 
 type RenderProfilePayload = {
   id: string;
@@ -133,6 +177,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    // GPT Image 2 (and other edit endpoints) need fetchable URLs, not data: URIs.
+    if (Array.isArray(input.image_urls)) {
+      input.image_urls = await resolveInputImageUrls(input.image_urls as string[], supabaseAdmin);
+    }
+
     const { data: inserted, error: insertError } = await supabaseAdmin
       .from('generated_katchimeras')
       .insert({
@@ -168,11 +217,7 @@ Deno.serve(async (req) => {
         Authorization: `Key ${falKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        ...defaultFalInput,
-        prompt: renderProfile.imagePrompt,
-        ...input,
-      }),
+      body: JSON.stringify(buildFalInput(modelId, renderProfile.imagePrompt, input)),
     });
 
     if (!falResponse.ok) {

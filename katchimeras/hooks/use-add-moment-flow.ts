@@ -15,7 +15,7 @@ import type {
   RecentPhotoAsset,
   RadialMomentAction,
 } from '@/types/home';
-import { deriveInspirationSelection } from '@/utils/home-engine';
+import { deriveInspirationSelection } from '@/game/days';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
 
 type UseAddMomentFlowOptions = {

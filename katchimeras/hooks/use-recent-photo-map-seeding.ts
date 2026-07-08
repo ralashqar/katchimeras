@@ -1,11 +1,18 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useEffect, useRef } from 'react';
+import { InteractionManager } from 'react-native';
 
 import type { RecentPhotoAsset } from '@/types/home';
+import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
 
-const MAX_RECENT_PHOTO_SEEDS = 8;
-const RECENT_PHOTO_SCAN_SIZE = 32;
+// Scan a multi-day window so photos land on the days they were actually taken
+// (today and recent past), not just the newest handful that might all be old.
+const LAST_SEEDED_DAY_KEY = 'katchadeck.recent-photo-map-seeded-day-v1';
+const MAX_RECENT_PHOTO_SEEDS = 24;
+const RECENT_PHOTO_SCAN_SIZE = 60;
+const RECENT_PHOTO_WINDOW_DAYS = 6;
+const inFlightSeedDays = new Set<string>();
 
 type UseRecentPhotoMapSeedingOptions = {
   enabled: boolean;
@@ -20,29 +27,44 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
     if (!enabled || !dayId) {
       return;
     }
+    const seedDayId = dayId;
 
-    if (lastSeededDayIdRef.current === dayId) {
+    if (
+      lastSeededDayIdRef.current === seedDayId ||
+      getStoredJson<string | null>(LAST_SEEDED_DAY_KEY, null) === seedDayId ||
+      inFlightSeedDays.has(seedDayId)
+    ) {
       return;
     }
 
     let active = true;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
 
     async function seedRecentPhotos() {
+      inFlightSeedDays.add(seedDayId);
       const mediaLibraryNative = requireOptionalNativeModule('ExpoMediaLibrary');
       if (!mediaLibraryNative) {
-        lastSeededDayIdRef.current = dayId;
+        lastSeededDayIdRef.current = seedDayId;
+        setStoredJson(LAST_SEEDED_DAY_KEY, seedDayId);
+        inFlightSeedDays.delete(seedDayId);
         return;
       }
 
       try {
         const MediaLibrary = await import('expo-media-library');
-        const permission = await MediaLibrary.requestPermissionsAsync(false);
+        const permission = await MediaLibrary.getPermissionsAsync(false);
         if (!permission.granted) {
-          lastSeededDayIdRef.current = dayId;
+          lastSeededDayIdRef.current = seedDayId;
+          inFlightSeedDays.delete(seedDayId);
           return;
         }
 
+        const windowStart = new Date();
+        windowStart.setDate(windowStart.getDate() - RECENT_PHOTO_WINDOW_DAYS);
+        windowStart.setHours(0, 0, 0, 0);
+
         const page = await MediaLibrary.getAssetsAsync({
+          createdAfter: windowStart.getTime(),
           first: RECENT_PHOTO_SCAN_SIZE,
           mediaType: MediaLibrary.MediaType.photo,
           sortBy: [['creationTime', false]],
@@ -64,11 +86,13 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
               continue;
             }
 
+            const isScreenshot = asset.mediaSubtypes?.includes('screenshot');
+
             recentGeotaggedPhotos.push({
               createdAt: asset.creationTime,
               height: asset.height,
               id: asset.id,
-              isScreenshot: asset.mediaSubtypes?.includes('screenshot'),
+              isScreenshot,
               latitude,
               longitude,
               thumbnailUri: asset.uri,
@@ -84,19 +108,30 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
           return;
         }
 
-        lastSeededDayIdRef.current = dayId;
+        lastSeededDayIdRef.current = seedDayId;
+        setStoredJson(LAST_SEEDED_DAY_KEY, seedDayId);
         if (recentGeotaggedPhotos.length > 0) {
           onSeed(recentGeotaggedPhotos);
         }
       } catch {
-        lastSeededDayIdRef.current = dayId;
+        lastSeededDayIdRef.current = seedDayId;
+      } finally {
+        inFlightSeedDays.delete(seedDayId);
       }
     }
 
-    void seedRecentPhotos();
+    const interactionTask = InteractionManager.runAfterInteractions(() => {
+      timeout = setTimeout(() => {
+        void seedRecentPhotos();
+      }, 650);
+    });
 
     return () => {
       active = false;
+      interactionTask.cancel();
+      if (timeout) {
+        clearTimeout(timeout);
+      }
     };
   }, [dayId, enabled, onSeed]);
 }

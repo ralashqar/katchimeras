@@ -1,0 +1,17 @@
+{
+  "background": {
+    "_comment": "Today background framing. scale >= 1 zooms the cover-fit image; offsetY in dp shifts it (negative = up). The code clamps offsetY so the image always fills the frame: |offsetY| <= (scale - 1) * screenHeight / 2.",
+    "scale": 1.08,
+    "offsetY": -29
+  },
+  "egg": {
+    "_comment": "Whole egg stage (glow + glass + shell): scale around centre, offsetY in dp (negative = up).",
+    "scale": 1,
+    "offsetY": 8
+  },
+  "membrane": {
+    "_comment": "Glass dome + ripple rings RELATIVE to the egg: scale around centre, offsetY in dp.",
+    "scale": 1,
+    "offsetY": 10
+  }
+}

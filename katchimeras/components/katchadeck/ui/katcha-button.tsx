@@ -1,11 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, type StyleProp, type ViewStyle, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { usePressMotion } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { KatchaDeckUI } from '@/constants/theme';
+import { KatchaDeckUI, Lantern } from '@/constants/theme';
 
 type KatchaButtonVariant = 'primary' | 'secondary' | 'premium';
 type KatchaButtonIcon = 'arrow.right' | 'sparkles' | 'arrow.counterclockwise' | 'xmark' | 'star.fill';
@@ -14,6 +14,7 @@ type KatchaButtonProps = {
   label: string;
   onPress?: () => void;
   disabled?: boolean;
+  loading?: boolean;
   variant?: KatchaButtonVariant;
   style?: StyleProp<ViewStyle>;
   glow?: boolean;
@@ -24,6 +25,7 @@ export function KatchaButton({
   label,
   onPress,
   disabled = false,
+  loading = false,
   variant = 'primary',
   style,
   glow = false,
@@ -31,11 +33,11 @@ export function KatchaButton({
 }: KatchaButtonProps) {
   const press = usePressMotion();
 
-  const iconColor = variant === 'secondary' ? '#F8FBFF' : '#0B1221';
+  const iconColor = variant === 'secondary' ? Lantern.moon50 : Lantern.emberInk;
 
   return (
     <Pressable
-      disabled={disabled}
+      disabled={disabled || loading}
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
@@ -63,7 +65,9 @@ export function KatchaButton({
             <View style={[StyleSheet.absoluteFill, styles.secondaryFill]} />
           ) : (
             <LinearGradient
-              colors={variant === 'premium' ? ['#F2E0FF', '#FFD8C0'] : ['#E9F1FF', '#D0DDF6']}
+              colors={[Lantern.ember300, Lantern.ember500]}
+              end={{ x: 1, y: 1 }}
+              start={{ x: 0, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
           )}
@@ -78,6 +82,7 @@ export function KatchaButton({
             />
           ) : null}
           <View style={styles.labelRow}>
+            {loading ? <ActivityIndicator color={iconColor} size="small" /> : null}
             <ThemedText
               style={
                 variant === 'premium'
@@ -86,11 +91,11 @@ export function KatchaButton({
                     ? styles.secondaryLabel
                     : styles.primaryLabel
               }
-              lightColor={variant === 'secondary' ? '#F8FBFF' : variant === 'premium' ? '#18111E' : '#0B1221'}
-              darkColor={variant === 'secondary' ? '#F8FBFF' : variant === 'premium' ? '#18111E' : '#0B1221'}>
+              lightColor={variant === 'secondary' ? Lantern.moon50 : Lantern.emberInk}
+              darkColor={variant === 'secondary' ? Lantern.moon50 : Lantern.emberInk}>
               {label}
             </ThemedText>
-            {icon ? <IconSymbol color={iconColor} name={icon} size={16} /> : null}
+            {icon && !loading ? <IconSymbol color={iconColor} name={icon} size={16} /> : null}
           </View>
         </View>
       </Animated.View>
@@ -117,28 +122,19 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   primaryShadow: {
-    boxShadow: KatchaDeckUI.shadows.soft,
+    boxShadow: '0 8px 32px rgba(245,142,60,0.35), 0 2px 8px rgba(0,0,0,0.4)',
   },
   premiumShadow: {
-    boxShadow: KatchaDeckUI.shadows.premium,
+    boxShadow: '0 8px 32px rgba(245,142,60,0.35), 0 2px 8px rgba(0,0,0,0.4)',
   },
   secondaryShadow: {
     boxShadow: 'none',
   },
-  primarySurface: {
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderWidth: 1,
-  },
-  premiumSurface: {
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderWidth: 1,
-  },
-  secondarySurface: {
-    borderColor: 'rgba(208,221,255,0.22)',
-    borderWidth: 1,
-  },
+  primarySurface: {},
+  premiumSurface: {},
+  secondarySurface: {},
   secondaryFill: {
-    backgroundColor: 'rgba(18, 27, 47, 0.92)',
+    backgroundColor: Lantern.dusk700,
   },
   labelRow: {
     alignItems: 'center',
@@ -148,15 +144,17 @@ const styles = StyleSheet.create({
   },
   primaryLabel: {
     ...KatchaDeckUI.typography.onboardingCTA,
-    color: '#0B1221',
+    fontWeight: '800',
+    color: Lantern.emberInk,
   },
   secondaryLabel: {
     ...KatchaDeckUI.typography.onboardingCTA,
-    color: '#F8FBFF',
+    color: Lantern.moon50,
   },
   premiumLabel: {
     ...KatchaDeckUI.typography.onboardingCTA,
-    color: '#1B1324',
+    fontWeight: '800',
+    color: Lantern.emberInk,
   },
   sheen: {
     borderRadius: 999,

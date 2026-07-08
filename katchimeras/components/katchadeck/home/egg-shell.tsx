@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   type SharedValue,
@@ -33,16 +33,22 @@ type EggShellProps = {
   crackStage?: 0 | 1 | 2;
 };
 
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
-const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
-const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+// Drag-to-tilt: dragX is already clamped to ±60 in LanternEgg's pan handler, so
+// a full sideways pull reaches the max tilt.
+const DRAG_TILT_RANGE = 60;
+const MAX_TILT_DEG = 9;
+
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
+const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.webp');
+const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.webp');
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
-export function EggShell({ egg, motion, reactionKey = 0, crackStage = 0 }: EggShellProps) {
+// Pure artwork egg: the render plus crack overlays, breathing. No procedural
+// glow capsules, rings, or sparks - the glow is baked into the art.
+export function EggShell({ egg: _egg, motion, reactionKey = 0, crackStage = 0 }: EggShellProps) {
   const breathe = useSharedValue(0);
   const reaction = useSharedValue(0);
-  const shimmer = useSharedValue(egg.shimmer ? 1 : 0);
   const crackOne = useSharedValue(0);
   const crackTwo = useSharedValue(0);
 
@@ -56,17 +62,6 @@ export function EggShell({ egg, motion, reactionKey = 0, crackStage = 0 }: EggSh
       false
     );
   }, [breathe]);
-
-  useEffect(() => {
-    shimmer.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.18, { duration: 1800, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      false
-    );
-  }, [egg.shimmer, shimmer]);
 
   useEffect(() => {
     reaction.value = 0;
@@ -83,26 +78,27 @@ export function EggShell({ egg, motion, reactionKey = 0, crackStage = 0 }: EggSh
 
   const shellStyle = useAnimatedStyle(() => {
     const energy = motion.interactionEnergy.value;
+    const press = motion.pressProgress.value;
     const dragMagnitude = Math.min(1, Math.hypot(motion.dragX.value, motion.dragY.value) / 88);
+    // Pulling the membrane swings the egg: a leftward pull (e.g. from the bottom
+    // left) tips it clockwise, a rightward pull counter-clockwise — driven by the
+    // horizontal component so a straight up/down pull leaves it upright. Clamped
+    // to a gentle tilt; springs back with dragX on release.
+    const tilt = Math.max(-1, Math.min(1, -motion.dragX.value / DRAG_TILT_RANGE)) * MAX_TILT_DEG;
 
     return {
       transform: [
         { translateX: motion.dragX.value * 0.14 },
         { translateY: motion.dragY.value * 0.14 },
-        { scaleX: 1 + breathe.value * 0.04 + reaction.value * 0.06 + dragMagnitude * 0.03 },
-        { scaleY: 1 + breathe.value * 0.04 + reaction.value * 0.06 - dragMagnitude * 0.018 + energy * 0.025 },
+        { rotate: `${tilt}deg` },
+        { scaleX: 1 + breathe.value * 0.05 + reaction.value * 0.06 + press * 0.03 + dragMagnitude * 0.03 },
+        {
+          scaleY:
+            1 + breathe.value * 0.05 + reaction.value * 0.06 + press * 0.03 - dragMagnitude * 0.018 + energy * 0.025,
+        },
       ],
     };
   });
-
-  const shellGlowStyle = useAnimatedStyle(() => ({
-    opacity: 0.18 + breathe.value * 0.14 + motion.interactionEnergy.value * 0.3,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.06 },
-      { translateY: motion.glowLagY.value * 0.06 },
-      { scale: 0.96 + breathe.value * 0.05 + motion.interactionEnergy.value * 0.08 },
-    ],
-  }));
 
   const crackOneStyle = useAnimatedStyle(() => ({
     opacity: crackOne.value * (1 - crackTwo.value * 0.65),
@@ -113,41 +109,13 @@ export function EggShell({ egg, motion, reactionKey = 0, crackStage = 0 }: EggSh
     transform: [{ scale: 1 + crackTwo.value * 0.02 }],
   }));
 
-  // The aurora is baked into the artwork; this accent layer keeps the day's
-  // own color identity and the moment-reaction pulses alive on top of it.
-  const accentGlowStyle = useAnimatedStyle(() => ({
-    opacity:
-      0.14 +
-      shimmer.value * 0.14 +
-      egg.intensity * 0.1 +
-      reaction.value * 0.22 +
-      motion.pressProgress.value * 0.12 +
-      motion.interactionEnergy.value * 0.12,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.18 },
-      { translateY: motion.glowLagY.value * 0.18 },
-      { scale: 0.92 + egg.intensity * 0.12 + reaction.value * 0.08 },
-    ],
-  }));
-
-  const sparkStyle = useAnimatedStyle(() => ({
-    opacity: 0.6 + shimmer.value * 0.24 + motion.interactionEnergy.value * 0.16,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.1 },
-      { translateY: motion.glowLagY.value * 0.06 },
-      { scale: 1 + motion.pressProgress.value * 0.08 },
-    ],
-  }));
-
   return (
     <Animated.View pointerEvents="none" style={[styles.eggWrap, shellStyle]}>
-      <Animated.View style={[styles.shellGlow, { backgroundColor: `${egg.accentColor}18` }, shellGlowStyle]} />
-      <Image contentFit="contain" source={eggBase} style={styles.eggImage} transition={0} />
-      <AnimatedImage contentFit="contain" source={eggCrackOne} style={[styles.eggImage, crackOneStyle]} transition={0} />
-      <AnimatedImage contentFit="contain" source={eggCrackTwo} style={[styles.eggImage, crackTwoStyle]} transition={0} />
-      <Animated.View style={[styles.accentGlow, { backgroundColor: egg.coreColor }, accentGlowStyle]} />
-      <Animated.View style={[styles.spark, { backgroundColor: egg.accentColor }, sparkStyle]} />
-      <Animated.View style={[styles.sparkSecondary, { backgroundColor: `${egg.coreColor}CC` }, sparkStyle]} />
+      {/* allowDownscaling=false keeps the full-res texture, so the egg stays crisp
+          when the World view shrinks it then zooms back in (it's drawn small there). */}
+      <Image contentFit="contain" allowDownscaling={false} source={eggBase} style={styles.eggImage} transition={0} />
+      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackOne} style={[styles.eggImage, crackOneStyle]} transition={0} />
+      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackTwo} style={[styles.eggImage, crackTwoStyle]} transition={0} />
     </Animated.View>
   );
 }
@@ -157,39 +125,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 224,
     justifyContent: 'center',
-    width: 186,
-  },
-  shellGlow: {
-    borderRadius: 999,
-    height: 182,
-    position: 'absolute',
-    width: 154,
+    width: 196,
+    // iOS derives this shadow from the RENDERED ALPHA (no background, no
+    // shadowPath) — a true silhouette drop-shadow, like CSS drop-shadow().
+    // Biased downward so it reads as contact with the nest, and it rides the
+    // shell's every transform (drag, breathe, shake) for free.
+    shadowColor: '#170F06',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
   },
   eggImage: {
     height: '100%',
     position: 'absolute',
-    width: '112%',
-  },
-  accentGlow: {
-    borderRadius: 999,
-    height: 104,
-    opacity: 0.2,
-    width: 104,
-  },
-  spark: {
-    borderRadius: 999,
-    height: 12,
-    position: 'absolute',
-    right: 44,
-    top: 46,
-    width: 12,
-  },
-  sparkSecondary: {
-    borderRadius: 999,
-    bottom: 52,
-    height: 8,
-    left: 56,
-    position: 'absolute',
-    width: 8,
+    width: '100%',
   },
 });

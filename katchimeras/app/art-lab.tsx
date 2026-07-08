@@ -1,14 +1,20 @@
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AvatarStudio } from '@/components/katchadeck/dev/avatar-studio';
 import { KatchimeraStudio } from '@/components/katchadeck/dev/katchimera-studio';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { presenceEnter } from '@/components/katchadeck/motion';
+import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
 import { KatchaDeckUI } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
+
+const assetTabOptions = [
+  { value: 'katchimeras', label: 'Katchimeras' },
+  { value: 'avatars', label: 'Avatars' },
+] as const;
 
 export default function ArtLabScreen() {
   const [assetTab, setAssetTab] = useState<'katchimeras' | 'avatars'>('katchimeras');
@@ -43,22 +49,13 @@ export default function ArtLabScreen() {
         </Animated.View>
 
         <Animated.View entering={presenceEnter(50)}>
-          <View style={styles.modeRow}>
-            <Pressable
-              onPress={() => setAssetTab('katchimeras')}
-              style={[styles.modeChip, assetTab === 'katchimeras' ? styles.modeChipSelected : null]}>
-              <ThemedText style={styles.modeChipText} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                Katchimeras
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={() => setAssetTab('avatars')}
-              style={[styles.modeChip, assetTab === 'avatars' ? styles.modeChipSelected : null]}>
-              <ThemedText style={styles.modeChipText} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                Avatars
-              </ThemedText>
-            </Pressable>
-          </View>
+          <SegmentedControl
+            activeTextColor="#F8FBFF"
+            inactiveTextColor="#F8FBFF"
+            options={assetTabOptions}
+            value={assetTab}
+            onChange={setAssetTab}
+          />
         </Animated.View>
 
         {assetTab === 'avatars' ? <AvatarStudio /> : <KatchimeraStudio />}
@@ -89,27 +86,5 @@ const styles = StyleSheet.create({
   },
   body: {
     maxWidth: 340,
-  },
-  modeRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  modeChip: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 20,
-    borderWidth: 1,
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  modeChipSelected: {
-    backgroundColor: 'rgba(200,216,255,0.16)',
-    borderColor: 'rgba(200,216,255,0.3)',
-  },
-  modeChipText: {
-    fontSize: 14,
   },
 });
