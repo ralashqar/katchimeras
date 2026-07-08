@@ -34,7 +34,7 @@ const RULES: ConceptRule[] = [
   { concept: 'baby', pattern: /baby|infant|newborn|\bcrib\b|stroller|pram/i },
   { concept: 'blossom', pattern: /cherry blossom|sakura|spring flower|blossom branch/i },
   { concept: 'flowers', pattern: /flower|bloom|blossom|bouquet|floral|\brose\b|tulip/i },
-  { concept: 'food', pattern: /food|meal|dish|burger|sandwich|breakfast|lunch|dinner|cuisine/i },
+  { concept: 'food', pattern: /food|meal|dish|burger|sandwich|breakfast|lunch|dinner|cuisine|fruit|apple|banana|berries|strawberr|grapes?|orange|mango|melon/i },
   { concept: 'water', pattern: /lake|river|waterfall|pond|pool|harbou?r/i },
   { concept: 'mountains', pattern: /mountain|hill|cliff|peak|valley|canyon|summit/i },
   { concept: 'snow', pattern: /snow|snowy|blizzard|frost/i },
@@ -144,4 +144,3 @@ export function signalMatches(signalKey: string, requested: string): boolean {
 function clamp01(value: number): number {
   return Math.min(Math.max(value, 0), 1);
 }
-

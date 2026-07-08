@@ -19,6 +19,7 @@ function transpileToTemp(relativeSourcePath, outName) {
 }
 
 const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'taxonomy.js');
+const intelligenceEvidencePath = transpileToTemp('utils/intelligence/evidence.ts', 'intelligence-evidence.js');
 const scoringPath = transpileToTemp('utils/quests/evidence-scoring.ts', 'evidence-scoring.js');
 const factsPath = transpileToTemp('utils/signals/facts.ts', 'facts.js');
 const definitionsPath = transpileToTemp('utils/quests/definitions.ts', 'definitions.js');
@@ -40,6 +41,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
 };
 
 const evaluate = require(evaluatePath);
+const intelligenceEvidence = require(intelligenceEvidencePath);
 
 let failures = 0;
 function check(label, condition, detail) {
@@ -74,6 +76,29 @@ const weakParkFacts = {
 const dogFacts = {
   'evidence.items': [photoEvidence('asset-dog', 'dog', 0.9)],
 };
+const bananaEvidence = intelligenceEvidence.buildPhotoEvidence({
+  sourceId: 'live-banana',
+  observedAt: '2026-07-07T12:30:00.000Z',
+  thumbnailUri: 'file://banana.jpg',
+  vision: {
+    concepts: [{ name: 'banana', salience: 1, coverage: 1, count: 1, peakConfidence: 0.88 }],
+    details: ['banana'],
+    maxFaceCount: 0,
+    faceCoverage: 0,
+    textTokens: [],
+    analyzedPhotoCount: 1,
+  },
+  scene: {
+    type: 'food',
+    label: 'Food',
+    detail: 'Fruit',
+    food: { detected: true, label: 'Fruit', emoji: 'fruit' },
+    source: 'rules',
+  },
+});
+const bananaFacts = {
+  'evidence.items': [bananaEvidence],
+};
 const noEvidenceFacts = {
   'evidence.items': [],
 };
@@ -81,6 +106,7 @@ const noEvidenceFacts = {
 check('new park quest passes with confirmed park and matching photo evidence', evaluate.isQuestComplete('quest-new-park', strongParkFacts));
 check('new park quest fails when photo evidence is low confidence', !evaluate.isQuestComplete('quest-new-park', weakParkFacts));
 check('dog photo quest passes from photo evidence', evaluate.isQuestComplete('quest-photo-dog', dogFacts));
+check('banana live photo passes food photo quest', evaluate.isQuestComplete('quest-photo-food', bananaFacts), JSON.stringify(bananaEvidence));
 check('dog photo quest fails without evidence', !evaluate.isQuestComplete('quest-photo-dog', noEvidenceFacts));
 
 const status = evaluate.questCriteriaStatus('quest-photo-dog', noEvidenceFacts)[0];

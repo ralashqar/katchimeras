@@ -230,5 +230,51 @@ const reusedSubmissionItems = buildQuestSubmissionItems(submissionDay, submissio
 ]);
 check('submission candidates exclude already submitted entries', reusedSubmissionItems.length === 0, JSON.stringify(reusedSubmissionItems));
 
+const foodSubmissionQuest = {
+  questId: 'quest-photo-food',
+  creatureId: 'creature-food',
+  title: 'Feast for the eyes',
+  hint: 'Snap a photo of food.',
+  acceptedAt: Date.parse('2026-07-07T10:00:00.000Z'),
+  acceptedDayId: '2026-07-07',
+};
+const foodSubmissionItems = buildQuestSubmissionItems(
+  {
+    ...baseDay,
+    evidence: [
+      {
+        id: 'photo:banana',
+        sourceType: 'photo',
+        sourceId: 'banana',
+        observedAt: '2026-07-07T12:00:00.000Z',
+        provider: 'appleVision',
+        confidence: 0.9,
+        thumbnailUri: 'file://banana.jpg',
+        explanation: 'Detected food from photo.',
+        signals: [{ key: 'food', confidence: 0.9, provider: 'appleVision', source: 'vision' }],
+      },
+    ],
+    capturedMeanings: [
+      {
+        sourceId: 'banana',
+        label: 'Banana',
+        archetype: 'calm',
+        thumbnailUri: 'file://banana.jpg',
+        createdAt: '2026-07-07T12:00:00.000Z',
+      },
+    ],
+  },
+  {
+    complete: false,
+    readyToSubmit: true,
+    questId: 'quest-photo-food',
+    matchedEvidenceIds: ['photo:banana'],
+  },
+  foodSubmissionQuest,
+  []
+);
+check('food photo submission previews the live captured photo', foodSubmissionItems[0]?.thumbnailUri === 'file://banana.jpg', JSON.stringify(foodSubmissionItems[0]));
+check('food photo submission uses the captured label', foodSubmissionItems[0]?.title === 'Banana', foodSubmissionItems[0]?.title);
+
 console.log(failures === 0 ? '\nAll quest report-back evidence checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

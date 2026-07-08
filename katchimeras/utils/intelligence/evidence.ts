@@ -47,10 +47,11 @@ export function buildPhotoEvidence(input: {
     for (const signal of visionSummaryToSignals(input.vision)) add(signal);
   }
   if (input.scene && input.scene.type !== 'other') {
+    const sceneConfidence = input.scene.source === 'llm' ? 0.72 : input.scene.type === 'food' && input.scene.food?.detected ? 0.9 : 0.55;
     add(
       {
         key: input.scene.type === 'nature' ? 'park' : input.scene.type,
-        confidence: input.scene.source === 'llm' ? 0.72 : 0.55,
+        confidence: sceneConfidence,
         raw: input.scene.detail ?? input.scene.type,
         source: 'scene',
       },
