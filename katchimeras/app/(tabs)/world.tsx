@@ -5,7 +5,7 @@ import { GestureHandlerRootView, type GestureType } from 'react-native-gesture-h
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { WorldCanvas } from '@/components/katchadeck/world/world-canvas';
+import { WorldCanvas, type WorldCameraController, type WorldCameraSnapshot } from '@/components/katchadeck/world/world-canvas';
 import { KingdomBuildingSheet } from '@/components/katchadeck/world/kingdom-building-sheet';
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
@@ -73,9 +73,11 @@ import {
   questFor,
   reconcileCompanionQuestOffer,
   saveCompanionQuests,
+  submitQuest,
+  type CompanionQuest,
 } from '@/utils/katchimera-quests';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
-import { buildQuestReportBackItems } from '@/utils/quests/report-back-evidence';
+import { buildQuestSubmissionItems, type QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import { evaluateQuestRuntime, type QuestRuntimeStatus } from '@/utils/quests/runtime';
 import { ESSENCE_AWARD } from '@/utils/essence-engine';
 import { voiceLine } from '@/utils/companion-voice';
@@ -122,7 +124,7 @@ const DISCOVERY_RARITY_ORDER: Record<string, number> = { legendary: 3, epic: 2, 
 export default function KingdomScreen() {
   const router = useRouter();
   const { kingdom } = useKingdom();
-  const { days } = useAllDays();
+  const { days, refresh: refreshAllDays } = useAllDays();
   const {
     addNote: addWorldNote,
     confirmPlace: confirmWorldPlace,
@@ -175,6 +177,13 @@ export default function KingdomScreen() {
   const [snapEnabled, setSnapEnabled] = useState(true);
   const snap = (value: number) => (snapEnabled ? Math.round(value * 2) / 2 : value);
   const panRef = useRef<GestureType | undefined>(undefined);
+  const worldCameraRef = useRef<WorldCameraController | null>(null);
+  const pendingQuestReturnRef = useRef<{
+    questId: string;
+    creatureId: string;
+    name: string;
+    camera: WorldCameraSnapshot | null;
+  } | null>(null);
   const getCenterCellRef = useRef<(() => { col: number; row: number; plotId: string | null } | null) | null>(null);
   // Provenance card for a tapped decoration.
   const [provenanceItem, setProvenanceItem] = useState<KingdomDecorItem | null>(null);
@@ -228,6 +237,33 @@ export default function KingdomScreen() {
       setMicrocopy(`Quest complete ✦ ${questTitle} — +${ESSENCE_AWARD.questComplete} essence, their home grows`);
       setJustPlantedId(`resident-${creatureId}`);
       setCompanion(null);
+    },
+    [questDayId]
+  );
+  const handleSubmitQuest = useCallback(
+    (creatureId: string, questTitle: string, item: QuestSubmissionItem) => {
+      setCompanionQuests((current) => {
+        const result = submitQuest(
+          current,
+          creatureId,
+          {
+            sourceType: item.sourceType,
+            sourceId: item.sourceId,
+            evidenceId: item.evidenceId ?? null,
+          },
+          Date.now(),
+          questDayId
+        );
+        if (!result.submitted) {
+          setMicrocopy('That entry was already submitted. Add a new matching one.');
+          return current;
+        }
+        saveCompanionQuests(result.state);
+        setMicrocopy(`Quest complete ✦ ${questTitle} — +${ESSENCE_AWARD.questComplete} essence, their home grows`);
+        setJustPlantedId(`resident-${creatureId}`);
+        setCompanion(null);
+        return result.state;
+      });
     },
     [questDayId]
   );
@@ -365,19 +401,31 @@ export default function KingdomScreen() {
         worldFormingTarget
       );
       refreshHomeState();
+      refreshAllDays();
       setMicrocopy(`${interpreted.label} took root`);
     },
-    [addWorldNote, refreshHomeState, setMicrocopy, worldFormingTarget]
+    [addWorldNote, refreshAllDays, refreshHomeState, setMicrocopy, worldFormingTarget]
   );
   const handleQuestRuntimeAction = useCallback(
-    async (runtime: QuestRuntimeStatus | null) => {
+    async (runtime: QuestRuntimeStatus | null, active: CompanionQuest | null, selectedCompanion: { creatureId: string; name: string } | null) => {
       if (!runtime || runtime.nextAction === 'none') return;
-      setCompanion(null);
+      if (active && selectedCompanion) {
+        pendingQuestReturnRef.current = {
+          questId: active.questId,
+          creatureId: active.creatureId,
+          name: selectedCompanion.name,
+          camera: worldCameraRef.current?.snapshot() ?? null,
+        };
+        worldCameraRef.current?.suppressNextFocusRecenter();
+      }
 
       switch (runtime.nextAction) {
         case 'take_photo':
         case 'enable_camera':
-          router.push({ pathname: '/moment-capture', params: { target: worldFormingTarget } });
+          router.push({
+            pathname: '/moment-capture',
+            params: { target: worldFormingTarget, questId: active?.questId, creatureId: active?.creatureId },
+          });
           return;
         case 'record_voice':
           if (runtime.state === 'blocked_permission' && runtime.missingCapabilities.includes('microphone')) {
@@ -387,7 +435,10 @@ export default function KingdomScreen() {
               return;
             }
           }
-          router.push({ pathname: '/note-capture', params: { target: worldFormingTarget } });
+          router.push({
+            pathname: '/note-capture',
+            params: { target: worldFormingTarget, questId: active?.questId, creatureId: active?.creatureId },
+          });
           return;
         case 'enable_photos':
           setMicrocopy(runtimeActionLabel(runtime));
@@ -629,6 +680,15 @@ export default function KingdomScreen() {
       // Companion quests: check today's signals against the active ledger
       // (docs/katchimera-engagement-v1.md — quests are signal-detectable).
       runQuestCheck('auto');
+      const pendingQuestReturn = pendingQuestReturnRef.current;
+      if (pendingQuestReturn) {
+        pendingQuestReturnRef.current = null;
+        setCompanion({ creatureId: pendingQuestReturn.creatureId, name: pendingQuestReturn.name });
+        setCompanionThread('quest');
+        if (pendingQuestReturn.camera) {
+          worldCameraRef.current?.restore(pendingQuestReturn.camera);
+        }
+      }
       setArrivals((current) => current ?? deriveKingdomArrivals(kingdom, next, { holdGiftDayIds: formingDayIds }));
       if (consumeKeepsakesShelfRequest()) setKeepsakesOpen(true);
     }, [days, kingdom, unlockedDiscoveries, patternProps, formingDayIds, runQuestCheck])
@@ -751,6 +811,7 @@ export default function KingdomScreen() {
           snapCell={snap}
           panRef={panRef}
           getCenterCellRef={getCenterCellRef}
+          cameraControllerRef={worldCameraRef}
           onSelectPatch={() => {}}
           onSelectMemory={() => {}}
           onSelectCell={handleSelectCell}
@@ -775,7 +836,7 @@ export default function KingdomScreen() {
               const hasOffer = hasQuestOfferForDay(companion.creatureId);
               const state = interactionState(companionQuests, companion.creatureId, todayFacts, hasOffer, questCapabilities);
               const complete = !!runtime?.complete;
-              const reportBackItems = buildQuestReportBackItems(questDay, runtime);
+              const submissionItems = buildQuestSubmissionItems(questDay, runtime, active, companionQuests.submissions);
               return (
                 <CompanionCard
                   name={companion.name}
@@ -787,10 +848,10 @@ export default function KingdomScreen() {
                   activeQuest={active}
                   questComplete={complete}
                   questRuntime={runtime}
-                  reportBackItems={reportBackItems}
+                  submissionItems={submissionItems}
                   offer={hasOffer ? unit.quest : undefined}
                   criteria={runtime?.progress ?? []}
-                  onQuestAction={() => void handleQuestRuntimeAction(runtime)}
+                  onQuestAction={() => void handleQuestRuntimeAction(runtime, active, companion)}
                   onAccept={() =>
                     unit.quest &&
                     handleAcceptQuest({
@@ -802,6 +863,7 @@ export default function KingdomScreen() {
                     })
                   }
                   onCashIn={() => active && handleCashIn(companion.creatureId, active.title)}
+                  onSubmitQuest={(item) => active && handleSubmitQuest(companion.creatureId, active.title, item)}
                   insightText={companionVoiced.insight ?? unit.line}
                   reflectionText={companionVoiced.reflection ?? reflectionLine(archetype)}
                   onAnswerReflection={() => {

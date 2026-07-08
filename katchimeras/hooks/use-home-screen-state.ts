@@ -63,7 +63,7 @@ export function useHomeScreenState() {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
-  const mutateHomeState = useHomeStateMutation(setStoredState);
+  const mutateHomeState = useHomeStateMutation(setStoredState, storedStateRef);
 
   useEffect(() => {
     storedStateRef.current = storedState;

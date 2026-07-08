@@ -60,6 +60,18 @@ import {
 } from '@/utils/world-base-projection';
 import { WORLD_STRUCTURE_POSITIONS } from '@/utils/world-structures';
 
+export type WorldCameraSnapshot = {
+  tx: number;
+  ty: number;
+  scale: number;
+};
+
+export type WorldCameraController = {
+  snapshot: () => WorldCameraSnapshot;
+  restore: (snapshot: WorldCameraSnapshot) => void;
+  suppressNextFocusRecenter: () => void;
+};
+
 type Props = {
   patches: WorldPatch[];
   onSelectPatch: (patchId: string) => void;
@@ -149,6 +161,7 @@ type Props = {
   // Inverts the screen centre to (cell, owning tile): plotId null = the main
   // island, otherwise the docked plot/expansion patch under the camera.
   getCenterCellRef?: MutableRefObject<(() => { col: number; row: number; plotId: string | null } | null) | null>;
+  cameraControllerRef?: MutableRefObject<WorldCameraController | null>;
   // The day's Featured Memory thumbnail — painted into the Featured Board's frame.
   featuredThumb?: string | null;
 };
@@ -343,6 +356,7 @@ export function WorldCanvas({
   questCount = 0,
   panRef,
   getCenterCellRef,
+  cameraControllerRef,
   featuredThumb,
   animateExpansionIndex = null,
 }: Props) {
@@ -827,6 +841,27 @@ export function WorldCanvas({
   const ty = useSharedValue(0);
   const scale = useSharedValue(1);
   const startScale = useSharedValue(1);
+  const suppressNextFocusRecenterRef = useRef(false);
+
+  if (cameraControllerRef) {
+    cameraControllerRef.current = {
+      snapshot: () => ({ tx: tx.value, ty: ty.value, scale: scale.value }),
+      restore: (snapshot) => {
+        suppressNextFocusRecenterRef.current = true;
+        cancelAnimation(tx);
+        cancelAnimation(ty);
+        cancelAnimation(scale);
+        tx.value = snapshot.tx;
+        ty.value = snapshot.ty;
+        scale.value = snapshot.scale;
+        startScale.value = snapshot.scale;
+        centred.current = true;
+      },
+      suppressNextFocusRecenter: () => {
+        suppressNextFocusRecenterRef.current = true;
+      },
+    };
+  }
 
   // Hold-to-move (outside customise mode): pick the keepsake under the finger
   // with EXACTLY the single-tap hit-test — the actual rendered sprite
@@ -1030,6 +1065,10 @@ export function WorldCanvas({
   const recentreOnFocus = useCallback(() => {
     if (imageBase) {
       setCustom(loadBaseCustomisation());
+    }
+    if (suppressNextFocusRecenterRef.current) {
+      suppressNextFocusRecenterRef.current = false;
+      return;
     }
     const { viewport: vp, focusSlab: fs } = focusRef.current;
     if (!vp.width || !fs) return; // first mount: layout not measured yet — the effect above handles it

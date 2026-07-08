@@ -3,6 +3,7 @@ import type { QuestCapabilityMap } from '@/utils/capabilities/quest-capabilities
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import type { Facts } from '@/utils/signals/facts';
 import { questCriteriaStatus } from '@/utils/quests/evaluate';
+import { isQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
 
 // Companion quest store (docs/katchimera-engagement-v1.md): tiny persisted
 // ledger of accepted quests, one active per katchimera. Completion is decided
@@ -22,19 +23,36 @@ export type CompanionQuest = {
   repairedFromQuestId?: string;
 };
 
-export type CompanionQuestState = { quests: CompanionQuest[] };
+export type QuestSubmissionRecord = {
+  id: string;
+  questId: string;
+  creatureId: string;
+  dayId: string;
+  sourceType: string;
+  sourceId: string;
+  evidenceId?: string | null;
+  submittedAt: number;
+};
+
+export type QuestSubmissionInput = {
+  sourceType: string;
+  sourceId: string;
+  evidenceId?: string | null;
+};
+
+export type CompanionQuestState = { quests: CompanionQuest[]; submissions: QuestSubmissionRecord[] };
 
 const KEY = 'katchadeck.companion-quests-v1';
 // No global cap for now — a katchimera still only holds one quest at a time.
 export const MAX_ACTIVE_QUESTS = Infinity;
 
 export function loadCompanionQuests(): CompanionQuestState {
-  const value = getStoredJson<CompanionQuestState>(KEY, { quests: [] });
-  return value && Array.isArray(value.quests) ? value : { quests: [] };
+  const value = getStoredJson<CompanionQuestState>(KEY, { quests: [], submissions: [] });
+  return normaliseState(value);
 }
 
 export function saveCompanionQuests(state: CompanionQuestState) {
-  setStoredJson(KEY, state);
+  setStoredJson(KEY, normaliseState(state));
 }
 
 export function activeQuests(state: CompanionQuestState): CompanionQuest[] {
@@ -50,8 +68,10 @@ export function hasCompanionQuestForDay(
   creatureId: string,
   dayId: string
 ): boolean {
+  const ignoreCompletedHistory = isQuestLoopAfterCompleteEnabled();
   return state.quests.some((quest) => {
     if (quest.creatureId !== creatureId) return false;
+    if (ignoreCompletedHistory && quest.completedAt) return false;
     return questDayId(quest.acceptedAt, quest.acceptedDayId) === dayId || questDayId(quest.completedAt, quest.completedDayId) === dayId;
   });
 }
@@ -70,7 +90,10 @@ export function interactionState(
   capabilities?: QuestCapabilityMap | null
 ): InteractionState {
   const active = questFor(state, creatureId);
-  if (active) return evaluateQuestRuntime({ questId: active.questId, facts, capabilities }).complete ? 'ready' : 'active';
+  if (active) {
+    const runtime = evaluateQuestRuntime({ questId: active.questId, facts, capabilities });
+    return runtime.complete || runtime.readyToSubmit ? 'ready' : 'active';
+  }
   return hasOffer ? 'offer' : 'idle';
 }
 
@@ -95,6 +118,7 @@ export function acceptQuest(
         acceptedDayId: offer.dayId ?? localDayId(acceptedAt),
       },
     ],
+    submissions: state.submissions ?? [],
   };
 }
 
@@ -125,6 +149,7 @@ export function reconcileCompanionQuestOffer(
           }
         : quest
     ),
+    submissions: state.submissions ?? [],
   };
 }
 
@@ -146,16 +171,18 @@ export function evaluateCompanionQuests(
   capabilities?: QuestCapabilityMap | null,
   dayId?: string | null
 ): { state: CompanionQuestState; completed: CompanionQuest[] } {
+  const loopAfterComplete = isQuestLoopAfterCompleteEnabled();
   const completed: CompanionQuest[] = [];
-  const quests = state.quests.map((quest) => {
-    if (quest.completedAt || !evaluateQuestRuntime({ questId: quest.questId, facts, capabilities }).complete) {
-      return quest;
+  const quests = state.quests.flatMap((quest) => {
+    const runtime = evaluateQuestRuntime({ questId: quest.questId, facts, capabilities });
+    if (quest.completedAt || !runtime.complete) {
+      return [quest];
     }
     const done = { ...quest, completedAt: now, completedDayId: dayId ?? localDayId(now) };
     completed.push(done);
-    return done;
+    return loopAfterComplete ? [] : [done];
   });
-  return { state: { quests }, completed };
+  return { state: { quests, submissions: state.submissions ?? [] }, completed };
 }
 
 export function completeQuest(
@@ -164,12 +191,78 @@ export function completeQuest(
   completedAt: number,
   dayId?: string | null
 ): CompanionQuestState {
+  if (isQuestLoopAfterCompleteEnabled()) {
+    return {
+      quests: state.quests.filter((quest) => quest.creatureId !== creatureId || quest.completedAt),
+      submissions: state.submissions ?? [],
+    };
+  }
   return {
     quests: state.quests.map((quest) =>
       quest.creatureId === creatureId && !quest.completedAt
         ? { ...quest, completedAt, completedDayId: dayId ?? localDayId(completedAt) }
         : quest
     ),
+    submissions: state.submissions ?? [],
+  };
+}
+
+export function submitQuest(
+  state: CompanionQuestState,
+  creatureId: string,
+  submission: QuestSubmissionInput,
+  submittedAt: number,
+  dayId?: string | null
+): { state: CompanionQuestState; quest: CompanionQuest | null; submitted: boolean } {
+  const active = questFor(state, creatureId);
+  if (!active || !submission.sourceId) return { state, quest: active, submitted: false };
+  const resolvedDayId = dayId ?? localDayId(submittedAt);
+  const submissions = state.submissions ?? [];
+  if (isSubmittedForQuest(submissions, active.questId, active.creatureId, submission.sourceType, submission.sourceId)) {
+    return { state, quest: active, submitted: false };
+  }
+
+  const record: QuestSubmissionRecord = {
+    id: `${active.questId}:${active.creatureId}:${submission.sourceType}:${submission.sourceId}:${submittedAt}`,
+    questId: active.questId,
+    creatureId: active.creatureId,
+    dayId: resolvedDayId,
+    sourceType: submission.sourceType,
+    sourceId: submission.sourceId,
+    evidenceId: submission.evidenceId ?? null,
+    submittedAt,
+  };
+  const done = { ...active, completedAt: submittedAt, completedDayId: resolvedDayId };
+  const quests = isQuestLoopAfterCompleteEnabled()
+    ? state.quests.filter((quest) => quest !== active)
+    : state.quests.map((quest) => (quest === active ? done : quest));
+  return {
+    state: { quests, submissions: [...submissions, record] },
+    quest: done,
+    submitted: true,
+  };
+}
+
+export function isSubmittedForQuest(
+  submissions: QuestSubmissionRecord[] | undefined,
+  questId: string,
+  creatureId: string,
+  sourceType: string,
+  sourceId: string
+): boolean {
+  return (submissions ?? []).some(
+    (record) =>
+      record.questId === questId &&
+      record.creatureId === creatureId &&
+      record.sourceType === sourceType &&
+      record.sourceId === sourceId
+  );
+}
+
+function normaliseState(value: CompanionQuestState | null | undefined): CompanionQuestState {
+  return {
+    quests: value && Array.isArray(value.quests) ? value.quests : [],
+    submissions: value && Array.isArray(value.submissions) ? value.submissions : [],
   };
 }
 

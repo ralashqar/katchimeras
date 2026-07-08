@@ -19,7 +19,7 @@ function transpile(relativeSourcePath, outName) {
 transpile('utils/quests/definitions.ts', 'definitions.js');
 const reportBackPath = transpile('utils/quests/report-back-evidence.ts', 'report-back-evidence.js');
 
-const { buildQuestReportBackItems } = require(reportBackPath);
+const { buildQuestReportBackItems, buildQuestSubmissionItems } = require(reportBackPath);
 
 let failures = 0;
 function check(label, condition, detail) {
@@ -171,6 +171,64 @@ const incompleteItems = buildQuestReportBackItems(baseDay, {
   matchedEvidenceIds: [],
 });
 check('incomplete quests do not preview report-back items', incompleteItems.length === 0, String(incompleteItems.length));
+
+const submissionQuest = {
+  questId: 'quest-photo-dog',
+  creatureId: 'creature-dog',
+  title: 'Good dog',
+  hint: 'Snap a dog.',
+  acceptedAt: Date.parse('2026-07-07T10:00:00.000Z'),
+  acceptedDayId: '2026-07-07',
+};
+const submissionRuntime = {
+  complete: false,
+  readyToSubmit: true,
+  questId: 'quest-photo-dog',
+  matchedEvidenceIds: ['photo:old-dog', 'photo:new-dog'],
+};
+const submissionDay = {
+  ...baseDay,
+  evidence: [
+    {
+      id: 'photo:old-dog',
+      sourceType: 'photo',
+      sourceId: 'old-dog',
+      observedAt: '2026-07-07T09:00:00.000Z',
+      provider: 'appleVision',
+      confidence: 0.9,
+      thumbnailUri: 'file://old-dog.jpg',
+      explanation: 'Detected dog.',
+      signals: [],
+    },
+    {
+      id: 'photo:new-dog',
+      sourceType: 'photo',
+      sourceId: 'new-dog',
+      observedAt: '2026-07-07T11:00:00.000Z',
+      provider: 'appleVision',
+      confidence: 0.9,
+      thumbnailUri: 'file://new-dog.jpg',
+      explanation: 'Detected dog.',
+      signals: [],
+    },
+  ],
+};
+const eligibleSubmissionItems = buildQuestSubmissionItems(submissionDay, submissionRuntime, submissionQuest, []);
+check('submission candidates exclude evidence before quest acceptance', eligibleSubmissionItems.length === 1, JSON.stringify(eligibleSubmissionItems));
+check('submission candidates include the new eligible evidence', eligibleSubmissionItems[0]?.sourceId === 'new-dog', eligibleSubmissionItems[0]?.sourceId);
+const reusedSubmissionItems = buildQuestSubmissionItems(submissionDay, submissionRuntime, submissionQuest, [
+  {
+    id: 'submitted-new-dog',
+    questId: 'quest-photo-dog',
+    creatureId: 'creature-dog',
+    dayId: '2026-07-07',
+    sourceType: 'photo',
+    sourceId: 'new-dog',
+    evidenceId: 'photo:new-dog',
+    submittedAt: Date.parse('2026-07-07T11:05:00.000Z'),
+  },
+]);
+check('submission candidates exclude already submitted entries', reusedSubmissionItems.length === 0, JSON.stringify(reusedSubmissionItems));
 
 console.log(failures === 0 ? '\nAll quest report-back evidence checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -68,7 +68,8 @@ const completeDog = runtime.evaluateQuestRuntime({
   questId: 'quest-photo-dog',
   facts: { 'evidence.items': [photoEvidence('photo:dog', 'dog', 0.9)] },
 });
-check('photo evidence completes matching quest', completeDog.state === 'complete', completeDog.state);
+check('photo evidence is ready for explicit submission', completeDog.state === 'ready_to_submit', completeDog.state);
+check('photo evidence does not auto-complete before submission', completeDog.complete === false, String(completeDog.complete));
 check('complete runtime exposes matched evidence id', completeDog.matchedEvidenceIds.includes('photo:dog'));
 
 const incompleteDog = runtime.evaluateQuestRuntime({
@@ -144,7 +145,15 @@ const cheerletComplete = runtime.evaluateQuestRuntime({
   facts: { 'notes.voiceAdded': 1 },
   capabilities: grantedMicCaps,
 });
-check('celebration voice note completes Cheerlet quest', cheerletComplete.state === 'complete', cheerletComplete.state);
+check('celebration voice note is ready for explicit submission', cheerletComplete.state === 'ready_to_submit', cheerletComplete.state);
+check('celebration voice note does not auto-complete before submission', cheerletComplete.complete === false, String(cheerletComplete.complete));
+
+const noteComplete = runtime.evaluateQuestRuntime({
+  questId: 'quest-goal-note',
+  facts: { 'notes.added': 1 },
+  capabilities: caps.defaultQuestCapabilities(),
+});
+check('manual note quest keeps add-note action while awaiting submission', noteComplete.nextAction === 'add_note', noteComplete.nextAction);
 
 console.log(failures === 0 ? '\nAll quest runtime checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

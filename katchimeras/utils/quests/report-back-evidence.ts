@@ -1,5 +1,6 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { DayEvidence, HomeDayRecord } from '@/types/home';
+import type { CompanionQuest, QuestSubmissionRecord } from '@/utils/katchimera-quests';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 
 import { questDefinition } from './definitions';
@@ -7,6 +8,10 @@ import { questDefinition } from './definitions';
 export type QuestReportBackItem = {
   id: string;
   kind: 'photo' | 'voice' | 'note' | 'place' | 'food' | 'studio' | 'movement' | 'sleep' | 'weather' | 'moment';
+  sourceType: string;
+  sourceId: string;
+  evidenceId?: string | null;
+  createdAt?: string | null;
   title: string;
   subtitle: string;
   body?: string | null;
@@ -14,6 +19,35 @@ export type QuestReportBackItem = {
   icon: IconSymbolName;
   accentColor: string;
 };
+
+export type QuestSubmissionItem = QuestReportBackItem;
+
+export function buildQuestSubmissionItems(
+  day: HomeDayRecord | null | undefined,
+  runtime: QuestRuntimeStatus | null | undefined,
+  quest: CompanionQuest | null | undefined,
+  submissions: QuestSubmissionRecord[] | undefined,
+  limit = 3
+): QuestSubmissionItem[] {
+  if (!day || !runtime || !quest) return [];
+  if (quest.acceptedDayId && quest.acceptedDayId !== day.isoDate) return [];
+  if (!runtime.readyToSubmit && !runtime.complete) return [];
+
+  const items: QuestSubmissionItem[] = [];
+  for (const id of runtime.matchedEvidenceIds) {
+    const item = itemForEvidenceId(day, id);
+    if (item) items.push(item);
+  }
+
+  if (items.length === 0) {
+    items.push(...fallbackItemsForQuest(day, runtime.questId));
+  }
+
+  return dedupeItems(items)
+    .filter((item) => isAfterQuestAccepted(item, quest))
+    .filter((item) => !isSubmittedForQuest(submissions, quest.questId, quest.creatureId, item.sourceType, item.sourceId))
+    .slice(0, limit);
+}
 
 export function buildQuestReportBackItems(
   day: HomeDayRecord | null | undefined,
@@ -50,6 +84,10 @@ function itemForEvidenceId(day: HomeDayRecord, evidenceId: string): QuestReportB
   return {
     id: evidence.id,
     kind: evidence.sourceType === 'place' ? 'place' : 'moment',
+    sourceType: evidence.sourceType,
+    sourceId: evidence.sourceId,
+    evidenceId: evidence.id,
+    createdAt: evidence.observedAt,
     title: titleForEvidence(evidence),
     subtitle: evidence.explanation ?? 'Matched evidence',
     thumbnailUri: evidence.thumbnailUri ?? null,
@@ -79,6 +117,10 @@ function photoEvidenceItem(day: HomeDayRecord, evidence: DayEvidence): QuestRepo
   return {
     id: evidence.id,
     kind: 'photo',
+    sourceType: 'photo',
+    sourceId: evidence.sourceId,
+    evidenceId: evidence.id,
+    createdAt: evidence.observedAt,
     title: meaning?.label ?? food?.label ?? studio?.label ?? moment?.label ?? 'Photo',
     subtitle: evidence.explanation ?? 'Matched photo evidence',
     thumbnailUri: evidence.thumbnailUri ?? meaning?.thumbnailUri ?? moment?.metadata?.thumbnailUri ?? food?.thumbnailUri ?? studio?.thumbnailUri ?? null,
@@ -96,6 +138,10 @@ function noteEvidenceItem(day: HomeDayRecord, evidence: DayEvidence): QuestRepor
   return {
     id: evidence.id,
     kind: isVoice ? 'voice' : 'note',
+    sourceType: isVoice ? 'voice_note' : 'text_note',
+    sourceId: evidence.sourceId,
+    evidenceId: evidence.id,
+    createdAt: evidence.observedAt,
     title: studio?.label ?? food?.label ?? note?.label ?? (isVoice ? 'Voice note' : 'Written note'),
     subtitle: isVoice ? 'Voice note' : 'Written note',
     body: note?.text ?? food?.detail ?? studio?.detail ?? evidence.explanation ?? null,
@@ -131,6 +177,10 @@ function fallbackItemsForQuest(day: HomeDayRecord, questId: string): QuestReport
     items.push({
       id: `steps-${day.isoDate}`,
       kind: 'movement',
+      sourceType: 'steps',
+      sourceId: day.isoDate,
+      evidenceId: null,
+      createdAt: day.stepsUpdatedAt ?? `${day.isoDate}T12:00:00.000Z`,
       title: `${formatCompact(day.stepsCount)} steps`,
       subtitle: day.stepsInterpretation?.label ?? 'Movement today',
       icon: 'figure.walk',
@@ -141,6 +191,10 @@ function fallbackItemsForQuest(day: HomeDayRecord, questId: string): QuestReport
     items.push({
       id: `sleep-${day.isoDate}`,
       kind: 'sleep',
+      sourceType: 'sleep',
+      sourceId: day.isoDate,
+      evidenceId: null,
+      createdAt: `${day.isoDate}T12:00:00.000Z`,
       title: sleepTitle(day.sleep.quality),
       subtitle: day.sleep.source === 'appleHealth' ? 'From Health' : 'Logged manually',
       icon: 'bed.double.fill',
@@ -151,6 +205,10 @@ function fallbackItemsForQuest(day: HomeDayRecord, questId: string): QuestReport
     items.push({
       id: `weather-${day.isoDate}`,
       kind: 'weather',
+      sourceType: 'weather',
+      sourceId: day.isoDate,
+      evidenceId: null,
+      createdAt: `${day.isoDate}T12:00:00.000Z`,
       title: weatherTitle(day.weather.condition),
       subtitle: day.weather.source === 'forecast' ? 'From forecast' : 'From photo evidence',
       icon: weatherIcon(day.weather.condition),
@@ -165,6 +223,10 @@ function latestFoodItems(day: HomeDayRecord): QuestReportBackItem[] {
   return [...(day.foodMoments ?? [])].reverse().map((item) => ({
     id: item.id,
     kind: 'food' as const,
+    sourceType: 'food',
+    sourceId: item.id,
+    evidenceId: null,
+    createdAt: item.createdAt,
     title: item.label,
     subtitle: [item.cuisine ? cuisineTitle(item.cuisine) : null, item.homeCooked ? 'Home cooked' : null, foodMeaningTitle(item.meaning)]
       .filter(Boolean)
@@ -184,6 +246,10 @@ function latestStudioItems(day: HomeDayRecord, requestedMedia?: unknown): QuestR
     .map((item) => ({
       id: item.id,
       kind: 'studio' as const,
+      sourceType: 'studio',
+      sourceId: item.id,
+      evidenceId: null,
+      createdAt: item.createdAt,
       title: item.label,
       subtitle: `${studioMediaTitle(item.mediaType)} - ${studioRatingTitle(item.rating)}`,
       body: item.detail ?? null,
@@ -205,6 +271,10 @@ function latestNoteItems(day: HomeDayRecord, questId: string): QuestReportBackIt
     return {
       id: item.id,
       kind: isVoice ? 'voice' as const : 'note' as const,
+      sourceType: isVoice ? 'voice_note' as const : 'text_note' as const,
+      sourceId: item.id,
+      evidenceId: null,
+      createdAt: item.createdAt,
       title: item.label,
       subtitle: bigMoment ? `${isVoice ? 'Voice note' : 'Written note'} - Big Moment` : isVoice ? durationSubtitle(item.durationMs) : 'Written note',
       body: item.text,
@@ -226,6 +296,10 @@ function latestPlaceItems(day: HomeDayRecord): QuestReportBackItem[] {
   return [...(day.confirmedPlaces ?? [])].reverse().map((item) => ({
     id: `place-${item.id}`,
     kind: 'place' as const,
+    sourceType: 'place',
+    sourceId: item.id,
+    evidenceId: null,
+    createdAt: item.confirmedAt,
     title: item.label,
     subtitle: item.meaningLabel ?? 'Confirmed place',
     icon: 'mappin.and.ellipse',
@@ -237,12 +311,39 @@ function latestCaptureItems(day: HomeDayRecord): QuestReportBackItem[] {
   return [...(day.capturedMeanings ?? [])].reverse().map((item, index) => ({
     id: `capture-${item.sourceId ?? item.createdAt ?? index}`,
     kind: 'photo' as const,
+    sourceType: 'photo',
+    sourceId: item.sourceId ?? item.thumbnailUri ?? item.createdAt,
+    evidenceId: null,
+    createdAt: item.createdAt,
     title: item.label,
     subtitle: 'Captured moment',
     thumbnailUri: item.thumbnailUri ?? null,
     icon: 'camera.fill',
     accentColor: '#92D7FF',
   }));
+}
+
+function isAfterQuestAccepted(item: QuestSubmissionItem, quest: CompanionQuest): boolean {
+  if (!item.createdAt) return true;
+  const createdAt = Date.parse(item.createdAt);
+  if (!Number.isFinite(createdAt)) return true;
+  return createdAt >= quest.acceptedAt;
+}
+
+function isSubmittedForQuest(
+  submissions: QuestSubmissionRecord[] | undefined,
+  questId: string,
+  creatureId: string,
+  sourceType: string,
+  sourceId: string
+): boolean {
+  return (submissions ?? []).some(
+    (record) =>
+      record.questId === questId &&
+      record.creatureId === creatureId &&
+      record.sourceType === sourceType &&
+      record.sourceId === sourceId
+  );
 }
 
 function dedupeItems(items: QuestReportBackItem[]): QuestReportBackItem[] {

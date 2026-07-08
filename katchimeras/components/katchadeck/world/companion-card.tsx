@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import type { QuestReportBackItem } from '@/utils/quests/report-back-evidence';
+import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 
 export type CompanionThread = 'quest' | 'insight' | 'reflection';
@@ -29,11 +29,12 @@ type Props = {
   activeQuest: { title: string; hint: string } | null;
   questComplete: boolean;
   questRuntime: QuestRuntimeStatus | null;
-  reportBackItems: QuestReportBackItem[];
+  submissionItems: QuestSubmissionItem[];
   offer: { id: string; title: string; hint: string } | undefined;
   criteria: Criterion[];
   onAccept: () => void;
   onCashIn: () => void;
+  onSubmitQuest: (item: QuestSubmissionItem) => void;
   onQuestAction: () => void;
   insightText: string;
   reflectionText: string;
@@ -102,6 +103,9 @@ export function CompanionCard(props: Props) {
 function threadLine(props: Props): string {
   if (props.thread === 'insight') return props.insightText;
   if (props.thread === 'reflection') return props.reflectionText;
+  if (props.questRuntime?.readyToSubmit) {
+    return props.submissionItems.length > 0 ? 'That looks right. Choose what to submit.' : 'This needs a new matching entry.';
+  }
   if (props.questComplete) return 'You did it. Ready to make it count?';
   if (props.questRuntime?.state === 'blocked_permission') return props.questRuntime.userMessage;
   if (props.questRuntime?.state === 'unavailable') return props.questRuntime.userMessage;
@@ -112,6 +116,7 @@ function threadLine(props: Props): string {
 
 function QuestBody(props: Props) {
   if (props.activeQuest) {
+    const hasSubmissionItem = props.submissionItems.length > 0;
     return (
       <View style={styles.questBody}>
         <ThemedText style={styles.questTitle} lightColor="#FFE2B8" darkColor="#FFE2B8">
@@ -119,14 +124,16 @@ function QuestBody(props: Props) {
         </ThemedText>
         {props.questRuntime ? (
           <View style={styles.statusPill}>
-            <ThemedText style={styles.statusText} lightColor={statusColor(props.questRuntime)} darkColor={statusColor(props.questRuntime)}>
-              {statusLabel(props.questRuntime)}
+            <ThemedText style={styles.statusText} lightColor={statusColor(props.questRuntime, hasSubmissionItem)} darkColor={statusColor(props.questRuntime, hasSubmissionItem)}>
+              {statusLabel(props.questRuntime, hasSubmissionItem)}
             </ThemedText>
           </View>
         ) : null}
         {props.questRuntime && !props.questRuntime.complete ? (
           <ThemedText style={styles.statusMessage} lightColor="#EDEAF6" darkColor="#EDEAF6">
-            {props.questRuntime.userMessage}
+            {props.questRuntime.readyToSubmit && !hasSubmissionItem
+              ? 'Make a new matching entry for this quest, then come back to submit it.'
+              : props.questRuntime.userMessage}
           </ThemedText>
         ) : null}
         {props.criteria.map((criterion) => (
@@ -143,12 +150,36 @@ function QuestBody(props: Props) {
             ) : null}
           </View>
         ))}
-        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete ? (
+        {props.questRuntime?.readyToSubmit ? (
+          <>
+            {hasSubmissionItem ? <ReportBackPreview items={props.submissionItems} emptyMode="submission" /> : null}
+            {hasSubmissionItem && props.submissionItems[0] ? (
+              <Pressable style={[styles.action, styles.cashIn]} onPress={() => props.onSubmitQuest(props.submissionItems[0])}>
+                <ThemedText style={styles.actionText} lightColor="#1B140A" darkColor="#1B140A">
+                  Submit quest
+                </ThemedText>
+              </Pressable>
+            ) : null}
+            {!hasSubmissionItem && props.questRuntime.nextAction !== 'none' ? (
+              <>
+                <ThemedText style={styles.actionHint} lightColor="#A8E2C6" darkColor="#A8E2C6">
+                  {nextActionLabel(props.questRuntime)}
+                </ThemedText>
+                <Pressable style={styles.action} onPress={props.onQuestAction}>
+                  <ThemedText style={styles.actionText} lightColor="#A8E2C6" darkColor="#A8E2C6">
+                    {nextActionButtonLabel(props.questRuntime)}
+                  </ThemedText>
+                </Pressable>
+              </>
+            ) : null}
+          </>
+        ) : null}
+        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete && !props.questRuntime.readyToSubmit ? (
           <ThemedText style={styles.actionHint} lightColor="#A8E2C6" darkColor="#A8E2C6">
             {nextActionLabel(props.questRuntime)}
           </ThemedText>
         ) : null}
-        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete ? (
+        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete && !props.questRuntime.readyToSubmit ? (
           <Pressable style={styles.action} onPress={props.onQuestAction}>
             <ThemedText style={styles.actionText} lightColor="#A8E2C6" darkColor="#A8E2C6">
               {nextActionButtonLabel(props.questRuntime)}
@@ -157,7 +188,7 @@ function QuestBody(props: Props) {
         ) : null}
         {props.questComplete ? (
           <>
-            <ReportBackPreview items={props.reportBackItems} />
+            <ReportBackPreview items={props.submissionItems} emptyMode="report" />
             <Pressable style={[styles.action, styles.cashIn]} onPress={props.onCashIn}>
               <ThemedText style={styles.actionText} lightColor="#1B140A" darkColor="#1B140A">
                 Report back
@@ -191,16 +222,20 @@ function QuestProgressBar({ label, ratio, complete }: { label: string; ratio: nu
   );
 }
 
-function ReportBackPreview({ items }: { items: QuestReportBackItem[] }) {
-  const visibleItems: QuestReportBackItem[] =
+function ReportBackPreview({ items, emptyMode }: { items: QuestSubmissionItem[]; emptyMode: 'submission' | 'report' }) {
+  const visibleItems: QuestSubmissionItem[] =
     items.length > 0
       ? items
       : [
           {
             id: 'fallback',
             kind: 'moment',
+            sourceType: 'moment',
+            sourceId: 'fallback',
+            evidenceId: null,
+            createdAt: null,
             title: 'Quest evidence from today',
-            subtitle: 'The matching signals are ready to submit.',
+            subtitle: emptyMode === 'submission' ? 'Make a new matching entry to submit this quest.' : 'The matching signals are ready to submit.',
             icon: 'sparkles' as const,
             accentColor: '#A8E2C6',
           },
@@ -239,7 +274,8 @@ function ReportBackPreview({ items }: { items: QuestReportBackItem[] }) {
   );
 }
 
-function statusLabel(runtime: QuestRuntimeStatus): string {
+function statusLabel(runtime: QuestRuntimeStatus, hasSubmissionItem = true): string {
+  if (runtime.readyToSubmit) return hasSubmissionItem ? 'Ready to submit' : 'Needs new entry';
   if (runtime.complete) return runtime.matchedEvidenceIds.length > 0 ? 'Matched from today' : 'Ready to report';
   switch (runtime.state) {
     case 'blocked_permission':
@@ -253,7 +289,8 @@ function statusLabel(runtime: QuestRuntimeStatus): string {
   }
 }
 
-function statusColor(runtime: QuestRuntimeStatus): string {
+function statusColor(runtime: QuestRuntimeStatus, hasSubmissionItem = true): string {
+  if (runtime.readyToSubmit) return hasSubmissionItem ? '#A8E2C6' : '#F3B36A';
   if (runtime.complete) return '#A8E2C6';
   if (runtime.state === 'blocked_permission' || runtime.state === 'unavailable') return '#F3B36A';
   if (runtime.state === 'impossible_today') return '#F08C8C';

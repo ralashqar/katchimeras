@@ -9,7 +9,8 @@ import type { Criterion } from '@/utils/signals/facts';
 
 export type QuestDefinition = {
   id: string;
-  family?: 'photo' | 'place' | 'movement' | 'note' | 'voice' | 'food' | 'studio' | 'sleep' | 'weather' | 'calendar';
+  family?: 'photo' | 'moment' | 'place' | 'movement' | 'note' | 'voice' | 'food' | 'studio' | 'sleep' | 'weather' | 'calendar';
+  submissionMode?: 'manual' | 'auto';
   themes?: string[];
   title: string;
   hint: string;
@@ -278,6 +279,7 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
         {
           ...definition,
           family: family ?? undefined,
+          submissionMode: definition.submissionMode ?? inferSubmissionMode(family),
           themes,
           requiresCapabilities,
           optionalCapabilities,
@@ -292,6 +294,7 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
 function inferFamily(definition: QuestDefinition): QuestDefinition['family'] | undefined {
   if (definition.criteria.some((criterion) => criterion.fact === 'places.categories' || criterion.fact === 'places.confirmed')) return 'place';
   if (definition.criteria.some((criterion) => criterion.fact === 'evidence.items' && criterion.sourceTypes?.includes('photo'))) return 'photo';
+  if (definition.criteria.some((criterion) => criterion.fact === 'moments.captured')) return 'moment';
   if (definition.criteria.some((criterion) => criterion.fact === 'steps.count')) return 'movement';
   if (definition.criteria.some((criterion) => criterion.fact === 'notes.added')) {
     return definition.id.includes('celebrate') ? 'voice' : 'note';
@@ -309,7 +312,7 @@ function inferRequiredCapabilities(
   family: QuestDefinition['family'] | undefined
 ): QuestCapabilityId[] {
   const required = new Set<QuestCapabilityId>();
-  if (family === 'photo') required.add('camera.capture');
+  if (family === 'photo' || family === 'moment') required.add('camera.capture');
   if (family === 'place') required.add('location.foreground');
   if (family === 'movement') required.add('health.steps');
   if (family === 'sleep') required.add('health.sleep');
@@ -343,6 +346,7 @@ function inferOptionalCapabilities(
 function inferSuggestedActions(family: QuestDefinition['family'] | undefined): string[] {
   switch (family) {
     case 'photo':
+    case 'moment':
       return ['take_photo'];
     case 'place':
       return ['confirm_place'];
@@ -355,6 +359,20 @@ function inferSuggestedActions(family: QuestDefinition['family'] | undefined): s
       return ['open_health'];
     default:
       return [];
+  }
+}
+
+function inferSubmissionMode(family: QuestDefinition['family'] | undefined): QuestDefinition['submissionMode'] {
+  switch (family) {
+    case 'photo':
+    case 'moment':
+    case 'note':
+    case 'voice':
+    case 'food':
+    case 'studio':
+      return 'manual';
+    default:
+      return 'auto';
   }
 }
 

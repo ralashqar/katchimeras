@@ -11,6 +11,7 @@ import { questDefinition, type QuestDefinition } from './definitions';
 
 export type QuestRuntimeState =
   | 'complete'
+  | 'ready_to_submit'
   | 'in_progress'
   | 'blocked_permission'
   | 'unavailable'
@@ -45,6 +46,8 @@ export type QuestRuntimeStatus = {
   questId: string;
   state: QuestRuntimeState;
   complete: boolean;
+  submissionMode: 'manual' | 'auto';
+  readyToSubmit: boolean;
   progress: QuestRuntimeCriterion[];
   matchedEvidenceIds: string[];
   confidence: number | null;
@@ -73,6 +76,8 @@ export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRun
       questId: def.id,
       state: capabilityStatus.state,
       complete: false,
+      submissionMode: submissionModeForQuest(def),
+      readyToSubmit: false,
       progress: [],
       matchedEvidenceIds: [],
       confidence: null,
@@ -101,23 +106,32 @@ export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRun
   const confidences = progress.map((criterion) => criterion.confidence).filter((value): value is number => value != null);
   const confidence = confidences.length ? confidences.reduce((sum, value) => sum + value, 0) / confidences.length : null;
   const missing = progress.find((criterion) => !criterion.done);
+  const submissionMode = submissionModeForQuest(def);
+  const readyToSubmit = complete && submissionMode === 'manual';
+  const runtimeComplete = complete && submissionMode === 'auto';
 
   return {
     questId: def.id,
-    state: complete ? 'complete' : impossibleToday(def, input.day) ? 'impossible_today' : 'in_progress',
-    complete,
+    state: runtimeComplete ? 'complete' : readyToSubmit ? 'ready_to_submit' : impossibleToday(def, input.day) ? 'impossible_today' : 'in_progress',
+    complete: runtimeComplete,
+    submissionMode,
+    readyToSubmit,
     progress,
     matchedEvidenceIds,
     confidence,
     missingCapabilities: [],
-    nextAction: complete ? 'none' : nextActionForQuest(def, input),
-    userMessage: complete
-      ? matchedEvidenceIds.length > 0
-        ? 'Matched by today\'s evidence.'
-        : 'Quest complete.'
+    nextAction: runtimeComplete ? 'none' : nextActionForQuest(def, input),
+    userMessage: readyToSubmit
+      ? 'Matching evidence is ready. Submit the entry you want to use.'
+      : runtimeComplete
+        ? matchedEvidenceIds.length > 0
+          ? 'Matched by today\'s evidence.'
+          : 'Quest complete.'
       : missing?.reason ?? def.hint,
     debugReason: complete
-      ? `All ${progress.length} criteria passed.`
+      ? submissionMode === 'manual'
+        ? `All ${progress.length} criteria passed; waiting for explicit submission.`
+        : `All ${progress.length} criteria passed.`
       : missing?.reason ?? 'At least one criterion is incomplete.',
   };
 }
@@ -161,7 +175,7 @@ function evaluateCapabilities(def: QuestDefinition, input: EvaluateQuestRuntimeI
 function requiredCapabilitiesForQuest(def: QuestDefinition): QuestCapabilityId[] {
   if (def.requiresCapabilities) return def.requiresCapabilities;
   const family = familyForQuest(def);
-  if (family === 'photo' || def.criteria.some((criterion) => criterion.sourceTypes?.includes('photo'))) {
+  if (family === 'photo' || family === 'moment' || def.criteria.some((criterion) => criterion.sourceTypes?.includes('photo'))) {
     return ['camera.capture'];
   }
   if (family === 'place' || def.criteria.some((criterion) => criterion.fact === 'places.categories')) {
@@ -177,10 +191,11 @@ function requiredCapabilitiesForQuest(def: QuestDefinition): QuestCapabilityId[]
 
 function nextActionForQuest(def: QuestDefinition, input: EvaluateQuestRuntimeInput): QuestNextAction {
   const family = familyForQuest(def);
-  if (def.suggestedActions?.includes('take_photo') || family === 'photo') return 'take_photo';
+  if (def.suggestedActions?.includes('take_photo') || family === 'photo' || family === 'moment') return 'take_photo';
   if (family === 'place') return 'confirm_place';
   if (family === 'voice') return 'record_voice';
   if (family === 'note') return 'add_note';
+  if (family === 'food' || family === 'studio') return 'add_note';
   if (family === 'movement' && hasUsableStepSignal(def, input)) return 'none';
   if (family === 'movement' || family === 'sleep') return 'open_health';
   return 'none';
@@ -232,6 +247,7 @@ function progressForCriterion(
 function familyForQuest(def: QuestDefinition): NonNullable<QuestDefinition['family']> | null {
   if (def.family) return def.family;
   if (def.id.startsWith('quest-photo-')) return 'photo';
+  if (def.criteria.some((criterion) => criterion.fact === 'moments.captured')) return 'moment';
   if (def.id.includes('park') || def.id.includes('beach') || def.id.includes('forest') || def.id.includes('garden') || def.id.includes('museum')) {
     return 'place';
   }
@@ -242,6 +258,22 @@ function familyForQuest(def: QuestDefinition): NonNullable<QuestDefinition['fami
   if (def.id.includes('cuisine')) return 'food';
   if (def.id.includes('book') || def.id.includes('film') || def.id.includes('inspiration')) return 'studio';
   return null;
+}
+
+export function submissionModeForQuest(def: QuestDefinition): 'manual' | 'auto' {
+  if (def.submissionMode) return def.submissionMode;
+  const family = familyForQuest(def);
+  switch (family) {
+    case 'photo':
+    case 'moment':
+    case 'note':
+    case 'voice':
+    case 'food':
+    case 'studio':
+      return 'manual';
+    default:
+      return 'auto';
+  }
 }
 
 function capabilityAction(action: string): QuestNextAction {
@@ -277,6 +309,8 @@ function unknownQuest(questId: string): QuestRuntimeStatus {
     questId,
     state: 'unavailable',
     complete: false,
+    submissionMode: 'auto',
+    readyToSubmit: false,
     progress: [],
     matchedEvidenceIds: [],
     confidence: null,
