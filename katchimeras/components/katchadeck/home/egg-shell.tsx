@@ -1,5 +1,5 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   type SharedValue,
@@ -12,7 +12,6 @@ import Animated, {
 import { useEffect } from 'react';
 
 import type { EggVisualState } from '@/types/home';
-import { KatchaDeckUI } from '@/constants/theme';
 
 export type EggAuraMotionValues = {
   dragX: SharedValue<number>;
@@ -28,12 +27,30 @@ type EggShellProps = {
   egg: EggVisualState;
   motion: EggAuraMotionValues;
   reactionKey?: number;
+  // 0 = whole shell, 1 = first glowing cracks, 2 = bursting. The stages are
+  // generated edits of the same render, tight-cropped to a shared bounding
+  // box so crossfades stay pixel-aligned.
+  crackStage?: 0 | 1 | 2;
 };
 
-export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
+// Drag-to-tilt: dragX is already clamped to ±60 in LanternEgg's pan handler, so
+// a full sideways pull reaches the max tilt.
+const DRAG_TILT_RANGE = 60;
+const MAX_TILT_DEG = 9;
+
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
+const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.webp');
+const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.webp');
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+
+// Pure artwork egg: the render plus crack overlays, breathing. No procedural
+// glow capsules, rings, or sparks - the glow is baked into the art.
+export function EggShell({ egg: _egg, motion, reactionKey = 0, crackStage = 0 }: EggShellProps) {
   const breathe = useSharedValue(0);
   const reaction = useSharedValue(0);
-  const shimmer = useSharedValue(egg.shimmer ? 1 : 0);
+  const crackOne = useSharedValue(0);
+  const crackTwo = useSharedValue(0);
 
   useEffect(() => {
     breathe.value = withRepeat(
@@ -47,17 +64,6 @@ export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
   }, [breathe]);
 
   useEffect(() => {
-    shimmer.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0.18, { duration: 1800, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      false
-    );
-  }, [egg.shimmer, shimmer]);
-
-  useEffect(() => {
     reaction.value = 0;
     reaction.value = withSequence(
       withTiming(1, { duration: 220, easing: Easing.out(Easing.cubic) }),
@@ -65,66 +71,51 @@ export function EggShell({ egg, motion, reactionKey = 0 }: EggShellProps) {
     );
   }, [reaction, reactionKey]);
 
+  useEffect(() => {
+    crackOne.value = withTiming(crackStage >= 1 ? 1 : 0, { duration: 360, easing: Easing.out(Easing.cubic) });
+    crackTwo.value = withTiming(crackStage >= 2 ? 1 : 0, { duration: 320, easing: Easing.out(Easing.cubic) });
+  }, [crackOne, crackTwo, crackStage]);
+
   const shellStyle = useAnimatedStyle(() => {
     const energy = motion.interactionEnergy.value;
+    const press = motion.pressProgress.value;
     const dragMagnitude = Math.min(1, Math.hypot(motion.dragX.value, motion.dragY.value) / 88);
+    // Pulling the membrane swings the egg: a leftward pull (e.g. from the bottom
+    // left) tips it clockwise, a rightward pull counter-clockwise — driven by the
+    // horizontal component so a straight up/down pull leaves it upright. Clamped
+    // to a gentle tilt; springs back with dragX on release.
+    const tilt = Math.max(-1, Math.min(1, -motion.dragX.value / DRAG_TILT_RANGE)) * MAX_TILT_DEG;
 
     return {
       transform: [
         { translateX: motion.dragX.value * 0.14 },
         { translateY: motion.dragY.value * 0.14 },
-        { scaleX: 1 + breathe.value * 0.04 + reaction.value * 0.06 + dragMagnitude * 0.03 },
-        { scaleY: 1 + breathe.value * 0.04 + reaction.value * 0.06 - dragMagnitude * 0.018 + energy * 0.025 },
+        { rotate: `${tilt}deg` },
+        { scaleX: 1 + breathe.value * 0.05 + reaction.value * 0.06 + press * 0.03 + dragMagnitude * 0.03 },
+        {
+          scaleY:
+            1 + breathe.value * 0.05 + reaction.value * 0.06 + press * 0.03 - dragMagnitude * 0.018 + energy * 0.025,
+        },
       ],
     };
   });
 
-  const shellGlowStyle = useAnimatedStyle(() => ({
-    opacity: 0.16 + breathe.value * 0.14 + motion.interactionEnergy.value * 0.3,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.06 },
-      { translateY: motion.glowLagY.value * 0.06 },
-      { scale: 0.96 + breathe.value * 0.05 + motion.interactionEnergy.value * 0.08 },
-    ],
+  const crackOneStyle = useAnimatedStyle(() => ({
+    opacity: crackOne.value * (1 - crackTwo.value * 0.65),
   }));
 
-  const coreStyle = useAnimatedStyle(() => ({
-    opacity: 0.52 + shimmer.value * 0.34 + reaction.value * 0.16 + motion.pressProgress.value * 0.1,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.18 },
-      { translateY: motion.glowLagY.value * 0.18 },
-      { scale: 0.9 + egg.intensity * 0.14 + reaction.value * 0.08 + motion.interactionEnergy.value * 0.12 },
-    ],
-  }));
-
-  const swirlStyle = useAnimatedStyle(() => ({
-    opacity: 0.18 + shimmer.value * 0.16 + motion.interactionEnergy.value * 0.08,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.08 },
-      { translateY: motion.glowLagY.value * 0.08 },
-      { rotateZ: `${egg.swirl * 210 + reaction.value * 16 + motion.dragX.value * 0.06}deg` },
-    ],
-  }));
-
-  const sparkStyle = useAnimatedStyle(() => ({
-    opacity: 0.74 + motion.interactionEnergy.value * 0.2,
-    transform: [
-      { translateX: motion.glowLagX.value * 0.1 },
-      { translateY: motion.glowLagY.value * 0.06 },
-      { scale: 1 + motion.pressProgress.value * 0.08 },
-    ],
+  const crackTwoStyle = useAnimatedStyle(() => ({
+    opacity: crackTwo.value,
+    transform: [{ scale: 1 + crackTwo.value * 0.02 }],
   }));
 
   return (
     <Animated.View pointerEvents="none" style={[styles.eggWrap, shellStyle]}>
-      <Animated.View style={[styles.shellGlow, { backgroundColor: `${egg.accentColor}18` }, shellGlowStyle]} />
-      <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']} style={styles.eggSheen} />
-      <View style={[styles.eggShell, { borderColor: `${egg.accentColor}9C` }]}>
-        <Animated.View style={[styles.eggCore, { backgroundColor: egg.coreColor }, coreStyle]} />
-        <Animated.View style={[styles.eggSwirl, { borderColor: `${egg.accentColor}80` }, swirlStyle]} />
-        <Animated.View style={[styles.spark, { backgroundColor: egg.accentColor }, sparkStyle]} />
-        <Animated.View style={[styles.sparkSecondary, { backgroundColor: `${egg.coreColor}CC` }, sparkStyle]} />
-      </View>
+      {/* allowDownscaling=false keeps the full-res texture, so the egg stays crisp
+          when the World view shrinks it then zooms back in (it's drawn small there). */}
+      <Image contentFit="contain" allowDownscaling={false} source={eggBase} style={styles.eggImage} transition={0} />
+      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackOne} style={[styles.eggImage, crackOneStyle]} transition={0} />
+      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackTwo} style={[styles.eggImage, crackTwoStyle]} transition={0} />
     </Animated.View>
   );
 }
@@ -134,63 +125,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 224,
     justifyContent: 'center',
-    width: 186,
+    width: 196,
+    // iOS derives this shadow from the RENDERED ALPHA (no background, no
+    // shadowPath) — a true silhouette drop-shadow, like CSS drop-shadow().
+    // Biased downward so it reads as contact with the nest, and it rides the
+    // shell's every transform (drag, breathe, shake) for free.
+    shadowColor: '#170F06',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
   },
-  shellGlow: {
-    borderRadius: 999,
-    height: 182,
-    position: 'absolute',
-    width: 154,
-  },
-  eggShell: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(10,14,24,0.96)',
-    borderRadius: 120,
-    borderWidth: 1.25,
-    boxShadow: KatchaDeckUI.shadows.card,
+  eggImage: {
     height: '100%',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    position: 'absolute',
     width: '100%',
-  },
-  eggSheen: {
-    borderRadius: 999,
-    height: 86,
-    left: 24,
-    opacity: 0.7,
-    position: 'absolute',
-    top: 26,
-    width: 56,
-    zIndex: 2,
-  },
-  eggCore: {
-    borderRadius: 999,
-    height: 96,
-    width: 96,
-  },
-  eggSwirl: {
-    borderRadius: 999,
-    borderWidth: 2,
-    height: 118,
-    opacity: 0.44,
-    position: 'absolute',
-    transform: [{ rotateZ: '22deg' }],
-    width: 88,
-  },
-  spark: {
-    borderRadius: 999,
-    height: 16,
-    position: 'absolute',
-    right: 42,
-    top: 40,
-    width: 16,
-  },
-  sparkSecondary: {
-    borderRadius: 999,
-    bottom: 46,
-    height: 10,
-    left: 52,
-    position: 'absolute',
-    width: 10,
   },
 });

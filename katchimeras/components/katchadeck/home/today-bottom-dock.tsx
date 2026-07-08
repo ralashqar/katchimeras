@@ -1,0 +1,208 @@
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+
+import { DayJournalSections, type DayStatKey } from '@/components/katchadeck/home/day-journal-sections';
+import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
+import { popEnter, presenceEnter } from '@/components/katchadeck/motion';
+import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
+import type { HomeDayRecord } from '@/types/home';
+import type { TodayCategoryState } from '@/utils/today-categories';
+import { ThemedText } from '@/components/themed-text';
+
+type TodayBottomDockProps = {
+  canHatch: boolean;
+  isForming: boolean;
+  isHatched: boolean;
+  viewedDay: HomeDayRecord | null;
+  showHatchedActionDock: boolean;
+  showHatchedReflectionCard: boolean;
+  recording: boolean;
+  cameraBadge?: number;
+  sharingBusy: boolean;
+  comicBusy: boolean;
+  statAttention?: Partial<Record<DayStatKey, boolean>>;
+  categories: TodayCategoryState[];
+  onReveal: () => void;
+  onCamera: () => void;
+  onMicTap: () => void;
+  onMicPressIn: () => void;
+  onMicPressOut: () => void;
+  onAdd: () => void;
+  onOpenMap: () => void;
+  onShareDay: () => void;
+  onMakeComic: () => void;
+  onStatPress: (key: DayStatKey) => void;
+  onCategoryPress: (category: TodayCategoryState) => void;
+};
+
+export function TodayBottomDock({
+  canHatch,
+  isForming,
+  isHatched,
+  viewedDay,
+  showHatchedActionDock,
+  showHatchedReflectionCard,
+  recording,
+  cameraBadge,
+  sharingBusy,
+  comicBusy,
+  statAttention,
+  categories,
+  onReveal,
+  onCamera,
+  onMicTap,
+  onMicPressIn,
+  onMicPressOut,
+  onAdd,
+  onOpenMap,
+  onShareDay,
+  onMakeComic,
+  onStatPress,
+  onCategoryPress,
+}: TodayBottomDockProps) {
+  return (
+    <View pointerEvents="box-none" style={styles.bottomDock}>
+      <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
+        {canHatch ? (
+          <Pressable accessibilityRole="button" onPress={onReveal} style={styles.hatchCta}>
+            <ThemedText style={styles.hatchCtaLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+              Reveal the hatch
+            </ThemedText>
+          </Pressable>
+        ) : isForming ? (
+          <View style={styles.addRow}>
+            <WorldActionStack
+              orientation="horizontal"
+              onCamera={onCamera}
+              onMicTap={onMicTap}
+              onMicPressIn={onMicPressIn}
+              onMicPressOut={onMicPressOut}
+              onAdd={onAdd}
+              recording={recording}
+              cameraBadge={cameraBadge}
+            />
+          </View>
+        ) : null}
+      </Animated.View>
+
+      {isHatched && showHatchedActionDock ? (
+        <View style={styles.actionDock}>
+          <Animated.View entering={popEnter(140)}>
+            <IconAction icon="mappin.and.ellipse" label="Map" onPress={onOpenMap} />
+          </Animated.View>
+          <Animated.View entering={popEnter(185)}>
+            <IconAction icon="paperplane.fill" label="Card" busy={sharingBusy} onPress={onShareDay} />
+          </Animated.View>
+          <Animated.View entering={popEnter(230)}>
+            <IconAction icon="sparkles" label="Comic" busy={comicBusy} onPress={onMakeComic} />
+          </Animated.View>
+        </View>
+      ) : null}
+      {isHatched && showHatchedReflectionCard && viewedDay?.creature ? <ReflectionCard creature={viewedDay.creature} /> : null}
+      {viewedDay ? (
+        <Animated.View entering={presenceEnter(200)}>
+          <DayJournalSections
+            day={viewedDay}
+            onStatPress={onStatPress}
+            statAttention={statAttention}
+            categories={categories}
+            onCategoryPress={onCategoryPress}
+          />
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
+
+function IconAction({
+  icon,
+  label,
+  onPress,
+  busy = false,
+}: {
+  icon: IconSymbolName;
+  label: string;
+  onPress: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      disabled={busy}
+      onPress={onPress}
+      style={styles.iconAction}>
+      <View style={styles.iconActionCircle}>
+        {busy ? (
+          <ActivityIndicator color={Lantern.moon50} size="small" />
+        ) : (
+          <IconSymbol name={icon} size={20} color={Lantern.moon50} />
+        )}
+      </View>
+      <ThemedText style={styles.iconActionLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  bottomDock: {
+    bottom: 106,
+    gap: 12,
+    left: 16,
+    position: 'absolute',
+    right: 16,
+  },
+  ctaArea: {
+    marginTop: 12,
+  },
+  hatchCta: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: Meadow.gold,
+    borderColor: Meadow.goldDeep,
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    boxShadow: '0 6px 18px rgba(233,185,78,0.35)',
+    paddingVertical: 15,
+  },
+  hatchCtaLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  addRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionDock: {
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 4,
+    paddingRight: 2,
+  },
+  iconAction: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  iconActionCircle: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 46,
+    justifyContent: 'center',
+    width: 46,
+  },
+  iconActionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+});

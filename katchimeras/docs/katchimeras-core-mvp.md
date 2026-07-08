@@ -1,5 +1,10 @@
 # Katchimeras Core MVP
 
+> Superseded for V1: the active product/design source of truth is now
+> `docs/katchimera-v1-living-memory-companion.md`. This document is retained as
+> historical context for the hatch ritual, emotional tone, and Today surface, but
+> it no longer defines the launch architecture. V1 is World-first.
+
 This is the source-of-truth product brief for the current Katchimeras MVP.
 
 It replaces older deck-first framing for the core app loop. The MVP is now:

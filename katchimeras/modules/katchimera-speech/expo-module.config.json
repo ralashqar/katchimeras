@@ -1,0 +1,7 @@
+{
+  "platforms": ["apple"],
+  "apple": {
+    "modules": ["KatchimeraSpeechModule"],
+    "podspecPath": "ios/KatchimeraSpeech.podspec"
+  }
+}

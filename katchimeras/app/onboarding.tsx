@@ -1,21 +1,32 @@
+import { Image } from 'expo-image';
 import { Redirect, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { FormingEgg } from '@/components/katchadeck/home/forming-egg';
-import { presenceEnter } from '@/components/katchadeck/motion';
+import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import {
+  HOME_EGG_SHELL_SCALE,
+  MeadowSceneBackdrop,
+  todayEggFraming,
+} from '@/components/katchadeck/home/meadow-scene-backdrop';
+import { presenceEnter, useFloatingMotion, usePressMotion, usePulseMotion } from '@/components/katchadeck/motion';
 import { CinematicOnboardingPage } from '@/components/katchadeck/onboarding/cinematic-onboarding-page';
-import { DayTimeline } from '@/components/katchadeck/timeline/day-timeline';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { preferenceOptions } from '@/constants/katchadeck';
+import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
-import type { LocalCreatureRecord } from '@/types/home';
+import { saveHomeAnchor } from '@/utils/home-location';
 import { defaultOnboardingProfile, loadOnboardingProfile, saveOnboardingProfile } from '@/utils/onboarding-state';
 
 const totalSteps = 5;
@@ -30,25 +41,46 @@ const sampleEgg = {
   label: 'Gathering shape',
 } as const;
 
-const sampleCreature: LocalCreatureRecord = {
-  id: 'onboarding-creature-creamalume',
-  name: 'Creamalume',
-  primaryTrait: 'calm',
-  secondaryTrait: 'exploration',
-  rarity: 'rare',
-  visualKey: 'creamalume',
-  accentColor: '#F3B788',
-  highlightMomentId: 'onboarding-coffee',
-  highlight: 'A warm stop and a little movement became the thing the day kept glowing around.',
-  reflection: 'The hatch kept warmth first, with just enough curiosity underneath to stay alive.',
-  motifTags: ['Coffee', 'Walk'],
-};
-
 const sampleMoments = [
   { id: 'walk', label: 'Walk' },
   { id: 'place', label: 'New place' },
   { id: 'photo', label: 'Photo' },
 ] as const;
+
+const castIntroItems = [
+  {
+    id: 'baristabbit',
+    name: 'Baristabbit',
+    line: 'Appears when your day keeps a coffee ritual.',
+    accentColor: '#E3B68C',
+    source: require('../assets/images/katchimeras/cutouts/baristabbit.png'),
+  },
+  {
+    id: 'mossprout',
+    name: 'Mossprout',
+    line: 'Grows out of park walks and green detours.',
+    accentColor: '#8FD8BE',
+    source: require('../assets/images/katchimeras/cutouts/mossprout.png'),
+  },
+  {
+    id: 'sprintail',
+    name: 'Sprintail',
+    line: 'Shows up on the days you really moved.',
+    accentColor: '#FF8F5A',
+    source: require('../assets/images/katchimeras/cutouts/sprintail.png'),
+  },
+] as const;
+
+const hatchHourOptions = [
+  { hour: 19, label: '7 PM' },
+  { hour: 20, label: '8 PM' },
+  { hour: 21, label: '9 PM' },
+  { hour: 22, label: '10 PM' },
+] as const;
+
+function formatHatchHour(hour: number) {
+  return hatchHourOptions.find((option) => option.hour === hour)?.label ?? `${hour}:00`;
+}
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -56,7 +88,37 @@ export default function OnboardingScreen() {
   const storedProfile = loadOnboardingProfile();
   const [step, setStep] = useState(0);
   const [selectedToneId, setSelectedToneId] = useState<string>(storedProfile.preferenceIds[0] ?? 'cozy');
+  const [selectedHatchHour, setSelectedHatchHour] = useState<number>(storedProfile.hatchHour ?? 20);
   const [primingPermissions, setPrimingPermissions] = useState(false);
+  const [homeAnchorSet, setHomeAnchorSet] = useState(false);
+  const [settingHome, setSettingHome] = useState(false);
+
+  async function handleUseCurrentAsHome() {
+    if (homeAnchorSet || settingHome) {
+      return;
+    }
+    setSettingHome(true);
+    try {
+      const Location = await import('expo-location');
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.granted) {
+        const known = await Location.getLastKnownPositionAsync();
+        const position = known ?? (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+        if (position) {
+          saveHomeAnchor({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            source: 'manual',
+            setAt: new Date().toISOString(),
+          });
+          setHomeAnchorSet(true);
+        }
+      }
+    } catch {
+      // Best-effort — the home spot can be set later from the map.
+    }
+    setSettingHome(false);
+  }
 
   const currentPreference =
     preferenceOptions.find((option) => option.id === selectedToneId) ?? preferenceOptions[0];
@@ -94,101 +156,109 @@ export default function OnboardingScreen() {
       completed: true,
       completedAt: new Date().toISOString(),
       preferenceIds: [selectedToneId],
+      hatchHour: selectedHatchHour,
     });
-    router.replace('/(tabs)');
+    // End on the emotional peak: reveal the collection already hidden in their
+    // recent days (the recap prompts that steer those hatches are asked there),
+    // then drop into the app.
+    router.replace('/hatch-your-past');
   }
 
   function renderContent() {
-    if (step === 0) {
-      return (
-        <View style={styles.cinematicWrap}>
-          <CinematicOnboardingPage
-            entries={timelineDemoEntries}
-            onAdvance={() => setStep(1)}
-            stopAfterOpening
-            tomorrowState={timelineTomorrowState}
-          />
-        </View>
-      );
-    }
-
     if (step === 1) {
       return (
         <View style={styles.stepStack}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#D7E4FF" darkColor="#D7E4FF">
-              Katchimeras
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
+              Meet a few of them
             </ThemedText>
-            <ThemedText type="display" style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">
-              See what your day becomes.
+            <ThemedText type="display" style={styles.title} lightColor="#FBF3E4" darkColor="#FBF3E4">
+              Your days become characters.
             </ThemedText>
-            <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
-              Movement, places, and the moments you save settle into an egg through the day. At night,
-              it becomes something living you can keep.
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
+              Each one appears because of something you actually did — a coffee stop, a park walk, a
+              day with real distance in it.
             </ThemedText>
           </Animated.View>
 
-          <Animated.View entering={presenceEnter(90)}>
-            <DayTimeline
-              entries={timelineDemoEntries.slice(-4)}
-              focusedEntryId="today-cafe"
-              mode="scripted"
-              scriptedState={{
-                focusedEntryId: 'today-cafe',
-                showMemoryCard: true,
-                showTomorrowEgg: true,
-              }}
-              showMemoryCard
-              showTomorrowEgg
-              tomorrowState={timelineTomorrowState}
-            />
+          <View style={styles.castStack}>
+            {castIntroItems.map((item, index) => (
+              <CastIntroCard item={item} index={index} key={item.id} />
+            ))}
+          </View>
+
+          <Animated.View entering={presenceEnter(280)}>
+            <GlassPanel contentStyle={styles.panelBody}>
+              <ThemedText style={styles.panelCopy} lightColor="rgba(251,243,228,0.9)" darkColor="rgba(251,243,228,0.9)">
+                Return to a ritual and the same character comes back — and remembers. The bond is the
+                collection.
+              </ThemedText>
+            </GlassPanel>
           </Animated.View>
         </View>
       );
     }
 
     if (step === 2) {
+      const eggFraming = todayEggFraming();
       return (
         <View style={styles.stepStack}>
-          <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#FFE7D7" darkColor="#FFE7D7">
-              The daily loop
-            </ThemedText>
-            <ThemedText type="title" style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-              A day gathers, then hatches.
-            </ThemedText>
-            <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
-              Steps and places quietly shape the egg. Quick tags, photos, and little reflections feed it
-              by hand.
-            </ThemedText>
+          {/* The egg leads, seated at (near) its home-page anchor — copy and
+              controls live BELOW it, like the rest of the redesign. */}
+          <Animated.View entering={presenceEnter(90)} style={styles.ritualEggStage}>
+            <LanternEgg
+              egg={sampleEgg}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
+              shellScale={HOME_EGG_SHELL_SCALE}
+              shellOffsetY={0}
+            />
           </Animated.View>
 
-          <Animated.View entering={presenceEnter(90)}>
-            <FormingEgg
-              caption="A walk, a stop, and a saved image are already changing the shape of the day."
-              egg={sampleEgg}
-            />
+          <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
+              The evening ritual
+            </ThemedText>
+            <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
+              A day gathers, then hatches.
+            </ThemedText>
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
+              Steps and places quietly shape the egg. Quick tags, photos, and little reflections feed it
+              by hand. When your evening arrives, the day is revealed.
+            </ThemedText>
           </Animated.View>
 
           <View style={styles.momentRow}>
             {sampleMoments.map((moment) => (
               <View key={moment.id} style={styles.momentChip}>
-                <ThemedText style={styles.momentChipLabel} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                <ThemedText style={styles.momentChipLabel} lightColor="#FBF3E4" darkColor="#FBF3E4">
                   {moment.label}
                 </ThemedText>
               </View>
             ))}
           </View>
 
-          <GlassPanel contentStyle={styles.panelBody}>
-            <ThemedText style={styles.panelCopy} lightColor="#E8EEFF" darkColor="#E8EEFF">
-              When the day settles, the hatch becomes your memory: one creature, one emotional line,
-              one place-memory worth keeping.
-            </ThemedText>
-          </GlassPanel>
-
           <Animated.View entering={presenceEnter(140)}>
-            <CreatureHero creature={sampleCreature} moments={[]} subtitle={sampleCreature.highlight} />
+            <GlassPanel contentStyle={styles.hatchHourPanel}>
+              <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
+                Your hatch time
+              </ThemedText>
+              <ThemedText style={styles.panelCopy} lightColor="rgba(251,243,228,0.9)" darkColor="rgba(251,243,228,0.9)">
+                When should the day be ready to reveal?
+              </ThemedText>
+              <View style={styles.hatchHourRow}>
+                {hatchHourOptions.map((option) => (
+                  <HatchHourChip
+                    key={option.hour}
+                    label={option.label}
+                    onPress={() => setSelectedHatchHour(option.hour)}
+                    selected={option.hour === selectedHatchHour}
+                  />
+                ))}
+              </View>
+            </GlassPanel>
           </Animated.View>
         </View>
       );
@@ -198,52 +268,27 @@ export default function OnboardingScreen() {
       return (
         <View style={styles.stepStack}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#D7E4FF" darkColor="#D7E4FF">
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
               Set the tone
             </ThemedText>
-            <ThemedText type="title" style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
               What kind of atmosphere should your memories lean toward?
             </ThemedText>
-            <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
               This only changes the emotional color of the app. The day still comes from what actually happened.
             </ThemedText>
           </Animated.View>
 
           <View style={styles.optionStack}>
-            {preferenceOptions.map((option, index) => {
-              const selected = option.id === selectedToneId;
-
-              return (
-                <Animated.View entering={presenceEnter(70 + index * 30)} key={option.id}>
-                  <Pressable onPress={() => setSelectedToneId(option.id)}>
-                    <View
-                      style={[
-                        styles.preferenceCard,
-                        selected ? styles.preferenceCardSelected : null,
-                        { borderColor: selected ? option.palette[1] : 'rgba(216,228,255,0.16)' },
-                      ]}>
-                      <View style={styles.preferenceCopy}>
-                        <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                          {option.title}
-                        </ThemedText>
-                        <ThemedText style={styles.preferenceBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
-                          {option.description}
-                        </ThemedText>
-                      </View>
-                      <View
-                        style={[
-                          styles.preferenceSwatch,
-                          {
-                            backgroundColor: option.palette[1],
-                            opacity: selected ? 1 : 0.7,
-                          },
-                        ]}
-                      />
-                    </View>
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
+            {preferenceOptions.map((option, index) => (
+              <PreferenceCard
+                key={option.id}
+                index={index}
+                onPress={() => setSelectedToneId(option.id)}
+                option={option}
+                selected={option.id === selectedToneId}
+              />
+            ))}
           </View>
         </View>
       );
@@ -252,16 +297,29 @@ export default function OnboardingScreen() {
     return (
       <View style={styles.stepStack}>
         <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#FFE7D7" darkColor="#FFE7D7">
+          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
             Let the day take shape
           </ThemedText>
-          <ThemedText type="title" style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
             Allow the two passive signals that make the loop feel earned.
           </ThemedText>
-          <ThemedText style={styles.body} lightColor="#DCE6FF" darkColor="#DCE6FF">
+          <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
             You can still use the app without them. These only make the egg feel more like your real day.
           </ThemedText>
         </Animated.View>
+
+        <GlassPanel
+          contentStyle={styles.privacyPanel}
+          fillColor="rgba(95,168,123,0.07)"
+          gradientColors={['rgba(143,216,190,0.12)', 'rgba(200,216,255,0.06)']}>
+          <ThemedText type="onboardingLabel" style={styles.privacyLabel} lightColor="#A8E2C6" darkColor="#A8E2C6">
+            Stays on your phone
+          </ThemedText>
+          <ThemedText style={styles.privacyBody} lightColor="#E2F2E9" darkColor="#E2F2E9">
+            Your days, places, and moments are stored on this device. Nothing is uploaded, and
+            there is no account.
+          </ThemedText>
+        </GlassPanel>
 
         <GlassPanel contentStyle={styles.permissionPanel}>
           <PermissionRow
@@ -278,15 +336,32 @@ export default function OnboardingScreen() {
           />
         </GlassPanel>
 
+        <GlassPanel contentStyle={styles.homePanel}>
+          <ThemedText type="onboardingLabel" style={styles.privacyLabel} lightColor="#F2D48A" darkColor="#F2D48A">
+            Mark home (optional)
+          </ThemedText>
+          <ThemedText style={styles.privacyBody} lightColor="rgba(251,243,228,0.9)" darkColor="rgba(251,243,228,0.9)">
+            Are you home right now? Tag this spot so your map can show a home pin and know which days you
+            were home. Only if you&apos;re home — otherwise skip and it learns over time.
+          </ThemedText>
+          <KatchaButton
+            disabled={homeAnchorSet || settingHome}
+            label={homeAnchorSet ? 'Home set' : settingHome ? 'Setting…' : 'Use my current spot'}
+            onPress={handleUseCurrentAsHome}
+            variant="secondary"
+          />
+        </GlassPanel>
+
         <GlassPanel contentStyle={styles.previewPanel}>
           <ThemedText type="onboardingLabel" style={styles.previewLabel} lightColor={currentPreference.palette[1]} darkColor={currentPreference.palette[1]}>
-            Selected tone
+            Your setup
           </ThemedText>
-          <ThemedText type="subtitle" style={styles.previewTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          <ThemedText type="subtitle" style={styles.previewTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
             {currentPreference.title}
           </ThemedText>
-          <ThemedText style={styles.previewBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
-            {currentPreference.description}. This becomes the emotional color behind your first week.
+          <ThemedText style={styles.previewBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
+            {currentPreference.description}. Your day hatches around {formatHatchHour(selectedHatchHour)} each
+            evening — you can change both later.
           </ThemedText>
         </GlassPanel>
       </View>
@@ -297,29 +372,34 @@ export default function OnboardingScreen() {
     return <Redirect href="/(tabs)" />;
   }
 
+  // Step 0 is the full-screen cinematic — the meadow scene with the egg pinned
+  // exactly where the home page keeps it. No chrome; it advances itself.
+  if (step === 0) {
+    return (
+      <View style={styles.screen}>
+        <MeadowSceneBackdrop />
+        <CinematicOnboardingPage
+          entries={timelineDemoEntries}
+          onAdvance={() => setStep(1)}
+          stopAfterOpening
+          tomorrowState={timelineTomorrowState}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
-      <AmbientBackground
-        accentColor={step === 1 ? 'rgba(227,160,110,0.14)' : 'rgba(200,216,255,0.14)'}
-        colors={['#090B12', '#11192C', '#191F35']}
-        meshColors={['rgba(200,216,255,0.14)', 'rgba(95,168,123,0.08)', 'rgba(227,160,110,0.08)', 'rgba(106,95,232,0.1)']}
-        showOrbs={false}
-      />
+      <MeadowSceneBackdrop />
 
       <View style={[styles.safeArea, { paddingBottom: insets.bottom + 12, paddingTop: insets.top + 12 }]}>
         <View style={styles.progressRow}>
-          <ThemedText type="onboardingLabel" style={styles.progressLabel} lightColor="#D7E4FF" darkColor="#D7E4FF">
+          <ThemedText type="onboardingLabel" style={styles.progressLabel} lightColor="#F2D48A" darkColor="#F2D48A">
             {step + 1} / {totalSteps}
           </ThemedText>
           <View style={styles.progressTrack}>
             {Array.from({ length: totalSteps }).map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressSegment,
-                  index <= step ? styles.progressSegmentActive : null,
-                ]}
-              />
+              <ProgressSegment active={index <= step} index={index} key={index} />
             ))}
           </View>
         </View>
@@ -328,28 +408,26 @@ export default function OnboardingScreen() {
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}>
-          {renderContent()}
+          <Animated.View entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))} key={step}>
+            {renderContent()}
+          </Animated.View>
         </ScrollView>
 
-        {step === 0 ? null : (
-          <View style={styles.footer}>
-            <KatchaButton
-              disabled={primingPermissions}
-              icon={step === totalSteps - 1 ? 'sparkles' : 'arrow.right'}
-              label={primingPermissions ? 'Preparing...' : primaryActionLabel}
-              onPress={handlePrimaryAction}
-              variant={step === totalSteps - 1 ? 'primary' : 'secondary'}
-            />
-            {step > 0 ? (
-              <KatchaButton
-                disabled={primingPermissions}
-                label={step === totalSteps - 1 ? 'Continue for now' : 'Back'}
-                onPress={handleSecondaryAction}
-                variant="secondary"
-              />
-            ) : null}
-          </View>
-        )}
+        <View style={styles.footer}>
+          <KatchaButton
+            disabled={primingPermissions}
+            icon={step === totalSteps - 1 ? 'sparkles' : 'arrow.right'}
+            label={primingPermissions ? 'Preparing...' : primaryActionLabel}
+            onPress={handlePrimaryAction}
+            variant={step === totalSteps - 1 ? 'primary' : 'secondary'}
+          />
+          <KatchaButton
+            disabled={primingPermissions}
+            label={step === totalSteps - 1 ? 'Continue for now' : 'Back'}
+            onPress={handleSecondaryAction}
+            variant="secondary"
+          />
+        </View>
       </View>
     </View>
   );
@@ -360,14 +438,127 @@ function PermissionRow({ title, body }: { title: string; body: string }) {
     <View style={styles.permissionRow}>
       <View style={styles.permissionDot} />
       <View style={styles.permissionCopy}>
-        <ThemedText type="subtitle" style={styles.permissionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+        <ThemedText type="subtitle" style={styles.permissionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
           {title}
         </ThemedText>
-        <ThemedText style={styles.permissionBody} lightColor="#DCE6FF" darkColor="#DCE6FF">
+        <ThemedText style={styles.permissionBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
           {body}
         </ThemedText>
       </View>
     </View>
+  );
+}
+
+function ProgressSegment({ active, index }: { active: boolean; index: number }) {
+  const fill = useSharedValue(active ? 1 : 0);
+
+  useEffect(() => {
+    fill.value = withDelay(
+      active ? index * 70 : 0,
+      withTiming(active ? 1 : 0, { duration: 460, easing: Easing.out(Easing.cubic) })
+    );
+  }, [active, fill, index]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    opacity: 0.35 + fill.value * 0.65,
+    transform: [{ scaleX: fill.value }],
+  }));
+
+  return (
+    <View style={styles.progressSegment}>
+      <Animated.View style={[styles.progressSegmentFill, fillStyle]} />
+    </View>
+  );
+}
+
+function CastIntroCard({ item, index }: { item: (typeof castIntroItems)[number]; index: number }) {
+  const floatStyle = useFloatingMotion(4, index * 240);
+  const haloStyle = usePulseMotion(0.86, 1.12, index * 240);
+
+  return (
+    <Animated.View entering={presenceEnter(80 + index * 60)}>
+      <View style={styles.castCard}>
+        <View style={styles.castPortraitWrap}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.castPortraitHalo, { backgroundColor: `${item.accentColor}2E` }, haloStyle]}
+          />
+          <Animated.View style={[styles.castPortrait, { backgroundColor: `${item.accentColor}14` }, floatStyle]}>
+            <Image contentFit="contain" source={item.source} style={styles.castImage} transition={0} />
+          </Animated.View>
+        </View>
+        <View style={styles.castCopy}>
+          <ThemedText type="subtitle" style={styles.castName} lightColor="#FBF3E4" darkColor="#FBF3E4">
+            {item.name}
+          </ThemedText>
+          <ThemedText style={styles.castLine} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
+            {item.line}
+          </ThemedText>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+function HatchHourChip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressMotion();
+
+  return (
+    <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.hatchHourPressable}>
+      <Animated.View style={[styles.hatchHourChip, selected ? styles.hatchHourChipSelected : null, animatedStyle]}>
+        <ThemedText
+          style={styles.hatchHourLabel}
+          lightColor={selected ? Lantern.emberInk : '#F8FBFF'}
+          darkColor={selected ? Lantern.emberInk : '#F8FBFF'}>
+          {label}
+        </ThemedText>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function PreferenceCard({
+  option,
+  selected,
+  onPress,
+  index,
+}: {
+  option: (typeof preferenceOptions)[number];
+  selected: boolean;
+  onPress: () => void;
+  index: number;
+}) {
+  const { animatedStyle, onPressIn, onPressOut } = usePressMotion();
+  const swatchPulse = usePulseMotion(0.9, 1.16);
+
+  return (
+    <Animated.View entering={presenceEnter(70 + index * 30)}>
+      <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
+        <Animated.View
+          style={[
+            styles.preferenceCard,
+            selected ? styles.preferenceCardSelected : null,
+            { borderColor: selected ? option.palette[1] : 'rgba(216,228,255,0.16)' },
+            animatedStyle,
+          ]}>
+          <View style={styles.preferenceCopy}>
+            <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
+              {option.title}
+            </ThemedText>
+            <ThemedText style={styles.preferenceBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
+              {option.description}
+            </ThemedText>
+          </View>
+          <Animated.View
+            style={[
+              styles.preferenceSwatch,
+              { backgroundColor: option.palette[1], opacity: selected ? 1 : 0.7 },
+              selected ? swatchPulse : null,
+            ]}
+          />
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -388,6 +579,15 @@ async function primePassivePermissions() {
     await Sensors.Pedometer.requestPermissionsAsync();
   } catch {
     // Pedometer is iPhone-first and optional at onboarding time.
+  }
+
+  try {
+    // Apple Health read access for workout routes, so the first hatches can show
+    // real map routes for past walks/runs even when those days have no photos.
+    const { requestHealthRoutePermission } = await import('@/utils/health-route-import');
+    await requestHealthRoutePermission();
+  } catch {
+    // HealthKit needs a native dev build; absent in Expo Go — non-fatal.
   }
 }
 
@@ -423,48 +623,165 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   progressSegment: {
-    backgroundColor: 'rgba(216,228,255,0.1)',
+    backgroundColor: 'rgba(244,222,180,0.18)',
     borderRadius: 999,
     flex: 1,
     height: 6,
+    overflow: 'hidden',
   },
-  progressSegmentActive: {
-    backgroundColor: '#D7E4FF',
+  progressSegmentFill: {
+    backgroundColor: '#E5BE6A',
+    borderRadius: 999,
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    transformOrigin: 'left',
   },
   content: {
     flexGrow: 1,
     paddingBottom: 32,
     paddingTop: 24,
   },
-  cinematicWrap: {
-    minHeight: 720,
-  },
   stepStack: {
     gap: 22,
+  },
+  // Seats the ritual egg at (approximately) the home-page anchor: safe-area +
+  // progress row + content padding ≈ 68dp of flow above, egg stage top at ~120.
+  ritualEggStage: {
+    marginTop: 52,
   },
   copyBlock: {
     gap: 10,
   },
   kicker: {
     fontSize: 11,
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   title: {
     fontSize: 50,
     lineHeight: 52,
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   sectionTitle: {
     fontSize: 34,
     lineHeight: 38,
+    textShadowColor: 'rgba(30, 20, 10, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   body: {
     fontSize: 16,
     lineHeight: 24,
     maxWidth: 340,
+    textShadowColor: 'rgba(30, 20, 10, 0.55)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
   panelBody: {
     gap: 8,
   },
   panelCopy: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  castStack: {
+    gap: 12,
+  },
+  castCard: {
+    alignItems: 'center',
+    backgroundColor: Lantern.ink800,
+    borderCurve: 'continuous',
+    borderRadius: 26,
+    boxShadow: '0 14px 40px rgba(0,0,0,0.35)',
+    flexDirection: 'row',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  castPortraitWrap: {
+    alignItems: 'center',
+    height: 76,
+    justifyContent: 'center',
+    width: 76,
+  },
+  castPortraitHalo: {
+    borderRadius: 999,
+    height: 92,
+    position: 'absolute',
+    width: 92,
+  },
+  castPortrait: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 76,
+    justifyContent: 'center',
+    overflow: 'hidden',
+    width: 76,
+  },
+  castImage: {
+    height: 68,
+    width: 68,
+  },
+  castCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  castName: {
+    fontFamily: AppFontFamilies.instrumentSerif,
+    fontSize: 25,
+    fontStyle: 'italic',
+    fontWeight: '400',
+    lineHeight: 29,
+  },
+  castLine: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  hatchHourPanel: {
+    gap: 12,
+  },
+  hatchHourRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  hatchHourPressable: {
+    flex: 1,
+  },
+  hatchHourChip: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(216,228,255,0.08)',
+    borderColor: 'rgba(216,228,255,0.16)',
+    borderCurve: 'continuous',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingVertical: 12,
+  },
+  hatchHourChipSelected: {
+    backgroundColor: Lantern.ember300,
+    borderColor: Lantern.ember300,
+    boxShadow: '0 6px 22px rgba(245,142,60,0.4)',
+  },
+  hatchHourLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  privacyPanel: {
+    gap: 6,
+  },
+  homePanel: {
+    gap: 10,
+  },
+  privacyLabel: {
+    fontSize: 11,
+  },
+  privacyBody: {
     fontSize: 15,
     lineHeight: 22,
   },

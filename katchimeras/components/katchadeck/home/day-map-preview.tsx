@@ -6,7 +6,7 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import type { HomeDayRecord } from '@/types/home';
-import type { ImportedHealthRoutesPayload } from '@/utils/home-engine';
+import type { ImportedHealthRoutesPayload } from '@/game/days';
 
 type DayMapPreviewProps = {
   day: HomeDayRecord;

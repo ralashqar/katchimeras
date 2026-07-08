@@ -34,6 +34,26 @@ export const AppFontFamilies = {
   manrope: 'Manrope',
 } as const;
 
+// Lantern design language tokens (docs/katchimera-lantern-design-language.md).
+// Rule: light = life - ink world, warmth only on living things and one CTA.
+export const Lantern = {
+  ink950: '#0C0A14',
+  ink900: '#14111F',
+  ink800: '#1C1830',
+  dusk700: '#272140',
+  line: 'rgba(196,186,240,0.08)',
+  moon50: '#F6F3FF',
+  moon300: '#C9C2E8',
+  moon500: '#908AB5',
+  ember300: '#FFC36B',
+  ember500: '#F58E3C',
+  emberGlow: 'rgba(245,142,60,0.35)',
+  emberInk: '#21130A',
+  auroraViolet: '#A78BFA',
+  auroraTeal: '#7DE8CD',
+  auroraRose: '#F49AC1',
+} as const;
+
 const palette = {
   obsidian: '#090B12',
   deepNavy: '#11192B',
@@ -67,13 +87,13 @@ export const Colors = {
     shadow: 'rgba(12, 19, 39, 0.14)',
   },
   dark: {
-    text: palette.frost,
-    background: palette.obsidian,
-    surface: 'rgba(16, 24, 40, 0.72)',
-    surfaceElevated: '#121B2F',
-    glass: 'rgba(21, 32, 52, 0.52)',
-    border: 'rgba(208, 221, 255, 0.12)',
-    muted: '#94A2C4',
+    text: Lantern.moon50,
+    background: Lantern.ink950,
+    surface: Lantern.ink900,
+    surfaceElevated: Lantern.ink800,
+    glass: 'rgba(20, 17, 31, 0.94)',
+    border: Lantern.line,
+    muted: Lantern.moon500,
     tint: palette.moonBlue,
     accent: palette.moonBlue,
     accentSecondary: palette.auroraPlum,
@@ -107,9 +127,9 @@ export const KatchaDeckUI = {
     xxl: 40,
   },
   gradients: {
-    onboarding: ['#090B12', '#121A2D', '#181C33'] as const,
-    reveal: ['#090B12', '#10192A', '#171B35'] as const,
-    world: ['#090C14', '#121A2B', '#151D30'] as const,
+    onboarding: ['#0C0A14', '#14111F', '#1B1430'] as const,
+    reveal: ['#0C0A14', '#131020', '#1A1430'] as const,
+    world: ['#0C0A14', '#14111F', '#191430'] as const,
     premium: ['#D9E5FF', '#F0DFFF', '#FFD8C0'] as const,
     glassSheen: ['rgba(255,255,255,0.24)', 'rgba(255,255,255,0.02)'] as const,
     mascotGlow: ['rgba(200,216,255,0.84)', 'rgba(106,95,232,0.08)'] as const,
@@ -122,18 +142,18 @@ export const KatchaDeckUI = {
   },
   typography: {
     display: {
-      fontFamily: Fonts.serif,
+      fontFamily: AppFontFamilies.instrumentSerif,
       fontSize: 42,
       lineHeight: 46,
-      fontWeight: '700',
-      letterSpacing: -0.8,
+      fontWeight: '400',
+      letterSpacing: 0,
     } satisfies TextStyle,
     hero: {
-      fontFamily: Fonts.serif,
+      fontFamily: AppFontFamilies.instrumentSerif,
       fontSize: 34,
       lineHeight: 38,
-      fontWeight: '700',
-      letterSpacing: -0.5,
+      fontWeight: '400',
+      letterSpacing: 0,
     } satisfies TextStyle,
     headline: {
       fontFamily: Fonts.sans,
@@ -177,11 +197,11 @@ export const KatchaDeckUI = {
       letterSpacing: 0.2,
     } satisfies TextStyle,
     onboardingDisplay: {
-      fontFamily: Fonts.serif,
+      fontFamily: AppFontFamilies.instrumentSerif,
       fontSize: 44,
-      lineHeight: 46,
-      fontWeight: '700',
-      letterSpacing: -0.6,
+      lineHeight: 48,
+      fontWeight: '400',
+      letterSpacing: 0,
     } satisfies TextStyle,
     onboardingCTA: {
       fontFamily: AppFontFamilies.manrope,

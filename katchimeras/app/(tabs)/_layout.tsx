@@ -1,60 +1,90 @@
 import { Redirect, Tabs } from 'expo-router';
-import React from 'react';
+import React, { useSyncExternalStore } from 'react';
 
-import { HapticTab } from '@/components/haptic-tab';
+import { DayCaptureSession } from '@/components/katchadeck/home/day-capture-session';
+import { MeadowTabBar } from '@/components/katchadeck/ui/meadow-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Lantern } from '@/constants/theme';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { isArrivalPending, subscribeArrivalPending } from '@/utils/kingdom-arrival';
+
+// Today is the app's home — the daily capture surface. The Kingdom (the
+// persistent world every day builds) sits alongside it as the long-term tab.
+export const unstable_settings = {
+  initialRouteName: 'today',
+};
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const onboardingProfile = loadOnboardingProfile();
+  // A hatched day is waiting to be witnessed in the Kingdom (cleared by the
+  // morning ceremony there).
+  const arrivalPending = useSyncExternalStore(subscribeArrivalPending, isArrivalPending);
 
   if (!onboardingProfile.completed) {
     return <Redirect href="/onboarding" />;
   }
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarHideOnKeyboard: true,
-        tabBarStyle: {
-          backgroundColor: 'rgba(10, 14, 24, 0.94)',
-          borderTopColor: Colors[colorScheme ?? 'light'].border,
-          display: DEV_DEBUG_NAV_ENABLED ? 'flex' : 'none',
-          height: 88,
-          paddingBottom: 10,
-          paddingTop: 10,
-          position: 'absolute',
-        },
-        tabBarLabelStyle: DEV_DEBUG_NAV_ENABLED
-          ? {
-              fontSize: 11,
-              fontWeight: '600',
-              marginBottom: 4,
-            }
-          : undefined,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          href: DEV_DEBUG_NAV_ENABLED ? '/explore' : null,
-          title: DEV_DEBUG_NAV_ENABLED ? 'Dev' : 'World',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-    </Tabs>
+    <>
+      <DayCaptureSession />
+      <Tabs
+        // The carved-wood Meadow bar (generated art + centre capture button)
+        // replaces the stock bar entirely.
+        tabBar={(props) => <MeadowTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          tabBarHideOnKeyboard: true,
+          // Kingdom (and every other tab) mounts on FIRST visit only, and stops
+          // re-rendering while blurred — Today stays the only live screen.
+          lazy: true,
+          freezeOnBlur: true,
+        }}>
+        <Tabs.Screen
+          name="index"
+          options={{
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="today"
+          options={{
+            title: 'Today',
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="moon.stars.fill" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="world"
+          options={{
+            title: 'Kingdom',
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="globe.americas.fill" color={color} />,
+            tabBarBadge: arrivalPending ? '' : undefined,
+            tabBarBadgeStyle: {
+              backgroundColor: Lantern.ember300,
+              maxHeight: 10,
+              maxWidth: 10,
+              minHeight: 10,
+              minWidth: 10,
+              top: 4,
+            },
+          }}
+        />
+        <Tabs.Screen
+          name="collection"
+          options={{
+            title: 'Collection',
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="sparkles" color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="explore"
+          options={{
+            href: DEV_DEBUG_NAV_ENABLED ? '/explore' : null,
+            title: 'Dev',
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="paperplane.fill" color={color} />,
+          }}
+        />
+      </Tabs>
+    </>
   );
 }

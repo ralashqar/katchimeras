@@ -2,7 +2,7 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
 
 import type { HealthPermissionState } from '@/types/home';
-import type { ImportedHealthRoutesPayload } from '@/utils/home-engine';
+import type { ImportedHealthRoutesPayload } from '@/game/days';
 
 type NativeHealthRouteAvailability = {
   platformSupported?: boolean;

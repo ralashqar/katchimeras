@@ -1,0 +1,8 @@
+{
+  "comment": "Daily prop supply dials (docs/world-objects-expansion-design.md §9.1). RULE ZERO: a hatched day never yields nothing — dayBloom commons are granted unconditionally, then one more at each points threshold. founding = friendlier thresholds for the first archive week so a new Kingdom greens up fast.",
+  "dayBloom": 1,
+  "lightThreshold": 3,
+  "engagedThreshold": 6,
+  "maxBloomGiftsPerDay": 3,
+  "founding": { "days": 7, "lightThreshold": 2, "engagedThreshold": 4 }
+}

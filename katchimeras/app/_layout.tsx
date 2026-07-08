@@ -1,3 +1,4 @@
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -5,17 +6,23 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import '@/utils/travel-memory-task';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
 
 SplashScreen.preventAutoHideAsync();
+
+// DEV: apply any saved Asset Lab overrides at launch so draft world art
+// renders in the Kingdom without opening the lab first (no-op in production).
+if (__DEV__) {
+  void import('@/utils/asset-lab').then((lab) => lab.loadAssetLabManifest()).catch(() => {});
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -71,7 +78,13 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
+          <Stack.Screen name="world-base-lab" options={{ title: 'World Base Lab' }} />
+          <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
+          <Stack.Screen name="photo-essence" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="day-map/[dayId]" options={{ title: 'Day Map' }} />
+          <Stack.Screen name="life-map" options={{ headerShown: false, title: 'Life Map' }} />
+          <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
         </Stack>
         <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />

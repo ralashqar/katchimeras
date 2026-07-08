@@ -4,6 +4,10 @@
 
 Move Katchimeras from a `species-first` model to an `encounter-first` model.
 
+Related reference:
+
+- `docs/katchimera-shareability-framework.md`
+
 The user should usually understand immediately why they got something:
 
 - went to a cafe -> coffee creature

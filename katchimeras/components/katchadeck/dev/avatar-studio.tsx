@@ -14,6 +14,7 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SectionHeader } from '@/components/katchadeck/ui/section-header';
+import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
 import { KatchaDeckUI } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import type { AvatarArtifactRecord, AvatarStatus } from '@/types/avatar';
@@ -34,6 +35,11 @@ const avatarStatusOptions: ('all' | AvatarStatus)[] = [
   'approved',
   'rejected',
 ];
+
+const viewModeOptions = [
+  { value: 'generate', label: 'Generate' },
+  { value: 'library', label: 'Library' },
+] as const;
 
 export function AvatarStudio() {
   const cameraRef = useRef<CameraView | null>(null);
@@ -193,22 +199,13 @@ export function AvatarStudio() {
   return (
     <>
       <Animated.View entering={presenceEnter(60)}>
-        <View style={styles.modeRow}>
-          <Pressable
-            onPress={() => setViewMode('generate')}
-            style={[styles.modeChip, viewMode === 'generate' ? styles.modeChipSelected : null]}>
-            <ThemedText style={styles.modeChipText} lightColor="#F8FBFF" darkColor="#F8FBFF">
-              Generate
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={() => setViewMode('library')}
-            style={[styles.modeChip, viewMode === 'library' ? styles.modeChipSelected : null]}>
-            <ThemedText style={styles.modeChipText} lightColor="#F8FBFF" darkColor="#F8FBFF">
-              Library
-            </ThemedText>
-          </Pressable>
-        </View>
+        <SegmentedControl
+          activeTextColor="#F8FBFF"
+          inactiveTextColor="#F8FBFF"
+          options={viewModeOptions}
+          value={viewMode}
+          onChange={setViewMode}
+        />
       </Animated.View>
 
       {viewMode === 'generate' ? (
@@ -518,28 +515,6 @@ function AvatarVariantRow({
 }
 
 const styles = StyleSheet.create({
-  modeRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  modeChip: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 20,
-    borderWidth: 1,
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  modeChipSelected: {
-    backgroundColor: 'rgba(200,216,255,0.16)',
-    borderColor: 'rgba(200,216,255,0.3)',
-  },
-  modeChipText: {
-    fontSize: 14,
-  },
   panel: {
     gap: 14,
   },

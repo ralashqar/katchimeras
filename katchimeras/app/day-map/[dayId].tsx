@@ -5,26 +5,22 @@ import Animated, { SlideInLeft, SlideInRight, SlideOutLeft, SlideOutRight } from
 
 import { DayMapSurface } from '@/components/katchadeck/day-map/day-map-surface';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
-import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI } from '@/constants/theme';
-import { useHomeScreenState } from '@/hooks/use-home-screen-state';
-import type { HomeDayRecord } from '@/types/home';
+import { useAllDays } from '@/hooks/use-all-days';
 
 export default function DayMapRoute() {
   const router = useRouter();
   const [navDirection, setNavDirection] = useState<'left' | 'right'>('right');
   const params = useLocalSearchParams<{ dayId?: string | string[] }>();
-  const { timelineDays } = useHomeScreenState();
+  const { days, getDayById } = useAllDays();
   const resolvedDayId = Array.isArray(params.dayId) ? params.dayId[0] : params.dayId;
-  const dayEntries = timelineDays.filter((entry): entry is HomeDayRecord => entry.kind === 'day');
-  const day = timelineDays.find(
-    (entry): entry is HomeDayRecord => entry.kind === 'day' && entry.id === resolvedDayId
-  );
-  const dayIndex = day ? dayEntries.findIndex((entry) => entry.id === day.id) : -1;
-  const previousDay = dayIndex > 0 ? dayEntries[dayIndex - 1] : null;
-  const nextDay = dayIndex >= 0 && dayIndex < dayEntries.length - 1 ? dayEntries[dayIndex + 1] : null;
+  const day = getDayById(resolvedDayId);
+  const dayIndex = day ? days.findIndex((entry) => entry.id === day.id) : -1;
+  const previousDay = dayIndex > 0 ? days[dayIndex - 1] : null;
+  const nextDay = dayIndex >= 0 && dayIndex < days.length - 1 ? days[dayIndex + 1] : null;
   const accentColor = day?.creature?.accentColor ?? day?.egg.accentColor ?? '#D8E2FF';
 
   function handleChangeDay(nextDayId: string, direction: 'left' | 'right') {
@@ -55,9 +51,7 @@ export default function DayMapRoute() {
             style={styles.map}
           />
 
-          <View style={styles.topBar}>
-            <KatchaButton icon="xmark" label="Close" onPress={() => router.back()} style={styles.closeButton} variant="secondary" />
-          </View>
+          <ScreenCloseButton onPress={() => router.back()} />
 
           <View pointerEvents="box-none" style={styles.bottomCaptionWrap}>
             <View style={styles.bottomRail}>
@@ -95,7 +89,7 @@ export default function DayMapRoute() {
         </Animated.View>
       ) : (
         <View style={styles.missingWrap}>
-          <KatchaButton icon="xmark" label="Close" onPress={() => router.back()} style={styles.closeButton} variant="secondary" />
+          <ScreenCloseButton onPress={() => router.back()} />
           <GlassPanel contentStyle={styles.missingPanel}>
             <ThemedText type="subtitle" style={styles.missingTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
               Day not found
@@ -140,16 +134,6 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
     minHeight: 0,
-  },
-  topBar: {
-    left: 16,
-    position: 'absolute',
-    right: 16,
-    top: 16,
-  },
-  closeButton: {
-    alignSelf: 'flex-start',
-    minHeight: 48,
   },
   bottomCaptionWrap: {
     bottom: 18,

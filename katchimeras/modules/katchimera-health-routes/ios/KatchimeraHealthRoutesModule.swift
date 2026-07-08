@@ -18,6 +18,53 @@ public final class KatchimeraHealthRoutesModule: Module {
     AsyncFunction("importRoutesForDayAsync") { (isoDate: String, promise: Promise) in
       self.importRoutesForDay(isoDate: isoDate, promise: promise)
     }
+
+    // Total asleep minutes for the night that BEGAN the given day (Sleep
+    // Atmosphere). Best-effort: resolves { available, totalSleepMinutes }; an
+    // unauthorised read silently yields 0, and JS falls back to a manual prompt.
+    AsyncFunction("getSleepForDayAsync") { (isoDate: String, promise: Promise) in
+      self.getSleepForDay(isoDate: isoDate, promise: promise)
+    }
+  }
+
+  private func getSleepForDay(isoDate: String, promise: Promise) {
+    guard HKHealthStore.isHealthDataAvailable(),
+          let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis),
+          let dayWindow = resolveDayWindow(isoDate: isoDate) else {
+      promise.resolve(["available": false])
+      return
+    }
+
+    // The sleep that started the day: from the previous evening to this midday.
+    let calendar = Calendar.current
+    let nightStart = calendar.date(byAdding: .hour, value: -6, to: dayWindow.start) ?? dayWindow.start
+    let nightEnd = calendar.date(byAdding: .hour, value: 11, to: dayWindow.start) ?? dayWindow.start
+    let predicate = HKQuery.predicateForSamples(withStart: nightStart, end: nightEnd, options: [])
+
+    let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+      guard let categorySamples = samples as? [HKCategorySample] else {
+        promise.resolve(["available": true, "totalSleepMinutes": 0])
+        return
+      }
+      var seconds = 0.0
+      for sample in categorySamples where self.isAsleepValue(sample.value) {
+        let start = max(sample.startDate, nightStart)
+        let end = min(sample.endDate, nightEnd)
+        if end > start { seconds += end.timeIntervalSince(start) }
+      }
+      promise.resolve(["available": true, "totalSleepMinutes": Int(seconds / 60.0)])
+    }
+    healthStore.execute(query)
+  }
+
+  private func isAsleepValue(_ value: Int) -> Bool {
+    if #available(iOS 16.0, *) {
+      return value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
+        || value == HKCategoryValueSleepAnalysis.asleepCore.rawValue
+        || value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue
+        || value == HKCategoryValueSleepAnalysis.asleepREM.rawValue
+    }
+    return value == HKCategoryValueSleepAnalysis.asleep.rawValue
   }
 
   private func getHealthRouteAvailability(promise: Promise) {
@@ -271,10 +318,14 @@ public final class KatchimeraHealthRoutesModule: Module {
   }
 
   private func readTypes() -> Set<HKObjectType> {
-    return [
+    var types: Set<HKObjectType> = [
       HKObjectType.workoutType(),
       HKSeriesType.workoutRoute()
     ]
+    if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
+      types.insert(sleepType)
+    }
+    return types
   }
 
   private func shareTypes() -> Set<HKSampleType> {

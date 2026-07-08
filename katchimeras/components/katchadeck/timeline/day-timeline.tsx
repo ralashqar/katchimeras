@@ -99,9 +99,10 @@ export function DayTimeline({
   const [viewportWidth, setViewportWidth] = useState<number | null>(null);
   const railWidth = viewportWidth ?? width;
   const bubbleSize = railWidth < 390 ? 82 : 92;
+  const railCellWidth = railWidth < 390 ? 90 : 100;
   const railGap = railWidth < 390 ? 16 : 20;
-  const snapInterval = bubbleSize + railGap;
-  const sidePadding = Math.max(20, railWidth / 2 - bubbleSize / 2);
+  const snapInterval = railCellWidth + railGap;
+  const sidePadding = Math.max(20, railWidth / 2 - railCellWidth / 2);
   const scriptedVisibleIds = mode === 'scripted' ? scriptedState?.visibleEntryIds : undefined;
   const activeVisibleIds = scriptedVisibleIds ?? visibleEntryIds;
   const activeFocusedId = mode === 'scripted' ? scriptedState?.focusedEntryId : focusedEntryId;
@@ -268,7 +269,7 @@ export function DayTimeline({
             {railItems.map((item, index) =>
               isFutureGhost(item) ? (
                 <Animated.View entering={FadeInUp.duration(320).delay(index * 70)} key={item.id}>
-                  <FutureGhostRailItem bubbleSize={bubbleSize} state={item} />
+                  <FutureGhostRailItem bubbleSize={bubbleSize} railCellWidth={railCellWidth} state={item} />
                 </Animated.View>
               ) : isTomorrowItem(item) ? (
                 <Animated.View entering={FadeInUp.duration(320).delay(index * 70)} key={item.id}>
@@ -276,6 +277,7 @@ export function DayTimeline({
                     bubbleSize={bubbleSize}
                     isSelected={resolvedSelectedId === TOMORROW_ID}
                     onPress={() => handleSelect(item.id)}
+                    railCellWidth={railCellWidth}
                     state={item}
                   />
                 </Animated.View>
@@ -288,6 +290,7 @@ export function DayTimeline({
                     isRevealed={scriptedState?.revealedCreatureId === item.id}
                     isSelected={item.id === resolvedSelectedId}
                     onPress={() => handleSelect(item.id)}
+                    railCellWidth={railCellWidth}
                   />
                 </Animated.View>
               )
@@ -318,6 +321,7 @@ function TimelineRailEntry({
   isHighlighted = false,
   isRevealed = false,
   onPress,
+  railCellWidth,
 }: {
   entry: TimelineDayEntry;
   bubbleSize: number;
@@ -325,6 +329,7 @@ function TimelineRailEntry({
   isHighlighted?: boolean;
   isRevealed?: boolean;
   onPress: () => void;
+  railCellWidth: number;
 }) {
   const scale = useSharedValue(isSelected ? 1.06 : 0.92);
   const lift = useSharedValue(isSelected ? -6 : 2);
@@ -354,7 +359,7 @@ function TimelineRailEntry({
   }));
 
   return (
-    <Pressable hitSlop={20} onPress={onPress} style={styles.railCell}>
+    <Pressable hitSlop={20} onPress={onPress} style={[styles.railCell, { width: railCellWidth }]}>
       <ThemedText type="onboardingLabel" style={styles.dayLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
         {entry.dayLabel}
       </ThemedText>
@@ -463,11 +468,13 @@ function TomorrowRailItem({
   bubbleSize,
   isSelected,
   onPress,
+  railCellWidth,
 }: {
   state: TimelineTomorrowState;
   bubbleSize: number;
   isSelected: boolean;
   onPress: () => void;
+  railCellWidth: number;
 }) {
   const scale = useSharedValue(isSelected ? 1.06 : 0.96);
   const pulse = useSharedValue(0);
@@ -497,7 +504,7 @@ function TomorrowRailItem({
   }));
 
   return (
-    <Pressable hitSlop={20} onPress={onPress} style={styles.railCell}>
+    <Pressable hitSlop={20} onPress={onPress} style={[styles.railCell, { width: railCellWidth }]}>
       <ThemedText type="onboardingLabel" style={styles.dayLabel} lightColor="#D4E1FF" darkColor="#D4E1FF">
         {state.dayLabel}
       </ThemedText>
@@ -520,9 +527,11 @@ function TomorrowRailItem({
 function FutureGhostRailItem({
   state,
   bubbleSize,
+  railCellWidth,
 }: {
   state: TimelineFutureGhost;
   bubbleSize: number;
+  railCellWidth: number;
 }) {
   const pulse = useSharedValue(0);
 
@@ -543,7 +552,7 @@ function FutureGhostRailItem({
   }));
 
   return (
-    <View style={[styles.railCell, styles.futureRailCell]}>
+    <View style={[styles.railCell, styles.futureRailCell, { width: railCellWidth }]}>
       <ThemedText type="onboardingLabel" style={styles.futureLabel} lightColor="#8693B5" darkColor="#8693B5">
         {state.dayLabel}
       </ThemedText>
