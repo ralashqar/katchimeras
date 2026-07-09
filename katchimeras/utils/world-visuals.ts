@@ -1,9 +1,12 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { homeCreatureVisuals } from '@/constants/home-mvp';
+import { WORLD_OBJECT_LOD_SOURCES, type WorldObjectLod } from '@/constants/world-asset-lod-sources.gen';
 import { PROMOTED_WORLD_SOURCES } from '@/constants/world-asset-sources.gen';
 import { getDevAssetOverrideSource, getDevKingdomBaseId } from '@/utils/dev-asset-overrides';
 import type { HomeVisualKey } from '@/types/home';
+
+export type { WorldObjectLod };
 
 // Bundled world cutouts produced by the generate → matte → verify pipeline
 // (scripts/generate-world-assets.py). Keys match the assetKeys the patch engine
@@ -442,7 +445,7 @@ const CREATURE_PREFIX = 'creature:';
 
 // Resolve an object's assetKey to a bundled image, or null when there is no art
 // (the caller draws a placeholder). Creatures reuse the existing cutouts.
-export function worldAssetSource(assetKey: string): ImageSourcePropType | null {
+export function worldAssetSource(assetKey: string, lod: WorldObjectLod = 'full'): ImageSourcePropType | null {
   // Dev-only: an Asset Lab draft override wins (no-op in production builds).
   const override = getDevAssetOverrideSource(assetKey);
   if (override) {
@@ -451,6 +454,14 @@ export function worldAssetSource(assetKey: string): ImageSourcePropType | null {
   if (assetKey.startsWith(CREATURE_PREFIX)) {
     const key = assetKey.slice(CREATURE_PREFIX.length) as HomeVisualKey;
     return homeCreatureVisuals[key]?.source ?? null;
+  }
+  if (lod !== 'full') {
+    const exact = WORLD_OBJECT_LOD_SOURCES[lod][assetKey];
+    if (exact) return exact;
+    if (lod === 'thumb') {
+      const medium = WORLD_OBJECT_LOD_SOURCES.medium[assetKey];
+      if (medium) return medium;
+    }
   }
   // Promoted Asset Lab variants (generated manifest) extend the hand map.
   return WORLD_OBJECT_SOURCES[assetKey] ?? PROMOTED_WORLD_SOURCES[assetKey] ?? null;

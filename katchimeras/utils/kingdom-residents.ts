@@ -3,7 +3,7 @@ import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { PATCH_SIZE } from '@/utils/world-iso';
 
 // Kingdom Residents (docs/kingdom-residents-plan.md): every UNIQUE katchimera
-// claims one quad of a ring tile, in hatch order; duplicates level up that
+// claims one hex tile, in hatch order; duplicates level up that
 // resident's house instead of adding a twin. Everything here is a PURE fold
 // over the Dex — allocation is derived, never stored, so migration and
 // recomputation are free. Only user-made moves would ever live in a store.
@@ -14,10 +14,11 @@ export type KingdomResident = {
   creatureId: string;
   /** 0-based order of first hatch among uniques — drives the spiral. */
   arrivalIndex: number;
-  /** Which expansion tile (matches utils/world-expansion.ts unlock order). */
+  /** Which resident hex tile this katchimera owns. */
   tileIndex: number;
+  /** Back-compat only: older code expected a quad. Hex residents always use 0. */
   quad: ResidentQuad;
-  /** Quad centre in the tile's fractional grid coords (SlotCell space). */
+  /** Creature centre in the tile's local fractional coords. */
   cell: { col: number; row: number };
   /** Total hatches of this creature (1 = first arrival). */
   hatchCount: number;
@@ -25,7 +26,7 @@ export type KingdomResident = {
   houseLevel: number;
 };
 
-export const QUADS_PER_TILE = 4;
+export const QUADS_PER_TILE = 1;
 export const MAX_HOUSE_LEVEL = 4;
 
 // Ring tiles render at PATCH_SIZE + 2·ring cells (14 with the standard ring
@@ -43,16 +44,12 @@ const QUAD_SIGNS: readonly { col: -1 | 1; row: -1 | 1 }[] = [
 
 /** Quad centres (where the katchimera stands) for a tile with this ring. */
 export function quadCell(quad: ResidentQuad, ring: number): { col: number; row: number } {
-  const halfTile = PATCH_SIZE / 2 + ring; // half extent in cells (7 @ ring 5)
-  const offset = halfTile / 2;
-  return { col: CENTRE + QUAD_SIGNS[quad].col * offset, row: CENTRE + QUAD_SIGNS[quad].row * offset };
+  return { col: CENTRE, row: CENTRE };
 }
 
 /** House spots: each quad's OUTER corner (toward the tile's edge). */
 export function quadHouseCell(quad: ResidentQuad, ring: number): { col: number; row: number } {
-  const halfTile = PATCH_SIZE / 2 + ring;
-  const offset = halfTile - 2.2; // a couple of cells in from the tile edge
-  return { col: CENTRE + QUAD_SIGNS[quad].col * offset, row: CENTRE + QUAD_SIGNS[quad].row * offset };
+  return { col: CENTRE + 0.65, row: CENTRE - 0.55 };
 }
 
 // Back-compat quad centres at ring 0 (the raw 4×4 grid) — used by
@@ -65,8 +62,7 @@ export type HatchRecord = { creatureId: string; hatchedAt: number };
 
 /**
  * Fold the full hatch history into the resident list. Uniques are ordered by
- * FIRST hatch time (stable across replays); each takes the next quad, four
- * per tile, tiles in the existing expansion unlock order.
+ * FIRST hatch time (stable across replays); each takes the next hex tile.
  */
 export function deriveResidents(
   hatches: HatchRecord[],
@@ -87,22 +83,21 @@ export function deriveResidents(
   return [...byFirstHatch.entries()]
     .sort((a, b) => a[1].first - b[1].first)
     .map(([creatureId, { count }], arrivalIndex) => {
-      const quad = (arrivalIndex % QUADS_PER_TILE) as ResidentQuad;
       return {
         creatureId,
         arrivalIndex,
-        tileIndex: Math.floor(arrivalIndex / QUADS_PER_TILE),
-        quad,
-        cell: QUAD_CELLS[quad],
+        tileIndex: arrivalIndex,
+        quad: 0,
+        cell: { col: CENTRE, row: CENTRE },
         hatchCount: count,
         houseLevel: Math.min(MAX_HOUSE_LEVEL, count + (questCredits?.get(creatureId) ?? 0)),
       };
     });
 }
 
-/** How many ring tiles the current unique count needs. */
+/** How many resident hex tiles the current unique count needs. */
 export function tilesNeeded(uniqueCount: number): number {
-  return Math.ceil(uniqueCount / QUADS_PER_TILE);
+  return uniqueCount;
 }
 
 // Placeholder house art until the resident-house family lands (slice F —

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 
@@ -60,6 +60,68 @@ function imageUrl(path, cacheBust = '') {
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
+
+const ENV_PROGRESS = {
+  base: [
+    'Preparing base prompt',
+    'Sending style reference to FAL AI',
+    'Generating base image',
+    'Downloading image and refreshing scene',
+  ],
+  fit: [
+    'Saving prompt and placement',
+    'Cropping base around object',
+    'Generating fitted image via FAL AI',
+    'Matting and extracting candidate prop',
+    'Refreshing previews',
+  ],
+  apply: [
+    'Reading fitted candidate',
+    'Replacing live prop image',
+    'Refreshing scene',
+  ],
+  mask: [
+    'Saving reveal mask',
+    'Refreshing masked scene preview',
+  ],
+  extractObject: [
+    'Saving current mask',
+    'Cropping full scene around object',
+    'Isolating object via FAL AI',
+    'Matting transparent object',
+    'Saving extracted object layer',
+    'Refreshing scene',
+  ],
+  linkObject: [
+    'Downloading linked generated image',
+    'Matting transparent object',
+    'Saving extracted object layer',
+    'Refreshing scene',
+  ],
+  extractAllObjects: [
+    'Finding masked objects without extractions',
+    'Starting parallel GPT image edit jobs, two at a time',
+    'Matting extracted objects',
+    'Saving extracted object layers',
+    'Refreshing scene',
+  ],
+  bake: [
+    'Collecting station list and placement rectangles',
+    'Sending base image and text-only object list to FAL AI',
+    'Generating full baked scene from scratch',
+    'Saving baked scene preview',
+    'Refreshing previews',
+  ],
+  directPipeline: [
+    'Preparing direct full-scene prompt',
+    'Generating populated scene from style reference',
+    'Saving direct scene preview',
+    'Removing station objects from final scene',
+    'Saving extracted base preview',
+    'Refreshing previews',
+  ],
+  save: ['Saving prompt changes'],
+};
 
 function round(value, step) {
   return Math.round(value / step) * step;
@@ -458,7 +520,10 @@ function App() {
             <h1>World Editor</h1>
             <p>{status}</p>
           </div>
-          <button onClick={load}>Reload</button>
+          <div className="actions">
+            <a className="linkButton" href="/environments">Environments</a>
+            <button onClick={load}>Reload</button>
+          </div>
         </div>
         <div className="toolbar">
           <button className={tool === 'move' ? 'active' : ''} onClick={() => setTool('move')}>Move</button>
@@ -767,4 +832,990 @@ function GridOverlay({ geometry }) {
   );
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+function revealRectForStation(station) {
+  const mask = station?.revealMask;
+  if (mask?.type === 'rect' && mask.rect) return mask.rect;
+  if (mask?.type === 'polygon' && mask.bounds) return mask.bounds;
+  const padding = mask?.type === 'rect' ? Number(mask.padding ?? 0) : 0;
+  return {
+    x: station.hitbox.x - padding,
+    y: station.hitbox.y - padding,
+    w: station.hitbox.w + padding * 2,
+    h: station.hitbox.h + padding * 2,
+  };
+}
+
+function rectToPoints(rect) {
+  return [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y + rect.h },
+    { x: rect.x, y: rect.y + rect.h },
+  ];
+}
+
+function rectToPointsForResolution(rect, resolution) {
+  const corners = rectToPoints(rect);
+  if (resolution <= 1) return corners;
+  const next = [];
+  corners.forEach((point, index) => {
+    const after = corners[(index + 1) % corners.length];
+    next.push(point);
+    next.push({
+      x: Math.round((point.x + after.x) / 2),
+      y: Math.round((point.y + after.y) / 2),
+    });
+  });
+  return next;
+}
+
+function boundsForPoints(points) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return {
+    x,
+    y,
+    w: Math.max(...xs) - x,
+    h: Math.max(...ys) - y,
+  };
+}
+
+function clipPathForPoints(points, bounds) {
+  if (!points?.length || !bounds?.w || !bounds?.h) return undefined;
+  return `polygon(${points.map((point) => `${((point.x - bounds.x) / bounds.w) * 100}% ${((point.y - bounds.y) / bounds.h) * 100}%`).join(', ')})`;
+}
+
+function pointsEqual(a = [], b = []) {
+  return a.length === b.length && a.every((point, index) => point.x === b[index]?.x && point.y === b[index]?.y);
+}
+
+function polygonResolutionForPoints(points = []) {
+  return points.length >= 8 ? 2 : 1;
+}
+
+function savedMaskForStation(station) {
+  if (station?.revealMask?.type === 'polygon' && station.revealMask.points?.length >= 3) {
+    return { type: 'polygon', points: station.revealMask.points, bounds: station.revealMask.bounds ?? boundsForPoints(station.revealMask.points) };
+  }
+  const rect = revealRectForStation(station);
+  return { type: 'rect', rect, bounds: rect };
+}
+
+function stationDepthZIndex(station, rect) {
+  return Math.round((rect.y + rect.h) / 8) + (station?.zIndex ?? 20);
+}
+
+function EnvironmentDesigner() {
+  const [environments, setEnvironments] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [selectedStationId, setSelectedStationId] = useState(null);
+  const [selectedLevel, setSelectedLevel] = useState(1);
+  const [rect, setRect] = useState(null);
+  const [maskMode, setMaskMode] = useState('rect');
+  const [polygonPoints, setPolygonPoints] = useState([]);
+  const [polygonResolution, setPolygonResolution] = useState(1);
+  const [basePrompt, setBasePrompt] = useState('');
+  const [stationPrompt, setStationPrompt] = useState('');
+  const [revealObjectUrlInput, setRevealObjectUrlInput] = useState('');
+  const [zoom, setZoom] = useState(0.58);
+  const [pan, setPan] = useState({ x: 30, y: 28 });
+  const [cacheBust, setCacheBust] = useState('');
+  const [status, setStatus] = useState('Loading environments');
+  const [progress, setProgress] = useState(null);
+  const stageRef = useRef(null);
+  const dragRef = useRef(null);
+  const progressTimerRef = useRef(null);
+
+  useEffect(() => {
+    loadEnvironmentList();
+  }, []);
+
+  useEffect(() => {
+    if (selectedId) loadEnvironment(selectedId);
+  }, [selectedId]);
+
+  useEffect(() => () => clearProgressTimer(), []);
+
+  const selectedStation = detail?.layout?.stations?.find((station) => station.id === selectedStationId) ?? detail?.layout?.stations?.[0] ?? null;
+  const selectedAssetKey = selectedStation?.art?.levels?.[selectedLevel - 1] ?? selectedStation?.art?.levels?.[0] ?? null;
+  const selectedStatus = selectedStation ? detail?.assets?.stations?.find((item) => item.id === selectedStation.id) : null;
+  const selectedLevelStatus = selectedStatus?.levels?.find((item) => item.key === selectedAssetKey) ?? null;
+  const selectedRevealObject = selectedStatus?.revealObject ?? null;
+  const selectedRevealObjectUrl = selectedRevealObject?.url ? `${selectedRevealObject.url}?v=${cacheBust}` : null;
+  const selectedStationArtPrompt = selectedStation ? propPromptFor(detail, selectedStation.id) : '';
+  const effectiveBasePrompt = basePrompt.trim() || detail?.art?.basePrompt || detail?.environment?.artPrompt || '';
+  const effectiveStationPrompt = stationPrompt.trim() || selectedStationArtPrompt || '';
+  const revealMode = detail?.layout?.plate?.revealMode === 'fullSceneMasks';
+  const overlayAsset = revealMode ? null : selectedLevelStatus?.candidate ?? selectedLevelStatus?.final ?? null;
+  const savedMask = selectedStation ? savedMaskForStation(selectedStation) : null;
+  const selectedRenderMode = revealMode && selectedStation?.revealRenderMode === 'object' && selectedRevealObject ? 'object' : 'mask';
+  const selectedComparisonRect = selectedStation ? (revealMode ? savedMask.bounds : selectedStation.hitbox) : null;
+  const maskDirty = revealMode && selectedRenderMode === 'mask' && !!selectedStation && !!rect && (
+    maskMode !== savedMask.type ||
+    (maskMode === 'polygon'
+      ? !pointsEqual(polygonPoints, savedMask.points ?? [])
+      : rect.x !== selectedComparisonRect.x || rect.y !== selectedComparisonRect.y || rect.w !== selectedComparisonRect.w || rect.h !== selectedComparisonRect.h)
+  );
+  const objectPlacementDirty = revealMode && selectedRenderMode === 'object' && !!selectedStation && !!rect && (
+    rect.x !== selectedComparisonRect.x ||
+    rect.y !== selectedComparisonRect.y ||
+    rect.w !== selectedComparisonRect.w ||
+    rect.h !== selectedComparisonRect.h
+  );
+  const placementDirty = !revealMode && !!rect && !!selectedStation && (
+    rect.x !== selectedComparisonRect.x ||
+    rect.y !== selectedComparisonRect.y ||
+    rect.w !== selectedComparisonRect.w ||
+    rect.h !== selectedComparisonRect.h
+  );
+
+  useEffect(() => {
+    if (!detail) return;
+    setBasePrompt(detail.art?.basePrompt || detail.environment?.artPrompt || '');
+    const firstStation = detail.layout?.stations?.[0] ?? null;
+    setSelectedStationId((current) => detail.layout?.stations?.some((station) => station.id === current) ? current : firstStation?.id ?? null);
+  }, [detail?.environment?.id, detail?.art?.basePrompt, detail?.environment?.artPrompt]);
+
+  useEffect(() => {
+    if (!selectedStation) return;
+    const mask = savedMaskForStation(selectedStation);
+    const nextRect = revealMode ? mask.bounds : selectedStation.hitbox;
+    setRect({ ...nextRect });
+    setMaskMode(revealMode ? mask.type : 'rect');
+    setPolygonPoints(mask.type === 'polygon' ? mask.points.map((point) => ({ ...point })) : rectToPoints(nextRect));
+    setPolygonResolution(mask.type === 'polygon' ? polygonResolutionForPoints(mask.points) : 1);
+    setStationPrompt(selectedStationArtPrompt);
+    setRevealObjectUrlInput('');
+  }, [revealMode, selectedStation?.id, selectedStationArtPrompt]);
+
+  async function loadEnvironmentList() {
+    const response = await fetch('/api/environments');
+    const data = await response.json();
+    setEnvironments(data.environments ?? []);
+    setSelectedId((current) => current ?? data.environments?.[0]?.id ?? null);
+    setStatus('Ready');
+  }
+
+  async function loadEnvironment(id) {
+    const response = await fetch(`/api/environments/${id}`);
+    const data = await response.json();
+    if (!response.ok) {
+      setStatus(data.error ?? 'Could not load environment');
+      return;
+    }
+    setDetail(data);
+    setCacheBust(String(Date.now()));
+    setStatus('Ready');
+  }
+
+  function stagePoint(event) {
+    const box = stageRef.current.getBoundingClientRect();
+    const width = detail?.layout?.plate?.width ?? 1;
+    const height = detail?.layout?.plate?.height ?? 1;
+    return {
+      x: clamp((event.clientX - box.left - pan.x) / zoom, 0, width),
+      y: clamp((event.clientY - box.top - pan.y) / zoom, 0, height),
+    };
+  }
+
+  function constrainRect(nextRect) {
+    const width = detail?.layout?.plate?.width ?? 1;
+    const height = detail?.layout?.plate?.height ?? 1;
+    const w = clamp(Math.round(nextRect.w), 8, width);
+    const h = clamp(Math.round(nextRect.h), 8, height);
+    return {
+      x: clamp(Math.round(nextRect.x), 0, Math.max(0, width - w)),
+      y: clamp(Math.round(nextRect.y), 0, Math.max(0, height - h)),
+      w,
+      h,
+    };
+  }
+
+  function beginStageDrag(event) {
+    if (!detail) return;
+    event.preventDefault();
+    dragRef.current = { type: 'pan', startClient: { x: event.clientX, y: event.clientY }, startPan: pan };
+  }
+
+  function beginObjectDrag(event, mode, handle = 'se') {
+    if (!detail || !rect) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      type: mode === 'scale' ? 'object-scale' : 'object-move',
+      handle,
+      start: stagePoint(event),
+      startRect: { ...rect },
+      startPoints: polygonPoints.map((point) => ({ ...point })),
+    };
+  }
+
+  function beginPolygonPointDrag(event, index) {
+    if (!detail || !rect) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    dragRef.current = {
+      type: 'polygon-point',
+      index,
+      start: stagePoint(event),
+      startPoints: polygonPoints.map((point) => ({ ...point })),
+    };
+  }
+
+  function applyRectTransformToPoints(startPoints, startRect, nextRect) {
+    if (!startPoints?.length || !startRect?.w || !startRect?.h) return rectToPoints(nextRect);
+    return startPoints.map((point) => ({
+      x: Math.round(nextRect.x + ((point.x - startRect.x) / startRect.w) * nextRect.w),
+      y: Math.round(nextRect.y + ((point.y - startRect.y) / startRect.h) * nextRect.h),
+    }));
+  }
+
+  function moveStageDrag(event) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (drag.type === 'pan') {
+      setPan({
+        x: drag.startPan.x + event.clientX - drag.startClient.x,
+        y: drag.startPan.y + event.clientY - drag.startClient.y,
+      });
+      return;
+    }
+    if (drag.type === 'object-move') {
+      const point = stagePoint(event);
+      const nextRect = constrainRect({
+        ...drag.startRect,
+        x: drag.startRect.x + point.x - drag.start.x,
+        y: drag.startRect.y + point.y - drag.start.y,
+      });
+      setRect(nextRect);
+      if (revealMode && selectedRenderMode === 'mask' && maskMode === 'polygon') {
+        setPolygonPoints(applyRectTransformToPoints(drag.startPoints, drag.startRect, nextRect));
+      }
+      return;
+    }
+    if (drag.type === 'object-scale') {
+      const point = stagePoint(event);
+      const dx = point.x - drag.start.x;
+      const dy = point.y - drag.start.y;
+      const next = { ...drag.startRect };
+      if (drag.handle.includes('e')) next.w = drag.startRect.w + dx;
+      if (drag.handle.includes('s')) next.h = drag.startRect.h + dy;
+      if (drag.handle.includes('w')) {
+        next.x = drag.startRect.x + dx;
+        next.w = drag.startRect.w - dx;
+      }
+      if (drag.handle.includes('n')) {
+        next.y = drag.startRect.y + dy;
+        next.h = drag.startRect.h - dy;
+      }
+      const nextRect = constrainRect(next);
+      setRect(nextRect);
+      if (revealMode && selectedRenderMode === 'mask' && maskMode === 'polygon') {
+        setPolygonPoints(applyRectTransformToPoints(drag.startPoints, drag.startRect, nextRect));
+      }
+      return;
+    }
+    if (drag.type === 'polygon-point') {
+      const point = stagePoint(event);
+      const width = detail?.layout?.plate?.width ?? 1;
+      const height = detail?.layout?.plate?.height ?? 1;
+      const nextPoints = drag.startPoints.map((item, index) => index === drag.index
+        ? { x: clamp(Math.round(item.x + point.x - drag.start.x), 0, width), y: clamp(Math.round(item.y + point.y - drag.start.y), 0, height) }
+        : item
+      );
+      setPolygonPoints(nextPoints);
+      setRect(constrainRect(boundsForPoints(nextPoints)));
+      return;
+    }
+  }
+
+  function endStageDrag() {
+    dragRef.current = null;
+  }
+
+  function moveObjectDrag(event) {
+    if (!dragRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moveStageDrag(event);
+  }
+
+  function endObjectDrag(event) {
+    if (!dragRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    endStageDrag();
+  }
+
+  const zoomEnvironment = useCallback((event) => {
+    event.preventDefault();
+    if (!stageRef.current) return;
+    const next = clamp(zoom * (event.deltaY > 0 ? 0.9 : 1.1), 0.18, 2.4);
+    const box = stageRef.current.getBoundingClientRect();
+    const viewPoint = { x: event.clientX - box.left, y: event.clientY - box.top };
+    const worldPoint = { x: (viewPoint.x - pan.x) / zoom, y: (viewPoint.y - pan.y) / zoom };
+    setZoom(Number(next.toFixed(3)));
+    setPan({
+      x: Number((viewPoint.x - worldPoint.x * next).toFixed(1)),
+      y: Number((viewPoint.y - worldPoint.y * next).toFixed(1)),
+    });
+  }, [pan.x, pan.y, zoom]);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    stage.addEventListener('wheel', zoomEnvironment, { passive: false });
+    return () => stage.removeEventListener('wheel', zoomEnvironment);
+  }, [zoomEnvironment]);
+
+  function clearProgressTimer() {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+  }
+
+  function startProgress(label, steps) {
+    clearProgressTimer();
+    const safeSteps = steps?.length ? steps : [label];
+    setProgress({ label, steps: safeSteps, index: 0, busy: true, error: null });
+    progressTimerRef.current = setInterval(() => {
+      setProgress((current) => {
+        if (!current?.busy) return current;
+        return { ...current, index: Math.min(current.index + 1, current.steps.length - 1) };
+      });
+    }, 4200);
+  }
+
+  function finishProgress(label) {
+    clearProgressTimer();
+    setProgress((current) => current ? { ...current, label, index: current.steps.length - 1, busy: false, error: null } : null);
+    window.setTimeout(() => {
+      setProgress((current) => (current && !current.busy ? null : current));
+    }, 1800);
+  }
+
+  function failProgress(error) {
+    clearProgressTimer();
+    setProgress((current) => current ? { ...current, busy: false, error } : null);
+  }
+
+  async function callEnvironmentApi(pathSuffix, body, busyLabel, doneLabel, steps = null) {
+    if (!detail) return null;
+    setStatus(busyLabel);
+    startProgress(busyLabel, steps);
+    try {
+      const response = await fetch(`/api/environments/${detail.environment.id}${pathSuffix}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setStatus(data.error ?? 'Request failed');
+        failProgress(data.error ?? 'Request failed');
+        return null;
+      }
+      setDetail(data);
+      setCacheBust(String(data.cacheBust ?? Date.now()));
+      const partialFailure = Array.isArray(data.failures) && data.failures.length > 0;
+      const nextDoneLabel = partialFailure
+        ? `${doneLabel}: ${data.extractedCount ?? 0} extracted, ${data.failedCount ?? data.failures.length} failed`
+        : doneLabel;
+      setStatus(nextDoneLabel);
+      finishProgress(nextDoneLabel);
+      return data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Request failed';
+      setStatus(message);
+      failProgress(message);
+      return null;
+    }
+  }
+
+  async function savePrompts() {
+    await callEnvironmentApi('/art', {
+      basePrompt: effectiveBasePrompt,
+      stationId: selectedStation?.id,
+      stationPrompt: effectiveStationPrompt,
+    }, 'Saving prompts', 'Prompts saved', ENV_PROGRESS.save);
+  }
+
+  async function generateBase() {
+    await callEnvironmentApi('/base', { prompt: effectiveBasePrompt, model: 'gpt' }, 'Generating base environment', 'Base generated', ENV_PROGRESS.base);
+  }
+
+  async function bakeScene() {
+    await callEnvironmentApi('/bake-scene', { prompt: effectiveBasePrompt, model: 'gpt' }, 'Baking full environment scene', 'Baked scene generated', ENV_PROGRESS.bake);
+  }
+
+  async function generateDirectScenePipeline() {
+    await callEnvironmentApi('/direct-scene-pipeline', { prompt: effectiveBasePrompt, model: 'gpt' }, 'Generating direct scene pipeline', 'Direct scene and base generated', ENV_PROGRESS.directPipeline);
+  }
+
+  async function saveRevealMask() {
+    if (!selectedStation || !rect) return;
+    await callEnvironmentApi(`/stations/${selectedStation.id}/reveal-mask`, {
+      mask: maskMode === 'polygon'
+        ? { type: 'polygon', points: polygonPoints }
+        : { type: 'rect', rect },
+    }, 'Saving reveal mask', 'Reveal mask saved', ENV_PROGRESS.mask);
+  }
+
+  async function switchRevealRenderMode(nextMode) {
+    if (!selectedStation || !rect || nextMode === selectedRenderMode) return;
+    await callEnvironmentApi(`/stations/${selectedStation.id}/reveal-render-mode`, {
+      mode: nextMode,
+      ...(nextMode === 'object'
+        ? { rect }
+        : {
+            mask: maskMode === 'polygon'
+              ? { type: 'polygon', points: polygonPoints }
+              : { type: 'rect', rect },
+          }),
+    }, nextMode === 'object' ? 'Switching to extracted object' : 'Switching to mask reveal', 'Reveal mode updated', ENV_PROGRESS.mask);
+  }
+
+  async function saveExtractedObjectPlacement() {
+    if (!selectedStation || !rect) return;
+    await callEnvironmentApi(`/stations/${selectedStation.id}/reveal-render-mode`, {
+      mode: 'object',
+      rect,
+    }, 'Saving extracted object placement', 'Extracted placement saved', ENV_PROGRESS.mask);
+  }
+
+  async function extractRevealObject() {
+    if (!selectedStation || !rect) return;
+    await callEnvironmentApi(`/stations/${selectedStation.id}/extract-reveal-object`, {
+      mask: maskMode === 'polygon'
+        ? { type: 'polygon', points: polygonPoints }
+        : { type: 'rect', rect },
+      model: 'gpt',
+    }, 'Extracting isolated object', 'Extracted object ready', ENV_PROGRESS.extractObject);
+  }
+
+  async function linkRevealObjectUrl() {
+    if (!selectedStation || !rect || !revealObjectUrlInput.trim()) return;
+    await callEnvironmentApi(`/stations/${selectedStation.id}/link-reveal-object-url`, {
+      url: revealObjectUrlInput.trim(),
+      mask: maskMode === 'polygon'
+        ? { type: 'polygon', points: polygonPoints }
+        : { type: 'rect', rect },
+    }, 'Linking extracted object URL', 'Linked extracted object ready', ENV_PROGRESS.linkObject);
+    setRevealObjectUrlInput('');
+  }
+
+  async function extractAllMissingRevealObjects() {
+    await callEnvironmentApi('/extract-missing-reveal-objects', {
+      model: 'gpt',
+      concurrency: 2,
+    }, 'Extracting all missing objects', 'Missing objects extracted', ENV_PROGRESS.extractAllObjects);
+  }
+
+  function switchMaskMode(nextMode) {
+    if (!rect || nextMode === maskMode) return;
+    if (nextMode === 'polygon') {
+      setPolygonPoints(maskMode === 'rect' ? rectToPointsForResolution(rect, polygonResolution) : polygonPoints.length >= 3 ? polygonPoints : rectToPointsForResolution(rect, polygonResolution));
+      setMaskMode('polygon');
+      return;
+    }
+    const nextRect = polygonPoints.length >= 3 ? boundsForPoints(polygonPoints) : rect;
+    setRect(constrainRect(nextRect));
+    setMaskMode('rect');
+  }
+
+  function changePolygonResolution(nextResolution) {
+    const value = Number(nextResolution);
+    if (!rect || !Number.isFinite(value)) return;
+    const next = clamp(Math.round(value), 1, 2);
+    setPolygonResolution(next);
+    setPolygonPoints(rectToPointsForResolution(boundsForPoints(polygonPoints.length >= 3 ? polygonPoints : rectToPoints(rect)), next));
+  }
+
+  async function fitObject() {
+    if (!selectedStation || !rect || !overlayAsset) return;
+    await savePrompts();
+    await callEnvironmentApi(`/stations/${selectedStation.id}/fit`, {
+      level: selectedLevel,
+      rect,
+      model: 'gpt',
+    }, 'Fitting object into environment', 'Fitted candidate generated', ENV_PROGRESS.fit);
+  }
+
+  async function applyFittedObject() {
+    if (!selectedStation || !selectedLevelStatus?.candidate) return;
+    await callEnvironmentApi(`/stations/${selectedStation.id}/apply-fit`, {
+      level: selectedLevel,
+    }, 'Applying fitted prop', 'Fitted prop applied', ENV_PROGRESS.apply);
+  }
+
+  const displayBaseAsset = revealMode ? detail?.assets?.extractedBase ?? detail?.assets?.base : detail?.assets?.base;
+  const baseUrl = displayBaseAsset?.url ? `${displayBaseAsset.url}?v=${cacheBust}` : null;
+  const originalBaseUrl = detail?.assets?.base?.url ? `${detail.assets.base.url}?v=${cacheBust}` : null;
+  const fullSceneUrl = detail?.assets?.directScene?.url ? `${detail.assets.directScene.url}?v=${cacheBust}` : null;
+  const styleUrl = detail?.assets?.styleReference?.url ? `${detail.assets.styleReference.url}?v=${cacheBust}` : null;
+  const overlayUrl = overlayAsset?.url ? `${overlayAsset.url}?v=${cacheBust}` : null;
+  const plate = detail?.layout?.plate ?? { width: 1536, height: 1536 };
+  const canRegenerateObject = placementDirty && !!baseUrl && !!selectedStation && !!selectedAssetKey && !!rect && !!overlayAsset;
+  const canSaveRevealMask = revealMode && maskDirty && !!selectedStation && !!rect;
+  const canSaveExtractedObjectPlacement = revealMode && objectPlacementDirty && !!selectedStation && !!rect && !!selectedRevealObject;
+  const canExtractRevealObject = revealMode && !!selectedStation && !!rect && !!fullSceneUrl;
+  const canLinkRevealObjectUrl = revealMode && !!selectedStation && !!rect && /^https?:\/\//i.test(revealObjectUrlInput.trim());
+  const objectCount = detail?.layout?.stations?.length ?? 0;
+  const missingRevealObjectCount = revealMode
+    ? (detail?.layout?.stations ?? []).filter((station) => {
+        const stationStatus = detail?.assets?.stations?.find((item) => item.id === station.id);
+        return !!station.revealMask && !stationStatus?.revealObject;
+      }).length
+    : 0;
+  const canBakeScene = !!originalBaseUrl && objectCount > 0 && !!effectiveBasePrompt;
+  const canRunDirectPipeline = !!styleUrl && objectCount > 0 && !!effectiveBasePrompt;
+  const canExtractAllMissing = revealMode && !!fullSceneUrl && missingRevealObjectCount > 0;
+  const busy = !!progress?.busy;
+
+  return (
+    <main className="app envApp">
+      <aside className="left">
+        <div className="brand">
+          <div>
+            <h1>Environment Designer</h1>
+            <p>{status}</p>
+          </div>
+          <a className="linkButton" href="/">World</a>
+        </div>
+        <section className="list">
+          <h2>Katchimeras</h2>
+          {environments.map((environment) => (
+            <button
+              key={environment.id}
+              className={`row ${environment.id === selectedId ? 'selected' : ''}`}
+              onClick={() => setSelectedId(environment.id)}>
+              <span className="envAvatar">{environment.ownerVisualKeys?.[0]?.slice(0, 2).toUpperCase() ?? 'EN'}</span>
+              <span>
+                <strong>{environment.title}</strong>
+                <small>{environment.generatedPropCount}/{environment.totalPropCount} props / {environment.domain}</small>
+              </span>
+            </button>
+          ))}
+        </section>
+        <section className="panel envPanel">
+          <h2>Style Ingredient</h2>
+          {styleUrl ? <img className="styleIngredient" src={styleUrl} alt="" /> : <div className="emptyIngredient">No style reference</div>}
+          <p className="hintText">Sent as the art-style reference for first base generation.</p>
+        </section>
+      </aside>
+
+      <section className="workspace">
+        <div className="topbar">
+          <div>
+            <strong>{detail?.environment?.title ?? 'Environment'}</strong>
+            <span>{selectedStation?.label ?? 'Select a station'} / {selectedAssetKey ?? 'no asset'}</span>
+          </div>
+          <div className="actions">
+            <button onClick={() => { setZoom(0.58); setPan({ x: 30, y: 28 }); }}>Reset</button>
+          </div>
+        </div>
+        {progress ? <ProgressPanel progress={progress} /> : null}
+
+        <div
+          ref={stageRef}
+          className="stage envStage"
+          onPointerDown={beginStageDrag}
+          onPointerMove={moveStageDrag}
+          onPointerUp={endStageDrag}
+          onPointerCancel={endStageDrag}
+          onAuxClick={(event) => event.preventDefault()}>
+          <div className="envStageInner" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
+            <div className="envPlate" style={{ width: plate.width, height: plate.height }}>
+              {baseUrl ? <img className="envBase" src={baseUrl} alt="" draggable="false" /> : <div className="missingBase">Generate the base environment first</div>}
+              {revealMode && fullSceneUrl ? [...(detail?.layout?.stations ?? [])].sort((a, b) => {
+                const aRect = revealRectForStation(a);
+                const bRect = revealRectForStation(b);
+                const bottomDelta = aRect.y + aRect.h - (bRect.y + bRect.h);
+                return bottomDelta === 0 ? (a.zIndex ?? 0) - (b.zIndex ?? 0) : bottomDelta;
+              }).map((station) => {
+                const isSelected = station.id === selectedStation?.id;
+                const maskType = isSelected ? maskMode : savedMaskForStation(station).type;
+                const mask = isSelected && rect ? rect : revealRectForStation(station);
+                const points = isSelected ? polygonPoints : station.revealMask?.points;
+                const clipPath = maskType === 'polygon' ? clipPathForPoints(points, mask) : undefined;
+                const stationStatus = detail?.assets?.stations?.find((item) => item.id === station.id);
+                const revealObjectUrl = stationStatus?.revealObject?.url ? `${stationStatus.revealObject.url}?v=${cacheBust}` : null;
+                const stationRenderMode = station.revealRenderMode === 'object' && revealObjectUrl ? 'object' : 'mask';
+                const showExtractedObject = stationRenderMode === 'object' && !(isSelected && selectedRenderMode === 'object');
+                if (showExtractedObject) {
+                  return (
+                    <div
+                      key={`reveal-object-${station.id}`}
+                      className="envExtractedObject"
+                      style={{
+                        left: mask.x,
+                        top: mask.y,
+                        width: mask.w,
+                        height: mask.h,
+                        zIndex: stationDepthZIndex(station, mask),
+                      }}>
+                      <img src={revealObjectUrl} alt="" draggable="false" />
+                    </div>
+                  );
+                }
+                if (stationRenderMode === 'object') return null;
+                return (
+                  <div
+                    key={`reveal-${station.id}`}
+                    className="envRevealLayer"
+                    style={{
+                      clipPath,
+                      left: mask.x,
+                      top: mask.y,
+                      width: mask.w,
+                      height: mask.h,
+                      zIndex: stationDepthZIndex(station, mask),
+                    }}>
+                    <img
+                      src={fullSceneUrl}
+                      alt=""
+                      draggable="false"
+                      style={{
+                        left: -mask.x,
+                        top: -mask.y,
+                        width: plate.width,
+                        height: plate.height,
+                      }}
+                    />
+                  </div>
+                );
+              }) : null}
+              {(detail?.layout?.stations ?? []).map((station) => (
+                <StationBoxButton
+                  key={station.id}
+                  revealMode={revealMode}
+                  selected={station.id === selectedStation?.id}
+                  station={station}
+                  onSelect={() => {
+                    setSelectedStationId(station.id);
+                    setRect({ ...(revealMode ? revealRectForStation(station) : station.hitbox) });
+                  }}
+                />
+              ))}
+              {rect && !revealMode ? (
+                <div className="envDrawRect" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+                  <span>{selectedStation?.shortLabel ?? selectedStation?.label ?? 'Selected'}</span>
+                </div>
+              ) : null}
+              {revealMode && rect && selectedRenderMode === 'mask' ? (
+                <div
+                  className={`envMaskOverlay interactive ${maskMode === 'polygon' ? 'polygon' : ''}`}
+                  style={{
+                    left: rect.x,
+                    top: rect.y,
+                    width: rect.w,
+                    height: rect.h,
+                    zIndex: selectedStation ? stationDepthZIndex(selectedStation, rect) + 700 : 700,
+                  }}
+                  onPointerDown={(event) => beginObjectDrag(event, 'move')}
+                  onPointerMove={moveObjectDrag}
+                  onPointerUp={endObjectDrag}
+                  onPointerCancel={endObjectDrag}>
+                  <span>{selectedStation?.shortLabel ?? selectedStation?.label ?? 'Mask'}</span>
+                  {['nw', 'ne', 'sw', 'se'].map((handle) => (
+                    <button
+                      key={handle}
+                      className={`envResizeHandle ${handle}`}
+                      aria-label={`Resize ${handle}`}
+                      onPointerDown={(event) => beginObjectDrag(event, 'scale', handle)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {revealMode && selectedRenderMode === 'mask' && maskMode === 'polygon' && polygonPoints.length >= 3 ? (
+                <svg
+                  className="envPolygonOutline"
+                  style={{ zIndex: selectedStation && rect ? stationDepthZIndex(selectedStation, rect) + 715 : 715 }}
+                  viewBox={`0 0 ${plate.width} ${plate.height}`}>
+                  <polygon points={polygonPoints.map((point) => `${point.x},${point.y}`).join(' ')} />
+                </svg>
+              ) : null}
+              {revealMode && selectedRenderMode === 'mask' && maskMode === 'polygon' ? polygonPoints.map((point, index) => (
+                <button
+                  key={`point-${index}`}
+                  className="envMaskPoint"
+                  aria-label={`Move mask point ${index + 1}`}
+                  style={{ left: point.x, top: point.y, zIndex: selectedStation && rect ? stationDepthZIndex(selectedStation, rect) + 720 : 720 }}
+                  onPointerDown={(event) => beginPolygonPointDrag(event, index)}
+                  onPointerMove={moveObjectDrag}
+                  onPointerUp={endObjectDrag}
+                  onPointerCancel={endObjectDrag}
+                />
+              )) : null}
+              {revealMode && selectedRenderMode === 'object' && selectedRevealObjectUrl && rect ? (
+                <div
+                  className="envPropOverlay envExtractedEditorOverlay interactive"
+                  style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, zIndex: selectedStation ? stationDepthZIndex(selectedStation, rect) + 700 : 700 }}
+                  onPointerDown={(event) => beginObjectDrag(event, 'move')}
+                  onPointerMove={moveObjectDrag}
+                  onPointerUp={endObjectDrag}
+                  onPointerCancel={endObjectDrag}>
+                  <img src={selectedRevealObjectUrl} alt="" draggable="false" />
+                  {['nw', 'ne', 'sw', 'se'].map((handle) => (
+                    <button
+                      key={handle}
+                      className={`envResizeHandle ${handle}`}
+                      aria-label={`Resize ${handle}`}
+                      onPointerDown={(event) => beginObjectDrag(event, 'scale', handle)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {overlayUrl && rect ? (
+                <div
+                  className="envPropOverlay interactive"
+                  style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, zIndex: (selectedStation?.zIndex ?? 70) + 70 }}
+                  onPointerDown={(event) => beginObjectDrag(event, 'move')}
+                  onPointerMove={moveObjectDrag}
+                  onPointerUp={endObjectDrag}
+                  onPointerCancel={endObjectDrag}>
+                  <img src={overlayUrl} alt="" draggable="false" />
+                  {['nw', 'ne', 'sw', 'se'].map((handle) => (
+                    <button
+                      key={handle}
+                      className={`envResizeHandle ${handle}`}
+                      aria-label={`Resize ${handle}`}
+                      onPointerDown={(event) => beginObjectDrag(event, 'scale', handle)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside className="right">
+        <section className="panel baseComposer">
+          <h2>Base Scene</h2>
+          <div className="referenceRow">
+            {styleUrl ? <img src={styleUrl} alt="" /> : <span>No reference</span>}
+            <div>
+              <strong>Today background reference</strong>
+              <small>This image is sent with the prompt for art style.</small>
+            </div>
+          </div>
+          <label>
+            Prompt
+            <textarea
+              value={basePrompt}
+              onChange={(event) => setBasePrompt(event.target.value)}
+              placeholder={detail?.art?.basePrompt || detail?.environment?.artPrompt || ''}
+              rows={7}
+            />
+          </label>
+          <button className="primary wideAction" disabled={busy || !effectiveBasePrompt} onClick={generateBase}>Generate Base from Prompt</button>
+          <button className="wideAction" disabled={busy || !canBakeScene} onClick={bakeScene}>Bake Full Scene with Objects</button>
+          <small className="hintText">
+            Sends only the base image plus a text list of {objectCount} objects. Existing prop images are not used.
+          </small>
+          <PreviewImage title="Baked Scene" asset={detail?.assets?.bakedScene} cacheBust={cacheBust} large />
+          <button className="wideAction" disabled={busy || !canRunDirectPipeline} onClick={generateDirectScenePipeline}>Generate Final, Then Extract Base</button>
+          <small className="hintText">
+            First creates a complete scene from the style reference and text list, then removes those objects into a clean base.
+          </small>
+          <div className="previewGrid">
+            <PreviewImage title="Direct Scene" asset={detail?.assets?.directScene} cacheBust={cacheBust} />
+            <PreviewImage title="Extracted Base" asset={detail?.assets?.extractedBase} cacheBust={cacheBust} />
+          </div>
+        </section>
+
+        <section className="panel">
+          <h2>Objects</h2>
+          {revealMode ? (
+            <button className="primary wideAction" disabled={!canExtractAllMissing || busy} onClick={extractAllMissingRevealObjects}>
+              Extract All Missing{missingRevealObjectCount > 0 ? ` (${missingRevealObjectCount})` : ''}
+            </button>
+          ) : null}
+          <div className="stationList">
+            {(detail?.layout?.stations ?? []).map((station) => {
+              const status = detail?.assets?.stations?.find((item) => item.id === station.id);
+              const count = status?.levels?.filter((level) => !!level.final).length ?? 0;
+              return (
+                <button
+                  key={station.id}
+                  className={station.id === selectedStation?.id ? 'active' : ''}
+                  onClick={() => setSelectedStationId(station.id)}>
+                  <strong>{station.label}</strong>
+                  <small>{count}/{station.art?.levels?.length ?? 0} generated / {station.kind}</small>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {selectedStation ? (
+          <section className="panel">
+            <h2>Selected Object</h2>
+            {revealMode ? (
+              <div className="maskControls">
+                <div className="segmentedControl" aria-label="Reveal render mode">
+                  <button className={selectedRenderMode === 'mask' ? 'active' : ''} onClick={() => switchRevealRenderMode('mask')}>
+                    Mask
+                  </button>
+                  <button
+                    className={selectedRenderMode === 'object' ? 'active' : ''}
+                    disabled={!selectedRevealObject || busy}
+                    onClick={() => switchRevealRenderMode('object')}>
+                    Extracted
+                  </button>
+                </div>
+                {selectedRenderMode === 'mask' ? (
+                  <div className="segmentedControl" aria-label="Mask shape">
+                    <button className={maskMode === 'rect' ? 'active' : ''} onClick={() => switchMaskMode('rect')}>Box</button>
+                    <button className={maskMode === 'polygon' ? 'active' : ''} onClick={() => switchMaskMode('polygon')}>Polygon</button>
+                  </div>
+                ) : null}
+                {selectedRenderMode === 'mask' && maskMode === 'polygon' ? (
+                  <label className="compactRange">
+                    <span>Vertices</span>
+                    <input
+                      max="2"
+                      min="1"
+                      onChange={(event) => changePolygonResolution(event.target.value)}
+                      step="1"
+                      type="range"
+                      value={polygonResolution}
+                    />
+                    <strong>{polygonResolution === 1 ? '4' : '8'}</strong>
+                  </label>
+                ) : null}
+                {selectedRenderMode === 'object' ? (
+                  <small className="hintText">Dragging now moves the extracted PNG. Corner handles scale the extracted object placement.</small>
+                ) : null}
+              </div>
+            ) : null}
+            <label>
+              Level
+              <select value={selectedLevel} onChange={(event) => setSelectedLevel(Number(event.target.value))}>
+                {(selectedStation.art?.levels ?? []).map((key, index) => (
+                  <option key={key} value={index + 1}>Level {index + 1} / {key}</option>
+                ))}
+              </select>
+            </label>
+            {canSaveRevealMask ? (
+              <button className="primary wideAction" disabled={busy} onClick={saveRevealMask}>
+                Save Reveal Mask
+              </button>
+            ) : null}
+            {canSaveExtractedObjectPlacement ? (
+              <button className="primary wideAction" disabled={busy} onClick={saveExtractedObjectPlacement}>
+                Save Extracted Placement
+              </button>
+            ) : null}
+            {revealMode ? (
+              <button className="primary wideAction" disabled={!canExtractRevealObject || busy} onClick={extractRevealObject}>
+                Extract Object
+              </button>
+            ) : null}
+            {revealMode ? (
+              <div className="urlLinkControl">
+                <input
+                  aria-label="Generated image URL"
+                  onChange={(event) => setRevealObjectUrlInput(event.target.value)}
+                  placeholder="Paste generated image URL"
+                  type="url"
+                  value={revealObjectUrlInput}
+                />
+                <button disabled={!canLinkRevealObjectUrl || busy} onClick={linkRevealObjectUrl}>
+                  Link
+                </button>
+              </div>
+            ) : null}
+            {!revealMode && placementDirty ? (
+              <button className="primary wideAction" disabled={!canRegenerateObject || busy} onClick={fitObject}>
+                Regenerate in New Spot
+              </button>
+            ) : null}
+            {!revealMode && selectedLevelStatus?.candidate ? (
+              <button className="wideAction" disabled={busy} onClick={applyFittedObject}>Apply Fitted Prop</button>
+            ) : null}
+            <div className="previewGrid">
+              {revealMode ? <PreviewImage title="Extracted" asset={selectedRevealObject} cacheBust={cacheBust} /> : null}
+              <PreviewImage title="Candidate" asset={selectedLevelStatus?.candidate} cacheBust={cacheBust} />
+              <PreviewImage title="Live" asset={selectedLevelStatus?.final} cacheBust={cacheBust} />
+            </div>
+          </section>
+        ) : null}
+      </aside>
+    </main>
+  );
+}
+
+function propPromptFor(detail, stationId) {
+  return detail?.art?.props?.find((item) => item.stationId === stationId)?.prompt ?? '';
+}
+
+function PreviewImage({ title, asset, cacheBust, large = false }) {
+  return (
+    <div className={`envPreview ${large ? 'large' : ''}`}>
+      <strong>{title}</strong>
+      {asset?.url ? <img src={`${asset.url}?v=${cacheBust}`} alt="" /> : <span>No image yet</span>}
+    </div>
+  );
+}
+
+function StationBoxButton({ station, selected, revealMode, onSelect }) {
+  const rect = revealMode ? revealRectForStation(station) : station.hitbox;
+  return (
+    <button
+      className={`envBox ${selected ? 'selected' : ''}`}
+      style={{
+        left: rect.x,
+        top: rect.y,
+        width: rect.w,
+        height: rect.h,
+        zIndex: stationDepthZIndex(station, rect) + 500,
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect();
+      }}>
+      <span>{station.shortLabel ?? station.label}</span>
+    </button>
+  );
+}
+
+function ProgressPanel({ progress }) {
+  const current = progress.steps[progress.index] ?? progress.label;
+  const pct = Math.round(((progress.index + 1) / progress.steps.length) * 100);
+  return (
+    <div className={`progressPanel ${progress.error ? 'error' : ''}`}>
+      <div className="progressHead">
+        <span className={progress.busy ? 'spinner' : 'progressDone'} />
+        <div>
+          <strong>{progress.error ? 'Generation failed' : progress.label}</strong>
+          <small>{progress.error ?? current}</small>
+        </div>
+      </div>
+      <div className="progressTrack">
+        <span style={{ width: `${pct}%` }} />
+      </div>
+      <ol>
+        {progress.steps.map((step, index) => (
+          <li key={step} className={index < progress.index ? 'done' : index === progress.index ? 'active' : ''}>
+            {step}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function Root() {
+  return window.location.pathname.startsWith('/environments') ? <EnvironmentDesigner /> : <App />;
+}
+
+createRoot(document.getElementById('root')).render(<Root />);

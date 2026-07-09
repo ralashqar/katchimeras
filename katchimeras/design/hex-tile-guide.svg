@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="768" viewBox="0 0 1024 768">
+  <rect width="1024" height="768" fill="#101018"/>
+  <g transform="translate(512 352)">
+    <path d="M0 -230 L210 -116 L246 82 L0 240 L-246 82 L-210 -116 Z" fill="#4f8b5f" stroke="#d9f5c7" stroke-width="5"/>
+    <path d="M246 82 L0 240 L-246 82 L-246 150 L0 308 L246 150 Z" fill="#385132" stroke="#233722" stroke-width="4"/>
+    <path d="M0 -230 L210 -116 L246 82 L0 240 L-246 82 L-210 -116 Z" fill="none" stroke="#ffe0a3" stroke-width="3" stroke-dasharray="16 14" opacity=".75"/>
+    <ellipse cx="0" cy="18" rx="76" ry="42" fill="none" stroke="#fff1e4" stroke-width="4"/>
+    <text x="0" y="24" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" fill="#fff1e4">creature / egg center</text>
+    <ellipse cx="112" cy="-86" rx="70" ry="40" fill="none" stroke="#ffc36b" stroke-width="4"/>
+    <text x="112" y="-80" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#ffc36b">building</text>
+    <path d="M-150 -24 C-88 -78 86 -78 150 -24 C184 10 148 112 0 146 C-148 112 -184 10 -150 -24 Z" fill="none" stroke="#a8e2c6" stroke-width="4" stroke-dasharray="10 10"/>
+    <text x="0" y="142" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" fill="#a8e2c6">prop-safe planting zone</text>
+    <line x1="-246" y1="82" x2="246" y2="82" stroke="#ff8f5a" stroke-width="4"/>
+    <text x="0" y="348" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#ffe0a3">Canonical isometric-perspective hex tile guide</text>
+    <text x="0" y="386" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="#c9c2e8">transparent art should preserve this silhouette, center anchor, and front lip</text>
+  </g>
+</svg>

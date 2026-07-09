@@ -239,18 +239,46 @@ function commonsBias(day: HomeDayRecord): string | null {
   return null;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function bloomCycleOffset(day: HomeDayRecord): number {
+  const timestamp = Date.parse(`${day.isoDate}T00:00:00Z`);
+  if (Number.isFinite(timestamp)) {
+    return Math.floor(timestamp / DAY_MS) % BLOOM_COMMONS.length;
+  }
+  return hashSeed(day.id) % BLOOM_COMMONS.length;
+}
+
+function bloomSpeciesForGrant(day: HomeDayRecord, index: number, bias: string | null): WorldObjectDefinition {
+  const biased = index === 0 && bias ? BLOOM_COMMONS.find((definition) => definition.id === bias) : undefined;
+  if (biased) return biased;
+
+  const skippedBias = bias ? BLOOM_COMMONS.find((definition) => definition.id === bias) : undefined;
+  const offset = bloomCycleOffset(day);
+  let step = index + (skippedBias ? 1 : 0);
+  for (let attempt = 0; attempt < BLOOM_COMMONS.length; attempt += 1) {
+    const candidate = BLOOM_COMMONS[(offset + step) % BLOOM_COMMONS.length];
+    if (!skippedBias || candidate.id !== skippedBias.id) return candidate;
+    step += 1;
+  }
+  return BLOOM_COMMONS[offset];
+}
+
+function bloomVariantForGrant(species: WorldObjectDefinition, day: HomeDayRecord, index: number): string {
+  const variants = species.art.variants;
+  if (variants.length <= 1) return variants[0];
+  return variants[(bloomCycleOffset(day) + index) % variants.length];
+}
+
 function bloomGrants(day: HomeDayRecord, foundingBoost: boolean): { grantId: string; assetKey: string; name: string; points: number }[] {
   const { points, count } = bloomYieldForDay(day, foundingBoost);
   const bias = commonsBias(day);
-  // Deterministic picks (hashSeed) — no randomness, so re-syncing always
-  // grants the same gift: species by day+index, then the VARIANT within the
-  // species' family by grant id (B1 families = 4 fresh looks each).
+  // Deterministic cycle: species rotates through the bloom pool, then the
+  // picked species rotates through its own image variants.
   return Array.from({ length: count }, (_, index) => {
     const grantId = `${day.id}:bloom:${index}`;
-    const species =
-      (index === 0 && bias ? BLOOM_COMMONS.find((definition) => definition.id === bias) : undefined) ??
-      BLOOM_COMMONS[hashSeed(`${day.id}:${index}`) % BLOOM_COMMONS.length];
-    return { grantId, assetKey: pickVariant(species, grantId), name: species.name, points };
+    const species = bloomSpeciesForGrant(day, index, bias);
+    return { grantId, assetKey: bloomVariantForGrant(species, day, index), name: species.name, points };
   });
 }
 

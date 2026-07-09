@@ -189,6 +189,7 @@ small {
 }
 
 .workspace {
+  position: relative;
   min-width: 0;
   background: #0c1017;
   display: grid;
@@ -201,6 +202,109 @@ small {
   justify-content: space-between;
   padding: 11px 14px;
   border-bottom: 1px solid rgba(222, 231, 255, 0.1);
+}
+
+.progressPanel {
+  position: absolute;
+  top: 72px;
+  right: 16px;
+  z-index: 200;
+  width: min(360px, calc(100% - 32px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 195, 107, 0.28);
+  border-radius: 8px;
+  background: rgba(12, 16, 23, 0.92);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.42);
+}
+
+.progressPanel.error {
+  border-color: rgba(255, 154, 154, 0.5);
+}
+
+.progressHead {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.progressHead strong {
+  display: block;
+  font-size: 13px;
+}
+
+.spinner,
+.progressDone {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
+
+.spinner {
+  border: 2px solid rgba(255, 195, 107, 0.22);
+  border-top-color: #ffc36b;
+  animation: spin 0.78s linear infinite;
+}
+
+.progressDone {
+  display: grid;
+  place-items: center;
+  background: #7de8cd;
+}
+
+.progressDone::after {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid #0c1017;
+  border-bottom: 2px solid #0c1017;
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.progressTrack {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(222, 231, 255, 0.11);
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #ffc36b;
+  transition: width 240ms ease;
+}
+
+.progressPanel ol {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progressPanel li {
+  color: #687386;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.progressPanel li.active {
+  color: #eef4ff;
+  font-weight: 800;
+}
+
+.progressPanel li.done {
+  color: #7de8cd;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .stage {
@@ -355,6 +459,53 @@ small {
   gap: 8px;
 }
 
+.segmentedControl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(222, 231, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.segmentedControl button {
+  min-height: 34px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.segmentedControl button.active {
+  border-color: rgba(125, 232, 205, 0.65);
+  background: rgba(125, 232, 205, 0.12);
+}
+
+.maskControls {
+  display: grid;
+  gap: 8px;
+}
+
+.compactRange {
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid rgba(222, 231, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.compactRange span,
+.compactRange strong {
+  color: #aeb8c8;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.compactRange input {
+  padding: 0;
+}
+
 .currentAsset {
   display: grid;
   grid-template-columns: 74px 1fr;
@@ -496,4 +647,428 @@ small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.envApp {
+  grid-template-columns: 292px minmax(680px, 1fr) 380px;
+}
+
+.linkButton {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid rgba(222, 231, 255, 0.16);
+  border-radius: 8px;
+  color: #eef4ff;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.linkButton:hover {
+  border-color: rgba(255, 195, 107, 0.7);
+  background: rgba(255, 195, 107, 0.12);
+}
+
+.envAvatar {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid rgba(125, 232, 205, 0.26);
+  border-radius: 8px;
+  background: linear-gradient(145deg, rgba(125, 232, 205, 0.14), rgba(255, 195, 107, 0.09));
+  color: #dffcf4;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.envPanel {
+  margin: 0 14px 16px;
+  padding-top: 12px;
+}
+
+.styleIngredient,
+.emptyIngredient {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(222, 231, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.styleIngredient {
+  object-fit: cover;
+}
+
+.emptyIngredient {
+  display: grid;
+  place-items: center;
+  color: #8490a3;
+  font-size: 12px;
+}
+
+.hintText {
+  color: #8490a3;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.envStage {
+  cursor: grab;
+}
+
+.envStageInner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.envPlate {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(222, 231, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.4);
+}
+
+.envBase,
+.missingBase {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.envBase {
+  object-fit: cover;
+  user-select: none;
+  pointer-events: none;
+}
+
+.envRevealLayer {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.envRevealLayer img {
+  position: absolute;
+  max-width: none;
+  object-fit: cover;
+  user-select: none;
+  pointer-events: none;
+}
+
+.envExtractedObject {
+  position: absolute;
+  pointer-events: none;
+}
+
+.envExtractedObject img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.missingBase {
+  display: grid;
+  place-items: center;
+  color: #8490a3;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    rgba(255, 255, 255, 0.03);
+  background-size: 48px 48px;
+  font-weight: 800;
+}
+
+.envBox,
+.envDrawRect {
+  position: absolute;
+  z-index: 40;
+  border-radius: 8px;
+  pointer-events: auto;
+}
+
+.envBox {
+  display: grid;
+  place-items: end start;
+  padding: 8px;
+  border: 2px solid rgba(125, 232, 205, 0.55);
+  background: rgba(13, 241, 196, 0.08);
+  color: #dffcf4;
+  text-align: left;
+}
+
+.envBox:hover,
+.envBox.selected {
+  border-color: #ffc36b;
+  background: rgba(255, 195, 107, 0.14);
+}
+
+.envBox span,
+.envDrawRect span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(3, 7, 12, 0.76);
+  color: #fff6e3;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.envDrawRect {
+  z-index: 80;
+  display: grid;
+  place-items: start end;
+  padding: 6px;
+  border: 2px solid rgba(255, 195, 107, 0.5);
+  background: rgba(255, 195, 107, 0.06);
+  pointer-events: none;
+}
+
+.envPropOverlay {
+  position: absolute;
+  display: grid;
+  place-items: stretch;
+  border: 2px solid rgba(255, 195, 107, 0.88);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.envPropOverlay.interactive {
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.envMaskOverlay {
+  position: absolute;
+  display: grid;
+  place-items: start end;
+  padding: 7px;
+  border: 2px solid rgba(125, 232, 205, 0.9);
+  border-radius: 8px;
+  background: rgba(125, 232, 205, 0.08);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.envMaskOverlay.polygon {
+  border-style: dashed;
+  background: rgba(125, 232, 205, 0.045);
+}
+
+.envMaskOverlay span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: rgba(3, 7, 12, 0.76);
+  color: #dffcf4;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.envPolygonOutline {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.envPolygonOutline polygon {
+  fill: rgba(125, 232, 205, 0.12);
+  stroke: rgba(125, 232, 205, 0.95);
+  stroke-dasharray: 12 8;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.envMaskPoint {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(12, 16, 23, 0.92);
+  border-radius: 999px;
+  background: #7de8cd;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.38);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.envPropOverlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.envResizeHandle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid rgba(12, 16, 23, 0.9);
+  border-radius: 6px;
+  background: #ffc36b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.envPropOverlay:not(.interactive) .envResizeHandle {
+  display: none;
+}
+
+.envResizeHandle.nw {
+  left: -11px;
+  top: -11px;
+  cursor: nwse-resize;
+}
+
+.envResizeHandle.ne {
+  right: -11px;
+  top: -11px;
+  cursor: nesw-resize;
+}
+
+.envResizeHandle.sw {
+  left: -11px;
+  bottom: -11px;
+  cursor: nesw-resize;
+}
+
+.envResizeHandle.se {
+  right: -11px;
+  bottom: -11px;
+  cursor: nwse-resize;
+}
+
+.stationList {
+  display: grid;
+  gap: 7px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.baseComposer textarea {
+  min-height: 154px;
+}
+
+.referenceRow {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid rgba(222, 231, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.referenceRow img,
+.referenceRow > span {
+  width: 76px;
+  height: 76px;
+  border-radius: 7px;
+  object-fit: cover;
+  background: rgba(6, 8, 13, 0.72);
+}
+
+.referenceRow > span {
+  display: grid;
+  place-items: center;
+  color: #8490a3;
+  font-size: 11px;
+}
+
+.referenceRow strong {
+  display: block;
+  font-size: 13px;
+}
+
+.stationList button {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+
+.stationList button.active {
+  border-color: rgba(125, 232, 205, 0.75);
+  background: rgba(125, 232, 205, 0.08);
+}
+
+.previewPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.wideAction {
+  width: 100%;
+}
+
+.urlLinkControl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.urlLinkControl input {
+  min-width: 0;
+}
+
+.envPreview {
+  min-height: 154px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid rgba(222, 231, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.envPreview strong {
+  font-size: 12px;
+}
+
+.envPreview img {
+  width: 100%;
+  height: 118px;
+  object-fit: contain;
+}
+
+.envPreview.large img {
+  height: 210px;
+}
+
+.envPreview span {
+  display: grid;
+  place-items: center;
+  color: #8490a3;
+  font-size: 12px;
 }

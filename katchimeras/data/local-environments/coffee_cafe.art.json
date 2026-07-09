@@ -1,0 +1,37 @@
+{
+  "environmentId": "coffee_cafe",
+  "stylePrompt": "Match the provided reference image style: premium stylized 3D mobile-game art, soft rounded clay-like forms, cozy handcrafted materials, clean simplified surfaces, readable silhouettes, bright warm lighting, gentle contact shadows, isometric three-quarter top-down camera, square composition.",
+  "basePrompt": "Square isometric cozy cafe interior, warm rounded wood, cream stone tile floor, green painted trim, soft amber pendant lights, arched windows with a bright valley view, curved counter, fireplace nook, open floor spaces and empty wall shelves reserved for later props. Keep the room polished, readable, uncluttered, and prop-ready.",
+  "negativePrompt": "No people, no readable text, no clutter, no flat vector art, no realistic photography, no UI elements, no watermark.",
+  "propInstructions": "Generate the selected object aligned to the room camera and placement rectangle. Keep the final isolated prop transparent, readable, and matched to the same lighting and material style.",
+  "props": [
+    {
+      "stationId": "coffee_bar",
+      "prompt": "A rounded coffee bar station with warm wood, cream countertop, espresso machine shapes, cups, and small jars, matching the room camera and lighting."
+    },
+    {
+      "stationId": "bean_shelf",
+      "prompt": "A wall-mounted bean shelf with rounded wooden shelves, small jars, sacks, and plant details, matching the room camera and lighting."
+    },
+    {
+      "stationId": "travel_map",
+      "prompt": "A small cafe travel map display with pins and simple cards, no readable text, warm wood frame, matching the room camera and lighting."
+    },
+    {
+      "stationId": "photo_wall",
+      "prompt": "A cozy photo wall with framed cafe-photo cards and small decorative clips, no readable text, matching the room camera and lighting."
+    },
+    {
+      "stationId": "recipe_book",
+      "prompt": "A recipe book station with an open rounded book, small brewer tools, cups, and warm wood details, matching the room camera and lighting."
+    },
+    {
+      "stationId": "notice_board",
+      "prompt": "A small wooden notice board with pinned cards and cafe motifs, no readable text, matching the room camera and lighting."
+    },
+    {
+      "stationId": "trophy_shelf",
+      "prompt": "A compact trophy shelf with tiny cup trophies, jars, and keepsakes, warm wood, matching the room camera and lighting."
+    }
+  ]
+}

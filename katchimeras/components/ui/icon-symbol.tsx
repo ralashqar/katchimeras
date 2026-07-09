@@ -27,6 +27,7 @@ const MAPPING = {
   'xmark': 'close',
   'figure.walk': 'directions-walk',
   'mappin.and.ellipse': 'location-on',
+  'map.fill': 'map',
   'bolt.fill': 'bolt',
   'cup.and.saucer.fill': 'local-cafe',
   'moon.stars.fill': 'dark-mode',

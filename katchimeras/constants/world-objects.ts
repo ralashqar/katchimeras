@@ -1089,11 +1089,22 @@ export const MILESTONE_KEEPSAKES: WorldObjectDefinition[] = [
 // Everyday bloom commons — the green pool the bloom lane draws from. Variant
 // families come from the B1 grid batch (4 fresh looks per species, picked
 // deterministically per grant id); the birch keeps its bespoke BiRefNet art.
+const BLOOM_PINE_VARIANTS = ['bloom_pine_1', 'bloom_pine_2', 'bloom_pine_3', 'bloom_pine_4'];
+const BLOOM_OAK_VARIANTS = ['bloom_oak_1', 'bloom_oak_2', 'bloom_oak_3', 'bloom_oak_4'];
+const BLOOM_BIRCH_VARIANTS = ['decor_4', 'bloom_birch_1', 'bloom_birch_2', 'bloom_birch_3', 'bloom_birch_4'];
+const BLOOM_BLOSSOM_VARIANTS = ['bloom_blossom_1', 'bloom_blossom_2', 'bloom_blossom_3', 'bloom_blossom_4'];
+const DISCOVERY_SAPLING_VARIANTS = [
+  ...BLOOM_PINE_VARIANTS,
+  ...BLOOM_OAK_VARIANTS,
+  ...BLOOM_BIRCH_VARIANTS,
+  ...BLOOM_BLOSSOM_VARIANTS,
+];
+
 export const BLOOM_COMMONS: WorldObjectDefinition[] = [
-  { id: 'bloom_pine', name: 'Pine Tree', art: { variants: ['bloom_pine_1', 'bloom_pine_2', 'bloom_pine_3', 'bloom_pine_4'], pick: 'random' } },
-  { id: 'bloom_oak', name: 'Oak Tree', art: { variants: ['bloom_oak_1', 'bloom_oak_2', 'bloom_oak_3', 'bloom_oak_4'], pick: 'random' } },
-  { id: 'bloom_birch', name: 'Birch Tree', art: { variants: ['decor_4', 'bloom_birch_1', 'bloom_birch_2', 'bloom_birch_3', 'bloom_birch_4'], pick: 'random' } },
-  { id: 'bloom_blossom', name: 'Blossom Tree', art: { variants: ['bloom_blossom_1', 'bloom_blossom_2', 'bloom_blossom_3', 'bloom_blossom_4'], pick: 'random' } },
+  { id: 'bloom_pine', name: 'Pine Tree', art: { variants: BLOOM_PINE_VARIANTS, pick: 'random' } },
+  { id: 'bloom_oak', name: 'Oak Tree', art: { variants: BLOOM_OAK_VARIANTS, pick: 'random' } },
+  { id: 'bloom_birch', name: 'Birch Tree', art: { variants: BLOOM_BIRCH_VARIANTS, pick: 'random' } },
+  { id: 'bloom_blossom', name: 'Blossom Tree', art: { variants: BLOOM_BLOSSOM_VARIANTS, pick: 'random' } },
   { id: 'bloom_shrub', name: 'Garden Shrub', art: { variants: ['bloom_shrub_1', 'bloom_shrub_2', 'bloom_shrub_3', 'bloom_shrub_4'], pick: 'random' } },
   { id: 'bloom_fern', name: 'Fern', art: { variants: ['bloom_fern_1', 'bloom_fern_2', 'bloom_fern_3', 'bloom_fern_4'], pick: 'random' } },
   { id: 'bloom_wildflowers', name: 'Wildflowers', art: { variants: ['bloom_wildflowers_1', 'bloom_wildflowers_2', 'bloom_wildflowers_3', 'bloom_wildflowers_4'], pick: 'random' } },
@@ -1136,10 +1147,10 @@ export function bloomSpeciesForAssetKey(assetKey: string): string | null {
 }
 
 // Discovery keepsakes by rarity tier (fallbacks for unmapped discoveries).
-// The sapling is the planned 4-random-variant pilot: add the generated
-// decor_4 siblings to `variants` and every future planting randomises.
+// Common discoveries use the tree/sapling family pool so generic discoveries
+// do not all collapse into the same birch sprite.
 export const DISCOVERY_TIER_KEEPSAKES: Record<'common' | 'rare' | 'epic' | 'legendary', WorldObjectDefinition> = {
-  common: { id: 'discovery_sapling', name: 'Discovery Sapling', art: { variants: ['decor_4'], pick: 'random' } },
+  common: { id: 'discovery_sapling', name: 'Discovery Sapling', art: { variants: DISCOVERY_SAPLING_VARIANTS, pick: 'random' } },
   rare: { id: 'discovery_lantern', name: 'Honour Lantern', art: { variants: ['decor_12'], pick: 'random', sizeScale: 1.15 } },
   epic: { id: 'discovery_stone', name: 'Milestone Stone', art: { variants: ['monument_stone'], pick: 'random', sizeScale: 1.15 } },
   legendary: { id: 'discovery_shard', name: 'Monument Shard', art: { variants: ['monument_shard'], pick: 'random', sizeScale: 1.3 } },

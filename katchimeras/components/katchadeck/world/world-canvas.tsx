@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import tileLayout from '@/data/world-tile-layout.json';
 import { MotiView } from 'moti';
-import { Fragment, type MutableRefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, type MutableRefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, type LayoutChangeEvent, Pressable, StyleSheet, type StyleProp, Text, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
@@ -44,6 +44,7 @@ import { cellCenter, cellFromPoint, drawDepth, SLAB_THICKNESS, TILE_H, TILE_W, t
 import {
   kingdomBaseSource,
   kingdomSlabOverlay,
+  type WorldObjectLod,
   worldAssetSource,
 } from '@/utils/world-visuals';
 import {
@@ -209,6 +210,106 @@ const SHADOW_DX = -5; // nudge left (light reads from upper-right)
 const SHADOW_DY = 1; // tiny forward nudge — the shadow is anchored at the object's feet
 const SHADOW_OPACITY = 0.4;
 const SPRITE_DROP = TILE_H * 0.18;
+const OBJECT_SHADOWS_ENABLED = false;
+const OBJECT_LOD_ENABLED = true;
+const RENDER_WINDOW_MARGIN = 960;
+const RENDER_WINDOW_REFRESH_PX = 220;
+const VIEWPORT_ENTRY_FADE_MS = 120;
+const VIEWPORT_ENTRY_STAGGER_MS = 25;
+const VIEWPORT_ENTRY_BATCH_MAX = 8;
+
+type RenderWindow = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  frameLeft: number;
+  frameTop: number;
+  frameRight: number;
+  frameBottom: number;
+  scale: number;
+  motionActive: boolean;
+};
+
+function fullRenderWindow(motionActive = false): RenderWindow {
+  return {
+    left: -Infinity,
+    top: -Infinity,
+    right: Infinity,
+    bottom: Infinity,
+    frameLeft: -Infinity,
+    frameTop: -Infinity,
+    frameRight: Infinity,
+    frameBottom: Infinity,
+    scale: 1,
+    motionActive,
+  };
+}
+
+function makeRenderWindow(
+  viewport: { width: number; height: number },
+  tx: number,
+  ty: number,
+  s: number,
+  sceneW: number,
+  sceneH: number,
+  motionActive: boolean
+): RenderWindow {
+  if (!viewport.width || !viewport.height || !Number.isFinite(s) || s <= 0) {
+    return fullRenderWindow(motionActive);
+  }
+  const left = (-RENDER_WINDOW_MARGIN - sceneW / 2 - tx) / s + sceneW / 2;
+  const right = (viewport.width + RENDER_WINDOW_MARGIN - sceneW / 2 - tx) / s + sceneW / 2;
+  const top = (-RENDER_WINDOW_MARGIN - sceneH / 2 - ty) / s + sceneH / 2;
+  const bottom = (viewport.height + RENDER_WINDOW_MARGIN - sceneH / 2 - ty) / s + sceneH / 2;
+  const frameLeft = (0 - sceneW / 2 - tx) / s + sceneW / 2;
+  const frameRight = (viewport.width - sceneW / 2 - tx) / s + sceneW / 2;
+  const frameTop = (0 - sceneH / 2 - ty) / s + sceneH / 2;
+  const frameBottom = (viewport.height - sceneH / 2 - ty) / s + sceneH / 2;
+  return {
+    left: Math.min(left, right),
+    top: Math.min(top, bottom),
+    right: Math.max(left, right),
+    bottom: Math.max(top, bottom),
+    frameLeft: Math.min(frameLeft, frameRight),
+    frameTop: Math.min(frameTop, frameBottom),
+    frameRight: Math.max(frameLeft, frameRight),
+    frameBottom: Math.max(frameTop, frameBottom),
+    scale: s,
+    motionActive,
+  };
+}
+
+function rectHitsRenderWindow(rect: { left: number; top: number; right: number; bottom: number }, window: RenderWindow) {
+  return rect.right >= window.left && rect.left <= window.right && rect.bottom >= window.top && rect.top <= window.bottom;
+}
+
+function rectHitsCameraFrame(rect: { left: number; top: number; right: number; bottom: number }, window: RenderWindow) {
+  return rect.right >= window.frameLeft && rect.left <= window.frameRight && rect.bottom >= window.frameTop && rect.top <= window.frameBottom;
+}
+
+type ObjectRenderPolicy = {
+  lod: WorldObjectLod;
+  showSmallDecor: boolean;
+  showAdornments: boolean;
+};
+
+function objectRenderPolicyForScale(scale: number): ObjectRenderPolicy {
+  if (!OBJECT_LOD_ENABLED) {
+    return { lod: 'full', showSmallDecor: true, showAdornments: true };
+  }
+  if (scale < 0.72) {
+    return { lod: 'thumb', showSmallDecor: true, showAdornments: false };
+  }
+  if (scale < 1.15) {
+    return { lod: 'medium', showSmallDecor: true, showAdornments: false };
+  }
+  return { lod: 'full', showSmallDecor: true, showAdornments: true };
+}
+
+function isSmallDecorSprite(sprite: SceneSprite) {
+  return sprite.category === 'decor';
+}
 
 // Embedded (single-patch home) camera defaults: zoom in a bit past pure fit, and
 // lift the patch up so it sits high in the hero (leaving room for the bottom UI).
@@ -841,6 +942,10 @@ export function WorldCanvas({
   const ty = useSharedValue(0);
   const scale = useSharedValue(1);
   const startScale = useSharedValue(1);
+  const lastRenderWindowTx = useSharedValue(0);
+  const lastRenderWindowTy = useSharedValue(0);
+  const lastRenderWindowScale = useSharedValue(1);
+  const [renderWindow, setRenderWindow] = useState<RenderWindow>(() => fullRenderWindow(false));
   const suppressNextFocusRecenterRef = useRef(false);
 
   if (cameraControllerRef) {
@@ -921,6 +1026,19 @@ export function WorldCanvas({
   const sceneH = scene.height;
   const vw = viewport.width;
   const vh = viewport.height;
+  const updateRenderWindow = useCallback(
+    (nextTx: number, nextTy: number, nextScale: number, motionActive = false) => {
+      setRenderWindow(makeRenderWindow(viewport, nextTx, nextTy, nextScale, sceneW, sceneH, motionActive));
+    },
+    [viewport, sceneW, sceneH]
+  );
+
+  useEffect(() => {
+    updateRenderWindow(tx.value, ty.value, scale.value, false);
+    lastRenderWindowTx.value = tx.value;
+    lastRenderWindowTy.value = ty.value;
+    lastRenderWindowScale.value = scale.value;
+  }, [sceneW, sceneH, viewport.width, viewport.height, updateRenderWindow, tx, ty, scale, lastRenderWindowTx, lastRenderWindowTy, lastRenderWindowScale]);
 
   // Multi-tile gameplay preview (data-flagged in world-tile-layout.json):
   // ONE neighbor tile beside the centre island, seated across the diamond edge
@@ -1055,7 +1173,8 @@ export function WorldCanvas({
     tx.value = c.x;
     ty.value = c.y;
     centred.current = true;
-  }, [viewport, focusSlab, tx, ty, centreFor, baseScale, scale, startScale]);
+    updateRenderWindow(c.x, c.y, baseScale, false);
+  }, [viewport, focusSlab, tx, ty, centreFor, baseScale, scale, startScale, updateRenderWindow]);
 
   // Re-centre on today's egg every time the World tab regains focus (exit + come
   // back). Reads the latest viewport/focus through a ref so the focus effect's
@@ -1080,7 +1199,8 @@ export function WorldCanvas({
     tx.value = c.x;
     ty.value = c.y;
     centred.current = true;
-  }, [imageBase, tx, ty, scale, startScale, centreFor, baseScale]);
+    updateRenderWindow(c.x, c.y, baseScale, false);
+  }, [imageBase, tx, ty, scale, startScale, centreFor, baseScale, updateRenderWindow]);
   useFocusEffect(recentreOnFocus);
 
   // During an in-place hatch: glide-zoom in and centre on the egg; on completion,
@@ -1237,6 +1357,10 @@ export function WorldCanvas({
       cancelAnimation(tx); // stop any momentum glide so a new grab takes over
       cancelAnimation(ty);
       dragged.value = false;
+      lastRenderWindowTx.value = tx.value;
+      lastRenderWindowTy.value = ty.value;
+      lastRenderWindowScale.value = scale.value;
+      runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, true);
     })
     .onChange((e) => {
       // While a piece is in hand (hold-to-move), THIS pan is the drag engine:
@@ -1258,6 +1382,16 @@ export function WorldCanvas({
       const hh = (boundsH * s) / 2;
       tx.value = Math.min(Math.max(tx.value + e.changeX, vw / 2 - sceneW / 2 - hw), vw / 2 - sceneW / 2 + hw);
       ty.value = Math.min(Math.max(ty.value + e.changeY, vh / 2 - sceneH / 2 - hh), vh / 2 - sceneH / 2 + hh);
+      const renderWindowDelta =
+        Math.abs(tx.value - lastRenderWindowTx.value) +
+        Math.abs(ty.value - lastRenderWindowTy.value) +
+        Math.abs(scale.value - lastRenderWindowScale.value) * 420;
+      if (renderWindowDelta > RENDER_WINDOW_REFRESH_PX) {
+        lastRenderWindowTx.value = tx.value;
+        lastRenderWindowTy.value = ty.value;
+        lastRenderWindowScale.value = scale.value;
+        runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, true);
+      }
       if (Math.abs(e.translationX) + Math.abs(e.translationY) > 8) {
         dragged.value = true;
       }
@@ -1266,6 +1400,7 @@ export function WorldCanvas({
       // Fires at the end of EVERY touch (even ones this pan never activated
       // for) — the one guaranteed drop signal for a held piece.
       runOnJS(commitFromPan)();
+      runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, false);
     })
     .onEnd((e) => {
       if (dragKeySV.value !== '') return; // no momentum fling off an object drag
@@ -1273,16 +1408,26 @@ export function WorldCanvas({
       const s = scale.value;
       const hw = (boundsW * s) / 2;
       const hh = (boundsH * s) / 2;
-      tx.value = withDecay({
-        velocity: e.velocityX,
-        deceleration: 0.996,
-        clamp: [vw / 2 - sceneW / 2 - hw, vw / 2 - sceneW / 2 + hw],
-      });
-      ty.value = withDecay({
-        velocity: e.velocityY,
-        deceleration: 0.996,
-        clamp: [vh / 2 - sceneH / 2 - hh, vh / 2 - sceneH / 2 + hh],
-      });
+      tx.value = withDecay(
+        {
+          velocity: e.velocityX,
+          deceleration: 0.996,
+          clamp: [vw / 2 - sceneW / 2 - hw, vw / 2 - sceneW / 2 + hw],
+        },
+        () => {
+          runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, false);
+        }
+      );
+      ty.value = withDecay(
+        {
+          velocity: e.velocityY,
+          deceleration: 0.996,
+          clamp: [vh / 2 - sceneH / 2 - hh, vh / 2 - sceneH / 2 + hh],
+        },
+        () => {
+          runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, false);
+        }
+      );
     });
   // A drag that starts ON the patch pans the patch in 2D and claims the touch,
   // so the page ScrollView does NOT scroll underneath it. The page only scrolls
@@ -1295,10 +1440,26 @@ export function WorldCanvas({
   pan.activeOffsetX([-6, 6]).activeOffsetY([-6, 6]);
   if (panRef) pan.withRef(panRef); // exposed so the parent's UI can block the pan
   const pinch = Gesture.Pinch()
+    .onBegin(() => {
+      lastRenderWindowTx.value = tx.value;
+      lastRenderWindowTy.value = ty.value;
+      lastRenderWindowScale.value = scale.value;
+      runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, true);
+    })
     .onUpdate((e) => {
       if (dragKeySV.value !== '') return; // camera stays put during an object drag
       scale.value = Math.max(minScale, Math.min(maxScale, startScale.value * e.scale));
       dragged.value = true;
+      const renderWindowDelta =
+        Math.abs(tx.value - lastRenderWindowTx.value) +
+        Math.abs(ty.value - lastRenderWindowTy.value) +
+        Math.abs(scale.value - lastRenderWindowScale.value) * 420;
+      if (renderWindowDelta > RENDER_WINDOW_REFRESH_PX) {
+        lastRenderWindowTx.value = tx.value;
+        lastRenderWindowTy.value = ty.value;
+        lastRenderWindowScale.value = scale.value;
+        runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, true);
+      }
     })
     .onEnd(() => {
       startScale.value = scale.value;
@@ -1306,8 +1467,20 @@ export function WorldCanvas({
       const s = scale.value;
       const hw = (boundsW * s) / 2;
       const hh = (boundsH * s) / 2;
-      tx.value = withTiming(Math.min(Math.max(tx.value, vw / 2 - sceneW / 2 - hw), vw / 2 - sceneW / 2 + hw), { duration: 160 });
-      ty.value = withTiming(Math.min(Math.max(ty.value, vh / 2 - sceneH / 2 - hh), vh / 2 - sceneH / 2 + hh), { duration: 160 });
+      tx.value = withTiming(
+        Math.min(Math.max(tx.value, vw / 2 - sceneW / 2 - hw), vw / 2 - sceneW / 2 + hw),
+        { duration: 160 },
+        () => {
+          runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, false);
+        }
+      );
+      ty.value = withTiming(
+        Math.min(Math.max(ty.value, vh / 2 - sceneH / 2 - hh), vh / 2 - sceneH / 2 + hh),
+        { duration: 160 },
+        () => {
+          runOnJS(updateRenderWindow)(tx.value, ty.value, scale.value, false);
+        }
+      );
     });
   const tap = Gesture.Tap()
     .maxDistance(14)
@@ -1353,8 +1526,13 @@ export function WorldCanvas({
     cancelAnimation(ty);
     const focus = focusSlab.centre;
     const s = scale.value;
-    tx.value = withTiming(viewport.width / 2 - sceneW / 2 - (focus.x - sceneW / 2) * s, { duration: 320 });
-    ty.value = withTiming(viewport.height / 2 - sceneH / 2 - (focus.y - sceneH / 2) * s, { duration: 320 });
+    const nextTx = viewport.width / 2 - sceneW / 2 - (focus.x - sceneW / 2) * s;
+    const nextTy = viewport.height / 2 - sceneH / 2 - (focus.y - sceneH / 2) * s;
+    updateRenderWindow(nextTx, nextTy, s, true);
+    tx.value = withTiming(nextTx, { duration: 320 });
+    ty.value = withTiming(nextTy, { duration: 320 }, () => {
+      runOnJS(updateRenderWindow)(nextTx, nextTy, s, false);
+    });
   };
 
   // Companion focus: glide + zoom onto a tapped resident. Assigned to a ref
@@ -1366,14 +1544,155 @@ export function WorldCanvas({
     cancelAnimation(ty);
     cancelAnimation(scale);
     const zoom = Math.max(scale.value, 1.35);
+    const nextTx = viewport.width / 2 - sceneW / 2 - (x - sceneW / 2) * zoom;
+    const nextTy = viewport.height * 0.42 - sceneH / 2 - (y - sceneH / 2) * zoom;
+    updateRenderWindow(nextTx, nextTy, zoom, true);
     scale.value = withTiming(zoom, { duration: 420 });
-    tx.value = withTiming(viewport.width / 2 - sceneW / 2 - (x - sceneW / 2) * zoom, { duration: 420 });
-    ty.value = withTiming(viewport.height * 0.42 - sceneH / 2 - (y - sceneH / 2) * zoom, { duration: 420 });
+    tx.value = withTiming(nextTx, { duration: 420 });
+    ty.value = withTiming(nextTy, { duration: 420 }, () => {
+      runOnJS(updateRenderWindow)(nextTx, nextTy, zoom, false);
+    });
   };
 
   const worldStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: scale.value }],
   }));
+
+  const renderPolicy = useMemo(() => objectRenderPolicyForScale(renderWindow.scale), [renderWindow.scale]);
+  const motionActive = renderWindow.motionActive;
+  const spriteRenderMeta = useMemo(
+    () =>
+      visiblePositionedSprites.map((s) => {
+        const isCreature = s.kind === 'creature';
+        const w = s.size * SPRITE_SCALE;
+        const h = w;
+        const top =
+          (isCreature ? s.y - h / 2 - TILE_H * 0.35 : s.y + OBJECT_SEAT - h * OBJECT_BOTTOM_FRAC) + SPRITE_DROP;
+        return {
+          key: spriteAnimationKey(s),
+          sprite: s,
+          rect: {
+            left: s.x - w / 2,
+            top,
+            right: s.x + w / 2,
+            bottom: top + h,
+          },
+        };
+      }),
+    [visiblePositionedSprites]
+  );
+
+  const renderedSpriteMeta = useMemo(() => {
+    if (customising) return spriteRenderMeta;
+    return spriteRenderMeta.filter(({ sprite, rect }) => {
+      if (!renderPolicy.showSmallDecor && isSmallDecorSprite(sprite)) return false;
+      return rectHitsRenderWindow(rect, renderWindow);
+    });
+  }, [customising, renderPolicy.showSmallDecor, renderWindow, spriteRenderMeta]);
+
+  const renderedSprites = useMemo(() => renderedSpriteMeta.map(({ sprite }) => sprite), [renderedSpriteMeta]);
+  const viewportSeenSpriteKeys = useRef<Set<string>>(new Set());
+  const [viewportFadeInIds, setViewportFadeInIds] = useState<Set<string>>(() => new Set());
+  const [viewportFadePulse, setViewportFadePulse] = useState(0);
+
+  useEffect(() => {
+    if (motionActive || customising) return;
+    const batch: string[] = [];
+    for (const { key, rect } of renderedSpriteMeta) {
+      if (!rectHitsCameraFrame(rect, renderWindow)) continue;
+      if (viewportSeenSpriteKeys.current.has(key)) continue;
+      if (animateInIds.has(key)) {
+        viewportSeenSpriteKeys.current.add(key);
+        continue;
+      }
+      if (!animateInIds.has(key) && batch.length < VIEWPORT_ENTRY_BATCH_MAX) {
+        batch.push(key);
+      }
+      if (batch.length >= VIEWPORT_ENTRY_BATCH_MAX) break;
+    }
+    if (batch.length === 0) return;
+    for (const key of batch) {
+      viewportSeenSpriteKeys.current.add(key);
+    }
+    setViewportFadeInIds(new Set(batch));
+    const timeout = setTimeout(
+      () => {
+        setViewportFadeInIds(new Set());
+        setViewportFadePulse((value) => value + 1);
+      },
+      VIEWPORT_ENTRY_FADE_MS + VIEWPORT_ENTRY_STAGGER_MS * Math.max(0, batch.length - 1) + 40
+    );
+    return () => clearTimeout(timeout);
+  }, [animateInIds, customising, motionActive, renderWindow, renderedSpriteMeta, viewportFadePulse]);
+
+  const viewportFadeDelays = useMemo(() => {
+    const delays = new Map<string, number>();
+    let index = 0;
+    for (const key of viewportFadeInIds) {
+      delays.set(key, index * VIEWPORT_ENTRY_STAGGER_MS);
+      index += 1;
+    }
+    return delays;
+  }, [viewportFadeInIds]);
+
+  const renderedFences = useMemo(
+    () =>
+      customising
+        ? scene.fences
+        : scene.fences.filter((fence) =>
+            rectHitsRenderWindow(
+              {
+                left: fence.x - Math.abs(fence.w) * 0.2,
+                top: fence.y,
+                right: fence.x + fence.w + Math.abs(fence.w) * 0.2,
+                bottom: fence.y + fence.h,
+              },
+              renderWindow
+            )
+          ),
+    [customising, renderWindow, scene.fences]
+  );
+
+  const renderedGhosts = useMemo(
+    () =>
+      customising
+        ? scene.ghosts
+        : scene.ghosts.filter((ghost) =>
+            rectHitsRenderWindow(
+              {
+                left: ghost.x - ghost.size / 2,
+                top: ghost.y - ghost.size / 2,
+                right: ghost.x + ghost.size / 2,
+                bottom: ghost.y + ghost.size / 2,
+              },
+              renderWindow
+            )
+          ),
+    [customising, renderWindow, scene.ghosts]
+  );
+
+  const renderedArtefactPoints = useMemo(
+    () =>
+      customising
+        ? artefactPoints
+        : artefactPoints.filter((artefact) =>
+            rectHitsRenderWindow(
+              {
+                left: artefact.x - TILE_W * SPRITE_SCALE,
+                top: artefact.y - TILE_W * SPRITE_SCALE,
+                right: artefact.x + TILE_W * SPRITE_SCALE,
+                bottom: artefact.y + TILE_W * SPRITE_SCALE * 2,
+              },
+              renderWindow
+            )
+          ),
+    [artefactPoints, customising, renderWindow]
+  );
+
+  const renderedTags = useMemo(
+    () => (renderPolicy.showAdornments ? renderedSprites.filter((s) => s.category === 'chronicle' || s.category === 'quests') : []),
+    [renderPolicy.showAdornments, renderedSprites]
+  );
 
   // The whole procedural ground recorded into TWO Skia pictures (one draw
   // pass each — never per-cell views):
@@ -1463,12 +1782,12 @@ export function WorldCanvas({
   // correctly relative to the objects in front of / behind them.
   const renderables = useMemo(() => {
     const items: { depth: number; sprite?: SceneSprite; fence?: SceneFence }[] = [
-      ...visiblePositionedSprites.map((s) => ({ depth: s.depth, sprite: s })),
+      ...renderedSprites.map((s) => ({ depth: s.depth, sprite: s })),
       // The image base has no procedural perimeter fence; skip fences in that mode.
-      ...(imgBase ? [] : scene.fences).map((f) => ({ depth: f.depth, fence: f })),
+      ...(imgBase ? [] : renderedFences).map((f) => ({ depth: f.depth, fence: f })),
     ];
     return items.sort((a, b) => a.depth - b.depth);
-  }, [visiblePositionedSprites, scene.fences, imgBase]);
+  }, [renderedSprites, renderedFences, imgBase]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -1536,7 +1855,7 @@ export function WorldCanvas({
 
           {/* Soft contact shadows under every object — drawn on the ground, beneath
               the objects, so each reads as grounded (not floating). */}
-          {imgBase
+          {OBJECT_SHADOWS_ENABLED && imgBase
             ? visiblePositionedSprites.map((s) => {
                 // Anchor the shadow at the object's CONTACT POINT (its bottom pixel),
                 // matching the SpriteView seating — not the cell centre — so it reads
@@ -1590,7 +1909,7 @@ export function WorldCanvas({
 
           {/* Empty slot ghosts — faint, gently breathing placeholders that hint
               what could grow there, drawn under the objects. */}
-          {!imgBase && scene.ghosts.map((ghost) => {
+          {!imgBase && renderedGhosts.map((ghost) => {
             const hint = GHOST_HINT[ghost.slotType];
             if (!hint) return null;
             const size = ghost.size * 0.6;
@@ -1599,8 +1918,8 @@ export function WorldCanvas({
                 key={ghost.id}
                 pointerEvents="none"
                 from={{ opacity: 0.32, scale: 0.9 }}
-                animate={{ opacity: 0.6, scale: 1 }}
-                transition={{ loop: true, type: 'timing', duration: 1500 }}
+                animate={motionActive ? { opacity: 0.34, scale: 0.94 } : { opacity: 0.6, scale: 1 }}
+                transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 1500 }}
                 style={[styles.ghost, { left: ghost.x - size / 2, top: ghost.y - size / 2, width: size, height: size }]}>
                 <Text style={styles.ghostEmoji}>{hint.emoji}</Text>
               </MotiView>
@@ -1609,8 +1928,8 @@ export function WorldCanvas({
 
           {/* Permanent Discovery artefacts on the outer ring (decorative). Drawn
               before objects/egg so the patch reads in front of its framing ring. */}
-          {!imgBase && artefactPoints.map((artefact) => {
-            const source = worldAssetSource(artefact.assetKey);
+          {!imgBase && renderedArtefactPoints.map((artefact) => {
+            const source = worldAssetSource(artefact.assetKey, renderPolicy.lod);
             if (!source) return null;
             const w = TILE_W * SPRITE_SCALE;
             const h = w * 2;
@@ -1633,8 +1952,8 @@ export function WorldCanvas({
             <MotiView
               pointerEvents="none"
               from={{ opacity: 0.3, scale: 0.92 }}
-              animate={{ opacity: 0.6, scale: 1.06 }}
-              transition={{ loop: true, type: 'timing', duration: 1300 }}
+              animate={motionActive ? { opacity: 0.32, scale: 0.98 } : { opacity: 0.6, scale: 1.06 }}
+              transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 1300 }}
               style={[
                 styles.highlight,
                 {
@@ -1652,8 +1971,8 @@ export function WorldCanvas({
             <MotiView
               pointerEvents="none"
               from={{ opacity: 0.22, scale: 0.9 }}
-              animate={{ opacity: 0.5, scale: 1.1 }}
-              transition={{ loop: true, type: 'timing', duration: 1500 }}
+              animate={motionActive ? { opacity: 0.24, scale: 0.98 } : { opacity: 0.5, scale: 1.1 }}
+              transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 1500 }}
               style={[
                 styles.highlight,
                 {
@@ -1676,9 +1995,13 @@ export function WorldCanvas({
               <SpriteView
                 key={spriteAnimationKey(item.sprite)}
                 sprite={item.sprite}
+                lod={renderPolicy.lod}
                 animateIn={animateInIds.has(spriteAnimationKey(item.sprite))}
+                viewportFadeIn={viewportFadeInIds.has(spriteAnimationKey(item.sprite))}
+                viewportFadeDelay={viewportFadeDelays.get(spriteAnimationKey(item.sprite)) ?? 0}
                 animationDelay={Math.min(220, (spriteStaggerIndex.get(item.sprite.id) ?? 0) * SPRITE_STAGGER_MS)}
-                showBadge={item.sprite.patchId === eggPatchId}
+                showBadge={renderPolicy.showAdornments && item.sprite.patchId === eggPatchId}
+                showAdornments={renderPolicy.showAdornments}
                 dragKeySV={dragKeySV}
                 dragOX={dragOX}
                 dragOY={dragOY}
@@ -1692,7 +2015,7 @@ export function WorldCanvas({
               frame sits in the upper-centre of the easel art (offsets are tunable). */}
           {imgBase && featuredThumb
             ? (() => {
-                const s = visiblePositionedSprites.find((sp) => sp.category === 'featured');
+                const s = renderedSprites.find((sp) => sp.category === 'featured');
                 if (!s) return null;
                 const w = s.size * SPRITE_SCALE;
                 const h = w;
@@ -1715,8 +2038,7 @@ export function WorldCanvas({
 
           {/* Tags under the hub structures — the Town Hall (day summary) and the
               Quest Board (quest count). A dark pill with an icon, like a map label. */}
-          {visiblePositionedSprites.map((s) => {
-            if (s.category !== 'chronicle' && s.category !== 'quests') return null;
+          {renderedTags.map((s) => {
             const isChronicle = s.category === 'chronicle';
             const label = isChronicle ? 'Day summary' : questCount > 0 ? `${questCount} quests` : 'Quests';
             return (
@@ -1733,7 +2055,7 @@ export function WorldCanvas({
               the object within the grass (clamped); release persists it. Works
               in BOTH ground modes — drag math is slab-relative, not image-based. */}
           {customising
-            ? visiblePositionedSprites.map((s) => {
+            ? renderedSprites.map((s) => {
                 const isCreature = s.kind === 'creature';
                 const w = s.size * SPRITE_SCALE;
                 const h = w; // square frame (1:1) — object bottom-anchored at OBJECT_BOTTOM_FRAC
@@ -1908,8 +2230,8 @@ export function WorldCanvas({
             <MotiView
               pointerEvents="none"
               from={{ translateY: 2, scale: 0.92 }}
-              animate={{ translateY: -6, scale: 1 }}
-              transition={{ loop: true, type: 'timing', duration: 900 }}
+              animate={motionActive ? { translateY: 0, scale: 0.96 } : { translateY: -6, scale: 1 }}
+              transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 900 }}
               style={[styles.alertLayer, { left: memoryPoint.x - 15, top: memoryPoint.y - 74 }]}>
               <View style={styles.alertBubble}>
                 <Text style={styles.alertMark}>!</Text>
@@ -1922,8 +2244,8 @@ export function WorldCanvas({
             <MotiView
               pointerEvents="none"
               from={{ translateY: 2, scale: 0.92 }}
-              animate={{ translateY: -6, scale: 1 }}
-              transition={{ loop: true, type: 'timing', duration: 900 }}
+              animate={motionActive ? { translateY: 0, scale: 0.96 } : { translateY: -6, scale: 1 }}
+              transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 900 }}
               style={[styles.alertLayer, { left: placesPoint.x - 15, top: placesPoint.y - 74 }]}>
               <View style={styles.alertBubble}>
                 <Text style={styles.alertMark}>!</Text>
@@ -1937,8 +2259,8 @@ export function WorldCanvas({
             <MotiView
               pointerEvents="none"
               from={{ translateY: 2, scale: 0.92 }}
-              animate={{ translateY: -6, scale: 1 }}
-              transition={{ loop: true, type: 'timing', duration: 900 }}
+              animate={motionActive ? { translateY: 0, scale: 0.96 } : { translateY: -6, scale: 1 }}
+              transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 900 }}
               style={[styles.alertLayer, { left: stepsPoint.x - 15, top: stepsPoint.y - 74 }]}>
               <View style={styles.alertBubble}>
                 <Text style={styles.alertMark}>!</Text>
@@ -1951,8 +2273,8 @@ export function WorldCanvas({
             <MotiView
               pointerEvents="none"
               from={{ translateY: 2, scale: 0.92 }}
-              animate={{ translateY: -6, scale: 1 }}
-              transition={{ loop: true, type: 'timing', duration: 900 }}
+              animate={motionActive ? { translateY: 0, scale: 0.96 } : { translateY: -6, scale: 1 }}
+              transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 900 }}
               style={[styles.alertLayer, { left: moodPoint.x - 15, top: moodPoint.y - 88 }]}>
               <View style={styles.alertBubble}>
                 <Text style={styles.alertMark}>!</Text>
@@ -1964,8 +2286,8 @@ export function WorldCanvas({
             <MotiView
               pointerEvents="none"
               from={{ translateY: 2, scale: 0.92 }}
-              animate={{ translateY: -6, scale: 1 }}
-              transition={{ loop: true, type: 'timing', duration: 900 }}
+              animate={motionActive ? { translateY: 0, scale: 0.96 } : { translateY: -6, scale: 1 }}
+              transition={motionActive ? { type: 'timing', duration: 80 } : { loop: true, type: 'timing', duration: 900 }}
               style={[styles.alertLayer, { left: sleepPoint.x - 15, top: sleepPoint.y - 74 }]}>
               <View style={styles.alertBubble}>
                 <Text style={styles.alertMark}>!</Text>
@@ -2077,26 +2399,87 @@ function DragFollower({
   );
 }
 
-function SpriteView({
-  sprite,
+function SpriteMotionFrame({
   animateIn,
+  viewportFadeIn,
+  viewportFadeDelay,
+  animationDelay,
+  isMood,
+  children,
+}: {
+  animateIn: boolean;
+  viewportFadeIn: boolean;
+  viewportFadeDelay: number;
+  animationDelay: number;
+  isMood: boolean;
+  children: React.ReactNode;
+  [key: string]: unknown;
+}) {
+  if (!animateIn && !viewportFadeIn) {
+    return (
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.spriteInner, styles.spriteOrigin]}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <MotiView
+      pointerEvents="none"
+      renderToHardwareTextureAndroid={false}
+      shouldRasterizeIOS={false}
+      from={
+        animateIn
+          ? isMood
+            ? { scale: 0.48, translateY: 14 }
+            : { scale: 0.35, translateY: 9 }
+          : { opacity: 0 }
+      }
+      animate={animateIn ? { scale: 1, translateY: 0 } : { opacity: 1 }}
+      transition={
+        animateIn
+          ? {
+              type: 'spring',
+              damping: isMood ? 7 : 11,
+              stiffness: isMood ? 230 : 180,
+              mass: isMood ? 0.72 : 0.85,
+              delay: animationDelay,
+            }
+          : { type: 'timing', duration: VIEWPORT_ENTRY_FADE_MS, delay: viewportFadeDelay }
+      }
+      style={[StyleSheet.absoluteFill, styles.spriteInner, styles.spriteOrigin]}>
+      {children}
+    </MotiView>
+  );
+}
+
+const SpriteView = memo(function SpriteView({
+  sprite,
+  lod,
+  animateIn,
+  viewportFadeIn,
+  viewportFadeDelay,
   animationDelay,
   showBadge,
+  showAdornments,
   dragKeySV,
   dragOX,
   dragOY,
 }: {
   sprite: SceneSprite;
+  lod: WorldObjectLod;
   animateIn: boolean;
+  viewportFadeIn: boolean;
+  viewportFadeDelay: number;
   animationDelay: number;
   showBadge?: boolean;
+  showAdornments: boolean;
   // Drag-in-place: when dragKeySV matches this sprite's slot, the drag offset
   // rides this wrapper — the sprite itself follows the finger, no overlay copy.
   dragKeySV?: SharedValue<string>;
   dragOX?: SharedValue<number>;
   dragOY?: SharedValue<number>;
 }) {
-  const source = worldAssetSource(sprite.assetKey);
+  const source = worldAssetSource(sprite.assetKey, lod);
   const theme = ARCHETYPE_THEME[sprite.archetype];
   const isCreature = sprite.kind === 'creature';
   const isMood = sprite.category === 'mood';
@@ -2124,7 +2507,12 @@ function SpriteView({
     // MotiView inside keeps its entrance spring. Splitting them means a drag
     // never touches Moti's animator (and vice versa).
     <Animated.View pointerEvents="none" style={[styles.sprite, { left, top, width: w, height: h }, dragStyle]}>
-      <MotiView
+      <SpriteMotionFrame
+        animateIn={animateIn}
+        viewportFadeIn={viewportFadeIn}
+        viewportFadeDelay={viewportFadeDelay}
+        animationDelay={animationDelay}
+        isMood={isMood}
         // Display-only: taps are handled globally by the tile hit-test, so sprites
         // never intercept touches (no z-fighting between tall transparent frames).
         pointerEvents="none"
@@ -2150,7 +2538,7 @@ function SpriteView({
             the art's foot line, UNDER the image, so every prop reads as resting
             ON the land (runtime effect, never baked into assets). It lives
             inside the MotiView so it springs/scales with the sprite. */}
-        {source && !isCreature ? (
+        {OBJECT_SHADOWS_ENABLED && source && !isCreature ? (
           <Image
             source={HIGHLIGHT_GLOW}
             tintColor="#140F08"
@@ -2185,7 +2573,7 @@ function SpriteView({
         ) : null}
         {/* Village interaction glyph over the resident's head: gold ! = quest
             to offer, gray ? = active, gold ? = ready to report back. */}
-        {sprite.statusGlyph ? (
+        {showAdornments && sprite.statusGlyph ? (
           <View pointerEvents="none" style={[styles.statusGlyphWrap, { top: -h * 0.06 }]}>
             <View
               style={[
@@ -2196,12 +2584,12 @@ function SpriteView({
             </View>
           </View>
         ) : null}
-      </MotiView>
+      </SpriteMotionFrame>
     </Animated.View>
   );
-}
+});
 
-function FenceView({ fence }: { fence: SceneFence }) {
+const FenceView = memo(function FenceView({ fence }: { fence: SceneFence }) {
   const source = worldAssetSource('fence_strip');
   if (!source) return null;
   // Clip this segment's slice of the strip, then skew the whole slice onto the edge.
@@ -2230,7 +2618,7 @@ function FenceView({ fence }: { fence: SceneFence }) {
       />
     </View>
   );
-}
+});
 
 
 const styles = StyleSheet.create({

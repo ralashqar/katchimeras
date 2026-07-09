@@ -86,6 +86,8 @@ Deno.serve(async (req) => {
     resolution?: '1K' | '2K';
     // GPT branch square output size in px (default 1024).
     gptImageSize?: number;
+    // GPT Image 2 quality. Medium is the editor default to reduce latency/cost.
+    gptQuality?: 'low' | 'medium' | 'high';
     // GPT branch: ask the model for a natively TRANSPARENT background PNG
     // (no matting needed — more reliable than BiRefNet/flood-fill for props).
     transparentBackground?: boolean;
@@ -213,13 +215,14 @@ Deno.serve(async (req) => {
 
     const gptSide =
       typeof body.gptImageSize === 'number' && body.gptImageSize >= 256 ? Math.min(4096, Math.round(body.gptImageSize)) : 1024;
+    const gptQuality = body.gptQuality === 'low' || body.gptQuality === 'high' ? body.gptQuality : 'medium';
     const falBody =
       modelEndpoint === MODEL_ENDPOINTS.gpt
         ? {
             prompt,
             image_urls: imageUrls,
             image_size: { width: gptSide, height: gptSide },
-            quality: 'high',
+            quality: gptQuality,
             ...(body.transparentBackground ? { background: 'transparent', output_format: 'png' } : {}),
           }
         : { prompt, image_urls: imageUrls, aspect_ratio: '1:1', resolution: body.resolution ?? '2K' };
