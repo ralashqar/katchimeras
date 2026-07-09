@@ -425,6 +425,8 @@ export const COBBLE_PATH_TEXTURE: ImageSourcePropType = require('../assets/image
 // gen-kingdom-slab.py + fit-kingdom-slab.py). Drawn as ONE image in place of
 // the procedural face layers.
 export const KINGDOM_SLAB_OVERLAY: ImageSourcePropType = require('../assets/images/katchimeras/world/base/base_kingdom_slab.webp');
+export const KINGDOM_DEFAULT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/default_hex_tile.webp');
+export const KINGDOM_EGG_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_hex_tile.webp');
 
 export const DECAL_ATLAS: ImageSourcePropType = require('../assets/images/katchimeras/world/decals/_atlas.webp');
 export const DECAL_ATLAS_COLS = 4;

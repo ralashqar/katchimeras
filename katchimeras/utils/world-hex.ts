@@ -7,10 +7,12 @@ export type HexPoint = { x: number; y: number };
 // Canonical guide size for generated tile art. The rendered top face is a
 // regular flat-top hex with one orthographic y-scale tilt, matching
 // design/hex-tile-clean-flat-regular-projected-widthfit-1024.png.
-export const HEX_TILE_W = 196;
+export const HEX_TILE_W = 490;
 export const HEX_TILE_TILT = 0.7;
 export const HEX_TILE_H = HEX_TILE_W * (Math.sqrt(3) / 2) * HEX_TILE_TILT;
 export const HEX_TILE_LIP = HEX_TILE_W * 0.0975;
+export const HEX_TILE_SPACING = 1.08;
+export const HEX_TILE_ART_Y_SPACING = 1.12;
 
 // Axial neighbour steps. Order starts east and walks counter-clockwise; the
 // ring helper below starts at south-west so ring traversal is stable and compact.
@@ -36,8 +38,8 @@ export function hexScale(a: HexCoord, scale: number): HexCoord {
 // hex math, then one y-scale tilt.
 export function hexToWorld(hex: HexCoord): HexPoint {
   return {
-    x: HEX_TILE_W * 0.75 * hex.q,
-    y: HEX_TILE_H * (hex.r + hex.q / 2),
+    x: HEX_TILE_W * 0.75 * HEX_TILE_SPACING * hex.q,
+    y: HEX_TILE_H * HEX_TILE_SPACING * HEX_TILE_ART_Y_SPACING * (hex.r + hex.q / 2),
   };
 }
 

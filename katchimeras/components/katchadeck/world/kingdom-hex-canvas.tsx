@@ -1,10 +1,10 @@
-import { Canvas, Path, Skia } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
 import { MotiView } from 'moti';
 import { memo, type MutableRefObject, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   Easing,
   runOnJS,
   type SharedValue,
@@ -34,9 +34,10 @@ import {
   worldToHexLocal,
   type HexCoord,
 } from '@/utils/world-hex';
-import { worldAssetSource } from '@/utils/world-visuals';
+import { KINGDOM_DEFAULT_HEX_TILE, KINGDOM_EGG_HEX_TILE, worldAssetSource } from '@/utils/world-visuals';
 
 export type KingdomHexCenterRef = () => { col: number; row: number; plotId: string | null } | null;
+export type KingdomResidentStatusGlyph = 'offer' | 'active' | 'ready';
 
 export type KingdomHexResidentTile = {
   id: string;
@@ -62,38 +63,85 @@ type Props = {
   highlightObjectId?: string | null;
   eggVisual?: EggVisualState | null;
   lanternColor?: string;
+  residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
   getCenterCellRef?: MutableRefObject<KingdomHexCenterRef | null>;
   onSelectResident?: (creatureId: string, label: string) => void;
   onSelectDecor?: (id: string) => void;
-  onMoveDecor?: (id: string, col: number, row: number) => void;
+  onMoveDecor?: (id: string, col: number, row: number, plotId?: string | null) => void;
   onRemoveDecor?: (id: string) => void;
   onOpenKeepsakes?: () => void;
   unplantedCount?: number;
 };
 
-const SCENE_PAD = 260;
+const SCENE_PAD = 1200;
 const CENTER_ID = 'kingdom';
 const CREATURE_SIZE = 58;
 const HOUSE_SIZE = 62;
 const DECOR_BASE_SIZE = 54;
-const EGG_STAGE_W = 156;
-const EGG_STAGE_H = 202;
-
-function makePath(points: { x: number; y: number }[]) {
-  const path = Skia.Path.Make();
-  points.forEach((point, index) => {
-    if (index === 0) path.moveTo(point.x, point.y);
-    else path.lineTo(point.x, point.y);
-  });
-  path.close();
-  return path;
-}
+const EGG_STAGE_W = 200;
+const EGG_STAGE_H = 258;
+const EGG_STAGE_SCALE = 0.7;
+const CENTER_TILE_ASSET_SIZE = 1024;
+const CENTER_TILE_ALPHA_BOUNDS = {
+  left: 14,
+  top: 144,
+  right: 1010,
+  bottom: 879,
+};
+const DEFAULT_TILE_ALPHA_BOUNDS = {
+  left: 14,
+  top: 147,
+  right: 1010,
+  bottom: 876,
+};
 
 function residentTileId(creatureId: string) {
   return `resident:${creatureId}`;
 }
 
-function sceneFromResidents(residents: KingdomHexResidentTile[]) {
+function tileVisibleBounds(cx: number, cy: number) {
+  const topPoints = hexTileTopPoints(cx, cy);
+  const xs = topPoints.map((point) => point.x);
+  const ys = topPoints.flatMap((point) => [point.y, point.y + HEX_TILE_LIP]);
+  return {
+    left: Math.min(...xs),
+    right: Math.max(...xs),
+    top: Math.min(...ys),
+    bottom: Math.max(...ys),
+  };
+}
+
+function tileArtFrame(tile: TileRender, assetBounds: typeof CENTER_TILE_ALPHA_BOUNDS) {
+  const target = tileVisibleBounds(tile.cx, tile.cy);
+  const assetBoundsWidth = assetBounds.right - assetBounds.left;
+  const assetBoundsCenterX = (assetBounds.left + assetBounds.right) / 2;
+  const assetBoundsCenterY = (assetBounds.top + assetBounds.bottom) / 2;
+  const targetWidth = target.right - target.left;
+  const targetCenterX = (target.left + target.right) / 2;
+  const targetCenterY = (target.top + target.bottom) / 2;
+  const size = targetWidth * (CENTER_TILE_ASSET_SIZE / assetBoundsWidth);
+
+  return {
+    height: size,
+    left: targetCenterX - (assetBoundsCenterX / CENTER_TILE_ASSET_SIZE) * size,
+    top: targetCenterY - (assetBoundsCenterY / CENTER_TILE_ASSET_SIZE) * size,
+    width: size,
+  };
+}
+
+function tileArtFor(tile: TileRender) {
+  return tile.kind === 'center'
+    ? {
+        source: KINGDOM_EGG_HEX_TILE,
+        frame: tileArtFrame(tile, CENTER_TILE_ALPHA_BOUNDS),
+      }
+    : {
+        source: KINGDOM_DEFAULT_HEX_TILE,
+        frame: tileArtFrame(tile, DEFAULT_TILE_ALPHA_BOUNDS),
+      };
+}
+
+function sceneFromResidents(residents: KingdomHexResidentTile[], decor: KingdomDecorItem[]) {
   const tilesRaw: TileRender[] = [
     { id: CENTER_ID, kind: 'center', coord: { q: 0, r: 0 }, cx: 0, cy: 0, depth: 0 },
     ...residents.map((resident) => {
@@ -109,17 +157,31 @@ function sceneFromResidents(residents: KingdomHexResidentTile[]) {
       };
     }),
   ];
-  const xs = tilesRaw.flatMap((tile) => [tile.cx - HEX_TILE_W, tile.cx + HEX_TILE_W]);
-  const ys = tilesRaw.flatMap((tile) => [tile.cy - HEX_TILE_H, tile.cy + HEX_TILE_H + HEX_TILE_LIP]);
-  const minX = Math.min(...xs, -HEX_TILE_W);
-  const maxX = Math.max(...xs, HEX_TILE_W);
-  const minY = Math.min(...ys, -HEX_TILE_H);
-  const maxY = Math.max(...ys, HEX_TILE_H);
+  const tileXs = tilesRaw.flatMap((tile) => [tile.cx - HEX_TILE_W, tile.cx + HEX_TILE_W]);
+  const tileYs = tilesRaw.flatMap((tile) => [tile.cy - HEX_TILE_H, tile.cy + HEX_TILE_H + HEX_TILE_LIP]);
+  const minX = Math.min(...tileXs, -HEX_TILE_W);
+  const maxX = Math.max(...tileXs, HEX_TILE_W);
+  const minY = Math.min(...tileYs, -HEX_TILE_H);
+  const maxY = Math.max(...tileYs, HEX_TILE_H);
   const dx = -minX + SCENE_PAD;
   const dy = -minY + SCENE_PAD;
+  const tileById = new Map(tilesRaw.map((tile) => [tile.id, tile]));
+  const decorExtents = decor.flatMap((item) => {
+    const tile = tileById.get(item.plotId ?? CENTER_ID) ?? tilesRaw[0];
+    const local = hexLocalToWorld(item.col, item.row);
+    const size = DECOR_BASE_SIZE * (item.sizeScale ?? 1);
+    const x = tile.cx + dx + local.x;
+    const y = tile.cy + dy + local.y;
+    return [
+      { x: x - size, y: y - size },
+      { x: x + size, y: y + size },
+    ];
+  });
+  const sceneMaxX = Math.max(maxX + dx + SCENE_PAD, ...decorExtents.map((point) => point.x + SCENE_PAD));
+  const sceneMaxY = Math.max(maxY + dy + SCENE_PAD, ...decorExtents.map((point) => point.y + SCENE_PAD));
   return {
-    width: maxX - minX + SCENE_PAD * 2,
-    height: maxY - minY + SCENE_PAD * 2,
+    width: sceneMaxX,
+    height: sceneMaxY,
     tiles: tilesRaw
       .map((tile) => ({ ...tile, cx: tile.cx + dx, cy: tile.cy + dy, depth: hexDrawDepth({ x: tile.cx + dx, y: tile.cy + dy }) }))
       .sort((a, b) => a.depth - b.depth),
@@ -150,6 +212,7 @@ export function KingdomHexCanvas({
   highlightObjectId,
   eggVisual,
   lanternColor,
+  residentStatusGlyphs,
   getCenterCellRef,
   onSelectResident,
   onSelectDecor,
@@ -158,7 +221,7 @@ export function KingdomHexCanvas({
   onOpenKeepsakes,
   unplantedCount = 0,
 }: Props) {
-  const scene = useMemo(() => sceneFromResidents(residents), [residents]);
+  const scene = useMemo(() => sceneFromResidents(residents, decor), [decor, residents]);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
@@ -168,6 +231,14 @@ export function KingdomHexCanvas({
 
   const centreTile = useMemo(() => scene.tiles.find((tile) => tile.id === CENTER_ID) ?? scene.tiles[0], [scene.tiles]);
   const tileById = useMemo(() => new Map(scene.tiles.map((tile) => [tile.id, tile])), [scene.tiles]);
+  const tileArtLayers = useMemo(
+    () =>
+      scene.tiles.map((tile) => ({
+        id: tile.id,
+        ...tileArtFor(tile),
+      })),
+    [scene.tiles]
+  );
 
   const baseScale = viewport.width && viewport.height ? Math.min(1.28, Math.max(0.72, Math.min(viewport.width / 520, viewport.height / 620))) : 1;
   const minScale = 0.54;
@@ -261,6 +332,23 @@ export function KingdomHexCanvas({
     ty.value = withTiming(nextTy, { duration: 260, easing: Easing.out(Easing.cubic) });
   }, [baseScale, centreTile, scene.height, scene.width, scale, tx, ty, viewport.height, viewport.width]);
 
+  const focusResident = useCallback(
+    (x: number, y: number) => {
+      if (!viewport.width || !viewport.height) return;
+      cancelAnimation(tx);
+      cancelAnimation(ty);
+      cancelAnimation(scale);
+      const zoom = Math.min(maxScale, Math.max(scale.value, 1.35));
+      const nextTx = viewport.width / 2 - scene.width / 2 - (x - scene.width / 2) * zoom;
+      const nextTy = viewport.height * 0.42 - scene.height / 2 - (y - scene.height / 2) * zoom;
+      startScale.value = zoom;
+      scale.value = withTiming(zoom, { duration: 420, easing: Easing.out(Easing.cubic) });
+      tx.value = withTiming(nextTx, { duration: 420, easing: Easing.out(Easing.cubic) });
+      ty.value = withTiming(nextTy, { duration: 420, easing: Easing.out(Easing.cubic) });
+    },
+    [maxScale, scale, scene.height, scene.width, startScale, tx, ty, viewport.height, viewport.width]
+  );
+
   const renderObjects = useMemo(() => {
     const items: { id: string; depth: number; node: ReactNode }[] = [];
     for (const tile of scene.tiles) {
@@ -269,18 +357,20 @@ export function KingdomHexCanvas({
         const creature = { x: tile.cx, y: tile.cy + HEX_TILE_H * 0.03 };
         items.push({
           id: `house-${tile.id}`,
-          depth: tile.depth + 1,
+          depth: hexDrawDepth(house, 1),
           node: <ResidentHouse key={`house-${tile.id}`} tile={tile} x={house.x} y={house.y} />,
         });
         items.push({
           id: `creature-${tile.id}`,
-          depth: tile.depth + 4,
+          depth: hexDrawDepth(creature, 4),
           node: (
             <ResidentCreature
               key={`creature-${tile.id}`}
               tile={tile}
               x={creature.x}
               y={creature.y}
+              statusGlyph={residentStatusGlyphs?.[tile.resident.creature.creatureId]}
+              onFocus={() => focusResident(creature.x, creature.y)}
               onSelectResident={onSelectResident}
             />
           ),
@@ -295,7 +385,7 @@ export function KingdomHexCanvas({
       const y = tile.cy + local.y;
       items.push({
         id: item.id,
-        depth: tile.depth + 3 + item.row,
+        depth: hexDrawDepth({ x, y }, 5),
         node: (
           <HexDecorSprite
             key={item.id}
@@ -303,6 +393,7 @@ export function KingdomHexCanvas({
             tile={tile}
             x={x}
             y={y}
+            tiles={scene.tiles}
             scaleSV={scale}
             customising={customising}
             highlighted={highlightObjectId === item.id}
@@ -314,7 +405,7 @@ export function KingdomHexCanvas({
       });
     }
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [centreTile, customising, decor, highlightObjectId, onMoveDecor, onRemoveDecor, onSelectDecor, onSelectResident, scene.tiles, scale, tileById]);
+  }, [centreTile, customising, decor, focusResident, highlightObjectId, onMoveDecor, onRemoveDecor, onSelectDecor, onSelectResident, residentStatusGlyphs, scene.tiles, scale, tileById]);
 
   const gesture = Gesture.Simultaneous(pan, pinch);
 
@@ -323,14 +414,29 @@ export function KingdomHexCanvas({
       <GestureDetector gesture={gesture}>
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, worldStyle]}>
-            <HexGround width={scene.width} height={scene.height} tiles={scene.tiles} />
+            {tileArtLayers.map((tile) => (
+              <Image
+                key={`tile-art-${tile.id}`}
+                pointerEvents="none"
+                source={tile.source}
+                contentFit="contain"
+                style={[styles.tileArt, tile.frame]}
+              />
+            ))}
             {centreTile && eggVisual ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Kingdom egg"
                 onPress={recenter}
-                style={[styles.eggLayer, { left: centreTile.cx - EGG_STAGE_W / 2, top: centreTile.cy - EGG_STAGE_H / 2 - 18 }]}>
-                <LanternEgg egg={eggVisual} lanternColor={lanternColor} scale={0.74} shellScale={0.72} />
+                style={[
+                  styles.eggLayer,
+                  {
+                    left: centreTile.cx - EGG_STAGE_W / 2,
+                    top: centreTile.cy - EGG_STAGE_H / 2 - HEX_TILE_H * 0.04,
+                    transform: [{ scale: EGG_STAGE_SCALE }],
+                  },
+                ]}>
+                <LanternEgg egg={eggVisual} lanternColor={lanternColor} />
               </Pressable>
             ) : (
               <View style={[styles.centerMark, { left: centreTile.cx - 28, top: centreTile.cy - 36 }]}>
@@ -364,51 +470,6 @@ export function KingdomHexCanvas({
   );
 }
 
-function HexGround({ width, height, tiles }: { width: number; height: number; tiles: TileRender[] }) {
-  const paths = useMemo(
-    () =>
-      tiles.map((tile) => {
-        const topPoints = hexTileTopPoints(tile.cx, tile.cy);
-        const right = [topPoints[0], topPoints[1], { x: topPoints[1].x, y: topPoints[1].y + HEX_TILE_LIP }, { x: topPoints[0].x, y: topPoints[0].y + HEX_TILE_LIP }];
-        const front = [topPoints[1], topPoints[2], { x: topPoints[2].x, y: topPoints[2].y + HEX_TILE_LIP }, { x: topPoints[1].x, y: topPoints[1].y + HEX_TILE_LIP }];
-        const left = [topPoints[2], topPoints[3], { x: topPoints[3].x, y: topPoints[3].y + HEX_TILE_LIP }, { x: topPoints[2].x, y: topPoints[2].y + HEX_TILE_LIP }];
-        return {
-          id: tile.id,
-          kind: tile.kind,
-          top: makePath(topPoints),
-          left: makePath(left),
-          front: makePath(front),
-          right: makePath(right),
-          outline: makePath(topPoints),
-          accent: tile.resident?.creature.accentColor ?? '#8FD8BE',
-        };
-      }),
-    [tiles]
-  );
-  return (
-    <Canvas style={{ width, height, position: 'absolute' }}>
-      {paths.map((path) => (
-        <Path key={`${path.id}-left`} path={path.left} color={path.kind === 'center' ? '#B86A1B' : '#BE7020'} opacity={0.98} />
-      ))}
-      {paths.map((path) => (
-        <Path key={`${path.id}-right`} path={path.right} color={path.kind === 'center' ? '#A86119' : '#AC611B'} opacity={0.98} />
-      ))}
-      {paths.map((path) => (
-        <Path key={`${path.id}-front`} path={path.front} color={path.kind === 'center' ? '#C27A24' : '#CA7B24'} opacity={0.98} />
-      ))}
-      {paths.map((path) => (
-        <Path key={`${path.id}-top`} path={path.top} color={path.kind === 'center' ? '#78952F' : '#69A61D'} opacity={0.99} />
-      ))}
-      {paths.map((path) => (
-        <Path key={`${path.id}-wash`} path={path.top} color={path.accent} opacity={path.kind === 'center' ? 0.08 : 0.1} />
-      ))}
-      {paths.map((path) => (
-        <Path key={`${path.id}-line`} path={path.outline} color={path.kind === 'center' ? '#E8D083' : '#D9F5C7'} style="stroke" strokeWidth={1} opacity={path.kind === 'center' ? 0.28 : 0.18} />
-      ))}
-    </Canvas>
-  );
-}
-
 function ResidentHouse({ tile, x, y }: { tile: TileRender; x: number; y: number }) {
   const source = worldAssetSource('home');
   const badge = tile.resident?.resident.houseLevel ?? 1;
@@ -428,22 +489,38 @@ function ResidentCreature({
   tile,
   x,
   y,
+  statusGlyph,
+  onFocus,
   onSelectResident,
 }: {
   tile: TileRender;
   x: number;
   y: number;
+  statusGlyph?: KingdomResidentStatusGlyph;
+  onFocus?: () => void;
   onSelectResident?: (creatureId: string, label: string) => void;
 }) {
   const creature = tile.resident?.creature;
   const source = creature ? worldAssetSource(`creature:${creature.visualKey}`) : null;
+  const handlePress = useCallback(() => {
+    if (!creature) return;
+    onFocus?.();
+    onSelectResident?.(creature.creatureId, creature.name);
+  }, [creature, onFocus, onSelectResident]);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={creature?.name}
-      onPress={() => creature && onSelectResident?.(creature.creatureId, creature.name)}
+      onPress={handlePress}
       style={[styles.creature, { left: x - CREATURE_SIZE / 2, top: y - CREATURE_SIZE * 0.63, width: CREATURE_SIZE, height: CREATURE_SIZE }]}>
       {source ? <Image source={source} contentFit="contain" style={StyleSheet.absoluteFill} /> : null}
+      {statusGlyph ? (
+        <View pointerEvents="none" style={styles.statusGlyphWrap}>
+          <View style={[styles.statusGlyph, statusGlyph === 'active' ? styles.statusGlyphActive : styles.statusGlyphReady]}>
+            <Text style={styles.statusGlyphText}>{statusGlyph === 'offer' ? '!' : '?'}</Text>
+          </View>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -453,6 +530,7 @@ const HexDecorSprite = memo(function HexDecorSprite({
   tile,
   x,
   y,
+  tiles,
   scaleSV,
   customising,
   highlighted,
@@ -464,29 +542,46 @@ const HexDecorSprite = memo(function HexDecorSprite({
   tile: TileRender;
   x: number;
   y: number;
+  tiles: TileRender[];
   scaleSV: SharedValue<number>;
   customising: boolean;
   highlighted: boolean;
-  onMoveDecor?: (id: string, col: number, row: number) => void;
+  onMoveDecor?: (id: string, col: number, row: number, plotId?: string | null) => void;
   onRemoveDecor?: (id: string) => void;
   onSelectDecor?: (id: string) => void;
 }) {
   const dx = useSharedValue(0);
   const dy = useSharedValue(0);
+  const dragging = useSharedValue(false);
   const source = worldAssetSource(item.assetKey);
   const size = DECOR_BASE_SIZE * (item.sizeScale ?? 1);
   const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dx.value }, { translateY: dy.value }],
+    transform: [{ translateX: dx.value }, { translateY: dy.value }, { scale: dragging.value ? 1.07 : 1 }],
+    zIndex: dragging.value ? 20 : 1,
   }));
   const commit = useCallback(
     (worldDx: number, worldDy: number) => {
-      const local = clampHexLocal(worldToHexLocal(x + worldDx - tile.cx, y + worldDy - tile.cy));
-      onMoveDecor?.(item.id, local.col, local.row);
+      const drop = { x: x + worldDx, y: y + worldDy };
+      let nearest = tile;
+      let nearestDistance = Infinity;
+      for (const candidate of tiles) {
+        const distance = (drop.x - candidate.cx) ** 2 + (drop.y - candidate.cy) ** 2;
+        if (distance < nearestDistance) {
+          nearest = candidate;
+          nearestDistance = distance;
+        }
+      }
+      const local = worldToHexLocal(drop.x - nearest.cx, drop.y - nearest.cy);
+      onMoveDecor?.(item.id, local.col, local.row, nearest.id === CENTER_ID ? null : nearest.id);
     },
-    [item.id, onMoveDecor, tile.cx, tile.cy, x, y]
+    [item.id, onMoveDecor, tile, tiles, x, y]
   );
   const drag = Gesture.Pan()
-    .enabled(customising)
+    .enabled(Boolean(onMoveDecor))
+    .activateAfterLongPress(customising ? 0 : 320)
+    .onStart(() => {
+      dragging.value = true;
+    })
     .onChange((event) => {
       dx.value = event.translationX / scaleSV.value;
       dy.value = event.translationY / scaleSV.value;
@@ -497,6 +592,7 @@ const HexDecorSprite = memo(function HexDecorSprite({
       dy.value = withTiming(0, { duration: 140 });
     })
     .onFinalize(() => {
+      dragging.value = false;
       dx.value = withTiming(0, { duration: 140 });
       dy.value = withTiming(0, { duration: 140 });
     });
@@ -528,6 +624,7 @@ const HexDecorSprite = memo(function HexDecorSprite({
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
   scene: { position: 'relative' },
+  tileArt: { position: 'absolute' },
   eggLayer: { height: EGG_STAGE_H, position: 'absolute', width: EGG_STAGE_W },
   centerMark: {
     alignItems: 'center',
@@ -542,6 +639,28 @@ const styles = StyleSheet.create({
   },
   centerMarkText: { color: '#FFE0A3', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
   creature: { position: 'absolute' },
+  statusGlyphWrap: {
+    alignItems: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: -16,
+  },
+  statusGlyph: {
+    alignItems: 'center',
+    borderColor: 'rgba(255,255,255,0.42)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 23,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    width: 23,
+  },
+  statusGlyphActive: { backgroundColor: 'rgba(120,120,140,0.92)' },
+  statusGlyphReady: { backgroundColor: '#E9A93E' },
+  statusGlyphText: { color: Lantern.emberInk, fontSize: 17, fontWeight: '900', lineHeight: 19 },
   decor: { position: 'absolute' },
   decorHighlight: {
     backgroundColor: 'rgba(255,224,163,0.18)',

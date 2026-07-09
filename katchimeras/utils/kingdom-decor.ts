@@ -655,10 +655,10 @@ export function plantKingdomGift(
   return next;
 }
 
-export function moveKingdomDecor(state: KingdomDecorState, id: string, col: number, row: number): KingdomDecorState {
+export function moveKingdomDecor(state: KingdomDecorState, id: string, col: number, row: number, plotId?: string | null): KingdomDecorState {
   const next: KingdomDecorState = {
     ...state,
-    placed: state.placed.map((item) => (item.id === id ? { ...item, col, row } : item)),
+    placed: state.placed.map((item) => (item.id === id ? { ...item, col, row, ...(plotId !== undefined ? { plotId } : null) } : item)),
   };
   saveKingdomDecor(next);
   return next;
