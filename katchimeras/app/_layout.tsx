@@ -79,6 +79,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
           <Stack.Screen name="world-base-lab" options={{ title: 'World Base Lab' }} />
+          <Stack.Screen name="dev-katchimera-tile-lab" options={{ title: 'Katchimera Tile Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="photo-essence" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />

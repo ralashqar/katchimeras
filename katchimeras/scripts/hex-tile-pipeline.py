@@ -34,6 +34,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "assets" / "images" / "katchimeras" / "world" / "hex"
+BIREFNET_HEAVY_MODEL = "General Use (Heavy)"
 
 
 def parse_args() -> argparse.Namespace:
@@ -174,7 +175,7 @@ def matte(source: Path, args: argparse.Namespace, work: Path) -> Path:
         {
             "imageBase64": file_b64(source),
             "outputName": args.key.replace("_", "-") + "-hex-matte",
-            "model": "General Use (Heavy)",
+            "model": BIREFNET_HEAVY_MODEL,
             "operatingResolution": "2048x2048",
             "refineForeground": True,
         },
@@ -184,6 +185,40 @@ def matte(source: Path, args: argparse.Namespace, work: Path) -> Path:
         raise RuntimeError(f"matte failed: {data}")
     download(str(data["imageUrl"]), out_path)
     return out_path
+
+
+def source_foreground_mask(source: Image.Image, target_size: tuple[int, int]) -> np.ndarray:
+    """Find the non-background tile silhouette from the source's black backdrop.
+
+    BiRefNet Heavy is still the matting source, but high-detail tile interiors
+    can contain dark/blue water, blank boards, or shadows that the matte may cut
+    out. Since our tile renders are intentionally on pure black, a flood fill of
+    black-ish pixels connected to the image border gives a conservative
+    foreground silhouette used to restore those internal cuts.
+    """
+
+    rgb = source.convert("RGB").resize(target_size, Image.Resampling.LANCZOS)
+    arr = np.asarray(rgb).astype(np.int16)
+    max_channel = arr.max(axis=2)
+    min_channel = arr.min(axis=2)
+    blackish = (max_channel < 30) & ((max_channel - min_channel) < 18)
+
+    outside = np.zeros_like(blackish)
+    outside[0, :] = blackish[0, :]
+    outside[-1, :] = blackish[-1, :]
+    outside[:, 0] = blackish[:, 0]
+    outside[:, -1] = blackish[:, -1]
+    while True:
+        grown = outside.copy()
+        grown[1:, :] |= outside[:-1, :]
+        grown[:-1, :] |= outside[1:, :]
+        grown[:, 1:] |= outside[:, :-1]
+        grown[:, :-1] |= outside[:, 1:]
+        grown &= blackish
+        if grown.sum() == outside.sum():
+            break
+        outside = grown
+    return ~outside
 
 
 def fill_internal_alpha_holes(rgba: Image.Image, source: Image.Image) -> Image.Image:
@@ -217,10 +252,27 @@ def fill_internal_alpha_holes(rgba: Image.Image, source: Image.Image) -> Image.I
     return Image.fromarray(fixed)
 
 
+def restore_source_silhouette(rgba: Image.Image, source: Image.Image) -> Image.Image:
+    rgba = rgba.convert("RGBA")
+    source_rgb = source.convert("RGB").resize(rgba.size, Image.Resampling.LANCZOS)
+    foreground = source_foreground_mask(source, rgba.size)
+    alpha = np.asarray(rgba.getchannel("A"))
+    restore = foreground & (alpha < 245)
+    if restore.sum() == 0:
+        return rgba
+    print("source silhouette restore:", int(restore.sum()), "px from source")
+    fixed = np.asarray(rgba).copy()
+    src = np.asarray(source_rgb)
+    fixed[..., :3] = np.where(restore[..., None], src, fixed[..., :3])
+    fixed[..., 3] = np.where(restore, 255, fixed[..., 3])
+    return Image.fromarray(fixed)
+
+
 def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: Path) -> Path:
     rgba = Image.open(matted).convert("RGBA")
     source_img = Image.open(source)
     rgba = fill_internal_alpha_holes(rgba, source_img)
+    rgba = restore_source_silhouette(rgba, source_img)
 
     bbox = rgba.getchannel("A").getbbox()
     if not bbox:

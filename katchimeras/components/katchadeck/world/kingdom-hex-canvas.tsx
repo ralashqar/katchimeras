@@ -8,6 +8,7 @@ import Animated, {
   Easing,
   runOnJS,
   type SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withDecay,
@@ -19,6 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { EggVisualState } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
+import { katchimeraHexTileForCreature } from '@/utils/katchimera-hex-tiles';
 import type { KingdomDecorItem } from '@/utils/kingdom-decor';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import {
@@ -82,6 +84,20 @@ const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
 const EGG_STAGE_SCALE = 0.32;
 const CENTER_TILE_ASSET_SIZE = 1024;
+const CULL_SCREEN_PAD = 520;
+
+type Rect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+type CameraSnapshot = {
+  tx: number;
+  ty: number;
+  scale: number;
+};
 
 function residentTileId(creatureId: string) {
   return `resident:${creatureId}`;
@@ -96,6 +112,44 @@ function tileVisibleBounds(cx: number, cy: number) {
     right: Math.max(...xs),
     top: Math.min(...ys),
     bottom: Math.max(...ys),
+  };
+}
+
+function rectsIntersect(a: Rect, b: Rect) {
+  return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
+}
+
+function frameToRect(frame: { left: number; top: number; width: number; height: number }): Rect {
+  return {
+    left: frame.left,
+    top: frame.top,
+    right: frame.left + frame.width,
+    bottom: frame.top + frame.height,
+  };
+}
+
+function pointObjectRect(x: number, y: number, radius: number): Rect {
+  return {
+    left: x - radius,
+    top: y - radius,
+    right: x + radius,
+    bottom: y + radius,
+  };
+}
+
+function visibleWorldRect(
+  viewport: { width: number; height: number },
+  scene: { width: number; height: number },
+  camera: CameraSnapshot
+): Rect | null {
+  if (!viewport.width || !viewport.height || camera.scale <= 0) return null;
+  const toWorldX = (screenX: number) => (screenX - scene.width / 2 - camera.tx) / camera.scale + scene.width / 2;
+  const toWorldY = (screenY: number) => (screenY - scene.height / 2 - camera.ty) / camera.scale + scene.height / 2;
+  return {
+    left: toWorldX(-CULL_SCREEN_PAD),
+    top: toWorldY(-CULL_SCREEN_PAD),
+    right: toWorldX(viewport.width + CULL_SCREEN_PAD),
+    bottom: toWorldY(viewport.height + CULL_SCREEN_PAD),
   };
 }
 
@@ -118,14 +172,24 @@ function tileArtFrame(tile: TileRender, assetBounds: KingdomHexTileAlphaBounds) 
 }
 
 function tileArtFor(tile: TileRender, hexTiles: KingdomHexTileSelection) {
+  const customResidentTile = tile.kind === 'resident' && tile.resident ? katchimeraHexTileForCreature(tile.resident.creature) : null;
+  if (customResidentTile) {
+    return {
+      source: customResidentTile.source,
+      frame: tileArtFrame(tile, customResidentTile.alphaBounds),
+      custom: true,
+    };
+  }
   return tile.kind === 'center'
     ? {
         source: hexTiles.center.source,
         frame: tileArtFrame(tile, hexTiles.center.alphaBounds),
+        custom: false,
       }
     : {
         source: hexTiles.default.source,
         frame: tileArtFrame(tile, hexTiles.default.alphaBounds),
+        custom: false,
       };
 }
 
@@ -216,6 +280,8 @@ export function KingdomHexCanvas({
   const scale = useSharedValue(1);
   const startScale = useSharedValue(1);
   const centred = useSharedValue(false);
+  const lastCullUpdate = useSharedValue(0);
+  const [cameraSnapshot, setCameraSnapshot] = useState<CameraSnapshot>({ tx: 0, ty: 0, scale: 1 });
 
   const centreTile = useMemo(() => scene.tiles.find((tile) => tile.id === CENTER_ID) ?? scene.tiles[0], [scene.tiles]);
   const tileById = useMemo(() => new Map(scene.tiles.map((tile) => [tile.id, tile])), [scene.tiles]);
@@ -228,6 +294,15 @@ export function KingdomHexCanvas({
       })),
     [hexTiles, scene.tiles]
   );
+  const cullWorldRect = useMemo(
+    () => visibleWorldRect(viewport, { width: scene.width, height: scene.height }, cameraSnapshot),
+    [cameraSnapshot, scene.height, scene.width, viewport]
+  );
+  const visibleTileArtLayers = useMemo(
+    () => (cullWorldRect ? tileArtLayers.filter((tile) => rectsIntersect(frameToRect(tile.frame), cullWorldRect)) : tileArtLayers),
+    [cullWorldRect, tileArtLayers]
+  );
+  const visibleTileIds = useMemo(() => new Set(visibleTileArtLayers.map((tile) => tile.id)), [visibleTileArtLayers]);
 
   const baseScale = viewport.width && viewport.height ? Math.min(1.28, Math.max(0.72, Math.min(viewport.width / 520, viewport.height / 620))) : 1;
   const minScale = 0.54;
@@ -243,6 +318,30 @@ export function KingdomHexCanvas({
     ],
   }));
 
+  const updateCameraSnapshot = useCallback((nextTx: number, nextTy: number, nextScale: number) => {
+    setCameraSnapshot((current) => {
+      if (
+        Math.abs(current.tx - nextTx) < 2 &&
+        Math.abs(current.ty - nextTy) < 2 &&
+        Math.abs(current.scale - nextScale) < 0.01
+      ) {
+        return current;
+      }
+      return { tx: nextTx, ty: nextTy, scale: nextScale };
+    });
+  }, []);
+
+  useAnimatedReaction(
+    () => ({ tx: tx.value, ty: ty.value, scale: scale.value }),
+    (next) => {
+      const now = Date.now();
+      if (now - lastCullUpdate.value < 72) return;
+      lastCullUpdate.value = now;
+      runOnJS(updateCameraSnapshot)(next.tx, next.ty, next.scale);
+    },
+    [updateCameraSnapshot]
+  );
+
   useEffect(() => {
     if (!viewport.width || !viewport.height || !centreTile || centred.value) return;
     const nextTx = viewport.width / 2 - scene.width / 2 - (centreTile.cx - scene.width / 2) * baseScale;
@@ -251,6 +350,7 @@ export function KingdomHexCanvas({
     startScale.value = baseScale;
     tx.value = nextTx;
     ty.value = nextTy;
+    setCameraSnapshot({ tx: nextTx, ty: nextTy, scale: baseScale });
     centred.value = true;
   }, [baseScale, centreTile, centred, scene.height, scene.width, scale, startScale, tx, ty, viewport.height, viewport.width]);
 
@@ -319,6 +419,7 @@ export function KingdomHexCanvas({
     scale.value = withTiming(baseScale, { duration: 260, easing: Easing.out(Easing.cubic) });
     tx.value = withTiming(nextTx, { duration: 260, easing: Easing.out(Easing.cubic) });
     ty.value = withTiming(nextTy, { duration: 260, easing: Easing.out(Easing.cubic) });
+    setCameraSnapshot({ tx: nextTx, ty: nextTy, scale: baseScale });
   }, [baseScale, centreTile, scene.height, scene.width, scale, tx, ty, viewport.height, viewport.width]);
 
   const focusResident = useCallback(
@@ -334,21 +435,26 @@ export function KingdomHexCanvas({
       scale.value = withTiming(zoom, { duration: 420, easing: Easing.out(Easing.cubic) });
       tx.value = withTiming(nextTx, { duration: 420, easing: Easing.out(Easing.cubic) });
       ty.value = withTiming(nextTy, { duration: 420, easing: Easing.out(Easing.cubic) });
+      setCameraSnapshot({ tx: nextTx, ty: nextTy, scale: zoom });
     },
     [maxScale, scale, scene.height, scene.width, startScale, tx, ty, viewport.height, viewport.width]
   );
 
   const renderObjects = useMemo(() => {
+    const customTileIds = new Set(tileArtLayers.filter((tile) => tile.custom).map((tile) => tile.id));
     const items: { id: string; depth: number; node: ReactNode }[] = [];
     for (const tile of scene.tiles) {
+      if (!visibleTileIds.has(tile.id)) continue;
       if (tile.kind === 'resident' && tile.resident) {
         const house = { x: tile.cx + HEX_TILE_W * 0.22, y: tile.cy - HEX_TILE_H * 0.18 };
         const creature = { x: tile.cx, y: tile.cy + HEX_TILE_H * 0.03 };
-        items.push({
-          id: `house-${tile.id}`,
-          depth: hexDrawDepth(house, 1),
-          node: <ResidentHouse key={`house-${tile.id}`} tile={tile} x={house.x} y={house.y} />,
-        });
+        if (!customTileIds.has(tile.id)) {
+          items.push({
+            id: `house-${tile.id}`,
+            depth: hexDrawDepth(house, 1),
+            node: <ResidentHouse key={`house-${tile.id}`} tile={tile} x={house.x} y={house.y} />,
+          });
+        }
         items.push({
           id: `creature-${tile.id}`,
           depth: hexDrawDepth(creature, 4),
@@ -372,6 +478,8 @@ export function KingdomHexCanvas({
       const local = hexLocalToWorld(item.col, item.row);
       const x = tile.cx + local.x;
       const y = tile.cy + local.y;
+      const size = DECOR_BASE_SIZE * (item.sizeScale ?? 1);
+      if (cullWorldRect && !rectsIntersect(pointObjectRect(x, y, size * 1.35), cullWorldRect)) continue;
       items.push({
         id: item.id,
         depth: hexDrawDepth({ x, y }, 5),
@@ -394,7 +502,7 @@ export function KingdomHexCanvas({
       });
     }
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [centreTile, customising, decor, focusResident, highlightObjectId, onMoveDecor, onRemoveDecor, onSelectDecor, onSelectResident, residentStatusGlyphs, scene.tiles, scale, tileById]);
+  }, [centreTile, cullWorldRect, customising, decor, focusResident, highlightObjectId, onMoveDecor, onRemoveDecor, onSelectDecor, onSelectResident, residentStatusGlyphs, scene.tiles, scale, tileArtLayers, tileById, visibleTileIds]);
 
   const gesture = Gesture.Simultaneous(pan, pinch);
 
@@ -403,7 +511,7 @@ export function KingdomHexCanvas({
       <GestureDetector gesture={gesture}>
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, worldStyle]}>
-            {tileArtLayers.map((tile) => (
+            {visibleTileArtLayers.map((tile) => (
               <Image
                 key={`tile-art-${tile.id}`}
                 pointerEvents="none"
