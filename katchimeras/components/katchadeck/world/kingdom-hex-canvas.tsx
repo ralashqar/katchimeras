@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { MotiView } from 'moti';
-import { memo, type MutableRefObject, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, type MutableRefObject, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -34,7 +34,7 @@ import {
   worldToHexLocal,
   type HexCoord,
 } from '@/utils/world-hex';
-import { KINGDOM_DEFAULT_HEX_TILE, KINGDOM_EGG_HEX_TILE, worldAssetSource } from '@/utils/world-visuals';
+import { kingdomHexTileSet, worldAssetSource, type KingdomHexTileAlphaBounds, type KingdomHexTileSelection } from '@/utils/world-visuals';
 
 export type KingdomHexCenterRef = () => { col: number; row: number; plotId: string | null } | null;
 export type KingdomResidentStatusGlyph = 'offer' | 'active' | 'ready';
@@ -80,20 +80,8 @@ const HOUSE_SIZE = 62;
 const DECOR_BASE_SIZE = 54;
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
-const EGG_STAGE_SCALE = 0.7;
+const EGG_STAGE_SCALE = 0.32;
 const CENTER_TILE_ASSET_SIZE = 1024;
-const CENTER_TILE_ALPHA_BOUNDS = {
-  left: 14,
-  top: 144,
-  right: 1010,
-  bottom: 879,
-};
-const DEFAULT_TILE_ALPHA_BOUNDS = {
-  left: 14,
-  top: 147,
-  right: 1010,
-  bottom: 876,
-};
 
 function residentTileId(creatureId: string) {
   return `resident:${creatureId}`;
@@ -111,7 +99,7 @@ function tileVisibleBounds(cx: number, cy: number) {
   };
 }
 
-function tileArtFrame(tile: TileRender, assetBounds: typeof CENTER_TILE_ALPHA_BOUNDS) {
+function tileArtFrame(tile: TileRender, assetBounds: KingdomHexTileAlphaBounds) {
   const target = tileVisibleBounds(tile.cx, tile.cy);
   const assetBoundsWidth = assetBounds.right - assetBounds.left;
   const assetBoundsCenterX = (assetBounds.left + assetBounds.right) / 2;
@@ -129,15 +117,15 @@ function tileArtFrame(tile: TileRender, assetBounds: typeof CENTER_TILE_ALPHA_BO
   };
 }
 
-function tileArtFor(tile: TileRender) {
+function tileArtFor(tile: TileRender, hexTiles: KingdomHexTileSelection) {
   return tile.kind === 'center'
     ? {
-        source: KINGDOM_EGG_HEX_TILE,
-        frame: tileArtFrame(tile, CENTER_TILE_ALPHA_BOUNDS),
+        source: hexTiles.center.source,
+        frame: tileArtFrame(tile, hexTiles.center.alphaBounds),
       }
     : {
-        source: KINGDOM_DEFAULT_HEX_TILE,
-        frame: tileArtFrame(tile, DEFAULT_TILE_ALPHA_BOUNDS),
+        source: hexTiles.default.source,
+        frame: tileArtFrame(tile, hexTiles.default.alphaBounds),
       };
 }
 
@@ -231,13 +219,14 @@ export function KingdomHexCanvas({
 
   const centreTile = useMemo(() => scene.tiles.find((tile) => tile.id === CENTER_ID) ?? scene.tiles[0], [scene.tiles]);
   const tileById = useMemo(() => new Map(scene.tiles.map((tile) => [tile.id, tile])), [scene.tiles]);
+  const hexTiles = kingdomHexTileSet();
   const tileArtLayers = useMemo(
     () =>
       scene.tiles.map((tile) => ({
         id: tile.id,
-        ...tileArtFor(tile),
+        ...tileArtFor(tile, hexTiles),
       })),
-    [scene.tiles]
+    [hexTiles, scene.tiles]
   );
 
   const baseScale = viewport.width && viewport.height ? Math.min(1.28, Math.max(0.72, Math.min(viewport.width / 520, viewport.height / 620))) : 1;
@@ -436,7 +425,7 @@ export function KingdomHexCanvas({
                     transform: [{ scale: EGG_STAGE_SCALE }],
                   },
                 ]}>
-                <LanternEgg egg={eggVisual} lanternColor={lanternColor} />
+                <LanternEgg egg={eggVisual} interactive={false} lanternColor={lanternColor} showMembrane={false} />
               </Pressable>
             ) : (
               <View style={[styles.centerMark, { left: centreTile.cx - 28, top: centreTile.cy - 36 }]}>
@@ -553,10 +542,11 @@ const HexDecorSprite = memo(function HexDecorSprite({
   const dx = useSharedValue(0);
   const dy = useSharedValue(0);
   const dragging = useSharedValue(false);
+  const released = useSharedValue(false);
   const source = worldAssetSource(item.assetKey);
   const size = DECOR_BASE_SIZE * (item.sizeScale ?? 1);
   const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dx.value }, { translateY: dy.value }, { scale: dragging.value ? 1.07 : 1 }],
+    transform: [{ translateX: dx.value }, { translateY: dy.value }],
     zIndex: dragging.value ? 20 : 1,
   }));
   const commit = useCallback(
@@ -576,25 +566,34 @@ const HexDecorSprite = memo(function HexDecorSprite({
     },
     [item.id, onMoveDecor, tile, tiles, x, y]
   );
+
+  useLayoutEffect(() => {
+    dx.value = 0;
+    dy.value = 0;
+    released.value = false;
+  }, [dx, dy, released, x, y]);
+
   const drag = Gesture.Pan()
     .enabled(Boolean(onMoveDecor))
     .activateAfterLongPress(customising ? 0 : 320)
     .onStart(() => {
       dragging.value = true;
+      released.value = false;
     })
     .onChange((event) => {
       dx.value = event.translationX / scaleSV.value;
       dy.value = event.translationY / scaleSV.value;
     })
     .onEnd(() => {
+      released.value = true;
       runOnJS(commit)(dx.value, dy.value);
-      dx.value = withTiming(0, { duration: 140 });
-      dy.value = withTiming(0, { duration: 140 });
     })
     .onFinalize(() => {
       dragging.value = false;
-      dx.value = withTiming(0, { duration: 140 });
-      dy.value = withTiming(0, { duration: 140 });
+      if (!released.value) {
+        dx.value = withTiming(0, { duration: 140 });
+        dy.value = withTiming(0, { duration: 140 });
+      }
     });
   return (
     <GestureDetector gesture={drag}>

@@ -3,7 +3,7 @@ import type { ImageSourcePropType } from 'react-native';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { WORLD_OBJECT_LOD_SOURCES, type WorldObjectLod } from '@/constants/world-asset-lod-sources.gen';
 import { PROMOTED_WORLD_SOURCES } from '@/constants/world-asset-sources.gen';
-import { getDevAssetOverrideSource, getDevKingdomBaseId } from '@/utils/dev-asset-overrides';
+import { getDevAssetOverrideSource, getDevKingdomBaseId, getDevKingdomHexBaseTileId, getDevKingdomHexCenterTileId } from '@/utils/dev-asset-overrides';
 import type { HomeVisualKey } from '@/types/home';
 
 export type { WorldObjectLod };
@@ -247,9 +247,9 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   studio_shelf: require('../assets/images/katchimeras/world/objects/studio_shelf/studio_shelf_01.webp'),
   // Town Hall: keeps the day's story; tapping it opens the Chronicle reader.
   // User-supplied house cottage (BiRefNet-matted + tight-framed from world/house.png).
-  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_01.webp'), // original perspective restored; iso-aligned _02 kept
+  town_hall: require('../assets/images/katchimeras/world/objects/town_hall_house/town_hall_house_hex_v2.webp'),
   // Quest Board: today's notice board; tapping it opens the day's Memory Quests.
-  quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_01.png'), // original perspective restored; iso-aligned _02 kept
+  quest_board: require('../assets/images/katchimeras/world/objects/quest_board/quest_board_hex_v2.webp'),
 
   // --- Kingdom keepsakes (K5 wave 2 — earned decorations, kingdom-decor.ts) ---
   trail_stone: require('../assets/images/katchimeras/world/objects/trail_stones/trail_stone_pick.png'), // 👣 journeys
@@ -262,44 +262,44 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
 
   // --- Cozy Collectible buildings (docs/world-structures-cozy-direction.md) ---
   // The 7 domains in one designer-toy style, on the new base_env2 island.
-  home: require('../assets/images/katchimeras/world/objects/home/home_01.webp'), // 🏠 the day's story (chronicle) — original perspective restored; iso-aligned home_02 kept
+  home: require('../assets/images/katchimeras/world/objects/home/home_hex_v2.webp'), // 🏠 the day's story (chronicle)
   // Round paver plaza — plantable centre platform matching base_garden_main
   // (the main tile has NO baked plaza; this object provides it).
-  plaza_platform: require('../assets/images/katchimeras/world/objects/plaza_platform/plaza_platform_01.webp'),
-  memory_vault: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'), // 📸 owns all captured media
-  memory_vault_empty: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
+  plaza_platform: require('../assets/images/katchimeras/world/objects/plaza_platform/plaza_platform_hex_v2.webp'),
+  memory_vault: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_hex_v2.webp'), // 📸 owns all captured media
+  memory_vault_empty: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_hex_v2.webp'),
   // Memory Vault GROWS 1→4 (same identity, richer): small safe → grand multi-tier vault.
-  memory_vault_1: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_01.png'),
+  memory_vault_1: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_hex_v2.webp'),
   memory_vault_2: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_02.webp'),
   memory_vault_3: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_03.webp'),
   memory_vault_4: require('../assets/images/katchimeras/world/objects/memory_vault/memory_vault_04.webp'),
-  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_01.png'), // 🗺 where did I go? (cozy signpost + lantern) — original perspective restored; iso-aligned _02/_03 kept
-  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_01.png'), // 🛤 how did I move? (cozy footprint stele) — original perspective restored; iso-aligned _02 kept
+  crossroads: require('../assets/images/katchimeras/world/objects/crossroads/crossroads_hex_v2.webp'), // 🗺 where did I go?
+  journey_hall: require('../assets/images/katchimeras/world/objects/journey_hall/journey_hall_hex_v2.webp'), // 🛤 how did I move?
   // 🔭 Observatory tower (Places / where I went) — a proper structure with a telescope.
-  observatory: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
-  observatory_empty: require('../assets/images/katchimeras/world/objects/observatory/observatory_01.png'),
+  observatory: require('../assets/images/katchimeras/world/objects/observatory/observatory_hex_v2.webp'),
+  observatory_empty: require('../assets/images/katchimeras/world/objects/observatory/observatory_hex_v2.webp'),
   // 👣 Steps path (Journey / how I moved) — a small engraved stepping-stone trail that
   // GROWS its stone count by level (3 → 5 → 7 → winding path).
   steps_path_1: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_01.webp'),
   steps_path_2: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_02.webp'),
   steps_path_3: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_03.webp'),
   steps_path_4: require('../assets/images/katchimeras/world/objects/steps_path/steps_path_04.webp'),
-  sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_01.png'), // 🌿 how today felt (mood) — original perspective restored; iso-aligned _02/_03 kept
-  sanctuary_empty: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_03.webp'),
-  study: require('../assets/images/katchimeras/world/objects/study/study_01.png'), // 📚 what inspired me — original perspective restored; iso-aligned _02 kept
-  food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_01.png'), // 🍽 what I savoured — original perspective restored; iso-aligned _02 kept
+  sanctuary: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_hex_v2.webp'), // 🌿 how today felt (mood)
+  sanctuary_empty: require('../assets/images/katchimeras/world/objects/sanctuary/sanctuary_hex_v2.webp'),
+  study: require('../assets/images/katchimeras/world/objects/study/study_hex_v2.webp'), // 📚 what inspired me
+  food_pavilion: require('../assets/images/katchimeras/world/objects/food_pavilion/food_pavilion_hex_v2.webp'), // 🍽 what I savoured
   // Memory cluster satellites + the Featured Memory Board (the day's cover).
-  featured_board: require('../assets/images/katchimeras/world/objects/featured_board/featured_board_01.png'),
-  photos_stack: require('../assets/images/katchimeras/world/objects/photos_stack/photos_stack_01.png'),
-  notes_stack: require('../assets/images/katchimeras/world/objects/notes_stack/notes_stack_01.png'),
+  featured_board: require('../assets/images/katchimeras/world/objects/featured_board/featured_board_hex_v2.webp'),
+  photos_stack: require('../assets/images/katchimeras/world/objects/photos_stack/photos_stack_hex_v2.webp'),
+  notes_stack: require('../assets/images/katchimeras/world/objects/notes_stack/notes_stack_hex_v2.webp'),
   // 😴 Sleep nook (Sanctuary satellite) — how the day began; cozy bed + moon by quality.
-  sleep_nook_empty: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_empty.png'),
+  sleep_nook_empty: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_hex_v2.webp'),
   sleep_nook_good: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_01.png'),
   sleep_nook_normal: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_11.png'),
   sleep_nook_low: require('../assets/images/katchimeras/world/objects/sleep_nook/sleep_nook_04.png'),
   // Mood Monument states: one generated structure family with consistent frame
   // and state-specific face/emblem panels.
-  mood_monument_empty: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_empty.png'),
+  mood_monument_empty: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_hex_v2.webp'),
   mood_monument_radiant: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_radiant.png'),
   mood_monument_light: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_light.png'),
   mood_monument_meh: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_meh.png'),
@@ -307,24 +307,23 @@ const WORLD_OBJECT_SOURCES: Record<string, ImageSourcePropType> = {
   mood_monument_stormy: require('../assets/images/katchimeras/world/objects/mood_monument/mood_monument_stormy.png'),
 
   // Decorate-your-day plant palette (earned blooms, planted freely on the patch).
-  // 16-prop decoration set (trees incl. cone pine, shrubs, flowers, crates, barrel,
-  // lantern, signpost, boulder, mushrooms, hay bale) — planted freely in Decorate mode.
-  decor_1: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_01.png'), // cone pine
-  decor_2: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_02.png'), // oak
-  decor_3: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_03.png'), // blossom tree
-  decor_4: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_04_v3.webp'), // birch — BiRefNet-heavy matte (clears enclosed canopy gaps); _04.png/_v2 kept as backup
-  decor_5: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_05.png'), // shrub
-  decor_6: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_06.png'), // fern
-  decor_7: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_07.png'), // wildflowers
-  decor_8: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_08.png'), // potted plant
+  // Nature props use the hex-era style sheet; utility props stay on their original art.
+  decor_1: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_03.webp'), // cone pine
+  decor_2: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_01.webp'), // leafy tree
+  decor_3: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_06.webp'), // flowering shrub
+  decor_4: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_02.webp'), // small leafy tree
+  decor_5: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_05.webp'), // shrub
+  decor_6: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_14.webp'), // grass tuft
+  decor_7: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_13.webp'), // wildflowers
+  decor_8: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_12.webp'), // sapling
   decor_9: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_09.png'), // crate
   decor_10: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_10.png'), // crate stack
   decor_11: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_11.png'), // barrel
   decor_12: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_12.png'), // lantern post
   decor_13: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_13.png'), // signpost
-  decor_14: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_14.png'), // boulder
-  decor_15: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_15.png'), // mushrooms
-  decor_16: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_16.png'),
+  decor_14: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_08.webp'), // rock cluster
+  decor_15: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_15.webp'), // mushrooms
+  decor_16: require('../assets/images/katchimeras/world/objects/decor_plants/decor_plants_style_v2_11.webp'), // log
   // B1 bloom variant families (4x4 grid batch, 2026-07) - see BLOOM_COMMONS.
   bloom_birch_1: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/birch_v1.webp'),
   bloom_birch_2: require('../assets/images/katchimeras/world/objects/decor_plants/bloom/birch_v2.webp'),
@@ -425,8 +424,125 @@ export const COBBLE_PATH_TEXTURE: ImageSourcePropType = require('../assets/image
 // gen-kingdom-slab.py + fit-kingdom-slab.py). Drawn as ONE image in place of
 // the procedural face layers.
 export const KINGDOM_SLAB_OVERLAY: ImageSourcePropType = require('../assets/images/katchimeras/world/base/base_kingdom_slab.webp');
+export type KingdomHexTileAlphaBounds = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+export type KingdomHexTileSpec = {
+  source: ImageSourcePropType;
+  alphaBounds: KingdomHexTileAlphaBounds;
+};
+
+export type KingdomHexTileVariant = {
+  id: string;
+  label: string;
+  description: string;
+  tile: KingdomHexTileSpec;
+};
+
+export type KingdomHexTileSelection = {
+  center: KingdomHexTileSpec;
+  default: KingdomHexTileSpec;
+};
+
 export const KINGDOM_DEFAULT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/default_hex_tile.webp');
 export const KINGDOM_EGG_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_hex_tile.webp');
+export const KINGDOM_EGG_HEX_TILE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_hex_tile_v2.webp');
+export const KINGDOM_CENTER_PLAZA_HEX_TILE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/center_plaza_hex_tile_v2.webp');
+export const KINGDOM_GRASS_HEX_TILE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_v2.webp');
+export const KINGDOM_GRASS_HEX_TILE_DENSE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2.webp');
+export const KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_crossroad_v2.webp');
+export const KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_vertical_v2.webp');
+export const KINGDOM_GRASS_HEX_TILE_PATH_Y_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_y_v2.webp');
+
+export const KINGDOM_HEX_CENTER_TILE_VARIANTS: KingdomHexTileVariant[] = [
+  {
+    id: 'egg',
+    label: 'Egg nest',
+    description: 'Current egg-center hex tile.',
+    tile: {
+      source: KINGDOM_EGG_HEX_TILE_V2,
+      alphaBounds: { left: 26, top: 157, right: 1002, bottom: 888 },
+    },
+  },
+  {
+    id: 'plaza',
+    label: 'Plaza center',
+    description: 'Three-path plaza center tile.',
+    tile: {
+      source: KINGDOM_CENTER_PLAZA_HEX_TILE_V2,
+      alphaBounds: { left: 14, top: 142, right: 1010, bottom: 881 },
+    },
+  },
+];
+
+export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
+  {
+    id: 'classic_grass',
+    label: 'Classic grass',
+    description: 'Original empty grass resident tile.',
+    tile: {
+      source: KINGDOM_DEFAULT_HEX_TILE,
+      alphaBounds: { left: 14, top: 147, right: 1010, bottom: 876 },
+    },
+  },
+  {
+    id: 'smooth_grass',
+    label: 'Smooth grass',
+    description: 'Open smooth grass tile.',
+    tile: {
+      source: KINGDOM_GRASS_HEX_TILE_V2,
+      alphaBounds: { left: 14, top: 148, right: 1010, bottom: 875 },
+    },
+  },
+  {
+    id: 'dense_grass',
+    label: 'Detailed grass',
+    description: 'Denser tufted grass base tile.',
+    tile: {
+      source: KINGDOM_GRASS_HEX_TILE_DENSE_V2,
+      alphaBounds: { left: 14, top: 142, right: 1010, bottom: 882 },
+    },
+  },
+  {
+    id: 'crossroad_path',
+    label: 'Crossroad path',
+    description: 'Four-way cobble path resident tile.',
+    tile: {
+      source: KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2,
+      alphaBounds: { left: 25, top: 159, right: 1001, bottom: 888 },
+    },
+  },
+  {
+    id: 'vertical_path',
+    label: 'Curved path',
+    description: 'Single winding cobble path resident tile.',
+    tile: {
+      source: KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2,
+      alphaBounds: { left: 25, top: 159, right: 1002, bottom: 888 },
+    },
+  },
+  {
+    id: 'y_path',
+    label: 'Forked path',
+    description: 'Three-way forked cobble path resident tile.',
+    tile: {
+      source: KINGDOM_GRASS_HEX_TILE_PATH_Y_V2,
+      alphaBounds: { left: 26, top: 159, right: 1004, bottom: 889 },
+    },
+  },
+];
+
+export function kingdomHexTileSet(): KingdomHexTileSelection {
+  const centerId = getDevKingdomHexCenterTileId();
+  const baseId = getDevKingdomHexBaseTileId();
+  const center = KINGDOM_HEX_CENTER_TILE_VARIANTS.find((variant) => variant.id === centerId) ?? KINGDOM_HEX_CENTER_TILE_VARIANTS[0];
+  const base = KINGDOM_HEX_BASE_TILE_VARIANTS.find((variant) => variant.id === baseId) ?? KINGDOM_HEX_BASE_TILE_VARIANTS[0];
+  return { center: center.tile, default: base.tile };
+}
 
 export const DECAL_ATLAS: ImageSourcePropType = require('../assets/images/katchimeras/world/decals/_atlas.webp');
 export const DECAL_ATLAS_COLS = 4;

@@ -35,8 +35,15 @@ import {
   type AssetLabMode,
   type AssetLabModel,
 } from '@/utils/asset-lab';
-import { getDevKingdomBaseId, setDevKingdomBaseId } from '@/utils/dev-asset-overrides';
-import { worldAssetSource, worldBaseSource } from '@/utils/world-visuals';
+import {
+  getDevKingdomBaseId,
+  getDevKingdomHexBaseTileId,
+  getDevKingdomHexCenterTileId,
+  setDevKingdomBaseId,
+  setDevKingdomHexBaseTileId,
+  setDevKingdomHexCenterTileId,
+} from '@/utils/dev-asset-overrides';
+import { KINGDOM_HEX_BASE_TILE_VARIANTS, KINGDOM_HEX_CENTER_TILE_VARIANTS, worldAssetSource, worldBaseSource } from '@/utils/world-visuals';
 
 // DEV TOOL — the World Asset Lab (v1: browse + audit). Every bundled world
 // asset by section, with its display name and UNLOCK PROVENANCE (what life
@@ -92,6 +99,18 @@ export default function DevAssetLabScreen() {
     setDevKingdomBaseId(baseId);
     setKingdomBase(baseId);
   };
+  const [hexCenterTileId, setHexCenterTileId] = useState(
+    () => getDevKingdomHexCenterTileId() ?? KINGDOM_HEX_CENTER_TILE_VARIANTS[0].id
+  );
+  const [hexBaseTileId, setHexBaseTileId] = useState(() => getDevKingdomHexBaseTileId() ?? KINGDOM_HEX_BASE_TILE_VARIANTS[0].id);
+  const applyHexCenterTile = (tileId: string) => {
+    setDevKingdomHexCenterTileId(tileId === KINGDOM_HEX_CENTER_TILE_VARIANTS[0].id ? null : tileId);
+    setHexCenterTileId(tileId);
+  };
+  const applyHexBaseTile = (tileId: string) => {
+    setDevKingdomHexBaseTileId(tileId === KINGDOM_HEX_BASE_TILE_VARIANTS[0].id ? null : tileId);
+    setHexBaseTileId(tileId);
+  };
 
   return (
     <View style={styles.screen}>
@@ -115,6 +134,88 @@ export default function DevAssetLabScreen() {
         <ThemedText style={styles.subtitle} lightColor="#AAB4D4" darkColor="#AAB4D4">
           {totalCount} live assets · tap any tile for provenance, variants and the generate/edit loop.
         </ThemedText>
+
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+            Hex tiles
+            <ThemedText style={styles.sectionCount} lightColor="#8C96B8" darkColor="#8C96B8">
+              {'  '}{KINGDOM_HEX_CENTER_TILE_VARIANTS.length + KINGDOM_HEX_BASE_TILE_VARIANTS.length}
+            </ThemedText>
+          </ThemedText>
+          <ThemedText style={styles.sectionBlurb} lightColor="#8C96B8" darkColor="#8C96B8">
+            Switch the center tile and resident/base tiles independently in the live World tab.
+          </ThemedText>
+          <ThemedText style={styles.hexGroupTitle} lightColor="#E8EEFF" darkColor="#E8EEFF">
+            Center tile
+          </ThemedText>
+          <View style={styles.hexSetGrid}>
+            {KINGDOM_HEX_CENTER_TILE_VARIANTS.map((variant) => {
+              const active = hexCenterTileId === variant.id;
+              return (
+                <Pressable
+                  key={variant.id}
+                  accessibilityRole="button"
+                  onPress={() => applyHexCenterTile(variant.id)}
+                  style={({ pressed }) => [styles.hexSetCard, active ? styles.hexSetCardActive : null, pressed ? styles.tilePressed : null]}>
+                  <View style={styles.hexPreviewRow}>
+                    <View style={styles.hexPreview}>
+                      <Image source={variant.tile.source} style={styles.hexPreviewArt} contentFit="contain" transition={0} />
+                      <ThemedText style={styles.hexPreviewLabel} lightColor="#8C96B8" darkColor="#8C96B8">
+                        center
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <View style={styles.hexSetText}>
+                    <ThemedText style={styles.hexSetTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                      {variant.label}
+                    </ThemedText>
+                    <ThemedText style={styles.hexSetDesc} lightColor="#AAB4D4" darkColor="#AAB4D4">
+                      {variant.description}
+                    </ThemedText>
+                    <ThemedText style={styles.hexSetAction} lightColor={active ? '#A8E2C6' : '#FFC36B'} darkColor={active ? '#A8E2C6' : '#FFC36B'}>
+                      {active ? 'Used for center tile' : 'Use for center tile'}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <ThemedText style={styles.hexGroupTitle} lightColor="#E8EEFF" darkColor="#E8EEFF">
+            Resident/base tiles
+          </ThemedText>
+          <View style={styles.hexSetGrid}>
+            {KINGDOM_HEX_BASE_TILE_VARIANTS.map((variant) => {
+              const active = hexBaseTileId === variant.id;
+              return (
+                <Pressable
+                  key={variant.id}
+                  accessibilityRole="button"
+                  onPress={() => applyHexBaseTile(variant.id)}
+                  style={({ pressed }) => [styles.hexSetCard, active ? styles.hexSetCardActive : null, pressed ? styles.tilePressed : null]}>
+                  <View style={styles.hexPreviewRow}>
+                    <View style={styles.hexPreview}>
+                      <Image source={variant.tile.source} style={styles.hexPreviewArt} contentFit="contain" transition={0} />
+                      <ThemedText style={styles.hexPreviewLabel} lightColor="#8C96B8" darkColor="#8C96B8">
+                        base
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <View style={styles.hexSetText}>
+                    <ThemedText style={styles.hexSetTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                      {variant.label}
+                    </ThemedText>
+                    <ThemedText style={styles.hexSetDesc} lightColor="#AAB4D4" darkColor="#AAB4D4">
+                      {variant.description}
+                    </ThemedText>
+                    <ThemedText style={styles.hexSetAction} lightColor={active ? '#A8E2C6' : '#FFC36B'} darkColor={active ? '#A8E2C6' : '#FFC36B'}>
+                      {active ? 'Used for resident tiles' : 'Use for resident tiles'}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
 
         {sections.map(({ section, entries }) =>
           entries.length === 0 ? null : (
@@ -722,6 +823,28 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '800' },
   sectionCount: { fontSize: 13, fontWeight: '700' },
   sectionBlurb: { fontSize: 12, lineHeight: 16, marginBottom: 10, marginTop: 2 },
+  hexGroupTitle: { fontSize: 12, fontWeight: '900', marginBottom: 8, marginTop: 8, textTransform: 'uppercase' },
+  hexSetGrid: { gap: 10 },
+  hexSetCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(216,228,255,0.12)',
+    borderCurve: 'continuous',
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 10,
+  },
+  hexSetCardActive: { backgroundColor: 'rgba(168,226,198,0.1)', borderColor: 'rgba(168,226,198,0.65)' },
+  hexPreviewRow: { flexDirection: 'row', gap: 7 },
+  hexPreview: { alignItems: 'center', gap: 3 },
+  hexPreviewArt: { height: 62, width: 62 },
+  hexPreviewLabel: { fontSize: 9.5, fontWeight: '800', textTransform: 'uppercase' },
+  hexSetText: { flex: 1, gap: 3 },
+  hexSetTitle: { fontSize: 14, fontWeight: '900' },
+  hexSetDesc: { fontSize: 11.5, lineHeight: 15 },
+  hexSetAction: { fontSize: 12, fontWeight: '900', marginTop: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tile: {
     alignItems: 'center',

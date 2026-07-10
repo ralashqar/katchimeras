@@ -47,6 +47,10 @@ type LanternEggProps = {
   // Vertical lift of the shell inside the dome/membrane (negative = up). The
   // default centres it; a smaller magnitude sits the egg lower in the glass.
   shellOffsetY?: number;
+  // World/kingdom displays can render the egg like a passive object: no drag/tap
+  // membrane interaction, and optionally no glass/ripple membrane art.
+  interactive?: boolean;
+  showMembrane?: boolean;
 };
 
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
@@ -76,6 +80,8 @@ export function LanternEgg({
   membraneOffsetY = 0,
   shellScale = 1,
   shellOffsetY = -26,
+  interactive = true,
+  showMembrane = true,
 }: LanternEggProps) {
   const pressProgress = useSharedValue(0);
   const ripple = useSharedValue(1);
@@ -182,6 +188,7 @@ export function LanternEgg({
   };
 
   const tapGesture = Gesture.Tap()
+    .enabled(interactive)
     .maxDeltaX(12)
     .maxDeltaY(12)
     .onBegin(() => {
@@ -196,6 +203,7 @@ export function LanternEgg({
     });
 
   const panGesture = Gesture.Pan()
+    .enabled(interactive)
     .minDistance(10)
     .onBegin(() => {
       pressProgress.value = withTiming(1, { duration: 140, easing: Easing.out(Easing.cubic) });
@@ -291,30 +299,34 @@ export function LanternEgg({
           tintColor={lanternColor ?? egg.haloColor}
           transition={0}
         />
-        <AnimatedImage
-          contentFit="contain"
-          allowDownscaling={false}
-          pointerEvents="none"
-          source={glassDome}
-          style={[styles.dome, membraneStyle]}
-          transition={0}
-        />
-        <AnimatedImage
-          contentFit="contain"
-          pointerEvents="none"
-          source={softRing}
-          style={[styles.membrane, rippleStyle]}
-          tintColor={egg.accentColor}
-          transition={0}
-        />
-        <AnimatedImage
-          contentFit="contain"
-          pointerEvents="none"
-          source={softRing}
-          style={[styles.membrane, rippleEchoStyle]}
-          tintColor={egg.coreColor}
-          transition={0}
-        />
+        {showMembrane ? (
+          <>
+            <AnimatedImage
+              contentFit="contain"
+              allowDownscaling={false}
+              pointerEvents="none"
+              source={glassDome}
+              style={[styles.dome, membraneStyle]}
+              transition={0}
+            />
+            <AnimatedImage
+              contentFit="contain"
+              pointerEvents="none"
+              source={softRing}
+              style={[styles.membrane, rippleStyle]}
+              tintColor={egg.accentColor}
+              transition={0}
+            />
+            <AnimatedImage
+              contentFit="contain"
+              pointerEvents="none"
+              source={softRing}
+              style={[styles.membrane, rippleEchoStyle]}
+              tintColor={egg.coreColor}
+              transition={0}
+            />
+          </>
+        ) : null}
         <Animated.View style={liftStyle}>
           <EggShell crackStage={crackStage} egg={egg} motion={motion} reactionKey={reactionKey} />
         </Animated.View>

@@ -43,3 +43,60 @@ export function setDevKingdomBaseId(baseId: string | null): void {
   devKingdomBaseId = baseId;
   setStoredJson(DEV_BASE_KEY, baseId);
 }
+
+// --- Kingdom hex tile overrides (dev) ---------------------------------------
+// The Asset Lab can switch center and resident/base hex tile art independently.
+// null = bundled default variant. Production always ignores it.
+const DEV_HEX_TILE_SET_KEY = 'katchadeck.dev-kingdom-hex-tile-set-v1';
+const DEV_HEX_CENTER_TILE_KEY = 'katchadeck.dev-kingdom-hex-center-tile-v1';
+const DEV_HEX_BASE_TILE_KEY = 'katchadeck.dev-kingdom-hex-base-tile-v1';
+let devKingdomHexCenterTileId: string | null | undefined;
+let devKingdomHexBaseTileId: string | null | undefined;
+
+export function getDevKingdomHexTileSetId(): string | null {
+  return getDevKingdomHexBaseTileId();
+}
+
+export function setDevKingdomHexTileSetId(tileSetId: string | null): void {
+  setDevKingdomHexBaseTileId(tileSetId);
+}
+
+export function getDevKingdomHexCenterTileId(): string | null {
+  if (!__DEV__) return null;
+  if (devKingdomHexCenterTileId === undefined) {
+    devKingdomHexCenterTileId = getStoredJson<string | null>(DEV_HEX_CENTER_TILE_KEY, null);
+    if (devKingdomHexCenterTileId === null) {
+      const legacySetId = getStoredJson<string | null>(DEV_HEX_TILE_SET_KEY, null);
+      if (legacySetId === 'plaza_grass_v2' || legacySetId === 'plaza_dense_grass_v2') {
+        devKingdomHexCenterTileId = 'plaza';
+      }
+    }
+  }
+  return devKingdomHexCenterTileId ?? null;
+}
+
+export function setDevKingdomHexCenterTileId(tileId: string | null): void {
+  devKingdomHexCenterTileId = tileId;
+  setStoredJson(DEV_HEX_CENTER_TILE_KEY, tileId);
+}
+
+export function getDevKingdomHexBaseTileId(): string | null {
+  if (!__DEV__) return null;
+  if (devKingdomHexBaseTileId === undefined) {
+    devKingdomHexBaseTileId = getStoredJson<string | null>(DEV_HEX_BASE_TILE_KEY, null);
+    if (devKingdomHexBaseTileId === null) {
+      const legacySetId = getStoredJson<string | null>(DEV_HEX_TILE_SET_KEY, null);
+      if (legacySetId === 'plaza_grass_v2') {
+        devKingdomHexBaseTileId = 'smooth_grass';
+      } else if (legacySetId === 'plaza_dense_grass_v2') {
+        devKingdomHexBaseTileId = 'dense_grass';
+      }
+    }
+  }
+  return devKingdomHexBaseTileId ?? null;
+}
+
+export function setDevKingdomHexBaseTileId(tileId: string | null): void {
+  devKingdomHexBaseTileId = tileId;
+  setStoredJson(DEV_HEX_BASE_TILE_KEY, tileId);
+}

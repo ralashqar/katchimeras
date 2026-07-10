@@ -108,21 +108,21 @@ export function decorPalette(archetype: WorldArchetype): string[] {
 // props small. Keyed by assetKey; defaults to 1.
 const DECOR_SCALE: Record<string, number> = {
   decor_1: 1.35, // cone pine
-  decor_2: 1.35, // oak
-  decor_3: 1.3, // blossom tree
-  decor_4: 1.3, // birch
+  decor_2: 1.35, // leafy tree
+  decor_3: 1.3, // flowering shrub
+  decor_4: 1.3, // small leafy tree
   decor_5: 0.85, // shrub
-  decor_6: 0.85, // fern
+  decor_6: 0.85, // grass tuft
   decor_7: 0.8, // wildflowers
-  decor_8: 0.8, // potted plant
+  decor_8: 0.8, // sapling
   decor_9: 0.85, // crate
   decor_10: 0.95, // crate stack
   decor_11: 0.9, // barrel
   decor_12: 1.15, // lantern post
   decor_13: 1.05, // signpost
-  decor_14: 0.9, // boulder
+  decor_14: 0.9, // rock cluster
   decor_15: 0.7, // mushrooms
-  decor_16: 0.9, // hay bale
+  decor_16: 0.9, // log
 };
 
 // Project decor items into render-ready patch objects (category 'decor'). Merged
