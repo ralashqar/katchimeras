@@ -13,7 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
 import { Lantern } from '@/constants/theme';
 import type { EggVisualState } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
@@ -29,7 +29,14 @@ import {
   hexToWorld,
   type HexCoord,
 } from '@/utils/world-hex';
-import { kingdomHexTileSet, worldAssetSource, type KingdomHexTileAlphaBounds, type KingdomHexTileSelection } from '@/utils/world-visuals';
+import {
+  kingdomHexTileSet,
+  kingdomHexTileSourceForLod,
+  worldAssetSource,
+  type KingdomHexTileAlphaBounds,
+  type KingdomHexTileLod,
+  type KingdomHexTileSelection,
+} from '@/utils/world-visuals';
 
 export type KingdomHexCenterRef = () => { col: number; row: number; plotId: string | null } | null;
 export type KingdomResidentStatusGlyph = 'offer' | 'active' | 'ready';
@@ -62,9 +69,18 @@ type Props = {
 const SCENE_PAD = 1200;
 const CENTER_ID = 'kingdom';
 const CREATURE_SIZE = 58;
+const CREATURE_WORLD_SCALE = kingdomWorldViewConfig.katchimera.globalScale;
+const CREATURE_WORLD_SIZE = CREATURE_SIZE * CREATURE_WORLD_SCALE;
+const CREATURE_WORLD_HORIZONTAL_HEX_OFFSET = kingdomWorldViewConfig.katchimera.horizontalOffsetHexTileWidth;
+const CREATURE_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.katchimera.verticalOffsetHexTileHeight;
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
-const EGG_STAGE_SCALE = 0.32;
+const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale;
+const EGG_WORLD_HORIZONTAL_HEX_OFFSET = kingdomWorldViewConfig.egg.horizontalOffsetHexTileWidth;
+const EGG_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.egg.verticalOffsetHexTileHeight;
+const EGG_WORLD_W = EGG_STAGE_W * EGG_WORLD_SCALE;
+const EGG_WORLD_H = EGG_STAGE_H * EGG_WORLD_SCALE;
+const KINGDOM_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 const CENTER_TILE_ASSET_SIZE = 1024;
 const CULL_SCREEN_PAD = 520;
 
@@ -149,6 +165,7 @@ function tileArtFor(tile: TileRender, hexTiles: KingdomHexTileSelection) {
   if (customResidentTile) {
     return {
       source: customResidentTile.source,
+      sources: customResidentTile.sources,
       frame: tileArtFrame(tile, customResidentTile.alphaBounds),
       custom: true,
     };
@@ -156,14 +173,22 @@ function tileArtFor(tile: TileRender, hexTiles: KingdomHexTileSelection) {
   return tile.kind === 'center'
     ? {
         source: hexTiles.center.source,
+        sources: hexTiles.center.sources,
         frame: tileArtFrame(tile, hexTiles.center.alphaBounds),
         custom: false,
       }
     : {
         source: hexTiles.default.source,
+        sources: hexTiles.default.sources,
         frame: tileArtFrame(tile, hexTiles.default.alphaBounds),
         custom: false,
       };
+}
+
+function tileLodForScreenWidth(screenWidth: number): KingdomHexTileLod {
+  if (screenWidth < 360) return 'thumb';
+  if (screenWidth < 760) return 'medium';
+  return 'full';
 }
 
 function sceneFromResidents(residents: KingdomHexResidentTile[]) {
@@ -219,7 +244,6 @@ export function kingdomResidentHexTiles(residents: KingdomResident[], creatures:
 export function KingdomHexCanvas({
   residents,
   eggVisual,
-  lanternColor,
   residentStatusGlyphs,
   onSelectResident,
 }: Props) {
@@ -248,8 +272,16 @@ export function KingdomHexCanvas({
     [cameraSnapshot, scene.height, scene.width, viewport]
   );
   const visibleTileArtLayers = useMemo(
-    () => (cullWorldRect ? tileArtLayers.filter((tile) => rectsIntersect(frameToRect(tile.frame), cullWorldRect)) : tileArtLayers),
-    [cullWorldRect, tileArtLayers]
+    () =>
+      (cullWorldRect ? tileArtLayers.filter((tile) => rectsIntersect(frameToRect(tile.frame), cullWorldRect)) : tileArtLayers).map((tile) => {
+        const lod = tileLodForScreenWidth(tile.frame.width * cameraSnapshot.scale);
+        return {
+          ...tile,
+          lod,
+          source: kingdomHexTileSourceForLod(tile, lod),
+        };
+      }),
+    [cameraSnapshot.scale, cullWorldRect, tileArtLayers]
   );
   const visibleTileIds = useMemo(() => new Set(visibleTileArtLayers.map((tile) => tile.id)), [visibleTileArtLayers]);
 
@@ -375,7 +407,10 @@ export function KingdomHexCanvas({
     for (const tile of scene.tiles) {
       if (!visibleTileIds.has(tile.id)) continue;
       if (tile.kind === 'resident' && tile.resident) {
-        const creature = { x: tile.cx, y: tile.cy + HEX_TILE_H * 0.03 };
+        const creature = {
+          x: tile.cx + HEX_TILE_W * CREATURE_WORLD_HORIZONTAL_HEX_OFFSET,
+          y: tile.cy + HEX_TILE_H * CREATURE_WORLD_VERTICAL_HEX_OFFSET,
+        };
         items.push({
           id: `creature-${tile.id}`,
           depth: hexDrawDepth(creature, 4),
@@ -420,12 +455,11 @@ export function KingdomHexCanvas({
                 style={[
                   styles.eggLayer,
                   {
-                    left: centreTile.cx - EGG_STAGE_W / 2,
-                    top: centreTile.cy - EGG_STAGE_H / 2 - HEX_TILE_H * 0.04,
-                    transform: [{ scale: EGG_STAGE_SCALE }],
+                    left: centreTile.cx + HEX_TILE_W * EGG_WORLD_HORIZONTAL_HEX_OFFSET - EGG_WORLD_W / 2,
+                    top: centreTile.cy + HEX_TILE_H * EGG_WORLD_VERTICAL_HEX_OFFSET - EGG_WORLD_H / 2,
                   },
                 ]}>
-                <LanternEgg egg={eggVisual} interactive={false} lanternColor={lanternColor} showMembrane={false} />
+                <Image source={KINGDOM_EGG_SOURCE} contentFit="contain" allowDownscaling={false} style={StyleSheet.absoluteFill} />
               </Pressable>
             ) : (
               <View style={[styles.centerMark, { left: centreTile.cx - 28, top: centreTile.cy - 36 }]}>
@@ -459,7 +493,7 @@ function ResidentCreature({
   onSelectResident?: (creatureId: string, label: string) => void;
 }) {
   const creature = tile.resident?.creature;
-  const source = creature ? worldAssetSource(`creature:${creature.visualKey}`) : null;
+  const source = creature ? worldAssetSource(`creature:${creature.visualKey}`, 'thumb') : null;
   const handlePress = useCallback(() => {
     if (!creature) return;
     onFocus?.();
@@ -471,14 +505,16 @@ function ResidentCreature({
       accessibilityLabel={creature?.name}
       onPress={handlePress}
       style={[styles.creature, { left: x - CREATURE_SIZE / 2, top: y - CREATURE_SIZE * 0.63, width: CREATURE_SIZE, height: CREATURE_SIZE }]}>
-      {source ? <Image source={source} contentFit="contain" style={StyleSheet.absoluteFill} /> : null}
-      {statusGlyph ? (
-        <View pointerEvents="none" style={styles.statusGlyphWrap}>
-          <View style={[styles.statusGlyph, statusGlyph === 'active' ? styles.statusGlyphActive : styles.statusGlyphReady]}>
-            <Text style={styles.statusGlyphText}>{statusGlyph === 'offer' ? '!' : '?'}</Text>
+      <View pointerEvents="none" style={styles.creatureVisual}>
+        {source ? <Image source={source} contentFit="contain" style={StyleSheet.absoluteFill} /> : null}
+        {statusGlyph ? (
+          <View pointerEvents="none" style={styles.statusGlyphWrap}>
+            <View style={[styles.statusGlyph, statusGlyph === 'active' ? styles.statusGlyphActive : styles.statusGlyphReady]}>
+              <Text style={styles.statusGlyphText}>{statusGlyph === 'offer' ? '!' : '?'}</Text>
+            </View>
           </View>
-        </View>
-      ) : null}
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -487,7 +523,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
   scene: { position: 'relative' },
   tileArt: { position: 'absolute' },
-  eggLayer: { height: EGG_STAGE_H, position: 'absolute', width: EGG_STAGE_W },
+  eggLayer: { height: EGG_WORLD_H, position: 'absolute', width: EGG_WORLD_W },
   centerMark: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,224,163,0.12)',
@@ -501,6 +537,13 @@ const styles = StyleSheet.create({
   },
   centerMarkText: { color: '#FFE0A3', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' },
   creature: { position: 'absolute' },
+  creatureVisual: {
+    height: CREATURE_WORLD_SIZE,
+    left: -(CREATURE_WORLD_SIZE - CREATURE_SIZE) / 2,
+    position: 'absolute',
+    top: -(CREATURE_WORLD_SIZE - CREATURE_SIZE),
+    width: CREATURE_WORLD_SIZE,
+  },
   statusGlyphWrap: {
     alignItems: 'center',
     left: 0,

@@ -25,7 +25,10 @@ OUT_ROOT = ROOT / ".tmp" / "katchimera-hex-tiles"
 CAST_THEMES = {
     "feastle": "a hearty food spirit who treats every good meal as a small celebration; cozy feast kitchen and outdoor cafe habitat",
     "flickerbun": "a velvet-dark story lover with projector-bright eyes; cozy miniature cinema and moonlit story theater habitat",
+    "cheerlet": "a joyful party sprite who marks genuinely worth-it moments; bright celebration garden and candlelit confetti habitat",
+    "gatherglow": "a warm hearth spirit who glows brighter in good company; shared-table gathering nook and lantern-lit convivial habitat",
     "mossprout": "gentle and grounded, delighted by green detours; lush park garden and mossy nature habitat",
+    "skylo": "a city-cool wanderer who carries skyline confidence and warm window-light glow; bright urban plaza and cozy street-corner habitat",
     "steppling": "a cheerful walking and hiking spirit who turns long walks, trails, route markers, footprints, and movement milestones into a cozy outdoor habitat",
     "tasklet": "a determined, competent little doer who loves a checked-off list; focused workshop and productivity garden habitat",
     "vesperitt": "a wide-awake small-hours spirit, calm in the quiet after midnight; moonlit night owl study and stargazing habitat",
@@ -38,6 +41,18 @@ TILE_VARIANTS = {
         "small celebratory food market nook with open-roof back stall, produce baskets, meal table and warm lights",
         "quiet breakfast garden cafe with rounded benches, berry shrubs, tiny oven alcove and clear central floor",
     ],
+    "cheerlet": [
+        "bright celebration patio with chunky confetti shapes, low back party-garland walls, one tiny candle plinth, rounded balloon shrubs, gift-like blocks with no text, and a clear open standing area",
+        "joyful garden party nook with low open-roof back perimeter, smooth bunting arches, oversized flower clusters, candle glow, soft path stones, and clean central floor",
+        "small occasion plaza with rounded cake-stand shapes, confetti petals, lantern strings, tiny stage step, festive planters, and open front grass",
+        "cozy birthday-candle courtyard with soft gold lights, chunky balloon posts, simple party table shapes, no writing, and a readable resident clearing",
+    ],
+    "gatherglow": [
+        "warm shared-table hearth nook with low back walls, round communal table, glowing lantern belly motifs, ember lights, cozy stools, and a clear front standing space",
+        "convivial evening garden with tiny open-roof gathering shelter, soft lantern strings, rounded bench circle, warm firefly embers, snack table shapes, and open central grass",
+        "small feast-and-friends patio with low perimeter wall, hearth lamp, shared-table scarf color accents, chunky cushions, glowing jar lights, and clean resident clearing",
+        "cozy community lantern courtyard with rounded seating arc, warm amber path stones, tiny tea table, ember-spark planters, and open front lawn",
+    ],
     "flickerbun": [
         "cozy open-air story cinema with a tiny projector booth, velvet seating, moonlit lanterns, film reels, and a clear front stage",
         "miniature outdoor theater nook with low back walls, blank projection screen, starry curtains, ticket-stub props, and soft purple lights",
@@ -49,6 +64,12 @@ TILE_VARIANTS = {
         "quiet toy greenhouse garden nook with open-roof back perimeter, chunky moss benches, simplified seedling shelves, one rounded watering can, large fern clumps, and central standing space",
         "soft woodland toy park with a clean curved path, smooth mushroom log shapes, rounded leafy arch, one blank nature sign, large pond stones, and open front lawn",
         "minimal mossy meditation garden with low stone border, rounded fern planters, smooth tiny stream, two lanterns, chunky seed sprouts, and a clear resident clearing",
+    ],
+    "skylo": [
+        "bright city-corner pocket plaza with low back skyline-wall silhouettes, warm window-light lantern blocks, rounded bench, simple crosswalk stones, tiny street trees, and clear open standing space",
+        "cozy downtown roof-garden nook with low parapet walls, chunky skyline shapes around the back edge, glowing window tiles, planters, soft path stones, and open front lawn",
+        "urban stroll habitat with smooth pavement loop, toy-like lamp posts, rounded city planters, tiny transit sign with no writing, warm apartment-window motifs, and clear center grass",
+        "mini city square with low open-roof perimeter, skyline crown motifs, cafe bench, soft amber lights, chunky shrubs, no text, and a readable resident clearing",
     ],
     "steppling": [
         "sunny trailhead rest stop with rounded stepping stones, tiny route signposts with no writing, a backpack bench, water station, grass tufts, and soft footprint motifs",

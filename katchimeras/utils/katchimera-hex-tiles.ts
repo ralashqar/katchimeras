@@ -110,7 +110,7 @@ function bundledTileForVisualKey(visualKey: HomeVisualKey): KingdomHexTileSpec |
     catalogEntry?.variants.find((variant) => variant.id === selectedVariantId) ??
     catalogEntry?.variants.find((variant) => variant.id === catalogEntry.defaultVariantId);
   if (selected) {
-    return { source: selected.source, alphaBounds: selected.alphaBounds };
+    return { source: selected.source, sources: selected.sources, alphaBounds: selected.alphaBounds };
   }
   const bundled = KATCHIMERA_HEX_TILE_SOURCES[visualKey];
   return bundled ?? null;

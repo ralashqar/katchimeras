@@ -48,7 +48,7 @@ export function setDevKingdomBaseId(baseId: string | null): void {
 // The Asset Lab can switch center and resident/base hex tile art independently.
 // null = bundled default variant. Production always ignores it.
 const DEV_HEX_TILE_SET_KEY = 'katchadeck.dev-kingdom-hex-tile-set-v1';
-const DEV_HEX_CENTER_TILE_KEY = 'katchadeck.dev-kingdom-hex-center-tile-v1';
+const DEV_HEX_CENTER_TILE_KEY = 'katchadeck.dev-kingdom-hex-center-tile-v2';
 const DEV_HEX_BASE_TILE_KEY = 'katchadeck.dev-kingdom-hex-base-tile-v1';
 let devKingdomHexCenterTileId: string | null | undefined;
 let devKingdomHexBaseTileId: string | null | undefined;

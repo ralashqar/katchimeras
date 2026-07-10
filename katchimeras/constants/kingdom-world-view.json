@@ -1,0 +1,12 @@
+{
+  "katchimera": {
+    "globalScale": 2,
+    "horizontalOffsetHexTileWidth": 0,
+    "verticalOffsetHexTileHeight": 0.2
+  },
+  "egg": {
+    "globalScale": 0.35,
+    "horizontalOffsetHexTileWidth": 0,
+    "verticalOffsetHexTileHeight": -0.11
+  }
+}

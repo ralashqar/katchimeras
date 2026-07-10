@@ -1,10 +1,11 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import type { HomeVisualKey } from '@/types/home';
-import type { KingdomHexTileAlphaBounds } from '@/utils/world-visuals';
+import type { KingdomHexTileAlphaBounds, KingdomHexTileLodSources } from '@/utils/world-visuals';
 
 export type KatchimeraHexTileSource = {
   source: ImageSourcePropType;
+  sources?: KingdomHexTileLodSources;
   alphaBounds: KingdomHexTileAlphaBounds;
 };
 
@@ -27,6 +28,82 @@ export type KatchimeraHexTileCatalogEntry = {
   variants: KatchimeraHexTileVariantSource[];
 };
 
+const RESIDENT_FEASTLE_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile.webp'),
+};
+const RESIDENT_FEASTLE_HEX_TILE_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v2_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v2.webp'),
+};
+const RESIDENT_FEASTLE_HEX_TILE_V3_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v3_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v3_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v3.webp'),
+};
+const RESIDENT_STEPPLING_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile.webp'),
+};
+const RESIDENT_STEPPLING_HEX_TILE_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v2_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v2.webp'),
+};
+const RESIDENT_STEPPLING_HEX_TILE_V3_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v3_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v3_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v3.webp'),
+};
+const RESIDENT_FLICKERBUN_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile.webp'),
+};
+const RESIDENT_FLICKERBUN_HEX_TILE_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v2_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v2.webp'),
+};
+const RESIDENT_FLICKERBUN_HEX_TILE_V3_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v3_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v3_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v3.webp'),
+};
+const RESIDENT_CHEERLET_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_cheerlet_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_cheerlet_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_cheerlet_hex_tile.webp'),
+};
+const RESIDENT_GATHERGLOW_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_gatherglow_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_gatherglow_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_gatherglow_hex_tile.webp'),
+};
+const RESIDENT_MOSSPROUT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_mossprout_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_mossprout_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_mossprout_hex_tile.webp'),
+};
+const RESIDENT_SKYLO_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_skylo_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_skylo_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_skylo_hex_tile.webp'),
+};
+const RESIDENT_TASKLET_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_tasklet_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_tasklet_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_tasklet_hex_tile.webp'),
+};
+const RESIDENT_VESPERITT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile.webp'),
+};
+
 export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, KatchimeraHexTileCatalogEntry>> = {
   feastle: {
     visualKey: 'feastle',
@@ -40,6 +117,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Open-roof Feastle cafe kitchen habitat with warm cooking props and an open standing area.',
         generationId: 'feastle-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile.webp'),
+        sources: RESIDENT_FEASTLE_HEX_TILE_SOURCES,
         alphaBounds: { left: 14, top: 123, right: 1010, bottom: 901 },
         generatedFrom: {
           candidateId: 'feastle-resident-hex-1',
@@ -53,6 +131,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Open Feastle supper patio with low back walls, prep shelves, garden herbs, and cobble path details.',
         generationId: 'feastle-resident-hex-2',
         source: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v2.webp'),
+        sources: RESIDENT_FEASTLE_HEX_TILE_V2_SOURCES,
         alphaBounds: { left: 14, top: 100, right: 1010, bottom: 923 },
         generatedFrom: {
           candidateId: 'feastle-resident-hex-2',
@@ -66,6 +145,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Small celebratory Feastle food market habitat with produce baskets, warm lights, and an open roof stall.',
         generationId: 'feastle-resident-hex-3',
         source: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v3.webp'),
+        sources: RESIDENT_FEASTLE_HEX_TILE_V3_SOURCES,
         alphaBounds: { left: 14, top: 96, right: 1010, bottom: 928 },
         generatedFrom: {
           candidateId: 'feastle-resident-hex-3',
@@ -87,6 +167,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Sunny Steppling trailhead habitat with stepping stones, route signs, water station, and footprint motifs.',
         generationId: 'steppling-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile.webp'),
+        sources: RESIDENT_STEPPLING_HEX_TILE_SOURCES,
         alphaBounds: { left: 27, top: 75, right: 996, bottom: 895 },
         generatedFrom: {
           candidateId: 'steppling-resident-hex-1',
@@ -100,6 +181,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Cozy Steppling hiking-lodge porch habitat with path, trail map shapes, pine shrubs, and open standing space.',
         generationId: 'steppling-resident-hex-2',
         source: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v2.webp'),
+        sources: RESIDENT_STEPPLING_HEX_TILE_V2_SOURCES,
         alphaBounds: { left: 14, top: 120, right: 1011, bottom: 901 },
         generatedFrom: {
           candidateId: 'steppling-resident-hex-2',
@@ -113,6 +195,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Park walking-loop Steppling habitat with curved path, bench, blank marker stones, lanterns, and picnic pause spot.',
         generationId: 'steppling-resident-hex-3',
         source: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v3.webp'),
+        sources: RESIDENT_STEPPLING_HEX_TILE_V3_SOURCES,
         alphaBounds: { left: 17, top: 47, right: 1009, bottom: 891 },
         generatedFrom: {
           candidateId: 'steppling-resident-hex-3',
@@ -134,6 +217,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Open-air moonlit story cinema with velvet seats, projector booth, reels, lanterns, and a clear front stage.',
         generationId: 'flickerbun-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile.webp'),
+        sources: RESIDENT_FLICKERBUN_HEX_TILE_SOURCES,
         alphaBounds: { left: 14, top: 88, right: 1010, bottom: 936 },
         generatedFrom: {
           candidateId: 'flickerbun-resident-hex-1',
@@ -147,6 +231,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Mini outdoor theater nook with low back walls, blank projection screen, starry curtains, and purple lights.',
         generationId: 'flickerbun-resident-hex-2',
         source: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v2.webp'),
+        sources: RESIDENT_FLICKERBUN_HEX_TILE_V2_SOURCES,
         alphaBounds: { left: 14, top: 136, right: 1010, bottom: 887 },
         generatedFrom: {
           candidateId: 'flickerbun-resident-hex-2',
@@ -160,11 +245,56 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Dreamy moonlit cinema patio with projector glow, plush seating, snack stand, decorative reels, and warm lamps.',
         generationId: 'flickerbun-resident-hex-3',
         source: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v3.webp'),
+        sources: RESIDENT_FLICKERBUN_HEX_TILE_V3_SOURCES,
         alphaBounds: { left: 14, top: 131, right: 1010, bottom: 892 },
         generatedFrom: {
           candidateId: 'flickerbun-resident-hex-3',
           promptTheme:
             'a velvet-dark story lover with projector-bright eyes; cozy miniature cinema and moonlit story theater habitat',
+        },
+      },
+    ],
+  },
+  cheerlet: {
+    visualKey: 'cheerlet',
+    label: 'Cheerlet resident tile',
+    selectedVariantId: 'cheerlet-celebration-patio-v1',
+    defaultVariantId: 'cheerlet-celebration-patio-v1',
+    variants: [
+      {
+        id: 'cheerlet-celebration-patio-v1',
+        label: 'Celebration patio',
+        description: 'Bright Cheerlet celebration patio with bunting, confetti, candle glow, balloons, gifts, and an open resident lawn.',
+        generationId: 'cheerlet-resident-hex-1',
+        source: require('../assets/images/katchimeras/world/hex/resident_cheerlet_hex_tile.webp'),
+        sources: RESIDENT_CHEERLET_HEX_TILE_SOURCES,
+        alphaBounds: { left: 14, top: 100, right: 1010, bottom: 924 },
+        generatedFrom: {
+          candidateId: 'cheerlet-resident-hex-1',
+          promptTheme:
+            'a joyful party sprite who marks genuinely worth-it moments; bright celebration garden and candlelit confetti habitat',
+        },
+      },
+    ],
+  },
+  gatherglow: {
+    visualKey: 'gatherglow',
+    label: 'Gatherglow resident tile',
+    selectedVariantId: 'gatherglow-hearth-nook-v1',
+    defaultVariantId: 'gatherglow-hearth-nook-v1',
+    variants: [
+      {
+        id: 'gatherglow-hearth-nook-v1',
+        label: 'Hearth nook',
+        description: 'Warm Gatherglow gathering nook with shared table, lanterns, rounded stools, hearth glow, and an open resident rug.',
+        generationId: 'gatherglow-resident-hex-1',
+        source: require('../assets/images/katchimeras/world/hex/resident_gatherglow_hex_tile.webp'),
+        sources: RESIDENT_GATHERGLOW_HEX_TILE_SOURCES,
+        alphaBounds: { left: 14, top: 90, right: 1010, bottom: 934 },
+        generatedFrom: {
+          candidateId: 'gatherglow-resident-hex-1',
+          promptTheme:
+            'a warm hearth spirit who glows brighter in good company; shared-table gathering nook and lantern-lit convivial habitat',
         },
       },
     ],
@@ -181,10 +311,33 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Simplified Mossprout toy pocket park with chunky moss mounds, smooth pond, oversized flowers, and clear open grass.',
         generationId: 'mossprout-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_mossprout_hex_tile.webp'),
+        sources: RESIDENT_MOSSPROUT_HEX_TILE_SOURCES,
         alphaBounds: { left: 14, top: 107, right: 1010, bottom: 916 },
         generatedFrom: {
           candidateId: 'mossprout-resident-hex-1',
           promptTheme: 'gentle and grounded, delighted by green detours; lush park garden and mossy nature habitat',
+        },
+      },
+    ],
+  },
+  skylo: {
+    visualKey: 'skylo',
+    label: 'Skylo resident tile',
+    selectedVariantId: 'skylo-city-plaza-v1',
+    defaultVariantId: 'skylo-city-plaza-v1',
+    variants: [
+      {
+        id: 'skylo-city-plaza-v1',
+        label: 'City plaza',
+        description: 'Bright Skylo city-corner plaza with skyline walls, warm window lights, street trees, lamps, bench, and open standing space.',
+        generationId: 'skylo-resident-hex-1',
+        source: require('../assets/images/katchimeras/world/hex/resident_skylo_hex_tile.webp'),
+        sources: RESIDENT_SKYLO_HEX_TILE_SOURCES,
+        alphaBounds: { left: 14, top: 82, right: 1010, bottom: 941 },
+        generatedFrom: {
+          candidateId: 'skylo-resident-hex-1',
+          promptTheme:
+            'a city-cool wanderer who carries skyline confidence and warm window-light glow; bright urban plaza and cozy street-corner habitat',
         },
       },
     ],
@@ -201,6 +354,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Focused Tasklet workshop habitat with blank planning board, tidy bench, supplies, blue lanterns, and open center.',
         generationId: 'tasklet-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_tasklet_hex_tile.webp'),
+        sources: RESIDENT_TASKLET_HEX_TILE_SOURCES,
         alphaBounds: { left: 14, top: 82, right: 1010, bottom: 942 },
         generatedFrom: {
           candidateId: 'tasklet-resident-hex-1',
@@ -221,6 +375,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         description: 'Moonlit Vesperitt night owl study habitat with quiet small-hours lighting and an open resident space.',
         generationId: 'vesperitt-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile.webp'),
+        sources: RESIDENT_VESPERITT_HEX_TILE_SOURCES,
         alphaBounds: { left: 14, top: 137, right: 1010, bottom: 887 },
         generatedFrom: {
           candidateId: 'fal-yjZuCe-a4Igg2pptZC3Mj',
@@ -239,6 +394,6 @@ export const KATCHIMERA_HEX_TILE_SOURCES: Partial<Record<HomeVisualKey, Katchime
       entry.variants.find((variant) => variant.id === entry.selectedVariantId) ??
       entry.variants.find((variant) => variant.id === entry.defaultVariantId) ??
       entry.variants[0];
-    return selected ? [[visualKey, { source: selected.source, alphaBounds: selected.alphaBounds }]] : [];
+    return selected ? [[visualKey, { source: selected.source, sources: selected.sources, alphaBounds: selected.alphaBounds }]] : [];
   })
 ) as Partial<Record<HomeVisualKey, KatchimeraHexTileSource>>;

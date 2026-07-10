@@ -1,5 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 
+import { CREATURE_LOD_SOURCES } from '@/constants/creature-lod-sources.gen';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { WORLD_OBJECT_LOD_SOURCES, type WorldObjectLod } from '@/constants/world-asset-lod-sources.gen';
 import { PROMOTED_WORLD_SOURCES } from '@/constants/world-asset-sources.gen';
@@ -431,8 +432,12 @@ export type KingdomHexTileAlphaBounds = {
   bottom: number;
 };
 
+export type KingdomHexTileLod = 'thumb' | 'medium' | 'full';
+export type KingdomHexTileLodSources = Partial<Record<KingdomHexTileLod, ImageSourcePropType>>;
+
 export type KingdomHexTileSpec = {
   source: ImageSourcePropType;
+  sources?: KingdomHexTileLodSources;
   alphaBounds: KingdomHexTileAlphaBounds;
 };
 
@@ -448,9 +453,17 @@ export type KingdomHexTileSelection = {
   default: KingdomHexTileSpec;
 };
 
+export function kingdomHexTileSourceForLod(
+  tile: Pick<KingdomHexTileSpec, 'source' | 'sources'>,
+  lod: KingdomHexTileLod
+): ImageSourcePropType {
+  return tile.sources?.[lod] ?? tile.sources?.full ?? tile.source;
+}
+
 export const KINGDOM_DEFAULT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/default_hex_tile.webp');
 export const KINGDOM_EGG_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_hex_tile.webp');
 export const KINGDOM_EGG_HEX_TILE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_hex_tile_v2.webp');
+export const KINGDOM_EGG_HOME_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/egg_home_hex_tile.webp');
 export const KINGDOM_CENTER_PLAZA_HEX_TILE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/center_plaza_hex_tile_v2.webp');
 export const KINGDOM_GRASS_HEX_TILE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_v2.webp');
 export const KINGDOM_GRASS_HEX_TILE_DENSE_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2.webp');
@@ -458,13 +471,70 @@ export const KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2: ImageSourcePropType = require(
 export const KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_vertical_v2.webp');
 export const KINGDOM_GRASS_HEX_TILE_PATH_Y_V2: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_y_v2.webp');
 
+const KINGDOM_DEFAULT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/default_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/default_hex_tile_512.webp'),
+  full: KINGDOM_DEFAULT_HEX_TILE,
+};
+const KINGDOM_EGG_HEX_TILE_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/egg_hex_tile_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/egg_hex_tile_v2_512.webp'),
+  full: KINGDOM_EGG_HEX_TILE_V2,
+};
+const KINGDOM_EGG_HOME_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/egg_home_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/egg_home_hex_tile_512.webp'),
+  full: KINGDOM_EGG_HOME_HEX_TILE,
+};
+const KINGDOM_CENTER_PLAZA_HEX_TILE_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/center_plaza_hex_tile_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/center_plaza_hex_tile_v2_512.webp'),
+  full: KINGDOM_CENTER_PLAZA_HEX_TILE_V2,
+};
+const KINGDOM_GRASS_HEX_TILE_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/grass_hex_tile_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/grass_hex_tile_v2_512.webp'),
+  full: KINGDOM_GRASS_HEX_TILE_V2,
+};
+const KINGDOM_GRASS_HEX_TILE_DENSE_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2_512.webp'),
+  full: KINGDOM_GRASS_HEX_TILE_DENSE_V2,
+};
+const KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/grass_hex_tile_crossroad_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/grass_hex_tile_crossroad_v2_512.webp'),
+  full: KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2,
+};
+const KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_vertical_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_vertical_v2_512.webp'),
+  full: KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2,
+};
+const KINGDOM_GRASS_HEX_TILE_PATH_Y_V2_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_y_v2_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_y_v2_512.webp'),
+  full: KINGDOM_GRASS_HEX_TILE_PATH_Y_V2,
+};
+
 export const KINGDOM_HEX_CENTER_TILE_VARIANTS: KingdomHexTileVariant[] = [
   {
     id: 'egg',
-    label: 'Egg nest',
-    description: 'Current egg-center hex tile.',
+    label: 'Home nest',
+    description: 'Home center hex tile with a centered wicker nest plaza.',
+    tile: {
+      source: KINGDOM_EGG_HOME_HEX_TILE,
+      sources: KINGDOM_EGG_HOME_HEX_TILE_SOURCES,
+      alphaBounds: { left: 14, top: 95, right: 1010, bottom: 929 },
+    },
+  },
+  {
+    id: 'egg_classic',
+    label: 'Classic egg nest',
+    description: 'Previous egg-center hex tile.',
     tile: {
       source: KINGDOM_EGG_HEX_TILE_V2,
+      sources: KINGDOM_EGG_HEX_TILE_V2_SOURCES,
       alphaBounds: { left: 26, top: 157, right: 1002, bottom: 888 },
     },
   },
@@ -474,6 +544,7 @@ export const KINGDOM_HEX_CENTER_TILE_VARIANTS: KingdomHexTileVariant[] = [
     description: 'Three-path plaza center tile.',
     tile: {
       source: KINGDOM_CENTER_PLAZA_HEX_TILE_V2,
+      sources: KINGDOM_CENTER_PLAZA_HEX_TILE_V2_SOURCES,
       alphaBounds: { left: 14, top: 142, right: 1010, bottom: 881 },
     },
   },
@@ -486,6 +557,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     description: 'Original empty grass resident tile.',
     tile: {
       source: KINGDOM_DEFAULT_HEX_TILE,
+      sources: KINGDOM_DEFAULT_HEX_TILE_SOURCES,
       alphaBounds: { left: 14, top: 147, right: 1010, bottom: 876 },
     },
   },
@@ -495,6 +567,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     description: 'Open smooth grass tile.',
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_V2,
+      sources: KINGDOM_GRASS_HEX_TILE_V2_SOURCES,
       alphaBounds: { left: 14, top: 148, right: 1010, bottom: 875 },
     },
   },
@@ -504,6 +577,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     description: 'Denser tufted grass base tile.',
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_DENSE_V2,
+      sources: KINGDOM_GRASS_HEX_TILE_DENSE_V2_SOURCES,
       alphaBounds: { left: 14, top: 142, right: 1010, bottom: 882 },
     },
   },
@@ -513,6 +587,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     description: 'Four-way cobble path resident tile.',
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2,
+      sources: KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2_SOURCES,
       alphaBounds: { left: 25, top: 159, right: 1001, bottom: 888 },
     },
   },
@@ -522,6 +597,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     description: 'Single winding cobble path resident tile.',
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2,
+      sources: KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2_SOURCES,
       alphaBounds: { left: 25, top: 159, right: 1002, bottom: 888 },
     },
   },
@@ -531,6 +607,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     description: 'Three-way forked cobble path resident tile.',
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_PATH_Y_V2,
+      sources: KINGDOM_GRASS_HEX_TILE_PATH_Y_V2_SOURCES,
       alphaBounds: { left: 26, top: 159, right: 1004, bottom: 889 },
     },
   },
@@ -571,6 +648,14 @@ export function worldAssetSource(assetKey: string, lod: WorldObjectLod = 'full')
   }
   if (assetKey.startsWith(CREATURE_PREFIX)) {
     const key = assetKey.slice(CREATURE_PREFIX.length) as HomeVisualKey;
+    if (lod !== 'full') {
+      const exact = CREATURE_LOD_SOURCES[lod][key];
+      if (exact) return exact;
+      if (lod === 'thumb') {
+        const medium = CREATURE_LOD_SOURCES.medium[key];
+        if (medium) return medium;
+      }
+    }
     return homeCreatureVisuals[key]?.source ?? null;
   }
   if (lod !== 'full') {

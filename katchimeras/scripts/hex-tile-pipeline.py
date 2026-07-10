@@ -47,6 +47,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size", type=int, default=1024, help="Final square asset size.")
     parser.add_argument("--pad", type=int, default=14, help="Final transparent border padding.")
     parser.add_argument("--quality", type=int, default=86, help="Final WebP quality.")
+    parser.add_argument(
+        "--lod-sizes",
+        type=int,
+        nargs="*",
+        default=[512, 256],
+        help="Additional square WebP LOD sizes to write beside the final asset.",
+    )
     parser.add_argument("--workdir")
     return parser.parse_args()
 
@@ -291,6 +298,14 @@ def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: P
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
     out_path = OUT_ROOT / f"{args.key}.webp"
     canvas.save(out_path, format="WEBP", quality=args.quality, method=6)
+    for lod_size in args.lod_sizes:
+        if lod_size <= 0 or lod_size >= final_size:
+            continue
+        lod = canvas.resize((lod_size, lod_size), Image.Resampling.LANCZOS)
+        lod_path = OUT_ROOT / f"{args.key}_{lod_size}.webp"
+        lod_quality = 82 if lod_size >= 512 else 78
+        lod.save(lod_path, format="WEBP", quality=min(args.quality, lod_quality), method=6)
+        print("bundled lod", lod_path, lod_path.stat().st_size // 1024, "KB")
 
     qa = Image.new("RGB", (final_size, final_size), (18, 22, 40))
     qa.paste(canvas, (0, 0), canvas)
