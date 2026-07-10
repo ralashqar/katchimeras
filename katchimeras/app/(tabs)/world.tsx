@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,13 +9,9 @@ import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import {
   KingdomHexCanvas,
   kingdomResidentHexTiles,
-  type KingdomHexCenterRef,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { CompanionCard, type CompanionThread } from '@/components/katchadeck/world/companion-card';
-import { KeepsakeAlmanacSheet } from '@/components/katchadeck/world/keepsake-almanac-sheet';
-import { KeepsakesSheet } from '@/components/katchadeck/world/keepsakes-sheet';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
@@ -44,16 +40,6 @@ import {
   reflectionLine,
   subtypeForCreature,
 } from '@/utils/katchimera-engagement';
-import {
-  findKingdomDecor,
-  keepsakeAlmanac,
-  loadKingdomDecor,
-  moveKingdomDecor,
-  plantKingdomGift,
-  syncKingdomDecorFromDays,
-  unplantKingdomDecor,
-  type KingdomDecorItem,
-} from '@/utils/kingdom-decor';
 import { deriveResidents, type HatchRecord, type KingdomResident } from '@/utils/kingdom-residents';
 import { buildQuestReportBackItems, buildQuestSubmissionItems, type QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
@@ -78,39 +64,18 @@ export default function KingdomScreen() {
     totalCount: discoveriesTotal,
   } = useDiscoveries();
 
-  const [decorState, setDecorState] = useState(() => loadKingdomDecor());
-  const [customising, setCustomising] = useState(false);
-  const [keepsakesOpen, setKeepsakesOpen] = useState(false);
-  const [almanacOpen, setAlmanacOpen] = useState(false);
   const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
   const [microcopy, setMicrocopy] = useState<string | null>(null);
   const [selectedResident, setSelectedResident] = useState<{ resident: KingdomResident; creature: KingdomCreature; thread: CompanionThread | null } | null>(null);
   const [companionQuestState, setCompanionQuestState] = useState<CompanionQuestState>(() => loadCompanionQuests());
   const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
-  const [provenanceItem, setProvenanceItem] = useState<KingdomDecorItem | null>(null);
-  const [justPlantedId, setJustPlantedId] = useState<string | null>(null);
-  const getCenterCellRef = useRef<KingdomHexCenterRef | null>(null);
   const { capabilities: questCapabilities } = useQuestCapabilities(storedHomeState);
-
-  const unlockedDiscoveries = useMemo(
-    () =>
-      discoveryEntries
-        .filter((entry) => entry.record)
-        .map((entry) => ({
-          id: entry.def.id,
-          name: entry.def.name,
-          rarity: entry.def.rarity,
-          unlockedAt: entry.record?.unlockedAt ?? null,
-        })),
-    [discoveryEntries]
-  );
 
   useFocusEffect(
     useCallback(() => {
-      setDecorState(syncKingdomDecorFromDays(days, { unlockedDiscoveries }));
       setCompanionQuestState(loadCompanionQuests());
       setStoredHomeState(homeRepository.load());
-    }, [days, unlockedDiscoveries])
+    }, [])
   );
 
   useEffect(() => {
@@ -118,12 +83,6 @@ export default function KingdomScreen() {
     const timeout = setTimeout(() => setMicrocopy(null), 2300);
     return () => clearTimeout(timeout);
   }, [microcopy]);
-
-  useEffect(() => {
-    if (!justPlantedId) return;
-    const timeout = setTimeout(() => setJustPlantedId(null), 5200);
-    return () => clearTimeout(timeout);
-  }, [justPlantedId]);
 
   const hatches = useMemo<HatchRecord[]>(
     () =>
@@ -223,31 +182,10 @@ export default function KingdomScreen() {
     setCompanionQuestState(next);
   }, []);
 
-  const handlePlantGift = (giftId: string, name: string) => {
-    const at = getCenterCellRef.current?.();
-    setDecorState((state) => plantKingdomGift(state, giftId, at?.col, at?.row, at?.plotId ?? null));
-    setJustPlantedId(`placed-${giftId}`);
-    setCustomising(true);
-    setMicrocopy(`${name} planted`);
-  };
-
-  const handleMoveDecor = (id: string, col: number, row: number, plotId?: string | null) => {
-    setDecorState((state) => moveKingdomDecor(state, id, col, row, plotId));
-  };
-
-  const handleRemoveDecor = (id: string) => {
-    setDecorState((state) => unplantKingdomDecor(state, id));
-    setMicrocopy('Returned to keepsakes');
-  };
-
   const handleSelectResident = (creatureId: string) => {
     const resident = residentById.get(creatureId);
     const creature = creatureById.get(creatureId);
     if (resident && creature) setSelectedResident({ resident, creature, thread: 'quest' });
-  };
-
-  const handleSelectDecor = (id: string) => {
-    setProvenanceItem(findKingdomDecor(decorState, id));
   };
 
   const handleAcceptQuest = () => {
@@ -330,18 +268,9 @@ export default function KingdomScreen() {
       <View style={styles.stage}>
         <KingdomHexCanvas
           residents={residentTiles}
-          decor={decorState.placed}
-          customising={customising}
-          highlightObjectId={justPlantedId}
           eggVisual={eggVisual}
           residentStatusGlyphs={residentStatusGlyphs}
-          getCenterCellRef={getCenterCellRef}
           onSelectResident={(creatureId) => handleSelectResident(creatureId)}
-          onSelectDecor={handleSelectDecor}
-          onMoveDecor={handleMoveDecor}
-          onRemoveDecor={handleRemoveDecor}
-          onOpenKeepsakes={() => setKeepsakesOpen(true)}
-          unplantedCount={decorState.unplanted.length}
         />
 
         <View pointerEvents="none" style={styles.header}>
@@ -357,34 +286,7 @@ export default function KingdomScreen() {
           <Pressable accessibilityRole="button" accessibilityLabel="Hall of Discoveries" onPress={() => setDiscoveriesOpen(true)} style={styles.headerButton}>
             <IconSymbol name="star.fill" size={18} color={Lantern.moon50} />
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={customising ? 'Finish decorating' : 'Decorate your Kingdom'}
-            onPress={() => setCustomising((value) => !value)}
-            style={[styles.headerButton, customising ? styles.headerButtonOn : null]}>
-            <IconSymbol name={customising ? 'checkmark' : 'pencil'} size={18} color={customising ? Lantern.ink950 : Lantern.moon50} />
-            {!customising && decorState.unplanted.length > 0 ? (
-              <View pointerEvents="none" style={styles.giftBadge}>
-                <ThemedText style={styles.giftBadgeLabel} lightColor={Lantern.ink950} darkColor={Lantern.ink950}>
-                  {decorState.unplanted.length}
-                </ThemedText>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Keepsakes" onPress={() => setKeepsakesOpen(true)} style={styles.headerButton}>
-            <IconSymbol name="leaf.fill" size={18} color={Lantern.moon50} />
-          </Pressable>
         </View>
-
-        {customising ? (
-          <View style={styles.decorHint}>
-            <ThemedText style={styles.decorHintText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              {decorState.unplanted.length > 0
-                ? `${decorState.unplanted.length} keepsakes waiting · plant from shelf, drag to move`
-                : 'Drag planted keepsakes to move them'}
-            </ThemedText>
-          </View>
-        ) : null}
 
         {microcopy ? (
           <Animated.View
@@ -399,27 +301,6 @@ export default function KingdomScreen() {
           </Animated.View>
         ) : null}
       </View>
-
-      {keepsakesOpen ? (
-        <KeepsakesSheet
-          gifts={decorState.unplanted}
-          onPlant={(gift) => {
-            setKeepsakesOpen(false);
-            handlePlantGift(gift.id, gift.name);
-          }}
-          onDecorate={() => {
-            setKeepsakesOpen(false);
-            setCustomising(true);
-          }}
-          onOpenAlmanac={() => {
-            setKeepsakesOpen(false);
-            setAlmanacOpen(true);
-          }}
-          onClose={() => setKeepsakesOpen(false)}
-        />
-      ) : null}
-
-      {almanacOpen ? <KeepsakeAlmanacSheet sections={keepsakeAlmanac(decorState)} onClose={() => setAlmanacOpen(false)} /> : null}
 
       {discoveriesOpen ? (
         <DiscoveriesHallSheet
@@ -452,19 +333,6 @@ export default function KingdomScreen() {
           reflectionText={reflectionLine(selectedCompanionData?.archetype ?? '')}
           onAnswerReflection={handleAnswerReflection}
         />
-      ) : null}
-
-      {provenanceItem ? (
-        <MeadowSheet onClose={() => setProvenanceItem(null)} kicker={provenanceItem.provenance.isoDate || 'Keepsake'} title={provenanceItem.name}>
-          <View style={styles.residentSheet}>
-            <ThemedText style={styles.residentBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              {provenanceItem.provenance.label}
-            </ThemedText>
-            <ThemedText style={styles.residentHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-              Hold and drag to move it. Turn on decorate mode to remove it.
-            </ThemedText>
-          </View>
-        </MeadowSheet>
       ) : null}
     </GestureHandlerRootView>
   );
@@ -500,31 +368,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 40,
   },
-  headerButtonOn: { backgroundColor: Lantern.ember300, borderColor: Lantern.ember300 },
-  giftBadge: {
-    alignItems: 'center',
-    backgroundColor: Lantern.ember300,
-    borderRadius: 999,
-    minWidth: 17,
-    paddingHorizontal: 4,
-    position: 'absolute',
-    right: -4,
-    top: -4,
-  },
-  giftBadgeLabel: { fontSize: 10, fontWeight: '900', lineHeight: 13 },
-  decorHint: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(12,10,20,0.82)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderCurve: 'continuous',
-    borderRadius: 999,
-    borderWidth: 1,
-    bottom: 122,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    position: 'absolute',
-  },
-  decorHintText: { fontSize: 11.5, fontWeight: '800' },
   microcopy: {
     alignSelf: 'center',
     backgroundColor: 'rgba(12, 10, 20, 0.88)',

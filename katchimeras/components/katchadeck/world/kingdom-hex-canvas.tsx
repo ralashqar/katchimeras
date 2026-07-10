@@ -1,13 +1,11 @@
 import { Image } from 'expo-image';
-import { MotiView } from 'moti';
-import { memo, type MutableRefObject, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   Easing,
   runOnJS,
-  type SharedValue,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
@@ -16,24 +14,19 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
-import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { EggVisualState } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
 import { katchimeraHexTileForCreature } from '@/utils/katchimera-hex-tiles';
-import type { KingdomDecorItem } from '@/utils/kingdom-decor';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import {
-  clampHexLocal,
   HEX_TILE_H,
   HEX_TILE_LIP,
   HEX_TILE_W,
   hexDrawDepth,
-  hexLocalToWorld,
   hexSpiral,
   hexTileTopPoints,
   hexToWorld,
-  worldToHexLocal,
   type HexCoord,
 } from '@/utils/world-hex';
 import { kingdomHexTileSet, worldAssetSource, type KingdomHexTileAlphaBounds, type KingdomHexTileSelection } from '@/utils/world-visuals';
@@ -60,26 +53,15 @@ type TileRender = {
 
 type Props = {
   residents: KingdomHexResidentTile[];
-  decor: KingdomDecorItem[];
-  customising?: boolean;
-  highlightObjectId?: string | null;
   eggVisual?: EggVisualState | null;
   lanternColor?: string;
   residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
-  getCenterCellRef?: MutableRefObject<KingdomHexCenterRef | null>;
   onSelectResident?: (creatureId: string, label: string) => void;
-  onSelectDecor?: (id: string) => void;
-  onMoveDecor?: (id: string, col: number, row: number, plotId?: string | null) => void;
-  onRemoveDecor?: (id: string) => void;
-  onOpenKeepsakes?: () => void;
-  unplantedCount?: number;
 };
 
 const SCENE_PAD = 1200;
 const CENTER_ID = 'kingdom';
 const CREATURE_SIZE = 58;
-const HOUSE_SIZE = 62;
-const DECOR_BASE_SIZE = 54;
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
 const EGG_STAGE_SCALE = 0.32;
@@ -125,15 +107,6 @@ function frameToRect(frame: { left: number; top: number; width: number; height: 
     top: frame.top,
     right: frame.left + frame.width,
     bottom: frame.top + frame.height,
-  };
-}
-
-function pointObjectRect(x: number, y: number, radius: number): Rect {
-  return {
-    left: x - radius,
-    top: y - radius,
-    right: x + radius,
-    bottom: y + radius,
   };
 }
 
@@ -193,7 +166,7 @@ function tileArtFor(tile: TileRender, hexTiles: KingdomHexTileSelection) {
       };
 }
 
-function sceneFromResidents(residents: KingdomHexResidentTile[], decor: KingdomDecorItem[]) {
+function sceneFromResidents(residents: KingdomHexResidentTile[]) {
   const tilesRaw: TileRender[] = [
     { id: CENTER_ID, kind: 'center', coord: { q: 0, r: 0 }, cx: 0, cy: 0, depth: 0 },
     ...residents.map((resident) => {
@@ -217,23 +190,9 @@ function sceneFromResidents(residents: KingdomHexResidentTile[], decor: KingdomD
   const maxY = Math.max(...tileYs, HEX_TILE_H);
   const dx = -minX + SCENE_PAD;
   const dy = -minY + SCENE_PAD;
-  const tileById = new Map(tilesRaw.map((tile) => [tile.id, tile]));
-  const decorExtents = decor.flatMap((item) => {
-    const tile = tileById.get(item.plotId ?? CENTER_ID) ?? tilesRaw[0];
-    const local = hexLocalToWorld(item.col, item.row);
-    const size = DECOR_BASE_SIZE * (item.sizeScale ?? 1);
-    const x = tile.cx + dx + local.x;
-    const y = tile.cy + dy + local.y;
-    return [
-      { x: x - size, y: y - size },
-      { x: x + size, y: y + size },
-    ];
-  });
-  const sceneMaxX = Math.max(maxX + dx + SCENE_PAD, ...decorExtents.map((point) => point.x + SCENE_PAD));
-  const sceneMaxY = Math.max(maxY + dy + SCENE_PAD, ...decorExtents.map((point) => point.y + SCENE_PAD));
   return {
-    width: sceneMaxX,
-    height: sceneMaxY,
+    width: maxX + dx + SCENE_PAD,
+    height: maxY + dy + SCENE_PAD,
     tiles: tilesRaw
       .map((tile) => ({ ...tile, cx: tile.cx + dx, cy: tile.cy + dy, depth: hexDrawDepth({ x: tile.cx + dx, y: tile.cy + dy }) }))
       .sort((a, b) => a.depth - b.depth),
@@ -259,21 +218,12 @@ export function kingdomResidentHexTiles(residents: KingdomResident[], creatures:
 
 export function KingdomHexCanvas({
   residents,
-  decor,
-  customising = false,
-  highlightObjectId,
   eggVisual,
   lanternColor,
   residentStatusGlyphs,
-  getCenterCellRef,
   onSelectResident,
-  onSelectDecor,
-  onMoveDecor,
-  onRemoveDecor,
-  onOpenKeepsakes,
-  unplantedCount = 0,
 }: Props) {
-  const scene = useMemo(() => sceneFromResidents(residents, decor), [decor, residents]);
+  const scene = useMemo(() => sceneFromResidents(residents), [residents]);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
@@ -284,7 +234,6 @@ export function KingdomHexCanvas({
   const [cameraSnapshot, setCameraSnapshot] = useState<CameraSnapshot>({ tx: 0, ty: 0, scale: 1 });
 
   const centreTile = useMemo(() => scene.tiles.find((tile) => tile.id === CENTER_ID) ?? scene.tiles[0], [scene.tiles]);
-  const tileById = useMemo(() => new Map(scene.tiles.map((tile) => [tile.id, tile])), [scene.tiles]);
   const hexTiles = kingdomHexTileSet();
   const tileArtLayers = useMemo(
     () =>
@@ -354,25 +303,6 @@ export function KingdomHexCanvas({
     centred.value = true;
   }, [baseScale, centreTile, centred, scene.height, scene.width, scale, startScale, tx, ty, viewport.height, viewport.width]);
 
-  if (getCenterCellRef) {
-    getCenterCellRef.current = () => {
-      if (!viewport.width || !viewport.height || scene.tiles.length === 0) return null;
-      const wx = (viewport.width / 2 - scene.width / 2 - tx.value) / scale.value + scene.width / 2;
-      const wy = (viewport.height / 2 - scene.height / 2 - ty.value) / scale.value + scene.height / 2;
-      let best = scene.tiles[0];
-      let bestDistance = Infinity;
-      for (const tile of scene.tiles) {
-        const distance = (wx - tile.cx) ** 2 + (wy - tile.cy) ** 2;
-        if (distance < bestDistance) {
-          best = tile;
-          bestDistance = distance;
-        }
-      }
-      const local = clampHexLocal(worldToHexLocal(wx - best.cx, wy - best.cy));
-      return { col: local.col, row: local.row, plotId: best.id === CENTER_ID ? null : best.id };
-    };
-  }
-
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setViewport({ width, height });
@@ -440,21 +370,12 @@ export function KingdomHexCanvas({
     [maxScale, scale, scene.height, scene.width, startScale, tx, ty, viewport.height, viewport.width]
   );
 
-  const renderObjects = useMemo(() => {
-    const customTileIds = new Set(tileArtLayers.filter((tile) => tile.custom).map((tile) => tile.id));
+  const renderResidents = useMemo(() => {
     const items: { id: string; depth: number; node: ReactNode }[] = [];
     for (const tile of scene.tiles) {
       if (!visibleTileIds.has(tile.id)) continue;
       if (tile.kind === 'resident' && tile.resident) {
-        const house = { x: tile.cx + HEX_TILE_W * 0.22, y: tile.cy - HEX_TILE_H * 0.18 };
         const creature = { x: tile.cx, y: tile.cy + HEX_TILE_H * 0.03 };
-        if (!customTileIds.has(tile.id)) {
-          items.push({
-            id: `house-${tile.id}`,
-            depth: hexDrawDepth(house, 1),
-            node: <ResidentHouse key={`house-${tile.id}`} tile={tile} x={house.x} y={house.y} />,
-          });
-        }
         items.push({
           id: `creature-${tile.id}`,
           depth: hexDrawDepth(creature, 4),
@@ -472,37 +393,8 @@ export function KingdomHexCanvas({
         });
       }
     }
-    for (const item of decor) {
-      const tile = tileById.get(item.plotId ?? CENTER_ID) ?? centreTile;
-      if (!tile) continue;
-      const local = hexLocalToWorld(item.col, item.row);
-      const x = tile.cx + local.x;
-      const y = tile.cy + local.y;
-      const size = DECOR_BASE_SIZE * (item.sizeScale ?? 1);
-      if (cullWorldRect && !rectsIntersect(pointObjectRect(x, y, size * 1.35), cullWorldRect)) continue;
-      items.push({
-        id: item.id,
-        depth: hexDrawDepth({ x, y }, 5),
-        node: (
-          <HexDecorSprite
-            key={item.id}
-            item={item}
-            tile={tile}
-            x={x}
-            y={y}
-            tiles={scene.tiles}
-            scaleSV={scale}
-            customising={customising}
-            highlighted={highlightObjectId === item.id}
-            onMoveDecor={onMoveDecor}
-            onRemoveDecor={onRemoveDecor}
-            onSelectDecor={onSelectDecor}
-          />
-        ),
-      });
-    }
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [centreTile, cullWorldRect, customising, decor, focusResident, highlightObjectId, onMoveDecor, onRemoveDecor, onSelectDecor, onSelectResident, residentStatusGlyphs, scene.tiles, scale, tileArtLayers, tileById, visibleTileIds]);
+  }, [focusResident, onSelectResident, residentStatusGlyphs, scene.tiles, visibleTileIds]);
 
   const gesture = Gesture.Simultaneous(pan, pinch);
 
@@ -540,44 +432,13 @@ export function KingdomHexCanvas({
                 <Text style={styles.centerMarkText}>egg</Text>
               </View>
             )}
-            {renderObjects}
-            {unplantedCount > 0 && centreTile ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Open keepsakes"
-                onPress={onOpenKeepsakes}
-                style={[styles.giftCrate, { left: centreTile.cx + HEX_TILE_W * 0.23, top: centreTile.cy + HEX_TILE_H * 0.2 }]}>
-                <ThemedText style={styles.giftCrateIcon} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                  +
-                </ThemedText>
-                <View style={styles.giftCrateBadge}>
-                  <ThemedText style={styles.giftCrateCount} lightColor={Lantern.ink950} darkColor={Lantern.ink950}>
-                    {unplantedCount}
-                  </ThemedText>
-                </View>
-              </Pressable>
-            ) : null}
+            {renderResidents}
           </Animated.View>
         </View>
       </GestureDetector>
       <Pressable accessibilityRole="button" accessibilityLabel="Recenter kingdom" onPress={recenter} style={styles.recenter}>
         <Text style={styles.recenterText}>⌖</Text>
       </Pressable>
-    </View>
-  );
-}
-
-function ResidentHouse({ tile, x, y }: { tile: TileRender; x: number; y: number }) {
-  const source = worldAssetSource('home');
-  const badge = tile.resident?.resident.houseLevel ?? 1;
-  return (
-    <View pointerEvents="none" style={[styles.house, { left: x - HOUSE_SIZE / 2, top: y - HOUSE_SIZE * 0.72, width: HOUSE_SIZE, height: HOUSE_SIZE }]}>
-      {source ? <Image source={source} contentFit="contain" style={StyleSheet.absoluteFill} /> : <View style={styles.houseFallback} />}
-      {badge > 1 ? (
-        <View style={styles.houseBadge}>
-          <Text style={styles.houseBadgeText}>{badge}</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -622,112 +483,6 @@ function ResidentCreature({
   );
 }
 
-const HexDecorSprite = memo(function HexDecorSprite({
-  item,
-  tile,
-  x,
-  y,
-  tiles,
-  scaleSV,
-  customising,
-  highlighted,
-  onMoveDecor,
-  onRemoveDecor,
-  onSelectDecor,
-}: {
-  item: KingdomDecorItem;
-  tile: TileRender;
-  x: number;
-  y: number;
-  tiles: TileRender[];
-  scaleSV: SharedValue<number>;
-  customising: boolean;
-  highlighted: boolean;
-  onMoveDecor?: (id: string, col: number, row: number, plotId?: string | null) => void;
-  onRemoveDecor?: (id: string) => void;
-  onSelectDecor?: (id: string) => void;
-}) {
-  const dx = useSharedValue(0);
-  const dy = useSharedValue(0);
-  const dragging = useSharedValue(false);
-  const released = useSharedValue(false);
-  const source = worldAssetSource(item.assetKey);
-  const size = DECOR_BASE_SIZE * (item.sizeScale ?? 1);
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dx.value }, { translateY: dy.value }],
-    zIndex: dragging.value ? 20 : 1,
-  }));
-  const commit = useCallback(
-    (worldDx: number, worldDy: number) => {
-      const drop = { x: x + worldDx, y: y + worldDy };
-      let nearest = tile;
-      let nearestDistance = Infinity;
-      for (const candidate of tiles) {
-        const distance = (drop.x - candidate.cx) ** 2 + (drop.y - candidate.cy) ** 2;
-        if (distance < nearestDistance) {
-          nearest = candidate;
-          nearestDistance = distance;
-        }
-      }
-      const local = worldToHexLocal(drop.x - nearest.cx, drop.y - nearest.cy);
-      onMoveDecor?.(item.id, local.col, local.row, nearest.id === CENTER_ID ? null : nearest.id);
-    },
-    [item.id, onMoveDecor, tile, tiles, x, y]
-  );
-
-  useLayoutEffect(() => {
-    dx.value = 0;
-    dy.value = 0;
-    released.value = false;
-  }, [dx, dy, released, x, y]);
-
-  const drag = Gesture.Pan()
-    .enabled(Boolean(onMoveDecor))
-    .activateAfterLongPress(customising ? 0 : 320)
-    .onStart(() => {
-      dragging.value = true;
-      released.value = false;
-    })
-    .onChange((event) => {
-      dx.value = event.translationX / scaleSV.value;
-      dy.value = event.translationY / scaleSV.value;
-    })
-    .onEnd(() => {
-      released.value = true;
-      runOnJS(commit)(dx.value, dy.value);
-    })
-    .onFinalize(() => {
-      dragging.value = false;
-      if (!released.value) {
-        dx.value = withTiming(0, { duration: 140 });
-        dy.value = withTiming(0, { duration: 140 });
-      }
-    });
-  return (
-    <GestureDetector gesture={drag}>
-      <Animated.View style={[styles.decor, { left: x - size / 2, top: y - size * 0.78, width: size, height: size }, animStyle]}>
-        <Pressable accessibilityRole="button" onPress={() => !customising && onSelectDecor?.(item.id)} style={StyleSheet.absoluteFill}>
-          {highlighted ? (
-            <MotiView
-              pointerEvents="none"
-              from={{ opacity: 0.25, scale: 0.9 }}
-              animate={{ opacity: 0.58, scale: 1.08 }}
-              transition={{ loop: true, type: 'timing', duration: 900 }}
-              style={styles.decorHighlight}
-            />
-          ) : null}
-          {source ? <Image source={source} contentFit="contain" style={StyleSheet.absoluteFill} /> : <View style={styles.decorFallback} />}
-        </Pressable>
-        {customising ? (
-          <Pressable accessibilityRole="button" onPress={() => onRemoveDecor?.(item.id)} style={styles.remove}>
-            <Text style={styles.removeText}>×</Text>
-          </Pressable>
-        ) : null}
-      </Animated.View>
-    </GestureDetector>
-  );
-});
-
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden' },
   scene: { position: 'relative' },
@@ -768,57 +523,6 @@ const styles = StyleSheet.create({
   statusGlyphActive: { backgroundColor: 'rgba(120,120,140,0.92)' },
   statusGlyphReady: { backgroundColor: '#E9A93E' },
   statusGlyphText: { color: Lantern.emberInk, fontSize: 17, fontWeight: '900', lineHeight: 19 },
-  decor: { position: 'absolute' },
-  decorHighlight: {
-    backgroundColor: 'rgba(255,224,163,0.18)',
-    borderColor: 'rgba(255,224,163,0.65)',
-    borderRadius: 999,
-    borderWidth: 1,
-    bottom: 4,
-    left: 4,
-    position: 'absolute',
-    right: 4,
-    top: 4,
-  },
-  decorFallback: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 12, flex: 1 },
-  giftCrate: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(28,24,48,0.92)',
-    borderColor: 'rgba(255,195,107,0.45)',
-    borderRadius: 16,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: 42,
-  },
-  giftCrateIcon: { fontSize: 24, fontWeight: '900', lineHeight: 28 },
-  giftCrateBadge: {
-    alignItems: 'center',
-    backgroundColor: Lantern.ember300,
-    borderRadius: 999,
-    minWidth: 17,
-    paddingHorizontal: 4,
-    position: 'absolute',
-    right: -5,
-    top: -5,
-  },
-  giftCrateCount: { fontSize: 10, fontWeight: '900' },
-  house: { position: 'absolute' },
-  houseFallback: { backgroundColor: 'rgba(255,224,163,0.16)', borderRadius: 14, flex: 1 },
-  houseBadge: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(20,17,31,0.88)',
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 999,
-    borderWidth: 1,
-    bottom: 4,
-    minWidth: 18,
-    paddingHorizontal: 4,
-    position: 'absolute',
-    right: 3,
-  },
-  houseBadgeText: { color: '#FFE0A3', fontSize: 10, fontWeight: '900' },
   recenter: {
     alignItems: 'center',
     backgroundColor: 'rgba(20,17,31,0.82)',
@@ -833,18 +537,4 @@ const styles = StyleSheet.create({
     width: 46,
   },
   recenterText: { color: Lantern.moon50, fontSize: 22, fontWeight: '900' },
-  remove: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(20,17,31,0.94)',
-    borderColor: 'rgba(255,255,255,0.28)',
-    borderRadius: 10,
-    borderWidth: 1,
-    height: 20,
-    justifyContent: 'center',
-    position: 'absolute',
-    right: -4,
-    top: -4,
-    width: 20,
-  },
-  removeText: { color: Lantern.moon50, fontSize: 13, fontWeight: '900', lineHeight: 15 },
 });

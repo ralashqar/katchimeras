@@ -45,10 +45,10 @@ TILE_VARIANTS = {
         "dreamy moonlit cinema patio with rounded velvet cushions, projector glow, decorative reels, low walls, and clear central standing space",
     ],
     "mossprout": [
-        "lush pocket park with mossy stepping stones, tiny pond, rounded shrubs, flower beds, low garden wall around the back, and clear open grass in front",
-        "quiet greenhouse garden nook with open-roof back perimeter, moss benches, seedling shelves, watering can, soft fern clusters, and central standing space",
-        "woodland park habitat with curved path, mushroom logs, leafy arch, small nature sign with no text, gentle pond stones, and open front lawn",
-        "mossy meditation garden with low stone border, fern planters, tiny stream, soft lanterns, seed sprouts, and a clear resident clearing",
+        "simple toy-like pocket park with one rounded moss mound, two or three chunky bush clusters, smooth tiny blue oval pond, a few large rounded stepping stones, oversized flowers, low garden alcove around the back, and clear open grass in front",
+        "quiet toy greenhouse garden nook with open-roof back perimeter, chunky moss benches, simplified seedling shelves, one rounded watering can, large fern clumps, and central standing space",
+        "soft woodland toy park with a clean curved path, smooth mushroom log shapes, rounded leafy arch, one blank nature sign, large pond stones, and open front lawn",
+        "minimal mossy meditation garden with low stone border, rounded fern planters, smooth tiny stream, two lanterns, chunky seed sprouts, and a clear resident clearing",
     ],
     "steppling": [
         "sunny trailhead rest stop with rounded stepping stones, tiny route signposts with no writing, a backpack bench, water station, grass tufts, and soft footprint motifs",
@@ -196,7 +196,8 @@ def prompt_for(visual_key: str, theme: str, variant_index: int) -> str:
             "Design the environment as a themed little habitat with props, trees or shrubs, ground details, and one small open-roof structure if useful.",
             "If a building exists, place it around the back perimeter of the hex tile with visible low walls and no roof blocking the interior.",
             "Keep the center/front standing area readable and open so the live Katchimera sprite can stand there later.",
-            "Premium cozy 3D toy mobile-game render, crisp materials, soft warm lighting, same perspective as the base.",
+            "Premium stylized 3D toy diorama, mascot-world art, rounded clay-like forms, soft bevels, smooth simplified materials, low-frequency detail, clean readable silhouette, soft warm lighting, same perspective as the base.",
+            "Avoid realism, dense foliage, tiny repeated leaves, tiny grass blades, moss noise, many small petals, pebble scatter, bark grain, water ripples, photoreal texture, sharp micro-detail, and clutter.",
             "No text, no numbers, no labels, no UI, no extra creature, no humans, no watermark, no crop outside the hex tile.",
         ]
     )

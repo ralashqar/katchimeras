@@ -178,10 +178,10 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
       {
         id: 'mossprout-park-garden-v1',
         label: 'Park garden',
-        description: 'Lush Mossprout pocket park with moss stones, pond, flower beds, shrubs, and clear open grass.',
+        description: 'Simplified Mossprout toy pocket park with chunky moss mounds, smooth pond, oversized flowers, and clear open grass.',
         generationId: 'mossprout-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_mossprout_hex_tile.webp'),
-        alphaBounds: { left: 14, top: 101, right: 1010, bottom: 922 },
+        alphaBounds: { left: 14, top: 107, right: 1010, bottom: 916 },
         generatedFrom: {
           candidateId: 'mossprout-resident-hex-1',
           promptTheme: 'gentle and grounded, delighted by green detours; lush park garden and mossy nature habitat',
