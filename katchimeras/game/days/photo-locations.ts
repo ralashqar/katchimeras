@@ -5,7 +5,9 @@ import type {
   StoredHomeLocationPoint,
   StoredHomeState,
 } from '@/types/home';
-import { buildPhotoEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
+import { upsertEvidence } from '@/utils/intelligence/evidence';
+import { upsertClassifiedMemory } from '@/utils/intelligence/classification';
+import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
 import { curatePhotos } from '@/utils/photo-curation';
 import { aggregatePhotoVision } from '@/utils/vision-signals';
 
@@ -89,22 +91,30 @@ export function withSeededPhotoLocationsByDay(
       .map((photo) => photo.vision)
       .filter((result): result is PhotoVisionResult => result != null);
     const nextVision = visionResults.length > 0 ? aggregatePhotoVision(visionResults) : day.vision;
-    const evidence = bucket
+    const intelligence = bucket
       .filter((photo) => photo.vision != null)
       .map((photo) =>
-        buildPhotoEvidence({
+        buildPhotoIntelligence({
           sourceId: photo.id,
           observedAt: new Date(photo.createdAt).toISOString(),
           thumbnailUri: photo.thumbnailUri || photo.uri,
           rawVision: photo.vision ?? null,
+          vision: photo.visionSummary ?? aggregatePhotoVision([photo.vision!]),
+          scene: photo.sceneRead ?? null,
         })
       );
+    const evidence = intelligence.map((item) => item.evidence);
+    const classifiedMemories = intelligence.map((item) => item.memory);
 
     return {
       ...day,
       locations: nextLocations.slice(-MAX_STORED_DAY_LOCATIONS),
       vision: nextVision,
       evidence: evidence.length > 0 ? upsertEvidence(day.evidence, evidence) : day.evidence,
+      classifiedMemories:
+        classifiedMemories.length > 0
+          ? upsertClassifiedMemory(day.classifiedMemories, classifiedMemories)
+          : day.classifiedMemories,
     };
   };
   const todayPhotoTarget =

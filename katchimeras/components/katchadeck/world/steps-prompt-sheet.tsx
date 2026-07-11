@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -18,8 +19,33 @@ const MOVEMENTS: MovementOption[] = [
   { movement: 'cycle', label: 'A ride', emoji: '🚴', tint: '#92D7FF' },
   { movement: 'workout', label: 'A workout', emoji: '🏋️', tint: '#F49AC1' },
   { movement: 'errands', label: 'Out & about', emoji: '🛍️', tint: '#C7B8FF' },
+  { movement: 'transit', label: 'Just transit', emoji: '🚇', tint: '#8FC9FF' },
+  { movement: 'commute', label: 'A commute', emoji: '🚉', tint: '#A7D5FF' },
+  { movement: 'drive', label: 'Driving / a ride', emoji: '🚗', tint: '#B8C1D9' },
   { movement: 'travel', label: 'A travel day', emoji: '✈️', tint: '#A78BFA' },
+  { movement: 'mixed', label: 'A bit of everything', emoji: '🧭', tint: '#D3B7FF' },
 ];
+
+const SUBTYPES: Partial<Record<DayMovementKind, { id: string; label: string; emoji: string }[]>> = {
+  transit: [
+    { id: 'train', label: 'Train / Tube', emoji: '🚇' },
+    { id: 'bus', label: 'Bus', emoji: '🚌' },
+    { id: 'taxi', label: 'Taxi / car', emoji: '🚕' },
+    { id: 'flight_ferry', label: 'Flight / ferry', emoji: '⛴️' },
+  ],
+  commute: [
+    { id: 'mostly_transit', label: 'Mostly transit', emoji: '🚉' },
+    { id: 'mostly_walking', label: 'Mostly walking', emoji: '🚶' },
+    { id: 'mostly_driving', label: 'Mostly driving', emoji: '🚗' },
+    { id: 'mixed', label: 'Mixed', emoji: '🧭' },
+  ],
+  walk: [
+    { id: 'leisure', label: 'A leisurely walk', emoji: '🌿' },
+    { id: 'dog_walk', label: 'A dog walk', emoji: '🐾' },
+    { id: 'walking_commute', label: 'Walking commute', emoji: '🏙️' },
+    { id: 'exploring', label: 'Exploring', emoji: '🧭' },
+  ],
+};
 
 export function StepsPromptSheet({
   stepsCount,
@@ -27,20 +53,36 @@ export function StepsPromptSheet({
   onClose,
 }: {
   stepsCount?: number | null;
-  onConfirm: (input: { movement: DayMovementKind; label: string; emoji: string }) => void;
+  onConfirm: (input: { movement: DayMovementKind; label: string; emoji: string; subtype?: string | null }) => void;
   onClose: () => void;
 }) {
+  const [selected, setSelected] = useState<MovementOption | null>(null);
   const stepsLine = stepsCount && stepsCount > 0 ? `${stepsCount.toLocaleString()} steps today` : 'A big day of movement';
+  const subtypes = selected ? SUBTYPES[selected.movement] : null;
+  const chooseMovement = (option: MovementOption) => {
+    if (SUBTYPES[option.movement]) setSelected(option);
+    else onConfirm({ movement: option.movement, label: option.label, emoji: option.emoji });
+  };
 
   return (
-    <MeadowSheet onClose={onClose} kicker={stepsLine} title="What kind of day was it?">
+    <MeadowSheet onClose={onClose} kicker={stepsLine} title={selected ? 'What kind of route?' : 'How did you get around?'}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <Animated.View entering={FadeInDown.duration(220)} style={styles.grid}>
-          {MOVEMENTS.map((option) => (
+          {(subtypes ?? MOVEMENTS).map((option) => (
             <Pressable
-              key={option.movement}
-              onPress={() => onConfirm({ movement: option.movement, label: option.label, emoji: option.emoji })}
-              style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
+              key={'movement' in option ? option.movement : option.id}
+              onPress={() => {
+                if (selected && !('movement' in option)) {
+                  onConfirm({ movement: selected.movement, label: selected.label, emoji: selected.emoji, subtype: option.id });
+                } else {
+                  chooseMovement(option as MovementOption);
+                }
+              }}
+              style={({ pressed }) => [
+                styles.chip,
+                'tint' in option ? { borderColor: `${option.tint}66` } : null,
+                pressed && styles.chipPressed,
+              ]}>
               <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
               <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                 {option.label}
@@ -48,6 +90,16 @@ export function StepsPromptSheet({
             </Pressable>
           ))}
         </Animated.View>
+        {selected ? (
+          <View style={styles.backRow}>
+            <Pressable onPress={() => setSelected(null)}>
+              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Back</ThemedText>
+            </Pressable>
+            <Pressable onPress={() => onConfirm({ movement: selected.movement, label: selected.label, emoji: selected.emoji })}>
+              <ThemedText style={styles.backLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Skip detail</ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
     </MeadowSheet>
   );
@@ -69,4 +121,6 @@ const styles = StyleSheet.create({
   chipPressed: { backgroundColor: 'rgba(40,34,60,0.9)' },
   chipEmoji: { fontSize: 16 },
   chipLabel: { fontSize: 13, fontWeight: '700' },
+  backRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingTop: 6 },
+  backLabel: { fontSize: 12.5, fontWeight: '700' },
 });

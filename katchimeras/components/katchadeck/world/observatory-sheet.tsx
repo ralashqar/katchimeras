@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
@@ -6,6 +6,7 @@ import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { Observation, ObservationKind } from '@/utils/observations-engine';
+import { foundationSceneAvailability } from '@/utils/foundation-scene';
 
 type ObservatorySheetProps = {
   day: HomeDayRecord;
@@ -21,6 +22,9 @@ type ObservatorySheetProps = {
     onDisable?: () => void;
     onDeleteTodayPlaces?: () => void;
   } | null;
+  cloudIntelligenceEnabled?: boolean;
+  onCloudIntelligenceChange?: (enabled: boolean) => void;
+  onOpenIntelligenceLab?: () => void;
   onViewPlaces?: () => void;
   onReflect?: () => void;
   onClose: () => void;
@@ -115,6 +119,9 @@ export function ObservatorySheet({
   observations,
   focusedObservationId,
   travelMemory,
+  cloudIntelligenceEnabled = false,
+  onCloudIntelligenceChange,
+  onOpenIntelligenceLab,
   onViewPlaces,
   onReflect,
   onClose,
@@ -124,6 +131,7 @@ export function ObservatorySheet({
   const prompt = strongest?.prompt ?? null;
   const placeCount = (day.confirmedPlaces?.length ?? 0) || (day.visitedPlaceCount ?? 0);
   const constellationRows = constellations(ordered);
+  const foundationAvailability = foundationSceneAvailability();
 
   return (
     <MeadowSheet onClose={onClose} kicker="The Observatory" title="What Katchimera has noticed" maxHeight="80%">
@@ -225,6 +233,64 @@ export function ObservatorySheet({
               ) : null}
             </View>
           </View>
+        ) : null}
+
+        {onCloudIntelligenceChange ? (
+          <View style={styles.privacyCard}>
+            <View style={styles.privacyCopy}>
+              <ThemedText style={styles.privacyLabel} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+                Private cloud assist
+              </ThemedText>
+              <ThemedText style={styles.privacyStatus} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {cloudIntelligenceEnabled ? 'Enabled for notes' : 'On-device only'}
+              </ThemedText>
+              <ThemedText style={styles.privacyBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                {cloudIntelligenceEnabled
+                  ? 'If local interpretation is unavailable, derived note text may use the private cloud fallback. Photos still need a separate explicit action.'
+                  : 'Photos, written notes, and voice notes stay on device. Local rules fill any model gaps.'}
+              </ThemedText>
+            </View>
+            <Switch
+              accessibilityLabel="Private cloud assistance for notes"
+              value={cloudIntelligenceEnabled}
+              onValueChange={onCloudIntelligenceChange}
+              trackColor={{ false: 'rgba(196,186,240,0.22)', true: 'rgba(125,232,205,0.36)' }}
+              thumbColor={cloudIntelligenceEnabled ? Lantern.auroraTeal : Lantern.moon300}
+            />
+          </View>
+        ) : null}
+
+        {process.env.EXPO_OS === 'ios' && !foundationAvailability.available ? (
+          <View style={styles.intelligenceWarning}>
+            <View style={styles.travelIcon}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={15} color={Lantern.ember300} />
+            </View>
+            <View style={styles.privacyCopy}>
+              <ThemedText style={styles.privacyLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300} selectable>
+                On-device intelligence needs attention
+              </ThemedText>
+              <ThemedText style={styles.privacyStatus} lightColor={Lantern.moon50} darkColor={Lantern.moon50} selectable>
+                {foundationAvailability.reason.replaceAll('_', ' ')}
+              </ThemedText>
+              <ThemedText style={styles.privacyBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+                Open Settings → Apple Intelligence &amp; Siri. Turn Apple Intelligence on, then make sure iPhone Language and Siri Language use the same supported language. The app cannot change these private system settings for you.
+              </ThemedText>
+              {foundationAvailability.locale ? (
+                <ThemedText style={styles.travelCount} lightColor={Lantern.moon500} darkColor={Lantern.moon500} selectable>
+                  Device language visible to Katchimeras: {foundationAvailability.locale}{foundationAvailability.localeSupported === false ? ' (not supported by this model)' : ''}
+                </ThemedText>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
+        {__DEV__ && onOpenIntelligenceLab ? (
+          <Pressable accessibilityRole="button" onPress={onOpenIntelligenceLab} style={styles.inspectorAction}>
+            <IconSymbol name="wrench.and.screwdriver.fill" size={14} color={Lantern.auroraTeal} />
+            <ThemedText style={styles.inspectorLabel} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+              Open intelligence inspector
+            </ThemedText>
+          </Pressable>
         ) : null}
 
         {ordered.length > 1 ? (
@@ -385,6 +451,41 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   travelDangerText: { fontSize: 12, fontWeight: '800' },
+  privacyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 13,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(125,232,205,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(125,232,205,0.18)',
+  },
+  intelligenceWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 13,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: 'rgba(255,195,107,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,195,107,0.25)',
+  },
+  privacyCopy: { flex: 1, gap: 3 },
+  privacyLabel: { fontSize: 10.5, fontWeight: '900', letterSpacing: 0.45, textTransform: 'uppercase' },
+  privacyStatus: { fontSize: 14, fontWeight: '900', lineHeight: 18 },
+  privacyBody: { fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
+  inspectorAction: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
+  inspectorLabel: { fontSize: 12, fontWeight: '900' },
   constellationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   constellationChip: {
     flexDirection: 'row',

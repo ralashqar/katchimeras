@@ -1,7 +1,8 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
-import type { DayEvidence, HomeDayRecord } from '@/types/home';
+import type { ClassifiedMemory, DayEvidence, HomeDayRecord } from '@/types/home';
 import type { CompanionQuest, QuestSubmissionRecord } from '@/utils/katchimera-quests';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
+import { resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
 
 import { questDefinition } from './definitions';
 
@@ -18,6 +19,8 @@ export type QuestReportBackItem = {
   thumbnailUri?: string | null;
   icon: IconSymbolName;
   accentColor: string;
+  matchStatus?: 'ready' | 'possible';
+  qualityId?: string | null;
 };
 
 export type QuestSubmissionItem = QuestReportBackItem;
@@ -30,21 +33,26 @@ export function buildQuestSubmissionItems(
   limit = 3
 ): QuestSubmissionItem[] {
   if (!day || !runtime || !quest) return [];
-  if (quest.acceptedDayId && quest.acceptedDayId !== day.isoDate) return [];
-  if (!runtime.readyToSubmit && !runtime.complete) return [];
+  if (!runtime.readyToSubmit && !runtime.complete && (runtime.possibleEvidenceIds ?? []).length === 0) return [];
 
   const items: QuestSubmissionItem[] = [];
   for (const id of runtime.matchedEvidenceIds) {
     const item = itemForEvidenceId(day, id);
-    if (item) items.push(item);
+    if (item) items.push({ ...item, matchStatus: 'ready' });
+  }
+  const requestedQuality = questDefinition(runtime.questId)?.criteria.find(
+    (criterion) => criterion.fact === 'memory.qualities' && typeof criterion.value === 'string'
+  )?.value as string | undefined;
+  for (const id of runtime.possibleEvidenceIds ?? []) {
+    const item = itemForEvidenceId(day, id);
+    if (item) items.push({ ...item, matchStatus: 'possible', qualityId: requestedQuality ?? null });
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && (runtime.readyToSubmit || runtime.complete)) {
     items.push(...fallbackItemsForQuest(day, runtime.questId));
   }
 
   return dedupeItems(items)
-    .filter((item) => isAfterQuestAccepted(item, quest))
     .filter((item) => !isSubmittedForQuest(submissions, quest.questId, quest.creatureId, item.sourceType, item.sourceId))
     .slice(0, limit);
 }
@@ -70,7 +78,7 @@ export function buildQuestReportBackItems(
 }
 
 function itemForEvidenceId(day: HomeDayRecord, evidenceId: string): QuestReportBackItem | null {
-  const evidence = (day.evidence ?? []).find((item) => item.id === evidenceId);
+  const evidence = (day.evidence ?? []).find((item) => item.id === evidenceId) ?? evidenceFromClassifiedMemory(day, evidenceId);
   if (!evidence) return null;
 
   if (evidence.sourceType === 'photo') {
@@ -94,6 +102,50 @@ function itemForEvidenceId(day: HomeDayRecord, evidenceId: string): QuestReportB
     icon: iconForEvidence(evidence),
     accentColor: '#A8E2C6',
   };
+}
+
+function evidenceFromClassifiedMemory(day: HomeDayRecord, evidenceId: string): DayEvidence | null {
+  const sourceId = evidenceId.startsWith('photo:') || evidenceId.startsWith('note:')
+    ? evidenceId.slice(evidenceId.indexOf(':') + 1)
+    : null;
+  const memory = (day.classifiedMemories ?? []).find(
+    (item) => item.id === evidenceId || (!!sourceId && item.sourceId === sourceId)
+  );
+  if (!memory) return null;
+  return {
+    id: evidenceId,
+    sourceType: memory.sourceType === 'movement' ? 'steps' : memory.sourceType,
+    sourceId: memory.sourceId,
+    observedAt: memory.createdAt,
+    thumbnailUri: thumbnailForMemory(day, memory),
+    provider: 'deterministic',
+    confidence: Math.max(0, ...(memory.qualities ?? []).map((quality) => quality.score)),
+    signals: (memory.qualities ?? [])
+      .filter((quality) => quality.status !== 'rejected')
+      .map((quality) => ({
+        key: quality.qualityId,
+        confidence: quality.score,
+        raw: quality.qualityId,
+        provider: quality.status === 'confirmed' ? 'manual' : quality.sources[0]?.provider ?? 'deterministic',
+        source: 'aggregate',
+        centrality: quality.centrality,
+        qualityStatus: quality.status,
+      })),
+    explanation: 'Possible match from the photo intelligence record.',
+  };
+}
+
+function thumbnailForMemory(day: HomeDayRecord, memory: ClassifiedMemory): string | null {
+  const meaning = (day.capturedMeanings ?? []).find((item) => item.sourceId === memory.sourceId);
+  if (meaning?.thumbnailUri) return meaning.thumbnailUri;
+  const moment = day.moments.find(
+    (item) => item.type === 'photo' && (
+      item.metadata?.assetId === memory.sourceId ||
+      item.metadata?.localUri === memory.sourceId ||
+      item.metadata?.thumbnailUri === memory.sourceId
+    )
+  );
+  return moment?.metadata?.thumbnailUri ?? moment?.metadata?.localUri ?? null;
 }
 
 function photoEvidenceItem(day: HomeDayRecord, evidence: DayEvidence): QuestReportBackItem {
@@ -220,22 +272,25 @@ function fallbackItemsForQuest(day: HomeDayRecord, questId: string): QuestReport
 }
 
 function latestFoodItems(day: HomeDayRecord): QuestReportBackItem[] {
-  return [...(day.foodMoments ?? [])].reverse().map((item) => ({
+  return [...(day.foodMoments ?? [])].reverse().map((item) => {
+    const display = resolveFoodMomentDisplay(item);
+    return ({
     id: item.id,
     kind: 'food' as const,
     sourceType: 'food',
     sourceId: item.id,
     evidenceId: null,
     createdAt: item.createdAt,
-    title: item.label,
-    subtitle: [item.cuisine ? cuisineTitle(item.cuisine) : null, item.homeCooked ? 'Home cooked' : null, foodMeaningTitle(item.meaning)]
+    title: display.label,
+    subtitle: [display.detail, foodMeaningTitle(item.meaning)]
       .filter(Boolean)
       .join(' - '),
     body: item.detail ?? null,
     thumbnailUri: item.thumbnailUri ?? null,
     icon: 'fork.knife',
     accentColor: '#FFC36B',
-  }));
+    });
+  });
 }
 
 function latestStudioItems(day: HomeDayRecord, requestedMedia?: unknown): QuestReportBackItem[] {
@@ -243,20 +298,23 @@ function latestStudioItems(day: HomeDayRecord, requestedMedia?: unknown): QuestR
   return [...(day.studioMoments ?? [])]
     .filter((item) => !requested || item.mediaType === requested)
     .reverse()
-    .map((item) => ({
+    .map((item) => {
+      const display = resolveStudioMomentDisplay(item);
+      return ({
       id: item.id,
       kind: 'studio' as const,
       sourceType: 'studio',
       sourceId: item.id,
       evidenceId: null,
       createdAt: item.createdAt,
-      title: item.label,
+      title: display.label,
       subtitle: `${studioMediaTitle(item.mediaType)} - ${studioRatingTitle(item.rating)}`,
-      body: item.detail ?? null,
+      body: display.detail,
       thumbnailUri: item.thumbnailUri ?? null,
       icon: studioIcon(item.mediaType),
       accentColor: '#E8C272',
-    }));
+      });
+    });
 }
 
 function latestNoteItems(day: HomeDayRecord, questId: string): QuestReportBackItem[] {
@@ -321,13 +379,6 @@ function latestCaptureItems(day: HomeDayRecord): QuestReportBackItem[] {
     icon: 'camera.fill',
     accentColor: '#92D7FF',
   }));
-}
-
-function isAfterQuestAccepted(item: QuestSubmissionItem, quest: CompanionQuest): boolean {
-  if (!item.createdAt) return true;
-  const createdAt = Date.parse(item.createdAt);
-  if (!Number.isFinite(createdAt)) return true;
-  return createdAt >= quest.acceptedAt;
 }
 
 function isSubmittedForQuest(
@@ -478,13 +529,6 @@ function foodMeaningTitle(meaning: string): string {
     default:
       return 'Treat';
   }
-}
-
-function cuisineTitle(cuisine: string): string {
-  return cuisine
-    .split('_')
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
 }
 
 function sleepTitle(quality: string): string {

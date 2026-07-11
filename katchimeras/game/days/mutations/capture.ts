@@ -1,7 +1,10 @@
-import type { DayScores, DayVisionSummary, StoredHomeDayRecord } from '@/types/home';
+import type { DayScores, DayVisionSummary, StoredHomeDayRecord, UserConfirmation } from '@/types/home';
 import { mergeCaptureEnergy } from '@/utils/capture-energy';
 import type { FoodDetection } from '@/utils/food-detect';
-import { buildPhotoEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
+import { upsertEvidence } from '@/utils/intelligence/evidence';
+import { upsertClassifiedMemory } from '@/utils/intelligence/classification';
+import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
+import { studioDetectionForClassifiedMemory } from '@/utils/intelligence/classification-policy';
 import type { SceneRead } from '@/utils/scene-classify';
 import type { StudioDetection } from '@/utils/studio-detect';
 import { mergeDayVision } from '@/utils/vision-signals';
@@ -19,6 +22,7 @@ export type CapturedMomentInput = {
   vision: DayVisionSummary | null;
   sourceId?: string | null;
   scene?: SceneRead;
+  confirmations?: UserConfirmation[];
   meaning?: { archetype: string; label: string; thumbnailUri?: string | null; sourceId?: string | null };
 };
 
@@ -38,16 +42,25 @@ export function withCapturedMoment(
 
   const meaning = capture.meaning;
   const sourceId = capture.sourceId ?? meaning?.sourceId ?? meaning?.thumbnailUri ?? null;
-  const photoEvidence =
+  const photoIntelligence =
     sourceId && capture.vision
-      ? buildPhotoEvidence({
+      ? buildPhotoIntelligence({
           sourceId,
           observedAt: now.toISOString(),
           thumbnailUri: meaning?.thumbnailUri ?? null,
           vision: capture.vision,
           scene: capture.scene ?? null,
+          confirmations: capture.confirmations,
         })
       : null;
+  const photoEvidence = photoIntelligence?.evidence ?? null;
+  const classifiedMemory = photoIntelligence?.memory ?? null;
+  // The finalized camera classification is the only authority for automatic
+  // Studio creation. Re-running the lower-level detector here used to turn a
+  // distant OCR fragment into a second, contradictory Today prompt.
+  const finalizedStudioDetection = classifiedMemory
+    ? studioDetectionForClassifiedMemory(classifiedMemory)
+    : detections.studio;
 
   return {
     ...day,
@@ -64,6 +77,9 @@ export function withCapturedMoment(
         : day.capturedMeanings,
     vision: capture.vision ? mergeDayVision(day.vision, capture.vision) : day.vision,
     evidence: photoEvidence ? upsertEvidence(day.evidence, [photoEvidence]) : day.evidence,
+    classifiedMemories: classifiedMemory
+      ? upsertClassifiedMemory(day.classifiedMemories, [classifiedMemory])
+      : day.classifiedMemories,
     foodMoments: detections.food.detected
       ? appendFoodMoment(
           day.foodMoments,
@@ -72,17 +88,19 @@ export function withCapturedMoment(
             now,
             archetype: meaning?.archetype,
             thumbnailUri: meaning?.thumbnailUri ?? null,
+            sourceId,
           })
         )
       : day.foodMoments,
-    studioMoments: detections.studio.detected
+    studioMoments: finalizedStudioDetection.detected
       ? appendStudioMoment(
           day.studioMoments,
-          buildAutoStudioMoment(detections.studio, {
+          buildAutoStudioMoment(finalizedStudioDetection, {
             source: 'photo',
             now,
             archetype: meaning?.archetype,
             thumbnailUri: meaning?.thumbnailUri ?? null,
+            sourceId,
             detail: detections.studioDetail,
           })
         )

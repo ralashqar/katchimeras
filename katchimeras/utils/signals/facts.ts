@@ -33,6 +33,7 @@ export type Facts = {
   'photo.place.categories': string[] | 'unknown';
   'sleep.quality': 'good' | 'low' | 'unknown';
   'evidence.items': DayEvidence[];
+  'memory.qualities': DayEvidence[];
 };
 
 export type FactKey = keyof Facts;
@@ -51,7 +52,9 @@ export type Op =
   | 'evidenceAny'
   | 'evidenceAll'
   | 'evidenceCorroborated'
-  | 'evidenceCount';
+  | 'evidenceCount'
+  | 'qualityAtLeast';
+
 
 export type Criterion = {
   fact: FactKey;
@@ -61,6 +64,9 @@ export type Criterion = {
   sourceTypes?: DayEvidenceSourceType[];
   requireCount?: number;
   withinDay?: boolean;
+  qualityId?: string;
+  minimumScore?: number;
+  minimumCentrality?: 'primary' | 'supporting' | 'any';
   label: string;
 };
 
@@ -69,10 +75,14 @@ export type CriterionEvaluation = {
   evidenceIds: string[];
   confidence: number | null;
   reason: string | null;
+  qualityId?: string | null;
+  centrality?: 'primary' | 'supporting' | 'incidental' | null;
 };
 
 export function evaluateCriterion(criterion: Criterion, facts: Partial<Facts>): CriterionEvaluation {
-  const actual = facts[criterion.fact];
+  const actual = criterion.op === 'qualityAtLeast'
+    ? facts[criterion.fact] ?? facts['evidence.items']
+    : facts[criterion.fact];
   if (actual === undefined || actual === 'unknown') {
     return { done: false, evidenceIds: [], confidence: null, reason: 'Signal is not available yet.' };
   }
@@ -96,6 +106,7 @@ export function evaluateCriterion(criterion: Criterion, facts: Partial<Facts>): 
     case 'evidenceAll':
     case 'evidenceCorroborated':
     case 'evidenceCount':
+    case 'qualityAtLeast':
       return evaluateEvidenceCriterion(criterion, actual);
     default:
       return done(false);
@@ -115,10 +126,11 @@ function evaluateEvidenceCriterion(criterion: Criterion, actual: FactValue): Cri
     return { done: false, evidenceIds: [], confidence: null, reason: 'No evidence has been recorded yet.' };
   }
 
-  const requested = String(criterion.value ?? '');
+  const requested = criterion.qualityId ?? String(criterion.value ?? '');
   const match = scoreEvidenceMatch(actual, {
     value: requested,
-    minConfidence: criterion.minConfidence,
+    minConfidence: criterion.minimumScore ?? criterion.minConfidence,
+    minimumCentrality: criterion.minimumCentrality,
     sourceTypes: criterion.sourceTypes,
     requireCount: criterion.op === 'evidenceCount' ? criterion.requireCount ?? 1 : criterion.requireCount,
     allowCorroboration: criterion.op === 'evidenceCorroborated',
@@ -128,6 +140,8 @@ function evaluateEvidenceCriterion(criterion: Criterion, actual: FactValue): Cri
     evidenceIds: match.evidenceIds,
     confidence: match.confidence || null,
     reason: match.reason,
+    qualityId: match.qualityId ?? null,
+    centrality: match.centrality ?? null,
   };
 }
 

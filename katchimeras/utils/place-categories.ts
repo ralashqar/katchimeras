@@ -38,8 +38,13 @@ type ResolvedCategory = {
 //   are never sent at all
 export async function resolvePlaceSeedsForDay(
   day: StoredHomeDayRecord,
-  priorDays: StoredHomeDayRecord[]
+  priorDays: StoredHomeDayRecord[],
+  options: { allowRemote?: boolean } = {}
 ): Promise<string[]> {
+  // Coordinate enrichment is never an automatic hatch-time side effect. A
+  // future explicit user action may opt this one lookup in; manual categories
+  // and local dwell patterns remain the default intelligence path.
+  if (options.allowRemote !== true) return [];
   const dayMap = deriveDayMapSummary(day.locations, day.moments);
   if (!dayMap || dayMap.nodes.length === 0) {
     return [];

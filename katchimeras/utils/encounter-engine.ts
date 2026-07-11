@@ -12,6 +12,7 @@ import type {
 import { computeLivingRarity, computeDaySpanMeters, maxRarity, type LivingRarity } from '@/utils/living-rarity';
 import { resolveBondStage, type BondStage } from '@/utils/bond';
 import { buildVisionSignals } from '@/utils/vision-signals';
+import { assignmentSignals } from '@/utils/intelligence/classification';
 
 // Where a signal came from — drives Hatch Engine v2 weighting (explicit
 // moment/prompt input counts as "intent") and the day-tag field's grouping.
@@ -72,11 +73,25 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
     });
   });
 
+  // V8 intelligence assignments are the authoritative, explainable route from
+  // each source to the cast. Supporting assignments deliberately contribute
+  // less than the source's primary read; confirmed answers count as intent.
+  assignmentSignals(day.classifiedMemories).forEach((assignment) => {
+    signals.push({
+      seedId: assignment.seedId,
+      intensity: clamp01(assignment.score * (assignment.role === 'primary' ? 1 : 0.45)),
+      sourceMomentIds: [],
+      isRecovery: false,
+      source: assignment.confirmed ? 'prompt' : 'vision',
+    });
+  });
+
   // On-device vision read: what the day's photos actually showed (scenes, signs,
   // people) becomes encounter signals — including social_gathering from a face
   // count, the one signal passive sensors can't reach. Present only once the
   // native vision module has analysed the day.
-  if (day.vision) {
+  const hasClassifiedPhoto = (day.classifiedMemories ?? []).some((memory) => memory.sourceType === 'photo');
+  if (day.vision && !hasClassifiedPhoto) {
     buildVisionSignals(day.vision).forEach((visionSignal) => {
       signals.push({
         seedId: visionSignal.seedId,

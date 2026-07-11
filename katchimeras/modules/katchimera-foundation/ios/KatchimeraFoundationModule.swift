@@ -26,6 +26,36 @@ public final class KatchimeraFoundationModule: Module {
       return false
     }
 
+    // Preserve Apple's concrete availability reason for diagnostics and UI.
+    // The boolean API above remains for compatibility with older JS bundles.
+    Function("availabilityInfo") { () -> [String: String] in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        let model = SystemLanguageModel.default
+        let locale = Locale.current
+        let localeDetails = [
+          "locale": locale.identifier,
+          "localeSupported": model.supportsLocale(locale) ? "true" : "false",
+        ]
+        switch model.availability {
+        case .available:
+          return localeDetails.merging(["status": "available", "reason": "available"]) { _, new in new }
+        case .unavailable(.appleIntelligenceNotEnabled):
+          return localeDetails.merging(["status": "unavailable", "reason": "apple_intelligence_not_enabled"]) { _, new in new }
+        case .unavailable(.deviceNotEligible):
+          return localeDetails.merging(["status": "unavailable", "reason": "device_not_eligible"]) { _, new in new }
+        case .unavailable(.modelNotReady):
+          return localeDetails.merging(["status": "unavailable", "reason": "model_not_ready"]) { _, new in new }
+        case .unavailable:
+          return localeDetails.merging(["status": "unavailable", "reason": "unknown_unavailable_reason"]) { _, new in new }
+        }
+      }
+      return ["status": "unavailable", "reason": "ios_version_unsupported"]
+      #else
+      return ["status": "unavailable", "reason": "framework_not_linked"]
+      #endif
+    }
+
     AsyncFunction("suggestMeaningsAsync") { (tags: [String], faceCount: Int, promise: Promise) in
       #if canImport(FoundationModels)
       if #available(iOS 26.0, *) {
@@ -46,6 +76,22 @@ public final class KatchimeraFoundationModule: Module {
       if #available(iOS 26.0, *) {
         Task {
           let result = await Self.interpretNote(transcript: transcript)
+          promise.resolve(result)
+        }
+        return
+      }
+      #endif
+      promise.resolve([String: String]())
+    }
+
+    // Unified structured read used by the v8 intelligence pipeline. Sensitive
+    // relationship and ownership fields are deliberately absent: those always
+    // come from a user confirmation in the clarification graph.
+    AsyncFunction("readMemoryAsync") { (tags: [String], ocrLines: [String], faceCount: Int, promise: Promise) in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        Task {
+          let result = await Self.readMemory(tags: tags, ocrLines: ocrLines, faceCount: faceCount)
           promise.resolve(result)
         }
         return
@@ -92,6 +138,69 @@ public final class KatchimeraFoundationModule: Module {
 
   #if canImport(FoundationModels)
   @available(iOS 26.0, *)
+  private static func readMemory(tags: [String], ocrLines: [String], faceCount: Int) async -> [String: String] {
+    guard case .available = SystemLanguageModel.default.availability else { return [:] }
+    let cleaned = tags.filter { !$0.isEmpty }
+    let cleanedOCR = ocrLines.filter { !$0.isEmpty }
+    guard !cleaned.isEmpty || !cleanedOCR.isEmpty else { return [:] }
+    let instructions = Instructions(
+      """
+      Classify a personal memory from on-device visual observations and OCR.
+      Choose exactly one dominant domain: animal, people, food, media, movement, place, work,
+      nature, life_event, or other. Name the specific subject in 2-5 words.
+      If it is media, identify mediaKind as book, film, show, game, music, or art
+      and only provide title/creator when supported by OCR. If it is food, name
+      the dish or drink. First distinguish a real physical scene from a screenshot,
+      game, cartoon, illustration, app interface, or content displayed on a screen.
+      Depicted food, animals, people, and places are not real-life food, pet, people,
+      or place memories; classify the work as media when identifiable, otherwise other.
+      A photographed television showing sport, news, or another live event is media
+      being watched, never the user's work or physical movement. Describe the broadcast
+      specifically only when the observations or OCR support that detail. Never guess a
+      particular sport; use "live sport on TV" when the sport itself is uncertain, and
+      use show as its mediaKind when no more specific supported media kind exists.
+      If it is movement, use walk, run, hike, cycle, workout,
+      transit, commute, drive, travel, or mixed. Never infer identity, ownership,
+      gender, age, family relationship, or whether an animal is someone's pet.
+      Return up to four other clearly visible subjects as a comma-separated list,
+      excluding the dominant subject. Do not include weak guesses.
+      """
+    )
+    let session = LanguageModelSession(instructions: instructions)
+    let observations = cleaned.prefix(12).joined(separator: ", ")
+    let text = cleanedOCR.prefix(12).joined(separator: " / ")
+    var prompt = "Observations: \(observations). Faces detected: \(faceCount)."
+    if !text.isEmpty { prompt += " OCR: \"\(text)\"." }
+    do {
+      let response = try await session.respond(to: Prompt(prompt), generating: MemoryRead.self)
+      return memoryResult(response.content, promptVersion: "memory-read-v1-ios26")
+    } catch {
+      return [:]
+    }
+  }
+  #endif
+
+  #if canImport(FoundationModels)
+  @available(iOS 26.0, *)
+  private static func memoryResult(_ content: MemoryRead, promptVersion: String) -> [String: String] {
+    return [
+      "domain": content.domain,
+      "subject": content.subject,
+      "animalKind": content.animalKind,
+      "mediaKind": content.mediaKind,
+      "title": content.title,
+      "creator": content.creator,
+      "food": content.food,
+      "activity": content.activity,
+      "representation": content.representation,
+      "supportingSubjects": content.supportingSubjects,
+      "promptVersion": promptVersion,
+    ]
+  }
+  #endif
+
+  #if canImport(FoundationModels)
+  @available(iOS 26.0, *)
   private static func interpretNote(transcript: String) async -> [String: String] {
     guard case .available = SystemLanguageModel.default.availability else {
       return [:]
@@ -109,10 +218,12 @@ public final class KatchimeraFoundationModule: Module {
         specific to what the person said. No punctuation, no emoji, no quotes.
       - feeling: the single dominant feeling of the note, one of:
         calm, energy, together, meaningful.
-      - mediaKind: when the note mentions taking in a work of media — reading a book,
-        watching a film or show, playing a video game, listening to an album, seeing
-        art — the kind of work: book, film, show, game, music, or art. Otherwise none.
-        Booking a table, reading emails or the news, or watching people are NOT media.
+      - mediaKind: when the note mentions taking in media — reading a book,
+        watching a film/show/sports broadcast/news/online video, playing a video game,
+        listening to an album or podcast, or seeing art — classify it as book, film,
+        show, game, music, art, or other. Use other for watched sport, news, podcasts,
+        livestreams, and consumed media outside the six specific kinds. Watching a
+        person in real life is not media. Otherwise use none.
       - mediaTitle: the mentioned work's full official title with correct capitalization.
         Transcripts are often lowercase — use your knowledge of the work to restore the
         real title (for example "the way of kings" is the book "The Way of Kings").
@@ -194,7 +305,8 @@ public final class KatchimeraFoundationModule: Module {
       return [:]
     }
     let cleaned = tags.filter { !$0.isEmpty }
-    guard !cleaned.isEmpty else {
+    let cleanedOCR = ocrLines.filter { !$0.isEmpty }
+    guard !cleaned.isEmpty || !cleanedOCR.isEmpty else {
       return [:]
     }
 
@@ -204,6 +316,10 @@ public final class KatchimeraFoundationModule: Module {
       You receive what an on-device vision model detected (MAIN subject first) and any
       text it read in the photo. Decide what the photo is MAINLY OF — the thing the
       person pointed the camera at — not incidental textures or background objects.
+      Before choosing the subject, distinguish a physical scene from a screenshot,
+      game, cartoon, illustration, app interface, or other screen content. Objects
+      depicted in digital content are not physical memories: an illustrated/game egg
+      is not food, a cartoon dog is not a pet, and a game landscape is not a place.
       Choose the single best top-level category:
       - media: the photo is OF a work — a book cover, a film or TV poster, a screen
         showing an identifiable film/show, a video game box or gameplay, an album
@@ -211,8 +327,9 @@ public final class KatchimeraFoundationModule: Module {
         the camera was pointed at (a close-up that fills much of the frame). A book,
         screen, or poster that merely appears somewhere in a wider scene is NOT
         media — classify the scene by its real subject instead.
-      - food: a meal, drink, snack, dessert, or cooking (still food when packaging
-        or a menu is partly visible)
+      - food: real physical food — a photographed meal, drink, snack, dessert, or
+        cooking (still food when packaging or a menu is partly visible). Never use
+        food for an icon, cartoon, illustration, screenshot, or game object.
       - social: people together — a gathering, party, friends, or family
       - screen: a device itself — TV, monitor, phone, laptop — with no identifiable work on it
       - nature: the outdoors — landscapes, plants, sky, water, weather, wild animals
@@ -246,7 +363,7 @@ public final class KatchimeraFoundationModule: Module {
     } else if faceCount == 1 {
       described += "; one person is in the photo"
     }
-    let text = ocrLines.filter { !$0.isEmpty }.prefix(12).joined(separator: " / ")
+    let text = cleanedOCR.prefix(12).joined(separator: " / ")
     var prompt = "The photo shows \(described)."
     if !text.isEmpty {
       prompt += " Text read in the photo: \"\(text)\"."
@@ -283,8 +400,13 @@ public final class KatchimeraFoundationModule: Module {
       """
       You classify what a personal photo is mainly about, for a gentle journaling app.
       You receive what an on-device vision model detected, with the MAIN subject first.
+      First distinguish real physical scenes from screenshots, games, cartoons,
+      illustrations, app interfaces, and screen content. Depicted objects are not
+      real-life memories: an illustrated/game egg is not food and a cartoon dog is
+      not a pet. Choose screen or document for unidentified digital content.
       Choose the single best top-level category:
-      - food: a meal, drink, snack, dessert, or cooking
+      - food: a real photographed meal, drink, snack, dessert, or cooking — never
+        an icon, illustration, cartoon, screenshot, or video-game object
       - social: people together — a gathering, party, friends, or family
       - screen: a TV, monitor, phone, laptop, or video game shown in the photo
       - nature: the outdoors — landscapes, plants, sky, water, weather, wild animals
@@ -323,6 +445,40 @@ public final class KatchimeraFoundationModule: Module {
 #if canImport(FoundationModels)
 @available(iOS 26.0, *)
 @Generable
+struct MemoryRead {
+  @Guide(description: "Whether this is a physical scene, screen content, or unclear", .anyOf(["real_world", "screen_content", "unknown"]))
+  let representation: String
+
+  @Guide(description: "The dominant memory domain", .anyOf(["animal", "people", "food", "media", "movement", "place", "work", "nature", "life_event", "other"]))
+  let domain: String
+
+  @Guide(description: "A short specific 2-5 word subject phrase with no punctuation")
+  let subject: String
+
+  @Guide(description: "Up to four other clearly visible subjects, comma-separated, or empty")
+  let supportingSubjects: String
+
+  @Guide(description: "The animal kind, or none", .anyOf(["none", "dog", "cat", "other"]))
+  let animalKind: String
+
+  @Guide(description: "The media kind, or none", .anyOf(["none", "book", "film", "show", "game", "music", "art"]))
+  let mediaKind: String
+
+  @Guide(description: "The OCR-supported official media title, or empty")
+  let title: String
+
+  @Guide(description: "The confidently known creator, or empty")
+  let creator: String
+
+  @Guide(description: "A short dish or drink name, or empty")
+  let food: String
+
+  @Guide(description: "The movement kind, or none", .anyOf(["none", "walk", "run", "hike", "cycle", "workout", "transit", "commute", "drive", "travel", "mixed"]))
+  let activity: String
+}
+
+@available(iOS 26.0, *)
+@Generable
 struct MeaningOption {
   @Guide(description: "A short present-tense phrase (2–4 words, under 24 characters) for what the person is doing or savouring in the moment, anchored to the photo's main subject")
   let label: String
@@ -348,8 +504,8 @@ struct NoteRead {
   let feeling: String
 
   @Guide(
-    description: "The kind of media work the note mentions taking in (reading a book, watching a film or show, playing a game, listening to an album, seeing art), or none",
-    .anyOf(["none", "book", "film", "show", "game", "music", "art"])
+    description: "The kind of media the note mentions taking in; use other for watched sport/news, podcasts, livestreams, or another consumed format, otherwise none",
+    .anyOf(["none", "book", "film", "show", "game", "music", "art", "other"])
   )
   let mediaKind: String
 

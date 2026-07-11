@@ -1,4 +1,6 @@
 import type { DayVisionConcept, DayVisionSummary, PhotoVisionResult } from '@/types/home';
+import { canonicalizeSignal, seedIdForCanonicalSignal } from '@/utils/intelligence/taxonomy';
+import { guardPhotoVisionResult } from '@/utils/photo-reality';
 
 // The pure bridge from "what the camera saw" to "which creature the day meets"
 // and "what the nightly line names". The native Apple Vision module produces
@@ -158,14 +160,38 @@ export function aggregatePhotoVision(
   const totals = new Map<string, { salience: number; count: number; peak: number }>();
   // Raw, un-canonicalised labels kept in parallel for specific narration.
   const rawTotals = new Map<string, number>();
-  const textTokens = new Set<string>();
+  // De-duplicate OCR case-insensitively but preserve Vision's original casing.
+  // Cover-title extraction and Foundation Models both benefit from seeing
+  // "THE WAY OF KINGS" instead of a prematurely lower-cased version.
+  const textTokens = new Map<string, string>();
   let maxFaceCount = 0;
   let socialPhotoCount = 0;
   let analyzedPhotoCount = 0;
+  let maxDominantSubjectCoverage = 0;
+  let documentPhotoCount = 0;
+  let representation: DayVisionSummary['representation'];
+  const analysisRegions: NonNullable<DayVisionSummary['analysisRegions']> = [];
+  const recognizedText: NonNullable<DayVisionSummary['recognizedText']> = [];
 
-  for (const result of results) {
+  for (const incoming of results) {
+    // Establish whether this depicts the physical world before interpreting its
+    // subjects. A game/cartoon screenshot containing an egg keeps its screen or
+    // gaming evidence but cannot contribute breakfast/dessert/pet signals.
+    const result = guardPhotoVisionResult(incoming);
+    representation = result.reality ?? representation;
+    if (result.dominantSubject) analysisRegions.push({ ...result.dominantSubject, kind: 'saliency' });
+    result.humans?.forEach((region) => analysisRegions.push({ ...region, kind: 'human' }));
+    result.faces?.forEach((region) => analysisRegions.push({ ...region, kind: 'face' }));
+    result.animals?.forEach((animal) => animal.region && analysisRegions.push({ ...animal.region, kind: 'animal' }));
+    (result.recognizedText ?? []).forEach((item) => recognizedText.push({ text: item.text, confidence: item.confidence }));
     analyzedPhotoCount += 1;
-    const faceCount = result.faceCount ?? 0;
+    const dominant = result.dominantSubject;
+    if (dominant) {
+      const area = clamp01(dominant.width) * clamp01(dominant.height);
+      maxDominantSubjectCoverage = Math.max(maxDominantSubjectCoverage, area);
+    }
+    if (result.documentDetected) documentPhotoCount += 1;
+    const faceCount = Math.max(result.faceCount ?? 0, result.humanCount ?? 0);
     maxFaceCount = Math.max(maxFaceCount, faceCount);
     if (faceCount >= SOCIAL_FACE_MIN) {
       socialPhotoCount += 1;
@@ -189,6 +215,14 @@ export function aggregatePhotoVision(
       }
       perPhoto.set(concept, Math.max(perPhoto.get(concept) ?? 0, label.confidence));
     }
+    for (const animal of result.animals ?? []) {
+      if (animal.kind === 'unknown' || animal.confidence < confidenceFloor) continue;
+      perPhoto.set(animal.kind, Math.max(perPhoto.get(animal.kind) ?? 0, animal.confidence));
+      perPhotoRaw.set(animal.kind, Math.max(perPhotoRaw.get(animal.kind) ?? 0, animal.confidence));
+    }
+    if (result.documentDetected) {
+      perPhotoRaw.set('document', Math.max(perPhotoRaw.get('document') ?? 0, 0.72));
+    }
     for (const [concept, confidence] of perPhoto) {
       const entry = totals.get(concept) ?? { salience: 0, count: 0, peak: 0 };
       entry.salience += confidence;
@@ -201,10 +235,9 @@ export function aggregatePhotoVision(
     }
 
     for (const token of result.text ?? []) {
-      const normalized = token.trim().toLowerCase();
-      if (normalized) {
-        textTokens.add(normalized);
-      }
+      const preserved = token.trim();
+      const normalized = preserved.toLowerCase();
+      if (normalized && !textTokens.has(normalized)) textTokens.set(normalized, preserved);
     }
   }
 
@@ -229,8 +262,13 @@ export function aggregatePhotoVision(
     details,
     maxFaceCount,
     faceCoverage: analyzedPhotoCount > 0 ? socialPhotoCount / analyzedPhotoCount : 0,
-    textTokens: [...textTokens].slice(0, 40),
+    textTokens: [...textTokens.values()].slice(0, 40),
     analyzedPhotoCount,
+    dominantSubjectCoverage: maxDominantSubjectCoverage,
+    documentCoverage: analyzedPhotoCount > 0 ? documentPhotoCount / analyzedPhotoCount : 0,
+    representation,
+    analysisRegions: analysisRegions.slice(0, 8),
+    recognizedText: recognizedText.slice(0, 12),
   };
 }
 
@@ -275,13 +313,23 @@ export function mergeDayVision(
     faceCoverage: totalPhotos > 0 ? socialPhotos / totalPhotos : 0,
     textTokens,
     analyzedPhotoCount: totalPhotos,
+    dominantSubjectCoverage: Math.max(
+      existing.dominantSubjectCoverage ?? 0,
+      incoming.dominantSubjectCoverage ?? 0
+    ),
+    documentCoverage:
+      totalPhotos > 0
+        ? ((existing.documentCoverage ?? 0) * existing.analyzedPhotoCount +
+            (incoming.documentCoverage ?? 0) * incoming.analyzedPhotoCount) /
+          totalPhotos
+        : 0,
   };
 }
 
 // The encounter seed a canonical concept maps to (if any). Exposed so the
 // day-tag field can link a vision tag to the candidate it feeds.
 export function conceptSeedId(concept: string): string | null {
-  return CONCEPT_SEED_MAP[concept] ?? null;
+  return seedIdForCanonicalSignal(concept);
 }
 
 export function buildVisionSignals(vision: DayVisionSummary): VisionSignal[] {
@@ -296,7 +344,7 @@ export function buildVisionSignals(vision: DayVisionSummary): VisionSignal[] {
   // Frequency-aware: coverage says how much the day was about it, peak keeps a
   // one-off lucky detection from hatching a whole creature on its own.
   for (const concept of vision.concepts) {
-    const seedId = CONCEPT_SEED_MAP[concept.name];
+    const seedId = seedIdForCanonicalSignal(concept.name);
     if (seedId) {
       consider(seedId, 0.4 + 0.35 * concept.coverage + 0.1 * concept.peakConfidence);
     }
@@ -337,18 +385,11 @@ export function pickProminentTags(vision: DayVisionSummary, limit = 3, minConfid
 }
 
 function canonicalizeLabel(rawName: string): string | null {
-  const key = rawName.trim().toLowerCase();
-  if (!key || GENERIC_VISION_LABELS.has(key)) {
-    return null;
-  }
-  for (const rule of CONCEPT_RULES) {
-    if (rule.pattern.test(key)) {
-      return rule.concept;
-    }
-  }
+  const key = canonicalizeSignal(rawName);
+  if (!key) return null;
   // Specific subject not in the taxonomy — keep it (humanised) so the nightly
   // line can still name it; it just won't group with anything.
-  return key.replace(/_/g, ' ');
+  return key;
 }
 
 function clamp01(value: number): number {

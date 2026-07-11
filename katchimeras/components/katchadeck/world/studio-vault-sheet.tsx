@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { Lantern } from '@/constants/theme';
 import type { StudioMediaType, StudioMoment, StudioRating } from '@/types/home';
+import { resolveStudioMomentDisplay } from '@/utils/memory-display';
 
 // The Studio — your inspiration archive. Books, films, shows, games, music you took
 // in, kept with how they landed. NOT a review tracker. A two-step add (what + how it
@@ -135,20 +136,22 @@ export function StudioVaultSheet({
               Nothing here yet — keep a book, a film, a song that stayed with you.
             </ThemedText>
           ) : null}
-          {studioMoments.map((moment) => (
+          {studioMoments.map((moment) => {
+            const display = resolveStudioMomentDisplay(moment);
+            return (
             <View key={moment.id} style={styles.row}>
               {moment.thumbnailUri ? (
                 <Image source={{ uri: moment.thumbnailUri }} style={styles.photo} contentFit="cover" transition={120} />
               ) : (
-                <ThemedText style={styles.rowEmoji}>{moment.emoji}</ThemedText>
+                <ThemedText style={styles.rowEmoji}>{display.emoji}</ThemedText>
               )}
               <View style={styles.rowText}>
                 <ThemedText style={styles.rowLabel} numberOfLines={1} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                  {moment.label}
+                  {display.label}
                 </ThemedText>
-                {moment.detail || moment.source ? (
+                {display.detail || moment.source ? (
                   <ThemedText style={styles.rowDetail} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                    {moment.detail ? `“${moment.detail}”` : SOURCE_LABEL[moment.source ?? 'manual']}
+                    {display.detail ?? SOURCE_LABEL[moment.source ?? 'manual']}
                   </ThemedText>
                 ) : null}
               </View>
@@ -159,7 +162,8 @@ export function StudioVaultSheet({
                 </ThemedText>
               </View>
             </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
     </MeadowSheet>

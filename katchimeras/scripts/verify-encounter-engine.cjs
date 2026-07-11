@@ -44,6 +44,17 @@ const castPath = transpileToTemp('constants/encounter-cast.ts', 'encounter-cast.
 const livingRarityPath = transpileToTemp('utils/living-rarity.ts', 'living-rarity.js');
 const bondPath = transpileToTemp('utils/bond.ts', 'bond.js');
 const visionSignalsPath = transpileToTemp('utils/vision-signals.ts', 'vision-signals.js');
+const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'taxonomy.js');
+const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-reality.js');
+const peopleDetectPath = transpileToTemp('utils/people-detect.ts', 'people-detect.js');
+const studioDetectPath = transpileToTemp('utils/studio-detect.ts', 'studio-detect.js');
+const classificationPath = transpileToTemp('utils/intelligence/classification.ts', 'classification.js');
+const classificationPolicyPath = path.join(tempDir, 'classification-policy.js');
+fs.writeFileSync(classificationPolicyPath, 'exports.memoryRejectsDomain = () => false;');
+const qualityRegistryPath = path.join(tempDir, 'quality-registry.js');
+fs.writeFileSync(qualityRegistryPath, 'exports.deriveMemoryQualities = () => []; exports.qualityDefinition = () => null; exports.qualityThresholds = () => ({ ready: 0.72, review: 0.3 });');
+const photoDescriptorPath = path.join(tempDir, 'photo-descriptor.js');
+fs.writeFileSync(photoDescriptorPath, 'exports.buildPhotoAnalysisDescriptor = () => null; exports.replanDescriptorAfterSubjectRejection = value => value;');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const hatchPastPath = transpileToTemp('utils/hatch-your-past.ts', 'hatch-your-past.js');
 
@@ -54,6 +65,14 @@ const stubs = {
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/bond': bondPath,
   '@/utils/vision-signals': visionSignalsPath,
+  '@/utils/intelligence/taxonomy': taxonomyPath,
+  '@/utils/photo-reality': photoRealityPath,
+  '@/utils/people-detect': peopleDetectPath,
+  '@/utils/studio-detect': studioDetectPath,
+  '@/utils/intelligence/classification': classificationPath,
+  '@/utils/intelligence/classification-policy': classificationPolicyPath,
+  '@/utils/intelligence/quality-registry': qualityRegistryPath,
+  '@/utils/intelligence/photo-descriptor': photoDescriptorPath,
   '@/utils/encounter-engine': enginePath,
   '@/types/home': {},
   '@/types/katchimera': {},
@@ -61,6 +80,8 @@ const stubs = {
 
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
+  if (request === './quality-registry') return qualityRegistryPath;
+  if (request === './photo-descriptor') return photoDescriptorPath;
   if (request in stubs) {
     const stub = stubs[request];
     if (typeof stub === 'string') {

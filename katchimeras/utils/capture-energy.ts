@@ -290,7 +290,8 @@ const SCORE_KEYS: HomeScoreKey[] = ['energy', 'calm', 'social', 'exploration', '
 export function buildCaptureEnergy(
   meaning: MeaningTag,
   vision: DayVisionSummary | null,
-  dayScores?: DayScores
+  dayScores?: DayScores,
+  options: { rejectFood?: boolean; rejectMedia?: boolean; rejectAnimal?: boolean } = {}
 ): Partial<DayScores> {
   const deltas: Partial<DayScores> = {};
   const add = (key: HomeScoreKey, value: number) => {
@@ -309,8 +310,8 @@ export function buildCaptureEnergy(
     if (category === 'nature' || category === 'water' || category === 'mountains') add('exploration', 0.1);
     if (category === 'landmark') add('exploration', 0.12);
     if (category === 'active') add('energy', 0.1);
-    if (category === 'culture') add('focus', 0.08);
-    if (category === 'food' || category === 'drink') add('calm', 0.06);
+    if (category === 'culture' && !options.rejectMedia) add('focus', 0.08);
+    if ((category === 'food' || category === 'drink') && !options.rejectFood) add('calm', 0.06);
     if (vision.maxFaceCount >= 1) add('social', 0.1);
   }
 

@@ -42,7 +42,7 @@ export default function NoteCaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ target?: string }>();
   const insets = useSafeAreaInsets();
-  const { addNote, isTodayHatched } = useHomeScreenState();
+  const { addNote, isTodayHatched, cloudIntelligenceEnabled } = useHomeScreenState();
   const requestedTarget = parseCaptureTarget(params.target);
   const noteTarget: DayInputTarget = requestedTarget ?? (isTodayHatched ? 'tomorrow' : 'today');
   const targetLabel = noteTarget === 'tomorrow' ? 'tomorrow' : 'today';
@@ -91,7 +91,7 @@ export default function NoteCaptureScreen() {
     if (uri) {
       setTranscribing(true);
       try {
-        const transcript = await transcribeAudioNote(uri);
+        const transcript = await transcribeAudioNote(uri, 'audio/m4a', { allowRemote: cloudIntelligenceEnabled });
         if (transcript) setText(transcript);
       } catch {
         // leave the box for the user to type
@@ -163,9 +163,9 @@ export default function NoteCaptureScreen() {
       // The text box is the source of truth (typed, or filled from transcription).
       // If transcription failed and there's audio, interpret the audio directly.
       const interpreted = text.trim()
-        ? await interpretNote({ text: text.trim() })
+        ? await interpretNote({ text: text.trim() }, { allowRemote: cloudIntelligenceEnabled })
         : audioUri
-          ? await interpretNote({ audioUri })
+          ? await interpretNote({ audioUri }, { allowRemote: cloudIntelligenceEnabled })
           : null;
       if (!interpreted) {
         setPhase('input');

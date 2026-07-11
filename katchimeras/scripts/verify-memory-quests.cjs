@@ -24,9 +24,13 @@ function transpileToTemp(relativeSourcePath, outName) {
 // them so the Node-only harness can load the pure quest engine.
 const foodDetectPath = transpileToTemp('utils/food-detect.ts', 'food-detect.js');
 const studioDetectPath = transpileToTemp('utils/studio-detect.ts', 'studio-detect.js');
+const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'taxonomy.js');
+const classificationPolicyPath = transpileToTemp('utils/intelligence/classification-policy.ts', 'classification-policy.js');
 const stubs = {
   '@/utils/food-detect': foodDetectPath,
   '@/utils/studio-detect': studioDetectPath,
+  '@/utils/intelligence/taxonomy': taxonomyPath,
+  '@/utils/intelligence/classification-policy': classificationPolicyPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
@@ -78,6 +82,18 @@ check('an empty day offers Reflection', empty.some((q) => q.type === 'answerRefl
 check('never more than 3 quests', empty.length <= 3, String(empty.length));
 check('a late evening offers a voice memory', engine.selectMemoryQuests(day(), lateNight).some((q) => q.type === 'recordVoiceMemory'));
 check('meal time offers a food memory', engine.selectMemoryQuests(day(), lunch).some((q) => q.type === 'saveFoodMemory'));
+check(
+  'rejecting a food classification suppresses the meal-time food nudge',
+  !engine.selectMemoryQuests(day({
+    classifiedMemories: [{
+      dominantDomain: 'other', observations: [{ value: 'dessert' }], facets: [
+        { key: 'food_item', value: 'Dessert' },
+        { key: 'food_kind', value: 'incidental', confirmed: true },
+      ], confirmations: [{ facetKey: 'food_kind', facetValue: 'incidental', optionId: 'incidental' }],
+    }],
+    vision: { concepts: [{ name: 'dessert' }], details: [], textTokens: [] },
+  }), lunch, 7).some((q) => q.type === 'saveFoodMemory')
+);
 check('no food quest outside meal times', !engine.selectMemoryQuests(day(), lateNight).some((q) => q.type === 'saveFoodMemory'));
 check(
   'detected food offers the food quest even off meal times',

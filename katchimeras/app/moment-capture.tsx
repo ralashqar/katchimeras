@@ -18,8 +18,11 @@ import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
+import { confirmationsRejectDomain } from '@/utils/intelligence/classification-policy';
 import type { SceneRead } from '@/utils/scene-classify';
-import type { DayInputTarget, DayVisionSummary } from '@/types/home';
+import type { DayInputTarget, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
+import { cancelQuestCapture, completeQuestCapture } from '@/utils/quest-capture-session';
+import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
@@ -28,7 +31,7 @@ type CaptureState = 'live' | 'capturing' | 'captured';
 
 export default function MomentCaptureScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ target?: string }>();
+  const params = useLocalSearchParams<{ target?: string; questId?: string; questCreatureId?: string }>();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const { selectedDay, applyCapturedMoment, isTodayHatched, tomorrowDay } = useHomeScreenState();
@@ -39,8 +42,16 @@ export default function MomentCaptureScreen() {
   const dayScores = targetDay?.scores ?? null;
 
   const cameraRef = useRef<CameraView | null>(null);
+  const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const questId = typeof params.questId === 'string' ? params.questId : null;
+  const questCreatureId = typeof params.questCreatureId === 'string' ? params.questCreatureId : null;
+
+  const closeCapture = useCallback(() => {
+    cancelQuestCapture(questId);
+    router.back();
+  }, [questId, router]);
 
   useEffect(() => {
     if (permission && !permission.granted && permission.canAskAgain) {
@@ -60,27 +71,41 @@ export default function MomentCaptureScreen() {
         setPhotoUri(photo.uri);
         setState('captured');
       } else {
-        router.back();
+        closeCapture();
       }
     } catch {
-      router.back();
+      closeCapture();
     }
-  }, [state, router]);
+  }, [closeCapture, state]);
 
   const analyzeCaptured = useCallback(async (): Promise<DayVisionSummary | null> => {
     if (!photoUri) {
       return null;
     }
     const result = await analyzePhoto(photoUri);
-    return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
+    rawVisionRef.current = result;
+    return result
+      ? aggregatePhotoVision([{ ...result, captureSource: 'camera' }], CAPTURE_PHOTO_CONFIDENCE_FLOOR)
+      : null;
   }, [photoUri]);
 
   const commit = useCallback(
     // `scene` is the hierarchical read EssenceReview resolved (and showed) —
     // the same classification the engine acts on.
-    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null) => {
-      const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined);
-      const category = vision ? resolvePhotoCategory(vision) : { icon: 'sparkles' as const, accent: '#F1D4B4' };
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[]) => {
+      const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined, {
+        rejectFood: confirmationsRejectDomain(confirmations, 'food'),
+        rejectMedia: confirmationsRejectDomain(confirmations, 'media'),
+        rejectAnimal: confirmationsRejectDomain(confirmations, 'animal'),
+      });
+      const resolvedCategory = vision ? resolvePhotoCategory(vision) : null;
+      const categoryRejected =
+        (resolvedCategory?.id === 'food' || resolvedCategory?.id === 'drink') && confirmationsRejectDomain(confirmations, 'food') ||
+        resolvedCategory?.id === 'culture' && confirmationsRejectDomain(confirmations, 'media') ||
+        resolvedCategory?.id === 'pet' && confirmationsRejectDomain(confirmations, 'animal');
+      const category = resolvedCategory && !categoryRejected
+        ? resolvedCategory
+        : { icon: 'sparkles' as const, accent: '#F1D4B4' };
       applyCapturedMoment(
         {
           energy,
@@ -88,15 +113,29 @@ export default function MomentCaptureScreen() {
           sourceId: photoUri,
           meaning: { archetype: meaning, label, thumbnailUri: photoUri ?? null, sourceId: photoUri },
           scene: scene ?? undefined,
+          confirmations,
         },
         captureTarget
       );
       if (photoUri) {
         queueCaptureFeed({ photoUri, icon: category.icon, accent: category.accent });
+        saveDevLastPhotoAnalysis({
+          sourceId: photoUri,
+          thumbnailUri: photoUri,
+          rawVision: rawVisionRef.current,
+          visionSummary: vision,
+          scene,
+          confirmations,
+          questId,
+          creatureId: questCreatureId,
+        });
+      }
+      if (questId && questCreatureId && photoUri) {
+        completeQuestCapture(questId, questCreatureId, photoUri);
       }
       router.back();
     },
-    [applyCapturedMoment, captureTarget, dayScores, photoUri, router]
+    [applyCapturedMoment, captureTarget, dayScores, photoUri, questCreatureId, questId, router]
   );
 
   if (permission && !permission.granted) {
@@ -113,7 +152,7 @@ export default function MomentCaptureScreen() {
           {permission.canAskAgain ? (
             <KatchaButton label="Enable camera" onPress={() => void requestPermission()} variant="primary" />
           ) : null}
-          <KatchaButton label="Not now" onPress={() => router.back()} variant="secondary" />
+          <KatchaButton label="Not now" onPress={closeCapture} variant="secondary" />
         </View>
       </View>
     );
@@ -122,7 +161,13 @@ export default function MomentCaptureScreen() {
   if (state === 'captured' && photoUri) {
     return (
       <View style={styles.screen}>
-        <EssenceReview photoUri={photoUri} analyze={analyzeCaptured} onCommit={commit} onClose={() => router.back()} />
+        <EssenceReview
+          photoUri={photoUri}
+          questId={questId}
+          analyze={analyzeCaptured}
+          onCommit={commit}
+          onClose={closeCapture}
+        />
       </View>
     );
   }
@@ -136,7 +181,7 @@ export default function MomentCaptureScreen() {
         <Animated.View entering={FadeIn.duration(120)} exiting={FadeOut.duration(360)} pointerEvents="none" style={styles.flash} />
       ) : null}
 
-      <ScreenCloseButton onPress={() => router.back()} />
+      <ScreenCloseButton onPress={closeCapture} />
 
       {state === 'live' ? (
         <Animated.View entering={FadeInDown.duration(320)} style={[styles.prompt, { top: insets.top + 18 }]}>

@@ -49,6 +49,12 @@ const castPath = transpileToTemp('constants/encounter-cast.ts', 'encounter-cast.
 const livingRarityPath = transpileToTemp('utils/living-rarity.ts', 'living-rarity.js');
 const bondPath = transpileToTemp('utils/bond.ts', 'bond.js');
 const visionSignalsPath = transpileToTemp('utils/vision-signals.ts', 'vision-signals.js');
+const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-reality.js');
+const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'intelligence-taxonomy.js');
+const classificationPath = path.join(tempDir, 'intelligence-classification.js');
+fs.writeFileSync(classificationPath, 'exports.assignmentSignals = () => [];');
+const classificationPolicyPath = path.join(tempDir, 'intelligence-classification-policy.js');
+fs.writeFileSync(classificationPolicyPath, 'exports.visionSignalIsRejected = () => false;');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const dayTagsPath = transpileToTemp('utils/day-tags.ts', 'day-tags.js');
 const dexPath = transpileToTemp('utils/dex.ts', 'dex.js');
@@ -60,6 +66,10 @@ const stubs = {
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/bond': bondPath,
   '@/utils/vision-signals': visionSignalsPath,
+  '@/utils/photo-reality': photoRealityPath,
+  '@/utils/intelligence/taxonomy': taxonomyPath,
+  '@/utils/intelligence/classification': classificationPath,
+  '@/utils/intelligence/classification-policy': classificationPolicyPath,
   '@/utils/encounter-engine': enginePath,
   '@/utils/day-tags': dayTagsPath,
   '@/utils/dex': dexPath,

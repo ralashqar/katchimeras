@@ -26,6 +26,7 @@ type DayPromptStripProps = {
   onAnswer: (kind: DayPromptKind, choiceIds: string[], from: FeedSourceRect) => void;
   onDismiss: (kind: DayPromptKind) => void;
   onSelectHeroPhoto: (photo: DayPromptPhotoCandidate, from: FeedSourceRect) => void;
+  dismissLabel?: string;
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -37,7 +38,7 @@ const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#F
 // Secondary cream — matches the shared Meadow sheet's muted copy.
 const CREAM_SOFT = 'rgba(251,243,228,0.75)';
 
-export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto }: DayPromptStripProps) {
+export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto, dismissLabel = 'Later' }: DayPromptStripProps) {
   if (!prompt) {
     return null;
   }
@@ -67,7 +68,7 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto 
         </Animated.View>
         <Pressable accessibilityRole="button" onPress={() => onDismiss(prompt.id)} style={styles.dismiss}>
           <ThemedText style={styles.dismissLabel} lightColor={CREAM_SOFT} darkColor={CREAM_SOFT}>
-            Later
+            {dismissLabel}
           </ThemedText>
         </Pressable>
       </View>

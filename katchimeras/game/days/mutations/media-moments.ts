@@ -11,6 +11,7 @@ import type {
 } from '@/types/home';
 import type { FoodDetection } from '@/utils/food-detect';
 import type { StudioDetection } from '@/utils/studio-detect';
+import { buildNoteClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 
 export function appendFoodMoment(existing: FoodMoment[] | undefined, moment: FoodMoment): FoodMoment[] {
   const list = existing ?? [];
@@ -61,9 +62,37 @@ export function withManualFoodMoment(
   },
   now: Date
 ): StoredHomeDayRecord {
+  const moment = buildManualFoodMoment(input, now);
+  const classifiedMemory = buildNoteClassifiedMemory({
+    noteId: moment.id,
+    kind: 'text',
+    observedAt: moment.createdAt,
+    text: `${moment.label} ${moment.meaning}`,
+    provider: 'manual',
+    food: moment.label,
+    confirmations: [
+      {
+        promptId: 'food-context.root',
+        optionId: moment.label.toLowerCase().replace(/\s+/g, '_'),
+        label: moment.label,
+        facetKey: 'food_kind',
+        facetValue: moment.label,
+        createdAt: moment.createdAt,
+      },
+      {
+        promptId: 'food-context.meaning',
+        optionId: moment.meaning,
+        label: moment.meaning,
+        facetKey: 'food_meaning',
+        facetValue: moment.meaning,
+        createdAt: moment.createdAt,
+      },
+    ],
+  });
   return {
     ...day,
-    foodMoments: appendFoodMoment(day.foodMoments, buildManualFoodMoment(input, now)),
+    foodMoments: appendFoodMoment(day.foodMoments, moment),
+    classifiedMemories: upsertClassifiedMemory(day.classifiedMemories, [classifiedMemory]),
   };
 }
 
@@ -74,6 +103,7 @@ export function buildAutoFoodMoment(
     now: Date;
     archetype?: string | null;
     thumbnailUri?: string | null;
+    sourceId?: string | null;
     noteId?: string | null;
     detail?: string | null;
   }
@@ -84,6 +114,7 @@ export function buildAutoFoodMoment(
     emoji: detection.emoji ?? '🍽',
     meaning: foodMeaningFromArchetype(opts.archetype),
     thumbnailUri: opts.thumbnailUri ?? null,
+    sourceId: opts.sourceId ?? opts.noteId ?? opts.thumbnailUri ?? null,
     source: opts.source,
     noteId: opts.noteId ?? null,
     detail: opts.detail ?? null,
@@ -174,9 +205,37 @@ export function withManualStudioMoment(
   },
   now: Date
 ): StoredHomeDayRecord {
+  const moment = buildManualStudioMoment(input, now);
+  const classifiedMemory = buildNoteClassifiedMemory({
+    noteId: moment.id,
+    kind: 'text',
+    observedAt: moment.createdAt,
+    text: `${moment.mediaType} ${moment.label}`,
+    provider: 'manual',
+    mediaType: moment.mediaType,
+    confirmations: [
+      {
+        promptId: 'media-context.root',
+        optionId: moment.mediaType,
+        label: moment.mediaType,
+        facetKey: 'media_type',
+        facetValue: moment.mediaType,
+        createdAt: moment.createdAt,
+      },
+      {
+        promptId: 'media-context.meaning',
+        optionId: moment.rating,
+        label: moment.rating,
+        facetKey: 'media_rating',
+        facetValue: moment.rating,
+        createdAt: moment.createdAt,
+      },
+    ],
+  });
   return {
     ...day,
-    studioMoments: appendStudioMoment(day.studioMoments, buildManualStudioMoment(input, now)),
+    studioMoments: appendStudioMoment(day.studioMoments, moment),
+    classifiedMemories: upsertClassifiedMemory(day.classifiedMemories, [classifiedMemory]),
   };
 }
 
@@ -187,6 +246,7 @@ export function buildAutoStudioMoment(
     now: Date;
     archetype?: string | null;
     thumbnailUri?: string | null;
+    sourceId?: string | null;
     noteId?: string | null;
     detail?: string | null;
   }
@@ -198,6 +258,7 @@ export function buildAutoStudioMoment(
     emoji: detection.emoji ?? '✨',
     rating: studioRatingFromArchetype(opts.archetype),
     thumbnailUri: opts.thumbnailUri ?? null,
+    sourceId: opts.sourceId ?? opts.noteId ?? opts.thumbnailUri ?? null,
     source: opts.source,
     noteId: opts.noteId ?? null,
     detail: opts.detail ?? null,

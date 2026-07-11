@@ -3,6 +3,7 @@ import type {
   DayEvidenceProvider,
   DayEvidenceSignal,
   DayVisionSummary,
+  ClassifiedMemory,
   PhotoVisionResult,
 } from '@/types/home';
 import type { SceneRead } from '@/utils/scene-classify';
@@ -25,6 +26,7 @@ export function buildPhotoEvidence(input: {
   rawVision?: PhotoVisionResult | null;
   scene?: SceneRead | null;
   provider?: DayEvidenceProvider;
+  memory?: ClassifiedMemory | null;
 }): DayEvidence {
   const signals = new Map<string, DayEvidenceSignal>();
   const add = (signal: CanonicalSignal, provider: DayEvidenceProvider = input.provider ?? 'appleVision') => {
@@ -57,6 +59,29 @@ export function buildPhotoEvidence(input: {
       },
       input.scene.source === 'llm' ? 'appleFoundation' : 'deterministic'
     );
+  }
+  for (const quality of input.memory?.qualities ?? []) {
+    if (quality.status === 'rejected') continue;
+    const strongestSource = [...quality.sources].sort(
+      (left, right) => right.confidence * right.weight - left.confidence * left.weight
+    )[0];
+    add(
+      {
+        key: quality.qualityId,
+        confidence: quality.score,
+        raw: quality.qualityId,
+        source: 'aggregate',
+      },
+      quality.status === 'confirmed' ? 'manual' : strongestSource?.provider ?? 'deterministic'
+    );
+    const projected = signals.get(quality.qualityId);
+    if (projected) {
+      signals.set(quality.qualityId, {
+        ...projected,
+        centrality: quality.centrality,
+        qualityStatus: quality.status,
+      });
+    }
   }
 
   return {

@@ -2,6 +2,7 @@ import type { HomeDayRecord } from '@/types/home';
 import { deriveDayMemoryRoles, type DayMemoryRole } from '@/utils/memory-roles-engine';
 import type { DayChronicle } from '@/utils/chronicle-engine';
 import type { MemoryQuest } from '@/utils/memory-quests-engine';
+import { resolveFoodMomentDisplay } from '@/utils/memory-display';
 
 export type ContinuityMotifKind = 'place' | 'routine' | 'mood' | 'movement' | 'food' | 'studio' | 'creature' | 'week';
 
@@ -152,7 +153,7 @@ export function deriveContinuityMotifs(days: HomeDayRecord[], limit = 3): Contin
   }
 
   const food = topEntry(
-    tallyBy(history, (day) => (day.foodMoments ?? []).map((item) => item.label)),
+    tallyBy(history, (day) => (day.foodMoments ?? []).map((item) => resolveFoodMomentDisplay(item).label)),
     2
   );
   if (food) {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import type { MemoryVaultTab } from '@/components/katchadeck/world/memory-vault-sheet';
 
@@ -19,6 +19,27 @@ export function useTodaySheetController() {
   const [stepsSheetOpen, setStepsSheetOpen] = useState(false);
   const [journeySheetOpen, setJourneySheetOpen] = useState(false);
   const [nameSheetOpen, setNameSheetOpen] = useState(false);
+
+  // The Today hub uses state-backed sheets rather than navigator modals. Keep
+  // transitions exclusive so a manual "+" action can never inherit or stack on
+  // top of a previously-open reader, picker, or automatic follow-up surface.
+  const closeAllSheets = useCallback(() => {
+    setMemoryVaultOpen(false);
+    setFoodPickerOpen(false);
+    setFoodVaultOpen(false);
+    setStudioPickerOpen(false);
+    setStudioVaultOpen(false);
+    setSanctuaryOpen(false);
+    setMoodSheetOpen(false);
+    setSleepSheetOpen(false);
+    setQuestBoardOpen(false);
+    setBigMomentPickerOpen(false);
+    setPlacePromptOpen(false);
+    setPlacesVaultOpen(false);
+    setStepsSheetOpen(false);
+    setJourneySheetOpen(false);
+    setNameSheetOpen(false);
+  }, []);
 
   return {
     memoryVaultOpen,
@@ -53,6 +74,7 @@ export function useTodaySheetController() {
     setJourneySheetOpen,
     nameSheetOpen,
     setNameSheetOpen,
+    closeAllSheets,
   };
 }
 

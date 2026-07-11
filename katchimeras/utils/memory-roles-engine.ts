@@ -1,4 +1,5 @@
 import type { HomeDayRecord } from '@/types/home';
+import { resolveBigMomentDisplay, resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
 
 export type MemoryRoleId =
   | 'anchor_place'
@@ -61,10 +62,11 @@ export function deriveDayMemoryRoles(day: HomeDayRecord, limit = 4): DayMemoryRo
 
   if ((day.bigMoments?.length ?? 0) > 0) {
     const moment = day.bigMoments?.[0];
+    const display = moment ? resolveBigMomentDisplay(moment) : null;
     pushUnique(roles, {
       id: 'milestone',
-      label: moment?.label ?? 'Milestone',
-      reason: moment?.subject ? `${moment.label} with ${moment.subject}` : 'A day marker worth keeping.',
+      label: display?.label ?? 'Milestone',
+      reason: display ? `${display.label} became part of the day.` : 'A day marker worth keeping.',
       source: 'bigMoment',
     });
   }
@@ -85,20 +87,22 @@ export function deriveDayMemoryRoles(day: HomeDayRecord, limit = 4): DayMemoryRo
     day.moments.some((moment) => moment.type === 'coffee')
   ) {
     const food = foods.find((item) => item.meaning === 'comfort' || item.meaning === 'treat');
+    const foodDisplay = food ? resolveFoodMomentDisplay(food) : null;
     pushUnique(roles, {
       id: 'comfort_routine',
-      label: food?.label ?? 'Comfort routine',
-      reason: food ? `${food.label} gave the day a familiar shape.` : 'A familiar place or ritual shaped the day.',
+      label: foodDisplay?.label ?? 'Comfort routine',
+      reason: foodDisplay ? `${foodDisplay.label} gave the day a familiar shape.` : 'A familiar place or ritual shaped the day.',
       source: food ? 'food' : 'place',
     });
   }
 
   if (studio.length > 0) {
     const item = studio[0];
+    const display = resolveStudioMomentDisplay(item);
     pushUnique(roles, {
       id: 'creative_spark',
-      label: item.label,
-      reason: `${item.label} joined the Study.`,
+      label: display.label,
+      reason: `${display.label} joined the Study.`,
       source: 'studio',
     });
   }

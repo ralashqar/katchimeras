@@ -23,12 +23,19 @@ function transpileToTemp(relativeSourcePath, outName) {
 
 const livingRarityPath = transpileToTemp('utils/living-rarity.ts', 'living-rarity.js');
 const visionSignalsPath = transpileToTemp('utils/vision-signals.ts', 'vision-signals.js');
+const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-reality.js');
+const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'intelligence-taxonomy.js');
+const classificationPolicyPath = path.join(tempDir, 'intelligence-classification-policy.js');
+fs.writeFileSync(classificationPolicyPath, 'exports.visionSignalIsRejected = () => false;');
 const dayWeatherPath = transpileToTemp('utils/day-weather.ts', 'day-weather.js');
 const contextPath = transpileToTemp('utils/reflection-context.ts', 'reflection-context.js');
 
 const stubs = {
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/vision-signals': visionSignalsPath,
+  '@/utils/photo-reality': photoRealityPath,
+  '@/utils/intelligence/taxonomy': taxonomyPath,
+  '@/utils/intelligence/classification-policy': classificationPolicyPath,
   '@/utils/day-weather': dayWeatherPath,
   '@/components/ui/icon-symbol': {},
   '@/types/home': {},

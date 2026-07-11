@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
@@ -11,39 +9,17 @@ import {
   kingdomResidentHexTiles,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
-import { CompanionCard, type CompanionThread } from '@/components/katchadeck/world/companion-card';
+import { CompanionCard } from '@/components/katchadeck/world/companion-card';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
-import { useDiscoveries } from '@/hooks/use-discoveries';
-import { useKingdom } from '@/hooks/use-kingdom';
-import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
-import { homeRepository } from '@/storage/repositories/home-repository';
+import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
+import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
 import type { KingdomCreature } from '@/types/kingdom';
-import type { CompanionQuestState } from '@/utils/katchimera-quests';
-import {
-  acceptQuest,
-  completeQuest,
-  hasCompanionQuestForDay,
-  interactionState,
-  loadCompanionQuests,
-  questCriteria,
-  questFor,
-  saveCompanionQuests,
-  submitQuest,
-} from '@/utils/katchimera-quests';
-import {
-  archetypeForCreature,
-  companionUnit,
-  openingLine,
-  reflectionLine,
-  subtypeForCreature,
-} from '@/utils/katchimera-engagement';
-import { deriveResidents, type HatchRecord, type KingdomResident } from '@/utils/kingdom-residents';
-import { buildQuestReportBackItems, buildQuestSubmissionItems, type QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
-import { evaluateQuestRuntime } from '@/utils/quests/runtime';
-import { requestQuestActionIntent } from '@/utils/quest-action-signal';
+import { openingLine, reflectionLine } from '@/utils/katchimera-engagement';
+import { deriveKingdom } from '@/utils/kingdom-engine';
+import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
 
 // The Kingdom tab is the persistent hex map: center egg, then one tile per
@@ -55,34 +31,16 @@ function hatchTimestamp(creature: KingdomCreature, index: number): number {
 }
 
 export default function KingdomScreen() {
-  const router = useRouter();
-  const { kingdom } = useKingdom();
-  const { days } = useAllDays();
+  const archive = useAllDays();
+  const { days } = archive;
+  const kingdom = useMemo(() => deriveKingdom(days), [days]);
   const {
     entries: discoveryEntries,
     unlockedCount: discoveriesUnlocked,
     totalCount: discoveriesTotal,
-  } = useDiscoveries();
+  } = useDiscoveriesFromArchive(archive);
 
   const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
-  const [microcopy, setMicrocopy] = useState<string | null>(null);
-  const [selectedResident, setSelectedResident] = useState<{ resident: KingdomResident; creature: KingdomCreature; thread: CompanionThread | null } | null>(null);
-  const [companionQuestState, setCompanionQuestState] = useState<CompanionQuestState>(() => loadCompanionQuests());
-  const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
-  const { capabilities: questCapabilities } = useQuestCapabilities(storedHomeState);
-
-  useFocusEffect(
-    useCallback(() => {
-      setCompanionQuestState(loadCompanionQuests());
-      setStoredHomeState(homeRepository.load());
-    }, [])
-  );
-
-  useEffect(() => {
-    if (!microcopy) return;
-    const timeout = setTimeout(() => setMicrocopy(null), 2300);
-    return () => clearTimeout(timeout);
-  }, [microcopy]);
 
   const hatches = useMemo<HatchRecord[]>(
     () =>
@@ -94,8 +52,6 @@ export default function KingdomScreen() {
   );
   const residents = useMemo(() => deriveResidents(hatches), [hatches]);
   const residentTiles = useMemo(() => kingdomResidentHexTiles(residents, kingdom.creatures), [kingdom.creatures, residents]);
-  const residentById = useMemo(() => new Map(residents.map((resident) => [resident.creatureId, resident])), [residents]);
-  const creatureById = useMemo(() => new Map(kingdom.creatures.map((creature) => [creature.creatureId, creature])), [kingdom.creatures]);
   const eggVisual = useMemo(() => days.find((day) => day.isToday)?.egg ?? days[days.length - 1]?.egg ?? null, [days]);
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
   const yesterday = useMemo(() => {
@@ -104,152 +60,7 @@ export default function KingdomScreen() {
     return index > 0 ? days[index - 1] : null;
   }, [days, today]);
   const todayFacts = useMemo(() => resolveFactsForDay(today, yesterday), [today, yesterday]);
-
-  const companionDataByCreatureId = useMemo(() => {
-    const map = new Map<
-      string,
-      ReturnType<typeof companionUnit> & {
-        archetype: string;
-        subtype: string;
-      }
-    >();
-    for (const creature of kingdom.creatures) {
-      const fallback = `${creature.name} ${creature.visualKey}`;
-      const archetype = archetypeForCreature(creature.creatureId, fallback);
-      const subtype = subtypeForCreature(creature.creatureId, fallback);
-      map.set(creature.creatureId, {
-        ...companionUnit(archetype, kingdom, subtype),
-        archetype,
-        subtype,
-      });
-    }
-    return map;
-  }, [kingdom]);
-
-  const residentStatusGlyphs = useMemo(() => {
-    const glyphs: Partial<Record<string, 'offer' | 'active' | 'ready'>> = {};
-    for (const creature of kingdom.creatures) {
-      const offer = companionDataByCreatureId.get(creature.creatureId)?.quest;
-      const hasOffer = Boolean(
-        offer &&
-          today?.isoDate &&
-          !hasCompanionQuestForDay(companionQuestState, creature.creatureId, today.isoDate)
-      );
-      const state = interactionState(companionQuestState, creature.creatureId, todayFacts, hasOffer, questCapabilities);
-      if (state !== 'idle') {
-        glyphs[creature.creatureId] = state;
-      }
-    }
-    return glyphs;
-  }, [companionDataByCreatureId, companionQuestState, kingdom.creatures, questCapabilities, today?.isoDate, todayFacts]);
-
-  const selectedCompanionData = selectedResident ? companionDataByCreatureId.get(selectedResident.creature.creatureId) : null;
-  const selectedActiveQuest = selectedResident ? questFor(companionQuestState, selectedResident.creature.creatureId) : null;
-  const selectedQuestRuntime = useMemo(
-    () =>
-      selectedActiveQuest
-        ? evaluateQuestRuntime({
-            questId: selectedActiveQuest.questId,
-            day: today,
-            facts: todayFacts,
-            capabilities: questCapabilities,
-          })
-        : null,
-    [questCapabilities, selectedActiveQuest, today, todayFacts]
-  );
-  const selectedQuestItems = useMemo(() => {
-    if (!selectedActiveQuest || !selectedQuestRuntime) return [];
-    if (selectedQuestRuntime.readyToSubmit) {
-      return buildQuestSubmissionItems(today, selectedQuestRuntime, selectedActiveQuest, companionQuestState.submissions);
-    }
-    if (selectedQuestRuntime.complete) {
-      return buildQuestReportBackItems(today, selectedQuestRuntime);
-    }
-    return [];
-  }, [companionQuestState.submissions, selectedActiveQuest, selectedQuestRuntime, today]);
-  const selectedOffer =
-    selectedResident && selectedCompanionData?.quest && today?.isoDate &&
-    !selectedActiveQuest &&
-    !hasCompanionQuestForDay(companionQuestState, selectedResident.creature.creatureId, today.isoDate)
-      ? selectedCompanionData.quest
-      : undefined;
-  const selectedInteractionState = selectedResident
-    ? interactionState(companionQuestState, selectedResident.creature.creatureId, todayFacts, Boolean(selectedOffer), questCapabilities)
-    : 'idle';
-
-  const commitCompanionQuestState = useCallback((next: CompanionQuestState) => {
-    saveCompanionQuests(next);
-    setCompanionQuestState(next);
-  }, []);
-
-  const handleSelectResident = (creatureId: string) => {
-    const resident = residentById.get(creatureId);
-    const creature = creatureById.get(creatureId);
-    if (resident && creature) setSelectedResident({ resident, creature, thread: 'quest' });
-  };
-
-  const handleAcceptQuest = () => {
-    if (!selectedResident || !selectedOffer) return;
-    const next = acceptQuest(
-      companionQuestState,
-      {
-        questId: selectedOffer.id,
-        creatureId: selectedResident.creature.creatureId,
-        title: selectedOffer.title,
-        hint: selectedOffer.hint,
-        dayId: today?.isoDate ?? null,
-      },
-      Date.now()
-    );
-    if (!next) {
-      setMicrocopy('Quest already active');
-      return;
-    }
-    commitCompanionQuestState(next);
-    setMicrocopy('Quest accepted');
-    setSelectedResident((current) => (current ? { ...current, thread: 'quest' } : current));
-  };
-
-  const handleCashInQuest = () => {
-    if (!selectedResident) return;
-    commitCompanionQuestState(completeQuest(companionQuestState, selectedResident.creature.creatureId, Date.now(), today?.isoDate ?? null));
-    setMicrocopy('Quest complete');
-    setSelectedResident(null);
-  };
-
-  const handleSubmitQuest = (item: QuestSubmissionItem) => {
-    if (!selectedResident) return;
-    const result = submitQuest(
-      companionQuestState,
-      selectedResident.creature.creatureId,
-      {
-        sourceType: item.sourceType,
-        sourceId: item.sourceId,
-        evidenceId: item.evidenceId,
-      },
-      Date.now(),
-      today?.isoDate ?? null
-    );
-    commitCompanionQuestState(result.state);
-    setMicrocopy(result.submitted ? 'Quest submitted' : 'Already submitted');
-    if (result.submitted) setSelectedResident(null);
-  };
-
-  const handleQuestAction = () => {
-    if (!selectedQuestRuntime || selectedQuestRuntime.nextAction === 'none') return;
-    requestQuestActionIntent({
-      action: selectedQuestRuntime.nextAction,
-      questId: selectedQuestRuntime.questId,
-    });
-    setSelectedResident(null);
-    router.push('/today');
-  };
-
-  const handleAnswerReflection = () => {
-    requestQuestActionIntent({ action: 'add_note' });
-    setSelectedResident(null);
-    router.push('/today');
-  };
+  const quests = useKingdomQuests({ kingdom, residents, today, todayFacts });
 
   const subtitle = [
     `${kingdom.totals.daysHatched} ${kingdom.totals.daysHatched === 1 ? 'day' : 'days'}`,
@@ -269,8 +80,8 @@ export default function KingdomScreen() {
         <KingdomHexCanvas
           residents={residentTiles}
           eggVisual={eggVisual}
-          residentStatusGlyphs={residentStatusGlyphs}
-          onSelectResident={(creatureId) => handleSelectResident(creatureId)}
+          residentStatusGlyphs={quests.residentStatusGlyphs}
+          onSelectResident={quests.selectResident}
         />
 
         <View pointerEvents="none" style={styles.header}>
@@ -288,15 +99,15 @@ export default function KingdomScreen() {
           </Pressable>
         </View>
 
-        {microcopy ? (
+        {quests.microcopy ? (
           <Animated.View
-            key={microcopy}
+            key={quests.microcopy}
             entering={FadeInDown.duration(240)}
             exiting={FadeOut.duration(180)}
             pointerEvents="none"
             style={styles.microcopy}>
             <ThemedText style={styles.microcopyText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              {microcopy}
+              {quests.microcopy}
             </ThemedText>
           </Animated.View>
         ) : null}
@@ -311,27 +122,29 @@ export default function KingdomScreen() {
         />
       ) : null}
 
-      {selectedResident ? (
+      {quests.selectedResident ? (
         <CompanionCard
-          name={selectedResident.creature.name}
-          houseLevel={selectedResident.resident.houseLevel}
-          openingLine={openingLine(selectedResident.creature.name, selectedInteractionState)}
-          thread={selectedResident.thread}
-          onSelectThread={(thread) => setSelectedResident((current) => (current ? { ...current, thread } : current))}
-          onClose={() => setSelectedResident(null)}
-          activeQuest={selectedActiveQuest ? { title: selectedActiveQuest.title, hint: selectedActiveQuest.hint } : null}
-          questComplete={Boolean(selectedQuestRuntime?.complete)}
-          questRuntime={selectedQuestRuntime}
-          submissionItems={selectedQuestItems}
-          offer={selectedOffer}
-          criteria={selectedQuestRuntime?.progress ?? (selectedActiveQuest ? questCriteria(selectedActiveQuest.questId, todayFacts) : [])}
-          onAccept={handleAcceptQuest}
-          onCashIn={handleCashInQuest}
-          onSubmitQuest={handleSubmitQuest}
-          onQuestAction={handleQuestAction}
-          insightText={selectedCompanionData?.line ?? 'This tile remembers the day we met.'}
-          reflectionText={reflectionLine(selectedCompanionData?.archetype ?? '')}
-          onAnswerReflection={handleAnswerReflection}
+          name={quests.selectedResident.creature.name}
+          houseLevel={quests.selectedResident.resident.houseLevel}
+          openingLine={openingLine(quests.selectedResident.creature.name, quests.selectedInteractionState)}
+          thread={quests.selectedResident.thread}
+          onSelectThread={quests.selectThread}
+          onClose={quests.closeSelectedResident}
+          activeQuest={quests.selectedActiveQuest ? { title: quests.selectedActiveQuest.title, hint: quests.selectedActiveQuest.hint } : null}
+          questComplete={Boolean(quests.selectedQuestRuntime?.complete)}
+          questRuntime={quests.selectedQuestRuntime}
+          questCaptureFeedback={quests.questCaptureFeedback}
+          submissionItems={quests.selectedQuestItems}
+          offer={quests.selectedOffer}
+          criteria={quests.questCriteria}
+          onAccept={quests.acceptSelectedQuest}
+          onCashIn={quests.cashInSelectedQuest}
+          onSubmitQuest={quests.submitSelectedQuest}
+          onClarifyQuestMatch={quests.clarifySelectedQuestMatch}
+          onQuestAction={quests.performSelectedQuestAction}
+          insightText={quests.selectedCompanionData?.line ?? 'This tile remembers the day we met.'}
+          reflectionText={reflectionLine(quests.selectedCompanionData?.archetype ?? '')}
+          onAnswerReflection={quests.answerSelectedReflection}
         />
       ) : null}
     </GestureHandlerRootView>

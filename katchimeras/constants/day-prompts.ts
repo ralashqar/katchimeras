@@ -79,7 +79,7 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     title: 'What are you up to?',
     categoryIcon: 'figure.walk',
     dayparts: ['midday', 'evening'],
-    maxOptions: 8,
+    maxOptions: 10,
     launchEnabled: true,
     options: [
       {
@@ -133,10 +133,19 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
     title: "Who's here?",
     categoryIcon: 'person.2.fill',
     dayparts: ['midday', 'evening'],
-    maxOptions: 5,
+    maxOptions: 6,
     launchEnabled: true,
     options: [
       { id: 'just_me', label: 'Just me', emoji: 'Solo', icon: 'moon.stars.fill', semanticTags: ['people:solo'], scoreBias: { calm: 0.12, focus: 0.06 } },
+      {
+        id: 'my_child',
+        label: 'My child',
+        emoji: 'My child',
+        icon: 'heart.fill',
+        semanticTags: ['people:my_child', 'relationship:my_child'],
+        scoreBias: { social: 0.28, calm: 0.08 },
+        encounterSeedBias: [{ seedId: 'parenting_care', intensity: 0.52 }],
+      },
       {
         id: 'family',
         label: 'Family',
@@ -240,7 +249,7 @@ export const dayPromptMenuLabels: Record<DayPromptKind, string> = {
   people: 'People',
   meaning: 'Photo meaning',
   day_word: 'A word',
-  meaningful_photo: 'Photo',
+  meaningful_photo: 'Recent photo',
   intention: 'Intention',
   energy: 'Energy',
   inner_weather: 'Inner weather',

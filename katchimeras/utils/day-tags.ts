@@ -3,6 +3,7 @@ import { homeMomentOptions } from '@/constants/home-mvp';
 import type { DayTag, StoredHomeDayRecord } from '@/types/home';
 import { extractEncounterCandidates } from '@/utils/encounter-engine';
 import { conceptSeedId, pickProminentTags } from '@/utils/vision-signals';
+import { visionSignalIsRejected } from '@/utils/intelligence/classification-policy';
 
 // The day-tag field: one weighted, source-tagged chip per signal the day
 // surfaced, unified across moments, prompts, vision, places, steps, capture, and
@@ -70,7 +71,9 @@ export function buildDayTags(day: StoredHomeDayRecord): DayTag[] {
     });
 
   if (day.vision) {
-    pickProminentTags(day.vision, MAX_VISION_TAGS).forEach((concept, index) => {
+    pickProminentTags(day.vision, MAX_VISION_TAGS)
+      .filter((concept) => !visionSignalIsRejected(day, concept))
+      .forEach((concept, index) => {
       const seedId = conceptSeedId(concept);
       const conceptEntry = day.vision?.concepts.find((entry) => entry.name === concept);
       tags.push({
@@ -82,7 +85,7 @@ export function buildDayTags(day: StoredHomeDayRecord): DayTag[] {
         feedsSpecies: feedsFor(seedId),
         source: 'vision',
       });
-    });
+      });
   }
 
   (day.placeCategorySeeds ?? []).forEach((seedId, index) => {

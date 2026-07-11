@@ -45,6 +45,10 @@ const castPath = transpileToTemp('constants/encounter-cast.ts', 'encounter-cast.
 const livingRarityPath = transpileToTemp('utils/living-rarity.ts', 'living-rarity.js');
 const bondPath = transpileToTemp('utils/bond.ts', 'bond.js');
 const visionSignalsPath = transpileToTemp('utils/vision-signals.ts', 'vision-signals.js');
+const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-reality.js');
+const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'intelligence-taxonomy.js');
+const classificationPath = path.join(tempDir, 'intelligence-classification.js');
+fs.writeFileSync(classificationPath, 'exports.assignmentSignals = () => [];');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const selectionPath = transpileToTemp('utils/hatch-selection.ts', 'hatch-selection.js');
 
@@ -55,6 +59,9 @@ const stubs = {
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/bond': bondPath,
   '@/utils/vision-signals': visionSignalsPath,
+  '@/utils/photo-reality': photoRealityPath,
+  '@/utils/intelligence/taxonomy': taxonomyPath,
+  '@/utils/intelligence/classification': classificationPath,
   '@/utils/encounter-engine': enginePath,
   '@/utils/hatch-selection': selectionPath,
   '@/types/home': {},

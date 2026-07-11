@@ -4,6 +4,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { FoodMoment, HomeDayRecord } from '@/types/home';
+import { resolveFoodMomentDisplay } from '@/utils/memory-display';
 import type { DayChronicle } from '@/utils/chronicle-engine';
 import type { ContinuityMotif, WorldGuideActionType, WorldGuideMessage } from '@/utils/continuity-engine';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
@@ -181,7 +182,7 @@ export function WorldDashboard({
             <IconSymbol name="chevron.right" size={13} color={Lantern.moon500} style={styles.chronicleChevron} />
           </View>
           <ThemedText style={styles.foodCardRow}>
-            {foodMoments.slice(0, 8).map((moment) => moment.emoji).join('  ')}
+            {foodMoments.slice(0, 8).map((moment) => resolveFoodMomentDisplay(moment).emoji).join('  ')}
           </ThemedText>
         </Pressable>
       ) : null}

@@ -1,7 +1,6 @@
 import type { StoredHomeDayRecord } from '@/types/home';
 import type { CalendarEventContext } from '@/utils/chronicle-engine';
-import { detectFoodInVision } from '@/utils/food-detect';
-import { detectStudioInVision } from '@/utils/studio-detect';
+import { acceptedFoodDetection, acceptedStudioDetection, dayRejectsDomain } from '@/utils/intelligence/classification-policy';
 
 // Memory Quests (Patch Systems V3) — they replace the generic "Daily Seeds".
 // Quests are never chores: each one is a meaningful capture/reflection that grows
@@ -52,6 +51,7 @@ type QuestDayInput = Pick<
   | 'studioMoments'
   | 'dayName'
   | 'vision'
+  | 'classifiedMemories'
 >;
 
 const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
@@ -217,11 +217,11 @@ export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3, calen
   // memory, then an evening voice note. Around meal times nudges food (a proxy
   // for "food in the day" until on-device food detection lands).
   const mealtime = (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 21);
-  const foodDetected = detectFoodInVision(day.vision).detected;
-  const studioDetected = detectStudioInVision(day.vision).detected;
+  const foodDetected = acceptedFoodDetection(day).detected;
+  const studioDetected = acceptedStudioDetection(day).detected;
   if (visited > 0) offered.push('markPlace');
   // Detected food (Vision) is a strong trigger; otherwise nudge at meal times.
-  if (foodDetected || mealtime) offered.push('saveFoodMemory');
+  if (foodDetected || (mealtime && !dayRejectsDomain(day, 'food'))) offered.push('saveFoodMemory');
   // A detected book/screen/poster invites keeping it in the Studio archive.
   if (studioDetected) offered.push('saveStudioMemory');
   if (hour >= 17) offered.push('recordVoiceMemory');

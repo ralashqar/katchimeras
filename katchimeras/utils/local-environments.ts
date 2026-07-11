@@ -9,6 +9,7 @@ import type {
   LocalEnvironmentStationRuntime,
 } from '@/types/local-environment';
 import { activeQuests, questFor, type CompanionQuestState } from '@/utils/katchimera-quests';
+import { resolveFoodMomentDisplay } from '@/utils/memory-display';
 
 export type LocalKatchimeraHomeCard = {
   creature: KingdomCreature;
@@ -379,8 +380,9 @@ function deriveFoodStats(days: HomeDayRecord[]): FoodStats {
 
     for (const food of day.foodMoments ?? []) {
       foodMoments += 1;
-      const title = food.label || 'Food memory';
-      const subtitle = [date, food.cuisine ? CUISINE_LABELS[food.cuisine] : null, food.homeCooked ? 'Home cooked' : null, food.detail]
+      const display = resolveFoodMomentDisplay(food);
+      const title = display.label;
+      const subtitle = [date, display.detail]
         .filter(Boolean)
         .join(' - ');
       const entry = {

@@ -2,8 +2,8 @@ import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { DayMapNode, HomeDayRecord } from '@/types/home';
 import type { ActiveDayPrompt } from '@/utils/day-prompt-engine';
 import type { MemoryQuest } from '@/utils/memory-quests-engine';
-import { detectFoodInVision } from '@/utils/food-detect';
-import { detectStudioInVision } from '@/utils/studio-detect';
+import { acceptedFoodDetection, acceptedStudioDetection } from '@/utils/intelligence/classification-policy';
+import { buildMomentTimeline } from '@/utils/moment-timeline';
 
 // The Today screen's single source of category state: one entry per life
 // category orbiting the egg — what it has, whether it's asking for attention,
@@ -123,22 +123,6 @@ function latestMoodMeta(day: HomeDayRecord): { icon: IconSymbolName; accent: str
   return (choice && MOOD_META[choice]) || null;
 }
 
-// MUST mirror sanctuary-sheet's REFLECTION_KINDS — the Reflection badge is a
-// promise of what the Sanctuary reader will list.
-const REFLECTIVE_KINDS = new Set([
-  'feeling',
-  'inner_weather',
-  'day_word',
-  'meaning',
-  'gratitude',
-  'highlight',
-  'people',
-  'for_who',
-  'body',
-  'intention',
-  'energy',
-]);
-
 function formatSteps(steps: number): string {
   if (steps >= 1000) return `${(steps / 1000).toFixed(steps >= 10000 ? 0 : 1)}k`;
   return `${steps}`;
@@ -152,22 +136,15 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
   const noteCount = day.notes?.length ?? 0;
   const placeCount = day.confirmedPlaces?.length ?? day.visitedPlaceCount ?? 0;
   const steps = day.stepsCount ?? 0;
-  // The count = the number of entries the Sanctuary reader will show when this
-  // chip is pressed (its four feeds: reflective prompt answers, hero-photo
-  // meanings, captured-moment meanings, voice/written notes).
-  const reflectionCount =
-    (day.promptAnswers ?? []).filter(
-      (answer) => !answer.dismissed && REFLECTIVE_KINDS.has(answer.kind) && answer.labels.length > 0
-    ).length +
-    (day.heroPhoto?.meaningLabels.length ?? 0) +
-    (day.capturedMeanings?.length ?? 0) +
-    (day.notes?.length ?? 0);
+  // The badge and the reader share one projection, so every successful manual
+  // "+" action changes both together and the count can never promise hidden rows.
+  const momentCount = buildMomentTimeline(day).length;
   const foodCount = day.foodMoments?.length ?? 0;
   const studioCount = day.studioMoments?.length ?? 0;
   const questsLeft = quests.filter((quest) => !quest.completed).length;
 
-  const foodSuggestion = foodCount === 0 ? detectFoodInVision(day.vision) : null;
-  const studioSuggestion = studioCount === 0 ? detectStudioInVision(day.vision) : null;
+  const foodSuggestion = foodCount === 0 ? acceptedFoodDetection(day) : null;
+  const studioSuggestion = studioCount === 0 ? acceptedStudioDetection(day) : null;
 
   const categories: TodayCategoryState[] = [
     {
@@ -212,11 +189,11 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
     },
     {
       id: 'reflection',
-      label: 'Reflection',
-      icon: 'leaf.fill',
+      label: 'Moments',
+      icon: 'sparkles',
       accent: '#A78BFA',
-      count: reflectionCount,
-      hasContent: reflectionCount > 0,
+      count: momentCount,
+      hasContent: momentCount > 0,
       // The mood icon carries the "how does it feel?" ask — this stays a reader.
       needsAttention: false,
     },

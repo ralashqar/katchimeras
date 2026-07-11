@@ -24,8 +24,15 @@ import type {
   StudioMediaType,
   StudioMoment,
   StudioRating,
+  UserConfirmation,
+  ClassifiedMemory,
 } from '@/types/home';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
+import { rememberPersonalContext } from '@/utils/intelligence/classification';
+import {
+  confirmationsRejectDomain,
+  pruneRejectedDerivedMoments,
+} from '@/utils/intelligence/classification-policy';
 import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import {
@@ -305,6 +312,29 @@ export function setStudioMomentRatingForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+export function updateClassifiedMemoryForToday(
+  state: StoredHomeState,
+  memory: ClassifiedMemory,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const remembered = rememberPersonalContext(state.personalEntities, memory, now);
+  const nextDay = pruneRejectedDerivedMoments({
+    ...base,
+    classifiedMemories: [
+      ...(base.classifiedMemories ?? []).filter((candidate) => candidate.id !== remembered.memory.id),
+      remembered.memory,
+    ],
+  }, remembered.memory);
+  return normalizeStoredHomeState(
+    { ...writeInputDay(state, target, nextDay), personalEntities: remembered.entities },
+    profile,
+    now
+  );
+}
+
 export function setSleepForToday(
   state: StoredHomeState,
   sleep: DaySleep,
@@ -313,14 +343,14 @@ export function setSleepForToday(
   target: DayInputTarget = 'today'
 ): StoredHomeState {
   const base = readInputDay(state, target, profile, now);
-  const nextDay = withSleep(base, sleep);
+  const nextDay = withSleep(base, sleep, now);
 
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function setStepsInterpretationForToday(
   state: StoredHomeState,
-  input: { movement: StepsInterpretation['movement']; label: string; emoji: string },
+  input: { movement: StepsInterpretation['movement']; label: string; emoji: string; subtype?: string | null },
   profile: OnboardingProfile,
   now: Date,
   target: DayInputTarget = 'today'
@@ -550,6 +580,7 @@ export function applyCapturedMomentForToday(
     sourceId?: string | null;
     meaning?: { archetype: string; label: string; thumbnailUri?: string | null; sourceId?: string | null };
     scene?: SceneRead;
+    confirmations?: UserConfirmation[];
   },
   profile: OnboardingProfile,
   now: Date,
@@ -561,9 +592,11 @@ export function applyCapturedMomentForToday(
   }
   const meaning = capture.meaning;
   const scene = capture.scene ?? classifyScene(capture.vision);
+  const foodRejected = confirmationsRejectDomain(capture.confirmations, 'food');
+  const mediaRejected = confirmationsRejectDomain(capture.confirmations, 'media');
   const foodDetection: FoodDetection =
-    scene.type === 'food' ? scene.food ?? detectFoodInVision(capture.vision) : { detected: false };
-  const studioDetection: StudioDetection = foodDetection.detected
+    !foodRejected && scene.type === 'food' ? scene.food ?? detectFoodInVision(capture.vision) : { detected: false };
+  const studioDetection: StudioDetection = foodDetection.detected || mediaRejected
     ? { detected: false }
     : scene.type === 'media' && scene.media
       ? studioDetectionFromMedia(scene.media.mediaType, scene.media.title)
@@ -575,7 +608,23 @@ export function applyCapturedMomentForToday(
     { food: foodDetection, studio: studioDetection, studioDetail },
     now
   );
-  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+  const sourceId = capture.sourceId ?? capture.meaning?.sourceId ?? capture.meaning?.thumbnailUri ?? null;
+  const classified = sourceId
+    ? nextDay.classifiedMemories?.find((memory) => memory.sourceType === 'photo' && memory.sourceId === sourceId)
+    : null;
+  if (!classified) return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+  const remembered = rememberPersonalContext(state.personalEntities, classified, now);
+  const dayWithEntity = {
+    ...nextDay,
+    classifiedMemories: nextDay.classifiedMemories?.map((memory) =>
+      memory.id === remembered.memory.id ? remembered.memory : memory
+    ),
+  };
+  return normalizeStoredHomeState(
+    { ...writeInputDay(state, target, dayWithEntity), personalEntities: remembered.entities },
+    profile,
+    now
+  );
 }
 
 export function setDayWeatherForDay(

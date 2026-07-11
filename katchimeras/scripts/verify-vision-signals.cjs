@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const Module = require('module');
 const ts = require('typescript');
 
 const projectRoot = path.join(__dirname, '..');
@@ -19,8 +20,23 @@ function transpileToTemp(relativeSourcePath, outName) {
   return outPath;
 }
 
+const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'taxonomy.js');
+const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-reality.js');
+const originalResolve = Module._resolveFilename;
+Module._resolveFilename = function (request, ...rest) {
+  if (request === '@/utils/intelligence/taxonomy') return taxonomyPath;
+  if (request === '@/utils/photo-reality') return photoRealityPath;
+  if (request === '@/types/home') return path.join(tempDir, 'types-home.js');
+  return originalResolve.call(this, request, ...rest);
+};
+fs.writeFileSync(path.join(tempDir, 'types-home.js'), '');
+
 const { aggregatePhotoVision, buildVisionSignals, mergeDayVision, pickProminentTags } = require(
   transpileToTemp('utils/vision-signals.ts', 'vision-signals.js')
+);
+const nativeVisionSource = fs.readFileSync(
+  path.join(projectRoot, 'modules/katchimera-vision/ios/KatchimeraVisionModule.swift'),
+  'utf8'
 );
 
 let failures = 0;
@@ -79,6 +95,54 @@ check('concepts collapse to museum', museum.concepts[0].name === 'museum', JSON.
 check('details keep the specific raw labels', museum.details.includes('art gallery') && museum.details.includes('marble sculpture'), JSON.stringify(museum.details));
 check('details drop generics', !aggregatePhotoVision([photo([['outdoor', 0.9], ['painting', 0.6]])]).details.includes('outdoor'));
 
+const screenshotFood = aggregatePhotoVision([{
+  ...photo([['cake', 0.94], ['dessert', 0.88]]),
+  isScreenshot: true,
+  captureSource: 'camera_roll',
+}]);
+check('screenshot metadata suppresses depicted food', !screenshotFood.concepts.some((concept) => ['food', 'bakery', 'dessert'].includes(concept.name)), JSON.stringify(screenshotFood));
+check('screenshot keeps a screen-content explanation', screenshotFood.details.includes('screen content'), JSON.stringify(screenshotFood.details));
+
+const cartoonFood = aggregatePhotoVision([photo([['cartoon', 0.91], ['cake', 0.86], ['dessert', 0.72]])]);
+check('cartoon/game representation suppresses depicted food', !cartoonFood.concepts.some((concept) => ['food', 'bakery', 'dessert'].includes(concept.name)), JSON.stringify(cartoonFood));
+const cartoonPet = aggregatePhotoVision([photo([['illustration', 0.9], ['dog', 0.88]], 1)]);
+check('cartoon character does not become a pet or person memory', !cartoonPet.concepts.some((concept) => concept.name === 'dog') && cartoonPet.maxFaceCount === 0, JSON.stringify(cartoonPet));
+const screenshotChild = aggregatePhotoVision([{
+  ...photo([['user interface', 0.92], ['child', 0.89]], 1),
+  isScreenshot: true,
+}]);
+check('depicted screenshot child cannot trigger a people memory', !screenshotChild.concepts.some((concept) => concept.name === 'child') && screenshotChild.maxFaceCount === 0, JSON.stringify(screenshotChild));
+
+const geotaggedFood = aggregatePhotoVision([{
+  ...photo([['cake', 0.86], ['dessert', 0.7]]),
+  captureSource: 'camera_roll',
+  hasLocation: true,
+}]);
+check('geotagged real-world food remains classifiable', geotaggedFood.concepts.some((concept) => ['bakery', 'dessert'].includes(concept.name)), JSON.stringify(geotaggedFood.concepts));
+
+const ambiguousEgg = aggregatePhotoVision([{
+  ...photo([['egg', 0.94]]),
+  captureSource: 'camera_roll',
+}]);
+check('unlocated camera-roll egg alone is not physical-food evidence', !ambiguousEgg.details.includes('egg'), JSON.stringify(ambiguousEgg.details));
+const geotaggedEgg = aggregatePhotoVision([{
+  ...photo([['egg', 0.94]]),
+  captureSource: 'camera_roll',
+  hasLocation: true,
+}]);
+check('geotag lets a physical egg observation pass the reality gate', geotaggedEgg.details.includes('egg'), JSON.stringify(geotaggedEgg.details));
+
+const coverStructure = aggregatePhotoVision([{
+  ...photo([['book', 0.34], ['publication', 0.29]], 0, ['KAZUO ISHIGURO', 'KLARA AND THE SUN']),
+  dominantSubject: { x: 0.1, y: 0.1, width: 0.72, height: 0.8, confidence: 0.9 },
+  documentDetected: true,
+}]);
+check('OCR keeps original cover casing for title resolution', coverStructure.textTokens[0] === 'KAZUO ISHIGURO' && coverStructure.textTokens[1] === 'KLARA AND THE SUN', JSON.stringify(coverStructure.textTokens));
+check('dominant-subject area survives aggregation', Math.abs(coverStructure.dominantSubjectCoverage - 0.576) < 1e-9, String(coverStructure.dominantSubjectCoverage));
+check('document structure survives aggregation', coverStructure.documentCoverage === 1, String(coverStructure.documentCoverage));
+check('native cover OCR uses accurate recognition', nativeVisionSource.includes('textRequest.recognitionLevel = .accurate'));
+check('native cover OCR enables language correction', nativeVisionSource.includes('textRequest.usesLanguageCorrection = true'));
+
 // 4. Face coverage tracks how much of the day had people in frame.
 const faces = aggregatePhotoVision([photo([], 3), photo([], 0), photo([], 4)]);
 check('max face count taken', faces.maxFaceCount === 4, String(faces.maxFaceCount));
@@ -135,11 +199,15 @@ check('merge sums photo count', merged.analyzedPhotoCount === 3, String(merged.a
 check('merge keeps existing concept', merged.concepts.some((c) => c.name === 'coffee'));
 check('merge adds new concept', merged.concepts.some((c) => c.name === 'pizza'));
 check('merge into empty returns incoming', mergeDayVision(undefined, snapped) === snapped);
+const mergedStructure = mergeDayVision(existingDay, coverStructure);
+check('merge preserves strongest dominant-subject structure', mergedStructure.dominantSubjectCoverage === coverStructure.dominantSubjectCoverage, String(mergedStructure.dominantSubjectCoverage));
+check('merge weights document coverage by analysed photos', Math.abs(mergedStructure.documentCoverage - 1 / 3) < 1e-9, String(mergedStructure.documentCoverage));
 
 // 8. A generic "child" (e.g. kids at a party) must NOT become the baby concept
 // or hatch the tender little-one creature — only genuine infant cues do.
 const childAgg = aggregatePhotoVision([photo([['child', 0.9], ['children', 0.8]])]);
 check('child label is not the baby concept', !childAgg.concepts.some((c) => c.name === 'baby'), JSON.stringify(childAgg.concepts.map((c) => c.name)));
+check('child labels collapse to a dedicated clarification signal', childAgg.concepts.length === 1 && childAgg.concepts[0].name === 'child', JSON.stringify(childAgg.concepts));
 check('child does not hatch little_one', !buildVisionSignals(childAgg).some((s) => s.seedId === 'little_one'), JSON.stringify(buildVisionSignals(childAgg)));
 
 // 8b. A real infant cue still hatches the little one.

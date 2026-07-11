@@ -8,6 +8,7 @@ import type {
   StepsInterpretation,
   StoredHomeDayRecord,
 } from '@/types/home';
+import { buildMovementClassifiedMemory, buildPlaceClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 
 const MANUAL_BIG_MOMENT_LABEL: Record<BigMomentType, string> = {
   birthday: 'Birthday',
@@ -82,6 +83,14 @@ export function withConfirmedPlace(
         confirmedAt: now.toISOString(),
       },
     ],
+    classifiedMemories: upsertClassifiedMemory(day.classifiedMemories, [
+      buildPlaceClassifiedMemory({
+        sourceId: input.id,
+        observedAt: now.toISOString(),
+        category: input.category,
+        meaning: input.meaningLabel ?? input.archetype,
+      }),
+    ]),
   };
 }
 
@@ -104,16 +113,16 @@ export function withManualBigMoment(
   };
 }
 
-export function withSleep(day: StoredHomeDayRecord, sleep: DaySleep): StoredHomeDayRecord {
+export function withSleep(day: StoredHomeDayRecord, sleep: DaySleep, now?: Date): StoredHomeDayRecord {
   return {
     ...day,
-    sleep,
+    sleep: { ...sleep, recordedAt: sleep.recordedAt ?? now?.toISOString() },
   };
 }
 
 export function withStepsInterpretation(
   day: StoredHomeDayRecord,
-  input: { movement: StepsInterpretation['movement']; label: string; emoji: string },
+  input: { movement: StepsInterpretation['movement']; label: string; emoji: string; subtype?: string | null },
   now: Date
 ): StoredHomeDayRecord {
   return {
@@ -122,8 +131,17 @@ export function withStepsInterpretation(
       movement: input.movement,
       label: input.label,
       emoji: input.emoji,
+      subtype: input.subtype ?? null,
       createdAt: now.toISOString(),
     },
+    classifiedMemories: upsertClassifiedMemory(day.classifiedMemories, [
+      buildMovementClassifiedMemory({
+        sourceId: `movement:${day.isoDate}`,
+        observedAt: now.toISOString(),
+        movement: input.movement,
+        subtype: input.subtype,
+      }),
+    ]),
   };
 }
 

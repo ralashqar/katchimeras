@@ -17,6 +17,13 @@ type VisionNativeModule = {
     labels?: { name?: unknown; confidence?: unknown }[];
     text?: unknown[];
     faceCount?: unknown;
+    humanCount?: unknown;
+    animals?: { kind?: unknown; confidence?: unknown; region?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown } }[];
+    humans?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[];
+    faces?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[];
+    recognizedText?: { text?: unknown; confidence?: unknown }[];
+    dominantSubject?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown } | null;
+    documentDetected?: unknown;
   }>;
   // Reliable native brightness read (local thumbnail, Apple decode) — null when
   // unavailable in the build or unreadable. Added so black/blank photos can be
@@ -107,6 +114,7 @@ export async function analyzePhoto(uri: string): Promise<PhotoVisionResult | nul
 
   try {
     const raw = await nativeVision.analyzePhotoAsync(uri);
+    const dominant = raw.dominantSubject;
     return {
       labels: (raw.labels ?? [])
         .map((label) => ({
@@ -116,10 +124,45 @@ export async function analyzePhoto(uri: string): Promise<PhotoVisionResult | nul
         .filter((label) => label.name.length > 0),
       text: (raw.text ?? []).map((token) => String(token)).filter((token) => token.length > 0),
       faceCount: Number(raw.faceCount) || 0,
+      humanCount: Number(raw.humanCount) || 0,
+      animals: (raw.animals ?? [])
+        .map((animal) => ({
+          kind: (animal.kind === 'cat' || animal.kind === 'dog' ? animal.kind : 'unknown') as
+            | 'cat'
+            | 'dog'
+            | 'unknown',
+          confidence: Number(animal.confidence) || 0,
+          region: normalizeRegions(animal.region ? [animal.region] : [])[0] ?? null,
+        }))
+        .filter((animal) => animal.confidence > 0),
+      humans: normalizeRegions(raw.humans),
+      faces: normalizeRegions(raw.faces),
+      recognizedText: (raw.recognizedText ?? [])
+        .map((item) => ({ text: typeof item.text === 'string' ? item.text.trim() : '', confidence: Number(item.confidence) || 0 }))
+        .filter((item) => item.text.length > 0)
+        .slice(0, 12),
+      dominantSubject:
+        dominant && [dominant.x, dominant.y, dominant.width, dominant.height, dominant.confidence].every((value) => Number.isFinite(Number(value)))
+          ? {
+              x: Number(dominant.x), y: Number(dominant.y), width: Number(dominant.width),
+              height: Number(dominant.height), confidence: Number(dominant.confidence),
+            }
+          : null,
+      documentDetected: raw.documentDetected === true,
     };
   } catch {
     return null;
   }
+}
+
+function normalizeRegions(
+  values: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[] | undefined
+) {
+  return (values ?? []).flatMap((value) => {
+    const numbers = [value.x, value.y, value.width, value.height, value.confidence].map(Number);
+    if (!numbers.every(Number.isFinite)) return [];
+    return [{ x: numbers[0], y: numbers[1], width: numbers[2], height: numbers[3], confidence: numbers[4] }];
+  }).slice(0, 8);
 }
 
 // Guarantees a day has a vision read before we ask the LLM to narrate it — so a
@@ -148,10 +191,22 @@ export async function ensureDayVision(day: StoredHomeDayRecord): Promise<DayVisi
     const results: PhotoVisionResult[] = [];
     for (const assetId of assetIds) {
       const info = await MediaLibrary.getAssetInfoAsync(assetId);
-      const localInfo = info as { localUri?: string; uri?: string };
+      const localInfo = info as {
+        localUri?: string;
+        uri?: string;
+        mediaSubtypes?: string[];
+        location?: { latitude?: number | null; longitude?: number | null } | null;
+      };
       const result = await analyzePhoto(localInfo.localUri ?? localInfo.uri ?? '');
       if (result) {
-        results.push(result);
+        results.push({
+          ...result,
+          captureSource: 'camera_roll',
+          isScreenshot: localInfo.mediaSubtypes?.includes('screenshot') ?? false,
+          hasLocation:
+            Number.isFinite(Number(localInfo.location?.latitude)) &&
+            Number.isFinite(Number(localInfo.location?.longitude)),
+        });
       }
     }
     return results.length > 0 ? aggregatePhotoVision(results) : (day.vision ?? null);

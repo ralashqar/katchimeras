@@ -19,11 +19,14 @@ function transpile(relativeSourcePath, outName) {
 
 const taxonomyPath = transpile('utils/intelligence/taxonomy.ts', 'taxonomy.js');
 const typesPath = path.join(tempDir, 'types-home.js');
+const qualityRegistryPath = path.join(tempDir, 'quality-registry.js');
 fs.writeFileSync(typesPath, '');
+fs.writeFileSync(qualityRegistryPath, 'exports.qualityDefinition = () => null;');
 
 const stubs = {
   '@/types/home': typesPath,
   '@/utils/intelligence/taxonomy': taxonomyPath,
+  '@/utils/intelligence/quality-registry': qualityRegistryPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
@@ -58,4 +61,3 @@ check('date window filters stale evidence', !scoring.scoreEvidenceMatch([evidenc
 
 console.log(failures === 0 ? '\nAll evidence scoring checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
-

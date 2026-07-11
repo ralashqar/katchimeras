@@ -6,6 +6,7 @@ import { buildReflectionContext } from '@/utils/reflection-context';
 import { weatherLabel } from '@/utils/day-weather';
 import { supabase } from '@/utils/supabase';
 import { pickProminentTags } from '@/utils/vision-signals';
+import { visionSignalIsRejected } from '@/utils/intelligence/classification-policy';
 
 // Per-creature character bible: a persona paragraph plus one short voice note
 // for each mood and each bond depth. The narrator composes within these instead
@@ -59,10 +60,10 @@ export function buildReflectionRequest(
     stepsBand: resolveStepsBand(day.stepsCount),
     visitedPlaceCount: day.visitedPlaceCount,
     newPlaceCount: day.newPlaceCount,
-    prominentTags: day.vision ? pickProminentTags(day.vision) : [],
+    prominentTags: day.vision ? pickProminentTags(day.vision).filter((tag) => !visionSignalIsRejected(day, tag)) : [],
     // Specific camera-derived object descriptions are allowed; OCR text is not
     // sent in the default nightly reflection.
-    photoDetails: day.vision?.details ?? [],
+    photoDetails: (day.vision?.details ?? []).filter((detail) => !visionSignalIsRejected(day, detail)),
     character: {
       name: creature.name,
       encounterCue: castEntry?.categoryLabel ?? null,

@@ -12,6 +12,7 @@ import type {
   LocationPermissionState,
   RecentPhotoAsset,
   StoredHomeState,
+  ClassifiedMemory,
 } from '@/types/home';
 import {
   addMomentToDay,
@@ -42,6 +43,7 @@ import {
   updateHealthPermissionState,
   updateLocationPermissionState,
   updateTodayStepCount,
+  updateClassifiedMemoryForToday,
 } from '@/game/days';
 import {
   listAvailableDayPrompts,
@@ -451,6 +453,20 @@ export function useHomeScreenState() {
     setSelectedDayId(hydrated.todayId);
   }, []);
 
+  const setCloudIntelligenceEnabled = useCallback(
+    (enabled: boolean) => {
+      mutateHomeState((state) => ({ ...state, cloudIntelligenceEnabled: enabled }));
+    },
+    [mutateHomeState]
+  );
+
+  const updateClassifiedMemory = useCallback(
+    (memory: ClassifiedMemory, target: DayInputTarget = 'today') => {
+      mutateHomeState((state, profile, now) => updateClassifiedMemoryForToday(state, memory, profile, now, target));
+    },
+    [mutateHomeState]
+  );
+
   return {
     timelineDays,
     selectedDayId: selectedDay?.id ?? viewModel.todayId,
@@ -478,6 +494,10 @@ export function useHomeScreenState() {
     locationPermission: viewModel.state.locationPermission,
     activityPermission: viewModel.state.activityPermission,
     healthPermission: viewModel.state.healthPermission,
+    cloudIntelligenceEnabled: viewModel.state.cloudIntelligenceEnabled,
+    personalEntities: viewModel.state.personalEntities,
+    setCloudIntelligenceEnabled,
+    updateClassifiedMemory,
     questCapabilities,
     requestMicrophonePermission,
     importingHealthRouteDayId,

@@ -25,7 +25,9 @@ const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js
 const themedPath = transpile('utils/quests/themed.ts', 'themed.js');
 const engagementPath = transpile('utils/katchimera-engagement.ts', 'katchimera-engagement.js');
 const typesPath = path.join(tempDir, 'types-home.js');
+const qualityRegistryPath = path.join(tempDir, 'quality-registry.js');
 fs.writeFileSync(typesPath, '');
+fs.writeFileSync(qualityRegistryPath, "exports.qualityDefinition = id => ({ id, aliases: [id.split('.').pop()] }); exports.qualityMatchesText = (q, value) => q.aliases.some(a => value.toLowerCase().includes(a)); exports.qualityThresholds = () => ({ ready: 0.72, review: 0.3 });");
 
 const stubs = {
   '@/types/home': typesPath,
@@ -34,6 +36,7 @@ const stubs = {
   '@/utils/quests/evidence-scoring': scoringPath,
   '@/utils/intelligence/taxonomy': taxonomyPath,
   '@/utils/quests/themed': themedPath,
+  '@/utils/intelligence/quality-registry': qualityRegistryPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {

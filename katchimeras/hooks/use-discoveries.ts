@@ -48,8 +48,9 @@ function resolveSourceDayId(category: DiscoveryCategory, days: HomeDayRecord[]):
 // Baseline rule: the FIRST evaluation on an install silently backfills everything
 // already earned (seenAnimation:true) + surfaces ONE quiet summary; only unlocks
 // AFTER baseline celebrate (seenAnimation:false → `pending`).
-export function useDiscoveries() {
-  const { days, getDayById, refresh } = useAllDays();
+export type AllDaysArchive = Pick<ReturnType<typeof useAllDays>, 'days' | 'getDayById' | 'refresh'>;
+
+export function useDiscoveriesFromArchive({ days, getDayById, refresh }: AllDaysArchive) {
   const [state, setState] = useState<DiscoveryState>(() => loadDiscoveryState());
 
   // Every mutation saves immediately, so a focus re-read is always safe — and it
@@ -132,4 +133,8 @@ export function useDiscoveries() {
     // Re-read the day archive + re-evaluate now (for same-screen additions).
     refresh,
   };
+}
+
+export function useDiscoveries() {
+  return useDiscoveriesFromArchive(useAllDays());
 }

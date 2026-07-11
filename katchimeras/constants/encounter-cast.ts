@@ -386,6 +386,22 @@ export const encounterLiveCast: readonly EncounterCastEntry[] = [
     categoryLabel: 'Fog',
     visualKey: 'mistle',
   },
+  {
+    profileId: 'activity_transit_commute_signalhop',
+    voice: 'a bright city-route spirit who notices every platform, crossing, and familiar turn',
+    seedId: 'transit_commute',
+    categoryLabel: 'Transit',
+    visualKey: 'neonpoko',
+    placeholderArt: true,
+  },
+  {
+    profileId: 'subject_parenting_care_nestkin',
+    voice: 'a warm protective nest spirit who honours ordinary acts of care',
+    seedId: 'parenting_care',
+    categoryLabel: 'Parenting',
+    visualKey: 'snuglet',
+    placeholderArt: true,
+  },
 ];
 
 export const encounterCastBySeedId: ReadonlyMap<string, EncounterCastEntry> = new Map(

@@ -5,9 +5,9 @@ import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { MomentPromptSheet } from '@/components/katchadeck/home/moment-prompt-sheet';
+import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
@@ -51,8 +51,10 @@ import { useTodayNavigationController } from '@/features/today/use-today-navigat
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
 import { MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
-import type { HomeDayRecord } from '@/types/home';
+import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
+import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
+import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -61,9 +63,23 @@ const SHOW_HATCHED_REFLECTION_CARD = false;
 
 // Mood + Sleep entries in the "+" menu — they open their own sheets instead of
 // the retired strip prompts (accents match those sheets' tiles).
-const QUICK_PROMPT_CATEGORIES: { id: string; title: string; icon: IconSymbolName; accent: string }[] = [
-  { id: 'mood', title: 'Mood', icon: 'face.smiling', accent: '#F5AFC6' },
-  { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF' },
+const QUICK_PROMPT_CATEGORIES: {
+  id: string;
+  title: string;
+  icon: IconSymbolName;
+  accent: string;
+  section: PromptMenuSection;
+}[] = [
+  { id: 'photo', title: 'Photo', icon: 'camera.fill', accent: '#92D7FF', section: 'capture' },
+  { id: 'voice_note', title: 'Voice note', icon: 'mic.fill', accent: '#7DE8CD', section: 'capture' },
+  { id: 'written_note', title: 'Written note', icon: 'square.and.pencil', accent: '#9DDCB8', section: 'capture' },
+  { id: 'place', title: 'Place', icon: 'mappin.and.ellipse', accent: '#F49AC1', section: 'context' },
+  { id: 'food', title: 'Food & drink', icon: 'fork.knife', accent: '#FFC36B', section: 'context' },
+  { id: 'studio', title: 'Watch, read, listen', icon: 'book.fill', accent: '#E8C272', section: 'context' },
+  { id: 'movement', title: 'Movement', icon: 'figure.walk', accent: '#A8C99A', section: 'more' },
+  { id: 'mood', title: 'Mood', icon: 'face.smiling', accent: '#F5AFC6', section: 'more' },
+  { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF', section: 'more' },
+  { id: 'life_event', title: 'Life event', icon: 'sparkles', accent: '#D5B8FF', section: 'more' },
 ];
 
 
@@ -122,8 +138,12 @@ export default function HomeScreen() {
     triggerHatchIfReady,
     refreshState,
     requestMicrophonePermission,
+    cloudIntelligenceEnabled,
+    setCloudIntelligenceEnabled,
+    updateClassifiedMemory,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
+  const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const tabBarHeight = useBottomTabBarHeight();
   const backfillStatus = useBackfillStatus();
   const { eggFeed, eggFeedKey, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
@@ -185,8 +205,8 @@ export default function HomeScreen() {
   const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
   const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
   const formingActivePrompt = onTomorrowForming ? tomorrowActivePrompt : activeDayPrompt;
-  const openMomentCapture = useCallback(() => {
-    router.push({ pathname: '/moment-capture', params: { target: formingTarget } });
+  const openMomentCapture = useCallback((questId?: string | null) => {
+    router.push({ pathname: '/moment-capture', params: { target: formingTarget, questId: questId ?? undefined } });
   }, [formingTarget, router]);
   const openNoteCapture = useCallback(() => {
     router.push({ pathname: '/note-capture', params: { target: formingTarget } });
@@ -245,6 +265,7 @@ export default function HomeScreen() {
   // Quick TEXT note (tap the mic): an inline text box over the page — enter
   // interprets on-device and commits straight away, no full-screen flow.
   const { quickNoteOpen, setQuickNoteOpen, handleQuickNoteSubmit, voiceNote } = useNoteCaptureController({
+    allowRemote: cloudIntelligenceEnabled,
     formingTarget,
     windowWidth,
     windowHeight,
@@ -326,14 +347,34 @@ export default function HomeScreen() {
   // once the current flow is done, never on top of an open prompt/sheet.
   const { celebrateDiscovery, markDiscoverySeen } = useDiscoveryRevealController(formingDay);
 
+  const anyManualSheetOpen =
+    memoryVaultOpen ||
+    foodPickerOpen ||
+    foodVaultOpen ||
+    studioPickerOpen ||
+    studioVaultOpen ||
+    sanctuaryOpen ||
+    moodSheetOpen ||
+    sleepSheetOpen ||
+    questBoardOpen ||
+    bigMomentPickerOpen ||
+    placePromptOpen ||
+    placesVaultOpen ||
+    stepsSheetOpen ||
+    journeySheetOpen ||
+    nameSheetOpen ||
+    observatoryOpen ||
+    quickNoteOpen ||
+    clarificationMemory !== null;
+
   const { foodFollowUp, studioFollowUp, clearFoodFollowUp, clearStudioFollowUp } = useMomentFollowUpController({
     formingDay,
-    blocked: promptSheetOpen || isHatching,
+    blocked: promptSheetOpen || isHatching || anyManualSheetOpen,
+    suppressFoodFollowUp: anyManualSheetOpen,
+    suppressStudioFollowUp: anyManualSheetOpen,
   });
 
   const {
-    foodSuggestion,
-    studioSuggestion,
     handleAddFood,
     handleAddStudio,
     handlePickBigMoment,
@@ -341,7 +382,6 @@ export default function HomeScreen() {
     handleSetSleep,
     handleConfirmSteps,
   } = useTodayMemoryWriters({
-    formingDay,
     formingTarget,
     isFormingToday: Boolean(isFormingToday),
     todayHasMood,
@@ -384,15 +424,59 @@ export default function HomeScreen() {
     openCapture: openMomentCapture,
     openNoteCapture,
     openQuickNote: () => setQuickNoteOpen(true),
+    openPlaceContext: handleAddCurrentPlace,
     openObservatory: () => setObservatoryOpen(true),
     requestMicrophonePermission,
   });
+  const suggestedPromptActions = useMemo(
+    () => {
+      const intelligent = formingDay
+        ? planContextualPrompts(formingDay).map((suggestion) => {
+            const category = QUICK_PROMPT_CATEGORIES.find((item) =>
+              item.id === (suggestion.actionId === 'note' ? 'written_note' : suggestion.actionId)
+            );
+            return {
+              // A day can have more than one unresolved memory with the same
+              // action (for example two photos). Preserve the planner's
+              // memory-specific identity so React and dismissal state do not
+              // collapse those suggestions into one item.
+              id: suggestion.id,
+              actionId: suggestion.actionId,
+              title: suggestion.title,
+              icon: category?.icon ?? 'sparkles',
+              accent: category?.accent ?? Lantern.auroraTeal,
+              sourceMemoryId: suggestion.sourceMemoryId,
+            };
+          })
+        : [];
+      const fallback = categories
+        .filter((category) => category.needsAttention)
+        .map((category) => {
+          switch (category.id) {
+            case 'photos': return { id: 'photo', actionId: 'photo', title: 'Take a photo', icon: category.icon, accent: category.accent };
+            case 'places': return { id: 'place', actionId: 'place', title: 'Add this place', icon: category.icon, accent: category.accent };
+            case 'journey': return { id: 'movement', actionId: 'movement', title: 'How did you move?', icon: category.icon, accent: category.accent };
+            case 'food': return { id: 'food', actionId: 'food', title: 'Add food or drink', icon: category.icon, accent: category.accent };
+            case 'studio': return { id: 'studio', actionId: 'studio', title: 'Add watch / read', icon: category.icon, accent: category.accent };
+            case 'mood': return { id: 'mood', actionId: 'mood', title: 'How does it feel?', icon: category.icon, accent: category.accent };
+            case 'sleep': return { id: 'sleep', actionId: 'sleep', title: 'How was sleep?', icon: category.icon, accent: category.accent };
+            default: return null;
+          }
+        })
+        .filter((item): item is { id: string; actionId: string; title: string; icon: IconSymbolName; accent: string } => item != null);
+      return [
+        ...intelligent,
+        ...fallback.filter((item) => !intelligent.some((candidate) => candidate.actionId === item.actionId)),
+      ].slice(0, 2);
+    },
+    [categories, formingDay]
+  );
 
   useFocusEffect(
     useCallback(() => {
       const intent = consumeQuestActionIntent();
       if (intent) {
-        void handleQuestActionIntent(intent.action);
+        void handleQuestActionIntent(intent);
       }
     }, [handleQuestActionIntent])
   );
@@ -432,6 +516,8 @@ export default function HomeScreen() {
     stepsSheetOpen ||
     journeySheetOpen ||
     nameSheetOpen ||
+    quickNoteOpen ||
+    clarificationMemory !== null ||
     !!foodFollowUp ||
     !!studioFollowUp ||
     !!comicGen ||
@@ -601,6 +687,15 @@ export default function HomeScreen() {
           // Mood + Sleep stay in the menu but open their OWN sheets (the old
           // strip prompts for both are retired).
           quickCategories={QUICK_PROMPT_CATEGORIES}
+          suggestions={suggestedPromptActions}
+          onSelectSuggestion={(suggestion) => {
+            if (!suggestion.sourceMemoryId || !formingDay) return false;
+            const memory = formingDay.classifiedMemories?.find((candidate) => candidate.id === suggestion.sourceMemoryId);
+            if (!memory) return false;
+            setClarificationMemory(memory);
+            closePromptSheet();
+            return true;
+          }}
           onQuickCategory={handleQuickCategory}
           onAnswer={handleAnswerDayPrompt}
           onSelectHeroPhoto={handleSelectHeroPhoto}
@@ -610,6 +705,14 @@ export default function HomeScreen() {
             if (promptId === 'meaningful_photo') dismissPhotoAlert();
           }}
           onClose={closePromptSheet}
+        />
+      ) : null}
+
+      {clarificationMemory ? (
+        <MemoryClarificationSheet
+          memory={clarificationMemory}
+          onResolve={(memory) => updateClassifiedMemory(memory, formingTarget)}
+          onClose={() => setClarificationMemory(null)}
         />
       ) : null}
 
@@ -634,16 +737,18 @@ export default function HomeScreen() {
         observatoryOpen={observatoryOpen}
         placePromptOpen={placePromptOpen}
         nameSheetOpen={nameSheetOpen}
-        foodSuggestion={foodSuggestion}
-        studioSuggestion={studioSuggestion}
         foodFollowUp={foodFollowUp}
         studioFollowUp={studioFollowUp}
+        suppressFollowUps={promptSheetOpen || isHatching || quickNoteOpen || clarificationMemory !== null}
         memoryQuests={memoryQuests}
         recentAvgSteps={recentAvgSteps}
         activePlace={activePlace}
         placePreset={placePreset}
         observations={observations}
         travelMemory={travelMemory}
+        cloudIntelligenceEnabled={cloudIntelligenceEnabled}
+        setCloudIntelligenceEnabled={setCloudIntelligenceEnabled}
+        onOpenIntelligenceLab={() => router.push('/intelligence-lab')}
         setMemoryVaultOpen={setMemoryVaultOpen}
         setMemoryVaultTab={setMemoryVaultTab}
         setFoodPickerOpen={setFoodPickerOpen}

@@ -20,8 +20,6 @@ import type { Observation } from '@/utils/observations-engine';
 
 type FoodConfirmInput = Parameters<ComponentProps<typeof FoodMomentSheet>['onConfirm']>[0];
 type StudioConfirmInput = Parameters<ComponentProps<typeof StudioMomentSheet>['onConfirm']>[0];
-type FoodSuggestion = ComponentProps<typeof FoodMomentSheet>['suggested'];
-type StudioSuggestion = ComponentProps<typeof StudioMomentSheet>['suggested'];
 type MemoryVaultTab = ComponentProps<typeof MemoryVaultSheet>['initialTab'];
 
 type ActivePlace = {
@@ -51,16 +49,18 @@ type TodaySheetHostProps = {
   observatoryOpen: boolean;
   placePromptOpen: boolean;
   nameSheetOpen: boolean;
-  foodSuggestion: FoodSuggestion;
-  studioSuggestion: StudioSuggestion;
   foodFollowUp: FoodMomentFollowUp | null;
   studioFollowUp: StudioMomentFollowUp | null;
+  suppressFollowUps: boolean;
   memoryQuests: MemoryQuest[];
   recentAvgSteps: number | null;
   activePlace: ActivePlace | null;
   placePreset: ComponentProps<typeof PlacePromptSheet>['presetCategory'];
   observations: Observation[];
   travelMemory: ComponentProps<typeof ObservatorySheet>['travelMemory'];
+  cloudIntelligenceEnabled: boolean;
+  setCloudIntelligenceEnabled: (enabled: boolean) => void;
+  onOpenIntelligenceLab?: () => void;
   setMemoryVaultOpen: (open: boolean) => void;
   setMemoryVaultTab: (tab: NonNullable<MemoryVaultTab>) => void;
   setFoodPickerOpen: (open: boolean) => void;
@@ -122,16 +122,18 @@ export function TodaySheetHost({
   observatoryOpen,
   placePromptOpen,
   nameSheetOpen,
-  foodSuggestion,
-  studioSuggestion,
   foodFollowUp,
   studioFollowUp,
+  suppressFollowUps,
   memoryQuests,
   recentAvgSteps,
   activePlace,
   placePreset,
   observations,
   travelMemory,
+  cloudIntelligenceEnabled,
+  setCloudIntelligenceEnabled,
+  onOpenIntelligenceLab,
   setMemoryVaultOpen,
   setMemoryVaultTab,
   setFoodPickerOpen,
@@ -175,6 +177,24 @@ export function TodaySheetHost({
     return null;
   }
 
+  const blockingSheetOpen =
+    memoryVaultOpen ||
+    foodPickerOpen ||
+    foodVaultOpen ||
+    studioPickerOpen ||
+    studioVaultOpen ||
+    sanctuaryOpen ||
+    moodSheetOpen ||
+    sleepSheetOpen ||
+    questBoardOpen ||
+    bigMomentPickerOpen ||
+    stepsSheetOpen ||
+    journeySheetOpen ||
+    placesVaultOpen ||
+    observatoryOpen ||
+    placePromptOpen ||
+    nameSheetOpen;
+
   return (
     <>
       {memoryVaultOpen ? (
@@ -209,9 +229,9 @@ export function TodaySheetHost({
         />
       ) : null}
       {foodPickerOpen ? (
-        <FoodMomentSheet onConfirm={handleAddFood} onClose={() => setFoodPickerOpen(false)} suggested={foodSuggestion} />
+        <FoodMomentSheet onConfirm={handleAddFood} onClose={() => setFoodPickerOpen(false)} />
       ) : null}
-      {foodFollowUp ? (
+      {foodFollowUp && !blockingSheetOpen && !suppressFollowUps ? (
         <FoodMomentSheet
           suggested={{ label: foodFollowUp.label, emoji: foodFollowUp.emoji }}
           onConfirm={({ meaning }) => {
@@ -223,7 +243,7 @@ export function TodaySheetHost({
           onClose={clearFoodFollowUp}
         />
       ) : null}
-      {studioFollowUp ? (
+      {studioFollowUp && !blockingSheetOpen && !suppressFollowUps ? (
         <StudioMomentSheet
           suggested={{ mediaType: studioFollowUp.mediaType, label: studioFollowUp.label, emoji: studioFollowUp.emoji }}
           onConfirm={({ rating }) => {
@@ -250,7 +270,7 @@ export function TodaySheetHost({
         />
       ) : null}
       {studioPickerOpen ? (
-        <StudioMomentSheet onConfirm={handleAddStudio} onClose={() => setStudioPickerOpen(false)} suggested={studioSuggestion} />
+        <StudioMomentSheet onConfirm={handleAddStudio} onClose={() => setStudioPickerOpen(false)} />
       ) : null}
       {studioVaultOpen ? (
         <StudioVaultSheet
@@ -360,6 +380,9 @@ export function TodaySheetHost({
           observations={observations}
           focusedObservationId={null}
           travelMemory={travelMemory}
+          cloudIntelligenceEnabled={cloudIntelligenceEnabled}
+          onCloudIntelligenceChange={setCloudIntelligenceEnabled}
+          onOpenIntelligenceLab={onOpenIntelligenceLab}
           onViewPlaces={() => {
             setObservatoryOpen(false);
             setPlacesVaultOpen(true);

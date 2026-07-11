@@ -9,8 +9,10 @@ import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
+import { confirmationsRejectDomain } from '@/utils/intelligence/classification-policy';
 import type { SceneRead } from '@/utils/scene-classify';
-import type { DayVisionSummary } from '@/types/home';
+import type { DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
+import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
 // on-device, asks what it meant (essence-based options), then feeds the day with
@@ -31,6 +33,7 @@ export default function PhotoEssenceRoute() {
   const { selectedDay, applyCapturedMoment, selectHeroPhoto } = useHomeScreenState();
   const dayScores = selectedDay?.kind === 'day' ? selectedDay.scores : null;
   const localUriRef = useRef<string | null>(null);
+  const rawVisionRef = useRef<PhotoVisionResult | null>(null);
 
   // Load the asset's decodable local file (camera-roll candidates only carry a
   // thumbnail), then read it on-device. Best-effort — null degrades gracefully.
@@ -41,13 +44,29 @@ export default function PhotoEssenceRoute() {
     try {
       const MediaLibrary = await import('expo-media-library');
       const info = await MediaLibrary.getAssetInfoAsync(assetId);
-      const localUri = (info as { localUri?: string; uri?: string }).localUri ?? (info as { uri?: string }).uri ?? null;
+      const assetInfo = info as {
+        localUri?: string;
+        uri?: string;
+        mediaSubtypes?: string[];
+        location?: { latitude?: number | null; longitude?: number | null } | null;
+      };
+      const localUri = assetInfo.localUri ?? assetInfo.uri ?? null;
       localUriRef.current = localUri;
       if (!localUri) {
         return null;
       }
       const result = await analyzePhoto(localUri);
-      return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
+      rawVisionRef.current = result;
+      return result
+        ? aggregatePhotoVision([{
+            ...result,
+            captureSource: 'camera_roll',
+            isScreenshot: assetInfo.mediaSubtypes?.includes('screenshot') ?? false,
+            hasLocation:
+              Number.isFinite(Number(assetInfo.location?.latitude)) &&
+              Number.isFinite(Number(assetInfo.location?.longitude)),
+          }], CAPTURE_PHOTO_CONFIDENCE_FLOOR)
+        : null;
     } catch {
       return null;
     }
@@ -55,9 +74,20 @@ export default function PhotoEssenceRoute() {
 
   const commit = useCallback(
     // `scene` is the hierarchical read EssenceReview resolved (and showed).
-    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null) => {
-      const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined);
-      const category = vision ? resolvePhotoCategory(vision) : { icon: 'sparkles' as const, accent: '#F1D4B4' };
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[]) => {
+      const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined, {
+        rejectFood: confirmationsRejectDomain(confirmations, 'food'),
+        rejectMedia: confirmationsRejectDomain(confirmations, 'media'),
+        rejectAnimal: confirmationsRejectDomain(confirmations, 'animal'),
+      });
+      const resolvedCategory = vision ? resolvePhotoCategory(vision) : null;
+      const categoryRejected =
+        (resolvedCategory?.id === 'food' || resolvedCategory?.id === 'drink') && confirmationsRejectDomain(confirmations, 'food') ||
+        resolvedCategory?.id === 'culture' && confirmationsRejectDomain(confirmations, 'media') ||
+        resolvedCategory?.id === 'pet' && confirmationsRejectDomain(confirmations, 'animal');
+      const category = resolvedCategory && !categoryRejected
+        ? resolvedCategory
+        : { icon: 'sparkles' as const, accent: '#F1D4B4' };
       if (assetId) {
         // Marks it the day's hero photo (and answers the meaningful-photo prompt
         // so it doesn't re-surface).
@@ -78,10 +108,19 @@ export default function PhotoEssenceRoute() {
           sourceId: assetId,
           meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null, sourceId: assetId },
           scene: scene ?? undefined,
+          confirmations,
         },
         captureTarget
       );
       queueCaptureFeed({ photoUri: thumbnailUri || localUriRef.current || '', icon: category.icon, accent: category.accent });
+      saveDevLastPhotoAnalysis({
+        sourceId: assetId,
+        thumbnailUri: thumbnailUri || localUriRef.current || '',
+        rawVision: rawVisionRef.current,
+        visionSummary: vision,
+        scene,
+        confirmations,
+      });
       router.back();
     },
     [assetId, thumbnailUri, params.capturedAt, captureTarget, dayScores, selectHeroPhoto, applyCapturedMoment, router]

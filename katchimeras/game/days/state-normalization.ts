@@ -1,6 +1,9 @@
 import type { DayMapSummary, StoredHomeDayRecord, StoredHomeState } from '@/types/home';
 import { deriveDayMapSummary } from '@/utils/day-map-engine';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
+import { pruneRejectedDerivedMoments } from '@/utils/intelligence/classification-policy';
+import { recalibrateClassifiedMemory, repairUrbanPhotoCentrality } from '@/utils/intelligence/classification';
+import { normalizeFoodEmoji } from '@/utils/food-detect';
 
 import { tomorrowDateId, toLocalDateId } from './date';
 import { getDistanceMeters } from './geo';
@@ -67,11 +70,13 @@ export function normalizeStoredHomeState(
       : undefined;
 
   return {
-    version: 7,
+    version: 10,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
     encounterHistory: upgradedState.encounterHistory,
+    personalEntities: upgradedState.personalEntities,
+    cloudIntelligenceEnabled: upgradedState.cloudIntelligenceEnabled,
     archivedDays: normalizedArchived,
     today: normalizedToday,
     tomorrow: normalizedTomorrow,
@@ -80,12 +85,24 @@ export function normalizeStoredHomeState(
 }
 
 function updateStoredDayDerivedFields(
-  day: StoredHomeDayRecord,
+  inputDay: StoredHomeDayRecord,
   priorDays: StoredHomeDayRecord[],
   now: Date,
   hatchHour: number,
   force: boolean
 ): StoredHomeDayRecord {
+  const emojiNormalizedDay: StoredHomeDayRecord = {
+    ...inputDay,
+    foodMoments: inputDay.foodMoments?.map((moment) => ({ ...moment, emoji: normalizeFoodEmoji(moment.emoji) })),
+    classifiedMemories: inputDay.classifiedMemories?.map((memory) => {
+      const recalibrated = memory.schemaVersion < 3 ? recalibrateClassifiedMemory(memory) : memory;
+      return repairUrbanPhotoCentrality(recalibrated);
+    }),
+  };
+  const day = (emojiNormalizedDay.classifiedMemories ?? []).reduce(
+    (current, memory) => pruneRejectedDerivedMoments(current, memory),
+    emojiNormalizedDay
+  );
   const signature = dayInputSignature(day);
 
   if (!force && day.derivedSignature === signature) {

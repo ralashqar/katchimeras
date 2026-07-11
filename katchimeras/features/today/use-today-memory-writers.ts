@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import type {
@@ -9,9 +9,8 @@ import type {
   setStepsInterpretationForToday,
 } from '@/game/days/actions';
 import type { MoodMonumentChoiceId } from '@/components/katchadeck/world/mood-monument-sheet';
-import type { DayInputTarget, HomeDayRecord } from '@/types/home';
-import { detectFoodInVision } from '@/utils/food-detect';
-import { detectStudioInVision } from '@/utils/studio-detect';
+import type { DayInputTarget } from '@/types/home';
+import { resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
 
 type AddFoodInput = Parameters<typeof addFoodMomentForToday>[1];
 type AddStudioInput = Parameters<typeof addStudioMomentForToday>[1];
@@ -20,7 +19,6 @@ type SleepInput = Parameters<typeof setSleepForToday>[1];
 type StepsInput = Parameters<typeof setStepsInterpretationForToday>[1];
 
 type UseTodayMemoryWritersParams = {
-  formingDay: HomeDayRecord | null;
   formingTarget: DayInputTarget;
   isFormingToday: boolean;
   todayHasMood: boolean;
@@ -42,7 +40,6 @@ type UseTodayMemoryWritersParams = {
 };
 
 export function useTodayMemoryWriters({
-  formingDay,
   formingTarget,
   isFormingToday,
   todayHasMood,
@@ -62,34 +59,24 @@ export function useTodayMemoryWriters({
   pulseEgg,
   setMicrocopy,
 }: UseTodayMemoryWritersParams) {
-  const foodSuggestion = useMemo(() => {
-    const detection = detectFoodInVision(formingDay?.vision);
-    return detection.label && detection.emoji ? { label: detection.label, emoji: detection.emoji } : null;
-  }, [formingDay]);
-
-  const studioSuggestion = useMemo(() => {
-    const detection = detectStudioInVision(formingDay?.vision);
-    return detection.detected && detection.mediaType && detection.label && detection.emoji
-      ? { mediaType: detection.mediaType, label: detection.label, emoji: detection.emoji }
-      : null;
-  }, [formingDay]);
-
   const handleAddFood = useCallback(
     (input: AddFoodInput) => {
+      const display = resolveFoodMomentDisplay(input);
       addFoodMoment(input, formingTarget);
       setFoodPickerOpen(false);
       pulseEgg();
-      setMicrocopy(`${input.emoji} ${input.label} - saved`);
+      setMicrocopy(`${display.emoji} ${display.label} - saved`);
     },
     [addFoodMoment, formingTarget, pulseEgg, setFoodPickerOpen, setMicrocopy]
   );
 
   const handleAddStudio = useCallback(
     (input: AddStudioInput) => {
+      const display = resolveStudioMomentDisplay(input);
       addStudioMoment(input, formingTarget);
       setStudioPickerOpen(false);
       pulseEgg();
-      setMicrocopy(`${input.emoji} ${input.label} - kept`);
+      setMicrocopy(`${display.emoji} ${display.label} - kept`);
     },
     [addStudioMoment, formingTarget, pulseEgg, setMicrocopy, setStudioPickerOpen]
   );
@@ -138,8 +125,6 @@ export function useTodayMemoryWriters({
   );
 
   return {
-    foodSuggestion,
-    studioSuggestion,
     handleAddFood,
     handleAddStudio,
     handlePickBigMoment,

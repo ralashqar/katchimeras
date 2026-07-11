@@ -343,12 +343,40 @@ check(
 );
 
 const stripSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-prompt-strip.tsx'), 'utf8');
+const momentSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/moment-prompt-sheet.tsx'), 'utf8');
 check('DayPromptStrip guards missing prompt options', stripSource.includes('prompt.options ?? []'));
 check('DayPromptStrip guards missing photo candidates', stripSource.includes('prompt.photoCandidates ?? []'));
+check('manual strip flows label their escape action Back', momentSheetSource.includes('dismissLabel="Back"'));
+check(
+  'every launched option set fits its visible cap',
+  dayPrompts.launchedDayPrompts.every((prompt) => prompt.options.length <= prompt.maxOptions),
+  dayPrompts.launchedDayPrompts.map((prompt) => `${prompt.id}:${prompt.options.length}/${prompt.maxOptions}`).join(',')
+);
 const actionStackSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/world-action-stack.tsx'), 'utf8');
 check('Add button does not pass press event as prompt', actionStackSource.includes('onPress={() => onAdd()}'));
 const promptControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-prompt-sheet-controller.ts'), 'utf8');
 check('Prompt sheet controller rejects non-prompt initial values', promptControllerSource.includes('isActiveDayPrompt(prompt) ? prompt : null'));
+const todaySheetHostSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/today-sheet-host.tsx'), 'utf8');
+check('manual Food & drink starts by asking what it was', !todaySheetHostSource.includes('suggested={foodSuggestion}'));
+check('manual Watch / read starts by asking what it was', !todaySheetHostSource.includes('suggested={studioSuggestion}'));
+check('automatic food follow-up cannot overlay any manual flow', todaySheetHostSource.includes('foodFollowUp && !blockingSheetOpen && !suppressFollowUps'));
+check('automatic studio follow-up cannot overlay any manual flow', todaySheetHostSource.includes('studioFollowUp && !blockingSheetOpen && !suppressFollowUps'));
+const todaySource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/today.tsx'), 'utf8');
+check('all manual surfaces cancel pending food follow-up', todaySource.includes('suppressFoodFollowUp: anyManualSheetOpen'));
+check('all manual surfaces cancel pending studio follow-up', todaySource.includes('suppressStudioFollowUp: anyManualSheetOpen'));
+check('voice and written notes have distinct menu actions', todaySource.includes("id: 'voice_note'") && todaySource.includes("id: 'written_note'") && !todaySource.includes("title: 'Voice & note'"));
+check('manual menu is grouped into capture, context, and more', ['capture', 'context', 'more'].every((section) => todaySource.includes(`section: '${section}'`)));
+const actionRouterSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-today-action-router.ts'), 'utf8');
+check('every quick action closes state-backed sheets before opening', actionRouterSource.includes('sheets.closeAllSheets();'));
+check('place quick action starts current-place context directly', actionRouterSource.includes("id === 'place') await openPlaceContext()"));
+const foodSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/food-vault-sheet.tsx'), 'utf8');
+check('manual food has no forced third question', !foodSheetSource.includes('· what kind?'));
+check('meal refinements remain optional on the meaning screen', foodSheetSource.includes('Meal detail · optional'));
+const placeSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/place-prompt-sheet.tsx'), 'utf8');
+const lifeEventSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/big-moment-picker-sheet.tsx'), 'utf8');
+check('long place options are scrollable', placeSheetSource.includes('<ScrollView'));
+check('long life-event options are scrollable', lifeEventSheetSource.includes('<ScrollView'));
+check('People includes explicit My child context', dayPrompts.dayPromptRegistry.people.options.some((option) => option.id === 'my_child'));
 
 Module._resolveFilename = originalResolve;
 fs.rmSync(tempDir, { recursive: true, force: true });

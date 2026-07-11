@@ -29,7 +29,7 @@ type FoundationNoteModule = {
 const nativeFoundation = requireOptionalNativeModule<FoundationNoteModule>('KatchimeraFoundation');
 
 const VALID_ARCHETYPES: NoteArchetype[] = ['calm', 'energy', 'together', 'meaningful'];
-const VALID_MEDIA_KINDS: StudioMediaType[] = ['book', 'film', 'show', 'game', 'music', 'art'];
+const VALID_MEDIA_KINDS: StudioMediaType[] = ['book', 'film', 'show', 'game', 'music', 'art', 'other'];
 const TIMEOUT_MS = 2500;
 
 export type OnDeviceNoteRead = {

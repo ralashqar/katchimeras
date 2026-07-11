@@ -36,11 +36,33 @@ type MomentPromptSheetProps = {
   // Categories that DON'T open a strip prompt here — tapping hands off to the
   // parent, which opens the category's own sheet (Mood / Sleep). Rendered
   // first in the same grid so the menu still shows every category.
-  quickCategories?: { id: string; title: string; icon: IconSymbolName; accent: string }[];
+  quickCategories?: {
+    id: string;
+    title: string;
+    icon: IconSymbolName;
+    accent: string;
+    section: PromptMenuSection;
+  }[];
+  suggestions?: { id: string; actionId: string; title: string; icon: IconSymbolName; accent: string; sourceMemoryId?: string }[];
+  onSelectSuggestion?: (suggestion: { id: string; actionId: string; sourceMemoryId?: string }) => boolean | void;
   onQuickCategory?: (id: string) => void;
 };
 
+export type PromptMenuSection = 'capture' | 'context' | 'more';
+
+const MENU_SECTIONS: { id: PromptMenuSection; title: string }[] = [
+  { id: 'capture', title: 'Capture' },
+  { id: 'context', title: 'Add context' },
+  { id: 'more', title: 'More' },
+];
+
 const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#FFB4A2'];
+
+function sectionForPrompt(prompt: ActiveDayPrompt): PromptMenuSection {
+  if (prompt.id === 'meaningful_photo') return 'capture';
+  if (prompt.id === 'people') return 'context';
+  return 'more';
+}
 
 export function MomentPromptSheet({
   prompts,
@@ -53,6 +75,8 @@ export function MomentPromptSheet({
   onSelectPrompt,
   onPromptDismiss,
   quickCategories = [],
+  suggestions = [],
+  onSelectSuggestion,
   onQuickCategory,
 }: MomentPromptSheetProps) {
   const [selected, setSelected] = useState<ActiveDayPrompt | null>(initialPrompt);
@@ -62,6 +86,7 @@ export function MomentPromptSheet({
       {selected ? (
         <DayPromptStrip
           prompt={selected}
+          dismissLabel="Back"
           // Answering or picking a photo feeds the egg (handled by the parent),
           // then the sheet closes; "Later" just returns to the category list.
           onAnswer={(kind, choiceIds, from) => {
@@ -93,40 +118,84 @@ export function MomentPromptSheet({
             </View>
           ) : null}
 
+          {suggestions.length > 0 ? (
+            <View style={styles.suggestionSection}>
+              <ThemedText style={styles.seedHeading} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                Suggested now
+              </ThemedText>
+              <View style={styles.suggestionRow}>
+                {suggestions.slice(0, 2).map((suggestion) => (
+                  <View key={`suggestion-${suggestion.id}`} style={styles.suggestionCell}>
+                    <ActionTile
+                      icon={suggestion.icon}
+                      title={suggestion.title}
+                      tint={suggestion.accent}
+                      onPress={() => {
+                        if (onSelectSuggestion?.(suggestion)) return;
+                        onQuickCategory?.(suggestion.actionId);
+                      }}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           {prompts.length === 0 && quickCategories.length === 0 ? (
             <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
               {"You've answered everything for now — the egg has what it needs today."}
             </ThemedText>
           ) : (
             <ScrollView
-              contentContainerStyle={styles.categoryGrid}
+              contentContainerStyle={styles.menuSections}
               showsVerticalScrollIndicator={false}
               style={styles.categoryScroll}>
-              {quickCategories.map((category, index) => (
-                <Animated.View
-                  key={`quick-${category.id}`}
-                  entering={FadeInDown.delay(40 + index * 35).duration(280)}
-                  style={styles.categoryCell}>
-                  <ActionTile icon={category.icon} title={category.title} tint={category.accent} onPress={() => onQuickCategory?.(category.id)} />
-                </Animated.View>
-              ))}
-              {prompts.map((prompt, index) => {
-                const accent = CHIP_ACCENTS[index % CHIP_ACCENTS.length];
+              {MENU_SECTIONS.map((section) => {
+                const sectionCategories = quickCategories.filter((category) => category.section === section.id);
+                const sectionPrompts = prompts.filter((prompt) => sectionForPrompt(prompt) === section.id);
+                if (sectionCategories.length === 0 && sectionPrompts.length === 0) return null;
+
                 return (
-                  <Animated.View
-                    key={prompt.id}
-                    entering={FadeInDown.delay(40 + (quickCategories.length + index) * 35).duration(280)}
-                    style={styles.categoryCell}>
-                    <ActionTile
-                      icon={prompt.categoryIcon}
-                      title={dayPromptMenuLabels[prompt.id]}
-                      tint={accent}
-                      onPress={() => {
-                        if (onSelectPrompt?.(prompt)) return;
-                        setSelected(prompt);
-                      }}
-                    />
-                  </Animated.View>
+                  <View key={section.id} style={styles.menuSection}>
+                    <ThemedText style={styles.menuHeading} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                      {section.title}
+                    </ThemedText>
+                    <View style={styles.categoryGrid}>
+                      {sectionCategories.map((category, index) => (
+                        <Animated.View
+                          key={`quick-${category.id}`}
+                          entering={FadeInDown.delay(40 + index * 35).duration(280)}
+                          style={styles.categoryCell}>
+                          <ActionTile
+                            icon={category.icon}
+                            title={category.title}
+                            tint={category.accent}
+                            onPress={() => void onQuickCategory?.(category.id)}
+                          />
+                        </Animated.View>
+                      ))}
+                      {sectionPrompts.map((prompt, index) => {
+                        const promptIndex = prompts.indexOf(prompt);
+                        const accent = CHIP_ACCENTS[promptIndex % CHIP_ACCENTS.length];
+                        return (
+                          <Animated.View
+                            key={prompt.id}
+                            entering={FadeInDown.delay(40 + (sectionCategories.length + index) * 35).duration(280)}
+                            style={styles.categoryCell}>
+                            <ActionTile
+                              icon={prompt.categoryIcon}
+                              title={dayPromptMenuLabels[prompt.id]}
+                              tint={accent}
+                              onPress={() => {
+                                if (onSelectPrompt?.(prompt)) return;
+                                setSelected(prompt);
+                              }}
+                            />
+                          </Animated.View>
+                        );
+                      })}
+                    </View>
+                  </View>
                 );
               })}
             </ScrollView>
@@ -208,7 +277,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   categoryScroll: {
-    maxHeight: 320,
+    maxHeight: 390,
+  },
+  menuSections: { gap: 16, paddingVertical: 4 },
+  menuSection: { gap: 8 },
+  menuHeading: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   categoryGrid: {
     flexDirection: 'row',
@@ -222,4 +299,7 @@ const styles = StyleSheet.create({
     // a clean 3×2 grid).
     width: '30%',
   },
+  suggestionSection: { gap: 8 },
+  suggestionRow: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
+  suggestionCell: { width: '46%' },
 });

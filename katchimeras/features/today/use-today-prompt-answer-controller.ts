@@ -42,10 +42,9 @@ export function useTodayPromptAnswerController({
 
   const dismissPhotoAlert = useCallback(() => setHandledPhotoSig(photoSig), [photoSig]);
 
-  const popupPrompts = useMemo(
-    () => formingPrompts.filter((prompt) => prompt.id !== 'meaningful_photo'),
-    [formingPrompts]
-  );
+  // Keep the recent-library photo action in the manual menu as a distinct
+  // choice from taking a new photo. It is already gated on a real candidate.
+  const popupPrompts = formingPrompts;
 
   const handleAnswerDayPrompt = useCallback(
     (kind: DayPromptKind, choiceIds: string[], from: FeedSourceRect) => {

@@ -1,5 +1,6 @@
 import type { BigMomentType, DayEvidenceProvider, StoredHomeDayRecord } from '@/types/home';
 import { buildNoteEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
+import { buildNoteClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import type { FoodDetection } from '@/utils/food-detect';
 import type { StudioDetection } from '@/utils/studio-detect';
 import type { StudioMediaType } from '@/types/home';
@@ -57,11 +58,22 @@ export function withNoteMemory(
     food: input.food ?? (detections.food.detected ? detections.food.label ?? 'food' : null),
     bigMomentType: input.bigMoment?.type ?? null,
   });
+  const classifiedMemory = buildNoteClassifiedMemory({
+    noteId: note.id,
+    kind: input.kind,
+    observedAt: createdAt,
+    text: input.text,
+    provider: input.intelligenceProvider ?? (input.llmClassified ? 'appleFoundation' : 'deterministic'),
+    mediaType: input.media?.mediaType ?? (detections.studio.detected ? detections.studio.mediaType ?? null : null),
+    food: input.food ?? (detections.food.detected ? detections.food.label ?? 'food' : null),
+    bigMomentType: input.bigMoment?.type ?? null,
+  });
 
   return {
     ...day,
     notes: [...(day.notes ?? []), note],
     evidence: upsertEvidence(day.evidence, [evidence]),
+    classifiedMemories: upsertClassifiedMemory(day.classifiedMemories, [classifiedMemory]),
     foodMoments: detections.food.detected
       ? appendFoodMoment(
           day.foodMoments,
@@ -70,6 +82,7 @@ export function withNoteMemory(
             now,
             archetype: input.archetype,
             noteId: note.id,
+            sourceId: note.id,
             detail: input.text.trim().slice(0, 120),
           })
         )
@@ -82,6 +95,7 @@ export function withNoteMemory(
             now,
             archetype: input.archetype,
             noteId: note.id,
+            sourceId: note.id,
             detail: input.text.trim().slice(0, 120),
           })
         )

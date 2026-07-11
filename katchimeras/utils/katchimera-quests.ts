@@ -92,7 +92,7 @@ export function interactionState(
   const active = questFor(state, creatureId);
   if (active) {
     const runtime = evaluateQuestRuntime({ questId: active.questId, facts, capabilities });
-    return runtime.complete || runtime.readyToSubmit ? 'ready' : 'active';
+    return runtime.complete || runtime.readyToSubmit || runtime.possibleEvidenceIds.length > 0 ? 'ready' : 'active';
   }
   return hasOffer ? 'offer' : 'idle';
 }

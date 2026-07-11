@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -27,6 +27,12 @@ export const PLACE_CATEGORIES: PlaceCategory[] = [
   { id: 'market', emoji: '🧺', label: 'Market' },
   { id: 'work', emoji: '💼', label: 'Work' },
   { id: 'home', emoji: '🏠', label: 'Home' },
+  { id: 'transit', emoji: '🚉', label: 'Transit stop' },
+  { id: 'school_childcare', emoji: '🎒', label: 'School / childcare' },
+  { id: 'healthcare', emoji: '🩺', label: 'Appointment' },
+  { id: 'family_home', emoji: '🫶', label: "Someone's home" },
+  { id: 'exercise', emoji: '🏃', label: 'Exercise' },
+  { id: 'entertainment', emoji: '🎟️', label: 'Entertainment' },
   { id: 'other', emoji: '✨', label: 'Somewhere else' },
 ];
 
@@ -61,6 +67,12 @@ export const PLACE_MEANINGS_BY_CATEGORY: Record<string, PlaceMeaning[]> = {
   shopping: [m('energy', '🎁', 'A treat'), m('focus', '🎯', 'Errands'), m('meaningful', '✨', 'Found something'), m('together', '🧑‍🤝‍🧑', 'Together')],
   work: [m('focus', '🎯', 'Focused'), m('energy', '⚡', 'Productive'), m('meaningful', '🏆', 'A win'), m('together', '🧑‍🤝‍🧑', 'With the team'), m('calm', '🌿', 'Routine')],
   home: [m('calm', '🛋', 'Restful'), m('together', '🧑‍🤝‍🧑', 'Family time'), m('meaningful', '💛', 'Cozy'), m('focus', '🎯', 'Got things done'), m('energy', '✨', 'Lively')],
+  transit: [m('focus', '🚉', 'Passing through'), m('calm', '🪟', 'Window time'), m('energy', '🧭', 'On the move'), m('together', '🫶', 'Along for the ride')],
+  school_childcare: [m('focus', '🎒', 'Drop-off / pick-up'), m('together', '🫶', 'Caring'), m('meaningful', '🌱', 'A growing moment'), m('energy', '✨', 'An event')],
+  healthcare: [m('focus', '🩺', 'An appointment'), m('meaningful', '💛', 'Taking care'), m('calm', '🌿', 'Reassuring'), m('energy', '⚡', 'A hard visit')],
+  family_home: [m('together', '🫶', 'Family visit'), m('calm', '🏡', 'Familiar'), m('meaningful', '💛', 'Important time'), m('energy', '✨', 'A gathering')],
+  exercise: [m('energy', '🏃', 'Training'), m('focus', '🎯', 'Focused'), m('meaningful', '🏆', 'Progress'), m('together', '🤝', 'With others')],
+  entertainment: [m('energy', '🎟️', 'Fun'), m('meaningful', '✨', 'Memorable'), m('together', '🫶', 'Shared it'), m('calm', '🌙', 'An escape')],
 };
 export function meaningsForCategory(categoryId: string): PlaceMeaning[] {
   return PLACE_MEANINGS_BY_CATEGORY[categoryId] ?? PLACE_MEANINGS;
@@ -105,8 +117,12 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
           </ThemedText>
         ) : null}
 
-        {!category ? (
-          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
+        <ScrollView
+          contentContainerStyle={styles.optionsContent}
+          showsVerticalScrollIndicator={false}
+          style={styles.optionsScroll}>
+          {!category ? (
+            <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
             <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
               What was it?
             </ThemedText>
@@ -123,9 +139,9 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
                 </Pressable>
               ))}
             </View>
-          </Animated.View>
-        ) : (
-          <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
+            </Animated.View>
+          ) : (
+            <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
             <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
               {presetCategory ? "What's happening there?" : `${category.emoji} ${category.label} · what did it mean?`}
             </ThemedText>
@@ -149,8 +165,9 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
                 </ThemedText>
               </Pressable>
             )}
-          </Animated.View>
-        )}
+            </Animated.View>
+          )}
+        </ScrollView>
 
         <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
           <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
@@ -184,6 +201,8 @@ const styles = StyleSheet.create({
   kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   title: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
   time: { fontSize: 12.5, fontWeight: '600' },
+  optionsScroll: { maxHeight: 390 },
+  optionsContent: { paddingBottom: 2 },
   section: { gap: 10, paddingTop: 8 },
   question: { fontSize: 13, fontWeight: '700' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

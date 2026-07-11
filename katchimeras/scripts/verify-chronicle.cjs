@@ -19,6 +19,15 @@ function transpileToTemp(relativeSourcePath, outName) {
   return outPath;
 }
 
+const originalResolveFilename = require('module')._resolveFilename;
+const studioDetectPath = transpileToTemp('utils/studio-detect.ts', 'studio-detect.js');
+const memoryDisplayPath = transpileToTemp('utils/memory-display.ts', 'memory-display.js');
+require('module')._resolveFilename = function resolveVerificationModule(request, parent, isMain, options) {
+  if (request === '@/utils/studio-detect') return studioDetectPath;
+  if (request === '@/utils/memory-display') return memoryDisplayPath;
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
+
 const engine = require(transpileToTemp('utils/chronicle-engine.ts', 'chronicle-engine.js'));
 
 let failures = 0;

@@ -48,6 +48,8 @@ function check(label, condition, detail) {
 check('park synonyms canonicalize', taxonomy.canonicalizeSignal('green space') === 'park');
 check('dog synonyms canonicalize', taxonomy.canonicalizeSignal('golden retriever') === 'dog');
 check('generic labels are ignored', taxonomy.canonicalizeSignal('outdoor') === null);
+check('movie signals share the Flickerbun route', taxonomy.seedIdForCanonicalSignal('film') === 'cinema');
+check('transit signals route to Signalhop', taxonomy.seedIdForCanonicalSignal('transit') === 'transit_commute');
 
 const rawSignals = taxonomy.visionResultToSignals({
   labels: [
@@ -87,4 +89,3 @@ check('note evidence adds explicit food signal', noteEvidence.signals.some((sign
 
 console.log(failures === 0 ? '\nAll intelligence taxonomy checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);
-

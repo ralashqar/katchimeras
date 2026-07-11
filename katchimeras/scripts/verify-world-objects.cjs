@@ -185,7 +185,7 @@ check(
 
 // --- Discovery tiers (old TIER_FALLBACK) ---------------------------------------
 const tiers = registry.DISCOVERY_TIER_KEEPSAKES;
-check('common tier = sapling decor_4', tiers.common.art.variants[0] === 'decor_4' && tiers.common.name === 'Discovery Sapling');
+check('common tier = pooled discovery saplings', tiers.common.art.variants.includes('decor_4') && tiers.common.art.variants.length > 4 && tiers.common.name === 'Discovery Sapling');
 check('rare tier = lantern 1.15', tiers.rare.art.variants[0] === 'decor_12' && tiers.rare.art.sizeScale === 1.15);
 check('epic tier = monument_stone 1.15', tiers.epic.art.variants[0] === 'monument_stone' && tiers.epic.art.sizeScale === 1.15);
 check('legendary tier = monument_shard 1.3', tiers.legendary.art.variants[0] === 'monument_shard' && tiers.legendary.art.sizeScale === 1.3);

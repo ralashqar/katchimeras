@@ -1,6 +1,7 @@
 import type { HomeDayRecord } from '@/types/home';
 import type { KingdomBuildingId } from '@/types/kingdom';
-import { isGenericStudioLabel, resolveStudioTitle } from '@/utils/studio-detect';
+import { isGenericStudioLabel } from '@/utils/studio-detect';
+import { resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
 
 // The Kingdom buildings' lifetime archives — every inspiration, meal and
 // reflection ever logged, folded from the full day archive and grouped by
@@ -64,7 +65,8 @@ function collect(days: HomeDayRecord[], buildingId: KingdomBuildingId): KingdomA
         // Heal generic titles ("A book") from the source note's excerpt; when
         // no title can be recovered, surface the excerpt itself so the entry
         // is never meaningless.
-        const title = resolveStudioTitle(moment.label, moment.detail);
+        const display = resolveStudioMomentDisplay(moment);
+        const title = display.label;
         const meta = [STUDIO_MEDIA_LABEL[moment.mediaType] ?? 'Inspiration', STUDIO_RATING_LABEL[moment.rating]]
           .filter(Boolean)
           .join(' · ');
@@ -85,11 +87,12 @@ function collect(days: HomeDayRecord[], buildingId: KingdomBuildingId): KingdomA
       }
     } else if (buildingId === 'foodPavilion') {
       for (const moment of day.foodMoments ?? []) {
+        const display = resolveFoodMomentDisplay(moment);
         entries.push({
           id: `food-${day.id}-${moment.id}`,
-          emoji: moment.emoji,
-          title: moment.label,
-          subtitle: FOOD_MEANING_LABEL[moment.meaning] ?? 'Savoured',
+          emoji: display.emoji,
+          title: display.label,
+          subtitle: [display.detail, FOOD_MEANING_LABEL[moment.meaning] ?? 'Savoured'].filter(Boolean).join(' · '),
           isoDate: day.isoDate,
           time: entryTime(moment.createdAt, day.isoDate),
           dayId: day.id,

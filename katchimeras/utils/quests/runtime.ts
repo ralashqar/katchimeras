@@ -6,6 +6,8 @@ import {
 } from '@/utils/capabilities/quest-capabilities';
 import type { Facts } from '@/utils/signals/facts';
 import { evaluateCriterion } from '@/utils/signals/facts';
+import { scoreEvidenceMatch } from '@/utils/quests/evidence-scoring';
+import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 
 import { questDefinition, type QuestDefinition } from './definitions';
 
@@ -40,7 +42,12 @@ export type QuestRuntimeCriterion = {
   unit?: string | null;
   progressRatio?: number | null;
   progressLabel?: string | null;
+  qualityId?: string | null;
+  centrality?: 'primary' | 'supporting' | 'incidental' | null;
+  matchStatus?: 'ready' | 'possible' | 'missing';
 };
+
+export type QuestMatchEvaluation = QuestRuntimeCriterion;
 
 export type QuestRuntimeStatus = {
   questId: string;
@@ -50,6 +57,7 @@ export type QuestRuntimeStatus = {
   readyToSubmit: boolean;
   progress: QuestRuntimeCriterion[];
   matchedEvidenceIds: string[];
+  possibleEvidenceIds: string[];
   confidence: number | null;
   missingCapabilities: QuestCapabilityId[];
   nextAction: QuestNextAction;
@@ -80,6 +88,7 @@ export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRun
       readyToSubmit: false,
       progress: [],
       matchedEvidenceIds: [],
+      possibleEvidenceIds: [],
       confidence: null,
       missingCapabilities: capabilityStatus.missing,
       nextAction: capabilityStatus.action,
@@ -97,12 +106,36 @@ export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRun
       evidenceIds: result.evidenceIds,
       confidence: result.confidence,
       reason: result.done ? result.reason : progress?.progressLabel ?? result.reason,
+      qualityId: result.qualityId ?? criterion.qualityId ?? null,
+      centrality: result.centrality ?? null,
+      matchStatus: result.done ? 'ready' : 'missing',
       ...progress,
     };
   });
 
   const complete = progress.length > 0 && progress.every((criterion) => criterion.done);
   const matchedEvidenceIds = Array.from(new Set(progress.flatMap((criterion) => criterion.evidenceIds)));
+  const possibleEvidenceIds = Array.from(
+    new Set(
+      def.criteria.flatMap((criterion) => {
+        const qualityId = criterion.qualityId ?? (typeof criterion.value === 'string' ? criterion.value : null);
+        if (criterion.fact !== 'memory.qualities' || !qualityId) return [];
+        const evidence = input.facts['memory.qualities'] ?? input.facts['evidence.items'];
+        if (!Array.isArray(evidence)) return [];
+        return scoreEvidenceMatch(evidence, {
+          value: qualityId,
+          minConfidence: qualityThresholds(qualityId).review,
+          sourceTypes: criterion.sourceTypes,
+          minimumCentrality: criterion.minimumCentrality,
+        }).evidenceIds;
+      })
+    )
+  ).filter((id) => !matchedEvidenceIds.includes(id));
+  const explainedProgress = progress.map((criterion) =>
+    !criterion.done && criterion.qualityId && possibleEvidenceIds.length > 0
+      ? { ...criterion, matchStatus: 'possible' as const, reason: 'Review-level visual evidence is available for confirmation.' }
+      : criterion
+  );
   const confidences = progress.map((criterion) => criterion.confidence).filter((value): value is number => value != null);
   const confidence = confidences.length ? confidences.reduce((sum, value) => sum + value, 0) / confidences.length : null;
   const missing = progress.find((criterion) => !criterion.done);
@@ -116,8 +149,9 @@ export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRun
     complete: runtimeComplete,
     submissionMode,
     readyToSubmit,
-    progress,
+    progress: explainedProgress,
     matchedEvidenceIds,
+    possibleEvidenceIds,
     confidence,
     missingCapabilities: [],
     nextAction: runtimeComplete ? 'none' : nextActionForQuest(def, input),
@@ -313,6 +347,7 @@ function unknownQuest(questId: string): QuestRuntimeStatus {
     readyToSubmit: false,
     progress: [],
     matchedEvidenceIds: [],
+    possibleEvidenceIds: [],
     confidence: null,
     missingCapabilities: [],
     nextAction: 'none',

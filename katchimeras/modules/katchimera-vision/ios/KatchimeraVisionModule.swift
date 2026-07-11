@@ -214,13 +214,16 @@ public final class KatchimeraVisionModule: Module {
     let handler = VNImageRequestHandler(url: url, options: [:])
 
     let classifyRequest = VNClassifyImageRequest()
-    let textRequest = VNRecognizeTextRequest()
-    textRequest.recognitionLevel = .fast
-    textRequest.usesLanguageCorrection = false
     let faceRequest = VNDetectFaceRectanglesRequest()
+    let animalRequest = VNRecognizeAnimalsRequest()
+    let humanRequest = VNDetectHumanRectanglesRequest()
+    humanRequest.upperBodyOnly = false
+    let saliencyRequest = VNGenerateAttentionBasedSaliencyImageRequest()
 
     do {
-      try handler.perform([classifyRequest, textRequest, faceRequest])
+      // Keep the universal pass visual-only and quick. Accurate OCR is much
+      // slower and is added below only for document/media candidates.
+      try handler.perform([classifyRequest, faceRequest, animalRequest, humanRequest, saliencyRequest])
     } catch {
       promise.resolve(emptyResult())
       return
@@ -235,20 +238,114 @@ public final class KatchimeraVisionModule: Module {
     }
 
     var text: [String] = []
-    if let observations = textRequest.results {
-      text = observations.compactMap { $0.topCandidates(1).first?.string }
+    var recognizedText: [[String: Any]] = []
+    if shouldRunTextRecognition(labels) {
+      let textRequest = VNRecognizeTextRequest()
+      textRequest.recognitionLevel = .accurate
+      textRequest.usesLanguageCorrection = true
+      do {
+        try handler.perform([textRequest])
+        if let observations = textRequest.results {
+          recognizedText = observations.compactMap { observation in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            return [
+              "text": candidate.string,
+              "confidence": Double(candidate.confidence),
+              "region": regionDictionary(observation.boundingBox, confidence: candidate.confidence)
+            ]
+          }
+          text = recognizedText.compactMap { $0["text"] as? String }
+        }
+      } catch {
+        text = []
+        recognizedText = []
+      }
     }
 
     var faceCount = 0
+    var faces: [[String: Any]] = []
     if let observations = faceRequest.results {
       faceCount = observations.count
+      faces = observations.map { regionDictionary($0.boundingBox, confidence: $0.confidence) }
+    }
+
+    var animals: [[String: Any]] = []
+    if let observations = animalRequest.results {
+      animals = observations.compactMap { observation in
+        guard let label = observation.labels.first else { return nil }
+        let identifier = label.identifier.lowercased()
+        let kind = identifier.contains("dog") ? "dog" : identifier.contains("cat") ? "cat" : "unknown"
+        return [
+          "kind": kind,
+          "confidence": Double(label.confidence),
+          "region": regionDictionary(observation.boundingBox, confidence: label.confidence)
+        ]
+      }
+    }
+
+    let humanCount = humanRequest.results?.count ?? 0
+    let humans = humanRequest.results?.map { regionDictionary($0.boundingBox, confidence: $0.confidence) } ?? []
+    var dominantSubject: [String: Any]? = nil
+    if let object = saliencyRequest.results?.first?.salientObjects?.first {
+      let box = object.boundingBox
+      dominantSubject = [
+        "x": Double(box.origin.x),
+        "y": Double(box.origin.y),
+        "width": Double(box.size.width),
+        "height": Double(box.size.height),
+        "confidence": Double(object.confidence)
+      ]
+    }
+
+    var documentDetected = false
+    if #available(iOS 15.0, *), shouldRunDocumentDetection(labels) {
+      let documentRequest = VNDetectDocumentSegmentationRequest()
+      do {
+        try handler.perform([documentRequest])
+        documentDetected = !(documentRequest.results?.isEmpty ?? true)
+      } catch {
+        documentDetected = false
+      }
     }
 
     promise.resolve([
       "labels": labels,
       "text": text,
-      "faceCount": faceCount
+      "recognizedText": recognizedText,
+      "faceCount": faceCount,
+      "faces": faces,
+      "humanCount": humanCount,
+      "humans": humans,
+      "animals": animals,
+        "dominantSubject": dominantSubject ?? NSNull(),
+      "documentDetected": documentDetected
     ])
+  }
+
+  private func shouldRunTextRecognition(_ labels: [[String: Any]]) -> Bool {
+    let text = labels.compactMap { $0["name"] as? String }.joined(separator: " ").lowercased()
+    let cues = [
+      "book", "publication", "document", "paper", "page", "text", "receipt",
+      "menu", "sign", "poster", "screen", "television", "monitor", "album",
+      "magazine", "newspaper", "whiteboard", "label"
+    ]
+    return cues.contains { text.contains($0) }
+  }
+
+  private func shouldRunDocumentDetection(_ labels: [[String: Any]]) -> Bool {
+    let text = labels.compactMap { $0["name"] as? String }.joined(separator: " ").lowercased()
+    let cues = ["book", "publication", "document", "paper", "page", "receipt", "menu", "poster", "magazine", "newspaper", "whiteboard"]
+    return cues.contains { text.contains($0) }
+  }
+
+  private func regionDictionary(_ box: CGRect, confidence: VNConfidence) -> [String: Any] {
+    return [
+      "x": Double(box.origin.x),
+      "y": Double(box.origin.y),
+      "width": Double(box.size.width),
+      "height": Double(box.size.height),
+      "confidence": Double(confidence)
+    ]
   }
 
   private func resolveURL(from uri: String) -> URL? {
@@ -259,6 +356,6 @@ public final class KatchimeraVisionModule: Module {
   }
 
   private func emptyResult() -> [String: Any] {
-    return ["labels": [], "text": [], "faceCount": 0]
+    return ["labels": [], "text": [], "recognizedText": [], "faceCount": 0, "faces": [], "humanCount": 0, "humans": [], "animals": [], "documentDetected": false]
   }
 }

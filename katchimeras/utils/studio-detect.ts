@@ -52,7 +52,7 @@ const MEDIA_LABEL: Record<StudioMediaType, string> = {
   game: 'A game',
   music: 'Music',
   art: 'Art',
-  other: 'Something',
+  other: 'Other media',
 };
 
 export type StudioDetection = {
@@ -164,6 +164,32 @@ function emojiFor(mediaType: StudioMediaType): string {
   return MEDIA.find((spec) => spec.mediaType === mediaType)?.emoji ?? '✨';
 }
 
+// Explicit consumption language for formats outside the six named Studio
+// kinds. Keep this verb-led: "watched the football game" is media, while
+// "my son played football" is a real-world activity.
+function detectOtherConsumedMedia(text: string): StudioDetection | null {
+  const sport = text.match(
+    /\b(?:watched|watching|caught|saw)\s+(?:a\s+|the\s+)?((?:football|soccer|rugby|tennis|basketball|baseball|cricket|hockey|golf|boxing|formula\s*1|f1)(?:\s+(?:game|match|race|final))?|(?:sports?|game|match|race|final))\b/i
+  );
+  if (sport) {
+    const raw = sport[1].trim().toLowerCase();
+    const label = /^(sports?|game|match|race|final)$/.test(raw)
+      ? 'Live sport'
+      : titleCase(raw.replace(/\bgame\b/, 'match'));
+    return { detected: true, mediaType: 'other', label, emoji: '🏟️' };
+  }
+  if (/\b(?:watched|watching|caught)\s+(?:a\s+|the\s+)?(?:news|news broadcast|current affairs)\b/i.test(text)) {
+    return { detected: true, mediaType: 'other', label: 'The news', emoji: '📰' };
+  }
+  if (/\b(?:listened to|listening to|heard)\s+(?:a\s+|the\s+)?podcast\b/i.test(text)) {
+    return { detected: true, mediaType: 'other', label: 'A podcast', emoji: '🎙️' };
+  }
+  if (/\b(?:watched|watching)\s+(?:a\s+|the\s+)?(?:youtube\s+video|online\s+video|livestream|live\s+stream|live\s+event)\b/i.test(text)) {
+    return { detected: true, mediaType: 'other', label: 'Online video', emoji: '📡' };
+  }
+  return null;
+}
+
 // Media VERB + a Capitalised Title = a work, even without a media keyword —
 // "I read Dune" has no 'book/novel/reading' but is unmistakable. The capital
 // requirement is the guard: "i read the news" stays a plain note.
@@ -219,6 +245,8 @@ function stripTrailingMediaNoun(title: string): string {
 // → { book, label: 'Dune' }.
 export function detectStudioInText(text: string | undefined | null): StudioDetection {
   if (!text || !text.trim()) return { detected: false };
+  const otherMedia = detectOtherConsumedMedia(text);
+  if (otherMedia) return otherMedia;
   const mediaType = matchMedia(` ${text.toLowerCase()} `);
   if (mediaType) {
     const title = extractTitle(text);
@@ -254,6 +282,19 @@ export function detectStudioInText(text: string | undefined | null): StudioDetec
 const COVER_NOISE =
   /^(a novel|a memoir|a thriller|the\s.*bestseller.*|(inter)?national bestseller|bestselling.*|author of .*|by [\w'’. -]+|winner of .*|shortlisted .*|now a major .*|introduction by .*|foreword by .*|translated by .*|soon to be .*|volume \d+|book (one|two|three|\d+)|\d+(th|st|nd|rd) anniversary.*|penguin|vintage|picador|faber|harper ?collins|bloomsbury|tor|orbit|del rey|paperback|hardcover)$/i;
 
+// OCR commonly substitutes digits for similarly shaped cover letters. Use a
+// normalized copy only for matching cover furniture; never show it as a title.
+function normalizeCoverOcrForMatching(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\b8(?=[a-z])/g, 'b')
+    .replace(/(?<=[a-z])0(?=[a-z])/g, 'o')
+    .replace(/(?<=[a-z])1(?=[a-z])/g, 'i')
+    .replace(/[^a-z0-9' -]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Pull a title off a photographed cover/poster from the OCR read. Covers stack
 // the title in big display type across SHORT lines ('NORWEGIAN' / 'WOOD') with
 // the author above or below, so a single OCR line is rarely the whole title.
@@ -268,7 +309,8 @@ export function extractTitleFromVisionText(tokens: string[] | undefined | null):
     .map((token) => token.trim())
     .filter((token) => token.length >= 2 && token.length <= 60)
     .filter((token) => /[a-zA-Z]{2}/.test(token) && !/^\d+$/.test(token))
-    .filter((token) => !COVER_NOISE.test(token));
+    .filter((token) => !COVER_NOISE.test(normalizeCoverOcrForMatching(token)))
+    .filter((token) => !/^(t?he )?phenomenal\b/i.test(normalizeCoverOcrForMatching(token)));
   if (lines.length === 0) return null;
   const head = lines.slice(0, 5);
   const wordsIn = (text: string) => text.split(/\s+/).length;
@@ -316,7 +358,7 @@ function matchVisionMedia(haystack: string): StudioMediaType | null {
 
 // Cover furniture in the OCR itself is a strong book/film signal even when the
 // classifier only said 'text' or 'document'.
-const OCR_BOOK_HINT = /\b(a novel|a memoir|(inter)?national bestseller|bestselling author|winner of the|shortlisted for)\b/;
+const OCR_BOOK_HINT = /\b(a novel|a memoir|(inter)?national bestseller|bestseller|bestselling author|winner of the|shortlisted for)\b/;
 
 // A media concept must be one of the photo's LEADING reads to count — within
 // the top ranks (concepts arrive salience-sorted) and confidently seen. A book
@@ -324,6 +366,54 @@ const OCR_BOOK_HINT = /\b(a novel|a memoir|(inter)?national bestseller|bestselli
 // into a Studio entry with a garbage OCR title.
 const MEDIA_CONCEPT_TOP_RANKS = 3;
 const MEDIA_CONCEPT_MIN_CONFIDENCE = 0.45;
+const STRUCTURED_BOOK_MIN_CONFIDENCE = 0.22;
+const BOOK_SUBJECT_PATTERN = /\b(book|books|book cover|paperback|hardcover|novel|publication|comic book)\b/i;
+
+// Apple Vision often returns only a middling bare `book` confidence for a
+// cover dominated by typography. Recover that case only when the book is still
+// one of the leading objects AND the newer structural reads agree that a
+// document-like subject fills the frame. This deliberately does not promote a
+// low-ranked book on a shelf or across the room.
+function hasProminentStructuredBook(
+  vision: DayVisionSummary,
+  extractedTitle: string | null
+): boolean {
+  const candidate = (vision.concepts ?? [])
+    .slice(0, MEDIA_CONCEPT_TOP_RANKS)
+    .find((concept) => BOOK_SUBJECT_PATTERN.test(concept.name));
+  if (!candidate || (candidate.peakConfidence ?? 0) < STRUCTURED_BOOK_MIN_CONFIDENCE) return false;
+
+  const tokens = (vision.textTokens ?? []).filter((token) => !!token.trim());
+  const totalWords = tokens.reduce((sum, token) => sum + token.trim().split(/\s+/).length, 0);
+  const coverLikeOcr = !!extractedTitle && tokens.length <= 18 && totalWords <= 55;
+  const documentLike = (vision.documentCoverage ?? 0) >= 0.5;
+  const subjectCoverage = vision.dominantSubjectCoverage ?? 0;
+
+  return (
+    (coverLikeOcr && (documentLike || subjectCoverage >= 0.18)) ||
+    (coverLikeOcr && (candidate.peakConfidence ?? 0) >= 0.34) ||
+    (documentLike && subjectCoverage >= 0.28 && (candidate.peakConfidence ?? 0) >= 0.3)
+  );
+}
+
+// Some close covers are classified only as `sign` because their dominant
+// visual feature is typography. Strong cover furniture plus a recoverable
+// title and a salient foreground object is still structured book evidence.
+// This remains deliberately stricter than OCR_BOOK_HINT alone so a distant
+// bestseller poster or bookstore sign does not silently become a book memory.
+function hasProminentOcrBookCover(
+  vision: DayVisionSummary,
+  extractedTitle: string | null,
+  ocrText: string
+): boolean {
+  if (!extractedTitle || !OCR_BOOK_HINT.test(` ${ocrText} `)) return false;
+  const tokens = (vision.textTokens ?? []).filter((token) => !!token.trim());
+  const totalWords = tokens.reduce((sum, token) => sum + token.trim().split(/\s+/).length, 0);
+  const compactCoverText = tokens.length >= 4 && tokens.length <= 18 && totalWords <= 55;
+  const foregroundCoverage = vision.dominantSubjectCoverage ?? 0;
+  const documentCoverage = vision.documentCoverage ?? 0;
+  return compactCoverText && (foregroundCoverage >= 0.22 || documentCoverage >= 0.35);
+}
 
 // Detect from the on-device Apple Vision read — a book cover, a television, a
 // poster, a games console. Classification requires the work to be the photo's
@@ -348,13 +438,23 @@ export function detectStudioInVision(vision: DayVisionSummary | undefined | null
     .join(' ');
   const ocrText = (vision.textTokens ?? [])
     .filter((term): term is string => typeof term === 'string')
-    .map((term) => term.toLowerCase())
+    .map(normalizeCoverOcrForMatching)
     .join(' ');
-  const mediaType =
-    matchVisionMedia(` ${leadingTerms} `) ??
-    matchVisionMedia(` ${compoundDetails} `) ??
-    (OCR_BOOK_HINT.test(` ${ocrText} `) ? 'book' : null);
-  if (!mediaType) return { detected: false };
   const ocrTitle = extractTitleFromVisionText(vision.textTokens);
-  return { detected: true, mediaType, label: ocrTitle ?? MEDIA_LABEL[mediaType], emoji: emojiFor(mediaType) };
+  const leadingMedia = matchVisionMedia(` ${leadingTerms} `);
+  const detailedMedia = matchVisionMedia(` ${compoundDetails} `);
+  const structuredBook = hasProminentStructuredBook(vision, ocrTitle);
+  const ocrOnlyBook = OCR_BOOK_HINT.test(` ${ocrText} `);
+  const prominentOcrBook = hasProminentOcrBookCover(vision, ocrTitle, ocrText);
+  const mediaType = leadingMedia ?? detailedMedia ?? (structuredBook ? 'book' : null) ?? (ocrOnlyBook ? 'book' : null);
+  if (!mediaType) return { detected: false };
+  // OCR furniture can establish a cover without reliably separating author,
+  // title, and strapline. Keep OCR-only books unnamed and ask for confirmation.
+  const reliableTitle = !ocrOnlyBook || !!leadingMedia || !!detailedMedia || structuredBook || prominentOcrBook;
+  return {
+    detected: true,
+    mediaType,
+    label: reliableTitle ? ocrTitle ?? MEDIA_LABEL[mediaType] : MEDIA_LABEL[mediaType],
+    emoji: emojiFor(mediaType),
+  };
 }

@@ -9,12 +9,25 @@ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'katchimera-report-back-')
 function transpile(relativeSourcePath, outName) {
   const source = fs.readFileSync(path.join(projectRoot, relativeSourcePath), 'utf8');
   const output = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
   }).outputText;
   const outPath = path.join(tempDir, outName);
   fs.writeFileSync(outPath, output);
   return outPath;
 }
+
+const originalResolveFilename = require('module')._resolveFilename;
+const studioDetectPath = transpile('utils/studio-detect.ts', 'studio-detect.js');
+const memoryDisplayPath = transpile('utils/memory-display.ts', 'memory-display.js');
+const qualityRegistryPath = transpile('utils/intelligence/quality-registry.ts', 'quality-registry.js');
+const qualityDataPath = path.join(projectRoot, 'data/intelligence/memory-qualities.json');
+require('module')._resolveFilename = function resolveVerificationModule(request, parent, isMain, options) {
+  if (request === '@/utils/studio-detect') return studioDetectPath;
+  if (request === '@/utils/memory-display') return memoryDisplayPath;
+  if (request === '@/utils/intelligence/quality-registry') return qualityRegistryPath;
+  if (request === '@/data/intelligence/memory-qualities.json') return qualityDataPath;
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
 
 transpile('utils/quests/definitions.ts', 'definitions.js');
 const reportBackPath = transpile('utils/quests/report-back-evidence.ts', 'report-back-evidence.js');
@@ -172,6 +185,59 @@ const incompleteItems = buildQuestReportBackItems(baseDay, {
 });
 check('incomplete quests do not preview report-back items', incompleteItems.length === 0, String(incompleteItems.length));
 
+const projectedPossibleItems = buildQuestSubmissionItems(
+  {
+    ...baseDay,
+    classifiedMemories: [{
+      id: 'memory-city-photo',
+      sourceType: 'photo',
+      sourceId: 'city-photo',
+      dominantDomain: 'place',
+      observations: [],
+      facets: [],
+      qualities: [{
+        qualityId: 'place.city',
+        score: 0.64,
+        centrality: 'supporting',
+        status: 'inferred',
+        sources: [{ provider: 'appleVision', confidence: 0.7, weight: 0.9 }],
+        reasons: ['Vision city signal'],
+      }],
+      confirmations: [],
+      entityIds: [],
+      assignments: [],
+      promptState: { status: 'pending', answeredNodeIds: [], graphVersion: 1 },
+      createdAt: '2026-07-07T09:00:00.000Z',
+      schemaVersion: 2,
+    }],
+    capturedMeanings: [{
+      sourceId: 'city-photo',
+      label: 'City view',
+      archetype: 'energy',
+      thumbnailUri: 'file://city.jpg',
+      createdAt: '2026-07-07T09:00:00.000Z',
+    }],
+  },
+  {
+    complete: false,
+    readyToSubmit: false,
+    questId: 'quest-photo-city',
+    matchedEvidenceIds: [],
+    possibleEvidenceIds: ['photo:city-photo'],
+  },
+  {
+    questId: 'quest-photo-city',
+    creatureId: 'creature-skylo',
+    title: 'City sighting',
+    hint: 'Snap the city.',
+    acceptedAt: Date.parse('2026-07-07T10:00:00.000Z'),
+    acceptedDayId: '2026-07-07',
+  },
+  []
+);
+check('projected possible quality resolves back to an actionable photo', projectedPossibleItems[0]?.sourceId === 'city-photo', JSON.stringify(projectedPossibleItems));
+check('projected possible photo retains its thumbnail', projectedPossibleItems[0]?.thumbnailUri === 'file://city.jpg', JSON.stringify(projectedPossibleItems));
+
 const submissionQuest = {
   questId: 'quest-photo-dog',
   creatureId: 'creature-dog',
@@ -214,8 +280,15 @@ const submissionDay = {
   ],
 };
 const eligibleSubmissionItems = buildQuestSubmissionItems(submissionDay, submissionRuntime, submissionQuest, []);
-check('submission candidates exclude evidence before quest acceptance', eligibleSubmissionItems.length === 1, JSON.stringify(eligibleSubmissionItems));
-check('submission candidates include the new eligible evidence', eligibleSubmissionItems[0]?.sourceId === 'new-dog', eligibleSubmissionItems[0]?.sourceId);
+check('same-day candidates can be reused even when captured before quest acceptance', eligibleSubmissionItems.length === 2, JSON.stringify(eligibleSubmissionItems));
+check('submission candidates include the new eligible evidence', eligibleSubmissionItems.some((item) => item.sourceId === 'new-dog'), JSON.stringify(eligibleSubmissionItems));
+const carriedQuestItems = buildQuestSubmissionItems(
+  { ...submissionDay, id: 'day-2026-07-08', isoDate: '2026-07-08' },
+  submissionRuntime,
+  submissionQuest,
+  []
+);
+check('active quest accepted on an earlier day can submit today photo', carriedQuestItems.length === 2, JSON.stringify(carriedQuestItems));
 const reusedSubmissionItems = buildQuestSubmissionItems(submissionDay, submissionRuntime, submissionQuest, [
   {
     id: 'submitted-new-dog',
@@ -228,7 +301,7 @@ const reusedSubmissionItems = buildQuestSubmissionItems(submissionDay, submissio
     submittedAt: Date.parse('2026-07-07T11:05:00.000Z'),
   },
 ]);
-check('submission candidates exclude already submitted entries', reusedSubmissionItems.length === 0, JSON.stringify(reusedSubmissionItems));
+check('submission candidates exclude already submitted entries', reusedSubmissionItems.length === 1 && reusedSubmissionItems[0]?.sourceId === 'old-dog', JSON.stringify(reusedSubmissionItems));
 
 const foodSubmissionQuest = {
   questId: 'quest-photo-food',

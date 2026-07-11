@@ -5,6 +5,7 @@ import { InteractionManager } from 'react-native';
 import type { RecentPhotoAsset } from '@/types/home';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
+import { analyzePassivePhoto, PASSIVE_FOUNDATION_DAILY_LIMIT } from '@/utils/intelligence/passive-photo-analysis';
 
 // Scan a multi-day window so photos land on the days they were actually taken
 // (today and recent past), not just the newest handful that might all be old.
@@ -71,6 +72,7 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
         });
 
         const recentGeotaggedPhotos: RecentPhotoAsset[] = [];
+        let foundationUpgradeCount = 0;
         for (const asset of page.assets) {
           if (!active || recentGeotaggedPhotos.length >= MAX_RECENT_PHOTO_SEEDS) {
             break;
@@ -87,6 +89,14 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
             }
 
             const isScreenshot = asset.mediaSubtypes?.includes('screenshot');
+            const localUri = (info as { localUri?: string; uri?: string }).localUri ?? info.uri ?? asset.uri;
+            const analysis = await analyzePassivePhoto({
+              uri: localUri,
+              isScreenshot,
+              hasLocation: true,
+              allowFoundation: foundationUpgradeCount < PASSIVE_FOUNDATION_DAILY_LIMIT,
+            });
+            if (analysis.scene?.source === 'llm') foundationUpgradeCount += 1;
 
             recentGeotaggedPhotos.push({
               createdAt: asset.creationTime,
@@ -98,6 +108,9 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
               thumbnailUri: asset.uri,
               uri: asset.uri,
               width: asset.width,
+              vision: analysis.vision ?? undefined,
+              visionSummary: analysis.summary ?? undefined,
+              sceneRead: analysis.scene ?? undefined,
             });
           } catch {
             continue;

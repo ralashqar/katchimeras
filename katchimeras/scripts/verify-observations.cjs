@@ -11,6 +11,8 @@ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'katchimera-observations-'
 const SPECIFIER_MAP = {
   '@/utils/continuity-engine': './continuity-engine',
   '@/utils/memory-roles-engine': './memory-roles-engine',
+  '@/utils/memory-display': './memory-display',
+  '@/utils/studio-detect': './studio-detect',
 };
 
 function transpile(rel, out) {
@@ -24,6 +26,8 @@ function transpile(rel, out) {
   fs.writeFileSync(path.join(tempDir, out), output);
 }
 
+transpile('utils/studio-detect.ts', 'studio-detect.js');
+transpile('utils/memory-display.ts', 'memory-display.js');
 transpile('utils/memory-roles-engine.ts', 'memory-roles-engine.js');
 transpile('utils/continuity-engine.ts', 'continuity-engine.js');
 transpile('utils/observations-engine.ts', 'observations-engine.js');

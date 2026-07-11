@@ -4,6 +4,7 @@ import { interpretNoteOnDevice } from '@/utils/foundation-note';
 import { interpretNoteText, type NoteInterpretation } from '@/utils/note-meaning';
 import type { DayEvidenceProvider, StudioMediaType } from '@/types/home';
 import { transcribeOnDevice } from '@/utils/speech-transcribe';
+import { detectStudioInText, isGenericStudioLabel } from '@/utils/studio-detect';
 import { supabase } from '@/utils/supabase';
 
 // Client-side note interpreter, on-device first:
@@ -12,9 +13,9 @@ import { supabase } from '@/utils/supabase';
 //   2. Interpret the transcript (title + mood) ON-DEVICE (Foundation Models) —
 //      the text never leaves the phone either. Big Moments are detected by the
 //      local rules and merged in.
-//   3. Fallbacks, in order: the interpret-voice-note edge function (text → Claude,
-//      or audio → Whisper+Claude on older devices), then the on-device rule
-//      interpreter — so a note ALWAYS resolves to something.
+//   3. The deterministic local interpreter is the default fallback. The edge
+//      function is considered only after an explicit cloud-assistance opt-in;
+//      voice audio is never uploaded merely because a local model is absent.
 
 const TIMEOUT_MS = 9000;
 
@@ -76,9 +77,15 @@ async function interpretViaEdge(
 // Transcribe a voice clip to editable text (no meaning inference yet). On-device
 // first, server (Whisper) only if that's unavailable. Returns '' on failure so
 // the user can just type instead.
-export async function transcribeAudioNote(audioUri: string, mimeType = 'audio/m4a'): Promise<string> {
+export async function transcribeAudioNote(
+  audioUri: string,
+  mimeType = 'audio/m4a',
+  options: { allowRemote?: boolean } = {}
+): Promise<string> {
   const local = await transcribeOnDevice(audioUri);
   if (local) return local;
+
+  if (options.allowRemote !== true) return '';
 
   const base64 = await audioToBase64(audioUri);
   if (!base64) return '';
@@ -96,7 +103,7 @@ export async function transcribeAudioNote(audioUri: string, mimeType = 'audio/m4
   return '';
 }
 
-export async function interpretNote(input: NoteInput): Promise<InterpretedNote> {
+export async function interpretNote(input: NoteInput, options: { allowRemote?: boolean } = {}): Promise<InterpretedNote> {
   // 1. Resolve a transcript: typed text, or an on-device transcription.
   let transcript = (input.text ?? '').trim();
   if (!transcript && input.audioUri) {
@@ -110,27 +117,40 @@ export async function interpretNote(input: NoteInput): Promise<InterpretedNote> 
     const local = await interpretNoteOnDevice(transcript);
     if (local) {
       const rule = interpretNoteText(transcript);
+      const explicitMedia = detectStudioInText(transcript);
+      const fallbackMedia = explicitMedia.detected && explicitMedia.mediaType
+        ? {
+            mediaType: explicitMedia.mediaType,
+            title: explicitMedia.label && !isGenericStudioLabel(explicitMedia.label) ? explicitMedia.label : null,
+            creator: null,
+          }
+        : null;
       return {
         archetype: local.archetype,
         label: local.label,
         bigMoment: rule.bigMoment,
         transcript,
-        media: local.media,
+        // Older native prompts know only the original six media kinds. Strict,
+        // verb-led local rules fill explicit watched sport/news and podcasts
+        // without overriding a positive Foundation classification.
+        media: local.media ?? fallbackMedia,
         food: local.food,
         llmClassified: local.llmClassified,
         intelligenceProvider: 'appleFoundation',
       };
     }
     // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.
-    const edge = await interpretViaEdge({ text: transcript }, transcript);
-    if (edge) return edge;
+    if (options.allowRemote === true) {
+      const edge = await interpretViaEdge({ text: transcript }, transcript);
+      if (edge) return edge;
+    }
     // 2c. On-device rules.
     return { ...interpretNoteText(transcript), transcript, intelligenceProvider: 'deterministic' };
   }
 
   // 3. No transcript (on-device transcription unavailable) but we have audio →
   //    upload it for server transcription + interpretation (Whisper + Claude).
-  if (input.audioUri) {
+  if (input.audioUri && options.allowRemote === true) {
     const base64 = await audioToBase64(input.audioUri);
     if (base64) {
       const edge = await interpretViaEdge({ audioBase64: base64, mimeType: input.mimeType ?? 'audio/m4a' }, '');

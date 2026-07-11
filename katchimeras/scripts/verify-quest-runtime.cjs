@@ -24,7 +24,9 @@ const factsPath = transpile('utils/signals/facts.ts', 'facts.js');
 const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js');
 const runtimePath = transpile('utils/quests/runtime.ts', 'runtime.js');
 const typesPath = path.join(tempDir, 'types-home.js');
+const qualityRegistryPath = path.join(tempDir, 'quality-registry.js');
 fs.writeFileSync(typesPath, '');
+fs.writeFileSync(qualityRegistryPath, "exports.qualityDefinition = id => ({ id, aliases: [id.split('.').pop()] }); exports.qualityMatchesText = (q, value) => q.aliases.some(a => value.toLowerCase().includes(a)); exports.qualityThresholds = () => ({ ready: 0.72, review: 0.3 });");
 
 const stubs = {
   '@/types/home': typesPath,
@@ -32,6 +34,7 @@ const stubs = {
   '@/utils/quests/evidence-scoring': scoringPath,
   '@/utils/capabilities/quest-capabilities': capsPath,
   '@/utils/signals/facts': factsPath,
+  '@/utils/intelligence/quality-registry': qualityRegistryPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {

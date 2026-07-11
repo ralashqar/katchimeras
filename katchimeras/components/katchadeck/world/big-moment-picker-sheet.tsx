@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
@@ -43,24 +43,27 @@ type BigMomentPickerSheetProps = {
 export function BigMomentPickerSheet({ onPick, onClose }: BigMomentPickerSheetProps) {
   return (
     <MeadowSheet onClose={onClose} kicker="A big moment" title="What made today matter?">
-      <View style={styles.grid}>
-        {OPTIONS.map((option) => (
-          <Pressable
-            key={option.type}
-            onPress={() => onPick(option.type)}
-            style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
-            <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-            <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              {option.label}
-            </ThemedText>
-          </Pressable>
-        ))}
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <View style={styles.grid}>
+          {OPTIONS.map((option) => (
+            <Pressable
+              key={option.type}
+              onPress={() => onPick(option.type)}
+              style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
+              <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
+              <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {option.label}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
     </MeadowSheet>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: { paddingBottom: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 8 },
   chip: {
     flexDirection: 'row',

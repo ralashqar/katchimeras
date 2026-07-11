@@ -1,10 +1,13 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
+import type { MemoryQualityScore } from '@/types/home';
+import type { QuestCaptureFeedback } from '@/hooks/use-kingdom-quests';
 
 export type CompanionThread = 'quest' | 'insight' | 'reflection';
 
@@ -29,12 +32,14 @@ type Props = {
   activeQuest: { title: string; hint: string } | null;
   questComplete: boolean;
   questRuntime: QuestRuntimeStatus | null;
+  questCaptureFeedback: QuestCaptureFeedback | null;
   submissionItems: QuestSubmissionItem[];
   offer: { id: string; title: string; hint: string } | undefined;
   criteria: Criterion[];
   onAccept: () => void;
   onCashIn: () => void;
   onSubmitQuest: (item: QuestSubmissionItem) => void;
+  onClarifyQuestMatch: (item: QuestSubmissionItem, answer: MemoryQualityScore['centrality'] | 'rejected') => void;
   onQuestAction: () => void;
   insightText: string;
   reflectionText: string;
@@ -106,6 +111,7 @@ function threadLine(props: Props): string {
   if (props.questRuntime?.readyToSubmit) {
     return props.submissionItems.length > 0 ? 'That looks right. Choose what to submit.' : 'This needs a new matching entry.';
   }
+  if ((props.questRuntime?.possibleEvidenceIds.length ?? 0) > 0 && props.submissionItems.length > 0) return 'I found a possible match. Check it before submitting.';
   if (props.questComplete) return 'You did it. Ready to make it count?';
   if (props.questRuntime?.state === 'blocked_permission') return props.questRuntime.userMessage;
   if (props.questRuntime?.state === 'unavailable') return props.questRuntime.userMessage;
@@ -115,17 +121,34 @@ function threadLine(props: Props): string {
 }
 
 function QuestBody(props: Props) {
+  const [reviewItem, setReviewItem] = useState<QuestSubmissionItem | null>(null);
   if (props.activeQuest) {
     const hasSubmissionItem = props.submissionItems.length > 0;
+    const questRuntime = props.questRuntime;
     return (
       <View style={styles.questBody}>
         <ThemedText style={styles.questTitle} lightColor="#FFE2B8" darkColor="#FFE2B8">
           {props.activeQuest.title}
         </ThemedText>
-        {props.questRuntime ? (
+        {questRuntime ? (
           <View style={styles.statusPill}>
-            <ThemedText style={styles.statusText} lightColor={statusColor(props.questRuntime, hasSubmissionItem)} darkColor={statusColor(props.questRuntime, hasSubmissionItem)}>
-              {statusLabel(props.questRuntime, hasSubmissionItem)}
+            <ThemedText style={styles.statusText} lightColor={statusColor(questRuntime, hasSubmissionItem)} darkColor={statusColor(questRuntime, hasSubmissionItem)}>
+              {statusLabel(questRuntime, hasSubmissionItem)}
+            </ThemedText>
+          </View>
+        ) : null}
+        {props.questCaptureFeedback ? (
+          <View style={styles.captureFeedback}>
+            <Image source={props.questCaptureFeedback.sourceId} style={styles.captureFeedbackThumb} contentFit="cover" transition={120} />
+            {props.questCaptureFeedback.phase === 'analyzing' ? <ActivityIndicator size="small" color="#92D7FF" /> : null}
+            <ThemedText style={[styles.statusMessage, styles.captureFeedbackText]} lightColor="#EDEAF6" darkColor="#EDEAF6">
+              {props.questCaptureFeedback.phase === 'analyzing'
+                ? 'Analysing your new photo…'
+                : props.questCaptureFeedback.phase === 'matched'
+                  ? 'This photo matches the quest. It is ready to submit.'
+                  : props.questCaptureFeedback.phase === 'possible'
+                    ? 'This may match. Review the photo below to confirm it.'
+                    : 'This photo did not clearly match the quest. You can try another.'}
             </ThemedText>
           </View>
         ) : null}
@@ -133,6 +156,8 @@ function QuestBody(props: Props) {
           <ThemedText style={styles.statusMessage} lightColor="#EDEAF6" darkColor="#EDEAF6">
             {props.questRuntime.readyToSubmit && !hasSubmissionItem
               ? 'Make a new matching entry for this quest, then come back to submit it.'
+              : props.questRuntime.possibleEvidenceIds.length > 0 && !hasSubmissionItem
+                ? 'There is no reviewable photo attached to that old signal. Take another photo to create a usable match.'
               : props.questRuntime.userMessage}
           </ThemedText>
         ) : null}
@@ -150,36 +175,75 @@ function QuestBody(props: Props) {
             ) : null}
           </View>
         ))}
-        {props.questRuntime?.readyToSubmit ? (
+        {questRuntime?.readyToSubmit || (questRuntime?.possibleEvidenceIds.length ?? 0) > 0 ? (
           <>
-            {hasSubmissionItem ? <ReportBackPreview items={props.submissionItems} emptyMode="submission" /> : null}
+            {hasSubmissionItem ? (
+              <ReportBackPreview
+                items={props.submissionItems}
+                emptyMode="submission"
+                selectedId={reviewItem?.id ?? null}
+                onSelect={(item) => item.matchStatus === 'possible' ? setReviewItem(item) : undefined}
+              />
+            ) : null}
+            {reviewItem?.matchStatus === 'possible' ? (
+              <View style={styles.matchQuestion}>
+                <ThemedText style={styles.criterion} lightColor="#F8E8C8" darkColor="#F8E8C8">
+                  {reviewItem.qualityId === 'place.city'
+                    ? 'Does this photo show the city view Skylo is looking for?'
+                    : 'Does this photo show what the quest is looking for?'}
+                </ThemedText>
+                {([
+                  ['primary', "Yes — that's what I captured"],
+                  ['supporting', "Yes — it's clearly visible"],
+                  ['incidental', "It's only in the background"],
+                  ['rejected', "No — it doesn't"],
+                ] as const).map(([answer, label]) => (
+                  <Pressable
+                    key={answer}
+                    style={styles.matchAnswer}
+                    onPress={() => {
+                      props.onClarifyQuestMatch(reviewItem, answer);
+                      setReviewItem(null);
+                    }}>
+                    <ThemedText style={styles.actionText} lightColor="#F8E8C8" darkColor="#F8E8C8">{label}</ThemedText>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             {hasSubmissionItem && props.submissionItems[0] ? (
-              <Pressable style={[styles.action, styles.cashIn]} onPress={() => props.onSubmitQuest(props.submissionItems[0])}>
-                <ThemedText style={styles.actionText} lightColor="#1B140A" darkColor="#1B140A">
-                  Submit quest
+              <Pressable
+                style={[styles.action, props.submissionItems[0].matchStatus === 'possible' ? null : styles.cashIn]}
+                onPress={() => props.submissionItems[0].matchStatus === 'possible'
+                  ? setReviewItem(props.submissionItems[0])
+                  : props.onSubmitQuest(props.submissionItems[0])}>
+                <ThemedText
+                  style={styles.actionText}
+                  lightColor={props.submissionItems[0].matchStatus === 'possible' ? '#F8E8C8' : '#1B140A'}
+                  darkColor={props.submissionItems[0].matchStatus === 'possible' ? '#F8E8C8' : '#1B140A'}>
+                  {props.submissionItems[0].matchStatus === 'possible' ? 'Review possible match' : 'Submit quest'}
                 </ThemedText>
               </Pressable>
             ) : null}
-            {!hasSubmissionItem && props.questRuntime.nextAction !== 'none' ? (
+            {!hasSubmissionItem && questRuntime && questRuntime.nextAction !== 'none' ? (
               <>
                 <ThemedText style={styles.actionHint} lightColor="#A8E2C6" darkColor="#A8E2C6">
-                  {nextActionLabel(props.questRuntime)}
+                  {nextActionLabel(questRuntime)}
                 </ThemedText>
                 <Pressable style={styles.action} onPress={props.onQuestAction}>
                   <ThemedText style={styles.actionText} lightColor="#A8E2C6" darkColor="#A8E2C6">
-                    {nextActionButtonLabel(props.questRuntime)}
+                    {nextActionButtonLabel(questRuntime)}
                   </ThemedText>
                 </Pressable>
               </>
             ) : null}
           </>
         ) : null}
-        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete && !props.questRuntime.readyToSubmit ? (
+        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete && !props.questRuntime.readyToSubmit && props.questRuntime.possibleEvidenceIds.length === 0 ? (
           <ThemedText style={styles.actionHint} lightColor="#A8E2C6" darkColor="#A8E2C6">
             {nextActionLabel(props.questRuntime)}
           </ThemedText>
         ) : null}
-        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete && !props.questRuntime.readyToSubmit ? (
+        {props.questRuntime && props.questRuntime.nextAction !== 'none' && !props.questRuntime.complete && !props.questRuntime.readyToSubmit && props.questRuntime.possibleEvidenceIds.length === 0 ? (
           <Pressable style={styles.action} onPress={props.onQuestAction}>
             <ThemedText style={styles.actionText} lightColor="#A8E2C6" darkColor="#A8E2C6">
               {nextActionButtonLabel(props.questRuntime)}
@@ -222,7 +286,17 @@ function QuestProgressBar({ label, ratio, complete }: { label: string; ratio: nu
   );
 }
 
-function ReportBackPreview({ items, emptyMode }: { items: QuestSubmissionItem[]; emptyMode: 'submission' | 'report' }) {
+function ReportBackPreview({
+  items,
+  emptyMode,
+  selectedId = null,
+  onSelect,
+}: {
+  items: QuestSubmissionItem[];
+  emptyMode: 'submission' | 'report';
+  selectedId?: string | null;
+  onSelect?: (item: QuestSubmissionItem) => void;
+}) {
   const visibleItems: QuestSubmissionItem[] =
     items.length > 0
       ? items
@@ -244,10 +318,19 @@ function ReportBackPreview({ items, emptyMode }: { items: QuestSubmissionItem[];
   return (
     <View style={styles.reportPreview}>
       <ThemedText style={styles.reportKicker} lightColor="#A8E2C6" darkColor="#A8E2C6">
-        Reporting back
+        {emptyMode === 'submission' ? 'Matches from today' : 'Reporting back'}
       </ThemedText>
-      {visibleItems.map((item) => (
-        <View key={item.id} style={styles.reportRow}>
+      {visibleItems.map((item, index) => (
+        <View key={item.id}>
+          {emptyMode === 'submission' && item.matchStatus && (index === 0 || visibleItems[index - 1]?.matchStatus !== item.matchStatus) ? (
+            <ThemedText style={styles.reportKicker} lightColor={item.matchStatus === 'ready' ? '#A8E2C6' : '#F3B36A'} darkColor={item.matchStatus === 'ready' ? '#A8E2C6' : '#F3B36A'}>
+              {item.matchStatus === 'ready' ? 'Ready' : 'Possible'}
+            </ThemedText>
+          ) : null}
+          <Pressable
+            disabled={!onSelect || item.matchStatus !== 'possible'}
+            onPress={() => onSelect?.(item)}
+            style={[styles.reportRow, selectedId === item.id ? styles.reportRowSelected : null]}>
           {item.thumbnailUri ? (
             <Image source={item.thumbnailUri} style={styles.reportThumb} contentFit="cover" transition={120} />
           ) : (
@@ -268,6 +351,7 @@ function ReportBackPreview({ items, emptyMode }: { items: QuestSubmissionItem[];
               </ThemedText>
             ) : null}
           </View>
+          </Pressable>
         </View>
       ))}
     </View>
@@ -276,6 +360,7 @@ function ReportBackPreview({ items, emptyMode }: { items: QuestSubmissionItem[];
 
 function statusLabel(runtime: QuestRuntimeStatus, hasSubmissionItem = true): string {
   if (runtime.readyToSubmit) return hasSubmissionItem ? 'Ready to submit' : 'Needs new entry';
+  if (runtime.possibleEvidenceIds.length > 0) return hasSubmissionItem ? 'Possible match' : 'No usable match yet';
   if (runtime.complete) return runtime.matchedEvidenceIds.length > 0 ? 'Matched from today' : 'Ready to report';
   switch (runtime.state) {
     case 'blocked_permission':
@@ -291,6 +376,7 @@ function statusLabel(runtime: QuestRuntimeStatus, hasSubmissionItem = true): str
 
 function statusColor(runtime: QuestRuntimeStatus, hasSubmissionItem = true): string {
   if (runtime.readyToSubmit) return hasSubmissionItem ? '#A8E2C6' : '#F3B36A';
+  if (runtime.possibleEvidenceIds.length > 0) return '#F3B36A';
   if (runtime.complete) return '#A8E2C6';
   if (runtime.state === 'blocked_permission' || runtime.state === 'unavailable') return '#F3B36A';
   if (runtime.state === 'impossible_today') return '#F08C8C';
@@ -379,6 +465,24 @@ const styles = StyleSheet.create({
   },
   statusText: { fontSize: 11.5, fontWeight: '800' },
   statusMessage: { fontSize: 12.5, lineHeight: 17, fontWeight: '600' },
+  captureFeedback: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: 'rgba(146,215,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(146,215,255,0.22)',
+  },
+  captureFeedbackThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  captureFeedbackText: { flex: 1 },
   criterion: { fontSize: 12.5 },
   criterionBlock: { gap: 5 },
   progressBlock: { gap: 4 },
@@ -411,6 +515,14 @@ const styles = StyleSheet.create({
   },
   reportKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 0, textTransform: 'uppercase' },
   reportRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  reportRowSelected: {
+    marginHorizontal: -6,
+    padding: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(243,179,106,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(243,179,106,0.42)',
+  },
   reportThumb: {
     width: 48,
     height: 48,
@@ -432,6 +544,23 @@ const styles = StyleSheet.create({
   reportTitle: { fontSize: 12.5, lineHeight: 16, fontWeight: '800' },
   reportSubtitle: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
   reportBody: { fontSize: 11.5, lineHeight: 16 },
+  matchQuestion: {
+    marginTop: 8,
+    gap: 7,
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: 'rgba(243,179,106,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(243,179,106,0.26)',
+  },
+  matchAnswer: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
   action: {
     marginTop: 10,
     alignSelf: 'flex-start',

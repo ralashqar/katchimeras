@@ -18,6 +18,15 @@ function transpile(rel, out) {
   return outPath;
 }
 
+const originalResolveFilename = require('module')._resolveFilename;
+const studioDetectPath = transpile('utils/studio-detect.ts', 'studio-detect.js');
+const memoryDisplayPath = transpile('utils/memory-display.ts', 'memory-display.js');
+require('module')._resolveFilename = function resolveVerificationModule(request, parent, isMain, options) {
+  if (request === '@/utils/studio-detect') return studioDetectPath;
+  if (request === '@/utils/memory-display') return memoryDisplayPath;
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
+
 const { deriveDayMemoryRoles } = require(transpile('utils/memory-roles-engine.ts', 'memory-roles-engine.js'));
 
 let failures = 0;

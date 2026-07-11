@@ -1,5 +1,6 @@
 import type { HomeDayRecord } from '@/types/home';
 import { deriveContinuityMotifs, type ContinuityMotif, type ContinuityMotifKind } from '@/utils/continuity-engine';
+import { resolveMovementDisplay } from '@/utils/memory-display';
 
 export type ObservationKind = ContinuityMotifKind | 'life' | 'reflection';
 
@@ -108,7 +109,7 @@ function selectedDayObservations(day: HomeDayRecord): Observation[] {
     pushObservation(observations, {
       id: `day:${day.id}:movement`,
       kind: 'movement',
-      title: day.stepsInterpretation?.label ? `${day.stepsInterpretation.label} became a trail` : 'Today left a long trail',
+      title: day.stepsInterpretation ? `${resolveMovementDisplay(day.stepsInterpretation).label} became a trail` : 'Today left a long trail',
       body:
         steps > 0
           ? `${steps.toLocaleString()} steps gave this patch a stronger path.`

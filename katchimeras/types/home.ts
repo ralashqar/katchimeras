@@ -140,10 +140,46 @@ export type PhotoVisionLabel = {
   confidence: number;
 };
 
+export type NormalizedImageRegion = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+};
+
 export type PhotoVisionResult = {
   labels: PhotoVisionLabel[];
   text: string[];
   faceCount: number;
+  humanCount?: number;
+  animals?: {
+    kind: 'cat' | 'dog' | 'unknown';
+    confidence: number;
+    region?: NormalizedImageRegion | null;
+  }[];
+  humans?: NormalizedImageRegion[];
+  faces?: NormalizedImageRegion[];
+  recognizedText?: { text: string; confidence: number; region?: NormalizedImageRegion | null }[];
+  dominantSubject?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    confidence: number;
+  } | null;
+  documentDetected?: boolean;
+  // Local provenance used before semantic classification. Location/live-camera
+  // evidence supports a physical-world read; screenshot/screen-content evidence
+  // takes priority and prevents depicted objects becoming real-life memories.
+  isScreenshot?: boolean;
+  hasLocation?: boolean;
+  captureSource?: 'camera' | 'camera_roll' | 'unknown';
+  reality?: {
+    kind: 'real_world' | 'screen_content' | 'unknown';
+    confidence: number;
+    reasons: string[];
+  };
 };
 
 export type DayEvidenceSourceType =
@@ -171,6 +207,8 @@ export type DayEvidenceSignal = {
   raw?: string | null;
   provider: DayEvidenceProvider;
   source: 'vision' | 'scene' | 'note' | 'manual' | 'aggregate';
+  centrality?: MemoryQualityCentrality;
+  qualityStatus?: MemoryQualityStatus;
 };
 
 export type DayEvidence = {
@@ -183,6 +221,149 @@ export type DayEvidence = {
   signals: DayEvidenceSignal[];
   thumbnailUri?: string | null;
   explanation?: string | null;
+};
+
+export type MemorySourceType = 'photo' | 'text_note' | 'voice_note' | 'place' | 'movement';
+
+export type MemoryDomain =
+  | 'animal'
+  | 'people'
+  | 'food'
+  | 'media'
+  | 'movement'
+  | 'place'
+  | 'work'
+  | 'nature'
+  | 'life_event'
+  | 'other';
+
+export type IntelligenceObservation = {
+  key: string;
+  value: string;
+  confidence: number;
+  provider: DayEvidenceProvider;
+  raw?: string | null;
+};
+
+export type MemoryFacet = {
+  key: string;
+  value: string;
+  confidence: number;
+  sensitive?: boolean;
+  confirmed?: boolean;
+};
+
+export type MemoryQualityCentrality = 'primary' | 'supporting' | 'incidental';
+export type MemoryQualityStatus = 'inferred' | 'confirmed' | 'rejected';
+
+export type MemoryQualitySource = {
+  provider: DayEvidenceProvider;
+  confidence: number;
+  weight: number;
+  raw?: string | null;
+};
+
+export type MemoryQualityScore = {
+  qualityId: string;
+  score: number;
+  centrality: MemoryQualityCentrality;
+  status: MemoryQualityStatus;
+  sources: MemoryQualitySource[];
+  reasons: string[];
+};
+
+export type UserConfirmation = {
+  promptId: string;
+  optionId: string;
+  label: string;
+  facetKey: string;
+  facetValue: string;
+  createdAt: string;
+};
+
+export type KatchimeraAssignment = {
+  seedId: string;
+  role: 'primary' | 'supporting';
+  score: number;
+  reasons: string[];
+  confirmed: boolean;
+};
+
+export type ClarificationStatus = 'not_needed' | 'pending' | 'answered' | 'dismissed';
+
+export type ClarificationState = {
+  status: ClarificationStatus;
+  graphId?: string | null;
+  currentNodeId?: string | null;
+  answeredNodeIds: string[];
+  dismissedAt?: string | null;
+  graphVersion: number;
+  questionCount?: number;
+  maxQuestions?: number;
+  skippedGoalIds?: string[];
+  completedGoalIds?: string[];
+};
+
+export type PhotoSubjectRole = 'primary' | 'supporting' | 'incidental';
+
+export type PhotoAnalysisSubject = {
+  id: string;
+  label: string;
+  canonicalValue: string;
+  domain: MemoryDomain;
+  role: PhotoSubjectRole;
+  score: number;
+  region?: NormalizedImageRegion | null;
+  providers: DayEvidenceProvider[];
+  sensitive?: boolean;
+};
+
+export type PhotoAnalysisDescriptor = {
+  schemaVersion: 2;
+  stage: 'vision' | 'foundation' | 'complete';
+  representation: {
+    kind: 'real_world' | 'screen_content' | 'unknown';
+    confidence: number;
+    reasons: string[];
+  };
+  dominantSubjectId: string | null;
+  subjects: PhotoAnalysisSubject[];
+  selectedOcr: { text: string; confidence: number; purpose: 'title_candidate' | 'document' | 'context' }[];
+  regions: Array<NormalizedImageRegion & { kind: 'saliency' | 'human' | 'face' | 'animal' }>;
+  providerRuns: {
+    provider: DayEvidenceProvider;
+    status: 'used' | 'fallback' | 'unavailable' | 'rejected';
+    promptVersion?: string | null;
+    reason?: string | null;
+  }[];
+  alternatives: { domain: MemoryDomain; score: number; reason: string }[];
+};
+
+export type ClassifiedMemory = {
+  id: string;
+  sourceType: MemorySourceType;
+  sourceId: string;
+  dominantDomain: MemoryDomain;
+  observations: IntelligenceObservation[];
+  facets: MemoryFacet[];
+  qualities: MemoryQualityScore[];
+  confirmations: UserConfirmation[];
+  entityIds: string[];
+  assignments: KatchimeraAssignment[];
+  promptState: ClarificationState;
+  photoAnalysis?: PhotoAnalysisDescriptor | null;
+  createdAt: string;
+  schemaVersion: number;
+};
+
+export type PersonalEntity = {
+  id: string;
+  kind: 'person' | 'pet' | 'place';
+  displayName?: string;
+  relationship?: string;
+  subrole?: string;
+  createdAt: string;
+  lastUsedAt: string;
 };
 
 // A canonical day-level subject, after grouping synonyms across the day's
@@ -226,6 +407,14 @@ export type DayVisionSummary = {
   faceCoverage: number;
   textTokens: string[];
   analyzedPhotoCount: number;
+  // Structural signals from Vision's saliency/document requests. These let
+  // media detection distinguish a cover filling the frame from a book that is
+  // merely sitting in the background. Optional for migrated/legacy summaries.
+  dominantSubjectCoverage?: number;
+  documentCoverage?: number;
+  representation?: PhotoVisionResult['reality'];
+  analysisRegions?: Array<NormalizedImageRegion & { kind: 'saliency' | 'human' | 'face' | 'animal' }>;
+  recognizedText?: { text: string; confidence: number }[];
 };
 
 export type HomeMomentMetadata = {
@@ -567,6 +756,7 @@ export type FoodMoment = {
   meaning: FoodMeaning;
   thumbnailUri?: string | null;
   source?: FoodSource;
+  sourceId?: string | null;
   noteId?: string | null; // the note this food was detected in (source 'note')
   detail?: string | null; // a short snippet for the reader (e.g. note excerpt)
   // Optional "what kind?" answer on a Meal — either a cuisine family or
@@ -593,6 +783,7 @@ export type StudioMoment = {
   rating: StudioRating;
   thumbnailUri?: string | null;
   source?: StudioSource;
+  sourceId?: string | null;
   noteId?: string | null; // the note this was detected in (source 'note')
   detail?: string | null; // a short snippet for the reader (e.g. note excerpt)
   createdAt: string;
@@ -616,17 +807,30 @@ export type DaySleep = {
   quality: SleepQuality;
   source: 'manual' | 'appleHealth';
   totalSleepMinutes?: number;
+  recordedAt?: string;
 };
 
 // How a notably active day MOVED — the steps tell us "a lot happened", the user
 // tells us what it WAS (a hike, a long walk, a run...). Read-only interpretation
 // that colours the day's story; never a goal or a score. One-tap, from the "!" on
 // the Steps structure when the day's steps spike.
-export type DayMovementKind = 'hike' | 'walk' | 'run' | 'cycle' | 'workout' | 'errands' | 'travel';
+export type DayMovementKind =
+  | 'hike'
+  | 'walk'
+  | 'run'
+  | 'cycle'
+  | 'workout'
+  | 'errands'
+  | 'transit'
+  | 'drive'
+  | 'commute'
+  | 'travel'
+  | 'mixed';
 export type StepsInterpretation = {
   movement: DayMovementKind;
   label: string; // "A hike", "A long walk"
   emoji: string;
+  subtype?: string | null;
   createdAt: string;
 };
 
@@ -711,6 +915,9 @@ export type StoredHomeDayRecord = {
   // Per-source intelligence evidence for quest-grade verification. Aggregate
   // fields like `vision` remain derived compatibility surfaces for older code.
   evidence?: DayEvidence[];
+  // Versioned, explainable classification records. Legacy `vision` and
+  // `evidence` remain readable compatibility surfaces during the v8 rollout.
+  classifiedMemories?: ClassifiedMemory[];
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
   // Energy captured through the camera (Moment Capture): score deltas that fold
@@ -760,11 +967,15 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 7;
+  version: 10;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;
   encounterHistory: EncounterHistoryMap;
+  // User-confirmed local context only. No face embeddings or biometric data.
+  personalEntities: PersonalEntity[];
+  // Remote enrichment is disabled by default and must be explicitly enabled.
+  cloudIntelligenceEnabled: boolean;
   archivedDays: StoredHomeDayRecord[];
   today: StoredHomeDayRecord;
   // A forming "next day" the user can pre-feed (moments / prompts / captures)
@@ -833,6 +1044,19 @@ export type RecentPhotoAsset = {
   luminanceRange?: number;
   // On-device vision read of this frame (labels/OCR/face count), when analysed.
   vision?: PhotoVisionResult;
+  visionSummary?: DayVisionSummary;
+  sceneRead?: {
+    memoryDomain?: MemoryDomain | null;
+    type: 'media' | 'food' | 'social' | 'screen' | 'nature' | 'pet' | 'activity' | 'place' | 'document' | 'other';
+    label: string;
+    detail?: string | null;
+    food?: { detected: boolean; label?: string; emoji?: string; cuisine?: CuisineFamily | null };
+    media?: { mediaType: StudioMediaType; title: string | null; creator: string | null };
+    source: 'llm' | 'rules';
+    supportingSubjects?: string[];
+    representation?: 'real_world' | 'screen_content' | 'unknown' | null;
+    promptVersion?: string | null;
+  };
 };
 
 export type InspirationQuote = {

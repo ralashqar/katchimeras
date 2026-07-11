@@ -32,6 +32,13 @@ fs.writeFileSync(
 );
 const visionSignalsPath = path.join(tempDir, 'vision-signals.js');
 fs.writeFileSync(visionSignalsPath, 'exports.aggregatePhotoVision = () => null;\n');
+const classificationPath = path.join(tempDir, 'classification.js');
+fs.writeFileSync(
+  classificationPath,
+  'exports.buildPhotoClassifiedMemory = (input) => ({ id: `classified:${input.sourceId}` });\nexports.upsertClassifiedMemory = (existing, incoming) => [...(existing || []), ...incoming];\n'
+);
+const photoIntelligencePath = path.join(tempDir, 'photo-intelligence.js');
+fs.writeFileSync(photoIntelligencePath, 'exports.buildPhotoIntelligence = (input) => ({ memory: { id: `classified:${input.sourceId}` }, evidence: { id: input.sourceId, signals: [], sourceType: "photo" } });\n');
 
 transpileTo('game/days/date.ts', 'game/days/date.js');
 const recordsPath = transpileTo('game/days/records.ts', 'game/days/records.js');
@@ -40,6 +47,8 @@ const photoLocationsPath = transpileTo('game/days/photo-locations.ts', 'game/day
 const stubs = {
   '@/types/home': emptyModulePath,
   '@/utils/intelligence/evidence': evidencePath,
+  '@/utils/intelligence/classification': classificationPath,
+  '@/utils/intelligence/photo-intelligence': photoIntelligencePath,
   '@/utils/photo-curation': photoCurationPath,
   '@/utils/vision-signals': visionSignalsPath,
 };

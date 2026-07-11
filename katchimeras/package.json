@@ -12,7 +12,9 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "verify": "node ./scripts/verify-all.cjs",
-    "check": "npm run typecheck && npm run lint && npm run verify",
+    "verify:foundation-native": "node ./scripts/verify-foundation-native.cjs",
+    "test:kingdom": "tsx --test tests/kingdom-rendering.test.ts",
+    "check": "npm run typecheck && npm run lint && npm run verify && npm run test:kingdom",
     "world:editor": "node tools/world-editor/server.cjs",
     "world:editor:check": "node tools/world-editor/check.cjs",
     "world:creatures:lod": "python scripts/generate-creature-lod.py",
@@ -89,6 +91,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "express": "^5.2.1",
+    "tsx": "^4.23.0",
     "typescript": "~5.9.2",
     "vite": "^6.4.3"
   },

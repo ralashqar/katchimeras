@@ -1,4 +1,5 @@
 import type { BigMomentType, CapturedMeaning, DayNote, DayScores, HomeDayRecord } from '@/types/home';
+import { resolveBigMomentDisplay, resolveMovementDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
 
 // Chronicle (Patch Systems V3) — answers "what was this day about?". It turns the
 // day's real signals (calendar events, big moments, photos+meanings, places,
@@ -164,7 +165,7 @@ function chronicleShaped(day: ChronicleDayInput, events: CalendarEventContext[])
   const shaped: string[] = [];
   for (const event of events.slice(0, 2)) shaped.push(calendarHighlightForEvent(event));
   for (const moment of day.bigMoments ?? []) {
-    shaped.push(moment.subject ? `${moment.label} · ${moment.subject}` : moment.label);
+    shaped.push(resolveBigMomentDisplay(moment).label);
   }
   const places = placeCount(day);
   if (places > 0) shaped.push(`${places} ${places === 1 ? 'place' : 'places'} visited`);
@@ -178,7 +179,8 @@ function chronicleShaped(day: ChronicleDayInput, events: CalendarEventContext[])
   const stepsLabel = steps >= 1000 ? `${(steps / 1000).toFixed(steps >= 10000 ? 0 : 1)}k steps` : null;
   // An interpreted day leads with what it WAS (a hike), with the count as colour.
   if (day.stepsInterpretation) {
-    shaped.push(stepsLabel ? `${day.stepsInterpretation.label} · ${stepsLabel}` : day.stepsInterpretation.label);
+    const display = resolveMovementDisplay(day.stepsInterpretation);
+    shaped.push(stepsLabel ? `${display.label} · ${stepsLabel}` : display.label);
   } else if (steps >= 6000 && stepsLabel) {
     shaped.push(stepsLabel);
   }
@@ -188,9 +190,9 @@ function chronicleShaped(day: ChronicleDayInput, events: CalendarEventContext[])
 function chronicleSummary(day: ChronicleDayInput, events: CalendarEventContext[]): string {
   const lead: string[] = [];
   const big = day.bigMoments?.[0];
-  if (big && lead.length < 2) lead.push(big.subject ? `${big.label.toLowerCase()} with ${big.subject}` : big.label.toLowerCase());
+  if (big && lead.length < 2) lead.push(resolveBigMomentDisplay(big).label.toLowerCase());
   // A named active day (a hike, a travel day) is a strong day-shaper.
-  if (day.stepsInterpretation && lead.length < 2) lead.push(day.stepsInterpretation.label.toLowerCase());
+  if (day.stepsInterpretation && lead.length < 2) lead.push(resolveMovementDisplay(day.stepsInterpretation).label.toLowerCase());
   const places = placeCount(day);
   if (places > 0 && lead.length < 2) lead.push(`${places} ${places === 1 ? 'place' : 'places'}`);
   const memories = memoryCount(day);
@@ -243,10 +245,11 @@ function chronicleTimeline(day: ChronicleDayInput, events: CalendarEventContext[
     if (note.createdAt) raw.push({ id: note.id, label: note.label, ms: new Date(note.createdAt).getTime() });
   }
   for (const moment of day.bigMoments ?? []) {
-    if (moment.createdAt) raw.push({ id: moment.id, label: moment.label, ms: new Date(moment.createdAt).getTime() });
+    if (moment.createdAt) raw.push({ id: moment.id, label: resolveBigMomentDisplay(moment).label, ms: new Date(moment.createdAt).getTime() });
   }
   for (const item of day.studioMoments ?? []) {
-    if (item.createdAt) raw.push({ id: item.id, label: `${item.emoji} ${item.label}`, ms: new Date(item.createdAt).getTime() });
+    const display = resolveStudioMomentDisplay(item);
+    if (item.createdAt) raw.push({ id: item.id, label: `${display.emoji} ${display.label}`, ms: new Date(item.createdAt).getTime() });
   }
   raw.sort((a, b) => a.ms - b.ms);
   return raw

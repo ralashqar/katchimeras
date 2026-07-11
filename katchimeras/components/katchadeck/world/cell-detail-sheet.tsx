@@ -13,6 +13,7 @@ import { Lantern } from '@/constants/theme';
 import type { DayMapNode, HomeDayRecord } from '@/types/home';
 import type { PatchCell } from '@/types/world';
 import { resolvePlaceName } from '@/utils/place-names';
+import { resolveMovementDisplay } from '@/utils/memory-display';
 
 // category id → emoji / label, for confirmed places.
 const PLACE_CATEGORY_EMOJI: Record<string, string> = Object.fromEntries(
@@ -101,11 +102,12 @@ export function JourneyDetailSheet({
   onInterpret?: () => void;
 }) {
   const interpretation = day.stepsInterpretation;
+  const interpretationDisplay = interpretation ? resolveMovementDisplay(interpretation) : null;
   return (
     <MeadowSheet
       onClose={onClose}
       kicker="Journey"
-      title={interpretation ? `${interpretation.emoji} ${interpretation.label}` : 'How the day moved'}>
+      title={interpretationDisplay ? `${interpretationDisplay.emoji} ${interpretationDisplay.label}` : 'How the day moved'}>
       <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} />
       {!interpretation && onInterpret ? (
         <Pressable

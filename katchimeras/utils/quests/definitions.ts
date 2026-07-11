@@ -1,5 +1,6 @@
 import type { QuestCapabilityId } from '@/utils/capabilities/quest-capabilities';
 import type { Criterion } from '@/utils/signals/facts';
+import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 
 // Declarative companion-quest catalogue (docs/katchimera-engagement-v1.md
 // refactor). A quest is DATA: id + copy + a list of criteria against facts.
@@ -24,6 +25,21 @@ export type QuestDefinition = {
   };
 };
 
+function photoQualityCriterion(qualityId: string, label: string): Criterion {
+  const thresholds = qualityThresholds(qualityId);
+  return {
+    fact: 'memory.qualities',
+    op: 'qualityAtLeast',
+    value: qualityId,
+    qualityId,
+    minimumScore: thresholds.ready,
+    minConfidence: thresholds.ready,
+    minimumCentrality: 'supporting',
+    sourceTypes: ['photo'],
+    label,
+  };
+}
+
 const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
   'quest-new-place': {
     id: 'quest-new-place',
@@ -47,12 +63,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     criteria: [
       { fact: 'places.categories', op: 'includes', value: 'park', label: 'Confirm a park' },
       {
-        fact: 'evidence.items',
-        op: 'evidenceIncludes',
-        value: 'park',
-        minConfidence: 0.55,
-        sourceTypes: ['photo'],
-        label: 'Snap a photo of the park',
+        ...photoQualityCriterion('place.park', 'Snap a photo of the park'),
       },
     ],
   },
@@ -173,79 +184,79 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     id: 'quest-photo-cat',
     title: 'A cat in the frame',
     hint: 'Snap a photo with a cat in it.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'cat', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph a cat' }],
+    criteria: [photoQualityCriterion('subject.cat', 'Photograph a cat')],
   },
   'quest-photo-dog': {
     id: 'quest-photo-dog',
     title: 'Good dog',
     hint: 'Snap a photo with a dog in it.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'dog', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph a dog' }],
+    criteria: [photoQualityCriterion('subject.dog', 'Photograph a dog')],
   },
   'quest-photo-food': {
     id: 'quest-photo-food',
     title: 'Feast for the eyes',
     hint: 'Snap a photo of your food.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'food', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph a meal' }],
+    criteria: [photoQualityCriterion('subject.food', 'Photograph a meal')],
   },
   'quest-photo-flowers': {
     id: 'quest-photo-flowers',
     title: 'In bloom',
     hint: 'Snap a photo of some flowers.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'flowers', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph flowers' }],
+    criteria: [photoQualityCriterion('nature.flowers', 'Photograph flowers')],
   },
   'quest-photo-water': {
     id: 'quest-photo-water',
     title: 'By the water',
     hint: 'Snap a photo of the sea, a lake, or a river.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'water', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph water' }],
+    criteria: [photoQualityCriterion('nature.water', 'Photograph water')],
   },
   'quest-photo-mountains': {
     id: 'quest-photo-mountains',
     title: 'Reach the heights',
     hint: 'Snap a photo of mountains or hills.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'mountains', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph the hills' }],
+    criteria: [photoQualityCriterion('nature.mountains', 'Photograph the hills')],
   },
   'quest-photo-stars': {
     id: 'quest-photo-stars',
     title: 'Under the stars',
     hint: 'Snap a photo of the night sky.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'stars', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph the night sky' }],
+    criteria: [photoQualityCriterion('nature.stars', 'Photograph the night sky')],
   },
   'quest-photo-sunset': {
     id: 'quest-photo-sunset',
     title: 'Chase the light',
     hint: 'Snap a photo at sunset or sunrise.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'sunset', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph the golden hour' }],
+    criteria: [photoQualityCriterion('nature.sunset', 'Photograph the golden hour')],
   },
   'quest-photo-snow': {
     id: 'quest-photo-snow',
     title: 'First flurries',
     hint: 'Snap a photo of the snow.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'snow', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph snow' }],
+    criteria: [photoQualityCriterion('nature.snow', 'Photograph snow')],
   },
   'quest-photo-autumn': {
     id: 'quest-photo-autumn',
     title: 'Turning leaves',
     hint: 'Snap a photo of autumn colours.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'autumn', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph autumn' }],
+    criteria: [photoQualityCriterion('nature.autumn', 'Photograph autumn')],
   },
   'quest-photo-blossom': {
     id: 'quest-photo-blossom',
     title: 'Blossom season',
     hint: 'Snap a photo of spring blossom.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'blossom', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph blossom' }],
+    criteria: [photoQualityCriterion('nature.blossom', 'Photograph blossom')],
   },
   'quest-photo-baby': {
     id: 'quest-photo-baby',
     title: 'Little one',
     hint: 'Snap a photo of the little one.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'baby', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph the little one' }],
+    criteria: [photoQualityCriterion('subject.baby', 'Photograph the little one')],
   },
   'quest-photo-city': {
     id: 'quest-photo-city',
     title: 'City lights',
     hint: 'Snap a photo of the city skyline.',
-    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'city', minConfidence: 0.62, sourceTypes: ['photo'], label: 'Photograph the city' }],
+    criteria: [photoQualityCriterion('place.city', 'Photograph the city')],
   },
 
   // Time-of-day (dawn / small-hours creatures) — from capture timestamps.
@@ -263,21 +274,44 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
   },
 };
 
+const PHOTO_QUALITY_IDS: Record<string, string> = {
+  cat: 'subject.cat', dog: 'subject.dog', food: 'subject.food', flowers: 'nature.flowers',
+  water: 'nature.water', mountains: 'nature.mountains', stars: 'nature.stars', sunset: 'nature.sunset',
+  snow: 'nature.snow', autumn: 'nature.autumn', blossom: 'nature.blossom', baby: 'subject.baby',
+  city: 'place.city', park: 'place.park',
+};
+
 export const QUEST_DEFINITIONS: Record<string, QuestDefinition> = withQuestMetadata(RAW_QUEST_DEFINITIONS);
 
 function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record<string, QuestDefinition> {
   return Object.fromEntries(
     Object.entries(definitions).map(([id, definition]) => {
-      const family = definition.family ?? inferFamily(definition);
+      const criteria = definition.criteria.map((criterion) => {
+        const qualityId =
+          criterion.fact === 'evidence.items' && criterion.sourceTypes?.includes('photo')
+            ? PHOTO_QUALITY_IDS[String(criterion.value ?? '')]
+            : null;
+        return qualityId
+          ? {
+              ...criterion,
+              fact: 'memory.qualities' as const,
+              op: 'qualityAtLeast' as const,
+              value: qualityId,
+              minConfidence: qualityThresholds(qualityId).ready,
+            }
+          : criterion;
+      });
+      const normalizedDefinition = { ...definition, criteria };
+      const family = definition.family ?? inferFamily(normalizedDefinition);
       const requiresCapabilities = definition.requiresCapabilities ?? inferRequiredCapabilities(definition, family);
       const optionalCapabilities = definition.optionalCapabilities ?? inferOptionalCapabilities(definition, family);
       const suggestedActions = definition.suggestedActions ?? inferSuggestedActions(family);
       const themes = Array.from(new Set([...(definition.themes ?? []), ...inferThemes(definition, family)]));
-      const evidencePolicy = definition.evidencePolicy ?? inferEvidencePolicy(definition);
+      const evidencePolicy = definition.evidencePolicy ?? inferEvidencePolicy(normalizedDefinition);
       return [
         id,
         {
-          ...definition,
+          ...normalizedDefinition,
           family: family ?? undefined,
           submissionMode: definition.submissionMode ?? inferSubmissionMode(family),
           themes,
@@ -293,6 +327,7 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
 
 function inferFamily(definition: QuestDefinition): QuestDefinition['family'] | undefined {
   if (definition.criteria.some((criterion) => criterion.fact === 'places.categories' || criterion.fact === 'places.confirmed')) return 'place';
+  if (definition.criteria.some((criterion) => criterion.fact === 'memory.qualities')) return 'photo';
   if (definition.criteria.some((criterion) => criterion.fact === 'evidence.items' && criterion.sourceTypes?.includes('photo'))) return 'photo';
   if (definition.criteria.some((criterion) => criterion.fact === 'moments.captured')) return 'moment';
   if (definition.criteria.some((criterion) => criterion.fact === 'steps.count')) return 'movement';
@@ -320,7 +355,7 @@ function inferRequiredCapabilities(
     required.add('microphone');
     required.add('speech.transcription');
   }
-  if (definition.criteria.some((criterion) => criterion.sourceTypes?.includes('photo'))) required.add('camera.capture');
+  if (definition.criteria.some((criterion) => criterion.sourceTypes?.includes('photo') || criterion.fact === 'memory.qualities')) required.add('camera.capture');
   if (definition.criteria.some((criterion) => criterion.fact === 'places.categories' || criterion.fact === 'places.confirmed')) {
     required.add('location.foreground');
   }
@@ -332,7 +367,7 @@ function inferOptionalCapabilities(
   family: QuestDefinition['family'] | undefined
 ): QuestCapabilityId[] {
   const optional = new Set<QuestCapabilityId>();
-  if (family === 'photo' || definition.criteria.some((criterion) => criterion.sourceTypes?.includes('photo'))) {
+  if (family === 'photo' || definition.criteria.some((criterion) => criterion.sourceTypes?.includes('photo') || criterion.fact === 'memory.qualities')) {
     optional.add('photos.read');
     optional.add('appleVision');
   }
@@ -391,7 +426,7 @@ function inferThemes(definition: QuestDefinition, family: QuestDefinition['famil
 }
 
 function inferEvidencePolicy(definition: QuestDefinition): QuestDefinition['evidencePolicy'] | undefined {
-  const evidenceCriteria = definition.criteria.filter((criterion) => criterion.fact === 'evidence.items');
+  const evidenceCriteria = definition.criteria.filter((criterion) => criterion.fact === 'evidence.items' || criterion.fact === 'memory.qualities');
   if (evidenceCriteria.length === 0) return undefined;
   const confidenceValues = evidenceCriteria
     .map((criterion) => criterion.minConfidence)

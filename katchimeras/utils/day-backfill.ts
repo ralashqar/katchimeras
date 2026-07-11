@@ -488,7 +488,12 @@ async function buildDayPhotos(
       for (const photo of visionTargets) {
         const vision = await analyzePhoto(photo.localUri);
         if (vision) {
-          visionResults.push(vision);
+          visionResults.push({
+            ...vision,
+            captureSource: 'camera_roll',
+            isScreenshot: photo.isScreenshot,
+            hasLocation: photo.latitude != null && photo.longitude != null,
+          });
         }
       }
     }

@@ -31,6 +31,7 @@ export type InlineVoiceNotePayload = {
 };
 
 type Options = {
+  allowRemote?: boolean;
   // Persist the accepted note (screen binds addNote + its today/tomorrow target).
   saveNote: (note: InlineVoiceNotePayload) => void;
   // Recording just stopped and interpretation started — fly the mote into the egg.
@@ -41,7 +42,7 @@ type Options = {
 
 const MAX_SECONDS = 30;
 
-export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved }: Options) {
+export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote = false }: Options) {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [phase, setPhase] = useState<InlineVoiceNotePhase>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -72,7 +73,7 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved }: Options) 
     onAnalyzing?.();
     try {
       // On-device transcription happens inside interpretNote (audio stays local).
-      const interpreted = await interpretNote({ audioUri: uri });
+      const interpreted = await interpretNote({ audioUri: uri }, { allowRemote });
       setResult(interpreted);
       setMarkBig(true);
       setPhase('confirm');

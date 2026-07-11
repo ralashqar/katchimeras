@@ -83,6 +83,7 @@ const MAPPING = {
   'flame.fill': 'local-fire-department',
   'chevron.down': 'keyboard-arrow-down',
   'book.closed.fill': 'auto-stories',
+  'exclamationmark.triangle.fill': 'warning',
 } as IconMapping;
 
 /**

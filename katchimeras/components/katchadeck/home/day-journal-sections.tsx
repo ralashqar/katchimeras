@@ -15,10 +15,10 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { PlacesModal } from '@/components/katchadeck/home/places-modal';
 import { CATEGORY_ART, VARIANT_ART } from '@/components/katchadeck/home/today-category-ring';
-import { dayPromptRegistry } from '@/constants/day-prompts';
 import { Meadow } from '@/constants/meadow-theme';
-import type { DayPromptKind, HomeDayRecord } from '@/types/home';
+import type { HomeDayRecord } from '@/types/home';
 import type { TodayCategoryState } from '@/utils/today-categories';
+import { buildMomentTimeline } from '@/utils/moment-timeline';
 
 // Meaning archetypes (calm/energy/together/meaningful) → icon + colour so the
 // "what it meant" chips read like the chips shown when the photo was prompted.
@@ -29,16 +29,6 @@ const MEANING_META: Record<string, { icon: IconSymbolName; accent: string }> = {
   meaningful: { icon: 'sparkles', accent: '#C77DFF' },
 };
 const MEANING_FALLBACK: { icon: IconSymbolName; accent: string } = { icon: 'sparkles', accent: '#FFC36B' };
-
-const DAY_PROMPT_ACCENT: Partial<Record<DayPromptKind, string>> = {
-  feeling: '#F5AFC6',
-  sleep: '#AAB2FF',
-  activity: '#91D8C7',
-  hobby: '#C77DFF',
-  people: '#F4BE8D',
-  day_word: '#A7D5FF',
-};
-const NOTE_FALLBACK_ACCENT = '#C9C2E8';
 
 const STAT_ICON: Record<string, IconSymbolName> = {
   steps: 'figure.walk',
@@ -452,12 +442,6 @@ function collectMeanings(day: HomeDayRecord): Meaning[] {
   return out;
 }
 
-function resolveAnswerIcon(kind: DayPromptKind, choiceIds: string[]): IconSymbolName {
-  const prompt = dayPromptRegistry[kind];
-  const option = prompt?.options.find((candidate) => choiceIds.includes(candidate.id));
-  return option?.icon ?? prompt?.categoryIcon ?? 'sparkles';
-}
-
 type TimelineEntry = {
   id: string;
   time: number;
@@ -468,127 +452,18 @@ type TimelineEntry = {
   category?: string;
 };
 
-function humanizeKind(kind: DayPromptKind): string {
-  return kind.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
 // Everything the user logged today, with a timestamp, woven into one stream:
 // moments, prompt answers, photo meanings. Sorted earliest → latest. Display-only.
 function buildDayTimeline(day: HomeDayRecord): TimelineEntry[] {
-  const entries: TimelineEntry[] = [];
-  const pushAt = (
-    createdAt: string,
-    id: string,
-    icon: IconSymbolName,
-    accent: string,
-    label: string,
-    category?: string
-  ) => {
-    const time = Date.parse(createdAt);
-    if (!Number.isNaN(time) && label.trim()) {
-      entries.push({ id, time, timeLabel: formatClock(time), icon, accent, label, category });
-    }
-  };
-  for (const moment of day.moments ?? []) {
-    pushAt(moment.createdAt, `m-${moment.id}`, moment.icon, moment.accentColor, moment.label);
-  }
-  for (const answer of day.promptAnswers ?? []) {
-    if (answer.dismissed || answer.labels.length === 0 || answer.kind === 'meaningful_photo') {
-      continue;
-    }
-    const label = answer.labels.join(' · ');
-    if (answer.kind === 'meaning') {
-      const meta = MEANING_META[answer.choiceIds[0]] ?? MEANING_FALLBACK;
-      pushAt(answer.createdAt, `a-${answer.id}`, meta.icon, meta.accent, label);
-    } else {
-      // A bare value ("Poor") is ambiguous, so carry the category ("Sleep") too.
-      pushAt(
-        answer.createdAt,
-        `a-${answer.id}`,
-        resolveAnswerIcon(answer.kind, answer.choiceIds),
-        DAY_PROMPT_ACCENT[answer.kind] ?? NOTE_FALLBACK_ACCENT,
-        label,
-        humanizeKind(answer.kind)
-      );
-    }
-  }
-  (day.capturedMeanings ?? []).forEach((captured, index) => {
-    const meta = MEANING_META[captured.archetype] ?? MEANING_FALLBACK;
-    pushAt(captured.createdAt, `c-${index}`, meta.icon, meta.accent, captured.label);
-  });
-  for (const food of day.foodMoments ?? []) {
-    if (food.source && food.source !== 'manual') continue;
-    pushAt(food.createdAt, `f-${food.id}`, 'fork.knife', foodMeaningAccent(food.meaning), food.label, 'Food');
-  }
-  for (const studio of day.studioMoments ?? []) {
-    if (studio.source && studio.source !== 'manual') continue;
-    pushAt(
-      studio.createdAt,
-      `s-${studio.id}`,
-      studioMediaIcon(studio.mediaType),
-      studioRatingAccent(studio.rating),
-      studio.label,
-      'Studio'
-    );
-  }
-  for (const note of day.notes ?? []) {
-    const meta = MEANING_META[note.archetype] ?? MEANING_FALLBACK;
-    pushAt(
-      note.createdAt,
-      `n-${note.id}`,
-      note.kind === 'voice' ? 'mic.fill' : 'square.and.pencil',
-      meta.accent,
-      note.label,
-      note.kind === 'voice' ? 'Voice note' : 'Note'
-    );
-  }
-  return entries.sort((left, right) => left.time - right.time);
-}
-
-function foodMeaningAccent(meaning: string): string {
-  switch (meaning) {
-    case 'sharedMeal':
-      return '#F4BE8D';
-    case 'comfort':
-      return '#91D8C7';
-    case 'discovery':
-      return '#C77DFF';
-    case 'fuel':
-      return '#92D7FF';
-    default:
-      return '#FFC36B';
-  }
-}
-
-function studioRatingAccent(rating: string): string {
-  switch (rating) {
-    case 'loved':
-      return '#F49AC1';
-    case 'inspired':
-      return '#C77DFF';
-    case 'meh':
-      return '#A7D5FF';
-    default:
-      return '#E8C272';
-  }
-}
-
-function studioMediaIcon(mediaType: string): IconSymbolName {
-  switch (mediaType) {
-    case 'book':
-      return 'book.fill';
-    case 'film':
-    case 'show':
-      return 'film.fill';
-    case 'game':
-      return 'gamecontroller.fill';
-    case 'music':
-      return 'music.note';
-    case 'art':
-      return 'paintbrush.fill';
-    default:
-      return 'sparkles';
-  }
+  return buildMomentTimeline(day).map((entry) => ({
+    id: entry.id,
+    time: entry.time,
+    timeLabel: formatClock(entry.time),
+    icon: entry.icon,
+    accent: entry.accent,
+    label: entry.label,
+    category: entry.category,
+  }));
 }
 
 type TimelineBucket = { id: string; time: number; timeLabel: string; items: TimelineEntry[] };

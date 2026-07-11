@@ -5,6 +5,7 @@ import type { TodaySheetController } from '@/features/today/use-today-sheet-cont
 import type { ActiveDayPrompt } from '@/utils/day-prompt-engine';
 import type { MemoryQuestType } from '@/utils/memory-quests-engine';
 import type { QuestNextAction } from '@/utils/quests/runtime';
+import type { PendingQuestActionIntent } from '@/utils/quest-action-signal';
 import type { TodayCategoryState } from '@/utils/today-categories';
 
 type UseTodayActionRouterParams = {
@@ -15,9 +16,10 @@ type UseTodayActionRouterParams = {
   sheets: TodaySheetController;
   openPromptSheet: (prompt?: ActiveDayPrompt | null) => void;
   closePromptSheet: () => void;
-  openCapture: () => void;
+  openCapture: (questId?: string | null) => void;
   openNoteCapture: () => void;
   openQuickNote: () => void;
+  openPlaceContext: () => void | Promise<void>;
   openObservatory: () => void;
   requestMicrophonePermission?: () => Promise<{ granted?: boolean } | null>;
 };
@@ -33,6 +35,7 @@ export function useTodayActionRouter({
   openCapture,
   openNoteCapture,
   openQuickNote,
+  openPlaceContext,
   openObservatory,
   requestMicrophonePermission,
 }: UseTodayActionRouterParams) {
@@ -231,21 +234,45 @@ export function useTodayActionRouter({
   }, [categoryById, openCapture, openPromptSheet, photoPrompt]);
 
   const handleQuickCategory = useCallback(
-    (id: string) => {
+    async (id: string) => {
       closePromptSheet();
-      if (id === 'sleep') sheets.setSleepSheetOpen(true);
+      sheets.closeAllSheets();
+      if (id === 'photo') openCapture();
+      else if (id === 'voice_note') {
+        if (requestMicrophonePermission) {
+          const permission = await requestMicrophonePermission();
+          if (!permission?.granted) return;
+        }
+        openNoteCapture();
+      }
+      else if (id === 'written_note' || id === 'note') openQuickNote();
+      else if (id === 'place') await openPlaceContext();
+      else if (id === 'food') sheets.setFoodPickerOpen(true);
+      else if (id === 'studio') sheets.setStudioPickerOpen(true);
+      else if (id === 'movement') sheets.setStepsSheetOpen(true);
+      else if (id === 'sleep') sheets.setSleepSheetOpen(true);
       else if (id === 'mood') sheets.setMoodSheetOpen(true);
+      else if (id === 'life_event') sheets.setBigMomentPickerOpen(true);
     },
-    [closePromptSheet, sheets]
+    [
+      closePromptSheet,
+      openCapture,
+      openNoteCapture,
+      openPlaceContext,
+      openQuickNote,
+      requestMicrophonePermission,
+      sheets,
+    ]
   );
 
   const handleQuestActionIntent = useCallback(
-    async (action: QuestNextAction) => {
+    async (intent: PendingQuestActionIntent) => {
+      const action: QuestNextAction = intent.action;
       closePromptSheet();
       switch (action) {
         case 'take_photo':
         case 'enable_camera':
-          openCapture();
+          openCapture(intent.questId ?? null);
           break;
         case 'enable_photos':
           if (photoPrompt) openPromptSheet(photoPrompt);

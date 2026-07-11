@@ -9,6 +9,7 @@ import { interpretNote } from '@/utils/note-interpret';
 type NoteInput = Parameters<typeof applyNoteForToday>[1];
 
 type UseNoteCaptureControllerParams = {
+  allowRemote?: boolean;
   formingTarget: DayInputTarget;
   windowWidth: number;
   windowHeight: number;
@@ -26,12 +27,13 @@ export function useNoteCaptureController({
   startEggFeed,
   pulseEgg,
   setMicrocopy,
+  allowRemote = false,
 }: UseNoteCaptureControllerParams) {
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
 
   const handleQuickNoteSubmit = useCallback(
     async (text: string) => {
-      const interpreted = await interpretNote({ text });
+      const interpreted = await interpretNote({ text }, { allowRemote });
       const from: FeedSourceRect = { x: windowWidth / 2 + 40, y: windowHeight - 260, w: 60, h: 60 };
       startEggFeed(from, { label: interpreted.label }, () => {
         addNote(
@@ -54,10 +56,11 @@ export function useNoteCaptureController({
         setMicrocopy(`${interpreted.label} took root`);
       });
     },
-    [addNote, formingTarget, pulseEgg, setMicrocopy, startEggFeed, windowHeight, windowWidth]
+    [addNote, allowRemote, formingTarget, pulseEgg, setMicrocopy, startEggFeed, windowHeight, windowWidth]
   );
 
   const voiceNote = useInlineVoiceNote({
+    allowRemote,
     saveNote: (note) => addNote(note, formingTarget),
     onAnalyzing: () => {
       const from: FeedSourceRect = { x: windowWidth / 2 + 40, y: windowHeight - 260, w: 60, h: 60 };

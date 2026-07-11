@@ -90,6 +90,8 @@ const landmark = buildCaptureEnergy('meaningful', vision(['city']), { energy: 0,
 check('landmark photo adds exploration', (landmark.exploration ?? 0) > 0, JSON.stringify(landmark));
 const food = buildCaptureEnergy('calm', vision(['food']));
 check('food photo nudges calm further', (food.calm ?? 0) > 0.26, JSON.stringify(food));
+const rejectedFood = buildCaptureEnergy('calm', vision(['food']), undefined, { rejectFood: true });
+check('rejected food does not add subject energy', rejectedFood.calm === 0.26, JSON.stringify(rejectedFood));
 const faces = buildCaptureEnergy('calm', vision(['food'], 2));
 check('faces in frame add social', (faces.social ?? 0) > 0, JSON.stringify(faces));
 

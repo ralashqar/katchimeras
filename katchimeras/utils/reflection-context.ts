@@ -1,4 +1,5 @@
 import type { StoredHomeDayRecord } from '@/types/home';
+import { visionSignalIsRejected } from '@/utils/intelligence/classification-policy';
 import { forcesIndoors, isFairWeather } from '@/utils/day-weather';
 import { computeDaySpanMeters } from '@/utils/living-rarity';
 import { pickProminentTags } from '@/utils/vision-signals';
@@ -170,7 +171,9 @@ export function classifyMood(day: StoredHomeDayRecord): DayMood {
   const span = computeDaySpanMeters(day.locations);
   const stayedPut = day.locations.length < 2 || span <= STAY_PUT_METERS;
   const steps = day.stepsCount;
-  const concepts = day.vision?.concepts.map((concept) => concept.name) ?? [];
+  const concepts = day.vision?.concepts
+    .map((concept) => concept.name)
+    .filter((concept) => !visionSignalIsRejected(day, concept)) ?? [];
   const warm = concepts.some((name) => WARM_SUBJECTS.has(name));
   // Weather that "did the deciding" — a rainy/snowy stay-in is cozy or forced,
   // never a defiant choice to skip a beautiful day. Prefer the resolved weather
