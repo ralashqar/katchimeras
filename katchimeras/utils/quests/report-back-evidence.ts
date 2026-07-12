@@ -21,6 +21,7 @@ export type QuestReportBackItem = {
   accentColor: string;
   matchStatus?: 'ready' | 'possible';
   qualityId?: string | null;
+  requestedLabel?: string | null;
 };
 
 export type QuestSubmissionItem = QuestReportBackItem;
@@ -46,7 +47,12 @@ export function buildQuestSubmissionItems(
   )?.value as string | undefined;
   for (const id of runtime.possibleEvidenceIds ?? []) {
     const item = itemForEvidenceId(day, id);
-    if (item) items.push({ ...item, matchStatus: 'possible', qualityId: requestedQuality ?? null });
+    if (item) items.push({
+      ...item,
+      matchStatus: 'possible',
+      qualityId: requestedQuality ?? null,
+      requestedLabel: questDefinition(runtime.questId)?.criteria.find((criterion) => criterion.qualityId === requestedQuality)?.label ?? quest.hint,
+    });
   }
 
   if (items.length === 0 && (runtime.readyToSubmit || runtime.complete)) {

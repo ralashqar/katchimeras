@@ -36,6 +36,7 @@ import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import { refreshQuestFacts } from '@/utils/quests/facts';
 import type { Facts } from '@/utils/signals/facts';
 import { recalibrateClassifiedMemory, repairUrbanPhotoCentrality, withQualityConfirmation } from '@/utils/intelligence/classification';
+import { buildPhotoEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
 
 type SelectedResident = {
   creature: KingdomCreature;
@@ -294,19 +295,34 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       if (item.matchStatus === 'possible' && item.qualityId) {
         const stored = homeRepository.load();
         if (!stored) return;
+        const targetMemory = (stored.today.classifiedMemories ?? []).find((memory) => memory.sourceId === item.sourceId) ?? null;
+        const confirmedMemory = targetMemory
+          ? withQualityConfirmation(
+              targetMemory,
+              item.qualityId!,
+              answer !== 'rejected',
+              new Date(),
+              answer === 'rejected' ? 'incidental' : answer
+            )
+          : null;
+        const classifiedMemories = (stored.today.classifiedMemories ?? []).map((memory) =>
+          memory.sourceId === item.sourceId && confirmedMemory ? confirmedMemory : memory
+        );
+        const existingEvidence = (stored.today.evidence ?? []).find((evidence) => evidence.sourceId === item.sourceId);
+        const refreshedEvidence = confirmedMemory
+          ? buildPhotoEvidence({
+              sourceId: confirmedMemory.sourceId,
+              observedAt: confirmedMemory.createdAt,
+              thumbnailUri: existingEvidence?.thumbnailUri ?? item.thumbnailUri ?? null,
+              memory: confirmedMemory,
+            })
+          : null;
         const updatedToday = {
           ...stored.today,
-          classifiedMemories: (stored.today.classifiedMemories ?? []).map((memory) =>
-            memory.sourceId === item.sourceId
-              ? withQualityConfirmation(
-                  memory,
-                  item.qualityId!,
-                  answer !== 'rejected',
-                  new Date(),
-                  answer === 'rejected' ? 'incidental' : answer
-                )
-              : memory
-          ),
+          classifiedMemories,
+          evidence: refreshedEvidence
+            ? upsertEvidence(stored.today.evidence, [refreshedEvidence])
+            : stored.today.evidence,
         };
         const nextStored = { ...stored, today: updatedToday };
         homeRepository.save(nextStored);

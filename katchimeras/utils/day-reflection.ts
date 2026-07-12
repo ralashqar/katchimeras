@@ -7,6 +7,7 @@ import { weatherLabel } from '@/utils/day-weather';
 import { supabase } from '@/utils/supabase';
 import { pickProminentTags } from '@/utils/vision-signals';
 import { visionSignalIsRejected } from '@/utils/intelligence/classification-policy';
+import { projectDayPhotoSubjects } from '@/utils/intelligence/photo-subject-projection';
 
 // Per-creature character bible: a persona paragraph plus one short voice note
 // for each mood and each bond depth. The narrator composes within these instead
@@ -53,6 +54,11 @@ export function buildReflectionRequest(
     ? personasByProfileId[creature.encounterProfileId]
     : undefined;
   const promptSummary = buildPromptReflectionSummary(day);
+  const classifiedSubjects = projectDayPhotoSubjects(day, 4).map((subject) => subject.value);
+  const fallbackTags = day.vision ? pickProminentTags(day.vision) : [];
+  const prominentTags = [...new Set([...classifiedSubjects, ...fallbackTags])]
+    .filter((tag) => !visionSignalIsRejected(day, tag))
+    .slice(0, 4);
 
   return {
     dayLabel: weekdayNames[new Date(`${day.isoDate}T12:00:00`).getDay()] ?? 'Today',
@@ -60,7 +66,7 @@ export function buildReflectionRequest(
     stepsBand: resolveStepsBand(day.stepsCount),
     visitedPlaceCount: day.visitedPlaceCount,
     newPlaceCount: day.newPlaceCount,
-    prominentTags: day.vision ? pickProminentTags(day.vision).filter((tag) => !visionSignalIsRejected(day, tag)) : [],
+    prominentTags,
     // Specific camera-derived object descriptions are allowed; OCR text is not
     // sent in the default nightly reflection.
     photoDetails: (day.vision?.details ?? []).filter((detail) => !visionSignalIsRejected(day, detail)),

@@ -4,6 +4,7 @@ import type { DayTag, StoredHomeDayRecord } from '@/types/home';
 import { extractEncounterCandidates } from '@/utils/encounter-engine';
 import { conceptSeedId, pickProminentTags } from '@/utils/vision-signals';
 import { visionSignalIsRejected } from '@/utils/intelligence/classification-policy';
+import { projectDayPhotoSubjects } from '@/utils/intelligence/photo-subject-projection';
 
 // The day-tag field: one weighted, source-tagged chip per signal the day
 // surfaced, unified across moments, prompts, vision, places, steps, capture, and
@@ -71,17 +72,24 @@ export function buildDayTags(day: StoredHomeDayRecord): DayTag[] {
     });
 
   if (day.vision) {
-    pickProminentTags(day.vision, MAX_VISION_TAGS)
+    const projected = projectDayPhotoSubjects(day, MAX_VISION_TAGS);
+    const visionSubjects = projected.length > 0
+      ? projected.map((subject) => subject.value)
+      : pickProminentTags(day.vision, MAX_VISION_TAGS);
+    visionSubjects
       .filter((concept) => !visionSignalIsRejected(day, concept))
       .forEach((concept, index) => {
       const seedId = conceptSeedId(concept);
       const conceptEntry = day.vision?.concepts.find((entry) => entry.name === concept);
+      const projectedSubject = projected.find((subject) => subject.value === concept);
       tags.push({
         id: `tag-vision-${concept}`,
         label: humanize(concept),
         icon: 'sparkles',
         accentColor: SOURCE_ACCENT.vision,
-        weight: clamp01(0.45 + 0.4 * (conceptEntry?.coverage ?? 0) - index * 0.04),
+        weight: projectedSubject
+          ? clamp01((projectedSubject.role === 'primary' ? 0.62 : 0.44) + projectedSubject.score * 0.18)
+          : clamp01(0.45 + 0.4 * (conceptEntry?.coverage ?? 0) - index * 0.04),
         feedsSpecies: feedsFor(seedId),
         source: 'vision',
       });

@@ -442,6 +442,19 @@ const balancedBookAndPerson = classification.buildPhotoClassifiedMemory({
 const balancedFocus = clarification.currentClarificationNode(balancedBookAndPerson);
 check('balanced book and person evidence asks a generic focus question', balancedBookAndPerson.promptState.graphId === 'subject-focus' && balancedFocus?.question === 'What was this moment mainly about?', JSON.stringify(balancedBookAndPerson.photoAnalysis));
 check('generic focus question offers both detected subjects', balancedFocus?.options.some((item) => item.facetValue === 'book') && balancedFocus?.options.some((item) => item.facetValue === 'person'), JSON.stringify(balancedFocus?.options));
+const focusedBook = clarification.answerClarification(
+  balancedBookAndPerson,
+  balancedFocus,
+  balancedFocus.options.find((item) => item.facetValue === 'book')
+);
+const focusedBookType = clarification.currentClarificationNode(focusedBook);
+check('choosing Book focus continues to the real Book question', focusedBookType?.question === 'Is this a book?', JSON.stringify(focusedBook.promptState));
+const confirmedFocusedBook = clarification.answerClarification(
+  focusedBook,
+  focusedBookType,
+  focusedBookType.options.find((item) => item.id === 'confirm_book')
+);
+check('focused Book continues to OCR title validation', clarification.currentClarificationNode(confirmedFocusedBook)?.question.includes('Norwegian Wood'), JSON.stringify(confirmedFocusedBook.promptState));
 
 const movement = classification.buildMovementClassifiedMemory({
   sourceId: 'today', observedAt: '2026-07-10T18:00:00.000Z', movement: 'transit', subtype: 'train',

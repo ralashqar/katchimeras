@@ -91,7 +91,22 @@ public final class KatchimeraFoundationModule: Module {
       #if canImport(FoundationModels)
       if #available(iOS 26.0, *) {
         Task {
-          let result = await Self.readMemory(tags: tags, ocrLines: ocrLines, faceCount: faceCount)
+          let result = await Self.readMemory(tags: tags, ocrLines: ocrLines, faceCount: faceCount, spatialCandidates: [])
+          promise.resolve(result)
+        }
+        return
+      }
+      #endif
+      promise.resolve([String: String]())
+    }
+
+    // Spatially-aware memory read. Kept as a separate bridge method so older
+    // native clients continue to use readMemoryAsync without an arity mismatch.
+    AsyncFunction("readMemoryV2Async") { (tags: [String], ocrLines: [String], faceCount: Int, spatialCandidates: [String], promise: Promise) in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        Task {
+          let result = await Self.readMemory(tags: tags, ocrLines: ocrLines, faceCount: faceCount, spatialCandidates: spatialCandidates)
           promise.resolve(result)
         }
         return
@@ -138,14 +153,19 @@ public final class KatchimeraFoundationModule: Module {
 
   #if canImport(FoundationModels)
   @available(iOS 26.0, *)
-  private static func readMemory(tags: [String], ocrLines: [String], faceCount: Int) async -> [String: String] {
+  private static func readMemory(tags: [String], ocrLines: [String], faceCount: Int, spatialCandidates: [String]) async -> [String: String] {
     guard case .available = SystemLanguageModel.default.availability else { return [:] }
     let cleaned = tags.filter { !$0.isEmpty }
     let cleanedOCR = ocrLines.filter { !$0.isEmpty }
     guard !cleaned.isEmpty || !cleanedOCR.isEmpty else { return [:] }
     let instructions = Instructions(
       """
-      Organize a personal photo from on-device visual observations and OCR.
+      Organize a personal photo from on-device visual observations, independently
+      classified salient regions, and OCR. Observation order is confidence order,
+      not proof of the main subject. Use region coverage and saliency to distinguish
+      dominant, supporting, and incidental subjects. When two significant regions
+      are comparable, keep the result uncertain and return the other subject as an
+      alternative instead of forcing a winner.
       First classify representation as physical_scene, physical_artwork,
       physical_document, device_showing_content, native_digital_image, screenshot,
       or unknown. Classify its container as none, book, screen, frame_or_canvas,
@@ -178,6 +198,8 @@ public final class KatchimeraFoundationModule: Module {
     let observations = cleaned.prefix(12).joined(separator: ", ")
     let text = cleanedOCR.prefix(12).joined(separator: " / ")
     var prompt = "Observations: \(observations). Faces detected: \(faceCount)."
+    let spatial = spatialCandidates.prefix(3).joined(separator: " | ")
+    if !spatial.isEmpty { prompt += " Spatial candidates: \(spatial)." }
     if !text.isEmpty { prompt += " OCR: \"\(text)\"." }
     do {
       let response = try await session.respond(to: Prompt(prompt), generating: MemoryRead.self)

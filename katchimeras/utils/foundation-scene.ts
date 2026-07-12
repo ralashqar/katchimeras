@@ -1,4 +1,5 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
+import type { PhotoVisionResult } from '@/types/home';
 
 // On-device hierarchical scene classification via Apple Foundation Models (iOS 26+,
 // Apple-Intelligence devices). Given the photo's on-device vision tags it returns
@@ -43,6 +44,27 @@ type FoundationSceneModule = {
     supportingSubjects?: unknown;
     promptVersion?: unknown;
   }>;
+  readMemoryV2Async?: (
+    tags: string[],
+    ocrLines: string[],
+    faceCount: number,
+    spatialCandidates: string[]
+  ) => Promise<{
+    domain?: unknown;
+    subject?: unknown;
+    animalKind?: unknown;
+    mediaKind?: unknown;
+    title?: unknown;
+    creator?: unknown;
+    food?: unknown;
+    activity?: unknown;
+    representation?: unknown;
+    container?: unknown;
+    confidence?: unknown;
+    alternatives?: unknown;
+    supportingSubjects?: unknown;
+    promptVersion?: unknown;
+  }>;
 };
 
 export const FOUNDATION_MEMORY_PROMPT_VERSION = 1;
@@ -63,6 +85,7 @@ const nativeFoundation = requireOptionalNativeModule<FoundationSceneModule>('Kat
 export function isFoundationSceneAvailable(): boolean {
   try {
     const hasSceneReader = !!(
+      nativeFoundation?.readMemoryV2Async ||
       nativeFoundation?.readMemoryAsync ||
       nativeFoundation?.readSceneAsync ||
       nativeFoundation?.classifySceneAsync
@@ -80,7 +103,7 @@ export function foundationSceneAvailability(): {
   localeSupported?: boolean;
 } {
   if (!nativeFoundation) return { available: false, reason: 'native_module_missing' };
-  if (!nativeFoundation.readMemoryAsync && !nativeFoundation.readSceneAsync && !nativeFoundation.classifySceneAsync) {
+  if (!nativeFoundation.readMemoryV2Async && !nativeFoundation.readMemoryAsync && !nativeFoundation.readSceneAsync && !nativeFoundation.classifySceneAsync) {
     return { available: false, reason: 'scene_reader_missing' };
   }
   try {
@@ -141,16 +164,27 @@ export async function readSceneOnDevice(
   tags: string[],
   ocrLines: string[],
   faceCount: number,
-  _imageUri?: string | null
+  _imageUri?: string | null,
+  _rawVision?: PhotoVisionResult | null
 ): Promise<DeepSceneRead | null> {
   if (
-    (!nativeFoundation?.readMemoryAsync && !nativeFoundation?.readSceneAsync) ||
+    (!nativeFoundation?.readMemoryV2Async && !nativeFoundation?.readMemoryAsync && !nativeFoundation?.readSceneAsync) ||
     !(nativeFoundation.isAvailable?.() ?? false) ||
     (tags.length === 0 && ocrLines.length === 0)
   ) {
     return null;
   }
   try {
+    if (nativeFoundation.readMemoryV2Async) {
+      const memory = await nativeFoundation.readMemoryV2Async(
+        tags.slice(0, 12),
+        ocrLines.slice(0, 12),
+        Math.max(0, Math.trunc(faceCount)),
+        spatialCandidateDescriptions(_rawVision)
+      );
+      const structured = sceneFromMemoryResult(memory);
+      if (structured) return structured;
+    }
     if (nativeFoundation.readMemoryAsync) {
       const memory = await nativeFoundation.readMemoryAsync(
         tags.slice(0, 12),
@@ -187,6 +221,21 @@ export async function readSceneOnDevice(
   } catch {
     return null;
   }
+}
+
+function spatialCandidateDescriptions(raw: PhotoVisionResult | null | undefined): string[] {
+  const candidates = (raw?.regionClassifications ?? []).map((item, index) => {
+    const area = Math.max(0, item.region.width * item.region.height);
+    const labels = [...item.labels]
+      .sort((left, right) => right.confidence - left.confidence)
+      .slice(0, 3)
+      .map((label) => `${label.name} ${label.confidence.toFixed(2)}`)
+      .join(', ');
+    const centreX = item.region.x + item.region.width / 2;
+    const centreY = item.region.y + item.region.height / 2;
+    return `region ${index + 1}: ${labels}; coverage ${area.toFixed(2)}; centre ${centreX.toFixed(2)},${centreY.toFixed(2)}; saliency ${item.region.confidence.toFixed(2)}`;
+  });
+  return candidates.slice(0, 3);
 }
 
 function sceneFromMemoryResult(memory: {

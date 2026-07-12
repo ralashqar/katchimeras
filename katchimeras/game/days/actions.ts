@@ -581,6 +581,8 @@ export function applyCapturedMomentForToday(
     meaning?: { archetype: string; label: string; thumbnailUri?: string | null; sourceId?: string | null };
     scene?: SceneRead;
     confirmations?: UserConfirmation[];
+    classifiedMemory?: import('@/types/home').ClassifiedMemory | null;
+    evidence?: import('@/types/home').DayEvidence | null;
   },
   profile: OnboardingProfile,
   now: Date,

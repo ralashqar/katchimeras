@@ -38,6 +38,14 @@ const nativeVisionSource = fs.readFileSync(
   path.join(projectRoot, 'modules/katchimera-vision/ios/KatchimeraVisionModule.swift'),
   'utf8'
 );
+const essenceReviewSource = fs.readFileSync(
+  path.join(projectRoot, 'components/katchadeck/capture/essence-review.tsx'),
+  'utf8'
+);
+const foundationSource = fs.readFileSync(
+  path.join(projectRoot, 'modules/katchimera-foundation/ios/KatchimeraFoundationModule.swift'),
+  'utf8'
+);
 
 let failures = 0;
 function check(label, condition, detail) {
@@ -150,6 +158,9 @@ check(
 );
 check('native Vision classifies salient regions independently', nativeVisionSource.includes('request.regionOfInterest = object.boundingBox'));
 check('native Vision returns region classifications', nativeVisionSource.includes('"regionClassifications": regionClassifications'));
+check('capture review passes raw Vision into classification', essenceReviewSource.includes('rawVision: analyzed.rawVision'));
+check('capture review returns the finalized memory and evidence', essenceReviewSource.includes('analysis: ReviewedPhotoAnalysis') && essenceReviewSource.includes('memory,\n      evidence'));
+check('Foundation exposes a backward-compatible spatial V2 reader', foundationSource.includes('AsyncFunction("readMemoryV2Async")'));
 
 // 4. Face coverage tracks how much of the day had people in frame.
 const faces = aggregatePhotoVision([photo([], 3), photo([], 0), photo([], 4)]);

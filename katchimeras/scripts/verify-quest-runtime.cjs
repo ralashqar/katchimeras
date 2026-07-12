@@ -82,6 +82,13 @@ const incompleteDog = runtime.evaluateQuestRuntime({
 check('wrong evidence stays in progress', incompleteDog.state === 'in_progress', incompleteDog.state);
 check('photo quest suggests taking a photo', incompleteDog.nextAction === 'take_photo', incompleteDog.nextAction);
 
+const mossproutPark = runtime.evaluateQuestRuntime({
+  questId: 'quest-new-park',
+  facts: { 'evidence.items': [] },
+});
+check('Mossprout park quest opens the camera', mossproutPark.nextAction === 'take_photo', mossproutPark.nextAction);
+check('Mossprout park quest is not blocked on place confirmation', mossproutPark.progress.length === 1 && mossproutPark.progress[0].qualityId === 'place.park', JSON.stringify(mossproutPark.progress));
+
 const blockedCaps = caps.defaultQuestCapabilities();
 blockedCaps['camera.capture'] = { ...blockedCaps['camera.capture'], status: 'denied' };
 const blockedDog = runtime.evaluateQuestRuntime({

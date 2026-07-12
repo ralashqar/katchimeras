@@ -69,11 +69,9 @@ function photoEvidence(id, key, confidence) {
 }
 
 const strongParkFacts = {
-  'places.categories': ['park'],
   'evidence.items': [photoEvidence('asset-park', 'park', 0.81)],
 };
 const weakParkFacts = {
-  'places.categories': ['park'],
   'evidence.items': [photoEvidence('asset-park', 'park', 0.4)],
 };
 const dogFacts = {
@@ -106,7 +104,7 @@ const noEvidenceFacts = {
   'evidence.items': [],
 };
 
-check('new park quest passes with confirmed park and matching photo evidence', evaluate.isQuestComplete('quest-new-park', strongParkFacts));
+check('Mossprout park quest passes from photo evidence without place confirmation', evaluate.isQuestComplete('quest-new-park', strongParkFacts));
 check('new park quest fails when photo evidence is low confidence', !evaluate.isQuestComplete('quest-new-park', weakParkFacts));
 check('dog photo quest passes from photo evidence', evaluate.isQuestComplete('quest-photo-dog', dogFacts));
 check('banana live photo passes food photo quest', evaluate.isQuestComplete('quest-photo-food', bananaFacts), JSON.stringify(bananaEvidence));

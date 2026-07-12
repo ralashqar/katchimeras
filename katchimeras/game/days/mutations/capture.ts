@@ -1,4 +1,4 @@
-import type { DayScores, DayVisionSummary, StoredHomeDayRecord, UserConfirmation } from '@/types/home';
+import type { ClassifiedMemory, DayEvidence, DayScores, DayVisionSummary, StoredHomeDayRecord, UserConfirmation } from '@/types/home';
 import { mergeCaptureEnergy } from '@/utils/capture-energy';
 import type { FoodDetection } from '@/utils/food-detect';
 import { upsertEvidence } from '@/utils/intelligence/evidence';
@@ -23,6 +23,8 @@ export type CapturedMomentInput = {
   sourceId?: string | null;
   scene?: SceneRead;
   confirmations?: UserConfirmation[];
+  classifiedMemory?: ClassifiedMemory | null;
+  evidence?: DayEvidence | null;
   meaning?: { archetype: string; label: string; thumbnailUri?: string | null; sourceId?: string | null };
 };
 
@@ -43,7 +45,7 @@ export function withCapturedMoment(
   const meaning = capture.meaning;
   const sourceId = capture.sourceId ?? meaning?.sourceId ?? meaning?.thumbnailUri ?? null;
   const photoIntelligence =
-    sourceId && capture.vision
+    !capture.classifiedMemory && sourceId && capture.vision
       ? buildPhotoIntelligence({
           sourceId,
           observedAt: now.toISOString(),
@@ -53,8 +55,8 @@ export function withCapturedMoment(
           confirmations: capture.confirmations,
         })
       : null;
-  const photoEvidence = photoIntelligence?.evidence ?? null;
-  const classifiedMemory = photoIntelligence?.memory ?? null;
+  const photoEvidence = capture.evidence ?? photoIntelligence?.evidence ?? null;
+  const classifiedMemory = capture.classifiedMemory ?? photoIntelligence?.memory ?? null;
   // The finalized camera classification is the only authority for automatic
   // Studio creation. Re-running the lower-level detector here used to turn a
   // distant OCR fragment into a second, contradictory Today prompt.

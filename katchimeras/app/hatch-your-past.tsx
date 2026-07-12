@@ -16,6 +16,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EssenceReview } from '@/components/katchadeck/capture/essence-review';
+import type { PhotoAnalysisInput } from '@/utils/intelligence/photo-analysis';
 import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay, type EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
@@ -218,12 +219,16 @@ export default function HatchYourPastRoute() {
     }
   }
 
-  const analyzeCapture = useCallback(async (): Promise<DayVisionSummary | null> => {
+  const analyzeCapture = useCallback(async (): Promise<PhotoAnalysisInput> => {
     if (!capturePhotoUri) {
-      return null;
+      return { rawVision: null, summary: null };
     }
     const result = await analyzePhoto(capturePhotoUri);
-    return result ? aggregatePhotoVision([result], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null;
+    const enrichedResult = result ? { ...result, captureSource: 'camera' as const } : null;
+    return {
+      rawVision: enrichedResult,
+      summary: enrichedResult ? aggregatePhotoVision([enrichedResult], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null,
+    };
   }, [capturePhotoUri]);
 
   function commitCapture(meaning: MeaningTag, vision: DayVisionSummary | null) {
@@ -378,6 +383,7 @@ export default function HatchYourPastRoute() {
             onClose={proceedToHatch}
             onCommit={commitCapture}
             photoUri={capturePhotoUri}
+            sourceId={capturePhotoUri}
           />
         ) : captureStage === 'live' || captureStage === 'capturing' ? (
           <View style={StyleSheet.absoluteFill}>

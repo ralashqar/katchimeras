@@ -328,7 +328,28 @@ export function mergeDayVision(
             (incoming.documentCoverage ?? 0) * incoming.analyzedPhotoCount) /
           totalPhotos
         : 0,
+    representation:
+      (incoming.representation?.confidence ?? 0) >= (existing.representation?.confidence ?? 0)
+        ? incoming.representation ?? existing.representation
+        : existing.representation,
+    analysisRegions: [...(incoming.analysisRegions ?? []), ...(existing.analysisRegions ?? [])].slice(0, 8),
+    recognizedText: dedupeRecognizedText([
+      ...(existing.recognizedText ?? []),
+      ...(incoming.recognizedText ?? []),
+    ]).slice(0, 12),
   };
+}
+
+function dedupeRecognizedText(
+  values: NonNullable<DayVisionSummary['recognizedText']>
+): NonNullable<DayVisionSummary['recognizedText']> {
+  const byText = new Map<string, NonNullable<DayVisionSummary['recognizedText']>[number]>();
+  for (const value of values) {
+    const key = value.text.trim().toLowerCase();
+    const current = byText.get(key);
+    if (key && (!current || current.confidence < value.confidence)) byText.set(key, value);
+  }
+  return [...byText.values()];
 }
 
 // The encounter seed a canonical concept maps to (if any). Exposed so the

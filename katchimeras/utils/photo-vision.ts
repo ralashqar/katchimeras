@@ -21,7 +21,11 @@ type VisionNativeModule = {
     animals?: { kind?: unknown; confidence?: unknown; region?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown } }[];
     humans?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[];
     faces?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[];
-    recognizedText?: { text?: unknown; confidence?: unknown }[];
+    recognizedText?: {
+      text?: unknown;
+      confidence?: unknown;
+      region?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown };
+    }[];
     dominantSubject?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown } | null;
     salientSubjects?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[];
     regionClassifications?: {
@@ -143,7 +147,11 @@ export async function analyzePhoto(uri: string): Promise<PhotoVisionResult | nul
       humans: normalizeRegions(raw.humans),
       faces: normalizeRegions(raw.faces),
       recognizedText: (raw.recognizedText ?? [])
-        .map((item) => ({ text: typeof item.text === 'string' ? item.text.trim() : '', confidence: Number(item.confidence) || 0 }))
+        .map((item) => ({
+          text: typeof item.text === 'string' ? item.text.trim() : '',
+          confidence: Number(item.confidence) || 0,
+          region: normalizeRegions(item.region ? [item.region] : [])[0] ?? null,
+        }))
         .filter((item) => item.text.length > 0)
         .slice(0, 12),
       dominantSubject:

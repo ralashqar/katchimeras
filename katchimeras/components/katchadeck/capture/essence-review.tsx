@@ -25,6 +25,8 @@ import {
 } from '@/utils/capture-energy';
 import { foundationSceneAvailability, isFoundationSceneAvailable } from '@/utils/foundation-scene';
 import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
+import { buildPhotoEvidence } from '@/utils/intelligence/evidence';
+import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import {
   answerClarification,
   currentClarificationNode,
@@ -35,7 +37,7 @@ import {
 import { classifyScene, resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
 import { detectStudioInVision, extractTitleFromVisionText, isGenericStudioLabel, studioDetectionFromMedia } from '@/utils/studio-detect';
 import { pickProminentTags } from '@/utils/vision-signals';
-import type { ClassifiedMemory, DayVisionSummary, UserConfirmation } from '@/types/home';
+import type { ClassifiedMemory, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
 
 // The shared "read the moment" experience: a photo's on-device essence animates
 // into the centre, the user says what it meant, and the tags then stream down
@@ -54,7 +56,9 @@ type EssenceReviewProps = {
   questId?: string | null;
   // Produce the on-device vision read (camera analyses a temp file; the photo
   // prompt loads the chosen asset). Null when nothing could be read.
-  analyze: () => Promise<DayVisionSummary | null>;
+  analyze: () => Promise<PhotoAnalysisInput>;
+  sourceId?: string | null;
+  observedAt?: string | null;
   // Feed the day with the chosen meaning + the photo's essence, then leave.
   // `scene` is the hierarchical scene read resolved here (null if it wasn't
   // ready / available) — pass it through to applyCapturedMoment so the whole
@@ -64,12 +68,13 @@ type EssenceReviewProps = {
     vision: DayVisionSummary | null,
     label: string,
     scene: SceneRead | null,
-    confirmations: UserConfirmation[]
+    confirmations: UserConfirmation[],
+    analysis: ReviewedPhotoAnalysis
   ) => void;
   onClose: () => void;
 };
 
-export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceReviewProps) {
+export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommit, onClose }: EssenceReviewProps) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const [state, setState] = useState<EssenceReviewState>('analyzing');
@@ -77,8 +82,10 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
   const [meanings, setMeanings] = useState<readonly CaptureMeaning[]>(CAPTURE_MEANINGS);
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const visionRef = useRef<DayVisionSummary | null>(null);
+  const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const sceneRef = useRef<SceneRead | null>(null);
   const clarificationRef = useRef<ClassifiedMemory | null>(null);
+  const observedAtRef = useRef(observedAt ?? new Date().toISOString());
   // Once the user picks a meaning, late LLM upgrades must not reshuffle the UI.
   const committedRef = useRef(false);
   const intro = useSharedValue(0);
@@ -88,10 +95,12 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
   useEffect(() => {
     let active = true;
     void (async () => {
-      const vision = await analyze();
+      const analyzed = await analyze();
+      const vision = analyzed.summary;
       if (!active) {
         return;
       }
+      rawVisionRef.current = analyzed.rawVision;
       visionRef.current = vision;
       const fastScene = classifyScene(vision);
       // Foundation Models run locally. On supported devices, wait for their
@@ -99,7 +108,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
       // freeze the deterministic preview before Foundation could replace it.
       const foundationAvailable = !!vision && isFoundationSceneAvailable();
       const initialScene = foundationAvailable
-        ? await resolveSceneRead(vision, photoUri)
+        ? await resolveSceneRead(vision, photoUri, analyzed.rawVision)
         : {
             ...fastScene,
             foundationStatus: 'unavailable' as const,
@@ -110,9 +119,10 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
       committedRef.current = false;
       const initialMemory = vision
         ? buildPhotoClassifiedMemory({
-            sourceId: 'capture-preview',
-            observedAt: new Date().toISOString(),
+            sourceId: sourceId ?? photoUri ?? 'capture-preview',
+            observedAt: observedAtRef.current,
             vision,
+            rawVision: analyzed.rawVision,
             scene: initialScene,
           })
         : null;
@@ -133,15 +143,16 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
         if (mediaMeanings) setMeanings(mediaMeanings);
       }
       // Upgrade 1 — the hierarchical scene read (chips + media-owned options).
-      if (!foundationAvailable) void resolveSceneRead(vision, photoUri)
+      if (!foundationAvailable) void resolveSceneRead(vision, photoUri, analyzed.rawVision)
         .then((read) => {
           sceneRef.current = read;
           if (!active || !read || committedRef.current) return;
           const currentMemory = clarificationRef.current;
           const upgradedMemory = buildPhotoClassifiedMemory({
-            sourceId: 'capture-preview',
+            sourceId: sourceId ?? photoUri ?? 'capture-preview',
             observedAt: currentMemory?.createdAt ?? new Date().toISOString(),
             vision,
+            rawVision: analyzed.rawVision,
             scene: read,
             confirmations: currentMemory?.confirmations ?? [],
           });
@@ -161,7 +172,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
     return () => {
       active = false;
     };
-  }, [analyze, intro, photoUri]);
+  }, [analyze, intro, photoUri, sourceId]);
 
   const commitMeaning = (meaning: MeaningTag, label: string, memory = clarificationRef.current) => {
     if (state !== 'essence') {
@@ -171,8 +182,26 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setState('absorbing');
     absorb.value = withTiming(1, { duration: 680, easing: Easing.in(Easing.cubic) });
+    const evidence = memory
+      ? buildPhotoEvidence({
+          sourceId: memory.sourceId,
+          observedAt: memory.createdAt,
+          thumbnailUri: photoUri,
+          vision: visionRef.current,
+          rawVision: rawVisionRef.current,
+          scene: sceneRef.current,
+          memory,
+        })
+      : null;
+    const reviewed: ReviewedPhotoAnalysis = {
+      rawVision: rawVisionRef.current,
+      summary: visionRef.current,
+      scene: sceneRef.current,
+      memory,
+      evidence,
+    };
     setTimeout(
-      () => onCommit(meaning, visionRef.current, label, sceneRef.current, memory?.confirmations ?? []),
+      () => onCommit(meaning, visionRef.current, label, sceneRef.current, memory?.confirmations ?? [], reviewed),
       740
     );
   };

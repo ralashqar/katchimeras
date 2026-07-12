@@ -188,9 +188,7 @@ function QuestBody(props: Props) {
             {reviewItem?.matchStatus === 'possible' ? (
               <View style={styles.matchQuestion}>
                 <ThemedText style={styles.criterion} lightColor="#F8E8C8" darkColor="#F8E8C8">
-                  {reviewItem.qualityId === 'place.city'
-                    ? 'Does this photo show the city view Skylo is looking for?'
-                    : 'Does this photo show what the quest is looking for?'}
+                  {questMatchQuestion(reviewItem)}
                 </ThemedText>
                 {([
                   ['primary', "Yes — that's what I captured"],
@@ -271,6 +269,18 @@ function QuestBody(props: Props) {
       </ThemedText>
     </Pressable>
   );
+}
+
+function questMatchQuestion(item: QuestSubmissionItem): string {
+  if (item.qualityId === 'place.city') return 'Does this photo clearly show the city skyline?';
+  if (item.qualityId === 'place.park') return 'Does this photo clearly show the park or green space?';
+  if (item.qualityId === 'subject.food') return 'Does this photo clearly show the meal?';
+  if (item.qualityId === 'subject.dog') return 'Is the dog clearly visible in this photo?';
+  if (item.qualityId === 'subject.cat') return 'Is the cat clearly visible in this photo?';
+  const requested = item.requestedLabel?.replace(/^photograph\s+/i, '').replace(/[.]$/, '');
+  return requested
+    ? `Does this photo clearly show ${requested.toLowerCase()}?`
+    : 'Does this photo clearly show what the quest is looking for?';
 }
 
 function QuestProgressBar({ label, ratio, complete }: { label: string; ratio: number; complete: boolean }) {

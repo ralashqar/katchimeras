@@ -12,7 +12,7 @@
   "centralityWeights": { "primary": 1, "supporting": 0.65, "incidental": 0.25 },
   "qualities": [
     { "id": "place.city", "domain": "place", "aliases": ["city", "cityscape", "skyline", "skyscraper", "downtown", "urban", "urban street", "high rise", "city centre", "city center"], "physicalOnly": true, "assignmentSeedId": "city_day" },
-    { "id": "place.park", "domain": "place", "aliases": ["park", "city park", "green space"], "physicalOnly": true, "assignmentSeedId": "park" },
+    { "id": "place.park", "domain": "place", "aliases": ["park", "city park", "green space", "parkland", "recreation area", "playground", "walking path", "lawn", "meadow", "greenery"], "physicalOnly": true, "assignmentSeedId": "park" },
     { "id": "place.beach", "domain": "place", "aliases": ["beach", "seaside", "shore", "coast"], "physicalOnly": true, "assignmentSeedId": "beach" },
     { "id": "place.forest", "domain": "nature", "aliases": ["forest", "woodland", "jungle"], "physicalOnly": true, "assignmentSeedId": "forest" },
     { "id": "place.garden", "domain": "nature", "aliases": ["garden", "botanical garden", "flowerbed"], "physicalOnly": true, "assignmentSeedId": "garden" },

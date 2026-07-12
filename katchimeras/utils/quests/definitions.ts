@@ -58,14 +58,12 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
   },
   'quest-new-park': {
     id: 'quest-new-park',
-    title: 'A new green spot',
-    hint: 'Visit a park and snap a photo there to show me.',
-    criteria: [
-      { fact: 'places.categories', op: 'includes', value: 'park', label: 'Confirm a park' },
-      {
-        ...photoQualityCriterion('place.park', 'Snap a photo of the park'),
-      },
-    ],
+    family: 'photo',
+    submissionMode: 'manual',
+    suggestedActions: ['take_photo'],
+    title: 'A green spot',
+    hint: 'Snap a photo of a park or green space to show me.',
+    criteria: [photoQualityCriterion('place.park', 'Photograph a park')],
   },
   'quest-visit-beach': {
     id: 'quest-visit-beach',

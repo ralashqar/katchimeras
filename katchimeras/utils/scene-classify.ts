@@ -1,4 +1,4 @@
-import type { DayVisionSummary, MemoryDomain, StudioMediaType } from '@/types/home';
+import type { DayVisionSummary, MemoryDomain, PhotoVisionResult, StudioMediaType } from '@/types/home';
 import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
 import {
   classifySceneOnDevice,
@@ -228,7 +228,8 @@ function normalizeMediaKind(raw: string | null): StudioMediaType | null {
 // its title heuristic fallback keeps working on non-AI devices.
 async function resolveFoundationSceneRead(
   vision: DayVisionSummary | undefined | null,
-  imageUri?: string | null
+  imageUri?: string | null,
+  rawVision?: PhotoVisionResult | null
 ): Promise<SceneRead | null> {
   if (!vision) return null;
   const tags = [
@@ -239,7 +240,7 @@ async function resolveFoundationSceneRead(
     (token): token is string => typeof token === 'string' && !!token.trim()
   );
   try {
-    const deep = await readSceneOnDevice(tags, ocrLines, vision.maxFaceCount ?? 0, imageUri);
+    const deep = await readSceneOnDevice(tags, ocrLines, vision.maxFaceCount ?? 0, imageUri, rawVision);
     const deepType = deep ? normalizeType(deep.type) : null;
     if (deep && deepType) {
       if (deepType === 'media') {
@@ -312,7 +313,8 @@ function normalizeMemoryDomain(value: string | null): MemoryDomain | null {
 
 export async function resolveSceneRead(
   vision: DayVisionSummary | undefined | null,
-  imageUri?: string | null
+  imageUri?: string | null,
+  rawVision?: PhotoVisionResult | null
 ): Promise<SceneRead> {
   if (!vision) return { type: 'other', label: SCENE_LABEL.other, source: 'rules' };
   const result = await runIntelligenceTask({
@@ -324,7 +326,7 @@ export async function resolveSceneRead(
         id: 'appleFoundation',
         task: 'classifyScene',
         canRun: () => isFoundationSceneAvailable(),
-        run: (input) => resolveFoundationSceneRead(input, imageUri),
+        run: (input) => resolveFoundationSceneRead(input, imageUri, rawVision),
         confidence: () => 0.8,
       },
       {

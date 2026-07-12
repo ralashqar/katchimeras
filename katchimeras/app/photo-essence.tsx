@@ -13,6 +13,7 @@ import { confirmationsRejectDomain } from '@/utils/intelligence/classification-p
 import type { SceneRead } from '@/utils/scene-classify';
 import type { DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
+import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
 // on-device, asks what it meant (essence-based options), then feeds the day with
@@ -37,9 +38,9 @@ export default function PhotoEssenceRoute() {
 
   // Load the asset's decodable local file (camera-roll candidates only carry a
   // thumbnail), then read it on-device. Best-effort — null degrades gracefully.
-  const analyze = useCallback(async (): Promise<DayVisionSummary | null> => {
+  const analyze = useCallback(async (): Promise<PhotoAnalysisInput> => {
     if (!assetId) {
-      return null;
+      return { rawVision: null, summary: null };
     }
     try {
       const MediaLibrary = await import('expo-media-library');
@@ -53,28 +54,30 @@ export default function PhotoEssenceRoute() {
       const localUri = assetInfo.localUri ?? assetInfo.uri ?? null;
       localUriRef.current = localUri;
       if (!localUri) {
-        return null;
+        return { rawVision: null, summary: null };
       }
       const result = await analyzePhoto(localUri);
-      rawVisionRef.current = result;
-      return result
-        ? aggregatePhotoVision([{
-            ...result,
-            captureSource: 'camera_roll',
-            isScreenshot: assetInfo.mediaSubtypes?.includes('screenshot') ?? false,
-            hasLocation:
-              Number.isFinite(Number(assetInfo.location?.latitude)) &&
-              Number.isFinite(Number(assetInfo.location?.longitude)),
-          }], CAPTURE_PHOTO_CONFIDENCE_FLOOR)
-        : null;
+      const enrichedResult = result ? {
+        ...result,
+        captureSource: 'camera_roll' as const,
+        isScreenshot: assetInfo.mediaSubtypes?.includes('screenshot') ?? false,
+        hasLocation:
+          Number.isFinite(Number(assetInfo.location?.latitude)) &&
+          Number.isFinite(Number(assetInfo.location?.longitude)),
+      } : null;
+      rawVisionRef.current = enrichedResult;
+      return {
+        rawVision: enrichedResult,
+        summary: enrichedResult ? aggregatePhotoVision([enrichedResult], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null,
+      };
     } catch {
-      return null;
+      return { rawVision: null, summary: null };
     }
   }, [assetId]);
 
   const commit = useCallback(
     // `scene` is the hierarchical read EssenceReview resolved (and showed).
-    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[]) => {
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[], reviewed?: ReviewedPhotoAnalysis) => {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined, {
         rejectFood: confirmationsRejectDomain(confirmations, 'food'),
         rejectMedia: confirmationsRejectDomain(confirmations, 'media'),
@@ -109,6 +112,8 @@ export default function PhotoEssenceRoute() {
           meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null, sourceId: assetId },
           scene: scene ?? undefined,
           confirmations,
+          classifiedMemory: reviewed?.memory ?? null,
+          evidence: reviewed?.evidence ?? null,
         },
         captureTarget
       );
@@ -128,7 +133,14 @@ export default function PhotoEssenceRoute() {
 
   return (
     <View style={styles.screen}>
-      <EssenceReview photoUri={thumbnailUri || null} analyze={analyze} onCommit={commit} onClose={() => router.back()} />
+      <EssenceReview
+        photoUri={thumbnailUri || null}
+        sourceId={assetId}
+        observedAt={params.capturedAt ?? null}
+        analyze={analyze}
+        onCommit={commit}
+        onClose={() => router.back()}
+      />
     </View>
   );
 }

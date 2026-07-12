@@ -159,6 +159,16 @@ check('supporting subjects retain independent presence confidence', supportingCi
 const supportingCityQuest = evaluateQuestRuntime({ questId: 'quest-photo-city', facts: { 'memory.qualities': [supportingCity.evidence] } });
 check('quest can accept a clear supporting subject without making it dominant', supportingCityQuest.readyToSubmit, JSON.stringify(supportingCityQuest));
 
+const parkPhoto = buildPhotoIntelligence({
+  sourceId: 'mossprout-park-photo', observedAt: '2026-07-10T20:35:00.000Z',
+  vision: summary([['lawn', 0.84], ['greenery', 0.8], ['outdoor', 0.72]]),
+  scene: { memoryDomain: 'place', type: 'place', label: 'A place', detail: 'green space', source: 'llm', representation: 'real_world', confidence: 0.84 },
+});
+const parkQuality = parkPhoto.memory.qualities.find((quality) => quality.qualityId === 'place.park');
+const mossproutParkQuest = evaluateQuestRuntime({ questId: 'quest-new-park', facts: { 'memory.qualities': [parkPhoto.evidence] } });
+check('park photo derives the canonical place.park quality', parkQuality?.centrality === 'primary' && parkQuality.score >= 0.72, JSON.stringify(parkPhoto.memory));
+check('Mossprout quest becomes ready from the park photo alone', mossproutParkQuest.readyToSubmit, JSON.stringify(mossproutParkQuest));
+
 function qualityEvidence(centrality) {
   return [{ id: `photo:city-${centrality}`, sourceType: 'photo', sourceId: `city-${centrality}`, observedAt: '2026-07-10T12:00:00.000Z', provider: 'appleVision', confidence: 0.9, signals: [{ key: 'place.city', confidence: 0.9, provider: 'appleVision', source: 'aggregate', centrality }] }];
 }

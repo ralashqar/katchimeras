@@ -89,6 +89,7 @@ const requiredExports = [
   'suggestMeaningsAsync',
   'interpretNoteAsync',
   'readMemoryAsync',
+  'readMemoryV2Async',
   'readSceneAsync',
   'classifySceneAsync',
 ];

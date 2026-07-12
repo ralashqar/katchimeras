@@ -25,6 +25,14 @@ export function detectProminentPeopleInVision(
 ): ProminentPeopleDetection {
   if (!vision || summaryIsScreenContent(vision.details)) return { detected: false };
 
+  const personRegions = (vision.analysisRegions ?? []).filter(
+    (region) => region.kind === 'human' || region.kind === 'face'
+  );
+  const largestPersonRegion = personRegions.reduce(
+    (largest, region) => Math.max(largest, region.width * region.height),
+    0
+  );
+
   const leading = (vision.concepts ?? []).slice(0, 3);
   for (let rank = 0; rank < leading.length; rank += 1) {
     const concept = leading[rank];
@@ -35,7 +43,7 @@ export function detectProminentPeopleInVision(
     const sufficientlyProminent =
       (rank === 0 && confidence >= (specific ? 0.16 : 0.22)) ||
       (rank === 1 && confidence >= (specific ? 0.22 : 0.3)) ||
-      (rank === 2 && confidence >= 0.36 && (vision.dominantSubjectCoverage ?? 0) >= 0.18);
+      (rank === 2 && confidence >= 0.36 && largestPersonRegion >= 0.08);
     if (sufficientlyProminent) {
       return {
         detected: true,
@@ -51,8 +59,13 @@ export function detectProminentPeopleInVision(
   if (faces >= 2) {
     return { detected: true, kind: 'group', confidence: 0.75, reason: `${faces} people detected` };
   }
-  if (faces === 1 && (vision.dominantSubjectCoverage ?? 0) >= 0.18) {
-    return { detected: true, kind: 'person', confidence: 0.68, reason: 'One prominent person detected' };
+  if (faces === 1 && largestPersonRegion >= 0.08) {
+    return {
+      detected: true,
+      kind: 'person',
+      confidence: Math.min(0.82, 0.58 + largestPersonRegion * 0.5),
+      reason: 'One person occupies a meaningful region of the frame',
+    };
   }
   // Rear-view/full-body subjects may have no detectable face. Native Vision
   // retains human rectangles; use occupied area instead of requiring a face.

@@ -20,11 +20,12 @@ import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 import { confirmationsRejectDomain } from '@/utils/intelligence/classification-policy';
-import { classifyScene, type SceneRead } from '@/utils/scene-classify';
+import { resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
 import type { DayInputTarget, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import { cancelQuestCapture, completeQuestCapture } from '@/utils/quest-capture-session';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
+import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import { evaluatePhotoForQuest } from '@/utils/quests/photo-evaluation';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
@@ -82,21 +83,24 @@ export default function MomentCaptureScreen() {
     }
   }, [closeCapture, state]);
 
-  const analyzeCaptured = useCallback(async (): Promise<DayVisionSummary | null> => {
+  const analyzeCaptured = useCallback(async (): Promise<PhotoAnalysisInput> => {
     if (!photoUri) {
-      return null;
+      return { rawVision: null, summary: null };
     }
     const result = await analyzePhoto(photoUri);
     rawVisionRef.current = result ? { ...result, captureSource: 'camera' } : null;
-    return result
-      ? aggregatePhotoVision([{ ...result, captureSource: 'camera' }], CAPTURE_PHOTO_CONFIDENCE_FLOOR)
-      : null;
+    return {
+      rawVision: rawVisionRef.current,
+      summary: result
+        ? aggregatePhotoVision([{ ...result, captureSource: 'camera' }], CAPTURE_PHOTO_CONFIDENCE_FLOOR)
+        : null,
+    };
   }, [photoUri]);
 
   const commit = useCallback(
     // `scene` is the hierarchical read EssenceReview resolved (and showed) —
     // the same classification the engine acts on.
-    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[]) => {
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[], reviewed?: ReviewedPhotoAnalysis) => {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined, {
         rejectFood: confirmationsRejectDomain(confirmations, 'food'),
         rejectMedia: confirmationsRejectDomain(confirmations, 'media'),
@@ -118,6 +122,8 @@ export default function MomentCaptureScreen() {
           meaning: { archetype: meaning, label, thumbnailUri: photoUri ?? null, sourceId: photoUri },
           scene: scene ?? undefined,
           confirmations,
+          classifiedMemory: reviewed?.memory ?? null,
+          evidence: reviewed?.evidence ?? null,
         },
         captureTarget
       );
@@ -135,7 +141,7 @@ export default function MomentCaptureScreen() {
         });
       }
       if (questId && questCreatureId && photoUri) {
-        const memory = buildPhotoIntelligence({
+        const memory = reviewed?.memory ?? buildPhotoIntelligence({
           sourceId: photoUri,
           observedAt: new Date().toISOString(),
           thumbnailUri: photoUri,
@@ -155,8 +161,25 @@ export default function MomentCaptureScreen() {
     if (state !== 'captured' || !questId || !questCreatureId || !photoUri || questProcessingRef.current) return;
     questProcessingRef.current = true;
     setState('questAnalyzing');
-    void analyzeCaptured().then((vision) => {
-      commit('meaningful', vision, 'Quest capture', classifyScene(vision), []);
+    void analyzeCaptured().then(async (analysis) => {
+      const scene = await resolveSceneRead(analysis.summary, photoUri, analysis.rawVision);
+      const intelligence = analysis.summary
+        ? buildPhotoIntelligence({
+            sourceId: photoUri,
+            observedAt: new Date().toISOString(),
+            thumbnailUri: photoUri,
+            rawVision: analysis.rawVision,
+            vision: analysis.summary,
+            scene,
+            confirmations: [],
+          })
+        : null;
+      commit('meaningful', analysis.summary, 'Quest capture', scene, [], {
+        ...analysis,
+        scene,
+        memory: intelligence?.memory ?? null,
+        evidence: intelligence?.evidence ?? null,
+      });
     }).catch(() => {
       completeQuestCapture(
         questId,
@@ -209,6 +232,7 @@ export default function MomentCaptureScreen() {
       <View style={styles.screen}>
         <EssenceReview
           photoUri={photoUri}
+          sourceId={photoUri}
           questId={questId}
           analyze={analyzeCaptured}
           onCommit={commit}

@@ -373,6 +373,15 @@ export function withMemoryConfirmation(
   }
   if (confirmation.facetKey === 'primary_subject' && photoAnalysis) {
     photoAnalysis = selectConfirmedPrimarySubject(photoAnalysis, confirmation.facetValue);
+    if (photoAnalysis.hierarchy) {
+      photoAnalysis = {
+        ...photoAnalysis,
+        hierarchy: {
+          ...photoAnalysis.hierarchy,
+          unresolvedFacets: photoAnalysis.hierarchy.unresolvedFacets.filter((item) => item.key !== 'primary_subject'),
+        },
+      };
+    }
     const selected = photoAnalysis.subjects.find((subject) => subject.role === 'primary');
     dominantDomain = selected?.domain !== 'other' ? selected?.domain ?? dominantDomain : dominantDomain;
     if (selected) {
