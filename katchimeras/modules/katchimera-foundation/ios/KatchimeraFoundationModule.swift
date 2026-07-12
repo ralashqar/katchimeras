@@ -145,11 +145,17 @@ public final class KatchimeraFoundationModule: Module {
     guard !cleaned.isEmpty || !cleanedOCR.isEmpty else { return [:] }
     let instructions = Instructions(
       """
-      Classify a personal memory from on-device visual observations and OCR.
+      Organize a personal photo from on-device visual observations and OCR.
+      First classify representation as physical_scene, physical_artwork,
+      physical_document, device_showing_content, native_digital_image, screenshot,
+      or unknown. Classify its container as none, book, screen, frame_or_canvas,
+      poster_or_print, document, packaging, or unknown. A container is what was
+      photographed; objects shown inside it are depicted content.
       Choose exactly one dominant domain: animal, people, food, media, movement, place, work,
       nature, life_event, or other. Name the specific subject in 2-5 words.
       If it is media, identify mediaKind as book, film, show, game, music, or art
-      and only provide title/creator when supported by OCR. If it is food, name
+      and only provide title/creator when directly supported by OCR. Never complete
+      partial titles or creators from world knowledge. If it is food, name
       the dish or drink. First distinguish a real physical scene from a screenshot,
       game, cartoon, illustration, app interface, or content displayed on a screen.
       Depicted food, animals, people, and places are not real-life food, pet, people,
@@ -164,6 +170,8 @@ public final class KatchimeraFoundationModule: Module {
       gender, age, family relationship, or whether an animal is someone's pet.
       Return up to four other clearly visible subjects as a comma-separated list,
       excluding the dominant subject. Do not include weak guesses.
+      Give a zero-to-one confidence for the dominant classification and a short
+      comma-separated list of plausible alternatives when evidence is ambiguous.
       """
     )
     let session = LanguageModelSession(instructions: instructions)
@@ -193,6 +201,9 @@ public final class KatchimeraFoundationModule: Module {
       "food": content.food,
       "activity": content.activity,
       "representation": content.representation,
+      "container": content.container,
+      "confidence": String(content.confidence),
+      "alternatives": content.alternatives,
       "supportingSubjects": content.supportingSubjects,
       "promptVersion": promptVersion,
     ]
@@ -446,8 +457,17 @@ public final class KatchimeraFoundationModule: Module {
 @available(iOS 26.0, *)
 @Generable
 struct MemoryRead {
-  @Guide(description: "Whether this is a physical scene, screen content, or unclear", .anyOf(["real_world", "screen_content", "unknown"]))
+  @Guide(description: "How the image itself is represented", .anyOf(["physical_scene", "physical_artwork", "physical_document", "device_showing_content", "native_digital_image", "screenshot", "unknown"]))
   let representation: String
+
+  @Guide(description: "The physical or digital container holding the depicted content", .anyOf(["none", "book", "screen", "frame_or_canvas", "poster_or_print", "document", "packaging", "unknown"]))
+  let container: String
+
+  @Guide(description: "Confidence in the dominant classification", .range(0.0...1.0))
+  let confidence: Double
+
+  @Guide(description: "Up to three plausible alternative domain or subject labels, comma-separated, or empty")
+  let alternatives: String
 
   @Guide(description: "The dominant memory domain", .anyOf(["animal", "people", "food", "media", "movement", "place", "work", "nature", "life_event", "other"]))
   let domain: String

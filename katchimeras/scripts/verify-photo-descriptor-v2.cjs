@@ -167,5 +167,48 @@ const supportingQuest = evaluateQuestRuntime({ questId: 'quest-photo-city', fact
 check('incidental city evidence cannot satisfy a supporting-centrality quest', !incidentalQuest.readyToSubmit);
 check('supporting city evidence can become ready for explicit submission', supportingQuest.readyToSubmit && !supportingQuest.complete);
 
+const spatiallyBalanced = buildPhotoClassifiedMemory({
+  sourceId: 'spatially-balanced', observedAt: '2026-07-12T16:00:00.000Z',
+  rawVision: {
+    labels: [{ name: 'dog', confidence: 0.78 }, { name: 'sushi', confidence: 0.77 }],
+    text: [], faceCount: 0, humanCount: 0, animals: [], humans: [], faces: [],
+    regionClassifications: [
+      { region: { x: 0.04, y: 0.18, width: 0.43, height: 0.58, confidence: 0.82 }, labels: [{ name: 'dog', confidence: 0.81 }] },
+      { region: { x: 0.52, y: 0.2, width: 0.42, height: 0.56, confidence: 0.8 }, labels: [{ name: 'sushi', confidence: 0.8 }] },
+    ],
+    dominantSubject: { x: 0.04, y: 0.18, width: 0.43, height: 0.58, confidence: 0.82 },
+    documentDetected: false, captureSource: 'camera',
+  },
+  scene: { type: 'other', label: 'A moment', source: 'rules' },
+});
+check(
+  'independently classified comparable regions create generic subject ambiguity',
+  spatiallyBalanced.photoAnalysis.hierarchy?.unresolvedFacets.some((item) =>
+    item.key === 'primary_subject' && item.candidates.includes('dog') && item.candidates.includes('sushi')
+  ),
+  JSON.stringify(spatiallyBalanced.photoAnalysis)
+);
+
+const spatiallyDominant = buildPhotoClassifiedMemory({
+  sourceId: 'spatially-dominant', observedAt: '2026-07-12T16:01:00.000Z',
+  rawVision: {
+    labels: [{ name: 'dog', confidence: 0.8 }, { name: 'sushi', confidence: 0.79 }],
+    text: [], faceCount: 0, humanCount: 0, animals: [], humans: [], faces: [],
+    regionClassifications: [
+      { region: { x: 0.03, y: 0.08, width: 0.78, height: 0.78, confidence: 0.86 }, labels: [{ name: 'dog', confidence: 0.82 }] },
+      { region: { x: 0.84, y: 0.7, width: 0.12, height: 0.12, confidence: 0.62 }, labels: [{ name: 'sushi', confidence: 0.8 }] },
+    ],
+    dominantSubject: { x: 0.03, y: 0.08, width: 0.78, height: 0.78, confidence: 0.86 },
+    documentDetected: false, captureSource: 'camera',
+  },
+  scene: { type: 'other', label: 'A moment', source: 'rules' },
+});
+check(
+  'a clearly larger classified region proceeds without a focus question',
+  !spatiallyDominant.photoAnalysis.hierarchy?.unresolvedFacets.some((item) => item.key === 'primary_subject') &&
+    spatiallyDominant.photoAnalysis.subjects.find((item) => item.role === 'primary')?.canonicalValue === 'dog',
+  JSON.stringify(spatiallyDominant.photoAnalysis)
+);
+
 console.log(failures ? `\n${failures} descriptor-v2 check(s) FAILED.` : '\nAll descriptor-v2 checks passed.');
 process.exit(failures ? 1 : 0);

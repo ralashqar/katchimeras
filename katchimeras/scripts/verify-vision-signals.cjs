@@ -140,8 +140,16 @@ const coverStructure = aggregatePhotoVision([{
 check('OCR keeps original cover casing for title resolution', coverStructure.textTokens[0] === 'KAZUO ISHIGURO' && coverStructure.textTokens[1] === 'KLARA AND THE SUN', JSON.stringify(coverStructure.textTokens));
 check('dominant-subject area survives aggregation', Math.abs(coverStructure.dominantSubjectCoverage - 0.576) < 1e-9, String(coverStructure.dominantSubjectCoverage));
 check('document structure survives aggregation', coverStructure.documentCoverage === 1, String(coverStructure.documentCoverage));
-check('native cover OCR uses accurate recognition', nativeVisionSource.includes('textRequest.recognitionLevel = .accurate'));
-check('native cover OCR enables language correction', nativeVisionSource.includes('textRequest.usesLanguageCorrection = true'));
+check(
+  'native cover OCR uses accurate recognition',
+  nativeVisionSource.includes('textRequest.recognitionLevel = labelsSuggestText ? .accurate : .fast'),
+);
+check(
+  'native cover OCR enables language correction',
+  nativeVisionSource.includes('textRequest.usesLanguageCorrection = labelsSuggestText'),
+);
+check('native Vision classifies salient regions independently', nativeVisionSource.includes('request.regionOfInterest = object.boundingBox'));
+check('native Vision returns region classifications', nativeVisionSource.includes('"regionClassifications": regionClassifications'));
 
 // 4. Face coverage tracks how much of the day had people in frame.
 const faces = aggregatePhotoVision([photo([], 3), photo([], 0), photo([], 4)]);

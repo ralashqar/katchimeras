@@ -1,4 +1,5 @@
 import type { ClassifiedMemory, StoredHomeDayRecord } from '@/types/home';
+import { currentClarificationNode } from '@/utils/intelligence/clarification';
 
 export type ContextualPromptSuggestion = {
   id: string;
@@ -35,6 +36,8 @@ export function planContextualPrompts(
 }
 
 function promptTitle(memory: ClassifiedMemory): string {
+  const currentQuestion = currentClarificationNode(memory);
+  if (currentQuestion?.question) return currentQuestion.question;
   if (memory.promptState.graphId === 'people-relationship') {
     const subject = memory.facets.find((facet) => facet.key === 'person_subject')?.value;
     if (subject === 'baby') return 'Who is this little one to you?';

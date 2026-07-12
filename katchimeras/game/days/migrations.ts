@@ -6,6 +6,7 @@ import type {
   StoredHomeState,
 } from '@/types/home';
 import { deriveMemoryQualities } from '@/utils/intelligence/quality-registry';
+import { QUESTION_PLANNER_VERSION, questionIdForGraphNode } from '@/utils/intelligence/question-registry';
 import { createFallbackLocationsForStoredDay } from './locations';
 
 type LegacyStoredHomeDayRecord = Omit<
@@ -86,6 +87,7 @@ type Version8StoredHomeState = Omit<StoredHomeState, 'version' | 'archivedDays' 
   tomorrow?: Version8StoredHomeDayRecord;
 };
 type Version9StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 9 };
+type Version10StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 10 };
 type Version7StoredHomeState = Omit<Version8StoredHomeState, 'version' | 'personalEntities' | 'cloudIntelligenceEnabled'> & {
   version: 7;
 };
@@ -93,6 +95,7 @@ type Version6StoredHomeState = Omit<Version7StoredHomeState, 'version'> & { vers
 
 export type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version10StoredHomeState
   | Version9StoredHomeState
   | Version8StoredHomeState
   | Version7StoredHomeState
@@ -104,9 +107,19 @@ export type UpgradeableStoredHomeState =
   | LegacyStoredHomeState;
 
 export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
+  if ('version' in inputState && inputState.version === 11) {
+    return {
+      ...inputState,
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
+      tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
+    };
+  }
+
   if ('version' in inputState && inputState.version === 10) {
     return {
       ...inputState,
+      version: 11,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -116,7 +129,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 9) {
     return {
       ...inputState,
-      version: 10,
+      version: 11,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -126,7 +139,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 8) {
     return {
       ...inputState,
-      version: 10,
+      version: 11,
       personalEntities: inputState.personalEntities ?? [],
       cloudIntelligenceEnabled: inputState.cloudIntelligenceEnabled === true,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -138,7 +151,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && (inputState.version === 7 || inputState.version === 6)) {
     return {
       ...inputState,
-      version: 10,
+      version: 11,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -151,7 +164,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 5) {
     return {
       ...inputState,
-      version: 10,
+      version: 11,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -163,7 +176,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
-      version: 10,
+      version: 11,
       encounterHistory: {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -174,7 +187,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 10,
+      version: 11,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
@@ -188,7 +201,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 10,
+      version: 11,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
@@ -203,7 +216,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 10,
+    version: 11,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -229,7 +242,7 @@ function ensureStoredDayFields(
     ? day.classifiedMemories.map((memory): ClassifiedMemory => ({
         ...memory,
         qualities:
-          memory.schemaVersion >= 3 && Array.isArray(memory.qualities)
+          memory.schemaVersion >= 5 && Array.isArray(memory.qualities)
             ? memory.qualities
             : deriveMemoryQualities({
                 observations: memory.observations ?? [],
@@ -245,8 +258,14 @@ function ensureStoredDayFields(
           maxQuestions: memory.promptState.maxQuestions ?? 3,
           skippedGoalIds: memory.promptState.skippedGoalIds ?? [],
           completedGoalIds: memory.promptState.completedGoalIds ?? [],
+          plannerVersion: memory.promptState.plannerVersion ?? QUESTION_PLANNER_VERSION,
+          currentQuestionId: memory.promptState.currentQuestionId ?? questionIdForGraphNode(memory.promptState.graphId, memory.promptState.currentNodeId),
+          askedQuestionIds: memory.promptState.askedQuestionIds ?? [],
+          resolvedGoalIds: memory.promptState.resolvedGoalIds ?? [],
+          microQuestionCount: memory.promptState.microQuestionCount ?? 0,
+          candidateTrace: memory.promptState.candidateTrace ?? [],
         },
-        schemaVersion: 3,
+        schemaVersion: 5,
       }))
     : [];
   return {

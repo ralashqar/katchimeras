@@ -65,9 +65,7 @@ export function deriveMemoryQualities(input: {
           ? 'primary'
           : matchesAny(canonicalValue, supporting)
             ? 'supporting'
-            : observation.confidence < 0.3
-              ? 'incidental'
-              : 'supporting';
+            : 'incidental';
         return {
           provider: observation.provider,
           confidence: clamp01(observation.confidence),

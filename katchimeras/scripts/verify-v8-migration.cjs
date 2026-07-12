@@ -18,12 +18,15 @@ fs.writeFileSync(qualityRegistryPath, ts.transpileModule(qualitySource, {
 }).outputText);
 const typesPath = path.join(temp, 'types.js');
 const locationsPath = path.join(temp, 'locations.js');
+const questionsPath = path.join(temp, 'questions.js');
 fs.writeFileSync(typesPath, '');
 fs.writeFileSync(locationsPath, 'exports.createFallbackLocationsForStoredDay = () => [];');
+fs.writeFileSync(questionsPath, 'exports.QUESTION_PLANNER_VERSION = 2; exports.questionIdForGraphNode = (graphId, nodeId) => graphId && nodeId ? `${graphId}.${nodeId}` : null;');
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {
   if (request === '@/types/home') return typesPath;
   if (request === '@/utils/intelligence/quality-registry') return qualityRegistryPath;
+  if (request === '@/utils/intelligence/question-registry') return questionsPath;
   if (request === '@/data/intelligence/memory-qualities.json') return path.join(root, 'data/intelligence/memory-qualities.json');
   if (request === './locations' && parent?.filename === migrationPath) return locationsPath;
   return originalResolve.call(this, request, parent, ...rest);
@@ -55,23 +58,26 @@ const oldState = {
   archivedDays: [day], today: { ...day, id: 'day-2026-07-10', isoDate: '2026-07-10', state: 'forming' },
 };
 const upgraded = upgradeStoredHomeState(oldState);
+const upgradedFromV10 = upgradeStoredHomeState({ ...oldState, version: 10 });
 let failures = 0;
 function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
   else { failures += 1; console.log(`FAIL  ${label}`); }
 }
-check('v9 upgrades to v10', upgraded.version === 10);
+check('v9 upgrades to v11', upgraded.version === 11);
+check('v10 upgrades losslessly to v11', upgradedFromV10.version === 11 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
 check('cloud intelligence remains opt-in', upgraded.cloudIntelligenceEnabled === false);
 check('personal entities initialize locally', Array.isArray(upgraded.personalEntities) && upgraded.personalEntities.length === 0);
 check('days are preserved', upgraded.archivedDays.length === 1 && upgraded.today.id === 'day-2026-07-10');
 check('legacy vision survives', upgraded.archivedDays[0].vision.concepts[0].name === 'dog');
 check('evidence survives', upgraded.archivedDays[0].evidence[0].id === 'ev-1');
 check('legacy memories gain canonical qualities', upgraded.archivedDays[0].classifiedMemories[0].qualities.some((quality) => quality.qualityId === 'place.city'));
-check('legacy memories upgrade to separated-confidence schema v3', upgraded.archivedDays[0].classifiedMemories[0].schemaVersion === 3);
+check('legacy memories upgrade to canonical-confidence schema v5', upgraded.archivedDays[0].classifiedMemories[0].schemaVersion === 5);
 check('legacy prompt state gains adaptive budget', upgraded.archivedDays[0].classifiedMemories[0].promptState.maxQuestions === 3);
+check('legacy prompt state gains planner metadata', upgraded.archivedDays[0].classifiedMemories[0].promptState.plannerVersion === 2 && Array.isArray(upgraded.archivedDays[0].classifiedMemories[0].promptState.askedQuestionIds));
 check('creature survives', upgraded.archivedDays[0].creature.id === 'waglet');
 check('prompt answer survives', upgraded.archivedDays[0].promptAnswers[0].choiceIds[0] === 'calm');
 check('location survives', upgraded.archivedDays[0].locations[0].id === 'loc-1');
 
-console.log(failures ? `\n${failures} v10 migration check(s) FAILED.` : '\nAll v10 migration checks passed.');
+console.log(failures ? `\n${failures} v11 migration check(s) FAILED.` : '\nAll v11 migration checks passed.');
 process.exit(failures ? 1 : 0);

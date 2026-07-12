@@ -14,6 +14,7 @@ import type { SceneRead } from '@/utils/scene-classify';
 
 import { canonicalizeSignal } from './taxonomy';
 import { QUALITY_REGISTRY, qualityMatchesText } from './quality-registry';
+import { buildPhotoHierarchy } from './photo-hierarchy';
 
 const MAX_SUBJECTS = 5;
 const MAX_OCR = 12;
@@ -27,19 +28,21 @@ export function buildPhotoAnalysisDescriptor(input: {
   facets: MemoryFacet[];
 }): PhotoAnalysisDescriptor {
   const representation = representationFor(input.rawVision, input.vision, input.scene);
-  const dominantValue = dominantSubjectValue(input.scene, input.facets, input.observations);
+  const dominantValue = dominantSubjectValue(input.scene, input.facets, input.observations, representation.kind);
   const grouped = new Map<string, IntelligenceObservation[]>();
-  input.observations.forEach((observation) => {
-    const bucket = grouped.get(observation.value) ?? [];
-    bucket.push(observation);
-    grouped.set(observation.value, bucket);
+  [...input.observations, ...subjectObservationsFromFacets(input.facets)].forEach((observation) => {
+    const identity = subjectIdentity(observation.value);
+    const normalizedObservation = identity === observation.value ? observation : { ...observation, value: identity };
+    const bucket = grouped.get(identity) ?? [];
+    bucket.push(normalizedObservation);
+    grouped.set(identity, bucket);
   });
 
   const subjects = [...grouped.entries()]
     .map<PhotoAnalysisSubject>(([value, observations]) => {
       const score = Math.max(...observations.map((observation) => observation.confidence));
       const domain = domainForValue(value, observations.map((item) => item.raw ?? '').join(' '));
-      const role = value === dominantValue ? 'primary' : score >= 0.35 ? 'supporting' : 'incidental';
+      const role = score >= 0.35 ? 'supporting' : 'incidental';
       return {
         id: `subject:${value}`,
         label: observations.find((item) => item.raw)?.raw ?? value,
@@ -49,23 +52,27 @@ export function buildPhotoAnalysisDescriptor(input: {
         score: round2(score),
         region: regionForSubject(value, input.rawVision, input.vision),
         providers: [...new Set(observations.map((item) => item.provider))],
-        sensitive: ['child', 'baby', 'person', 'social', 'dog', 'cat'].includes(value),
+        sensitive: ['child', 'baby', 'person', 'adult', 'social', 'dog', 'cat'].includes(value),
       };
     })
-    .sort((left, right) => roleRank(left.role) - roleRank(right.role) || right.score - left.score)
+    .sort((left, right) => subjectCentralityScore(right, dominantValue) - subjectCentralityScore(left, dominantValue))
     .slice(0, MAX_SUBJECTS);
 
-  if (!subjects.some((subject) => subject.role === 'primary') && subjects[0]) subjects[0].role = 'primary';
-  let foundPrimary = false;
+  const rankedMeaningful = subjects
+    .filter((subject) => subject.domain !== 'other' && subject.role !== 'incidental')
+    .sort((left, right) => subjectCentralityScore(right, dominantValue) - subjectCentralityScore(left, dominantValue));
+  const primary = rankedMeaningful[0] ?? subjects[0] ?? null;
   subjects.forEach((subject) => {
-    if (subject.role !== 'primary') return;
-    if (!foundPrimary) foundPrimary = true;
-    else subject.role = 'supporting';
+    if (subject.id === primary?.id) subject.role = 'primary';
+    else if (subject.role !== 'incidental') subject.role = 'supporting';
   });
 
-  const dominant = subjects.find((subject) => subject.role === 'primary') ?? null;
-  const alternatives = aggregateDomainAlternatives(subjects, dominant?.domain ?? 'other');
-  return {
+  const dominant = primary;
+  const alternatives = mergeAlternatives(
+    aggregateDomainAlternatives(subjects, dominant?.domain ?? 'other'),
+    input.scene
+  );
+  const descriptor: PhotoAnalysisDescriptor = {
     schemaVersion: 2,
     stage: input.scene?.source === 'llm' ? 'foundation' : input.scene ? 'complete' : 'vision',
     representation,
@@ -76,6 +83,66 @@ export function buildPhotoAnalysisDescriptor(input: {
     providerRuns: providerRuns(input.rawVision, input.scene),
     alternatives,
   };
+  descriptor.hierarchy = buildPhotoHierarchy({
+    rawVision: input.rawVision,
+    scene: input.scene,
+    observations: input.observations,
+    facets: input.facets,
+    subjects,
+  });
+  return descriptor;
+}
+
+function subjectIdentity(value: string): string {
+  if (/^(book|book cover|publication|paperback|hardcover|novel)$/i.test(value)) return 'book';
+  if (/^(television|tv|tv screen|screen content|computer monitor|broadcast)$/i.test(value)) return 'television';
+  if (/^(people|person|adult)$/i.test(value)) return 'person';
+  return value;
+}
+
+function subjectObservationsFromFacets(facets: MemoryFacet[]): IntelligenceObservation[] {
+  const subjectKeys = new Set(['person_subject', 'animal_kind', 'media_type', 'food_item', 'food_kind']);
+  return facets
+    .filter((facet) => subjectKeys.has(facet.key) && !['other', 'incidental', 'unknown'].includes(facet.value))
+    .flatMap((facet) => {
+      const value = canonicalizeSignal(facet.value);
+      return value ? [{
+        key: 'facet_subject',
+        value,
+        confidence: Math.max(facet.confidence, 0.74),
+        provider: 'deterministic' as const,
+        raw: facet.value,
+      }] : [];
+    });
+}
+
+export function subjectCentralityScore(subject: PhotoAnalysisSubject, preferredValue?: string | null): number {
+  const area = subject.region ? Math.max(0, subject.region.width * subject.region.height) : 0;
+  const regionConfidence = subject.region?.confidence ?? 0;
+  const visualProminence = Math.min(0.3, area * 0.42 + regionConfidence * 0.12);
+  const semanticValue = subject.domain === 'other' ? -0.16 : 0.08;
+  // The scene read is useful supporting evidence, but a visible foreground
+  // subject is allowed to beat it. This preference is deliberately small.
+  const sceneContinuity = subject.canonicalValue === preferredValue ? 0.2 : 0;
+  return subject.score + visualProminence + semanticValue + sceneContinuity;
+}
+
+function mergeAlternatives(
+  subjectAlternatives: PhotoAnalysisDescriptor['alternatives'],
+  scene: SceneRead | null | undefined
+): PhotoAnalysisDescriptor['alternatives'] {
+  const merged = new Map(subjectAlternatives.map((item) => [item.domain, item]));
+  for (const alternative of scene?.alternatives ?? []) {
+    const canonical = canonicalizeSignal(alternative) ?? alternative;
+    const domain = domainForValue(canonical, alternative);
+    if (domain === 'other' || merged.has(domain)) continue;
+    merged.set(domain, {
+      domain,
+      score: round2(Math.max(0.3, (scene?.confidence ?? 0.6) * 0.75)),
+      reason: `Foundation alternative: ${alternative}`,
+    });
+  }
+  return [...merged.values()].sort((left, right) => right.score - left.score).slice(0, 4);
 }
 
 export function replanDescriptorAfterSubjectRejection(
@@ -99,7 +166,8 @@ export function replanDescriptorAfterSubjectRejection(
 function dominantSubjectValue(
   scene: SceneRead | null | undefined,
   facets: MemoryFacet[],
-  observations: IntelligenceObservation[]
+  observations: IntelligenceObservation[],
+  representation: 'real_world' | 'screen_content' | 'unknown'
 ): string | null {
   const person = facets.find((facet) => facet.key === 'person_subject')?.value;
   if (person) return canonicalizeSignal(person);
@@ -122,16 +190,13 @@ function dominantSubjectValue(
     const mediaValue = canonicalizeSignal(prominentMedia.value);
     if (mediaValue && observations.some((item) => item.value === mediaValue)) return mediaValue;
   }
-  if (scene?.type === 'media') return canonicalizeSignal(scene.media?.mediaType ?? scene.detail ?? 'media');
-  if (scene?.type === 'screen') {
-    // Prefer the photographed display over a person or object depicted inside
-    // it. This keeps the descriptor multi-label while making its centrality
-    // match the user's real subject: the TV/screen and its content.
-    const screenSubject = observations.find((item) =>
-      /television|\btv\b|tv screen|broadcast|screen content|computer monitor|display/i.test(`${item.value} ${item.raw ?? ''}`)
-    );
-    if (screenSubject) return screenSubject.value;
+  if (representation === 'screen_content') {
+    const mediaSubject = observations
+      .filter((item) => domainForValue(item.value, item.raw ?? '') === 'media')
+      .sort((left, right) => right.confidence - left.confidence)[0];
+    if (mediaSubject) return mediaSubject.value;
   }
+  if (scene?.type === 'media') return canonicalizeSignal(scene.media?.mediaType ?? scene.detail ?? 'media');
   if (scene?.type === 'food') return canonicalizeSignal(scene.food?.label ?? scene.detail ?? 'food');
   if (scene?.type === 'pet') return facets.find((facet) => facet.key === 'animal_kind')?.value ?? null;
   const sceneDetail = canonicalizeSignal(scene?.detail ?? '');
@@ -152,12 +217,13 @@ function domainForValue(value: string, raw: string): MemoryDomain {
   const text = `${value} ${raw}`;
   const quality = QUALITY_REGISTRY.qualities.find((candidate) => qualityMatchesText(candidate, text));
   if (quality) return quality.domain;
-  if (['child', 'person', 'social', 'people'].includes(value)) return 'people';
+  if (['child', 'baby', 'person', 'adult', 'social', 'people', 'group'].includes(value)) return 'people';
   if (/television|\btv\b|tv screen|broadcast/i.test(text)) return 'media';
+  if (['book', 'film', 'show', 'game', 'gaming', 'music', 'concert', 'art', 'cinema'].includes(value)) return 'media';
   if (['dog', 'cat'].includes(value)) return 'animal';
   if (['creative', 'focus_work'].includes(value)) return value === 'focus_work' ? 'work' : 'media';
   if (['gym', 'basketball', 'tennis'].includes(value)) return 'movement';
-  if (['travel', 'city'].includes(value)) return 'place';
+  if (['place', 'travel', 'city', 'bookstore', 'library', 'museum', 'farm', 'park', 'beach', 'platform'].includes(value)) return 'place';
   if (value === 'celebration') return 'life_event';
   return 'other';
 }
@@ -167,6 +233,22 @@ function representationFor(
   vision: DayVisionSummary | null | undefined,
   scene: SceneRead | null | undefined
 ) {
+  const screenConfidence = Math.max(
+    vision?.representation?.kind === 'screen_content' ? vision.representation.confidence : 0,
+    summaryIsScreenContent(vision?.details) ? 0.82 : 0,
+    ...(vision?.concepts ?? [])
+      .filter((concept) => /screen content|television|\btv\b|computer monitor|display/i.test(concept.name))
+      .map((concept) => concept.peakConfidence)
+  );
+  const genericActivityRead = scene?.type === 'activity' ||
+    scene?.memoryDomain === 'work' || scene?.memoryDomain === 'movement' || scene?.memoryDomain === 'other';
+  // Representation is a higher-level fact than depicted activity. Corroborated
+  // screen evidence beats a generic activity read regardless of whether the
+  // screen contains work, craft, sport, food, or a future unseen category.
+  if (screenConfidence >= 0.45 && genericActivityRead) {
+    return { kind: 'screen_content' as const, confidence: screenConfidence, reasons: ['Screen container evidence outweighs depicted activity'] };
+  }
+  if (vision?.representation?.kind === 'screen_content' && vision.representation.confidence >= 0.7) return vision.representation;
   if (scene?.representation) {
     return { kind: scene.representation, confidence: 0.82, reasons: ['Foundation memory representation'] };
   }
@@ -202,6 +284,8 @@ function selectedRegions(raw: PhotoVisionResult | null | undefined, vision: DayV
   if (!raw && vision?.analysisRegions) return vision.analysisRegions.slice(0, MAX_REGIONS);
   const regions: PhotoAnalysisDescriptor['regions'] = [];
   if (raw?.dominantSubject) regions.push({ ...raw.dominantSubject, kind: 'saliency' });
+  raw?.salientSubjects?.forEach((region) => regions.push({ ...region, kind: 'saliency' }));
+  raw?.regionClassifications?.forEach((item) => regions.push({ ...item.region, kind: 'saliency' }));
   raw?.humans?.forEach((region) => regions.push({ ...region, kind: 'human' }));
   raw?.faces?.forEach((region) => regions.push({ ...region, kind: 'face' }));
   raw?.animals?.forEach((animal) => animal.region && regions.push({ ...animal.region, kind: 'animal' }));
@@ -214,9 +298,34 @@ function regionForSubject(
   vision: DayVisionSummary | null | undefined
 ): NormalizedImageRegion | null {
   const regions = raw ? selectedRegions(raw, vision) : vision?.analysisRegions ?? [];
-  if (value === 'dog' || value === 'cat') return raw?.animals?.find((animal) => animal.kind === value)?.region ?? null;
-  if (['child', 'baby', 'person', 'social'].includes(value)) {
+  if (value === 'dog' || value === 'cat') {
+    const dedicatedAnimalRegion = raw?.animals?.find((animal) => animal.kind === value)?.region;
+    if (dedicatedAnimalRegion) return dedicatedAnimalRegion;
+  }
+  if (['child', 'baby', 'person', 'adult', 'people', 'social', 'group'].includes(value)) {
     return raw?.humans?.[0] ?? raw?.faces?.[0] ?? regions.find((region) => region.kind === 'human' || region.kind === 'face') ?? raw?.dominantSubject ?? null;
+  }
+  const spatialMatch = raw?.regionClassifications
+    ?.flatMap((item) => item.labels.map((label) => ({ item, label })))
+    .filter(({ label }) => subjectIdentity(canonicalizeSignal(label.name) ?? '') === subjectIdentity(value))
+    .sort((left, right) => {
+      const leftArea = left.item.region.width * left.item.region.height;
+      const rightArea = right.item.region.width * right.item.region.height;
+      return (right.label.confidence * 0.7 + rightArea * 0.3) - (left.label.confidence * 0.7 + leftArea * 0.3);
+    })[0];
+  if (spatialMatch) {
+    return {
+      ...spatialMatch.item.region,
+      confidence: Math.max(spatialMatch.item.region.confidence, spatialMatch.label.confidence),
+    };
+  }
+  if (raw?.documentDetected && ['book', 'document', 'page', 'paper', 'publication'].includes(value)) {
+    return raw.dominantSubject ?? regions.find((region) => region.kind === 'saliency') ?? null;
+  }
+  if (!raw && (vision?.documentCoverage ?? 0) >= 0.3 && ['book', 'document', 'page', 'paper', 'publication'].includes(value)) {
+    const area = Math.min(1, Math.max(0, vision?.dominantSubjectCoverage ?? vision?.documentCoverage ?? 0));
+    const side = Math.sqrt(area);
+    return { x: 0.5 - side / 2, y: 0.5 - side / 2, width: side, height: side, confidence: 0.72 };
   }
   return value === canonicalizeSignal(raw?.labels?.[0]?.name ?? '') ? raw?.dominantSubject ?? regions.find((region) => region.kind === 'saliency') ?? null : null;
 }
@@ -255,10 +364,6 @@ function aggregateDomainAlternatives(subjects: PhotoAnalysisSubject[], dominant:
     .sort((left, right) => right[1] - left[1])
     .slice(0, 4)
     .map(([domain, score]) => ({ domain, score: round2(score), reason: 'Supporting subject did not win centrality' }));
-}
-
-function roleRank(role: PhotoAnalysisSubject['role']) {
-  return role === 'primary' ? 0 : role === 'supporting' ? 1 : 2;
 }
 
 function round2(value: number) {

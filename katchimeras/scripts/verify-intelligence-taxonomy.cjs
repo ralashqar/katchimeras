@@ -48,6 +48,10 @@ function check(label, condition, detail) {
 check('park synonyms canonicalize', taxonomy.canonicalizeSignal('green space') === 'park');
 check('dog synonyms canonicalize', taxonomy.canonicalizeSignal('golden retriever') === 'dog');
 check('generic labels are ignored', taxonomy.canonicalizeSignal('outdoor') === null);
+check('train station cannot collide with rain', taxonomy.canonicalizeSignal('train station') === 'travel');
+check('rain remains canonical', taxonomy.canonicalizeSignal('rainy afternoon') === 'rain');
+check('portrait cannot become a museum', taxonomy.canonicalizeSignal('portrait') === 'person');
+check('parking cannot become a park memory', taxonomy.canonicalizeSignal('parking garage') !== 'park');
 check('movie signals share the Flickerbun route', taxonomy.seedIdForCanonicalSignal('film') === 'cinema');
 check('transit signals route to Signalhop', taxonomy.seedIdForCanonicalSignal('transit') === 'transit_commute');
 

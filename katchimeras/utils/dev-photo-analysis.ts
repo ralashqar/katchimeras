@@ -2,6 +2,7 @@ import type { DayEvidence, DayVisionSummary, PhotoVisionResult, UserConfirmation
 import type { SceneRead } from '@/utils/scene-classify';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
+import { classifiedMemoryConsistencyWarnings } from '@/utils/intelligence/consistency';
 import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 import { QUEST_DEFINITIONS } from '@/utils/quests/definitions';
 
@@ -33,6 +34,7 @@ export type DevLastPhotoAnalysis = {
   classifiedMemory: ReturnType<typeof buildPhotoIntelligence>['memory'] | null;
   evidence: DayEvidence | null;
   questEvaluations: DevQuestPhotoEvaluation[];
+  consistencyWarnings: string[];
 };
 
 export function saveDevLastPhotoAnalysis(input: {
@@ -72,6 +74,7 @@ export function saveDevLastPhotoAnalysis(input: {
       classifiedMemory: intelligence?.memory ?? null,
       evidence: intelligence?.evidence ?? null,
       questEvaluations: intelligence ? evaluatePhotoQuests(intelligence.memory.qualities) : [],
+      consistencyWarnings: intelligence ? classifiedMemoryConsistencyWarnings(intelligence.memory) : [],
     };
     setStoredJson(STORAGE_KEY, snapshot);
   }, 700);

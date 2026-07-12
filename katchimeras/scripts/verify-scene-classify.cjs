@@ -110,6 +110,29 @@ check('prominent typographic book cover routes to media', prominentBookCover.typ
 check('book-cover OCR extracts a usable title', prominentBookCover.media?.title === 'Klara and the Sun', prominentBookCover.media?.title);
 check('food illustrated on a confirmed cover cannot outrank the book', prominentBookCover.type !== 'food', prominentBookCover.type);
 
+const lowConfidenceNorwegianWood = scene.classifyScene(vision({
+  concepts: [
+    { name: 'textile', salience: 0.35, coverage: 1, count: 1, peakConfidence: 0.35 },
+    { name: 'document', salience: 0.197, coverage: 1, count: 1, peakConfidence: 0.197 },
+    { name: 'book', salience: 0.197, coverage: 1, count: 1, peakConfidence: 0.197 },
+  ],
+  details: ['textile', 'document', 'book'],
+  textTokens: ['MURAKAMI', 'NORWEGIAN', 'WOOD', 'VINTAGE'],
+  dominantSubjectCoverage: 0.53,
+  documentCoverage: 1,
+}));
+check('large structured cover beats higher-scored background textile', lowConfidenceNorwegianWood.type === 'media' && lowConfidenceNorwegianWood.media?.mediaType === 'book', JSON.stringify(lowConfidenceNorwegianWood));
+check('low-confidence structured cover retains OCR title', lowConfidenceNorwegianWood.media?.title === 'Norwegian Wood', lowConfidenceNorwegianWood.media?.title);
+
+const ocrStructuredCoverWithoutBookLabel = scene.classifyScene(vision({
+  concepts: ['textile', 'utensil', 'tableware'],
+  details: ['textile', 'utensil', 'tableware'],
+  textTokens: ['MURAKAMI', 'NORWEGIAN', 'WOOD', 'VINTAGE'],
+  dominantSubjectCoverage: 0.53,
+  documentCoverage: 1,
+}));
+check('strong OCR document can recover a cover without a book classifier label', ocrStructuredCoverWithoutBookLabel.type === 'media' && ocrStructuredCoverWithoutBookLabel.media?.mediaType === 'book', JSON.stringify(ocrStructuredCoverWithoutBookLabel));
+
 const ocrOnlyBook = scene.classifyScene(vision({
   concepts: ['conveyance', 'portal', 'window', 'blue sky'],
   details: ['conveyance', 'portal', 'window', 'blue sky'],

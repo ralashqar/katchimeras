@@ -37,6 +37,9 @@ type FoundationSceneModule = {
     food?: unknown;
     activity?: unknown;
     representation?: unknown;
+    container?: unknown;
+    confidence?: unknown;
+    alternatives?: unknown;
     supportingSubjects?: unknown;
     promptVersion?: unknown;
   }>;
@@ -116,6 +119,10 @@ export type DeepSceneRead = {
   title: string | null;
   creator: string | null;
   representation: 'real_world' | 'screen_content' | 'unknown' | null;
+  representationV2: string | null;
+  container: string | null;
+  confidence: number | null;
+  alternatives: string[];
   supportingSubjects: string[];
   promptVersion: string | null;
 };
@@ -170,6 +177,10 @@ export async function readSceneOnDevice(
       title: cleanText(result?.title, 60),
       creator: cleanText(result?.creator, 48),
       representation: null,
+      representationV2: null,
+      container: null,
+      confidence: null,
+      alternatives: [],
       supportingSubjects: [],
       promptVersion: null,
     };
@@ -185,6 +196,9 @@ function sceneFromMemoryResult(memory: {
   title?: unknown;
   creator?: unknown;
   representation?: unknown;
+  container?: unknown;
+  confidence?: unknown;
+  alternatives?: unknown;
   supportingSubjects?: unknown;
   promptVersion?: unknown;
 } | null | undefined): DeepSceneRead | null {
@@ -199,14 +213,30 @@ function sceneFromMemoryResult(memory: {
     mediaKind: mediaKind && mediaKind !== 'none' ? mediaKind : null,
     title: cleanText(memory.title, 60),
     creator: cleanText(memory.creator, 48),
-    representation: ['real_world', 'screen_content', 'unknown'].includes(String(memory.representation))
-      ? String(memory.representation) as DeepSceneRead['representation']
-      : null,
+    representation: legacyRepresentation(memory.representation),
+    representationV2: cleanEnum(memory.representation, ['physical_scene', 'physical_artwork', 'physical_document', 'device_showing_content', 'native_digital_image', 'screenshot', 'unknown']),
+    container: cleanEnum(memory.container, ['none', 'book', 'screen', 'frame_or_canvas', 'poster_or_print', 'document', 'packaging', 'unknown']),
+    confidence: Number.isFinite(Number(memory.confidence)) ? Math.min(1, Math.max(0, Number(memory.confidence))) : null,
+    alternatives: typeof memory.alternatives === 'string' ? memory.alternatives.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 3) : [],
     supportingSubjects: typeof memory.supportingSubjects === 'string'
       ? memory.supportingSubjects.split(',').map((item) => item.trim()).filter(Boolean).slice(0, 4)
       : [],
     promptVersion: cleanText(memory.promptVersion, 48),
   };
+}
+
+function cleanEnum(value: unknown, allowed: string[]): string | null {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return allowed.includes(normalized) ? normalized : null;
+}
+
+function legacyRepresentation(value: unknown): DeepSceneRead['representation'] {
+  const normalized = String(value);
+  if (normalized === 'physical_scene' || normalized === 'physical_artwork' || normalized === 'physical_document') return 'real_world';
+  if (normalized === 'device_showing_content' || normalized === 'native_digital_image' || normalized === 'screenshot') return 'screen_content';
+  return normalized === 'real_world' || normalized === 'screen_content' || normalized === 'unknown'
+    ? normalized as DeepSceneRead['representation']
+    : null;
 }
 
 function mapMemoryDomainToScene(domain: string): string | null {

@@ -53,6 +53,10 @@ type Args = {
 export type QuestCaptureFeedback = {
   phase: 'analyzing' | 'matched' | 'possible' | 'no_match';
   sourceId: string;
+  questId?: string;
+  creatureId?: string;
+  evidenceId?: string | null;
+  reason?: string | null;
 };
 
 export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args) {
@@ -96,7 +100,15 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         const resident = residentById.get(completedCapture.creatureId);
         const creature = creatureById.get(completedCapture.creatureId);
         if (resident && creature) setSelectedResident({ resident, creature, thread: 'quest' });
-        setQuestCaptureFeedback({ phase: 'analyzing', sourceId: completedCapture.sourceId });
+        const evaluation = completedCapture.evaluation;
+        setQuestCaptureFeedback({
+          phase: evaluation?.status === 'ready' ? 'matched' : evaluation?.status === 'possible' ? 'possible' : evaluation ? 'no_match' : 'analyzing',
+          sourceId: completedCapture.sourceId,
+          questId: completedCapture.questId,
+          creatureId: completedCapture.creatureId,
+          evidenceId: evaluation?.evidenceId ?? null,
+          reason: evaluation?.reason ?? null,
+        });
       }
     }, [creatureById, residentById])
   );
@@ -162,10 +174,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const selectedQuestItems = useMemo(() => {
     if (!selectedActiveQuest || !selectedQuestRuntime) return [];
     if (selectedQuestRuntime.readyToSubmit || selectedQuestRuntime.possibleEvidenceIds.length > 0) {
-      const items = buildQuestSubmissionItems(questDay, selectedQuestRuntime, selectedActiveQuest, companionQuestState.submissions);
-      return questCaptureFeedback?.sourceId
-        ? [...items].sort((left, right) => Number(right.sourceId === questCaptureFeedback.sourceId) - Number(left.sourceId === questCaptureFeedback.sourceId))
-        : items;
+      return buildQuestSubmissionItems(
+        questDay,
+        selectedQuestRuntime,
+        selectedActiveQuest,
+        companionQuestState.submissions,
+        3,
+        questCaptureFeedback?.sourceId ?? null
+      );
     }
     if (selectedQuestRuntime.complete) return buildQuestReportBackItems(questDay, selectedQuestRuntime);
     return [];
@@ -206,6 +222,31 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     saveCompanionQuests(next);
     setCompanionQuestState(next);
   }, []);
+
+  // A clear quest-camera match is authoritative and auto-submits the exact
+  // captured source. Keep the matched state visible briefly, then complete.
+  useEffect(() => {
+    if (questCaptureFeedback?.phase !== 'matched' || !questCaptureFeedback.creatureId) return;
+    const timeout = setTimeout(() => {
+      const latest = loadCompanionQuests();
+      const result = submitQuest(
+        latest,
+        questCaptureFeedback.creatureId!,
+        {
+          sourceType: 'photo',
+          sourceId: questCaptureFeedback.sourceId,
+          evidenceId: questCaptureFeedback.evidenceId ?? null,
+        },
+        Date.now(),
+        today?.isoDate ?? null
+      );
+      commitCompanionQuestState(result.state);
+      setMicrocopy(result.submitted ? 'Photo matched - quest complete' : 'Quest already submitted');
+      setQuestCaptureFeedback(null);
+      if (result.submitted) setSelectedResident(null);
+    }, 900);
+    return () => clearTimeout(timeout);
+  }, [commitCompanionQuestState, questCaptureFeedback, today?.isoDate]);
 
   const selectResident = useCallback(
     (creatureId: string) => {

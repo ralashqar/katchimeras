@@ -5,6 +5,10 @@ type KatchimeraVisionModuleShape = {
     labels?: { name?: unknown; confidence?: unknown }[];
     text?: unknown[];
     faceCount?: unknown;
+    regionClassifications?: {
+      region?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown };
+      labels?: { name?: unknown; confidence?: unknown }[];
+    }[];
   }>;
 };
 

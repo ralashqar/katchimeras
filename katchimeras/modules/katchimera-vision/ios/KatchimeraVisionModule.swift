@@ -239,27 +239,31 @@ public final class KatchimeraVisionModule: Module {
 
     var text: [String] = []
     var recognizedText: [[String: Any]] = []
-    if shouldRunTextRecognition(labels) {
+    let labelsSuggestText = shouldRunTextRecognition(labels)
+    // Classifier labels are unreliable for typographic covers: a close book
+    // can be labelled textile/tableware and would previously skip OCR entirely.
+    // Probe every image cheaply, then use accurate recognition for known text
+    // candidates. This keeps ordinary photos fast while allowing visible title
+    // text to rescue a missed book/document classification.
+    do {
       let textRequest = VNRecognizeTextRequest()
-      textRequest.recognitionLevel = .accurate
-      textRequest.usesLanguageCorrection = true
-      do {
-        try handler.perform([textRequest])
-        if let observations = textRequest.results {
-          recognizedText = observations.compactMap { observation in
-            guard let candidate = observation.topCandidates(1).first else { return nil }
-            return [
-              "text": candidate.string,
-              "confidence": Double(candidate.confidence),
-              "region": regionDictionary(observation.boundingBox, confidence: candidate.confidence)
-            ]
-          }
-          text = recognizedText.compactMap { $0["text"] as? String }
+      textRequest.recognitionLevel = labelsSuggestText ? .accurate : .fast
+      textRequest.usesLanguageCorrection = labelsSuggestText
+      try handler.perform([textRequest])
+      if let observations = textRequest.results {
+        recognizedText = observations.compactMap { observation in
+          guard let candidate = observation.topCandidates(1).first else { return nil }
+          return [
+            "text": candidate.string,
+            "confidence": Double(candidate.confidence),
+            "region": regionDictionary(observation.boundingBox, confidence: candidate.confidence)
+          ]
         }
-      } catch {
-        text = []
-        recognizedText = []
+        text = recognizedText.compactMap { $0["text"] as? String }
       }
+    } catch {
+      text = []
+      recognizedText = []
     }
 
     var faceCount = 0
@@ -286,6 +290,41 @@ public final class KatchimeraVisionModule: Module {
     let humanCount = humanRequest.results?.count ?? 0
     let humans = humanRequest.results?.map { regionDictionary($0.boundingBox, confidence: $0.confidence) } ?? []
     var dominantSubject: [String: Any]? = nil
+    let salientSubjects = saliencyRequest.results?.first?.salientObjects?.prefix(4).map {
+      regionDictionary($0.boundingBox, confidence: $0.confidence)
+    } ?? []
+    // Whole-image labels cannot tell us whether "book" belongs to the large
+    // foreground object or a shelf in the background. Classify the strongest
+    // salient regions independently so JS can compare like-for-like subject
+    // prominence without category-specific precedence rules.
+    let salientObjects = Array(saliencyRequest.results?.first?.salientObjects?.prefix(3) ?? [])
+    var regionClassifications: [[String: Any]] = []
+    // A single salient object is already represented by the whole-image pass.
+    // Only pay for crop classification when spatial competition is possible.
+    if salientObjects.count >= 2 {
+      let regionRequests = salientObjects.map { object -> VNClassifyImageRequest in
+        let request = VNClassifyImageRequest()
+        request.regionOfInterest = object.boundingBox
+        return request
+      }
+      do {
+        try handler.perform(regionRequests)
+        regionClassifications = zip(salientObjects, regionRequests).compactMap { pair in
+          let (object, request) = pair
+          let regionLabels: [[String: Any]] = (request.results ?? [])
+            .filter { $0.confidence >= 0.1 }
+            .prefix(6)
+            .map { ["name": $0.identifier, "confidence": Double($0.confidence)] }
+          guard !regionLabels.isEmpty else { return nil }
+          return [
+            "region": regionDictionary(object.boundingBox, confidence: object.confidence),
+            "labels": regionLabels
+          ]
+        }
+      } catch {
+        regionClassifications = []
+      }
+    }
     if let object = saliencyRequest.results?.first?.salientObjects?.first {
       let box = object.boundingBox
       dominantSubject = [
@@ -298,7 +337,7 @@ public final class KatchimeraVisionModule: Module {
     }
 
     var documentDetected = false
-    if #available(iOS 15.0, *), shouldRunDocumentDetection(labels) {
+    if #available(iOS 15.0, *), shouldRunDocumentDetection(labels) || recognizedText.count >= 2 {
       let documentRequest = VNDetectDocumentSegmentationRequest()
       do {
         try handler.perform([documentRequest])
@@ -317,7 +356,9 @@ public final class KatchimeraVisionModule: Module {
       "humanCount": humanCount,
       "humans": humans,
       "animals": animals,
-        "dominantSubject": dominantSubject ?? NSNull(),
+      "dominantSubject": dominantSubject ?? NSNull(),
+      "salientSubjects": salientSubjects,
+      "regionClassifications": regionClassifications,
       "documentDetected": documentDetected
     ])
   }
@@ -327,7 +368,8 @@ public final class KatchimeraVisionModule: Module {
     let cues = [
       "book", "publication", "document", "paper", "page", "text", "receipt",
       "menu", "sign", "poster", "screen", "television", "monitor", "album",
-      "magazine", "newspaper", "whiteboard", "label"
+      "magazine", "newspaper", "whiteboard", "label", "art", "artwork",
+      "painting", "drawing", "illustration", "canvas", "package", "box"
     ]
     return cues.contains { text.contains($0) }
   }
@@ -356,6 +398,6 @@ public final class KatchimeraVisionModule: Module {
   }
 
   private func emptyResult() -> [String: Any] {
-    return ["labels": [], "text": [], "recognizedText": [], "faceCount": 0, "faces": [], "humanCount": 0, "humans": [], "animals": [], "documentDetected": false]
+    return ["labels": [], "text": [], "recognizedText": [], "faceCount": 0, "faces": [], "humanCount": 0, "humans": [], "animals": [], "salientSubjects": [], "regionClassifications": [], "documentDetected": false]
   }
 }

@@ -1,5 +1,10 @@
 import type { ClassifiedMemory, UserConfirmation } from '@/types/home';
 import { withMemoryConfirmation } from '@/utils/intelligence/classification';
+import {
+  planNextQuestion,
+  questionDefinition,
+  questionIdForGraphNode,
+} from '@/utils/intelligence/question-registry';
 
 export type ClarificationOption = {
   id: string;
@@ -37,6 +42,41 @@ const FOOD_MEANINGS: ClarificationNode = {
 };
 
 const GRAPHS: Record<string, ClarificationGraph> = {
+  'subject-focus': graph('subject-focus', {
+    root: {
+      id: 'root', question: 'What was this moment mainly about?', options: [
+        option('focus_other', 'Something else', '✨', 'primary_subject', 'other', null, 'meaningful'),
+      ],
+    },
+  }),
+  'representation-context': graph('representation-context', {
+    root: {
+      id: 'root', question: 'What kind of image is this?', options: [
+        option('real_scene', 'A real scene', '📷', 'representation_kind', 'physical_scene', null, 'meaningful'),
+        option('artwork', 'Artwork', '🎨', 'representation_kind', 'artwork', null, 'meaningful'),
+        option('screen', 'On a screen', '📱', 'representation_kind', 'screen_or_digital', null, 'meaningful'),
+        option('book_document', 'Book / document', '📖', 'representation_kind', 'book_or_document', null, 'meaningful'),
+        option('other_image', 'Something else', '✨', 'representation_kind', 'other', null, 'meaningful'),
+      ],
+    },
+  }),
+  'art-context': graph('art-context', {
+    root: {
+      id: 'root', question: 'Whose artwork is this?', options: [
+        option('made_by_me', 'Made by me', '🎨', 'art_authorship', 'made_by_me', 'state', 'meaningful'),
+        option('made_by_other', 'By someone else', '🖼️', 'art_authorship', 'made_by_someone_else', null, 'meaningful'),
+        option('unknown_artist', 'Not sure', '🌙', 'art_authorship', 'unknown', null, 'meaningful'),
+        option('not_art', 'This is not art', '↩️', 'art_authorship', 'not_art', null, 'meaningful'),
+      ],
+    },
+    state: {
+      id: 'state', question: 'What stage was it at?', options: [
+        option('finished', 'Finished work', '✨', 'art_state', 'finished', null, 'meaningful'),
+        option('in_progress', 'Work in progress', '🛠️', 'art_state', 'in_progress', null, 'energy'),
+        option('experiment', 'An experiment', '🌱', 'art_state', 'experiment', null, 'meaningful'),
+      ],
+    },
+  }),
   'animal-relationship': graph('animal-relationship', {
     root: {
       id: 'root',
@@ -155,13 +195,63 @@ const GRAPHS: Record<string, ClarificationGraph> = {
   }),
   'place-context': graph('place-context', {
     root: {
-      id: 'root', question: 'What kind of stop was this?', options: [
+      id: 'root', question: 'What kind of place was this?', options: [
+        option('my_home', 'My home', '🏡', 'place_category', 'home', 'home-meaning', 'calm'),
+        option('someone_home', "Someone else's home", '🫶', 'place_category', 'someone_elses_home', 'visit-meaning', 'together'),
+        option('work_space', 'Work / study', '💼', 'place_category', 'work_space', 'general-purpose', 'meaningful'),
+        option('shop_errand', 'Shop / errand', '🛍️', 'place_category', 'shop', 'general-purpose', 'energy'),
+        option('appointment', 'Appointment', '🗓️', 'place_category', 'appointment', 'general-purpose', 'meaningful'),
+        option('travel_place', 'Travel / transit', '🚉', 'place_category', 'transit_place', 'transit-purpose', 'energy'),
+        option('other_place', 'Somewhere else', '📍', 'place_category', 'other_place', 'general-purpose', 'meaningful'),
+        option('not_about_place', 'Not about the place', '↩️', 'place_category', 'incidental', null, 'meaningful'),
+      ],
+    },
+    'home-meaning': {
+      id: 'home-meaning', question: 'What was happening at home?', options: [
+        option('relaxing', 'Relaxing', '🛋️', 'place_meaning', 'relaxing', null, 'calm'),
+        option('everyday', 'Everyday home life', '🏡', 'place_meaning', 'everyday_life', null, 'calm'),
+        option('family_time', 'Family time', '🫶', 'place_meaning', 'family_time', null, 'together'),
+        option('hosting', 'Hosting', '✨', 'place_meaning', 'hosting', null, 'together'),
+        option('home_work', 'Working / studying', '💻', 'place_meaning', 'work_study', null, 'meaningful'),
+        option('changing_space', 'Changing the space', '🪴', 'place_meaning', 'changing_space', null, 'meaningful'),
+      ],
+    },
+    'visit-meaning': {
+      id: 'visit-meaning', question: 'What brought you there?', options: [
+        option('catching_up', 'Catching up', '☕', 'place_purpose', 'catching_up', null, 'together'),
+        option('family_visit', 'Family visit', '🏡', 'place_purpose', 'family', null, 'together'),
+        option('helping', 'Helping / caring', '🫶', 'place_purpose', 'helping', null, 'meaningful'),
+        option('celebration', 'A celebration', '🎉', 'place_purpose', 'celebration', null, 'energy'),
+        option('staying_over', 'Staying over', '🌙', 'place_purpose', 'staying_over', null, 'calm'),
+        option('brief_visit', 'A brief visit', '📍', 'place_purpose', 'visit', null, 'together'),
+      ],
+    },
+    'stay-meaning': {
+      id: 'stay-meaning', question: 'What kind of stay was this?', options: [
+        option('holiday', 'A trip / holiday', '🧳', 'place_purpose', 'trip', null, 'energy'),
+        option('visiting', 'Visiting someone', '🫶', 'place_purpose', 'visiting', null, 'together'),
+        option('work_trip', 'Work trip', '💼', 'place_purpose', 'work_trip', null, 'meaningful'),
+        option('temporary_home', 'Temporary home', '🏡', 'place_purpose', 'temporary_home', null, 'calm'),
+        option('overnight', 'An overnight stop', '🌙', 'place_purpose', 'overnight', null, 'calm'),
+      ],
+    },
+    'general-purpose': {
+      id: 'general-purpose', question: 'What brought you here?', options: [
         option('visit', 'A visit', '📍', 'place_purpose', 'visit', null, 'together'),
-        option('work', 'Work', '💼', 'place_purpose', 'work', null, 'meaningful'),
-        option('family', 'Family visit', '🏡', 'place_purpose', 'family', null, 'together'),
+        option('work', 'Work / study', '💼', 'place_purpose', 'work', null, 'meaningful'),
         option('appointment', 'Appointment', '🗓️', 'place_purpose', 'appointment', null, 'meaningful'),
-        option('shopping', 'Shopping', '🛍️', 'place_purpose', 'shopping', null, 'energy'),
+        option('shopping', 'Shopping / errand', '🛍️', 'place_purpose', 'shopping', null, 'energy'),
         option('exercise', 'Exercise', '🏃', 'place_purpose', 'exercise', null, 'energy'),
+        option('social', 'Meeting someone', '🫶', 'place_purpose', 'social', null, 'together'),
+        option('passing', 'Passing through', '↪️', 'place_purpose', 'passing_through', null, 'meaningful'),
+      ],
+    },
+    'transit-purpose': {
+      id: 'transit-purpose', question: 'What kind of journey was this?', options: [
+        option('commute', 'Commute', '🚉', 'place_purpose', 'commute', null, 'energy'),
+        option('day_out', 'A day out', '🗺️', 'place_purpose', 'day_out', null, 'energy'),
+        option('trip', 'A trip', '🧳', 'place_purpose', 'trip', null, 'meaningful'),
+        option('errand_route', 'Running errands', '🛍️', 'place_purpose', 'errands', null, 'energy'),
         option('passing', 'Passing through', '↪️', 'place_purpose', 'passing_through', null, 'meaningful'),
       ],
     },
@@ -272,6 +362,12 @@ export function currentClarificationNode(memory: ClassifiedMemory): Clarificatio
   const nodeId = memory.promptState.currentNodeId ?? graph?.rootNodeId;
   const node = graph && nodeId ? graph.nodes[nodeId] ?? null : null;
   if (!node) return null;
+  if (memory.promptState.graphId === 'subject-focus' && node.id === 'root') {
+    return contextualSubjectFocusRoot(memory, node);
+  }
+  if (memory.promptState.graphId === 'place-context' && node.id === 'root') {
+    return contextualPlaceRoot(memory, node);
+  }
   if (memory.promptState.graphId === 'media-context' && node.id === 'title') {
     const title = memory.facets.find(
       (facet) => facet.key === 'media_title' && facet.value !== 'unknown'
@@ -375,6 +471,67 @@ export function currentClarificationNode(memory: ClassifiedMemory): Clarificatio
   return node;
 }
 
+function contextualSubjectFocusRoot(memory: ClassifiedMemory, fallback: ClarificationNode): ClarificationNode {
+  const candidates = memory.photoAnalysis?.hierarchy?.unresolvedFacets
+    .find((facet) => facet.key === 'primary_subject')?.candidates ?? [];
+  const options = candidates.flatMap((candidate): ClarificationOption[] => {
+    const subject = memory.photoAnalysis?.subjects.find((item) => item.canonicalValue === candidate);
+    const rawLabel = subject?.label && subject.label !== candidate ? subject.label : candidate.replace(/_/g, ' ');
+    const domain = subject?.domain ?? 'other';
+    const icon = domain === 'people' ? '🫶' : domain === 'animal' ? '🐾' : domain === 'food' ? '🍽️' : domain === 'media' ? '🎞️' : domain === 'place' ? '📍' : '✨';
+    const archetype = domain === 'people' ? 'together' : domain === 'movement' ? 'energy' : domain === 'food' ? 'calm' : 'meaningful';
+    return [option(
+      `focus_${candidate.replace(/\W+/g, '_')}`,
+      rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1),
+      icon,
+      'primary_subject',
+      candidate,
+      null,
+      archetype
+    )];
+  });
+  const deduped = options.filter((item, index) => options.findIndex((candidate) => candidate.facetValue === item.facetValue) === index);
+  return deduped.length >= 2
+    ? { id: 'root', question: 'What was this moment mainly about?', options: [...deduped, fallback.options[0]] }
+    : fallback;
+}
+
+function contextualPlaceRoot(memory: ClassifiedMemory, fallback: ClarificationNode): ClarificationNode {
+  const observed = memory.observations
+    .map((item) => `${item.value} ${item.raw ?? ''}`)
+    .join(' ');
+  const homeLike = /\b(sofa|couch|living room|bedroom|kitchen|bed|domicile|fireplace|home interior|house interior)\b/i.test(observed);
+  if (homeLike) {
+    return {
+      id: 'root',
+      question: 'What kind of space was this?',
+      options: [
+        option('my_home', 'My home', '🏡', 'place_category', 'home', 'home-meaning', 'calm'),
+        option('someone_home', "Someone else's home", '🫶', 'place_category', 'someone_elses_home', 'visit-meaning', 'together'),
+        option('place_staying', 'A place I was staying', '🌙', 'place_category', 'temporary_stay', 'stay-meaning', 'calm'),
+        option('work_space', 'Work / study space', '💼', 'place_category', 'work_space', 'general-purpose', 'meaningful'),
+        option('shared_space', 'Shared / public space', '📍', 'place_category', 'shared_space', 'general-purpose', 'together'),
+        option('not_about_space', 'Not about the space', '↩️', 'place_category', 'incidental', null, 'meaningful'),
+      ],
+    };
+  }
+  const transitLike = /\b(airport|station|platform|terminal|bus stop|train station|subway|underground|departure gate|arrival gate)\b/i.test(observed);
+  if (transitLike) {
+    return {
+      id: 'root',
+      question: 'How did this place fit the journey?',
+      options: [
+        option('starting_point', 'Starting point', '🚉', 'place_category', 'transit_place', 'transit-purpose', 'energy'),
+        option('destination', 'The destination', '📍', 'place_category', 'destination', 'transit-purpose', 'meaningful'),
+        option('stop_along_way', 'A stop along the way', '🗺️', 'place_category', 'transit_place', 'transit-purpose', 'meaningful'),
+        option('commute_place', 'Part of my commute', '🚇', 'place_category', 'transit_place', 'transit-purpose', 'energy'),
+        option('not_about_place', 'Not about the place', '↩️', 'place_category', 'incidental', null, 'meaningful'),
+      ],
+    };
+  }
+  return fallback;
+}
+
 function youngPersonRoot(subject: 'baby' | 'child'): ClarificationNode {
   return {
     id: 'root',
@@ -397,7 +554,7 @@ export function answerClarification(
   now = new Date()
 ): ClassifiedMemory {
   const confirmation: UserConfirmation = {
-    promptId: `${memory.promptState.graphId}.${node.id}`,
+    promptId: memory.promptState.currentQuestionId ?? `${memory.promptState.graphId}.${node.id}`,
     optionId: selected.id,
     label: selected.label,
     facetKey: selected.facetKey,
@@ -410,14 +567,26 @@ export function answerClarification(
 }
 
 export function skipClarificationGoal(memory: ClassifiedMemory): ClassifiedMemory {
-  const currentGoal = memory.promptState.graphId;
+  const activeQuestionId = memory.promptState.currentQuestionId ?? questionIdForGraphNode(memory.promptState.graphId, memory.promptState.currentNodeId);
+  const activeDefinition = questionDefinition(activeQuestionId);
+  const currentGoal = activeDefinition?.goal ?? memory.promptState.graphId;
   const questionCount = (memory.promptState.questionCount ?? memory.promptState.answeredNodeIds.length) + 1;
   const skippedGoalIds = currentGoal
     ? [...new Set([...(memory.promptState.skippedGoalIds ?? []), currentGoal])]
     : memory.promptState.skippedGoalIds ?? [];
   const next = {
     ...memory,
-    promptState: { ...memory.promptState, questionCount, skippedGoalIds, status: 'answered' as const, currentNodeId: null },
+    promptState: {
+      ...memory.promptState,
+      questionCount,
+      skippedGoalIds,
+      askedQuestionIds: activeQuestionId
+        ? [...new Set([...(memory.promptState.askedQuestionIds ?? []), activeQuestionId])]
+        : memory.promptState.askedQuestionIds ?? [],
+      status: 'answered' as const,
+      currentNodeId: null,
+      currentQuestionId: null,
+    },
   };
   return moveToNextGoal(next, null);
 }
@@ -425,28 +594,31 @@ export function skipClarificationGoal(memory: ClassifiedMemory): ClassifiedMemor
 export function dismissClarification(memory: ClassifiedMemory, now = new Date()): ClassifiedMemory {
   return {
     ...memory,
-    promptState: { ...memory.promptState, status: 'dismissed', currentNodeId: null, dismissedAt: now.toISOString() },
+    promptState: { ...memory.promptState, status: 'dismissed', currentNodeId: null, currentQuestionId: null, dismissedAt: now.toISOString() },
   };
 }
 
 function moveToNextGoal(memory: ClassifiedMemory, completedGoalId: string | null): ClassifiedMemory {
+  const activeDefinition = questionDefinition(memory.promptState.currentQuestionId) ??
+    questionDefinition(completedGoalId ? `${completedGoalId}.root` : null);
   const completedGoalIds = completedGoalId
     ? [...new Set([...(memory.promptState.completedGoalIds ?? []), completedGoalId])]
     : memory.promptState.completedGoalIds ?? [];
   const blocked = new Set([...completedGoalIds, ...(memory.promptState.skippedGoalIds ?? [])]);
+  const resolvedGoalIds = activeDefinition?.goal
+    ? [...new Set([...(memory.promptState.resolvedGoalIds ?? []), activeDefinition.goal])]
+    : memory.promptState.resolvedGoalIds ?? [];
+  resolvedGoalIds.forEach((goal) => blocked.add(goal));
   const questionCount = memory.promptState.questionCount ?? memory.promptState.answeredNodeIds.length;
   if (questionCount >= (memory.promptState.maxQuestions ?? 3)) {
-    return { ...memory, promptState: { ...memory.promptState, completedGoalIds, status: 'answered', currentNodeId: null } };
+    return { ...memory, promptState: { ...memory.promptState, completedGoalIds, resolvedGoalIds, status: 'answered', currentNodeId: null, currentQuestionId: null } };
   }
-  // Do not turn every supporting label into another questionnaire. Hierarchy
-  // lives inside the selected graph. A different subject is considered only
-  // after rejection replans that subject to primary.
-  const candidates = [...(memory.photoAnalysis?.subjects ?? [])]
-    .filter((subject) => subject.role === 'primary')
-    .sort((left, right) => right.score - left.score);
-  const nextGraphId = candidates.map(graphIdForSubject).find((id) => id && !blocked.has(id)) ?? null;
-  if (!nextGraphId) {
-    return { ...memory, promptState: { ...memory.promptState, completedGoalIds, status: 'answered', currentNodeId: null } };
+  const plan = planNextQuestion(
+    { ...memory, promptState: { ...memory.promptState, completedGoalIds, resolvedGoalIds } },
+    blocked
+  );
+  if (!plan) {
+    return { ...memory, promptState: { ...memory.promptState, completedGoalIds, resolvedGoalIds, candidateTrace: [], status: 'answered', currentNodeId: null, currentQuestionId: null } };
   }
   const confirmedMediaType = memory.facets.some(
     (facet) => facet.key === 'media_type' && facet.confirmed && facet.value !== 'other'
@@ -457,33 +629,22 @@ function moveToNextGoal(memory: ClassifiedMemory, completedGoalId: string | null
   // A document/screen question can already establish that the subject is a
   // book or game. Enter the media flow at the next unresolved question rather
   // than asking "What was this?" a second time.
-  const nextNodeId = nextGraphId === 'media-context' && confirmedMediaType
+  const nextNodeId = plan.graphId === 'media-context' && confirmedMediaType
     ? unconfirmedTitle ? 'title' : 'meaning'
-    : 'root';
+    : plan.nodeId;
   return {
     ...memory,
     promptState: {
       ...memory.promptState,
       completedGoalIds,
-      graphId: nextGraphId,
+      resolvedGoalIds,
+      graphId: plan.graphId,
       currentNodeId: nextNodeId,
+      currentQuestionId: questionIdForGraphNode(plan.graphId, nextNodeId),
+      candidateTrace: plan.trace,
       status: 'pending',
     },
   };
-}
-
-function graphIdForSubject(subject: NonNullable<ClassifiedMemory['photoAnalysis']>['subjects'][number]): string | null {
-  if (subject.domain === 'people') return 'people-relationship';
-  if (subject.domain === 'animal') return 'animal-relationship';
-  if (subject.domain === 'food') return 'food-context';
-  if (subject.domain === 'media') return 'media-context';
-  if (subject.domain === 'place') return 'place-context';
-  if (subject.domain === 'nature') return 'nature-context';
-  if (subject.domain === 'movement') return 'activity-context';
-  if (subject.domain === 'work') return 'work-context';
-  if (subject.domain === 'life_event') return 'life-event-context';
-  if (subject.canonicalValue === 'screen' || subject.canonicalValue === 'document') return 'document-screen-context';
-  return null;
 }
 
 function option(

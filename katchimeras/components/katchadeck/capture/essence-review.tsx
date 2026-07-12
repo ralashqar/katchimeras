@@ -23,7 +23,6 @@ import {
   type CaptureMeaning,
   type MeaningTag,
 } from '@/utils/capture-energy';
-import { suggestFoundationMeanings } from '@/utils/foundation-meaning';
 import { foundationSceneAvailability, isFoundationSceneAvailable } from '@/utils/foundation-scene';
 import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
 import {
@@ -124,7 +123,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
       // upgrade them in place when they land (typically ~1s later). The commit
       // still gets whatever scene has resolved by then (engine falls back to
       // rules when it hasn't).
-      setTags(buildEssenceTags(vision, initialScene));
+      setTags(buildEssenceTags(vision, initialScene, initialMemory));
       setMeanings(selectCaptureMeanings(vision));
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
@@ -138,7 +137,6 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
         .then((read) => {
           sceneRef.current = read;
           if (!active || !read || committedRef.current) return;
-          setTags(buildEssenceTags(vision, read));
           const currentMemory = clarificationRef.current;
           const upgradedMemory = buildPhotoClassifiedMemory({
             sourceId: 'capture-preview',
@@ -148,6 +146,7 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
             confirmations: currentMemory?.confirmations ?? [],
           });
           const reconciledMemory = reconcileProgressiveUpgrade(currentMemory, upgradedMemory);
+          setTags(buildEssenceTags(vision, read, reconciledMemory));
           clarificationRef.current = reconciledMemory;
           setClarificationMemory(reconciledMemory);
           if (read.type === 'media' && read.media) {
@@ -158,14 +157,6 @@ export function EssenceReview({ photoUri, analyze, onCommit, onClose }: EssenceR
         .catch(() => {});
       // Upgrade 2 — Foundation Models phrasing for the meaning options (media
       // scenes keep their owned options; see the guard).
-      void suggestFoundationMeanings(vision)
-        .then((llm) => {
-          if (!active || !llm || committedRef.current) return;
-          const scene = sceneRef.current;
-          if (scene?.type === 'media' && scene.media && meaningsForMediaKind(scene.media.mediaType)) return;
-          setMeanings(llm);
-        })
-        .catch(() => {});
     })();
     return () => {
       active = false;
@@ -343,8 +334,7 @@ function reconcileProgressiveUpgrade(
     (facet) => facet.key === 'media_title' && !facet.confirmed && facet.value !== 'unknown'
   );
   const titleAlreadyAsked = current.confirmations.some((confirmation) => confirmation.facetKey === 'media_title');
-  const questionCount = current.promptState.questionCount ?? current.promptState.answeredNodeIds.length;
-  const canAskTitle = questionCount < (current.promptState.maxQuestions ?? 3);
+  const canAskTitle = (current.promptState.microQuestionCount ?? 0) < 1;
   const shouldInsertTitleQuestion =
     confirmedMediaType &&
     hasUnconfirmedTitle &&
@@ -356,16 +346,31 @@ function reconcileProgressiveUpgrade(
     ...upgraded,
     createdAt: current.createdAt,
     promptState: {
-      ...current.promptState,
-      status: shouldInsertTitleQuestion ? 'pending' : current.promptState.status,
-      currentNodeId: shouldInsertTitleQuestion ? 'root' : current.promptState.currentNodeId,
+      // Semantic routing comes from the upgraded canonical interpretation;
+      // only interaction history is carried forward. Preserving the old graph
+      // here caused tags to update while an obsolete question stayed visible.
+      ...upgraded.promptState,
+      answeredNodeIds: current.promptState.answeredNodeIds,
+      askedQuestionIds: current.promptState.askedQuestionIds,
+      resolvedGoalIds: current.promptState.resolvedGoalIds,
+      skippedGoalIds: current.promptState.skippedGoalIds,
+      completedGoalIds: current.promptState.completedGoalIds,
+      questionCount: current.promptState.questionCount,
+      microQuestionCount: current.promptState.microQuestionCount,
+      status: shouldInsertTitleQuestion ? 'pending' : upgraded.promptState.status,
+      currentNodeId: shouldInsertTitleQuestion ? 'title' : upgraded.promptState.currentNodeId,
+      currentQuestionId: shouldInsertTitleQuestion ? 'media-context.title' : upgraded.promptState.currentQuestionId,
     },
   };
 }
 
 // The photo's essence = what the on-device vision read in it, as tags the user
 // can watch being captured into the day.
-function buildEssenceTags(vision: DayVisionSummary | null, scene: SceneRead | null): EssenceTag[] {
+function buildEssenceTags(
+  vision: DayVisionSummary | null,
+  scene: SceneRead | null,
+  memory: ClassifiedMemory | null
+): EssenceTag[] {
   const tags: EssenceTag[] = [];
   // When the work was identified (a cover/poster read as a real title), it
   // leads — the user sees '📖 Norwegian Wood', not just scene labels. The
@@ -391,19 +396,24 @@ function buildEssenceTags(vision: DayVisionSummary | null, scene: SceneRead | nu
   }
   // Lower confidence bar than the nightly line: a single snapped photo's weaker
   // reads (a soda can, a plate) are still worth surfacing as essence tags.
-  const rawNames = vision ? pickProminentTags(vision, 4, 0.16) : [];
-  const televisionScene =
-    !!vision?.concepts.some((concept) => /television|\btv\b|tv screen/i.test(concept.name)) &&
-    (scene?.type === 'screen' || (scene?.type === 'media' && ['show', 'film', 'game'].includes(scene.media?.mediaType ?? '')));
-  // When the camera is pointed at a broadcast, labels such as "adult",
-  // "machine", and "consumer electronics" describe pixels/device hardware,
-  // not the user's memory. Keep only content/viewing cues in the essence UI.
-  const names = televisionScene
-    ? rawNames.filter((name) => /television|\btv\b|football|soccer|sport|game|movie|show|news|broadcast/i.test(name))
-    : rawNames;
-  if (televisionScene && names.length === 0) names.push('television');
-  names.forEach((name) => {
-    tags.push({ id: name, label: humanizeTag(name), accent: TAG_PALETTE[tags.length % TAG_PALETTE.length] });
+  const canonicalNames = (memory?.photoAnalysis?.subjects ?? [])
+    .filter((subject) => subject.role !== 'incidental' && subject.score >= 0.35)
+    .sort((left, right) => (left.role === 'primary' ? -1 : right.role === 'primary' ? 1 : right.score - left.score))
+    .map((subject) => subject.label || subject.canonicalValue)
+    .filter((name) => !/^(machine|material|structure|consumer electronics|wood processed|conveyance)$/i.test(name))
+    .filter((name, index, names) => {
+      const normalized = name.trim().toLocaleLowerCase();
+      return names.findIndex((candidate) => candidate.trim().toLocaleLowerCase() === normalized) === index;
+    });
+  const rawNames = canonicalNames.length > 0
+    ? canonicalNames.slice(0, 4)
+    : vision
+      ? pickProminentTags(vision, 4, 0.16)
+      : [];
+  const names = rawNames;
+  names.forEach((name, index) => {
+    const normalizedId = name.trim().toLocaleLowerCase().replace(/\s+/g, '-');
+    tags.push({ id: `subject-${normalizedId}-${index}`, label: humanizeTag(name), accent: TAG_PALETTE[tags.length % TAG_PALETTE.length] });
   });
   if (tags.length === 0) {
     tags.push({ id: 'moment', label: 'A still moment', accent: '#C6D2F2' });

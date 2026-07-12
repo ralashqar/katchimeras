@@ -75,6 +75,10 @@ export function guardPhotoVisionResult(result: PhotoVisionResult): PhotoVisionRe
     return {
       ...result,
       labels: (result.labels ?? []).filter((label) => !FOOD_PATTERN.test(label.name)),
+      regionClassifications: result.regionClassifications?.map((item) => ({
+        ...item,
+        labels: item.labels.filter((label) => !FOOD_PATTERN.test(label.name)),
+      })).filter((item) => item.labels.length > 0),
       text: (result.text ?? []).filter((token) => !FOOD_PATTERN.test(token)),
       reality: assessment,
     };
@@ -90,7 +94,13 @@ export function guardPhotoVisionResult(result: PhotoVisionResult): PhotoVisionRe
     text: (result.text ?? []).filter((token) => !isDepictedWorldTerm(token)),
     faceCount: 0,
     humanCount: 0,
+    humans: [],
+    faces: [],
     animals: [],
+    regionClassifications: result.regionClassifications?.map((item) => ({
+      ...item,
+      labels: item.labels.filter((label) => !isDepictedWorldTerm(label.name)),
+    })).filter((item) => item.labels.length > 0),
     reality: assessment,
   };
 }

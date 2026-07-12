@@ -9,6 +9,7 @@ import {
   answerClarification,
   currentClarificationNode,
   dismissClarification,
+  skipClarificationGoal,
   type ClarificationOption,
 } from '@/utils/intelligence/clarification';
 
@@ -33,13 +34,23 @@ export function MemoryClarificationSheet({ memory, onResolve, onClose }: MemoryC
     setWorkingMemory(next);
   };
 
-  const skip = () => {
+  const dismiss = () => {
     onResolve(dismissClarification(workingMemory));
     onClose();
   };
 
+  const skip = () => {
+    const next = skipClarificationGoal(workingMemory);
+    if (next.promptState.status === 'pending') {
+      setWorkingMemory(next);
+      return;
+    }
+    onResolve(next);
+    onClose();
+  };
+
   return (
-    <MeadowSheet onClose={skip} kicker="A little context" title={node?.question ?? 'Keep this as it is?'}>
+    <MeadowSheet onClose={dismiss} kicker="A little context" title={node?.question ?? 'Keep this as it is?'}>
       <View style={styles.options}>
         {(node?.options ?? []).map((option) => (
           <Pressable key={option.id} accessibilityRole="button" onPress={() => choose(option)} style={styles.option}>

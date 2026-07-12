@@ -101,6 +101,9 @@ export default function IntelligenceLabScreen() {
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Qualities: {lastPhoto.classifiedMemory?.qualities.map((quality) => `${quality.qualityId} ${Math.round(quality.score * 100)}% ${quality.centrality}/${quality.status}`).join(' · ') || 'none'}
             </ThemedText>
+            <ThemedText style={styles.line} lightColor={lastPhoto.consistencyWarnings?.length ? '#F08C8C' : '#A8E2C6'} darkColor={lastPhoto.consistencyWarnings?.length ? '#F08C8C' : '#A8E2C6'} selectable>
+              Consistency: {lastPhoto.consistencyWarnings?.join(' | ') || 'all consumers agree'}
+            </ThemedText>
             <Pressable accessibilityRole="button" onPress={shareLastPhotoJson} style={styles.shareButton}>
               <ThemedText style={styles.shareLabel} lightColor={Lantern.ink950} darkColor={Lantern.ink950}>
                 Share full JSON
@@ -161,6 +164,19 @@ export default function IntelligenceLabScreen() {
                 <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
                   Alternatives: {memory.photoAnalysis.alternatives.map((item) => `${item.domain} ${Math.round(item.score * 100)}%`).join(' | ') || 'none'}
                 </ThemedText>
+                {memory.photoAnalysis.hierarchy ? (
+                  <>
+                    <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+                      Hierarchy: {memory.photoAnalysis.hierarchy.representation.kind} → {memory.photoAnalysis.hierarchy.container.kind}
+                    </ThemedText>
+                    <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+                      Paths: {memory.photoAnalysis.hierarchy.hypotheses.map((item) => `${item.path.join(' › ')} ${Math.round(item.confidence * 100)}%${item.contradictions.length ? ' ⚠' : ''}`).join(' | ') || 'none'}
+                    </ThemedText>
+                    <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+                      Ask next: {memory.photoAnalysis.hierarchy.unresolvedFacets.map((item) => `${item.key} ${Math.round(item.importance * item.uncertainty * 100)}%`).join(' | ') || 'nothing'}
+                    </ThemedText>
+                  </>
+                ) : null}
               </>
             ) : null}
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
@@ -175,6 +191,14 @@ export default function IntelligenceLabScreen() {
             <ThemedText style={styles.line} lightColor={Lantern.moon500} darkColor={Lantern.moon500} selectable>
               Prompt: {memory.promptState.status}{memory.promptState.graphId ? ` · ${memory.promptState.graphId}` : ''} · {memory.promptState.questionCount ?? memory.promptState.answeredNodeIds.length}/{memory.promptState.maxQuestions ?? 3}{memory.promptState.answeredNodeIds.length ? ` · path ${memory.promptState.answeredNodeIds.join(' → ')}` : ''}
             </ThemedText>
+            <ThemedText style={styles.line} lightColor={Lantern.moon500} darkColor={Lantern.moon500} selectable>
+              Question planner v{memory.promptState.plannerVersion ?? 1}: {memory.promptState.currentQuestionId ?? 'none'} · substantive {memory.promptState.questionCount ?? 0} · OCR checks {memory.promptState.microQuestionCount ?? 0}
+            </ThemedText>
+            {(memory.promptState.candidateTrace ?? []).map((candidate) => (
+              <ThemedText key={candidate.questionId} style={styles.line} lightColor={candidate.eligible ? '#A8E2C6' : Lantern.moon500} darkColor={candidate.eligible ? '#A8E2C6' : Lantern.moon500} selectable>
+                {candidate.eligible ? 'ELIGIBLE' : 'BLOCKED'} {candidate.questionId} · {Math.round(candidate.score * 100)}% · evidence {Math.round(candidate.components.evidenceSupport * 100)} · centrality {Math.round(candidate.components.centrality * 100)} · info {Math.round(candidate.components.informationGain * 100)}{candidate.blockers.length ? ` · ${candidate.blockers.join(', ')}` : ''}
+              </ThemedText>
+            ))}
           </View>
         ))}
         {memories.length === 0 ? (

@@ -148,7 +148,7 @@ function QuestBody(props: Props) {
                   ? 'This photo matches the quest. It is ready to submit.'
                   : props.questCaptureFeedback.phase === 'possible'
                     ? 'This may match. Review the photo below to confirm it.'
-                    : 'This photo did not clearly match the quest. You can try another.'}
+                    : props.questCaptureFeedback.reason ?? 'This photo did not clearly match the quest. You can try another.'}
             </ThemedText>
           </View>
         ) : null}

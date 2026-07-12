@@ -1,8 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,15 +20,17 @@ import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 import { confirmationsRejectDomain } from '@/utils/intelligence/classification-policy';
-import type { SceneRead } from '@/utils/scene-classify';
+import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 import type { DayInputTarget, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import { cancelQuestCapture, completeQuestCapture } from '@/utils/quest-capture-session';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
+import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
+import { evaluatePhotoForQuest } from '@/utils/quests/photo-evaluation';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
 // streams the tags into the day and exits).
-type CaptureState = 'live' | 'capturing' | 'captured';
+type CaptureState = 'live' | 'capturing' | 'captured' | 'questAnalyzing';
 
 export default function MomentCaptureScreen() {
   const router = useRouter();
@@ -45,6 +48,7 @@ export default function MomentCaptureScreen() {
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const questProcessingRef = useRef(false);
   const questId = typeof params.questId === 'string' ? params.questId : null;
   const questCreatureId = typeof params.questCreatureId === 'string' ? params.questCreatureId : null;
 
@@ -83,7 +87,7 @@ export default function MomentCaptureScreen() {
       return null;
     }
     const result = await analyzePhoto(photoUri);
-    rawVisionRef.current = result;
+    rawVisionRef.current = result ? { ...result, captureSource: 'camera' } : null;
     return result
       ? aggregatePhotoVision([{ ...result, captureSource: 'camera' }], CAPTURE_PHOTO_CONFIDENCE_FLOOR)
       : null;
@@ -131,12 +135,41 @@ export default function MomentCaptureScreen() {
         });
       }
       if (questId && questCreatureId && photoUri) {
-        completeQuestCapture(questId, questCreatureId, photoUri);
+        const memory = buildPhotoIntelligence({
+          sourceId: photoUri,
+          observedAt: new Date().toISOString(),
+          thumbnailUri: photoUri,
+          rawVision: rawVisionRef.current,
+          vision,
+          scene,
+          confirmations,
+        }).memory;
+        completeQuestCapture(questId, questCreatureId, photoUri, evaluatePhotoForQuest(memory, questId));
       }
       router.back();
     },
     [applyCapturedMoment, captureTarget, dayScores, photoUri, questCreatureId, questId, router]
   );
+
+  useEffect(() => {
+    if (state !== 'captured' || !questId || !questCreatureId || !photoUri || questProcessingRef.current) return;
+    questProcessingRef.current = true;
+    setState('questAnalyzing');
+    void analyzeCaptured().then((vision) => {
+      commit('meaningful', vision, 'Quest capture', classifyScene(vision), []);
+    }).catch(() => {
+      completeQuestCapture(
+        questId,
+        questCreatureId,
+        photoUri,
+        {
+          status: 'no_match', questId, qualityId: null, score: 0, centrality: null,
+          evidenceId: `photo:${photoUri}`, reason: 'The photo could not be analysed.',
+        }
+      );
+      router.back();
+    });
+  }, [analyzeCaptured, commit, photoUri, questCreatureId, questId, router, state]);
 
   if (permission && !permission.granted) {
     return (
@@ -158,7 +191,20 @@ export default function MomentCaptureScreen() {
     );
   }
 
-  if (state === 'captured' && photoUri) {
+  if (state === 'questAnalyzing' && photoUri) {
+    return (
+      <View style={[styles.screen, styles.permission]}>
+        <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <View style={[StyleSheet.absoluteFill, styles.vignette]} />
+        <ActivityIndicator size="large" color={Lantern.ember300} />
+        <ThemedText style={styles.promptText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+          Checking this photo against the quest…
+        </ThemedText>
+      </View>
+    );
+  }
+
+  if (state === 'captured' && photoUri && !questId) {
     return (
       <View style={styles.screen}>
         <EssenceReview

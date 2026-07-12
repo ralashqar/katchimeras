@@ -24,10 +24,10 @@ const RULES: ConceptRule[] = [
   { concept: 'beach', pattern: /beach|ocean|sea\b|seaside|shore|sand|coast|surf|wave/i },
   { concept: 'forest', pattern: /forest|woodland|jungle/i },
   { concept: 'garden', pattern: /garden|flowerbed|greenhouse|botanical/i },
-  { concept: 'park', pattern: /park|meadow|trail|lawn|greenery|green space/i },
+  { concept: 'park', pattern: /\bpark\b|meadow|trail|lawn|greenery|green space/i },
   { concept: 'bookstore', pattern: /bookstore|bookshop|book shop/i },
   { concept: 'library', pattern: /library|bookshelf|reading room/i },
-  { concept: 'museum', pattern: /museum|gallery|sculpture|exhibit|artwork|painting|portrait/i },
+  { concept: 'museum', pattern: /museum|gallery|sculpture|exhibit|artwork|painting/i },
   { concept: 'cinema', pattern: /cinema|movie theater|movie theatre|auditorium|big screen/i },
   { concept: 'farm', pattern: /farm|farmers market|produce|orchard|barn|vineyard/i },
   { concept: 'basketball', pattern: /basketball|\bhoop\b/i },
@@ -39,19 +39,20 @@ const RULES: ConceptRule[] = [
   // A child read is only an observation used to ask who the person is. It never
   // confirms age, identity, parenthood, gender, or a relationship by itself.
   { concept: 'child', pattern: /\bchild\b|\bchildren\b|\bkids?\b|toddler|young person|young people|\byouth\b/i },
+  { concept: 'person', pattern: /\bportrait\b|\badult\b/i },
   { concept: 'blossom', pattern: /cherry blossom|sakura|spring flower|blossom branch/i },
   { concept: 'flowers', pattern: /flower|bloom|blossom|bouquet|floral|\brose\b|tulip/i },
   { concept: 'food', pattern: /food|meal|dish|burger|sandwich|breakfast|lunch|dinner|cuisine|fruit|apple|banana|berries|strawberr|grapes?|orange|mango|melon/i },
   { concept: 'water', pattern: /lake|river|waterfall|pond|pool|harbou?r/i },
   { concept: 'mountains', pattern: /mountain|hill|cliff|peak|valley|canyon|summit/i },
   { concept: 'snow', pattern: /snow|snowy|blizzard|frost/i },
-  { concept: 'rain', pattern: /rain|rainy|drizzle|umbrella|downpour|puddle/i },
+  { concept: 'rain', pattern: /\brain\b|\brainy\b|drizzle|umbrella|downpour|puddle/i },
   { concept: 'autumn', pattern: /autumn|fall foliage|autumn leaves|maple leaf|maple leaves/i },
   { concept: 'stars', pattern: /\bstar\b|stars|starry|night sky|milky way|constellation/i },
   { concept: 'concert', pattern: /concert|live music|\bgig\b|\bstage\b|music festival|\bdj\b|crowd at a show/i },
   { concept: 'gaming', pattern: /game controller|gamepad|joystick|game console|video game|arcade|handheld console/i },
   { concept: 'creative', pattern: /guitar|piano|violin|instrument|microphone|painting|easel|paintbrush|sketch|canvas|pottery/i },
-  { concept: 'focus_work', pattern: /focus[_ ]work|\bwork\b|office|laptop|computer|keyboard|monitor|\bdesk\b|workspace/i },
+  { concept: 'focus_work', pattern: /focus[_ ]work|\bwork\b|office|laptop|keyboard|\bdesk\b|workspace|spreadsheet|whiteboard/i },
   { concept: 'celebration', pattern: /birthday|candle|balloon|confetti|party hat|fireworks|streamer/i },
   { concept: 'travel', pattern: /luggage|suitcase|passport|airport|airplane|aeroplane|boarding|train station|departure/i },
   { concept: 'gym', pattern: /gym|dumbbell|barbell|weights|treadmill|fitness|workout|yoga mat/i },
@@ -100,6 +101,11 @@ const GENERIC_LABELS = new Set([
   'texture',
   'plant',
   'tree',
+  'wood processed',
+  'consumer electronics',
+  'machine',
+  'container',
+  'carton',
 ]);
 
 export function canonicalizeSignal(raw: string): string | null {
@@ -113,7 +119,11 @@ export function canonicalizeSignal(raw: string): string | null {
 
 export function visionResultToSignals(result: PhotoVisionResult, confidenceFloor = 0.12): CanonicalSignal[] {
   const signals = new Map<string, CanonicalSignal>();
-  for (const label of result.labels ?? []) {
+  const labels = [
+    ...(result.labels ?? []),
+    ...(result.regionClassifications ?? []).flatMap((item) => item.labels),
+  ];
+  for (const label of labels) {
     if ((label.confidence ?? 0) < confidenceFloor) continue;
     const key = canonicalizeSignal(label.name);
     if (!key) continue;
@@ -142,9 +152,14 @@ export function visionSummaryToSignals(summary: DayVisionSummary, source: Canoni
   for (const concept of summary.concepts ?? []) {
     const key = canonicalizeSignal(concept.name);
     if (!key) continue;
+    // Coverage is always 1 for a single photo, so it must not inflate every
+    // weak label to 0.80. Only repeated evidence across photos earns a boost.
+    const repeatBoost = (summary.analyzedPhotoCount ?? 1) > 1 && concept.count > 1
+      ? Math.min(0.1, (concept.count - 1) * 0.025 + concept.coverage * 0.04)
+      : 0;
     signals.set(key, {
       key,
-      confidence: clamp01(Math.max(concept.peakConfidence, Math.min(0.95, 0.35 + concept.coverage * 0.45))),
+      confidence: clamp01(concept.peakConfidence + repeatBoost),
       raw: concept.name,
       source,
     });

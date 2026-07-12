@@ -23,6 +23,11 @@ type VisionNativeModule = {
     faces?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[];
     recognizedText?: { text?: unknown; confidence?: unknown }[];
     dominantSubject?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown } | null;
+    salientSubjects?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown }[];
+    regionClassifications?: {
+      region?: { x?: unknown; y?: unknown; width?: unknown; height?: unknown; confidence?: unknown };
+      labels?: { name?: unknown; confidence?: unknown }[];
+    }[];
     documentDetected?: unknown;
   }>;
   // Reliable native brightness read (local thumbnail, Apple decode) — null when
@@ -148,6 +153,19 @@ export async function analyzePhoto(uri: string): Promise<PhotoVisionResult | nul
               height: Number(dominant.height), confidence: Number(dominant.confidence),
             }
           : null,
+      salientSubjects: normalizeRegions(raw.salientSubjects),
+      regionClassifications: (raw.regionClassifications ?? []).flatMap((item) => {
+        const region = normalizeRegions(item.region ? [item.region] : [])[0];
+        if (!region) return [];
+        const labels = (item.labels ?? [])
+          .map((label) => ({
+            name: typeof label.name === 'string' ? label.name : '',
+            confidence: Number(label.confidence) || 0,
+          }))
+          .filter((label) => label.name.length > 0 && label.confidence >= 0.1)
+          .slice(0, 6);
+        return labels.length > 0 ? [{ region, labels }] : [];
+      }).slice(0, 4),
       documentDetected: raw.documentDetected === true,
     };
   } catch {

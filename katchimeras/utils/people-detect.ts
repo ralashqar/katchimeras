@@ -14,7 +14,7 @@ export type ProminentPeopleDetection = {
 const BABY_PATTERN = /\b(baby|infant|newborn)\b/i;
 const CHILD_PATTERN = /\b(child|children|kid|kids|toddler|young person|young people|youth)\b/i;
 const GROUP_PATTERN = /\b(family|friends?|group|crowd|gathering|people)\b/i;
-const PERSON_PATTERN = /\b(person|human|portrait|face|people)\b/i;
+const PERSON_PATTERN = /\b(person|human|adult|portrait|face|people)\b/i;
 
 // Detects whether people are the intentional subject of a captured photo, not
 // merely present somewhere in it. Specific child/baby labels may activate the
@@ -53,6 +53,21 @@ export function detectProminentPeopleInVision(
   }
   if (faces === 1 && (vision.dominantSubjectCoverage ?? 0) >= 0.18) {
     return { detected: true, kind: 'person', confidence: 0.68, reason: 'One prominent person detected' };
+  }
+  // Rear-view/full-body subjects may have no detectable face. Native Vision
+  // retains human rectangles; use occupied area instead of requiring a face.
+  const humanRegions = (vision.analysisRegions ?? []).filter((region) => region.kind === 'human');
+  const largestHuman = humanRegions.reduce(
+    (largest, region) => Math.max(largest, region.width * region.height),
+    0
+  );
+  if (largestHuman >= 0.14) {
+    return {
+      detected: true,
+      kind: humanRegions.length >= 2 ? 'group' : 'person',
+      confidence: Math.min(0.82, 0.58 + largestHuman * 0.5),
+      reason: 'A human body occupies a prominent part of the frame',
+    };
   }
   return { detected: false };
 }

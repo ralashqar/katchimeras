@@ -148,6 +148,11 @@ export type NormalizedImageRegion = {
   confidence: number;
 };
 
+export type PhotoVisionRegionClassification = {
+  region: NormalizedImageRegion;
+  labels: PhotoVisionLabel[];
+};
+
 export type PhotoVisionResult = {
   labels: PhotoVisionLabel[];
   text: string[];
@@ -168,6 +173,8 @@ export type PhotoVisionResult = {
     height: number;
     confidence: number;
   } | null;
+  salientSubjects?: NormalizedImageRegion[];
+  regionClassifications?: PhotoVisionRegionClassification[];
   documentDetected?: boolean;
   // Local provenance used before semantic classification. Location/live-camera
   // evidence supports a physical-world read; screenshot/screen-content evidence
@@ -291,6 +298,41 @@ export type KatchimeraAssignment = {
 
 export type ClarificationStatus = 'not_needed' | 'pending' | 'answered' | 'dismissed';
 
+export type ClarificationGoal =
+  | 'representation'
+  | 'subject_focus'
+  | 'authorship'
+  | 'relationship'
+  | 'ownership'
+  | 'food_context'
+  | 'media_identity'
+  | 'place_context'
+  | 'nature_context'
+  | 'movement_context'
+  | 'work_context'
+  | 'life_event'
+  | 'meaning';
+
+export type QuestionScoreComponents = {
+  evidenceSupport: number;
+  centrality: number;
+  informationGain: number;
+  downstreamValue: number;
+  continuity: number;
+  novelty: number;
+  penalty: number;
+};
+
+export type QuestionCandidateTrace = {
+  questionId: string;
+  goal: ClarificationGoal;
+  eligible: boolean;
+  score: number;
+  components: QuestionScoreComponents;
+  reasons: string[];
+  blockers: string[];
+};
+
 export type ClarificationState = {
   status: ClarificationStatus;
   graphId?: string | null;
@@ -302,9 +344,49 @@ export type ClarificationState = {
   maxQuestions?: number;
   skippedGoalIds?: string[];
   completedGoalIds?: string[];
+  plannerVersion?: number;
+  currentQuestionId?: string | null;
+  askedQuestionIds?: string[];
+  resolvedGoalIds?: string[];
+  microQuestionCount?: number;
+  candidateTrace?: QuestionCandidateTrace[];
 };
 
 export type PhotoSubjectRole = 'primary' | 'supporting' | 'incidental';
+
+export type PhotoRepresentationKind =
+  | 'physical_scene'
+  | 'physical_artwork'
+  | 'physical_document'
+  | 'device_showing_content'
+  | 'native_digital_image'
+  | 'screenshot'
+  | 'unknown';
+
+export type PhotoContainerKind =
+  | 'none'
+  | 'book'
+  | 'screen'
+  | 'frame_or_canvas'
+  | 'poster_or_print'
+  | 'document'
+  | 'packaging'
+  | 'unknown';
+
+export type PhotoHierarchyHypothesis = {
+  path: string[];
+  confidence: number;
+  evidenceIds: string[];
+  contradictions: string[];
+};
+
+export type PhotoUnresolvedFacet = {
+  key: 'representation' | 'container' | 'primary_subject' | 'relationship' | 'authorship' | 'media_type' | 'place_kind';
+  candidates: string[];
+  importance: number;
+  uncertainty: number;
+  askable: boolean;
+};
 
 export type PhotoAnalysisSubject = {
   id: string;
@@ -337,6 +419,13 @@ export type PhotoAnalysisDescriptor = {
     reason?: string | null;
   }[];
   alternatives: { domain: MemoryDomain; score: number; reason: string }[];
+  hierarchy?: {
+    schemaVersion: 2;
+    representation: { kind: PhotoRepresentationKind; confidence: number; evidenceIds: string[] };
+    container: { kind: PhotoContainerKind; confidence: number; evidenceIds: string[] };
+    hypotheses: PhotoHierarchyHypothesis[];
+    unresolvedFacets: PhotoUnresolvedFacet[];
+  };
 };
 
 export type ClassifiedMemory = {
@@ -967,7 +1056,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 10;
+  version: 11;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

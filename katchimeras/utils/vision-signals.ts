@@ -35,10 +35,10 @@ const CONCEPT_RULES: { concept: string; pattern: RegExp }[] = [
   { concept: 'beach', pattern: /beach|ocean|sea\b|seaside|shore|sand|coast|surf|wave/i },
   { concept: 'forest', pattern: /forest|woodland|jungle/i },
   { concept: 'garden', pattern: /garden|flowerbed|greenhouse|botanical/i },
-  { concept: 'park', pattern: /park|meadow|trail|lawn|greenery/i },
+  { concept: 'park', pattern: /\bpark\b|meadow|trail|lawn|greenery/i },
   { concept: 'bookstore', pattern: /bookstore|bookshop|book shop/i },
   { concept: 'library', pattern: /library|bookshelf|reading room/i },
-  { concept: 'museum', pattern: /museum|gallery|sculpture|exhibit|artwork|painting|portrait/i },
+  { concept: 'museum', pattern: /museum|gallery|sculpture|exhibit|artwork|painting/i },
   { concept: 'cinema', pattern: /cinema|movie theater|movie theatre|auditorium|big screen/i },
   { concept: 'farm', pattern: /farm|farmers market|produce|orchard|barn|vegetable/i },
   { concept: 'basketball', pattern: /basketball|\bhoop\b/i },
@@ -56,7 +56,7 @@ const CONCEPT_RULES: { concept: string; pattern: RegExp }[] = [
   { concept: 'water', pattern: /lake|river|waterfall|pond|pool|harbou?r/i },
   { concept: 'mountains', pattern: /mountain|hill|cliff|peak|valley|canyon|summit/i },
   { concept: 'snow', pattern: /snow|snowy|blizzard|frost/i },
-  { concept: 'rain', pattern: /rain|rainy|drizzle|umbrella|downpour|puddle/i },
+  { concept: 'rain', pattern: /\brain\b|\brainy\b|drizzle|umbrella|downpour|puddle/i },
   { concept: 'autumn', pattern: /autumn|fall foliage|autumn leaves|maple leaf|maple leaves/i },
   { concept: 'stars', pattern: /\bstar\b|stars|starry|night sky|milky way|constellation/i },
   // Live music (attending) before creative (making) so a stage/gig reads as a
@@ -65,7 +65,11 @@ const CONCEPT_RULES: { concept: string; pattern: RegExp }[] = [
   { concept: 'gaming', pattern: /game controller|gamepad|joystick|game console|video game|arcade|handheld console/i },
   // Life chapters (Wave C).
   { concept: 'creative', pattern: /guitar|piano|violin|instrument|microphone|painting|easel|paintbrush|sketch|canvas|pottery/i },
-  { concept: 'focus_work', pattern: /laptop|computer|keyboard|monitor|\bdesk\b|workspace/i },
+  // A bare computer/monitor label is device evidence, not evidence that the
+  // user was working (it is also commonly emitted for televisions). Require a
+  // genuinely work-shaped object or setting here; screen content is resolved
+  // separately by the photo descriptor.
+  { concept: 'focus_work', pattern: /laptop|keyboard|\bdesk\b|workspace|office|spreadsheet|whiteboard/i },
   { concept: 'celebration', pattern: /birthday|candle|balloon|confetti|party hat|fireworks|streamer/i },
   { concept: 'travel', pattern: /luggage|suitcase|passport|airport|airplane|aeroplane|boarding|train station|departure/i },
   { concept: 'gym', pattern: /gym|dumbbell|barbell|weights|treadmill|fitness|workout|yoga mat/i },
@@ -201,7 +205,8 @@ export function aggregatePhotoVision(
     // label), so a single frame contributes each at most once (its best read).
     const perPhoto = new Map<string, number>();
     const perPhotoRaw = new Map<string, number>();
-    for (const label of result.labels ?? []) {
+    const spatialLabels = (result.regionClassifications ?? []).flatMap((item) => item.labels);
+    for (const label of [...(result.labels ?? []), ...spatialLabels]) {
       if ((label.confidence ?? 0) < confidenceFloor) {
         continue;
       }

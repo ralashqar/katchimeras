@@ -381,15 +381,19 @@ function hasProminentStructuredBook(
   const candidate = (vision.concepts ?? [])
     .slice(0, MEDIA_CONCEPT_TOP_RANKS)
     .find((concept) => BOOK_SUBJECT_PATTERN.test(concept.name));
-  if (!candidate || (candidate.peakConfidence ?? 0) < STRUCTURED_BOOK_MIN_CONFIDENCE) return false;
+  if (!candidate) return false;
 
   const tokens = (vision.textTokens ?? []).filter((token) => !!token.trim());
   const totalWords = tokens.reduce((sum, token) => sum + token.trim().split(/\s+/).length, 0);
   const coverLikeOcr = !!extractedTitle && tokens.length <= 18 && totalWords <= 55;
   const documentLike = (vision.documentCoverage ?? 0) >= 0.5;
   const subjectCoverage = vision.dominantSubjectCoverage ?? 0;
+  const stronglyFramedLowConfidenceCover =
+    coverLikeOcr && documentLike && subjectCoverage >= 0.32 && (candidate.peakConfidence ?? 0) >= 0.12;
+  if ((candidate.peakConfidence ?? 0) < STRUCTURED_BOOK_MIN_CONFIDENCE && !stronglyFramedLowConfidenceCover) return false;
 
   return (
+    stronglyFramedLowConfidenceCover ||
     (coverLikeOcr && (documentLike || subjectCoverage >= 0.18)) ||
     (coverLikeOcr && (candidate.peakConfidence ?? 0) >= 0.34) ||
     (documentLike && subjectCoverage >= 0.28 && (candidate.peakConfidence ?? 0) >= 0.3)
@@ -406,13 +410,17 @@ function hasProminentOcrBookCover(
   extractedTitle: string | null,
   ocrText: string
 ): boolean {
-  if (!extractedTitle || !OCR_BOOK_HINT.test(` ${ocrText} `)) return false;
+  if (!extractedTitle) return false;
   const tokens = (vision.textTokens ?? []).filter((token) => !!token.trim());
   const totalWords = tokens.reduce((sum, token) => sum + token.trim().split(/\s+/).length, 0);
   const compactCoverText = tokens.length >= 4 && tokens.length <= 18 && totalWords <= 55;
   const foregroundCoverage = vision.dominantSubjectCoverage ?? 0;
   const documentCoverage = vision.documentCoverage ?? 0;
-  return compactCoverText && (foregroundCoverage >= 0.22 || documentCoverage >= 0.35);
+  const hasBookFurniture = OCR_BOOK_HINT.test(` ${ocrText} `);
+  return compactCoverText && (
+    (hasBookFurniture && (foregroundCoverage >= 0.22 || documentCoverage >= 0.35)) ||
+    (documentCoverage >= 0.5 && foregroundCoverage >= 0.32)
+  );
 }
 
 // Detect from the on-device Apple Vision read — a book cover, a television, a
@@ -446,7 +454,7 @@ export function detectStudioInVision(vision: DayVisionSummary | undefined | null
   const structuredBook = hasProminentStructuredBook(vision, ocrTitle);
   const ocrOnlyBook = OCR_BOOK_HINT.test(` ${ocrText} `);
   const prominentOcrBook = hasProminentOcrBookCover(vision, ocrTitle, ocrText);
-  const mediaType = leadingMedia ?? detailedMedia ?? (structuredBook ? 'book' : null) ?? (ocrOnlyBook ? 'book' : null);
+  const mediaType = leadingMedia ?? detailedMedia ?? (structuredBook ? 'book' : null) ?? (prominentOcrBook ? 'book' : null) ?? (ocrOnlyBook ? 'book' : null);
   if (!mediaType) return { detected: false };
   // OCR furniture can establish a cover without reliably separating author,
   // title, and strapline. Keep OCR-only books unnamed and ask for confirmation.

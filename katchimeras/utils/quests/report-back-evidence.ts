@@ -30,7 +30,8 @@ export function buildQuestSubmissionItems(
   runtime: QuestRuntimeStatus | null | undefined,
   quest: CompanionQuest | null | undefined,
   submissions: QuestSubmissionRecord[] | undefined,
-  limit = 3
+  limit = 3,
+  preferredSourceId: string | null = null
 ): QuestSubmissionItem[] {
   if (!day || !runtime || !quest) return [];
   if (!runtime.readyToSubmit && !runtime.complete && (runtime.possibleEvidenceIds ?? []).length === 0) return [];
@@ -54,6 +55,10 @@ export function buildQuestSubmissionItems(
 
   return dedupeItems(items)
     .filter((item) => !isSubmittedForQuest(submissions, quest.questId, quest.creatureId, item.sourceType, item.sourceId))
+    .sort((left, right) =>
+      Number(right.sourceId === preferredSourceId) - Number(left.sourceId === preferredSourceId) ||
+      Date.parse(right.createdAt ?? '') - Date.parse(left.createdAt ?? '')
+    )
     .slice(0, limit);
 }
 

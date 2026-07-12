@@ -2,7 +2,7 @@ import type { DayMapSummary, StoredHomeDayRecord, StoredHomeState } from '@/type
 import { deriveDayMapSummary } from '@/utils/day-map-engine';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { pruneRejectedDerivedMoments } from '@/utils/intelligence/classification-policy';
-import { recalibrateClassifiedMemory, repairUrbanPhotoCentrality } from '@/utils/intelligence/classification';
+import { CLASSIFIED_MEMORY_SCHEMA_VERSION, recalibrateClassifiedMemory, repairUrbanPhotoCentrality } from '@/utils/intelligence/classification';
 import { normalizeFoodEmoji } from '@/utils/food-detect';
 
 import { tomorrowDateId, toLocalDateId } from './date';
@@ -70,7 +70,7 @@ export function normalizeStoredHomeState(
       : undefined;
 
   return {
-    version: 10,
+    version: 11,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
@@ -95,7 +95,7 @@ function updateStoredDayDerivedFields(
     ...inputDay,
     foodMoments: inputDay.foodMoments?.map((moment) => ({ ...moment, emoji: normalizeFoodEmoji(moment.emoji) })),
     classifiedMemories: inputDay.classifiedMemories?.map((memory) => {
-      const recalibrated = memory.schemaVersion < 3 ? recalibrateClassifiedMemory(memory) : memory;
+      const recalibrated = memory.schemaVersion < CLASSIFIED_MEMORY_SCHEMA_VERSION ? recalibrateClassifiedMemory(memory) : memory;
       return repairUrbanPhotoCentrality(recalibrated);
     }),
   };

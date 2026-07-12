@@ -50,6 +50,10 @@ export type SceneRead = {
   source: 'llm' | 'rules';
   supportingSubjects?: string[];
   representation?: 'real_world' | 'screen_content' | 'unknown' | null;
+  representationV2?: string | null;
+  container?: string | null;
+  confidence?: number | null;
+  alternatives?: string[];
   promptVersion?: string | null;
   foundationStatus?: 'used' | 'unavailable' | 'failed';
   foundationReason?: string | null;
@@ -255,6 +259,10 @@ async function resolveFoundationSceneRead(
             source: 'llm',
             supportingSubjects: deep.supportingSubjects,
             representation: deep.representation,
+            representationV2: deep.representationV2,
+            container: deep.container,
+            confidence: deep.confidence,
+            alternatives: deep.alternatives,
             promptVersion: deep.promptVersion,
           };
         }
@@ -269,6 +277,10 @@ async function resolveFoundationSceneRead(
           source: 'llm',
           supportingSubjects: deep.supportingSubjects,
           representation: deep.representation,
+          representationV2: deep.representationV2,
+          container: deep.container,
+          confidence: deep.confidence,
+          alternatives: deep.alternatives,
           promptVersion: deep.promptVersion,
         };
       }
