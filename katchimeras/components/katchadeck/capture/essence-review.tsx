@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -18,10 +18,6 @@ import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import {
-  CAPTURE_MEANINGS,
-  meaningsForMediaKind,
-  selectCaptureMeanings,
-  type CaptureMeaning,
   type MeaningTag,
 } from '@/utils/capture-energy';
 import { foundationSceneAvailability, isFoundationSceneAvailable } from '@/utils/foundation-scene';
@@ -36,9 +32,16 @@ import {
   type ClarificationOption,
 } from '@/utils/intelligence/clarification';
 import { classifyScene, resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
-import { detectStudioInVision, extractTitleFromVisionText, isGenericStudioLabel, studioDetectionFromMedia } from '@/utils/studio-detect';
 import { pickProminentTags } from '@/utils/vision-signals';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
+import {
+  fallbackPhotoJournalRoute,
+  photoJournalQuestion,
+  photoJournalRouteForConfirmation,
+  photoJournalRouteProposals,
+  photoJournalSuggestions,
+  type PhotoJournalRouteProposal,
+} from '@/utils/intelligence/photo-journal-routing';
 import type { ClassifiedMemory, DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, StudioMediaType, UserConfirmation } from '@/types/home';
 
 // The shared "read the moment" experience: a photo's on-device essence animates
@@ -49,7 +52,6 @@ import type { ClassifiedMemory, DayVisionSummary, ManualJournalSubmission, Photo
 type EssenceReviewState = 'analyzing' | 'essence' | 'absorbing';
 
 type EssenceTag = { id: string; label: string; accent: string };
-type MediaDraft = { choiceId: 'book' | 'film'; title: string };
 
 const TAG_PALETTE = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8'];
 
@@ -72,7 +74,8 @@ type EssenceReviewProps = {
     label: string,
     scene: SceneRead | null,
     confirmations: UserConfirmation[],
-    analysis: ReviewedPhotoAnalysis
+    analysis: ReviewedPhotoAnalysis,
+    journal: ManualJournalSubmission
   ) => void;
   onClose: () => void;
 };
@@ -82,9 +85,9 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
   const { height } = useWindowDimensions();
   const [state, setState] = useState<EssenceReviewState>('analyzing');
   const [tags, setTags] = useState<EssenceTag[]>([]);
-  const [meanings, setMeanings] = useState<readonly CaptureMeaning[]>(CAPTURE_MEANINGS);
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
-  const [mediaDraft, setMediaDraft] = useState<MediaDraft | null>(null);
+  const [journalRoute, setJournalRoute] = useState<PhotoJournalRouteProposal | null>(null);
+  const [journalPickerOpen, setJournalPickerOpen] = useState(false);
   const visionRef = useRef<DayVisionSummary | null>(null);
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const sceneRef = useRef<SceneRead | null>(null);
@@ -132,22 +135,15 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
         : null;
       clarificationRef.current = initialMemory;
       setClarificationMemory(initialMemory);
-      const initialMediaDraft = editableMediaDraft(initialMemory);
-      if (initialMediaDraft) setMediaDraft(initialMediaDraft);
       // PROGRESSIVE reveal: the rule engine answers in microseconds — show the
       // screen NOW with its chips + meanings, then let the on-device LLM reads
       // upgrade them in place when they land (typically ~1s later). The commit
       // still gets whatever scene has resolved by then (engine falls back to
       // rules when it hasn't).
-      setTags(buildEssenceTags(vision, initialScene, initialMemory));
-      setMeanings(selectCaptureMeanings(vision));
+      setTags(buildEssenceTags(vision, initialMemory));
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
       if (!vision) return;
-      if (initialScene.type === 'media' && initialScene.media) {
-        const mediaMeanings = meaningsForMediaKind(initialScene.media.mediaType);
-        if (mediaMeanings) setMeanings(mediaMeanings);
-      }
       // Upgrade 1 — the hierarchical scene read (chips + media-owned options).
       if (!foundationAvailable) void resolveSceneRead(vision, photoUri, analyzed.rawVision)
         .then((read) => {
@@ -163,15 +159,9 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
             confirmations: currentMemory?.confirmations ?? [],
           });
           const reconciledMemory = reconcileProgressiveUpgrade(currentMemory, upgradedMemory);
-          setTags(buildEssenceTags(vision, read, reconciledMemory));
+          setTags(buildEssenceTags(vision, reconciledMemory));
           clarificationRef.current = reconciledMemory;
           setClarificationMemory(reconciledMemory);
-          const upgradedDraft = editableMediaDraft(reconciledMemory);
-          if (upgradedDraft) setMediaDraft(upgradedDraft);
-          if (read.type === 'media' && read.media) {
-            const mediaMeanings = meaningsForMediaKind(read.media.mediaType);
-            if (mediaMeanings) setMeanings(mediaMeanings);
-          }
         })
         .catch(() => {});
       // Upgrade 2 — Foundation Models phrasing for the meaning options (media
@@ -182,7 +172,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     };
   }, [analyze, intro, photoUri, sourceId]);
 
-  const commitMeaning = (meaning: MeaningTag, label: string, memory = clarificationRef.current) => {
+  const commitMeaning = (meaning: MeaningTag, label: string, journal: ManualJournalSubmission, memory = clarificationRef.current) => {
     if (state !== 'essence') {
       return;
     }
@@ -209,94 +199,73 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
       evidence,
     };
     setTimeout(
-      () => onCommit(meaning, visionRef.current, label, sceneRef.current, memory?.confirmations ?? [], reviewed),
+      () => onCommit(meaning, visionRef.current, label, sceneRef.current, memory?.confirmations ?? [], reviewed, journal),
       740
     );
   };
 
-  const handleMeaning = (meaning: MeaningTag) => {
-    commitMeaning(meaning, meanings.find((option) => option.id === meaning)?.label ?? '');
-  };
-
   const handleClarification = (option: ClarificationOption) => {
-    let memory = clarificationRef.current;
-    let resolvedOption = option;
+    const memory = clarificationRef.current;
     const node = memory ? currentClarificationNode(memory) : null;
     if (!memory || !node || state !== 'essence') return;
-    if (option.facetKey === 'media_type' && option.facetValue === 'book') {
-      const title = extractTitleFromVisionText(visionRef.current?.textTokens);
-      if (title) {
-        const existingScene = sceneRef.current;
-        sceneRef.current = {
-          memoryDomain: 'media',
-          type: 'media',
-          label: 'An inspiration',
-          detail: title,
-          media: { mediaType: 'book', title, creator: null },
-          source: existingScene?.source ?? 'rules',
-          supportingSubjects: existingScene?.supportingSubjects,
-          representation: existingScene?.representation,
-          promptVersion: existingScene?.promptVersion,
-        };
-        memory = {
-          ...memory,
-          facets: [
-            ...memory.facets.filter((facet) => facet.key !== 'media_title'),
-            { key: 'media_title', value: title, confidence: 0.78, sensitive: false, confirmed: false },
-          ],
-        };
-        resolvedOption = { ...option, nextNodeId: 'title' };
-      }
-    }
-    const next = answerClarification(memory, node, resolvedOption);
+    const next = answerClarification(memory, node, option);
     clarificationRef.current = next;
     setClarificationMemory(next);
     void Haptics.selectionAsync();
-    const draft = editableMediaDraft(next);
-    if (draft) {
-      setMediaDraft(draft);
+    const route = photoJournalRouteForConfirmation(option.facetKey, option.facetValue);
+    if (route) {
+      setJournalRoute(route);
       return;
     }
     if (next.promptState.status === 'answered') {
-      commitMeaning(option.meaning ?? 'meaningful', option.label, next);
+      setJournalPickerOpen(true);
     }
   };
 
-  const handleMediaDraftSave = (submission: ManualJournalSubmission) => {
+  const handleJournalSave = (submission: ManualJournalSubmission) => {
     const memory = clarificationRef.current;
     const flow = manualJournalFlow(submission.flowId);
     const choice = flow?.choices.find((item) => item.id === submission.categoryId);
-    const mediaType = choice?.mediaType;
-    if (!memory || !flow || !mediaType || state !== 'essence') return;
-    const titleValue = submission.fields.specific;
-    const title = typeof titleValue === 'string' ? titleValue.trim() : '';
+    if (!memory || !flow || !choice || state !== 'essence') return;
+    const specificValue = submission.fields.specific;
+    const specific = typeof specificValue === 'string' ? specificValue.trim() : '';
     const createdAt = new Date().toISOString();
+    const routeFacets = journalRoute?.confirmedFacets ?? [];
+    const finalFacets = dedupeJournalFacets([
+      ...routeFacets,
+      ...(choice.mediaType ? [{ key: 'media_type', value: choice.mediaType }] : []),
+      ...(choice.mediaType && specific ? [{ key: 'media_title', value: specific }] : []),
+      ...(flow.adapter === 'food' ? [{ key: 'food_item', value: specific || choice.label }] : []),
+      ...(submission.feeling ? [{ key: flow.adapter === 'studio' ? 'media_rating' : 'journal_feeling', value: submission.feeling }] : []),
+    ]);
+    const allowedRoutingFacets = routingFacetsForJournalAdapter(flow.adapter);
+    const routingFacetKeys = new Set(['media_type', 'media_title', 'food_kind', 'food_item', 'place_category', 'movement_mode', 'movement_subtype', 'activity_kind', 'device_activity', 'relationship', 'work_kind', 'life_event']);
+    const memoryWithoutMachineText = {
+      ...memory,
+      facets: memory.facets.filter((facet) =>
+        (!routingFacetKeys.has(facet.key) || allowedRoutingFacets.has(facet.key)) &&
+        (facet.key !== 'media_title' || facet.confirmed)
+      ),
+      confirmations: memory.confirmations.filter((confirmation) =>
+        !routingFacetKeys.has(confirmation.facetKey) || allowedRoutingFacets.has(confirmation.facetKey)
+      ),
+      dominantDomain: domainForJournalAdapter(flow.adapter),
+    };
     const confirmed = applyManualJournalFacets(
-      { ...memory, dominantDomain: 'media' },
-      [
-        { key: 'media_type', value: mediaType },
-        ...(title ? [{ key: 'media_title', value: title }] : []),
-        ...(submission.feeling ? [{ key: 'media_rating', value: submission.feeling }] : []),
-      ],
+      memoryWithoutMachineText,
+      finalFacets,
       createdAt
     );
     clarificationRef.current = confirmed;
     setClarificationMemory(confirmed);
-    setMediaDraft(null);
-    const priorScene = sceneRef.current;
-    sceneRef.current = {
-      memoryDomain: 'media',
-      type: 'media',
-      label: 'An inspiration',
-      detail: title || choice.label,
-      media: { mediaType: mediaType as StudioMediaType, title: title || null, creator: null },
-      source: priorScene?.source ?? 'rules',
-      supportingSubjects: priorScene?.supportingSubjects,
-      representation: priorScene?.representation,
-      promptVersion: priorScene?.promptVersion,
-    };
+    setJournalRoute(null);
+    setJournalPickerOpen(false);
+    if (choice.mediaType) {
+      const priorScene = sceneRef.current;
+      sceneRef.current = { memoryDomain: 'media', type: 'media', label: 'An inspiration', detail: specific || choice.label, media: { mediaType: choice.mediaType as StudioMediaType, title: specific || null, creator: null }, source: priorScene?.source ?? 'rules', supportingSubjects: priorScene?.supportingSubjects, representation: priorScene?.representation, promptVersion: priorScene?.promptVersion };
+    }
     const reactionLabel = flow.feelings.find((item) => item.id === submission.feeling)?.label ?? choice.label;
-    commitMeaning(meaningForMediaReaction(submission.feeling), reactionLabel, confirmed);
+    commitMeaning(meaningForJournal(submission.feeling), specific || reactionLabel, submission, confirmed);
   };
 
   const handleSkipClarification = () => {
@@ -306,7 +275,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     clarificationRef.current = skipped;
     setClarificationMemory(skipped);
     if (skipped.promptState.status !== 'pending') {
-      commitMeaning('meaningful', sceneRef.current?.label ?? 'A moment', skipped);
+      setJournalPickerOpen(true);
     }
   };
 
@@ -316,11 +285,17 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     const dismissed = dismissClarification(memory);
     clarificationRef.current = dismissed;
     setClarificationMemory(dismissed);
-    commitMeaning('meaningful', sceneRef.current?.label ?? 'A moment', dismissed);
+    setJournalPickerOpen(true);
   };
 
-  const clarificationNode = clarificationMemory ? currentClarificationNode(clarificationMemory) : null;
-  const displayedOptions = clarificationNode?.options ?? meanings;
+  const plannedClarificationNode = clarificationMemory ? currentClarificationNode(clarificationMemory) : null;
+  const clarificationNode = plannedClarificationNode && !/reaction|meaning|title/.test(plannedClarificationNode.id) ? plannedClarificationNode : null;
+  const routeProposals = clarificationMemory ? photoJournalRouteProposals(clarificationMemory) : [];
+  const showRouteConfirmation = !clarificationNode && !journalRoute && !journalPickerOpen;
+  const displayedOptions = clarificationNode?.options ?? [];
+  const visibleRoutes = routeProposals.length ? routeProposals : [fallbackPhotoJournalRoute()];
+  const fieldSuggestions = journalRoute ? photoJournalSuggestions({ route: journalRoute, rawVision: rawVisionRef.current, vision: visionRef.current, scene: sceneRef.current }) : [];
+  const prefilledSpecific = fieldSuggestions.find((item) => item.prefill)?.value ?? '';
 
   return (
     <View style={styles.fill}>
@@ -345,96 +320,120 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
       ) : null}
 
       {state === 'essence' || state === 'absorbing' ? (
-        <View style={styles.center} pointerEvents="none">
-          <Animated.View entering={FadeIn.duration(360)}>
-            <ThemedText type="onboardingLabel" style={styles.essenceKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-              Essence
-            </ThemedText>
-          </Animated.View>
-          <View style={styles.tagCloud}>
-            {tags.map((tag, index) => (
-              <EssenceChip key={tag.id} tag={tag} index={index} intro={intro} absorb={absorb} fallDistance={fallDistance} />
-            ))}
-          </View>
-        </View>
-      ) : null}
-
-      {state === 'essence' ? (
-        <Animated.View entering={FadeInDown.delay(220).duration(320)} style={[styles.captured, { paddingBottom: insets.bottom + 36 }]}>
-          <ThemedText type="display" style={styles.meaningTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {clarificationNode?.question ?? 'What did this mean?'}
-          </ThemedText>
-          <View style={styles.meaningGrid}>
-            {displayedOptions.map((option, index) => (
-              <Animated.View key={option.id} entering={FadeInDown.delay(280 + index * 50).duration(280)}>
-                <Pressable
-                  onPress={() => clarificationNode
-                    ? handleClarification(option as ClarificationOption)
-                    : handleMeaning(option.id as MeaningTag)}
-                  style={styles.meaningChip}
-                  accessibilityRole="button">
-                  <ThemedText style={styles.meaningEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                    {option.label}
-                  </ThemedText>
-                </Pressable>
-              </Animated.View>
-            ))}
-          </View>
-          {clarificationNode ? (
-            <View style={styles.clarificationActions}>
-              <Pressable accessibilityRole="button" onPress={handleSkipClarification} style={styles.skipAction}>
-                <ThemedText style={styles.skipLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                  Skip this
-                </ThemedText>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={handleDoneClarifying} style={styles.skipAction}>
-                <ThemedText style={styles.skipLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                  Done
-                </ThemedText>
-              </Pressable>
+        <ScrollView
+          style={styles.reviewScroll}
+          contentContainerStyle={[
+            styles.reviewContent,
+            { paddingTop: insets.top + 72, paddingBottom: insets.bottom + 28 },
+          ]}
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.tagSection} pointerEvents="none">
+            <Animated.View entering={FadeIn.duration(360)}>
+              <ThemedText type="onboardingLabel" style={styles.essenceKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+                Essence
+              </ThemedText>
+            </Animated.View>
+            <View style={styles.tagCloud}>
+              {tags.map((tag, index) => (
+                <EssenceChip key={tag.id} tag={tag} index={index} intro={intro} absorb={absorb} fallDistance={fallDistance} />
+              ))}
             </View>
+          </View>
+          {state === 'essence' ? (
+            <Animated.View entering={FadeInDown.delay(220).duration(320)} style={styles.captured}>
+              <ThemedText type="display" style={styles.meaningTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                {clarificationNode?.question ?? photoJournalQuestion(visibleRoutes)}
+              </ThemedText>
+              <View style={styles.meaningGrid}>
+                {clarificationNode ? displayedOptions.map((option, index) => (
+                  <Animated.View key={option.id} entering={FadeInDown.delay(280 + index * 50).duration(280)}>
+                    <Pressable
+                      onPress={() => handleClarification(option as ClarificationOption)}
+                      style={styles.meaningChip}
+                      accessibilityRole="button">
+                      <ThemedText style={styles.meaningEmoji}>{option.emoji}</ThemedText>
+                      <ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                        {option.label}
+                      </ThemedText>
+                    </Pressable>
+                  </Animated.View>
+                )) : visibleRoutes.map((route, index) => (
+                  <Animated.View key={route.id} entering={FadeInDown.delay(280 + index * 50).duration(280)}>
+                    <Pressable onPress={() => setJournalRoute(route)} style={styles.meaningChip} accessibilityRole="button">
+                      <ThemedText style={styles.meaningEmoji}>✨</ThemedText><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{route.label}</ThemedText>
+                    </Pressable>
+                  </Animated.View>
+                ))}
+                {showRouteConfirmation ? <Pressable onPress={() => setJournalPickerOpen(true)} style={styles.meaningChip} accessibilityRole="button"><ThemedText style={styles.meaningEmoji}>＋</ThemedText><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Something else</ThemedText></Pressable> : null}
+              </View>
+              {clarificationNode ? (
+                <View style={styles.clarificationActions}>
+                  <Pressable accessibilityRole="button" onPress={handleSkipClarification} style={styles.skipAction}>
+                    <ThemedText style={styles.skipLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                      Skip this
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={handleDoneClarifying} style={styles.skipAction}>
+                    <ThemedText style={styles.skipLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                      Done
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              ) : null}
+            </Animated.View>
           ) : null}
-        </Animated.View>
+        </ScrollView>
       ) : null}
 
-      {state === 'essence' && mediaDraft ? (
+      {state === 'essence' && journalRoute ? (
         <ManualJournalSheet
-          initialFlowId="studio"
-          initialChoiceId={mediaDraft.choiceId}
-          initialSpecific={mediaDraft.title}
+          initialFlowId={journalRoute.flowId}
+          initialChoiceId={journalRoute.choiceId}
+          initialSpecific={prefilledSpecific}
+          initialSpecificSuggestions={fieldSuggestions}
+          sourceType="photo"
+          sourceId={sourceId ?? photoUri}
+          thumbnailUri={photoUri}
+          onBackFromInitial={() => setJournalRoute(null)}
           onClose={onClose}
-          onSave={handleMediaDraftSave}
+          onSave={handleJournalSave}
         />
       ) : null}
+      {state === 'essence' && journalPickerOpen ? <ManualJournalSheet sourceType="photo" sourceId={sourceId ?? photoUri} thumbnailUri={photoUri} onBackFromInitial={() => setJournalPickerOpen(false)} onClose={onClose} onSave={handleJournalSave} /> : null}
     </View>
   );
 }
 
-function editableMediaDraft(memory: ClassifiedMemory | null): MediaDraft | null {
-  const descriptor = memory?.photoAnalysis;
-  if (!memory || !descriptor || memory.sourceType !== 'photo' || descriptor.representation.kind === 'screen_content') return null;
-  const mediaType = memory.facets.find(
-    (facet) => facet.key === 'media_type' && (facet.value === 'book' || facet.value === 'film')
-  )?.value;
-  const title = memory.facets.find(
-    (facet) => facet.key === 'media_title' && facet.value !== 'unknown'
-  )?.value.trim();
-  if ((mediaType !== 'book' && mediaType !== 'film') || !title) return null;
-  const hierarchy = descriptor.hierarchy;
-  const primary = descriptor.subjects.find((subject) => subject.role === 'primary');
-  const isPhysicalCover =
-    hierarchy?.representation.kind === 'physical_document' ||
-    hierarchy?.container.kind === 'book' ||
-    hierarchy?.container.kind === 'poster_or_print' ||
-    (primary?.domain === 'media' && descriptor.representation.kind === 'real_world');
-  return isPhysicalCover ? { choiceId: mediaType, title } : null;
-}
-
-function meaningForMediaReaction(reaction: string | null | undefined): MeaningTag {
+function meaningForJournal(reaction: string | null | undefined): MeaningTag {
   if (reaction === 'loved') return 'together';
   if (reaction === 'inspired') return 'meaningful';
   return 'calm';
+}
+
+function domainForJournalAdapter(adapter: string): ClassifiedMemory['dominantDomain'] {
+  return ({ food: 'food', studio: 'media', place: 'place', movement: 'movement', relationship: 'people', work: 'work', big_event: 'life_event' } as Record<string, ClassifiedMemory['dominantDomain']>)[adapter] ?? 'other';
+}
+
+function routingFacetsForJournalAdapter(adapter: string): Set<string> {
+  const keys = ({
+    studio: ['media_type', 'media_title', 'device_activity'],
+    food: ['food_kind', 'food_item'],
+    place: ['place_category'],
+    movement: ['movement_mode', 'movement_subtype', 'activity_kind'],
+    relationship: ['relationship'],
+    work: ['work_kind', 'device_activity'],
+    general: ['device_activity'],
+    big_event: ['life_event'],
+  } as Record<string, string[]>)[adapter] ?? [];
+  return new Set(keys);
+}
+
+function dedupeJournalFacets(values: { key: string; value: string; sensitive?: boolean }[]) {
+  const byKey = new Map<string, { key: string; value: string; sensitive?: boolean }>();
+  values.forEach((value) => byKey.set(value.key, value));
+  return [...byKey.values()];
 }
 
 function reconcileProgressiveUpgrade(
@@ -487,29 +486,9 @@ function reconcileProgressiveUpgrade(
 // can watch being captured into the day.
 function buildEssenceTags(
   vision: DayVisionSummary | null,
-  scene: SceneRead | null,
   memory: ClassifiedMemory | null
 ): EssenceTag[] {
   const tags: EssenceTag[] = [];
-  // When the work was identified (a cover/poster read as a real title), it
-  // leads — the user sees '📖 Norwegian Wood', not just scene labels. The
-  // scene read is the arbiter; the direct vision check only fills in when no
-  // scene resolved in time.
-  const studio =
-    scene?.type === 'media' && scene.media
-      ? studioDetectionFromMedia(scene.media.mediaType, scene.media.title)
-      : vision
-        ? detectStudioInVision(vision)
-        : null;
-  if (studio?.detected && studio.label && !isGenericStudioLabel(studio.label)) {
-    tags.push({ id: 'studio-title', label: `${studio.emoji ?? '📖'} ${studio.label}`, accent: '#E8C87A' });
-  } else if (scene?.type === 'media' && scene.media?.mediaType) {
-    const mediaLabel = scene.media.mediaType === 'film'
-      ? 'Movie'
-      : scene.media.mediaType.charAt(0).toUpperCase() + scene.media.mediaType.slice(1);
-    const mediaEmoji = scene.media.mediaType === 'book' ? '📖' : scene.media.mediaType === 'game' ? '🎮' : '✨';
-    tags.push({ id: `studio-${scene.media.mediaType}`, label: `${mediaEmoji} ${mediaLabel}`, accent: '#E8C87A' });
-  }
   if (vision && vision.maxFaceCount >= 2) {
     tags.push({ id: 'together', label: 'Together', accent: '#F2C2A8' });
   }
@@ -518,7 +497,7 @@ function buildEssenceTags(
   const canonicalNames = (memory?.photoAnalysis?.subjects ?? [])
     .filter((subject) => subject.role !== 'incidental' && subject.score >= 0.35)
     .sort((left, right) => (left.role === 'primary' ? -1 : right.role === 'primary' ? 1 : right.score - left.score))
-    .map((subject) => subject.label || subject.canonicalValue)
+    .map((subject) => subject.domain === 'media' ? subject.canonicalValue : subject.label || subject.canonicalValue)
     .filter((name) => !/^(machine|material|structure|consumer electronics|wood processed|conveyance)$/i.test(name))
     .filter((name, index, names) => {
       const normalized = name.trim().toLocaleLowerCase();
@@ -611,6 +590,15 @@ const styles = StyleSheet.create({
     width: 64,
   },
   essenceKicker: { fontSize: 12 },
+  reviewScroll: { ...StyleSheet.absoluteFillObject },
+  reviewContent: {
+    alignItems: 'center',
+    flexGrow: 1,
+    gap: 28,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  tagSection: { alignItems: 'center', gap: 12, width: '100%' },
   tagCloud: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -631,7 +619,7 @@ const styles = StyleSheet.create({
   },
   essenceDot: { borderRadius: 999, height: 8, width: 8 },
   essenceLabel: { fontSize: 15, fontWeight: '800', lineHeight: 18 },
-  captured: { alignItems: 'center', bottom: 0, gap: 8, left: 0, paddingHorizontal: 24, position: 'absolute', right: 0 },
+  captured: { alignItems: 'center', gap: 8, width: '100%' },
   meaningTitle: { fontSize: 26, fontStyle: 'italic', lineHeight: 31, marginBottom: 10, textAlign: 'center' },
   meaningGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   meaningChip: {

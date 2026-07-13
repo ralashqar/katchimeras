@@ -75,6 +75,16 @@ const sport = withManualJournalEntry(base, submission('movement', 'sport', {
 }), now);
 check('manual sport maps safely into the movement taxonomy', sport.stepsInterpretation?.movement === 'workout' && sport.stepsInterpretation?.subtype === 'football');
 
+const photoFood = withManualJournalEntry({ ...base, notes: [], foodMoments: [] }, submission('food', 'meal', {
+  sourceType: 'photo', sourceId: 'photo-1', thumbnailUri: 'thumb.jpg',
+  fields: { specific: 'Mushroom ramen', context: 'japanese' },
+  linkedNote: { kind: 'voice', text: 'Dinner after the show', audioUri: 'voice.m4a', durationMs: 4000 },
+}), now);
+check('photo journal projection retains photo source and thumbnail', photoFood.foodMoments?.[0]?.source === 'photo' && photoFood.foodMoments[0].sourceId === 'photo-1' && photoFood.foodMoments[0].thumbnailUri === 'thumb.jpg');
+check('voice attachment is linked to its photo', photoFood.notes?.[0]?.kind === 'voice' && photoFood.notes[0].parentSourceId === 'photo-1' && photoFood.manualJournalEntries[0].linkedNoteId === photoFood.notes[0].id);
+const repeatedPhoto = withManualJournalEntry(photoFood, submission('food', 'meal', { sourceType: 'photo', sourceId: 'photo-1', fields: { specific: 'Duplicate', context: null } }), new Date(now.getTime() + 1000));
+check('photo journal persistence is idempotent by source id', repeatedPhoto.manualJournalEntries.length === 1 && repeatedPhoto.foodMoments.length === 1);
+
 Module._resolveFilename = originalResolve;
 fs.rmSync(temp, { recursive: true, force: true });
 console.log(failures ? `\n${failures} manual-journal mutation check(s) FAILED.` : '\nAll manual-journal mutation checks passed.');

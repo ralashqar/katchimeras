@@ -57,6 +57,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
   const entries: MomentTimelineEntry[] = [];
   const seen = new Set<string>();
   const manualSourceIds = new Set((day.manualJournalEntries ?? []).map((entry) => entry.id));
+  const linkedJournalNoteIds = new Set((day.manualJournalEntries ?? []).map((entry) => entry.linkedNoteId).filter((id): id is string => !!id));
   const push = (entry: Omit<MomentTimelineEntry, 'time'>) => {
     const time = Date.parse(entry.createdAt);
     if (!entry.label.trim() || Number.isNaN(time) || seen.has(entry.id)) return;
@@ -113,6 +114,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
 
   (day.capturedMeanings ?? []).forEach((captured, index) => {
     const meta = MEANING_META[captured.archetype] ?? MEANING_META.meaningful;
+    const linkedNote = (day.notes ?? []).find((note) => note.parentSourceType === 'photo' && note.parentSourceId === captured.sourceId);
     push({
       id: `capture:${captured.sourceId ?? `${captured.createdAt}:${index}`}`,
       createdAt: captured.createdAt,
@@ -121,10 +123,13 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
       label: captured.label,
       category: 'Photo',
       thumbnailUri: captured.thumbnailUri,
+      noteText: linkedNote?.text,
+      audioUri: linkedNote?.kind === 'voice' ? linkedNote.audioUri : null,
     });
   });
 
   for (const note of day.notes ?? []) {
+    if ((note.parentSourceType === 'photo' && note.parentSourceId) || linkedJournalNoteIds.has(note.id)) continue;
     const meta = MEANING_META[note.archetype] ?? MEANING_META.meaningful;
     push({
       id: `note:${note.id}`,
@@ -139,9 +144,11 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
   }
 
   for (const entry of day.manualJournalEntries ?? []) {
+    if (entry.sourceType === 'photo') continue;
     const flow = manualJournalFlow(entry.flowId);
     const choice = flow?.choices.find((item) => item.id === entry.categoryId);
     const specific = typeof entry.fields.specific === 'string' ? entry.fields.specific.trim() : '';
+    const linkedNote = entry.linkedNoteId ? (day.notes ?? []).find((note) => note.id === entry.linkedNoteId) : null;
     push({
       id: `manual:${entry.id}`,
       createdAt: entry.createdAt,
@@ -149,7 +156,8 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
       accent: '#FFC36B',
       label: specific || choice?.label || flow?.title || 'Journal entry',
       category: flow?.title ?? 'Journal',
-      noteText: entry.note,
+      noteText: linkedNote?.text ?? entry.note,
+      audioUri: linkedNote?.kind === 'voice' ? linkedNote.audioUri : null,
     });
   }
 

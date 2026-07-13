@@ -27,6 +27,11 @@ function photoVision(details = []) {
   };
 }
 
+function cityVision(details = []) {
+  const vision = photoVision(details);
+  return { ...vision, concepts: [...vision.concepts, { name: 'city skyline', salience: 0.86, coverage: 1, count: 1, peakConfidence: 0.86 }] };
+}
+
 function dayFor(intelligence) {
   return {
     id: 'day-2026-07-10',
@@ -46,10 +51,10 @@ const city = buildPhotoIntelligence({
   sourceId: 'city-high',
   observedAt: '2026-07-10T12:00:00.000Z',
   thumbnailUri: 'file://city-high.jpg',
-  vision: photoVision(),
+  vision: cityVision(),
   scene: { type: 'place', label: 'City', detail: 'a city skyline', source: 'llm' },
 });
-check('Foundation scene detail survives as place.city', city.memory.qualities.some((quality) => quality.qualityId === 'place.city'));
+check('visually corroborated Foundation scene detail survives as place.city', city.memory.qualities.some((quality) => quality.qualityId === 'place.city'));
 const ready = evaluateQuestRuntime({
   questId: 'quest-photo-city',
   day: dayFor(city),
@@ -104,7 +109,7 @@ check('quest-UI confirmation promotes supported evidence to ready', confirmed.re
 const screen = buildPhotoIntelligence({
   sourceId: 'city-screen',
   observedAt: '2026-07-10T13:00:00.000Z',
-  vision: photoVision(['screen_content']),
+  vision: cityVision(['screen_content']),
   scene: { type: 'place', label: 'City', detail: 'a city skyline', source: 'llm' },
 });
 check('screen content cannot satisfy a physical city quality', !screen.memory.qualities.some((quality) => quality.qualityId === 'place.city'));

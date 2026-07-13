@@ -11,7 +11,7 @@ import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 import { confirmationsRejectDomain } from '@/utils/intelligence/classification-policy';
 import type { SceneRead } from '@/utils/scene-classify';
-import type { DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
+import type { DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import { safeGoBack } from '@/utils/safe-navigation';
@@ -78,7 +78,7 @@ export default function PhotoEssenceRoute() {
 
   const commit = useCallback(
     // `scene` is the hierarchical read EssenceReview resolved (and showed).
-    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[], reviewed?: ReviewedPhotoAnalysis) => {
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[], reviewed: ReviewedPhotoAnalysis, journal: ManualJournalSubmission) => {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined, {
         rejectFood: confirmationsRejectDomain(confirmations, 'food'),
         rejectMedia: confirmationsRejectDomain(confirmations, 'media'),
@@ -114,7 +114,8 @@ export default function PhotoEssenceRoute() {
           scene: scene ?? undefined,
           confirmations,
           classifiedMemory: reviewed?.memory ?? null,
-          evidence: reviewed?.evidence ?? null,
+        evidence: reviewed?.evidence ?? null,
+        journal,
         },
         captureTarget
       );

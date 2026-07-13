@@ -11,6 +11,8 @@ export type ManualJournalChoice = {
   mediaType?: StudioMediaType;
   bigMomentType?: BigMomentType;
   detailChoices?: { id: string; label: string }[];
+  specificFieldLabel?: string;
+  specificFieldPlaceholder?: string;
 };
 
 export type ManualJournalFlowDefinition = {
@@ -56,10 +58,14 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
   {
     id: 'food', version: 1, title: 'Ate or drank', icon: 'fork.knife', adapter: 'food',
     choices: [
-      { ...choice('meal', 'A meal', 'fork.knife', ['subject.food']), detailChoices: [{ id: 'italian', label: 'Italian' }, { id: 'japanese', label: 'Japanese' }, { id: 'chinese', label: 'Chinese' }, { id: 'indian', label: 'Indian' }, { id: 'mexican', label: 'Mexican' }, { id: 'middle_eastern', label: 'Middle Eastern' }, { id: 'french', label: 'French' }, { id: 'greek', label: 'Greek' }, { id: 'home_cooked', label: 'Home-cooked' }] }, choice('snack', 'A snack', 'takeoutbag.and.cup.and.straw.fill', ['subject.food']),
-      choice('dessert', 'Dessert', 'birthday.cake.fill', ['subject.food']), choice('coffee', 'Coffee', 'cup.and.saucer.fill', ['subject.drink']),
-      choice('tea', 'Tea', 'mug.fill', ['subject.drink']), choice('drink', 'Another drink', 'waterbottle.fill', ['subject.drink']),
-      choice('cooking', 'Cooking or baking', 'frying.pan.fill', ['subject.food']), choice('other_food', 'Something else', 'fork.knife.circle.fill', ['subject.food']),
+      { ...choice('meal', 'A meal', 'fork.knife', ['subject.food']), specificFieldLabel: 'Meal or dish', specificFieldPlaceholder: 'What did you have?', detailChoices: [{ id: 'italian', label: 'Italian' }, { id: 'japanese', label: 'Japanese' }, { id: 'chinese', label: 'Chinese' }, { id: 'indian', label: 'Indian' }, { id: 'mexican', label: 'Mexican' }, { id: 'middle_eastern', label: 'Middle Eastern' }, { id: 'french', label: 'French' }, { id: 'greek', label: 'Greek' }, { id: 'home_cooked', label: 'Home-cooked' }] },
+      { ...choice('snack', 'A snack', 'takeoutbag.and.cup.and.straw.fill', ['subject.food']), specificFieldLabel: 'Snack', specificFieldPlaceholder: 'What snack was it?' },
+      { ...choice('dessert', 'Dessert', 'birthday.cake.fill', ['subject.food']), specificFieldLabel: 'Dessert', specificFieldPlaceholder: 'What dessert was it?' },
+      { ...choice('coffee', 'Coffee', 'cup.and.saucer.fill', ['subject.drink']), specificFieldLabel: 'Coffee', specificFieldPlaceholder: 'What did you have?' },
+      { ...choice('tea', 'Tea', 'mug.fill', ['subject.drink']), specificFieldLabel: 'Tea', specificFieldPlaceholder: 'What kind of tea?' },
+      { ...choice('drink', 'Another drink', 'waterbottle.fill', ['subject.drink']), specificFieldLabel: 'Drink', specificFieldPlaceholder: 'What were you drinking?' },
+      { ...choice('cooking', 'Cooking or baking', 'frying.pan.fill', ['subject.food']), specificFieldLabel: 'What you made', specificFieldPlaceholder: 'What did you cook or bake?' },
+      choice('other_food', 'Something else', 'fork.knife.circle.fill', ['subject.food']),
     ],
     detailTitle: 'What did it mean?', specificFieldLabel: 'Food or drink', specificFieldPlaceholder: 'What did you have?',
     feelings: [{ id: 'treat', label: 'A treat' }, { id: 'sharedMeal', label: 'Shared' }, { id: 'comfort', label: 'Comfort' }, { id: 'fuel', label: 'Fuel' }, { id: 'discovery', label: 'Discovery' }],
@@ -67,11 +73,11 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
   {
     id: 'studio', version: 1, title: 'Watched, read or listened', icon: 'book.fill', adapter: 'studio',
     choices: [
-      { ...choice('book', 'Book or audiobook', 'book.fill', ['media.book']), mediaType: 'book' },
-      { ...choice('film', 'Film', 'film.fill', ['media.film']), mediaType: 'film' },
-      { ...choice('show', 'TV show or series', 'tv.fill'), mediaType: 'show' },
-      { ...choice('game', 'Video game', 'gamecontroller.fill', ['media.game']), mediaType: 'game' },
-      { ...choice('music', 'Music or album', 'music.note', ['media.music']), mediaType: 'music' },
+      { ...choice('book', 'Book or audiobook', 'book.fill', ['media.book']), mediaType: 'book', specificFieldLabel: 'Book title', specificFieldPlaceholder: 'What was the book called?' },
+      { ...choice('film', 'Film', 'film.fill', ['media.film']), mediaType: 'film', specificFieldLabel: 'Film title', specificFieldPlaceholder: 'What was the film called?' },
+      { ...choice('show', 'TV show or series', 'tv.fill'), mediaType: 'show', specificFieldLabel: 'Show title', specificFieldPlaceholder: 'What was the show called?' },
+      { ...choice('game', 'Video game', 'gamecontroller.fill', ['media.game']), mediaType: 'game', specificFieldLabel: 'Game title', specificFieldPlaceholder: 'What was the game called?' },
+      { ...choice('music', 'Music or album', 'music.note', ['media.music']), mediaType: 'music', specificFieldLabel: 'Track, artist or album', specificFieldPlaceholder: 'What were you listening to?' },
       { ...choice('podcast', 'Podcast', 'waveform'), mediaType: 'other' },
       { ...choice('art', 'Art or exhibition', 'paintbrush.fill', ['media.art']), mediaType: 'art' },
       { ...choice('other_media', 'News, live sport or other', 'play.rectangle.fill'), mediaType: 'other' },

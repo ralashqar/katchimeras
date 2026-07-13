@@ -122,6 +122,15 @@ export function classifyScene(vision: DayVisionSummary | undefined | null): Scen
   // may contain an egg, dog, landscape, or character, but those are not a meal,
   // pet, trip, or person in the user's physical day.
   if (summaryIsScreenContent(vision.details)) {
+    // A photographed interactive device is the container, not evidence that
+    // the OCR visible on its display is a physical book. Subtitle, browser,
+    // document, and chat text regularly satisfy the cover heuristics below.
+    // Keep these photos in the device-activity flow; explicit gameplay/video/
+    // ebook evidence is resolved there as gaming, watching, or reading.
+    const interactiveDevice = /\b(laptop|notebook computer|desktop computer|personal computer|computer|smartphone|mobile phone|cell phone|iphone|ipad|tablet)\b/i.test(haystack);
+    if (interactiveDevice) {
+      return { type: 'screen', label: SCENE_LABEL.screen, detail: 'Digital content', source: 'rules' };
+    }
     const screenStudio = detectStudioInVision(vision);
     if (screenStudio.detected && screenStudio.mediaType) {
       const title = screenStudio.label && !isGenericStudioLabel(screenStudio.label) ? screenStudio.label : null;

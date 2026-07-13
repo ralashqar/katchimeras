@@ -96,7 +96,11 @@ export function buildPhotoAnalysisDescriptor(input: {
 
 function subjectIdentity(value: string): string {
   if (/^(book|book cover|publication|paperback|hardcover|novel)$/i.test(value)) return 'book';
-  if (/^(television|tv|tv screen|screen content|computer monitor|broadcast)$/i.test(value)) return 'television';
+  // `screen content` is representation/container evidence, not a television
+  // programme. Collapsing it into `television` gave the generic container a
+  // media-domain score high enough to beat a correctly detected laptop.
+  if (/^(television|tv|tv screen|broadcast)$/i.test(value)) return 'television';
+  if (/^screen content$/i.test(value)) return 'screen_content';
   if (/^(people|person|adult)$/i.test(value)) return 'person';
   return value;
 }
@@ -184,6 +188,17 @@ function dominantSubjectValue(
     scene?.type === 'media' ||
     scene?.type === 'document' ||
     /\b(bookstore|bookshop|book cover|publication|document)\b/i.test(scene?.detail ?? '');
+  const deviceSubject = observations
+    .filter((item) => isDeviceSignal(item.value))
+    .sort((left, right) => right.confidence - left.confidence)[0];
+  // On a laptop/phone/tablet photo the hardware is the physical subject. OCR
+  // and document detection describe depicted screen content and must not turn
+  // it into a physical book before device activity has been resolved.
+  if (
+    representation === 'screen_content' &&
+    deviceSubject &&
+    deviceSubject.value !== 'device_television'
+  ) return deviceSubject.value;
   if (
     prominentMedia?.value === 'book' &&
     (structuredBookPair || (mediaTitle && sceneSupportsBookSubject))
@@ -191,9 +206,6 @@ function dominantSubjectValue(
     const mediaValue = canonicalizeSignal(prominentMedia.value);
     if (mediaValue && observations.some((item) => item.value === mediaValue)) return mediaValue;
   }
-  const deviceSubject = observations
-    .filter((item) => isDeviceSignal(item.value))
-    .sort((left, right) => right.confidence - left.confidence)[0];
   if (deviceSubject) return deviceSubject.value;
   if (representation === 'screen_content') {
     const mediaSubject = observations

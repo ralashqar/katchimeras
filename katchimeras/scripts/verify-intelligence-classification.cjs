@@ -114,6 +114,39 @@ check('laptop remains a device rather than becoming work or media', plainLaptop.
 check('plain laptop asks for activity first', plainLaptop.promptState.graphId === 'device-activity' && clarification.currentClarificationNode(plainLaptop)?.question === 'What were you using it for?', JSON.stringify(plainLaptop.promptState));
 check('plain laptop never starts with media identity or work feelings', !/book|movie|productive/i.test(clarification.currentClarificationNode(plainLaptop)?.question ?? ''), clarification.currentClarificationNode(plainLaptop)?.question);
 
+const subtitleLaptop = classification.buildPhotoClassifiedMemory({
+  sourceId: 'subtitle-laptop', observedAt: '2026-07-13T11:56:37.768Z',
+  rawVision: {
+    labels: [
+      { name: 'people', confidence: 0.796 }, { name: 'computer', confidence: 0.571 },
+      { name: 'laptop', confidence: 0.571 }, { name: 'computer_keyboard', confidence: 0.404 },
+    ],
+    text: ['IIIiMIiii', 'for vlctory for the Ilttle g', 'that I wanted was to see'],
+    faceCount: 1, humanCount: 1, animals: [], humans: [], faces: [], recognizedText: [],
+    dominantSubject: { x: 0.09, y: 0.28, width: 0.83, height: 0.57, confidence: 0.61 },
+    documentDetected: true, captureSource: 'camera',
+  },
+  vision: {
+    ...deviceSummary([['people', 0.796], ['screen content', 0.78], ['computer', 0.571], ['laptop', 0.571], ['document', 0.42]], ['adult', 'screen content', 'document', 'computer', 'laptop']),
+    textTokens: ['IIIiMIiii', 'for vlctory for the Ilttle g', 'that I wanted was to see'],
+    dominantSubjectCoverage: 0.47, documentCoverage: 1,
+    representation: { kind: 'screen_content', confidence: 0.78, reasons: ['screen/device evidence'] },
+  },
+  // Reproduce the stale deterministic scene read defensively as well as the
+  // now-fixed classifier, so retained/cached analysis cannot revive the bug.
+  scene: { type: 'media', label: 'An inspiration', detail: 'For Vlctory for the Ilttle G', source: 'rules', media: { mediaType: 'book', title: 'For Vlctory for the Ilttle G', creator: null } },
+});
+check(
+  'laptop document OCR cannot manufacture a primary book subject',
+  subtitleLaptop.photoAnalysis?.subjects.find((item) => item.role === 'primary')?.canonicalValue === 'device_laptop' &&
+    subtitleLaptop.dominantDomain === 'other' &&
+    subtitleLaptop.promptState.graphId === 'device-activity' &&
+    clarification.currentClarificationNode(subtitleLaptop)?.question === 'What were you using it for?' &&
+    !subtitleLaptop.facets.some((item) => item.key === 'media_type' && item.value === 'book') &&
+    subtitleLaptop.photoAnalysis?.hierarchy?.container.kind === 'screen',
+  JSON.stringify(subtitleLaptop)
+);
+
 const gameplayLaptop = laptopMemory('gameplay-laptop', [['gameplay', 0.91]], ['video game']);
 check('strong gameplay asks for targeted confirmation', gameplayLaptop.promptState.currentNodeId === 'confirm' && clarification.currentClarificationNode(gameplayLaptop)?.question === 'Were you gaming?', JSON.stringify(gameplayLaptop.facets));
 const spreadsheetLaptop = laptopMemory('spreadsheet-laptop', [['spreadsheet', 0.89]]);
@@ -295,7 +328,14 @@ const unnamedOcrBook = classification.buildPhotoClassifiedMemory({
   vision: { ...summary(['blue sky']), textTokens: ['INTERNAfioNAL 8ESTSELLER', 'STEPHEN', 'HAWKING', 'BRIFF', 'STO', 'TIME'] },
   scene: { type: 'media', label: 'An inspiration', source: 'rules', media: { mediaType: 'book', title: null, creator: null } },
 });
-check('unnamed OCR book asks for book confirmation', clarification.currentClarificationNode(unnamedOcrBook)?.question === 'Is this a book?', clarification.currentClarificationNode(unnamedOcrBook)?.question);
+check('unnamed OCR book does not create a book confirmation without visual support', clarification.currentClarificationNode(unnamedOcrBook)?.question !== 'Is this a book?', clarification.currentClarificationNode(unnamedOcrBook)?.question);
+const unsupportedFoundationFood = classification.buildPhotoClassifiedMemory({
+  sourceId: 'foundation-food-without-visual-food',
+  observedAt: '2026-07-10T13:30:31.000Z',
+  vision: summary(['computer', 'laptop']),
+  scene: { type: 'food', memoryDomain: 'food', label: 'A meal', detail: 'Pasta', source: 'llm', food: { detected: true, label: 'Pasta' } },
+});
+check('Foundation food text cannot create a photo category without visual food support', unsupportedFoundationFood.dominantDomain !== 'food' && !unsupportedFoundationFood.facets.some((facet) => facet.key === 'food_item'), JSON.stringify(unsupportedFoundationFood.facets));
 const signLabelledCover = classification.buildPhotoClassifiedMemory({
   sourceId: 'sign-labelled-cover',
   observedAt: '2026-07-11T00:13:55.594Z',
@@ -313,10 +353,10 @@ const signLabelledCover = classification.buildPhotoClassifiedMemory({
   },
   scene: { memoryDomain: 'place', type: 'place', label: 'A place', detail: 'bookstore', source: 'llm', supportingSubjects: ['sign'], representation: 'real_world' },
 });
-check('salient OCR book cover outranks an inferred bookstore place', signLabelledCover.dominantDomain === 'media', signLabelledCover.dominantDomain);
-check('OCR-only cover becomes a first-class book subject', signLabelledCover.photoAnalysis?.subjects.some((item) => item.canonicalValue === 'book' && item.role === 'primary'), JSON.stringify(signLabelledCover.photoAnalysis?.subjects));
-check('OCR-only cover retains its recovered title', signLabelledCover.facets.some((item) => item.key === 'media_title' && /brief history of time/i.test(item.value)), JSON.stringify(signLabelledCover.facets));
-check('OCR-only cover asks for book confirmation, not place purpose', clarification.currentClarificationNode(signLabelledCover)?.question === 'Is this a book?', clarification.currentClarificationNode(signLabelledCover)?.question);
+check('OCR-only cover cannot outrank a visually inferred place', signLabelledCover.dominantDomain === 'place', signLabelledCover.dominantDomain);
+check('OCR-only cover does not manufacture a book subject', !signLabelledCover.photoAnalysis?.subjects.some((item) => item.canonicalValue === 'book'), JSON.stringify(signLabelledCover.photoAnalysis?.subjects));
+check('OCR-only cover does not persist a title facet', !signLabelledCover.facets.some((item) => item.key === 'media_title'), JSON.stringify(signLabelledCover.facets));
+check('OCR-only cover follows the visual place question', clarification.currentClarificationNode(signLabelledCover)?.question === 'What kind of place was this?', clarification.currentClarificationNode(signLabelledCover)?.question);
 const distantBrianBook = classification.buildPhotoClassifiedMemory({
   sourceId: 'distant-brian-book',
   observedAt: '2026-07-11T00:20:00.000Z',

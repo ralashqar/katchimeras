@@ -452,17 +452,14 @@ export function detectStudioInVision(vision: DayVisionSummary | undefined | null
   const leadingMedia = matchVisionMedia(` ${leadingTerms} `);
   const detailedMedia = matchVisionMedia(` ${compoundDetails} `);
   const structuredBook = hasProminentStructuredBook(vision, ocrTitle);
-  const ocrOnlyBook = OCR_BOOK_HINT.test(` ${ocrText} `);
-  const prominentOcrBook = hasProminentOcrBookCover(vision, ocrTitle, ocrText);
-  const mediaType = leadingMedia ?? detailedMedia ?? (structuredBook ? 'book' : null) ?? (prominentOcrBook ? 'book' : null) ?? (ocrOnlyBook ? 'book' : null);
+  // OCR is suggestion data, never category evidence. A physical book still
+  // needs an explicit Vision book/media label; text alone cannot create one.
+  const mediaType = leadingMedia ?? detailedMedia ?? (structuredBook ? 'book' : null);
   if (!mediaType) return { detected: false };
-  // OCR furniture can establish a cover without reliably separating author,
-  // title, and strapline. Keep OCR-only books unnamed and ask for confirmation.
-  const reliableTitle = !ocrOnlyBook || !!leadingMedia || !!detailedMedia || structuredBook || prominentOcrBook;
   return {
     detected: true,
     mediaType,
-    label: reliableTitle ? ocrTitle ?? MEDIA_LABEL[mediaType] : MEDIA_LABEL[mediaType],
+    label: ocrTitle ?? MEDIA_LABEL[mediaType],
     emoji: emojiFor(mediaType),
   };
 }

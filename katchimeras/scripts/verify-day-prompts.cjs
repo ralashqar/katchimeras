@@ -381,9 +381,12 @@ const manualJournalSource = fs.readFileSync(path.join(projectRoot, 'components/k
 check('manual journal supports opening directly at a requested flow', manualJournalSource.includes("initialFlow ? 'category' : 'flow'") && manualJournalSource.includes('manualJournalFlow(initialFlowId)'));
 check('manual journal can prefill an editable media title', manualJournalSource.includes('initialChoiceId') && manualJournalSource.includes("useState(initialSpecific ?? '')"));
 const essenceReviewSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/capture/essence-review.tsx'), 'utf8');
-check('physical book and film OCR opens the editable Studio flow', essenceReviewSource.includes('editableMediaDraft') && essenceReviewSource.includes('initialFlowId="studio"') && essenceReviewSource.includes('initialSpecific={mediaDraft.title}'));
-check('OCR title is confirmed only when the editable flow is saved', essenceReviewSource.includes('handleMediaDraftSave') && essenceReviewSource.includes("{ key: 'media_title', value: title }"));
-check('screen content cannot trigger the physical-cover title editor', essenceReviewSource.includes("descriptor.representation.kind === 'screen_content'"));
+check('every photo route opens the shared editable journal flow', essenceReviewSource.includes('photoJournalRouteProposals') && essenceReviewSource.includes('initialFlowId={journalRoute.flowId}') && essenceReviewSource.includes('initialSpecificSuggestions={fieldSuggestions}'));
+check('machine title suggestions are confirmed only when the journal is saved', essenceReviewSource.includes('handleJournalSave') && essenceReviewSource.includes("{ key: 'media_title', value: specific }"));
+check('screen OCR is gated by confirmed route suggestion policy', essenceReviewSource.includes('photoJournalSuggestions') && essenceReviewSource.includes('journalRoute'));
+check('journal note control supports tap-to-type and hold-to-record', manualJournalSource.includes('delayLongPress={350}') && manualJournalSource.includes('Tap to type · hold to speak'));
+check('photo essence tags and prompts share one ordered scroll-safe layout', essenceReviewSource.includes('style={styles.reviewScroll}') && essenceReviewSource.indexOf('style={styles.tagSection}') < essenceReviewSource.indexOf('style={styles.captured}'));
+check('photo prompt is no longer an independent absolute bottom overlay', essenceReviewSource.includes("captured: { alignItems: 'center', gap: 8, width: '100%' }"));
 const foodSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/food-vault-sheet.tsx'), 'utf8');
 check('vault add buttons deep-link to Food and Studio flows', todaySheetHostSource.includes("openManualJournal('food')") && todaySheetHostSource.includes("openManualJournal('studio')"));
 check('Places and Journey add actions deep-link to their hierarchical flows', todaySheetHostSource.includes("openManualJournal('went_somewhere')") && todaySheetHostSource.includes("openManualJournal('movement')"));

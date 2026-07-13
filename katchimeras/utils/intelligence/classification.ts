@@ -43,13 +43,22 @@ type PhotoMemoryInput = {
 };
 
 export function buildPhotoClassifiedMemory(input: PhotoMemoryInput): ClassifiedMemory {
-  const initialObservations = photoObservations(input);
-  const facets = photoFacets(input, initialObservations);
+  // Foundation text can refine an Apple Vision category, but it cannot create
+  // one by itself. Keep the original scene available to the editor as a text
+  // suggestion while excluding an uncorroborated generated read here.
+  const classificationInput = input.scene?.source === 'llm' && !sceneHasVisualSupport(input)
+    ? { ...input, scene: null }
+    : input;
+  const descriptorScene = classificationInput.scene ?? (input.scene?.source === 'llm'
+    ? { ...input.scene, type: 'other' as const, memoryDomain: 'other' as const, label: 'Visual context', detail: null, food: undefined, media: undefined, supportingSubjects: [], alternatives: [] }
+    : null);
+  const initialObservations = photoObservations(classificationInput);
+  const facets = photoFacets(classificationInput, initialObservations);
   const observations = addRecoveredPhotoFacetObservations(initialObservations, facets);
   const photoAnalysis = buildPhotoAnalysisDescriptor({
     rawVision: input.rawVision,
     vision: input.vision,
-    scene: input.scene,
+    scene: descriptorScene,
     observations,
     facets,
   });
@@ -67,7 +76,7 @@ export function buildPhotoClassifiedMemory(input: PhotoMemoryInput): ClassifiedM
     sourceType: 'photo',
     sourceId: input.sourceId,
     createdAt: input.observedAt,
-    dominantDomain: resolvePhotoDomain(input.scene, facets, observations, photoAnalysis),
+    dominantDomain: resolvePhotoDomain(classificationInput.scene, facets, observations, photoAnalysis),
     observations,
     facets,
     qualities,
@@ -714,6 +723,57 @@ function buildMemory(input: Omit<ClassifiedMemory, 'assignments' | 'promptState'
   };
 }
 
+function sceneMediaHasVisualSupport(input: PhotoMemoryInput): boolean {
+  const mediaType = input.scene?.media?.mediaType;
+  if (!mediaType) return false;
+  const visual = [
+    ...(input.rawVision?.labels ?? []).map((item) => item.name),
+    ...(input.rawVision?.regionClassifications ?? []).flatMap((item) => item.labels.map((label) => label.name)),
+    ...(input.vision?.concepts ?? []).map((item) => item.name),
+    ...(input.vision?.details ?? []),
+  ].join(' ').toLowerCase();
+  const pattern: Record<string, RegExp> = {
+    book: /\b(book|publication|paperback|hardcover|novel|ebook)\b/,
+    film: /\b(movie|film|cinema|movie poster|film poster|video player)\b/,
+    show: /\b(television|tv screen|broadcast|video player)\b/,
+    game: /\b(gameplay|video game|game controller|gamepad|console)\b/,
+    music: /\b(music|concert|album|record player|turntable|headphones)\b/,
+    art: /\b(art|artwork|painting|sculpture|canvas|gallery)\b/,
+    other: /\b(screen content|television|video player|document)\b/,
+  };
+  return (pattern[mediaType] ?? pattern.other).test(visual);
+}
+
+function sceneHasVisualSupport(input: PhotoMemoryInput): boolean {
+  const scene = input.scene;
+  if (!scene) return false;
+  if (scene.type === 'media') return sceneMediaHasVisualSupport(input);
+  const visual = [
+    ...(input.rawVision?.labels ?? []).map((item) => item.name),
+    ...(input.rawVision?.regionClassifications ?? []).flatMap((item) => item.labels.map((label) => label.name)),
+    ...(input.vision?.concepts ?? []).map((item) => item.name),
+    ...(input.vision?.details ?? []),
+  ].join(' ').toLowerCase();
+  const domain = scene.memoryDomain ?? scene.type;
+  const patterns: Partial<Record<MemoryDomain | SceneRead['type'], RegExp>> = {
+    food: /\b(food|meal|dish|drink|beverage|coffee|tea|dessert|cake|pizza|sushi|ramen|restaurant)\b/,
+    animal: /\b(dog|cat|pet|animal)\b/,
+    pet: /\b(dog|cat|pet|animal)\b/,
+    people: /\b(person|people|adult|child|baby|group|human|face)\b/,
+    social: /\b(person|people|adult|child|baby|group|human|face)\b/,
+    nature: /\b(park|forest|garden|beach|coast|mountain|water|lake|river|flower|snow|sunset|nature)\b/,
+    place: /\b(place|building|structure|city|street|home|house|room|sofa|couch|furniture|interior|living room|cafe|museum|library|park|beach|forest)\b/,
+    movement: /\b(walk|run|running|cycle|bicycle|sport|gym|workout|exercise|football|basketball|tennis|travel|transit)\b/,
+    activity: /\b(walk|run|running|cycle|bicycle|sport|gym|workout|exercise|football|basketball|tennis|travel|transit)\b/,
+    work: /\b(work|office|spreadsheet|document editor|code editor|ide|keyboard)\b/,
+    screen: /\b(screen|computer|laptop|phone|tablet|monitor|television|consumer electronics)\b/,
+    document: /\b(document|sign|paper|publication|book|text)\b/,
+  };
+  if (scene.type === 'document' && (input.rawVision?.documentDetected || (input.vision?.documentCoverage ?? 0) >= 0.5)) return true;
+  if (scene.type === 'social' && (input.rawVision?.humanCount ?? input.rawVision?.faceCount ?? input.vision?.maxFaceCount ?? 0) > 0) return true;
+  return (patterns[domain] ?? patterns[scene.type])?.test(visual) ?? false;
+}
+
 function photoObservations(input: PhotoMemoryInput): IntelligenceObservation[] {
   const observations: IntelligenceObservation[] = [];
   const push = (value: string, confidence: number, provider: DayEvidenceProvider, raw?: string | null) => {
@@ -725,7 +785,15 @@ function photoObservations(input: PhotoMemoryInput): IntelligenceObservation[] {
   };
   input.rawVision && visionResultToSignals(input.rawVision).forEach((signal) => push(signal.key, signal.confidence, 'appleVision', signal.raw));
   input.vision && visionSummaryToSignals(input.vision).forEach((signal) => push(signal.key, signal.confidence, 'appleVision', signal.raw));
-  if (input.scene && input.scene.type !== 'other') {
+  const deterministicScreenBook =
+    input.scene?.source === 'rules' &&
+    input.scene.type === 'media' &&
+    input.scene.media?.mediaType === 'book' &&
+    (input.scene.representation === 'screen_content' || summaryIsScreenContent(input.vision?.details)) &&
+    detectDeviceContext(observations).deviceKind !== null &&
+    detectDeviceContext(observations).deviceKind !== 'television';
+  const unsupportedGeneratedMedia = input.scene?.type === 'media' && !!input.scene.media && !sceneMediaHasVisualSupport(input);
+  if (input.scene && input.scene.type !== 'other' && !deterministicScreenBook && !unsupportedGeneratedMedia) {
     const provider = input.scene.source === 'llm' ? 'appleFoundation' : input.scene.source === 'semantic' ? 'appleNaturalLanguage' : 'deterministic';
     const confidence = input.scene.source === 'llm' ? input.scene.confidence ?? 0.82 : input.scene.source === 'semantic' ? input.scene.confidence ?? 0.72 : 0.55;
     push(input.scene.type, confidence, provider, input.scene.detail);
@@ -746,6 +814,13 @@ function photoFacets(input: PhotoMemoryInput, observations: IntelligenceObservat
   const animal = values.has('dog') ? 'dog' : values.has('cat') ? 'cat' : null;
   if (animal) facets.push(facet('animal_kind', animal, maxConfidence(observations, animal), true));
   const device = detectDeviceContext(observations);
+  const deterministicScreenBook =
+    input.scene?.source === 'rules' &&
+    input.scene.type === 'media' &&
+    input.scene.media?.mediaType === 'book' &&
+    (input.scene.representation === 'screen_content' || summaryIsScreenContent(input.vision?.details)) &&
+    device.deviceKind !== null && device.deviceKind !== 'television';
+  const unsupportedGeneratedMedia = input.scene?.type === 'media' && !!input.scene.media && !sceneMediaHasVisualSupport(input);
   if (device.deviceKind) {
     facets.push(facet('device_kind', device.deviceKind, device.deviceConfidence));
     if (device.selected) {
@@ -778,14 +853,14 @@ function photoFacets(input: PhotoMemoryInput, observations: IntelligenceObservat
     // from the user's answer.
     facets.push(facet('person_subject', prominentPeople.kind, prominentPeople.confidence ?? 0.6, true));
   }
-  if (input.scene?.media) facets.push(facet('media_type', input.scene.media.mediaType, input.scene.source === 'llm' ? 0.82 : 0.62));
-  if (input.scene?.media?.title) facets.push(facet('media_title', input.scene.media.title, 0.78));
+  if (input.scene?.media && !deterministicScreenBook && !unsupportedGeneratedMedia) facets.push(facet('media_type', input.scene.media.mediaType, input.scene.source === 'llm' ? 0.82 : 0.62));
+  if (input.scene?.media?.title && !deterministicScreenBook && !unsupportedGeneratedMedia) facets.push(facet('media_title', input.scene.media.title, 0.78));
   // Essence and prompt planning must consume the same semantic anchor. The
   // Studio detector is deliberately prominence-gated (leading concepts plus
   // document/saliency and cover-like OCR), so it can recover a close book
   // cover when a broad scene read says "place" without promoting a book that
   // merely sits in the background.
-  if (!input.scene?.media) {
+  if (!input.scene?.media && !(device.deviceKind && device.deviceKind !== 'television' && summaryIsScreenContent(input.vision?.details))) {
     const prominentMedia = detectStudioInVision(input.vision);
     // Cross-domain recovery is intentionally limited to structured book
     // covers. Broad labels such as cinema/television can describe the setting
@@ -1068,7 +1143,7 @@ function resolvePhotoDomain(
   // work moment. Explicit place/nature/etc. reads remain untouched, so an
   // incidental TV label in a city photo cannot hijack the scene.
   if (scene?.memoryDomain) return scene.memoryDomain;
-  if (scene?.type === 'media' || (scene?.type === 'screen' && facets.some((item) => item.key === 'media_type'))) return 'media';
+  if ((scene?.type === 'media' || scene?.type === 'screen') && facets.some((item) => item.key === 'media_type')) return 'media';
   if (facets.some((item) => item.key === 'person_subject')) return 'people';
   if (scene?.type === 'food') return 'food';
   if (scene?.type === 'pet') return 'animal';

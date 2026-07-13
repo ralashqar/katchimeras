@@ -93,6 +93,19 @@ const heroDay = {
 };
 check('hero meaning is not duplicated by its prompt answer', buildMomentTimeline(heroDay).filter((entry) => entry.label === 'Worth keeping').length === 1);
 
+const linkedPhotoDay = {
+  ...day,
+  notes: [
+    ...day.notes,
+    { id: 'photo-note', kind: 'voice', archetype: 'calm', label: 'A photo', text: 'The detail I wanted to keep', audioUri: 'file://note.m4a', parentSourceType: 'photo', parentSourceId: 'p1', createdAt: at(3) },
+  ],
+  manualJournalEntries: [{ id: 'photo-journal', flowId: 'studio', flowVersion: 1, path: ['studio', 'book'], categoryId: 'book', canonicalQualityIds: ['media.book'], fields: { specific: 'Dune' }, feeling: 'loved', note: 'The detail I wanted to keep', sourceType: 'photo', sourceId: 'p1', linkedNoteId: 'photo-note', createdAt: at(3) }],
+};
+const linkedPhotoTimeline = buildMomentTimeline(linkedPhotoDay);
+const linkedPhoto = linkedPhotoTimeline.find((entry) => entry.id === 'capture:p1');
+check('linked photo note is grouped into the photo timeline item', linkedPhoto?.noteText === 'The detail I wanted to keep' && linkedPhoto.audioUri === 'file://note.m4a', JSON.stringify(linkedPhotoTimeline));
+check('linked photo note does not create a duplicate timeline item', !linkedPhotoTimeline.some((entry) => entry.id === 'note:photo-note'));
+
 const todayCategoriesSource = fs.readFileSync(path.join(projectRoot, 'utils/today-categories.ts'), 'utf8');
 const journalSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-journal-sections.tsx'), 'utf8');
 const sanctuarySource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/sanctuary-sheet.tsx'), 'utf8');

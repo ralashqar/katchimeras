@@ -99,6 +99,23 @@ check('screen-content egg cannot classify as food', screenshotEgg.type === 'scre
 const gameEgg = scene.classifyScene(vision({ concepts: ['gaming', 'dessert'], details: ['screen content', 'video game'] }));
 check('game screenshot routes to media instead of food', gameEgg.type === 'media' && gameEgg.media?.mediaType === 'game', JSON.stringify(gameEgg));
 
+const laptopSubtitlesMisreadAsBook = scene.classifyScene(vision({
+  concepts: [
+    { name: 'people', salience: 0.8, peakConfidence: 0.8 },
+    { name: 'computer', salience: 0.57, peakConfidence: 0.57 },
+    { name: 'laptop', salience: 0.57, peakConfidence: 0.57 },
+  ],
+  details: ['screen content', 'document', 'computer', 'laptop'],
+  textTokens: ['IIIiMIiii', 'for vlctory for the Ilttle g', 'that I wanted was to see'],
+  dominantSubjectCoverage: 0.47,
+  documentCoverage: 1,
+}));
+check(
+  'subtitle-like OCR on a laptop stays in the device flow instead of becoming a book',
+  laptopSubtitlesMisreadAsBook.type === 'screen',
+  JSON.stringify(laptopSubtitlesMisreadAsBook)
+);
+
 const prominentBookCover = scene.classifyScene(vision({
   concepts: [
     { name: 'book', salience: 0.34, coverage: 1, count: 1, peakConfidence: 0.34 },
@@ -134,14 +151,14 @@ const ocrStructuredCoverWithoutBookLabel = scene.classifyScene(vision({
   dominantSubjectCoverage: 0.53,
   documentCoverage: 1,
 }));
-check('strong OCR document can recover a cover without a book classifier label', ocrStructuredCoverWithoutBookLabel.type === 'media' && ocrStructuredCoverWithoutBookLabel.media?.mediaType === 'book', JSON.stringify(ocrStructuredCoverWithoutBookLabel));
+check('OCR cannot create a book category without a visual book label', ocrStructuredCoverWithoutBookLabel.type !== 'media', JSON.stringify(ocrStructuredCoverWithoutBookLabel));
 
 const ocrOnlyBook = scene.classifyScene(vision({
   concepts: ['conveyance', 'portal', 'window', 'blue sky'],
   details: ['conveyance', 'portal', 'window', 'blue sky'],
   textTokens: ['HE PHENOMENAL', 'INTERNAfioNAL 8ESTSELLER', 'STEPHEN', 'HAWKING', 'BRIFF', 'STO', 'TIME', 'FROMTHE BIG BANG', 'ID BLACK HOL'],
 }));
-check('corrupted bestseller OCR outranks weak nature labels as an unnamed book', ocrOnlyBook.type === 'media' && ocrOnlyBook.media?.mediaType === 'book' && ocrOnlyBook.media?.title === null, JSON.stringify(ocrOnlyBook));
+check('OCR-only bestseller text cannot outrank the visual scene category', ocrOnlyBook.type !== 'media', JSON.stringify(ocrOnlyBook));
 
 const childWithCake = scene.classifyScene(vision({
   concepts: [

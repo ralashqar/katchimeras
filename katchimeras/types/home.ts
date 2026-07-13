@@ -979,6 +979,8 @@ export type DayNote = {
   durationMs: number | null;
   archetype: string; // calm | energy | together | meaningful
   label: string;
+  parentSourceType?: 'photo' | null;
+  parentSourceId?: string | null;
   createdAt: string;
 };
 
@@ -1019,7 +1021,17 @@ export type ManualJournalEntry = {
   fields: Record<string, string | string[] | boolean | null>;
   feeling?: string | null;
   note?: string | null;
+  sourceType?: 'manual' | 'photo';
+  sourceId?: string | null;
+  linkedNoteId?: string | null;
   createdAt: string;
+};
+
+export type JournalNoteDraft = {
+  kind: 'text' | 'voice';
+  text: string;
+  audioUri?: string | null;
+  durationMs?: number | null;
 };
 
 export type ManualJournalSubmission = {
@@ -1030,6 +1042,10 @@ export type ManualJournalSubmission = {
   fields: Record<string, string | string[] | boolean | null>;
   feeling?: string | null;
   note?: string | null;
+  sourceType?: 'manual' | 'photo';
+  sourceId?: string | null;
+  thumbnailUri?: string | null;
+  linkedNote?: JournalNoteDraft | null;
 };
 
 export type StoredHomeDayRecord = {

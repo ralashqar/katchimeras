@@ -1,9 +1,8 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,8 +19,8 @@ import { resolvePhotoCategory } from '@/utils/photo-category';
 import { analyzePhoto } from '@/utils/photo-vision';
 import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vision-signals';
 import { confirmationsRejectDomain } from '@/utils/intelligence/classification-policy';
-import { resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
-import type { DayInputTarget, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
+import type { SceneRead } from '@/utils/scene-classify';
+import type { DayInputTarget, DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import { cancelQuestCapture, completeQuestCapture } from '@/utils/quest-capture-session';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
@@ -32,7 +31,7 @@ import { safeGoBack } from '@/utils/safe-navigation';
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
 // streams the tags into the day and exits).
-type CaptureState = 'live' | 'capturing' | 'captured' | 'questAnalyzing';
+type CaptureState = 'live' | 'capturing' | 'captured';
 
 export default function MomentCaptureScreen() {
   const router = useRouter();
@@ -50,7 +49,6 @@ export default function MomentCaptureScreen() {
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const questProcessingRef = useRef(false);
   const questId = typeof params.questId === 'string' ? params.questId : null;
   const questCreatureId = typeof params.questCreatureId === 'string' ? params.questCreatureId : null;
 
@@ -101,7 +99,7 @@ export default function MomentCaptureScreen() {
   const commit = useCallback(
     // `scene` is the hierarchical read EssenceReview resolved (and showed) —
     // the same classification the engine acts on.
-    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[], reviewed?: ReviewedPhotoAnalysis) => {
+    (meaning: MeaningTag, vision: DayVisionSummary | null, label: string, scene: SceneRead | null, confirmations: UserConfirmation[], reviewed: ReviewedPhotoAnalysis, journal: ManualJournalSubmission) => {
       const energy = buildCaptureEnergy(meaning, vision, dayScores ?? undefined, {
         rejectFood: confirmationsRejectDomain(confirmations, 'food'),
         rejectMedia: confirmationsRejectDomain(confirmations, 'media'),
@@ -125,6 +123,7 @@ export default function MomentCaptureScreen() {
           confirmations,
           classifiedMemory: reviewed?.memory ?? null,
           evidence: reviewed?.evidence ?? null,
+          journal,
         },
         captureTarget
       );
@@ -158,43 +157,6 @@ export default function MomentCaptureScreen() {
     [applyCapturedMoment, captureTarget, dayScores, photoUri, questCreatureId, questId, router]
   );
 
-  useEffect(() => {
-    if (state !== 'captured' || !questId || !questCreatureId || !photoUri || questProcessingRef.current) return;
-    questProcessingRef.current = true;
-    setState('questAnalyzing');
-    void analyzeCaptured().then(async (analysis) => {
-      const scene = await resolveSceneRead(analysis.summary, photoUri, analysis.rawVision);
-      const intelligence = analysis.summary
-        ? buildPhotoIntelligence({
-            sourceId: photoUri,
-            observedAt: new Date().toISOString(),
-            thumbnailUri: photoUri,
-            rawVision: analysis.rawVision,
-            vision: analysis.summary,
-            scene,
-            confirmations: [],
-          })
-        : null;
-      commit('meaningful', analysis.summary, 'Quest capture', scene, [], {
-        ...analysis,
-        scene,
-        memory: intelligence?.memory ?? null,
-        evidence: intelligence?.evidence ?? null,
-      });
-    }).catch(() => {
-      completeQuestCapture(
-        questId,
-        questCreatureId,
-        photoUri,
-        {
-          status: 'no_match', questId, qualityId: null, score: 0, centrality: null,
-          evidenceId: `photo:${photoUri}`, reason: 'The photo could not be analysed.',
-        }
-      );
-      safeGoBack(router);
-    });
-  }, [analyzeCaptured, commit, photoUri, questCreatureId, questId, router, state]);
-
   if (permission && !permission.granted) {
     return (
       <View style={[styles.screen, styles.permission, { paddingTop: insets.top + 40 }]}>
@@ -215,20 +177,7 @@ export default function MomentCaptureScreen() {
     );
   }
 
-  if (state === 'questAnalyzing' && photoUri) {
-    return (
-      <View style={[styles.screen, styles.permission]}>
-        <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        <View style={[StyleSheet.absoluteFill, styles.vignette]} />
-        <ActivityIndicator size="large" color={Lantern.ember300} />
-        <ThemedText style={styles.promptText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          Checking this photo against the quest…
-        </ThemedText>
-      </View>
-    );
-  }
-
-  if (state === 'captured' && photoUri && !questId) {
+  if (state === 'captured' && photoUri) {
     return (
       <View style={styles.screen}>
         <EssenceReview

@@ -1,4 +1,4 @@
-import type { ClassifiedMemory, DayEvidence, DayScores, DayVisionSummary, StoredHomeDayRecord, UserConfirmation } from '@/types/home';
+import type { ClassifiedMemory, DayEvidence, DayScores, DayVisionSummary, ManualJournalSubmission, StoredHomeDayRecord, UserConfirmation } from '@/types/home';
 import { mergeCaptureEnergy } from '@/utils/capture-energy';
 import type { FoodDetection } from '@/utils/food-detect';
 import { upsertEvidence } from '@/utils/intelligence/evidence';
@@ -16,6 +16,7 @@ import {
   buildAutoFoodMoment,
   buildAutoStudioMoment,
 } from './media-moments';
+import { withManualJournalEntry } from './manual-journal';
 
 export type CapturedMomentInput = {
   energy: Partial<DayScores>;
@@ -26,6 +27,7 @@ export type CapturedMomentInput = {
   classifiedMemory?: ClassifiedMemory | null;
   evidence?: DayEvidence | null;
   meaning?: { archetype: string; label: string; thumbnailUri?: string | null; sourceId?: string | null };
+  journal?: ManualJournalSubmission | null;
 };
 
 export function withCapturedMoment(
@@ -39,6 +41,11 @@ export function withCapturedMoment(
   now: Date
 ): StoredHomeDayRecord {
   if (day.state === 'hatched') {
+    return day;
+  }
+
+  const journalSourceId = capture.journal?.sourceType === 'photo' ? capture.journal.sourceId : null;
+  if (journalSourceId && day.manualJournalEntries?.some((entry) => entry.sourceType === 'photo' && entry.sourceId === journalSourceId)) {
     return day;
   }
 
@@ -64,7 +71,7 @@ export function withCapturedMoment(
     ? studioDetectionForClassifiedMemory(classifiedMemory)
     : detections.studio;
 
-  return {
+  const captured: StoredHomeDayRecord = {
     ...day,
     capturedEnergy: mergeCaptureEnergy(day.capturedEnergy, capture.energy),
     capturedMeanings:
@@ -108,4 +115,5 @@ export function withCapturedMoment(
         )
       : day.studioMoments,
   };
+  return capture.journal ? withManualJournalEntry(captured, capture.journal, now) : captured;
 }

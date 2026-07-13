@@ -44,7 +44,6 @@ function evidenceText(input: HierarchyInput): string {
   return [
     ...input.observations.flatMap((item) => [item.value, item.raw ?? '']),
     ...(input.rawVision?.labels ?? []).map((item) => item.name),
-    ...(input.rawVision?.text ?? []),
     input.scene?.detail ?? '',
     ...(input.scene?.supportingSubjects ?? []),
   ].join(' ');
@@ -90,6 +89,9 @@ function rankedRepresentation(kind: PhotoRepresentationKind, confidence: number,
 }
 
 function inferContainer(input: HierarchyInput, text: string, representation: PhotoRepresentationKind) {
+  // Representation has precedence over depicted content. A document or OCR
+  // block visible on a photographed laptop remains content inside a screen.
+  if (representation === 'device_showing_content') return rankedContainer('screen', 0.9, ['vision:screen']);
   const foundationContainer = input.scene?.container as PhotoContainerKind | null | undefined;
   if (foundationContainer && foundationContainer !== 'unknown') {
     return rankedContainer(foundationContainer, input.scene?.confidence ?? 0.8, ['foundation:container']);
@@ -97,7 +99,7 @@ function inferContainer(input: HierarchyInput, text: string, representation: Pho
   if (BOOK.test(text) || input.facets.some((item) => item.key === 'media_type' && item.value === 'book')) {
     return rankedContainer('book', input.rawVision?.documentDetected ? 0.88 : 0.72, ['vision:book']);
   }
-  if (representation === 'device_showing_content' || SCREEN.test(text)) return rankedContainer('screen', 0.86, ['vision:screen']);
+  if (SCREEN.test(text)) return rankedContainer('screen', 0.86, ['vision:screen']);
   if (/\b(frame|framed|canvas|easel)\b/i.test(text)) return rankedContainer('frame_or_canvas', 0.78, ['vision:art-container']);
   if (POSTER.test(text)) return rankedContainer('poster_or_print', 0.76, ['vision:poster']);
   if (PACKAGE.test(text)) return rankedContainer('packaging', 0.68, ['vision:packaging']);

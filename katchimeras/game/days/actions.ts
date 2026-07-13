@@ -601,6 +601,7 @@ export function applyCapturedMomentForToday(
     confirmations?: UserConfirmation[];
     classifiedMemory?: import('@/types/home').ClassifiedMemory | null;
     evidence?: import('@/types/home').DayEvidence | null;
+    journal?: ManualJournalSubmission | null;
   },
   profile: OnboardingProfile,
   now: Date,
@@ -612,11 +613,12 @@ export function applyCapturedMomentForToday(
   }
   const meaning = capture.meaning;
   const scene = capture.scene ?? classifyScene(capture.vision);
+  const hasJournal = !!capture.journal;
   const foodRejected = confirmationsRejectDomain(capture.confirmations, 'food');
   const mediaRejected = confirmationsRejectDomain(capture.confirmations, 'media');
   const foodDetection: FoodDetection =
-    !foodRejected && scene.type === 'food' ? scene.food ?? detectFoodInVision(capture.vision) : { detected: false };
-  const studioDetection: StudioDetection = foodDetection.detected || mediaRejected
+    !hasJournal && !foodRejected && scene.type === 'food' ? scene.food ?? detectFoodInVision(capture.vision) : { detected: false };
+  const studioDetection: StudioDetection = hasJournal || foodDetection.detected || mediaRejected
     ? { detected: false }
     : scene.type === 'media' && scene.media
       ? studioDetectionFromMedia(scene.media.mediaType, scene.media.title)
