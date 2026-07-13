@@ -164,7 +164,9 @@ export function photoJournalSuggestions(input: {
     const food = input.scene?.food?.label?.trim();
     if (food && !/^food|meal|dish$/i.test(food)) candidates.push(suggestion(food, input.scene?.source === 'llm' ? 0.82 : 0.72, input.scene?.source === 'llm' ? 'appleFoundation' : 'appleVision'));
   }
-  return dedupe(candidates).sort((a, b) => b.confidence - a.confidence).slice(0, 3);
+  // Present one editable machine suggestion directly in the text field.
+  // Alternative OCR fragments add noise, so they are not exposed as chips.
+  return dedupe(candidates).sort((a, b) => b.confidence - a.confidence).slice(0, 1);
 }
 
 function route(flowId: string, choiceId: string, label: string, facet: [string, string]) {

@@ -2,6 +2,7 @@ import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { BigMomentType, FoodMeaning, StudioMediaType, StudioRating } from '@/types/home';
 
 export type ManualJournalAdapter = 'place' | 'food' | 'studio' | 'movement' | 'relationship' | 'work' | 'big_event' | 'general';
+export type ManualJournalSection = 'everyday' | 'culture' | 'milestone' | 'other';
 
 export type ManualJournalChoice = {
   id: string;
@@ -11,6 +12,7 @@ export type ManualJournalChoice = {
   mediaType?: StudioMediaType;
   bigMomentType?: BigMomentType;
   detailChoices?: { id: string; label: string }[];
+  description?: string;
   specificFieldLabel?: string;
   specificFieldPlaceholder?: string;
 };
@@ -19,6 +21,9 @@ export type ManualJournalFlowDefinition = {
   id: string;
   version: 1;
   title: string;
+  shortTitle?: string;
+  description?: string;
+  section?: ManualJournalSection;
   icon: IconSymbolName;
   adapter: ManualJournalAdapter;
   choices: ManualJournalChoice[];
@@ -26,24 +31,24 @@ export type ManualJournalFlowDefinition = {
   detailTitle?: string;
   specificFieldLabel: string;
   specificFieldPlaceholder: string;
-  feelings: { id: string; label: string }[];
+  feelings: { id: string; label: string; icon?: IconSymbolName }[];
 };
 
 const REACTIONS = [
-  { id: 'loved', label: 'Loved it' }, { id: 'liked', label: 'Enjoyed it' },
-  { id: 'calm', label: 'Peaceful' }, { id: 'exciting', label: 'Exciting' },
-  { id: 'ordinary', label: 'Ordinary' }, { id: 'difficult', label: 'Difficult' },
-];
+  { id: 'loved', label: 'Loved it', icon: 'heart.fill' }, { id: 'liked', label: 'Enjoyed it', icon: 'face.smiling' },
+  { id: 'calm', label: 'Peaceful', icon: 'moon.stars.fill' }, { id: 'exciting', label: 'Exciting', icon: 'bolt.fill' },
+  { id: 'ordinary', label: 'Ordinary', icon: 'circle.fill' }, { id: 'difficult', label: 'Difficult', icon: 'cloud.rain.fill' },
+] satisfies ManualJournalFlowDefinition['feelings'];
 const MEDIA_REACTIONS = [
-  { id: 'loved', label: 'Loved it' }, { id: 'inspired', label: 'Inspired me' },
-  { id: 'liked', label: 'Liked it' }, { id: 'meh', label: 'Not for me' },
-];
+  { id: 'loved', label: 'Loved it', icon: 'heart.fill' }, { id: 'inspired', label: 'Inspired me', icon: 'sparkles' },
+  { id: 'liked', label: 'Liked it', icon: 'face.smiling' }, { id: 'meh', label: 'Not for me', icon: 'face.sad' },
+] satisfies ManualJournalFlowDefinition['feelings'];
 
 const choice = (id: string, label: string, icon: IconSymbolName, qualityIds?: string[]): ManualJournalChoice => ({ id, label, icon, qualityIds });
 
 export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
   {
-    id: 'went_somewhere', version: 1, title: 'Went somewhere', icon: 'mappin.and.ellipse', adapter: 'place',
+    id: 'went_somewhere', version: 1, title: 'Went somewhere', shortTitle: 'Places & days out', description: 'Places, trips and time away from home', section: 'everyday', icon: 'mappin.and.ellipse', adapter: 'place',
     choices: [
       choice('park', 'Park or green space', 'leaf.fill', ['place.park']), choice('city', 'City or town', 'building.2.fill', ['place.city']),
       choice('beach', 'Beach or coast', 'water.waves', ['place.beach']), choice('forest', 'Forest or trail', 'tree.fill', ['place.forest']),
@@ -56,7 +61,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     detailTitle: 'What kind of time was it?', specificFieldLabel: 'Place name', specificFieldPlaceholder: 'Where did you go?', feelings: REACTIONS,
   },
   {
-    id: 'food', version: 1, title: 'Ate or drank', icon: 'fork.knife', adapter: 'food',
+    id: 'food', version: 1, title: 'Ate or drank', shortTitle: 'Food & drink', description: 'Meals, snacks, coffee and drinks', section: 'everyday', icon: 'fork.knife', adapter: 'food',
     choices: [
       { ...choice('meal', 'A meal', 'fork.knife', ['subject.food']), specificFieldLabel: 'Meal or dish', specificFieldPlaceholder: 'What did you have?', detailChoices: [{ id: 'italian', label: 'Italian' }, { id: 'japanese', label: 'Japanese' }, { id: 'chinese', label: 'Chinese' }, { id: 'indian', label: 'Indian' }, { id: 'mexican', label: 'Mexican' }, { id: 'middle_eastern', label: 'Middle Eastern' }, { id: 'french', label: 'French' }, { id: 'greek', label: 'Greek' }, { id: 'home_cooked', label: 'Home-cooked' }] },
       { ...choice('snack', 'A snack', 'takeoutbag.and.cup.and.straw.fill', ['subject.food']), specificFieldLabel: 'Snack', specificFieldPlaceholder: 'What snack was it?' },
@@ -71,7 +76,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     feelings: [{ id: 'treat', label: 'A treat' }, { id: 'sharedMeal', label: 'Shared' }, { id: 'comfort', label: 'Comfort' }, { id: 'fuel', label: 'Fuel' }, { id: 'discovery', label: 'Discovery' }],
   },
   {
-    id: 'studio', version: 1, title: 'Watched, read or listened', icon: 'book.fill', adapter: 'studio',
+    id: 'studio', version: 1, title: 'Watched, read or listened', shortTitle: 'Watched, read or listened', description: 'Books, films, games, music and art', section: 'culture', icon: 'book.fill', adapter: 'studio',
     choices: [
       { ...choice('book', 'Book or audiobook', 'book.fill', ['media.book']), mediaType: 'book', specificFieldLabel: 'Book title', specificFieldPlaceholder: 'What was the book called?' },
       { ...choice('film', 'Film', 'film.fill', ['media.film']), mediaType: 'film', specificFieldLabel: 'Film title', specificFieldPlaceholder: 'What was the film called?' },
@@ -85,7 +90,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     detailTitle: 'How did it land?', specificFieldLabel: 'Title or name', specificFieldPlaceholder: 'What was it called?', feelings: MEDIA_REACTIONS,
   },
   {
-    id: 'movement', version: 1, title: 'Moved or exercised', icon: 'figure.walk', adapter: 'movement',
+    id: 'movement', version: 1, title: 'Moved or exercised', shortTitle: 'Movement', description: 'Walks, workouts, sport and travel', section: 'everyday', icon: 'figure.walk', adapter: 'movement',
     choices: [
       choice('walk', 'Walk', 'figure.walk'), choice('run', 'Run', 'figure.run', ['activity.run']), choice('cycle', 'Cycle', 'bicycle', ['activity.cycle']),
       choice('workout', 'Workout or gym', 'dumbbell.fill', ['activity.workout']), { ...choice('sport', 'Sport', 'sportscourt.fill', ['activity.sport']), detailChoices: [{ id: 'football', label: 'Football' }, { id: 'basketball', label: 'Basketball' }, { id: 'tennis', label: 'Tennis' }, { id: 'swimming', label: 'Swimming' }, { id: 'other_sport', label: 'Another sport' }] },
@@ -95,7 +100,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     detailTitle: 'How was it?', specificFieldLabel: 'Activity detail', specificFieldPlaceholder: 'What did you do?', feelings: REACTIONS,
   },
   {
-    id: 'people', version: 1, title: 'People or time alone', icon: 'person.2.fill', adapter: 'relationship',
+    id: 'people', version: 1, title: 'People or time alone', shortTitle: 'People & time', description: 'Company, connection or time by yourself', section: 'everyday', icon: 'person.2.fill', adapter: 'relationship',
     choices: [
       choice('partner', 'Partner', 'heart.fill', ['subject.person']), choice('my_child', 'My child', 'figure.and.child.holdinghands', ['subject.child']),
       choice('family', 'Family', 'person.3.fill', ['subject.group']), choice('friends', 'Friends', 'bubble.left.and.bubble.right.fill', ['subject.group']),
@@ -106,7 +111,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     detailTitle: 'How did it feel?', specificFieldLabel: 'Name', specificFieldPlaceholder: 'Who was it? (optional)', feelings: REACTIONS,
   },
   {
-    id: 'work', version: 1, title: 'Worked, learned or made something', icon: 'briefcase.fill', adapter: 'work',
+    id: 'work', version: 1, title: 'Worked, learned or made something', shortTitle: 'Work, learn or create', description: 'Work, learning and creative progress', section: 'culture', icon: 'briefcase.fill', adapter: 'work',
     choices: [
       choice('focus', 'Focused work', 'bolt.fill', ['work.focus']), choice('office', 'Office or workday', 'briefcase.fill', ['work.focus']),
       choice('learning', 'Studying or learning', 'graduationcap.fill', ['work.focus']), choice('planning', 'Planning', 'list.bullet.clipboard.fill', ['work.focus']),
@@ -117,7 +122,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     detailTitle: 'How did it go?', specificFieldLabel: 'Project or task', specificFieldPlaceholder: 'What were you working on?', feelings: REACTIONS,
   },
   {
-    id: 'big_event', version: 1, title: 'A big event', icon: 'sparkles', adapter: 'big_event',
+    id: 'big_event', version: 1, title: 'A big event', shortTitle: 'A big event', description: 'Milestones and days worth remembering', section: 'milestone', icon: 'sparkles', adapter: 'big_event',
     choices: [
       { ...choice('birthday', 'Birthday', 'birthday.cake.fill', ['life.celebration']), bigMomentType: 'birthday' },
       { ...choice('anniversary', 'Anniversary', 'heart.fill', ['life.celebration']), bigMomentType: 'anniversary' },
@@ -131,7 +136,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     detailTitle: 'How did it feel?', specificFieldLabel: 'What happened?', specificFieldPlaceholder: 'Give the event a short name', feelings: REACTIONS,
   },
   {
-    id: 'general', version: 1, title: 'Something else', icon: 'ellipsis.circle.fill', adapter: 'general',
+    id: 'general', version: 1, title: 'Something else', shortTitle: 'Something else', description: 'Highlights, hard moments or anything else', section: 'other', icon: 'ellipsis.circle.fill', adapter: 'general',
     choices: [
       choice('highlight', 'A highlight', 'star.fill'), choice('difficult', 'A difficult moment', 'cloud.rain.fill'), choice('gratitude', 'Something I’m grateful for', 'heart.fill'),
       choice('new', 'Something new', 'sparkles'), choice('rest', 'Rest or recovery', 'moon.stars.fill'), choice('ordinary', 'An ordinary moment', 'circle.fill'), choice('other', 'Other', 'ellipsis.circle.fill'),
@@ -159,6 +164,7 @@ export function validateManualJournalRegistry(): string[] {
       choices.add(item.id);
     }
     if (!flow.choices.length || !flow.specificFieldLabel || !flow.feelings.length) errors.push(`Incomplete flow ${flow.id}`);
+    if (!flow.shortTitle || !flow.description || !flow.section) errors.push(`Missing presentation metadata for ${flow.id}`);
   }
   return errors;
 }

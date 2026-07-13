@@ -17,6 +17,8 @@ test('registry exposes the eight human event branches', () => {
   assert.equal(validateManualJournalRegistry().length, 0);
   assert.deepEqual(MANUAL_JOURNAL_FLOWS.map((flow) => flow.id), ['went_somewhere', 'food', 'studio', 'movement', 'people', 'work', 'big_event', 'general']);
   assert.ok(MANUAL_JOURNAL_FLOWS.every((flow) => flow.choices.length >= 7));
+  assert.ok(MANUAL_JOURNAL_FLOWS.every((flow) => flow.shortTitle && flow.description && flow.section));
+  assert.deepEqual(new Set(MANUAL_JOURNAL_FLOWS.map((flow) => flow.section)), new Set(['everyday', 'culture', 'milestone', 'other']));
 });
 
 test('category-only park creates canonical quality and assignment without coordinates', () => {

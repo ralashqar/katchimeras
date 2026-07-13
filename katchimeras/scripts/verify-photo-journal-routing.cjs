@@ -41,7 +41,7 @@ const titleSuggestions = routing.photoJournalSuggestions({
   vision: { textTokens: ['FRANK HERBERT', 'DUNE'], documentCoverage: 1 },
   scene: null,
 });
-check('clean cover OCR becomes an editable prefill suggestion', titleSuggestions.some((item) => item.prefill && /dune/i.test(item.value)), JSON.stringify(titleSuggestions));
+check('clean cover OCR returns only its top editable text suggestion', titleSuggestions.length === 1 && titleSuggestions[0].prefill && /dune/i.test(titleSuggestions[0].value), JSON.stringify(titleSuggestions));
 
 const badSuggestions = routing.photoJournalSuggestions({
   route: routing.photoJournalRouteProposals(physicalBook)[0],

@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -11,6 +11,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -35,11 +36,23 @@ type MeadowSheetProps = {
   kicker?: string;
   title?: string;
   maxHeight?: number | `${number}%`;
+  variant?: 'compact' | 'tall';
   zIndex?: number;
 };
 
-export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%', zIndex = 50 }: MeadowSheetProps) {
+export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%', variant = 'compact', zIndex = 50 }: MeadowSheetProps) {
+  const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const dragY = useSharedValue(0);
+  const tablet = window.width >= 700;
+  const horizontalInset = tablet ? Math.max(20, (window.width - 600) / 2) : 12;
+  const tallTopClearance = insets.top + 8;
+  const tallBottomClearance = Math.max(Meadow.overlay.bottomClearance, insets.bottom + 12);
+  const availableTallHeight = Math.max(0, window.height - tallTopClearance - tallBottomClearance);
+  const tallHeight = Math.min(
+    availableTallHeight,
+    window.height * (tablet ? 0.84 : 0.93)
+  );
 
   // Down-only pan on the background layer: sideways/up fails fast.
   const dismissPan = Gesture.Pan()
@@ -51,6 +64,9 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
     })
     .onEnd((event) => {
       if (dragY.value > 90 || event.velocityY > 900) {
+        // A caller may guard dismissal (for example, to confirm a dirty
+        // draft). Always settle the sheet back in case it remains mounted.
+        dragY.value = withTiming(0, { duration: 160 });
         runOnJS(onClose)();
       } else {
         dragY.value = withTiming(0, { duration: 160 });
@@ -71,7 +87,17 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
       <Animated.View
         entering={SlideInDown.duration(260)}
         exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, dragStyle, { bottom: Meadow.overlay.bottomClearance, maxHeight }]}>
+        style={[
+          styles.sheet,
+          dragStyle,
+          {
+            bottom: variant === 'tall' ? tallBottomClearance : Meadow.overlay.bottomClearance,
+            left: horizontalInset,
+            right: horizontalInset,
+            height: variant === 'tall' ? tallHeight : undefined,
+            maxHeight: variant === 'tall' ? tallHeight : maxHeight,
+          },
+        ]}>
         {/* Dismiss surface: BELOW everything that follows, so it only receives
             touches no content view claims (sheet padding, gaps, header band). */}
         <GestureDetector gesture={dismissPan}>
@@ -116,12 +142,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
     gap: 8,
-    left: 12,
     paddingBottom: 14,
     paddingHorizontal: 16,
     paddingTop: 10,
     position: 'absolute',
-    right: 12,
   },
   grabber: {
     alignSelf: 'center',

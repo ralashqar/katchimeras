@@ -295,7 +295,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
   const displayedOptions = clarificationNode?.options ?? [];
   const visibleRoutes = routeProposals.length ? routeProposals : [fallbackPhotoJournalRoute()];
   const fieldSuggestions = journalRoute ? photoJournalSuggestions({ route: journalRoute, rawVision: rawVisionRef.current, vision: visionRef.current, scene: sceneRef.current }) : [];
-  const prefilledSpecific = journalRoute?.prefilledSpecific ?? fieldSuggestions.find((item) => item.prefill)?.value ?? '';
+  const prefilledSpecific = journalRoute?.prefilledSpecific ?? fieldSuggestions[0]?.value ?? '';
 
   return (
     <View style={styles.fill}>
@@ -392,7 +392,6 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
           initialFlowId={journalRoute.flowId}
           initialChoiceId={journalRoute.choiceId}
           initialSpecific={prefilledSpecific}
-          initialSpecificSuggestions={fieldSuggestions}
           sourceType="photo"
           sourceId={sourceId ?? photoUri}
           thumbnailUri={photoUri}
