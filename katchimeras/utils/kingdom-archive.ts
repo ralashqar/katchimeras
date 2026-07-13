@@ -67,7 +67,7 @@ function collect(days: HomeDayRecord[], buildingId: KingdomBuildingId): KingdomA
         // is never meaningless.
         const display = resolveStudioMomentDisplay(moment);
         const title = display.label;
-        const meta = [STUDIO_MEDIA_LABEL[moment.mediaType] ?? 'Inspiration', STUDIO_RATING_LABEL[moment.rating]]
+        const meta = [STUDIO_MEDIA_LABEL[moment.mediaType] ?? 'Inspiration', moment.rating ? STUDIO_RATING_LABEL[moment.rating] : null]
           .filter(Boolean)
           .join(' · ');
         entries.push({
@@ -92,12 +92,12 @@ function collect(days: HomeDayRecord[], buildingId: KingdomBuildingId): KingdomA
           id: `food-${day.id}-${moment.id}`,
           emoji: display.emoji,
           title: display.label,
-          subtitle: [display.detail, FOOD_MEANING_LABEL[moment.meaning] ?? 'Savoured'].filter(Boolean).join(' · '),
+          subtitle: [display.detail, moment.meaning ? FOOD_MEANING_LABEL[moment.meaning] : null].filter(Boolean).join(' · '),
           isoDate: day.isoDate,
           time: entryTime(moment.createdAt, day.isoDate),
           dayId: day.id,
           thumbnailUri: moment.thumbnailUri,
-          filterKey: moment.meaning,
+          filterKey: moment.meaning ?? 'unrated',
         });
       }
     } else if (buildingId === 'sanctuary') {

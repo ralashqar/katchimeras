@@ -20,6 +20,7 @@ function transpile(relativePath, outName) {
 const promptsPath = transpile('constants/day-prompts.ts', 'day-prompts.js');
 const studioPath = transpile('utils/studio-detect.ts', 'studio-detect.js');
 const displayPath = transpile('utils/memory-display.ts', 'memory-display.js');
+const manualJournalPath = transpile('utils/manual-journal-registry.ts', 'manual-journal-registry.js');
 const timelinePath = transpile('utils/moment-timeline.ts', 'moment-timeline.js');
 const typesPath = path.join(tempDir, 'types.js');
 fs.writeFileSync(typesPath, '');
@@ -29,6 +30,7 @@ Module._resolveFilename = function (request, ...rest) {
   if (request === '@/constants/day-prompts') return promptsPath;
   if (request === '@/utils/studio-detect') return studioPath;
   if (request === '@/utils/memory-display') return displayPath;
+  if (request === '@/utils/manual-journal-registry') return manualJournalPath;
   if (request === '@/types/home' || request === '@/components/ui/icon-symbol') return typesPath;
   return originalResolve.call(this, request, ...rest);
 };

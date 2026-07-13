@@ -198,11 +198,13 @@ export type DayEvidenceSourceType =
   | 'steps'
   | 'sleep'
   | 'studio'
-  | 'food';
+  | 'food'
+  | 'manual_log';
 
 export type DayEvidenceProvider =
   | 'appleVision'
   | 'appleFoundation'
+  | 'appleNaturalLanguage'
   | 'appleSpeech'
   | 'remoteLlm'
   | 'deterministic'
@@ -230,7 +232,7 @@ export type DayEvidence = {
   explanation?: string | null;
 };
 
-export type MemorySourceType = 'photo' | 'text_note' | 'voice_note' | 'place' | 'movement';
+export type MemorySourceType = 'photo' | 'text_note' | 'voice_note' | 'place' | 'movement' | 'manual_log';
 
 export type MemoryDomain =
   | 'animal'
@@ -842,7 +844,7 @@ export type FoodMoment = {
   id: string;
   label: string; // "Coffee", "Dinner", "Dessert"
   emoji: string;
-  meaning: FoodMeaning;
+  meaning?: FoodMeaning | null;
   thumbnailUri?: string | null;
   source?: FoodSource;
   sourceId?: string | null;
@@ -869,7 +871,7 @@ export type StudioMoment = {
   label: string; // the title if known ("Dune"), else the media kind ("A book")
   mediaType: StudioMediaType;
   emoji: string;
-  rating: StudioRating;
+  rating?: StudioRating | null;
   thumbnailUri?: string | null;
   source?: StudioSource;
   sourceId?: string | null;
@@ -976,6 +978,29 @@ export type BigMoment = {
   createdAt: string;
 };
 
+export type ManualJournalEntry = {
+  id: string;
+  flowId: string;
+  flowVersion: number;
+  path: string[];
+  categoryId: string;
+  canonicalQualityIds: string[];
+  fields: Record<string, string | string[] | boolean | null>;
+  feeling?: string | null;
+  note?: string | null;
+  createdAt: string;
+};
+
+export type ManualJournalSubmission = {
+  flowId: string;
+  path: string[];
+  categoryId: string;
+  canonicalQualityIds: string[];
+  fields: Record<string, string | string[] | boolean | null>;
+  feeling?: string | null;
+  note?: string | null;
+};
+
 export type StoredHomeDayRecord = {
   id: string;
   isoDate: string;
@@ -1007,6 +1032,7 @@ export type StoredHomeDayRecord = {
   // Versioned, explainable classification records. Legacy `vision` and
   // `evidence` remain readable compatibility surfaces during the v8 rollout.
   classifiedMemories?: ClassifiedMemory[];
+  manualJournalEntries?: ManualJournalEntry[];
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
   // Energy captured through the camera (Moment Capture): score deltas that fold
@@ -1141,7 +1167,7 @@ export type RecentPhotoAsset = {
     detail?: string | null;
     food?: { detected: boolean; label?: string; emoji?: string; cuisine?: CuisineFamily | null };
     media?: { mediaType: StudioMediaType; title: string | null; creator: string | null };
-    source: 'llm' | 'rules';
+    source: 'llm' | 'semantic' | 'rules';
     supportingSubjects?: string[];
     representation?: 'real_world' | 'screen_content' | 'unknown' | null;
     promptVersion?: string | null;

@@ -1,0 +1,54 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import type { HomeDayRecord, ManualJournalSubmission, StoredHomeDayRecord } from '@/types/home';
+import { withManualJournalEntry } from '@/game/days/mutations/manual-journal';
+import { MANUAL_JOURNAL_FLOWS, validateManualJournalRegistry } from '@/utils/manual-journal-registry';
+import { buildMomentTimeline } from '@/utils/moment-timeline';
+
+function day(): StoredHomeDayRecord {
+  return { id: 'day-1', isoDate: '2026-07-12', moments: [], locations: [], promptAnswers: [], notes: [], foodMoments: [], studioMoments: [], bigMoments: [], evidence: [], classifiedMemories: [] } as unknown as StoredHomeDayRecord;
+}
+function submission(flowId: string, categoryId: string, qualityIds: string[], specific?: string, feeling?: string): ManualJournalSubmission {
+  return { flowId, path: [flowId, categoryId], categoryId, canonicalQualityIds: qualityIds, fields: { specific: specific ?? null }, feeling: feeling ?? null, note: null };
+}
+
+test('registry exposes the eight human event branches', () => {
+  assert.equal(validateManualJournalRegistry().length, 0);
+  assert.deepEqual(MANUAL_JOURNAL_FLOWS.map((flow) => flow.id), ['went_somewhere', 'food', 'studio', 'movement', 'people', 'work', 'big_event', 'general']);
+  assert.ok(MANUAL_JOURNAL_FLOWS.every((flow) => flow.choices.length >= 7));
+});
+
+test('category-only park creates canonical quality and assignment without coordinates', () => {
+  const result = withManualJournalEntry(day(), submission('went_somewhere', 'park', ['place.park']), new Date('2026-07-12T12:00:00Z'));
+  assert.equal(result.manualJournalEntries?.[0].categoryId, 'park');
+  assert.equal(result.locations.length, 0);
+  assert.ok(result.classifiedMemories?.[0].qualities.some((quality) => quality.qualityId === 'place.park'));
+  assert.ok(result.classifiedMemories?.[0].assignments.some((assignment) => assignment.seedId === 'park'));
+});
+
+test('film title saves to Studio while rating remains genuinely absent', () => {
+  const result = withManualJournalEntry(day(), submission('studio', 'film', ['media.film'], 'Dune: Part Two'), new Date('2026-07-12T13:00:00Z'));
+  assert.equal(result.studioMoments?.[0].label, 'Dune: Part Two');
+  assert.equal(result.studioMoments?.[0].rating, null);
+  assert.equal(buildMomentTimeline(result as unknown as HomeDayRecord).filter((entry) => /Dune/.test(entry.label)).length, 1);
+});
+
+test('food can save without fabricated meaning', () => {
+  const result = withManualJournalEntry(day(), submission('food', 'meal', ['subject.food'], 'Ramen'), new Date('2026-07-12T14:00:00Z'));
+  assert.equal(result.foodMoments?.[0].label, 'Ramen');
+  assert.equal(result.foodMoments?.[0].meaning, null);
+});
+
+test('explicit My child choice creates confirmed parenting assignment', () => {
+  const result = withManualJournalEntry(day(), submission('people', 'my_child', ['subject.child']), new Date('2026-07-12T15:00:00Z'));
+  const memory = result.classifiedMemories?.[0];
+  assert.ok(memory?.facets.some((facet) => facet.key === 'relationship' && facet.value === 'my_child' && facet.confirmed));
+  assert.ok(memory?.assignments.some((assignment) => assignment.seedId === 'parenting_care' && assignment.confirmed));
+});
+
+test('big event uses the entered name and keeps one timeline entry', () => {
+  const result = withManualJournalEntry(day(), submission('big_event', 'wedding', ['life.celebration'], 'Maya and Jo’s wedding', 'loved'), new Date('2026-07-12T16:00:00Z'));
+  assert.equal(result.bigMoments?.[0].label, 'Maya and Jo’s wedding');
+  assert.equal(buildMomentTimeline(result as unknown as HomeDayRecord).filter((entry) => /Maya and Jo/.test(entry.label)).length, 1);
+});

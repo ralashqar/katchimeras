@@ -5,6 +5,7 @@ import { interpretNoteText, type NoteInterpretation } from '@/utils/note-meaning
 import type { DayEvidenceProvider, StudioMediaType } from '@/types/home';
 import { transcribeOnDevice } from '@/utils/speech-transcribe';
 import { detectStudioInText, isGenericStudioLabel } from '@/utils/studio-detect';
+import { classifyNoteSemantically, semanticMedia, type SemanticRead } from '@/utils/intelligence/semantic-fallback';
 import { supabase } from '@/utils/supabase';
 
 // Client-side note interpreter, on-device first:
@@ -28,6 +29,10 @@ export type InterpretedNote = NoteInterpretation & {
   food?: string | null;
   llmClassified?: boolean;
   intelligenceProvider: DayEvidenceProvider;
+  semantic?: SemanticRead | null;
+  semanticCategoryId?: string | null;
+  semanticConfidence?: number | null;
+  semanticEvaluated?: boolean;
 };
 
 type NoteInput = { text?: string; audioUri?: string; mimeType?: string };
@@ -125,6 +130,14 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
             creator: null,
           }
         : null;
+      // A current Foundation response with an explicit `none` is authoritative.
+      // Older native builds only return mood/title; in that case use the
+      // Natural Language fallback for classification without discarding the
+      // better Foundation phrasing.
+      const semantic = local.llmClassified
+        ? null
+        : await classifyNoteSemantically(transcript, input.audioUri ? 'voice_note' : 'text_note');
+      const semanticResolvedMedia = semanticMedia(semantic, transcript);
       return {
         archetype: local.archetype,
         label: local.label,
@@ -133,10 +146,14 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
         // Older native prompts know only the original six media kinds. Strict,
         // verb-led local rules fill explicit watched sport/news and podcasts
         // without overriding a positive Foundation classification.
-        media: local.media ?? fallbackMedia,
+        media: local.llmClassified ? local.media : semanticResolvedMedia ?? fallbackMedia,
         food: local.food,
         llmClassified: local.llmClassified,
-        intelligenceProvider: 'appleFoundation',
+        semantic,
+        semanticCategoryId: semantic?.selected?.categoryId ?? null,
+        semanticConfidence: semantic?.selected?.score ?? null,
+        semanticEvaluated: !!semantic,
+        intelligenceProvider: semantic ? 'appleNaturalLanguage' : 'appleFoundation',
       };
     }
     // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.
@@ -145,7 +162,18 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
       if (edge) return edge;
     }
     // 2c. On-device rules.
-    return { ...interpretNoteText(transcript), transcript, intelligenceProvider: 'deterministic' };
+    const semantic = await classifyNoteSemantically(transcript, input.audioUri ? 'voice_note' : 'text_note');
+    const media = semanticMedia(semantic, transcript);
+    return {
+      ...interpretNoteText(transcript),
+      transcript,
+      media,
+      semantic,
+      semanticCategoryId: semantic?.selected?.categoryId ?? null,
+      semanticConfidence: semantic?.selected?.score ?? null,
+      semanticEvaluated: !!semantic,
+      intelligenceProvider: semantic ? 'appleNaturalLanguage' : 'deterministic',
+    };
   }
 
   // 3. No transcript (on-device transcription unavailable) but we have audio →

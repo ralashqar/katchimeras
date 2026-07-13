@@ -198,6 +198,8 @@ export function buildNoteClassifiedMemory(input: {
   mediaType?: string | null;
   food?: string | null;
   bigMomentType?: string | null;
+  semanticCategoryId?: string | null;
+  semanticConfidence?: number | null;
   confirmations?: UserConfirmation[];
 }): ClassifiedMemory {
   const observations: IntelligenceObservation[] = textToSignals(input.text).map((signal) => ({
@@ -207,21 +209,76 @@ export function buildNoteClassifiedMemory(input: {
     provider: input.provider,
     raw: signal.raw ?? null,
   }));
+  if (input.semanticCategoryId) {
+    observations.push({
+      key: 'signal',
+      value: input.semanticCategoryId,
+      confidence: input.semanticConfidence ?? 0.8,
+      provider: 'appleNaturalLanguage',
+      raw: input.semanticCategoryId,
+    });
+  }
   const facets: MemoryFacet[] = [];
   if (input.mediaType) facets.push(facet('media_type', input.mediaType, 0.82));
   if (input.food) facets.push(facet('food_item', input.food, 0.82));
   if (input.bigMomentType) facets.push(facet('life_event', input.bigMomentType, 0.84));
+  const semanticDomain = input.semanticCategoryId
+    ? qualityDefinition(input.semanticCategoryId)?.domain ?? (input.semanticCategoryId.startsWith('media.') ? 'media' : null)
+    : null;
   return buildMemory({
     id: `classified:note:${input.noteId}`,
     sourceType: input.kind === 'voice' ? 'voice_note' : 'text_note',
     sourceId: input.noteId,
     createdAt: input.observedAt,
-    dominantDomain: input.mediaType ? 'media' : input.food ? 'food' : input.bigMomentType ? 'life_event' : resolveDomain(facets, observations),
+    dominantDomain: input.mediaType ? 'media' : input.food ? 'food' : input.bigMomentType ? 'life_event' : semanticDomain ?? resolveDomain(facets, observations),
     observations,
     facets,
     qualities: deriveMemoryQualities({ observations, confirmations: input.confirmations }),
     confirmations: input.confirmations ?? [],
   });
+}
+
+export function buildManualJournalClassifiedMemory(input: {
+  entryId: string;
+  observedAt: string;
+  text: string;
+  semanticCategoryId?: string | null;
+  mediaType?: string | null;
+  food?: string | null;
+  bigMomentType?: string | null;
+}): ClassifiedMemory {
+  const memory = buildNoteClassifiedMemory({
+    noteId: input.entryId, kind: 'text', observedAt: input.observedAt,
+    text: input.text, provider: 'manual', semanticCategoryId: input.semanticCategoryId,
+    semanticConfidence: 1, mediaType: input.mediaType, food: input.food, bigMomentType: input.bigMomentType,
+  });
+  return { ...memory, id: `classified:manual:${input.entryId}`, sourceType: 'manual_log', sourceId: input.entryId };
+}
+
+export function applyManualJournalFacets(
+  memory: ClassifiedMemory,
+  values: Array<{ key: string; value: string; sensitive?: boolean }>,
+  createdAt: string
+): ClassifiedMemory {
+  const confirmations = values.map((item) => ({
+    promptId: `manual.${item.key}`,
+    optionId: item.value,
+    label: item.value,
+    facetKey: item.key,
+    facetValue: item.value,
+    createdAt,
+  }));
+  const facets = [
+    ...memory.facets.filter((existing) => !values.some((item) => item.key === existing.key)),
+    ...values.map((item) => facet(item.key, item.value, 1, item.sensitive ?? false, true)),
+  ];
+  return {
+    ...memory,
+    facets,
+    confirmations: [...memory.confirmations, ...confirmations],
+    assignments: classifyAssignments(memory.dominantDomain, facets, memory.observations, memory.qualities),
+    promptState: { ...memory.promptState, status: 'answered', currentNodeId: null, currentQuestionId: null },
+  };
 }
 
 export function buildMovementClassifiedMemory(input: {
@@ -586,8 +643,8 @@ function photoObservations(input: PhotoMemoryInput): IntelligenceObservation[] {
   input.rawVision && visionResultToSignals(input.rawVision).forEach((signal) => push(signal.key, signal.confidence, 'appleVision', signal.raw));
   input.vision && visionSummaryToSignals(input.vision).forEach((signal) => push(signal.key, signal.confidence, 'appleVision', signal.raw));
   if (input.scene && input.scene.type !== 'other') {
-    const provider = input.scene.source === 'llm' ? 'appleFoundation' : 'deterministic';
-    const confidence = input.scene.source === 'llm' ? input.scene.confidence ?? 0.82 : 0.55;
+    const provider = input.scene.source === 'llm' ? 'appleFoundation' : input.scene.source === 'semantic' ? 'appleNaturalLanguage' : 'deterministic';
+    const confidence = input.scene.source === 'llm' ? input.scene.confidence ?? 0.82 : input.scene.source === 'semantic' ? input.scene.confidence ?? 0.72 : 0.55;
     push(input.scene.type, confidence, provider, input.scene.detail);
     // Preserve the specific subject as a canonical observation. Previously a
     // Foundation read of `place: city skyline` was flattened to `place`, which

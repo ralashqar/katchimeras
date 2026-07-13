@@ -21,6 +21,7 @@ type UseTodayActionRouterParams = {
   openQuickNote: () => void;
   openPlaceContext: () => void | Promise<void>;
   openObservatory: () => void;
+  openManualJournal: () => void;
   requestMicrophonePermission?: () => Promise<{ granted?: boolean } | null>;
 };
 
@@ -37,6 +38,7 @@ export function useTodayActionRouter({
   openQuickNote,
   openPlaceContext,
   openObservatory,
+  openManualJournal,
   requestMicrophonePermission,
 }: UseTodayActionRouterParams) {
   const ringCategories = useMemo(() => categories.filter((category) => category.id === 'quests'), [categories]);
@@ -253,6 +255,7 @@ export function useTodayActionRouter({
       else if (id === 'sleep') sheets.setSleepSheetOpen(true);
       else if (id === 'mood') sheets.setMoodSheetOpen(true);
       else if (id === 'life_event') sheets.setBigMomentPickerOpen(true);
+      else if (id === 'manual_journal') openManualJournal();
     },
     [
       closePromptSheet,
@@ -260,6 +263,7 @@ export function useTodayActionRouter({
       openNoteCapture,
       openPlaceContext,
       openQuickNote,
+      openManualJournal,
       requestMicrophonePermission,
       sheets,
     ]

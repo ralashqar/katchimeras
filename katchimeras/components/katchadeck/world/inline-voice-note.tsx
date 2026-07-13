@@ -18,6 +18,8 @@ type Props = {
   onToggleBig: () => void;
   onAccept: () => void;
   onDiscard: () => void;
+  onChooseSemantic: (categoryId: string | null) => void;
+  semanticChoiceMade: boolean;
   bottom: number; // tab bar height — anchors the capsule/card/status above the add bar
 };
 
@@ -45,6 +47,8 @@ export function InlineVoiceNote({
   onToggleBig,
   onAccept,
   onDiscard,
+  onChooseSemantic,
+  semanticChoiceMade,
   bottom,
 }: Props) {
   if (phase === 'analyzing') {
@@ -109,13 +113,30 @@ export function InlineVoiceNote({
           </ThemedText>
         </Pressable>
       ) : null}
+      {result.semantic?.needsClarification ? (
+        <View style={styles.semanticReview}>
+          <ThemedText style={styles.semanticTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            What was this mainly about?
+          </ThemedText>
+          <View style={styles.semanticOptions}>
+            {result.semantic.candidates.slice(0, 3).map((candidate) => (
+              <Pressable key={candidate.categoryId} onPress={() => onChooseSemantic(candidate.categoryId)} style={styles.semanticOption}>
+                <ThemedText style={styles.semanticOptionText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{candidate.label}</ThemedText>
+              </Pressable>
+            ))}
+            <Pressable onPress={() => onChooseSemantic(null)} style={styles.semanticOption}>
+              <ThemedText style={styles.semanticOptionText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Just the note</ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.actions}>
         <Pressable onPress={onDiscard} style={[styles.btn, styles.discard]}>
           <ThemedText style={styles.discardLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
             Discard
           </ThemedText>
         </Pressable>
-        <Pressable onPress={onAccept} style={[styles.btn, styles.accept]}>
+        <Pressable disabled={!semanticChoiceMade} onPress={onAccept} style={[styles.btn, styles.accept, !semanticChoiceMade && styles.disabled]}>
           <ThemedText style={styles.acceptLabel} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>
             Add to today
           </ThemedText>
@@ -190,6 +211,12 @@ const styles = StyleSheet.create({
   bigLabel: { flex: 1, fontSize: 13.5, fontWeight: '700' },
   bigCheck: { fontSize: 15, fontWeight: '900' },
   actions: { flexDirection: 'row', gap: 10 },
+  semanticReview: { gap: 8 },
+  semanticTitle: { fontSize: 13, fontWeight: '800' },
+  semanticOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  semanticOption: { paddingVertical: 8, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
+  semanticOptionText: { fontSize: 12.5, fontWeight: '700' },
+  disabled: { opacity: 0.4 },
   btn: { flex: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 999 },
   discard: { backgroundColor: 'rgba(255,255,255,0.06)' },
   discardLabel: { fontSize: 14, fontWeight: '800' },

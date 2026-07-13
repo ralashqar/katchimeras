@@ -42,6 +42,8 @@ fs.writeFileSync(
     return null;
   };\n`
 );
+const semanticStub = path.join(tempDir, 'semantic-fallback.js');
+fs.writeFileSync(semanticStub, 'exports.classifyPhotoLabelsSemantically = async () => null;\n');
 
 const stubs = {
   '@/utils/food-detect': foodDetectPath,
@@ -51,6 +53,7 @@ const stubs = {
   '@/utils/intelligence/types': intelligenceTypesPath,
   '@/utils/photo-reality': photoRealityPath,
   '@/utils/people-detect': peopleDetectPath,
+  '@/utils/intelligence/semantic-fallback': semanticStub,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {

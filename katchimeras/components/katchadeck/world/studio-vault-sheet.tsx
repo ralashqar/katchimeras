@@ -155,12 +155,12 @@ export function StudioVaultSheet({
                   </ThemedText>
                 ) : null}
               </View>
-              <View style={[styles.ratingChip, { borderColor: `${RATING_TINT[moment.rating] ?? Lantern.moon300}66` }]}>
+              {moment.rating ? <View style={[styles.ratingChip, { borderColor: `${RATING_TINT[moment.rating] ?? Lantern.moon300}66` }]}>
                 <View style={[styles.ratingDot, { backgroundColor: RATING_TINT[moment.rating] ?? Lantern.moon300 }]} />
                 <ThemedText style={styles.ratingLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                   {RATING_LABEL[moment.rating] ?? moment.rating}
                 </ThemedText>
-              </View>
+              </View> : null}
             </View>
             );
           })}

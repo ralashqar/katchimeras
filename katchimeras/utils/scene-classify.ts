@@ -11,6 +11,7 @@ import { runIntelligenceTask } from '@/utils/intelligence/run';
 import { ON_DEVICE_FIRST_POLICY } from '@/utils/intelligence/types';
 import { detectProminentPeopleInVision } from '@/utils/people-detect';
 import { summaryIsScreenContent } from '@/utils/photo-reality';
+import { classifyPhotoLabelsSemantically } from '@/utils/intelligence/semantic-fallback';
 
 // Hierarchical "read the photo" layer. Instead of every detector flatly scanning
 // the same bag of Apple Vision labels, we first classify the photo into ONE
@@ -47,7 +48,7 @@ export type SceneRead = {
   detail?: string | null; // a more specific subject ("a bowl of ramen", "3 people")
   food?: FoodDetection; // populated when type === 'food'
   media?: SceneMedia; // populated when type === 'media'
-  source: 'llm' | 'rules';
+  source: 'llm' | 'semantic' | 'rules';
   supportingSubjects?: string[];
   representation?: 'real_world' | 'screen_content' | 'unknown' | null;
   representationV2?: string | null;
@@ -317,7 +318,7 @@ export async function resolveSceneRead(
   rawVision?: PhotoVisionResult | null
 ): Promise<SceneRead> {
   if (!vision) return { type: 'other', label: SCENE_LABEL.other, source: 'rules' };
-  const result = await runIntelligenceTask({
+  const result = await runIntelligenceTask<DayVisionSummary, SceneRead>({
     task: 'classifyScene',
     input: vision,
     sourceIds: [],
@@ -328,6 +329,44 @@ export async function resolveSceneRead(
         canRun: () => isFoundationSceneAvailable(),
         run: (input) => resolveFoundationSceneRead(input, imageUri, rawVision),
         confidence: () => 0.8,
+      },
+      {
+        id: 'appleNaturalLanguage',
+        task: 'classifyScene',
+        canRun: () => !!rawVision,
+        run: async () => {
+          if (!rawVision) return null;
+          const read = await classifyPhotoLabelsSemantically(rawVision);
+          // Keep review-level evidence in the canonical memory so the existing
+          // clarification and quest-quality prompts can resolve it. Only the
+          // deterministic thresholds decide whether it is immediately ready.
+          const candidate = read?.selected ?? read?.candidates[0];
+          if (!candidate) return null;
+          const [prefix, value] = candidate.categoryId.split('.');
+          const type: SceneType = prefix === 'media' ? 'media'
+            : prefix === 'subject' && ['food', 'drink'].includes(value) ? 'food'
+            : prefix === 'subject' && ['dog', 'cat'].includes(value) ? 'pet'
+            : prefix === 'subject' ? 'social'
+            : prefix === 'activity' || prefix === 'work' ? 'activity'
+            : prefix === 'document' ? 'document'
+            : prefix === 'screen' ? 'screen'
+            : prefix === 'nature' || ['forest', 'garden'].includes(value) ? 'nature'
+            : prefix === 'place' ? 'place' : 'other';
+          const mediaType = prefix === 'media' ? value as StudioMediaType : null;
+          return {
+            memoryDomain: prefix === 'subject' ? (['food', 'drink'].includes(value) ? 'food' : ['dog', 'cat'].includes(value) ? 'animal' : 'people') : prefix === 'activity' ? 'movement' : prefix === 'work' ? 'work' : prefix === 'media' ? 'media' : prefix === 'nature' ? 'nature' : prefix === 'place' ? 'place' : 'other',
+            type,
+            label: SCENE_LABEL[type],
+            detail: value,
+            media: mediaType ? { mediaType, title: null, creator: null } : undefined,
+            food: type === 'food' ? detectFoodInVision(vision) : undefined,
+            source: 'semantic' as const,
+            confidence: candidate.score,
+            alternatives: read?.candidates.slice(1).map((item) => item.categoryId),
+            promptVersion: 'nl-embedding-v1',
+          } satisfies SceneRead;
+        },
+        confidence: (output) => output.confidence ?? 0.72,
       },
       {
         id: 'deterministic',

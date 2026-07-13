@@ -26,6 +26,7 @@ import type {
   StudioRating,
   UserConfirmation,
   ClassifiedMemory,
+  ManualJournalSubmission,
 } from '@/types/home';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 import { rememberPersonalContext } from '@/utils/intelligence/classification';
@@ -72,6 +73,7 @@ import {
   withManualBigMoment,
   withManualFoodMoment,
   withManualStudioMoment,
+  withManualJournalEntry,
   withNoteMemory,
   withPromptAnswer,
   withSeedCompletion,
@@ -249,6 +251,18 @@ export function markBigMomentForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+export function addManualJournalEntryForToday(
+  state: StoredHomeState,
+  input: ManualJournalSubmission,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const nextDay = withManualJournalEntry(base, input, now);
+  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
 export function addFoodMomentForToday(
   state: StoredHomeState,
   input: {
@@ -400,6 +414,9 @@ export function applyNoteForToday(
     media?: { mediaType: StudioMediaType; title: string | null; creator: string | null } | null;
     food?: string | null;
     llmClassified?: boolean;
+    semanticCategoryId?: string | null;
+    semanticConfidence?: number | null;
+    semanticEvaluated?: boolean;
     intelligenceProvider?: DayEvidenceProvider;
   },
   profile: OnboardingProfile,
@@ -413,11 +430,12 @@ export function applyNoteForToday(
       : { detected: false }
     : detectFoodInText(input.text);
   const studioDetection = (() => {
-    if (input.llmClassified) {
+    if (input.llmClassified || input.semanticCategoryId?.startsWith('media.')) {
       return input.media
         ? studioDetectionFromMedia(input.media.mediaType, input.media.title)
         : ({ detected: false } as StudioDetection);
     }
+    if (input.semanticEvaluated) return { detected: false } as StudioDetection;
     const detection = detectStudioInText(input.text);
     if (!detection.detected || !isGenericStudioLabel(detection.label)) return detection;
     const fromLabel = extractStudioTitle(input.label) ?? (isGenericStudioLabel(input.label) ? null : input.label.trim());

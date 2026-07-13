@@ -20,6 +20,7 @@ import {
   answerHeroPhotoMeaningForToday,
   applyCapturedMomentForToday,
   applyNoteForToday,
+  addManualJournalEntryForToday,
   addFoodMomentForToday,
   addStudioMomentForToday,
   setFoodMomentMeaningForToday,
@@ -460,6 +461,13 @@ export function useHomeScreenState() {
     [mutateHomeState]
   );
 
+  const addManualJournalEntry = useCallback(
+    (input: Parameters<typeof addManualJournalEntryForToday>[1], target: DayInputTarget = 'today') => {
+      mutateHomeState((state, profile, now) => addManualJournalEntryForToday(state, input, profile, now, target));
+    },
+    [mutateHomeState]
+  );
+
   const updateClassifiedMemory = useCallback(
     (memory: ClassifiedMemory, target: DayInputTarget = 'today') => {
       mutateHomeState((state, profile, now) => updateClassifiedMemoryForToday(state, memory, profile, now, target));
@@ -479,6 +487,7 @@ export function useHomeScreenState() {
     addNote,
     confirmPlace,
     markBigMoment,
+    addManualJournalEntry,
     setSleep,
     setStepsInterpretation,
     setFeaturedMemory,

@@ -8,6 +8,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
+import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
@@ -73,13 +74,9 @@ const QUICK_PROMPT_CATEGORIES: {
   { id: 'photo', title: 'Photo', icon: 'camera.fill', accent: '#92D7FF', section: 'capture' },
   { id: 'voice_note', title: 'Voice note', icon: 'mic.fill', accent: '#7DE8CD', section: 'capture' },
   { id: 'written_note', title: 'Written note', icon: 'square.and.pencil', accent: '#9DDCB8', section: 'capture' },
-  { id: 'place', title: 'Place', icon: 'mappin.and.ellipse', accent: '#F49AC1', section: 'context' },
-  { id: 'food', title: 'Food & drink', icon: 'fork.knife', accent: '#FFC36B', section: 'context' },
-  { id: 'studio', title: 'Watch, read, listen', icon: 'book.fill', accent: '#E8C272', section: 'context' },
-  { id: 'movement', title: 'Movement', icon: 'figure.walk', accent: '#A8C99A', section: 'more' },
+  { id: 'manual_journal', title: 'Log something', icon: 'plus.circle.fill', accent: '#FFC36B', section: 'context' },
   { id: 'mood', title: 'Mood', icon: 'face.smiling', accent: '#F5AFC6', section: 'more' },
   { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF', section: 'more' },
-  { id: 'life_event', title: 'Life event', icon: 'sparkles', accent: '#D5B8FF', section: 'more' },
 ];
 
 
@@ -108,6 +105,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const [manualJournalOpen, setManualJournalOpen] = useState(false);
   // Egg + membrane framing from data/today-scene.json (neutral by default) —
   // shared with onboarding/Hatch Your Past via meadow-scene-backdrop.
   const eggFraming = todayEggFraming();
@@ -118,6 +116,7 @@ export default function HomeScreen() {
     answerPhotoMeaning,
     dismissDayPrompt,
     addNote,
+    addManualJournalEntry,
     confirmPlace,
     markBigMoment,
     setSleep,
@@ -364,6 +363,7 @@ export default function HomeScreen() {
     journeySheetOpen ||
     nameSheetOpen ||
     observatoryOpen ||
+    manualJournalOpen ||
     quickNoteOpen ||
     clarificationMemory !== null;
 
@@ -411,7 +411,6 @@ export default function HomeScreen() {
     handleStatPress,
     handleCategoryPress,
     handleCameraPress,
-    handleQuickCategory,
     handleQuestActionIntent,
   } = useTodayActionRouter({
     categories,
@@ -426,6 +425,7 @@ export default function HomeScreen() {
     openQuickNote: () => setQuickNoteOpen(true),
     openPlaceContext: handleAddCurrentPlace,
     openObservatory: () => setObservatoryOpen(true),
+    openManualJournal: () => setManualJournalOpen(true),
     requestMicrophonePermission,
   });
   const suggestedPromptActions = useMemo(
@@ -516,6 +516,7 @@ export default function HomeScreen() {
     stepsSheetOpen ||
     journeySheetOpen ||
     nameSheetOpen ||
+    manualJournalOpen ||
     quickNoteOpen ||
     clarificationMemory !== null ||
     !!foodFollowUp ||
@@ -555,7 +556,7 @@ export default function HomeScreen() {
             ) : (
               <LanternEgg
                 egg={selectedDay.egg}
-                onPress={selectedDay.canAddMoments ? () => openPromptSheet() : undefined}
+                onPress={selectedDay.canAddMoments ? () => setManualJournalOpen(true) : undefined}
                 reactionKey={selectedDay.moments.length}
                 isReady={selectedDay.state === 'ready_to_hatch'}
                 feedKey={eggFeedKey}
@@ -571,7 +572,7 @@ export default function HomeScreen() {
           ) : onTomorrowForming ? (
             <LanternEgg
               egg={tomorrowDay.egg}
-              onPress={() => openPromptSheet()}
+              onPress={() => setManualJournalOpen(true)}
               reactionKey={tomorrowDay.moments.length}
               feedKey={eggFeedKey}
               lanternColor={lanternColour}
@@ -663,7 +664,7 @@ export default function HomeScreen() {
           onMicPressOut={() => {
             void voiceNote.stop();
           }}
-          onAdd={openPromptSheet}
+          onAdd={() => setManualJournalOpen(true)}
           onOpenMap={() => {
             if (isDay) handleOpenDayMap(selectedDay.id);
           }}
@@ -682,11 +683,8 @@ export default function HomeScreen() {
 
       {promptSheetOpen ? (
         <MomentPromptSheet
-          prompts={popupPrompts}
+          prompts={popupPrompts.filter((prompt) => prompt.id === 'meaningful_photo')}
           initialPrompt={initialPrompt}
-          // Mood + Sleep stay in the menu but open their OWN sheets (the old
-          // strip prompts for both are retired).
-          quickCategories={QUICK_PROMPT_CATEGORIES}
           suggestions={suggestedPromptActions}
           onSelectSuggestion={(suggestion) => {
             if (!suggestion.sourceMemoryId || !formingDay) return false;
@@ -696,7 +694,6 @@ export default function HomeScreen() {
             closePromptSheet();
             return true;
           }}
-          onQuickCategory={handleQuickCategory}
           onAnswer={handleAnswerDayPrompt}
           onSelectHeroPhoto={handleSelectHeroPhoto}
           onPromptDismiss={(promptId) => {
@@ -705,6 +702,17 @@ export default function HomeScreen() {
             if (promptId === 'meaningful_photo') dismissPhotoAlert();
           }}
           onClose={closePromptSheet}
+        />
+      ) : null}
+      {manualJournalOpen ? (
+        <ManualJournalSheet
+          onClose={() => setManualJournalOpen(false)}
+          onSave={(submission) => {
+            addManualJournalEntry(submission, formingTarget);
+            setManualJournalOpen(false);
+            pulseEgg();
+            setMicrocopy('Added to today');
+          }}
         />
       ) : null}
 
@@ -797,6 +805,8 @@ export default function HomeScreen() {
           onToggleBig={voiceNote.toggleMarkBig}
           onAccept={voiceNote.accept}
           onDiscard={voiceNote.discard}
+          onChooseSemantic={voiceNote.chooseSemantic}
+          semanticChoiceMade={voiceNote.semanticChoiceMade}
           bottom={tabBarHeight}
         />
       ) : null}

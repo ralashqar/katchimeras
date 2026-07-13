@@ -79,14 +79,14 @@ export function withManualFoodMoment(
         facetValue: moment.label,
         createdAt: moment.createdAt,
       },
-      {
+      ...(moment.meaning ? [{
         promptId: 'food-context.meaning',
         optionId: moment.meaning,
         label: moment.meaning,
         facetKey: 'food_meaning',
         facetValue: moment.meaning,
         createdAt: moment.createdAt,
-      },
+      }] : []),
     ],
   });
   return {
@@ -222,14 +222,14 @@ export function withManualStudioMoment(
         facetValue: moment.mediaType,
         createdAt: moment.createdAt,
       },
-      {
+      ...(moment.rating ? [{
         promptId: 'media-context.meaning',
         optionId: moment.rating,
         label: moment.rating,
         facetKey: 'media_rating',
         facetValue: moment.rating,
         createdAt: moment.createdAt,
-      },
+      }] : []),
     ],
   });
   return {

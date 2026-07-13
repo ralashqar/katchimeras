@@ -17,7 +17,8 @@ import { Lantern } from '@/constants/theme';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { interpretNote, transcribeAudioNote, type InterpretedNote } from '@/utils/note-interpret';
-import type { DayInputTarget } from '@/types/home';
+import type { DayInputTarget, StudioMediaType } from '@/types/home';
+import { extractStudioTitle } from '@/utils/studio-detect';
 
 const MAX_SECONDS = 30;
 const MEANING_TINT: Record<string, string> = {
@@ -58,6 +59,7 @@ export default function NoteCaptureScreen() {
   const [phase, setPhase] = useState<'input' | 'interpreting' | 'review'>('input');
   const [result, setResult] = useState<InterpretedNote | null>(null);
   const [markBig, setMarkBig] = useState(true);
+  const [semanticChoiceMade, setSemanticChoiceMade] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Tracks press-and-hold intent so a release mid-setup cancels cleanly.
   const recordingRef = useRef(false);
@@ -172,6 +174,7 @@ export default function NoteCaptureScreen() {
         return;
       }
       setResult(interpreted);
+      setSemanticChoiceMade(!interpreted.semantic?.needsClarification);
       setMarkBig(true);
       setPhase('review');
     } catch {
@@ -193,6 +196,9 @@ export default function NoteCaptureScreen() {
       media: result.media,
       food: result.food,
       llmClassified: result.llmClassified,
+      semanticCategoryId: result.semanticCategoryId,
+      semanticConfidence: result.semanticConfidence,
+      semanticEvaluated: result.semanticEvaluated,
       intelligenceProvider: result.intelligenceProvider,
     }, noteTarget);
     // Celebratory flight into the Memory Vault (World consumes this on focus).
@@ -312,7 +318,49 @@ export default function NoteCaptureScreen() {
             </Pressable>
           ) : null}
 
-          <Pressable onPress={commit} style={styles.cta}>
+          {result.semantic?.needsClarification ? (
+            <View style={styles.semanticReview}>
+              <ThemedText style={styles.semanticTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                What was this mainly about?
+              </ThemedText>
+              <View style={styles.semanticOptions}>
+                {result.semantic.candidates.slice(0, 3).map((candidate) => (
+                  <Pressable
+                    key={candidate.categoryId}
+                    onPress={() => {
+                      const mediaType = candidate.categoryId.startsWith('media.')
+                        ? candidate.categoryId.slice('media.'.length) as StudioMediaType
+                        : null;
+                      setResult((current) => current ? {
+                        ...current,
+                        media: mediaType ? { mediaType, title: extractStudioTitle(current.transcript), creator: null } : null,
+                        semanticCategoryId: candidate.categoryId,
+                        semanticConfidence: 1,
+                        intelligenceProvider: 'manual',
+                      } : current);
+                      setSemanticChoiceMade(true);
+                    }}
+                    style={[styles.semanticOption, result.semanticCategoryId === candidate.categoryId && styles.semanticOptionOn]}>
+                    <ThemedText style={styles.semanticOptionText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                      {candidate.label}
+                    </ThemedText>
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => {
+                    setResult((current) => current ? { ...current, media: null, semanticCategoryId: null, semanticConfidence: null, intelligenceProvider: 'manual' } : current);
+                    setSemanticChoiceMade(true);
+                  }}
+                  style={styles.semanticOption}>
+                  <ThemedText style={styles.semanticOptionText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                    Just keep the note
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+          <Pressable disabled={!semanticChoiceMade} onPress={commit} style={[styles.cta, !semanticChoiceMade && styles.ctaDisabled]}>
             <ThemedText style={styles.ctaLabel} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>
               Add to {targetLabel}
             </ThemedText>
@@ -427,4 +475,10 @@ const styles = StyleSheet.create({
   bigMomentOn: { borderColor: 'rgba(255,195,107,0.6)', backgroundColor: 'rgba(255,195,107,0.12)' },
   bigEmoji: { fontSize: 20 },
   bigLabel: { flex: 1, fontSize: 14, fontWeight: '700' },
+  semanticReview: { gap: 10, padding: 14, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.05)' },
+  semanticTitle: { fontSize: 14, fontWeight: '800' },
+  semanticOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  semanticOption: { paddingVertical: 9, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
+  semanticOptionOn: { borderColor: Lantern.ember300, backgroundColor: 'rgba(255,195,107,0.12)' },
+  semanticOptionText: { fontSize: 13, fontWeight: '700' },
 });

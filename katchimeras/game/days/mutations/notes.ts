@@ -23,6 +23,9 @@ export type DayNoteInput = {
   media?: { mediaType: StudioMediaType; title: string | null; creator: string | null } | null;
   food?: string | null;
   llmClassified?: boolean;
+  semanticCategoryId?: string | null;
+  semanticConfidence?: number | null;
+  semanticEvaluated?: boolean;
   intelligenceProvider?: DayEvidenceProvider;
 };
 
@@ -57,6 +60,8 @@ export function withNoteMemory(
     mediaType: input.media?.mediaType ?? (detections.studio.detected ? detections.studio.mediaType ?? null : null),
     food: input.food ?? (detections.food.detected ? detections.food.label ?? 'food' : null),
     bigMomentType: input.bigMoment?.type ?? null,
+    semanticCategoryId: input.semanticCategoryId ?? null,
+    semanticConfidence: input.semanticConfidence ?? null,
   });
   const classifiedMemory = buildNoteClassifiedMemory({
     noteId: note.id,
@@ -67,6 +72,8 @@ export function withNoteMemory(
     mediaType: input.media?.mediaType ?? (detections.studio.detected ? detections.studio.mediaType ?? null : null),
     food: input.food ?? (detections.food.detected ? detections.food.label ?? 'food' : null),
     bigMomentType: input.bigMoment?.type ?? null,
+    semanticCategoryId: input.semanticCategoryId ?? null,
+    semanticConfidence: input.semanticConfidence ?? null,
   });
 
   return {

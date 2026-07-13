@@ -52,6 +52,7 @@ type QuestDayInput = Pick<
   | 'dayName'
   | 'vision'
   | 'classifiedMemories'
+  | 'manualJournalEntries'
 >;
 
 const REFLECTION_KINDS = new Set(['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight']);
@@ -235,7 +236,8 @@ export function selectMemoryQuests(day: QuestDayInput, now: Date, max = 3, calen
     (day.confirmedPlaces?.length ?? 0) > 0 ||
     (day.bigMoments?.length ?? 0) > 0 ||
     (day.foodMoments?.length ?? 0) > 0 ||
-    (day.studioMoments?.length ?? 0) > 0;
+    (day.studioMoments?.length ?? 0) > 0 ||
+    (day.manualJournalEntries?.length ?? 0) > 0;
   if (hasContent) offered.push('namePatch');
   // Fill the slate with a voice memory if nothing else made the cut.
   if (!offered.includes('recordVoiceMemory') && offered.length < max) offered.push('recordVoiceMemory');

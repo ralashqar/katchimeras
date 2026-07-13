@@ -238,12 +238,12 @@ export function FoodVaultSheet({
                   </ThemedText>
                 ) : null}
               </View>
-              <View style={[styles.meaningChip, { borderColor: `${MEANING_TINT[moment.meaning] ?? Lantern.moon300}66` }]}>
+              {moment.meaning ? <View style={[styles.meaningChip, { borderColor: `${MEANING_TINT[moment.meaning] ?? Lantern.moon300}66` }]}>
                 <View style={[styles.meaningDot, { backgroundColor: MEANING_TINT[moment.meaning] ?? Lantern.moon300 }]} />
                 <ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                   {MEANING_LABEL[moment.meaning] ?? moment.meaning}
                 </ThemedText>
-              </View>
+              </View> : null}
             </View>
             );
           })}

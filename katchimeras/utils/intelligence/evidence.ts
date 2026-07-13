@@ -127,6 +127,8 @@ export function buildNoteEvidence(input: {
   mediaType?: string | null;
   food?: string | null;
   bigMomentType?: string | null;
+  semanticCategoryId?: string | null;
+  semanticConfidence?: number | null;
 }): DayEvidence {
   const provider = input.provider ?? 'deterministic';
   const signals: DayEvidenceSignal[] = textToSignals(input.text).map((signal) => ({
@@ -141,6 +143,15 @@ export function buildNoteEvidence(input: {
   if (input.food) signals.push({ key: 'food', confidence: 0.82, raw: input.food, provider, source: 'note' });
   if (input.bigMomentType) {
     signals.push({ key: `bigMoment:${input.bigMomentType}`, confidence: 0.84, raw: input.bigMomentType, provider, source: 'note' });
+  }
+  if (input.semanticCategoryId) {
+    signals.push({
+      key: input.semanticCategoryId,
+      confidence: input.semanticConfidence ?? 0.8,
+      raw: input.semanticCategoryId,
+      provider: 'appleNaturalLanguage',
+      source: 'note',
+    });
   }
 
   return {

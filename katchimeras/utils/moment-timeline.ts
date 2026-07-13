@@ -1,6 +1,7 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { dayPromptRegistry } from '@/constants/day-prompts';
 import type { HomeDayRecord } from '@/types/home';
+import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import {
   resolveBigMomentDisplay,
   resolveFoodMomentDisplay,
@@ -55,6 +56,7 @@ const SLEEP_LABEL: Record<string, string> = {
 export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
   const entries: MomentTimelineEntry[] = [];
   const seen = new Set<string>();
+  const manualSourceIds = new Set((day.manualJournalEntries ?? []).map((entry) => entry.id));
   const push = (entry: Omit<MomentTimelineEntry, 'time'>) => {
     const time = Date.parse(entry.createdAt);
     if (!entry.label.trim() || Number.isNaN(time) || seen.has(entry.id)) return;
@@ -136,14 +138,30 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     });
   }
 
+  for (const entry of day.manualJournalEntries ?? []) {
+    const flow = manualJournalFlow(entry.flowId);
+    const choice = flow?.choices.find((item) => item.id === entry.categoryId);
+    const specific = typeof entry.fields.specific === 'string' ? entry.fields.specific.trim() : '';
+    push({
+      id: `manual:${entry.id}`,
+      createdAt: entry.createdAt,
+      icon: flow?.icon ?? 'plus.circle.fill',
+      accent: '#FFC36B',
+      label: specific || choice?.label || flow?.title || 'Journal entry',
+      category: flow?.title ?? 'Journal',
+      noteText: entry.note,
+    });
+  }
+
   for (const food of day.foodMoments ?? []) {
     if (food.source !== 'manual') continue;
+    if (food.sourceId && manualSourceIds.has(food.sourceId)) continue;
     const display = resolveFoodMomentDisplay(food);
     push({
       id: `food:${food.id}`,
       createdAt: food.createdAt,
       icon: 'fork.knife',
-      accent: foodMeaningAccent(food.meaning),
+      accent: foodMeaningAccent(food.meaning ?? 'discovery'),
       label: display.label,
       category: 'Food & drink',
       thumbnailUri: food.thumbnailUri,
@@ -152,12 +170,13 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
 
   for (const studio of day.studioMoments ?? []) {
     if (studio.source !== 'manual') continue;
+    if (studio.sourceId && manualSourceIds.has(studio.sourceId)) continue;
     const display = resolveStudioMomentDisplay(studio);
     push({
       id: `studio:${studio.id}`,
       createdAt: studio.createdAt,
       icon: studioMediaIcon(studio.mediaType),
-      accent: studioRatingAccent(studio.rating),
+      accent: studioRatingAccent(studio.rating ?? 'liked'),
       label: display.label,
       category: 'Watch, read, listen',
       thumbnailUri: studio.thumbnailUri,
@@ -188,6 +207,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
   }
 
   for (const moment of day.bigMoments ?? []) {
+    if (moment.id.startsWith('bm-manual-')) continue;
     const display = resolveBigMomentDisplay(moment);
     push({
       id: `life-event:${moment.id}`,

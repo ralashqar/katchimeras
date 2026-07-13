@@ -4,6 +4,7 @@
   "providerWeights": {
     "manual": 1,
     "appleFoundation": 0.95,
+    "appleNaturalLanguage": 0.82,
     "appleVision": 0.95,
     "remoteLlm": 0.88,
     "deterministic": 0.72,

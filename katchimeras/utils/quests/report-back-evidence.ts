@@ -293,7 +293,7 @@ function latestFoodItems(day: HomeDayRecord): QuestReportBackItem[] {
     evidenceId: null,
     createdAt: item.createdAt,
     title: display.label,
-    subtitle: [display.detail, foodMeaningTitle(item.meaning)]
+    subtitle: [display.detail, item.meaning ? foodMeaningTitle(item.meaning) : null]
       .filter(Boolean)
       .join(' - '),
     body: item.detail ?? null,
@@ -319,7 +319,7 @@ function latestStudioItems(day: HomeDayRecord, requestedMedia?: unknown): QuestR
       evidenceId: null,
       createdAt: item.createdAt,
       title: display.label,
-      subtitle: `${studioMediaTitle(item.mediaType)} - ${studioRatingTitle(item.rating)}`,
+      subtitle: item.rating ? `${studioMediaTitle(item.mediaType)} - ${studioRatingTitle(item.rating)}` : studioMediaTitle(item.mediaType),
       body: display.detail,
       thumbnailUri: item.thumbnailUri ?? null,
       icon: studioIcon(item.mediaType),

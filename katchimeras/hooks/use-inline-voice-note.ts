@@ -7,6 +7,8 @@ import {
 } from 'expo-audio';
 
 import { interpretNote, type InterpretedNote } from '@/utils/note-interpret';
+import { extractStudioTitle } from '@/utils/studio-detect';
+import type { StudioMediaType } from '@/types/home';
 
 // Hold-to-record voice note: record → on-device transcribe + interpret →
 // accept/discard. Owns the recorder + phase state; the screen renders
@@ -27,6 +29,9 @@ export type InlineVoiceNotePayload = {
   media?: InterpretedNote['media'];
   food?: InterpretedNote['food'];
   llmClassified?: boolean;
+  semanticCategoryId?: string | null;
+  semanticConfidence?: number | null;
+  semanticEvaluated?: boolean;
   intelligenceProvider: InterpretedNote['intelligenceProvider'];
 };
 
@@ -48,6 +53,7 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
   const [elapsed, setElapsed] = useState(0);
   const [result, setResult] = useState<InterpretedNote | null>(null);
   const [markBig, setMarkBig] = useState(true);
+  const [semanticChoiceMade, setSemanticChoiceMade] = useState(false);
   const audioRef = useRef<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingRef = useRef(false);
@@ -75,6 +81,7 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
       // On-device transcription happens inside interpretNote (audio stays local).
       const interpreted = await interpretNote({ audioUri: uri }, { allowRemote });
       setResult(interpreted);
+      setSemanticChoiceMade(!interpreted.semantic?.needsClarification);
       setMarkBig(true);
       setPhase('confirm');
     } catch {
@@ -116,7 +123,7 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
   };
 
   const accept = () => {
-    if (!result) return;
+    if (!result || !semanticChoiceMade) return;
     saveNote({
       kind: 'voice',
       text: result.transcript,
@@ -128,6 +135,9 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
       media: result.media,
       food: result.food,
       llmClassified: result.llmClassified,
+      semanticCategoryId: result.semanticCategoryId,
+      semanticConfidence: result.semanticConfidence,
+      semanticEvaluated: result.semanticEvaluated,
       intelligenceProvider: result.intelligenceProvider,
     });
     onSaved?.(result);
@@ -140,6 +150,22 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
     setResult(null);
     audioRef.current = null;
     setPhase('idle');
+  };
+
+  const chooseSemantic = (categoryId: string | null) => {
+    setResult((current) => {
+      if (!current) return current;
+      if (!categoryId) return { ...current, media: null, semanticCategoryId: null, semanticConfidence: null, intelligenceProvider: 'manual' };
+      const mediaType = categoryId.startsWith('media.') ? categoryId.slice('media.'.length) as StudioMediaType : null;
+      return {
+        ...current,
+        media: mediaType ? { mediaType, title: extractStudioTitle(current.transcript), creator: null } : null,
+        semanticCategoryId: categoryId,
+        semanticConfidence: 1,
+        intelligenceProvider: 'manual',
+      };
+    });
+    setSemanticChoiceMade(true);
   };
 
   useEffect(
@@ -159,6 +185,8 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
     start,
     stop,
     accept,
+    chooseSemantic,
+    semanticChoiceMade,
     discard,
   };
 }

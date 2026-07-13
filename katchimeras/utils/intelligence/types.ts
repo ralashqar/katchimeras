@@ -1,6 +1,7 @@
 export type IntelligenceProviderId =
   | 'appleVision'
   | 'appleFoundation'
+  | 'appleNaturalLanguage'
   | 'appleSpeech'
   | 'remoteLlm'
   | 'deterministic';
@@ -38,14 +39,13 @@ export type IntelligenceProvider<TInput, TOutput> = {
 };
 
 export const ON_DEVICE_FIRST_POLICY: IntelligencePolicy = {
-  providerOrder: ['appleVision', 'appleFoundation', 'appleSpeech', 'deterministic'],
+  providerOrder: ['appleVision', 'appleFoundation', 'appleNaturalLanguage', 'appleSpeech', 'deterministic'],
   timeoutMs: 3000,
   allowRemote: false,
 };
 
 export const CLOUD_ASSISTED_POLICY: IntelligencePolicy = {
-  providerOrder: ['appleVision', 'appleFoundation', 'appleSpeech', 'remoteLlm', 'deterministic'],
+  providerOrder: ['appleVision', 'appleFoundation', 'appleNaturalLanguage', 'appleSpeech', 'remoteLlm', 'deterministic'],
   timeoutMs: 9000,
   allowRemote: true,
 };
-
