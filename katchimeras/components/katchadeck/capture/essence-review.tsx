@@ -356,6 +356,10 @@ function reconcileProgressiveUpgrade(
   upgraded: ClassifiedMemory
 ): ClassifiedMemory {
   if (!current || current.confirmations.length === 0) return upgraded;
+  const questionFamilyChanged =
+    !!current.promptState.graphId &&
+    !!upgraded.promptState.graphId &&
+    current.promptState.graphId !== upgraded.promptState.graphId;
   const confirmedMediaType = upgraded.facets.some(
     (facet) => facet.key === 'media_type' && facet.confirmed && facet.value !== 'other'
   );
@@ -378,7 +382,7 @@ function reconcileProgressiveUpgrade(
       // Semantic routing comes from the upgraded canonical interpretation;
       // only interaction history is carried forward. Preserving the old graph
       // here caused tags to update while an obsolete question stayed visible.
-      ...upgraded.promptState,
+      ...(questionFamilyChanged ? current.promptState : upgraded.promptState),
       answeredNodeIds: current.promptState.answeredNodeIds,
       askedQuestionIds: current.promptState.askedQuestionIds,
       resolvedGoalIds: current.promptState.resolvedGoalIds,
@@ -386,9 +390,9 @@ function reconcileProgressiveUpgrade(
       completedGoalIds: current.promptState.completedGoalIds,
       questionCount: current.promptState.questionCount,
       microQuestionCount: current.promptState.microQuestionCount,
-      status: shouldInsertTitleQuestion ? 'pending' : upgraded.promptState.status,
-      currentNodeId: shouldInsertTitleQuestion ? 'title' : upgraded.promptState.currentNodeId,
-      currentQuestionId: shouldInsertTitleQuestion ? 'media-context.title' : upgraded.promptState.currentQuestionId,
+      status: shouldInsertTitleQuestion ? 'pending' : questionFamilyChanged ? current.promptState.status : upgraded.promptState.status,
+      currentNodeId: shouldInsertTitleQuestion ? 'title' : questionFamilyChanged ? current.promptState.currentNodeId : upgraded.promptState.currentNodeId,
+      currentQuestionId: shouldInsertTitleQuestion ? 'media-context.title' : questionFamilyChanged ? current.promptState.currentQuestionId : upgraded.promptState.currentQuestionId,
     },
   };
 }

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { safeGoBack } from '@/utils/safe-navigation';
 import { KATCHIMERA_HEX_TILE_CATALOG } from '@/constants/katchimera-hex-tile-sources.gen';
 import { useKingdom } from '@/hooks/use-kingdom';
 import {
@@ -204,7 +205,7 @@ export default function DevKatchimeraTileLabScreen() {
         accessibilityRole="button"
         accessibilityLabel="Close the Katchimera Tile Lab"
         hitSlop={10}
-        onPress={() => router.back()}
+        onPress={() => safeGoBack(router)}
         style={[styles.exitButton, { top: insets.top + 10 }]}>
         <IconSymbol name="xmark" size={15} color="#E8EEFF" />
       </Pressable>

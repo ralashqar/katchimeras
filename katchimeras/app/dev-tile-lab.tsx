@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import tileLayout from '@/data/world-tile-layout.json';
 import { worldBaseSource } from '@/utils/world-visuals';
+import { safeGoBack } from '@/utils/safe-navigation';
 
 // DEV TOOL — the Tile Layout Lab: calibrate ISOMETRIC ADJACENCY offsets.
 // Each base is a square image with an isometric diamond top face; a neighbor
@@ -166,7 +167,7 @@ export default function DevTileLabScreen() {
         accessibilityRole="button"
         accessibilityLabel="Close the Tile Lab"
         hitSlop={10}
-        onPress={() => router.back()}
+        onPress={() => safeGoBack(router)}
         style={[styles.exitButton, { top: insets.top + 10 }]}>
         <IconSymbol name="xmark" size={15} color="#E8EEFF" />
       </Pressable>

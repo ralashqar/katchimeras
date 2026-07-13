@@ -164,8 +164,8 @@ const HOME_MEANINGS: readonly CaptureMeaning[] = [
 ];
 
 // An ambiguous device/screen photo offers the things you might have been doing
-// with it, so the user disambiguates (directly the "electronic device → work /
-// games" case). Lower priority than a SPECIFIC device read (laptop → work).
+// with it, so the user disambiguates. A device is a container, not proof of
+// work or media; the classified-memory flow can then ask the specific activity.
 const TECH_MEANINGS: readonly CaptureMeaning[] = [
   { id: 'meaningful', emoji: '💻', label: 'Working' },
   { id: 'energy', emoji: '🎮', label: 'Gaming' },
@@ -207,7 +207,8 @@ const BUCKETS: { key: string; pattern: RegExp; meanings: readonly CaptureMeaning
   { key: 'people', pattern: /\bperson\b|people|\bface\b|portrait|\bbaby\b|infant|toddler|\bchild\b|\bkid\b|\bgroup\b|crowd|selfie|\bfriends?\b|family/, meanings: MEANINGS_BY_CATEGORY.people },
   { key: 'celebration', pattern: /birthday|\bparty\b|celebration|balloon|confetti|wedding|champagne|firework/, meanings: MEANINGS_BY_CATEGORY.celebration },
   { key: 'pet', pattern: /\bdog\b|puppy|\bcat\b|kitten|\bpet\b|\bpaw\b|hamster|\brabbit\b|\bbird\b|parrot|aquarium/, meanings: MEANINGS_BY_CATEGORY.pet },
-  { key: 'work', pattern: /focus_work|laptop|computer|keyboard|monitor|\bdesk\b|office|workspace|spreadsheet|\bmeeting\b|whiteboard|cubicle/, meanings: WORK_MEANINGS },
+  { key: 'tech', pattern: /electronic|\bscreen\b|display|gadget|tablet|smartphone|\bphone\b|\bdevice\b|laptop|computer|keyboard|monitor/, meanings: TECH_MEANINGS },
+  { key: 'work', pattern: /focus_work|\bdesk\b|office|workspace|spreadsheet|\bmeeting\b|whiteboard|cubicle|code editor|developer tools/, meanings: WORK_MEANINGS },
   { key: 'games', pattern: /gaming|game ?controller|gamepad|console|joystick|arcade|video ?game|playstation|xbox|nintendo/, meanings: GAMES_MEANINGS },
   { key: 'music', pattern: /live_music|concert|\bgig\b|\bstage\b|guitar|piano|violin|cello|\bdrum|saxophone|trumpet|instrument|microphone|\bband\b|vinyl|headphones?|turntable|orchestra/, meanings: MUSIC_MEANINGS },
   { key: 'watching', pattern: /television|\btv\b|remote control|home cinema|streaming/, meanings: WATCHING_MEANINGS },
@@ -226,7 +227,6 @@ const BUCKETS: { key: string; pattern: RegExp; meanings: readonly CaptureMeaning
   { key: 'light', pattern: /sunset|sunrise|\bdusk\b|\bdawn\b|golden hour/, meanings: MEANINGS_BY_CATEGORY.light },
   { key: 'night', pattern: /\bnight\b|\bstars?\b|starry|\bmoon\b|\bsnow\b|\brain\b|\bstorm\b|\bfog\b|aurora/, meanings: MEANINGS_BY_CATEGORY.night },
   { key: 'home', pattern: /couch|sofa|blanket|bedroom|living room|fireplace|\bcozy\b|pajamas|\bbed\b/, meanings: HOME_MEANINGS },
-  { key: 'tech', pattern: /electronic|\bscreen\b|display|gadget|tablet|smartphone|\bphone\b|\bdevice\b/, meanings: TECH_MEANINGS },
 ];
 
 // The meaning options to offer for a freshly captured photo, adapted to its

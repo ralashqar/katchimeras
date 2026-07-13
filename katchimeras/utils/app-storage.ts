@@ -1,4 +1,5 @@
 import 'expo-sqlite/localStorage/install';
+import Storage from 'expo-sqlite/kv-store';
 
 function getStorage() {
   return globalThis.localStorage ?? null;
@@ -42,6 +43,10 @@ export function setStoredJson<T>(key: string, value: T) {
   }
 
   storage.setItem(key, JSON.stringify(value));
+}
+
+export async function setStoredJsonAsync<T>(key: string, value: T) {
+  await Storage.setItemAsync(key, JSON.stringify(value));
 }
 
 export function removeStoredValue(key: string) {

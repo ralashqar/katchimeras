@@ -23,6 +23,7 @@ const peopleDetectPath = transpile('utils/people-detect.ts', 'people-detect.js')
 const classificationPolicyPath = transpile('utils/intelligence/classification-policy.ts', 'classification-policy.js');
 const qualityRegistryPath = transpile('utils/intelligence/quality-registry.ts', 'quality-registry.js');
 const photoHierarchyPath = transpile('utils/intelligence/photo-hierarchy.ts', 'photo-hierarchy.js');
+const deviceActivityPath = transpile('utils/intelligence/device-activity.ts', 'device-activity.js');
 const photoDescriptorPath = transpile('utils/intelligence/photo-descriptor.ts', 'photo-descriptor.js');
 const questionRegistryPath = transpile('utils/intelligence/question-registry.ts', 'question-registry.js');
 const consistencyPath = transpile('utils/intelligence/consistency.ts', 'consistency.js');
@@ -41,6 +42,7 @@ const stubs = {
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
   '@/utils/intelligence/photo-descriptor': photoDescriptorPath,
   '@/utils/intelligence/photo-hierarchy': photoHierarchyPath,
+  '@/utils/intelligence/device-activity': deviceActivityPath,
   '@/utils/intelligence/question-registry': questionRegistryPath,
   '@/utils/intelligence/clarification': clarificationPath,
   '@/data/intelligence/memory-qualities.json': path.join(root, 'data/intelligence/memory-qualities.json'),
@@ -52,6 +54,7 @@ Module._resolveFilename = function (request, ...args) {
   if (request === './photo-descriptor') return photoDescriptorPath;
   if (request === './photo-hierarchy') return photoHierarchyPath;
   if (request === './question-registry') return questionRegistryPath;
+  if (request === './device-activity') return deviceActivityPath;
   return request in stubs ? stubs[request] : resolve.call(this, request, ...args);
 };
 
@@ -86,11 +89,104 @@ const dog = classification.buildPhotoClassifiedMemory({
   scene: { type: 'pet', label: 'A furry friend', source: 'rules' },
 });
 check('dog ownership stays pending', dog.promptState.graphId === 'animal-relationship');
-check('new memories retain a bounded scored decision trace', dog.promptState.plannerVersion === 2 && dog.promptState.candidateTrace.length <= 5 && dog.promptState.currentQuestionId === 'animal.ownership', JSON.stringify(dog.promptState));
+check('new memories retain a bounded scored decision trace', dog.promptState.plannerVersion === 3 && dog.promptState.candidateTrace.length <= 5 && dog.promptState.currentQuestionId === 'animal.ownership', JSON.stringify(dog.promptState));
 check('question scoring is deterministic', JSON.stringify(questionRegistry.planNextQuestion(dog)) === JSON.stringify(questionRegistry.planNextQuestion(dog)));
 const plannerStartedAt = Date.now();
 for (let index = 0; index < 2_000; index += 1) questionRegistry.planNextQuestion(dog);
 check('question planning stays comfortably off the interaction budget', Date.now() - plannerStartedAt < 500);
+
+function deviceSummary(entries, details = []) {
+  return {
+    concepts: entries.map(([name, confidence]) => ({ name, salience: 1, coverage: 1, count: 1, peakConfidence: confidence })),
+    details, maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1,
+  };
+}
+function laptopMemory(id, entries, details = []) {
+  return classification.buildPhotoClassifiedMemory({
+    sourceId: id, observedAt: '2026-07-13T10:00:00.000Z',
+    vision: deviceSummary([['laptop', 0.92], ...entries], details),
+    scene: { type: 'screen', label: 'On a screen', detail: 'Digital content', source: 'rules' },
+  });
+}
+
+const plainLaptop = laptopMemory('plain-laptop', []);
+check('laptop remains a device rather than becoming work or media', plainLaptop.dominantDomain === 'other' && plainLaptop.photoAnalysis.subjects.find((item) => item.role === 'primary')?.canonicalValue === 'device_laptop', JSON.stringify(plainLaptop.photoAnalysis));
+check('plain laptop asks for activity first', plainLaptop.promptState.graphId === 'device-activity' && clarification.currentClarificationNode(plainLaptop)?.question === 'What were you using it for?', JSON.stringify(plainLaptop.promptState));
+check('plain laptop never starts with media identity or work feelings', !/book|movie|productive/i.test(clarification.currentClarificationNode(plainLaptop)?.question ?? ''), clarification.currentClarificationNode(plainLaptop)?.question);
+
+const gameplayLaptop = laptopMemory('gameplay-laptop', [['gameplay', 0.91]], ['video game']);
+check('strong gameplay asks for targeted confirmation', gameplayLaptop.promptState.currentNodeId === 'confirm' && clarification.currentClarificationNode(gameplayLaptop)?.question === 'Were you gaming?', JSON.stringify(gameplayLaptop.facets));
+const spreadsheetLaptop = laptopMemory('spreadsheet-laptop', [['spreadsheet', 0.89]]);
+check('strong spreadsheet asks whether the user was working', clarification.currentClarificationNode(spreadsheetLaptop)?.question === 'Were you working?', JSON.stringify(spreadsheetLaptop.facets));
+const videoLaptop = laptopMemory('video-laptop', [['video player', 0.88]]);
+check('strong player evidence asks whether the user was watching', clarification.currentClarificationNode(videoLaptop)?.question === 'Were you watching something?', JSON.stringify(videoLaptop.facets));
+const ebookLaptop = laptopMemory('ebook-laptop', [['ebook', 0.88]]);
+check('strong ebook evidence asks whether the user was reading', clarification.currentClarificationNode(ebookLaptop)?.question === 'Were you reading?', JSON.stringify(ebookLaptop.facets));
+const conflictedLaptop = laptopMemory('conflicted-laptop', [['gameplay', 0.72], ['spreadsheet', 0.7]]);
+check('weak conflicting activities use the broad activity question', conflictedLaptop.promptState.currentNodeId === 'root' && clarification.currentClarificationNode(conflictedLaptop)?.question === 'What were you using it for?', JSON.stringify(conflictedLaptop.facets));
+const thresholdLaptop = laptopMemory('threshold-laptop', [['spreadsheet', 0.78], ['gameplay', 0.63]]);
+check('activity acceptance includes the exact threshold and margin', clarification.currentClarificationNode(thresholdLaptop)?.question === 'Were you working?', JSON.stringify(thresholdLaptop.facets));
+const narrowMarginLaptop = laptopMemory('narrow-margin-laptop', [['spreadsheet', 0.78], ['gameplay', 0.64]]);
+check('activity lead below the minimum margin stays broad', clarification.currentClarificationNode(narrowMarginLaptop)?.question === 'What were you using it for?', JSON.stringify(narrowMarginLaptop.facets));
+
+const gamingNode = clarification.currentClarificationNode(gameplayLaptop);
+const confirmedGaming = clarification.answerClarification(gameplayLaptop, gamingNode, gamingNode.options.find((item) => item.id === 'confirm_gaming'));
+check('confirmed gaming drives media and assignment routing', confirmedGaming.dominantDomain === 'media' && confirmedGaming.facets.some((item) => item.key === 'media_type' && item.value === 'game' && item.confirmed) && confirmedGaming.assignments.some((item) => item.seedId === 'gaming_session' && item.confirmed), JSON.stringify({ domain: confirmedGaming.dominantDomain, facets: confirmedGaming.facets, assignments: confirmedGaming.assignments }));
+
+const workNode = clarification.currentClarificationNode(spreadsheetLaptop);
+const confirmedWork = clarification.answerClarification(spreadsheetLaptop, workNode, workNode.options.find((item) => item.id === 'confirm_working'));
+check('confirmed working drives focus routing before feelings', confirmedWork.dominantDomain === 'work' && confirmedWork.assignments.some((item) => item.seedId === 'focus_day' && item.confirmed) && clarification.currentClarificationNode(confirmedWork)?.question === 'What kind of work was it?', JSON.stringify({ domain: confirmedWork.dominantDomain, assignments: confirmedWork.assignments, prompt: confirmedWork.promptState }));
+
+const laptopWithBook = laptopMemory('laptop-with-book', [['book', 0.5]]);
+const laptopWithBookNode = clarification.currentClarificationNode(laptopWithBook);
+const withoutDevice = clarification.answerClarification(laptopWithBook, laptopWithBookNode, laptopWithBookNode.options.find((item) => item.id === 'not_about_device'));
+check('not-about-device promotes and replans around the next subject', withoutDevice.photoAnalysis.subjects.find((item) => item.role === 'primary')?.canonicalValue === 'book' && withoutDevice.promptState.graphId === 'media-context', JSON.stringify({ subjects: withoutDevice.photoAnalysis.subjects, prompt: withoutDevice.promptState }));
+
+const balancedDeviceBook = classification.buildPhotoClassifiedMemory({
+  sourceId: 'balanced-device-book', observedAt: '2026-07-13T10:05:00.000Z',
+  rawVision: {
+    labels: [{ name: 'laptop', confidence: 0.86 }, { name: 'book', confidence: 0.84 }],
+    regionClassifications: [
+      { region: { x: 0.05, y: 0.2, width: 0.42, height: 0.5, confidence: 0.86 }, labels: [{ name: 'laptop', confidence: 0.86 }] },
+      { region: { x: 0.53, y: 0.2, width: 0.42, height: 0.5, confidence: 0.84 }, labels: [{ name: 'book', confidence: 0.84 }] },
+    ],
+    text: [], faceCount: 0, humanCount: 0, animals: [], humans: [], faces: [], recognizedText: [],
+    dominantSubject: { x: 0.05, y: 0.2, width: 0.42, height: 0.5, confidence: 0.86 },
+    documentDetected: false, captureSource: 'camera',
+  },
+  vision: deviceSummary([['laptop', 0.86], ['book', 0.84]]),
+  scene: { type: 'screen', label: 'On a screen', detail: 'Digital content', source: 'rules' },
+});
+check('comparable laptop and book regions resolve subject focus before activity', balancedDeviceBook.promptState.graphId === 'subject-focus' && clarification.currentClarificationNode(balancedDeviceBook)?.options.some((item) => item.facetValue === 'device_laptop') && clarification.currentClarificationNode(balancedDeviceBook)?.options.some((item) => item.facetValue === 'book'), JSON.stringify({ subjects: balancedDeviceBook.photoAnalysis.subjects, prompt: balancedDeviceBook.promptState }));
+
+const titledVideoLaptop = classification.buildPhotoClassifiedMemory({
+  sourceId: 'titled-video-laptop', observedAt: '2026-07-13T10:06:00.000Z',
+  vision: { ...deviceSummary([['laptop', 0.92], ['video player', 0.89]]), textTokens: ['Interstellar'] },
+  scene: { type: 'media', label: 'An inspiration', detail: 'Interstellar', media: { mediaType: 'film', title: 'Interstellar', creator: null }, source: 'llm', confidence: 0.86, representation: 'screen_content' },
+});
+const titledWatchConfirm = clarification.currentClarificationNode(titledVideoLaptop);
+const watchingTitled = clarification.answerClarification(titledVideoLaptop, titledWatchConfirm, titledWatchConfirm.options.find((item) => item.id === 'confirm_watching'));
+const watchKindNode = clarification.currentClarificationNode(watchingTitled);
+const movieSelected = clarification.answerClarification(watchingTitled, watchKindNode, watchKindNode.options.find((item) => item.id === 'movie'));
+check('watching flow confirms OCR title before reaction', movieSelected.promptState.currentNodeId === 'title' && clarification.currentClarificationNode(movieSelected)?.question === 'Is this “Interstellar”?', JSON.stringify(movieSelected.promptState));
+const titleNode = clarification.currentClarificationNode(movieSelected);
+const titleConfirmed = clarification.answerClarification(movieSelected, titleNode, titleNode.options.find((item) => item.id === 'confirm_title'));
+check('device media title proceeds to reaction last', clarification.currentClarificationNode(titleConfirmed)?.question === 'How did it land?', JSON.stringify(titleConfirmed.promptState));
+
+const legacyLaptop = {
+  ...plainLaptop,
+  dominantDomain: 'work', schemaVersion: 5,
+  observations: plainLaptop.observations.map((item) => item.value === 'device_laptop' ? { ...item, value: 'focus_work', raw: 'laptop' } : item),
+  photoAnalysis: {
+    ...plainLaptop.photoAnalysis,
+    dominantSubjectId: 'subject:focus_work',
+    subjects: plainLaptop.photoAnalysis.subjects.map((item) => item.canonicalValue === 'device_laptop' ? { ...item, id: 'subject:focus_work', canonicalValue: 'focus_work', domain: 'work', label: 'laptop' } : item),
+  },
+  promptState: { ...plainLaptop.promptState, graphId: 'work-context', currentNodeId: 'root', currentQuestionId: 'work.context', maxQuestions: 3, plannerVersion: 2 },
+};
+const migratedLaptop = classification.recalibrateClassifiedMemory(legacyLaptop);
+check('unanswered legacy laptop prompts migrate to device activity', migratedLaptop.schemaVersion === 6 && migratedLaptop.promptState.graphId === 'device-activity' && migratedLaptop.photoAnalysis.subjects.find((item) => item.role === 'primary')?.canonicalValue === 'device_laptop', JSON.stringify({ subjects: migratedLaptop.photoAnalysis.subjects, prompt: migratedLaptop.promptState }));
+
 check('unconfirmed dog does not assign Waglet', !dog.assignments.some((item) => item.seedId === 'dog_companion'));
 const dogRoot = clarification.currentClarificationNode(dog);
 const myPet = dogRoot.options.find((item) => item.id === 'my_pet');

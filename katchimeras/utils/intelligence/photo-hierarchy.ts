@@ -9,6 +9,7 @@ import type {
   PhotoVisionResult,
 } from '@/types/home';
 import type { SceneRead } from '@/utils/scene-classify';
+import { isDeviceSignal } from '@/utils/intelligence/device-activity';
 
 type HierarchyInput = {
   rawVision?: PhotoVisionResult | null;
@@ -200,7 +201,7 @@ function distinctCompetitors(
   const ranked = subjects
     .filter((subject) =>
       subject.role !== 'incidental' &&
-      subject.domain !== 'other' &&
+      (subject.domain !== 'other' || isDeviceSignal(subject.canonicalValue)) &&
       !isStructuralEvidenceSubject(subject.canonicalValue) &&
       hasIndependentFocusEvidence(subject, representation, container)
     )
@@ -242,7 +243,7 @@ function subjectFamily(subject: PhotoAnalysisDescriptor['subjects'][number]) {
 function centrality(subject: PhotoAnalysisDescriptor['subjects'][number]) {
   const area = subject.region ? Math.max(0, subject.region.width * subject.region.height) : 0;
   const visualProminence = Math.min(0.3, area * 0.42 + (subject.region?.confidence ?? 0) * 0.12);
-  return subject.score + visualProminence + (subject.domain === 'other' ? -0.16 : 0.08);
+  return subject.score + visualProminence + (subject.domain === 'other' && !isDeviceSignal(subject.canonicalValue) ? -0.16 : 0.08);
 }
 
 function facet(key: PhotoUnresolvedFacet['key'], candidates: string[], importance: number, uncertainty: number): PhotoUnresolvedFacet {

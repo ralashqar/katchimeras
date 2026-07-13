@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
+import { safeGoBack } from '@/utils/safe-navigation';
 
 export default function DayMapRoute() {
   const router = useRouter();
@@ -51,7 +52,7 @@ export default function DayMapRoute() {
             style={styles.map}
           />
 
-          <ScreenCloseButton onPress={() => router.back()} />
+          <ScreenCloseButton onPress={() => safeGoBack(router)} />
 
           <View pointerEvents="box-none" style={styles.bottomCaptionWrap}>
             <View style={styles.bottomRail}>
@@ -89,7 +90,7 @@ export default function DayMapRoute() {
         </Animated.View>
       ) : (
         <View style={styles.missingWrap}>
-          <ScreenCloseButton onPress={() => router.back()} />
+          <ScreenCloseButton onPress={() => safeGoBack(router)} />
           <GlassPanel contentStyle={styles.missingPanel}>
             <ThemedText type="subtitle" style={styles.missingTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
               Day not found

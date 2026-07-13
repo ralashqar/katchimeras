@@ -16,6 +16,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
+import { safeGoBack } from '@/utils/safe-navigation';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -122,7 +123,7 @@ export default function DevAssetLabScreen() {
         accessibilityRole="button"
         accessibilityLabel="Close the Asset Lab"
         hitSlop={10}
-        onPress={() => router.back()}
+        onPress={() => safeGoBack(router)}
         style={[styles.exitButton, { top: insets.top + 10 }]}>
         <IconSymbol name="xmark" size={15} color="#E8EEFF" />
       </Pressable>

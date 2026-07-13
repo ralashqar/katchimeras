@@ -27,6 +27,7 @@ import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import { evaluatePhotoForQuest } from '@/utils/quests/photo-evaluation';
+import { safeGoBack } from '@/utils/safe-navigation';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
@@ -55,7 +56,7 @@ export default function MomentCaptureScreen() {
 
   const closeCapture = useCallback(() => {
     cancelQuestCapture(questId);
-    router.back();
+    safeGoBack(router);
   }, [questId, router]);
 
   useEffect(() => {
@@ -152,7 +153,7 @@ export default function MomentCaptureScreen() {
         }).memory;
         completeQuestCapture(questId, questCreatureId, photoUri, evaluatePhotoForQuest(memory, questId));
       }
-      router.back();
+      safeGoBack(router);
     },
     [applyCapturedMoment, captureTarget, dayScores, photoUri, questCreatureId, questId, router]
   );
@@ -190,7 +191,7 @@ export default function MomentCaptureScreen() {
           evidenceId: `photo:${photoUri}`, reason: 'The photo could not be analysed.',
         }
       );
-      router.back();
+      safeGoBack(router);
     });
   }, [analyzeCaptured, commit, photoUri, questCreatureId, questId, router, state]);
 

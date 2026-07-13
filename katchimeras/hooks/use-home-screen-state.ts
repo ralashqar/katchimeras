@@ -66,18 +66,27 @@ export function useHomeScreenState() {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
-  const mutateHomeState = useHomeStateMutation(setStoredState, storedStateRef);
+  const scheduledStateRef = useRef<StoredHomeState | null>(null);
+  const mutateHomeState = useHomeStateMutation(setStoredState, storedStateRef, scheduledStateRef);
 
   useEffect(() => {
     storedStateRef.current = storedState;
   }, [storedState]);
 
-  const syncState = useCallback(() => {
+  const syncState = useCallback((forceDerive = false) => {
     const now = new Date();
     const profile = loadOnboardingProfile();
-    const hydrated = hydrateHomeState(homeRepository.load() ?? storedStateRef.current, profile, now);
+    const repositoryState = homeRepository.load();
+    // Focus and repository events commonly point at the exact state already in
+    // memory. Avoid cloning/normalizing the whole archive merely because a
+    // screen regained focus. Timed/foreground refreshes still force lifecycle
+    // derivation for hatch-hour and midnight transitions.
+    if (!forceDerive && repositoryState && repositoryState === storedStateRef.current) {
+      return;
+    }
+    const hydrated = hydrateHomeState(repositoryState ?? storedStateRef.current, profile, now);
 
-    setStoredState((current) => (areStoredStatesEqual(current, hydrated.state) ? current : hydrated.state));
+    setStoredState(hydrated.state);
     setSelectedDayId((current) => {
       // Keep an explicit selection when it's still a real day — either in the
       // recent timeline window OR anywhere in the archive (so a day opened from
@@ -103,7 +112,7 @@ export function useHomeScreenState() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
-        syncState();
+        syncState(true);
       }
     });
 
@@ -119,7 +128,7 @@ export function useHomeScreenState() {
   // syncState no-ops when nothing actually changed, so this stays cheap.
   useEffect(() => {
     const interval = setInterval(() => {
-      syncState();
+      syncState(true);
     }, 60_000);
 
     return () => clearInterval(interval);
@@ -130,7 +139,13 @@ export function useHomeScreenState() {
       return;
     }
 
-    homeRepository.save(storedState);
+    if (scheduledStateRef.current === storedState) {
+      return;
+    }
+    scheduledStateRef.current = storedState;
+    // Non-mutation state writers (hatching, health import, hydration repair)
+    // share the same non-blocking persistence path.
+    void homeRepository.saveDeferred(storedState, { notify: false });
   }, [storedState]);
 
   const viewModel = useMemo(() => {
@@ -528,16 +543,4 @@ export function useHomeScreenState() {
     refreshState,
     resetHomeState,
   };
-}
-
-function areStoredStatesEqual(left: StoredHomeState | null, right: StoredHomeState | null) {
-  if (left === right) {
-    return true;
-  }
-
-  if (!left || !right) {
-    return false;
-  }
-
-  return JSON.stringify(left) === JSON.stringify(right);
 }

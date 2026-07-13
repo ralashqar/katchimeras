@@ -6,7 +6,7 @@ import type {
   QuestionScoreComponents,
 } from '@/types/home';
 
-export const QUESTION_PLANNER_VERSION = 2;
+export const QUESTION_PLANNER_VERSION = 3;
 export type QuestionPlannerMode = 'on' | 'shadow' | 'legacy';
 
 export function questionPlannerMode(): QuestionPlannerMode {
@@ -56,6 +56,12 @@ export const QUESTION_REGISTRY: QuestionDefinition[] = [
   definition('representation.root', 'representation', 'representation-context', 'root', {
     domains: ['other'], requiresUnresolved: ['representation', 'container', 'primary_subject'], basePriority: 0.9, downstreamValue: 0.9,
     resolvesFacetKeys: ['representation_kind'],
+  }),
+  definition('device.activity', 'device_activity', 'device-activity', 'root', {
+    subjectValues: /^device_(laptop|desktop|phone|tablet|monitor|television|other)$/,
+    basePriority: 0.99, downstreamValue: 1,
+    resolvesFacetKeys: ['device_activity'],
+    scoreSignals: signals([/laptop|computer|phone|tablet|monitor|television|device|screen/, 1]),
   }),
   definition('people.relationship', 'relationship', 'people-relationship', 'root', {
     subjectDomains: ['people'], sensitivity: 'sensitive', basePriority: 0.96, downstreamValue: 1,
@@ -192,6 +198,10 @@ function evaluateQuestion(
   if (question.subjectValues && !relevantSubjects.some((subject) => subject.role === 'primary')) blockers.push('required specific subject is not primary');
   if (question.requiresUnresolved && !question.requiresUnresolved.some((key) => unresolved.some((item) => item.key === key))) blockers.push('required ambiguity is already resolved');
   if (subjectFocusPending && question.goal !== 'subject_focus') blockers.push('primary subject must be resolved first');
+  if (
+    question.goal === 'device_activity' &&
+    unresolved.some((item) => item.key === 'representation' || item.key === 'container')
+  ) blockers.push('device container must be resolved first');
   if (question.excludesRepresentations?.includes(representation)) blockers.push(`incompatible representation ${representation}`);
   if (question.resolvesFacetKeys.some((key) => memory.facets.some((facet) => facet.key === key && facet.confirmed))) blockers.push('goal already confirmed');
 
@@ -256,6 +266,7 @@ function missingFacetGain(question: QuestionDefinition, memory: ClassifiedMemory
 
 function goalMatchesUnresolved(goal: ClarificationGoal, key: string): boolean {
   if (goal === 'subject_focus') return key === 'primary_subject';
+  if (goal === 'device_activity') return key === 'device_activity';
   if (goal === 'representation') return ['representation', 'container', 'primary_subject'].includes(key);
   if (goal === 'relationship' || goal === 'ownership') return key === 'relationship';
   if (goal === 'authorship') return key === 'authorship';

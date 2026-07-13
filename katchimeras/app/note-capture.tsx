@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
+import { safeGoBack } from '@/utils/safe-navigation';
 import { interpretNote, transcribeAudioNote, type InterpretedNote } from '@/utils/note-interpret';
 import type { DayInputTarget, StudioMediaType } from '@/types/home';
 import { extractStudioTitle } from '@/utils/studio-detect';
@@ -203,13 +204,13 @@ export default function NoteCaptureScreen() {
     }, noteTarget);
     // Celebratory flight into the Memory Vault (World consumes this on focus).
     queueCaptureFeed({ photoUri: '', icon: 'square.and.pencil', accent: MEANING_TINT[result.archetype] ?? '#7DE8CD' });
-    router.back();
+    safeGoBack(router);
   };
 
   return (
     <View style={[styles.screen, { paddingBottom: insets.bottom }]}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
-        <Pressable onPress={() => router.back()} hitSlop={14} style={styles.closeButton}>
+        <Pressable onPress={() => safeGoBack(router)} hitSlop={14} style={styles.closeButton}>
           <IconSymbol name="xmark" size={20} color={Lantern.moon50} />
         </Pressable>
         <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>

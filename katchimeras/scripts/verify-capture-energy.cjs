@@ -123,7 +123,7 @@ check('wine glass → drink meanings', labelsOf(vision(['wine glass'])).includes
 check('salient drink beats a secondary work tag', labelsOf(vision(['coffee', 'laptop'])).includes('A slow sip') && !labelsOf(vision(['coffee', 'laptop'])).includes('Productive'), labelsOf(vision(['coffee', 'laptop'])).join(','));
 
 // Broad keyword coverage over concepts + raw detail labels.
-check('laptop → work meanings', labelsOf(vision(['laptop'])).includes('Productive'), labelsOf(vision(['laptop'])).join(','));
+check('laptop → activity choices, not work feelings', labelsOf(vision(['laptop'])).includes('Working') && !labelsOf(vision(['laptop'])).includes('Productive'), labelsOf(vision(['laptop'])).join(','));
 check('gaming → games meanings', labelsOf(vision(['gaming'])).includes('Gaming'), labelsOf(vision(['gaming'])).join(','));
 check('guitar → music meanings', labelsOf(vision(['guitar'])).includes('Vibing'), labelsOf(vision(['guitar'])).join(','));
 check('television → watching meanings', labelsOf(vision(['television'])).includes('Unwinding'), labelsOf(vision(['television'])).join(','));
@@ -134,14 +134,14 @@ check('couch → home meanings', labelsOf(vision(['couch'])).includes('Cozy'), l
 
 // Raw detail labels are scanned too (not just canonical concepts).
 const detailVision = { concepts: [{ name: 'outdoor', salience: 1, coverage: 1, count: 1, peakConfidence: 0.9 }], details: ['laptop'], maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1 };
-check('raw detail label (laptop) is matched', selectCaptureMeanings(detailVision).some((m) => m.label === 'Productive'), JSON.stringify(selectCaptureMeanings(detailVision).map((m) => m.label)));
+check('raw laptop detail remains an activity choice', selectCaptureMeanings(detailVision).some((m) => m.label === 'Working') && !selectCaptureMeanings(detailVision).some((m) => m.label === 'Productive'), JSON.stringify(selectCaptureMeanings(detailVision).map((m) => m.label)));
 
 // Ambiguous device → the mixed TECH options (the user's exact case).
 check('electronic device → work/games/watch/scroll', labelsOf(vision(['electronic device'])).includes('Gaming') && labelsOf(vision(['electronic device'])).includes('Working'), labelsOf(vision(['electronic device'])).join(','));
 
-// A SPECIFIC device read (high-confidence laptop) beats the ambiguous tech tag.
+// Explicit work content can still beat a generic device tag.
 const laptopBag = { concepts: [{ name: 'focus_work', salience: 1, coverage: 1, count: 1, peakConfidence: 0.92 }], details: ['electronic device', 'screen'], maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1 };
-check('specific laptop read beats ambiguous tech', selectCaptureMeanings(laptopBag).some((m) => m.label === 'Productive') && !selectCaptureMeanings(laptopBag).some((m) => m.label === 'Working'), JSON.stringify(selectCaptureMeanings(laptopBag).map((m) => m.label)));
+check('explicit work read beats generic tech', selectCaptureMeanings(laptopBag).some((m) => m.label === 'Productive') && !selectCaptureMeanings(laptopBag).some((m) => m.label === 'Working'), JSON.stringify(selectCaptureMeanings(laptopBag).map((m) => m.label)));
 
 // Holistic: a noisy bag where the meaningful tag isn't first still reads right.
 const noisyBag = { concepts: [{ name: 'indoor', salience: 1, coverage: 1, count: 1, peakConfidence: 0.8 }, { name: 'furniture', salience: 1, coverage: 1, count: 1, peakConfidence: 0.6 }, { name: 'gaming', salience: 1, coverage: 1, count: 1, peakConfidence: 0.85 }], details: [], maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1 };

@@ -21,6 +21,7 @@ import { canonicalizeSignal, seedIdForCanonicalSignal, textToSignals, visionResu
 import { memoryRejectsDomain } from './classification-policy';
 import { deriveMemoryQualities, qualityCentralityWeight, qualityDefinition, qualityThresholds } from './quality-registry';
 import { buildPhotoAnalysisDescriptor, replanDescriptorAfterSubjectRejection } from './photo-descriptor';
+import { detectDeviceContext, isDeviceSignal } from './device-activity';
 import {
   planNextQuestion,
   QUESTION_PLANNER_VERSION,
@@ -28,7 +29,7 @@ import {
   questionIdForGraphNode,
 } from './question-registry';
 
-export const CLASSIFIED_MEMORY_SCHEMA_VERSION = 5;
+export const CLASSIFIED_MEMORY_SCHEMA_VERSION = 6;
 const PRIMARY_THRESHOLD = 0.65;
 const SUPPORTING_THRESHOLD = 0.45;
 
@@ -171,21 +172,94 @@ export function repairUrbanPhotoCentrality(memory: ClassifiedMemory): Classified
 }
 
 export function recalibrateClassifiedMemory(memory: ClassifiedMemory): ClassifiedMemory {
-  const descriptor = memory.photoAnalysis;
-  const facets = mergeConfirmations(memory.facets, memory.confirmations);
+  const upgraded = upgradeUnansweredLegacyDeviceMemory(memory);
+  const descriptor = upgraded.photoAnalysis;
+  const facets = mergeConfirmations(upgraded.facets, upgraded.confirmations);
   const qualities = deriveMemoryQualities({
-    observations: memory.observations,
-    confirmations: memory.confirmations,
+    observations: upgraded.observations,
+    confirmations: upgraded.confirmations,
     primaryValues: descriptor?.subjects.filter((subject) => subject.role === 'primary').map((subject) => subject.canonicalValue),
     supportingValues: descriptor?.subjects.filter((subject) => subject.role === 'supporting').map((subject) => subject.canonicalValue),
     screenContent: descriptor?.representation.kind === 'screen_content',
   });
-  return {
-    ...memory,
+  const recalibrated: ClassifiedMemory = {
+    ...upgraded,
     facets,
     qualities,
-    assignments: classifyAssignments(memory.dominantDomain, facets, memory.observations, qualities, blocksInferredPrimary(descriptor, facets)),
+    assignments: classifyAssignments(upgraded.dominantDomain, facets, upgraded.observations, qualities, blocksInferredPrimary(descriptor, facets)),
     schemaVersion: CLASSIFIED_MEMORY_SCHEMA_VERSION,
+  };
+  if (upgraded === memory) return recalibrated;
+  const contextual = clarificationPlan('photo', recalibrated.dominantDomain, facets, recalibrated.observations, descriptor);
+  const plan = planNextQuestion(recalibrated);
+  const nodeId = plan && contextual?.graphId === plan.graphId ? contextual.nodeId : plan?.nodeId ?? null;
+  return {
+    ...recalibrated,
+    promptState: {
+      ...recalibrated.promptState,
+      status: plan ? 'pending' : 'not_needed',
+      graphId: plan?.graphId ?? null,
+      currentNodeId: nodeId,
+      currentQuestionId: plan ? questionIdForGraphNode(plan.graphId, nodeId) : null,
+      plannerVersion: QUESTION_PLANNER_VERSION,
+      candidateTrace: plan?.trace ?? [],
+      maxQuestions: 4,
+    },
+  };
+}
+
+function upgradeUnansweredLegacyDeviceMemory(memory: ClassifiedMemory): ClassifiedMemory {
+  if (
+    memory.sourceType !== 'photo' ||
+    !memory.photoAnalysis ||
+    memory.confirmations.length > 0 ||
+    memory.promptState.answeredNodeIds.length > 0 ||
+    !['pending', 'not_needed'].includes(memory.promptState.status)
+  ) return memory;
+  const context = detectDeviceContext(memory.observations, memory.facets);
+  if (!context.deviceKind || context.deviceKind === 'television') return memory;
+  const canonicalDevice = `device_${context.deviceKind}`;
+  const observations = memory.observations.map((observation) => {
+    const raw = observation.raw ?? '';
+    const isHardwareObservation = /laptop|notebook computer|desktop computer|personal computer|smartphone|mobile phone|cell phone|iphone|tablet|ipad|computer monitor/i.test(raw);
+    return isHardwareObservation ? { ...observation, value: canonicalDevice } : observation;
+  });
+  const facets = [
+    ...memory.facets.filter((item) => !['device_kind', 'device_activity', 'screen_content_kind'].includes(item.key)),
+    facet('device_kind', context.deviceKind, context.deviceConfidence),
+    ...(context.selected ? [
+      facet('screen_content_kind', context.selected.contentKind, context.selected.score),
+      facet('device_activity', context.selected.activity, context.selected.score),
+    ] : []),
+  ];
+  let foundDevice = false;
+  let subjects = memory.photoAnalysis.subjects.map((subject) => {
+    const hardwareLabel = /laptop|notebook computer|desktop computer|personal computer|smartphone|mobile phone|cell phone|iphone|tablet|ipad|computer monitor/i.test(subject.label);
+    if (!hardwareLabel && subject.canonicalValue !== canonicalDevice) return { ...subject };
+    foundDevice = true;
+    return { ...subject, id: `subject:${canonicalDevice}`, canonicalValue: canonicalDevice, domain: 'other' as const, role: 'primary' as const, sensitive: false };
+  });
+  if (!foundDevice) {
+    subjects = [
+      {
+        id: `subject:${canonicalDevice}`, label: context.deviceKind, canonicalValue: canonicalDevice,
+        domain: 'other', role: 'primary', score: context.deviceConfidence,
+        region: memory.photoAnalysis.regions.find((item) => item.kind === 'saliency') ?? null,
+        providers: ['appleVision'], sensitive: false,
+      },
+      ...subjects.map((subject) => ({ ...subject, role: subject.role === 'incidental' ? 'incidental' as const : 'supporting' as const })),
+    ];
+  } else {
+    subjects = subjects.map((subject) => subject.canonicalValue === canonicalDevice
+      ? subject
+      : { ...subject, role: subject.role === 'incidental' ? 'incidental' as const : 'supporting' as const });
+  }
+  return {
+    ...memory,
+    dominantDomain: 'other',
+    observations,
+    facets,
+    photoAnalysis: { ...memory.photoAnalysis, dominantSubjectId: `subject:${canonicalDevice}`, subjects },
   };
 }
 
@@ -404,6 +478,9 @@ export function withMemoryConfirmation(
     confirmation,
   ];
   let facets = mergeConfirmations(memory.facets, confirmations);
+  if (confirmation.facetKey === 'device_activity' && confirmation.facetValue === 'gaming') {
+    facets = [...facets.filter((item) => item.key !== 'media_type'), facet('media_type', 'game', 1, false, true)];
+  }
   let dominantDomain = domainAfterConfirmations(memory.dominantDomain, facets, memory.observations, confirmations);
   const rejectedSubjectValues = memory.photoAnalysis?.subjects
     .filter((subject) =>
@@ -412,12 +489,17 @@ export function withMemoryConfirmation(
       (confirmation.facetKey === 'media_type' && confirmation.facetValue === 'other' && subject.domain === 'media') ||
       (confirmation.facetKey === 'place_category' && confirmation.facetValue === 'incidental' && subject.domain === 'place') ||
       (confirmation.facetKey === 'activity_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'movement') ||
-      (confirmation.facetKey === 'work_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'work')
+      (confirmation.facetKey === 'work_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'work') ||
+      (confirmation.facetKey === 'device_activity' && confirmation.facetValue === 'incidental' && isDeviceSignal(subject.canonicalValue))
     )
     .map((subject) => subject.canonicalValue) ?? [];
   let photoAnalysis = rejectedSubjectValues.length > 0
     ? replanDescriptorAfterSubjectRejection(memory.photoAnalysis, rejectedSubjectValues)
     : memory.photoAnalysis;
+  if (confirmation.facetKey === 'device_activity' && confirmation.facetValue === 'incidental') {
+    const replacement = photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
+    if (replacement?.domain && replacement.domain !== 'other') dominantDomain = replacement.domain;
+  }
   const currentPrimary = photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
   if (photoAnalysis?.hierarchy && currentPrimary && confirmationAffirmsDomain(confirmation, currentPrimary.domain)) {
     photoAnalysis = {
@@ -505,6 +587,7 @@ function confirmationAffirmsDomain(confirmation: UserConfirmation, domain: Memor
   if (domain === 'media') return confirmation.facetKey === 'media_type' || confirmation.facetKey === 'media_title';
   if (domain === 'place') return confirmation.facetKey === 'place_category' || confirmation.facetKey === 'place_purpose';
   if (domain === 'movement') return confirmation.facetKey === 'movement_mode';
+  if (domain === 'work') return confirmation.facetKey === 'work_kind' || confirmation.facetKey === 'device_activity';
   return false;
 }
 
@@ -594,7 +677,7 @@ function buildMemory(input: Omit<ClassifiedMemory, 'assignments' | 'promptState'
       questionCount: 0,
       // Photo clarification may need one rejected subject followed by a
       // coherent media chain: type → OCR title → reaction.
-      maxQuestions: 3,
+      maxQuestions: input.photoAnalysis?.subjects.some((subject) => isDeviceSignal(subject.canonicalValue)) ? 4 : 3,
       skippedGoalIds: [],
       completedGoalIds: [],
       plannerVersion: QUESTION_PLANNER_VERSION,
@@ -662,6 +745,14 @@ function photoFacets(input: PhotoMemoryInput, observations: IntelligenceObservat
   const facets: MemoryFacet[] = [];
   const animal = values.has('dog') ? 'dog' : values.has('cat') ? 'cat' : null;
   if (animal) facets.push(facet('animal_kind', animal, maxConfidence(observations, animal), true));
+  const device = detectDeviceContext(observations);
+  if (device.deviceKind) {
+    facets.push(facet('device_kind', device.deviceKind, device.deviceConfidence));
+    if (device.selected) {
+      facets.push(facet('screen_content_kind', device.selected.contentKind, device.selected.score));
+      facets.push(facet('device_activity', device.selected.activity, device.selected.score));
+    }
+  }
   const depictedPeople =
     input.scene?.type === 'media' ||
     input.scene?.type === 'screen' ||
@@ -756,6 +847,12 @@ function classifyAssignments(
   if (mediaType === 'game') add('gaming_session', mediaConfirmed ? 1 : domain === 'media' ? 0.86 : 0.62, 'game was part of the memory', mediaConfirmed);
   if (mediaType === 'music') add('live_music', mediaConfirmed ? 1 : domain === 'media' ? 0.78 : 0.55, 'music was part of the memory', mediaConfirmed);
   if (mediaType === 'book') add('bookstore', mediaConfirmed ? 1 : domain === 'media' ? 0.72 : 0.5, 'reading was part of the memory', mediaConfirmed);
+  const deviceActivity = confirmed('device_activity')?.value;
+  if (deviceActivity === 'working' || deviceActivity === 'studying') {
+    add('focus_day', 1, `confirmed ${deviceActivity} on a device`, true);
+  }
+  if (deviceActivity === 'creating') add('creative_day', 1, 'confirmed creating on a device', true);
+  if (deviceActivity === 'gaming') add('gaming_session', 1, 'confirmed gaming on a device', true);
   const foodConfirmed = Boolean(confirmed('food_kind') || confirmed('food_item'));
   if (!foodRejected && facets.some((item) => item.key === 'food_item')) add('feast', foodConfirmed ? 1 : domain === 'food' ? 0.86 : 0.58, 'food was central to the memory', foodConfirmed);
 
@@ -859,6 +956,11 @@ function clarificationPlan(
     return { graphId: 'representation-context', nodeId: 'root' };
   }
 
+  if (isDeviceSignal(primary.canonicalValue)) {
+    const device = detectDeviceContext(observations, facets);
+    return { graphId: 'device-activity', nodeId: device.strong ? 'confirm' : 'root' };
+  }
+
   if (primaryDomain === 'people' && relationshipPending) {
     return { graphId: 'people-relationship', nodeId: 'root' };
   }
@@ -951,7 +1053,9 @@ function resolvePhotoDomain(
   // The descriptor has already reconciled providers, representation,
   // prominence, containers, and user-independent evidence. Its primary subject
   // is the generic authority; later category-specific overrides are forbidden.
-  const primaryDomain = descriptor?.subjects.find((subject) => subject.role === 'primary')?.domain;
+  const primarySubject = descriptor?.subjects.find((subject) => subject.role === 'primary');
+  if (primarySubject && isDeviceSignal(primarySubject.canonicalValue)) return 'other';
+  const primaryDomain = primarySubject?.domain;
   if (primaryDomain && primaryDomain !== 'other') return primaryDomain;
   // The scene reader describes the central subject, while observations describe
   // everything present. This preserves the important mixed-memory distinction:
@@ -994,6 +1098,11 @@ function domainAfterConfirmations(
   observations: IntelligenceObservation[],
   confirmations: UserConfirmation[]
 ): MemoryDomain {
+  const confirmedDeviceActivity = facets.find(
+    (facet) => facet.key === 'device_activity' && facet.confirmed
+  )?.value;
+  if (['working', 'studying', 'creating'].includes(confirmedDeviceActivity ?? '')) return 'work';
+  if (confirmedDeviceActivity === 'gaming') return 'media';
   const confirmedMedia = facets.some(
     (facet) => facet.key === 'media_type' && facet.confirmed && !['other', 'other_screen'].includes(facet.value)
   );

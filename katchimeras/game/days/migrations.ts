@@ -265,7 +265,10 @@ function ensureStoredDayFields(
           microQuestionCount: memory.promptState.microQuestionCount ?? 0,
           candidateTrace: memory.promptState.candidateTrace ?? [],
         },
-        schemaVersion: 5,
+        // Version 5 is the minimum shape guaranteed by this migration. Do not
+        // downgrade newer memories: doing so makes state normalization run the
+        // full classifier recalibration again on every mutation.
+        schemaVersion: Math.max(memory.schemaVersion ?? 1, 5),
       }))
     : [];
   return {

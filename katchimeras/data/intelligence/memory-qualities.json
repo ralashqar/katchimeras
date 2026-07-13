@@ -43,7 +43,7 @@
     { "id": "activity.run", "domain": "movement", "aliases": ["run", "running", "jog", "jogging"], "physicalOnly": true, "assignmentSeedId": "run_session" },
     { "id": "activity.cycle", "domain": "movement", "aliases": ["cycle", "cycling", "bicycle", "bike ride"], "physicalOnly": true },
     { "id": "activity.sport", "domain": "movement", "aliases": ["sport", "football", "soccer", "rugby", "basketball", "tennis", "match", "stadium"], "physicalOnly": true },
-    { "id": "work.focus", "domain": "work", "aliases": ["work", "office", "desk", "workspace", "focus", "laptop"], "physicalOnly": true, "assignmentSeedId": "focus_day" },
+    { "id": "work.focus", "domain": "work", "aliases": ["work", "office", "desk", "workspace", "focus", "spreadsheet", "code editor", "developer tools"], "physicalOnly": true, "assignmentSeedId": "focus_day" },
     { "id": "life.celebration", "domain": "life_event", "aliases": ["celebration", "party", "birthday", "wedding", "graduation", "anniversary"], "physicalOnly": true, "assignmentSeedId": "celebration" },
     { "id": "document.receipt", "domain": "other", "aliases": ["receipt", "invoice", "bill"], "physicalOnly": false },
     { "id": "document.menu", "domain": "other", "aliases": ["menu", "price list"], "physicalOnly": false },

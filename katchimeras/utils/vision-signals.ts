@@ -69,7 +69,12 @@ const CONCEPT_RULES: { concept: string; pattern: RegExp }[] = [
   // user was working (it is also commonly emitted for televisions). Require a
   // genuinely work-shaped object or setting here; screen content is resolved
   // separately by the photo descriptor.
-  { concept: 'focus_work', pattern: /laptop|keyboard|\bdesk\b|workspace|office|spreadsheet|whiteboard/i },
+  { concept: 'device_laptop', pattern: /\blaptop\b|notebook computer/i },
+  { concept: 'device_phone', pattern: /smartphone|mobile phone|cell phone|\biphone\b/i },
+  { concept: 'device_tablet', pattern: /tablet computer|\btablet\b|\bipad\b/i },
+  { concept: 'device_monitor', pattern: /computer monitor|external monitor/i },
+  { concept: 'device_desktop', pattern: /desktop computer|personal computer|\bpc\b/i },
+  { concept: 'focus_work', pattern: /\bdesk\b|workspace|office|spreadsheet|whiteboard|code editor|developer tools/i },
   { concept: 'celebration', pattern: /birthday|candle|balloon|confetti|party hat|fireworks|streamer/i },
   { concept: 'travel', pattern: /luggage|suitcase|passport|airport|airplane|aeroplane|boarding|train station|departure/i },
   { concept: 'gym', pattern: /gym|dumbbell|barbell|weights|treadmill|fitness|workout|yoga mat/i },

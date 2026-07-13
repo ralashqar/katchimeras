@@ -303,6 +303,7 @@ export type ClarificationStatus = 'not_needed' | 'pending' | 'answered' | 'dismi
 export type ClarificationGoal =
   | 'representation'
   | 'subject_focus'
+  | 'device_activity'
   | 'authorship'
   | 'relationship'
   | 'ownership'
@@ -375,6 +376,36 @@ export type PhotoContainerKind =
   | 'packaging'
   | 'unknown';
 
+export type DeviceKind =
+  | 'laptop'
+  | 'desktop'
+  | 'phone'
+  | 'tablet'
+  | 'monitor'
+  | 'television'
+  | 'other';
+
+export type ScreenContentKind =
+  | 'gameplay'
+  | 'work_app'
+  | 'study_material'
+  | 'creative_app'
+  | 'video'
+  | 'reading'
+  | 'browser'
+  | 'unknown';
+
+export type DeviceActivity =
+  | 'working'
+  | 'studying'
+  | 'creating'
+  | 'gaming'
+  | 'watching'
+  | 'reading'
+  | 'browsing'
+  | 'other'
+  | 'incidental';
+
 export type PhotoHierarchyHypothesis = {
   path: string[];
   confidence: number;
@@ -383,7 +414,7 @@ export type PhotoHierarchyHypothesis = {
 };
 
 export type PhotoUnresolvedFacet = {
-  key: 'representation' | 'container' | 'primary_subject' | 'relationship' | 'authorship' | 'media_type' | 'place_kind';
+  key: 'representation' | 'container' | 'primary_subject' | 'relationship' | 'authorship' | 'media_type' | 'place_kind' | 'device_activity';
   candidates: string[];
   importance: number;
   uncertainty: number;

@@ -15,6 +15,7 @@ import type { SceneRead } from '@/utils/scene-classify';
 import { canonicalizeSignal } from './taxonomy';
 import { QUALITY_REGISTRY, qualityMatchesText } from './quality-registry';
 import { buildPhotoHierarchy } from './photo-hierarchy';
+import { isDeviceSignal } from './device-activity';
 
 const MAX_SUBJECTS = 5;
 const MAX_OCR = 12;
@@ -59,7 +60,7 @@ export function buildPhotoAnalysisDescriptor(input: {
     .slice(0, MAX_SUBJECTS);
 
   const rankedMeaningful = subjects
-    .filter((subject) => subject.domain !== 'other' && subject.role !== 'incidental')
+    .filter((subject) => (subject.domain !== 'other' || isDeviceSignal(subject.canonicalValue)) && subject.role !== 'incidental')
     .sort((left, right) => subjectCentralityScore(right, dominantValue) - subjectCentralityScore(left, dominantValue));
   const primary = rankedMeaningful[0] ?? subjects[0] ?? null;
   subjects.forEach((subject) => {
@@ -120,7 +121,7 @@ export function subjectCentralityScore(subject: PhotoAnalysisSubject, preferredV
   const area = subject.region ? Math.max(0, subject.region.width * subject.region.height) : 0;
   const regionConfidence = subject.region?.confidence ?? 0;
   const visualProminence = Math.min(0.3, area * 0.42 + regionConfidence * 0.12);
-  const semanticValue = subject.domain === 'other' ? -0.16 : 0.08;
+  const semanticValue = subject.domain === 'other' && !isDeviceSignal(subject.canonicalValue) ? -0.16 : 0.08;
   // The scene read is useful supporting evidence, but a visible foreground
   // subject is allowed to beat it. This preference is deliberately small.
   const sceneContinuity = subject.canonicalValue === preferredValue ? 0.2 : 0;
@@ -190,6 +191,10 @@ function dominantSubjectValue(
     const mediaValue = canonicalizeSignal(prominentMedia.value);
     if (mediaValue && observations.some((item) => item.value === mediaValue)) return mediaValue;
   }
+  const deviceSubject = observations
+    .filter((item) => isDeviceSignal(item.value))
+    .sort((left, right) => right.confidence - left.confidence)[0];
+  if (deviceSubject) return deviceSubject.value;
   if (representation === 'screen_content') {
     const mediaSubject = observations
       .filter((item) => domainForValue(item.value, item.raw ?? '') === 'media')
@@ -214,6 +219,7 @@ function sceneDomain(type: SceneRead['type'] | undefined): MemoryDomain {
 }
 
 function domainForValue(value: string, raw: string): MemoryDomain {
+  if (isDeviceSignal(value)) return 'other';
   const text = `${value} ${raw}`;
   const quality = QUALITY_REGISTRY.qualities.find((candidate) => qualityMatchesText(candidate, text));
   if (quality) return quality.domain;

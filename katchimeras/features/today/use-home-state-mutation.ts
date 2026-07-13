@@ -14,7 +14,8 @@ type HomeStateMutation = (
 
 export function useHomeStateMutation(
   setStoredState: Dispatch<SetStateAction<StoredHomeState | null>>,
-  storedStateRef?: MutableRefObject<StoredHomeState | null>
+  storedStateRef?: MutableRefObject<StoredHomeState | null>,
+  scheduledStateRef?: MutableRefObject<StoredHomeState | null>
 ) {
   return useCallback(
     (mutation: HomeStateMutation) => {
@@ -32,18 +33,19 @@ export function useHomeStateMutation(
       const next = mutation(baseState, profile, now);
       const mutatedAt = performance.now();
 
-      homeRepository.save(next);
-      const savedAt = performance.now();
       if (storedStateRef) storedStateRef.current = next;
+      if (scheduledStateRef) scheduledStateRef.current = next;
       setStoredState(next);
-      if (__DEV__ && savedAt - startedAt > 80) {
+      void homeRepository.saveDeferred(next, { notify: false });
+      const completedAt = performance.now();
+      if (__DEV__ && completedAt - startedAt > 80) {
         console.warn(
-          `[Today mutation] ${Math.round(savedAt - startedAt)}ms ` +
+          `[Today mutation] ${Math.round(completedAt - startedAt)}ms ` +
           `(hydrate ${Math.round(hydratedAt - startedAt)}ms, ` +
-          `derive ${Math.round(mutatedAt - hydratedAt)}ms, save ${Math.round(savedAt - mutatedAt)}ms)`
+          `derive ${Math.round(mutatedAt - hydratedAt)}ms)`
         );
       }
     },
-    [setStoredState, storedStateRef]
+    [setStoredState, storedStateRef, scheduledStateRef]
   );
 }

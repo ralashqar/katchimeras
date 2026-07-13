@@ -5,6 +5,7 @@ import {
   questionDefinition,
   questionIdForGraphNode,
 } from '@/utils/intelligence/question-registry';
+import { deviceContextForMemory } from '@/utils/intelligence/device-activity';
 
 export type ClarificationOption = {
   id: string;
@@ -280,6 +281,89 @@ const GRAPHS: Record<string, ClarificationGraph> = {
       ],
     },
   }),
+  'device-activity': graph('device-activity', {
+    root: {
+      id: 'root', question: 'What were you using it for?', options: deviceActivityOptions(),
+    },
+    confirm: {
+      id: 'confirm', question: 'What were you using it for?', options: deviceActivityOptions(),
+    },
+    'work-kind': {
+      id: 'work-kind', question: 'What kind of work was it?', options: [
+        option('deep_work', 'Deep work', '💡', 'work_kind', 'deep_work', 'work-reaction'),
+        option('planning', 'Planning', '🗒️', 'work_kind', 'planning', 'work-reaction'),
+        option('admin', 'Life admin', '✅', 'work_kind', 'admin', 'work-reaction'),
+        option('learning_work', 'Learning', '📚', 'work_kind', 'learning', 'work-reaction'),
+        option('making_work', 'Making', '🛠️', 'work_kind', 'making', 'work-reaction'),
+      ],
+    },
+    'work-reaction': reactionNode('work-reaction', 'How did the work feel?', [
+      ['productive', 'Productive', '✅', 'meaningful'], ['flow', 'In flow', '🎯', 'calm'],
+      ['frustrating', 'Frustrating', '🌧️', 'energy'], ['routine', 'Routine', '🗂️', 'calm'],
+    ]),
+    'study-kind': {
+      id: 'study-kind', question: 'What kind of studying was it?', options: [
+        option('study_reading', 'Reading', '📖', 'study_kind', 'reading', 'study-reaction'),
+        option('course', 'Course / class', '🎓', 'study_kind', 'course', 'study-reaction'),
+        option('research', 'Research', '🔎', 'study_kind', 'research', 'study-reaction'),
+        option('practice', 'Practice', '📝', 'study_kind', 'practice', 'study-reaction'),
+      ],
+    },
+    'study-reaction': reactionNode('study-reaction', 'How did studying feel?', [
+      ['useful', 'Useful', '✅', 'meaningful'], ['engaging', 'Engaging', '✨', 'energy'],
+      ['challenging', 'Challenging', '🧠', 'energy'], ['steady', 'Steady', '🌿', 'calm'],
+    ]),
+    'create-kind': {
+      id: 'create-kind', question: 'What were you creating?', options: [
+        option('coding', 'Coding', '💻', 'creation_kind', 'coding', 'create-reaction'),
+        option('writing', 'Writing', '✍️', 'creation_kind', 'writing', 'create-reaction'),
+        option('designing', 'Designing', '🎨', 'creation_kind', 'designing', 'create-reaction'),
+        option('editing', 'Editing', '🎬', 'creation_kind', 'editing', 'create-reaction'),
+        option('music_art', 'Music / art', '🎵', 'creation_kind', 'music_art', 'create-reaction'),
+      ],
+    },
+    'create-reaction': reactionNode('create-reaction', 'How did creating feel?', [
+      ['flow', 'In flow', '✨', 'meaningful'], ['proud', 'Proud', '💛', 'meaningful'],
+      ['experimenting', 'Experimenting', '🌱', 'energy'], ['stuck', 'A bit stuck', '🌫️', 'calm'],
+    ]),
+    'game-reaction': reactionNode('game-reaction', 'How was the game?', [
+      ['loved', 'Loved it', '💛', 'together'], ['fun', 'Fun', '🎮', 'energy'],
+      ['challenging', 'Challenging', '🏆', 'energy'], ['social', 'Social', '👾', 'together'],
+      ['meh', 'Meh', '🌫️', 'calm'],
+    ], 'media_rating'),
+    'watch-kind': {
+      id: 'watch-kind', question: 'What were you watching?', options: [
+        option('movie', 'Movie', '🎬', 'media_type', 'film', 'media-reaction'),
+        option('show', 'Show', '📺', 'media_type', 'show', 'media-reaction'),
+        option('live_sport', 'Live sport', '🏟️', 'media_type', 'live_sport', 'media-reaction'),
+        option('online_video', 'Online video', '▶️', 'media_type', 'online_video', 'media-reaction'),
+        option('news', 'News / live event', '📰', 'media_type', 'news', 'media-reaction'),
+      ],
+    },
+    title: { id: 'title', question: 'Did I read the title correctly?', options: [] },
+    'media-reaction': reactionNode('media-reaction', 'How did it land?', [
+      ['loved', 'Loved it', '💛', 'together'], ['liked', 'Liked it', '👍', 'calm'],
+      ['gripping', 'Gripping', '⚡', 'energy'], ['thinking', 'Still thinking', '💭', 'meaningful'],
+      ['meh', 'Meh', '🌫️', 'calm'],
+    ], 'media_rating'),
+    'read-kind': {
+      id: 'read-kind', question: 'What were you reading?', options: [
+        option('book', 'Book / ebook', '📖', 'media_type', 'book', 'reading-reaction'),
+        option('article', 'Article', '📰', 'screen_kind', 'article', 'reading-reaction'),
+        option('document', 'Document / PDF', '📄', 'screen_kind', 'document', 'reading-reaction'),
+        option('other_reading', 'Something else', '✨', 'screen_kind', 'other_reading', 'reading-reaction'),
+      ],
+    },
+    'reading-reaction': reactionNode('reading-reaction', 'How was the reading?', [
+      ['engrossing', 'Engrossing', '📖', 'calm'], ['inspiring', 'Inspiring', '✨', 'meaningful'],
+      ['useful', 'Useful', '✅', 'meaningful'], ['not_for_me', 'Not for me', '🌫️', 'calm'],
+    ], 'media_rating'),
+    'browse-reaction': reactionNode('browse-reaction', 'How did the browsing feel?', [
+      ['useful', 'Useful', '✅', 'meaningful'], ['relaxing', 'Relaxing', '🌿', 'calm'],
+      ['interesting', 'Interesting', '✨', 'meaningful'], ['distracting', 'Distracting', '🌫️', 'energy'],
+      ['routine', 'Routine', '📱', 'calm'],
+    ], 'activity_reaction'),
+  }),
   'work-context': graph('work-context', {
     root: {
       id: 'root', question: 'What kind of focus was this?', options: [
@@ -362,6 +446,11 @@ export function currentClarificationNode(memory: ClassifiedMemory): Clarificatio
   const nodeId = memory.promptState.currentNodeId ?? graph?.rootNodeId;
   const node = graph && nodeId ? graph.nodes[nodeId] ?? null : null;
   if (!node) return null;
+  if (memory.promptState.graphId === 'device-activity') {
+    if (node.id === 'confirm') return contextualDeviceConfirmation(memory, node);
+    if (node.id === 'title') return contextualDeviceTitle(memory, node);
+    if (node.id === 'watch-kind' || node.id === 'read-kind') return withDeviceTitleRouting(memory, node);
+  }
   if (memory.promptState.graphId === 'subject-focus' && node.id === 'root') {
     return contextualSubjectFocusRoot(memory, node);
   }
@@ -469,6 +558,94 @@ export function currentClarificationNode(memory: ClassifiedMemory): Clarificatio
   if (subject === 'person') return { ...node, question: 'Who is this person to you?' };
   if (subject === 'group') return { ...node, question: 'Who were you with?' };
   return node;
+}
+
+function contextualDeviceConfirmation(memory: ClassifiedMemory, fallback: ClarificationNode): ClarificationNode {
+  const device = deviceContextForMemory(memory);
+  const selected = device.strong ? device.selected : null;
+  if (!selected) return { ...fallback, id: 'root', options: deviceActivityOptions() };
+  const question: Record<string, string> = {
+    working: 'Were you working?', studying: 'Were you studying?', creating: 'Were you creating something?',
+    gaming: 'Were you gaming?', watching: 'Were you watching something?', reading: 'Were you reading?',
+    browsing: 'Were you browsing or scrolling?',
+  };
+  const label = selected.activity.charAt(0).toUpperCase() + selected.activity.slice(1);
+  return {
+    id: 'confirm',
+    question: question[selected.activity] ?? fallback.question,
+    options: [
+      option(`confirm_${selected.activity}`, `Yes, ${label.toLowerCase()}`, deviceActivityEmoji(selected.activity), 'device_activity', selected.activity, nextDeviceNode(selected.activity)),
+      option('choose_activity', 'Something else', '✨', 'device_activity', 'unknown', 'root'),
+      option('not_about_device', 'Not about the device', '↩️', 'device_activity', 'incidental', null, 'meaningful'),
+    ],
+  };
+}
+
+function contextualDeviceTitle(memory: ClassifiedMemory, fallback: ClarificationNode): ClarificationNode {
+  const title = memory.facets.find((facet) => facet.key === 'media_title' && facet.value !== 'unknown')?.value;
+  if (!title) {
+    const activity = memory.facets.find((facet) => facet.key === 'device_activity' && facet.confirmed)?.value;
+    return memory.promptState.graphId === 'device-activity' && activity === 'reading'
+      ? GRAPHS['device-activity'].nodes['reading-reaction']
+      : GRAPHS['device-activity'].nodes['media-reaction'];
+  }
+  const activity = memory.facets.find((facet) => facet.key === 'device_activity' && facet.confirmed)?.value;
+  const next = activity === 'reading' ? 'reading-reaction' : 'media-reaction';
+  return {
+    ...fallback,
+    question: `Is this “${title}”?`,
+    options: [
+      option('confirm_title', 'Yes, keep this title', '✓', 'media_title', title, next, 'meaningful'),
+      option('unnamed_title', 'Keep without a title', '📚', 'media_title', 'unknown', next, 'meaningful'),
+    ],
+  };
+}
+
+function withDeviceTitleRouting(memory: ClassifiedMemory, node: ClarificationNode): ClarificationNode {
+  const hasTitle = memory.facets.some((facet) => facet.key === 'media_title' && facet.value !== 'unknown' && !facet.confirmed);
+  if (!hasTitle) return node;
+  return {
+    ...node,
+    options: node.options.map((item) => item.facetKey === 'media_type' ? { ...item, nextNodeId: 'title' } : item),
+  };
+}
+
+function deviceActivityOptions(): ClarificationOption[] {
+  return [
+    option('working', 'Working', '💻', 'device_activity', 'working', 'work-kind'),
+    option('studying', 'Studying', '📚', 'device_activity', 'studying', 'study-kind'),
+    option('creating', 'Creating', '🎨', 'device_activity', 'creating', 'create-kind'),
+    option('gaming', 'Gaming', '🎮', 'device_activity', 'gaming', 'game-reaction'),
+    option('watching', 'Watching', '📺', 'device_activity', 'watching', 'watch-kind'),
+    option('reading', 'Reading', '📖', 'device_activity', 'reading', 'read-kind'),
+    option('browsing', 'Browsing / scrolling', '📱', 'device_activity', 'browsing', 'browse-reaction'),
+    option('other_activity', 'Something else', '✨', 'device_activity', 'other', null, 'meaningful'),
+    option('not_about_device', 'Not about the device', '↩️', 'device_activity', 'incidental', null, 'meaningful'),
+  ];
+}
+
+function nextDeviceNode(activity: string): string | null {
+  return ({
+    working: 'work-kind', studying: 'study-kind', creating: 'create-kind', gaming: 'game-reaction',
+    watching: 'watch-kind', reading: 'read-kind', browsing: 'browse-reaction',
+  } as Record<string, string>)[activity] ?? null;
+}
+
+function deviceActivityEmoji(activity: string): string {
+  return ({ working: '💻', studying: '📚', creating: '🎨', gaming: '🎮', watching: '📺', reading: '📖', browsing: '📱' } as Record<string, string>)[activity] ?? '✨';
+}
+
+function reactionNode(
+  id: string,
+  question: string,
+  values: Array<[string, string, string, NonNullable<ClarificationOption['meaning']>]>,
+  facetKey = 'activity_reaction'
+): ClarificationNode {
+  return {
+    id,
+    question,
+    options: values.map(([value, label, emoji, meaning]) => option(value, label, emoji, facetKey, value, null, meaning)),
+  };
 }
 
 function contextualSubjectFocusRoot(memory: ClassifiedMemory, fallback: ClarificationNode): ClarificationNode {

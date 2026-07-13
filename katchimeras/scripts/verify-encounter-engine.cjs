@@ -55,8 +55,10 @@ const qualityRegistryPath = path.join(tempDir, 'quality-registry.js');
 fs.writeFileSync(qualityRegistryPath, 'exports.deriveMemoryQualities = () => []; exports.qualityDefinition = () => null; exports.qualityThresholds = () => ({ ready: 0.72, review: 0.3 });');
 const photoDescriptorPath = path.join(tempDir, 'photo-descriptor.js');
 fs.writeFileSync(photoDescriptorPath, 'exports.buildPhotoAnalysisDescriptor = () => null; exports.replanDescriptorAfterSubjectRejection = value => value;');
+const deviceActivityPath = path.join(tempDir, 'device-activity.js');
+fs.writeFileSync(deviceActivityPath, 'exports.detectDeviceContext = () => ({ deviceKind: null, deviceConfidence: 0, candidates: [], selected: null, strong: false }); exports.isDeviceSignal = () => false;');
 const questionRegistryPath = path.join(tempDir, 'question-registry.js');
-fs.writeFileSync(questionRegistryPath, 'exports.QUESTION_PLANNER_VERSION = 2; exports.questionPlannerMode = () => "on"; exports.planNextQuestion = () => null; exports.questionIdForGraphNode = (graphId, nodeId) => graphId && nodeId ? `${graphId}.${nodeId}` : null;');
+fs.writeFileSync(questionRegistryPath, 'exports.QUESTION_PLANNER_VERSION = 3; exports.questionPlannerMode = () => "on"; exports.planNextQuestion = () => null; exports.questionIdForGraphNode = (graphId, nodeId) => graphId && nodeId ? `${graphId}.${nodeId}` : null;');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const hatchPastPath = transpileToTemp('utils/hatch-your-past.ts', 'hatch-your-past.js');
 
@@ -75,6 +77,7 @@ const stubs = {
   '@/utils/intelligence/classification-policy': classificationPolicyPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
   '@/utils/intelligence/photo-descriptor': photoDescriptorPath,
+  '@/utils/intelligence/device-activity': deviceActivityPath,
   '@/utils/intelligence/question-registry': questionRegistryPath,
   '@/utils/encounter-engine': enginePath,
   '@/types/home': {},
@@ -86,6 +89,7 @@ Module._resolveFilename = function (request, ...rest) {
   if (request === './quality-registry') return qualityRegistryPath;
   if (request === './photo-descriptor') return photoDescriptorPath;
   if (request === './question-registry') return questionRegistryPath;
+  if (request === './device-activity') return deviceActivityPath;
   if (request in stubs) {
     const stub = stubs[request];
     if (typeof stub === 'string') {

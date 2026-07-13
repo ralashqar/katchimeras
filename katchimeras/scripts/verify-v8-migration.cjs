@@ -59,6 +59,14 @@ const oldState = {
 };
 const upgraded = upgradeStoredHomeState(oldState);
 const upgradedFromV10 = upgradeStoredHomeState({ ...oldState, version: 10 });
+const currentState = upgradeStoredHomeState({
+  ...oldState,
+  version: 11,
+  archivedDays: [{
+    ...day,
+    classifiedMemories: day.classifiedMemories.map((memory) => ({ ...memory, schemaVersion: 6 })),
+  }],
+});
 let failures = 0;
 function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
@@ -73,6 +81,7 @@ check('legacy vision survives', upgraded.archivedDays[0].vision.concepts[0].name
 check('evidence survives', upgraded.archivedDays[0].evidence[0].id === 'ev-1');
 check('legacy memories gain canonical qualities', upgraded.archivedDays[0].classifiedMemories[0].qualities.some((quality) => quality.qualityId === 'place.city'));
 check('legacy memories upgrade to canonical-confidence schema v5', upgraded.archivedDays[0].classifiedMemories[0].schemaVersion === 5);
+check('current classified-memory schema is never downgraded', currentState.archivedDays[0].classifiedMemories[0].schemaVersion === 6);
 check('legacy prompt state gains adaptive budget', upgraded.archivedDays[0].classifiedMemories[0].promptState.maxQuestions === 3);
 check('legacy prompt state gains planner metadata', upgraded.archivedDays[0].classifiedMemories[0].promptState.plannerVersion === 2 && Array.isArray(upgraded.archivedDays[0].classifiedMemories[0].promptState.askedQuestionIds));
 check('creature survives', upgraded.archivedDays[0].creature.id === 'waglet');

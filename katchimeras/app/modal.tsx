@@ -9,6 +9,7 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI } from '@/constants/theme';
+import { safeGoBack } from '@/utils/safe-navigation';
 
 export default function ModalScreen() {
   const router = useRouter();
@@ -66,7 +67,7 @@ export default function ModalScreen() {
 
         <Animated.View entering={presenceEnter(280)} style={styles.ctaRow}>
           <KatchaButton disabled label="Premium coming soon" variant="premium" />
-          <KatchaButton label="Back to reveal" onPress={() => router.back()} variant="secondary" />
+          <KatchaButton label="Back to reveal" onPress={() => safeGoBack(router)} variant="secondary" />
         </Animated.View>
       </ScrollView>
     </View>

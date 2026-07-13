@@ -10,6 +10,7 @@ import { getCreatureVisual } from '@/game/days';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { buildLifeMap, type LifeMapPin } from '@/utils/life-map-engine';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
+import { safeGoBack } from '@/utils/safe-navigation';
 
 type NativeMapsModule = typeof import('react-native-maps');
 
@@ -69,7 +70,7 @@ export default function LifeMapRoute() {
         </View>
       )}
 
-      <ScreenCloseButton onPress={() => router.back()} />
+      <ScreenCloseButton onPress={() => safeGoBack(router)} />
 
       <View pointerEvents="none" style={styles.captionWrap}>
         <GlassPanel contentStyle={styles.captionPanel} fillColor="rgba(10, 15, 28, 0.82)">
