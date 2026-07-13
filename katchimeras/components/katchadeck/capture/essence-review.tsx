@@ -14,6 +14,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
+import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import {
@@ -24,7 +25,7 @@ import {
   type MeaningTag,
 } from '@/utils/capture-energy';
 import { foundationSceneAvailability, isFoundationSceneAvailable } from '@/utils/foundation-scene';
-import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
+import { applyManualJournalFacets, buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
 import { buildPhotoEvidence } from '@/utils/intelligence/evidence';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import {
@@ -37,7 +38,8 @@ import {
 import { classifyScene, resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
 import { detectStudioInVision, extractTitleFromVisionText, isGenericStudioLabel, studioDetectionFromMedia } from '@/utils/studio-detect';
 import { pickProminentTags } from '@/utils/vision-signals';
-import type { ClassifiedMemory, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
+import { manualJournalFlow } from '@/utils/manual-journal-registry';
+import type { ClassifiedMemory, DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, StudioMediaType, UserConfirmation } from '@/types/home';
 
 // The shared "read the moment" experience: a photo's on-device essence animates
 // into the centre, the user says what it meant, and the tags then stream down
@@ -47,6 +49,7 @@ import type { ClassifiedMemory, DayVisionSummary, PhotoVisionResult, UserConfirm
 type EssenceReviewState = 'analyzing' | 'essence' | 'absorbing';
 
 type EssenceTag = { id: string; label: string; accent: string };
+type MediaDraft = { choiceId: 'book' | 'film'; title: string };
 
 const TAG_PALETTE = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8'];
 
@@ -81,6 +84,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
   const [tags, setTags] = useState<EssenceTag[]>([]);
   const [meanings, setMeanings] = useState<readonly CaptureMeaning[]>(CAPTURE_MEANINGS);
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
+  const [mediaDraft, setMediaDraft] = useState<MediaDraft | null>(null);
   const visionRef = useRef<DayVisionSummary | null>(null);
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const sceneRef = useRef<SceneRead | null>(null);
@@ -128,6 +132,8 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
         : null;
       clarificationRef.current = initialMemory;
       setClarificationMemory(initialMemory);
+      const initialMediaDraft = editableMediaDraft(initialMemory);
+      if (initialMediaDraft) setMediaDraft(initialMediaDraft);
       // PROGRESSIVE reveal: the rule engine answers in microseconds — show the
       // screen NOW with its chips + meanings, then let the on-device LLM reads
       // upgrade them in place when they land (typically ~1s later). The commit
@@ -160,6 +166,8 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
           setTags(buildEssenceTags(vision, read, reconciledMemory));
           clarificationRef.current = reconciledMemory;
           setClarificationMemory(reconciledMemory);
+          const upgradedDraft = editableMediaDraft(reconciledMemory);
+          if (upgradedDraft) setMediaDraft(upgradedDraft);
           if (read.type === 'media' && read.media) {
             const mediaMeanings = meaningsForMediaKind(read.media.mediaType);
             if (mediaMeanings) setMeanings(mediaMeanings);
@@ -244,9 +252,51 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     clarificationRef.current = next;
     setClarificationMemory(next);
     void Haptics.selectionAsync();
+    const draft = editableMediaDraft(next);
+    if (draft) {
+      setMediaDraft(draft);
+      return;
+    }
     if (next.promptState.status === 'answered') {
       commitMeaning(option.meaning ?? 'meaningful', option.label, next);
     }
+  };
+
+  const handleMediaDraftSave = (submission: ManualJournalSubmission) => {
+    const memory = clarificationRef.current;
+    const flow = manualJournalFlow(submission.flowId);
+    const choice = flow?.choices.find((item) => item.id === submission.categoryId);
+    const mediaType = choice?.mediaType;
+    if (!memory || !flow || !mediaType || state !== 'essence') return;
+    const titleValue = submission.fields.specific;
+    const title = typeof titleValue === 'string' ? titleValue.trim() : '';
+    const createdAt = new Date().toISOString();
+    const confirmed = applyManualJournalFacets(
+      { ...memory, dominantDomain: 'media' },
+      [
+        { key: 'media_type', value: mediaType },
+        ...(title ? [{ key: 'media_title', value: title }] : []),
+        ...(submission.feeling ? [{ key: 'media_rating', value: submission.feeling }] : []),
+      ],
+      createdAt
+    );
+    clarificationRef.current = confirmed;
+    setClarificationMemory(confirmed);
+    setMediaDraft(null);
+    const priorScene = sceneRef.current;
+    sceneRef.current = {
+      memoryDomain: 'media',
+      type: 'media',
+      label: 'An inspiration',
+      detail: title || choice.label,
+      media: { mediaType: mediaType as StudioMediaType, title: title || null, creator: null },
+      source: priorScene?.source ?? 'rules',
+      supportingSubjects: priorScene?.supportingSubjects,
+      representation: priorScene?.representation,
+      promptVersion: priorScene?.promptVersion,
+    };
+    const reactionLabel = flow.feelings.find((item) => item.id === submission.feeling)?.label ?? choice.label;
+    commitMeaning(meaningForMediaReaction(submission.feeling), reactionLabel, confirmed);
   };
 
   const handleSkipClarification = () => {
@@ -347,8 +397,44 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
           ) : null}
         </Animated.View>
       ) : null}
+
+      {state === 'essence' && mediaDraft ? (
+        <ManualJournalSheet
+          initialFlowId="studio"
+          initialChoiceId={mediaDraft.choiceId}
+          initialSpecific={mediaDraft.title}
+          onClose={onClose}
+          onSave={handleMediaDraftSave}
+        />
+      ) : null}
     </View>
   );
+}
+
+function editableMediaDraft(memory: ClassifiedMemory | null): MediaDraft | null {
+  const descriptor = memory?.photoAnalysis;
+  if (!memory || !descriptor || memory.sourceType !== 'photo' || descriptor.representation.kind === 'screen_content') return null;
+  const mediaType = memory.facets.find(
+    (facet) => facet.key === 'media_type' && (facet.value === 'book' || facet.value === 'film')
+  )?.value;
+  const title = memory.facets.find(
+    (facet) => facet.key === 'media_title' && facet.value !== 'unknown'
+  )?.value.trim();
+  if ((mediaType !== 'book' && mediaType !== 'film') || !title) return null;
+  const hierarchy = descriptor.hierarchy;
+  const primary = descriptor.subjects.find((subject) => subject.role === 'primary');
+  const isPhysicalCover =
+    hierarchy?.representation.kind === 'physical_document' ||
+    hierarchy?.container.kind === 'book' ||
+    hierarchy?.container.kind === 'poster_or_print' ||
+    (primary?.domain === 'media' && descriptor.representation.kind === 'real_world');
+  return isPhysicalCover ? { choiceId: mediaType, title } : null;
+}
+
+function meaningForMediaReaction(reaction: string | null | undefined): MeaningTag {
+  if (reaction === 'loved') return 'together';
+  if (reaction === 'inspired') return 'meaningful';
+  return 'calm';
 }
 
 function reconcileProgressiveUpgrade(

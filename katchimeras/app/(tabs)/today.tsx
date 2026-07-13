@@ -106,6 +106,15 @@ export default function HomeScreen() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
+  const [manualJournalInitialFlowId, setManualJournalInitialFlowId] = useState<string | null>(null);
+  const openManualJournal = useCallback((flowId?: string) => {
+    setManualJournalInitialFlowId(flowId ?? null);
+    setManualJournalOpen(true);
+  }, []);
+  const closeManualJournal = useCallback(() => {
+    setManualJournalOpen(false);
+    setManualJournalInitialFlowId(null);
+  }, []);
   // Egg + membrane framing from data/today-scene.json (neutral by default) —
   // shared with onboarding/Hatch Your Past via meadow-scene-backdrop.
   const eggFraming = todayEggFraming();
@@ -304,7 +313,6 @@ export default function HomeScreen() {
   const {
     activePlace,
     placePreset,
-    handleAddCurrentPlace,
     closePlacePrompt,
     handleConfirmPlaceFromVault,
     handleConfirmPlace,
@@ -423,9 +431,8 @@ export default function HomeScreen() {
     openCapture: openMomentCapture,
     openNoteCapture,
     openQuickNote: () => setQuickNoteOpen(true),
-    openPlaceContext: handleAddCurrentPlace,
     openObservatory: () => setObservatoryOpen(true),
-    openManualJournal: () => setManualJournalOpen(true),
+    openManualJournal,
     requestMicrophonePermission,
   });
   const suggestedPromptActions = useMemo(
@@ -556,7 +563,7 @@ export default function HomeScreen() {
             ) : (
               <LanternEgg
                 egg={selectedDay.egg}
-                onPress={selectedDay.canAddMoments ? () => setManualJournalOpen(true) : undefined}
+                onPress={selectedDay.canAddMoments ? () => openManualJournal() : undefined}
                 reactionKey={selectedDay.moments.length}
                 isReady={selectedDay.state === 'ready_to_hatch'}
                 feedKey={eggFeedKey}
@@ -572,7 +579,7 @@ export default function HomeScreen() {
           ) : onTomorrowForming ? (
             <LanternEgg
               egg={tomorrowDay.egg}
-              onPress={() => setManualJournalOpen(true)}
+              onPress={() => openManualJournal()}
               reactionKey={tomorrowDay.moments.length}
               feedKey={eggFeedKey}
               lanternColor={lanternColour}
@@ -664,7 +671,7 @@ export default function HomeScreen() {
           onMicPressOut={() => {
             void voiceNote.stop();
           }}
-          onAdd={() => setManualJournalOpen(true)}
+          onAdd={() => openManualJournal()}
           onOpenMap={() => {
             if (isDay) handleOpenDayMap(selectedDay.id);
           }}
@@ -706,10 +713,11 @@ export default function HomeScreen() {
       ) : null}
       {manualJournalOpen ? (
         <ManualJournalSheet
-          onClose={() => setManualJournalOpen(false)}
+          initialFlowId={manualJournalInitialFlowId}
+          onClose={closeManualJournal}
           onSave={(submission) => {
             addManualJournalEntry(submission, formingTarget);
-            setManualJournalOpen(false);
+            closeManualJournal();
             pulseEgg();
             setMicrocopy('Added to today');
           }}
@@ -776,7 +784,7 @@ export default function HomeScreen() {
         onCapturePhoto={openMomentCapture}
         onCaptureNote={openNoteCapture}
         openPromptSheet={openPromptSheet}
-        handleAddCurrentPlace={handleAddCurrentPlace}
+        openManualJournal={openManualJournal}
         handleOpenDayMap={handleOpenDayMap}
         handleAddFood={handleAddFood}
         handleAddStudio={handleAddStudio}

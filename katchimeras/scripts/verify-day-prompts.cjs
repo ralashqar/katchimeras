@@ -368,8 +368,25 @@ check('voice and written notes have distinct menu actions', todaySource.includes
 check('manual menu is grouped into capture, context, and more', ['capture', 'context', 'more'].every((section) => todaySource.includes(`section: '${section}'`)));
 const actionRouterSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-today-action-router.ts'), 'utf8');
 check('every quick action closes state-backed sheets before opening', actionRouterSource.includes('sheets.closeAllSheets();'));
-check('place quick action starts current-place context directly', actionRouterSource.includes("id === 'place') await openPlaceContext()"));
+check('manual quick actions deep-link to their hierarchical flows', [
+  "id === 'place') openManualJournal('went_somewhere')",
+  "id === 'food') openManualJournal('food')",
+  "id === 'studio') openManualJournal('studio')",
+  "id === 'movement') openManualJournal('movement')",
+  "id === 'life_event') openManualJournal('big_event')",
+].every((fragment) => actionRouterSource.includes(fragment)));
+check('empty Food category opens the hierarchical food journal flow', actionRouterSource.includes("else openManualJournal('food')"));
+check('memory quest logging uses the same hierarchical flows', ['went_somewhere', 'big_event', 'food', 'studio'].every((flowId) => actionRouterSource.includes(`openManualJournal('${flowId}')`)));
+const manualJournalSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/manual-journal-sheet.tsx'), 'utf8');
+check('manual journal supports opening directly at a requested flow', manualJournalSource.includes("initialFlow ? 'category' : 'flow'") && manualJournalSource.includes('manualJournalFlow(initialFlowId)'));
+check('manual journal can prefill an editable media title', manualJournalSource.includes('initialChoiceId') && manualJournalSource.includes("useState(initialSpecific ?? '')"));
+const essenceReviewSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/capture/essence-review.tsx'), 'utf8');
+check('physical book and film OCR opens the editable Studio flow', essenceReviewSource.includes('editableMediaDraft') && essenceReviewSource.includes('initialFlowId="studio"') && essenceReviewSource.includes('initialSpecific={mediaDraft.title}'));
+check('OCR title is confirmed only when the editable flow is saved', essenceReviewSource.includes('handleMediaDraftSave') && essenceReviewSource.includes("{ key: 'media_title', value: title }"));
+check('screen content cannot trigger the physical-cover title editor', essenceReviewSource.includes("descriptor.representation.kind === 'screen_content'"));
 const foodSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/food-vault-sheet.tsx'), 'utf8');
+check('vault add buttons deep-link to Food and Studio flows', todaySheetHostSource.includes("openManualJournal('food')") && todaySheetHostSource.includes("openManualJournal('studio')"));
+check('Places and Journey add actions deep-link to their hierarchical flows', todaySheetHostSource.includes("openManualJournal('went_somewhere')") && todaySheetHostSource.includes("openManualJournal('movement')"));
 check('manual food has no forced third question', !foodSheetSource.includes('· what kind?'));
 check('meal refinements remain optional on the meaning screen', foodSheetSource.includes('Meal detail · optional'));
 const placeSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/place-prompt-sheet.tsx'), 'utf8');

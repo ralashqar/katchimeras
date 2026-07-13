@@ -6,15 +6,32 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { ManualJournalSubmission } from '@/types/home';
-import { MANUAL_JOURNAL_FLOWS, type ManualJournalChoice, type ManualJournalFlowDefinition } from '@/utils/manual-journal-registry';
+import { MANUAL_JOURNAL_FLOWS, manualJournalFlow, type ManualJournalChoice, type ManualJournalFlowDefinition } from '@/utils/manual-journal-registry';
 
 type Stage = 'flow' | 'category' | 'details' | 'note';
 
-export function ManualJournalSheet({ onClose, onSave }: { onClose: () => void; onSave: (submission: ManualJournalSubmission) => void }) {
-  const [stage, setStage] = useState<Stage>('flow');
-  const [flow, setFlow] = useState<ManualJournalFlowDefinition | null>(null);
-  const [choice, setChoice] = useState<ManualJournalChoice | null>(null);
-  const [specific, setSpecific] = useState('');
+export function ManualJournalSheet({
+  initialFlowId,
+  initialChoiceId,
+  initialSpecific,
+  onClose,
+  onSave,
+}: {
+  initialFlowId?: string | null;
+  initialChoiceId?: string | null;
+  initialSpecific?: string | null;
+  onClose: () => void;
+  onSave: (submission: ManualJournalSubmission) => void;
+}) {
+  const initialFlow = useMemo(() => initialFlowId ? manualJournalFlow(initialFlowId) : null, [initialFlowId]);
+  const initialChoice = useMemo(
+    () => initialFlow?.choices.find((item) => item.id === initialChoiceId) ?? null,
+    [initialChoiceId, initialFlow]
+  );
+  const [stage, setStage] = useState<Stage>(initialChoice ? 'details' : initialFlow ? 'category' : 'flow');
+  const [flow, setFlow] = useState<ManualJournalFlowDefinition | null>(initialFlow);
+  const [choice, setChoice] = useState<ManualJournalChoice | null>(initialChoice);
+  const [specific, setSpecific] = useState(initialSpecific ?? '');
   const [feeling, setFeeling] = useState<string | null>(null);
   const [context, setContext] = useState<string | null>(null);
   const [note, setNote] = useState('');

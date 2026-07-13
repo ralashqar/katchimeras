@@ -80,7 +80,7 @@ type TodaySheetHostProps = {
   onCapturePhoto: () => void;
   onCaptureNote: () => void;
   openPromptSheet: () => void;
-  handleAddCurrentPlace: () => void | Promise<void>;
+  openManualJournal: (flowId?: string) => void;
   handleOpenDayMap: (dayId: string) => void;
   handleAddFood: ComponentProps<typeof FoodMomentSheet>['onConfirm'];
   handleAddStudio: ComponentProps<typeof StudioMomentSheet>['onConfirm'];
@@ -153,7 +153,7 @@ export function TodaySheetHost({
   onCapturePhoto,
   onCaptureNote,
   openPromptSheet,
-  handleAddCurrentPlace,
+  openManualJournal,
   handleOpenDayMap,
   handleAddFood,
   handleAddStudio,
@@ -262,7 +262,7 @@ export function TodaySheetHost({
             viewedIsForming
               ? () => {
                   setFoodVaultOpen(false);
-                  setFoodPickerOpen(true);
+                  openManualJournal('food');
                 }
               : undefined
           }
@@ -279,7 +279,7 @@ export function TodaySheetHost({
             viewedIsForming
               ? () => {
                   setStudioVaultOpen(false);
-                  setStudioPickerOpen(true);
+                  openManualJournal('studio');
                 }
               : undefined
           }
@@ -345,7 +345,7 @@ export function TodaySheetHost({
             viewedIsForming
               ? () => {
                   setJourneySheetOpen(false);
-                  setStepsSheetOpen(true);
+                  openManualJournal('movement');
                 }
               : undefined
           }
@@ -359,7 +359,7 @@ export function TodaySheetHost({
             viewedIsForming
               ? () => {
                   setPlacesVaultOpen(false);
-                  void handleAddCurrentPlace();
+                  openManualJournal('went_somewhere');
                 }
               : undefined
           }

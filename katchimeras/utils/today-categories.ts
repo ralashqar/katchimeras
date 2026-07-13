@@ -183,7 +183,7 @@ export function deriveTodayCategories(day: HomeDayRecord, options: DeriveOptions
       accent: '#A8C99A',
       count: steps,
       countLabel: steps > 0 ? formatSteps(steps) : undefined,
-      hasContent: steps > 0,
+      hasContent: steps > 0 || !!day.stepsInterpretation,
       needsAttention: stepsNeedInterpreting(day, recentAvgSteps),
       glowReason: 'Today’s movement looks meaningful — what kind of journey was it?',
     },

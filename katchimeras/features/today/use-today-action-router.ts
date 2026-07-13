@@ -19,9 +19,8 @@ type UseTodayActionRouterParams = {
   openCapture: (questId?: string | null) => void;
   openNoteCapture: () => void;
   openQuickNote: () => void;
-  openPlaceContext: () => void | Promise<void>;
   openObservatory: () => void;
-  openManualJournal: () => void;
+  openManualJournal: (flowId?: string) => void;
   requestMicrophonePermission?: () => Promise<{ granted?: boolean } | null>;
 };
 
@@ -36,7 +35,6 @@ export function useTodayActionRouter({
   openCapture,
   openNoteCapture,
   openQuickNote,
-  openPlaceContext,
   openObservatory,
   openManualJournal,
   requestMicrophonePermission,
@@ -82,23 +80,23 @@ export function useTodayActionRouter({
           break;
         }
         case 'markPlace':
-          sheets.setPlacesVaultOpen(true);
+          openManualJournal('went_somewhere');
           break;
         case 'markBigMoment':
-          sheets.setBigMomentPickerOpen(true);
+          openManualJournal('big_event');
           break;
         case 'saveFoodMemory':
-          sheets.setFoodPickerOpen(true);
+          openManualJournal('food');
           break;
         case 'saveStudioMemory':
-          sheets.setStudioPickerOpen(true);
+          openManualJournal('studio');
           break;
         case 'namePatch':
           sheets.setNameSheetOpen(true);
           break;
       }
     },
-    [formingPrompts, openCapture, openNoteCapture, openPromptSheet, requestMicrophonePermission, sheets]
+    [formingPrompts, openCapture, openManualJournal, openNoteCapture, openPromptSheet, requestMicrophonePermission, sheets]
   );
 
   const handleStatPress = useCallback(
@@ -190,10 +188,12 @@ export function useTodayActionRouter({
           openMemoryVault('notes');
           break;
         case 'places':
-          sheets.setPlacesVaultOpen(true);
+          if (category.hasContent) sheets.setPlacesVaultOpen(true);
+          else openManualJournal('went_somewhere');
           break;
         case 'journey':
-          sheets.setStepsSheetOpen(true);
+          if (category.hasContent) sheets.setStepsSheetOpen(true);
+          else openManualJournal('movement');
           break;
         case 'reflection':
           if (category.needsAttention) sheets.setMoodSheetOpen(true);
@@ -201,11 +201,11 @@ export function useTodayActionRouter({
           break;
         case 'food':
           if (category.hasContent) sheets.setFoodVaultOpen(true);
-          else sheets.setFoodPickerOpen(true);
+          else openManualJournal('food');
           break;
         case 'studio':
           if (category.hasContent) sheets.setStudioVaultOpen(true);
-          else sheets.setStudioPickerOpen(true);
+          else openManualJournal('studio');
           break;
         case 'sleep':
           sheets.setSleepSheetOpen(true);
@@ -220,6 +220,7 @@ export function useTodayActionRouter({
     },
     [
       openMemoryVault,
+      openManualJournal,
       openPromptSheet,
       photoPrompt,
       sheets,
@@ -248,20 +249,19 @@ export function useTodayActionRouter({
         openNoteCapture();
       }
       else if (id === 'written_note' || id === 'note') openQuickNote();
-      else if (id === 'place') await openPlaceContext();
-      else if (id === 'food') sheets.setFoodPickerOpen(true);
-      else if (id === 'studio') sheets.setStudioPickerOpen(true);
-      else if (id === 'movement') sheets.setStepsSheetOpen(true);
+      else if (id === 'place') openManualJournal('went_somewhere');
+      else if (id === 'food') openManualJournal('food');
+      else if (id === 'studio') openManualJournal('studio');
+      else if (id === 'movement') openManualJournal('movement');
       else if (id === 'sleep') sheets.setSleepSheetOpen(true);
       else if (id === 'mood') sheets.setMoodSheetOpen(true);
-      else if (id === 'life_event') sheets.setBigMomentPickerOpen(true);
+      else if (id === 'life_event') openManualJournal('big_event');
       else if (id === 'manual_journal') openManualJournal();
     },
     [
       closePromptSheet,
       openCapture,
       openNoteCapture,
-      openPlaceContext,
       openQuickNote,
       openManualJournal,
       requestMicrophonePermission,

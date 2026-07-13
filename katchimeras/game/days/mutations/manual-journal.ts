@@ -1,4 +1,4 @@
-import type { BigMoment, CuisineFamily, FoodMeaning, FoodMoment, ManualJournalEntry, ManualJournalSubmission, StoredHomeDayRecord, StudioMoment, StudioRating } from '@/types/home';
+import type { BigMoment, CuisineFamily, DayMovementKind, FoodMeaning, FoodMoment, ManualJournalEntry, ManualJournalSubmission, StoredHomeDayRecord, StudioMoment, StudioRating } from '@/types/home';
 import { buildNoteEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
 import { applyManualJournalFacets, buildManualJournalClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
@@ -6,6 +6,10 @@ import { manualJournalFlow } from '@/utils/manual-journal-registry';
 const EMOJI: Record<string, string> = {
   meal: '🍽️', snack: '🥐', dessert: '🍰', coffee: '☕', tea: '🫖', drink: '🥤', cooking: '🍳', other_food: '🍎',
   book: '📖', film: '🎬', show: '📺', game: '🎮', music: '🎵', podcast: '🎙️', art: '🎨', other_media: '✨',
+};
+const MOVEMENT_EMOJI: Record<string, string> = {
+  walk: 'ðŸš¶', run: 'ðŸƒ', cycle: 'ðŸš²', workout: 'ðŸ‹ï¸', sport: 'âš½', hike: 'ðŸ¥¾',
+  errands: 'ðŸ›’', commute: 'ðŸš‡', travel: 'âœˆï¸', mixed: 'âš¡',
 };
 
 export function withManualJournalEntry(day: StoredHomeDayRecord, submission: ManualJournalSubmission, now: Date): StoredHomeDayRecord {
@@ -60,6 +64,28 @@ export function withManualJournalEntry(day: StoredHomeDayRecord, submission: Man
     const moment: StudioMoment = { id: `studio-${id}`, label: specific || choice.label, mediaType: choice.mediaType ?? 'other', emoji: EMOJI[choice.id] ?? '✨', rating: asStudioRating(entry.feeling), source: 'manual', sourceId: id, detail: entry.note, createdAt };
     next.studioMoments = [...(day.studioMoments ?? []), moment].slice(-12);
   }
+  if (flow.adapter === 'place') {
+    next.confirmedPlaces = [
+      ...(day.confirmedPlaces ?? []),
+      {
+        id: `place-${id}`,
+        category: choice.id,
+        archetype: archetypeForFeeling(entry.feeling),
+        label: specific || choice.label,
+        meaningLabel: context ? humanize(context) : undefined,
+        confirmedAt: createdAt,
+      },
+    ];
+  }
+  if (flow.adapter === 'movement') {
+    next.stepsInterpretation = {
+      movement: movementKind(choice.id),
+      label: specific || choice.label,
+      emoji: MOVEMENT_EMOJI[choice.id] ?? 'âš¡',
+      subtype: context || undefined,
+      createdAt,
+    };
+  }
   if (flow.adapter === 'big_event' && choice.bigMomentType) {
     const moment: BigMoment = { id: `bm-${id}`, type: choice.bigMomentType, label: specific || choice.label, subject: stringField(entry.fields.subject) || null, noteId: null, createdAt };
     next.bigMoments = [...(day.bigMoments ?? []), moment];
@@ -70,3 +96,16 @@ export function withManualJournalEntry(day: StoredHomeDayRecord, submission: Man
 function stringField(value: string | string[] | boolean | null | undefined): string { return typeof value === 'string' ? value.trim() : ''; }
 function asFoodMeaning(value?: string | null): FoodMeaning | null { return value && ['treat', 'sharedMeal', 'comfort', 'fuel', 'discovery'].includes(value) ? value as FoodMeaning : null; }
 function asStudioRating(value?: string | null): StudioRating | null { return value && ['loved', 'inspired', 'liked', 'meh'].includes(value) ? value as StudioRating : null; }
+function movementKind(value: string): DayMovementKind {
+  if (value === 'sport') return 'workout';
+  return ['walk', 'run', 'cycle', 'workout', 'hike', 'errands', 'commute', 'travel', 'mixed'].includes(value)
+    ? value as DayMovementKind
+    : 'mixed';
+}
+function archetypeForFeeling(value?: string | null): string {
+  if (value === 'exciting') return 'energy';
+  if (value === 'loved' || value === 'liked') return 'together';
+  if (value === 'difficult') return 'meaningful';
+  return 'calm';
+}
+function humanize(value: string): string { return value.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase()); }
