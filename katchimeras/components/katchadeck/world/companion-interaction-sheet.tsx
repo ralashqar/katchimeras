@@ -66,7 +66,7 @@ export type CompanionInteractionSheetProps = {
   onReflectionDraftChange?: (draft: CompanionReflectionDraft | null) => void;
   onReviewReflection: (draft: CompanionReflectionDraft) => void;
   reflectionReviewPending?: boolean;
-  reflectionSaved?: boolean;
+  memorySaved?: boolean;
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
@@ -113,7 +113,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     else if (action.kind === 'submit') props.onSubmitQuest(action.item);
     else props.onCashIn();
   };
-  const footer = props.reflectionSaved
+  const footer = props.memorySaved
     ? null
     : state.thread === 'quest' && quest.primaryAction
       ? reviewItem ? null : <CompanionPrimaryAction label={quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} />
@@ -137,7 +137,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
             <Animated.View key={state.thread} entering={entering} exiting={FadeOut.duration(100)}>
-              {props.reflectionSaved ? (
+              {props.memorySaved ? (
                 <View accessibilityLiveRegion="polite" style={styles.saved}>
                   <ThemedText style={styles.savedTitle} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>Memory kept</ThemedText>
                   <ThemedText style={styles.savedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{props.name} will remember that with you.</ThemedText>

@@ -36,6 +36,13 @@ type ReflectionReview = {
   suggestedSpecific: string | null;
 };
 
+type EmbeddedJournalReview = {
+  origin: 'insight' | 'quest';
+  initialFlowId: string;
+  initialChoiceId?: string | null;
+  noteExpanded: boolean;
+};
+
 // The Kingdom tab is the persistent hex map: center egg, then one tile per
 // unique Katchimera in hatch order. Capture stays on Today; this is the archive.
 
@@ -58,7 +65,8 @@ export default function KingdomScreen() {
   const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
   const [reflectionReview, setReflectionReview] = useState<ReflectionReview | null>(null);
   const [reflectionReviewPending, setReflectionReviewPending] = useState(false);
-  const [reflectionSaved, setReflectionSaved] = useState(false);
+  const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
+  const [savedOrigin, setSavedOrigin] = useState<'reflection' | 'insight' | 'quest' | null>(null);
   const { addManualJournalEntry } = useHomeScreenState();
 
   const hatches = useMemo<HatchRecord[]>(
@@ -81,16 +89,43 @@ export default function KingdomScreen() {
   const todayFacts = useMemo(() => resolveFactsForDay(today, yesterday), [today, yesterday]);
   const quests = useKingdomQuests({ kingdom, residents, today, todayFacts });
   const closeSelectedResident = quests.closeSelectedResident;
+  const refreshQuestState = quests.refreshQuestState;
 
   useEffect(() => {
-    if (!reflectionSaved) return;
+    if (!savedOrigin) return;
     const timeout = setTimeout(() => {
-      setReflectionSaved(false);
-      setReflectionDraft(null);
-      closeSelectedResident();
+      refreshQuestState();
+      setSavedOrigin(null);
+      if (savedOrigin === 'reflection') {
+        setReflectionDraft(null);
+        closeSelectedResident();
+      }
     }, 1250);
     return () => clearTimeout(timeout);
-  }, [closeSelectedResident, reflectionSaved]);
+  }, [closeSelectedResident, refreshQuestState, savedOrigin]);
+
+  const handleInsightAction = () => {
+    const action = quests.selectedInsight?.action;
+    if (!action) return;
+    if (action.intent.kind === 'journal_flow') {
+      setEmbeddedJournal({
+        origin: 'insight',
+        initialFlowId: action.intent.flowId,
+        noteExpanded: /note|memory/i.test(action.label),
+      });
+      return;
+    }
+    quests.performSelectedInsightAction();
+  };
+
+  const handleQuestAction = () => {
+    const action = quests.selectedQuestRuntime?.nextAction;
+    if (action === 'add_note' || action === 'record_voice') {
+      setEmbeddedJournal({ origin: 'quest', initialFlowId: 'general', noteExpanded: true });
+      return;
+    }
+    quests.performSelectedQuestAction();
+  };
 
   const reviewReflection = async (draft: CompanionReflectionDraft) => {
     if (!quests.selectedResident || reflectionReviewPending) return;
@@ -177,7 +212,7 @@ export default function KingdomScreen() {
         />
       ) : null}
 
-      {quests.selectedResident && !reflectionReview ? (
+      {quests.selectedResident && !reflectionReview && !embeddedJournal ? (
         <CompanionInteractionSheet
           creatureId={quests.selectedResident.creature.creatureId}
           name={quests.selectedResident.creature.name}
@@ -199,15 +234,15 @@ export default function KingdomScreen() {
           onCashIn={quests.cashInSelectedQuest}
           onSubmitQuest={quests.submitSelectedQuest}
           onClarifyQuestMatch={quests.clarifySelectedQuestMatch}
-          onQuestAction={quests.performSelectedQuestAction}
+          onQuestAction={handleQuestAction}
           insight={quests.selectedInsight ?? { text: 'This tile remembers the day we met.', action: null }}
-          onInsightAction={quests.performSelectedInsightAction}
+          onInsightAction={handleInsightAction}
           reflectionText={reflectionLine(quests.selectedCompanionData?.archetype ?? '')}
           initialReflectionDraft={reflectionDraft}
           onReflectionDraftChange={setReflectionDraft}
           onReviewReflection={(draft) => { void reviewReflection(draft); }}
           reflectionReviewPending={reflectionReviewPending}
-          reflectionSaved={reflectionSaved}
+          memorySaved={Boolean(savedOrigin)}
         />
       ) : null}
       {reflectionReview ? (
@@ -224,7 +259,24 @@ export default function KingdomScreen() {
           onSave={(submission) => {
             addManualJournalEntry(submission, 'today');
             setReflectionReview(null);
-            setReflectionSaved(true);
+            setSavedOrigin('reflection');
+            if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }}
+        />
+      ) : null}
+      {embeddedJournal ? (
+        <ManualJournalSheet
+          initialFlowId={embeddedJournal.initialFlowId}
+          initialChoiceId={embeddedJournal.initialChoiceId}
+          initialNoteExpanded={embeddedJournal.noteExpanded}
+          returnToOriginOnBack
+          onBackFromInitial={() => setEmbeddedJournal(null)}
+          onClose={() => { setEmbeddedJournal(null); quests.closeSelectedResident(); }}
+          onSave={(submission) => {
+            addManualJournalEntry(submission, 'today');
+            const origin = embeddedJournal.origin;
+            setEmbeddedJournal(null);
+            setSavedOrigin(origin);
             if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
         />

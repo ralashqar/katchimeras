@@ -50,12 +50,14 @@ export type JournalComposerProps = {
   initialSpecific?: string | null;
   initialNote?: string | null;
   initialLinkedNote?: JournalNoteDraft | null;
+  initialNoteExpanded?: boolean;
   initialConfirmedFacets?: ManualJournalSubmission['confirmedFacets'];
   sourceType?: 'manual' | 'photo';
   sourceId?: string | null;
   thumbnailUri?: string | null;
   journalSource?: JournalSource;
   onBackFromInitial?: () => void;
+  returnToOriginOnBack?: boolean;
   onClose: () => void;
   onSave: (submission: ManualJournalSubmission) => void;
 };
@@ -66,12 +68,14 @@ export function JournalComposer({
   initialSpecific,
   initialNote,
   initialLinkedNote,
+  initialNoteExpanded = false,
   initialConfirmedFacets,
   sourceType = 'manual',
   sourceId,
   thumbnailUri,
   journalSource,
   onBackFromInitial,
+  returnToOriginOnBack = false,
   onClose,
   onSave,
 }: JournalComposerProps) {
@@ -89,7 +93,7 @@ export function JournalComposer({
   const [feeling, setFeeling] = useState<string | null>(null);
   const [context, setContext] = useState<string | null>(null);
   const [note, setNote] = useState(initialNote ?? '');
-  const [noteExpanded, setNoteExpanded] = useState(!!initialNote || !!initialLinkedNote);
+  const [noteExpanded, setNoteExpanded] = useState(initialNoteExpanded || !!initialNote || !!initialLinkedNote);
   const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(initialLinkedNote ?? null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const longPressRef = useRef(false);
@@ -161,6 +165,10 @@ export function JournalComposer({
       return;
     }
     if (stage === 'category') {
+      if (initialFlow && returnToOriginOnBack && onBackFromInitial) {
+        onBackFromInitial();
+        return;
+      }
       setFlow(null);
       setChoice(null);
       setSpecific('');

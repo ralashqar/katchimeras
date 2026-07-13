@@ -226,6 +226,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     saveCompanionQuests(next);
     setCompanionQuestState(next);
   }, []);
+  const refreshQuestState = useCallback(() => {
+    setCompanionQuestState(loadCompanionQuests());
+    setStoredHomeState(homeRepository.load());
+  }, []);
 
   // A clear quest-camera match is authoritative and auto-submits the exact
   // captured source. Keep the matched state visible briefly, then complete.
@@ -430,6 +434,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     clarifySelectedQuestMatch,
     submitSelectedQuest,
     performSelectedInsightAction,
+    refreshQuestState,
   };
 }
 
