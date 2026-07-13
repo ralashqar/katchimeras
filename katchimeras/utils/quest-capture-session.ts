@@ -28,3 +28,17 @@ export function consumeCompletedQuestCapture(): QuestCaptureSession | null {
 export function cancelQuestCapture(questId?: string | null): void {
   if (!questId || session?.questId === questId) session = null;
 }
+
+export function questCaptureBelongsTo(
+  capture: { questId?: string | null; creatureId?: string | null } | null | undefined,
+  questId: string | null | undefined,
+  creatureId: string | null | undefined
+): boolean {
+  return Boolean(
+    capture &&
+    questId &&
+    creatureId &&
+    capture.questId === questId &&
+    capture.creatureId === creatureId
+  );
+}

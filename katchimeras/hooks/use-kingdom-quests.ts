@@ -29,7 +29,7 @@ import {
 } from '@/utils/katchimera-quests';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import { requestQuestActionIntent } from '@/utils/quest-action-signal';
-import { beginQuestCapture, consumeCompletedQuestCapture } from '@/utils/quest-capture-session';
+import { beginQuestCapture, consumeCompletedQuestCapture, questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import {
   buildQuestReportBackItems,
   buildQuestSubmissionItems,
@@ -175,6 +175,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         : null,
     [questCapabilities, questDay, questFacts, selectedActiveQuest]
   );
+  const selectedQuestCaptureFeedback = useMemo(
+    () => questCaptureBelongsTo(
+      questCaptureFeedback,
+      selectedActiveQuest?.questId,
+      selectedResident?.creature.creatureId
+    ) ? questCaptureFeedback : null,
+    [questCaptureFeedback, selectedActiveQuest?.questId, selectedResident?.creature.creatureId]
+  );
   const selectedQuestItems = useMemo(() => {
     if (!selectedActiveQuest || !selectedQuestRuntime) return [];
     if (selectedQuestRuntime.readyToSubmit || selectedQuestRuntime.possibleEvidenceIds.length > 0) {
@@ -184,26 +192,31 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         selectedActiveQuest,
         companionQuestState.submissions,
         3,
-        questCaptureFeedback?.sourceId ?? null
+        selectedQuestCaptureFeedback?.sourceId ?? null
       );
     }
     if (selectedQuestRuntime.complete) return buildQuestReportBackItems(questDay, selectedQuestRuntime);
     return [];
-  }, [companionQuestState.submissions, questCaptureFeedback?.sourceId, questDay, selectedActiveQuest, selectedQuestRuntime]);
+  }, [companionQuestState.submissions, questDay, selectedActiveQuest, selectedQuestCaptureFeedback?.sourceId, selectedQuestRuntime]);
 
   useEffect(() => {
-    if (questCaptureFeedback?.phase !== 'analyzing' || !selectedQuestRuntime) return;
+    if (selectedQuestCaptureFeedback?.phase !== 'analyzing' || !selectedQuestRuntime) return;
     const timeout = setTimeout(() => {
-      const capturedItem = selectedQuestItems.find((item) => item.sourceId === questCaptureFeedback.sourceId);
+      const capturedItem = selectedQuestItems.find((item) => item.sourceId === selectedQuestCaptureFeedback.sourceId);
       const phase: QuestCaptureFeedback['phase'] = capturedItem?.matchStatus === 'ready'
         ? 'matched'
         : capturedItem?.matchStatus === 'possible'
           ? 'possible'
           : 'no_match';
-      setQuestCaptureFeedback((current) => current?.sourceId === questCaptureFeedback.sourceId ? { ...current, phase } : current);
+      setQuestCaptureFeedback((current) =>
+        questCaptureBelongsTo(current, selectedQuestCaptureFeedback.questId, selectedQuestCaptureFeedback.creatureId) &&
+        current?.sourceId === selectedQuestCaptureFeedback.sourceId
+          ? { ...current, phase }
+          : current
+      );
     }, 450);
     return () => clearTimeout(timeout);
-  }, [questCaptureFeedback, selectedQuestItems, selectedQuestRuntime]);
+  }, [selectedQuestCaptureFeedback, selectedQuestItems, selectedQuestRuntime]);
   const selectedOffer =
     selectedResident &&
     selectedCompanionData?.quest &&
@@ -252,7 +265,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       setMicrocopy(result.submitted ? 'Photo matched - quest complete' : 'Quest already submitted');
       if (result.submitted && process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setQuestCaptureFeedback(null);
-      if (result.submitted) setSelectedResident(null);
+      if (result.submitted) {
+        setSelectedResident((current) =>
+          current?.creature.creatureId === questCaptureFeedback.creatureId ? null : current
+        );
+      }
     }, 1200);
     return () => clearTimeout(timeout);
   }, [commitCompanionQuestState, questCaptureFeedback, today?.isoDate]);
@@ -418,7 +435,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     closeSelectedResident,
     microcopy,
     performSelectedQuestAction,
-    questCaptureFeedback,
+    questCaptureFeedback: selectedQuestCaptureFeedback,
     questCriteria: selectedQuestRuntime?.progress ?? (selectedActiveQuest ? questCriteria(selectedActiveQuest.questId, questFacts) : []),
     residentStatusGlyphs,
     selectResident,

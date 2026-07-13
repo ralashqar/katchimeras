@@ -165,5 +165,21 @@ const noteComplete = runtime.evaluateQuestRuntime({
 });
 check('manual note quest keeps add-note action while awaiting submission', noteComplete.nextAction === 'add_note', noteComplete.nextAction);
 
+const lateNightPhoto = photoEvidence('photo:late-night', 'time.late_night', 1);
+const ordinaryPhoto = photoEvidence('photo:afternoon', 'subject.food', 0.9);
+const lateCapture = runtime.evaluateQuestRuntime({
+  questId: 'quest-late-capture',
+  facts: { 'evidence.items': [ordinaryPhoto, lateNightPhoto] },
+});
+check('late-night quest is ready only from bounded time evidence', lateCapture.state === 'ready_to_submit', lateCapture.state);
+check('late-night quest carries only the matching photo id', lateCapture.matchedEvidenceIds.length === 1 && lateCapture.matchedEvidenceIds[0] === 'photo:late-night', JSON.stringify(lateCapture.matchedEvidenceIds));
+
+const daytimeCapture = runtime.evaluateQuestRuntime({
+  questId: 'quest-late-capture',
+  facts: { 'evidence.items': [ordinaryPhoto] },
+});
+check('an ordinary daytime photo cannot satisfy the late-night quest', daytimeCapture.state === 'in_progress', daytimeCapture.state);
+check('an ordinary daytime photo is not offered as late-night evidence', daytimeCapture.matchedEvidenceIds.length === 0, JSON.stringify(daytimeCapture.matchedEvidenceIds));
+
 console.log(failures === 0 ? '\nAll quest runtime checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

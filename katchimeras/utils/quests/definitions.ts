@@ -262,13 +262,13 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     id: 'quest-dawn-capture',
     title: 'Catch the dawn',
     hint: 'Capture a moment early — before 8am.',
-    criteria: [{ fact: 'capture.earliestHour', op: 'lt', value: 8, label: 'A moment before 8am' }],
+    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'time.before_8am', sourceTypes: ['photo'], label: 'A photo before 8am' }],
   },
   'quest-late-capture': {
     id: 'quest-late-capture',
     title: 'The small hours',
-    hint: 'Capture a moment late — after 11pm.',
-    criteria: [{ fact: 'capture.latestHour', op: 'gte', value: 23, label: 'A moment after 11pm' }],
+    hint: 'Capture a moment between 11pm and 5am.',
+    criteria: [{ fact: 'evidence.items', op: 'evidenceIncludes', value: 'time.late_night', sourceTypes: ['photo'], label: 'A photo between 11pm and 5am' }],
   },
 };
 

@@ -10,6 +10,8 @@ import {
   insightForArchetype,
 } from '@/utils/companion-interaction';
 import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
+import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
+import { isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
 
 function runtime(overrides: Partial<QuestRuntimeStatus> = {}): QuestRuntimeStatus {
   return {
@@ -64,6 +66,37 @@ test('possible evidence requires review before submission', () => {
   });
   assert.equal(model.mode, 'possible');
   assert.equal(model.primaryAction?.kind, 'review_match');
+});
+
+test('quest capture feedback is visible only to the quest and creature that started it', () => {
+  const feastleCapture = {
+    questId: 'quest-photo-food',
+    creatureId: 'feastle',
+  };
+  assert.equal(questCaptureBelongsTo(feastleCapture, 'quest-photo-food', 'feastle'), true);
+  assert.equal(questCaptureBelongsTo(feastleCapture, 'quest-log-film', 'flickerbun'), false);
+  assert.equal(questCaptureBelongsTo(feastleCapture, 'quest-photo-food', 'flickerbun'), false);
+});
+
+test('late-night quest evidence is restricted to photos captured from 11pm through 4:59am', () => {
+  const evidence = (observedAt: string) => withCaptureTimeSignals({
+    id: `photo:${observedAt}`,
+    sourceType: 'photo',
+    sourceId: observedAt,
+    observedAt,
+    provider: 'appleVision',
+    confidence: 0.9,
+    signals: [],
+  });
+  assert.equal(isLateNightHour(23), true);
+  assert.equal(isLateNightHour(0), true);
+  assert.equal(isLateNightHour(4), true);
+  assert.equal(isLateNightHour(5), false);
+  assert.equal(isLateNightHour(22), false);
+  assert.equal(evidence('2026-07-13T23:30:00').signals.some((signal) => signal.key === 'time.late_night'), true);
+  assert.equal(evidence('2026-07-14T04:59:00').signals.some((signal) => signal.key === 'time.late_night'), true);
+  assert.equal(evidence('2026-07-14T05:00:00').signals.some((signal) => signal.key === 'time.late_night'), false);
+  assert.equal(evidence('2026-07-14T14:00:00').signals.some((signal) => signal.key === 'time.late_night'), false);
 });
 
 test('insight actions are contextual and optional', () => {

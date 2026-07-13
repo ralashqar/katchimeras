@@ -1,3 +1,4 @@
+import type { DayEvidence } from '@/types/home';
 import type { Facts } from '@/utils/signals/facts';
 import type { SignalProvider } from '@/utils/signals/resolve';
 import { buildLegacyVisionEvidence } from '@/utils/intelligence/evidence';
@@ -7,7 +8,7 @@ export const evidenceProvider: SignalProvider = {
   produces: ['evidence.items', 'memory.qualities'],
   resolve: ({ today }): Partial<Facts> => {
     if (!today) return { 'evidence.items': [], 'memory.qualities': [] };
-    const storedEvidence = today.evidence ?? [];
+    const storedEvidence = (today.evidence ?? []).map(withCaptureTimeSignals);
     const qualities = (today.classifiedMemories ?? []).map((memory) => {
       const evidence = storedEvidence.find((item) => item.sourceId === memory.sourceId);
       return {
@@ -46,3 +47,34 @@ export const evidenceProvider: SignalProvider = {
     return { 'evidence.items': [], 'memory.qualities': qualities };
   },
 };
+
+export function withCaptureTimeSignals(evidence: DayEvidence): DayEvidence {
+  if (evidence.sourceType !== 'photo') return evidence;
+  const capturedAt = Date.parse(evidence.observedAt);
+  if (Number.isNaN(capturedAt)) return evidence;
+  const hour = new Date(capturedAt).getHours();
+  const timeKeys = [
+    isLateNightHour(hour) ? 'time.late_night' : null,
+    hour < 8 ? 'time.before_8am' : null,
+  ].filter((key): key is string => !!key && !evidence.signals.some((signal) => signal.key === key));
+  if (timeKeys.length === 0) return evidence;
+  return {
+    ...evidence,
+    signals: [
+      ...evidence.signals,
+      ...timeKeys.map((key) => ({
+        key,
+        confidence: 1,
+        raw: evidence.observedAt,
+        provider: 'deterministic' as const,
+        source: 'aggregate' as const,
+        centrality: 'primary' as const,
+        qualityStatus: 'confirmed' as const,
+      })),
+    ],
+  };
+}
+
+export function isLateNightHour(hour: number): boolean {
+  return hour >= 23 || hour < 5;
+}
