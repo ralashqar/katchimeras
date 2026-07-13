@@ -509,6 +509,23 @@ export function withMemoryConfirmation(
     const replacement = photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
     if (replacement?.domain && replacement.domain !== 'other') dominantDomain = replacement.domain;
   }
+  if (confirmation.facetKey === 'representation_kind' && photoAnalysis) {
+    const kind = confirmation.facetValue === 'screen_or_digital'
+      ? 'screen_content' as const
+      : confirmation.facetValue === 'physical_scene'
+        ? 'real_world' as const
+        : null;
+    if (kind) {
+      photoAnalysis = {
+        ...photoAnalysis,
+        representation: { kind, confidence: 1, reasons: [`User confirmed ${confirmation.label.toLowerCase()}`] },
+        hierarchy: photoAnalysis.hierarchy ? {
+          ...photoAnalysis.hierarchy,
+          unresolvedFacets: photoAnalysis.hierarchy.unresolvedFacets.filter((item) => item.key !== 'representation'),
+        } : photoAnalysis.hierarchy,
+      };
+    }
+  }
   const currentPrimary = photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
   if (photoAnalysis?.hierarchy && currentPrimary && confirmationAffirmsDomain(confirmation, currentPrimary.domain)) {
     photoAnalysis = {

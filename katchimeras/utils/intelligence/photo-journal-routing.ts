@@ -21,6 +21,7 @@ export type PhotoJournalRouteProposal = {
   confidence: number;
   reasons: string[];
   confirmedFacets: Array<{ key: string; value: string; sensitive?: boolean }>;
+  prefilledSpecific?: string;
 };
 
 const ROUTES: Array<{
@@ -115,7 +116,10 @@ export function photoJournalRouteForConfirmation(key: string, value: string): Ph
   if (key === 'movement_mode' || key === 'activity_kind') return proposal('movement', value === 'sport' ? 'sport' : value, labelFor(value), key, value);
   if (key === 'work_kind') return proposal('work', ({ learning: 'learning', planning: 'planning', admin: 'admin', making: 'creative' } as Record<string, string>)[value] ?? 'focus', labelFor(value), key, value);
   if (key === 'life_event') return proposal('big_event', ({ new_home: 'newHome', new_job: 'newJob', other: 'milestone' } as Record<string, string>)[value] ?? value, labelFor(value), key, value);
-  if (key === 'relationship') return proposal('people', ({ partner: 'partner', my_child: 'my_child', family: 'family', friends: 'friends', my_pet: 'pet' } as Record<string, string>)[value] ?? 'someone_else', labelFor(value), key, value);
+  if (key === 'relationship') {
+    const choiceId = ({ self: 'solo', partner: 'partner', my_child: 'my_child', family: 'family', friends: 'friends', my_pet: 'pet' } as Record<string, string>)[value] ?? 'someone_else';
+    return { ...proposal('people', choiceId, value === 'self' ? 'Me' : labelFor(value), key, value), prefilledSpecific: value === 'self' ? 'Me' : undefined };
+  }
   if (key === 'screen_kind') return proposal('general', 'ordinary', labelFor(value), key, value);
   return null;
 }

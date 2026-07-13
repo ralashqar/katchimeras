@@ -95,12 +95,12 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     detailTitle: 'How was it?', specificFieldLabel: 'Activity detail', specificFieldPlaceholder: 'What did you do?', feelings: REACTIONS,
   },
   {
-    id: 'people', version: 1, title: 'Spent time with someone', icon: 'person.2.fill', adapter: 'relationship',
+    id: 'people', version: 1, title: 'People or time alone', icon: 'person.2.fill', adapter: 'relationship',
     choices: [
       choice('partner', 'Partner', 'heart.fill', ['subject.person']), choice('my_child', 'My child', 'figure.and.child.holdinghands', ['subject.child']),
       choice('family', 'Family', 'person.3.fill', ['subject.group']), choice('friends', 'Friends', 'bubble.left.and.bubble.right.fill', ['subject.group']),
       choice('group', 'A group or gathering', 'person.3.sequence.fill', ['subject.group']), choice('someone_new', 'Someone new', 'sparkles', ['subject.person']),
-      choice('pet', 'A pet', 'pawprint.fill'), choice('solo', 'Time by myself', 'person.fill'), choice('someone_else', 'Someone else', 'person.fill', ['subject.person']),
+      choice('pet', 'A pet', 'pawprint.fill'), { ...choice('solo', 'Me / time by myself', 'person.fill'), specificFieldLabel: 'Memory label', specificFieldPlaceholder: 'Me' }, choice('someone_else', 'Someone else', 'person.fill', ['subject.person']),
     ],
     contextChoices: [{ id: 'meal', label: 'A meal' }, { id: 'celebration', label: 'Celebration' }, { id: 'visit', label: 'A visit' }, { id: 'activity', label: 'An activity' }, { id: 'conversation', label: 'Conversation' }, { id: 'care', label: 'Care' }],
     detailTitle: 'How did it feel?', specificFieldLabel: 'Name', specificFieldPlaceholder: 'Who was it? (optional)', feelings: REACTIONS,

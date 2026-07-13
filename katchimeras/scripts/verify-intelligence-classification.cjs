@@ -113,6 +113,14 @@ const plainLaptop = laptopMemory('plain-laptop', []);
 check('laptop remains a device rather than becoming work or media', plainLaptop.dominantDomain === 'other' && plainLaptop.photoAnalysis.subjects.find((item) => item.role === 'primary')?.canonicalValue === 'device_laptop', JSON.stringify(plainLaptop.photoAnalysis));
 check('plain laptop asks for activity first', plainLaptop.promptState.graphId === 'device-activity' && clarification.currentClarificationNode(plainLaptop)?.question === 'What were you using it for?', JSON.stringify(plainLaptop.promptState));
 check('plain laptop never starts with media identity or work feelings', !/book|movie|productive/i.test(clarification.currentClarificationNode(plainLaptop)?.question ?? ''), clarification.currentClarificationNode(plainLaptop)?.question);
+const representationLaptop = {
+  ...plainLaptop,
+  promptState: { ...plainLaptop.promptState, graphId: 'representation-context', currentNodeId: 'root', currentQuestionId: 'representation.root', status: 'pending', questionCount: 0, answeredNodeIds: [], askedQuestionIds: [], resolvedGoalIds: [], completedGoalIds: [], skippedGoalIds: [] },
+};
+const representationNode = clarification.currentClarificationNode(representationLaptop);
+const confirmedScreenLaptop = clarification.answerClarification(representationLaptop, representationNode, representationNode.options.find((item) => item.id === 'screen'));
+check('confirming On a screen retains screen representation', confirmedScreenLaptop.photoAnalysis?.representation.kind === 'screen_content', JSON.stringify(confirmedScreenLaptop.photoAnalysis?.representation));
+check('confirming On a screen continues to laptop activity instead of the journal root', confirmedScreenLaptop.promptState.graphId === 'device-activity' && clarification.currentClarificationNode(confirmedScreenLaptop)?.question === 'What were you using it for?', JSON.stringify(confirmedScreenLaptop.promptState));
 
 const subtitleLaptop = classification.buildPhotoClassifiedMemory({
   sourceId: 'subtitle-laptop', observedAt: '2026-07-13T11:56:37.768Z',

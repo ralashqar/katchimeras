@@ -73,6 +73,9 @@ check('supplied laptop subtitle OCR is not promoted into the title field', suppl
 const meal = memory([{ value: 'food', confidence: 0.91, provider: 'appleVision', raw: 'food' }]);
 check('food routes to the shared Meal editor', routing.photoJournalRouteProposals(meal)[0]?.id === 'food.meal');
 check('confirmed device gaming routes directly to the Game editor', routing.photoJournalRouteForConfirmation('device_activity', 'gaming')?.id === 'studio.game');
+const selfRoute = routing.photoJournalRouteForConfirmation('relationship', 'self');
+check('confirming Me opens the solo People editor', selfRoute?.id === 'people.solo', JSON.stringify(selfRoute));
+check('confirming Me carries an editable Me label into the editor', selfRoute?.prefilledSpecific === 'Me', JSON.stringify(selfRoute));
 check('people routes never generate OCR suggestions', routing.photoJournalSuggestions({ route: { id: 'people.someone_else', flowId: 'people', choiceId: 'someone_else', label: 'Someone', confidence: 1, reasons: [], confirmedFacets: [] }, vision: { textTokens: ['JOHN SMITH'] } }).length === 0);
 
 if (failures) { console.log(`\n${failures} photo-journal routing check(s) FAILED.`); process.exit(1); }
