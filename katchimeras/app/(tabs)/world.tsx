@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
@@ -9,18 +10,31 @@ import {
   kingdomResidentHexTiles,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
-import { CompanionCard } from '@/components/katchadeck/world/companion-card';
+import { CompanionInteractionSheet } from '@/components/katchadeck/world/companion-interaction-sheet';
+import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
+import { useHomeScreenState } from '@/hooks/use-home-screen-state';
+import type { CompanionReflectionDraft } from '@/types/companion-interaction';
+import type { JournalRouteProposal, JournalSource } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
 import { openingLine, reflectionLine } from '@/utils/katchimera-engagement';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
+import { noteJournalInputAdapter } from '@/utils/journal-input-adapters';
+import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
+
+type ReflectionReview = {
+  draft: CompanionReflectionDraft;
+  source: Extract<JournalSource, { kind: 'text_note' | 'voice_note' }>;
+  route: JournalRouteProposal | null;
+  suggestedSpecific: string | null;
+};
 
 // The Kingdom tab is the persistent hex map: center egg, then one tile per
 // unique Katchimera in hatch order. Capture stays on Today; this is the archive.
@@ -41,6 +55,11 @@ export default function KingdomScreen() {
   } = useDiscoveriesFromArchive(archive);
 
   const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
+  const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
+  const [reflectionReview, setReflectionReview] = useState<ReflectionReview | null>(null);
+  const [reflectionReviewPending, setReflectionReviewPending] = useState(false);
+  const [reflectionSaved, setReflectionSaved] = useState(false);
+  const { addManualJournalEntry } = useHomeScreenState();
 
   const hatches = useMemo<HatchRecord[]>(
     () =>
@@ -61,6 +80,42 @@ export default function KingdomScreen() {
   }, [days, today]);
   const todayFacts = useMemo(() => resolveFactsForDay(today, yesterday), [today, yesterday]);
   const quests = useKingdomQuests({ kingdom, residents, today, todayFacts });
+  const closeSelectedResident = quests.closeSelectedResident;
+
+  useEffect(() => {
+    if (!reflectionSaved) return;
+    const timeout = setTimeout(() => {
+      setReflectionSaved(false);
+      setReflectionDraft(null);
+      closeSelectedResident();
+    }, 1250);
+    return () => clearTimeout(timeout);
+  }, [closeSelectedResident, reflectionSaved]);
+
+  const reviewReflection = async (draft: CompanionReflectionDraft) => {
+    if (!quests.selectedResident || reflectionReviewPending) return;
+    setReflectionReviewPending(true);
+    setReflectionDraft(draft);
+    const sourceId = `companion-reflection:${quests.selectedResident.creature.creatureId}:${Date.now().toString(36)}`;
+    const origin = {
+      kind: 'companion_reflection' as const,
+      creatureId: quests.selectedResident.creature.creatureId,
+      promptId: draft.promptId,
+      promptText: draft.promptText,
+    };
+    const source: ReflectionReview['source'] = draft.kind === 'voice'
+      ? { kind: 'voice_note', sourceId, audioUri: draft.audioUri ?? null, durationMs: draft.durationMs ?? null, origin }
+      : { kind: 'text_note', sourceId, origin };
+    try {
+      const analysis = await noteJournalInputAdapter.analyze({ source, text: draft.text, audioUri: draft.audioUri ?? undefined }, { allowRemote: false });
+      const route = journalRouteNeedsConfirmation(analysis.routes) ? null : analysis.routes[0] ?? null;
+      setReflectionReview({ draft, source, route, suggestedSpecific: analysis.suggestedSpecific ?? null });
+    } catch {
+      setReflectionReview({ draft, source, route: null, suggestedSpecific: null });
+    } finally {
+      setReflectionReviewPending(false);
+    }
+  };
 
   const subtitle = [
     `${kingdom.totals.daysHatched} ${kingdom.totals.daysHatched === 1 ? 'day' : 'days'}`,
@@ -122,14 +177,17 @@ export default function KingdomScreen() {
         />
       ) : null}
 
-      {quests.selectedResident ? (
-        <CompanionCard
+      {quests.selectedResident && !reflectionReview ? (
+        <CompanionInteractionSheet
+          creatureId={quests.selectedResident.creature.creatureId}
           name={quests.selectedResident.creature.name}
+          visualKey={quests.selectedResident.creature.visualKey}
+          accentColor={quests.selectedResident.creature.accentColor}
           houseLevel={quests.selectedResident.resident.houseLevel}
           openingLine={openingLine(quests.selectedResident.creature.name, quests.selectedInteractionState)}
-          thread={quests.selectedResident.thread}
+          initialThread={quests.selectedResident.thread ?? 'insight'}
           onSelectThread={quests.selectThread}
-          onClose={quests.closeSelectedResident}
+          onClose={() => { setReflectionDraft(null); quests.closeSelectedResident(); }}
           activeQuest={quests.selectedActiveQuest ? { title: quests.selectedActiveQuest.title, hint: quests.selectedActiveQuest.hint } : null}
           questComplete={Boolean(quests.selectedQuestRuntime?.complete)}
           questRuntime={quests.selectedQuestRuntime}
@@ -142,9 +200,33 @@ export default function KingdomScreen() {
           onSubmitQuest={quests.submitSelectedQuest}
           onClarifyQuestMatch={quests.clarifySelectedQuestMatch}
           onQuestAction={quests.performSelectedQuestAction}
-          insightText={quests.selectedCompanionData?.line ?? 'This tile remembers the day we met.'}
+          insight={quests.selectedInsight ?? { text: 'This tile remembers the day we met.', action: null }}
+          onInsightAction={quests.performSelectedInsightAction}
           reflectionText={reflectionLine(quests.selectedCompanionData?.archetype ?? '')}
-          onAnswerReflection={quests.answerSelectedReflection}
+          initialReflectionDraft={reflectionDraft}
+          onReflectionDraftChange={setReflectionDraft}
+          onReviewReflection={(draft) => { void reviewReflection(draft); }}
+          reflectionReviewPending={reflectionReviewPending}
+          reflectionSaved={reflectionSaved}
+        />
+      ) : null}
+      {reflectionReview ? (
+        <ManualJournalSheet
+          initialFlowId={reflectionReview.route?.flowId}
+          initialChoiceId={reflectionReview.route?.choiceId}
+          initialSpecific={reflectionReview.suggestedSpecific}
+          initialNote={reflectionReview.draft.text}
+          initialLinkedNote={reflectionReview.draft}
+          initialConfirmedFacets={reflectionReview.route?.confirmedFacets}
+          journalSource={reflectionReview.source}
+          onBackFromInitial={() => setReflectionReview(null)}
+          onClose={() => { setReflectionReview(null); setReflectionDraft(null); quests.closeSelectedResident(); }}
+          onSave={(submission) => {
+            addManualJournalEntry(submission, 'today');
+            setReflectionReview(null);
+            setReflectionSaved(true);
+            if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }}
         />
       ) : null}
     </GestureHandlerRootView>

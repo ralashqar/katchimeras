@@ -1032,8 +1032,15 @@ export type JournalInputKind = 'manual' | 'photo' | 'text_note' | 'voice_note';
 export type JournalSource =
   | { kind: 'manual'; sourceId: string }
   | { kind: 'photo'; sourceId: string; thumbnailUri?: string | null; classifiedMemoryId?: string | null; evidenceId?: string | null }
-  | { kind: 'text_note'; sourceId: string }
-  | { kind: 'voice_note'; sourceId: string; audioUri?: string | null; durationMs?: number | null };
+  | { kind: 'text_note'; sourceId: string; origin?: JournalSourceOrigin | null }
+  | { kind: 'voice_note'; sourceId: string; audioUri?: string | null; durationMs?: number | null; origin?: JournalSourceOrigin | null };
+
+export type JournalSourceOrigin = {
+  kind: 'companion_reflection';
+  creatureId: string;
+  promptId: string;
+  promptText: string;
+};
 
 export type JournalAttachment = {
   id: string;

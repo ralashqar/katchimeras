@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
+import { StatusBadge } from '@/components/katchadeck/ui/status-badge';
 
 type SheetActionRowProps = {
   emoji?: string;
@@ -10,6 +11,8 @@ type SheetActionRowProps = {
   title: string;
   context?: string;
   meta?: string;
+  statusLabel?: string;
+  statusTone?: 'neutral' | 'warning' | 'success' | 'danger';
   completed?: boolean;
   disabled?: boolean;
   onPress?: () => void;
@@ -21,6 +24,8 @@ export function SheetActionRow({
   title,
   context,
   meta,
+  statusLabel,
+  statusTone = 'neutral',
   completed = false,
   disabled = false,
   onPress,
@@ -58,6 +63,7 @@ export function SheetActionRow({
             {meta}
           </ThemedText>
         ) : null}
+        {statusLabel ? <StatusBadge label={statusLabel} tone={statusTone} /> : null}
       </View>
       <View style={[styles.trailing, completed ? styles.trailingDone : null]}>
         <IconSymbol
@@ -74,10 +80,8 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(255,255,255,0.1)',
     borderCurve: 'continuous',
     borderRadius: 16,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 12,

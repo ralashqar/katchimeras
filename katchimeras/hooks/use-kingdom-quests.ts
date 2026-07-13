@@ -1,17 +1,20 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import type { CompanionThread } from '@/components/katchadeck/world/companion-card';
 import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { HomeDayRecord, MemoryQualityScore } from '@/types/home';
 import type { KingdomCreature, KingdomState } from '@/types/kingdom';
+import type { CompanionNavigationIntent, CompanionThread, QuestCaptureFeedback } from '@/types/companion-interaction';
 import {
   archetypeForCreature,
   companionUnit,
   subtypeForCreature,
 } from '@/utils/katchimera-engagement';
+import { insightForArchetype } from '@/utils/companion-interaction';
+import { requestCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import {
   acceptQuest,
   completeQuest,
@@ -51,14 +54,7 @@ type Args = {
   todayFacts: Partial<Facts>;
 };
 
-export type QuestCaptureFeedback = {
-  phase: 'analyzing' | 'matched' | 'possible' | 'no_match';
-  sourceId: string;
-  questId?: string;
-  creatureId?: string;
-  evidenceId?: string | null;
-  reason?: string | null;
-};
+export type { QuestCaptureFeedback } from '@/types/companion-interaction';
 
 export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args) {
   const router = useRouter();
@@ -157,6 +153,13 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const selectedCompanionData = selectedResident
     ? companionDataByCreatureId.get(selectedResident.creature.creatureId)
     : null;
+  const selectedInsight = selectedCompanionData
+    ? insightForArchetype({
+        archetype: selectedCompanionData.archetype,
+        text: selectedCompanionData.line,
+        count: insightCount(selectedCompanionData.archetype, kingdom),
+      })
+    : null;
   const selectedActiveQuest = selectedResident
     ? questFor(companionQuestState, selectedResident.creature.creatureId)
     : null;
@@ -243,9 +246,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       );
       commitCompanionQuestState(result.state);
       setMicrocopy(result.submitted ? 'Photo matched - quest complete' : 'Quest already submitted');
+      if (result.submitted && process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setQuestCaptureFeedback(null);
       if (result.submitted) setSelectedResident(null);
-    }, 900);
+    }, 1200);
     return () => clearTimeout(timeout);
   }, [commitCompanionQuestState, questCaptureFeedback, today?.isoDate]);
 
@@ -253,9 +257,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     (creatureId: string) => {
       const resident = residentById.get(creatureId);
       const creature = creatureById.get(creatureId);
-      if (resident && creature) setSelectedResident({ resident, creature, thread: 'quest' });
+      if (resident && creature) {
+        const active = questFor(companionQuestState, creatureId);
+        const offer = companionDataByCreatureId.get(creatureId)?.quest;
+        const hasOffer = Boolean(offer && today?.isoDate && !hasCompanionQuestForDay(companionQuestState, creatureId, today.isoDate));
+        setSelectedResident({ resident, creature, thread: active || hasOffer ? 'quest' : 'insight' });
+      }
     },
-    [creatureById, residentById]
+    [companionDataByCreatureId, companionQuestState, creatureById, residentById, today?.isoDate]
   );
 
   const acceptSelectedQuest = useCallback(() => {
@@ -385,6 +394,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     router.push('/today');
   }, [router]);
 
+  const performSelectedInsightAction = useCallback(() => {
+    const intent: CompanionNavigationIntent | undefined = selectedInsight?.action?.intent;
+    if (!intent) return;
+    requestCompanionNavigationIntent(intent);
+    setSelectedResident(null);
+    router.push('/today');
+  }, [router, selectedInsight?.action?.intent]);
+
   const selectThread = useCallback((thread: CompanionThread) => {
     setSelectedResident((current) => (current ? { ...current, thread } : current));
   }, []);
@@ -404,6 +421,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectThread,
     selectedActiveQuest,
     selectedCompanionData,
+    selectedInsight,
     selectedInteractionState,
     selectedOffer,
     selectedQuestItems,
@@ -411,5 +429,15 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedResident,
     clarifySelectedQuestMatch,
     submitSelectedQuest,
+    performSelectedInsightAction,
   };
+}
+
+function insightCount(archetype: string, kingdom: KingdomState): number | null {
+  if (archetype === 'food' || archetype === 'savour') return kingdom.totals.foodMoments;
+  if (archetype === 'culture') return kingdom.totals.studioMoments;
+  if (archetype === 'places') return kingdom.totals.places;
+  if (archetype === 'journey' || archetype === 'active') return kingdom.totals.daysHatched;
+  if (archetype === 'craft' || archetype === 'memory' || archetype === 'tender') return kingdom.totals.notes;
+  return null;
 }

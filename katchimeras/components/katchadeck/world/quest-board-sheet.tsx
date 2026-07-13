@@ -24,8 +24,8 @@ export function QuestBoardSheet({
 }) {
   const remaining = quests.filter((quest) => !quest.completed).length;
   return (
-    <MeadowSheet onClose={onClose} kicker="Quest Board" title={remaining > 0 ? 'Ways to grow today' : 'All done for today'}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+    <MeadowSheet onClose={onClose} kicker="Quest Board" title={remaining > 0 ? 'Ways to grow today' : 'All done for today'} variant="tall">
+      <ScrollView style={styles.scrollFrame} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.list}>
           {placeRecovery ? (
             <View style={styles.recoveryCard}>
@@ -73,10 +73,12 @@ export function QuestBoardSheet({
             return (
               <SheetActionRow
                 key={quest.id}
-                emoji={quest.emoji}
+                icon={questIcon(quest.type)}
                 title={quest.title}
                 context={quest.contextLabel}
-                meta={quest.completed ? 'Done' : `+ ${quest.rewardLabel} - ${quest.essenceReward} essence`}
+                meta={`${quest.rewardLabel} · ${quest.essenceReward} essence`}
+                statusLabel={quest.completed ? 'Complete' : 'Available'}
+                statusTone={quest.completed ? 'success' : 'neutral'}
                 completed={quest.completed}
                 onPress={handlePress}
               />
@@ -91,7 +93,21 @@ export function QuestBoardSheet({
   );
 }
 
+function questIcon(type: MemoryQuestType): import('@/components/ui/icon-symbol').IconSymbolName {
+  return ({
+    captureMoment: 'camera.fill',
+    recordVoiceMemory: 'mic.fill',
+    answerReflection: 'leaf.fill',
+    markPlace: 'mappin.and.ellipse',
+    markBigMoment: 'sparkles',
+    saveFoodMemory: 'fork.knife',
+    saveStudioMemory: 'books.vertical.fill',
+    namePatch: 'square.and.pencil',
+  } as const)[type];
+}
+
 const styles = StyleSheet.create({
+  scrollFrame: { flex: 1, minHeight: 0 },
   scroll: { gap: 6, paddingBottom: 4 },
   list: { gap: 8, paddingTop: 4 },
   recoveryCard: {

@@ -55,6 +55,7 @@ import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-compo
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
 import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
+import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
 import { noteRoutesForSignals } from '@/utils/journal-input-adapters';
 import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
@@ -489,7 +490,16 @@ export default function HomeScreen() {
       if (intent) {
         void handleQuestActionIntent(intent);
       }
-    }, [handleQuestActionIntent])
+      const companionIntent = consumeCompanionNavigationIntent();
+      if (!companionIntent) return;
+      if (companionIntent.kind === 'journal_flow') openManualJournal(companionIntent.flowId);
+      else if (companionIntent.kind === 'memory_vault') {
+        setMemoryVaultTab(companionIntent.tab);
+        setMemoryVaultOpen(true);
+      } else if (companionIntent.kind === 'places') setPlacesVaultOpen(true);
+      else if (companionIntent.kind === 'movement') setJourneySheetOpen(true);
+      else if (companionIntent.kind === 'rest') setSleepSheetOpen(true);
+    }, [handleQuestActionIntent, openManualJournal, setJourneySheetOpen, setMemoryVaultOpen, setMemoryVaultTab, setPlacesVaultOpen, setSleepSheetOpen])
   );
 
   const { swipeGesture } = useTodayNavigationController({
