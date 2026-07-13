@@ -42,11 +42,18 @@ type PhotoMemoryInput = {
   confirmations?: UserConfirmation[];
 };
 
+type SceneVisualSupport = {
+  supported: boolean;
+  confidence: number;
+  reasons: string[];
+};
+
 export function buildPhotoClassifiedMemory(input: PhotoMemoryInput): ClassifiedMemory {
   // Foundation text can refine an Apple Vision category, but it cannot create
   // one by itself. Keep the original scene available to the editor as a text
   // suggestion while excluding an uncorroborated generated read here.
-  const classificationInput = input.scene?.source === 'llm' && !sceneHasVisualSupport(input)
+  const visualSupport = input.scene?.source === 'llm' ? sceneVisualSupport(input) : null;
+  const classificationInput = input.scene?.source === 'llm' && !visualSupport?.supported
     ? { ...input, scene: null }
     : input;
   const descriptorScene = classificationInput.scene ?? (input.scene?.source === 'llm'
@@ -55,13 +62,14 @@ export function buildPhotoClassifiedMemory(input: PhotoMemoryInput): ClassifiedM
   const initialObservations = photoObservations(classificationInput);
   const facets = photoFacets(classificationInput, initialObservations);
   const observations = addRecoveredPhotoFacetObservations(initialObservations, facets);
-  const photoAnalysis = buildPhotoAnalysisDescriptor({
+  const initialPhotoAnalysis = buildPhotoAnalysisDescriptor({
     rawVision: input.rawVision,
     vision: input.vision,
     scene: descriptorScene,
     observations,
     facets,
   });
+  const photoAnalysis = applyPhotoConfirmationPolicy(initialPhotoAnalysis, input.confirmations ?? []);
   const primaryValues = photoAnalysis.subjects.filter((subject) => subject.role === 'primary').map((subject) => subject.canonicalValue);
   const supportingValues = photoAnalysis.subjects.filter((subject) => subject.role === 'supporting').map((subject) => subject.canonicalValue);
   const qualities = deriveMemoryQualities({
@@ -491,64 +499,13 @@ export function withMemoryConfirmation(
     facets = [...facets.filter((item) => item.key !== 'media_type'), facet('media_type', 'game', 1, false, true)];
   }
   let dominantDomain = domainAfterConfirmations(memory.dominantDomain, facets, memory.observations, confirmations);
-  const rejectedSubjectValues = memory.photoAnalysis?.subjects
-    .filter((subject) =>
-      (confirmation.facetKey === 'relationship' && confirmation.facetValue === 'incidental' && ['people', 'animal'].includes(subject.domain)) ||
-      (confirmation.facetKey === 'food_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'food') ||
-      (confirmation.facetKey === 'media_type' && confirmation.facetValue === 'other' && subject.domain === 'media') ||
-      (confirmation.facetKey === 'place_category' && confirmation.facetValue === 'incidental' && subject.domain === 'place') ||
-      (confirmation.facetKey === 'activity_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'movement') ||
-      (confirmation.facetKey === 'work_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'work') ||
-      (confirmation.facetKey === 'device_activity' && confirmation.facetValue === 'incidental' && isDeviceSignal(subject.canonicalValue))
-    )
-    .map((subject) => subject.canonicalValue) ?? [];
-  let photoAnalysis = rejectedSubjectValues.length > 0
-    ? replanDescriptorAfterSubjectRejection(memory.photoAnalysis, rejectedSubjectValues)
+  let photoAnalysis = memory.photoAnalysis
+    ? applyPhotoConfirmationPolicy(memory.photoAnalysis, confirmations)
     : memory.photoAnalysis;
-  if (confirmation.facetKey === 'device_activity' && confirmation.facetValue === 'incidental') {
-    const replacement = photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
-    if (replacement?.domain && replacement.domain !== 'other') dominantDomain = replacement.domain;
-  }
-  if (confirmation.facetKey === 'representation_kind' && photoAnalysis) {
-    const kind = confirmation.facetValue === 'screen_or_digital'
-      ? 'screen_content' as const
-      : confirmation.facetValue === 'physical_scene'
-        ? 'real_world' as const
-        : null;
-    if (kind) {
-      photoAnalysis = {
-        ...photoAnalysis,
-        representation: { kind, confidence: 1, reasons: [`User confirmed ${confirmation.label.toLowerCase()}`] },
-        hierarchy: photoAnalysis.hierarchy ? {
-          ...photoAnalysis.hierarchy,
-          unresolvedFacets: photoAnalysis.hierarchy.unresolvedFacets.filter((item) => item.key !== 'representation'),
-        } : photoAnalysis.hierarchy,
-      };
-    }
-  }
-  const currentPrimary = photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
-  if (photoAnalysis?.hierarchy && currentPrimary && confirmationAffirmsDomain(confirmation, currentPrimary.domain)) {
-    photoAnalysis = {
-      ...photoAnalysis,
-      hierarchy: {
-        ...photoAnalysis.hierarchy,
-        unresolvedFacets: photoAnalysis.hierarchy.unresolvedFacets.filter((item) => item.key !== 'primary_subject'),
-      },
-    };
-  }
+  const replacement = photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
+  if (replacement?.domain && replacement.domain !== 'other') dominantDomain = replacement.domain;
   if (confirmation.facetKey === 'primary_subject' && photoAnalysis) {
-    photoAnalysis = selectConfirmedPrimarySubject(photoAnalysis, confirmation.facetValue);
-    if (photoAnalysis.hierarchy) {
-      photoAnalysis = {
-        ...photoAnalysis,
-        hierarchy: {
-          ...photoAnalysis.hierarchy,
-          unresolvedFacets: photoAnalysis.hierarchy.unresolvedFacets.filter((item) => item.key !== 'primary_subject'),
-        },
-      };
-    }
     const selected = photoAnalysis.subjects.find((subject) => subject.role === 'primary');
-    dominantDomain = selected?.domain !== 'other' ? selected?.domain ?? dominantDomain : dominantDomain;
     if (selected) {
       const selectedTypeMatches = facets.some((item) =>
         item.key === 'media_type' && canonicalizeSignal(item.value) === selected.canonicalValue
@@ -617,6 +574,75 @@ function confirmationAffirmsDomain(confirmation: UserConfirmation, domain: Memor
   return false;
 }
 
+function applyPhotoConfirmationPolicy(
+  descriptor: PhotoAnalysisDescriptor,
+  confirmations: UserConfirmation[]
+): PhotoAnalysisDescriptor {
+  const rejectedValues = descriptor.subjects
+    .filter((subject) => confirmations.some((confirmation) => confirmationRejectsSubject(confirmation, subject)))
+    .map((subject) => subject.canonicalValue);
+  let next = rejectedValues.length > 0
+    ? replanDescriptorAfterSubjectRejection(descriptor, rejectedValues) ?? descriptor
+    : descriptor;
+
+  const primaryConfirmation = [...confirmations]
+    .reverse()
+    .find((confirmation) => confirmation.facetKey === 'primary_subject');
+  if (primaryConfirmation) next = selectConfirmedPrimarySubject(next, primaryConfirmation.facetValue);
+
+  const representationConfirmation = [...confirmations]
+    .reverse()
+    .find((confirmation) => confirmation.facetKey === 'representation_kind');
+  const representationKind = representationConfirmation?.facetValue === 'screen_or_digital'
+    ? 'screen_content' as const
+    : representationConfirmation?.facetValue === 'physical_scene'
+      ? 'real_world' as const
+      : null;
+  if (representationKind && representationConfirmation) {
+    next = {
+      ...next,
+      representation: {
+        kind: representationKind,
+        confidence: 1,
+        reasons: [`User confirmed ${representationConfirmation.label.toLowerCase()}`],
+      },
+    };
+  }
+
+  const currentPrimary = next.subjects.find((subject) => subject.role === 'primary');
+  const primaryResolved = !!primaryConfirmation || !!currentPrimary && confirmations.some((confirmation) =>
+    confirmationAffirmsDomain(confirmation, currentPrimary.domain)
+  );
+  if (next.hierarchy && (representationKind || primaryResolved)) {
+    next = {
+      ...next,
+      hierarchy: {
+        ...next.hierarchy,
+        unresolvedFacets: next.hierarchy.unresolvedFacets.filter((facet) =>
+          !(representationKind && facet.key === 'representation') &&
+          !(primaryResolved && facet.key === 'primary_subject')
+        ),
+      },
+    };
+  }
+  return next;
+}
+
+function confirmationRejectsSubject(
+  confirmation: UserConfirmation,
+  subject: PhotoAnalysisDescriptor['subjects'][number]
+): boolean {
+  return (
+    (confirmation.facetKey === 'relationship' && confirmation.facetValue === 'incidental' && ['people', 'animal'].includes(subject.domain)) ||
+    (confirmation.facetKey === 'food_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'food') ||
+    (confirmation.facetKey === 'media_type' && confirmation.facetValue === 'other' && subject.domain === 'media') ||
+    (confirmation.facetKey === 'place_category' && confirmation.facetValue === 'incidental' && subject.domain === 'place') ||
+    (confirmation.facetKey === 'activity_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'movement') ||
+    (confirmation.facetKey === 'work_kind' && confirmation.facetValue === 'incidental' && subject.domain === 'work') ||
+    (confirmation.facetKey === 'device_activity' && confirmation.facetValue === 'incidental' && isDeviceSignal(subject.canonicalValue))
+  );
+}
+
 function selectConfirmedPrimarySubject(
   descriptor: PhotoAnalysisDescriptor,
   selectedValue: string
@@ -630,6 +656,8 @@ function selectConfirmedPrimarySubject(
     ...subject,
     role: subject.id === selected.id
       ? 'primary' as const
+      : selected.domain === 'food' && subject.domain === 'people'
+        ? 'incidental' as const
       : subject.role === 'incidental'
         ? 'incidental' as const
         : 'supporting' as const,
@@ -740,15 +768,9 @@ function buildMemory(input: Omit<ClassifiedMemory, 'assignments' | 'promptState'
   };
 }
 
-function sceneMediaHasVisualSupport(input: PhotoMemoryInput): boolean {
+function sceneMediaVisualSupport(input: PhotoMemoryInput): SceneVisualSupport {
   const mediaType = input.scene?.media?.mediaType;
-  if (!mediaType) return false;
-  const visual = [
-    ...(input.rawVision?.labels ?? []).map((item) => item.name),
-    ...(input.rawVision?.regionClassifications ?? []).flatMap((item) => item.labels.map((label) => label.name)),
-    ...(input.vision?.concepts ?? []).map((item) => item.name),
-    ...(input.vision?.details ?? []),
-  ].join(' ').toLowerCase();
+  if (!mediaType) return { supported: false, confidence: 0, reasons: ['Foundation media type was missing'] };
   const pattern: Record<string, RegExp> = {
     book: /\b(book|publication|paperback|hardcover|novel|ebook)\b/,
     film: /\b(movie|film|cinema|movie poster|film poster|video player)\b/,
@@ -758,19 +780,17 @@ function sceneMediaHasVisualSupport(input: PhotoMemoryInput): boolean {
     art: /\b(art|artwork|painting|sculpture|canvas|gallery)\b/,
     other: /\b(screen content|television|video player|document)\b/,
   };
-  return (pattern[mediaType] ?? pattern.other).test(visual);
+  return supportForPattern(input, pattern[mediaType] ?? pattern.other, input.scene?.source === 'llm' ? 0.35 : 0.1, `visual ${mediaType}`);
 }
 
-function sceneHasVisualSupport(input: PhotoMemoryInput): boolean {
+function sceneMediaHasVisualSupport(input: PhotoMemoryInput): boolean {
+  return sceneMediaVisualSupport(input).supported;
+}
+
+function sceneVisualSupport(input: PhotoMemoryInput): SceneVisualSupport {
   const scene = input.scene;
-  if (!scene) return false;
-  if (scene.type === 'media') return sceneMediaHasVisualSupport(input);
-  const visual = [
-    ...(input.rawVision?.labels ?? []).map((item) => item.name),
-    ...(input.rawVision?.regionClassifications ?? []).flatMap((item) => item.labels.map((label) => label.name)),
-    ...(input.vision?.concepts ?? []).map((item) => item.name),
-    ...(input.vision?.details ?? []),
-  ].join(' ').toLowerCase();
+  if (!scene) return { supported: false, confidence: 0, reasons: ['Scene read was missing'] };
+  if (scene.type === 'media') return sceneMediaVisualSupport(input);
   const domain = scene.memoryDomain ?? scene.type;
   const patterns: Partial<Record<MemoryDomain | SceneRead['type'], RegExp>> = {
     food: /\b(food|meal|dish|drink|beverage|coffee|tea|dessert|cake|pizza|sushi|ramen|restaurant)\b/,
@@ -779,16 +799,74 @@ function sceneHasVisualSupport(input: PhotoMemoryInput): boolean {
     people: /\b(person|people|adult|child|baby|group|human|face)\b/,
     social: /\b(person|people|adult|child|baby|group|human|face)\b/,
     nature: /\b(park|forest|garden|beach|coast|mountain|water|lake|river|flower|snow|sunset|nature)\b/,
-    place: /\b(place|building|structure|city|street|home|house|room|sofa|couch|furniture|interior|living room|cafe|museum|library|park|beach|forest)\b/,
+    place: /\b(place|building|structure|city|street|home|house|room|sofa|couch|furniture|interior|living room|cafe|museum|library|park|beach|forest|sign)\b/,
     movement: /\b(walk|run|running|cycle|bicycle|sport|gym|workout|exercise|football|basketball|tennis|travel|transit)\b/,
     activity: /\b(walk|run|running|cycle|bicycle|sport|gym|workout|exercise|football|basketball|tennis|travel|transit)\b/,
     work: /\b(work|office|spreadsheet|document editor|code editor|ide|keyboard)\b/,
     screen: /\b(screen|computer|laptop|phone|tablet|monitor|television|consumer electronics)\b/,
     document: /\b(document|sign|paper|publication|book|text)\b/,
   };
-  if (scene.type === 'document' && (input.rawVision?.documentDetected || (input.vision?.documentCoverage ?? 0) >= 0.5)) return true;
-  if (scene.type === 'social' && (input.rawVision?.humanCount ?? input.rawVision?.faceCount ?? input.vision?.maxFaceCount ?? 0) > 0) return true;
-  return (patterns[domain] ?? patterns[scene.type])?.test(visual) ?? false;
+  if (scene.type === 'document' && (input.rawVision?.documentDetected || (input.vision?.documentCoverage ?? 0) >= 0.5)) {
+    return { supported: true, confidence: 0.78, reasons: ['Vision detected document structure'] };
+  }
+  if (scene.type === 'social' || domain === 'people') return peopleSceneVisualSupport(input);
+  const pattern = patterns[domain] ?? patterns[scene.type];
+  return pattern
+    ? supportForPattern(input, pattern, 0.35, `visual ${domain}`)
+    : { supported: false, confidence: 0, reasons: [`No visual support policy exists for ${domain}`] };
+}
+
+function peopleSceneVisualSupport(input: PhotoMemoryInput): SceneVisualSupport {
+  const faceCount = Math.max(input.rawVision?.faceCount ?? 0, input.vision?.maxFaceCount ?? 0);
+  const humanCount = Math.max(input.rawVision?.humanCount ?? 0, input.rawVision?.humans?.length ?? 0);
+  const humanCoverage = [
+    ...(input.rawVision?.humans ?? []),
+    ...(input.rawVision?.faces ?? []),
+    ...(input.vision?.analysisRegions ?? []).filter((region) => region.kind === 'human' || region.kind === 'face'),
+  ].reduce((largest, region) => Math.max(largest, region.width * region.height), 0);
+  if (faceCount > 0 || humanCount > 0 || humanCoverage >= 0.08) {
+    const confidence = Math.min(0.95, Math.max(0.58, 0.58 + humanCoverage * 0.5, faceCount >= 2 || humanCount >= 2 ? 0.75 : 0));
+    return { supported: true, confidence: round2(confidence), reasons: ['Vision detected a face or meaningful human region'] };
+  }
+  return supportForPattern(input, /\b(person|people|adult|group|crowd|family|friends|human|face)\b/, 0.45, 'strong people label');
+}
+
+function supportForPattern(input: PhotoMemoryInput, pattern: RegExp, threshold: number, reason: string): SceneVisualSupport {
+  const matches = appleVisionSupportSignals(input).filter((signal) => pattern.test(`${signal.key} ${signal.raw ?? ''}`));
+  const confidence = Math.max(0, ...matches.map((signal) => signal.confidence));
+  return {
+    supported: confidence >= threshold,
+    confidence: round2(confidence),
+    reasons: confidence >= threshold ? [`${reason} at ${confidence.toFixed(2)}`] : [`${reason} was only ${confidence.toFixed(2)}`],
+  };
+}
+
+function appleVisionSupportSignals(input: PhotoMemoryInput) {
+  const combined = [
+    ...(input.rawVision ? visionResultToSignals(input.rawVision) : []),
+    ...(input.vision ? visionSummaryToSignals(input.vision) : []),
+  ];
+  const strongest = new Map<string, (typeof combined)[number]>();
+  combined.forEach((signal) => {
+    const existing = strongest.get(signal.key);
+    if (!existing || existing.confidence < signal.confidence) strongest.set(signal.key, signal);
+  });
+  return [...strongest.values()];
+}
+
+function calibratedSceneConfidence(input: PhotoMemoryInput): number {
+  const base = input.scene?.source === 'llm' ? input.scene.confidence ?? 0.82 : input.scene?.source === 'semantic' ? input.scene.confidence ?? 0.72 : 0.55;
+  if (input.scene?.source !== 'llm') return base;
+  const support = sceneVisualSupport(input);
+  return Math.min(base, Math.min(1, support.confidence + 0.1));
+}
+
+function visualSupportForSubject(input: PhotoMemoryInput, subject: string): number {
+  const canonical = canonicalizeSignal(subject);
+  if (!canonical) return 0;
+  return Math.max(0, ...appleVisionSupportSignals(input)
+    .filter((signal) => signal.key === canonical)
+    .map((signal) => signal.confidence));
 }
 
 function photoObservations(input: PhotoMemoryInput): IntelligenceObservation[] {
@@ -812,7 +890,7 @@ function photoObservations(input: PhotoMemoryInput): IntelligenceObservation[] {
   const unsupportedGeneratedMedia = input.scene?.type === 'media' && !!input.scene.media && !sceneMediaHasVisualSupport(input);
   if (input.scene && input.scene.type !== 'other' && !deterministicScreenBook && !unsupportedGeneratedMedia) {
     const provider = input.scene.source === 'llm' ? 'appleFoundation' : input.scene.source === 'semantic' ? 'appleNaturalLanguage' : 'deterministic';
-    const confidence = input.scene.source === 'llm' ? input.scene.confidence ?? 0.82 : input.scene.source === 'semantic' ? input.scene.confidence ?? 0.72 : 0.55;
+    const confidence = calibratedSceneConfidence(input);
     push(input.scene.type, confidence, provider, input.scene.detail);
     // Preserve the specific subject as a canonical observation. Previously a
     // Foundation read of `place: city skyline` was flattened to `place`, which
@@ -820,7 +898,13 @@ function photoObservations(input: PhotoMemoryInput): IntelligenceObservation[] {
     if (input.scene.detail) push(input.scene.detail, confidence, provider, input.scene.detail);
     if (input.scene.media?.mediaType) push(input.scene.media.mediaType, confidence, provider, input.scene.media.title ?? input.scene.media.mediaType);
     if (input.scene.food?.label) push(input.scene.food.label, confidence, provider, input.scene.food.label);
-    input.scene.supportingSubjects?.forEach((subject) => push(subject, confidence * 0.75, provider, subject));
+    input.scene.supportingSubjects?.forEach((subject) => {
+      if (input.scene?.source !== 'llm') push(subject, confidence * 0.75, provider, subject);
+      else {
+        const visualConfidence = visualSupportForSubject(input, subject);
+        if (visualConfidence >= 0.35) push(subject, Math.min(confidence * 0.75, visualConfidence + 0.1), provider, subject);
+      }
+    });
   }
   return observations.sort((left, right) => right.confidence - left.confidence).slice(0, 20);
 }
@@ -870,7 +954,7 @@ function photoFacets(input: PhotoMemoryInput, observations: IntelligenceObservat
     // from the user's answer.
     facets.push(facet('person_subject', prominentPeople.kind, prominentPeople.confidence ?? 0.6, true));
   }
-  if (input.scene?.media && !deterministicScreenBook && !unsupportedGeneratedMedia) facets.push(facet('media_type', input.scene.media.mediaType, input.scene.source === 'llm' ? 0.82 : 0.62));
+  if (input.scene?.media && !deterministicScreenBook && !unsupportedGeneratedMedia) facets.push(facet('media_type', input.scene.media.mediaType, input.scene.source === 'llm' ? calibratedSceneConfidence(input) : 0.62));
   if (input.scene?.media?.title && !deterministicScreenBook && !unsupportedGeneratedMedia) facets.push(facet('media_title', input.scene.media.title, 0.78));
   // Essence and prompt planning must consume the same semantic anchor. The
   // Studio detector is deliberately prominence-gated (leading concepts plus
@@ -894,7 +978,7 @@ function photoFacets(input: PhotoMemoryInput, observations: IntelligenceObservat
       facets.push(facet('media_type', 'book', 0.74));
     }
   }
-  if (input.scene?.food?.detected) facets.push(facet('food_item', input.scene.food.label ?? 'food', input.scene.source === 'llm' ? 0.82 : 0.7));
+  if (input.scene?.food?.detected) facets.push(facet('food_item', input.scene.food.label ?? 'food', input.scene.source === 'llm' ? calibratedSceneConfidence(input) : 0.7));
   return facets;
 }
 
@@ -1126,7 +1210,7 @@ function resolveDomain(facets: MemoryFacet[], observations: IntelligenceObservat
   const values = new Set(observations.map((item) => item.value));
   if (facets.some((item) => item.key === 'media_type') || values.has('media')) return 'media';
   if (facets.some((item) => item.key === 'person_subject')) return 'people';
-  if (facets.some((item) => item.key === 'food_item') || values.has('food')) return 'food';
+  if (facets.some((item) => item.key === 'food_item') || values.has('food') || values.has('drink')) return 'food';
   if (facets.some((item) => item.key === 'animal_kind')) return 'animal';
   if (facets.some((item) => item.key === 'people_present') || values.has('social')) return 'people';
   if (values.has('focus_work')) return 'work';
@@ -1177,7 +1261,7 @@ function resolvePhotoDomain(
 }
 
 function observationMatchesDomain(value: string, domain: MemoryDomain): boolean {
-  if (domain === 'food') return ['food', 'coffee', 'bakery', 'pizza', 'sushi', 'ramen', 'dessert', 'bubble_tea'].includes(value);
+  if (domain === 'food') return ['food', 'drink', 'coffee', 'bakery', 'pizza', 'sushi', 'ramen', 'dessert', 'bubble_tea'].includes(value);
   if (domain === 'media') return ['cinema', 'film', 'show', 'gaming', 'concert', 'music', 'bookstore'].includes(value);
   if (domain === 'nature') return ['park', 'forest', 'garden', 'beach', 'mountains', 'water'].includes(value);
   if (domain === 'place') return ['place', 'home', 'city', 'travel', 'bookstore', 'library', 'museum', 'farm'].includes(value);

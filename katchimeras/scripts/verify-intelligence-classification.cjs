@@ -584,7 +584,7 @@ const balancedBookAndPerson = classification.buildPhotoClassifiedMemory({
   scene: { type: 'social', label: 'Time together', detail: 'person', supportingSubjects: ['book'], source: 'llm' },
 });
 const balancedFocus = clarification.currentClarificationNode(balancedBookAndPerson);
-check('balanced book and person evidence asks a generic focus question', balancedBookAndPerson.promptState.graphId === 'subject-focus' && balancedFocus?.question === 'What was this moment mainly about?', JSON.stringify(balancedBookAndPerson.photoAnalysis));
+check('balanced book and person evidence asks a generic focus question', balancedBookAndPerson.promptState.graphId === 'subject-focus' && balancedFocus?.question === 'What was this photo mainly about?', JSON.stringify(balancedBookAndPerson.photoAnalysis));
 check('generic focus question offers both detected subjects', balancedFocus?.options.some((item) => item.facetValue === 'book') && balancedFocus?.options.some((item) => item.facetValue === 'person'), JSON.stringify(balancedFocus?.options));
 const focusedBook = clarification.answerClarification(
   balancedBookAndPerson,
@@ -599,6 +599,119 @@ const confirmedFocusedBook = clarification.answerClarification(
   focusedBookType.options.find((item) => item.id === 'confirm_book')
 );
 check('focused Book continues to OCR title validation', clarification.currentClarificationNode(confirmedFocusedBook)?.question.includes('Norwegian Wood'), JSON.stringify(confirmedFocusedBook.promptState));
+
+const drinkingGlassFixture = {
+  sourceId: 'hand-holding-drinking-glass', observedAt: '2026-07-13T13:11:34.090Z',
+  rawVision: {
+    labels: [
+      { name: 'drinking_glass', confidence: 0.904296875 },
+      { name: 'tableware', confidence: 0.904296875 },
+      { name: 'utensil', confidence: 0.904296875 },
+      { name: 'liquid', confidence: 0.14453423023223877 },
+      { name: 'drink', confidence: 0.14453421533107758 },
+      { name: 'wine', confidence: 0.14453330636024475 },
+      { name: 'red_wine', confidence: 0.14453125 },
+      { name: 'people', confidence: 0.12405402213335037 },
+      { name: 'adult', confidence: 0.123291015625 },
+    ],
+    text: [], faceCount: 0, humanCount: 0, animals: [], humans: [], faces: [], recognizedText: [],
+    dominantSubject: { x: 0.06195068359375, y: 0.2275390625, width: 0.74224853515625, height: 0.6263427734375, confidence: 0.5703125 },
+    salientSubjects: [{ x: 0.06195068359375, y: 0.2275390625, width: 0.74224853515625, height: 0.6263427734375, confidence: 0.5703125 }],
+    regionClassifications: [], documentDetected: false, captureSource: 'camera',
+  },
+  vision: {
+    concepts: [
+      ['drinking glass', 0.904296875], ['tableware', 0.904296875], ['utensil', 0.904296875],
+      ['liquid', 0.14453423023223877], ['drink', 0.14453421533107758], ['wine', 0.14453330636024475],
+      ['red wine', 0.14453125], ['person', 0.123291015625],
+    ].map(([name, peakConfidence]) => ({ name, salience: peakConfidence, coverage: 1, count: 1, peakConfidence })),
+    details: ['drinking glass', 'tableware', 'utensil', 'liquid', 'drink', 'wine', 'red wine', 'adult'],
+    maxFaceCount: 0, faceCoverage: 0, textTokens: [], analyzedPhotoCount: 1,
+    dominantSubjectCoverage: 0.46490200608968735, documentCoverage: 0,
+    representation: { kind: 'real_world', confidence: 0.88, reasons: ['Captured with the in-app camera'] },
+    analysisRegions: [{ x: 0.06195068359375, y: 0.2275390625, width: 0.74224853515625, height: 0.6263427734375, confidence: 0.5703125, kind: 'saliency' }],
+  },
+  scene: {
+    memoryDomain: 'people', type: 'social', label: 'Time with people', detail: 'people', source: 'llm',
+    supportingSubjects: ['drink'], representation: 'real_world', confidence: 1,
+  },
+};
+const drinkingGlass = classification.buildPhotoClassifiedMemory(drinkingGlassFixture);
+const drinkingGlassPrimary = drinkingGlass.photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
+check('drinking_glass preserves its original Vision confidence as canonical drink', drinkingGlass.observations.some((item) => item.value === 'drink' && item.provider === 'appleVision' && item.confidence >= 0.9), JSON.stringify(drinkingGlass.observations));
+check('exact drinking-glass fixture classifies Drink as primary', drinkingGlass.dominantDomain === 'food' && drinkingGlassPrimary?.canonicalValue === 'drink' && drinkingGlassPrimary.score >= 0.9, JSON.stringify(drinkingGlass.photoAnalysis));
+check('weak people labels without a face or human region do not create People', !drinkingGlass.photoAnalysis?.subjects.some((subject) => subject.domain === 'people' && subject.role !== 'incidental'), JSON.stringify(drinkingGlass.photoAnalysis));
+check('uncorroborated Foundation Social is excluded', !drinkingGlass.observations.some((item) => item.provider === 'appleFoundation' && item.value === 'social'), JSON.stringify(drinkingGlass.observations));
+check('drinking-glass fixture has no consistency warnings', consistency.classifiedMemoryConsistencyWarnings(drinkingGlass).length === 0, JSON.stringify(consistency.classifiedMemoryConsistencyWarnings(drinkingGlass)));
+
+const comparablePersonAndDrink = classification.buildPhotoClassifiedMemory({
+  sourceId: 'comparable-person-drink', observedAt: '2026-07-13T13:11:50.000Z',
+  rawVision: {
+    labels: [{ name: 'people', confidence: 0.84 }, { name: 'drinking_glass', confidence: 0.82 }, { name: 'tableware', confidence: 0.78 }],
+    text: [], faceCount: 1, humanCount: 1, animals: [], recognizedText: [], documentDetected: false, captureSource: 'camera',
+    humans: [{ x: 0.05, y: 0.16, width: 0.4, height: 0.66, confidence: 0.86 }],
+    faces: [{ x: 0.16, y: 0.22, width: 0.14, height: 0.16, confidence: 0.88 }],
+    dominantSubject: { x: 0.05, y: 0.16, width: 0.4, height: 0.66, confidence: 0.86 },
+    salientSubjects: [
+      { x: 0.05, y: 0.16, width: 0.4, height: 0.66, confidence: 0.86 },
+      { x: 0.52, y: 0.2, width: 0.4, height: 0.62, confidence: 0.84 },
+    ],
+    regionClassifications: [{
+      region: { x: 0.52, y: 0.2, width: 0.4, height: 0.62, confidence: 0.84 },
+      labels: [{ name: 'drinking_glass', confidence: 0.82 }],
+    }],
+  },
+  vision: {
+    concepts: [
+      { name: 'person', salience: 0.84, coverage: 1, count: 1, peakConfidence: 0.84 },
+      { name: 'drinking glass', salience: 0.82, coverage: 1, count: 1, peakConfidence: 0.82 },
+    ],
+    details: ['people', 'drinking glass'], maxFaceCount: 1, faceCoverage: 0.0224,
+    textTokens: [], analyzedPhotoCount: 1, dominantSubjectCoverage: 0.264, documentCoverage: 0,
+  },
+});
+const personDrinkQuestion = clarification.currentClarificationNode(comparablePersonAndDrink);
+check('comparable localized person and drink evidence asks subject focus', comparablePersonAndDrink.promptState.graphId === 'subject-focus' && personDrinkQuestion?.question === 'What was this photo mainly about?', JSON.stringify(comparablePersonAndDrink.photoAnalysis));
+check('person/drink focus uses concrete labels', personDrinkQuestion?.options.some((item) => item.facetValue === 'drink' && item.label === 'The drink') && personDrinkQuestion?.options.some((item) => item.facetValue === 'person' && item.label === 'Me / the person'), JSON.stringify(personDrinkQuestion?.options));
+const choseDrink = clarification.answerClarification(
+  comparablePersonAndDrink,
+  personDrinkQuestion,
+  personDrinkQuestion.options.find((item) => item.facetValue === 'drink'),
+  new Date('2026-07-13T13:11:55.000Z')
+);
+check('choosing Drink makes People incidental and replans to Food', choseDrink.dominantDomain === 'food' && choseDrink.photoAnalysis?.subjects.some((subject) => subject.domain === 'people' && subject.role === 'incidental') && choseDrink.promptState.graphId === 'food-context', JSON.stringify(choseDrink));
+
+const architecturalGlass = classification.buildPhotoClassifiedMemory({
+  sourceId: 'architectural-glass', observedAt: '2026-07-13T13:12:00.000Z',
+  rawVision: {
+    labels: [{ name: 'glass', confidence: 0.92 }, { name: 'window', confidence: 0.88 }, { name: 'building', confidence: 0.84 }, { name: 'material', confidence: 0.8 }],
+    text: [], faceCount: 0, humanCount: 0, animals: [], humans: [], faces: [], recognizedText: [], dominantSubject: null,
+    regionClassifications: [], documentDetected: false, captureSource: 'camera',
+  },
+  scene: { type: 'place', memoryDomain: 'place', label: 'A place', detail: 'building', source: 'rules' },
+});
+check('architectural glass never canonicalizes to Drink', !architecturalGlass.observations.some((item) => item.value === 'drink'), JSON.stringify(architecturalGlass.observations));
+
+const replayedNotAboutPeople = classification.buildPhotoClassifiedMemory({
+  ...drinkingGlassFixture,
+  sourceId: 'replayed-not-about-people',
+  rawVision: {
+    ...drinkingGlassFixture.rawVision,
+    labels: drinkingGlassFixture.rawVision.labels.map((item) => item.name === 'people' || item.name === 'adult' ? { ...item, confidence: 0.78 } : item),
+    faceCount: 1, humanCount: 1,
+    humans: [{ x: 0.6, y: 0.15, width: 0.32, height: 0.68, confidence: 0.82 }],
+    faces: [{ x: 0.7, y: 0.2, width: 0.12, height: 0.14, confidence: 0.84 }],
+  },
+  vision: {
+    ...drinkingGlassFixture.vision,
+    concepts: drinkingGlassFixture.vision.concepts.map((item) => item.name === 'person' ? { ...item, salience: 0.78, peakConfidence: 0.78 } : item),
+    maxFaceCount: 1, faceCoverage: 0.02,
+  },
+  confirmations: [{ promptId: 'people.relationship', optionId: 'not_about_people', label: 'Not about the people', facetKey: 'relationship', facetValue: 'incidental', createdAt: '2026-07-13T13:12:30.000Z' }],
+});
+const replayPrimary = replayedNotAboutPeople.photoAnalysis?.subjects.find((subject) => subject.role === 'primary');
+check('retained Not about people confirmation promotes Drink during rebuild', replayedNotAboutPeople.dominantDomain === 'food' && replayPrimary?.canonicalValue === 'drink' && replayedNotAboutPeople.photoAnalysis?.subjects.some((subject) => subject.domain === 'people' && subject.role === 'incidental'), JSON.stringify(replayedNotAboutPeople));
+check('replayed rejection has no primary/domain consistency warning', consistency.classifiedMemoryConsistencyWarnings(replayedNotAboutPeople).length === 0, JSON.stringify(consistency.classifiedMemoryConsistencyWarnings(replayedNotAboutPeople)));
 
 const movement = classification.buildMovementClassifiedMemory({
   sourceId: 'today', observedAt: '2026-07-10T18:00:00.000Z', movement: 'transit', subtype: 'train',

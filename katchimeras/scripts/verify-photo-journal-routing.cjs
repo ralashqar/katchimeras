@@ -73,6 +73,8 @@ check('supplied laptop subtitle OCR is not promoted into the title field', suppl
 const meal = memory([{ value: 'food', confidence: 0.91, provider: 'appleVision', raw: 'food' }]);
 check('food routes to the shared Meal editor', routing.photoJournalRouteProposals(meal)[0]?.id === 'food.meal');
 check('confirmed device gaming routes directly to the Game editor', routing.photoJournalRouteForConfirmation('device_activity', 'gaming')?.id === 'studio.game');
+check('confirmed Drink focus routes directly to Food / Drink', routing.photoJournalRouteForConfirmation('primary_subject', 'drink')?.id === 'food.drink');
+check('confirmed People focus routes into the People editor', routing.photoJournalRouteForConfirmation('primary_subject', 'person')?.flowId === 'people');
 const selfRoute = routing.photoJournalRouteForConfirmation('relationship', 'self');
 check('confirming Me opens the solo People editor', selfRoute?.id === 'people.solo', JSON.stringify(selfRoute));
 check('confirming Me carries an editable Me label into the editor', selfRoute?.prefilledSpecific === 'Me', JSON.stringify(selfRoute));

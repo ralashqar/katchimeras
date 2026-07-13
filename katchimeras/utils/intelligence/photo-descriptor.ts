@@ -159,13 +159,24 @@ export function replanDescriptorAfterSubjectRejection(
   const subjects = descriptor.subjects.map((subject) =>
     rejected.has(subject.canonicalValue) ? { ...subject, role: 'incidental' as const } : { ...subject }
   );
-  const next = subjects
-    .filter((subject) => subject.role !== 'incidental')
-    .sort((left, right) => right.score - left.score)[0] ?? null;
+  const eligible = subjects.filter((subject) => subject.role !== 'incidental');
+  const meaningful = eligible.filter((subject) => subject.domain !== 'other' || isDeviceSignal(subject.canonicalValue));
+  const next = (meaningful.length > 0 ? meaningful : eligible)
+    .sort((left, right) => subjectCentralityScore(right) - subjectCentralityScore(left))[0] ?? null;
   subjects.forEach((subject) => {
     if (subject.role !== 'incidental') subject.role = subject.id === next?.id ? 'primary' : 'supporting';
   });
-  return { ...descriptor, dominantSubjectId: next?.id ?? null, subjects };
+  const remainingValues = new Set(subjects.filter((subject) => subject.role !== 'incidental').map((subject) => subject.canonicalValue));
+  const hierarchy = descriptor.hierarchy ? {
+    ...descriptor.hierarchy,
+    unresolvedFacets: descriptor.hierarchy.unresolvedFacets.flatMap((facet) => {
+      if (facet.key === 'relationship' && next?.domain !== 'people' && next?.domain !== 'animal') return [];
+      if (facet.key !== 'primary_subject') return [facet];
+      const candidates = facet.candidates.filter((candidate) => remainingValues.has(candidate));
+      return candidates.length >= 2 ? [{ ...facet, candidates }] : [];
+    }),
+  } : descriptor.hierarchy;
+  return { ...descriptor, dominantSubjectId: next?.id ?? null, subjects, hierarchy };
 }
 
 function dominantSubjectValue(
@@ -321,7 +332,7 @@ function regionForSubject(
     if (dedicatedAnimalRegion) return dedicatedAnimalRegion;
   }
   if (['child', 'baby', 'person', 'adult', 'people', 'social', 'group'].includes(value)) {
-    return raw?.humans?.[0] ?? raw?.faces?.[0] ?? regions.find((region) => region.kind === 'human' || region.kind === 'face') ?? raw?.dominantSubject ?? null;
+    return raw?.humans?.[0] ?? raw?.faces?.[0] ?? regions.find((region) => region.kind === 'human' || region.kind === 'face') ?? null;
   }
   const spatialMatch = raw?.regionClassifications
     ?.flatMap((item) => item.labels.map((label) => ({ item, label })))

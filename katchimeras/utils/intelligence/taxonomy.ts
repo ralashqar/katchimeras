@@ -14,6 +14,7 @@ type ConceptRule = {
 };
 
 const RULES: ConceptRule[] = [
+  { concept: 'drink', pattern: /drinking glass|drinkware|glassware|wine glass|stemware|tumbler|goblet|beverage|\bdrink\b/i },
   { concept: 'coffee', pattern: /coffee|espresso|latte|cappuccino|caf[eé]|barista|mocha/i },
   { concept: 'bakery', pattern: /bakery|patisserie|pastry|bread|croissant|cake|donut|doughnut|baked/i },
   { concept: 'pizza', pattern: /pizza/i },
@@ -128,9 +129,11 @@ export function visionResultToSignals(result: PhotoVisionResult, confidenceFloor
     ...(result.labels ?? []),
     ...(result.regionClassifications ?? []).flatMap((item) => item.labels),
   ];
+  const bareGlassIsDrink = allowsBareGlassAsDrink(labels.map((label) => label.name));
   for (const label of labels) {
     if ((label.confidence ?? 0) < confidenceFloor) continue;
-    const key = canonicalizeSignal(label.name);
+    const normalized = label.name.trim().toLowerCase().replace(/_/g, ' ');
+    const key = normalized === 'glass' && bareGlassIsDrink ? 'drink' : canonicalizeSignal(label.name);
     if (!key) continue;
     const existing = signals.get(key);
     if (!existing || existing.confidence < label.confidence) {
@@ -154,8 +157,11 @@ export function visionResultToSignals(result: PhotoVisionResult, confidenceFloor
 
 export function visionSummaryToSignals(summary: DayVisionSummary, source: CanonicalSignal['source'] = 'aggregate'): CanonicalSignal[] {
   const signals = new Map<string, CanonicalSignal>();
+  const terms = [...(summary.concepts ?? []).map((concept) => concept.name), ...(summary.details ?? [])];
+  const bareGlassIsDrink = allowsBareGlassAsDrink(terms);
   for (const concept of summary.concepts ?? []) {
-    const key = canonicalizeSignal(concept.name);
+    const normalized = concept.name.trim().toLowerCase().replace(/_/g, ' ');
+    const key = normalized === 'glass' && bareGlassIsDrink ? 'drink' : canonicalizeSignal(concept.name);
     if (!key) continue;
     // Coverage is always 1 for a single photo, so it must not inflate every
     // weak label to 0.80. Only repeated evidence across photos earns a boost.
@@ -170,7 +176,8 @@ export function visionSummaryToSignals(summary: DayVisionSummary, source: Canoni
     });
   }
   for (const detail of summary.details ?? []) {
-    const key = canonicalizeSignal(detail);
+    const normalized = detail.trim().toLowerCase().replace(/_/g, ' ');
+    const key = normalized === 'glass' && bareGlassIsDrink ? 'drink' : canonicalizeSignal(detail);
     if (!key || signals.has(key)) continue;
     signals.set(key, { key, confidence: 0.42, raw: detail, source });
   }
@@ -199,4 +206,12 @@ export function seedIdForCanonicalSignal(signalKey: string): string | null {
 
 function clamp01(value: number): number {
   return Math.min(Math.max(value, 0), 1);
+}
+
+function allowsBareGlassAsDrink(values: string[]): boolean {
+  const normalized = values.map((value) => value.trim().toLowerCase().replace(/_/g, ' '));
+  if (!normalized.includes('glass')) return false;
+  const architecturalGlass = normalized.some((value) => /window|glazing|building|structure|facade|material|pane/.test(value));
+  const drinkContext = normalized.some((value) => /drink|beverage|liquid|wine|tableware|utensil|cup|bottle|stemware|goblet|tumbler/.test(value));
+  return !architecturalGlass && drinkContext;
 }

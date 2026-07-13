@@ -105,6 +105,8 @@ export function fallbackPhotoJournalRoute(): PhotoJournalRouteProposal {
 }
 
 export function photoJournalRouteForConfirmation(key: string, value: string): PhotoJournalRouteProposal | null {
+  if (key === 'primary_subject' && value === 'drink') return proposal('food', 'drink', 'A drink', 'food_item', 'drink');
+  if (key === 'primary_subject' && ['person', 'people', 'social', 'group'].includes(value)) return proposal('people', 'someone_else', 'Me / the person', 'relationship', 'someone_else');
   if (key === 'device_activity' && DEVICE_ROUTES[value]) return { ...DEVICE_ROUTES[value], id: `${DEVICE_ROUTES[value].flowId}.${DEVICE_ROUTES[value].choiceId}`, confidence: 1, reasons: ['User confirmed device activity'] };
   const normalized = key === 'media_type' ? ({ live_sport: 'other_media', online_video: 'other_media', news: 'other_media', other_screen: 'other_media' } as Record<string, string>)[value] ?? value : value;
   if (key === 'media_type' && ['book', 'film', 'show', 'game', 'music', 'art', 'other_media'].includes(normalized)) return proposal('studio', normalized, labelFor(normalized), key, value);

@@ -158,12 +158,12 @@ function unresolvedFacets(
   const primaryAffirmed = primarySubjectAffirmed(input.facets, input.subjects.find((item) => item.role === 'primary'));
   if (first && second && !primaryAffirmed) {
     const gap = centrality(first) - centrality(second);
-    if (centrality(second) >= 0.48 && gap <= 0.18) {
+    if (centrality(first) >= 0.65 && centrality(second) >= 0.65 && gap <= 0.15) {
       result.push(facet(
         'primary_subject',
         [first.canonicalValue, second.canonicalValue],
         0.98,
-        Math.min(1, 0.72 + (0.18 - Math.max(0, gap)))
+        Math.min(1, 0.72 + (0.15 - Math.max(0, gap)))
       ));
     }
   }

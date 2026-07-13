@@ -32,6 +32,7 @@ export function detectProminentPeopleInVision(
     (largest, region) => Math.max(largest, region.width * region.height),
     0
   );
+  const faces = vision.maxFaceCount ?? 0;
 
   const leading = (vision.concepts ?? []).slice(0, 3);
   for (let rank = 0; rank < leading.length; rank += 1) {
@@ -40,10 +41,11 @@ export function detectProminentPeopleInVision(
     const kind = peopleKind(concept.name);
     if (!kind) continue;
     const specific = kind === 'baby' || kind === 'child';
-    const sufficientlyProminent =
-      (rank === 0 && confidence >= (specific ? 0.16 : 0.22)) ||
-      (rank === 1 && confidence >= (specific ? 0.22 : 0.3)) ||
-      (rank === 2 && confidence >= 0.36 && largestPersonRegion >= 0.08);
+    const genericThreshold = faces > 0 || largestPersonRegion >= 0.08
+      ? [0.22, 0.3, 0.36][rank] ?? 0.36
+      : [0.45, 0.52, 0.6][rank] ?? 0.6;
+    const specificThreshold = [0.16, 0.22, 0.36][rank] ?? 0.36;
+    const sufficientlyProminent = confidence >= (specific ? specificThreshold : genericThreshold);
     if (sufficientlyProminent) {
       return {
         detected: true,
@@ -55,7 +57,6 @@ export function detectProminentPeopleInVision(
     }
   }
 
-  const faces = vision.maxFaceCount ?? 0;
   if (faces >= 2) {
     return { detected: true, kind: 'group', confidence: 0.75, reason: `${faces} people detected` };
   }

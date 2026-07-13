@@ -653,9 +653,15 @@ function contextualSubjectFocusRoot(memory: ClassifiedMemory, fallback: Clarific
     .find((facet) => facet.key === 'primary_subject')?.candidates ?? [];
   const options = candidates.flatMap((candidate): ClarificationOption[] => {
     const subject = memory.photoAnalysis?.subjects.find((item) => item.canonicalValue === candidate);
-    const rawLabel = subject?.label && subject.label !== candidate ? subject.label : candidate.replace(/_/g, ' ');
     const domain = subject?.domain ?? 'other';
-    const icon = domain === 'people' ? '🫶' : domain === 'animal' ? '🐾' : domain === 'food' ? '🍽️' : domain === 'media' ? '🎞️' : domain === 'place' ? '📍' : '✨';
+    const rawLabel = candidate === 'drink'
+      ? 'The drink'
+      : domain === 'people'
+        ? 'Me / the person'
+        : domain === 'food'
+          ? 'The food'
+          : subject?.label && subject.label !== candidate ? subject.label : candidate.replace(/_/g, ' ');
+    const icon = candidate === 'drink' ? '🥤' : domain === 'people' ? '🫶' : domain === 'animal' ? '🐾' : domain === 'food' ? '🍽️' : domain === 'media' ? '🎞️' : domain === 'place' ? '📍' : '✨';
     const archetype = domain === 'people' ? 'together' : domain === 'movement' ? 'energy' : domain === 'food' ? 'calm' : 'meaningful';
     return [option(
       `focus_${candidate.replace(/\W+/g, '_')}`,
@@ -669,7 +675,7 @@ function contextualSubjectFocusRoot(memory: ClassifiedMemory, fallback: Clarific
   });
   const deduped = options.filter((item, index) => options.findIndex((candidate) => candidate.facetValue === item.facetValue) === index);
   return deduped.length >= 2
-    ? { id: 'root', question: 'What was this moment mainly about?', options: [...deduped, fallback.options[0]] }
+    ? { id: 'root', question: 'What was this photo mainly about?', options: [...deduped, fallback.options[0]] }
     : fallback;
 }
 
