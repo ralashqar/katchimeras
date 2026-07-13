@@ -30,14 +30,14 @@ export function useNoteCaptureController({
   allowRemote = false,
 }: UseNoteCaptureControllerParams) {
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
+  const [pendingJournalNote, setPendingJournalNote] = useState<(NoteInput & { captureId: string }) | null>(null);
 
   const handleQuickNoteSubmit = useCallback(
     async (text: string) => {
       const interpreted = await interpretNote({ text }, { allowRemote });
-      const from: FeedSourceRect = { x: windowWidth / 2 + 40, y: windowHeight - 260, w: 60, h: 60 };
-      startEggFeed(from, { label: interpreted.label }, () => {
-        addNote(
-          {
+      setQuickNoteOpen(false);
+      setPendingJournalNote({
+            captureId: `note-${Date.now().toString(36)}`,
             kind: 'text',
             text: interpreted.transcript || text,
             audioUri: null,
@@ -49,11 +49,6 @@ export function useNoteCaptureController({
             food: interpreted.food,
             llmClassified: interpreted.llmClassified,
             intelligenceProvider: interpreted.intelligenceProvider,
-          },
-          formingTarget
-        );
-        pulseEgg();
-        setMicrocopy(`${interpreted.label} took root`);
       });
     },
     [addNote, allowRemote, formingTarget, pulseEgg, setMicrocopy, startEggFeed, windowHeight, windowWidth]
@@ -61,14 +56,13 @@ export function useNoteCaptureController({
 
   const voiceNote = useInlineVoiceNote({
     allowRemote,
-    saveNote: (note) => addNote(note, formingTarget),
+    saveNote: (note) => setPendingJournalNote({ ...note, captureId: `note-${Date.now().toString(36)}` }),
     onAnalyzing: () => {
       const from: FeedSourceRect = { x: windowWidth / 2 + 40, y: windowHeight - 260, w: 60, h: 60 };
       startEggFeed(from, { label: 'mic' }, () => {});
     },
     onSaved: (interpreted) => {
-      pulseEgg();
-      setMicrocopy(`${interpreted.label} took root`);
+      setMicrocopy(`${interpreted.label} is ready to review`);
     },
   });
 
@@ -77,5 +71,7 @@ export function useNoteCaptureController({
     setQuickNoteOpen,
     handleQuickNoteSubmit,
     voiceNote,
+    pendingJournalNote,
+    clearPendingJournalNote: () => setPendingJournalNote(null),
   };
 }

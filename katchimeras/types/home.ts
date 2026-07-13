@@ -1027,6 +1027,69 @@ export type ManualJournalEntry = {
   createdAt: string;
 };
 
+export type JournalInputKind = 'manual' | 'photo' | 'text_note' | 'voice_note';
+
+export type JournalSource =
+  | { kind: 'manual'; sourceId: string }
+  | { kind: 'photo'; sourceId: string; thumbnailUri?: string | null; classifiedMemoryId?: string | null; evidenceId?: string | null }
+  | { kind: 'text_note'; sourceId: string }
+  | { kind: 'voice_note'; sourceId: string; audioUri?: string | null; durationMs?: number | null };
+
+export type JournalAttachment = {
+  id: string;
+  kind: 'text' | 'voice' | 'photo';
+  text?: string | null;
+  uri?: string | null;
+  durationMs?: number | null;
+};
+
+export type JournalConfirmedFacet = { key: string; value: string; sensitive?: boolean };
+
+export type JournalRouteProposal = {
+  id: string;
+  flowId: string;
+  choiceId: string;
+  label: string;
+  confidence: number;
+  reasons: string[];
+  confirmedFacets: JournalConfirmedFacet[];
+  prefilledSpecific?: string;
+};
+
+export type JournalDraft = {
+  sessionId: string;
+  source: JournalSource;
+  flowId: string | null;
+  categoryId: string | null;
+  fields: Record<string, string | string[] | boolean | null>;
+  feeling: string | null;
+  note: string | null;
+  attachments: JournalAttachment[];
+  confirmedFacets: JournalConfirmedFacet[];
+};
+
+export type JournalRecord = {
+  id: string;
+  schemaVersion: 1;
+  idempotencyKey: string;
+  source: JournalSource;
+  flowId: string;
+  flowVersion: number;
+  categoryId: string;
+  canonicalQualityIds: string[];
+  fields: Record<string, string | string[] | boolean | null>;
+  feeling: string | null;
+  note: string | null;
+  attachments: JournalAttachment[];
+  confirmedFacets: JournalConfirmedFacet[];
+  createdAt: string;
+};
+
+export type JournalCommitCommand = {
+  idempotencyKey: string;
+  draft: JournalDraft;
+};
+
 export type JournalNoteDraft = {
   kind: 'text' | 'voice';
   text: string;
@@ -1046,6 +1109,9 @@ export type ManualJournalSubmission = {
   sourceId?: string | null;
   thumbnailUri?: string | null;
   linkedNote?: JournalNoteDraft | null;
+  sessionId?: string;
+  confirmedFacets?: JournalConfirmedFacet[];
+  journalSource?: JournalSource;
 };
 
 export type StoredHomeDayRecord = {
@@ -1080,6 +1146,9 @@ export type StoredHomeDayRecord = {
   // `evidence` remain readable compatibility surfaces during the v8 rollout.
   classifiedMemories?: ClassifiedMemory[];
   manualJournalEntries?: ManualJournalEntry[];
+  // Canonical, reviewed journal inputs. Older arrays below remain materialized
+  // compatibility projections while their readers migrate to journal selectors.
+  journalRecords?: JournalRecord[];
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
   // Energy captured through the camera (Moment Capture): score deltas that fold
@@ -1129,7 +1198,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 11;
+  version: 12;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

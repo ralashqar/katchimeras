@@ -390,9 +390,10 @@ check('manual journal keeps notes inline', !manualJournalSource.includes("type S
 check('manual journal protects dirty drafts from accidental dismissal', manualJournalSource.includes('Discard this draft?') && manualJournalSource.includes('if (dirty) setDiscardOpen(true)'));
 check('manual journal exposes selected state to assistive technology', manualJournalSource.includes('accessibilityState={{ selected }}'));
 const essenceReviewSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/capture/essence-review.tsx'), 'utf8');
+const photoJournalCommitSource = fs.readFileSync(path.join(projectRoot, 'utils/intelligence/photo-journal-commit.ts'), 'utf8');
 check('every photo route opens the shared editable journal flow', essenceReviewSource.includes('photoJournalRouteProposals') && essenceReviewSource.includes('initialFlowId={journalRoute.flowId}') && essenceReviewSource.includes('initialSpecific={prefilledSpecific}'));
 check('top photo text suggestion prefills the editor without alternative chips', essenceReviewSource.includes('fieldSuggestions[0]?.value') && !essenceReviewSource.includes('initialSpecificSuggestions=') && !manualJournalSource.includes('initialSpecificSuggestions'));
-check('machine title suggestions are confirmed only when the journal is saved', essenceReviewSource.includes('handleJournalSave') && essenceReviewSource.includes("{ key: 'media_title', value: specific }"));
+check('machine title suggestions are confirmed only when the journal is saved', essenceReviewSource.includes('handleJournalSave') && photoJournalCommitSource.includes("{ key: 'media_title', value: specific }"));
 check('screen OCR is gated by confirmed route suggestion policy', essenceReviewSource.includes('photoJournalSuggestions') && essenceReviewSource.includes('journalRoute'));
 check('journal note control supports tap-to-type and hold-to-record', manualJournalSource.includes('delayLongPress={350}') && manualJournalSource.includes('Tap to type · hold to speak'));
 check('photo essence tags and prompts share one ordered scroll-safe layout', essenceReviewSource.includes('style={styles.reviewScroll}') && essenceReviewSource.indexOf('style={styles.tagSection}') < essenceReviewSource.indexOf('style={styles.captured}'));

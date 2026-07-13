@@ -16,7 +16,9 @@ function transpile(relative, name) {
 }
 
 const registryPath = transpile('utils/manual-journal-registry.ts', 'registry.js');
+const journalDomainPath = transpile('utils/journal-domain.ts', 'journal-domain.js');
 const mutationPath = transpile('game/days/mutations/manual-journal.ts', 'mutation.js');
+const projectionsPath = transpile('game/days/mutations/journal-projections.ts', 'journal-projections.js');
 const emptyPath = path.join(temp, 'empty.js');
 const evidencePath = path.join(temp, 'evidence.js');
 const classificationPath = path.join(temp, 'classification.js');
@@ -34,6 +36,8 @@ fs.writeFileSync(classificationPath, `
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {
   if (request === '@/utils/manual-journal-registry') return registryPath;
+  if (request === '@/utils/journal-domain') return journalDomainPath;
+  if (request === './journal-projections') return projectionsPath;
   if (request === '@/utils/intelligence/evidence') return evidencePath;
   if (request === '@/utils/intelligence/classification') return classificationPath;
   if (request === '@/types/home' || request === '@/components/ui/icon-symbol') return emptyPath;

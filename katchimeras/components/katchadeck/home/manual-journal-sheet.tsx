@@ -24,7 +24,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useJournalVoiceDraft } from '@/hooks/use-journal-voice-draft';
-import type { JournalNoteDraft, ManualJournalSubmission } from '@/types/home';
+import type { JournalNoteDraft, JournalSource, ManualJournalSubmission } from '@/types/home';
 import {
   MANUAL_JOURNAL_FLOWS,
   manualJournalFlow,
@@ -44,28 +44,39 @@ const SECTION_LABELS: Record<ManualJournalSection, string> = {
 };
 const FLOW_ORDER = ['people', 'food', 'went_somewhere', 'movement', 'studio', 'work', 'big_event', 'general'];
 
-export function ManualJournalSheet({
-  initialFlowId,
-  initialChoiceId,
-  initialSpecific,
-  sourceType = 'manual',
-  sourceId,
-  thumbnailUri,
-  onBackFromInitial,
-  onClose,
-  onSave,
-}: {
+export type JournalComposerProps = {
   initialFlowId?: string | null;
   initialChoiceId?: string | null;
   initialSpecific?: string | null;
+  initialNote?: string | null;
+  initialLinkedNote?: JournalNoteDraft | null;
+  initialConfirmedFacets?: ManualJournalSubmission['confirmedFacets'];
   sourceType?: 'manual' | 'photo';
   sourceId?: string | null;
   thumbnailUri?: string | null;
+  journalSource?: JournalSource;
   onBackFromInitial?: () => void;
   onClose: () => void;
   onSave: (submission: ManualJournalSubmission) => void;
-}) {
+};
+
+export function JournalComposer({
+  initialFlowId,
+  initialChoiceId,
+  initialSpecific,
+  initialNote,
+  initialLinkedNote,
+  initialConfirmedFacets,
+  sourceType = 'manual',
+  sourceId,
+  thumbnailUri,
+  journalSource,
+  onBackFromInitial,
+  onClose,
+  onSave,
+}: JournalComposerProps) {
   const initialFlow = useMemo(() => initialFlowId ? manualJournalFlow(initialFlowId) : null, [initialFlowId]);
+  const sessionId = useRef(journalSource?.sourceId ?? sourceId ?? `journal-${Date.now().toString(36)}`).current;
   const initialChoice = useMemo(
     () => initialFlow?.choices.find((item) => item.id === initialChoiceId) ?? null,
     [initialChoiceId, initialFlow]
@@ -77,9 +88,9 @@ export function ManualJournalSheet({
   const [specific, setSpecific] = useState(initialSpecific ?? '');
   const [feeling, setFeeling] = useState<string | null>(null);
   const [context, setContext] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-  const [noteExpanded, setNoteExpanded] = useState(false);
-  const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(null);
+  const [note, setNote] = useState(initialNote ?? '');
+  const [noteExpanded, setNoteExpanded] = useState(!!initialNote || !!initialLinkedNote);
+  const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(initialLinkedNote ?? null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const longPressRef = useRef(false);
   const redoLongPressRef = useRef(false);
@@ -124,7 +135,10 @@ export function ManualJournalSheet({
   };
   const selectChoice = (item: ManualJournalChoice) => {
     selectionHaptic();
-    if (choice?.id !== item.id) {
+    // Preserve source-adapter prefills (for example a standalone note's
+    // transcript) when the user chooses its first category. Only clear editor
+    // data when changing an already-selected category.
+    if (choice && choice.id !== item.id) {
       setSpecific('');
       setFeeling(null);
       setContext(null);
@@ -172,6 +186,7 @@ export function ManualJournalSheet({
     const trimmedNote = note.trim();
     successHaptic();
     onSave({
+      sessionId,
       flowId: flow.id,
       path: [flow.id, choice.id, ...(feeling ? [feeling] : [])],
       categoryId: choice.id,
@@ -187,6 +202,8 @@ export function ManualJournalSheet({
         : trimmedNote
           ? { kind: 'text', text: trimmedNote }
           : null,
+      journalSource,
+      confirmedFacets: initialConfirmedFacets,
     });
   };
   const toggleAudio = () => {
@@ -444,6 +461,12 @@ export function ManualJournalSheet({
       </KeyboardAvoidingView>
     </MeadowSheet>
   );
+}
+
+// Compatibility name for existing entry points. New input adapters target the
+// source-agnostic composer directly.
+export function ManualJournalSheet(props: JournalComposerProps) {
+  return <JournalComposer {...props} />;
 }
 
 function JournalHeader({ canGoBack, kicker, onBack, step, subtitle, title }: {

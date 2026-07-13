@@ -260,7 +260,11 @@ export function addManualJournalEntryForToday(
 ): StoredHomeState {
   const base = readInputDay(state, target, profile, now);
   const nextDay = withManualJournalEntry(base, input, now);
-  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+  // Journal projection is already a complete, pure day mutation and cannot
+  // affect rollover or map-derived fields. Avoid re-normalizing the full
+  // archive for a foreground button tap; hydration still owns migrations and
+  // lifecycle transitions.
+  return writeInputDay(state, target, nextDay);
 }
 
 export function addFoodMomentForToday(

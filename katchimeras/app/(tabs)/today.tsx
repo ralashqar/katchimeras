@@ -56,6 +56,8 @@ import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-c
 import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
+import { noteRoutesForSignals } from '@/utils/journal-input-adapters';
+import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -272,7 +274,7 @@ export default function HomeScreen() {
 
   // Quick TEXT note (tap the mic): an inline text box over the page — enter
   // interprets on-device and commits straight away, no full-screen flow.
-  const { quickNoteOpen, setQuickNoteOpen, handleQuickNoteSubmit, voiceNote } = useNoteCaptureController({
+  const { quickNoteOpen, setQuickNoteOpen, handleQuickNoteSubmit, voiceNote, pendingJournalNote, clearPendingJournalNote } = useNoteCaptureController({
     allowRemote: cloudIntelligenceEnabled,
     formingTarget,
     windowWidth,
@@ -300,6 +302,8 @@ export default function HomeScreen() {
     closePromptSheet,
     startEggFeed,
   });
+  const pendingNoteRoutes = useMemo(() => pendingJournalNote ? noteRoutesForSignals(pendingJournalNote) : [], [pendingJournalNote]);
+  const pendingNoteRoute = journalRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
   const { recentAvgSteps, memoryQuests, categories } = useTodayCategoryModel({
     allDays,
     formingDay,
@@ -718,6 +722,26 @@ export default function HomeScreen() {
           onSave={(submission) => {
             addManualJournalEntry(submission, formingTarget);
             closeManualJournal();
+            pulseEgg();
+            setMicrocopy('Added to today');
+          }}
+        />
+      ) : null}
+      {pendingJournalNote ? (
+        <ManualJournalSheet
+          initialFlowId={pendingNoteRoute?.flowId}
+          initialChoiceId={pendingNoteRoute?.choiceId}
+          initialSpecific={pendingJournalNote.media?.title ?? pendingJournalNote.food ?? pendingJournalNote.label}
+          initialNote={pendingJournalNote.text}
+          initialLinkedNote={{ kind: pendingJournalNote.kind, text: pendingJournalNote.text, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }}
+          initialConfirmedFacets={pendingNoteRoute?.confirmedFacets}
+          journalSource={pendingJournalNote.kind === 'voice'
+            ? { kind: 'voice_note', sourceId: pendingJournalNote.captureId, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }
+            : { kind: 'text_note', sourceId: pendingJournalNote.captureId }}
+          onClose={clearPendingJournalNote}
+          onSave={(submission) => {
+            addManualJournalEntry(submission, formingTarget);
+            clearPendingJournalNote();
             pulseEgg();
             setMicrocopy('Added to today');
           }}

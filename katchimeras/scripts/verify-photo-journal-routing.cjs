@@ -11,10 +11,15 @@ function transpile(source, name) {
   const target = path.join(temp, name); fs.writeFileSync(target, output); return target;
 }
 const studio = transpile('utils/studio-detect.ts', 'studio.js');
+const registry = transpile('utils/manual-journal-registry.ts', 'registry.js');
+const journalRouting = transpile('utils/journal-routing.ts', 'journal-routing.js');
 const routingPath = transpile('utils/intelligence/photo-journal-routing.ts', 'routing.js');
 const original = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === '@/utils/studio-detect') return studio;
+  if (request === '@/utils/manual-journal-registry') return registry;
+  if (request === '@/utils/journal-routing') return journalRouting;
+  if (request === '@/components/ui/icon-symbol') return path.join(temp, 'empty.js');
   if (request === '@/types/home' || request === '@/utils/scene-classify') return path.join(temp, 'empty.js');
   return original.call(this, request, ...args);
 };
@@ -72,6 +77,20 @@ check('supplied laptop subtitle OCR is not promoted into the title field', suppl
 
 const meal = memory([{ value: 'food', confidence: 0.91, provider: 'appleVision', raw: 'food' }]);
 check('food routes to the shared Meal editor', routing.photoJournalRouteProposals(meal)[0]?.id === 'food.meal');
+const mealRoute = routing.photoJournalRouteProposals(meal)[0];
+check('a general person scene never prefills the meal-name field', routing.photoJournalSuggestions({
+  route: mealRoute,
+  scene: { type: 'food', detail: 'person', food: { detected: false, label: null }, source: 'llm' },
+}).length === 0);
+check('food containers and tableware never prefill the meal-name field', routing.photoJournalSuggestions({
+  route: mealRoute,
+  scene: { type: 'food', detail: 'A bowl', food: { detected: true, label: 'bowl' }, source: 'llm' },
+}).length === 0);
+const ramenSuggestion = routing.photoJournalSuggestions({
+  route: mealRoute,
+  scene: { type: 'food', detail: 'person', food: { detected: true, label: 'Spicy ramen' }, source: 'llm' },
+});
+check('a credible category-specific dish remains an editable meal suggestion', ramenSuggestion[0]?.value === 'Spicy ramen', JSON.stringify(ramenSuggestion));
 check('confirmed device gaming routes directly to the Game editor', routing.photoJournalRouteForConfirmation('device_activity', 'gaming')?.id === 'studio.game');
 check('confirmed Drink focus routes directly to Food / Drink', routing.photoJournalRouteForConfirmation('primary_subject', 'drink')?.id === 'food.drink');
 check('confirmed People focus routes into the People editor', routing.photoJournalRouteForConfirmation('primary_subject', 'person')?.flowId === 'people');

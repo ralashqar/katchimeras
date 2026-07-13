@@ -1,10 +1,12 @@
 import type {
   ClassifiedMemory,
   DayVisionSummary,
+  JournalRouteProposal,
   PhotoVisionResult,
 } from '@/types/home';
 import type { SceneRead } from '@/utils/scene-classify';
 import { extractTitleFromVisionText } from '@/utils/studio-detect';
+import { journalRouteForAlias } from '@/utils/journal-routing';
 
 export type PhotoJournalFieldSuggestion = {
   value: string;
@@ -13,16 +15,7 @@ export type PhotoJournalFieldSuggestion = {
   prefill: boolean;
 };
 
-export type PhotoJournalRouteProposal = {
-  id: string;
-  flowId: string;
-  choiceId: string;
-  label: string;
-  confidence: number;
-  reasons: string[];
-  confirmedFacets: Array<{ key: string; value: string; sensitive?: boolean }>;
-  prefilledSpecific?: string;
-};
+export type PhotoJournalRouteProposal = JournalRouteProposal;
 
 const ROUTES: Array<{
   values: RegExp;
@@ -88,6 +81,8 @@ export function photoJournalRouteProposals(memory: ClassifiedMemory): PhotoJourn
 
   for (const observation of memory.observations.filter((item) => item.provider === 'appleVision')) {
     const value = observation.value.toLowerCase();
+    const registryMatch = journalRouteForAlias(value, round2(observation.confidence), `Apple Vision detected ${observation.raw ?? observation.value}`);
+    if (registryMatch) add(proposals, registryMatch);
     const match = ROUTES.find((candidate) => candidate.values.test(value));
     if (!match) continue;
     const confirmedFacets = match.facet ? [{ key: match.facet[0], value: match.facet[1] }] : [];
@@ -156,13 +151,17 @@ export function photoJournalSuggestions(input: {
     }
   }
   const sceneDetail = input.scene?.detail?.trim();
-  if (sceneDetail && textLooksSpecific(sceneDetail) && !/^(digital content|a person|city|place|food|meal)$/i.test(sceneDetail)) {
+  // A scene's general detail describes its dominant subject, not necessarily
+  // the category-specific value being edited. In particular, a weak people
+  // read must never become the name of a user-confirmed meal. Food has its own
+  // constrained suggestion channel below.
+  if (input.route.flowId !== 'food' && sceneDetail && textLooksSpecific(sceneDetail) && !/^(digital content|a person|person|people|city|place|food|meal)$/i.test(sceneDetail)) {
     const confidence = input.scene?.source === 'llm' ? 0.72 : 0.58;
     candidates.push(suggestion(sceneDetail, confidence, input.scene?.source === 'llm' ? 'appleFoundation' : 'appleVision'));
   }
   if (input.route.flowId === 'food') {
     const food = input.scene?.food?.label?.trim();
-    if (food && !/^food|meal|dish$/i.test(food)) candidates.push(suggestion(food, input.scene?.source === 'llm' ? 0.82 : 0.72, input.scene?.source === 'llm' ? 'appleFoundation' : 'appleVision'));
+    if (food && foodNameLooksSpecific(food)) candidates.push(suggestion(food, input.scene?.source === 'llm' ? 0.82 : 0.72, input.scene?.source === 'llm' ? 'appleFoundation' : 'appleVision'));
   }
   // Present one editable machine suggestion directly in the text field.
   // Alternative OCR fragments add noise, so they are not exposed as chips.
@@ -195,6 +194,14 @@ function textLooksSpecific(value: string) {
   if (/^[^aeiouy]*$/i.test(text.replace(/\W/g, '')) || /(.)\1{3,}/i.test(text)) return false;
   if (/\b(for|to|of|the|a|and)\b.*\b\1\b/i.test(text) && words.length >= 5) return false;
   if (/\b(that|this|what|wanted|because|here|there|with|from)\b/i.test(text) && words.length >= 5) return false;
+  return true;
+}
+function foodNameLooksSpecific(value: string) {
+  const text = value.trim();
+  if (!textLooksSpecific(text)) return false;
+  // These are subjects, containers, and dining context—not something a user
+  // would reasonably expect in a "Meal or dish" field.
+  if (/^(?:a |an |the )?(?:food|meal|dish|person|people|adult|child|baby|group|hand|arm|finger|bowl|plate|tableware|utensil|cutlery|fork|knife|spoon|glass|drinkware|container|table|restaurant|kitchen)$/i.test(text)) return false;
   return true;
 }
 function dedupe(items: PhotoJournalFieldSuggestion[]) {

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
@@ -20,8 +20,6 @@ import { Lantern } from '@/constants/theme';
 import {
   type MeaningTag,
 } from '@/utils/capture-energy';
-import { foundationSceneAvailability, isFoundationSceneAvailable } from '@/utils/foundation-scene';
-import { applyManualJournalFacets, buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
 import { buildPhotoEvidence } from '@/utils/intelligence/evidence';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import {
@@ -31,9 +29,8 @@ import {
   skipClarificationGoal,
   type ClarificationOption,
 } from '@/utils/intelligence/clarification';
-import { classifyScene, resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
+import type { SceneRead } from '@/utils/scene-classify';
 import { pickProminentTags } from '@/utils/vision-signals';
-import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import {
   fallbackPhotoJournalRoute,
   photoJournalQuestion,
@@ -42,7 +39,9 @@ import {
   photoJournalSuggestions,
   type PhotoJournalRouteProposal,
 } from '@/utils/intelligence/photo-journal-routing';
-import type { ClassifiedMemory, DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, StudioMediaType, UserConfirmation } from '@/types/home';
+import type { ClassifiedMemory, DayVisionSummary, ManualJournalSubmission, StudioMediaType, UserConfirmation } from '@/types/home';
+import { reviewPhotoJournalSubmission } from '@/utils/intelligence/photo-journal-commit';
+import { usePhotoAnalysisSession } from '@/hooks/use-photo-analysis-session';
 
 // The shared "read the moment" experience: a photo's on-device essence animates
 // into the centre, the user says what it meant, and the tags then stream down
@@ -88,89 +87,23 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const [journalRoute, setJournalRoute] = useState<PhotoJournalRouteProposal | null>(null);
   const [journalPickerOpen, setJournalPickerOpen] = useState(false);
-  const visionRef = useRef<DayVisionSummary | null>(null);
-  const rawVisionRef = useRef<PhotoVisionResult | null>(null);
-  const sceneRef = useRef<SceneRead | null>(null);
-  const clarificationRef = useRef<ClassifiedMemory | null>(null);
-  const observedAtRef = useRef(observedAt ?? new Date().toISOString());
-  // Once the user picks a meaning, late LLM upgrades must not reshuffle the UI.
-  const committedRef = useRef(false);
   const intro = useSharedValue(0);
   const absorb = useSharedValue(0);
   const fallDistance = height * 0.5;
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      const analyzed = await analyze();
-      const vision = analyzed.summary;
-      if (!active) {
-        return;
-      }
-      rawVisionRef.current = analyzed.rawVision;
-      visionRef.current = vision;
-      const fastScene = classifyScene(vision);
-      // Foundation Models run locally. On supported devices, wait for their
-      // structured read before exposing questions. A quick answer used to
-      // freeze the deterministic preview before Foundation could replace it.
-      const foundationAvailable = !!vision && isFoundationSceneAvailable();
-      const initialScene = foundationAvailable
-        ? await resolveSceneRead(vision, photoUri, analyzed.rawVision)
-        : {
-            ...fastScene,
-            foundationStatus: 'unavailable' as const,
-            foundationReason: foundationSceneAvailability().reason,
-          };
-      if (!active) return;
-      sceneRef.current = initialScene;
-      committedRef.current = false;
-      const initialMemory = vision
-        ? buildPhotoClassifiedMemory({
-            sourceId: sourceId ?? photoUri ?? 'capture-preview',
-            observedAt: observedAtRef.current,
-            vision,
-            rawVision: analyzed.rawVision,
-            scene: initialScene,
-          })
-        : null;
-      clarificationRef.current = initialMemory;
-      setClarificationMemory(initialMemory);
-      // PROGRESSIVE reveal: the rule engine answers in microseconds — show the
-      // screen NOW with its chips + meanings, then let the on-device LLM reads
-      // upgrade them in place when they land (typically ~1s later). The commit
-      // still gets whatever scene has resolved by then (engine falls back to
-      // rules when it hasn't).
-      setTags(buildEssenceTags(vision, initialMemory));
+  const { visionRef, rawVisionRef, sceneRef, memoryRef: clarificationRef, committedRef } = usePhotoAnalysisSession({
+    analyze, photoUri, sourceId, observedAt,
+    onReady: ({ vision, memory }) => {
+      setClarificationMemory(memory);
+      setTags(buildEssenceTags(vision, memory));
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
-      if (!vision) return;
-      // Upgrade 1 — the hierarchical scene read (chips + media-owned options).
-      if (!foundationAvailable) void resolveSceneRead(vision, photoUri, analyzed.rawVision)
-        .then((read) => {
-          sceneRef.current = read;
-          if (!active || !read || committedRef.current) return;
-          const currentMemory = clarificationRef.current;
-          const upgradedMemory = buildPhotoClassifiedMemory({
-            sourceId: sourceId ?? photoUri ?? 'capture-preview',
-            observedAt: currentMemory?.createdAt ?? new Date().toISOString(),
-            vision,
-            rawVision: analyzed.rawVision,
-            scene: read,
-            confirmations: currentMemory?.confirmations ?? [],
-          });
-          const reconciledMemory = reconcileProgressiveUpgrade(currentMemory, upgradedMemory);
-          setTags(buildEssenceTags(vision, reconciledMemory));
-          clarificationRef.current = reconciledMemory;
-          setClarificationMemory(reconciledMemory);
-        })
-        .catch(() => {});
-      // Upgrade 2 — Foundation Models phrasing for the meaning options (media
-      // scenes keep their owned options; see the guard).
-    })();
-    return () => {
-      active = false;
-    };
-  }, [analyze, intro, photoUri, sourceId]);
+    },
+    onUpgrade: ({ vision, memory }) => {
+      setClarificationMemory(memory);
+      setTags(buildEssenceTags(vision, memory));
+    },
+  });
 
   const commitMeaning = (meaning: MeaningTag, label: string, journal: ManualJournalSubmission, memory = clarificationRef.current) => {
     if (state !== 'essence') {
@@ -224,47 +157,19 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
 
   const handleJournalSave = (submission: ManualJournalSubmission) => {
     const memory = clarificationRef.current;
-    const flow = manualJournalFlow(submission.flowId);
-    const choice = flow?.choices.find((item) => item.id === submission.categoryId);
-    if (!memory || !flow || !choice || state !== 'essence') return;
-    const specificValue = submission.fields.specific;
-    const specific = typeof specificValue === 'string' ? specificValue.trim() : '';
+    if (!memory || state !== 'essence') return;
     const createdAt = new Date().toISOString();
-    const routeFacets = journalRoute?.confirmedFacets ?? [];
-    const finalFacets = dedupeJournalFacets([
-      ...routeFacets,
-      ...(choice.mediaType ? [{ key: 'media_type', value: choice.mediaType }] : []),
-      ...(choice.mediaType && specific ? [{ key: 'media_title', value: specific }] : []),
-      ...(flow.adapter === 'food' ? [{ key: 'food_item', value: specific || choice.label }] : []),
-      ...(submission.feeling ? [{ key: flow.adapter === 'studio' ? 'media_rating' : 'journal_feeling', value: submission.feeling }] : []),
-    ]);
-    const allowedRoutingFacets = routingFacetsForJournalAdapter(flow.adapter);
-    const routingFacetKeys = new Set(['media_type', 'media_title', 'food_kind', 'food_item', 'place_category', 'movement_mode', 'movement_subtype', 'activity_kind', 'device_activity', 'relationship', 'work_kind', 'life_event']);
-    const memoryWithoutMachineText = {
-      ...memory,
-      facets: memory.facets.filter((facet) =>
-        (!routingFacetKeys.has(facet.key) || allowedRoutingFacets.has(facet.key)) &&
-        (facet.key !== 'media_title' || facet.confirmed)
-      ),
-      confirmations: memory.confirmations.filter((confirmation) =>
-        !routingFacetKeys.has(confirmation.facetKey) || allowedRoutingFacets.has(confirmation.facetKey)
-      ),
-      dominantDomain: domainForJournalAdapter(flow.adapter),
-    };
-    const confirmed = applyManualJournalFacets(
-      memoryWithoutMachineText,
-      finalFacets,
-      createdAt
-    );
+    const reviewedSubmission = reviewPhotoJournalSubmission({ memory, route: journalRoute, submission, createdAt });
+    if (!reviewedSubmission) return;
+    const { memory: confirmed, specific, choiceLabel, mediaType, reactionLabel } = reviewedSubmission;
     clarificationRef.current = confirmed;
     setClarificationMemory(confirmed);
     setJournalRoute(null);
     setJournalPickerOpen(false);
-    if (choice.mediaType) {
+    if (mediaType) {
       const priorScene = sceneRef.current;
-      sceneRef.current = { memoryDomain: 'media', type: 'media', label: 'An inspiration', detail: specific || choice.label, media: { mediaType: choice.mediaType as StudioMediaType, title: specific || null, creator: null }, source: priorScene?.source ?? 'rules', supportingSubjects: priorScene?.supportingSubjects, representation: priorScene?.representation, promptVersion: priorScene?.promptVersion };
+      sceneRef.current = { memoryDomain: 'media', type: 'media', label: 'An inspiration', detail: specific || choiceLabel, media: { mediaType: mediaType as StudioMediaType, title: specific || null, creator: null }, source: priorScene?.source ?? 'rules', supportingSubjects: priorScene?.supportingSubjects, representation: priorScene?.representation, promptVersion: priorScene?.promptVersion };
     }
-    const reactionLabel = flow.feelings.find((item) => item.id === submission.feeling)?.label ?? choice.label;
     commitMeaning(meaningForJournal(submission.feeling), specific || reactionLabel, submission, confirmed);
   };
 
@@ -392,6 +297,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
           initialFlowId={journalRoute.flowId}
           initialChoiceId={journalRoute.choiceId}
           initialSpecific={prefilledSpecific}
+          initialConfirmedFacets={journalRoute.confirmedFacets}
           sourceType="photo"
           sourceId={sourceId ?? photoUri}
           thumbnailUri={photoUri}
@@ -409,76 +315,6 @@ function meaningForJournal(reaction: string | null | undefined): MeaningTag {
   if (reaction === 'loved') return 'together';
   if (reaction === 'inspired') return 'meaningful';
   return 'calm';
-}
-
-function domainForJournalAdapter(adapter: string): ClassifiedMemory['dominantDomain'] {
-  return ({ food: 'food', studio: 'media', place: 'place', movement: 'movement', relationship: 'people', work: 'work', big_event: 'life_event' } as Record<string, ClassifiedMemory['dominantDomain']>)[adapter] ?? 'other';
-}
-
-function routingFacetsForJournalAdapter(adapter: string): Set<string> {
-  const keys = ({
-    studio: ['media_type', 'media_title', 'device_activity'],
-    food: ['food_kind', 'food_item'],
-    place: ['place_category'],
-    movement: ['movement_mode', 'movement_subtype', 'activity_kind'],
-    relationship: ['relationship'],
-    work: ['work_kind', 'device_activity'],
-    general: ['device_activity'],
-    big_event: ['life_event'],
-  } as Record<string, string[]>)[adapter] ?? [];
-  return new Set(keys);
-}
-
-function dedupeJournalFacets(values: { key: string; value: string; sensitive?: boolean }[]) {
-  const byKey = new Map<string, { key: string; value: string; sensitive?: boolean }>();
-  values.forEach((value) => byKey.set(value.key, value));
-  return [...byKey.values()];
-}
-
-function reconcileProgressiveUpgrade(
-  current: ClassifiedMemory | null,
-  upgraded: ClassifiedMemory
-): ClassifiedMemory {
-  if (!current || current.confirmations.length === 0) return upgraded;
-  const questionFamilyChanged =
-    !!current.promptState.graphId &&
-    !!upgraded.promptState.graphId &&
-    current.promptState.graphId !== upgraded.promptState.graphId;
-  const confirmedMediaType = upgraded.facets.some(
-    (facet) => facet.key === 'media_type' && facet.confirmed && facet.value !== 'other'
-  );
-  const hasUnconfirmedTitle = upgraded.facets.some(
-    (facet) => facet.key === 'media_title' && !facet.confirmed && facet.value !== 'unknown'
-  );
-  const titleAlreadyAsked = current.confirmations.some((confirmation) => confirmation.facetKey === 'media_title');
-  const canAskTitle = (current.promptState.microQuestionCount ?? 0) < 1;
-  const shouldInsertTitleQuestion =
-    confirmedMediaType &&
-    hasUnconfirmedTitle &&
-    !titleAlreadyAsked &&
-    canAskTitle &&
-    current.promptState.graphId === 'media-context';
-
-  return {
-    ...upgraded,
-    createdAt: current.createdAt,
-    promptState: {
-      // Semantic routing comes from the upgraded canonical interpretation;
-      // only interaction history is carried forward. Preserving the old graph
-      // here caused tags to update while an obsolete question stayed visible.
-      ...(questionFamilyChanged ? current.promptState : upgraded.promptState),
-      answeredNodeIds: current.promptState.answeredNodeIds,
-      askedQuestionIds: current.promptState.askedQuestionIds,
-      resolvedGoalIds: current.promptState.resolvedGoalIds,
-      skippedGoalIds: current.promptState.skippedGoalIds,
-      completedGoalIds: current.promptState.completedGoalIds,
-      questionCount: current.promptState.questionCount,
-      microQuestionCount: current.promptState.microQuestionCount,
-      status: shouldInsertTitleQuestion ? 'pending' : questionFamilyChanged ? current.promptState.status : upgraded.promptState.status,
-      currentNodeId: shouldInsertTitleQuestion ? 'title' : questionFamilyChanged ? current.promptState.currentNodeId : upgraded.promptState.currentNodeId,
-      currentQuestionId: shouldInsertTitleQuestion ? 'media-context.title' : questionFamilyChanged ? current.promptState.currentQuestionId : upgraded.promptState.currentQuestionId,
-    },
-  };
 }
 
 // The photo's essence = what the on-device vision read in it, as tags the user

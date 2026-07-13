@@ -12,14 +12,17 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
 import { safeGoBack } from '@/utils/safe-navigation';
 import { interpretNote, transcribeAudioNote, type InterpretedNote } from '@/utils/note-interpret';
-import type { DayInputTarget, StudioMediaType } from '@/types/home';
+import type { DayInputTarget, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import { extractStudioTitle } from '@/utils/studio-detect';
+import { noteAnalysis } from '@/utils/journal-input-adapters';
+import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
 
 const MAX_SECONDS = 30;
 const MEANING_TINT: Record<string, string> = {
@@ -44,7 +47,7 @@ export default function NoteCaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ target?: string }>();
   const insets = useSafeAreaInsets();
-  const { addNote, isTodayHatched, cloudIntelligenceEnabled } = useHomeScreenState();
+  const { addNote, addManualJournalEntry, isTodayHatched, cloudIntelligenceEnabled } = useHomeScreenState();
   const requestedTarget = parseCaptureTarget(params.target);
   const noteTarget: DayInputTarget = requestedTarget ?? (isTodayHatched ? 'tomorrow' : 'today');
   const targetLabel = noteTarget === 'tomorrow' ? 'tomorrow' : 'today';
@@ -61,7 +64,10 @@ export default function NoteCaptureScreen() {
   const [result, setResult] = useState<InterpretedNote | null>(null);
   const [markBig, setMarkBig] = useState(true);
   const [semanticChoiceMade, setSemanticChoiceMade] = useState(false);
+  const [journalReviewOpen, setJournalReviewOpen] = useState(false);
+  const [journalRoute, setJournalRoute] = useState<JournalRouteProposal | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const journalSourceId = useRef(`note-${Date.now().toString(36)}`).current;
   // Tracks press-and-hold intent so a release mid-setup cancels cleanly.
   const recordingRef = useRef(false);
   const inputRef = useRef<TextInput>(null);
@@ -177,6 +183,9 @@ export default function NoteCaptureScreen() {
       setResult(interpreted);
       setSemanticChoiceMade(!interpreted.semantic?.needsClarification);
       setMarkBig(true);
+      const analysis = noteAnalysis(interpreted);
+      setJournalRoute(journalRouteNeedsConfirmation(analysis.routes) ? null : analysis.routes[0] ?? null);
+      setJournalReviewOpen(true);
       setPhase('review');
     } catch {
       setPhase('input');
@@ -367,6 +376,32 @@ export default function NoteCaptureScreen() {
             </ThemedText>
           </Pressable>
         </View>
+      ) : null}
+      {journalReviewOpen && result ? (
+        <ManualJournalSheet
+          key={journalRoute?.id ?? 'note-journal-picker'}
+          initialFlowId={journalRoute?.flowId}
+          initialChoiceId={journalRoute?.choiceId}
+          initialSpecific={result.media?.title ?? result.food ?? result.label}
+          initialConfirmedFacets={journalRoute?.confirmedFacets}
+          initialNote={result.transcript || text.trim()}
+          initialLinkedNote={{
+            kind: audioUri ? 'voice' : 'text',
+            text: result.transcript || text.trim(),
+            audioUri,
+            durationMs: audioUri ? elapsed * 1000 : null,
+          }}
+          journalSource={audioUri
+            ? { kind: 'voice_note', sourceId: journalSourceId, audioUri, durationMs: elapsed * 1000 }
+            : { kind: 'text_note', sourceId: journalSourceId }}
+          onBackFromInitial={journalRoute ? () => setJournalRoute(null) : undefined}
+          onClose={() => safeGoBack(router)}
+          onSave={(submission) => {
+            addManualJournalEntry(submission, noteTarget);
+            queueCaptureFeed({ photoUri: '', icon: 'square.and.pencil', accent: MEANING_TINT[result.archetype] ?? '#7DE8CD' });
+            safeGoBack(router);
+          }}
+        />
       ) : null}
     </View>
   );

@@ -59,9 +59,18 @@ const oldState = {
 };
 const upgraded = upgradeStoredHomeState(oldState);
 const upgradedFromV10 = upgradeStoredHomeState({ ...oldState, version: 10 });
-const currentState = upgradeStoredHomeState({
+const upgradedFromV11 = upgradeStoredHomeState({
   ...oldState,
   version: 11,
+  today: {
+    ...oldState.today,
+    manualJournalEntries: [{ id: 'legacy-journal', flowId: 'studio', flowVersion: 1, path: ['studio', 'book'], categoryId: 'book', canonicalQualityIds: ['media.book'], fields: { specific: 'Dune' }, feeling: 'loved', sourceType: 'manual', createdAt: '2026-07-10T12:00:00.000Z' }],
+    notes: [{ id: 'legacy-note', kind: 'text', text: 'A note', audioUri: null, durationMs: null, archetype: 'calm', label: 'A note', createdAt: '2026-07-10T13:00:00.000Z' }],
+  },
+});
+const currentState = upgradeStoredHomeState({
+  ...oldState,
+  version: 12,
   archivedDays: [{
     ...day,
     classifiedMemories: day.classifiedMemories.map((memory) => ({ ...memory, schemaVersion: 6 })),
@@ -72,8 +81,9 @@ function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
   else { failures += 1; console.log(`FAIL  ${label}`); }
 }
-check('v9 upgrades to v11', upgraded.version === 11);
-check('v10 upgrades losslessly to v11', upgradedFromV10.version === 11 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
+check('v9 upgrades to v12', upgraded.version === 12);
+check('v10 upgrades losslessly to v12', upgradedFromV10.version === 12 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
+check('v11 journals migrate to canonical records', upgradedFromV11.version === 12 && upgradedFromV11.today.journalRecords.length === 2);
 check('cloud intelligence remains opt-in', upgraded.cloudIntelligenceEnabled === false);
 check('personal entities initialize locally', Array.isArray(upgraded.personalEntities) && upgraded.personalEntities.length === 0);
 check('days are preserved', upgraded.archivedDays.length === 1 && upgraded.today.id === 'day-2026-07-10');
@@ -88,5 +98,5 @@ check('creature survives', upgraded.archivedDays[0].creature.id === 'waglet');
 check('prompt answer survives', upgraded.archivedDays[0].promptAnswers[0].choiceIds[0] === 'calm');
 check('location survives', upgraded.archivedDays[0].locations[0].id === 'loc-1');
 
-console.log(failures ? `\n${failures} v11 migration check(s) FAILED.` : '\nAll v11 migration checks passed.');
+console.log(failures ? `\n${failures} v12 migration check(s) FAILED.` : '\nAll v12 migration checks passed.');
 process.exit(failures ? 1 : 0);

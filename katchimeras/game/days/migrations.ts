@@ -2,6 +2,7 @@ import type {
   ClassifiedMemory,
   HealthPermissionState,
   LocationPermissionState,
+  JournalRecord,
   StoredHomeDayRecord,
   StoredHomeState,
 } from '@/types/home';
@@ -88,6 +89,7 @@ type Version8StoredHomeState = Omit<StoredHomeState, 'version' | 'archivedDays' 
 };
 type Version9StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 9 };
 type Version10StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 10 };
+type Version11StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 11 };
 type Version7StoredHomeState = Omit<Version8StoredHomeState, 'version' | 'personalEntities' | 'cloudIntelligenceEnabled'> & {
   version: 7;
 };
@@ -95,6 +97,7 @@ type Version6StoredHomeState = Omit<Version7StoredHomeState, 'version'> & { vers
 
 export type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version11StoredHomeState
   | Version10StoredHomeState
   | Version9StoredHomeState
   | Version8StoredHomeState
@@ -107,9 +110,19 @@ export type UpgradeableStoredHomeState =
   | LegacyStoredHomeState;
 
 export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
+  if ('version' in inputState && inputState.version === 12) {
+    return {
+      ...inputState,
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
+      tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
+    };
+  }
+
   if ('version' in inputState && inputState.version === 11) {
     return {
       ...inputState,
+      version: 12,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -119,7 +132,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 10) {
     return {
       ...inputState,
-      version: 11,
+      version: 12,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -129,7 +142,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 9) {
     return {
       ...inputState,
-      version: 11,
+      version: 12,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -139,7 +152,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 8) {
     return {
       ...inputState,
-      version: 11,
+      version: 12,
       personalEntities: inputState.personalEntities ?? [],
       cloudIntelligenceEnabled: inputState.cloudIntelligenceEnabled === true,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -151,7 +164,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && (inputState.version === 7 || inputState.version === 6)) {
     return {
       ...inputState,
-      version: 11,
+      version: 12,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -164,7 +177,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 5) {
     return {
       ...inputState,
-      version: 11,
+      version: 12,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -176,7 +189,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
-      version: 11,
+      version: 12,
       encounterHistory: {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -187,7 +200,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 11,
+      version: 12,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
@@ -201,7 +214,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 11,
+      version: 12,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
@@ -216,7 +229,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 11,
+    version: 12,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -273,6 +286,9 @@ function ensureStoredDayFields(
     : [];
   return {
     ...day,
+    journalRecords: 'journalRecords' in day && Array.isArray(day.journalRecords)
+      ? day.journalRecords
+      : migrateLegacyJournalRecords(day as StoredHomeDayRecord),
     stepsCount: 'stepsCount' in day && typeof day.stepsCount === 'number' ? Math.max(0, Math.round(day.stepsCount)) : 0,
     visitedPlaceCount:
       'visitedPlaceCount' in day && typeof day.visitedPlaceCount === 'number'
@@ -299,4 +315,59 @@ function ensureStoredDayFields(
         }
       : null,
   };
+}
+
+function migrateLegacyJournalRecords(day: StoredHomeDayRecord): JournalRecord[] {
+  const records: JournalRecord[] = [];
+  const linkedNoteIds = new Set<string>();
+  for (const entry of day.manualJournalEntries ?? []) {
+    const linked = entry.linkedNoteId ? day.notes?.find((note) => note.id === entry.linkedNoteId) : null;
+    if (linked) linkedNoteIds.add(linked.id);
+    const source = entry.sourceType === 'photo' && entry.sourceId
+      ? { kind: 'photo' as const, sourceId: entry.sourceId }
+      : { kind: 'manual' as const, sourceId: entry.sourceId ?? entry.id };
+    records.push({
+      id: `journal:legacy:${entry.id}`,
+      schemaVersion: 1,
+      idempotencyKey: entry.sourceType === 'photo' && entry.sourceId ? `photo:${entry.sourceId}` : `legacy:${entry.id}`,
+      source,
+      flowId: entry.flowId,
+      flowVersion: entry.flowVersion,
+      categoryId: entry.categoryId,
+      canonicalQualityIds: entry.canonicalQualityIds,
+      fields: entry.fields,
+      feeling: entry.feeling ?? null,
+      note: entry.note ?? null,
+      attachments: linked ? [{ id: `attachment:${linked.id}`, kind: linked.kind, text: linked.text, uri: linked.audioUri, durationMs: linked.durationMs }] : [],
+      confirmedFacets: [],
+      createdAt: entry.createdAt,
+    });
+  }
+  for (const note of day.notes ?? []) {
+    if (linkedNoteIds.has(note.id)) continue;
+    const studio = day.studioMoments?.find((item) => item.noteId === note.id);
+    const food = day.foodMoments?.find((item) => item.noteId === note.id);
+    const event = day.bigMoments?.find((item) => item.noteId === note.id);
+    const flowId = studio ? 'studio' : food ? 'food' : event ? 'big_event' : 'general';
+    const categoryId = studio ? studio.mediaType === 'other' ? 'other_media' : studio.mediaType : food ? 'meal' : event ? event.type : 'other';
+    records.push({
+      id: `journal:legacy:${note.id}`,
+      schemaVersion: 1,
+      idempotencyKey: `legacy:${note.id}`,
+      source: note.kind === 'voice'
+        ? { kind: 'voice_note', sourceId: note.id, audioUri: note.audioUri, durationMs: note.durationMs }
+        : { kind: 'text_note', sourceId: note.id },
+      flowId,
+      flowVersion: 1,
+      categoryId,
+      canonicalQualityIds: [],
+      fields: { specific: studio?.label ?? food?.label ?? event?.label ?? note.label },
+      feeling: null,
+      note: note.text,
+      attachments: [{ id: `attachment:${note.id}`, kind: note.kind, text: note.text, uri: note.audioUri, durationMs: note.durationMs }],
+      confirmedFacets: [],
+      createdAt: note.createdAt,
+    });
+  }
+  return records;
 }
