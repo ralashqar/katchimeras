@@ -78,6 +78,24 @@ export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRun
     return unknownQuest(input.questId);
   }
 
+  if (def.execution && def.execution.kind !== 'evidence') {
+    return {
+      questId: def.id,
+      state: 'in_progress',
+      complete: false,
+      submissionMode: 'auto',
+      readyToSubmit: false,
+      progress: [],
+      matchedEvidenceIds: [],
+      possibleEvidenceIds: [],
+      confidence: null,
+      missingCapabilities: [],
+      nextAction: 'none',
+      userMessage: def.hint,
+      debugReason: `Interactive ${def.execution.kind} quest is completed by its experience module.`,
+    };
+  }
+
   const capabilityStatus = evaluateCapabilities(def, input);
   if (capabilityStatus) {
     return {

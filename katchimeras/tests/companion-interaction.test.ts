@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import type { HomeDayRecord } from '@/types/home';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import {
   buildCompanionQuestViewModel,
@@ -11,7 +12,7 @@ import {
 } from '@/utils/companion-interaction';
 import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
 import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
-import { isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
+import { evidenceProvider, isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
 
 function runtime(overrides: Partial<QuestRuntimeStatus> = {}): QuestRuntimeStatus {
   return {
@@ -97,6 +98,18 @@ test('late-night quest evidence is restricted to photos captured from 11pm throu
   assert.equal(evidence('2026-07-14T04:59:00').signals.some((signal) => signal.key === 'time.late_night'), true);
   assert.equal(evidence('2026-07-14T05:00:00').signals.some((signal) => signal.key === 'time.late_night'), false);
   assert.equal(evidence('2026-07-14T14:00:00').signals.some((signal) => signal.key === 'time.late_night'), false);
+});
+
+test('the evidence provider returns its capture-time-enriched photo candidates', () => {
+  const photo = {
+    id: 'photo:late', sourceType: 'photo' as const, sourceId: 'late',
+    observedAt: '2026-07-13T23:30:00', provider: 'appleVision' as const,
+    confidence: 0.9, signals: [],
+  };
+  const facts = evidenceProvider.resolve({ today: { evidence: [photo] } as unknown as HomeDayRecord });
+  const candidates = facts['evidence.items'] ?? [];
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].signals.some((signal) => signal.key === 'time.late_night'), true);
 });
 
 test('insight actions are contextual and optional', () => {

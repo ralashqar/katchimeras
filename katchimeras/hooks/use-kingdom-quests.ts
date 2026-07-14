@@ -17,14 +17,19 @@ import { insightForArchetype } from '@/utils/companion-interaction';
 import { requestCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import {
   acceptQuest,
+  cancelQuestAttempt,
+  completeInteractiveQuest,
   completeQuest,
+  cycleQuestOffer,
   hasCompanionQuestForDay,
   interactionState,
   loadCompanionQuests,
   questCriteria,
   questFor,
+  questOfferForDay,
   saveCompanionQuests,
   submitQuest,
+  startQuestAttempt,
   type CompanionQuestState,
 } from '@/utils/katchimera-quests';
 import type { KingdomResident } from '@/utils/kingdom-residents';
@@ -36,6 +41,9 @@ import {
   type QuestSubmissionItem,
 } from '@/utils/quests/report-back-evidence';
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
+import { questDefinition } from '@/utils/quests/definitions';
+import { completedQuestCount, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig } from '@/utils/quests/experiences/difficulty';
+import { isInteractiveExecution, type QuestResult } from '@/utils/quests/experiences/types';
 import { refreshQuestFacts } from '@/utils/quests/facts';
 import type { Facts } from '@/utils/signals/facts';
 import { recalibrateClassifiedMemory, repairUrbanPhotoCentrality, withQualityConfirmation } from '@/utils/intelligence/classification';
@@ -129,13 +137,47 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       const archetype = archetypeForCreature(creature.creatureId, fallback);
       const subtype = subtypeForCreature(creature.creatureId, fallback);
       map.set(creature.creatureId, {
-        ...companionUnit(archetype, kingdom, subtype),
+        ...companionUnit(archetype, kingdom, subtype, creature.visualKey),
         archetype,
         subtype,
       });
     }
     return map;
   }, [kingdom]);
+
+  // Quests accepted before interactive experiences existed have no offerSeed.
+  // Upgrade launch companions with an interactive family once, so an old
+  // quest cannot permanently hide the new experience UI on an existing profile.
+  useEffect(() => {
+    let changed = false;
+    const quests = companionQuestState.quests.map((quest) => {
+      if (quest.completedAt || quest.offerSeed) return quest;
+      const creature = creatureById.get(quest.creatureId);
+      const data = companionDataByCreatureId.get(quest.creatureId);
+      const key = creature?.visualKey?.toLowerCase();
+      if (!creature || !data || !key || !['bedrotte', 'steppling', 'flickerbun', 'pagelet', 'mossprout', 'skylo', 'gatherglow', 'feastle', 'tasklet', 'relicoon', 'encora'].includes(key)) return quest;
+      const interactive = data.questOptions?.find((offer) => isInteractiveExecution(questDefinition(offer.id)?.execution));
+      if (!interactive || interactive.id === quest.questId) return quest;
+      const definition = questDefinition(interactive.id);
+      const dayId = quest.acceptedDayId ?? today?.isoDate ?? 'today';
+      changed = true;
+      return {
+        ...quest,
+        questId: interactive.id,
+        title: interactive.title,
+        hint: interactive.hint,
+        repairedAt: Date.now(),
+        repairedFromQuestId: quest.questId,
+        offerSeed: `${quest.creatureId}:${dayId}:${interactive.id}`,
+        resolvedConfig: resolveInteractiveConfig(definition, companionQuestState, quest.creatureId, interactive.id),
+      };
+    });
+    if (changed) {
+      const next = { ...companionQuestState, quests };
+      saveCompanionQuests(next);
+      setCompanionQuestState(next);
+    }
+  }, [companionDataByCreatureId, companionQuestState, creatureById, today?.isoDate]);
 
   const residentStatusGlyphs = useMemo(() => {
     const glyphs: Partial<Record<string, 'offer' | 'active' | 'ready'>> = {};
@@ -217,13 +259,23 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     }, 450);
     return () => clearTimeout(timeout);
   }, [selectedQuestCaptureFeedback, selectedQuestItems, selectedQuestRuntime]);
+  const selectedOfferOptions = selectedResident && selectedCompanionData?.questOptions && today?.isoDate
+    ? eligibleOfferOptions(
+        selectedCompanionData.questOptions,
+        companionQuestState,
+        selectedResident.creature.creatureId,
+        selectedResident.creature.visualKey,
+        selectedResident.resident.houseLevel,
+        today.isoDate
+      )
+    : [];
   const selectedOffer =
     selectedResident &&
-    selectedCompanionData?.quest &&
+    selectedOfferOptions.length > 0 &&
     today?.isoDate &&
     !selectedActiveQuest &&
     !hasCompanionQuestForDay(companionQuestState, selectedResident.creature.creatureId, today.isoDate)
-      ? selectedCompanionData.quest
+      ? questOfferForDay(companionQuestState, selectedResident.creature.creatureId, today.isoDate, selectedOfferOptions)
       : undefined;
   const selectedInteractionState = selectedResident
     ? interactionState(
@@ -290,6 +342,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
 
   const acceptSelectedQuest = useCallback(() => {
     if (!selectedResident || !selectedOffer) return;
+    const definition = questDefinition(selectedOffer.id);
+    const seed = `${selectedResident.creature.creatureId}:${today?.isoDate ?? 'today'}:${selectedOffer.id}`;
+    const resolvedConfig = resolveInteractiveConfig(
+      definition,
+      companionQuestState,
+      selectedResident.creature.creatureId,
+      selectedOffer.id
+    );
     const next = acceptQuest(
       companionQuestState,
       {
@@ -298,6 +358,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         title: selectedOffer.title,
         hint: selectedOffer.hint,
         dayId: today?.isoDate ?? null,
+        offerSeed: seed,
+        resolvedConfig,
       },
       Date.now()
     );
@@ -309,6 +371,52 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setMicrocopy('Quest accepted');
     setSelectedResident((current) => (current ? { ...current, thread: 'quest' } : current));
   }, [commitCompanionQuestState, companionQuestState, selectedOffer, selectedResident, today?.isoDate]);
+
+  const cycleSelectedOffer = useCallback(() => {
+    if (!selectedResident || !today?.isoDate || selectedOfferOptions.length < 2) return;
+    const result = cycleQuestOffer(
+      companionQuestState,
+      selectedResident.creature.creatureId,
+      today.isoDate,
+      selectedOfferOptions
+    );
+    commitCompanionQuestState(result.state);
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+  }, [commitCompanionQuestState, companionQuestState, selectedOfferOptions, selectedResident, today?.isoDate]);
+
+  const startSelectedQuestAttempt = useCallback((config: Record<string, unknown>): string => {
+    if (!selectedResident || !selectedActiveQuest || !today?.isoDate) return '';
+    const definition = questDefinition(selectedActiveQuest.questId);
+    if (!isInteractiveExecution(definition?.execution)) return '';
+    const result = startQuestAttempt(companionQuestState, {
+      questId: selectedActiveQuest.questId,
+      creatureId: selectedResident.creature.creatureId,
+      dayId: today.isoDate,
+      seed: selectedActiveQuest.offerSeed ?? `${selectedActiveQuest.questId}:${today.isoDate}`,
+      executionKind: definition.execution.kind,
+      configSnapshot: config,
+    });
+    commitCompanionQuestState(result.state);
+    return result.attempt.id;
+  }, [commitCompanionQuestState, companionQuestState, selectedActiveQuest, selectedResident, today?.isoDate]);
+
+  const cancelSelectedQuestAttempt = useCallback((attemptId: string) => {
+    const latest = loadCompanionQuests();
+    commitCompanionQuestState(cancelQuestAttempt(latest, attemptId));
+  }, [commitCompanionQuestState]);
+
+  const completeSelectedInteractiveQuest = useCallback((attemptId: string, result: QuestResult) => {
+    if (!selectedResident || !today?.isoDate) return;
+    const latest = loadCompanionQuests();
+    commitCompanionQuestState(completeInteractiveQuest(latest, {
+      attemptId,
+      creatureId: selectedResident.creature.creatureId,
+      result,
+      dayId: today.isoDate,
+    }));
+    setMicrocopy('Quest complete');
+    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [commitCompanionQuestState, selectedResident, today?.isoDate]);
 
   const cashInSelectedQuest = useCallback(() => {
     if (!selectedResident) return;
@@ -394,6 +502,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     ) {
       beginQuestCapture(selectedQuestRuntime.questId, selectedResident.creature.creatureId);
       setQuestCaptureFeedback(null);
+      // Do not retain a native companion Modal underneath the pushed camera
+      // route. It can keep gesture ownership when iOS restores the Kingdom
+      // screen. A committed capture reopens the correct quest sheet on focus.
+      setSelectedResident(null);
       router.push({
         pathname: '/moment-capture',
         params: {
@@ -427,24 +539,64 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setSelectedResident((current) => (current ? { ...current, thread } : current));
   }, []);
   const closeSelectedResident = useCallback(() => setSelectedResident(null), []);
+  const selectedActiveQuestDefinition = selectedActiveQuest ? questDefinition(selectedActiveQuest.questId) : null;
+  const selectedInteractiveExecution = isInteractiveExecution(selectedActiveQuestDefinition?.execution)
+    ? selectedActiveQuestDefinition.execution
+    : null;
+  const selectedSortingItemCount = typeof selectedActiveQuest?.resolvedConfig?.itemCount === 'number'
+    ? selectedActiveQuest.resolvedConfig.itemCount
+    : null;
+  const selectedSortingBestDurationMs = selectedActiveQuest && selectedInteractiveExecution?.kind === 'sorting'
+    ? companionQuestState.attempts.reduce<number | null>((best, attempt) => {
+        const result = attempt.questId === selectedActiveQuest.questId && attempt.result?.kind === 'sorting'
+          ? attempt.result
+          : null;
+        if (!result?.success || (selectedSortingItemCount != null && result.totalItems !== selectedSortingItemCount)) return best;
+        return best == null ? result.durationMs : Math.min(best, result.durationMs);
+      }, null)
+    : null;
+  const selectedMatchingPairCount = typeof selectedActiveQuest?.resolvedConfig?.pairCount === 'number'
+    ? selectedActiveQuest.resolvedConfig.pairCount
+    : null;
+  const selectedMatchingBestDurationMs = selectedActiveQuest && selectedInteractiveExecution?.kind === 'matching'
+    ? companionQuestState.attempts.reduce<number | null>((best, attempt) => {
+        const result = attempt.questId === selectedActiveQuest.questId && attempt.result?.kind === 'matching'
+          ? attempt.result
+          : null;
+        if (!result?.success || (selectedMatchingPairCount != null && result.pairs !== selectedMatchingPairCount)) return best;
+        return best == null ? result.durationMs : Math.min(best, result.durationMs);
+      }, null)
+    : null;
 
   return {
     acceptSelectedQuest,
+    cancelSelectedQuestAttempt,
     answerSelectedReflection,
     cashInSelectedQuest,
     closeSelectedResident,
     microcopy,
     performSelectedQuestAction,
+    completeSelectedInteractiveQuest,
+    cycleSelectedOffer,
     questCaptureFeedback: selectedQuestCaptureFeedback,
     questCriteria: selectedQuestRuntime?.progress ?? (selectedActiveQuest ? questCriteria(selectedActiveQuest.questId, questFacts) : []),
     residentStatusGlyphs,
     selectResident,
     selectThread,
     selectedActiveQuest,
+    selectedActiveQuestDefinition,
+    selectedInteractiveExecution,
     selectedCompanionData,
     selectedInsight,
     selectedInteractionState,
     selectedOffer,
+    selectedOfferCount: selectedOfferOptions.length,
+    recentTriviaQuestionIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'trivia' ? attempt.result.questionIds : []).slice(-40),
+    recentWordPuzzleIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'word_game' ? [attempt.result.puzzleId] : []).slice(-30),
+    recentSortingItemIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'sorting' ? attempt.result.itemIds : []).slice(-40),
+    selectedSortingBestDurationMs,
+    selectedMatchingBestDurationMs,
+    recentMatchingContentIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'matching' ? attempt.result.contentIds : []).slice(-32),
     selectedQuestItems,
     selectedQuestRuntime,
     selectedResident,
@@ -452,7 +604,73 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     submitSelectedQuest,
     performSelectedInsightAction,
     refreshQuestState,
+    startSelectedQuestAttempt,
   };
+}
+
+function eligibleOfferOptions<T extends { id: string }>(
+  offers: T[],
+  state: CompanionQuestState,
+  creatureId: string,
+  creatureKey: string,
+  houseLevel: number,
+  dayId: string
+): T[] {
+  return offers.filter((offer) => {
+    const definition = questDefinition(offer.id);
+    if (!definition) return false;
+    const eligibility = definition.eligibility;
+    if (eligibility?.creatureKeys?.length && !eligibility.creatureKeys.includes(creatureKey.toLowerCase())) return false;
+    if ((eligibility?.minimumHomeLevel ?? 0) > houseLevel) return false;
+    if (offer.id === 'quest-step-time-trial' && completedQuestCount(state.quests, 'quest-step-sprint', creatureId) < 1) return false;
+    const cooldownDays = eligibility?.cooldownDays ?? 0;
+    if (!cooldownDays) return true;
+    const latest = state.quests
+      .filter((quest) => quest.questId === offer.id && quest.creatureId === creatureId && quest.completedDayId)
+      .map((quest) => quest.completedDayId!)
+      .sort()
+      .at(-1);
+    return !latest || dayDistance(latest, dayId) >= cooldownDays;
+  });
+}
+
+function dayDistance(from: string, to: string): number {
+  const start = new Date(`${from}T12:00:00`).getTime();
+  const end = new Date(`${to}T12:00:00`).getTime();
+  return Math.floor((end - start) / 86_400_000);
+}
+
+function resolveInteractiveConfig(
+  definition: ReturnType<typeof questDefinition>,
+  state: CompanionQuestState,
+  creatureId: string,
+  questId: string
+): Record<string, unknown> | undefined {
+  if (definition?.execution?.kind === 'live_steps') {
+    return resolveStepChallengeConfig({
+      challengeId: definition.execution.challengeId,
+      completedCount: completedQuestCount(state.quests, questId, creatureId),
+    });
+  }
+  if (definition?.execution?.kind === 'trivia') {
+    return { packIds: definition.execution.packIds, questionCount: definition.execution.questionCount };
+  }
+  if (definition?.execution?.kind === 'word_game') {
+    return {
+      gameId: definition.execution.gameId,
+      rulesetId: definition.execution.rulesetId,
+      answerLength: definition.execution.answerLength,
+      maxGuesses: definition.execution.maxGuesses,
+      ...resolveLostWordDifficulty(completedQuestCount(state.quests, questId, creatureId)),
+    };
+  }
+  if (definition?.execution?.kind === 'paced_breathing') return resolveBreathingConfig(completedQuestCount(state.quests, questId, creatureId));
+  if (definition?.execution?.kind === 'timing_zone') return resolveTimingConfig(definition.execution.challengeId, completedQuestCount(state.quests, questId, creatureId));
+  if (definition?.execution?.kind === 'pattern_memory') return resolvePatternConfig(completedQuestCount(state.quests, questId, creatureId));
+  if (definition?.execution?.kind === 'sorting') return resolveSortingConfig(completedQuestCount(state.quests, questId, creatureId));
+  if (definition?.execution?.kind === 'matching') return resolveMatchingConfig(completedQuestCount(state.quests, questId, creatureId));
+  if (definition?.execution?.kind === 'rhythm') return resolveRhythmConfig(completedQuestCount(state.quests, questId, creatureId));
+  return undefined;
 }
 
 function insightCount(archetype: string, kingdom: KingdomState): number | null {

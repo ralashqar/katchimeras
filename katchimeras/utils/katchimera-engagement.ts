@@ -1,5 +1,5 @@
 import type { KingdomState } from '@/types/kingdom';
-import { themedQuestOffer } from '@/utils/quests/themed';
+import { themedQuestOffer, themedQuestOffers } from '@/utils/quests/themed';
 
 // Katchimera Engagement T1 rule engine (docs/katchimera-engagement-v1.md):
 // one engagement unit per companion-card open, computed from the user's own
@@ -11,6 +11,7 @@ export type CompanionUnit = {
   line: string;
   /** Optional quest offer (V1a: copy only; store + evaluators come next). */
   quest?: { id: string; title: string; hint: string };
+  questOptions?: { id: string; title: string; hint: string }[];
 };
 
 // The encounter registry records WHY each katchimera hatches (its trigger
@@ -161,8 +162,8 @@ const ARCHETYPE_QUEST: Record<string, string> = {
   memory: 'quest-snap-today',
 };
 
-function questOffer(subtype: string, archetype: string): CompanionUnit['quest'] {
-  return themedQuestOffer(subtype, archetype);
+function questOffer(subtype: string, archetype: string, creatureKey = ''): CompanionUnit['quest'] {
+  return themedQuestOffer(subtype, archetype, creatureKey);
 }
 
 // The insight LINE per archetype (the quest is chosen separately by subtype →
@@ -211,8 +212,9 @@ function insightLine(archetype: string, kingdom: KingdomState): string {
 // The full companion engagement: archetype-voiced insight + the creature's
 // most specific quest (subtype-first). Every companion ALWAYS has an offer —
 // a lifeless card reads as broken.
-export function companionUnit(archetype: string, kingdom: KingdomState, subtype = ''): CompanionUnit {
-  return { line: insightLine(archetype, kingdom), quest: questOffer(subtype, archetype) };
+export function companionUnit(archetype: string, kingdom: KingdomState, subtype = '', creatureKey = ''): CompanionUnit {
+  const questOptions = themedQuestOffers(subtype, archetype, creatureKey);
+  return { line: insightLine(archetype, kingdom), quest: questOffer(subtype, archetype, creatureKey), questOptions };
 }
 
 // A gentle open question in the creature's theme — invites the user to reflect

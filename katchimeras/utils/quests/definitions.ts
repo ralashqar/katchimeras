@@ -11,6 +11,30 @@ import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 export type QuestDefinition = {
   id: string;
   family?: 'photo' | 'moment' | 'place' | 'movement' | 'note' | 'voice' | 'food' | 'studio' | 'sleep' | 'weather' | 'calendar';
+  execution?:
+    | { kind: 'evidence' }
+    | { kind: 'live_steps'; challengeId: 'step_sprint' | 'step_time_trial'; difficultyCurveId: string }
+    | { kind: 'trivia'; packIds: ('film' | 'books' | 'city')[]; questionCount: number }
+    | { kind: 'paced_breathing'; patternId: 'bedrotte-calm-v1'; difficultyCurveId: string }
+    | { kind: 'timing_zone'; challengeId: 'steppling-stride' | 'mossprout-tend'; difficultyCurveId: string }
+    | { kind: 'pattern_memory'; gameId: 'gatherglow-lights'; difficultyCurveId: string }
+    | { kind: 'sorting'; packId: 'feastle-table' | 'tasklet-triage'; difficultyCurveId: string }
+    | { kind: 'matching'; packId: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; difficultyCurveId: string }
+    | { kind: 'rhythm'; gameId: 'encora-echo'; difficultyCurveId: string }
+    | {
+        kind: 'word_game';
+        gameId: 'pagelet_lost_word';
+        rulesetId: 'lost-word-v1';
+        answerLength: 5;
+        maxGuesses: 6;
+        difficultyCurveId: 'pagelet-lost-word-v1';
+      };
+  eligibility?: {
+    creatureKeys?: string[];
+    minimumHomeLevel?: number;
+    cooldownDays?: number;
+    weight?: number;
+  };
   submissionMode?: 'manual' | 'auto';
   themes?: string[];
   title: string;
@@ -41,6 +65,126 @@ function photoQualityCriterion(qualityId: string, label: string): Criterion {
 }
 
 const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
+  'quest-step-sprint': {
+    id: 'quest-step-sprint',
+    family: 'movement',
+    title: 'Quick feet',
+    hint: 'See how many steps you can take before the minute runs out.',
+    criteria: [],
+    requiresCapabilities: ['health.steps'],
+    execution: { kind: 'live_steps', challengeId: 'step_sprint', difficultyCurveId: 'step-sprint-v1' },
+    eligibility: { creatureKeys: ['steppling'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-step-time-trial': {
+    id: 'quest-step-time-trial',
+    family: 'movement',
+    title: 'Beat the trail clock',
+    hint: 'Reach the step target and see how long it takes.',
+    criteria: [],
+    requiresCapabilities: ['health.steps'],
+    execution: { kind: 'live_steps', challengeId: 'step_time_trial', difficultyCurveId: 'step-time-trial-v1' },
+    eligibility: { creatureKeys: ['steppling'], cooldownDays: 1, weight: 2 },
+  },
+  'quest-film-trivia': {
+    id: 'quest-film-trivia',
+    family: 'studio',
+    title: 'Five frames of film trivia',
+    hint: 'Answer five quick film questions. Finishing the round completes the quest.',
+    criteria: [],
+    execution: { kind: 'trivia', packIds: ['film'], questionCount: 5 },
+    eligibility: { creatureKeys: ['flickerbun'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-book-trivia': {
+    id: 'quest-book-trivia',
+    family: 'studio',
+    title: 'Five questions from the shelves',
+    hint: 'Answer five quick book questions. Finishing the round completes the quest.',
+    criteria: [],
+    execution: { kind: 'trivia', packIds: ['books'], questionCount: 5 },
+    eligibility: { creatureKeys: ['pagelet'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-pagelet-lost-word': {
+    id: 'quest-pagelet-lost-word',
+    family: 'studio',
+    title: 'Pagelet\'s Lost Word',
+    hint: 'Find a five-letter word from Pagelet\'s shelves. Finishing the round completes the quest.',
+    criteria: [],
+    execution: {
+      kind: 'word_game',
+      gameId: 'pagelet_lost_word',
+      rulesetId: 'lost-word-v1',
+      answerLength: 5,
+      maxGuesses: 6,
+      difficultyCurveId: 'pagelet-lost-word-v1',
+    },
+    eligibility: { creatureKeys: ['pagelet'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-bedrotte-breathe': {
+    id: 'quest-bedrotte-breathe', family: 'sleep', title: 'Breathe with Bedrotte',
+    hint: 'Settle into a few slow breaths with Bedrotte.', criteria: [],
+    execution: { kind: 'paced_breathing', patternId: 'bedrotte-calm-v1', difficultyCurveId: 'bedrotte-calm-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['bedrotte'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-steppling-stride': {
+    id: 'quest-steppling-stride', family: 'movement', title: 'Catch the stride',
+    hint: 'Tap as the marker crosses Steppling’s stride zone.', criteria: [],
+    execution: { kind: 'timing_zone', challengeId: 'steppling-stride', difficultyCurveId: 'steppling-stride-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['steppling'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-mossprout-tend': {
+    id: 'quest-mossprout-tend', family: 'place', title: 'Tend Mossprout’s patch',
+    hint: 'Time each drop so the little patch gets just enough water.', criteria: [],
+    execution: { kind: 'timing_zone', challengeId: 'mossprout-tend', difficultyCurveId: 'mossprout-tend-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['mossprout'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-mossprout-memory': {
+    id: 'quest-mossprout-memory', family: 'place', title: 'Mossprout’s garden pairs',
+    hint: 'Turn over the garden cards and find every matching plant.', criteria: [],
+    execution: { kind: 'matching', packId: 'mossprout-garden', difficultyCurveId: 'mossprout-memory-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['mossprout'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-skylo-city-trivia': {
+    id: 'quest-skylo-city-trivia', family: 'place', title: 'Skylo’s city circuit',
+    hint: 'Take a five-stop trip through cities around the world.', criteria: [],
+    execution: { kind: 'trivia', packIds: ['city'], questionCount: 5 }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['skylo'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-gatherglow-pattern': {
+    id: 'quest-gatherglow-pattern', family: 'moment', title: 'Follow Gatherglow’s lights',
+    hint: 'Watch the glow pattern, then play it back.', criteria: [],
+    execution: { kind: 'pattern_memory', gameId: 'gatherglow-lights', difficultyCurveId: 'gatherglow-lights-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['gatherglow'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-feastle-sort': {
+    id: 'quest-feastle-sort', family: 'food', title: 'Set Feastle’s table',
+    hint: 'Sort food, drinks and tableware into their proper places.', criteria: [],
+    execution: { kind: 'sorting', packId: 'feastle-table', difficultyCurveId: 'feastle-table-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['feastle'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-tasklet-sort': {
+    id: 'quest-tasklet-sort', family: 'studio', title: 'Clear Tasklet’s desk',
+    hint: 'Sort each task by what it needs next.', criteria: [],
+    execution: { kind: 'sorting', packId: 'tasklet-triage', difficultyCurveId: 'tasklet-triage-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['tasklet'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-feastle-memory': {
+    id: 'quest-feastle-memory', family: 'food', title: 'Feastle’s matching feast',
+    hint: 'Turn over the table cards and find every matching food.', criteria: [],
+    execution: { kind: 'matching', packId: 'feastle-food', difficultyCurveId: 'feastle-memory-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['feastle'], cooldownDays: 1, weight: 2 },
+  },
+  'quest-relicoon-match': {
+    id: 'quest-relicoon-match', family: 'place', title: 'Relicoon’s gallery pairs',
+    hint: 'Turn over the gallery cards and reunite each pair.', criteria: [],
+    execution: { kind: 'matching', packId: 'relicoon-gallery', difficultyCurveId: 'relicoon-gallery-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['relicoon'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-encora-rhythm': {
+    id: 'quest-encora-rhythm', family: 'studio', title: 'Echo Encora’s rhythm',
+    hint: 'Remember the phrase and tap it back in time.', criteria: [],
+    execution: { kind: 'rhythm', gameId: 'encora-echo', difficultyCurveId: 'encora-echo-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['encora'], cooldownDays: 1, weight: 3 },
+  },
   'quest-new-place': {
     id: 'quest-new-place',
     title: 'Somewhere new',

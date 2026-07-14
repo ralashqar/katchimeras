@@ -37,7 +37,7 @@ export function reviewPhotoJournalSubmission(input: {
     adapter: flow.projectionKind,
     choiceLabel: choice.label,
     mediaType: choice.mediaType ?? null,
-    reactionLabel: flow.feelings.find((item) => item.id === input.submission.feeling)?.label ?? choice.label,
+    reactionLabel: (choice.feelings ?? flow.feelings).find((item) => item.id === input.submission.feeling)?.label ?? choice.label,
   };
 }
 

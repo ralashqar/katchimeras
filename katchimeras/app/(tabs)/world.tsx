@@ -223,7 +223,13 @@ export default function KingdomScreen() {
           initialThread={quests.selectedResident.thread ?? 'insight'}
           onSelectThread={quests.selectThread}
           onClose={() => { setReflectionDraft(null); quests.closeSelectedResident(); }}
-          activeQuest={quests.selectedActiveQuest ? { title: quests.selectedActiveQuest.title, hint: quests.selectedActiveQuest.hint } : null}
+          activeQuest={quests.selectedActiveQuest ? {
+            title: quests.selectedActiveQuest.title,
+            hint: quests.selectedActiveQuest.hint,
+            execution: quests.selectedInteractiveExecution,
+            resolvedConfig: quests.selectedActiveQuest.resolvedConfig,
+            offerSeed: quests.selectedActiveQuest.offerSeed,
+          } : null}
           questComplete={Boolean(quests.selectedQuestRuntime?.complete)}
           questRuntime={quests.selectedQuestRuntime}
           questCaptureFeedback={quests.questCaptureFeedback}
@@ -231,10 +237,21 @@ export default function KingdomScreen() {
           offer={quests.selectedOffer}
           criteria={quests.questCriteria}
           onAccept={quests.acceptSelectedQuest}
+          offerCount={quests.selectedOfferCount}
+          onCycleOffer={quests.cycleSelectedOffer}
           onCashIn={quests.cashInSelectedQuest}
           onSubmitQuest={quests.submitSelectedQuest}
           onClarifyQuestMatch={quests.clarifySelectedQuestMatch}
           onQuestAction={handleQuestAction}
+          recentTriviaQuestionIds={quests.recentTriviaQuestionIds}
+          recentWordPuzzleIds={quests.recentWordPuzzleIds}
+          recentSortingItemIds={quests.recentSortingItemIds}
+          sortingBestDurationMs={quests.selectedSortingBestDurationMs}
+          matchingBestDurationMs={quests.selectedMatchingBestDurationMs}
+          recentMatchingContentIds={quests.recentMatchingContentIds}
+          onStartQuestAttempt={quests.startSelectedQuestAttempt}
+          onCancelQuestAttempt={quests.cancelSelectedQuestAttempt}
+          onCompleteInteractiveQuest={quests.completeSelectedInteractiveQuest}
           insight={quests.selectedInsight ?? { text: 'This tile remembers the day we met.', action: null }}
           onInsightAction={handleInsightAction}
           reflectionText={reflectionLine(quests.selectedCompanionData?.archetype ?? '')}

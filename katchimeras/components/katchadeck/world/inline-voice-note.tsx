@@ -1,6 +1,6 @@
-import { MotiView } from 'moti';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { MotionView as MotiView } from '@/components/katchadeck/ui/motion-view';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { InterpretedNote } from '@/utils/note-interpret';

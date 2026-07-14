@@ -1,6 +1,20 @@
 import { questDefinition } from './definitions';
 
-export type ThemedQuestOffer = { id: string; title: string; hint: string };
+export type ThemedQuestOffer = { id: string; title: string; hint: string; weight?: number };
+
+const CREATURE_QUEST_POOL: Record<string, string[]> = {
+  bedrotte: ['quest-bedrotte-breathe', 'quest-early-night'],
+  steppling: ['quest-steppling-stride', 'quest-step-sprint', 'quest-step-time-trial', 'quest-long-walk'],
+  flickerbun: ['quest-film-trivia', 'quest-watch-film', 'quest-any-inspiration'],
+  pagelet: ['quest-book-trivia', 'quest-pagelet-lost-word', 'quest-read-book', 'quest-any-inspiration'],
+  mossprout: ['quest-mossprout-memory', 'quest-new-park'],
+  skylo: ['quest-skylo-city-trivia', 'quest-photo-city'],
+  gatherglow: ['quest-gatherglow-pattern', 'quest-snap-today'],
+  feastle: ['quest-feastle-sort', 'quest-feastle-memory', 'quest-photo-food', 'quest-cuisine-any-new'],
+  tasklet: ['quest-tasklet-sort', 'quest-goal-note'],
+  relicoon: ['quest-relicoon-match', 'quest-visit-museum'],
+  encora: ['quest-encora-rhythm', 'quest-any-inspiration'],
+};
 
 const THEME_QUEST_POOL: Record<string, string[]> = {
   coffee_shop: ['quest-new-cafe', 'quest-photo-food'],
@@ -48,10 +62,24 @@ const ARCHETYPE_QUEST_POOL: Record<string, string[]> = {
   memory: ['quest-snap-today'],
 };
 
-export function themedQuestOffer(subtype: string, archetype: string): ThemedQuestOffer | undefined {
-  const ids = [...(THEME_QUEST_POOL[subtype] ?? []), ...(ARCHETYPE_QUEST_POOL[archetype] ?? []), 'quest-snap-today'];
-  const questId = ids.find((id, index) => ids.indexOf(id) === index && questDefinition(id));
-  const def = questId ? questDefinition(questId) : null;
-  return def ? { id: def.id, title: def.title, hint: def.hint } : undefined;
+export function themedQuestOffers(subtype: string, archetype: string, creatureKey = ''): ThemedQuestOffer[] {
+  const ids = [
+    ...(CREATURE_QUEST_POOL[creatureKey.toLowerCase()] ?? []),
+    ...(THEME_QUEST_POOL[subtype] ?? []),
+    ...(ARCHETYPE_QUEST_POOL[archetype] ?? []),
+    'quest-snap-today',
+  ];
+  return ids
+    .filter((id, index) => ids.indexOf(id) === index)
+    .map((id) => questDefinition(id))
+    .filter((definition): definition is NonNullable<typeof definition> => Boolean(definition))
+    .filter((definition) => {
+      const keys = definition.eligibility?.creatureKeys;
+      return !keys?.length || keys.includes(creatureKey.toLowerCase());
+    })
+    .map((definition) => ({ id: definition.id, title: definition.title, hint: definition.hint, weight: definition.eligibility?.weight }));
 }
 
+export function themedQuestOffer(subtype: string, archetype: string, creatureKey = ''): ThemedQuestOffer | undefined {
+  return themedQuestOffers(subtype, archetype, creatureKey)[0];
+}

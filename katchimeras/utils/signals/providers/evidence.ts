@@ -34,7 +34,9 @@ export const evidenceProvider: SignalProvider = {
       };
     });
     if (today.evidence && today.evidence.length > 0) {
-      return { 'evidence.items': today.evidence, 'memory.qualities': qualities };
+      // Return the enriched copy. Returning `today.evidence` here silently
+      // discarded deterministic capture-time signals used by dawn/night quests.
+      return { 'evidence.items': storedEvidence, 'memory.qualities': qualities };
     }
     if (today.vision && (today.vision.analyzedPhotoCount ?? 0) > 0) {
       return {

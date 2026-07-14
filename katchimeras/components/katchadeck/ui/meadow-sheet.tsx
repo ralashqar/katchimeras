@@ -36,11 +36,12 @@ type MeadowSheetProps = {
   kicker?: string;
   title?: string;
   maxHeight?: number | `${number}%`;
-  variant?: 'compact' | 'tall';
+  variant?: 'compact' | 'tall' | 'full';
+  showClose?: boolean;
   zIndex?: number;
 };
 
-export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%', variant = 'compact', zIndex = 50 }: MeadowSheetProps) {
+export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%', variant = 'compact', showClose = true, zIndex = 50 }: MeadowSheetProps) {
   const window = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const dragY = useSharedValue(0);
@@ -53,6 +54,8 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
     availableTallHeight,
     window.height * (tablet ? 0.84 : 0.93)
   );
+  const fullHeight = window.height;
+  const expanded = variant === 'tall' || variant === 'full';
 
   // Down-only pan on the background layer: sideways/up fails fast.
   const dismissPan = Gesture.Pan()
@@ -91,11 +94,16 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
           styles.sheet,
           dragStyle,
           {
-            bottom: variant === 'tall' ? tallBottomClearance : Meadow.overlay.bottomClearance,
-            left: horizontalInset,
-            right: horizontalInset,
-            height: variant === 'tall' ? tallHeight : undefined,
-            maxHeight: variant === 'tall' ? tallHeight : maxHeight,
+            bottom: variant === 'full' ? 0 : variant === 'tall' ? tallBottomClearance : Meadow.overlay.bottomClearance,
+            borderRadius: variant === 'full' ? 0 : 24,
+            borderWidth: variant === 'full' ? 0 : 1,
+            left: variant === 'full' ? 0 : horizontalInset,
+            paddingBottom: variant === 'full' ? 0 : 14,
+            paddingHorizontal: variant === 'full' ? 0 : 16,
+            paddingTop: variant === 'full' ? 0 : 10,
+            right: variant === 'full' ? 0 : horizontalInset,
+            height: variant === 'full' ? fullHeight : variant === 'tall' ? tallHeight : undefined,
+            maxHeight: expanded ? (variant === 'full' ? fullHeight : tallHeight) : maxHeight,
           },
         ]}>
         {/* Dismiss surface: BELOW everything that follows, so it only receives
@@ -106,27 +114,35 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
 
         {/* The grabber + header pass touches through to the dismiss surface —
             dragging the top band is the classic way to pull a sheet closed. */}
-        <View pointerEvents="none" style={styles.grabber} />
-        {kicker || title ? (
-          <View pointerEvents="none" style={styles.header}>
-            {kicker ? (
-              <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                {kicker}
-              </ThemedText>
-            ) : null}
-            {title ? (
-              <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {title}
-              </ThemedText>
-            ) : null}
-          </View>
-        ) : null}
-        {children}
+        {variant !== 'full' ? <View key="grabber" pointerEvents="none" style={styles.grabber} /> : null}
+        <View
+          key="sheet-content"
+          style={[
+            styles.sheetContent,
+            expanded && styles.expandedContent,
+            variant === 'full' && {
+              paddingBottom: insets.bottom + 10,
+              paddingHorizontal: Math.max(16, insets.left, insets.right),
+              paddingTop: insets.top + 8,
+            },
+          ]}>
+          {kicker || title ? <SheetHeading kicker={kicker} title={title} /> : null}
+          {children}
+        </View>
 
-        <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={10} onPress={onClose} style={styles.closeX}>
+        {showClose ? <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={10} onPress={onClose} style={styles.closeX}>
           <IconSymbol name="xmark" size={12} color="rgba(251,243,228,0.75)" />
-        </Pressable>
+        </Pressable> : null}
       </Animated.View>
+    </View>
+  );
+}
+
+function SheetHeading({ kicker, title }: { kicker?: string; title?: string }) {
+  return (
+    <View pointerEvents="none" style={styles.header}>
+      {kicker ? <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>{kicker}</ThemedText> : null}
+      {title ? <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{title}</ThemedText> : null}
     </View>
   );
 }
@@ -147,6 +163,8 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     position: 'absolute',
   },
+  sheetContent: { gap: 8 },
+  expandedContent: { flex: 1, minHeight: 0 },
   grabber: {
     alignSelf: 'center',
     backgroundColor: 'rgba(255,255,255,0.22)',

@@ -11,6 +11,7 @@ function check(label, condition, detail) {
 function memory(quality, subject = null) {
   return {
     sourceType: 'photo', sourceId: 'file:///camera/city.jpg', qualities: quality ? [quality] : [],
+    createdAt: '2026-07-14T12:00:00',
     photoAnalysis: subject ? { representation: { kind: 'real_world' }, subjects: [subject] } : undefined,
   };
 }
@@ -40,6 +41,12 @@ check('incidental evidence returns an explainable reason', incidental.reasonCode
 
 const rejected = evaluatePhotoForQuest(memory({ qualityId: 'place.city', score: 1, centrality: 'primary', status: 'rejected' }), 'quest-photo-city');
 check('a user-rejected quality cannot pass', rejected.status === 'no_match', JSON.stringify(rejected));
+
+const smallHours = evaluatePhotoForQuest({ ...memory(null), createdAt: '2026-07-14T23:30:00' }, 'quest-late-capture');
+check('direct quest camera accepts a photo captured after 11pm', smallHours.status === 'ready', JSON.stringify(smallHours));
+check('direct time result explains its deterministic match', smallHours.reasonCode === 'time_window_match', JSON.stringify(smallHours));
+const fiveAm = evaluatePhotoForQuest({ ...memory(null), createdAt: '2026-07-14T05:00:00' }, 'quest-late-capture');
+check('direct quest camera excludes 5am from the small-hours window', fiveAm.status === 'no_match', JSON.stringify(fiveAm));
 
 if (failures) process.exit(1);
 console.log('\nAll direct photo-quest checks passed.');

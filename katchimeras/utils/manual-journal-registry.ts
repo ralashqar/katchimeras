@@ -4,6 +4,8 @@ import type { BigMomentType, FoodMeaning, StudioMediaType, StudioRating } from '
 export type ManualJournalAdapter = 'place' | 'food' | 'studio' | 'movement' | 'relationship' | 'work' | 'big_event' | 'general';
 export type JournalProjectionKind = ManualJournalAdapter;
 export type ManualJournalSection = 'everyday' | 'culture' | 'milestone' | 'other';
+export type ManualJournalOption = { id: string; label: string };
+export type ManualJournalFeeling = { id: string; label: string; icon?: IconSymbolName };
 
 export type ManualJournalChoice = {
   id: string;
@@ -12,7 +14,11 @@ export type ManualJournalChoice = {
   qualityIds?: string[];
   mediaType?: StudioMediaType;
   bigMomentType?: BigMomentType;
-  detailChoices?: { id: string; label: string }[];
+  detailChoices?: ManualJournalOption[];
+  contextChoices?: ManualJournalOption[];
+  contextTitle?: string;
+  detailTitle?: string;
+  feelings?: ManualJournalFeeling[];
   description?: string;
   specificFieldLabel?: string;
   specificFieldPlaceholder?: string;
@@ -31,11 +37,11 @@ export type ManualJournalFlowDefinition = {
   adapter: ManualJournalAdapter;
   projectionKind: JournalProjectionKind;
   choices: ManualJournalChoice[];
-  contextChoices?: { id: string; label: string }[];
+  contextChoices?: ManualJournalOption[];
   detailTitle?: string;
   specificFieldLabel: string;
   specificFieldPlaceholder: string;
-  feelings: { id: string; label: string; icon?: IconSymbolName }[];
+  feelings: ManualJournalFeeling[];
 };
 
 const REACTIONS = [
@@ -47,6 +53,26 @@ const MEDIA_REACTIONS = [
   { id: 'loved', label: 'Loved it', icon: 'heart.fill' }, { id: 'inspired', label: 'Inspired me', icon: 'sparkles' },
   { id: 'liked', label: 'Liked it', icon: 'face.smiling' }, { id: 'meh', label: 'Not for me', icon: 'face.sad' },
 ] satisfies ManualJournalFlowDefinition['feelings'];
+const CHILD_REACTIONS = [
+  { id: 'tender', label: 'Tender', icon: 'heart.fill' }, { id: 'proud', label: 'Proud', icon: 'star.fill' },
+  { id: 'joyful', label: 'Joyful', icon: 'face.smiling' }, { id: 'funny', label: 'Funny', icon: 'sparkles' },
+  { id: 'calm', label: 'Peaceful', icon: 'moon.stars.fill' }, { id: 'difficult', label: 'A hard moment', icon: 'cloud.rain.fill' },
+] satisfies ManualJournalFeeling[];
+const CLOSE_REACTIONS = [
+  { id: 'close', label: 'Close', icon: 'heart.fill' }, { id: 'grateful', label: 'Grateful', icon: 'sparkles' },
+  { id: 'fun', label: 'Fun', icon: 'face.smiling' }, { id: 'calm', label: 'Comforting', icon: 'moon.stars.fill' },
+  { id: 'ordinary', label: 'Everyday', icon: 'circle.fill' }, { id: 'difficult', label: 'Difficult', icon: 'cloud.rain.fill' },
+] satisfies ManualJournalFeeling[];
+const PET_REACTIONS = [
+  { id: 'affectionate', label: 'Affectionate', icon: 'heart.fill' }, { id: 'funny', label: 'Funny', icon: 'face.smiling' },
+  { id: 'calm', label: 'Comforting', icon: 'moon.stars.fill' }, { id: 'proud', label: 'Proud', icon: 'star.fill' },
+  { id: 'worried', label: 'Worried', icon: 'cloud.rain.fill' }, { id: 'ordinary', label: 'Everyday', icon: 'circle.fill' },
+] satisfies ManualJournalFeeling[];
+const SOLO_REACTIONS = [
+  { id: 'restored', label: 'Restored', icon: 'sparkles' }, { id: 'calm', label: 'Peaceful', icon: 'moon.stars.fill' },
+  { id: 'productive', label: 'Productive', icon: 'bolt.fill' }, { id: 'free', label: 'Free', icon: 'heart.fill' },
+  { id: 'ordinary', label: 'Ordinary', icon: 'circle.fill' }, { id: 'lonely', label: 'Lonely', icon: 'cloud.rain.fill' },
+] satisfies ManualJournalFeeling[];
 
 const choice = (id: string, label: string, icon: IconSymbolName, qualityIds?: string[], routeAliases?: string[]): ManualJournalChoice => ({
   id, label, icon, qualityIds, routeAliases: [...new Set([id, label.toLowerCase(), ...(routeAliases ?? [])])],
@@ -108,10 +134,41 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
   {
     id: 'people', version: 1, title: 'People or time alone', shortTitle: 'People & time', description: 'Company, connection or time by yourself', section: 'everyday', icon: 'person.2.fill', adapter: 'relationship', projectionKind: 'relationship',
     choices: [
-      choice('partner', 'Partner', 'heart.fill', ['subject.person']), choice('my_child', 'My child', 'figure.and.child.holdinghands', ['subject.child']),
-      choice('family', 'Family', 'person.3.fill', ['subject.group']), choice('friends', 'Friends', 'bubble.left.and.bubble.right.fill', ['subject.group']),
-      choice('group', 'A group or gathering', 'person.3.sequence.fill', ['subject.group']), choice('someone_new', 'Someone new', 'sparkles', ['subject.person']),
-      choice('pet', 'A pet', 'pawprint.fill'), { ...choice('solo', 'Me / time by myself', 'person.fill'), specificFieldLabel: 'Memory label', specificFieldPlaceholder: 'Me' }, choice('someone_else', 'Someone else', 'person.fill', ['subject.person']),
+      {
+        ...choice('partner', 'Partner', 'heart.fill', ['subject.person']), contextTitle: 'What kind of time was it?', detailTitle: 'How did being together feel?', feelings: CLOSE_REACTIONS,
+        contextChoices: [{ id: 'date', label: 'A date' }, { id: 'meal', label: 'A meal' }, { id: 'conversation', label: 'A conversation' }, { id: 'relaxing', label: 'Relaxing' }, { id: 'celebration', label: 'Celebrating' }, { id: 'support', label: 'Supporting each other' }],
+      },
+      {
+        ...choice('my_child', 'My child', 'figure.and.child.holdinghands', ['subject.child']), contextTitle: 'What was happening?', detailTitle: 'What did this moment feel like?', feelings: CHILD_REACTIONS,
+        specificFieldLabel: 'Name or moment', specificFieldPlaceholder: 'Their name or what happened (optional)',
+        contextChoices: [{ id: 'playtime', label: 'Playtime' }, { id: 'out_together', label: 'Out together' }, { id: 'learning', label: 'Learning' }, { id: 'milestone', label: 'A milestone' }, { id: 'cuddles', label: 'Cuddles' }, { id: 'care', label: 'Care' }, { id: 'everyday', label: 'Everyday moment' }],
+      },
+      {
+        ...choice('family', 'Family', 'person.3.fill', ['subject.group']), contextTitle: 'What brought you together?', detailTitle: 'How did family time feel?', feelings: CLOSE_REACTIONS,
+        contextChoices: [{ id: 'gathering', label: 'A gathering' }, { id: 'meal', label: 'A meal' }, { id: 'visit', label: 'A visit' }, { id: 'celebration', label: 'Celebrating' }, { id: 'outing', label: 'An outing' }, { id: 'care', label: 'Care' }],
+      },
+      {
+        ...choice('friends', 'Friends', 'bubble.left.and.bubble.right.fill', ['subject.group']), contextTitle: 'What were you doing?', detailTitle: 'How did it feel to catch up?', feelings: CLOSE_REACTIONS,
+        contextChoices: [{ id: 'catch_up', label: 'Catching up' }, { id: 'meal', label: 'Food or drinks' }, { id: 'night_out', label: 'A night out' }, { id: 'activity', label: 'An activity' }, { id: 'celebration', label: 'Celebrating' }, { id: 'support', label: 'Being there' }],
+      },
+      {
+        ...choice('group', 'A group or gathering', 'person.3.sequence.fill', ['subject.group']), contextTitle: 'What kind of gathering?', detailTitle: 'What was the atmosphere like?', feelings: REACTIONS,
+        contextChoices: [{ id: 'party', label: 'A party' }, { id: 'event', label: 'An event' }, { id: 'meal', label: 'A meal' }, { id: 'work', label: 'Work' }, { id: 'community', label: 'Community' }, { id: 'casual', label: 'Casual time' }],
+      },
+      {
+        ...choice('someone_new', 'Someone new', 'sparkles', ['subject.person']), contextTitle: 'How did you meet?', detailTitle: 'What was the connection like?', feelings: REACTIONS,
+        contextChoices: [{ id: 'introduced', label: 'Introduced' }, { id: 'work', label: 'Through work' }, { id: 'event', label: 'At an event' }, { id: 'chance', label: 'By chance' }, { id: 'online', label: 'Online' }, { id: 'neighbour', label: 'Nearby' }],
+      },
+      {
+        ...choice('pet', 'A pet', 'pawprint.fill'), contextTitle: 'What was the moment?', detailTitle: 'How did it make you feel?', feelings: PET_REACTIONS,
+        specificFieldLabel: 'Pet or moment', specificFieldPlaceholder: 'Their name or what happened (optional)',
+        contextChoices: [{ id: 'play', label: 'Playing' }, { id: 'walk', label: 'A walk' }, { id: 'cuddle', label: 'A cuddle' }, { id: 'care', label: 'Care' }, { id: 'funny', label: 'Something funny' }, { id: 'everyday', label: 'Everyday moment' }],
+      },
+      {
+        ...choice('solo', 'Me / time by myself', 'person.fill'), specificFieldLabel: 'Memory label', specificFieldPlaceholder: 'What were you doing? (optional)', contextTitle: 'What kind of time was it?', detailTitle: 'How did the time feel?', feelings: SOLO_REACTIONS,
+        contextChoices: [{ id: 'rest', label: 'Resting' }, { id: 'reset', label: 'Resetting' }, { id: 'hobby', label: 'A hobby' }, { id: 'walk', label: 'A walk' }, { id: 'errands', label: 'Getting things done' }, { id: 'thinking', label: 'Thinking time' }],
+      },
+      choice('someone_else', 'Someone else', 'person.fill', ['subject.person']),
     ],
     contextChoices: [{ id: 'meal', label: 'A meal' }, { id: 'celebration', label: 'Celebration' }, { id: 'visit', label: 'A visit' }, { id: 'activity', label: 'An activity' }, { id: 'conversation', label: 'Conversation' }, { id: 'care', label: 'Care' }],
     detailTitle: 'How did it feel?', specificFieldLabel: 'Name', specificFieldPlaceholder: 'Who was it? (optional)', feelings: REACTIONS,

@@ -84,6 +84,10 @@ const MAPPING = {
   'chevron.down': 'keyboard-arrow-down',
   'book.closed.fill': 'auto-stories',
   'exclamationmark.triangle.fill': 'warning',
+  'circle.fill': 'circle',
+  'circle.grid.2x2.fill': 'apps',
+  'triangle.fill': 'change-history',
+  'square.fill': 'square',
 } as IconMapping;
 
 /**

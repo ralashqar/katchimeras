@@ -8,7 +8,7 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import tileLayout from '@/data/world-tile-layout.json';
-import { MotiView } from 'moti';
+import { MotionView as MotiView } from '@/components/katchadeck/ui/motion-view';
 import { Fragment, memo, type MutableRefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, type LayoutChangeEvent, Pressable, StyleSheet, type StyleProp, Text, View, type ViewStyle } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';

@@ -312,8 +312,9 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
 }
 
 function meaningForJournal(reaction: string | null | undefined): MeaningTag {
-  if (reaction === 'loved') return 'together';
-  if (reaction === 'inspired') return 'meaningful';
+  if (reaction && ['loved', 'liked', 'close', 'grateful', 'fun', 'joyful', 'tender', 'affectionate', 'funny'].includes(reaction)) return 'together';
+  if (reaction && ['inspired', 'proud', 'difficult', 'worried', 'lonely'].includes(reaction)) return 'meaningful';
+  if (reaction && ['exciting', 'productive', 'free'].includes(reaction)) return 'energy';
   return 'calm';
 }
 

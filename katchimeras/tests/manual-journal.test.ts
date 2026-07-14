@@ -49,6 +49,17 @@ test('explicit My child choice creates confirmed parenting assignment', () => {
   assert.ok(memory?.assignments.some((assignment) => assignment.seedId === 'parenting_care' && assignment.confirmed));
 });
 
+test('people choices expose category-specific contexts and reactions', () => {
+  const people = MANUAL_JOURNAL_FLOWS.find((flow) => flow.id === 'people');
+  const child = people?.choices.find((choice) => choice.id === 'my_child');
+  const solo = people?.choices.find((choice) => choice.id === 'solo');
+  assert.equal(child?.contextTitle, 'What was happening?');
+  assert.ok(child?.contextChoices?.some((item) => item.id === 'playtime'));
+  assert.ok(child?.feelings?.some((item) => item.id === 'proud'));
+  assert.equal(child?.contextChoices?.some((item) => item.id === 'conversation'), false);
+  assert.ok(solo?.feelings?.some((item) => item.id === 'restored'));
+});
+
 test('big event uses the entered name and keeps one timeline entry', () => {
   const result = withManualJournalEntry(day(), submission('big_event', 'wedding', ['life.celebration'], 'Maya and Jo’s wedding', 'loved'), new Date('2026-07-12T16:00:00Z'));
   assert.equal(result.bigMoments?.[0].label, 'Maya and Jo’s wedding');

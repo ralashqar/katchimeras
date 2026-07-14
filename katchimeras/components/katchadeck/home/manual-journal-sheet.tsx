@@ -320,10 +320,10 @@ export function JournalComposer({
                   />
                 </EditorSection>
 
-                {(choice.detailChoices ?? flow.contextChoices)?.length ? (
-                  <EditorSection label="A little more">
+                {(choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices)?.length ? (
+                  <EditorSection label={choice.contextTitle ?? 'A little more'}>
                     <View style={styles.optionWrap}>
-                      {(choice.detailChoices ?? flow.contextChoices ?? []).map((item) => (
+                      {(choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices ?? []).map((item) => (
                         <OptionChip
                           key={item.id}
                           label={item.label}
@@ -338,9 +338,9 @@ export function JournalComposer({
                   </EditorSection>
                 ) : null}
 
-                <EditorSection label={flow.detailTitle ?? 'How was it?'}>
+                <EditorSection label={choice.detailTitle ?? flow.detailTitle ?? 'How was it?'}>
                   <View style={styles.reactionGrid}>
-                    {flow.feelings.map((item) => (
+                    {(choice.feelings ?? flow.feelings).map((item) => (
                       <ReactionChip
                         icon={item.icon}
                         key={item.id}

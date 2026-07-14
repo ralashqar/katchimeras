@@ -147,7 +147,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
 
   return (
     <View style={styles.root} onLayout={onLayout}>
-      <GestureDetector gesture={camera.gesture}>
+      {/* Recreate the native handler whenever this tab regains focus. A camera
+          route can suspend a gesture mid-lifecycle on iOS; retaining that
+          handler leaves the otherwise-visible Kingdom canvas unresponsive. */}
+      <GestureDetector key={`kingdom-camera-${assetRevision}`} gesture={camera.gesture}>
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle]}>
             {scheduler.renderedTiles.map(({ layer, runtime }) => {

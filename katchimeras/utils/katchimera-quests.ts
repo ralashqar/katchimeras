@@ -4,6 +4,7 @@ import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import type { Facts } from '@/utils/signals/facts';
 import { questCriteriaStatus } from '@/utils/quests/evaluate';
 import { isQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
+import type { QuestAttempt, QuestResult } from '@/utils/quests/experiences/types';
 
 // Companion quest store (docs/katchimera-engagement-v1.md): tiny persisted
 // ledger of accepted quests, one active per katchimera. Completion is decided
@@ -21,6 +22,8 @@ export type CompanionQuest = {
   completedDayId?: string;
   repairedAt?: number;
   repairedFromQuestId?: string;
+  offerSeed?: string;
+  resolvedConfig?: Record<string, unknown>;
 };
 
 export type QuestSubmissionRecord = {
@@ -40,19 +43,71 @@ export type QuestSubmissionInput = {
   evidenceId?: string | null;
 };
 
-export type CompanionQuestState = { quests: CompanionQuest[]; submissions: QuestSubmissionRecord[] };
+export type QuestOfferCycle = {
+  creatureId: string;
+  dayId: string;
+  offerIds: string[];
+  index: number;
+};
+
+export type CompanionQuestState = {
+  schemaVersion: 2;
+  quests: CompanionQuest[];
+  submissions: QuestSubmissionRecord[];
+  offerCycles: QuestOfferCycle[];
+  attempts: QuestAttempt[];
+};
 
 const KEY = 'katchadeck.companion-quests-v1';
 // No global cap for now — a katchimera still only holds one quest at a time.
 export const MAX_ACTIVE_QUESTS = Infinity;
 
 export function loadCompanionQuests(): CompanionQuestState {
-  const value = getStoredJson<CompanionQuestState>(KEY, { quests: [], submissions: [] });
-  return normaliseState(value);
+  const value = getStoredJson<CompanionQuestState>(KEY, emptyCompanionQuestState());
+  return normaliseState(value, true);
 }
 
 export function saveCompanionQuests(state: CompanionQuestState) {
   setStoredJson(KEY, normaliseState(state));
+}
+
+export function emptyCompanionQuestState(): CompanionQuestState {
+  return { schemaVersion: 2, quests: [], submissions: [], offerCycles: [], attempts: [] };
+}
+
+export function questOfferForDay<T extends { id: string; weight?: number }>(
+  state: CompanionQuestState,
+  creatureId: string,
+  dayId: string,
+  offers: T[]
+): T | undefined {
+  if (!offers.length) return undefined;
+  const cycle = state.offerCycles.find((item) => item.creatureId === creatureId && item.dayId === dayId);
+  const order = cycle?.offerIds?.length ? cycle.offerIds : seededOfferOrder(offers, `${creatureId}:${dayId}`);
+  const offerId = order[Math.max(0, cycle?.index ?? 0) % order.length];
+  return offers.find((offer) => offer.id === offerId) ?? offers[0];
+}
+
+export function cycleQuestOffer<T extends { id: string; weight?: number }>(
+  state: CompanionQuestState,
+  creatureId: string,
+  dayId: string,
+  offers: T[]
+): { state: CompanionQuestState; offer: T | undefined } {
+  if (questFor(state, creatureId) || offers.length < 2) return { state, offer: questOfferForDay(state, creatureId, dayId, offers) };
+  const offerIds = seededOfferOrder(offers, `${creatureId}:${dayId}`);
+  const previous = state.offerCycles.find((item) => item.creatureId === creatureId && item.dayId === dayId);
+  const nextCycle: QuestOfferCycle = {
+    creatureId,
+    dayId,
+    offerIds,
+    index: ((previous?.index ?? 0) + 1) % offerIds.length,
+  };
+  const next = {
+    ...state,
+    offerCycles: [...state.offerCycles.filter((item) => item.creatureId !== creatureId || item.dayId !== dayId), nextCycle],
+  };
+  return { state: next, offer: questOfferForDay(next, creatureId, dayId, offers) };
 }
 
 export function activeQuests(state: CompanionQuestState): CompanionQuest[] {
@@ -100,13 +155,14 @@ export function interactionState(
 /** Accept a quest offer; returns null (unchanged) if caps are hit. */
 export function acceptQuest(
   state: CompanionQuestState,
-  offer: { questId: string; creatureId: string; title: string; hint: string; dayId?: string | null },
+  offer: { questId: string; creatureId: string; title: string; hint: string; dayId?: string | null; offerSeed?: string; resolvedConfig?: Record<string, unknown> },
   acceptedAt: number
 ): CompanionQuestState | null {
   if (questFor(state, offer.creatureId)) return null;
   if (offer.dayId && hasCompanionQuestForDay(state, offer.creatureId, offer.dayId)) return null;
   if (activeQuests(state).length >= MAX_ACTIVE_QUESTS) return null;
   return {
+    ...state,
     quests: [
       ...state.quests,
       {
@@ -116,9 +172,10 @@ export function acceptQuest(
         hint: offer.hint,
         acceptedAt,
         acceptedDayId: offer.dayId ?? localDayId(acceptedAt),
+        offerSeed: offer.offerSeed,
+        resolvedConfig: offer.resolvedConfig,
       },
     ],
-    submissions: state.submissions ?? [],
   };
 }
 
@@ -139,6 +196,7 @@ export function reconcileCompanionQuestOffer(
   }
 
   return {
+    ...state,
     quests: state.quests.map((quest) =>
       quest.creatureId === offer.creatureId && !quest.completedAt
         ? {
@@ -149,7 +207,6 @@ export function reconcileCompanionQuestOffer(
           }
         : quest
     ),
-    submissions: state.submissions ?? [],
   };
 }
 
@@ -182,7 +239,7 @@ export function evaluateCompanionQuests(
     completed.push(done);
     return loopAfterComplete ? [] : [done];
   });
-  return { state: { quests, submissions: state.submissions ?? [] }, completed };
+  return { state: { ...state, quests }, completed };
 }
 
 export function completeQuest(
@@ -193,17 +250,17 @@ export function completeQuest(
 ): CompanionQuestState {
   if (isQuestLoopAfterCompleteEnabled()) {
     return {
+      ...state,
       quests: state.quests.filter((quest) => quest.creatureId !== creatureId || quest.completedAt),
-      submissions: state.submissions ?? [],
     };
   }
   return {
+    ...state,
     quests: state.quests.map((quest) =>
       quest.creatureId === creatureId && !quest.completedAt
         ? { ...quest, completedAt, completedDayId: dayId ?? localDayId(completedAt) }
         : quest
     ),
-    submissions: state.submissions ?? [],
   };
 }
 
@@ -237,7 +294,7 @@ export function submitQuest(
     ? state.quests.filter((quest) => quest !== active)
     : state.quests.map((quest) => (quest === active ? done : quest));
   return {
-    state: { quests, submissions: [...submissions, record] },
+    state: { ...state, quests, submissions: [...submissions, record] },
     quest: done,
     submitted: true,
   };
@@ -259,11 +316,128 @@ export function isSubmittedForQuest(
   );
 }
 
-function normaliseState(value: CompanionQuestState | null | undefined): CompanionQuestState {
+function normaliseState(value: CompanionQuestState | null | undefined, cancelInterrupted = false): CompanionQuestState {
   return {
+    schemaVersion: 2,
     quests: value && Array.isArray(value.quests) ? value.quests : [],
     submissions: value && Array.isArray(value.submissions) ? value.submissions : [],
+    offerCycles: value && Array.isArray(value.offerCycles) ? value.offerCycles : [],
+    attempts: value && Array.isArray(value.attempts)
+      ? value.attempts.map((attempt) => cancelInterrupted && attempt.status === 'running'
+        ? { ...attempt, status: 'cancelled' as const, endedAt: Date.now() }
+        : attempt)
+      : [],
   };
+}
+
+export function startQuestAttempt(
+  state: CompanionQuestState,
+  input: Omit<QuestAttempt, 'id' | 'status' | 'startedAt'>,
+  startedAt = Date.now()
+): { state: CompanionQuestState; attempt: QuestAttempt } {
+  const running = state.attempts.find((attempt) =>
+    attempt.questId === input.questId &&
+    attempt.creatureId === input.creatureId &&
+    attempt.dayId === input.dayId &&
+    attempt.status === 'running'
+  );
+  if (running) return { state, attempt: running };
+  const attempt: QuestAttempt = {
+    ...input,
+    id: `${input.questId}:${input.creatureId}:${input.dayId}:${startedAt}`,
+    status: 'running',
+    startedAt,
+  };
+  return { state: { ...state, attempts: [...state.attempts, attempt] }, attempt };
+}
+
+export function cancelQuestAttempt(state: CompanionQuestState, attemptId: string, endedAt = Date.now()): CompanionQuestState {
+  return {
+    ...state,
+    attempts: state.attempts.map((attempt) =>
+      attempt.id === attemptId && attempt.status === 'running'
+        ? { ...attempt, status: 'cancelled', endedAt }
+        : attempt
+    ),
+  };
+}
+
+export function completeInteractiveQuest(
+  state: CompanionQuestState,
+  input: { attemptId: string; creatureId: string; result: QuestResult; dayId: string },
+  completedAt = Date.now()
+): CompanionQuestState {
+  const existing = state.attempts.find((attempt) => attempt.id === input.attemptId);
+  if (!existing || existing.status === 'succeeded') return state;
+  const result = withPersonalBest(state, existing.questId, input.result);
+  const withResult: CompanionQuestState = {
+    ...state,
+    attempts: state.attempts.map((attempt) =>
+      attempt.id === input.attemptId
+        ? { ...attempt, status: 'succeeded', endedAt: completedAt, result }
+        : attempt
+    ),
+  };
+  return completeQuest(withResult, input.creatureId, completedAt, input.dayId);
+}
+
+function withPersonalBest(state: CompanionQuestState, questId: string, result: QuestResult): QuestResult {
+  const previous = state.attempts.filter((attempt) => attempt.questId === questId && attempt.result?.kind === result.kind).map((attempt) => attempt.result!);
+  if (result.kind === 'live_steps') return { ...result, personalBest: !previous.some((item) => item.kind === 'live_steps' && item.target === result.target && item.durationMs <= result.durationMs) };
+  if (result.kind === 'timing_zone') return { ...result, personalBest: !previous.some((item) => item.kind === 'timing_zone' && (item.accuracy > result.accuracy || (item.accuracy === result.accuracy && item.averageOffsetMs <= result.averageOffsetMs))) };
+  if (result.kind === 'pattern_memory') return { ...result, personalBest: !previous.some((item) => item.kind === 'pattern_memory' && (item.completedRounds > result.completedRounds || (item.completedRounds === result.completedRounds && item.durationMs <= result.durationMs))) };
+  if (result.kind === 'sorting') {
+    const packId = result.packId ?? 'feastle-table';
+    return {
+      ...result,
+      personalBest: result.success && !previous.some((item) =>
+        item.kind === 'sorting' &&
+        item.success &&
+        (item.packId ?? 'feastle-table') === packId &&
+        item.totalItems === result.totalItems &&
+        item.durationMs <= result.durationMs
+      ),
+    };
+  }
+  if (result.kind === 'matching') {
+    const packId = result.packId ?? 'relicoon-gallery';
+    return {
+      ...result,
+      personalBest: result.success && !previous.some((item) =>
+        item.kind === 'matching' &&
+        item.success &&
+        (item.packId ?? 'relicoon-gallery') === packId &&
+        item.pairs === result.pairs &&
+        item.durationMs <= result.durationMs
+      ),
+    };
+  }
+  if (result.kind === 'rhythm') return { ...result, personalBest: !previous.some((item) => item.kind === 'rhythm' && (item.score > result.score || (item.score === result.score && item.durationMs <= result.durationMs))) };
+  return result;
+}
+
+function seededOfferOrder(offers: { id: string; weight?: number }[], seed: string): string[] {
+  return [...offers]
+    .sort((left, right) => {
+      const weightLead = (right.weight ?? 1) - (left.weight ?? 1);
+      return weightLead || weightedOfferScore(left, seed) - weightedOfferScore(right, seed);
+    })
+    .map((offer) => offer.id);
+}
+
+function weightedOfferScore(offer: { id: string; weight?: number }, seed: string): number {
+  const unit = (stableHash(`${seed}:${offer.id}`) + 1) / 4_294_967_297;
+  const weight = Math.max(0.1, offer.weight ?? 1);
+  return -Math.log(unit) / weight;
+}
+
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function questDayId(timestamp?: number, explicitDayId?: string): string | null {

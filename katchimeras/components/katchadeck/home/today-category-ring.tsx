@@ -1,8 +1,8 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { MotiView } from 'moti';
 import Animated from 'react-native-reanimated';
 
+import { MotionView as MotiView } from '@/components/katchadeck/ui/motion-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ThemedText } from '@/components/themed-text';
 import { popEnter } from '@/components/katchadeck/motion';
