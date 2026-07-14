@@ -10,7 +10,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
   mossprout: ['quest-mossprout-memory', 'quest-new-park'],
   skylo: ['quest-skylo-city-trivia', 'quest-photo-city'],
   gatherglow: ['quest-gatherglow-pattern', 'quest-snap-today'],
-  feastle: ['quest-feastle-sort', 'quest-feastle-memory', 'quest-photo-food', 'quest-cuisine-any-new'],
+  feastle: ['quest-feastle-merge', 'quest-feastle-sort', 'quest-feastle-memory', 'quest-photo-food', 'quest-cuisine-any-new'],
   tasklet: ['quest-tasklet-sort', 'quest-goal-note'],
   relicoon: ['quest-relicoon-match', 'quest-visit-museum'],
   encora: ['quest-encora-rhythm', 'quest-any-inspiration'],

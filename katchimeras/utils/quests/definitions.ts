@@ -20,6 +20,7 @@ export type QuestDefinition = {
     | { kind: 'pattern_memory'; gameId: 'gatherglow-lights'; difficultyCurveId: string }
     | { kind: 'sorting'; packId: 'feastle-table' | 'tasklet-triage'; difficultyCurveId: string }
     | { kind: 'matching'; packId: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; difficultyCurveId: string }
+    | { kind: 'merge'; packId: 'feastle-kitchen'; difficultyCurveId: 'feastle-merge-v1' }
     | { kind: 'rhythm'; gameId: 'encora-echo'; difficultyCurveId: string }
     | {
         kind: 'word_game';
@@ -160,6 +161,12 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     hint: 'Sort food, drinks and tableware into their proper places.', criteria: [],
     execution: { kind: 'sorting', packId: 'feastle-table', difficultyCurveId: 'feastle-table-v1' }, requiresCapabilities: [], submissionMode: 'auto',
     eligibility: { creatureKeys: ['feastle'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-feastle-merge': {
+    id: 'quest-feastle-merge', family: 'food', title: 'Feastle’s Merge Feast',
+    hint: 'Merge matching ingredients into bigger dishes and serve two hungry orders.', criteria: [],
+    execution: { kind: 'merge', packId: 'feastle-kitchen', difficultyCurveId: 'feastle-merge-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['feastle'], cooldownDays: 1, weight: 4 },
   },
   'quest-tasklet-sort': {
     id: 'quest-tasklet-sort', family: 'studio', title: 'Clear Tasklet’s desk',

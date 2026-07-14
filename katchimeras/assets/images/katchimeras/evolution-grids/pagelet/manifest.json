@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "type": "katchimera-evolution-grid",
+  "name": "Pagelet",
+  "profileId": "location_bookstore_pagelet",
+  "model": "gpt",
+  "quality": "high",
+  "hatchlingReference": "assets/images/katchimeras/hatchlings/base-hatchling.png",
+  "finalReference": "assets/images/katchimeras/cutouts/pagelet.png",
+  "prompt": "Create one clean 3x3 character evolution contact sheet: exactly three rows and three columns, nine equal square cells in left-to-right, top-to-bottom chronological order, separated by thin even gutters. Show the SAME single Katchimera evolving gradually from the hatchling in reference image 1 into Pagelet, the final character in reference image 2. Target identity: Pagelet is a cute objectling tied to bookstore encounters, with page ears, bookmark tail, linen cover texture, a cozy curious warm mood, dramatically oversized luminous eyes, a visible inner glow core, head-dominant mascot proportions, and premium stylized game-mascot presence. Reference image 1 is authoritative for the fixed hatchling pose, face, eyes, egg-shell format, materials, lighting and project art style. Reference image 2 is authoritative for the final species identity, palette, signature motif, materials and mature silhouette. Every intermediate must look like a plausible direct growth stage between those two exact identities, never a different creature. Cell 1: Fixed hatchling: the exact neutral newborn in its cracked egg shell. Cell 2: First signs: fully inside the shell, with only the earliest target colour and one tiny motif cue. Cell 3: Awakening: half-emerged from the broken shell, with small buds of the final silhouette features. Cell 4: Infant: out of the shell, about 45% of mature body development, very short limbs and tiny motifs. Cell 5: Young form: about 58% mature, round child proportions and a clearly readable but small signature motif. Cell 6: Juvenile: about 70% mature, longer limbs, growing silhouette features, and a stronger target palette. Cell 7: Growing form: about 82% mature, most final traits present but visibly softer and smaller than the adult. Cell 8: Near-final form: about 93% mature, almost adult proportions with one last restrained layer of detail. Cell 9: Final form: faithful to the supplied existing Katchimera reference. Keep one consistent straight-on or gentle three-quarter hero camera, centered framing, scale logic, warm studio lighting and premium rounded 3D Katchimeras toy-diorama rendering in every cell. Growth must be smooth: preserve the large expressive eyes and recognizable face while the body grows, the egg disappears, and the final motif becomes progressively clearer. Every adjacent stage must be visibly different in at least three ways: shell coverage, body proportions, silhouette-feature size, motif size, material richness, or pose confidence. Do not repeat the same mature body from cells 4 through 9 and do not reach the complete adult silhouette before cell 9. Use a single simple matte dark-plum studio background in every cell so the characters can be cleanly matted. No scenery, platforms, props unrelated to the final identity, extra creatures, duplicated body parts, text, letters, numbers, labels, arrows, captions, logos, badges, UI, humans, photorealism or aggressive monster features.",
+  "stages": [
+    {
+      "index": 1,
+      "description": "Fixed hatchling: the exact neutral newborn in its cracked egg shell"
+    },
+    {
+      "index": 2,
+      "description": "First signs: fully inside the shell, with only the earliest target colour and one tiny motif cue"
+    },
+    {
+      "index": 3,
+      "description": "Awakening: half-emerged from the broken shell, with small buds of the final silhouette features"
+    },
+    {
+      "index": 4,
+      "description": "Infant: out of the shell, about 45% of mature body development, very short limbs and tiny motifs"
+    },
+    {
+      "index": 5,
+      "description": "Young form: about 58% mature, round child proportions and a clearly readable but small signature motif"
+    },
+    {
+      "index": 6,
+      "description": "Juvenile: about 70% mature, longer limbs, growing silhouette features, and a stronger target palette"
+    },
+    {
+      "index": 7,
+      "description": "Growing form: about 82% mature, most final traits present but visibly softer and smaller than the adult"
+    },
+    {
+      "index": 8,
+      "description": "Near-final form: about 93% mature, almost adult proportions with one last restrained layer of detail"
+    },
+    {
+      "index": 9,
+      "description": "Final form: faithful to the supplied existing Katchimera reference"
+    }
+  ],
+  "status": "completed",
+  "generatedAt": "2026-07-14T16:27:59Z",
+  "generationUrl": "https://v3b.fal.media/files/b/0aa23d14/kkNGdKW0SgknsIaNKD8v-_DC4eyctb.png",
+  "matteUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/cutouts/pagelet-evolution-grid/1784046476323.png",
+  "generationResponse": {
+    "status": "completed",
+    "imageUrl": "https://v3b.fal.media/files/b/0aa23d14/kkNGdKW0SgknsIaNKD8v-_DC4eyctb.png",
+    "model": "openai/gpt-image-2/edit",
+    "mode": "single"
+  },
+  "rawGrid": "assets/images/katchimeras/evolution-grids/pagelet/raw-grid.png",
+  "mattedGrid": "assets/images/katchimeras/evolution-grids/pagelet/matted-grid.png",
+  "reviewGrid": "assets/images/katchimeras/evolution-grids/pagelet/pagelet-evolution-grid.png",
+  "cells": [
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-01.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-02.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-03.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-04.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-05.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-06.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-07.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-08.png",
+    "assets/images/katchimeras/evolution-grids/pagelet/cells/stage-09.png"
+  ]
+}

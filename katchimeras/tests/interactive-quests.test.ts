@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig } from '@/utils/quests/experiences/difficulty';
+import { resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig } from '@/utils/quests/experiences/difficulty';
+import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
 import { LOST_WORD_PUZZLES, selectLostWordPuzzle, validateLostWordPuzzles } from '@/utils/quests/experiences/lost-word-puzzles';
 import { answerTriviaQuestion, createTriviaRound, triviaRoundComplete, triviaRoundScore } from '@/utils/quests/experiences/trivia';
@@ -27,7 +28,7 @@ test('the new companion quest pools lead with their reusable mini-game', () => {
   assert.equal(themedQuestOffers('park', 'places', 'mossprout')[0]?.id, 'quest-mossprout-memory');
   assert.equal(themedQuestOffers('city', 'places', 'skylo')[0]?.id, 'quest-skylo-city-trivia');
   assert.equal(themedQuestOffers('social_gathering', 'memory', 'gatherglow')[0]?.id, 'quest-gatherglow-pattern');
-  assert.equal(themedQuestOffers('feast', 'food', 'feastle')[0]?.id, 'quest-feastle-sort');
+  assert.equal(themedQuestOffers('feast', 'food', 'feastle')[0]?.id, 'quest-feastle-merge');
   assert.equal(themedQuestOffers('focus_work', 'craft', 'tasklet')[0]?.id, 'quest-tasklet-sort');
   assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-memory'));
   assert.equal(themedQuestOffers('museum', 'culture', 'relicoon')[0]?.id, 'quest-relicoon-match');
@@ -215,6 +216,105 @@ test('matching games reshuffle card cells without changing the selected pairs', 
   );
 });
 
+test('Feastle merge pack is complete, tiered, deterministic, and becomes the lead quest', () => {
+  assert.equal(FEASTLE_MERGE_ITEMS.length, 15);
+  assert.deepEqual(validateMergePack(), []);
+  assert.equal(new Set(FEASTLE_MERGE_ITEMS.map((item) => item.id)).size, 15);
+  assert.deepEqual(resolveMergeConfig(0).targetTiers, [3, 4]);
+  assert.deepEqual(resolveMergeConfig(2).targetTiers, [4, 4]);
+  assert.deepEqual(resolveMergeConfig(99).targetTiers, [4, 5]);
+  const config = resolveMergeConfig(0);
+  assert.ok(config.moveBudget > mergeRoundMinimumActions(config));
+  const first = createMergeRound('feastle:merge:day-1', config);
+  const repeated = createMergeRound('feastle:merge:day-1', config);
+  assert.deepEqual(first, repeated);
+  assert.equal(first.board.length, 36);
+  assert.equal(first.board.length, MERGE_BOARD_SIZE);
+  const next = createMergeRound('feastle:merge:day-2', config, first.orders.map((order) => order.targetId));
+  assert.ok(next.orders.every((order) => !first.orders.some((previous) => previous.targetId === order.targetId)));
+  assert.equal(questDefinition('quest-feastle-merge')?.execution?.kind, 'merge');
+  assert.equal(themedQuestOffers('feast', 'food', 'feastle')[0]?.id, 'quest-feastle-merge');
+  assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-sort'));
+  assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-memory'));
+});
+
+test('merge board hit testing targets every 6x6 cell from the finger release position', () => {
+  const boardX = 100;
+  const boardY = 200;
+  const inset = 7;
+  const gap = 5;
+  const cellSize = 52;
+  const boardWidth = cellSize * MERGE_BOARD_COLUMNS + gap * (MERGE_BOARD_COLUMNS - 1) + inset * 2;
+  const boardHeight = cellSize * MERGE_BOARD_ROWS + gap * (MERGE_BOARD_ROWS - 1) + inset * 2;
+  const hit = (absoluteX: number, absoluteY: number) => mergeBoardCellFromPoint({
+    absoluteX, absoluteY, boardX, boardY, boardWidth, boardHeight, inset, gap, cellSize,
+  });
+
+  for (let row = 0; row < MERGE_BOARD_ROWS; row += 1) {
+    for (let column = 0; column < MERGE_BOARD_COLUMNS; column += 1) {
+      const x = boardX + inset + column * (cellSize + gap) + cellSize / 2;
+      const y = boardY + inset + row * (cellSize + gap) + cellSize / 2;
+      const expected = row * MERGE_BOARD_COLUMNS + column;
+      assert.equal(hit(x, y), expected);
+      assert.equal(hit(
+        boardX + inset + column * (cellSize + gap) + 0.1,
+        boardY + inset + row * (cellSize + gap) + 0.1,
+      ), expected);
+      assert.equal(hit(
+        boardX + inset + column * (cellSize + gap) + cellSize - 0.1,
+        boardY + inset + row * (cellSize + gap) + cellSize - 0.1,
+      ), expected);
+    }
+  }
+
+  assert.equal(hit(boardX - 0.1, boardY + inset), null);
+  assert.equal(hit(boardX + boardWidth + 0.1, boardY + inset), null);
+  assert.equal(hit(boardX + inset, boardY - 0.1), null);
+  assert.equal(hit(boardX + inset, boardY + boardHeight + 0.1), null);
+});
+
+test('pantry draws choose varied deterministic empty cells', () => {
+  const board = Array.from({ length: MERGE_BOARD_SIZE }, (_, index) => index % 4 === 0 ? { instanceId: `occupied:${index}`, definitionId: 'pasta:1' } : null);
+  const selections = Array.from({ length: 20 }, (_, index) => selectPantrySpawnCell(board, `pantry-draw:${index}`));
+  assert.equal(selectPantrySpawnCell(board, 'pantry-draw:4'), selections[4]);
+  assert.ok(selections.every((cell) => cell >= 0 && board[cell] == null));
+  assert.ok(new Set(selections).size > 8);
+  assert.equal(selectPantrySpawnCell(board.map(() => ({ instanceId: 'full', definitionId: 'pasta:1' })), 'full'), -1);
+});
+
+test('merge reducer conserves items, rejects unlike merges, serves orders, and does not charge free moves', () => {
+  const config = resolveMergeConfig(0);
+  let state = createMergeRound('feastle:merge:reducer', config);
+  const occupied = state.board.flatMap((item, index) => item ? [index] : []);
+  const empty = state.board.findIndex((item) => !item);
+  const beforeMoves = state.movesUsed;
+  state = mergeRoundReducer(state, { type: 'move', from: occupied[0], to: empty }, config.moveBudget);
+  assert.equal(state.movesUsed, beforeMoves);
+  assert.ok(state.board[empty]);
+
+  const unlike = state.board.flatMap((item, index) => item ? [{ item, index }] : []);
+  const left = unlike[0];
+  const right = unlike.find((candidate) => candidate.item.definitionId !== left.item.definitionId)!;
+  assert.equal(canMergeItems(left.item, right.item), false);
+  assert.deepEqual(mergeRoundReducer(state, { type: 'move', from: left.index, to: right.index }, config.moveBudget), state);
+
+  const solved = solveMergeRound(state, config.moveBudget);
+  assert.equal(solved.status, 'won');
+  assert.equal(solved.orders.filter((order) => order.completed).length, 2);
+  assert.ok(solved.movesUsed <= config.moveBudget);
+});
+
+test('every sampled Feastle merge round is solvable within its budget', () => {
+  for (let completed = 0; completed <= 6; completed += 2) {
+    const config = resolveMergeConfig(completed);
+    for (let index = 0; index < 250; index += 1) {
+      const solved = solveMergeRound(createMergeRound(`feastle:solver:${completed}:${index}`, config), config.moveBudget);
+      assert.equal(solved.status, 'won', `seed ${completed}:${index} should be solvable`);
+      assert.ok(solved.movesUsed <= config.moveBudget);
+    }
+  }
+});
+
 test('trivia round is seeded, unique, scoreable, and completes after every answer', () => {
   let round = createTriviaRound({ packIds: ['film'], questionCount: 5, seed: 'flickerbun:day-1' });
   const repeated = createTriviaRound({ packIds: ['film'], questionCount: 5, seed: 'flickerbun:day-1' });
@@ -227,3 +327,35 @@ test('trivia round is seeded, unique, scoreable, and completes after every answe
   assert.equal(triviaRoundScore(round), 5);
   assert.equal(triviaRoundComplete(round), true);
 });
+
+function solveMergeRound(initial: MergeRoundState, moveBudget: number): MergeRoundState {
+  let state = initial;
+  for (let guard = 0; guard < 500 && state.status === 'playing'; guard += 1) {
+    let acted = false;
+    for (let cell = 0; cell < state.board.length; cell += 1) {
+      const order = readyOrderForItem(state, cell);
+      if (!order) continue;
+      state = mergeRoundReducer(state, { type: 'serve', cell, orderId: order.id }, moveBudget);
+      acted = true;
+      break;
+    }
+    if (acted) continue;
+    for (let left = 0; left < state.board.length; left += 1) {
+      for (let right = left + 1; right < state.board.length; right += 1) {
+        if (!canMergeItems(state.board[left], state.board[right])) continue;
+        state = mergeRoundReducer(state, { type: 'move', from: left, to: right }, moveBudget);
+        acted = true;
+        break;
+      }
+      if (acted) break;
+    }
+    if (acted) continue;
+    const empty = state.board.findIndex((item) => !item);
+    if (empty >= 0 && state.pantry.length) {
+      state = mergeRoundReducer(state, { type: 'spawn', cell: empty }, moveBudget);
+      acted = true;
+    }
+    if (!acted) break;
+  }
+  return state;
+}

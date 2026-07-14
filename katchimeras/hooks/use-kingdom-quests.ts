@@ -42,7 +42,7 @@ import {
 } from '@/utils/quests/report-back-evidence';
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import { questDefinition } from '@/utils/quests/definitions';
-import { completedQuestCount, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig } from '@/utils/quests/experiences/difficulty';
+import { completedQuestCount, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig } from '@/utils/quests/experiences/difficulty';
 import { isInteractiveExecution, type QuestResult } from '@/utils/quests/experiences/types';
 import { refreshQuestFacts } from '@/utils/quests/facts';
 import type { Facts } from '@/utils/signals/facts';
@@ -567,6 +567,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         return best == null ? result.durationMs : Math.min(best, result.durationMs);
       }, null)
     : null;
+  const selectedMergeBest = selectedActiveQuest && selectedInteractiveExecution?.kind === 'merge'
+    ? companionQuestState.attempts.reduce<{ movesUsed: number; durationMs: number } | null>((best, attempt) => {
+        const result = attempt.questId === selectedActiveQuest.questId && attempt.result?.kind === 'merge' ? attempt.result : null;
+        if (!result?.success) return best;
+        if (!best || result.movesUsed < best.movesUsed || (result.movesUsed === best.movesUsed && result.durationMs < best.durationMs)) {
+          return { movesUsed: result.movesUsed, durationMs: result.durationMs };
+        }
+        return best;
+      }, null)
+    : null;
 
   return {
     acceptSelectedQuest,
@@ -597,6 +607,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedSortingBestDurationMs,
     selectedMatchingBestDurationMs,
     recentMatchingContentIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'matching' ? attempt.result.contentIds : []).slice(-32),
+    recentMergeOrderIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'merge' ? attempt.result.contentIds : []).slice(-12),
+    selectedMergeBest,
     selectedQuestItems,
     selectedQuestRuntime,
     selectedResident,
@@ -669,6 +681,7 @@ function resolveInteractiveConfig(
   if (definition?.execution?.kind === 'pattern_memory') return resolvePatternConfig(completedQuestCount(state.quests, questId, creatureId));
   if (definition?.execution?.kind === 'sorting') return resolveSortingConfig(completedQuestCount(state.quests, questId, creatureId));
   if (definition?.execution?.kind === 'matching') return resolveMatchingConfig(completedQuestCount(state.quests, questId, creatureId));
+  if (definition?.execution?.kind === 'merge') return resolveMergeConfig(completedQuestCount(state.quests, questId, creatureId));
   if (definition?.execution?.kind === 'rhythm') return resolveRhythmConfig(completedQuestCount(state.quests, questId, creatureId));
   return undefined;
 }

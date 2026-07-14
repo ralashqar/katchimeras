@@ -70,6 +70,8 @@ export type CompanionInteractionSheetProps = {
   sortingBestDurationMs?: number | null;
   matchingBestDurationMs?: number | null;
   recentMatchingContentIds?: string[];
+  recentMergeOrderIds?: string[];
+  mergeBest?: { movesUsed: number; durationMs: number } | null;
   onStartQuestAttempt?: (config: Record<string, unknown>) => string;
   onCancelQuestAttempt?: (attemptId: string) => void;
   onCompleteInteractiveQuest?: (attemptId: string, result: QuestResult) => void;
@@ -215,6 +217,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   sortingBestDurationMs={props.sortingBestDurationMs ?? null}
                   matchingBestDurationMs={props.matchingBestDurationMs ?? null}
                   recentMatchingContentIds={props.recentMatchingContentIds ?? []}
+                  recentMergeOrderIds={props.recentMergeOrderIds ?? []}
+                  mergeBest={props.mergeBest ?? null}
                   onAttemptStart={props.onStartQuestAttempt}
                   onAttemptCancel={props.onCancelQuestAttempt}
                   onComplete={(attemptId, result) => {

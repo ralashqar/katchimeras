@@ -412,6 +412,18 @@ function withPersonalBest(state: CompanionQuestState, questId: string, result: Q
       ),
     };
   }
+  if (result.kind === 'merge') {
+    return {
+      ...result,
+      personalBest: result.success && !previous.some((item) =>
+        item.kind === 'merge' &&
+        item.success &&
+        item.packId === result.packId &&
+        item.ordersTotal === result.ordersTotal &&
+        (item.movesUsed < result.movesUsed || (item.movesUsed === result.movesUsed && item.durationMs <= result.durationMs))
+      ),
+    };
+  }
   if (result.kind === 'rhythm') return { ...result, personalBest: !previous.some((item) => item.kind === 'rhythm' && (item.score > result.score || (item.score === result.score && item.durationMs <= result.durationMs))) };
   return result;
 }

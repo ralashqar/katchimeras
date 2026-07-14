@@ -86,6 +86,33 @@ python scripts/asset-pipeline.py matte \
 python scripts/asset-pipeline.py verify --in assets/images/katchimeras/cutouts/lattelet.png
 ```
 
+### Hatchling-to-final evolution grids
+
+`scripts/generate-evolution-grid.py` creates an ordered 3x3 review sheet for
+any catalog Katchimera. It passes the fixed base hatchling and the existing
+final cutout together to the edit model, runs the result through the deployed
+BiRefNet **General Use (Heavy)** matte, stamps the exact hatchling into stage
+one, and exports nine transparent cells plus a review grid and manifest.
+
+```bash
+# Resolves the profile and final cutout from the catalog/name.
+python scripts/generate-evolution-grid.py --creature pagelet
+
+# Explicit inputs for a new or non-catalog creature.
+python scripts/generate-evolution-grid.py \
+  --name moonling \
+  --description "a soft moonlit cloud creature with crescent ears" \
+  --final path/to/moonling.png
+
+# Prompt and manifest only; no generation cost.
+python scripts/generate-evolution-grid.py --creature pagelet --dry-run --force
+```
+
+Outputs live under
+`assets/images/katchimeras/evolution-grids/<name>/`: raw and matted sheets,
+`cells/stage-01.png` through `stage-09.png`, the assembled review grid, the
+exact prompt, and `manifest.json` with generation provenance.
+
 ## QA gates (do not skip — taste is human)
 
 After downloading, **Read the PNG** and judge against the art bible's five gates:

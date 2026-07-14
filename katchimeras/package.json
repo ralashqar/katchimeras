@@ -21,6 +21,7 @@
     "world:creatures:lod:report": "python scripts/generate-creature-lod.py --report-only",
     "world:objects:lod": "python scripts/generate-world-object-lod.py",
     "world:objects:lod:report": "python scripts/generate-world-object-lod.py --report-only",
+    "art:evolution-grid": "python scripts/generate-evolution-grid.py",
     "local-env:guide": "python scripts/generate-local-environment-guide.py",
     "local-env:placeholders": "python scripts/generate-local-environment-placeholders.py",
     "eas:login": "eas login",

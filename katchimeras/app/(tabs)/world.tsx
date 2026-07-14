@@ -275,6 +275,8 @@ export default function KingdomScreen() {
           sortingBestDurationMs={quests.selectedSortingBestDurationMs}
           matchingBestDurationMs={quests.selectedMatchingBestDurationMs}
           recentMatchingContentIds={quests.recentMatchingContentIds}
+          recentMergeOrderIds={quests.recentMergeOrderIds}
+          mergeBest={quests.selectedMergeBest}
           onStartQuestAttempt={quests.startSelectedQuestAttempt}
           onCancelQuestAttempt={quests.cancelSelectedQuestAttempt}
           onCompleteInteractiveQuest={quests.completeSelectedInteractiveQuest}

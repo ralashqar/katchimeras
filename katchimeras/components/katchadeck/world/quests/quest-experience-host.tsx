@@ -8,8 +8,10 @@ import { PatternMemoryQuest } from './pattern-memory-quest';
 import { SortingQuest } from './sorting-quest';
 import { MatchingQuest } from './matching-quest';
 import { RhythmQuest } from './rhythm-quest';
+import { MergeQuest } from './merge-quest';
+import type { MergeRoundConfig } from '@/utils/quests/experiences/merge';
 
-export function QuestExperienceHost({ execution, config, seed, recentQuestionIds, recentPuzzleIds, recentSortingItemIds = [], sortingBestDurationMs = null, recentMatchingContentIds = [], matchingBestDurationMs = null, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: {
+export function QuestExperienceHost({ execution, config, seed, recentQuestionIds, recentPuzzleIds, recentSortingItemIds = [], sortingBestDurationMs = null, recentMatchingContentIds = [], matchingBestDurationMs = null, recentMergeOrderIds = [], mergeBest = null, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: {
   execution: InteractiveQuestExecution;
   config: Record<string, unknown>;
   seed: string;
@@ -19,6 +21,8 @@ export function QuestExperienceHost({ execution, config, seed, recentQuestionIds
   sortingBestDurationMs?: number | null;
   recentMatchingContentIds?: string[];
   matchingBestDurationMs?: number | null;
+  recentMergeOrderIds?: string[];
+  mergeBest?: { movesUsed: number; durationMs: number } | null;
   onAttemptStart: (config: Record<string, unknown>) => string;
   onAttemptCancel: (attemptId: string) => void;
   onComplete: (attemptId: string, result: QuestResult) => void;
@@ -36,5 +40,6 @@ export function QuestExperienceHost({ execution, config, seed, recentQuestionIds
   if (execution.kind === 'pattern_memory') return <PatternMemoryQuest config={config as { rounds: number; targetRounds: number; startLength: number; maxLength: number; playbackMs: number; tier: number }} seed={seed} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   if (execution.kind === 'sorting') return <SortingQuest config={config as { itemCount: number; targetCorrect: number; tier: number }} packId={execution.packId} seed={seed} recentIds={recentSortingItemIds} bestDurationMs={sortingBestDurationMs} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   if (execution.kind === 'matching') return <MatchingQuest config={config as { pairCount: number; moveBudget: number; tier: number }} packId={execution.packId} seed={seed} recentIds={recentMatchingContentIds} bestDurationMs={matchingBestDurationMs} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
+  if (execution.kind === 'merge') return <MergeQuest config={config as MergeRoundConfig} packId={execution.packId} seed={seed} recentOrderIds={recentMergeOrderIds} best={mergeBest} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   return <RhythmQuest config={config as { phraseLengths: number[]; phrases: number; targetScore: number; bpm: number; hitWindowMs: number; tier: number }} seed={seed} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
 }

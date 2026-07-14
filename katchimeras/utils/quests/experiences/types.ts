@@ -22,6 +22,7 @@ export type QuestResult =
   | { kind: 'pattern_memory'; success: boolean; completedRounds: number; rounds: number; longestSequence: number; mistakes: number; durationMs: number; personalBest?: boolean }
   | { kind: 'sorting'; success: boolean; correctFirstPlacements: number; totalItems: number; mistakes: number; durationMs: number; itemIds: string[]; packId?: 'feastle-table' | 'tasklet-triage'; personalBest?: boolean }
   | { kind: 'matching'; success: boolean; pairs: number; moves: number; durationMs: number; contentIds: string[]; packId?: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; personalBest?: boolean }
+  | { kind: 'merge'; success: boolean; packId: 'feastle-kitchen'; ordersCompleted: number; ordersTotal: number; movesUsed: number; moveBudget: number; mergeCount: number; highestTier: number; orderIds: string[]; contentIds: string[]; durationMs: number; personalBest?: boolean }
   | { kind: 'rhythm'; success: boolean; sequenceAccuracy: number; timingAccuracy: number; score: number; durationMs: number; personalBest?: boolean };
 
 export type QuestAttemptStatus = 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';

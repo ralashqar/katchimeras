@@ -1,4 +1,5 @@
 import type { CompanionQuest } from '@/utils/katchimera-quests';
+export { resolveMergeConfig } from './merge';
 
 const SPRINT_TARGETS = [100, 120, 150, 175, 200] as const;
 const TIME_TRIAL_TARGETS = [250, 400, 600] as const;
