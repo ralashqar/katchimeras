@@ -22,6 +22,7 @@ const bucketName = 'katchimera-art-dev';
 const MODEL_ENDPOINTS: Record<string, string> = {
   nano: 'fal-ai/nano-banana-2/edit',
   gpt: 'openai/gpt-image-2/edit',
+  seedream: 'bytedance/seedream/v5/pro/edit',
 };
 
 // fal's QUEUE API submits to the full endpoint (with subpath) but addresses
@@ -82,7 +83,7 @@ Deno.serve(async (req) => {
     guideMime?: string;
     guideUrl?: string;
     mode?: 'single' | '2x2' | '4x4';
-    model?: 'nano' | 'gpt';
+    model?: 'nano' | 'gpt' | 'seedream';
     resolution?: '1K' | '2K';
     // GPT branch square output size in px (default 1024).
     gptImageSize?: number;
@@ -225,9 +226,18 @@ Deno.serve(async (req) => {
             quality: gptQuality,
             ...(body.transparentBackground ? { background: 'transparent', output_format: 'png' } : {}),
           }
+        : modelEndpoint === MODEL_ENDPOINTS.seedream
+          ? {
+              prompt,
+              image_urls: imageUrls,
+              image_size: 'auto_2K',
+              num_images: 1,
+              output_format: 'png',
+              enable_safety_checker: true,
+            }
         : { prompt, image_urls: imageUrls, aspect_ratio: '1:1', resolution: body.resolution ?? '2K' };
 
-    if (modelEndpoint === MODEL_ENDPOINTS.gpt) {
+    if (modelEndpoint === MODEL_ENDPOINTS.gpt || modelEndpoint === MODEL_ENDPOINTS.seedream) {
       // Slow model → queue; the caller polls. (Sync fal.run 504s the gateway.)
       const submitResponse = await fetch(`https://queue.fal.run/${modelEndpoint}`, {
         method: 'POST',

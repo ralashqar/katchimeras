@@ -1,7 +1,12 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import type { HomeVisualKey } from '@/types/home';
+import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
 import type { KingdomHexTileAlphaBounds, KingdomHexTileLodSources } from '@/utils/world-visuals';
+
+const tileAlphaBounds = (
+  assetName: keyof typeof KINGDOM_HEX_TILE_ALPHA_BOUNDS
+): KingdomHexTileAlphaBounds => KINGDOM_HEX_TILE_ALPHA_BOUNDS[assetName];
 
 export type KatchimeraHexTileSource = {
   source: ImageSourcePropType;
@@ -73,6 +78,11 @@ const RESIDENT_FLICKERBUN_HEX_TILE_V3_SOURCES: KingdomHexTileLodSources = {
   medium: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v3_512.webp'),
   full: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v3.webp'),
 };
+const RESIDENT_PAGELET_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_pagelet_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_pagelet_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_pagelet_hex_tile.webp'),
+};
 const RESIDENT_CHEERLET_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
   thumb: require('../assets/images/katchimeras/world/hex/resident_cheerlet_hex_tile_256.webp'),
   medium: require('../assets/images/katchimeras/world/hex/resident_cheerlet_hex_tile_512.webp'),
@@ -118,7 +128,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'feastle-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile.webp'),
         sources: RESIDENT_FEASTLE_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 123, right: 1010, bottom: 901 },
+        alphaBounds: tileAlphaBounds('resident_feastle_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'feastle-resident-hex-1',
           promptTheme:
@@ -132,7 +142,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'feastle-resident-hex-2',
         source: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v2.webp'),
         sources: RESIDENT_FEASTLE_HEX_TILE_V2_SOURCES,
-        alphaBounds: { left: 14, top: 100, right: 1010, bottom: 923 },
+        alphaBounds: tileAlphaBounds('resident_feastle_hex_tile_v2.webp'),
         generatedFrom: {
           candidateId: 'feastle-resident-hex-2',
           promptTheme:
@@ -146,7 +156,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'feastle-resident-hex-3',
         source: require('../assets/images/katchimeras/world/hex/resident_feastle_hex_tile_v3.webp'),
         sources: RESIDENT_FEASTLE_HEX_TILE_V3_SOURCES,
-        alphaBounds: { left: 14, top: 96, right: 1010, bottom: 928 },
+        alphaBounds: tileAlphaBounds('resident_feastle_hex_tile_v3.webp'),
         generatedFrom: {
           candidateId: 'feastle-resident-hex-3',
           promptTheme:
@@ -168,7 +178,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'steppling-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile.webp'),
         sources: RESIDENT_STEPPLING_HEX_TILE_SOURCES,
-        alphaBounds: { left: 27, top: 75, right: 996, bottom: 895 },
+        alphaBounds: tileAlphaBounds('resident_steppling_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'steppling-resident-hex-1',
           promptTheme:
@@ -182,7 +192,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'steppling-resident-hex-2',
         source: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v2.webp'),
         sources: RESIDENT_STEPPLING_HEX_TILE_V2_SOURCES,
-        alphaBounds: { left: 14, top: 120, right: 1011, bottom: 901 },
+        alphaBounds: tileAlphaBounds('resident_steppling_hex_tile_v2.webp'),
         generatedFrom: {
           candidateId: 'steppling-resident-hex-2',
           promptTheme:
@@ -196,7 +206,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'steppling-resident-hex-3',
         source: require('../assets/images/katchimeras/world/hex/resident_steppling_hex_tile_v3.webp'),
         sources: RESIDENT_STEPPLING_HEX_TILE_V3_SOURCES,
-        alphaBounds: { left: 17, top: 47, right: 1009, bottom: 891 },
+        alphaBounds: tileAlphaBounds('resident_steppling_hex_tile_v3.webp'),
         generatedFrom: {
           candidateId: 'steppling-resident-hex-3',
           promptTheme:
@@ -218,7 +228,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'flickerbun-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile.webp'),
         sources: RESIDENT_FLICKERBUN_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 88, right: 1010, bottom: 936 },
+        alphaBounds: tileAlphaBounds('resident_flickerbun_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'flickerbun-resident-hex-1',
           promptTheme:
@@ -232,7 +242,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'flickerbun-resident-hex-2',
         source: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v2.webp'),
         sources: RESIDENT_FLICKERBUN_HEX_TILE_V2_SOURCES,
-        alphaBounds: { left: 14, top: 136, right: 1010, bottom: 887 },
+        alphaBounds: tileAlphaBounds('resident_flickerbun_hex_tile_v2.webp'),
         generatedFrom: {
           candidateId: 'flickerbun-resident-hex-2',
           promptTheme:
@@ -246,11 +256,33 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'flickerbun-resident-hex-3',
         source: require('../assets/images/katchimeras/world/hex/resident_flickerbun_hex_tile_v3.webp'),
         sources: RESIDENT_FLICKERBUN_HEX_TILE_V3_SOURCES,
-        alphaBounds: { left: 14, top: 131, right: 1010, bottom: 892 },
+        alphaBounds: tileAlphaBounds('resident_flickerbun_hex_tile_v3.webp'),
         generatedFrom: {
           candidateId: 'flickerbun-resident-hex-3',
           promptTheme:
             'a velvet-dark story lover with projector-bright eyes; cozy miniature cinema and moonlit story theater habitat',
+        },
+      },
+    ],
+  },
+  pagelet: {
+    visualKey: 'pagelet',
+    label: 'Pagelet resident tile',
+    selectedVariantId: 'pagelet-bookshop-v1',
+    defaultVariantId: 'pagelet-bookshop-v1',
+    variants: [
+      {
+        id: 'pagelet-bookshop-v1',
+        label: 'Storybook shop',
+        description: 'Open-front Pagelet bookshop with an open-book canopy, curved shelves, reading chair, ribbon-marked books, and a clear resident lawn.',
+        generationId: 'pagelet-resident-hex-1',
+        source: require('../assets/images/katchimeras/world/hex/resident_pagelet_hex_tile.webp'),
+        sources: RESIDENT_PAGELET_HEX_TILE_SOURCES,
+        alphaBounds: tileAlphaBounds('resident_pagelet_hex_tile.webp'),
+        generatedFrom: {
+          candidateId: 'pagelet-resident-hex-1',
+          promptTheme:
+            'cozy miniature bookshop and reading garden habitat with cream paper, warm walnut wood, burgundy ribbon accents, and amber lamplight',
         },
       },
     ],
@@ -268,7 +300,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'cheerlet-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_cheerlet_hex_tile.webp'),
         sources: RESIDENT_CHEERLET_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 100, right: 1010, bottom: 924 },
+        alphaBounds: tileAlphaBounds('resident_cheerlet_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'cheerlet-resident-hex-1',
           promptTheme:
@@ -290,7 +322,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'gatherglow-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_gatherglow_hex_tile.webp'),
         sources: RESIDENT_GATHERGLOW_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 90, right: 1010, bottom: 934 },
+        alphaBounds: tileAlphaBounds('resident_gatherglow_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'gatherglow-resident-hex-1',
           promptTheme:
@@ -312,7 +344,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'mossprout-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_mossprout_hex_tile.webp'),
         sources: RESIDENT_MOSSPROUT_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 107, right: 1010, bottom: 916 },
+        alphaBounds: tileAlphaBounds('resident_mossprout_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'mossprout-resident-hex-1',
           promptTheme: 'gentle and grounded, delighted by green detours; lush park garden and mossy nature habitat',
@@ -333,7 +365,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'skylo-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_skylo_hex_tile.webp'),
         sources: RESIDENT_SKYLO_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 82, right: 1010, bottom: 941 },
+        alphaBounds: tileAlphaBounds('resident_skylo_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'skylo-resident-hex-1',
           promptTheme:
@@ -355,7 +387,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'tasklet-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_tasklet_hex_tile.webp'),
         sources: RESIDENT_TASKLET_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 82, right: 1010, bottom: 942 },
+        alphaBounds: tileAlphaBounds('resident_tasklet_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'tasklet-resident-hex-1',
           promptTheme: 'a determined, competent little doer who loves a checked-off list; focused workshop and productivity garden habitat',
@@ -376,7 +408,7 @@ export const KATCHIMERA_HEX_TILE_CATALOG: Partial<Record<HomeVisualKey, Katchime
         generationId: 'vesperitt-resident-hex-1',
         source: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile.webp'),
         sources: RESIDENT_VESPERITT_HEX_TILE_SOURCES,
-        alphaBounds: { left: 14, top: 137, right: 1010, bottom: 887 },
+        alphaBounds: tileAlphaBounds('resident_vesperitt_hex_tile.webp'),
         generatedFrom: {
           candidateId: 'fal-yjZuCe-a4Igg2pptZC3Mj',
           promptTheme:

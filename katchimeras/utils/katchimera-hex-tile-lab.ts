@@ -5,6 +5,7 @@ import { encounterLiveCast, type EncounterCastEntry } from '@/constants/encounte
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import type { HomeVisualKey } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
+import { measureImageAlphaBounds } from '@/utils/image-alpha-bounds';
 import {
   generateAssetVariants,
   keepCell,
@@ -27,8 +28,6 @@ export type KatchimeraTileCandidate = {
   themePrompt: string;
   source: ImageSourcePropType;
 };
-
-const DEFAULT_BOUNDS: KingdomHexTileAlphaBounds = { left: 26, top: 157, right: 1002, bottom: 888 };
 
 const CAST_BY_VISUAL_KEY = new Map<HomeVisualKey, EncounterCastEntry>(
   encounterLiveCast.map((entry) => [entry.visualKey, entry])
@@ -107,7 +106,11 @@ export async function keepKatchimeraHexTileCell(options: {
     cellUrl: options.cellUrl,
     matte: options.matte,
   });
-  return { uri, alphaBounds: DEFAULT_BOUNDS };
+  const alphaBounds = await measureImageAlphaBounds(uri);
+  if (!alphaBounds) {
+    throw new Error('Could not measure visible bounds for the kept tile.');
+  }
+  return { uri, alphaBounds };
 }
 
 export async function fileExists(uri: string): Promise<boolean> {
@@ -117,4 +120,3 @@ export async function fileExists(uri: string): Promise<boolean> {
     return false;
   }
 }
-

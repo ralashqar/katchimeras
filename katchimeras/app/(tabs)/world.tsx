@@ -11,6 +11,8 @@ import {
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { CompanionInteractionSheet } from '@/components/katchadeck/world/companion-interaction-sheet';
+import { HomeIdentitySheet } from '@/components/katchadeck/world/home-identity-sheet';
+import { ZodiacTileSheet } from '@/components/katchadeck/world/zodiac-tile-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -22,12 +24,14 @@ import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import type { JournalRouteProposal, JournalSource } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
+import type { WorldIdentityState } from '@/types/world-identity';
 import { openingLine, reflectionLine } from '@/utils/katchimera-engagement';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
 import { noteJournalInputAdapter } from '@/utils/journal-input-adapters';
 import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
+import { loadWorldIdentity, saveWorldIdentity } from '@/utils/world-identity';
 
 type ReflectionReview = {
   draft: CompanionReflectionDraft;
@@ -62,6 +66,9 @@ export default function KingdomScreen() {
   } = useDiscoveriesFromArchive(archive);
 
   const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
+  const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
+  const [homeIdentityOpen, setHomeIdentityOpen] = useState(false);
+  const [zodiacOpen, setZodiacOpen] = useState(false);
   const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
   const [reflectionReview, setReflectionReview] = useState<ReflectionReview | null>(null);
   const [reflectionReviewPending, setReflectionReviewPending] = useState(false);
@@ -88,6 +95,20 @@ export default function KingdomScreen() {
   }, [days, today]);
   const todayFacts = useMemo(() => resolveFactsForDay(today, yesterday), [today, yesterday]);
   const quests = useKingdomQuests({ kingdom, residents, today, todayFacts });
+
+  useEffect(() => {
+    if (!identity.selectedHomeArchetypeId) {
+      const seeded: WorldIdentityState = { ...identity, selectedHomeArchetypeId: 'explorer', recommendedHomeArchetypeId: 'explorer' };
+      setIdentity(seeded);
+      saveWorldIdentity(seeded);
+      setHomeIdentityOpen(true);
+    }
+  }, [identity]);
+
+  const updateIdentity = (next: WorldIdentityState) => {
+    setIdentity(next);
+    saveWorldIdentity(next);
+  };
   const closeSelectedResident = quests.closeSelectedResident;
   const refreshQuestState = quests.refreshQuestState;
 
@@ -169,9 +190,12 @@ export default function KingdomScreen() {
       <View style={styles.stage}>
         <KingdomHexCanvas
           residents={residentTiles}
+          identity={identity}
           eggVisual={eggVisual}
           residentStatusGlyphs={quests.residentStatusGlyphs}
           onSelectResident={quests.selectResident}
+          onSelectHome={() => setHomeIdentityOpen(true)}
+          onSelectZodiac={() => setZodiacOpen(true)}
         />
 
         <View pointerEvents="none" style={styles.header}>
@@ -211,6 +235,8 @@ export default function KingdomScreen() {
           onClose={() => setDiscoveriesOpen(false)}
         />
       ) : null}
+      {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
+      {zodiacOpen ? <ZodiacTileSheet identity={identity} onChange={updateIdentity} onClose={() => setZodiacOpen(false)} /> : null}
 
       {quests.selectedResident && !reflectionReview && !embeddedJournal ? (
         <CompanionInteractionSheet

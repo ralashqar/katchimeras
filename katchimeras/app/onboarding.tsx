@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -20,16 +20,20 @@ import {
 } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { presenceEnter, useFloatingMotion, usePressMotion, usePulseMotion } from '@/components/katchadeck/motion';
 import { CinematicOnboardingPage } from '@/components/katchadeck/onboarding/cinematic-onboarding-page';
+import { ConnectStarsGame } from '@/components/katchadeck/world/connect-stars-game';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
 import { preferenceOptions } from '@/constants/katchadeck';
+import { CONSTELLATION_LEVELS, HOME_PRESETS, PERSONALITY_QUESTIONS } from '@/constants/world-identity';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
 import { saveHomeAnchor } from '@/utils/home-location';
 import { defaultOnboardingProfile, loadOnboardingProfile, saveOnboardingProfile } from '@/utils/onboarding-state';
+import { deriveZodiacSign, homePreset, loadWorldIdentity, saveWorldIdentity, scorePersonality, zodiacProfile } from '@/utils/world-identity';
+import { KINGDOM_HOME_HEX_TILES } from '@/utils/world-visuals';
 
-const totalSteps = 5;
+const totalSteps = 9;
 
 const sampleEgg = {
   accentColor: '#93C7FF',
@@ -86,12 +90,21 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const storedProfile = loadOnboardingProfile();
+  const [identity, setIdentity] = useState(loadWorldIdentity);
   const [step, setStep] = useState(0);
-  const [selectedToneId, setSelectedToneId] = useState<string>(storedProfile.preferenceIds[0] ?? 'cozy');
+  const selectedToneId = storedProfile.preferenceIds[0] ?? 'cozy';
   const [selectedHatchHour, setSelectedHatchHour] = useState<number>(storedProfile.hatchHour ?? 20);
   const [primingPermissions, setPrimingPermissions] = useState(false);
   const [homeAnchorSet, setHomeAnchorSet] = useState(false);
   const [settingHome, setSettingHome] = useState(false);
+  const [birthMonthText, setBirthMonthText] = useState(identity.birthMonth ? String(identity.birthMonth) : '');
+  const [birthDayText, setBirthDayText] = useState(identity.birthDay ? String(identity.birthDay) : '');
+  const [zodiacSkipped, setZodiacSkipped] = useState(false);
+  const [constellationDone, setConstellationDone] = useState(identity.constellationTutorialCompleted);
+
+  useEffect(() => {
+    saveWorldIdentity(identity);
+  }, [identity]);
 
   async function handleUseCurrentAsHome() {
     if (homeAnchorSet || settingHome) {
@@ -125,8 +138,30 @@ export default function OnboardingScreen() {
 
   const primaryActionLabel = step === totalSteps - 1 ? 'Allow and continue' : 'Continue';
 
+  const personalityQuestion = step >= 3 && step <= 5 ? PERSONALITY_QUESTIONS[step - 3] : null;
+  const recommendedHomeId = scorePersonality(identity.personalityAnswers);
+  const selectedHome = homePreset(identity.selectedHomeArchetypeId ?? recommendedHomeId);
+  const birthMonth = Number(birthMonthText);
+  const birthDay = Number(birthDayText);
+  const selectedSignId = deriveZodiacSign(birthMonth, birthDay);
+  const selectedSign = zodiacProfile(selectedSignId);
+  const canContinue =
+    !personalityQuestion || Boolean(identity.personalityAnswers[personalityQuestion.id]);
+  const canAdvanceZodiac = step !== 7 || zodiacSkipped || Boolean(selectedSignId && constellationDone);
+
   async function handlePrimaryAction() {
+    if (!canContinue || !canAdvanceZodiac) return;
     if (step < totalSteps - 1) {
+      if (step === 6) {
+        setIdentity((current) => ({
+          ...current,
+          recommendedHomeArchetypeId: recommendedHomeId,
+          selectedHomeArchetypeId: current.selectedHomeArchetypeId ?? recommendedHomeId,
+        }));
+      }
+      if (step === 7 && selectedSignId) {
+        setIdentity((current) => ({ ...current, birthMonth, birthDay, zodiacSignId: selectedSignId }));
+      }
       setStep((current) => Math.min(current + 1, totalSteps - 1));
       return;
     }
@@ -150,6 +185,17 @@ export default function OnboardingScreen() {
   }
 
   function completeOnboarding() {
+    const now = new Date().toISOString();
+    saveWorldIdentity({
+      ...identity,
+      recommendedHomeArchetypeId: recommendedHomeId,
+      selectedHomeArchetypeId: identity.selectedHomeArchetypeId ?? recommendedHomeId ?? 'explorer',
+      birthMonth: zodiacSkipped ? null : identity.birthMonth,
+      birthDay: zodiacSkipped ? null : identity.birthDay,
+      zodiacSignId: zodiacSkipped ? null : identity.zodiacSignId,
+      setupCompletedAt: now,
+      constellationTutorialCompleted: constellationDone,
+    });
     saveOnboardingProfile({
       ...defaultOnboardingProfile,
       aspirationId: resolveAspirationForTone(selectedToneId),
@@ -264,32 +310,88 @@ export default function OnboardingScreen() {
       );
     }
 
-    if (step === 3) {
+    if (personalityQuestion) {
       return (
         <View style={styles.stepStack}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
             <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
-              Set the tone
+              Find your home · {step - 2} of 3
             </ThemedText>
             <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
-              What kind of atmosphere should your memories lean toward?
+              {personalityQuestion.question}
             </ThemedText>
             <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
-              This only changes the emotional color of the app. The day still comes from what actually happened.
+              There is no right answer. This only shapes the home at the heart of your world.
             </ThemedText>
           </Animated.View>
 
           <View style={styles.optionStack}>
-            {preferenceOptions.map((option, index) => (
-              <PreferenceCard
-                key={option.id}
-                index={index}
-                onPress={() => setSelectedToneId(option.id)}
-                option={option}
-                selected={option.id === selectedToneId}
-              />
-            ))}
+            {personalityQuestion.answers.map((answer, index) => {
+              const selected = identity.personalityAnswers[personalityQuestion.id] === answer.id;
+              return (
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  key={answer.id}
+                  onPress={() => setIdentity((current) => ({ ...current, personalityAnswers: { ...current.personalityAnswers, [personalityQuestion.id]: answer.id } }))}
+                  style={[styles.personalityAnswer, selected && styles.personalityAnswerSelected]}>
+                  <View style={[styles.answerIndex, selected && styles.answerIndexSelected]}>
+                    <ThemedText lightColor={selected ? Lantern.emberInk : Lantern.moon50} darkColor={selected ? Lantern.emberInk : Lantern.moon50}>{index + 1}</ThemedText>
+                  </View>
+                  <ThemedText style={styles.answerLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{answer.label}</ThemedText>
+                </Pressable>
+              );
+            })}
           </View>
+        </View>
+      );
+    }
+
+    if (step === 6) {
+      return (
+        <View style={styles.stepStack}>
+          <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={selectedHome.accent} darkColor={selectedHome.accent}>Your home found you</ThemedText>
+            <ThemedText type="display" style={styles.title} lightColor="#FBF3E4" darkColor="#FBF3E4">{selectedHome.name}</ThemedText>
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">{selectedHome.description}</ThemedText>
+          </Animated.View>
+          <View style={[styles.homePreview, { borderColor: selectedHome.accent }]}>
+            <Image contentFit="contain" source={KINGDOM_HOME_HEX_TILES[selectedHome.id].source} style={styles.homeTilePreview} />
+            <View style={styles.keywordRow}>{selectedHome.keywords.map((keyword) => <View key={keyword} style={styles.keyword}><ThemedText style={styles.keywordText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{keyword}</ThemedText></View>)}</View>
+          </View>
+          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">Or choose the place that feels right</ThemedText>
+          <View style={styles.homeChoiceGrid}>{HOME_PRESETS.map((preset) => {
+            const selected = preset.id === selectedHome.id;
+            return <Pressable key={preset.id} onPress={() => setIdentity((current) => ({ ...current, selectedHomeArchetypeId: preset.id, recommendedHomeArchetypeId: recommendedHomeId }))} style={[styles.homeChoice, selected && { borderColor: preset.accent, backgroundColor: `${preset.accent}22` }]}><Image contentFit="contain" source={KINGDOM_HOME_HEX_TILES[preset.id].sources?.thumb ?? KINGDOM_HOME_HEX_TILES[preset.id].source} style={styles.homeChoiceImage} /><ThemedText style={styles.homeChoiceName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{preset.name}</ThemedText></Pressable>;
+          })}</View>
+        </View>
+      );
+    }
+
+    if (step === 7) {
+      const level = selectedSignId ? CONSTELLATION_LEVELS.find((item) => item.signId === selectedSignId) : null;
+      return (
+        <View style={styles.stepStack}>
+          <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#AFA6F2" darkColor="#AFA6F2">Your place among the stars</ThemedText>
+            <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">When is your birthday?</ThemedText>
+            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">Month and day are enough. This stays on your phone and never changes which Katchimeras hatch.</ThemedText>
+          </Animated.View>
+          <View style={styles.birthdayRow}>
+            <TextInput accessibilityLabel="Birth month" keyboardType="number-pad" maxLength={2} onChangeText={(value) => { setBirthMonthText(value); setZodiacSkipped(false); setConstellationDone(false); }} placeholder="MM" placeholderTextColor="rgba(255,255,255,0.35)" style={styles.birthdayInput} value={birthMonthText} />
+            <TextInput accessibilityLabel="Birth day" keyboardType="number-pad" maxLength={2} onChangeText={(value) => { setBirthDayText(value); setZodiacSkipped(false); setConstellationDone(false); }} placeholder="DD" placeholderTextColor="rgba(255,255,255,0.35)" style={styles.birthdayInput} value={birthDayText} />
+          </View>
+          {selectedSign && level ? (
+            <>
+              <GlassPanel contentStyle={styles.zodiacReveal} fillColor={`${selectedSign.accent}18`}>
+                <ThemedText style={styles.zodiacSymbol} lightColor={selectedSign.accent} darkColor={selectedSign.accent}>{selectedSign.symbol}</ThemedText>
+                <View style={{ flex: 1 }}><ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{selectedSign.name} · {selectedSign.element}</ThemedText><ThemedText style={styles.panelCopy} lightColor="rgba(251,243,228,0.82)" darkColor="rgba(251,243,228,0.82)">{selectedSign.familiarName} has arrived. {selectedSign.profileLine}</ThemedText></View>
+              </GlassPanel>
+              <ConnectStarsGame accentColor={selectedSign.accent} points={level.points.slice(0, 4)} tutorial onComplete={() => { setConstellationDone(true); setIdentity((current) => ({ ...current, birthMonth, birthDay, zodiacSignId: selectedSign.id, constellationTutorialCompleted: true })); }} />
+              {constellationDone ? <ThemedText style={styles.constellationComplete} lightColor={selectedSign.accent} darkColor={selectedSign.accent}>Your constellation is awake.</ThemedText> : null}
+            </>
+          ) : birthMonthText || birthDayText ? <ThemedText style={styles.invalidDate} lightColor="#F3B3A7" darkColor="#F3B3A7">Enter a valid month and day.</ThemedText> : null}
+          <KatchaButton label={zodiacSkipped ? 'Zodiac skipped' : 'Skip for now'} disabled={zodiacSkipped} onPress={() => { setZodiacSkipped(true); setBirthMonthText(''); setBirthDayText(''); setConstellationDone(false); setIdentity((current) => ({ ...current, birthMonth: null, birthDay: null, zodiacSignId: null })); }} variant="secondary" />
         </View>
       );
     }
@@ -415,7 +517,7 @@ export default function OnboardingScreen() {
 
         <View style={styles.footer}>
           <KatchaButton
-            disabled={primingPermissions}
+            disabled={primingPermissions || !canContinue || !canAdvanceZodiac}
             icon={step === totalSteps - 1 ? 'sparkles' : 'arrow.right'}
             label={primingPermissions ? 'Preparing...' : primaryActionLabel}
             onPress={handlePrimaryAction}
@@ -514,51 +616,6 @@ function HatchHourChip({ label, selected, onPress }: { label: string; selected: 
         </ThemedText>
       </Animated.View>
     </Pressable>
-  );
-}
-
-function PreferenceCard({
-  option,
-  selected,
-  onPress,
-  index,
-}: {
-  option: (typeof preferenceOptions)[number];
-  selected: boolean;
-  onPress: () => void;
-  index: number;
-}) {
-  const { animatedStyle, onPressIn, onPressOut } = usePressMotion();
-  const swatchPulse = usePulseMotion(0.9, 1.16);
-
-  return (
-    <Animated.View entering={presenceEnter(70 + index * 30)}>
-      <Pressable onPress={onPress} onPressIn={onPressIn} onPressOut={onPressOut}>
-        <Animated.View
-          style={[
-            styles.preferenceCard,
-            selected ? styles.preferenceCardSelected : null,
-            { borderColor: selected ? option.palette[1] : 'rgba(216,228,255,0.16)' },
-            animatedStyle,
-          ]}>
-          <View style={styles.preferenceCopy}>
-            <ThemedText type="subtitle" style={styles.preferenceTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
-              {option.title}
-            </ThemedText>
-            <ThemedText style={styles.preferenceBody} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
-              {option.description}
-            </ThemedText>
-          </View>
-          <Animated.View
-            style={[
-              styles.preferenceSwatch,
-              { backgroundColor: option.palette[1], opacity: selected ? 1 : 0.7 },
-              selected ? swatchPulse : null,
-            ]}
-          />
-        </Animated.View>
-      </Pressable>
-    </Animated.View>
   );
 }
 
@@ -806,6 +863,56 @@ const styles = StyleSheet.create({
   optionStack: {
     gap: 12,
   },
+  personalityAnswer: {
+    alignItems: 'center',
+    backgroundColor: Lantern.ink800,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 22,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+  },
+  personalityAnswerSelected: {
+    backgroundColor: 'rgba(229,190,106,0.15)',
+    borderColor: Lantern.ember300,
+  },
+  answerIndex: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 999,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  answerIndexSelected: { backgroundColor: Lantern.ember300 },
+  answerLabel: { flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  homePreview: {
+    alignItems: 'center',
+    backgroundColor: Lantern.ink800,
+    borderRadius: 30,
+    borderWidth: 1,
+    gap: 18,
+    minHeight: 210,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  homeTilePreview: { height: 210, width: '100%' },
+  keywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  keyword: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  keywordText: { fontSize: 12, fontWeight: '800' },
+  homeChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  homeChoice: { alignItems: 'center', backgroundColor: Lantern.ink800, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 20, borderWidth: 1, gap: 5, padding: 8, width: '31%' },
+  homeChoiceImage: { aspectRatio: 1, width: '100%' },
+  homeChoiceName: { fontSize: 11, fontWeight: '800' },
+  birthdayRow: { flexDirection: 'row', gap: 12 },
+  birthdayInput: { backgroundColor: Lantern.ink800, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 20, borderWidth: 1, color: Lantern.moon50, flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 28, fontWeight: '800', minHeight: 72, paddingHorizontal: 22, textAlign: 'center' },
+  zodiacReveal: { alignItems: 'center', flexDirection: 'row', gap: 16 },
+  zodiacSymbol: { fontSize: 52, lineHeight: 60 },
+  constellationComplete: { fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  invalidDate: { fontSize: 13, textAlign: 'center' },
   preferenceCard: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',

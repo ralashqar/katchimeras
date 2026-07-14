@@ -20,6 +20,7 @@ import base64
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import time
@@ -306,6 +307,12 @@ def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: P
         lod_quality = 82 if lod_size >= 512 else 78
         lod.save(lod_path, format="WEBP", quality=min(args.quality, lod_quality), method=6)
         print("bundled lod", lod_path, lod_path.stat().st_size // 1024, "KB")
+
+    subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "generate-hex-tile-bounds.py")],
+        cwd=ROOT,
+        check=True,
+    )
 
     qa = Image.new("RGB", (final_size, final_size), (18, 22, 40))
     qa.paste(canvas, (0, 0), canvas)

@@ -1,6 +1,7 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import type { KingdomHexVerticalAlignmentMode } from '@/utils/kingdom-tile-alignment';
 
 // DEV-ONLY live overrides for world assets: the Asset Lab points an assetKey at
 // a locally-saved draft (documents dir) so the real Kingdom renders it without
@@ -99,4 +100,26 @@ export function getDevKingdomHexBaseTileId(): string | null {
 export function setDevKingdomHexBaseTileId(tileId: string | null): void {
   devKingdomHexBaseTileId = tileId;
   setStoredJson(DEV_HEX_BASE_TILE_KEY, tileId);
+}
+
+// --- Kingdom tile vertical alignment experiment (dev) ----------------------
+// Production uses ground-bottom alignment. Dev builds can switch back to the
+// legacy silhouette-centering behaviour for direct visual comparison.
+const DEV_HEX_VERTICAL_ALIGNMENT_KEY = 'katchadeck.dev-kingdom-hex-vertical-alignment-v1';
+let devKingdomHexVerticalAlignmentMode: KingdomHexVerticalAlignmentMode | undefined;
+
+export function getDevKingdomHexVerticalAlignmentMode(): KingdomHexVerticalAlignmentMode {
+  if (!__DEV__) return 'ground-bottom';
+  if (devKingdomHexVerticalAlignmentMode === undefined) {
+    const stored = getStoredJson<unknown>(DEV_HEX_VERTICAL_ALIGNMENT_KEY, 'ground-bottom');
+    devKingdomHexVerticalAlignmentMode = stored === 'silhouette-center' ? 'silhouette-center' : 'ground-bottom';
+  }
+  return devKingdomHexVerticalAlignmentMode;
+}
+
+export function setDevKingdomHexVerticalAlignmentMode(mode: KingdomHexVerticalAlignmentMode): void {
+  if (!__DEV__) return;
+  const next = mode === 'ground-bottom' ? 'ground-bottom' : 'silhouette-center';
+  devKingdomHexVerticalAlignmentMode = next;
+  setStoredJson(DEV_HEX_VERTICAL_ALIGNMENT_KEY, next);
 }

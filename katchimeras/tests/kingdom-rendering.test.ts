@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { KINGDOM_RENDERING } from '../constants/kingdom-rendering';
+import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
 import {
   cameraTranslationBounds,
   frameToRect,
@@ -11,6 +12,7 @@ import {
   tileLodWithHysteresis,
   visibleWorldRect,
 } from '../utils/kingdom-rendering';
+import { kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
 import {
   EMPTY_KINGDOM_TILE_SCHEDULER,
   kingdomTileSchedulerReducer,
@@ -20,6 +22,133 @@ import {
   kingdomLodSchedulerReducer,
 } from '../utils/kingdom-lod-scheduler';
 import { createKingdomRendererFixture } from './fixtures/kingdom-renderer-fixture';
+
+const TILE_TARGET = { left: -245, top: -148, right: 245, bottom: 196 };
+const BASE_BOUNDS = { left: 14, top: 147, right: 1010, bottom: 876 };
+const TALL_HOME_BOUNDS = { left: 14, top: 25, right: 1010, bottom: 998 };
+
+function assertClose(actual: number, expected: number, message?: string): void {
+  assert.ok(Math.abs(actual - expected) < 1e-9, message ?? `${actual} was not close to ${expected}`);
+}
+
+function renderedAssetY(frame: { top: number; height: number }, assetY: number): number {
+  return frame.top + (assetY / 1024) * frame.height;
+}
+
+function renderedAssetX(frame: { left: number; width: number }, assetX: number): number {
+  return frame.left + (assetX / 1024) * frame.width;
+}
+
+test('visible pixel bounds use alpha 16 and normalize draft dimensions to 1024', () => {
+  const pixels = new Uint8Array(4 * 2 * 4);
+  pixels[(0 * 4 + 0) * 4 + 3] = 15;
+  pixels[(0 * 4 + 1) * 4 + 3] = 16;
+  pixels[(1 * 4 + 3) * 4 + 3] = 255;
+
+  assert.deepEqual(visiblePixelBoundsFromRgba(pixels, 4, 2), {
+    left: 256,
+    top: 0,
+    right: 1024,
+    bottom: 1024,
+  });
+});
+
+test('silhouette-center retains the existing tile frame calculation', () => {
+  const frame = kingdomTileArtFrame({
+    alignmentMode: 'silhouette-center',
+    assetBounds: TALL_HOME_BOUNDS,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+  const expectedSize = 490 * (1024 / 996);
+
+  assertClose(frame.width, expectedSize);
+  assertClose(frame.height, expectedSize);
+  assertClose(frame.left, -((14 + 1010) / 2 / 1024) * expectedSize);
+  assertClose(frame.top, 24 - ((25 + 998) / 2 / 1024) * expectedSize);
+});
+
+test('the selected reference tile does not move between vertical alignment modes', () => {
+  const legacy = kingdomTileArtFrame({
+    alignmentMode: 'silhouette-center',
+    assetBounds: BASE_BOUNDS,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+  const experimental = kingdomTileArtFrame({
+    alignmentMode: 'ground-bottom',
+    assetBounds: BASE_BOUNDS,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+
+  assertClose(experimental.left, legacy.left);
+  assertClose(experimental.top, legacy.top);
+  assertClose(experimental.width, legacy.width);
+  assertClose(experimental.height, legacy.height);
+});
+
+test('ground-bottom preserves horizontal fit and aligns a tall tile to the reference bottom', () => {
+  const legacyHome = kingdomTileArtFrame({
+    alignmentMode: 'silhouette-center',
+    assetBounds: TALL_HOME_BOUNDS,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+  const alignedHome = kingdomTileArtFrame({
+    alignmentMode: 'ground-bottom',
+    assetBounds: TALL_HOME_BOUNDS,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+  const legacyBase = kingdomTileArtFrame({
+    alignmentMode: 'silhouette-center',
+    assetBounds: BASE_BOUNDS,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+
+  assertClose(alignedHome.left, legacyHome.left);
+  assertClose(alignedHome.width, legacyHome.width);
+  assertClose(
+    renderedAssetY(alignedHome, TALL_HOME_BOUNDS.bottom),
+    renderedAssetY(legacyBase, BASE_BOUNDS.bottom)
+  );
+  assert.ok(alignedHome.top < legacyHome.top, 'the tall home should move upward to share the ground baseline');
+});
+
+test('asymmetric visible bounds are centered from their measured midpoint', () => {
+  const asymmetricBounds = { left: 80, top: 40, right: 920, bottom: 970 };
+  const frame = kingdomTileArtFrame({
+    alignmentMode: 'ground-bottom',
+    assetBounds: asymmetricBounds,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+  const targetCenterX = (TILE_TARGET.left + TILE_TARGET.right) / 2;
+
+  assertClose(
+    (renderedAssetX(frame, asymmetricBounds.left) + renderedAssetX(frame, asymmetricBounds.right)) / 2,
+    targetCenterX
+  );
+});
+
+test('different source silhouette widths resolve to the same canonical world width', () => {
+  const narrow = { left: 120, top: 30, right: 900, bottom: 990 };
+  const wide = { left: 14, top: 100, right: 1010, bottom: 930 };
+  for (const bounds of [narrow, wide]) {
+    const frame = kingdomTileArtFrame({
+      alignmentMode: 'ground-bottom',
+      assetBounds: bounds,
+      referenceBounds: BASE_BOUNDS,
+      target: TILE_TARGET,
+    });
+    assertClose(
+      renderedAssetX(frame, bounds.right) - renderedAssetX(frame, bounds.left),
+      TILE_TARGET.right - TILE_TARGET.left
+    );
+  }
+});
 
 test('scene dimensions stay stable while the kingdom grows to fifty residents', () => {
   assert.deepEqual(kingdomSceneMetrics(0), kingdomSceneMetrics(50));

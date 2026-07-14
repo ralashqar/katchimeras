@@ -21,11 +21,15 @@ import { useKingdomLodScheduler } from '@/components/katchadeck/world/use-kingdo
 import { useKingdomTileScheduler } from '@/components/katchadeck/world/use-kingdom-tile-scheduler';
 import { KINGDOM_RENDERING } from '@/constants/kingdom-rendering';
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
+import { zodiacFamiliarSource } from '@/constants/world-identity-art';
 import { Lantern } from '@/constants/theme';
 import type { EggVisualState } from '@/types/home';
+import type { WorldIdentityState } from '@/types/world-identity';
+import { homePreset, zodiacProfile } from '@/utils/world-identity';
 import { HEX_TILE_H, HEX_TILE_W, hexDrawDepth } from '@/utils/world-hex';
 import type { KingdomResidentLod } from '@/utils/kingdom-rendering';
 import type { KingdomTilePhase } from '@/utils/kingdom-tile-scheduler';
+import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
 import {
   kingdomHexTileSet,
   kingdomHexTileSourceForLod,
@@ -41,10 +45,13 @@ export type KingdomResidentStatusGlyph = 'offer' | 'active' | 'ready';
 
 type Props = {
   residents: KingdomHexResidentTile[];
+  identity?: WorldIdentityState | null;
   eggVisual?: EggVisualState | null;
   lanternColor?: string;
   residentStatusGlyphs?: Partial<Record<string, KingdomResidentStatusGlyph>>;
   onSelectResident?: (creatureId: string, label: string) => void;
+  onSelectHome?: () => void;
+  onSelectZodiac?: () => void;
 };
 
 const CREATURE_SIZE = 58;
@@ -64,9 +71,12 @@ const TILE_WORLD_LOD_WIDTH = HEX_TILE_W * 1.03;
 
 export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   residents,
+  identity,
   eggVisual,
   residentStatusGlyphs,
   onSelectResident,
+  onSelectHome,
+  onSelectZodiac,
 }: Props) {
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [assetRevision, setAssetRevision] = useState(0);
@@ -81,9 +91,13 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     () => ({ revision: assetRevision, value: kingdomHexTileSet() }),
     [assetRevision]
   );
+  const verticalAlignmentSelection = useMemo(
+    () => ({ revision: assetRevision, value: getDevKingdomHexVerticalAlignmentMode() }),
+    [assetRevision]
+  );
   const scene = useMemo(
-    () => buildKingdomHexScene(residents, hexTileSelection.value),
-    [hexTileSelection, residents]
+    () => buildKingdomHexScene(residents, hexTileSelection.value, identity, verticalAlignmentSelection.value),
+    [hexTileSelection, identity, residents, verticalAlignmentSelection]
   );
   const camera = useKingdomHexCamera({
     center: { x: scene.centerTile.cx, y: scene.centerTile.cy },
@@ -139,6 +153,9 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   }, [camera.focusResident, camera.isMoving, camera.residentLod, onSelectResident, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds]);
 
   const centerRuntime = runtimeById.get(scene.centerTile.id);
+  const zodiacTile = scene.tiles.find((tile) => tile.kind === 'zodiac');
+  const home = homePreset(identity?.selectedHomeArchetypeId);
+  const zodiac = zodiacProfile(identity?.zodiacSignId);
   const showEgg =
     Boolean(eggVisual) &&
     scheduler.readyTileIds.has(scene.centerTile.id) &&
@@ -189,6 +206,27 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 onPress={camera.recenter}
               />
             ) : null}
+            {identity?.selectedHomeArchetypeId && centerRuntime ? (
+              <HomeTileHitTarget
+                accessibilityLabel={`${home.name} home`}
+                onPress={onSelectHome}
+                x={scene.centerTile.cx}
+                y={scene.centerTile.cy - HEX_TILE_H * 0.38}
+              />
+            ) : null}
+            {zodiacTile && zodiac ? (
+              <IdentityMarker
+                accessibilityLabel={`${zodiac.name} zodiac tile`}
+                accent={zodiac.accent}
+                glyph={zodiac.symbol}
+                imageSource={zodiacFamiliarSource(zodiac.element, camera.residentLod)}
+                label={zodiac.familiarName}
+                onPress={onSelectZodiac}
+                x={zodiacTile.cx}
+                y={zodiacTile.cy - HEX_TILE_H * 0.08}
+                celestial
+              />
+            ) : null}
             {residentNodes}
           </Animated.View>
         </View>
@@ -197,6 +235,32 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         <IconSymbol name="scope" size={22} color={Lantern.moon50} />
       </Pressable>
     </View>
+  );
+});
+
+const HomeTileHitTarget = memo(function HomeTileHitTarget({ accessibilityLabel, onPress, x, y }: {
+  accessibilityLabel: string; onPress?: () => void; x: number; y: number;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={12}
+      onPress={onPress}
+      style={[styles.homeTileHitTarget, { left: x - 54, top: y - 42 }]}
+    />
+  );
+});
+
+const IdentityMarker = memo(function IdentityMarker({ accessibilityLabel, accent, celestial = false, glyph, imageSource, label, onPress, x, y }: {
+  accessibilityLabel: string; accent: string; celestial?: boolean; glyph: string; imageSource?: ImageSourcePropType | null; label: string; onPress?: () => void; x: number; y: number;
+}) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={[styles.identityMarker, { left: x - 47, top: y - 47, borderColor: `${accent}99`, backgroundColor: celestial ? '#171630' : '#29233A' }]}>
+      <View pointerEvents="none" style={[styles.identityGlow, { backgroundColor: `${accent}24` }]} />
+      {imageSource ? <View pointerEvents="none" style={styles.identityImage}><SeamlessWorldImage source={imageSource} priority="high" /></View> : <Text style={[styles.identityGlyph, { color: accent }]}>{glyph}</Text>}
+      <Text numberOfLines={1} style={styles.identityLabel}>{label}</Text>
+    </Pressable>
   );
 });
 
@@ -412,6 +476,12 @@ const styles = StyleSheet.create({
   tileArt: { position: 'absolute' },
   eggLayer: { height: EGG_WORLD_H, position: 'absolute', width: EGG_WORLD_W },
   creature: { position: 'absolute' },
+  homeTileHitTarget: { height: 84, position: 'absolute', width: 108 },
+  identityMarker: { alignItems: 'center', borderRadius: 47, borderWidth: 1, height: 94, justifyContent: 'center', overflow: 'hidden', position: 'absolute', width: 94 },
+  identityGlow: { borderRadius: 999, height: 72, position: 'absolute', width: 72 },
+  identityGlyph: { fontSize: 38, fontWeight: '700', lineHeight: 42 },
+  identityImage: { height: 70, width: 70 },
+  identityLabel: { color: Lantern.moon50, fontSize: 9, fontWeight: '800', marginTop: 2, maxWidth: 78 },
   statusGlyphWrap: {
     alignItems: 'center',
     left: 0,

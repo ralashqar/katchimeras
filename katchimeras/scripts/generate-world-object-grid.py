@@ -234,10 +234,8 @@ def generate_grid(name, subject, ref_path, model, model_id, size, grid, mode, st
     return rec['image_url']
 
 
-# BiRefNet variant. 'General Use (Light 2K)' mattes the 2K grids cleanly (paired with
-# refine_foreground + 2K operating resolution) without cutting chunks out of light
-# objects. ('General Use (Heavy)' is the more accurate but slower alternative.)
-BIREFNET_MODEL = 'General Use (Light 2K)'
+# All production matting uses the slower, more accurate BiRefNet Heavy variant.
+BIREFNET_MODEL = 'General Use (Heavy)'
 
 
 def matte(image_url, out_name):

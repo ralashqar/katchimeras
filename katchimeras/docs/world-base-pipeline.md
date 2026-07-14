@@ -157,11 +157,9 @@ food), use `--mode variants` and map the cells you want by eye when wiring.
 **Clean matting (BiRefNet).** Two levers, both needed for light objects:
 1. Objects render on a FLAT high-contrast CHROMA backdrop (`BACKDROP` — a bold solid
    colour the object doesn't use, like a green screen), NOT a low-contrast neutral bg.
-2. The matte uses BiRefNet **'General Use (Light 2K)'** (`BIREFNET_MODEL`) + `refine_foreground`
-   at 2K, not the default 'General Use (Light)' which cuts chunks out of light objects.
-   ('General Use (Heavy)' is the slower, more-accurate alternative.)
-   The `remove-image-background` edge function now passes `model` / `operatingResolution` /
-   `refineForeground` through to `fal-ai/birefnet/v2` (must be deployed:
+2. The matte uses BiRefNet **'General Use (Heavy)'** + `refine_foreground` at 2K.
+   The shared `remove-image-background` Edge Function enforces Heavy so callers cannot silently
+   inherit fal's Light default (it must be deployed:
    `npx supabase functions deploy remove-image-background --project-ref <ref>`).
 To re-matte an already-generated grid with a different model (no regeneration), call
 `matte(rawGeneratedUrl, name)` on the logged "generated grid" URL, then `split_grid`.

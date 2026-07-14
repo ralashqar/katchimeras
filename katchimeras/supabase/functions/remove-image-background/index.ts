@@ -12,6 +12,9 @@ const bucketName = 'katchimera-art-dev';
 // generator for "transparent background" (fake checkerboards) or chroma-keying
 // a greenscreen (fringes).
 const modelId = 'fal-ai/birefnet/v2';
+const birefnetModel = 'General Use (Heavy)';
+const operatingResolution = '2048x2048';
+const refineForeground = true;
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -52,11 +55,6 @@ Deno.serve(async (req) => {
     imageUrl?: string;
     imageBase64?: string;
     outputName?: string;
-    // BiRefNet variant, e.g. 'General Use (Heavy)' (more accurate, fewer chunks cut
-    // out of light objects) vs the default 'General Use (Light)'. Optional.
-    model?: string;
-    operatingResolution?: string; // '1024x1024' | '2048x2048'
-    refineForeground?: boolean;
   };
   try {
     body = await req.json();
@@ -87,13 +85,9 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         image_url: sourceUrl,
         output_format: 'png',
-        ...(typeof body.model === 'string' ? { model: body.model } : {}),
-        ...(typeof body.operatingResolution === 'string'
-          ? { operating_resolution: body.operatingResolution }
-          : {}),
-        ...(typeof body.refineForeground === 'boolean'
-          ? { refine_foreground: body.refineForeground }
-          : {}),
+        model: birefnetModel,
+        operating_resolution: operatingResolution,
+        refine_foreground: refineForeground,
       }),
     });
 
@@ -127,7 +121,13 @@ Deno.serve(async (req) => {
 
     const { data: publicUrlData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(storagePath);
 
-    return jsonResponse({ status: 'completed', imageUrl: publicUrlData.publicUrl });
+    return jsonResponse({
+      status: 'completed',
+      imageUrl: publicUrlData.publicUrl,
+      model: birefnetModel,
+      operatingResolution,
+      refineForeground,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Background removal failed.';
     return jsonResponse({ error: message }, 502);

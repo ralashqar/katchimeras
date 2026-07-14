@@ -102,7 +102,7 @@ def gen(prompt, image_uris):
 def matte(image_url, out_name):
     data = call('remove-image-background', {
         'imageUrl': image_url, 'outputName': out_name,
-        'model': 'General Use (Light 2K)', 'operatingResolution': '2048x2048', 'refineForeground': True,
+        'model': 'General Use (Heavy)', 'operatingResolution': '2048x2048', 'refineForeground': True,
     })
     m = data.get('imageUrl')
     if not m:

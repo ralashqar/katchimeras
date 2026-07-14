@@ -40,10 +40,13 @@ import {
   getDevKingdomBaseId,
   getDevKingdomHexBaseTileId,
   getDevKingdomHexCenterTileId,
+  getDevKingdomHexVerticalAlignmentMode,
   setDevKingdomBaseId,
   setDevKingdomHexBaseTileId,
   setDevKingdomHexCenterTileId,
+  setDevKingdomHexVerticalAlignmentMode,
 } from '@/utils/dev-asset-overrides';
+import type { KingdomHexVerticalAlignmentMode } from '@/utils/kingdom-tile-alignment';
 import { KINGDOM_HEX_BASE_TILE_VARIANTS, KINGDOM_HEX_CENTER_TILE_VARIANTS, worldAssetSource, worldBaseSource } from '@/utils/world-visuals';
 
 // DEV TOOL — the World Asset Lab (v1: browse + audit). Every bundled world
@@ -78,6 +81,23 @@ const FAMILY_KIND_LABEL: Record<string, string> = {
   state: 'state set — picked by a live state',
 };
 
+const HEX_VERTICAL_ALIGNMENT_OPTIONS: {
+  description: string;
+  id: KingdomHexVerticalAlignmentMode;
+  label: string;
+}[] = [
+  {
+    id: 'ground-bottom',
+    label: 'Ground bottom',
+    description: 'Default: align each tile bottom to the selected resident/base tile.',
+  },
+  {
+    id: 'silhouette-center',
+    label: 'Silhouette centre',
+    description: 'Legacy comparison: centre each tile using its complete visible artwork.',
+  },
+];
+
 export default function DevAssetLabScreen() {
   const insets = useSafeAreaInsets();
   const sections = useMemo(() => catalogBySection(), []);
@@ -104,6 +124,9 @@ export default function DevAssetLabScreen() {
     () => getDevKingdomHexCenterTileId() ?? KINGDOM_HEX_CENTER_TILE_VARIANTS[0].id
   );
   const [hexBaseTileId, setHexBaseTileId] = useState(() => getDevKingdomHexBaseTileId() ?? KINGDOM_HEX_BASE_TILE_VARIANTS[0].id);
+  const [hexVerticalAlignmentMode, setHexVerticalAlignmentMode] = useState(() =>
+    getDevKingdomHexVerticalAlignmentMode()
+  );
   const applyHexCenterTile = (tileId: string) => {
     setDevKingdomHexCenterTileId(tileId === KINGDOM_HEX_CENTER_TILE_VARIANTS[0].id ? null : tileId);
     setHexCenterTileId(tileId);
@@ -111,6 +134,10 @@ export default function DevAssetLabScreen() {
   const applyHexBaseTile = (tileId: string) => {
     setDevKingdomHexBaseTileId(tileId === KINGDOM_HEX_BASE_TILE_VARIANTS[0].id ? null : tileId);
     setHexBaseTileId(tileId);
+  };
+  const applyHexVerticalAlignment = (mode: KingdomHexVerticalAlignmentMode) => {
+    setDevKingdomHexVerticalAlignmentMode(mode);
+    setHexVerticalAlignmentMode(mode);
   };
 
   return (
@@ -210,6 +237,48 @@ export default function DevAssetLabScreen() {
                     </ThemedText>
                     <ThemedText style={styles.hexSetAction} lightColor={active ? '#A8E2C6' : '#FFC36B'} darkColor={active ? '#A8E2C6' : '#FFC36B'}>
                       {active ? 'Used for resident tiles' : 'Use for resident tiles'}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+          <ThemedText style={styles.hexGroupTitle} lightColor="#E8EEFF" darkColor="#E8EEFF">
+            Vertical alignment
+          </ThemedText>
+          <View style={styles.hexSetGrid}>
+            {HEX_VERTICAL_ALIGNMENT_OPTIONS.map((option) => {
+              const active = hexVerticalAlignmentMode === option.id;
+              return (
+                <Pressable
+                  key={option.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => applyHexVerticalAlignment(option.id)}
+                  style={({ pressed }) => [
+                    styles.hexSetCard,
+                    active ? styles.hexSetCardActive : null,
+                    pressed ? styles.tilePressed : null,
+                  ]}>
+                  <View style={styles.alignmentIcon}>
+                    <IconSymbol
+                      name={active ? 'checkmark.circle.fill' : 'circle'}
+                      size={22}
+                      color={active ? '#A8E2C6' : '#8C96B8'}
+                    />
+                  </View>
+                  <View style={styles.hexSetText}>
+                    <ThemedText style={styles.hexSetTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                      {option.label}
+                    </ThemedText>
+                    <ThemedText style={styles.hexSetDesc} lightColor="#AAB4D4" darkColor="#AAB4D4">
+                      {option.description}
+                    </ThemedText>
+                    <ThemedText
+                      style={styles.hexSetAction}
+                      lightColor={active ? '#A8E2C6' : '#FFC36B'}
+                      darkColor={active ? '#A8E2C6' : '#FFC36B'}>
+                      {active ? 'Current alignment' : 'Try this alignment'}
                     </ThemedText>
                   </View>
                 </Pressable>
@@ -838,6 +907,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   hexSetCardActive: { backgroundColor: 'rgba(168,226,198,0.1)', borderColor: 'rgba(168,226,198,0.65)' },
+  alignmentIcon: { alignItems: 'center', justifyContent: 'center', width: 62 },
   hexPreviewRow: { flexDirection: 'row', gap: 7 },
   hexPreview: { alignItems: 'center', gap: 3 },
   hexPreviewArt: { height: 62, width: 62 },

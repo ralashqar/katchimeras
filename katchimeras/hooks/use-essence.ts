@@ -6,6 +6,7 @@ import { loadDiscoveryState } from '@/utils/discoveries-storage';
 import { earnedTotal, essenceBalance } from '@/utils/essence-engine';
 import { loadEssenceState, recordSpend, saveEssenceState } from '@/utils/essence-storage';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
+import { loadWorldIdentity } from '@/utils/world-identity';
 
 // Essence balance for the UI. Earned is re-derived from all of history (+ unlocked
 // discoveries) on every archive change; spent is read from storage. Spending lands
@@ -30,7 +31,7 @@ export function useEssence() {
   }, [days]);
 
   const earned = useMemo(
-    () => earnedTotal(days, unlockedDiscoveries, completedQuestCount),
+    () => earnedTotal(days, unlockedDiscoveries, completedQuestCount, loadWorldIdentity().constellationCompletions.length),
     [days, unlockedDiscoveries, completedQuestCount]
   );
   const balance = essenceBalance(earned, state.spent);

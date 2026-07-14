@@ -28,11 +28,55 @@ CAST_THEMES = {
     "cheerlet": "a joyful party sprite who marks genuinely worth-it moments; bright celebration garden and candlelit confetti habitat",
     "gatherglow": "a warm hearth spirit who glows brighter in good company; shared-table gathering nook and lantern-lit convivial habitat",
     "mossprout": "gentle and grounded, delighted by green detours; lush park garden and mossy nature habitat",
+    "pagelet": "cozy miniature bookshop and reading garden habitat with cream paper, warm walnut wood, burgundy ribbon accents, and amber lamplight",
     "skylo": "a city-cool wanderer who carries skyline confidence and warm window-light glow; bright urban plaza and cozy street-corner habitat",
     "steppling": "a cheerful walking and hiking spirit who turns long walks, trails, route markers, footprints, and movement milestones into a cozy outdoor habitat",
     "tasklet": "a determined, competent little doer who loves a checked-off list; focused workshop and productivity garden habitat",
     "vesperitt": "a wide-awake small-hours spirit, calm in the quiet after midnight; moonlit night owl study and stargazing habitat",
 }
+
+HOME_THEMES = {
+    "explorer": (
+        "A compact lookout cabin with a small porch, brass telescope, trail sign, map table, "
+        "rolled maps, travelling bags, and a few pine shrubs. Use a sage-green roof, warm timber, "
+        "and small brass accents."
+    ),
+    "creator": (
+        "A compact open-front art studio with a curved rose-and-violet roof, a large studio window, "
+        "easel and canvas, sculpture stand, shelves of paint pots and brushes, loose sketches, and "
+        "one small worktable."
+    ),
+    "builder": (
+        "A compact open-front workshop with a drafting table and blueprints, stacked timber and stone, "
+        "measuring tools, gears, a tool rack, and one partially assembled structure. Use honey-toned "
+        "wood with muted blue accents."
+    ),
+    "nurturer": (
+        "A small warm cottage with flower boxes, simple garden beds, a watering can, an outdoor "
+        "armchair, potted plants, and soft light glowing from the windows. Use sage, cream, and warm wood."
+    ),
+    "connector": (
+        "A small welcoming clubhouse with an open entrance, gathering table, spare chairs, hanging "
+        "lanterns, a blank message board, banners, and friendship ribbons. Use coral, cream, and gold."
+    ),
+    "dreamer": (
+        "A small observatory with a domed roof, brass telescope, moon lamp, books, star ornaments, "
+        "cloud-shaped stones, and a small reflective moon pool. Use indigo, violet, and gold."
+    ),
+}
+
+TILE_FRAMING = (
+    "Create one iconic main structure or landmark silhouette around the rear/top perimeter of the hex. "
+    "Use both sides for a few large, readable thematic props and simple landscaping, creating a broad "
+    "U-shaped composition. Keep the center/front standing area generous and uncluttered so the live "
+    "central object remains fully readable there. Keep the front 30% as open grass. Keep every addition "
+    "inside the original hex footprint and leave its outer edges unobstructed. No text or humans."
+)
+
+HOME_TILE_FRAMING = (
+    f"{TILE_FRAMING} Keep the main structure at the rear, with its highest point near the upper safe "
+    "area of the original square framing."
+)
 
 TILE_VARIANTS = {
     "feastle": [
@@ -64,6 +108,12 @@ TILE_VARIANTS = {
         "quiet toy greenhouse garden nook with open-roof back perimeter, chunky moss benches, simplified seedling shelves, one rounded watering can, large fern clumps, and central standing space",
         "soft woodland toy park with a clean curved path, smooth mushroom log shapes, rounded leafy arch, one blank nature sign, large pond stones, and open front lawn",
         "minimal mossy meditation garden with low stone border, rounded fern planters, smooth tiny stream, two lanterns, chunky seed sprouts, and a clear resident clearing",
+    ],
+    "pagelet": [
+        "open-front bookshop with curved wooden bookshelves, a large open-book canopy, oversized stacked books, a cushioned reading chair, bookmark ribbons, blank book displays, and warm reading lamps",
+        "cozy reading garden with an arched book alcove, chunky book stacks, a small library ladder, paper-leaf plants, ribbon markers, and a lantern-lit reading nook",
+        "miniature story library with rounded shelves, an open-book roofline, large readable book props, a soft reading bench, scroll basket, and warm amber lamps",
+        "quiet bookstore courtyard with a curved bookcase pavilion, oversized books, bookmark banners, a reading chair, paper ornaments, and walnut display tables",
     ],
     "skylo": [
         "bright city-corner pocket plaza with low back skyline-wall silhouettes, warm window-light lantern blocks, rounded bench, simple crosswalk stones, tiny street trees, and clear open standing space",
@@ -151,15 +201,14 @@ def generate_queued_tile(
     output_name: str,
     prompt: str,
     base_path: Path,
-    creature_path: Path,
+    creature_path: Path | None,
     quality: str,
     gpt_size: int,
+    model: str,
 ) -> str:
-    data = call_function(
-        "generate-asset",
-        {
+    payload = {
             "action": "generate",
-            "model": "gpt",
+            "model": model,
             "mode": "single",
             "gptImageSize": gpt_size,
             "gptQuality": quality,
@@ -167,9 +216,13 @@ def generate_queued_tile(
             "prompt": prompt,
             "referenceBase64": file_b64(base_path),
             "referenceMime": mime_for(base_path),
-            "guideBase64": file_b64(creature_path),
-            "guideMime": mime_for(creature_path),
-        },
+    }
+    if creature_path is not None:
+        payload["guideBase64"] = file_b64(creature_path)
+        payload["guideMime"] = mime_for(creature_path)
+    data = call_function(
+        "generate-asset",
+        payload,
         timeout=120,
     )
     request_id = data.get("requestId")
@@ -182,7 +235,7 @@ def generate_queued_tile(
             "generate-asset",
             {
                 "action": "poll",
-                "model": "gpt",
+                "model": model,
                 "mode": "single",
                 "outputName": output_name,
                 "requestId": request_id,
@@ -196,6 +249,18 @@ def generate_queued_tile(
     raise TimeoutError(f"{output_name}: generation did not complete")
 
 
+def structured_tile_prompt(*, reference: str, art_style: str, visuals: str, framing: str) -> str:
+    """Build a reusable image-edit prompt whose visual brief is easy to swap."""
+    return "\n\n".join(
+        [
+            f"REFERENCE\n{reference}",
+            f"ART STYLE\n{art_style}",
+            f"VISUALS\n{visuals}",
+            f"FRAMING\n{framing}",
+        ]
+    )
+
+
 def prompt_for(visual_key: str, theme: str, variant_index: int) -> str:
     variants = TILE_VARIANTS.get(
         visual_key,
@@ -207,20 +272,38 @@ def prompt_for(visual_key: str, theme: str, variant_index: int) -> str:
         ],
     )
     flavor = variants[(variant_index - 1) % len(variants)]
-    return " ".join(
-        [
-            f"Create a custom resident hex tile for {visual_key}.",
-            f"Theme: {theme}. Direction: {flavor}.",
-            "Use input image 1 as the exact base hex tile geometry, footprint, camera angle, depth, square framing, lighting, grass edge, soil side walls, and app art style reference.",
-            "Use input image 2 only as the Katchimera identity and personality reference; do not draw the Katchimera itself.",
-            "The tile must align exactly to the base tile footprint and remain a single square render on a perfectly flat black background.",
-            "Design the environment as a themed little habitat with props, trees or shrubs, ground details, and one small open-roof structure if useful.",
-            "If a building exists, place it around the back perimeter of the hex tile with visible low walls and no roof blocking the interior.",
-            "Keep the center/front standing area readable and open so the live Katchimera sprite can stand there later.",
-            "Premium stylized 3D toy diorama, mascot-world art, rounded clay-like forms, soft bevels, smooth simplified materials, low-frequency detail, clean readable silhouette, soft warm lighting, same perspective as the base.",
-            "Avoid realism, dense foliage, tiny repeated leaves, tiny grass blades, moss noise, many small petals, pebble scatter, bark grain, water ripples, photoreal texture, sharp micro-detail, and clutter.",
-            "No text, no numbers, no labels, no UI, no extra creature, no humans, no watermark, no crop outside the hex tile.",
-        ]
+    return structured_tile_prompt(
+        reference=(
+            "Edit image 1. Preserve its exact hex footprint, position, scale, rotation, camera angle, "
+            "perspective, depth, grass edge, soil side walls, and square framing. Keep the grass platform, "
+            "soil-wall depth, and every platform corner unchanged. Add new structures only on the grass "
+            "surface. Keep the flat pure-black background. Use image 2 only as a visual identity reference; "
+            "do not draw its character."
+        ),
+        art_style=(
+            "Match image 1's premium stylized 3D toy-diorama finish: rounded clay-like forms, soft "
+            "bevels, smooth simplified materials, low-frequency detail, clean silhouettes, and soft warm lighting."
+        ),
+        visuals=f"{theme}. {flavor}.",
+        framing=TILE_FRAMING,
+    )
+
+
+def prompt_for_home(visual_key: str, theme: str) -> str:
+    return structured_tile_prompt(
+        reference=(
+            "Edit image 1. Preserve its exact hex footprint, position, scale, rotation, camera angle, "
+            "perspective, depth, outline, grass edge, soil side walls, and square framing. Keep the existing "
+            "grass platform and soil walls unchanged. Do not increase the platform depth or move its corners. "
+            "Add structures only on the grass surface. Keep the flat pure-black background. The supplied "
+            "empty base tile is the only image reference."
+        ),
+        art_style=(
+            "Premium stylized 3D toy-diorama materials, rounded clay-like forms, soft bevels, simplified "
+            "surface detail, clean silhouettes, and soft warm lighting."
+        ),
+        visuals=theme,
+        framing=HOME_TILE_FRAMING,
     )
 
 
@@ -233,24 +316,34 @@ def main() -> None:
     parser.add_argument("--theme", help="Theme prompt override.")
     parser.add_argument("--quality", default="high")
     parser.add_argument("--gpt-size", type=int, default=2048)
+    parser.add_argument("--kind", choices=("resident", "home"), default="resident")
+    parser.add_argument("--model", choices=("gpt", "seedream"), default="gpt")
     args = parser.parse_args()
 
     visual_key = args.visual_key
     base_path = (ROOT / args.base).resolve()
-    creature_path = (ROOT / (args.creature or f"assets/images/katchimeras/cutouts/{visual_key}.png")).resolve()
+    creature_path = (
+        (ROOT / (args.creature or f"assets/images/katchimeras/cutouts/{visual_key}.png")).resolve()
+        if args.kind == "resident" or args.creature
+        else None
+    )
     if not base_path.exists():
         sys.exit(f"Missing base image: {base_path}")
-    if not creature_path.exists():
+    if creature_path is not None and not creature_path.exists():
         sys.exit(f"Missing creature image: {creature_path}")
 
     out_dir = OUT_ROOT / visual_key
     out_dir.mkdir(parents=True, exist_ok=True)
-    theme = args.theme or CAST_THEMES.get(visual_key, f"a custom habitat themed to {visual_key}")
+    theme = args.theme or (
+        HOME_THEMES.get(visual_key, f"a polished home themed to {visual_key}")
+        if args.kind == "home"
+        else CAST_THEMES.get(visual_key, f"a custom habitat themed to {visual_key}")
+    )
 
     records = []
     for index in range(1, args.count + 1):
-        output_name = f"{visual_key}-resident-hex-{index}"
-        prompt = prompt_for(visual_key, theme, index)
+        output_name = f"{visual_key}-{args.kind}-hex-{index}"
+        prompt = prompt_for_home(visual_key, theme) if args.kind == "home" else prompt_for(visual_key, theme, index)
         print(f"generating {output_name}...")
         image_url = generate_queued_tile(
             output_name=output_name,
@@ -259,10 +352,11 @@ def main() -> None:
             creature_path=creature_path,
             quality=args.quality,
             gpt_size=args.gpt_size,
+            model=args.model,
         )
         out_path = out_dir / f"candidate-{index}.png"
         download(str(image_url), out_path)
-        records.append({"index": index, "url": image_url, "path": str(out_path), "quality": args.quality, "gptSize": args.gpt_size})
+        records.append({"index": index, "url": image_url, "path": str(out_path), "model": args.model, "quality": args.quality, "gptSize": args.gpt_size})
         print(f"  saved {out_path}")
 
     (out_dir / "candidates.json").write_text(json.dumps(records, indent=2), encoding="utf-8")

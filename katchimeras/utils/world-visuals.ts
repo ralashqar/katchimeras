@@ -2,10 +2,12 @@ import type { ImageSourcePropType } from 'react-native';
 
 import { CREATURE_LOD_SOURCES } from '@/constants/creature-lod-sources.gen';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
+import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
 import { WORLD_OBJECT_LOD_SOURCES, type WorldObjectLod } from '@/constants/world-asset-lod-sources.gen';
 import { PROMOTED_WORLD_SOURCES } from '@/constants/world-asset-sources.gen';
 import { getDevAssetOverrideSource, getDevKingdomBaseId, getDevKingdomHexBaseTileId, getDevKingdomHexCenterTileId } from '@/utils/dev-asset-overrides';
 import type { HomeVisualKey } from '@/types/home';
+import type { HomeArchetypeId } from '@/types/world-identity';
 
 export type { WorldObjectLod };
 
@@ -441,6 +443,10 @@ export type KingdomHexTileSpec = {
   alphaBounds: KingdomHexTileAlphaBounds;
 };
 
+const hexTileAlphaBounds = (
+  assetName: keyof typeof KINGDOM_HEX_TILE_ALPHA_BOUNDS
+): KingdomHexTileAlphaBounds => KINGDOM_HEX_TILE_ALPHA_BOUNDS[assetName];
+
 export type KingdomHexTileVariant = {
   id: string;
   label: string;
@@ -451,6 +457,8 @@ export type KingdomHexTileVariant = {
 export type KingdomHexTileSelection = {
   center: KingdomHexTileSpec;
   default: KingdomHexTileSpec;
+  homes: Record<HomeArchetypeId, KingdomHexTileSpec>;
+  zodiac: KingdomHexTileSpec;
 };
 
 export function kingdomHexTileSourceForLod(
@@ -516,6 +524,57 @@ const KINGDOM_GRASS_HEX_TILE_PATH_Y_V2_SOURCES: KingdomHexTileLodSources = {
   medium: require('../assets/images/katchimeras/world/hex/grass_hex_tile_path_y_v2_512.webp'),
   full: KINGDOM_GRASS_HEX_TILE_PATH_Y_V2,
 };
+const KINGDOM_ZODIAC_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile_512.webp'),
+  full: require('../assets/images/katchimeras/world/hex/resident_vesperitt_hex_tile.webp'),
+};
+
+const homeHexTile = (
+  source: ImageSourcePropType,
+  sources: KingdomHexTileLodSources,
+  alphaBounds: KingdomHexTileAlphaBounds
+): KingdomHexTileSpec => ({ source, sources, alphaBounds });
+
+const HOME_EXPLORER_HEX_TILE = require('../assets/images/katchimeras/world/hex/home_explorer_hex_tile.webp');
+const HOME_CREATOR_HEX_TILE = require('../assets/images/katchimeras/world/hex/home_creator_hex_tile.webp');
+const HOME_BUILDER_HEX_TILE = require('../assets/images/katchimeras/world/hex/home_builder_hex_tile.webp');
+const HOME_NURTURER_HEX_TILE = require('../assets/images/katchimeras/world/hex/home_nurturer_hex_tile.webp');
+const HOME_CONNECTOR_HEX_TILE = require('../assets/images/katchimeras/world/hex/home_connector_hex_tile.webp');
+const HOME_DREAMER_HEX_TILE = require('../assets/images/katchimeras/world/hex/home_dreamer_hex_tile.webp');
+
+export const KINGDOM_HOME_HEX_TILES: Record<HomeArchetypeId, KingdomHexTileSpec> = {
+  explorer: homeHexTile(HOME_EXPLORER_HEX_TILE, {
+    thumb: require('../assets/images/katchimeras/world/hex/home_explorer_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/home_explorer_hex_tile_512.webp'),
+    full: HOME_EXPLORER_HEX_TILE,
+  }, hexTileAlphaBounds('home_explorer_hex_tile.webp')),
+  creator: homeHexTile(HOME_CREATOR_HEX_TILE, {
+    thumb: require('../assets/images/katchimeras/world/hex/home_creator_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/home_creator_hex_tile_512.webp'),
+    full: HOME_CREATOR_HEX_TILE,
+  }, hexTileAlphaBounds('home_creator_hex_tile.webp')),
+  builder: homeHexTile(HOME_BUILDER_HEX_TILE, {
+    thumb: require('../assets/images/katchimeras/world/hex/home_builder_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/home_builder_hex_tile_512.webp'),
+    full: HOME_BUILDER_HEX_TILE,
+  }, hexTileAlphaBounds('home_builder_hex_tile.webp')),
+  nurturer: homeHexTile(HOME_NURTURER_HEX_TILE, {
+    thumb: require('../assets/images/katchimeras/world/hex/home_nurturer_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/home_nurturer_hex_tile_512.webp'),
+    full: HOME_NURTURER_HEX_TILE,
+  }, hexTileAlphaBounds('home_nurturer_hex_tile.webp')),
+  connector: homeHexTile(HOME_CONNECTOR_HEX_TILE, {
+    thumb: require('../assets/images/katchimeras/world/hex/home_connector_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/home_connector_hex_tile_512.webp'),
+    full: HOME_CONNECTOR_HEX_TILE,
+  }, hexTileAlphaBounds('home_connector_hex_tile.webp')),
+  dreamer: homeHexTile(HOME_DREAMER_HEX_TILE, {
+    thumb: require('../assets/images/katchimeras/world/hex/home_dreamer_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/home_dreamer_hex_tile_512.webp'),
+    full: HOME_DREAMER_HEX_TILE,
+  }, hexTileAlphaBounds('home_dreamer_hex_tile.webp')),
+};
 
 export const KINGDOM_HEX_CENTER_TILE_VARIANTS: KingdomHexTileVariant[] = [
   {
@@ -525,7 +584,7 @@ export const KINGDOM_HEX_CENTER_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_EGG_HOME_HEX_TILE,
       sources: KINGDOM_EGG_HOME_HEX_TILE_SOURCES,
-      alphaBounds: { left: 14, top: 95, right: 1010, bottom: 929 },
+      alphaBounds: hexTileAlphaBounds('egg_home_hex_tile.webp'),
     },
   },
   {
@@ -535,7 +594,7 @@ export const KINGDOM_HEX_CENTER_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_EGG_HEX_TILE_V2,
       sources: KINGDOM_EGG_HEX_TILE_V2_SOURCES,
-      alphaBounds: { left: 26, top: 157, right: 1002, bottom: 888 },
+      alphaBounds: hexTileAlphaBounds('egg_hex_tile_v2.webp'),
     },
   },
   {
@@ -545,7 +604,7 @@ export const KINGDOM_HEX_CENTER_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_CENTER_PLAZA_HEX_TILE_V2,
       sources: KINGDOM_CENTER_PLAZA_HEX_TILE_V2_SOURCES,
-      alphaBounds: { left: 14, top: 142, right: 1010, bottom: 881 },
+      alphaBounds: hexTileAlphaBounds('center_plaza_hex_tile_v2.webp'),
     },
   },
 ];
@@ -558,7 +617,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_DEFAULT_HEX_TILE,
       sources: KINGDOM_DEFAULT_HEX_TILE_SOURCES,
-      alphaBounds: { left: 14, top: 147, right: 1010, bottom: 876 },
+      alphaBounds: hexTileAlphaBounds('default_hex_tile.webp'),
     },
   },
   {
@@ -568,7 +627,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_V2,
       sources: KINGDOM_GRASS_HEX_TILE_V2_SOURCES,
-      alphaBounds: { left: 14, top: 148, right: 1010, bottom: 875 },
+      alphaBounds: hexTileAlphaBounds('grass_hex_tile_v2.webp'),
     },
   },
   {
@@ -578,7 +637,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_DENSE_V2,
       sources: KINGDOM_GRASS_HEX_TILE_DENSE_V2_SOURCES,
-      alphaBounds: { left: 14, top: 142, right: 1010, bottom: 882 },
+      alphaBounds: hexTileAlphaBounds('grass_hex_tile_dense_v2.webp'),
     },
   },
   {
@@ -588,7 +647,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2,
       sources: KINGDOM_GRASS_HEX_TILE_CROSSROAD_V2_SOURCES,
-      alphaBounds: { left: 25, top: 159, right: 1001, bottom: 888 },
+      alphaBounds: hexTileAlphaBounds('grass_hex_tile_crossroad_v2.webp'),
     },
   },
   {
@@ -598,7 +657,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2,
       sources: KINGDOM_GRASS_HEX_TILE_PATH_VERTICAL_V2_SOURCES,
-      alphaBounds: { left: 25, top: 159, right: 1002, bottom: 888 },
+      alphaBounds: hexTileAlphaBounds('grass_hex_tile_path_vertical_v2.webp'),
     },
   },
   {
@@ -608,7 +667,7 @@ export const KINGDOM_HEX_BASE_TILE_VARIANTS: KingdomHexTileVariant[] = [
     tile: {
       source: KINGDOM_GRASS_HEX_TILE_PATH_Y_V2,
       sources: KINGDOM_GRASS_HEX_TILE_PATH_Y_V2_SOURCES,
-      alphaBounds: { left: 26, top: 159, right: 1004, bottom: 889 },
+      alphaBounds: hexTileAlphaBounds('grass_hex_tile_path_y_v2.webp'),
     },
   },
 ];
@@ -618,7 +677,16 @@ export function kingdomHexTileSet(): KingdomHexTileSelection {
   const baseId = getDevKingdomHexBaseTileId();
   const center = KINGDOM_HEX_CENTER_TILE_VARIANTS.find((variant) => variant.id === centerId) ?? KINGDOM_HEX_CENTER_TILE_VARIANTS[0];
   const base = KINGDOM_HEX_BASE_TILE_VARIANTS.find((variant) => variant.id === baseId) ?? KINGDOM_HEX_BASE_TILE_VARIANTS[0];
-  return { center: center.tile, default: base.tile };
+  return {
+    center: center.tile,
+    default: base.tile,
+    homes: KINGDOM_HOME_HEX_TILES,
+    zodiac: {
+      source: KINGDOM_ZODIAC_HEX_TILE_SOURCES.full!,
+      sources: KINGDOM_ZODIAC_HEX_TILE_SOURCES,
+      alphaBounds: hexTileAlphaBounds('resident_vesperitt_hex_tile.webp'),
+    },
+  };
 }
 
 export const DECAL_ATLAS: ImageSourcePropType = require('../assets/images/katchimeras/world/decals/_atlas.webp');
