@@ -19,5 +19,25 @@ export function loadWorldIdentity(): WorldIdentityState {
 export function saveWorldIdentity(value: WorldIdentityState): void { setStoredJson(STORAGE_KEY, value); }
 export function resetWorldIdentity(): void { removeStoredValue(STORAGE_KEY); }
 
+/**
+ * Clears only the choices made by the personality/zodiac setup experience.
+ * Long-lived constellation history and saved zodiac reflections are retained so
+ * the developer replay tool cannot erase player-created content by accident.
+ */
+export function resetWorldIdentityOnboarding(): void {
+  const current = loadWorldIdentity();
+  saveWorldIdentity({
+    ...current,
+    personalityAnswers: {},
+    recommendedHomeArchetypeId: null,
+    selectedHomeArchetypeId: null,
+    birthMonth: null,
+    birthDay: null,
+    zodiacSignId: null,
+    setupCompletedAt: null,
+    constellationTutorialCompleted: false,
+  });
+}
+
 export function homePreset(id: HomeArchetypeId | null | undefined) { return HOME_PRESETS.find((item) => item.id === id) ?? HOME_PRESETS[0]; }
 export function zodiacProfile(id: ZodiacSignId | null | undefined) { return ZODIAC_PROFILES.find((item) => item.id === id) ?? null; }

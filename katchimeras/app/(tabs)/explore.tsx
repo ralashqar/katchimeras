@@ -36,6 +36,7 @@ import { getCreatureVisual, resetTodayInState } from '@/game/days';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { isQuestLoopAfterCompleteEnabled, setQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
+import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 
 export default function ExploreScreen() {
@@ -78,6 +79,23 @@ export default function ExploreScreen() {
         },
       },
     ]);
+  }
+
+  function handleReplayWorldIdentity() {
+    Alert.alert(
+      'Replay personality and zodiac?',
+      'Resets only your home-archetype and zodiac setup. Hatches, memories, quests, and the rest of onboarding stay untouched.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Replay setup',
+          onPress: () => {
+            resetWorldIdentityOnboarding();
+            router.push({ pathname: '/onboarding', params: { mode: 'identity' } });
+          },
+        },
+      ]
+    );
   }
 
   // One-button "test a brand-new user": wipes EVERYTHING (profile, days,
@@ -354,6 +372,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="Preview comic beats (LLM)" onPress={handlePreviewComicBeats} variant="secondary" />
                 <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
+                <KatchaButton label="Replay personality + zodiac" onPress={handleReplayWorldIdentity} variant="secondary" />
                 <KatchaButton label="Restart onboarding" onPress={handleReset} variant="secondary" />
                 <KatchaButton
                   label={backfilling ? 'Backfilling…' : 'Backfill real history (pins + hatch + LLM)'}

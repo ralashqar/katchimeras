@@ -65,6 +65,57 @@ HOME_THEMES = {
     ),
 }
 
+ZODIAC_THEMES = {
+    "aries": (
+        "A celestial fire shrine with one curved ram-horn arch, two low ember-crystal braziers, "
+        "a small solar stone, and restrained crimson, coral, and warm-gold accents."
+    ),
+    "taurus": (
+        "A moonlit earth sanctuary with one broad horn-shaped stone arch, sturdy emerald crystal "
+        "clusters, two rounded flowering planters, and moss, jade, cream, and antique-gold accents."
+    ),
+    "gemini": (
+        "A twin observatory garden with two mirrored crescent arches, a paired set of floating star "
+        "orbs, two matching ribbon-stream sculptures, and pale gold, sky-blue, and cream accents."
+    ),
+    "cancer": (
+        "A gentle moon-pool shrine with one shell-shaped rear alcove, pearl lanterns, crescent stones, "
+        "a small still star pool, and silver, moon-blue, and soft lavender accents."
+    ),
+    "leo": (
+        "A radiant solar pavilion with one sun-mane arch, a warm central sun disc, two low flame "
+        "lanterns, bold stepped plinths, and amber, saffron, coral, and gold accents."
+    ),
+    "virgo": (
+        "A celestial harvest garden with one elegant leaf-and-grain arch, a small crystal astrolabe, "
+        "orderly herb planters, sheaf motifs, and sage, ivory, wheat-gold, and pale-teal accents."
+    ),
+    "libra": (
+        "A balanced sky pavilion with one graceful symmetrical arch, two suspended balance stones, "
+        "paired low reflecting bowls, mirrored side planters, and rose, powder-blue, cream, and gold accents."
+    ),
+    "scorpio": (
+        "A moonlit crystal grotto with one curled tail-like spire at the rear, deep amethyst crystals, "
+        "two low red-violet star lamps, dark stone, and restrained plum, wine, and silver accents."
+    ),
+    "sagittarius": (
+        "A comet lookout with one bow-shaped observatory arch, a single upward comet-arrow ornament, "
+        "travel stones, a small brass telescope, and cobalt, coral, indigo, and warm-gold accents."
+    ),
+    "capricorn": (
+        "A mountain-star sanctuary with one angular horned summit arch, layered climbing stones, "
+        "small teal crystals, a summit beacon, and slate, pine, cream, and muted-gold accents."
+    ),
+    "aquarius": (
+        "A sky-vessel fountain shrine with one sculpted celestial vessel at the rear, broad flowing "
+        "water-ribbon forms, two low electric crystal conduits, and cyan, turquoise, silver, and violet accents."
+    ),
+    "pisces": (
+        "A dream-tide sanctuary with one twin-fin arch, two small paired moon pools, flowing ribbon "
+        "sculptures, pearl star lights, and ocean-blue, lilac, aqua, and silver accents."
+    ),
+}
+
 TILE_FRAMING = (
     "Create one iconic main structure or landmark silhouette around the rear/top perimeter of the hex. "
     "Use both sides for a few large, readable thematic props and simple landscaping, creating a broad "
@@ -76,6 +127,11 @@ TILE_FRAMING = (
 HOME_TILE_FRAMING = (
     f"{TILE_FRAMING} Keep the main structure at the rear, with its highest point near the upper safe "
     "area of the original square framing."
+)
+
+ZODIAC_TILE_FRAMING = (
+    f"{TILE_FRAMING} Place one clear celestial landmark at the rear and distribute the sign-specific "
+    "motifs across both sides. Keep the familiar's center/front standing area unobstructed."
 )
 
 TILE_VARIANTS = {
@@ -307,6 +363,27 @@ def prompt_for_home(visual_key: str, theme: str) -> str:
     )
 
 
+def prompt_for_zodiac(visual_key: str, theme: str) -> str:
+    return structured_tile_prompt(
+        reference=(
+            "Edit image 1. Preserve its exact hex footprint, position, scale, rotation, camera angle, "
+            "perspective, depth, grass edge, soil side walls, and square framing. Keep the existing grass "
+            "platform and soil walls unchanged. Do not increase the platform depth or move its corners. "
+            "Add structures only on the grass surface. Keep the flat pure-black background. The supplied "
+            "empty base tile is the only image reference."
+        ),
+        art_style=(
+            "Premium stylized 3D toy-diorama materials, rounded clay-like forms, soft bevels, simplified "
+            "surface detail, clean readable silhouettes, celestial lighting, and the same finish as image 1."
+        ),
+        visuals=(
+            f"Create a unique {visual_key.title()} zodiac sanctuary. {theme} "
+            "No writing, zodiac glyph, character, creature, animal, or human."
+        ),
+        framing=ZODIAC_TILE_FRAMING,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--visual-key", required=True)
@@ -316,7 +393,7 @@ def main() -> None:
     parser.add_argument("--theme", help="Theme prompt override.")
     parser.add_argument("--quality", default="high")
     parser.add_argument("--gpt-size", type=int, default=2048)
-    parser.add_argument("--kind", choices=("resident", "home"), default="resident")
+    parser.add_argument("--kind", choices=("resident", "home", "zodiac"), default="resident")
     parser.add_argument("--model", choices=("gpt", "seedream"), default="gpt")
     args = parser.parse_args()
 
@@ -334,16 +411,25 @@ def main() -> None:
 
     out_dir = OUT_ROOT / visual_key
     out_dir.mkdir(parents=True, exist_ok=True)
-    theme = args.theme or (
-        HOME_THEMES.get(visual_key, f"a polished home themed to {visual_key}")
-        if args.kind == "home"
-        else CAST_THEMES.get(visual_key, f"a custom habitat themed to {visual_key}")
-    )
+    if args.theme:
+        theme = args.theme
+    elif args.kind == "home":
+        theme = HOME_THEMES.get(visual_key, f"a polished home themed to {visual_key}")
+    elif args.kind == "zodiac":
+        theme = ZODIAC_THEMES.get(visual_key, f"a polished celestial sanctuary themed to {visual_key}")
+    else:
+        theme = CAST_THEMES.get(visual_key, f"a custom habitat themed to {visual_key}")
 
     records = []
     for index in range(1, args.count + 1):
         output_name = f"{visual_key}-{args.kind}-hex-{index}"
-        prompt = prompt_for_home(visual_key, theme) if args.kind == "home" else prompt_for(visual_key, theme, index)
+        prompt = (
+            prompt_for_home(visual_key, theme)
+            if args.kind == "home"
+            else prompt_for_zodiac(visual_key, theme)
+            if args.kind == "zodiac"
+            else prompt_for(visual_key, theme, index)
+        )
         print(f"generating {output_name}...")
         image_url = generate_queued_tile(
             output_name=output_name,

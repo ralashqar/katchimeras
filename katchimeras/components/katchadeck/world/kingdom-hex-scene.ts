@@ -114,7 +114,7 @@ export function tileVisibleBounds(cx: number, cy: number) {
 function artLayerFor(
   tile: KingdomTileRender,
   hexTiles: KingdomHexTileSelection,
-  identity: Pick<WorldIdentityState, 'selectedHomeArchetypeId'> | null | undefined,
+  identity: Pick<WorldIdentityState, 'selectedHomeArchetypeId' | 'zodiacSignId'> | null | undefined,
   verticalAlignmentMode: KingdomHexVerticalAlignmentMode
 ): KingdomTileArtLayer {
   const customResidentTile =
@@ -122,7 +122,8 @@ function artLayerFor(
   const homeTile = identity?.selectedHomeArchetypeId
     ? hexTiles.homes[identity.selectedHomeArchetypeId]
     : hexTiles.center;
-  const selected = customResidentTile ?? (tile.kind === 'home' ? homeTile : tile.kind === 'zodiac' ? hexTiles.zodiac : hexTiles.default);
+  const zodiacTile = identity?.zodiacSignId ? hexTiles.zodiacs[identity.zodiacSignId] : hexTiles.default;
+  const selected = customResidentTile ?? (tile.kind === 'home' ? homeTile : tile.kind === 'zodiac' ? zodiacTile : hexTiles.default);
   const baseBounds = tileAlphaBoundsOrBase('selected-base', hexTiles.default.alphaBounds, FULL_IMAGE_BOUNDS);
   const selectedBounds = tileAlphaBoundsOrBase(tile.id, selected.alphaBounds, baseBounds);
 

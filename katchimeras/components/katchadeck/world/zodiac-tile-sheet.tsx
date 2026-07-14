@@ -1,69 +1,256 @@
-import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useMemo, useState } from 'react';
-import { Image } from 'expo-image';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
+import { InteractionThreadSwitcher, type InteractionThreadOption } from '@/components/katchadeck/ui/interaction-thread-switcher';
+import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { ConnectStarsGame } from '@/components/katchadeck/world/connect-stars-game';
-import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { CompanionHero } from '@/components/katchadeck/world/companion-hero';
+import { CompanionPrimaryAction, CompanionSecondaryAction, CompanionSection } from '@/components/katchadeck/world/companion-interaction-primitives';
+import { CompanionReflectionThread } from '@/components/katchadeck/world/companion-reflection-thread';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { CONSTELLATION_LEVELS } from '@/constants/world-identity';
 import { zodiacFamiliarSource } from '@/constants/world-identity-art';
-import { Lantern } from '@/constants/theme';
-import { useInlineVoiceNote } from '@/hooks/use-inline-voice-note';
+import { AppFontFamilies, Lantern } from '@/constants/theme';
+import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import type { WorldIdentityState } from '@/types/world-identity';
 import { deriveZodiacSign, localDayId, promptForDay, zodiacProfile } from '@/utils/world-identity';
 
-type Mode = 'menu' | 'game' | 'prompt' | 'birthday';
+type Thread = 'profile' | 'game' | 'prompt';
+type Mode = Thread | 'birthday';
+
+const THREADS: InteractionThreadOption<Thread>[] = [
+  { id: 'profile', label: 'Profile', icon: 'star.fill' },
+  { id: 'game', label: 'Stars', icon: 'sparkles' },
+  { id: 'prompt', label: 'Reflect', icon: 'leaf.fill' },
+];
 
 export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: WorldIdentityState; onChange: (next: WorldIdentityState) => void; onClose: () => void }) {
-  const [mode, setMode] = useState<Mode>('menu');
-  const [text, setText] = useState('');
+  const [mode, setMode] = useState<Mode>('profile');
   const [birthMonth, setBirthMonth] = useState(identity.birthMonth ? String(identity.birthMonth) : '');
   const [birthDay, setBirthDay] = useState(identity.birthDay ? String(identity.birthDay) : '');
+  const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
+  const reduceMotion = useReducedMotion();
   const profile = zodiacProfile(identity.zodiacSignId);
   const level = CONSTELLATION_LEVELS.find((item) => item.signId === identity.zodiacSignId);
   const prompt = useMemo(() => profile ? promptForDay(profile.id) : null, [profile]);
-  const voice = useInlineVoiceNote({ saveNote: (note) => {
-    if (!prompt) return;
-    onChange({ ...identity, recentZodiacPromptIds: [prompt.id, ...identity.recentZodiacPromptIds.filter((id) => id !== prompt.id)].slice(0, 6), zodiacReflections: [...identity.zodiacReflections, { id: `zodiac-${Date.now().toString(36)}`, dayId: localDayId(), promptId: prompt.id, prompt: prompt.text, text: note.text, audioUri: note.audioUri, durationMs: note.durationMs, createdAt: new Date().toISOString(), origin: 'zodiac_prompt' }] });
-    setMode('menu');
-  }});
   if (!profile || !level) return null;
+
   const dayId = localDayId();
   const completedToday = identity.constellationCompletions.includes(dayId);
+  const proposedSign = deriveZodiacSign(Number(birthMonth), Number(birthDay));
+
+  function selectThread(thread: Thread) {
+    setMode(thread);
+  }
 
   function completeGame() {
-    onChange({ ...identity, constellationCompletions: completedToday ? identity.constellationCompletions : [...identity.constellationCompletions, dayId] });
+    onChange({
+      ...identity,
+      constellationCompletions: completedToday
+        ? identity.constellationCompletions
+        : [...identity.constellationCompletions, dayId],
+    });
     setTimeout(() => setMode('prompt'), 350);
   }
 
   function saveReflection() {
-    if (!prompt || !text.trim()) return;
-    onChange({ ...identity, recentZodiacPromptIds: [prompt.id, ...identity.recentZodiacPromptIds.filter((id) => id !== prompt.id)].slice(0, 6), zodiacReflections: [...identity.zodiacReflections, { id: `zodiac-${Date.now().toString(36)}`, dayId, promptId: prompt.id, prompt: prompt.text, text: text.trim(), createdAt: new Date().toISOString(), origin: 'zodiac_prompt' }] });
-    setText(''); setMode('menu');
+    if (!prompt || !reflectionDraft?.text.trim()) return;
+    onChange({
+      ...identity,
+      recentZodiacPromptIds: [prompt.id, ...identity.recentZodiacPromptIds.filter((id) => id !== prompt.id)].slice(0, 6),
+      zodiacReflections: [
+        ...identity.zodiacReflections,
+        {
+          id: `zodiac-${Date.now().toString(36)}`,
+          dayId,
+          promptId: prompt.id,
+          prompt: prompt.text,
+          text: reflectionDraft.text.trim(),
+          audioUri: reflectionDraft.audioUri,
+          durationMs: reflectionDraft.durationMs,
+          createdAt: new Date().toISOString(),
+          origin: 'zodiac_prompt',
+        },
+      ],
+    });
+    setReflectionDraft(null);
+    setMode('profile');
   }
 
+  function updateBirthday() {
+    if (!proposedSign) return;
+    onChange({
+      ...identity,
+      birthMonth: Number(birthMonth),
+      birthDay: Number(birthDay),
+      zodiacSignId: proposedSign,
+    });
+    setMode('profile');
+  }
+
+  const footer = mode === 'profile'
+    ? <CompanionPrimaryAction label={completedToday ? 'Replay constellation' : 'Play tonight’s constellation'} icon="sparkles" onPress={() => setMode('game')} />
+    : mode === 'prompt'
+      ? <CompanionPrimaryAction label="Save reflection" icon="arrow.right" disabled={!reflectionDraft?.text.trim()} onPress={saveReflection} />
+      : mode === 'birthday'
+        ? <CompanionPrimaryAction label="Update star companion" icon="calendar" disabled={!proposedSign} onPress={updateBirthday} />
+        : null;
+
   return (
-    <Modal animationType="slide" presentationStyle="pageSheet" visible onRequestClose={onClose}>
-      <View style={styles.screen}>
-        <View style={styles.header}><Pressable accessibilityRole="button" onPress={() => mode === 'menu' ? onClose() : setMode('menu')} style={styles.close}><ThemedText>{mode === 'menu' ? '×' : '‹'}</ThemedText></Pressable><ThemedText type="onboardingLabel" lightColor={profile.accent} darkColor={profile.accent}>Star Garden</ThemedText><View style={styles.spacer} /></View>
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={[styles.hero, { borderColor: `${profile.accent}88` }]}><View style={[styles.orbit, { borderColor: `${profile.accent}55` }]}><Image contentFit="contain" source={zodiacFamiliarSource(profile.element)} style={styles.familiarImage} /><View style={[styles.signBadge, { backgroundColor: profile.accent }]}><ThemedText style={styles.signBadgeText} lightColor="#14101F" darkColor="#14101F">{profile.symbol}</ThemedText></View></View><ThemedText type="title">{profile.name}</ThemedText><ThemedText style={styles.familiar} lightColor={profile.accent} darkColor={profile.accent}>{profile.familiarName} · {profile.element}</ThemedText><ThemedText style={styles.profileLine}>{profile.profileLine}</ThemedText></View>
-          {mode === 'menu' ? <><KatchaButton label={completedToday ? 'Replay constellation' : 'Play tonight’s constellation'} onPress={() => setMode('game')} icon="sparkles" /><KatchaButton label="Today’s star prompt" onPress={() => setMode('prompt')} variant="secondary" /><View style={styles.info}><ThemedText type="subtitle">{profile.dateLabel}</ThemedText><ThemedText style={styles.infoText}>A playful celestial identity for reflection—not a prediction. Your sign never changes what hatches.</ThemedText></View><KatchaButton label="Edit birthday" onPress={() => setMode('birthday')} variant="secondary" /></> : null}
-          {mode === 'game' ? <><ThemedText type="subtitle">Help {profile.familiarName} restore tonight’s constellation.</ThemedText><ConnectStarsGame accentColor={profile.accent} points={level.points} onComplete={completeGame} />{completedToday ? <ThemedText style={styles.status} lightColor={profile.accent} darkColor={profile.accent}>Tonight’s Star Spark is already safe. Replay just for the glow.</ThemedText> : null}</> : null}
-          {mode === 'prompt' && prompt ? <><ThemedText type="title">A question from the stars</ThemedText><ThemedText style={styles.prompt}>{prompt.text}</ThemedText><TextInput accessibilityLabel="Star prompt response" multiline onChangeText={setText} placeholder="Write what comes to mind…" placeholderTextColor="rgba(255,255,255,0.35)" style={styles.input} value={text} /><KatchaButton disabled={!text.trim()} label="Save reflection" onPress={saveReflection} />
-            {voice.phase === 'confirm' && voice.result ? <View style={styles.voiceConfirm}><ThemedText style={styles.voiceTranscript}>“{voice.result.transcript}”</ThemedText>{!voice.semanticChoiceMade ? <KatchaButton label="Keep as a star reflection" onPress={() => voice.chooseSemantic(null)} variant="secondary" /> : null}<View style={styles.voiceActions}><KatchaButton label="Discard" onPress={voice.discard} variant="secondary" style={{ flex: 1 }} /><KatchaButton disabled={!voice.semanticChoiceMade} label="Save voice" onPress={voice.accept} style={{ flex: 1 }} /></View></View> : <Pressable accessibilityRole="button" accessibilityLabel="Hold to record a voice reflection" onPressIn={() => { void voice.start(); }} onPressOut={() => { void voice.stop(); }} style={[styles.voiceButton, voice.phase === 'recording' && { borderColor: profile.accent }]}><ThemedText style={styles.voiceButtonText}>{voice.phase === 'recording' ? `Recording 0:${String(voice.elapsed).padStart(2, '0')} · release to finish` : voice.phase === 'analyzing' ? 'Reading your voice…' : 'Hold to answer with voice'}</ThemedText></Pressable>}
-            <KatchaButton label="Skip for today" onPress={() => setMode('menu')} variant="secondary" /></> : null}
-          {mode === 'birthday' ? <><ThemedText type="title">Change your birthday</ThemedText><ThemedText style={styles.infoText}>Only month and day are stored, on this device.</ThemedText><View style={styles.birthdayRow}><TextInput keyboardType="number-pad" maxLength={2} onChangeText={setBirthMonth} placeholder="MM" placeholderTextColor="rgba(255,255,255,0.35)" style={styles.birthdayInput} value={birthMonth} /><TextInput keyboardType="number-pad" maxLength={2} onChangeText={setBirthDay} placeholder="DD" placeholderTextColor="rgba(255,255,255,0.35)" style={styles.birthdayInput} value={birthDay} /></View><KatchaButton disabled={!deriveZodiacSign(Number(birthMonth), Number(birthDay))} label="Update Zodiac Tile" onPress={() => { const sign = deriveZodiacSign(Number(birthMonth), Number(birthDay)); if (sign) { onChange({ ...identity, birthMonth: Number(birthMonth), birthDay: Number(birthDay), zodiacSignId: sign }); setMode('menu'); } }} /></> : null}
-        </ScrollView>
-      </View>
+    <Modal animationType="none" navigationBarTranslucent onRequestClose={onClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible>
+      <GestureHandlerRootView style={styles.modalRoot}>
+        <MeadowSheet onClose={onClose} variant="tall">
+          <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8} style={styles.keyboard}>
+            <CompanionHero
+              accentColor={profile.accent}
+              image={zodiacFamiliarSource(profile.element)}
+              kicker={`${profile.name} · ${profile.element}`}
+              name={profile.familiarName}
+              openingLine={profile.profileLine}
+            />
+
+            {mode === 'birthday' ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Back to star profile" onPress={() => setMode('profile')} style={({ pressed }) => [styles.backRow, pressed && styles.pressed]}>
+                <IconSymbol name="chevron.left" size={16} color={Lantern.moon300} />
+                <ThemedText style={styles.backText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Back to profile</ThemedText>
+              </Pressable>
+            ) : (
+              <InteractionThreadSwitcher options={THREADS} value={mode} onChange={selectThread} />
+            )}
+
+            <View style={styles.contentFrame}>
+              <ScrollView
+                automaticallyAdjustKeyboardInsets
+                contentContainerStyle={styles.scrollContent}
+                contentInsetAdjustmentBehavior="automatic"
+                keyboardDismissMode="interactive"
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                <Animated.View key={mode} entering={FadeIn.duration(reduceMotion ? 100 : 210)} exiting={FadeOut.duration(100)}>
+                  {mode === 'profile' ? (
+                    <View style={styles.thread}>
+                      <CompanionSection label="Your celestial identity">
+                        <ProfileRow icon="calendar" label="Zodiac sign" value={`${profile.name} · ${profile.dateLabel}`} accent={profile.accent} />
+                        <ProfileRow icon="sparkles" label="Tonight’s constellation" value={completedToday ? 'Restored today' : 'Ready to restore'} accent={profile.accent} />
+                      </CompanionSection>
+                      <CompanionSection label="How this works">
+                        <View style={styles.infoPanel}>
+                          <ThemedText style={styles.infoTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>A playful daily ritual</ThemedText>
+                          <ThemedText style={styles.infoBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Your Star Companion offers a constellation and a reflection—not a prediction. Your sign never changes what hatches.</ThemedText>
+                        </View>
+                      </CompanionSection>
+                      <CompanionSecondaryAction label="Edit birthday" icon="calendar" onPress={() => setMode('birthday')} />
+                    </View>
+                  ) : null}
+
+                  {mode === 'game' ? (
+                    <View style={styles.thread}>
+                      <CompanionSection label="Tonight’s constellation">
+                        <ThemedText style={styles.threadTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Help {profile.familiarName} restore the stars.</ThemedText>
+                        <ThemedText style={styles.threadBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Trace the pattern in order. When it wakes, your daily reflection will follow.</ThemedText>
+                      </CompanionSection>
+                      <ConnectStarsGame accentColor={profile.accent} points={level.points} onComplete={completeGame} />
+                      {completedToday ? <View style={styles.status}><IconSymbol name="checkmark" size={14} color={Lantern.auroraTeal} /><ThemedText style={styles.statusText} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>Today’s constellation is already safe. Replay it just for the glow.</ThemedText></View> : null}
+                    </View>
+                  ) : null}
+
+                  {mode === 'prompt' && prompt ? (
+                    <CompanionReflectionThread
+                      promptId={`zodiac:${prompt.id}`}
+                      promptText={prompt.text}
+                      initialDraft={reflectionDraft}
+                      onDraftChange={setReflectionDraft}
+                    />
+                  ) : null}
+
+                  {mode === 'birthday' ? (
+                    <View style={styles.thread}>
+                      <CompanionSection label="Star companion settings">
+                        <ThemedText style={styles.threadTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Change your birthday</ThemedText>
+                        <ThemedText style={styles.threadBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Only the month and day are stored on this device.</ThemedText>
+                      </CompanionSection>
+                      <View style={styles.birthdayRow}>
+                        <BirthdayField label="Month" value={birthMonth} onChange={(value) => setBirthMonth(value.replace(/\D/g, ''))} placeholder="MM" />
+                        <BirthdayField label="Day" value={birthDay} onChange={(value) => setBirthDay(value.replace(/\D/g, ''))} placeholder="DD" />
+                      </View>
+                      {proposedSign ? <View style={styles.signResult}><ThemedText style={styles.signSymbol} lightColor={profile.accent} darkColor={profile.accent}>{zodiacProfile(proposedSign)?.symbol}</ThemedText><View style={styles.signCopy}><ThemedText style={styles.signName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{zodiacProfile(proposedSign)?.name}</ThemedText><ThemedText style={styles.signHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Your companion will update with this sign.</ThemedText></View></View> : null}
+                    </View>
+                  ) : null}
+                </Animated.View>
+              </ScrollView>
+            </View>
+
+            {footer ? <View style={styles.footer}>{footer}</View> : null}
+          </KeyboardAvoidingView>
+        </MeadowSheet>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
+function ProfileRow({ icon, label, value, accent }: { icon: 'calendar' | 'sparkles'; label: string; value: string; accent: string }) {
+  return (
+    <View style={styles.profileRow}>
+      <View style={[styles.profileIcon, { backgroundColor: `${accent}18` }]}><IconSymbol name={icon} size={18} color={accent} /></View>
+      <View style={styles.profileCopy}>
+        <ThemedText style={styles.profileLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{label}</ThemedText>
+        <ThemedText style={styles.profileValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{value}</ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function BirthdayField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
+  return (
+    <View style={styles.field}>
+      <ThemedText style={styles.fieldLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{label}</ThemedText>
+      <TextInput
+        accessibilityLabel={`Birth ${label.toLowerCase()}`}
+        keyboardType="number-pad"
+        maxLength={2}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={Lantern.moon500}
+        selectionColor={Lantern.ember300}
+        style={styles.birthdayInput}
+        value={value}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#0B0B18', flex: 1 }, header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20 }, close: { alignItems: 'center', backgroundColor: Lantern.ink800, borderRadius: 20, height: 40, justifyContent: 'center', width: 40 }, spacer: { width: 40 }, content: { gap: 18, padding: 20, paddingBottom: 50 },
-  hero: { alignItems: 'center', backgroundColor: '#16152A', borderRadius: 30, borderWidth: 1, gap: 7, padding: 24 }, orbit: { alignItems: 'center', borderRadius: 70, borderWidth: 1, height: 138, justifyContent: 'center', width: 138 }, familiarImage: { height: 128, width: 128 }, signBadge: { alignItems: 'center', borderRadius: 18, bottom: -2, height: 36, justifyContent: 'center', position: 'absolute', right: -2, width: 36 }, signBadgeText: { fontSize: 21, fontWeight: '900' }, familiar: { fontSize: 13, fontWeight: '900', textTransform: 'uppercase' }, profileLine: { color: Lantern.moon300, lineHeight: 21, textAlign: 'center' },
-  info: { backgroundColor: Lantern.ink800, borderRadius: 22, gap: 6, padding: 18 }, infoText: { color: Lantern.moon300, fontSize: 13, lineHeight: 19 }, status: { fontSize: 12, fontWeight: '800', textAlign: 'center' }, prompt: { fontSize: 23, lineHeight: 31 }, input: { backgroundColor: Lantern.ink800, borderRadius: 22, color: Lantern.moon50, fontSize: 16, minHeight: 150, padding: 18, textAlignVertical: 'top' },
-  voiceButton: { alignItems: 'center', backgroundColor: Lantern.ink800, borderColor: 'rgba(255,255,255,0.14)', borderRadius: 999, borderWidth: 1, minHeight: 58, justifyContent: 'center', paddingHorizontal: 18 }, voiceButtonText: { fontSize: 14, fontWeight: '800' }, voiceConfirm: { backgroundColor: Lantern.ink800, borderRadius: 22, gap: 12, padding: 16 }, voiceTranscript: { fontSize: 15, fontStyle: 'italic', lineHeight: 21 }, voiceActions: { flexDirection: 'row', gap: 10 },
-  birthdayRow: { flexDirection: 'row', gap: 10 }, birthdayInput: { backgroundColor: Lantern.ink800, borderRadius: 18, color: Lantern.moon50, flex: 1, fontSize: 24, fontWeight: '800', minHeight: 64, textAlign: 'center' },
+  modalRoot: { flex: 1 },
+  keyboard: { flex: 1, gap: 10, minHeight: 0 },
+  backRow: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Lantern.dusk700, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 5, minHeight: 42, paddingHorizontal: 12 },
+  backText: { fontSize: 12.5, fontWeight: '800' },
+  contentFrame: { flex: 1, minHeight: 0 },
+  scrollContent: { paddingBottom: 16, paddingHorizontal: 4 },
+  thread: { gap: 24, paddingBottom: 20, paddingTop: 8 },
+  threadTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 25, lineHeight: 31 },
+  threadBody: { fontSize: 13.5, lineHeight: 20 },
+  profileRow: { alignItems: 'center', backgroundColor: Lantern.ink900, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 11, minHeight: 72, padding: 11 },
+  profileIcon: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 13, height: 48, justifyContent: 'center', width: 48 },
+  profileCopy: { flex: 1, gap: 2 },
+  profileLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.35, textTransform: 'uppercase' },
+  profileValue: { fontSize: 13.5, fontWeight: '800', lineHeight: 19 },
+  infoPanel: { backgroundColor: Lantern.ink900, borderColor: Lantern.line, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 5, padding: 15 },
+  infoTitle: { fontSize: 14, fontWeight: '800' },
+  infoBody: { fontSize: 12.5, lineHeight: 19 },
+  status: { alignItems: 'flex-start', backgroundColor: 'rgba(125,232,205,0.07)', borderCurve: 'continuous', borderRadius: 16, flexDirection: 'row', gap: 8, padding: 12 },
+  statusText: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
+  birthdayRow: { flexDirection: 'row', gap: 10 },
+  field: { flex: 1, gap: 7 },
+  fieldLabel: { fontSize: 12, fontWeight: '700' },
+  birthdayInput: { backgroundColor: Lantern.ink900, borderColor: Lantern.line, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, color: Lantern.moon50, fontFamily: AppFontFamilies.manrope, fontSize: 23, fontVariant: ['tabular-nums'], fontWeight: '800', minHeight: 62, paddingHorizontal: 14, textAlign: 'center' },
+  signResult: { alignItems: 'center', backgroundColor: Lantern.ink900, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 12, minHeight: 72, padding: 12 },
+  signSymbol: { fontSize: 34, lineHeight: 40 },
+  signCopy: { flex: 1, gap: 2 },
+  signName: { fontSize: 14.5, fontWeight: '800' },
+  signHint: { fontSize: 11.5, lineHeight: 16 },
+  footer: { paddingBottom: 2, paddingHorizontal: 4, paddingTop: 10 },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

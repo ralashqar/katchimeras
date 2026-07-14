@@ -59,6 +59,10 @@ const CREATURE_WORLD_SCALE = kingdomWorldViewConfig.katchimera.globalScale;
 const CREATURE_WORLD_SIZE = CREATURE_SIZE * CREATURE_WORLD_SCALE;
 const CREATURE_WORLD_HORIZONTAL_HEX_OFFSET = kingdomWorldViewConfig.katchimera.horizontalOffsetHexTileWidth;
 const CREATURE_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.katchimera.verticalOffsetHexTileHeight;
+const ZODIAC_WORLD_SCALE = kingdomWorldViewConfig.zodiac.globalScale;
+const ZODIAC_WORLD_SIZE = CREATURE_SIZE * ZODIAC_WORLD_SCALE;
+const ZODIAC_WORLD_HORIZONTAL_HEX_OFFSET = kingdomWorldViewConfig.zodiac.horizontalOffsetHexTileWidth;
+const ZODIAC_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.zodiac.verticalOffsetHexTileHeight;
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
 const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale;
@@ -123,7 +127,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     setViewport((current) => (current.width === width && current.height === height ? current : { width, height }));
   }, []);
 
-  const residentNodes = useMemo(() => {
+  const creatureNodes = useMemo(() => {
     const items: { depth: number; node: ReactNode }[] = [];
     for (const tile of scene.tiles) {
       if (tile.kind !== 'resident' || !tile.resident || !scheduler.readyTileIds.has(tile.id)) continue;
@@ -149,13 +153,38 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         ),
       });
     }
+
+    const zodiacTile = scene.tiles.find((tile) => tile.kind === 'zodiac');
+    const zodiac = zodiacProfile(identity?.zodiacSignId);
+    if (zodiacTile && zodiac && scheduler.readyTileIds.has(zodiacTile.id)) {
+      const runtime = runtimeById.get(zodiacTile.id);
+      if (runtime && (scheduler.visibleTileIds.has(zodiacTile.id) || runtime.phase === 'exiting')) {
+        const x = zodiacTile.cx + HEX_TILE_W * ZODIAC_WORLD_HORIZONTAL_HEX_OFFSET;
+        const y = zodiacTile.cy + HEX_TILE_H * ZODIAC_WORLD_VERTICAL_HEX_OFFSET;
+        items.push({
+          depth: hexDrawDepth({ x, y }, 4),
+          node: (
+            <ZodiacCreature
+              accessibilityLabel={`${zodiac.familiarName}, ${zodiac.name} star companion`}
+              key={`zodiac-creature-${zodiac.id}`}
+              onFocus={camera.focusResident}
+              onPress={onSelectZodiac}
+              phase={runtime.phase}
+              settled={!camera.isMoving}
+              source={zodiacFamiliarSource(zodiac.element, camera.residentLod)}
+              x={x}
+              y={y}
+            />
+          ),
+        });
+      }
+    }
+
     return items.sort((a, b) => a.depth - b.depth).map((item) => item.node);
-  }, [camera.focusResident, camera.isMoving, camera.residentLod, onSelectResident, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds]);
+  }, [camera.focusResident, camera.isMoving, camera.residentLod, identity?.zodiacSignId, onSelectResident, onSelectZodiac, residentStatusGlyphs, runtimeById, scene.tiles, scheduler.readyTileIds, scheduler.visibleTileIds]);
 
   const centerRuntime = runtimeById.get(scene.centerTile.id);
-  const zodiacTile = scene.tiles.find((tile) => tile.kind === 'zodiac');
   const home = homePreset(identity?.selectedHomeArchetypeId);
-  const zodiac = zodiacProfile(identity?.zodiacSignId);
   const showEgg =
     Boolean(eggVisual) &&
     scheduler.readyTileIds.has(scene.centerTile.id) &&
@@ -214,20 +243,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                 y={scene.centerTile.cy - HEX_TILE_H * 0.38}
               />
             ) : null}
-            {zodiacTile && zodiac ? (
-              <IdentityMarker
-                accessibilityLabel={`${zodiac.name} zodiac tile`}
-                accent={zodiac.accent}
-                glyph={zodiac.symbol}
-                imageSource={zodiacFamiliarSource(zodiac.element, camera.residentLod)}
-                label={zodiac.familiarName}
-                onPress={onSelectZodiac}
-                x={zodiacTile.cx}
-                y={zodiacTile.cy - HEX_TILE_H * 0.08}
-                celestial
-              />
-            ) : null}
-            {residentNodes}
+            {creatureNodes}
           </Animated.View>
         </View>
       </GestureDetector>
@@ -249,18 +265,6 @@ const HomeTileHitTarget = memo(function HomeTileHitTarget({ accessibilityLabel, 
       onPress={onPress}
       style={[styles.homeTileHitTarget, { left: x - 54, top: y - 42 }]}
     />
-  );
-});
-
-const IdentityMarker = memo(function IdentityMarker({ accessibilityLabel, accent, celestial = false, glyph, imageSource, label, onPress, x, y }: {
-  accessibilityLabel: string; accent: string; celestial?: boolean; glyph: string; imageSource?: ImageSourcePropType | null; label: string; onPress?: () => void; x: number; y: number;
-}) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={[styles.identityMarker, { left: x - 47, top: y - 47, borderColor: `${accent}99`, backgroundColor: celestial ? '#171630' : '#29233A' }]}>
-      <View pointerEvents="none" style={[styles.identityGlow, { backgroundColor: `${accent}24` }]} />
-      {imageSource ? <View pointerEvents="none" style={styles.identityImage}><SeamlessWorldImage source={imageSource} priority="high" /></View> : <Text style={[styles.identityGlyph, { color: accent }]}>{glyph}</Text>}
-      <Text numberOfLines={1} style={styles.identityLabel}>{label}</Text>
-    </Pressable>
   );
 });
 
@@ -460,6 +464,73 @@ const ResidentCreature = memo(function ResidentCreature({
   );
 });
 
+const ZodiacCreature = memo(function ZodiacCreature({
+  accessibilityLabel,
+  onFocus,
+  onPress,
+  phase,
+  settled,
+  source,
+  x,
+  y,
+}: {
+  accessibilityLabel: string;
+  onFocus: (x: number, y: number) => void;
+  onPress?: () => void;
+  phase: KingdomTilePhase;
+  settled: boolean;
+  source: ImageSourcePropType;
+  x: number;
+  y: number;
+}) {
+  const [ready, setReady] = useState(false);
+  const opacity = useSharedValue(0);
+  const lift = useSharedValue(12);
+  const shownRef = useRef(false);
+
+  useEffect(() => {
+    if (phase === 'exiting') {
+      opacity.value = withTiming(0, { duration: KINGDOM_RENDERING.exitDurationMs });
+      lift.value = withTiming(6, { duration: KINGDOM_RENDERING.exitDurationMs });
+      return;
+    }
+    if (!ready || (!shownRef.current && !settled)) return;
+    shownRef.current = true;
+    opacity.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
+    lift.value = withSpring(0, { damping: 14, stiffness: 210 });
+  }, [lift, opacity, phase, ready, settled]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: lift.value }],
+  }));
+  const handlePress = useCallback(() => {
+    onFocus(x, y);
+    onPress?.();
+  }, [onFocus, onPress, x, y]);
+  const markReady = useCallback(() => setReady(true), []);
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={handlePress}
+      style={[
+        styles.creature,
+        {
+          height: ZODIAC_WORLD_SIZE,
+          left: x - ZODIAC_WORLD_SIZE / 2,
+          top: y - CREATURE_SIZE * 0.63 - (ZODIAC_WORLD_SIZE - CREATURE_SIZE),
+          width: ZODIAC_WORLD_SIZE,
+        },
+      ]}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
+        <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} />
+      </Animated.View>
+    </Pressable>
+  );
+});
+
 const ResidentStatusGlyph = memo(function ResidentStatusGlyph({ status }: { status: KingdomResidentStatusGlyph }) {
   return (
     <View pointerEvents="none" style={styles.statusGlyphWrap}>
@@ -477,11 +548,6 @@ const styles = StyleSheet.create({
   eggLayer: { height: EGG_WORLD_H, position: 'absolute', width: EGG_WORLD_W },
   creature: { position: 'absolute' },
   homeTileHitTarget: { height: 84, position: 'absolute', width: 108 },
-  identityMarker: { alignItems: 'center', borderRadius: 47, borderWidth: 1, height: 94, justifyContent: 'center', overflow: 'hidden', position: 'absolute', width: 94 },
-  identityGlow: { borderRadius: 999, height: 72, position: 'absolute', width: 72 },
-  identityGlyph: { fontSize: 38, fontWeight: '700', lineHeight: 42 },
-  identityImage: { height: 70, width: 70 },
-  identityLabel: { color: Lantern.moon50, fontSize: 9, fontWeight: '800', marginTop: 2, maxWidth: 78 },
   statusGlyphWrap: {
     alignItems: 'center',
     left: 0,

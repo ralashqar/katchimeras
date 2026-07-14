@@ -6,8 +6,8 @@ import { ThemedText } from '@/components/themed-text';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 
 export function CompanionHero({
-  name, image, accentColor, houseLevel, openingLine,
-}: { name: string; image: ImageSourcePropType; accentColor: string; houseLevel?: number; openingLine: string }) {
+  name, image, accentColor, houseLevel, openingLine, kicker,
+}: { name: string; image: ImageSourcePropType; accentColor: string; houseLevel?: number; openingLine: string; kicker?: string }) {
   const reduceMotion = useReducedMotion();
   return (
     <View style={styles.root}>
@@ -17,7 +17,7 @@ export function CompanionHero({
       </Animated.View>
       <View style={styles.copy}>
         <ThemedText style={styles.kicker} lightColor={accentColor} darkColor={accentColor}>
-          {houseLevel ? `Home level ${houseLevel}` : 'Kingdom companion'}
+          {kicker ?? (houseLevel ? `Home level ${houseLevel}` : 'Kingdom companion')}
         </ThemedText>
         <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.name} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{name}</ThemedText>
         <ThemedText style={styles.opening} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{openingLine}</ThemedText>

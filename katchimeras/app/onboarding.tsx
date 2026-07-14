@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -20,20 +20,37 @@ import {
 } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { presenceEnter, useFloatingMotion, usePressMotion, usePulseMotion } from '@/components/katchadeck/motion';
 import { CinematicOnboardingPage } from '@/components/katchadeck/onboarding/cinematic-onboarding-page';
-import { ConnectStarsGame } from '@/components/katchadeck/world/connect-stars-game';
+import { BirthdayWheelPicker } from '@/components/katchadeck/onboarding/birthday-wheel-picker';
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { preferenceOptions } from '@/constants/katchadeck';
-import { CONSTELLATION_LEVELS, HOME_PRESETS, PERSONALITY_QUESTIONS } from '@/constants/world-identity';
+import { HOME_PRESETS, PERSONALITY_QUESTIONS } from '@/constants/world-identity';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { timelineDemoEntries, timelineTomorrowState } from '@/constants/timeline-demo';
 import { saveHomeAnchor } from '@/utils/home-location';
 import { defaultOnboardingProfile, loadOnboardingProfile, saveOnboardingProfile } from '@/utils/onboarding-state';
+import { safeGoBack } from '@/utils/safe-navigation';
 import { deriveZodiacSign, homePreset, loadWorldIdentity, saveWorldIdentity, scorePersonality, zodiacProfile } from '@/utils/world-identity';
 import { KINGDOM_HOME_HEX_TILES } from '@/utils/world-visuals';
 
 const totalSteps = 9;
+
+function defaultBirthdayPickerDate(): Date {
+  return new Date(2000, 0, 1, 12);
+}
+
+function birthdayDateFromParts(month: number | null, day: number | null): Date | null {
+  if (!month || !day || !deriveZodiacSign(month, day)) return null;
+  // The year is deliberately not persisted; use a leap year when reconstructing
+  // the picker value so 29 February remains a valid saved birthday.
+  return new Date(2000, month - 1, day, 12);
+}
+
+function birthdayLabel(date: Date): string {
+  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'long' }).format(date);
+}
 
 const sampleEgg = {
   accentColor: '#93C7FF',
@@ -88,19 +105,21 @@ function formatHatchHour(hour: number) {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ mode?: string | string[] }>();
+  const identityReplay = (Array.isArray(params.mode) ? params.mode[0] : params.mode) === 'identity';
   const insets = useSafeAreaInsets();
   const storedProfile = loadOnboardingProfile();
   const [identity, setIdentity] = useState(loadWorldIdentity);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(identityReplay ? 3 : 0);
   const selectedToneId = storedProfile.preferenceIds[0] ?? 'cozy';
   const [selectedHatchHour, setSelectedHatchHour] = useState<number>(storedProfile.hatchHour ?? 20);
   const [primingPermissions, setPrimingPermissions] = useState(false);
   const [homeAnchorSet, setHomeAnchorSet] = useState(false);
   const [settingHome, setSettingHome] = useState(false);
-  const [birthMonthText, setBirthMonthText] = useState(identity.birthMonth ? String(identity.birthMonth) : '');
-  const [birthDayText, setBirthDayText] = useState(identity.birthDay ? String(identity.birthDay) : '');
+  const [birthDate, setBirthDate] = useState<Date | null>(() => birthdayDateFromParts(identity.birthMonth, identity.birthDay));
+  const [birthdayPickerOpen, setBirthdayPickerOpen] = useState(false);
+  const [birthdayDraft, setBirthdayDraft] = useState<Date>(() => birthdayDateFromParts(identity.birthMonth, identity.birthDay) ?? defaultBirthdayPickerDate());
   const [zodiacSkipped, setZodiacSkipped] = useState(false);
-  const [constellationDone, setConstellationDone] = useState(identity.constellationTutorialCompleted);
 
   useEffect(() => {
     saveWorldIdentity(identity);
@@ -136,32 +155,64 @@ export default function OnboardingScreen() {
   const currentPreference =
     preferenceOptions.find((option) => option.id === selectedToneId) ?? preferenceOptions[0];
 
-  const primaryActionLabel = step === totalSteps - 1 ? 'Allow and continue' : 'Continue';
+  const primaryActionLabel = step === totalSteps - 1
+      ? 'Allow and continue'
+      : step === 6
+        ? 'Choose this home'
+        : step === 7
+          ? zodiacSkipped ? 'Finish without zodiac' : identityReplay ? 'Save Zodiac Tile' : 'Add my Zodiac Tile'
+          : 'Continue';
 
   const personalityQuestion = step >= 3 && step <= 5 ? PERSONALITY_QUESTIONS[step - 3] : null;
   const recommendedHomeId = scorePersonality(identity.personalityAnswers);
   const selectedHome = homePreset(identity.selectedHomeArchetypeId ?? recommendedHomeId);
-  const birthMonth = Number(birthMonthText);
-  const birthDay = Number(birthDayText);
+  const birthMonth = birthDate ? birthDate.getMonth() + 1 : Number.NaN;
+  const birthDay = birthDate ? birthDate.getDate() : Number.NaN;
   const selectedSignId = deriveZodiacSign(birthMonth, birthDay);
   const selectedSign = zodiacProfile(selectedSignId);
   const canContinue =
     !personalityQuestion || Boolean(identity.personalityAnswers[personalityQuestion.id]);
-  const canAdvanceZodiac = step !== 7 || zodiacSkipped || Boolean(selectedSignId && constellationDone);
+  const canAdvanceZodiac = step !== 7 || zodiacSkipped || Boolean(selectedSignId);
+
+  function chooseBirthday(date: Date) {
+    setBirthDate(date);
+    setBirthdayDraft(date);
+    setZodiacSkipped(false);
+  }
+
+  function openBirthdayPicker() {
+    const value = birthDate ?? defaultBirthdayPickerDate();
+    setBirthdayDraft(value);
+    setBirthdayPickerOpen(true);
+  }
 
   async function handlePrimaryAction() {
     if (!canContinue || !canAdvanceZodiac) return;
+    if (step === 6) {
+      setIdentity((current) => ({
+        ...current,
+        recommendedHomeArchetypeId: recommendedHomeId,
+        selectedHomeArchetypeId: current.selectedHomeArchetypeId ?? recommendedHomeId,
+      }));
+      setStep(7);
+      return;
+    }
+    if (step === 7) {
+      const nextIdentity = {
+        ...identity,
+        recommendedHomeArchetypeId: recommendedHomeId,
+        selectedHomeArchetypeId: identity.selectedHomeArchetypeId ?? recommendedHomeId,
+        birthMonth: zodiacSkipped ? null : birthMonth,
+        birthDay: zodiacSkipped ? null : birthDay,
+        zodiacSignId: zodiacSkipped ? null : selectedSignId,
+      };
+      setIdentity(nextIdentity);
+      saveWorldIdentity(nextIdentity);
+      if (identityReplay) finishIdentityReplay(nextIdentity);
+      else setStep(totalSteps - 1);
+      return;
+    }
     if (step < totalSteps - 1) {
-      if (step === 6) {
-        setIdentity((current) => ({
-          ...current,
-          recommendedHomeArchetypeId: recommendedHomeId,
-          selectedHomeArchetypeId: current.selectedHomeArchetypeId ?? recommendedHomeId,
-        }));
-      }
-      if (step === 7 && selectedSignId) {
-        setIdentity((current) => ({ ...current, birthMonth, birthDay, zodiacSignId: selectedSignId }));
-      }
       setStep((current) => Math.min(current + 1, totalSteps - 1));
       return;
     }
@@ -176,12 +227,34 @@ export default function OnboardingScreen() {
       return;
     }
 
+    if (identityReplay && step === 3) {
+      safeGoBack(router, '/(tabs)/world');
+      return;
+    }
+
+    if (step === totalSteps - 1 && zodiacSkipped) {
+      setStep(7);
+      return;
+    }
+
     if (step === totalSteps - 1) {
       completeOnboarding();
       return;
     }
 
     setStep((current) => Math.max(current - 1, 0));
+  }
+
+  function finishIdentityReplay(nextIdentity = identity) {
+    const completedIdentity = {
+      ...nextIdentity,
+      recommendedHomeArchetypeId: recommendedHomeId,
+      selectedHomeArchetypeId: nextIdentity.selectedHomeArchetypeId ?? recommendedHomeId,
+      setupCompletedAt: new Date().toISOString(),
+    };
+    saveWorldIdentity(completedIdentity);
+    setIdentity(completedIdentity);
+    router.replace('/(tabs)/world');
   }
 
   function completeOnboarding() {
@@ -194,7 +267,6 @@ export default function OnboardingScreen() {
       birthDay: zodiacSkipped ? null : identity.birthDay,
       zodiacSignId: zodiacSkipped ? null : identity.zodiacSignId,
       setupCompletedAt: now,
-      constellationTutorialCompleted: constellationDone,
     });
     saveOnboardingProfile({
       ...defaultOnboardingProfile,
@@ -312,16 +384,16 @@ export default function OnboardingScreen() {
 
     if (personalityQuestion) {
       return (
-        <View style={styles.stepStack}>
+        <View style={[styles.stepStack, styles.identityStep]}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
             <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">
-              Find your home · {step - 2} of 3
+              Shape your home · {step - 2} of 3
             </ThemedText>
             <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">
               {personalityQuestion.question}
             </ThemedText>
-            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
-              There is no right answer. This only shapes the home at the heart of your world.
+            <ThemedText style={styles.identityBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              Choose the answer that feels most natural—not the one you think you should pick.
             </ThemedText>
           </Animated.View>
 
@@ -334,11 +406,14 @@ export default function OnboardingScreen() {
                   accessibilityState={{ checked: selected }}
                   key={answer.id}
                   onPress={() => setIdentity((current) => ({ ...current, personalityAnswers: { ...current.personalityAnswers, [personalityQuestion.id]: answer.id } }))}
-                  style={[styles.personalityAnswer, selected && styles.personalityAnswerSelected]}>
+                  style={({ pressed }) => [styles.personalityAnswer, selected && styles.personalityAnswerSelected, pressed && styles.identityOptionPressed]}>
                   <View style={[styles.answerIndex, selected && styles.answerIndexSelected]}>
-                    <ThemedText lightColor={selected ? Lantern.emberInk : Lantern.moon50} darkColor={selected ? Lantern.emberInk : Lantern.moon50}>{index + 1}</ThemedText>
+                    {selected
+                      ? <IconSymbol name="checkmark" color={Lantern.emberInk} size={15} />
+                      : <ThemedText style={styles.answerIndexText} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{index + 1}</ThemedText>}
                   </View>
                   <ThemedText style={styles.answerLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{answer.label}</ThemedText>
+                  <View style={[styles.answerRadio, selected && styles.answerRadioSelected]} />
                 </Pressable>
               );
             })}
@@ -349,49 +424,55 @@ export default function OnboardingScreen() {
 
     if (step === 6) {
       return (
-        <View style={styles.stepStack}>
+        <View style={[styles.stepStack, styles.identityStep]}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={selectedHome.accent} darkColor={selectedHome.accent}>Your home found you</ThemedText>
-            <ThemedText type="display" style={styles.title} lightColor="#FBF3E4" darkColor="#FBF3E4">{selectedHome.name}</ThemedText>
-            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">{selectedHome.description}</ThemedText>
+            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={selectedHome.accent} darkColor={selectedHome.accent}>{selectedHome.id === recommendedHomeId ? 'Your recommended home' : 'Your chosen home'}</ThemedText>
+            <ThemedText type="display" style={styles.identityDisplay} lightColor="#FBF3E4" darkColor="#FBF3E4">The {selectedHome.name}</ThemedText>
+            <ThemedText style={styles.identityBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{selectedHome.description}</ThemedText>
           </Animated.View>
-          <View style={[styles.homePreview, { borderColor: selectedHome.accent }]}>
+          <View style={[styles.homePreview, { borderColor: `${selectedHome.accent}66` }]}>
+            <View pointerEvents="none" style={[styles.homeGlow, { backgroundColor: `${selectedHome.accent}20` }]} />
             <Image contentFit="contain" source={KINGDOM_HOME_HEX_TILES[selectedHome.id].source} style={styles.homeTilePreview} />
-            <View style={styles.keywordRow}>{selectedHome.keywords.map((keyword) => <View key={keyword} style={styles.keyword}><ThemedText style={styles.keywordText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{keyword}</ThemedText></View>)}</View>
+            <View style={styles.keywordRow}>{selectedHome.keywords.map((keyword) => <View key={keyword} style={[styles.keyword, { borderColor: `${selectedHome.accent}55` }]}><ThemedText style={styles.keywordText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{keyword}</ThemedText></View>)}</View>
           </View>
-          <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#F2D48A" darkColor="#F2D48A">Or choose the place that feels right</ThemedText>
+          <View style={styles.choiceSectionHeader}>
+            <ThemedText style={styles.choiceSectionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Choose by feeling</ThemedText>
+            <ThemedText style={styles.choiceSectionBody} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>The recommendation is only a starting point.</ThemedText>
+          </View>
           <View style={styles.homeChoiceGrid}>{HOME_PRESETS.map((preset) => {
             const selected = preset.id === selectedHome.id;
-            return <Pressable key={preset.id} onPress={() => setIdentity((current) => ({ ...current, selectedHomeArchetypeId: preset.id, recommendedHomeArchetypeId: recommendedHomeId }))} style={[styles.homeChoice, selected && { borderColor: preset.accent, backgroundColor: `${preset.accent}22` }]}><Image contentFit="contain" source={KINGDOM_HOME_HEX_TILES[preset.id].sources?.thumb ?? KINGDOM_HOME_HEX_TILES[preset.id].source} style={styles.homeChoiceImage} /><ThemedText style={styles.homeChoiceName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{preset.name}</ThemedText></Pressable>;
+            return <Pressable accessibilityRole="radio" accessibilityState={{ checked: selected }} key={preset.id} onPress={() => setIdentity((current) => ({ ...current, selectedHomeArchetypeId: preset.id, recommendedHomeArchetypeId: recommendedHomeId }))} style={({ pressed }) => [styles.homeChoice, selected && styles.homeChoiceSelected, selected && { borderColor: `${preset.accent}AA` }, pressed && styles.identityOptionPressed]}><View style={styles.homeChoiceArt}><Image contentFit="contain" source={KINGDOM_HOME_HEX_TILES[preset.id].sources?.thumb ?? KINGDOM_HOME_HEX_TILES[preset.id].source} style={styles.homeChoiceImage} />{selected ? <View style={[styles.homeChoiceCheck, { backgroundColor: preset.accent }]}><IconSymbol name="checkmark" color={Lantern.emberInk} size={13} /></View> : null}</View><ThemedText style={styles.homeChoiceName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{preset.name}</ThemedText><ThemedText numberOfLines={1} style={styles.homeChoiceKeywords} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{preset.keywords.join(' · ')}</ThemedText></Pressable>;
           })}</View>
         </View>
       );
     }
 
     if (step === 7) {
-      const level = selectedSignId ? CONSTELLATION_LEVELS.find((item) => item.signId === selectedSignId) : null;
       return (
-        <View style={styles.stepStack}>
+        <View style={[styles.stepStack, styles.identityStep]}>
           <Animated.View entering={presenceEnter()} style={styles.copyBlock}>
-            <ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#AFA6F2" darkColor="#AFA6F2">Your place among the stars</ThemedText>
+            <View style={styles.celestialKickerRow}><IconSymbol name="sparkles" color="#B8AEFF" size={15} /><ThemedText type="onboardingLabel" style={styles.kicker} lightColor="#B8AEFF" darkColor="#B8AEFF">Your place among the stars</ThemedText></View>
             <ThemedText type="title" style={styles.sectionTitle} lightColor="#FBF3E4" darkColor="#FBF3E4">When is your birthday?</ThemedText>
-            <ThemedText style={styles.body} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">Month and day are enough. This stays on your phone and never changes which Katchimeras hatch.</ThemedText>
+            <ThemedText style={styles.identityBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Choose the day and month to find your star companion.</ThemedText>
           </Animated.View>
-          <View style={styles.birthdayRow}>
-            <TextInput accessibilityLabel="Birth month" keyboardType="number-pad" maxLength={2} onChangeText={(value) => { setBirthMonthText(value); setZodiacSkipped(false); setConstellationDone(false); }} placeholder="MM" placeholderTextColor="rgba(255,255,255,0.35)" style={styles.birthdayInput} value={birthMonthText} />
-            <TextInput accessibilityLabel="Birth day" keyboardType="number-pad" maxLength={2} onChangeText={(value) => { setBirthDayText(value); setZodiacSkipped(false); setConstellationDone(false); }} placeholder="DD" placeholderTextColor="rgba(255,255,255,0.35)" style={styles.birthdayInput} value={birthDayText} />
+          <View style={styles.birthdayCard}>
+            <Pressable
+              accessibilityHint="Opens the day and month picker"
+              accessibilityLabel={birthDate ? `Birthday, ${birthdayLabel(birthDate)}` : 'Choose birthday'}
+              accessibilityRole="button"
+              onPress={openBirthdayPicker}
+              style={({ pressed }) => [styles.birthdayPickerRow, pressed && styles.identityOptionPressed]}>
+              <View style={styles.birthdayIcon}><IconSymbol name="calendar" color="#B8AEFF" size={24} /></View>
+              <View style={styles.birthdayPickerCopy}>
+                <ThemedText style={styles.birthdayPickerLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>BIRTHDAY</ThemedText>
+                <ThemedText style={styles.birthdayPickerValue} lightColor={birthDate ? Lantern.moon50 : Lantern.moon300} darkColor={birthDate ? Lantern.moon50 : Lantern.moon300}>{birthDate ? birthdayLabel(birthDate) : 'Choose date'}</ThemedText>
+              </View>
+              <IconSymbol name="chevron.right" color={Lantern.moon500} size={18} />
+            </Pressable>
+            {selectedSign ? <Animated.View entering={FadeIn.duration(220)} style={[styles.signPreview, { borderColor: `${selectedSign.accent}44` }]}><ThemedText style={styles.signPreviewSymbol} lightColor={selectedSign.accent} darkColor={selectedSign.accent}>{selectedSign.symbol}</ThemedText><View style={styles.signPreviewCopy}><ThemedText style={styles.signPreviewTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{selectedSign.name}</ThemedText><ThemedText style={styles.signPreviewDate} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{selectedSign.dateLabel} · {selectedSign.element}</ThemedText></View><IconSymbol name="chevron.right" color={Lantern.moon500} size={17} /></Animated.View> : null}
           </View>
-          {selectedSign && level ? (
-            <>
-              <GlassPanel contentStyle={styles.zodiacReveal} fillColor={`${selectedSign.accent}18`}>
-                <ThemedText style={styles.zodiacSymbol} lightColor={selectedSign.accent} darkColor={selectedSign.accent}>{selectedSign.symbol}</ThemedText>
-                <View style={{ flex: 1 }}><ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{selectedSign.name} · {selectedSign.element}</ThemedText><ThemedText style={styles.panelCopy} lightColor="rgba(251,243,228,0.82)" darkColor="rgba(251,243,228,0.82)">{selectedSign.familiarName} has arrived. {selectedSign.profileLine}</ThemedText></View>
-              </GlassPanel>
-              <ConnectStarsGame accentColor={selectedSign.accent} points={level.points.slice(0, 4)} tutorial onComplete={() => { setConstellationDone(true); setIdentity((current) => ({ ...current, birthMonth, birthDay, zodiacSignId: selectedSign.id, constellationTutorialCompleted: true })); }} />
-              {constellationDone ? <ThemedText style={styles.constellationComplete} lightColor={selectedSign.accent} darkColor={selectedSign.accent}>Your constellation is awake.</ThemedText> : null}
-            </>
-          ) : birthMonthText || birthDayText ? <ThemedText style={styles.invalidDate} lightColor="#F3B3A7" darkColor="#F3B3A7">Enter a valid month and day.</ThemedText> : null}
-          <KatchaButton label={zodiacSkipped ? 'Zodiac skipped' : 'Skip for now'} disabled={zodiacSkipped} onPress={() => { setZodiacSkipped(true); setBirthMonthText(''); setBirthDayText(''); setConstellationDone(false); setIdentity((current) => ({ ...current, birthMonth: null, birthDay: null, zodiacSignId: null })); }} variant="secondary" />
+          <View style={styles.privacyNote}><IconSymbol name="house.fill" color={Lantern.moon500} size={14} /><ThemedText style={styles.privacyNoteText} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Stored on this device. It never affects which Katchimeras hatch.</ThemedText></View>
+          <Pressable accessibilityRole="button" onPress={() => { setZodiacSkipped(true); setBirthDate(null); setBirthdayPickerOpen(false); setIdentity((current) => ({ ...current, birthMonth: null, birthDay: null, zodiacSignId: null })); }} style={({ pressed }) => [styles.skipLink, pressed && styles.identityOptionPressed]}><ThemedText style={styles.skipLinkText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{zodiacSkipped ? 'Birthday skipped' : 'Skip this for now'}</ThemedText></Pressable>
         </View>
       );
     }
@@ -470,7 +551,7 @@ export default function OnboardingScreen() {
     );
   }
 
-  if (storedProfile.completed) {
+  if (storedProfile.completed && !identityReplay) {
     return <Redirect href="/(tabs)" />;
   }
 
@@ -493,15 +574,16 @@ export default function OnboardingScreen() {
   return (
     <View style={styles.screen}>
       <MeadowSceneBackdrop />
+      {step >= 3 && step <= 7 ? <View pointerEvents="none" style={styles.identitySceneScrim} /> : null}
 
       <View style={[styles.safeArea, { paddingBottom: insets.bottom + 12, paddingTop: insets.top + 12 }]}>
         <View style={styles.progressRow}>
           <ThemedText type="onboardingLabel" style={styles.progressLabel} lightColor="#F2D48A" darkColor="#F2D48A">
-            {step + 1} / {totalSteps}
+            {identityReplay ? step - 2 : step + 1} / {identityReplay ? 5 : totalSteps}
           </ThemedText>
           <View style={styles.progressTrack}>
-            {Array.from({ length: totalSteps }).map((_, index) => (
-              <ProgressSegment active={index <= step} index={index} key={index} />
+            {Array.from({ length: identityReplay ? 5 : totalSteps }).map((_, index) => (
+              <ProgressSegment active={index < (identityReplay ? step - 2 : step + 1)} index={index} key={index} />
             ))}
           </View>
         </View>
@@ -509,6 +591,8 @@ export default function OnboardingScreen() {
         <ScrollView
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <Animated.View entering={FadeIn.duration(360).easing(Easing.out(Easing.cubic))} key={step}>
             {renderContent()}
@@ -521,7 +605,7 @@ export default function OnboardingScreen() {
             icon={step === totalSteps - 1 ? 'sparkles' : 'arrow.right'}
             label={primingPermissions ? 'Preparing...' : primaryActionLabel}
             onPress={handlePrimaryAction}
-            variant={step === totalSteps - 1 ? 'primary' : 'secondary'}
+            variant={step >= 6 ? 'primary' : 'secondary'}
           />
           <KatchaButton
             disabled={primingPermissions}
@@ -531,6 +615,28 @@ export default function OnboardingScreen() {
           />
         </View>
       </View>
+
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setBirthdayPickerOpen(false)}
+        presentationStyle="pageSheet"
+        visible={birthdayPickerOpen}>
+        <View style={styles.birthdayModal}>
+          <View style={styles.birthdayModalHeader}>
+            <Pressable accessibilityRole="button" hitSlop={10} onPress={() => setBirthdayPickerOpen(false)} style={styles.birthdayModalAction}>
+              <ThemedText style={styles.birthdayModalActionText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Cancel</ThemedText>
+            </Pressable>
+            <ThemedText style={styles.birthdayModalTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Choose birthday</ThemedText>
+            <Pressable accessibilityRole="button" hitSlop={10} onPress={() => { chooseBirthday(birthdayDraft); setBirthdayPickerOpen(false); }} style={styles.birthdayModalAction}>
+              <ThemedText style={styles.birthdayModalDone} lightColor="#B8AEFF" darkColor="#B8AEFF">Done</ThemedText>
+            </Pressable>
+          </View>
+          <View style={styles.birthdayModalBody}>
+            {birthdayPickerOpen ? <BirthdayWheelPicker onChange={setBirthdayDraft} value={birthdayDraft} /> : null}
+            <ThemedText style={styles.birthdayModalNote} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Only the day and month are kept on this device.</ThemedText>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -704,6 +810,28 @@ const styles = StyleSheet.create({
   stepStack: {
     gap: 22,
   },
+  identitySceneScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(12, 10, 20, 0.72)',
+  },
+  identityStep: {
+    gap: 20,
+  },
+  identityBody: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 21,
+    maxWidth: 350,
+  },
+  identityDisplay: {
+    fontSize: 44,
+    lineHeight: 47,
+  },
+  identityOptionPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.985 }],
+  },
   // Seats the ritual egg at (approximately) the home-page anchor: safe-area +
   // progress row + content padding ≈ 68dp of flow above, egg stage top at ~120.
   ritualEggStage: {
@@ -865,54 +993,90 @@ const styles = StyleSheet.create({
   },
   personalityAnswer: {
     alignItems: 'center',
-    backgroundColor: Lantern.ink800,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 22,
+    backgroundColor: Lantern.ink900,
+    borderColor: Lantern.line,
+    borderCurve: 'continuous',
+    borderRadius: 18,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 14,
-    minHeight: 64,
-    paddingHorizontal: 16,
-    paddingVertical: 11,
+    gap: 12,
+    minHeight: 66,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
   },
   personalityAnswerSelected: {
-    backgroundColor: 'rgba(229,190,106,0.15)',
-    borderColor: Lantern.ember300,
+    backgroundColor: Lantern.ink800,
+    borderColor: 'rgba(255,195,107,0.5)',
   },
   answerIndex: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderCurve: 'continuous',
+    borderRadius: 12,
+    height: 40,
     justifyContent: 'center',
-    width: 32,
+    width: 40,
   },
   answerIndexSelected: { backgroundColor: Lantern.ember300 },
-  answerLabel: { flex: 1, fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  answerIndexText: { fontSize: 12, fontWeight: '800' },
+  answerLabel: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  answerRadio: { borderColor: 'rgba(255,255,255,0.16)', borderRadius: 999, borderWidth: 1.5, height: 18, width: 18 },
+  answerRadioSelected: { backgroundColor: Lantern.ember300, borderColor: Lantern.ember300, borderWidth: 5 },
   homePreview: {
     alignItems: 'center',
-    backgroundColor: Lantern.ink800,
-    borderRadius: 30,
+    backgroundColor: Lantern.ink900,
+    borderCurve: 'continuous',
+    borderRadius: 28,
     borderWidth: 1,
-    gap: 18,
-    minHeight: 210,
+    gap: 8,
+    minHeight: 280,
     justifyContent: 'center',
-    padding: 24,
+    overflow: 'hidden',
+    paddingBottom: 18,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    position: 'relative',
   },
-  homeTilePreview: { height: 210, width: '100%' },
+  homeGlow: { borderRadius: 999, height: 240, position: 'absolute', top: 8, width: 240 },
+  homeTilePreview: { height: 238, width: '100%' },
   keywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
-  keyword: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  keywordText: { fontSize: 12, fontWeight: '800' },
+  keyword: { backgroundColor: 'rgba(5,7,14,0.36)', borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+  keywordText: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '700' },
+  choiceSectionHeader: { gap: 3, paddingTop: 4 },
+  choiceSectionTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 24, lineHeight: 28 },
+  choiceSectionBody: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, lineHeight: 18 },
   homeChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  homeChoice: { alignItems: 'center', backgroundColor: Lantern.ink800, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 20, borderWidth: 1, gap: 5, padding: 8, width: '31%' },
-  homeChoiceImage: { aspectRatio: 1, width: '100%' },
-  homeChoiceName: { fontSize: 11, fontWeight: '800' },
-  birthdayRow: { flexDirection: 'row', gap: 12 },
-  birthdayInput: { backgroundColor: Lantern.ink800, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 20, borderWidth: 1, color: Lantern.moon50, flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 28, fontWeight: '800', minHeight: 72, paddingHorizontal: 22, textAlign: 'center' },
-  zodiacReveal: { alignItems: 'center', flexDirection: 'row', gap: 16 },
-  zodiacSymbol: { fontSize: 52, lineHeight: 60 },
-  constellationComplete: { fontSize: 15, fontWeight: '800', textAlign: 'center' },
-  invalidDate: { fontSize: 13, textAlign: 'center' },
+  homeChoice: { backgroundColor: Lantern.ink900, borderColor: Lantern.line, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 3, padding: 9, width: '48.5%' },
+  homeChoiceSelected: { backgroundColor: Lantern.ink800 },
+  homeChoiceArt: { aspectRatio: 1.18, position: 'relative', width: '100%' },
+  homeChoiceImage: { height: '100%', width: '100%' },
+  homeChoiceCheck: { alignItems: 'center', borderRadius: 999, height: 25, justifyContent: 'center', position: 'absolute', right: 1, top: 1, width: 25 },
+  homeChoiceName: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '800', lineHeight: 18 },
+  homeChoiceKeywords: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, lineHeight: 14 },
+  celestialKickerRow: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  birthdayCard: { alignItems: 'stretch', backgroundColor: Lantern.ink900, borderColor: 'rgba(184,174,255,0.18)', borderCurve: 'continuous', borderRadius: 26, borderWidth: 1, gap: 14, padding: 14 },
+  birthdayPickerRow: { alignItems: 'center', backgroundColor: 'rgba(6,7,16,0.44)', borderColor: 'rgba(255,255,255,0.1)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 12, minHeight: 76, paddingHorizontal: 13, paddingVertical: 10 },
+  birthdayIcon: { alignItems: 'center', backgroundColor: 'rgba(184,174,255,0.12)', borderCurve: 'continuous', borderRadius: 14, height: 48, justifyContent: 'center', width: 48 },
+  birthdayPickerCopy: { flex: 1, gap: 2 },
+  birthdayPickerLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '800', letterSpacing: 1.1 },
+  birthdayPickerValue: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 25, lineHeight: 29 },
+  signPreview: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: 'rgba(5,7,14,0.35)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 62, paddingHorizontal: 12, paddingVertical: 8 },
+  signPreviewSymbol: { fontSize: 29, lineHeight: 34 },
+  signPreviewCopy: { flex: 1, gap: 1 },
+  signPreviewTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '800' },
+  signPreviewDate: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, textTransform: 'capitalize' },
+  privacyNote: { alignItems: 'center', flexDirection: 'row', gap: 7, justifyContent: 'center', paddingHorizontal: 10 },
+  privacyNoteText: { flexShrink: 1, fontFamily: AppFontFamilies.manrope, fontSize: 11.5, lineHeight: 16 },
+  skipLink: { alignItems: 'center', alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: 18 },
+  skipLinkText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700', textDecorationLine: 'underline' },
+  birthdayModal: { backgroundColor: Lantern.ink950, flex: 1 },
+  birthdayModalHeader: { alignItems: 'center', borderBottomColor: 'rgba(255,255,255,0.08)', borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 58, paddingHorizontal: 18 },
+  birthdayModalAction: { alignItems: 'center', justifyContent: 'center', minHeight: 44, minWidth: 58 },
+  birthdayModalActionText: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '600' },
+  birthdayModalDone: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '800' },
+  birthdayModalTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 16, fontWeight: '800' },
+  birthdayModalBody: { alignItems: 'center', gap: 18, paddingHorizontal: 20, paddingTop: 24 },
+  birthdayModalNote: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, lineHeight: 18, maxWidth: 310, textAlign: 'center' },
   preferenceCard: {
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.06)',

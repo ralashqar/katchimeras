@@ -52,7 +52,7 @@ export default function TabLayout() {
           name="world"
           options={{
             title: 'Kingdom',
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="map.fill" color={color} />,
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="globe.americas.fill" color={color} />,
           }}
         />
         <Tabs.Screen

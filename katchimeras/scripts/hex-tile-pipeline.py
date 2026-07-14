@@ -56,6 +56,16 @@ def parse_args() -> argparse.Namespace:
         help="Additional square WebP LOD sizes to write beside the final asset.",
     )
     parser.add_argument("--workdir")
+    parser.add_argument(
+        "--skip-bounds",
+        action="store_true",
+        help="Defer the shared alpha-bounds manifest rebuild (useful for parallel batches).",
+    )
+    parser.add_argument(
+        "--preserve-background-cutouts",
+        action="store_true",
+        help="Keep pure-black openings through arches transparent while restoring non-black source detail.",
+    )
     return parser.parse_args()
 
 
@@ -276,11 +286,40 @@ def restore_source_silhouette(rgba: Image.Image, source: Image.Image) -> Image.I
     return Image.fromarray(fixed)
 
 
+def restore_nonblack_source_pixels(rgba: Image.Image, source: Image.Image) -> Image.Image:
+    """Repair matte dropouts without filling intentional pure-black openings.
+
+    Celestial arches and similar open structures can enclose background regions,
+    so border-connected flood fill cannot distinguish them from damaged grass.
+    The generation contract gives us a pure-black backdrop: restore only source
+    pixels that are visibly non-black and leave every black opening transparent.
+    """
+
+    rgba = rgba.convert("RGBA")
+    source_rgb = source.convert("RGB").resize(rgba.size, Image.Resampling.LANCZOS)
+    src = np.asarray(source_rgb).astype(np.int16)
+    max_channel = src.max(axis=2)
+    min_channel = src.min(axis=2)
+    nonblack = (max_channel >= 30) | ((max_channel - min_channel) >= 18)
+    alpha = np.asarray(rgba.getchannel("A"))
+    restore = nonblack & (alpha < 245)
+    if restore.sum() == 0:
+        return rgba
+    print("non-black source restore:", int(restore.sum()), "px from source")
+    fixed = np.asarray(rgba).copy()
+    fixed[..., :3] = np.where(restore[..., None], src, fixed[..., :3])
+    fixed[..., 3] = np.where(restore, 255, fixed[..., 3])
+    return Image.fromarray(fixed.astype(np.uint8))
+
+
 def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: Path) -> Path:
     rgba = Image.open(matted).convert("RGBA")
     source_img = Image.open(source)
-    rgba = fill_internal_alpha_holes(rgba, source_img)
-    rgba = restore_source_silhouette(rgba, source_img)
+    if args.preserve_background_cutouts:
+        rgba = restore_nonblack_source_pixels(rgba, source_img)
+    else:
+        rgba = fill_internal_alpha_holes(rgba, source_img)
+        rgba = restore_source_silhouette(rgba, source_img)
 
     bbox = rgba.getchannel("A").getbbox()
     if not bbox:
@@ -308,11 +347,12 @@ def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: P
         lod.save(lod_path, format="WEBP", quality=min(args.quality, lod_quality), method=6)
         print("bundled lod", lod_path, lod_path.stat().st_size // 1024, "KB")
 
-    subprocess.run(
-        [sys.executable, str(ROOT / "scripts" / "generate-hex-tile-bounds.py")],
-        cwd=ROOT,
-        check=True,
-    )
+    if not args.skip_bounds:
+        subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "generate-hex-tile-bounds.py")],
+            cwd=ROOT,
+            check=True,
+        )
 
     qa = Image.new("RGB", (final_size, final_size), (18, 22, 40))
     qa.paste(canvas, (0, 0), canvas)
