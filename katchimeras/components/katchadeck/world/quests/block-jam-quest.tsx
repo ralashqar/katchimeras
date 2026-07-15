@@ -57,7 +57,6 @@ export function BlockJamQuest(props: Props) {
   const cell = Math.max(25, Math.floor((maxBoard - outer * 2 - gap * (level.columns - 1)) / level.columns));
   const pitch = cell + gap; const gridWidth = level.columns * cell + (level.columns - 1) * gap; const gridHeight = level.rows * cell + (level.rows - 1) * gap;
   const boardWidth = gridWidth + outer * 2; const boardHeight = gridHeight + outer * 2;
-  const reachable = selectedId ? reachableBlockJamAnchors(level, state, selectedId) : [];
   const exit = selectedId ? availableBlockJamDoor(level, state, selectedId) : null;
 
   useEffect(() => {
@@ -109,14 +108,6 @@ export function BlockJamQuest(props: Props) {
     setTimeout(() => setBurst(null), exitDuration + 40);
   };
   const undo = () => { setState((current) => blockJamReducer(level, current, { type: 'undo' })); setSelectedId(null); };
-  const place = (blockId: string, anchor: BlockJamAnchor) => {
-    const destinationDoor = blockJamDoorAtAnchor(level, state, blockId, anchor);
-    move(blockId, anchor);
-    if (destinationDoor) {
-      const start = { x: outer + anchor.column * pitch, y: outer + anchor.row * pitch };
-      setTimeout(() => clear(blockId, destinationDoor, { start }), reduceMotion ? 20 : 135);
-    }
-  };
 
   if (!started) return <Preview level={level} best={best} onStart={start} reduceMotion={reduceMotion} />;
   if (state.status === 'won' && attempt.current) {
@@ -131,11 +122,10 @@ export function BlockJamQuest(props: Props) {
     <View style={styles.boardFrame}><View pointerEvents={state.status === 'playing' ? 'auto' : 'none'} accessibilityLabel={`${level.rows} by ${level.columns} color block puzzle`} style={[styles.board, { width: boardWidth, height: boardHeight }]}>
       <BoardSurface level={level} cell={cell} gap={gap} outer={outer} width={boardWidth} height={boardHeight} />
       {level.doors.map((door) => <ExitRail key={door.id} door={door} cell={cell} pitch={pitch} outer={outer} boardWidth={boardWidth} boardHeight={boardHeight} active={exit?.id === door.id} onPress={() => selectedId && exit?.id === door.id && clear(selectedId, door)} reduceMotion={reduceMotion} />)}
-      {reachable.map((anchor) => <Pressable key={`${anchor.row}:${anchor.column}`} accessibilityLabel={`Move to row ${anchor.row + 1}, column ${anchor.column + 1}`} onPress={() => selectedId && place(selectedId, anchor)} style={[styles.destination, { left: outer + anchor.column * pitch + cell * .34, top: outer + anchor.row * pitch + cell * .34, width: cell * .32, height: cell * .32 }]} />)}
       {level.blocks.map((block, index) => state.clearedBlockIds.includes(block.id) || burst?.block.id === block.id ? null : <BrickPiece key={block.id} level={level} state={state} block={block} anchor={state.anchors[block.id]} reachable={reachableBlockJamAnchors(level, state, block.id)} exitOptions={blockJamExitOptions(level, state, block.id)} cell={cell} gap={gap} outer={outer} index={index} selected={selectedId === block.id} visible={boardReady} reduceMotion={reduceMotion} onPick={() => { setSelectedId(block.id); haptic('pick'); }} onMove={(anchor) => move(block.id, anchor)} onExit={(door, exitOptions) => clear(block.id, door, exitOptions)} />)}
       {burst ? <ClearBurst block={burst.block} door={burst.door} start={burst.start} cell={cell} gap={gap} pitch={pitch} boardWidth={boardWidth} boardHeight={boardHeight} reduceMotion={reduceMotion} /> : null}
     </View></View>
-    {state.status === 'failed' ? <Animated.View entering={FadeInDown.duration(160)} style={styles.jammed}><ThemedText style={styles.jammedTitle} lightColor="#FF9B8C" darkColor="#FF9B8C">Time’s up</ThemedText><ThemedText style={styles.jammedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart for a fresh clock and keep experimenting with the layout.</ThemedText></Animated.View> : <ThemedText style={styles.help} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{selectedId ? 'Drag anywhere in the lit area, or tap a landing dot.' : 'Drag connected blocks freely. Match each color to its glowing rail.'}</ThemedText>}
+    {state.status === 'failed' ? <Animated.View entering={FadeInDown.duration(160)} style={styles.jammed}><ThemedText style={styles.jammedTitle} lightColor="#FF9B8C" darkColor="#FF9B8C">Time’s up</ThemedText><ThemedText style={styles.jammedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart for a fresh clock and keep experimenting with the layout.</ThemedText></Animated.View> : <ThemedText style={styles.help} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{selectedId ? 'Try dragging it to any open grid position.' : 'Drag connected blocks freely. Match each color to its glowing rail.'}</ThemedText>}
     <View style={styles.controls}><Pressable disabled={!state.history.length || state.status !== 'playing'} onPress={undo} style={[styles.iconButton, (!state.history.length || state.status !== 'playing') && styles.disabled]}><IconSymbol name="arrow.counterclockwise" size={18} color={Lantern.moon300} /></Pressable><Pressable onPress={reset} style={styles.controlButton}><ThemedText style={styles.controlText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart</ThemedText></Pressable><Pressable onPress={() => Alert.alert('Leave Block Jam?', 'This layout will reset.', [{ text: 'Keep playing', style: 'cancel' }, { text: 'Leave', style: 'destructive', onPress: leave }])} style={styles.iconButton}><IconSymbol name="xmark" size={18} color={Lantern.moon300} /></Pressable></View>
   </View>;
 }
@@ -221,7 +211,28 @@ function ClearBurst({ block, door, start, cell, gap, pitch, boardWidth, boardHei
 }
 
 function Preview({ level, best, onStart, reduceMotion }: { level: BlockJamLevel; best: Props['best']; onStart: () => void; reduceMotion: boolean }) {
-  return <View style={styles.previewRoot}><ExperienceHeader eyebrow="TASKLET" title="Tasklet’s Block Jam" body="Unclog the desk. Experiment freely, open routes, and slide every connected color block through its matching edge rail before time runs out." /><Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 240)} style={styles.previewScene}><View style={styles.previewBoard}>{(['red','violet','cyan','lime','blue','amber'] as BlockJamColorId[]).map((color, index) => <View key={color} style={[styles.previewBrick, { backgroundColor: COLORS[color].mid, borderColor: COLORS[color].bright, left: 18 + (index % 3) * 39, top: 24 + Math.floor(index / 3) * 43, width: index % 2 ? 66 : 34 }]} />)}</View><Image source={TASKLET} contentFit="contain" style={styles.tasklet} /><View style={styles.previewBadge}><ThemedText style={styles.previewBadgeText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{level.rows}×{level.columns} · {level.blocks.length} BLOCKS</ThemedText></View></Animated.View><View style={styles.previewFooter}><ThemedText style={styles.best} lightColor={best ? Lantern.auroraTeal : Lantern.moon500} darkColor={best ? Lantern.auroraTeal : Lantern.moon500}>{best ? `FASTEST ${formatCountdown(Math.max(1, Math.round(best.durationMs / 1000)))}` : `${formatCountdown(Math.ceil(level.timeLimitMs / 1000))} TO CLEAR · MOVES ARE FREE`}</ThemedText><ExperienceAction label="Clear the jam" onPress={onStart} /></View></View>;
+  return <View style={styles.previewRoot}><ExperienceHeader eyebrow="TASKLET" title="Tasklet’s Block Jam" body="Unclog the desk. Experiment freely, open routes, and slide every connected color block through its matching edge rail before time runs out." /><Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 240)} style={styles.previewScene}><PreviewBoard level={level} /><Image source={TASKLET} contentFit="contain" style={styles.tasklet} /><View style={styles.previewBadge}><ThemedText style={styles.previewBadgeText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{level.rows}×{level.columns} · {level.blocks.length} BLOCKS</ThemedText></View></Animated.View><View style={styles.previewFooter}><ThemedText style={styles.best} lightColor={best ? Lantern.auroraTeal : Lantern.moon500} darkColor={best ? Lantern.auroraTeal : Lantern.moon500}>{best ? `FASTEST ${formatCountdown(Math.max(1, Math.round(best.durationMs / 1000)))}` : `${formatCountdown(Math.ceil(level.timeLimitMs / 1000))} TO CLEAR · MOVES ARE FREE`}</ThemedText><ExperienceAction label="Clear the jam" onPress={onStart} /></View></View>;
+}
+
+const PREVIEW_BOARD_CANVAS_STYLE = { backgroundColor: 'transparent', borderWidth: 0, overflow: 'hidden' as const };
+
+function PreviewBoard({ level }: { level: BlockJamLevel }) {
+  const width = 150; const height = 140; const padding = 10; const gap = 1;
+  const cell = Math.floor(Math.min((width - padding * 2 - gap * (level.columns - 1)) / level.columns, (height - padding * 2 - gap * (level.rows - 1)) / level.rows));
+  const pitch = cell + gap; const gridWidth = level.columns * cell + (level.columns - 1) * gap; const gridHeight = level.rows * cell + (level.rows - 1) * gap;
+  const originX = (width - gridWidth) / 2; const originY = (height - gridHeight) / 2;
+  return <View style={[styles.previewBoard, PREVIEW_BOARD_CANVAS_STYLE, { height, width }]}><Canvas style={StyleSheet.absoluteFill}>
+    <RoundedRect x={1} y={1} width={width - 2} height={height - 2} r={17}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#222A4A', '#0D1228']} /></RoundedRect>
+    <RoundedRect x={originX - 4} y={originY - 4} width={gridWidth + 8} height={gridHeight + 8} r={9} color="#070A17" />
+    {Array.from({ length: level.rows * level.columns }, (_, index) => { const x = originX + (index % level.columns) * pitch; const y = originY + Math.floor(index / level.columns) * pitch; return <RoundedRect key={`preview-cell-${index}`} x={x} y={y} width={cell} height={cell} r={Math.max(2, cell * .18)} color={level.fixedCells.includes(index) ? '#485067' : '#171D35'} />; })}
+    {level.blocks.flatMap((block) => block.cells.map((part, index) => { const x = originX + (block.anchor.column + part.column) * pitch; const y = originY + (block.anchor.row + part.row) * pitch; const palette = COLORS[block.colorId]; return <Group key={`preview-${block.id}-${index}`}>
+      {block.cells.some((other) => other.row === part.row && other.column === part.column + 1) ? <Rect x={x + cell - 2} y={y + 2} width={gap + 4} height={cell - 4} color={palette.mid} /> : null}
+      {block.cells.some((other) => other.column === part.column && other.row === part.row + 1) ? <Rect x={x + 2} y={y + cell - 2} width={cell - 4} height={gap + 4} color={palette.deep} /> : null}
+      <RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(2.5, cell * .2)}><LinearGradient start={vec(x, y)} end={vec(x, y + cell)} colors={[palette.bright, palette.mid, palette.deep]} positions={[0, .5, 1]} /></RoundedRect>
+      <RoundedRect x={x + 2} y={y + 2} width={Math.max(2, cell - 4)} height={Math.max(2, cell * .3)} r={Math.max(1.5, cell * .12)} color="#FFFFFF" opacity={.16} />
+    </Group>; }))}
+    {level.doors.map((door) => { const palette = COLORS[door.colorId]; const horizontal = door.edge === 'top' || door.edge === 'bottom'; const railLength = door.span * cell + (door.span - 1) * gap; const x = horizontal ? originX + door.offset * pitch : door.edge === 'left' ? originX - 5 : originX + gridWidth + 2; const y = horizontal ? door.edge === 'top' ? originY - 5 : originY + gridHeight + 2 : originY + door.offset * pitch; return <RoundedRect key={`preview-door-${door.id}`} x={x} y={y} width={horizontal ? railLength : 3} height={horizontal ? 3 : railLength} r={2} color={palette.bright} />; })}
+  </Canvas></View>;
 }
 
 function formatCountdown(totalSeconds: number): string {

@@ -56,6 +56,7 @@ test('Tasklet Block Jam V2 ships 30 deterministic, connected, dense boards', () 
   assert.deepEqual([...new Set(TASKLET_DESK_JAM_LEVELS.map((level) => level.tier))], [1, 2, 3]);
   for (const level of TASKLET_DESK_JAM_LEVELS) {
     assert.deepEqual(validateBlockJamLevel(level), [], level.id);
+    assert.deepEqual(level.fixedCells, [], `${level.id} should not ship blocked cells`);
     assert.equal(level.rulesetId, BLOCK_JAM_RULESET);
     assert.equal(level.timeLimitMs, level.chapter === 'tutorial' || level.tier === 1 ? 180_000 : level.tier === 2 ? 240_000 : 300_000);
     if (level.chapter === 'standard') {

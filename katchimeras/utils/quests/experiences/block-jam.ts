@@ -69,10 +69,13 @@ const SHAPES = {
 } as const;
 type ShapeId = keyof typeof SHAPES;
 const C: BlockJamColorId[] = ['red','violet','cyan','lime','blue','amber'];
+// Fixed cells are temporarily disabled until obstacle placement is included in
+// the same solvability pass as exits and starting block positions.
+const FIXED_CELLS_ENABLED = false;
 
 const block = (id: string, colorId: BlockJamColorId, shape: ShapeId, row: number, column: number): BlockJamBlockDefinition => ({ id, colorId, anchor: { row, column }, cells: SHAPES[shape].map(([cellRow, cellColumn]) => ({ row: cellRow, column: cellColumn })) });
 const door = (id: string, colorId: BlockJamColorId, edge: BlockJamEdge, offset: number, span: number): BlockJamDoor => ({ id, colorId, edge, offset, span });
-const level = (id: string, chapter: BlockJamLevel['chapter'], tier: BlockJamTier, rows: number, columns: number, blocks: BlockJamBlockDefinition[], doors: BlockJamDoor[], fixedCells: number[] = [], parMoves = blocks.length): BlockJamLevel => ({ id, rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter, tier, rows, columns, parMoves, timeLimitMs: chapter === 'tutorial' || tier === 1 ? 180_000 : tier === 2 ? 240_000 : 300_000, blocks, doors, fixedCells });
+const level = (id: string, chapter: BlockJamLevel['chapter'], tier: BlockJamTier, rows: number, columns: number, blocks: BlockJamBlockDefinition[], doors: BlockJamDoor[], fixedCells: number[] = [], parMoves = blocks.length): BlockJamLevel => ({ id, rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter, tier, rows, columns, parMoves, timeLimitMs: chapter === 'tutorial' || tier === 1 ? 180_000 : tier === 2 ? 240_000 : 300_000, blocks, doors, fixedCells: FIXED_CELLS_ENABLED ? fixedCells : [] });
 
 function tutorialLevels(): BlockJamLevel[] {
   return [
