@@ -6,7 +6,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
   bedrotte: ['quest-bedrotte-breathe', 'quest-early-night'],
   steppling: ['quest-steppling-stride', 'quest-step-sprint', 'quest-step-time-trial', 'quest-long-walk'],
   flickerbun: ['quest-film-trivia', 'quest-watch-film', 'quest-any-inspiration'],
-  pagelet: ['quest-book-trivia', 'quest-pagelet-lost-word', 'quest-read-book', 'quest-any-inspiration'],
+  pagelet: ['quest-book-trivia', 'quest-pagelet-word-paths', 'quest-pagelet-lost-word', 'quest-read-book', 'quest-any-inspiration'],
   mossprout: ['quest-mossprout-memory', 'quest-new-park'],
   skylo: ['quest-skylo-city-trivia', 'quest-photo-city'],
   gatherglow: ['quest-gatherglow-pattern', 'quest-snap-today'],

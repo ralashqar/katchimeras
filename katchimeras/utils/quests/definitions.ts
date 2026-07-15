@@ -29,6 +29,13 @@ export type QuestDefinition = {
         answerLength: 5;
         maxGuesses: 6;
         difficultyCurveId: 'pagelet-lost-word-v1';
+      }
+    | {
+        kind: 'word_connect';
+        gameId: 'pagelet_word_paths';
+        packId: 'pagelet-word-paths';
+        rulesetId: 'word-paths-v1';
+        difficultyCurveId: 'pagelet-word-paths-v1';
       };
   eligibility?: {
     creatureKeys?: string[];
@@ -118,6 +125,23 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       maxGuesses: 6,
       difficultyCurveId: 'pagelet-lost-word-v1',
     },
+    eligibility: { creatureKeys: ['pagelet'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-pagelet-word-paths': {
+    id: 'quest-pagelet-word-paths',
+    family: 'studio',
+    title: 'Pagelet\'s Word Paths',
+    hint: 'Link the shelf letters to uncover every crossing word.',
+    criteria: [],
+    execution: {
+      kind: 'word_connect',
+      gameId: 'pagelet_word_paths',
+      packId: 'pagelet-word-paths',
+      rulesetId: 'word-paths-v1',
+      difficultyCurveId: 'pagelet-word-paths-v1',
+    },
+    requiresCapabilities: [],
+    submissionMode: 'auto',
     eligibility: { creatureKeys: ['pagelet'], cooldownDays: 1, weight: 3 },
   },
   'quest-bedrotte-breathe': {

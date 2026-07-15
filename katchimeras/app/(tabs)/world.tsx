@@ -271,6 +271,7 @@ export default function KingdomScreen() {
           onQuestAction={handleQuestAction}
           recentTriviaQuestionIds={quests.recentTriviaQuestionIds}
           recentWordPuzzleIds={quests.recentWordPuzzleIds}
+          recentWordPathPuzzleIds={quests.recentWordPathPuzzleIds}
           recentSortingItemIds={quests.recentSortingItemIds}
           sortingBestDurationMs={quests.selectedSortingBestDurationMs}
           matchingBestDurationMs={quests.selectedMatchingBestDurationMs}

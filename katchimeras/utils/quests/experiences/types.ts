@@ -17,6 +17,19 @@ export type QuestResult =
       difficultyTier: 1 | 2 | 3 | 4 | 5;
       hintUsed: boolean;
     }
+  | {
+      kind: 'word_connect';
+      success: true;
+      packId: 'pagelet-word-paths';
+      puzzleId: string;
+      wordsFound: number;
+      totalWords: number;
+      bonusWordsFound: number;
+      submittedWords: number;
+      durationMs: number;
+      difficultyTier: 1 | 2 | 3 | 4 | 5;
+      hintsUsed: number;
+    }
   | { kind: 'paced_breathing'; success: true; completedCycles: number; durationMs: number }
   | { kind: 'timing_zone'; success: boolean; hits: number; attempts: number; accuracy: number; averageOffsetMs: number; durationMs: number; personalBest?: boolean }
   | { kind: 'pattern_memory'; success: boolean; completedRounds: number; rounds: number; longestSequence: number; mistakes: number; durationMs: number; personalBest?: boolean }

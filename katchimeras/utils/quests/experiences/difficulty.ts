@@ -40,6 +40,10 @@ export function resolveLostWordDifficulty(completedCount: number): {
   return { difficultyTier: 5, initialHint: 'category', hintUnlockAfter: 3 };
 }
 
+export function resolveWordPathsDifficulty(completedCount: number): { difficultyTier: 1 | 2 | 3 | 4 | 5; hintAllowance: 1 } {
+  return { difficultyTier: Math.min(5, 1 + Math.floor(completedCount / 2)) as 1 | 2 | 3 | 4 | 5, hintAllowance: 1 };
+}
+
 export function resolveBreathingConfig(completedCount: number) {
   return { inhaleMs: 4_000, exhaleMs: 6_000, cycles: Math.min(6, 4 + Math.floor(completedCount / 2)), tier: Math.min(3, 1 + Math.floor(completedCount / 2)) };
 }

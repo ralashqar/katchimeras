@@ -89,10 +89,12 @@ python scripts/asset-pipeline.py verify --in assets/images/katchimeras/cutouts/l
 ### Hatchling-to-final evolution grids
 
 `scripts/generate-evolution-grid.py` creates an ordered 3x3 review sheet for
-any catalog Katchimera. It passes the fixed base hatchling and the existing
-final cutout together to the edit model, runs the result through the deployed
-BiRefNet **General Use (Heavy)** matte, stamps the exact hatchling into stage
-one, and exports nine transparent cells plus a review grid and manifest.
+any catalog Katchimera. Its default `guided-sheet` strategy passes the fixed
+base hatchling as the sole generation image reference, supplies the adult
+identity and every monotonic stage as text, and then runs the sheet through the
+deployed BiRefNet **General Use (Heavy)** matte. The exact hatchling and exact
+existing adult cutout are stamped into stages one and nine after generation.
+This avoids both backward egg states and premature copying of the adult design.
 
 ```bash
 # Resolves the profile and final cutout from the catalog/name.
@@ -103,6 +105,9 @@ python scripts/generate-evolution-grid.py \
   --name moonling \
   --description "a soft moonlit cloud creature with crescent ears" \
   --final path/to/moonling.png
+
+# Prefer a precise adult description: palette, anatomy, motif, tail/ears and
+# explicit exclusions such as no clothing or handheld props.
 
 # Prompt and manifest only; no generation cost.
 python scripts/generate-evolution-grid.py --creature pagelet --dry-run --force

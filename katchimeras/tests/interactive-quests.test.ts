@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig } from '@/utils/quests/experiences/difficulty';
+import { resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
 import { LOST_WORD_PUZZLES, selectLostWordPuzzle, validateLostWordPuzzles } from '@/utils/quests/experiences/lost-word-puzzles';
+import { createWordPathRound, wordPathCellRevealed, wordPathLetterAtPoint, wordPathReducer, wordPathRoundComplete } from '@/utils/quests/experiences/word-paths';
+import { selectWordPathPuzzle, validateWordPathPuzzles, WORD_PATH_PUZZLES } from '@/utils/quests/experiences/word-paths-puzzles';
 import { answerTriviaQuestion, createTriviaRound, triviaRoundComplete, triviaRoundScore } from '@/utils/quests/experiences/trivia';
 import { BOOK_TRIVIA_QUESTIONS, CITY_TRIVIA_QUESTIONS, FILM_TRIVIA_QUESTIONS, validateTriviaPack } from '@/utils/quests/experiences/trivia-packs';
 import { advanceBreathing, createBreathingState } from '@/utils/quests/experiences/paced-breathing';
@@ -21,6 +23,7 @@ test('Steppling, Flickerbun, and Pagelet receive their interactive quest familie
   assert.equal(themedQuestOffers('cinema', 'culture', 'flickerbun')[0]?.id, 'quest-film-trivia');
   assert.equal(themedQuestOffers('bookstore', 'culture', 'pagelet')[0]?.id, 'quest-book-trivia');
   assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-pagelet-lost-word'));
+  assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-pagelet-word-paths'));
 });
 
 test('the new companion quest pools lead with their reusable mini-game', () => {
@@ -73,6 +76,108 @@ test('Lost Word difficulty reduces and delays hints across five bounded tiers', 
   assert.equal(resolveLostWordDifficulty(6).difficultyTier, 3);
   assert.deepEqual(resolveLostWordDifficulty(9), { difficultyTier: 4, initialHint: 'delayed_clue', hintUnlockAfter: 2 });
   assert.deepEqual(resolveLostWordDifficulty(99), { difficultyTier: 5, initialHint: 'category', hintUnlockAfter: 3 });
+});
+
+test('Word Paths includes a broad, valid 4-to-6-letter difficulty curve and avoids recent rounds', () => {
+  assert.ok(WORD_PATH_PUZZLES.length >= 90);
+  assert.deepEqual(validateWordPathPuzzles(), []);
+  const selected = selectWordPathPuzzle('pagelet:paths:day-1');
+  assert.equal(selected.letters.length, 6);
+  assert.equal(selected.words.length, 8);
+  assert.equal(selectWordPathPuzzle('pagelet:paths:day-1').id, selected.id);
+  assert.notEqual(selectWordPathPuzzle('pagelet:paths:day-1', [selected.id]).id, selected.id);
+  const letterCounts = [4, 4, 5, 5, 6];
+  const wordCounts = [4, 5, 6, 7, 8];
+  for (let tier = 1; tier <= 5; tier += 1) {
+    const tierPuzzle = selectWordPathPuzzle(`pagelet:paths:tier-${tier}`, [], tier);
+    assert.equal(tierPuzzle.tier, tier);
+    assert.equal(tierPuzzle.letters.length, letterCounts[tier - 1]);
+    assert.equal(tierPuzzle.words.length, wordCounts[tier - 1]);
+  }
+  assert.deepEqual(resolveWordPathsDifficulty(0), { difficultyTier: 1, hintAllowance: 1 });
+  assert.equal(resolveWordPathsDifficulty(99).difficultyTier, 5);
+});
+
+test('Word Paths rejects side-touching placements that create undeclared words', () => {
+  const invalid = {
+    id: 'invalid-side-touch',
+    letters: ['e', 'a', 's', 't'],
+    words: ['eat', 'sea'],
+    bonusWords: [],
+    placements: [
+      { word: 'eat', row: 0, column: 0, direction: 'across' as const },
+      { word: 'sea', row: 1, column: 0, direction: 'across' as const },
+    ],
+    rows: 2,
+    columns: 3,
+    tier: 1 as const,
+  };
+  assert.ok(validateWordPathPuzzles([...WORD_PATH_PUZZLES, invalid]).some((error) => error.includes('unintended down word')));
+});
+
+test('Word Paths traces, backtracks, scores bonus words, hints, shuffles, and completes', () => {
+  let round = createWordPathRound({ seed: 'paths:test', puzzleId: 'pagelet-word-paths-001', difficultyTier: 1 });
+  const identityFor = (letter: string, used: number[] = []) => round.puzzle.letters.findIndex((candidate, index) => candidate === letter && !used.includes(index));
+  const traceWord = (word: string) => {
+    const used: number[] = [];
+    for (const letter of word) {
+      const index = identityFor(letter, used);
+      used.push(index);
+      round = wordPathReducer(round, { type: 'trace_letter', index });
+    }
+    round = wordPathReducer(round, { type: 'submit' });
+  };
+
+  const first = identityFor('e');
+  const second = identityFor('a');
+  round = wordPathReducer(round, { type: 'trace_letter', index: first });
+  round = wordPathReducer(round, { type: 'trace_letter', index: second });
+  round = wordPathReducer(round, { type: 'trace_letter', index: first });
+  assert.deepEqual(round.trace, [first]);
+  round = wordPathReducer(round, { type: 'clear_trace' });
+
+  traceWord('tea');
+  assert.deepEqual(round.bonusWordsFound, ['tea']);
+  const beforeShuffle = round.shuffleOrder;
+  round = wordPathReducer(round, { type: 'shuffle' });
+  assert.notDeepEqual(round.shuffleOrder, beforeShuffle);
+  assert.deepEqual([...round.shuffleOrder].sort(), beforeShuffle);
+  round = wordPathReducer(round, { type: 'hint' });
+  assert.equal(round.hintsUsed, 1);
+  assert.equal(round.hintedCells.length, 1);
+  assert.equal(wordPathCellRevealed(round, round.hintedCells[0]), true);
+  assert.deepEqual(wordPathReducer(round, { type: 'hint' }), round);
+
+  for (const word of round.puzzle.words) traceWord(word);
+  assert.equal(wordPathRoundComplete(round), true);
+  assert.equal(round.foundWords.length, round.puzzle.words.length);
+});
+
+test('Word Paths wheel hit testing selects the nearest letter within hit slop', () => {
+  const positions = [{ x: 20, y: 20 }, { x: 80, y: 20 }, { x: 50, y: 80 }];
+  assert.equal(wordPathLetterAtPoint(20, 20, positions, 24), 0);
+  assert.equal(wordPathLetterAtPoint(75, 22, positions, 24), 1);
+  assert.equal(wordPathLetterAtPoint(50, 55, positions, 24), -1);
+  assert.equal(wordPathLetterAtPoint(200, 200, positions, 24), -1);
+});
+
+test('Word Paths marks an already revealed word as a fresh duplicate submission', () => {
+  let round = createWordPathRound({ seed: 'paths:duplicate', puzzleId: 'pagelet-word-paths-001', difficultyTier: 1 });
+  const submit = (word: string) => {
+    const used: number[] = [];
+    for (const letter of word) {
+      const index = round.puzzle.letters.findIndex((candidate, identity) => candidate === letter && !used.includes(identity));
+      used.push(index);
+      round = wordPathReducer(round, { type: 'trace_letter', index });
+    }
+    round = wordPathReducer(round, { type: 'submit' });
+  };
+  submit('east');
+  assert.equal(round.feedback, 'target');
+  submit('east');
+  assert.equal(round.feedback, 'already_found');
+  assert.equal(round.submissions, 2);
+  assert.deepEqual(round.foundWords, ['east']);
 });
 
 test('step sprint difficulty is bounded and time trials use their own targets', () => {

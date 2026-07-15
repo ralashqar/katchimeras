@@ -469,15 +469,19 @@ function MergeCell({ item, index, cellSize, merged, invalid, ready, reduceMotion
     .onFinalize(() => {
       runOnJS(onDragFinish)();
       const settleDuration = reduceMotion ? 55 : 135;
+      const releaseHold = reduceMotion ? 32 : 80;
       const settleEasing = Easing.out(Easing.cubic);
-      x.value = withTiming(0, { duration: settleDuration, easing: settleEasing });
-      y.value = withTiming(0, { duration: settleDuration, easing: settleEasing });
-      scale.value = reduceMotion
+      // Keep the source tile at its exact final drag transform until the JS
+      // board commit mounts the destination tile. This prevents a one-frame
+      // flash back toward the source before a successful drop lands.
+      x.value = withDelay(releaseHold, withTiming(0, { duration: settleDuration, easing: settleEasing }));
+      y.value = withDelay(releaseHold, withTiming(0, { duration: settleDuration, easing: settleEasing }));
+      scale.value = withDelay(releaseHold, reduceMotion
         ? withTiming(1, { duration: settleDuration, easing: settleEasing })
         : withSequence(
           withTiming(0.99, { duration: 55, easing: Easing.out(Easing.quad) }),
           withTiming(1, { duration: 80, easing: settleEasing }),
-        );
+        ));
     });
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }] }));
   const landingStyle = useAnimatedStyle(() => ({ transform: [{ translateX: dropX.value }, { translateY: dropY.value }, { scale: landingScale.value }] }));

@@ -42,7 +42,7 @@ import {
 } from '@/utils/quests/report-back-evidence';
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import { questDefinition } from '@/utils/quests/definitions';
-import { completedQuestCount, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig } from '@/utils/quests/experiences/difficulty';
+import { completedQuestCount, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
 import { isInteractiveExecution, type QuestResult } from '@/utils/quests/experiences/types';
 import { refreshQuestFacts } from '@/utils/quests/facts';
 import type { Facts } from '@/utils/signals/facts';
@@ -603,6 +603,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedOfferCount: selectedOfferOptions.length,
     recentTriviaQuestionIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'trivia' ? attempt.result.questionIds : []).slice(-40),
     recentWordPuzzleIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'word_game' ? [attempt.result.puzzleId] : []).slice(-30),
+    recentWordPathPuzzleIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'word_connect' ? [attempt.result.puzzleId] : []).slice(-30),
     recentSortingItemIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'sorting' ? attempt.result.itemIds : []).slice(-40),
     selectedSortingBestDurationMs,
     selectedMatchingBestDurationMs,
@@ -674,6 +675,14 @@ function resolveInteractiveConfig(
       answerLength: definition.execution.answerLength,
       maxGuesses: definition.execution.maxGuesses,
       ...resolveLostWordDifficulty(completedQuestCount(state.quests, questId, creatureId)),
+    };
+  }
+  if (definition?.execution?.kind === 'word_connect') {
+    return {
+      gameId: definition.execution.gameId,
+      packId: definition.execution.packId,
+      rulesetId: definition.execution.rulesetId,
+      ...resolveWordPathsDifficulty(completedQuestCount(state.quests, questId, creatureId)),
     };
   }
   if (definition?.execution?.kind === 'paced_breathing') return resolveBreathingConfig(completedQuestCount(state.quests, questId, creatureId));

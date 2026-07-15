@@ -66,6 +66,7 @@ export type CompanionInteractionSheetProps = {
   onQuestAction: () => void;
   recentTriviaQuestionIds?: string[];
   recentWordPuzzleIds?: string[];
+  recentWordPathPuzzleIds?: string[];
   recentSortingItemIds?: string[];
   sortingBestDurationMs?: number | null;
   matchingBestDurationMs?: number | null;
@@ -213,6 +214,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   seed={props.activeQuest?.offerSeed ?? `${props.creatureId}:${props.activeQuest?.title}`}
                   recentQuestionIds={props.recentTriviaQuestionIds ?? []}
                   recentPuzzleIds={props.recentWordPuzzleIds ?? []}
+                  recentWordPathPuzzleIds={props.recentWordPathPuzzleIds ?? []}
                   recentSortingItemIds={props.recentSortingItemIds ?? []}
                   sortingBestDurationMs={props.sortingBestDurationMs ?? null}
                   matchingBestDurationMs={props.matchingBestDurationMs ?? null}
