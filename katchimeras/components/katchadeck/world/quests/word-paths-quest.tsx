@@ -32,7 +32,7 @@ import {
 import type { QuestResult } from '@/utils/quests/experiences/types';
 import { ExperienceAction, ExperienceHeader } from './quest-experience-ui';
 
-type Config = { difficultyTier: 1 | 2 | 3 | 4 | 5; hintAllowance: 1 };
+type Config = { difficultyTier: 1 | 2 | 3 | 4 | 5; hintAllowance: 1; puzzleId?: string };
 type Point = { x: number; y: number };
 
 export function WordPathsQuest({ config, seed, recentPuzzleIds, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: {
@@ -46,7 +46,7 @@ export function WordPathsQuest({ config, seed, recentPuzzleIds, onAttemptStart, 
 }) {
   const { height, width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
-  const makeRound = () => createWordPathRound({ seed, recentPuzzleIds, difficultyTier: config.difficultyTier ?? 1 });
+  const makeRound = () => createWordPathRound({ seed, recentPuzzleIds, puzzleId: config.puzzleId, difficultyTier: config.difficultyTier ?? 1 });
   const [round, dispatch] = useReducer(wordPathReducer, null, makeRound);
   const [started, setStarted] = useState(false);
   const [showResult, setShowResult] = useState(false);

@@ -143,6 +143,30 @@ EPIC_STAGE_SPECS = [
         "description": "a majestic ultimate Pagelet evolution with enormous gold-edged layered page ears, luminous linen body, radiant open-book core, sweeping burgundy bookmark tail and controlled orbiting page-light energy",
     },
 ]
+
+EPIC_STAGE_DELTAS = [
+    "Use the exact approved hatchling without modification.",
+    "Remove the egg completely and reveal a tiny free-standing newborn body. Keep the limbs extremely short, "
+    "the page ears smaller than the head, the bookmark tail short, and the belly crest faint.",
+    "Grow roughly 15% taller than the newborn. Lengthen the legs enough for a stable toddler stance, enlarge the "
+    "page ears slightly, lengthen the tail, and strengthen the belly crest without using mature proportions.",
+    "Grow roughly 12% taller than the toddler. Reduce the head-to-body ratio slightly, lengthen arms and legs, "
+    "open the ears into two readable page layers, and make the stance playful and confident.",
+    "Grow roughly 12% taller than the young child. Broaden the torso, lengthen the bookmark tail, expand the ears "
+    "to half-grown layered fans, and refine the book crest while remaining visibly pre-adolescent.",
+    "Create a clear adolescent growth spurt: roughly 15% taller, longer slimmer limbs, a smaller head-to-body "
+    "ratio, two-thirds mature ear layering, richer burgundy-and-gold details, and controlled internal glow.",
+    "Move close to the adult destination without reaching it: nearly adult height, mature stance, almost full "
+    "page ears and tail, but retain a softer face, slightly larger eyes, and less visual authority than the adult.",
+    "Use the exact canonical adult Pagelet asset without modification.",
+    "Evolve beyond the canonical adult: increase ear span and layered gold page structure by roughly 40%, brighten "
+    "the open-book core, strengthen the linen-and-gold body glow, and add a controlled orbit of page-light energy. "
+    "Keep the face, trunk, body anatomy and bookmark tail unmistakably Pagelet.",
+]
+
+# Relative display scale is part of the chronological context. Without this,
+# tight-fitting every cutout makes a newborn and an adult appear equally tall.
+SEQUENTIAL_STAGE_SCALES = (0.58, 0.55, 0.64, 0.72, 0.80, 0.88, 0.94, 1.0, 1.0)
 EPIC_STAGES = [f"{spec['title']}: {spec['description']}" for spec in EPIC_STAGE_SPECS]
 
 
@@ -264,6 +288,13 @@ def build_prompt(display_name: str, description: str, adult_image_reference: boo
         else "There is no adult image reference in this generation. The adult destination is defined only by "
         "the target identity text, and the complete supplied adult will be inserted into cell 9 afterward. "
     )
+    return (
+        "Create one clean 3x3 character evolution contact sheet with nine equal square cells in chronological "
+        f"order. Show the same Katchimera evolving into {display_name}. Target identity: {description}. Reference "
+        f"image 1 defines the hatchling identity and project art style. {destination_reference}{stage_lines} "
+        "Growth moves forward only. Keep camera and lighting consistent. No scenery, extra creatures, text, UI, "
+        "humans or photorealism."
+    )
 
 
 def build_epic_prompt(display_name: str, description: str) -> str:
@@ -272,58 +303,49 @@ def build_epic_prompt(display_name: str, description: str) -> str:
         for index, spec in enumerate(EPIC_STAGE_SPECS)
     )
     return (
-        "Create one clean 3x3 character progression contact sheet: exactly three rows and three columns, nine "
-        "equal square cells read left-to-right and top-to-bottom, with thin even gutters. Show the SAME single "
-        f"{display_name} growing through nine chronological ages. Adult identity: {description}. "
-        "REFERENCE IMAGE 1 is the authoritative Pagelet hatchling and is mandatory for the face, huge amber "
-        "eyes, short soft trunk, linen material, layered page ears, burgundy bookmark tail, glowing book motifs, "
-        "rounded Katchimeras art style, camera and lighting. Preserve this exact species identity in every cell. "
-        "There is no adult image reference in the generation; the canonical adult will be inserted into cell 8 "
-        "afterward. Cell 9 must be a newly generated epic evolution of that same identity. "
-        f"{stage_lines} "
-        "EGG RULE IS ABSOLUTE: the egg-shell hatchling appears in CELL 1 ONLY. Starting with cell 2, show a full "
-        "free-standing body with absolutely no egg, shell, shell cap, shell bowl, shell fragments or egg motifs. "
-        "Never reintroduce the egg in any later cell. From cell 2 onward, the top of the head is uncovered linen: "
-        "no cap, helmet, crown, dome, segmented head covering, shell plates or eggshell-shaped headpiece. Only "
-        "intrinsic page tufts, ears and the creature's natural markings may rise from the head. Growth must be "
-        "strictly forward: each cell is visibly older, "
-        "taller, more developed and more powerful than the previous one. Do not duplicate adjacent ages and do "
-        "not change species. Preserve the short trunk, page ears, bookmark tail, linen body and open-book core as "
-        "anatomical identity markers while their size, layering and glow increase gradually. "
-        "Cell 9 is overpowered and epic but still unmistakably Pagelet: premium heroic silhouette, stronger gold "
-        "page edging, layered luminous ears, brighter inner glow, radiant open-book core and graceful magical "
-        "page-light orbit. No weapon, armor, aggression or unrelated elemental theme. "
-        "Use the same centred straight-on or gentle three-quarter hero camera, consistent framing, warm studio "
-        "lighting and premium rounded 3D Katchimeras toy-diorama finish in every cell. Use one uniform matte "
-        "dark-plum studio background for clean matting. Interpret book identity as anatomy, surfaces and magical "
-        "body markings—not literal carried objects. No clothing, scarves, bags, handheld books, tools, platforms, "
-        "scenery, extra creatures, text, letters, numbers, labels, arrows, logos, UI, humans or photorealism."
+        "Create one clean 3x3 character progression contact sheet with nine equal square cells read left-to-right "
+        f"and top-to-bottom. Show the same {display_name} growing through nine ages. Adult identity: {description}. "
+        f"Reference image 1 defines the hatchling and project art style. {stage_lines} The egg and shell appear in "
+        "cell 1 only. Each later cell must be visibly older and more developed. Cell 8 becomes the canonical adult "
+        "and cell 9 is an epic evolution. Keep camera and warm rounded 3D rendering consistent. No text or UI."
+    )
+
+
+def build_sequential_prompt(
+    display_name: str,
+    description: str,
+    stage_index: int,
+    history_count: int,
+) -> str:
+    """Build one epic-stage prompt using the accepted chronological history as context."""
+    if stage_index <= 0 or stage_index >= STAGE_COUNT:
+        raise ValueError("Sequential generation only creates stages 2 through 9")
+    current = EPIC_STAGE_SPECS[stage_index]
+    previous = EPIC_STAGE_SPECS[stage_index - 1]
+    history_instruction = (
+        "REFERENCE IMAGE 2 is a chronological history board of every accepted earlier stage, read left-to-right "
+        "and top-to-bottom. Its final occupied cell is the immediate predecessor. Use the whole board to preserve "
+        "identity and one-way growth, but render only one new character—not a grid or contact sheet. "
+        if history_count > 1
+        else "Only the base hatchling reference is supplied because this is the first generated transition. "
     )
     return (
-        "Create one clean 3x3 character evolution contact sheet: exactly three rows and three columns, "
-        "nine equal square cells in left-to-right, top-to-bottom chronological order, separated by thin "
-        "even gutters. Show the SAME single Katchimera evolving gradually from the hatchling in reference "
-        f"image 1 into the adult form of {display_name}. Target identity: {description}. "
-        "Reference image 1 is authoritative for the fixed hatchling pose, face, eyes, egg-shell format, "
-        f"materials, lighting and project art style. {destination_reference}Every intermediate must look like "
-        "a plausible direct growth stage between those two exact identities, never a different creature. "
-        f"{stage_lines} "
-        "Keep one consistent straight-on or gentle three-quarter hero camera, centered framing, scale logic, "
-        "warm studio lighting and premium rounded 3D Katchimeras toy-diorama rendering in every cell. Growth "
-        "must be smooth: preserve the large expressive eyes and recognizable face while the body grows, the "
-        "egg disappears, and the final motif becomes progressively clearer. Every adjacent stage must be visibly "
-        "different in at least three ways: shell coverage, body proportions, silhouette-feature size, motif size, "
-        "material richness, or pose confidence. Do not repeat the same mature body from cells 4 through 9 and do "
-        "not reach the complete adult silhouette before cell 9. SHELL ORDER IS ABSOLUTE: cell 2 must show the "
-        "same amount of open shell as cell 1 or less, never more; cell 3 must have less shell than cell 2; cell 4 "
-        "must have no enclosing shell; cells 5 through 9 must contain no egg or shell at all. Never return to an "
-        "earlier egg state. Keep the exact same face and species identity across all nine cells. Use a single simple matte dark-plum "
-        "studio background in every cell so the characters can be cleanly matted. No scenery, platforms, props "
-        "unrelated to the final identity, extra creatures, duplicated body parts, text, letters, numbers, labels, "
-        "arrows, captions, logos, badges, UI, humans, photorealism or aggressive monster features. Interpret the "
-        "target theme as anatomy, surface material and body markings—not as costumes or carried objects. Do not "
-        "add clothing, scarves, bags, tools, books, handheld props or accessories unless the adult description "
-        "explicitly says that exact item is worn or carried."
+        "Create one isolated full-body character render on a perfectly uniform matte dark-plum studio background. "
+        f"This is stage {stage_index + 1} of 9 in {display_name}'s strict chronological growth sequence. "
+        f"Adult identity destination: {description}. "
+        "REFERENCE IMAGE 1 is the approved hatchling and permanently defines the same individual, huge amber eyes, "
+        "short elephant-like trunk, warm linen material, page anatomy, rounded project art style, camera and lighting. "
+        f"{history_instruction}"
+        f"CURRENT STAGE: {current['title']}. {current['description']}. "
+        f"REQUIRED CHANGE FROM STAGE {stage_index} ({previous['title']}): {EPIC_STAGE_DELTAS[stage_index]} "
+        "The new result must be visibly older and more developed than the immediate predecessor; do not duplicate "
+        "its height, proportions, silhouette or feature scale. Preserve facial identity and species anatomy. "
+        "The egg and shell exist only in stage 1. Show no egg, shell, cap, crown, dome, shell plate, fragment or egg "
+        "motif at this stage. The top of the head is uncovered linen with only natural page tufts. "
+        "Render exactly one centered character with generous padding, consistent gentle three-quarter hero camera, "
+        "premium rounded 3D Katchimeras toy-diorama materials and warm studio lighting. No grid, multiple poses, "
+        "extra creature, scenery, platform, clothing, handheld book, bag, tool, armor, weapon, text, letters, numbers, "
+        "labels, arrows, logo, UI, human, photorealism or unrelated theme."
     )
 
 
@@ -549,6 +571,123 @@ def contain_rgba(source: Image.Image, size: tuple[int, int], padding_ratio: floa
     return canvas
 
 
+def contain_rgba_at_scale(
+    source: Image.Image,
+    size: tuple[int, int],
+    relative_scale: float,
+    padding_ratio: float = 0.07,
+) -> Image.Image:
+    """Tight-fit a cutout, then preserve its intended relative age scale and baseline."""
+    normalized = contain_rgba(source, size, padding_ratio=padding_ratio)
+    bbox = normalized.getchannel("A").getbbox()
+    if bbox is None:
+        raise ValueError("Scaled source has no visible pixels")
+    cropped = normalized.crop(bbox)
+    width = max(1, round(cropped.width * relative_scale))
+    height = max(1, round(cropped.height * relative_scale))
+    resized = cropped.resize((width, height), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", size, (0, 0, 0, 0))
+    x = (size[0] - width) // 2
+    y = size[1] - height - round(size[1] * padding_ratio)
+    canvas.alpha_composite(resized, (x, y))
+    return canvas
+
+
+def build_history_board(sources: list[Path], destination: Path, size: int = 1024) -> Path:
+    """Compose accepted prior stages into one chronological reference image."""
+    if not sources or len(sources) >= STAGE_COUNT:
+        raise ValueError("History board requires between one and eight accepted stages")
+    gutter = max(8, size // 96)
+    cell_size = (size - gutter * (GRID_SIDE + 1)) // GRID_SIDE
+    board = Image.new("RGBA", (size, size), (37, 27, 51, 255))
+    draw = ImageDraw.Draw(board)
+    for index, source in enumerate(sources):
+        row, column = divmod(index, GRID_SIDE)
+        x = gutter + column * (cell_size + gutter)
+        y = gutter + row * (cell_size + gutter)
+        draw.rounded_rectangle(
+            (x, y, x + cell_size, y + cell_size),
+            radius=max(8, cell_size // 20),
+            fill=(45, 34, 61, 255),
+            outline=(100, 77, 120, 255),
+            width=2,
+        )
+        cell = contain_rgba_at_scale(
+            Image.open(source),
+            (cell_size, cell_size),
+            SEQUENTIAL_STAGE_SCALES[index],
+            padding_ratio=0.05,
+        )
+        board.alpha_composite(cell, (x, y))
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    board.convert("RGB").save(destination, quality=95)
+    return destination
+
+
+def generate_sequential_assets(
+    *,
+    display_name: str,
+    description: str,
+    hatchling: Path,
+    final: Path,
+    model: str,
+    size: int,
+    quality: str,
+    output_dir: Path,
+    progression: str,
+) -> tuple[list[dict[str, Any]], list[Path]]:
+    """Generate each new age from the accepted history, then return all nine sources."""
+    accepted: list[Path] = [hatchling]
+    generated: list[dict[str, Any]] = []
+    for stage_index in range(1, STAGE_COUNT):
+        stage_number = stage_index + 1
+        if progression == "epic" and stage_number == 8:
+            accepted.append(final)
+            continue
+        if progression == "standard" and stage_number == 9:
+            accepted.append(final)
+            continue
+
+        history_path = output_dir / "history" / f"before-stage-{stage_number:02d}.jpg"
+        history_reference = None
+        if len(accepted) > 1:
+            history_reference = build_history_board(accepted, history_path, size=1024)
+        prompt = build_sequential_prompt(display_name, description, stage_index, len(accepted))
+        raw_path = output_dir / "raw-stages" / f"stage-{stage_number:02d}.png"
+        matted_path = output_dir / "matted-stages" / f"stage-{stage_number:02d}.png"
+        image_url, generation = submit_generation(
+            name=f"{display_name}-sequential-stage-{stage_number:02d}",
+            prompt=prompt,
+            hatchling=hatchling,
+            final=history_reference,
+            model=model,
+            size=size,
+            quality=quality,
+        )
+        download(image_url, raw_path)
+        matte_url = matte_grid(raw_path, f"{display_name}-sequential-stage-{stage_number:02d}", matted_path)
+        if Image.open(matted_path).convert("RGBA").getchannel("A").getbbox() is None:
+            raise ValueError(f"Heavy matting removed all visible pixels from stage {stage_number}")
+        accepted.append(matted_path)
+        generated.append(
+            {
+                "index": stage_number,
+                "prompt": prompt,
+                "historyCount": stage_index,
+                "historyReference": history_path if history_reference else None,
+                "generationUrl": image_url,
+                "matteUrl": matte_url,
+                "generationResponse": generation,
+                "rawPath": raw_path,
+                "mattedPath": matted_path,
+            }
+        )
+        print(f"stage {stage_number}: generated sequentially and Heavy-matted", flush=True)
+    if len(accepted) != STAGE_COUNT:
+        raise RuntimeError(f"Expected nine accepted stages, got {len(accepted)}")
+    return generated, accepted
+
+
 def process_grid(
     matted_path: Path,
     hatchling_path: Path,
@@ -679,6 +818,29 @@ def process_staged_assets(
     return write_review_grid(cells, output_dir, name), cells
 
 
+def process_sequential_assets(
+    sources: list[Path],
+    output_dir: Path,
+    name: str,
+) -> tuple[Path, list[Path]]:
+    """Normalize nine sequential sources and assemble the deterministic review grid."""
+    if len(sources) != STAGE_COUNT:
+        raise ValueError(f"Expected {STAGE_COUNT} sequential sources, got {len(sources)}")
+    cells_dir = output_dir / "cells"
+    cells_dir.mkdir(parents=True, exist_ok=True)
+    cells: list[Path] = []
+    for index, source_path in enumerate(sources, 1):
+        cell = contain_rgba_at_scale(
+            Image.open(source_path),
+            (512, 512),
+            SEQUENTIAL_STAGE_SCALES[index - 1],
+        )
+        destination = cells_dir / f"stage-{index:02d}.png"
+        cell.save(destination, optimize=True)
+        cells.append(destination)
+    return write_review_grid(cells, output_dir, name), cells
+
+
 def relative_to_root(path: Path) -> str:
     try:
         return path.resolve().relative_to(ROOT).as_posix()
@@ -694,7 +856,11 @@ def main() -> None:
     parser.add_argument("--hatchling", default=str(DEFAULT_HATCHLING), help="fixed hatchling reference image")
     parser.add_argument("--final", help="existing final-form image; inferred from the creature name when omitted")
     parser.add_argument("--model", choices=("gpt", "seedream", "nano"), default="gpt")
-    parser.add_argument("--strategy", choices=("guided-sheet", "staged", "sheet"), default="guided-sheet")
+    parser.add_argument(
+        "--strategy",
+        choices=("guided-sheet", "sequential", "staged", "sheet"),
+        default="guided-sheet",
+    )
     parser.add_argument(
         "--progression",
         choices=("standard", "epic"),
@@ -715,8 +881,8 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="replace an existing output directory")
     args = parser.parse_args()
 
-    if args.progression == "epic" and args.strategy != "guided-sheet":
-        parser.error("--progression epic currently requires --strategy guided-sheet")
+    if args.progression == "epic" and args.strategy not in {"guided-sheet", "sequential"}:
+        parser.error("--progression epic requires --strategy guided-sheet or sequential")
 
     if not args.creature and not args.name:
         parser.error("provide --creature or --name")
@@ -749,7 +915,13 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     effective_adult_reference_mode = (
-        "image" if args.strategy == "sheet" else "description" if args.strategy == "guided-sheet" else args.adult_reference_mode
+        "image"
+        if args.strategy == "sheet"
+        else "history"
+        if args.strategy == "sequential"
+        else "description"
+        if args.strategy == "guided-sheet"
+        else args.adult_reference_mode
     )
     stage_prompts = {
         index + 1: build_stage_prompt(
@@ -760,7 +932,17 @@ def main() -> None:
         )
         for index in range(1, STAGE_COUNT - 1)
     }
-    if args.progression == "epic":
+    sequential_prompts = {
+        index + 1: build_sequential_prompt(display_name, description, index, index)
+        for index in range(1, STAGE_COUNT)
+        if not (args.progression == "epic" and index + 1 == 8)
+        and not (args.progression == "standard" and index + 1 == 9)
+    }
+    if args.strategy == "sequential":
+        prompt = "\n\n".join(
+            f"=== STAGE {index} ===\n{value}" for index, value in sequential_prompts.items()
+        )
+    elif args.progression == "epic":
         prompt = build_epic_prompt(display_name, description)
     elif args.strategy == "sheet":
         prompt = build_prompt(display_name, description, adult_image_reference=True)
@@ -787,7 +969,11 @@ def main() -> None:
             {
                 "index": index + 1,
                 "description": stage,
-                "prompt": None if args.progression == "epic" else stage_prompts.get(index + 1),
+                "prompt": sequential_prompts.get(index + 1)
+                if args.strategy == "sequential"
+                else None
+                if args.progression == "epic"
+                else stage_prompts.get(index + 1),
             }
             for index, stage in enumerate(EPIC_STAGES if args.progression == "epic" else STAGES)
         ],
@@ -800,7 +986,39 @@ def main() -> None:
         print(f"wrote dry-run prompt and manifest to {output_dir}")
         return
 
-    if args.strategy == "staged":
+    if args.strategy == "sequential":
+        generated_stages, accepted_sources = generate_sequential_assets(
+            display_name=display_name,
+            description=description,
+            hatchling=hatchling_path,
+            final=final_path,
+            model=args.model,
+            size=args.size,
+            quality=args.quality,
+            output_dir=output_dir,
+            progression=args.progression,
+        )
+        preview_path, cells = process_sequential_assets(
+            accepted_sources,
+            output_dir,
+            display_name,
+        )
+        manifest["generatedStages"] = [
+            {
+                **{
+                    key: value
+                    for key, value in stage.items()
+                    if key not in {"rawPath", "mattedPath", "historyReference"}
+                },
+                "rawPath": relative_to_root(Path(stage["rawPath"])),
+                "mattedPath": relative_to_root(Path(stage["mattedPath"])),
+                "historyReference": relative_to_root(Path(stage["historyReference"]))
+                if stage.get("historyReference")
+                else None,
+            }
+            for stage in generated_stages
+        ]
+    elif args.strategy == "staged":
         generated_stages = generate_staged_assets(
             display_name=display_name,
             description=description,

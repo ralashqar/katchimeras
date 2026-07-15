@@ -1,11 +1,20 @@
 import type { CompanionQuest } from '@/utils/katchimera-quests';
+import type { QuestAttempt } from './types';
 export { resolveMergeConfig } from './merge';
+export { resolveBlockJamConfig } from './block-jam';
 
 const SPRINT_TARGETS = [100, 120, 150, 175, 200] as const;
 const TIME_TRIAL_TARGETS = [250, 400, 600] as const;
 
-export function completedQuestCount(quests: CompanionQuest[], questId: string, creatureId: string): number {
-  return quests.filter((quest) => quest.questId === questId && quest.creatureId === creatureId && quest.completedAt).length;
+export function completedQuestCount(quests: CompanionQuest[], questId: string, creatureId: string, attempts: QuestAttempt[] = []): number {
+  const completedRows = quests.filter((quest) => quest.questId === questId && quest.creatureId === creatureId && quest.completedAt).length;
+  const completedAttempts = attempts.filter((attempt) =>
+    attempt.questId === questId && attempt.creatureId === creatureId && attempt.status === 'succeeded',
+  ).length;
+  // A normal completion creates both records, while the developer replay loop
+  // deliberately removes the quest row. max() counts either representation
+  // without double-counting a completion that exists in both ledgers.
+  return Math.max(completedRows, completedAttempts);
 }
 
 export function resolveStepChallengeConfig(input: {

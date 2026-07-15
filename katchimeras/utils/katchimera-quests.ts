@@ -424,6 +424,15 @@ function withPersonalBest(state: CompanionQuestState, questId: string, result: Q
       ),
     };
   }
+  if (result.kind === 'block_jam') {
+    return {
+      ...result,
+      personalBest: result.success && !previous.some((item) =>
+        item.kind === 'block_jam' && item.success && item.rulesetId === result.rulesetId && item.packId === result.packId && item.levelId === result.levelId &&
+        (item.durationMs < result.durationMs || (item.durationMs === result.durationMs && item.movesUsed <= result.movesUsed))
+      ),
+    };
+  }
   if (result.kind === 'rhythm') return { ...result, personalBest: !previous.some((item) => item.kind === 'rhythm' && (item.score > result.score || (item.score === result.score && item.durationMs <= result.durationMs))) };
   return result;
 }

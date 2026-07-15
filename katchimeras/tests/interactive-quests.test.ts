@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
+import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
+import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
 import { LOST_WORD_PUZZLES, selectLostWordPuzzle, validateLostWordPuzzles } from '@/utils/quests/experiences/lost-word-puzzles';
@@ -34,10 +35,96 @@ test('the new companion quest pools lead with their reusable mini-game', () => {
   assert.equal(themedQuestOffers('city', 'places', 'skylo')[0]?.id, 'quest-skylo-city-trivia');
   assert.equal(themedQuestOffers('social_gathering', 'memory', 'gatherglow')[0]?.id, 'quest-gatherglow-pattern');
   assert.equal(themedQuestOffers('feast', 'food', 'feastle')[0]?.id, 'quest-feastle-merge');
-  assert.equal(themedQuestOffers('focus_work', 'craft', 'tasklet')[0]?.id, 'quest-tasklet-sort');
+  assert.equal(themedQuestOffers('focus_work', 'craft', 'tasklet')[0]?.id, 'quest-tasklet-desk-jam');
   assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-memory'));
   assert.equal(themedQuestOffers('museum', 'culture', 'relicoon')[0]?.id, 'quest-relicoon-match');
   assert.equal(themedQuestOffers('live_music', 'culture', 'encora')[0]?.id, 'quest-encora-rhythm');
+});
+
+test('interactive progression survives repeat-loop removal without double-counting normal completions', () => {
+  const quest = { questId: 'quest-tasklet-desk-jam', creatureId: 'tasklet', title: 'Jam', hint: 'Clear it', acceptedAt: 1, completedAt: 2 };
+  const attempt = { id: 'attempt-1', questId: quest.questId, creatureId: quest.creatureId, dayId: '2026-07-15', seed: 'seed', executionKind: 'block_jam' as const, configSnapshot: {}, status: 'succeeded' as const };
+  assert.equal(completedQuestCount([], quest.questId, quest.creatureId, [attempt]), 1, 'repeat-loop attempts must advance progression');
+  assert.equal(completedQuestCount([quest], quest.questId, quest.creatureId, [attempt]), 1, 'normal quest and attempt records represent one completion');
+  assert.equal(resolveBlockJamConfig(completedQuestCount([], quest.questId, quest.creatureId, [attempt]), 'next').levelId, 'desk-v2-tutorial-02');
+});
+
+test('Tasklet Block Jam V2 ships 30 deterministic, connected, dense boards', () => {
+  assert.equal(TASKLET_DESK_JAM_LEVELS.length, 30);
+  assert.equal(TASKLET_DESK_JAM_LEVELS.filter((level) => level.chapter === 'tutorial').length, 6);
+  assert.equal(TASKLET_DESK_JAM_LEVELS.filter((level) => level.chapter === 'standard').length, 24);
+  assert.deepEqual([...new Set(TASKLET_DESK_JAM_LEVELS.map((level) => level.tier))], [1, 2, 3]);
+  for (const level of TASKLET_DESK_JAM_LEVELS) {
+    assert.deepEqual(validateBlockJamLevel(level), [], level.id);
+    assert.equal(level.rulesetId, BLOCK_JAM_RULESET);
+    assert.equal(level.timeLimitMs, level.chapter === 'tutorial' || level.tier === 1 ? 180_000 : level.tier === 2 ? 240_000 : 300_000);
+    if (level.chapter === 'standard') {
+      assert.ok(level.blocks.every((block) => block.cells.length >= 3), `${level.id} should use substantial connected pieces`);
+      assert.ok(blockJamOccupancy(level) >= 0.4, `${level.id} should feel densely packed`);
+    }
+  }
+  const selected = resolveBlockJamConfig(0, 'tasklet:day-1');
+  assert.deepEqual(resolveBlockJamConfig(0, 'tasklet:day-1'), selected);
+  assert.equal(selected.rulesetId, BLOCK_JAM_RULESET);
+  assert.equal(resolveBlockJamConfig(6, 'tasklet:day-1').tier, 1);
+  assert.equal(resolveBlockJamConfig(99, 'tasklet:late').tier, 3);
+  assert.equal(questDefinition('quest-tasklet-desk-jam')?.execution?.kind, 'block_jam');
+});
+
+test('Desk Jam opening board requires a parking move and replays its nine-move jam chain', () => {
+  const level = TASKLET_DESK_JAM_LEVELS[0];
+  let state = createBlockJamState(level);
+  assert.equal(blockJamReducer(level, state, { type: 'move', blockId: 'a', anchor: { row: 99, column: 99 } }), state);
+  const destinations = reachableBlockJamAnchors(level, state, 'a');
+  assert.ok(destinations.length > 0);
+  assert.ok(blockJamPath(level, state, 'a', destinations[0])?.length);
+  assert.ok(level.blocks.every((block) => availableBlockJamDoor(level, state, block.id) == null), 'nothing starts aligned to an exit');
+  const solution = [
+    { type: 'move', blockId: 'c', anchor: { row: 5, column: 3 } },
+    { type: 'move', blockId: 'b', anchor: { row: 4, column: 5 } },
+    { type: 'exit', blockId: 'b', doorId: 'c' },
+    { type: 'move', blockId: 'a', anchor: { row: 2, column: 4 } },
+    { type: 'exit', blockId: 'a', doorId: 'r' },
+    { type: 'move', blockId: 'd', anchor: { row: 0, column: 1 } },
+    { type: 'exit', blockId: 'd', doorId: 'v' },
+    { type: 'move', blockId: 'c', anchor: { row: 4, column: 0 } },
+    { type: 'exit', blockId: 'c', doorId: 'a' },
+  ] as const;
+  for (const action of solution) state = blockJamReducer(level, state, action);
+  assert.equal(state.status, 'won');
+  assert.equal(state.movesUsed, 9);
+  assert.equal(state.clearedBlockIds.length, 4);
+  state = blockJamReducer(level, state, { type: 'undo' });
+  assert.equal(state.movesUsed, 8);
+  assert.equal(state.clearedBlockIds.length, 3);
+  assert.equal(state.undoCount, 1);
+});
+
+test('Block Jam rejects an exit when any trailing polyomino cell has a blocked sweep lane', () => {
+  const level: BlockJamLevel = {
+    id: 'sweep-fixture', rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter: 'tutorial', tier: 1,
+    rows: 5, columns: 5, parMoves: 2, timeLimitMs: 180_000, fixedCells: [],
+    blocks: [
+      { id: 'target', colorId: 'cyan', anchor: { row: 0, column: 1 }, cells: [{ row: 0, column: 0 }, { row: 1, column: 0 }, { row: 1, column: 1 }] },
+      { id: 'blocker', colorId: 'red', anchor: { row: 0, column: 2 }, cells: [{ row: 0, column: 0 }] },
+    ],
+    doors: [{ id: 'cyan-exit', colorId: 'cyan', edge: 'top', offset: 1, span: 2 }],
+  };
+  const blocked = createBlockJamState(level);
+  assert.equal(availableBlockJamDoor(level, blocked, 'target'), null, 'the lower-right cell would sweep through the blocker');
+  const unblocked = { ...blocked, clearedBlockIds: ['blocker'] };
+  assert.equal(availableBlockJamDoor(level, unblocked, 'target')?.id, 'cyan-exit');
+});
+
+test('Block Jam moves are unlimited and only timeout can fail a live board', () => {
+  const level = TASKLET_DESK_JAM_LEVELS[0];
+  const state = { ...createBlockJamState(level), movesUsed: 999 };
+  const moved = blockJamReducer(level, state, { type: 'move', blockId: 'c', anchor: { row: 5, column: 3 } });
+  assert.equal(moved.status, 'playing');
+  assert.equal(moved.movesUsed, 1000);
+  const timedOut = blockJamReducer(level, moved, { type: 'timeout' });
+  assert.equal(timedOut.status, 'failed');
+  assert.equal(blockJamReducer(level, timedOut, { type: 'restart' }).status, 'playing');
 });
 
 test('Lost Word includes 150 valid, unique, deterministic Pagelet puzzles', () => {

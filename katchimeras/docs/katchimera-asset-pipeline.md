@@ -111,6 +111,18 @@ python scripts/generate-evolution-grid.py \
   --final assets/images/katchimeras/cutouts/pagelet.png \
   --progression epic
 
+# Sequential low-cost continuity test. Each 1024px stage receives the approved
+# hatchling plus one history-board reference containing every accepted earlier
+# stage. Stages are Heavy-matted individually and assembled afterward.
+python scripts/generate-evolution-grid.py \
+  --name Pagelet \
+  --hatchling assets/images/katchimeras/hatchlings/pagelet-hatchling-v1.png \
+  --final assets/images/katchimeras/cutouts/pagelet.png \
+  --strategy sequential \
+  --progression epic \
+  --size 1024 \
+  --quality low
+
 # Explicit inputs for a new or non-catalog creature.
 python scripts/generate-evolution-grid.py \
   --name moonling \

@@ -11,7 +11,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
   skylo: ['quest-skylo-city-trivia', 'quest-photo-city'],
   gatherglow: ['quest-gatherglow-pattern', 'quest-snap-today'],
   feastle: ['quest-feastle-merge', 'quest-feastle-sort', 'quest-feastle-memory', 'quest-photo-food', 'quest-cuisine-any-new'],
-  tasklet: ['quest-tasklet-sort', 'quest-goal-note'],
+  tasklet: ['quest-tasklet-desk-jam', 'quest-tasklet-sort', 'quest-goal-note'],
   relicoon: ['quest-relicoon-match', 'quest-visit-museum'],
   encora: ['quest-encora-rhythm', 'quest-any-inspiration'],
 };

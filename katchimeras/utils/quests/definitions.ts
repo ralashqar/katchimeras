@@ -21,6 +21,7 @@ export type QuestDefinition = {
     | { kind: 'sorting'; packId: 'feastle-table' | 'tasklet-triage'; difficultyCurveId: string }
     | { kind: 'matching'; packId: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; difficultyCurveId: string }
     | { kind: 'merge'; packId: 'feastle-kitchen'; difficultyCurveId: 'feastle-merge-v1' }
+    | { kind: 'block_jam'; packId: 'tasklet-desk'; difficultyCurveId: 'tasklet-desk-jam-v2' }
     | { kind: 'rhythm'; gameId: 'encora-echo'; difficultyCurveId: string }
     | {
         kind: 'word_game';
@@ -197,6 +198,12 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     hint: 'Sort each task by what it needs next.', criteria: [],
     execution: { kind: 'sorting', packId: 'tasklet-triage', difficultyCurveId: 'tasklet-triage-v1' }, requiresCapabilities: [], submissionMode: 'auto',
     eligibility: { creatureKeys: ['tasklet'], cooldownDays: 1, weight: 3 },
+  },
+  'quest-tasklet-desk-jam': {
+    id: 'quest-tasklet-desk-jam', family: 'studio', title: 'Tasklet’s Desk Jam',
+    hint: 'Slide each scattered task into its matching tray before the desk jams.', criteria: [],
+    execution: { kind: 'block_jam', packId: 'tasklet-desk', difficultyCurveId: 'tasklet-desk-jam-v2' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['tasklet'], cooldownDays: 1, weight: 4 },
   },
   'quest-feastle-memory': {
     id: 'quest-feastle-memory', family: 'food', title: 'Feastle’s matching feast',

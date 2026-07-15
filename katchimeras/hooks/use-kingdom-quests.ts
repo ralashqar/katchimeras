@@ -42,7 +42,8 @@ import {
 } from '@/utils/quests/report-back-evidence';
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import { questDefinition } from '@/utils/quests/definitions';
-import { completedQuestCount, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
+import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
+import { selectWordPathPuzzle } from '@/utils/quests/experiences/word-paths-puzzles';
 import { isInteractiveExecution, type QuestResult } from '@/utils/quests/experiences/types';
 import { refreshQuestFacts } from '@/utils/quests/facts';
 import type { Facts } from '@/utils/signals/facts';
@@ -151,6 +152,28 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   useEffect(() => {
     let changed = false;
     const quests = companionQuestState.quests.map((quest) => {
+      const activeDefinition = !quest.completedAt ? questDefinition(quest.questId) : null;
+      const progressionSensitive = activeDefinition?.execution?.kind === 'block_jam' || activeDefinition?.execution?.kind === 'word_connect';
+      if (!quest.completedAt && progressionSensitive) {
+        const dayId = quest.acceptedDayId ?? today?.isoDate ?? 'today';
+        const expectedConfig = resolveInteractiveConfig(
+          activeDefinition,
+          companionQuestState,
+          quest.creatureId,
+          quest.questId,
+          quest.offerSeed ?? `${quest.creatureId}:${dayId}:${quest.questId}`,
+        );
+        const staleBlockJam = activeDefinition.execution?.kind === 'block_jam' && (
+          quest.resolvedConfig?.rulesetId !== 'tasklet-desk-jam-v2' ||
+          quest.resolvedConfig?.levelId !== expectedConfig?.levelId ||
+          quest.resolvedConfig?.timeLimitMs !== expectedConfig?.timeLimitMs
+        );
+        const staleWordPaths = activeDefinition.execution?.kind === 'word_connect' && quest.resolvedConfig?.puzzleId !== expectedConfig?.puzzleId;
+        if (staleBlockJam || staleWordPaths) {
+          changed = true;
+          return { ...quest, repairedAt: Date.now(), resolvedConfig: expectedConfig };
+        }
+      }
       if (quest.completedAt || quest.offerSeed) return quest;
       const creature = creatureById.get(quest.creatureId);
       const data = companionDataByCreatureId.get(quest.creatureId);
@@ -169,7 +192,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         repairedAt: Date.now(),
         repairedFromQuestId: quest.questId,
         offerSeed: `${quest.creatureId}:${dayId}:${interactive.id}`,
-        resolvedConfig: resolveInteractiveConfig(definition, companionQuestState, quest.creatureId, interactive.id),
+        resolvedConfig: resolveInteractiveConfig(definition, companionQuestState, quest.creatureId, interactive.id, `${quest.creatureId}:${dayId}:${interactive.id}`),
       };
     });
     if (changed) {
@@ -348,7 +371,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       definition,
       companionQuestState,
       selectedResident.creature.creatureId,
-      selectedOffer.id
+      selectedOffer.id,
+      seed
     );
     const next = acceptQuest(
       companionQuestState,
@@ -577,6 +601,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         return best;
       }, null)
     : null;
+  const selectedBlockJamBest = selectedActiveQuest && selectedInteractiveExecution?.kind === 'block_jam'
+    ? companionQuestState.attempts.reduce<{ movesUsed: number; durationMs: number } | null>((best, attempt) => {
+        const result = attempt.questId === selectedActiveQuest.questId && attempt.result?.kind === 'block_jam' ? attempt.result : null;
+        if (!result?.success || result.rulesetId !== 'tasklet-desk-jam-v2' || result.levelId !== selectedActiveQuest.resolvedConfig?.levelId) return best;
+        if (!best || result.durationMs < best.durationMs || (result.durationMs === best.durationMs && result.movesUsed < best.movesUsed)) return { movesUsed: result.movesUsed, durationMs: result.durationMs };
+        return best;
+      }, null)
+    : null;
 
   return {
     acceptSelectedQuest,
@@ -610,6 +642,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     recentMatchingContentIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'matching' ? attempt.result.contentIds : []).slice(-32),
     recentMergeOrderIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'merge' ? attempt.result.contentIds : []).slice(-12),
     selectedMergeBest,
+    recentBlockJamLevelIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'block_jam' ? [attempt.result.levelId] : []).slice(-12),
+    selectedBlockJamBest,
     selectedQuestItems,
     selectedQuestRuntime,
     selectedResident,
@@ -635,7 +669,7 @@ function eligibleOfferOptions<T extends { id: string }>(
     const eligibility = definition.eligibility;
     if (eligibility?.creatureKeys?.length && !eligibility.creatureKeys.includes(creatureKey.toLowerCase())) return false;
     if ((eligibility?.minimumHomeLevel ?? 0) > houseLevel) return false;
-    if (offer.id === 'quest-step-time-trial' && completedQuestCount(state.quests, 'quest-step-sprint', creatureId) < 1) return false;
+    if (offer.id === 'quest-step-time-trial' && completedQuestCount(state.quests, 'quest-step-sprint', creatureId, state.attempts) < 1) return false;
     const cooldownDays = eligibility?.cooldownDays ?? 0;
     if (!cooldownDays) return true;
     const latest = state.quests
@@ -657,12 +691,14 @@ function resolveInteractiveConfig(
   definition: ReturnType<typeof questDefinition>,
   state: CompanionQuestState,
   creatureId: string,
-  questId: string
+  questId: string,
+  seed = `${creatureId}:${questId}`
 ): Record<string, unknown> | undefined {
+  const completedCount = completedQuestCount(state.quests, questId, creatureId, state.attempts);
   if (definition?.execution?.kind === 'live_steps') {
     return resolveStepChallengeConfig({
       challengeId: definition.execution.challengeId,
-      completedCount: completedQuestCount(state.quests, questId, creatureId),
+      completedCount,
     });
   }
   if (definition?.execution?.kind === 'trivia') {
@@ -674,24 +710,37 @@ function resolveInteractiveConfig(
       rulesetId: definition.execution.rulesetId,
       answerLength: definition.execution.answerLength,
       maxGuesses: definition.execution.maxGuesses,
-      ...resolveLostWordDifficulty(completedQuestCount(state.quests, questId, creatureId)),
+      ...resolveLostWordDifficulty(completedCount),
     };
   }
   if (definition?.execution?.kind === 'word_connect') {
+    const difficulty = resolveWordPathsDifficulty(completedCount);
+    const recentPuzzleIds = state.attempts.flatMap((attempt) =>
+      attempt.questId === questId && attempt.creatureId === creatureId && attempt.result?.kind === 'word_connect'
+        ? [attempt.result.puzzleId]
+        : [],
+    ).slice(-30);
+    const puzzle = selectWordPathPuzzle(`${seed}:round:${completedCount}`, recentPuzzleIds, difficulty.difficultyTier);
     return {
       gameId: definition.execution.gameId,
       packId: definition.execution.packId,
       rulesetId: definition.execution.rulesetId,
-      ...resolveWordPathsDifficulty(completedQuestCount(state.quests, questId, creatureId)),
+      ...difficulty,
+      puzzleId: puzzle.id,
     };
   }
-  if (definition?.execution?.kind === 'paced_breathing') return resolveBreathingConfig(completedQuestCount(state.quests, questId, creatureId));
-  if (definition?.execution?.kind === 'timing_zone') return resolveTimingConfig(definition.execution.challengeId, completedQuestCount(state.quests, questId, creatureId));
-  if (definition?.execution?.kind === 'pattern_memory') return resolvePatternConfig(completedQuestCount(state.quests, questId, creatureId));
-  if (definition?.execution?.kind === 'sorting') return resolveSortingConfig(completedQuestCount(state.quests, questId, creatureId));
-  if (definition?.execution?.kind === 'matching') return resolveMatchingConfig(completedQuestCount(state.quests, questId, creatureId));
-  if (definition?.execution?.kind === 'merge') return resolveMergeConfig(completedQuestCount(state.quests, questId, creatureId));
-  if (definition?.execution?.kind === 'rhythm') return resolveRhythmConfig(completedQuestCount(state.quests, questId, creatureId));
+  if (definition?.execution?.kind === 'paced_breathing') return resolveBreathingConfig(completedCount);
+  if (definition?.execution?.kind === 'timing_zone') return resolveTimingConfig(definition.execution.challengeId, completedCount);
+  if (definition?.execution?.kind === 'pattern_memory') return resolvePatternConfig(completedCount);
+  if (definition?.execution?.kind === 'sorting') return resolveSortingConfig(completedCount);
+  if (definition?.execution?.kind === 'matching') return resolveMatchingConfig(completedCount);
+  if (definition?.execution?.kind === 'merge') return resolveMergeConfig(completedCount);
+  if (definition?.execution?.kind === 'block_jam') return resolveBlockJamConfig(
+    completedCount,
+    seed,
+    state.attempts.flatMap((attempt) => attempt.result?.kind === 'block_jam' && attempt.result.rulesetId === 'tasklet-desk-jam-v2' ? [attempt.result.levelId] : []).slice(-12),
+  );
+  if (definition?.execution?.kind === 'rhythm') return resolveRhythmConfig(completedCount);
   return undefined;
 }
 
