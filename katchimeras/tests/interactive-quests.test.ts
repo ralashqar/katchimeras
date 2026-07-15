@@ -15,6 +15,8 @@ import { createPattern, patternComplete, patternMatches } from '@/utils/quests/e
 import { createSortingRound, FEASTLE_SORTING_ITEMS, TASKLET_SORTING_ITEMS, validateSortingItems } from '@/utils/quests/experiences/sorting';
 import { formatQuestDuration } from '@/utils/quests/experiences/duration';
 import { createMatchingDeck, createMemoryMatchState, FEASTLE_MATCHING_MOTIFS, memoryMatchReducer, MOSSPROUT_MATCHING_MOTIFS, RELICOON_MATCHING_MOTIFS, shuffleMatchingDeck, validateMatchingMotifs } from '@/utils/quests/experiences/matching';
+import { attemptMatchThreeSwap, createMatchThreeState, findMatchRuns, hasLegalMove, MATCH_THREE_DIFFICULTY, resolveMatchThreeConfig, type MatchThreeState, type MatchThreeTile } from '@/utils/quests/experiences/match-three';
+import { matchThreePack, validateMatchThreePack } from '@/utils/quests/experiences/match-three-packs';
 import { questDefinition } from '@/utils/quests/definitions';
 import { themedQuestOffers } from '@/utils/quests/themed';
 
@@ -321,6 +323,116 @@ test('matching games reshuffle card cells without changing the selected pairs', 
   );
 });
 
+test('Zodiac Match 3 has a deterministic, playable five-tier difficulty curve and a valid elemental pack', () => {
+  const pack = matchThreePack();
+  assert.deepEqual(validateMatchThreePack(pack), []);
+  assert.deepEqual(resolveMatchThreeConfig(0), MATCH_THREE_DIFFICULTY[0]);
+  assert.deepEqual(resolveMatchThreeConfig(99), MATCH_THREE_DIFFICULTY[4]);
+  const fireKinds = pack.motifs.filter((motif) => motif.element === 'fire').map((motif) => motif.id);
+  const elemental = createMatchThreeState({
+    seed: 'zodiac:daily:aries:1',
+    config: MATCH_THREE_DIFFICULTY[0],
+    availableKinds: pack.motifs.map((motif) => motif.id),
+    requiredKinds: fireKinds,
+    objectiveRules: [{ id: 'fire', kindIds: fireKinds, target: MATCH_THREE_DIFFICULTY[0].targetCounts[0] }],
+  });
+  assert.ok(fireKinds.every((kind) => elemental.tileKinds.includes(kind)));
+  assert.deepEqual(elemental.objectives, [{ id: 'fire', kindIds: fireKinds, target: MATCH_THREE_DIFFICULTY[0].targetCounts[0], collected: 0 }]);
+  for (const config of MATCH_THREE_DIFFICULTY) {
+    for (let seed = 0; seed < 30; seed += 1) {
+      const first = createMatchThreeState({ seed: `match-three:${config.tier}:${seed}`, config, availableKinds: pack.motifs.map((motif) => motif.id) });
+      const repeated = createMatchThreeState({ seed: `match-three:${config.tier}:${seed}`, config, availableKinds: pack.motifs.map((motif) => motif.id) });
+      assert.deepEqual(first, repeated);
+      assert.equal(findMatchRuns(first.board, first.rows, first.columns).length, 0);
+      assert.equal(hasLegalMove(first.board, first.rows, first.columns), true);
+      assert.equal(first.board.length, config.rows * config.columns);
+      assert.equal(first.blockers.filter((layers) => layers > 0).length, config.singleFrost + config.doubleFrost);
+    }
+  }
+});
+
+test('Match 3 rejects invalid swaps without spending a move and resolves valid boards to stability', () => {
+  const pack = matchThreePack();
+  const state = createMatchThreeState({ seed: 'match-three:swap-rules', config: MATCH_THREE_DIFFICULTY[1], availableKinds: pack.motifs.map((motif) => motif.id) });
+  let invalid = null as ReturnType<typeof attemptMatchThreeSwap> | null;
+  let valid = null as ReturnType<typeof attemptMatchThreeSwap> | null;
+  for (let index = 0; index < state.board.length && (!invalid || !valid); index += 1) {
+    for (const adjacent of [index + 1, index + state.columns]) {
+      if (adjacent >= state.board.length || (adjacent === index + 1 && index % state.columns === state.columns - 1)) continue;
+      const result = attemptMatchThreeSwap(state, index, adjacent);
+      if (result.valid) valid ??= result;
+      else invalid ??= result;
+    }
+  }
+  assert.ok(invalid);
+  assert.equal(invalid.state.movesRemaining, state.movesRemaining);
+  assert.deepEqual(invalid.state.board, state.board);
+  assert.ok(valid);
+  assert.equal(valid.state.movesRemaining, state.movesRemaining - 1);
+  assert.equal(findMatchRuns(valid.state.board, valid.state.rows, valid.state.columns).length, 0);
+  if (valid.state.status === 'playing') assert.equal(hasLegalMove(valid.state.board, valid.state.rows, valid.state.columns), true);
+  assert.ok(valid.steps.some((step) => step.kind === 'clear'));
+  assert.ok(valid.steps.some((step) => step.kind === 'fall'));
+  assert.ok(valid.steps.some((step) => step.kind === 'refill'));
+});
+
+test('Match 3 creates line specials, damages frost, and activates special combinations', () => {
+  const lineState = matchThreeFixture([
+    'a', 'b', 'c', 'd',
+    'a', 'a', 'b', 'a',
+    'c', 'd', 'a', 'b',
+  ], 3, 4);
+  lineState.blockers[4] = 1;
+  lineState.frostTarget = 1;
+  const lineMove = attemptMatchThreeSwap(lineState, 6, 10);
+  assert.equal(lineMove.valid, true);
+  const lineClear = lineMove.steps.find((step) => step.kind === 'clear');
+  assert.ok(lineClear);
+  assert.ok(lineClear.cleared.length >= 4, 'every gem in a 4+ match should clear');
+  assert.ok(lineMove.steps.some((step) => step.kind === 'refill' && step.board.some((tile) => tile?.special === 'row')));
+  assert.equal(lineMove.state.frostCleared, 1);
+  assert.ok(lineMove.state.objectives[0].collected > 0);
+
+  const comboState = matchThreeFixture([
+    'a', 'b', 'c',
+    'c', 'b', 'a',
+    'b', 'a', 'c',
+  ], 3, 3);
+  comboState.board[0]!.special = 'prism';
+  comboState.board[1]!.special = 'row';
+  const combo = attemptMatchThreeSwap(comboState, 0, 1);
+  assert.equal(combo.valid, true);
+  assert.ok(combo.state.specialsTriggered >= 2);
+  assert.ok(combo.steps.find((step) => step.kind === 'clear')!.cleared.length >= 3);
+});
+
+test('Match 3 supports every planned special-to-special combination', () => {
+  const combinations: Array<[MatchThreeTile['special'], MatchThreeTile['special']]> = [
+    ['row', 'column'],
+    ['row', 'burst'],
+    ['burst', 'burst'],
+    ['prism', null],
+    ['prism', 'row'],
+    ['prism', 'burst'],
+    ['prism', 'prism'],
+  ];
+  for (const [firstSpecial, secondSpecial] of combinations) {
+    const state = matchThreeFixture([
+      'a', 'b', 'c', 'd', 'a',
+      'c', 'd', 'a', 'b', 'c',
+      'b', 'a', 'd', 'c', 'b',
+      'd', 'c', 'b', 'a', 'd',
+      'a', 'b', 'c', 'd', 'a',
+    ], 5, 5);
+    state.board[0]!.special = firstSpecial;
+    state.board[1]!.special = secondSpecial;
+    const result = attemptMatchThreeSwap(state, 0, 1);
+    assert.equal(result.valid, true, `${firstSpecial}+${secondSpecial} should be a valid combo`);
+    assert.ok(result.steps.some((step) => step.kind === 'clear' && step.cleared.length > 0));
+    assert.ok(result.state.specialsTriggered >= 1);
+  }
+});
+
 test('Feastle merge pack is complete, tiered, deterministic, and becomes the lead quest', () => {
   assert.equal(FEASTLE_MERGE_ITEMS.length, 15);
   assert.deepEqual(validateMergePack(), []);
@@ -463,4 +575,25 @@ function solveMergeRound(initial: MergeRoundState, moveBudget: number): MergeRou
     if (!acted) break;
   }
   return state;
+}
+
+function matchThreeFixture(kinds: string[], rows: number, columns: number): MatchThreeState {
+  const board: MatchThreeTile[] = kinds.map((kind, index) => ({ id: `fixture-${index}`, kind, special: null }));
+  return {
+    board,
+    blockers: board.map(() => 0),
+    objectives: [{ id: 'fixture', kindIds: ['a', 'b'], target: 99, collected: 0 }],
+    rows,
+    columns,
+    movesRemaining: 20,
+    movesUsed: 0,
+    frostCleared: 0,
+    frostTarget: 0,
+    maxCascade: 0,
+    specialsTriggered: 0,
+    status: 'playing',
+    rngState: 12345,
+    nextTileId: 100,
+    tileKinds: ['a', 'b', 'c', 'd'],
+  };
 }

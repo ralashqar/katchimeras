@@ -5,15 +5,33 @@ export { deriveZodiacSign, localDayId, promptForDay, scorePersonality, validBirt
 
 const STORAGE_KEY = 'katchimeras.world-identity.v1';
 
+type LegacyWorldIdentity = Omit<WorldIdentityState, 'version' | 'zodiacRitualCompletions'> & {
+  version: 1;
+  constellationTutorialCompleted?: boolean;
+  constellationCompletions?: string[];
+};
+
 export const EMPTY_WORLD_IDENTITY: WorldIdentityState = {
-  version: 1, personalityAnswers: {}, recommendedHomeArchetypeId: null, selectedHomeArchetypeId: null,
+  version: 2, personalityAnswers: {}, recommendedHomeArchetypeId: null, selectedHomeArchetypeId: null,
   birthMonth: null, birthDay: null, zodiacSignId: null, setupCompletedAt: null,
-  constellationTutorialCompleted: false, constellationCompletions: [], recentZodiacPromptIds: [], zodiacReflections: [],
+  zodiacRitualCompletions: [], recentZodiacPromptIds: [], zodiacReflections: [],
 };
 
 export function loadWorldIdentity(): WorldIdentityState {
-  const value = getStoredJson<WorldIdentityState>(STORAGE_KEY, EMPTY_WORLD_IDENTITY);
-  return value?.version === 1 ? { ...EMPTY_WORLD_IDENTITY, ...value } : EMPTY_WORLD_IDENTITY;
+  const value = getStoredJson<WorldIdentityState | LegacyWorldIdentity | null>(STORAGE_KEY, null);
+  if (value?.version === 2) return { ...EMPTY_WORLD_IDENTITY, ...value };
+  if (value?.version === 1) {
+    const { constellationCompletions = [], constellationTutorialCompleted: _tutorial, ...legacy } = value;
+    const migrated: WorldIdentityState = {
+      ...EMPTY_WORLD_IDENTITY,
+      ...legacy,
+      version: 2,
+      zodiacRitualCompletions: [...new Set(constellationCompletions)],
+    };
+    saveWorldIdentity(migrated);
+    return migrated;
+  }
+  return EMPTY_WORLD_IDENTITY;
 }
 
 export function saveWorldIdentity(value: WorldIdentityState): void { setStoredJson(STORAGE_KEY, value); }
@@ -21,7 +39,7 @@ export function resetWorldIdentity(): void { removeStoredValue(STORAGE_KEY); }
 
 /**
  * Clears only the choices made by the personality/zodiac setup experience.
- * Long-lived constellation history and saved zodiac reflections are retained so
+ * Long-lived zodiac ritual history and saved reflections are retained so
  * the developer replay tool cannot erase player-created content by accident.
  */
 export function resetWorldIdentityOnboarding(): void {
@@ -35,7 +53,6 @@ export function resetWorldIdentityOnboarding(): void {
     birthDay: null,
     zodiacSignId: null,
     setupCompletedAt: null,
-    constellationTutorialCompleted: false,
   });
 }
 

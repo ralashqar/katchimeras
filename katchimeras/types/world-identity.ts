@@ -9,7 +9,7 @@ export type ZodiacElement = 'fire' | 'earth' | 'air' | 'water';
 export type PersonalityAnswerMap = Record<string, string>;
 
 export type WorldIdentityState = {
-  version: 1;
+  version: 2;
   personalityAnswers: PersonalityAnswerMap;
   recommendedHomeArchetypeId: HomeArchetypeId | null;
   selectedHomeArchetypeId: HomeArchetypeId | null;
@@ -17,8 +17,7 @@ export type WorldIdentityState = {
   birthDay: number | null;
   zodiacSignId: ZodiacSignId | null;
   setupCompletedAt: string | null;
-  constellationTutorialCompleted: boolean;
-  constellationCompletions: string[];
+  zodiacRitualCompletions: string[];
   recentZodiacPromptIds: string[];
   zodiacReflections: ZodiacReflection[];
 };
@@ -65,13 +64,6 @@ export type ZodiacProfile = {
   accent: string;
   familiarName: string;
   profileLine: string;
-};
-
-export type ConstellationPoint = { x: number; y: number };
-
-export type ConstellationLevel = {
-  signId: ZodiacSignId;
-  points: readonly ConstellationPoint[];
 };
 
 export type ZodiacPrompt = {

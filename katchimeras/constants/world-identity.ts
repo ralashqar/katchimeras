@@ -1,4 +1,4 @@
-import type { ConstellationLevel, HomePreset, PersonalityQuestion, ZodiacProfile, ZodiacPrompt } from '@/types/world-identity';
+import type { HomePreset, PersonalityQuestion, ZodiacProfile, ZodiacPrompt } from '@/types/world-identity';
 
 export const HOME_PRESETS: readonly HomePreset[] = [
   { id: 'explorer', name: 'Explorer', description: 'A lookout home for curiosity, movement, and new horizons.', keywords: ['Curious', 'Adventurous', 'Open'], accent: '#7CC9A8', glyph: '↗' },
@@ -55,22 +55,6 @@ export const ZODIAC_PROFILES: readonly ZodiacProfile[] = [
   { id: 'aquarius', name: 'Aquarius', symbol: '♒', element: 'air', dateLabel: 'Jan 20–Feb 18', accent: '#78C8DA', familiarName: 'Sky Vessel', profileLine: 'An unusual current for invention and change.' },
   { id: 'pisces', name: 'Pisces', symbol: '♓', element: 'water', dateLabel: 'Feb 19–Mar 20', accent: '#83AEE2', familiarName: 'Dream Fins', profileLine: 'A soft tide for feeling and imagination.' },
 ] as const;
-
-const SHAPES: Record<ZodiacProfile['id'], ConstellationLevel['points']> = {
-  aries: [{x:.16,y:.72},{x:.3,y:.48},{x:.48,y:.57},{x:.67,y:.28},{x:.84,y:.42}],
-  taurus: [{x:.14,y:.62},{x:.32,y:.38},{x:.5,y:.51},{x:.69,y:.34},{x:.84,y:.59}],
-  gemini: [{x:.2,y:.24},{x:.22,y:.76},{x:.48,y:.63},{x:.49,y:.35},{x:.78,y:.22},{x:.8,y:.74}],
-  cancer: [{x:.18,y:.54},{x:.34,y:.3},{x:.55,y:.39},{x:.75,y:.26},{x:.82,y:.61},{x:.58,y:.72}],
-  leo: [{x:.16,y:.68},{x:.29,y:.43},{x:.48,y:.28},{x:.65,y:.43},{x:.81,y:.31},{x:.76,y:.7}],
-  virgo: [{x:.15,y:.27},{x:.31,y:.51},{x:.48,y:.37},{x:.62,y:.63},{x:.79,y:.48},{x:.84,y:.76}],
-  libra: [{x:.17,y:.64},{x:.34,y:.45},{x:.5,y:.28},{x:.67,y:.45},{x:.83,y:.64}],
-  scorpio: [{x:.14,y:.31},{x:.29,y:.46},{x:.44,y:.35},{x:.6,y:.57},{x:.76,y:.45},{x:.84,y:.72}],
-  sagittarius: [{x:.17,y:.72},{x:.36,y:.54},{x:.56,y:.36},{x:.8,y:.2},{x:.69,y:.5}],
-  capricorn: [{x:.14,y:.57},{x:.31,y:.34},{x:.49,y:.5},{x:.64,y:.29},{x:.82,y:.48},{x:.71,y:.72}],
-  aquarius: [{x:.14,y:.37},{x:.31,y:.25},{x:.48,y:.43},{x:.66,y:.3},{x:.84,y:.47},{x:.67,y:.7}],
-  pisces: [{x:.17,y:.24},{x:.33,y:.47},{x:.5,y:.64},{x:.67,y:.47},{x:.83,y:.24},{x:.5,y:.82}],
-};
-export const CONSTELLATION_LEVELS: readonly ConstellationLevel[] = ZODIAC_PROFILES.map((profile) => ({ signId: profile.id, points: SHAPES[profile.id] }));
 
 const PROMPT_TEXT: Record<ZodiacProfile['id'], readonly string[]> = {
   aries: ['What could you begin today without overthinking it?', 'Where would one brave little step help?', 'What deserves your first spark today?'],

@@ -1,21 +1,21 @@
-import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
 import { InteractionThreadSwitcher, type InteractionThreadOption } from '@/components/katchadeck/ui/interaction-thread-switcher';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
-import { ConnectStarsGame } from '@/components/katchadeck/world/connect-stars-game';
 import { CompanionHero } from '@/components/katchadeck/world/companion-hero';
 import { CompanionPrimaryAction, CompanionSecondaryAction, CompanionSection } from '@/components/katchadeck/world/companion-interaction-primitives';
 import { CompanionReflectionThread } from '@/components/katchadeck/world/companion-reflection-thread';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { CONSTELLATION_LEVELS } from '@/constants/world-identity';
+import { ZodiacElementMatchGame } from '@/components/katchadeck/world/zodiac-element-match-game';
 import { zodiacFamiliarSource } from '@/constants/world-identity-art';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import type { WorldIdentityState } from '@/types/world-identity';
+import { resolveMatchThreeConfig } from '@/utils/quests/experiences/match-three';
 import { deriveZodiacSign, localDayId, promptForDay, zodiacProfile } from '@/utils/world-identity';
 
 type Thread = 'profile' | 'game' | 'prompt';
@@ -23,7 +23,7 @@ type Mode = Thread | 'birthday';
 
 const THREADS: InteractionThreadOption<Thread>[] = [
   { id: 'profile', label: 'Profile', icon: 'star.fill' },
-  { id: 'game', label: 'Stars', icon: 'sparkles' },
+  { id: 'game', label: 'Elements', icon: 'sparkles' },
   { id: 'prompt', label: 'Reflect', icon: 'leaf.fill' },
 ];
 
@@ -32,28 +32,33 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
   const [birthMonth, setBirthMonth] = useState(identity.birthMonth ? String(identity.birthMonth) : '');
   const [birthDay, setBirthDay] = useState(identity.birthDay ? String(identity.birthDay) : '');
   const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
+  const [gameRunning, setGameRunning] = useState(false);
+  const closePromptOpen = useRef(false);
   const reduceMotion = useReducedMotion();
   const profile = zodiacProfile(identity.zodiacSignId);
-  const level = CONSTELLATION_LEVELS.find((item) => item.signId === identity.zodiacSignId);
   const prompt = useMemo(() => profile ? promptForDay(profile.id) : null, [profile]);
-  if (!profile || !level) return null;
+  if (!profile) return null;
 
   const dayId = localDayId();
-  const completedToday = identity.constellationCompletions.includes(dayId);
+  const completedToday = identity.zodiacRitualCompletions.includes(dayId);
+  const gameConfig = resolveMatchThreeConfig(identity.zodiacRitualCompletions.length);
+  const gameSeed = `zodiac:${dayId}:${profile.id}:${gameConfig.tier}`;
   const proposedSign = deriveZodiacSign(Number(birthMonth), Number(birthDay));
 
   function selectThread(thread: Thread) {
+    setGameRunning(false);
     setMode(thread);
   }
 
   function completeGame() {
     onChange({
       ...identity,
-      constellationCompletions: completedToday
-        ? identity.constellationCompletions
-        : [...identity.constellationCompletions, dayId],
+      zodiacRitualCompletions: completedToday
+        ? identity.zodiacRitualCompletions
+        : [...identity.zodiacRitualCompletions, dayId],
     });
-    setTimeout(() => setMode('prompt'), 350);
+    setGameRunning(false);
+    setTimeout(() => setMode('prompt'), 280);
   }
 
   function saveReflection() {
@@ -91,8 +96,39 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
     setMode('profile');
   }
 
+  function requestClose() {
+    if (!gameRunning) {
+      onClose();
+      return;
+    }
+
+    if (closePromptOpen.current) return;
+    closePromptOpen.current = true;
+
+    const releasePrompt = () => {
+      closePromptOpen.current = false;
+    };
+
+    Alert.alert(
+      'Leave elemental ritual?',
+      'Your progress in this round will be lost.',
+      [
+        { text: 'Keep playing', style: 'cancel', onPress: releasePrompt },
+        {
+          text: 'Leave ritual',
+          style: 'destructive',
+          onPress: () => {
+            releasePrompt();
+            onClose();
+          },
+        },
+      ],
+      { cancelable: true, onDismiss: releasePrompt },
+    );
+  }
+
   const footer = mode === 'profile'
-    ? <CompanionPrimaryAction label={completedToday ? 'Replay constellation' : 'Play tonight’s constellation'} icon="sparkles" onPress={() => setMode('game')} />
+    ? <CompanionPrimaryAction label={completedToday ? 'Replay elemental ritual' : 'Begin elemental ritual'} icon="sparkles" onPress={() => setMode('game')} />
     : mode === 'prompt'
       ? <CompanionPrimaryAction label="Save reflection" icon="arrow.right" disabled={!reflectionDraft?.text.trim()} onPress={saveReflection} />
       : mode === 'birthday'
@@ -100,29 +136,42 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
         : null;
 
   return (
-    <Modal animationType="none" navigationBarTranslucent onRequestClose={onClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible>
+    <Modal animationType="none" navigationBarTranslucent onRequestClose={requestClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible>
       <GestureHandlerRootView style={styles.modalRoot}>
-        <MeadowSheet onClose={onClose} variant="tall">
+        <MeadowSheet onClose={requestClose} variant={gameRunning ? 'full' : 'tall'}>
           <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8} style={styles.keyboard}>
-            <CompanionHero
+            {!gameRunning ? <CompanionHero
               accentColor={profile.accent}
               image={zodiacFamiliarSource(profile.element)}
               kicker={`${profile.name} · ${profile.element}`}
               name={profile.familiarName}
               openingLine={profile.profileLine}
-            />
+            /> : null}
 
-            {mode === 'birthday' ? (
+            {!gameRunning && mode === 'birthday' ? (
               <Pressable accessibilityRole="button" accessibilityLabel="Back to star profile" onPress={() => setMode('profile')} style={({ pressed }) => [styles.backRow, pressed && styles.pressed]}>
                 <IconSymbol name="chevron.left" size={16} color={Lantern.moon300} />
                 <ThemedText style={styles.backText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Back to profile</ThemedText>
               </Pressable>
-            ) : (
-              <InteractionThreadSwitcher options={THREADS} value={mode} onChange={selectThread} />
-            )}
+            ) : !gameRunning ? (
+              <InteractionThreadSwitcher options={THREADS} value={mode as Thread} onChange={selectThread} />
+            ) : null}
 
             <View style={styles.contentFrame}>
-              <ScrollView
+              {mode === 'game' ? (
+                <Animated.View key="elemental-game" entering={FadeIn.duration(reduceMotion ? 100 : 210)} exiting={FadeOut.duration(100)} style={styles.gameFrame}>
+                  <ZodiacElementMatchGame
+                    completedToday={completedToday}
+                    config={gameConfig}
+                    element={profile.element}
+                    familiarName={profile.familiarName}
+                    onComplete={completeGame}
+                    onExit={() => setMode('profile')}
+                    onRunningChange={setGameRunning}
+                    seed={gameSeed}
+                  />
+                </Animated.View>
+              ) : <ScrollView
                 automaticallyAdjustKeyboardInsets
                 contentContainerStyle={styles.scrollContent}
                 contentInsetAdjustmentBehavior="automatic"
@@ -134,26 +183,15 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
                     <View style={styles.thread}>
                       <CompanionSection label="Your celestial identity">
                         <ProfileRow icon="calendar" label="Zodiac sign" value={`${profile.name} · ${profile.dateLabel}`} accent={profile.accent} />
-                        <ProfileRow icon="sparkles" label="Tonight’s constellation" value={completedToday ? 'Restored today' : 'Ready to restore'} accent={profile.accent} />
+                        <ProfileRow icon="sparkles" label={`${profile.element} ritual · Tier ${gameConfig.tier}`} value={completedToday ? 'Gathered today' : `${gameConfig.targetCounts[0]} gems ready to gather`} accent={profile.accent} />
                       </CompanionSection>
                       <CompanionSection label="How this works">
                         <View style={styles.infoPanel}>
                           <ThemedText style={styles.infoTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>A playful daily ritual</ThemedText>
-                          <ThemedText style={styles.infoBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Your Star Companion offers a constellation and a reflection—not a prediction. Your sign never changes what hatches.</ThemedText>
+                          <ThemedText style={styles.infoBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Your sign chooses the elemental gems you gather, then opens a reflection—not a prediction. It never changes what hatches.</ThemedText>
                         </View>
                       </CompanionSection>
                       <CompanionSecondaryAction label="Edit birthday" icon="calendar" onPress={() => setMode('birthday')} />
-                    </View>
-                  ) : null}
-
-                  {mode === 'game' ? (
-                    <View style={styles.thread}>
-                      <CompanionSection label="Tonight’s constellation">
-                        <ThemedText style={styles.threadTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Help {profile.familiarName} restore the stars.</ThemedText>
-                        <ThemedText style={styles.threadBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Trace the pattern in order. When it wakes, your daily reflection will follow.</ThemedText>
-                      </CompanionSection>
-                      <ConnectStarsGame accentColor={profile.accent} points={level.points} onComplete={completeGame} />
-                      {completedToday ? <View style={styles.status}><IconSymbol name="checkmark" size={14} color={Lantern.auroraTeal} /><ThemedText style={styles.statusText} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>Today’s constellation is already safe. Replay it just for the glow.</ThemedText></View> : null}
                     </View>
                   ) : null}
 
@@ -180,10 +218,10 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
                     </View>
                   ) : null}
                 </Animated.View>
-              </ScrollView>
+              </ScrollView>}
             </View>
 
-            {footer ? <View style={styles.footer}>{footer}</View> : null}
+            {footer && mode !== 'game' ? <View style={styles.footer}>{footer}</View> : null}
           </KeyboardAvoidingView>
         </MeadowSheet>
       </GestureHandlerRootView>
@@ -228,6 +266,7 @@ const styles = StyleSheet.create({
   backRow: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Lantern.dusk700, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 5, minHeight: 42, paddingHorizontal: 12 },
   backText: { fontSize: 12.5, fontWeight: '800' },
   contentFrame: { flex: 1, minHeight: 0 },
+  gameFrame: { flex: 1, minHeight: 0 },
   scrollContent: { paddingBottom: 16, paddingHorizontal: 4 },
   thread: { gap: 24, paddingBottom: 20, paddingTop: 8 },
   threadTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 25, lineHeight: 31 },

@@ -4,8 +4,9 @@
 The default guided-sheet strategy sends only the fixed base hatchling as the
 generation image reference. A precise adult description and explicit monotonic
 cell specifications guide the evolution without letting an adult image dominate
-early cells. After Heavy matting, the script deterministically replaces stage 1
-with the exact hatchling and stage 9 with the exact existing adult cutout.
+early cells. After Heavy matting, the script deterministically inserts the exact
+hatchling and canonical adult cutouts at the progression's configured anchor
+cells (1 and 9 for standard, 1 and 8 for epic).
 
 An experimental staged strategy can render intermediate cells independently;
 the legacy sheet strategy supplies both endpoint images to one grid generation.
@@ -37,7 +38,7 @@ from PIL import Image, ImageDraw
 
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_HATCHLING = ROOT / "assets/images/katchimeras/hatchlings/base-hatchling.png"
+DEFAULT_HATCHLING = ROOT / "assets/images/katchimeras/hatchlings/base-hatchling-v2.png"
 DEFAULT_OUTPUT_ROOT = ROOT / "assets/images/katchimeras/evolution-grids"
 CATALOG_PATH = ROOT / "data/katchimeras/encounter-katchimeras.json"
 GRID_SIDE = 3
@@ -103,6 +104,46 @@ STAGES = [
     f"{spec['title']}: {spec['development']}; {spec['shell']}; {spec['anatomy']}"
     for spec in STAGE_SPECS
 ]
+
+EPIC_STAGE_SPECS = [
+    {
+        "title": "Fixed egg-shell hatchling",
+        "description": "the exact supplied Pagelet hatchling gripping its decorated lower shell with the cracked cap on its head",
+    },
+    {
+        "title": "Newborn baby",
+        "description": "fully out of the egg with no shell anywhere; tiny complete body, very short limbs, short soft trunk, tiny page ears, tiny bookmark tail and faint crest",
+    },
+    {
+        "title": "Toddler",
+        "description": "small unsteady child body, oversized head and eyes, page ears beginning to layer, short trunk, small tail and softly glowing book crest",
+    },
+    {
+        "title": "Young child",
+        "description": "round playful child proportions, clearer linen texture, larger layered page ears, longer bookmark tail and brighter belly crest",
+    },
+    {
+        "title": "Older child",
+        "description": "slightly taller body and more confident stance, recognizable adult palette, half-grown page ears, tail and book crest",
+    },
+    {
+        "title": "Adolescent",
+        "description": "longer limbs and stronger silhouette, two-thirds adult page-ear layering, richer burgundy-and-gold markings and controlled inner glow",
+    },
+    {
+        "title": "Young adult",
+        "description": "nearly mature Pagelet with softer proportions than the adult, almost full ears and tail, refined linen surface and strong belly crest",
+    },
+    {
+        "title": "Canonical full-grown Pagelet",
+        "description": "the exact supplied existing adult Pagelet form; this cell is replaced deterministically after generation",
+    },
+    {
+        "title": "Overpowered epic Pagelet",
+        "description": "a majestic ultimate Pagelet evolution with enormous gold-edged layered page ears, luminous linen body, radiant open-book core, sweeping burgundy bookmark tail and controlled orbiting page-light energy",
+    },
+]
+EPIC_STAGES = [f"{spec['title']}: {spec['description']}" for spec in EPIC_STAGE_SPECS]
 
 
 def slugify(value: str) -> str:
@@ -222,6 +263,41 @@ def build_prompt(display_name: str, description: str, adult_image_reference: boo
         if adult_image_reference
         else "There is no adult image reference in this generation. The adult destination is defined only by "
         "the target identity text, and the complete supplied adult will be inserted into cell 9 afterward. "
+    )
+
+
+def build_epic_prompt(display_name: str, description: str) -> str:
+    stage_lines = " ".join(
+        f"Cell {index + 1}: {spec['title']} — {spec['description']}."
+        for index, spec in enumerate(EPIC_STAGE_SPECS)
+    )
+    return (
+        "Create one clean 3x3 character progression contact sheet: exactly three rows and three columns, nine "
+        "equal square cells read left-to-right and top-to-bottom, with thin even gutters. Show the SAME single "
+        f"{display_name} growing through nine chronological ages. Adult identity: {description}. "
+        "REFERENCE IMAGE 1 is the authoritative Pagelet hatchling and is mandatory for the face, huge amber "
+        "eyes, short soft trunk, linen material, layered page ears, burgundy bookmark tail, glowing book motifs, "
+        "rounded Katchimeras art style, camera and lighting. Preserve this exact species identity in every cell. "
+        "There is no adult image reference in the generation; the canonical adult will be inserted into cell 8 "
+        "afterward. Cell 9 must be a newly generated epic evolution of that same identity. "
+        f"{stage_lines} "
+        "EGG RULE IS ABSOLUTE: the egg-shell hatchling appears in CELL 1 ONLY. Starting with cell 2, show a full "
+        "free-standing body with absolutely no egg, shell, shell cap, shell bowl, shell fragments or egg motifs. "
+        "Never reintroduce the egg in any later cell. From cell 2 onward, the top of the head is uncovered linen: "
+        "no cap, helmet, crown, dome, segmented head covering, shell plates or eggshell-shaped headpiece. Only "
+        "intrinsic page tufts, ears and the creature's natural markings may rise from the head. Growth must be "
+        "strictly forward: each cell is visibly older, "
+        "taller, more developed and more powerful than the previous one. Do not duplicate adjacent ages and do "
+        "not change species. Preserve the short trunk, page ears, bookmark tail, linen body and open-book core as "
+        "anatomical identity markers while their size, layering and glow increase gradually. "
+        "Cell 9 is overpowered and epic but still unmistakably Pagelet: premium heroic silhouette, stronger gold "
+        "page edging, layered luminous ears, brighter inner glow, radiant open-book core and graceful magical "
+        "page-light orbit. No weapon, armor, aggression or unrelated elemental theme. "
+        "Use the same centred straight-on or gentle three-quarter hero camera, consistent framing, warm studio "
+        "lighting and premium rounded 3D Katchimeras toy-diorama finish in every cell. Use one uniform matte "
+        "dark-plum studio background for clean matting. Interpret book identity as anatomy, surfaces and magical "
+        "body markings—not literal carried objects. No clothing, scarves, bags, handheld books, tools, platforms, "
+        "scenery, extra creatures, text, letters, numbers, labels, arrows, logos, UI, humans or photorealism."
     )
     return (
         "Create one clean 3x3 character evolution contact sheet: exactly three rows and three columns, "
@@ -479,6 +555,8 @@ def process_grid(
     final_path: Path,
     output_dir: Path,
     name: str,
+    progression: str = "standard",
+    raw_path: Path | None = None,
 ) -> tuple[Path, list[Path]]:
     grid = Image.open(matted_path).convert("RGBA")
     side = min(grid.size)
@@ -486,6 +564,14 @@ def process_grid(
     left = (grid.width - side) // 2
     top = (grid.height - side) // 2
     grid = grid.crop((left, top, left + side, top + side))
+    raw_grid = None
+    if raw_path is not None:
+        raw_grid = Image.open(raw_path).convert("RGBA")
+        raw_side = min(raw_grid.size)
+        raw_side -= raw_side % GRID_SIDE
+        raw_left = (raw_grid.width - raw_side) // 2
+        raw_top = (raw_grid.height - raw_side) // 2
+        raw_grid = raw_grid.crop((raw_left, raw_top, raw_left + raw_side, raw_top + raw_side))
     cell_size = side // GRID_SIDE
 
     cells_dir = output_dir / "cells"
@@ -503,8 +589,35 @@ def process_grid(
         )
         if index == 0:
             cell = contain_rgba(Image.open(hatchling_path), (cell_size, cell_size))
-        elif index == STAGE_COUNT - 1:
+        elif progression == "epic" and index == STAGE_COUNT - 2:
             cell = contain_rgba(Image.open(final_path), (cell_size, cell_size))
+        elif progression == "standard" and index == STAGE_COUNT - 1:
+            cell = contain_rgba(Image.open(final_path), (cell_size, cell_size))
+        elif cell.getchannel("A").getbbox() is None:
+            if raw_grid is None:
+                raise ValueError(f"Heavy matting removed all visible pixels from stage {index + 1}")
+            raw_cell_size = raw_grid.width // GRID_SIDE
+            raw_cell = raw_grid.crop(
+                (
+                    column * raw_cell_size,
+                    row * raw_cell_size,
+                    (column + 1) * raw_cell_size,
+                    (row + 1) * raw_cell_size,
+                )
+            )
+            raw_stages_dir = output_dir / "raw-stages"
+            matted_stages_dir = output_dir / "matted-stages"
+            raw_stages_dir.mkdir(parents=True, exist_ok=True)
+            matted_stages_dir.mkdir(parents=True, exist_ok=True)
+            raw_stage_path = raw_stages_dir / f"stage-{index + 1:02d}.png"
+            matted_stage_path = matted_stages_dir / f"stage-{index + 1:02d}.png"
+            raw_cell.save(raw_stage_path, optimize=True)
+            matte_grid(raw_stage_path, f"{name}-stage-{index + 1:02d}", matted_stage_path)
+            recovered = Image.open(matted_stage_path).convert("RGBA")
+            if recovered.getchannel("A").getbbox() is None:
+                raise ValueError(f"Per-cell Heavy matting removed all visible pixels from stage {index + 1}")
+            cell = contain_rgba(recovered, (cell_size, cell_size), padding_ratio=0.0)
+            print(f"recovered stage {index + 1} with per-cell Heavy matting", flush=True)
         destination = cells_dir / f"stage-{index + 1:02d}.png"
         cell.save(destination, optimize=True)
         cells.append(destination)
@@ -583,6 +696,12 @@ def main() -> None:
     parser.add_argument("--model", choices=("gpt", "seedream", "nano"), default="gpt")
     parser.add_argument("--strategy", choices=("guided-sheet", "staged", "sheet"), default="guided-sheet")
     parser.add_argument(
+        "--progression",
+        choices=("standard", "epic"),
+        default="standard",
+        help="standard ends at canonical adult; epic uses adult in cell 8 and an ultimate form in cell 9",
+    )
+    parser.add_argument(
         "--adult-reference-mode",
         choices=("description", "image"),
         default="description",
@@ -595,6 +714,9 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="write prompt/manifest without network generation")
     parser.add_argument("--force", action="store_true", help="replace an existing output directory")
     args = parser.parse_args()
+
+    if args.progression == "epic" and args.strategy != "guided-sheet":
+        parser.error("--progression epic currently requires --strategy guided-sheet")
 
     if not args.creature and not args.name:
         parser.error("provide --creature or --name")
@@ -638,7 +760,9 @@ def main() -> None:
         )
         for index in range(1, STAGE_COUNT - 1)
     }
-    if args.strategy == "sheet":
+    if args.progression == "epic":
+        prompt = build_epic_prompt(display_name, description)
+    elif args.strategy == "sheet":
         prompt = build_prompt(display_name, description, adult_image_reference=True)
     elif args.strategy == "guided-sheet":
         prompt = build_prompt(display_name, description, adult_image_reference=False)
@@ -652,6 +776,7 @@ def main() -> None:
         "name": display_name,
         "profileId": profile.get("id") if profile else None,
         "strategy": args.strategy,
+        "progression": args.progression,
         "adultReferenceMode": effective_adult_reference_mode,
         "model": args.model,
         "quality": args.quality if args.model == "gpt" else None,
@@ -662,9 +787,9 @@ def main() -> None:
             {
                 "index": index + 1,
                 "description": stage,
-                "prompt": stage_prompts.get(index + 1),
+                "prompt": None if args.progression == "epic" else stage_prompts.get(index + 1),
             }
-            for index, stage in enumerate(STAGES)
+            for index, stage in enumerate(EPIC_STAGES if args.progression == "epic" else STAGES)
         ],
     }
     manifest_path = output_dir / "manifest.json"
@@ -719,7 +844,15 @@ def main() -> None:
         print(f"saved raw grid: {raw_path}", flush=True)
         matte_url = matte_grid(raw_path, display_name, matted_path)
         print(f"saved Heavy-matted grid: {matted_path}", flush=True)
-        preview_path, cells = process_grid(matted_path, hatchling_path, final_path, output_dir, display_name)
+        preview_path, cells = process_grid(
+            matted_path,
+            hatchling_path,
+            final_path,
+            output_dir,
+            display_name,
+            progression=args.progression,
+            raw_path=raw_path,
+        )
         manifest.update(
             {
                 "generationUrl": image_url,

@@ -95,10 +95,21 @@ identity and every monotonic stage as text, and then runs the sheet through the
 deployed BiRefNet **General Use (Heavy)** matte. The exact hatchling and exact
 existing adult cutout are stamped into stages one and nine after generation.
 This avoids both backward egg states and premature copying of the adult design.
+The default hatchling reference is the approved richer
+`assets/images/katchimeras/hatchlings/base-hatchling-v2.png` derived from the
+`exec-e274bd86-4c34-4a20-ab70-37850ce0d4f8` render.
 
 ```bash
 # Resolves the profile and final cutout from the catalog/name.
 python scripts/generate-evolution-grid.py --creature pagelet
+
+# Epic progression: egg only in cell 1, canonical adult in cell 8, generated
+# overpowered ultimate form in cell 9.
+python scripts/generate-evolution-grid.py \
+  --name Pagelet \
+  --hatchling assets/images/katchimeras/hatchlings/pagelet-hatchling-v1.png \
+  --final assets/images/katchimeras/cutouts/pagelet.png \
+  --progression epic
 
 # Explicit inputs for a new or non-catalog creature.
 python scripts/generate-evolution-grid.py \

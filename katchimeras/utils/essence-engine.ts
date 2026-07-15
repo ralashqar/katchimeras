@@ -18,7 +18,7 @@ export const ESSENCE_AWARD = {
   bigMoment: 15,
   weeklyRecap: 25,
   questComplete: 12, // a companion quest fulfilled (docs/katchimera-engagement-v1.md)
-  constellation: 1, // first zodiac constellation completion per local day
+  zodiacRitual: 1, // first completed Zodiac ritual per local day
 } as const;
 
 // Discovery essence by rarity (a def may override via essenceReward).
@@ -66,7 +66,7 @@ export function earnedTotal(
   // Completed companion quests each pay once (the ledger persists completedAt,
   // so this stays deterministic + anti-farm like the rest of `earned`).
   completedQuestCount = 0,
-  constellationCompletionCount = 0
+  zodiacRitualCompletionCount = 0
 ): number {
   let total = 0;
   for (const day of days) total += essenceAwardsForDay(day);
@@ -74,7 +74,7 @@ export function earnedTotal(
   const finalised = days.filter((day) => day.state === 'hatched').length;
   total += Math.floor(finalised / DAYS_PER_RECAP) * ESSENCE_AWARD.weeklyRecap;
   total += completedQuestCount * ESSENCE_AWARD.questComplete;
-  total += constellationCompletionCount * ESSENCE_AWARD.constellation;
+  total += zodiacRitualCompletionCount * ESSENCE_AWARD.zodiacRitual;
   return total;
 }
 

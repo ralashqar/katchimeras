@@ -31,7 +31,7 @@ export function useEssence() {
   }, [days]);
 
   const earned = useMemo(
-    () => earnedTotal(days, unlockedDiscoveries, completedQuestCount, loadWorldIdentity().constellationCompletions.length),
+    () => earnedTotal(days, unlockedDiscoveries, completedQuestCount, loadWorldIdentity().zodiacRitualCompletions.length),
     [days, unlockedDiscoveries, completedQuestCount]
   );
   const balance = essenceBalance(earned, state.spent);
