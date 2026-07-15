@@ -167,6 +167,30 @@ EPIC_STAGE_DELTAS = [
 # Relative display scale is part of the chronological context. Without this,
 # tight-fitting every cutout makes a newborn and an adult appear equally tall.
 SEQUENTIAL_STAGE_SCALES = (0.58, 0.55, 0.64, 0.72, 0.80, 0.88, 0.94, 1.0, 1.0)
+
+SCRATCH_STAGE_SPECS = [
+    {"title": "Species egg-shell hatchling", "description": "the approved egg-shell hatchling format, newly themed as this species through its palette, earliest ear silhouette, tiny signature marking and faint inner core"},
+    {"title": "Newborn baby", "description": "fully out of the shell with a tiny complete body, extremely short limbs, oversized eyes and only the earliest hints of the final signature anatomy"},
+    {"title": "Toddler", "description": "a small stable toddler body with the first clearly readable species silhouette, small signature ears or head feature, short tail and a softly glowing core"},
+    {"title": "Young child", "description": "round playful child proportions with clearer materials, longer limbs and roughly one-third of the final signature motif development"},
+    {"title": "Older child", "description": "a taller pre-adolescent with a more confident stance and roughly half-grown signature ears, tail, head feature and glow core"},
+    {"title": "Adolescent", "description": "a visible growth spurt with longer limbs, stronger silhouette and roughly two-thirds of the adult material, motif and anatomy development"},
+    {"title": "Young adult", "description": "nearly mature anatomy and palette with softer facial proportions, slightly larger eyes and less authority than the final adult"},
+    {"title": "Canonical full-grown form", "description": "a completely newly generated adult expression of the supplied identity description, with mature proportions and fully resolved signature anatomy"},
+    {"title": "Overpowered epic form", "description": "a majestic ultimate evolution of the newly generated adult, amplifying its signature anatomy, inner core, material richness and controlled thematic energy"},
+]
+
+SCRATCH_STAGE_DELTAS = [
+    "Translate the generic hatchling into the target species while preserving the approved egg-shell format.",
+    "Remove the egg completely and reveal a tiny free-standing newborn. Keep final-species anatomy minimal and immature.",
+    "Grow roughly 15% taller; lengthen the legs, clarify the first species silhouette and strengthen the core slightly.",
+    "Grow roughly 12% taller; reduce the head-to-body ratio slightly and develop the signature anatomy to one-third maturity.",
+    "Grow roughly 12% taller; broaden the torso, lengthen appendages and develop the signature anatomy to half maturity.",
+    "Create a clear adolescent growth spurt; use longer limbs and develop the signature anatomy and materials to two-thirds maturity.",
+    "Move to roughly 85% of adult development while retaining a softer face, larger eyes and less visual authority.",
+    "Complete a new adult design from the supplied text identity. Resolve every signature trait without copying any existing artwork.",
+    "Evolve beyond that newly generated adult by amplifying its signature silhouette, core glow and thematic energy while preserving identity.",
+]
 EPIC_STAGES = [f"{spec['title']}: {spec['description']}" for spec in EPIC_STAGE_SPECS]
 
 
@@ -316,12 +340,15 @@ def build_sequential_prompt(
     description: str,
     stage_index: int,
     history_count: int,
+    from_scratch: bool = False,
 ) -> str:
     """Build one epic-stage prompt using the accepted chronological history as context."""
     if stage_index <= 0 or stage_index >= STAGE_COUNT:
         raise ValueError("Sequential generation only creates stages 2 through 9")
-    current = EPIC_STAGE_SPECS[stage_index]
-    previous = EPIC_STAGE_SPECS[stage_index - 1]
+    specs = SCRATCH_STAGE_SPECS if from_scratch else EPIC_STAGE_SPECS
+    deltas = SCRATCH_STAGE_DELTAS if from_scratch else EPIC_STAGE_DELTAS
+    current = specs[stage_index]
+    previous = specs[stage_index - 1]
     history_instruction = (
         "REFERENCE IMAGE 2 is a chronological history board of every accepted earlier stage, read left-to-right "
         "and top-to-bottom. Its final occupied cell is the immediate predecessor. Use the whole board to preserve "
@@ -329,19 +356,48 @@ def build_sequential_prompt(
         if history_count > 1
         else "Only the base hatchling reference is supplied because this is the first generated transition. "
     )
+
+
+def build_grid_refinement_prompt(display_name: str, description: str) -> str:
+    return (
+        "Redraw one complete 3x3 chronological evolution grid as a single square image. "
+        "REFERENCE IMAGE 1 is the existing grid and is authoritative for the exact three-row, three-column layout, "
+        "cell order, dark-plum rounded panels, increasing character scale and left-to-right top-to-bottom ages. "
+        "REFERENCE IMAGE 2 is the original in-game character and is authoritative for species identity, face, cream-"
+        "and-coffee-brown markings, glossy eyes, bent latte-foam rabbit ears, ceramic coffee-cup hood and handle, "
+        "orange caramel glow core, coffee-bean tail details, small waist pouch, materials and premium mascot finish. "
+        f"Every cell must depict the same {display_name}. Identity description: {description}. "
+        "Redo the progression to resemble reference image 2 much more closely while preserving genuine growth. "
+        "CELL 1: egg-shell hatchling, bent foam ear tips and brown infant markings, no cup hood, pouch or handheld cup. "
+        "CELL 2: shell-free newborn sitting low, tiny body, no cup hood, pouch or handheld cup. CELL 3: toddler, "
+        "standing but still head-heavy, only a small soft cup-rim head band, no square hood, pouch or handheld cup. "
+        "CELL 4: young child, one-third ceramic hood development, no pouch or handheld cup. CELL 5: older child, "
+        "half-developed hood and tiny waist pouch, no handheld cup. CELL 6: adolescent, two-thirds adult height, "
+        "nearly complete hood and pouch, empty hands. CELL 7: young adult, almost the original silhouette but slimmer "
+        "and softer, complete hood and pouch, empty hands. CELL 8: full adult closely matching reference image 2, "
+        "including its joyful pose and small coffee cup. CELL 9: overpowered epic adult amplifying the same identity "
+        "with radiant caramel energy, orbiting coffee beans and a magical steaming cup. Do not render the complete "
+        "adult silhouette before cell 8. Only cell 1 may contain eggshell. Adjacent cells must visibly differ in "
+        "height, body proportions, "
+        "ear development, hood development, core strength and pose confidence. Keep one character per cell, fully "
+        "inside its panel. Preserve clean even gutters and one consistent warm rounded 3D game-mascot rendering. "
+        "No captions, stage numbers, text, letters, logos, UI labels, humans, extra creatures or scenery outside "
+        "the nine panels. Output exactly one 3x3 grid, not separate images."
+    )
     return (
         "Create one isolated full-body character render on a perfectly uniform matte dark-plum studio background. "
         f"This is stage {stage_index + 1} of 9 in {display_name}'s strict chronological growth sequence. "
         f"Adult identity destination: {description}. "
-        "REFERENCE IMAGE 1 is the approved hatchling and permanently defines the same individual, huge amber eyes, "
-        "short elephant-like trunk, warm linen material, page anatomy, rounded project art style, camera and lighting. "
+        "REFERENCE IMAGE 1 is the approved species hatchling and permanently defines the same individual, face, "
+        "eyes, initial palette, rounded project art style, camera and lighting. "
         f"{history_instruction}"
         f"CURRENT STAGE: {current['title']}. {current['description']}. "
-        f"REQUIRED CHANGE FROM STAGE {stage_index} ({previous['title']}): {EPIC_STAGE_DELTAS[stage_index]} "
+        f"REQUIRED CHANGE FROM STAGE {stage_index} ({previous['title']}): {deltas[stage_index]} "
         "The new result must be visibly older and more developed than the immediate predecessor; do not duplicate "
         "its height, proportions, silhouette or feature scale. Preserve facial identity and species anatomy. "
-        "The egg and shell exist only in stage 1. Show no egg, shell, cap, crown, dome, shell plate, fragment or egg "
-        "motif at this stage. The top of the head is uncovered linen with only natural page tufts. "
+        "The egg and eggshell exist only in stage 1. Show no egg, eggshell, broken shell cap, shell plate, fragment "
+        "or egg motif at this stage. A signature adult head feature named in the identity may emerge gradually, but "
+        "it must read as that feature rather than reused eggshell. "
         "Render exactly one centered character with generous padding, consistent gentle three-quarter hero camera, "
         "premium rounded 3D Katchimeras toy-diorama materials and warm studio lighting. No grid, multiple poses, "
         "extra creature, scenery, platform, clothing, handheld book, bag, tool, armor, weapon, text, letters, numbers, "
@@ -624,27 +680,100 @@ def build_history_board(sources: list[Path], destination: Path, size: int = 1024
     return destination
 
 
+def generate_species_hatchling(
+    *,
+    display_name: str,
+    description: str,
+    base_hatchling: Path,
+    model: str,
+    size: int,
+    quality: str,
+    output_dir: Path,
+) -> tuple[dict[str, Any], Path]:
+    """Create a species-specific stage 1 using only the approved base hatchling."""
+    prompt = (
+        "Create one newly designed species-specific hatchling using REFERENCE IMAGE 1 only as the exact approved "
+        "hatchling format and project-style guide. Preserve its centered full-body framing, huge expressive eyes, "
+        "tiny creature gripping an open lower eggshell, shallow cracked shell cap, rounded premium 3D materials, "
+        "warm studio lighting and simple matte dark-plum background. Do not copy its botanical species details. "
+        f"Redesign the hatchling as {display_name}. Adult identity destination: {description}. At this first age, "
+        "show only infant versions of the target palette, ear or head silhouette, one tiny signature marking and a "
+        "faint inner glow. Keep the adult motif embryonic rather than fully formed. The shell may carry simple target "
+        "palette accents but must remain an eggshell. One isolated character only. No existing adult artwork, grid, "
+        "multiple poses, scenery, platform, clothing, handheld object, readable text, letters, numbers, logo, UI, "
+        "human, weapon, photorealism or unrelated theme."
+    )
+    raw_path = output_dir / "raw-stages" / "stage-01.png"
+    matted_path = output_dir / "matted-stages" / "stage-01.png"
+    image_url, generation = submit_generation(
+        name=f"{display_name}-scratch-hatchling",
+        prompt=prompt,
+        hatchling=base_hatchling,
+        final=None,
+        model=model,
+        size=size,
+        quality=quality,
+    )
+    download(image_url, raw_path)
+    matte_url = matte_grid(raw_path, f"{display_name}-scratch-hatchling", matted_path)
+    if Image.open(matted_path).convert("RGBA").getchannel("A").getbbox() is None:
+        raise ValueError("Heavy matting removed all visible pixels from generated hatchling")
+    return (
+        {
+            "index": 1,
+            "prompt": prompt,
+            "generationUrl": image_url,
+            "matteUrl": matte_url,
+            "generationResponse": generation,
+            "rawPath": raw_path,
+            "mattedPath": matted_path,
+        },
+        matted_path,
+    )
+
+
 def generate_sequential_assets(
     *,
     display_name: str,
     description: str,
     hatchling: Path,
-    final: Path,
+    final: Path | None,
     model: str,
     size: int,
     quality: str,
     output_dir: Path,
     progression: str,
+    from_scratch: bool = False,
 ) -> tuple[list[dict[str, Any]], list[Path]]:
     """Generate each new age from the accepted history, then return all nine sources."""
-    accepted: list[Path] = [hatchling]
     generated: list[dict[str, Any]] = []
+    if from_scratch:
+        hatchling_record, species_hatchling = generate_species_hatchling(
+            display_name=display_name,
+            description=description,
+            base_hatchling=hatchling,
+            model=model,
+            size=size,
+            quality=quality,
+            output_dir=output_dir,
+        )
+        generated.append(hatchling_record)
+        accepted: list[Path] = [species_hatchling]
+        identity_hatchling = species_hatchling
+        print("stage 1: generated species hatchling and Heavy-matted", flush=True)
+    else:
+        accepted = [hatchling]
+        identity_hatchling = hatchling
     for stage_index in range(1, STAGE_COUNT):
         stage_number = stage_index + 1
-        if progression == "epic" and stage_number == 8:
+        if not from_scratch and progression == "epic" and stage_number == 8:
+            if final is None:
+                raise ValueError("Epic anchored progression requires a final reference")
             accepted.append(final)
             continue
-        if progression == "standard" and stage_number == 9:
+        if not from_scratch and progression == "standard" and stage_number == 9:
+            if final is None:
+                raise ValueError("Standard anchored progression requires a final reference")
             accepted.append(final)
             continue
 
@@ -652,13 +781,19 @@ def generate_sequential_assets(
         history_reference = None
         if len(accepted) > 1:
             history_reference = build_history_board(accepted, history_path, size=1024)
-        prompt = build_sequential_prompt(display_name, description, stage_index, len(accepted))
+        prompt = build_sequential_prompt(
+            display_name,
+            description,
+            stage_index,
+            len(accepted),
+            from_scratch=from_scratch,
+        )
         raw_path = output_dir / "raw-stages" / f"stage-{stage_number:02d}.png"
         matted_path = output_dir / "matted-stages" / f"stage-{stage_number:02d}.png"
         image_url, generation = submit_generation(
             name=f"{display_name}-sequential-stage-{stage_number:02d}",
             prompt=prompt,
-            hatchling=hatchling,
+            hatchling=identity_hatchling,
             final=history_reference,
             model=model,
             size=size,
@@ -855,6 +990,13 @@ def main() -> None:
     parser.add_argument("--description", help="target final-form description; inferred from catalog when omitted")
     parser.add_argument("--hatchling", default=str(DEFAULT_HATCHLING), help="fixed hatchling reference image")
     parser.add_argument("--final", help="existing final-form image; inferred from the creature name when omitted")
+    parser.add_argument(
+        "--from-scratch",
+        action="store_true",
+        help="generate the species hatchling, adult and epic form without using existing creature artwork",
+    )
+    parser.add_argument("--refine-grid", help="existing 3x3 grid to redraw as reference image 1")
+    parser.add_argument("--identity-reference", help="authoritative original creature image as reference image 2")
     parser.add_argument("--model", choices=("gpt", "seedream", "nano"), default="gpt")
     parser.add_argument(
         "--strategy",
@@ -883,6 +1025,10 @@ def main() -> None:
 
     if args.progression == "epic" and args.strategy not in {"guided-sheet", "sequential"}:
         parser.error("--progression epic requires --strategy guided-sheet or sequential")
+    if args.from_scratch and args.strategy != "sequential":
+        parser.error("--from-scratch requires --strategy sequential")
+    if bool(args.refine_grid) != bool(args.identity_reference):
+        parser.error("--refine-grid and --identity-reference must be provided together")
 
     if not args.creature and not args.name:
         parser.error("provide --creature or --name")
@@ -899,12 +1045,18 @@ def main() -> None:
     hatchling_path = Path(args.hatchling)
     if not hatchling_path.is_absolute():
         hatchling_path = ROOT / hatchling_path
-    final_path = Path(args.final) if args.final else infer_final_path(output_name)
+    final_path = (
+        None
+        if args.from_scratch or args.refine_grid
+        else Path(args.final)
+        if args.final
+        else infer_final_path(output_name)
+    )
     if final_path and not final_path.is_absolute():
         final_path = ROOT / final_path
     if not hatchling_path.exists():
         sys.exit(f"Missing hatchling reference: {hatchling_path}")
-    if final_path is None or not final_path.exists():
+    if not args.from_scratch and not args.refine_grid and (final_path is None or not final_path.exists()):
         sys.exit("Could not infer the final-form image; provide --final <path>")
 
     output_dir = Path(args.out_dir) if args.out_dir else DEFAULT_OUTPUT_ROOT / output_name
@@ -913,6 +1065,81 @@ def main() -> None:
     if output_dir.exists() and any(output_dir.iterdir()) and not args.force:
         sys.exit(f"Output directory already contains files: {output_dir} (use --force)")
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.refine_grid:
+        grid_path = Path(args.refine_grid)
+        identity_path = Path(args.identity_reference)
+        if not grid_path.is_absolute():
+            grid_path = ROOT / grid_path
+        if not identity_path.is_absolute():
+            identity_path = ROOT / identity_path
+        if not grid_path.exists():
+            sys.exit(f"Missing refinement grid: {grid_path}")
+        if not identity_path.exists():
+            sys.exit(f"Missing identity reference: {identity_path}")
+        prompt = build_grid_refinement_prompt(display_name, description)
+        prompt_path = output_dir / "prompt.txt"
+        prompt_path.write_text(prompt + "\n", encoding="utf-8")
+        manifest_path = output_dir / "manifest.json"
+        if args.dry_run:
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 2,
+                        "type": "katchimera-evolution-grid-refinement",
+                        "name": display_name,
+                        "model": args.model,
+                        "quality": args.quality,
+                        "renderSize": args.size,
+                        "gridReference": relative_to_root(grid_path),
+                        "identityReference": relative_to_root(identity_path),
+                        "prompt": prompt,
+                        "status": "dry-run",
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            print(f"wrote refinement dry run to {output_dir}")
+            return
+        image_url, generation = submit_generation(
+            name=f"{display_name}-grid-refinement",
+            prompt=prompt,
+            hatchling=grid_path,
+            final=identity_path,
+            model=args.model,
+            size=args.size,
+            quality=args.quality,
+        )
+        result_path = output_dir / f"{slugify(display_name)}-evolution-grid.png"
+        download(image_url, result_path)
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 2,
+                    "type": "katchimera-evolution-grid-refinement",
+                    "name": display_name,
+                    "model": args.model,
+                    "quality": args.quality,
+                    "renderSize": args.size,
+                    "gridReference": relative_to_root(grid_path),
+                    "identityReference": relative_to_root(identity_path),
+                    "prompt": prompt,
+                    "generationUrl": image_url,
+                    "generationResponse": generation,
+                    "result": relative_to_root(result_path),
+                    "status": "completed",
+                    "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        print(f"saved refined grid: {result_path}")
+        print(f"saved manifest: {manifest_path}")
+        return
 
     effective_adult_reference_mode = (
         "image"
@@ -933,10 +1160,19 @@ def main() -> None:
         for index in range(1, STAGE_COUNT - 1)
     }
     sequential_prompts = {
-        index + 1: build_sequential_prompt(display_name, description, index, index)
+        index + 1: build_sequential_prompt(
+            display_name,
+            description,
+            index,
+            index,
+            from_scratch=args.from_scratch,
+        )
         for index in range(1, STAGE_COUNT)
-        if not (args.progression == "epic" and index + 1 == 8)
-        and not (args.progression == "standard" and index + 1 == 9)
+        if args.from_scratch
+        or (
+            not (args.progression == "epic" and index + 1 == 8)
+            and not (args.progression == "standard" and index + 1 == 9)
+        )
     }
     if args.strategy == "sequential":
         prompt = "\n\n".join(
@@ -963,7 +1199,8 @@ def main() -> None:
         "model": args.model,
         "quality": args.quality if args.model == "gpt" else None,
         "hatchlingReference": relative_to_root(hatchling_path),
-        "finalReference": relative_to_root(final_path),
+        "finalReference": relative_to_root(final_path) if final_path else None,
+        "fromScratch": args.from_scratch,
         "prompt": prompt,
         "stages": [
             {
@@ -975,7 +1212,13 @@ def main() -> None:
                 if args.progression == "epic"
                 else stage_prompts.get(index + 1),
             }
-            for index, stage in enumerate(EPIC_STAGES if args.progression == "epic" else STAGES)
+            for index, stage in enumerate(
+                [f"{spec['title']}: {spec['description']}" for spec in SCRATCH_STAGE_SPECS]
+                if args.from_scratch
+                else EPIC_STAGES
+                if args.progression == "epic"
+                else STAGES
+            )
         ],
     }
     manifest_path = output_dir / "manifest.json"
@@ -997,6 +1240,7 @@ def main() -> None:
             quality=args.quality,
             output_dir=output_dir,
             progression=args.progression,
+            from_scratch=args.from_scratch,
         )
         preview_path, cells = process_sequential_assets(
             accepted_sources,

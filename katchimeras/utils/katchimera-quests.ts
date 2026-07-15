@@ -5,6 +5,7 @@ import type { Facts } from '@/utils/signals/facts';
 import { questCriteriaStatus } from '@/utils/quests/evaluate';
 import { isQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
 import type { QuestAttempt, QuestResult } from '@/utils/quests/experiences/types';
+import { rankedQuestOfferIds } from '@/utils/quest-offer-order';
 
 // Companion quest store (docs/katchimera-engagement-v1.md): tiny persisted
 // ledger of accepted quests, one active per katchimera. Completion is decided
@@ -83,9 +84,25 @@ export function questOfferForDay<T extends { id: string; weight?: number }>(
 ): T | undefined {
   if (!offers.length) return undefined;
   const cycle = state.offerCycles.find((item) => item.creatureId === creatureId && item.dayId === dayId);
-  const order = cycle?.offerIds?.length ? cycle.offerIds : seededOfferOrder(offers, `${creatureId}:${dayId}`);
+  const order = cycle?.offerIds?.length ? cycle.offerIds : rankedQuestOfferIds(offers, `${creatureId}:${dayId}`);
   const offerId = order[Math.max(0, cycle?.index ?? 0) % order.length];
   return offers.find((offer) => offer.id === offerId) ?? offers[0];
+}
+
+export function questOffersForDay<T extends { id: string; weight?: number }>(
+  state: CompanionQuestState,
+  creatureId: string,
+  dayId: string,
+  offers: T[],
+  limit = 3
+): T[] {
+  if (!offers.length || limit <= 0) return [];
+  const cycle = state.offerCycles.find((item) => item.creatureId === creatureId && item.dayId === dayId);
+  const order = cycle?.offerIds?.length ? cycle.offerIds : rankedQuestOfferIds(offers, `${creatureId}:${dayId}`);
+  return order
+    .map((id) => offers.find((offer) => offer.id === id))
+    .filter((offer): offer is T => Boolean(offer))
+    .slice(0, limit);
 }
 
 export function cycleQuestOffer<T extends { id: string; weight?: number }>(
@@ -95,7 +112,7 @@ export function cycleQuestOffer<T extends { id: string; weight?: number }>(
   offers: T[]
 ): { state: CompanionQuestState; offer: T | undefined } {
   if (questFor(state, creatureId) || offers.length < 2) return { state, offer: questOfferForDay(state, creatureId, dayId, offers) };
-  const offerIds = seededOfferOrder(offers, `${creatureId}:${dayId}`);
+  const offerIds = rankedQuestOfferIds(offers, `${creatureId}:${dayId}`);
   const previous = state.offerCycles.find((item) => item.creatureId === creatureId && item.dayId === dayId);
   const nextCycle: QuestOfferCycle = {
     creatureId,
@@ -435,30 +452,6 @@ function withPersonalBest(state: CompanionQuestState, questId: string, result: Q
   }
   if (result.kind === 'rhythm') return { ...result, personalBest: !previous.some((item) => item.kind === 'rhythm' && (item.score > result.score || (item.score === result.score && item.durationMs <= result.durationMs))) };
   return result;
-}
-
-function seededOfferOrder(offers: { id: string; weight?: number }[], seed: string): string[] {
-  return [...offers]
-    .sort((left, right) => {
-      const weightLead = (right.weight ?? 1) - (left.weight ?? 1);
-      return weightLead || weightedOfferScore(left, seed) - weightedOfferScore(right, seed);
-    })
-    .map((offer) => offer.id);
-}
-
-function weightedOfferScore(offer: { id: string; weight?: number }, seed: string): number {
-  const unit = (stableHash(`${seed}:${offer.id}`) + 1) / 4_294_967_297;
-  const weight = Math.max(0.1, offer.weight ?? 1);
-  return -Math.log(unit) / weight;
-}
-
-function stableHash(value: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
 }
 
 function questDayId(timestamp?: number, explicitDayId?: string): string | null {

@@ -14,8 +14,8 @@ import type { QuestResult } from '@/utils/quests/experiences/types';
 
 import {
   ExperienceAction,
-  ExperienceHeader,
   ExperienceResult,
+  QuestExperiencePreview,
   experienceStyles,
   useQuestAppActive,
 } from './quest-experience-ui';
@@ -140,14 +140,14 @@ export function PatternMemoryQuest({
 
   if (!started) {
     return (
-      <View style={experienceStyles.root}>
-        <ExperienceHeader
-          eyebrow="GATHERGLOW"
+        <QuestExperiencePreview
+          eyebrow="Gatherglow"
           title="Follow Gatherglow’s lights"
           body="Watch the four lights, then repeat their order."
+          icon="sparkles"
+          actionLabel="Begin pattern"
+          onAction={start}
         />
-        <ExperienceAction label="Begin pattern" onPress={start} />
-      </View>
     );
   }
 

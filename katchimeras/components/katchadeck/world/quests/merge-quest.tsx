@@ -41,7 +41,7 @@ import {
 import { formatQuestDuration } from '@/utils/quests/experiences/duration';
 import type { QuestResult } from '@/utils/quests/experiences/types';
 
-import { ExperienceAction, ExperienceHeader, ExperienceResult, experienceStyles } from './quest-experience-ui';
+import { ExperienceResult, QuestExperiencePreview } from './quest-experience-ui';
 
 type Props = {
   config: MergeRoundConfig;
@@ -315,16 +315,15 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   };
 
   if (!started) {
-    return <View style={experienceStyles.root}>
-      <ExperienceHeader eyebrow="FEASTLE" title="Merge Feast" body="Drag matching foods together. Build the two dishes on the tickets, then serve them to Feastle." />
-      <View style={styles.previewPanel}>
-        <IconSymbol name="fork.knife" size={30} color={Lantern.ember300} />
-        <ThemedText selectable style={styles.previewTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Two orders · {config.moveBudget} actions</ThemedText>
-        <ThemedText selectable style={styles.previewBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Build across a 36-cell pantry board. Moves into empty spaces are free; pantry draws and successful merges use one action.</ThemedText>
-        {best ? <ThemedText selectable style={styles.best} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>LOCAL BEST · {best.movesUsed} ACTIONS · {formatQuestDuration(best.durationMs)}</ThemedText> : null}
-      </View>
-      <ExperienceAction label="Open the pantry" onPress={start} />
-    </View>;
+    return <QuestExperiencePreview
+      eyebrow="Feastle"
+      title="Merge Feast"
+      body={`Build two dishes across the pantry. Empty-space moves are free; draws and merges use one of ${config.moveBudget} actions.`}
+      icon="fork.knife"
+      meta={best ? `Local best · ${best.movesUsed} actions · ${formatQuestDuration(best.durationMs)}` : 'Two orders · 36-cell pantry'}
+      actionLabel="Open the pantry"
+      onAction={start}
+    />;
   }
 
   const durationMs = (finishedAt.current ?? Date.now()) - startedAt.current;
@@ -609,9 +608,6 @@ const styles = StyleSheet.create({
   mergeHalo: { backgroundColor: 'rgba(255,195,107,0.30)', borderRadius: 999, position: 'absolute' },
   mergeRing: { borderColor: 'rgba(255,225,174,0.92)', borderRadius: 999, borderWidth: 2, position: 'absolute' },
   crumb: { backgroundColor: '#FFE1AE', borderRadius: 999, height: 5, position: 'absolute', width: 5, boxShadow: '0 1px 4px rgba(255,195,107,0.42)' },
-  previewPanel: { alignItems: 'flex-start', backgroundColor: 'rgba(255,195,107,0.06)', borderColor: 'rgba(255,195,107,0.13)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, gap: 9, padding: 20 },
-  previewTitle: { fontSize: 17, fontWeight: '900' },
-  previewBody: { fontSize: 13, lineHeight: 19 },
   best: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7, paddingTop: 4 },
   disabled: { opacity: 0.42 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },

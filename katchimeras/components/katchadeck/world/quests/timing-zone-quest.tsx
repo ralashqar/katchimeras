@@ -20,8 +20,8 @@ import type { QuestResult } from '@/utils/quests/experiences/types';
 
 import {
   ExperienceAction,
-  ExperienceHeader,
   ExperienceResult,
+  QuestExperiencePreview,
   experienceStyles,
   useQuestAppActive,
 } from './quest-experience-ui';
@@ -160,18 +160,14 @@ export function TimingZoneQuest({
 
   if (!started) {
     return (
-      <View style={experienceStyles.root}>
-        <ExperienceHeader
-          eyebrow={moss ? 'MOSSPROUT' : 'STEPPLING'}
+        <QuestExperiencePreview
+          eyebrow={moss ? 'Mossprout' : 'Steppling'}
           title={moss ? 'Tend Mossprout’s patch' : 'Catch the stride'}
-          body={
-            moss
-              ? 'Tap anywhere in the garden when the drop reaches the glowing soil.'
-              : 'Tap when the moving light enters the stride zone.'
-          }
+          body={moss ? 'Tap when the drop reaches the glowing soil.' : 'Tap when the moving light enters the stride zone.'}
+          icon={moss ? 'water.waves' : 'figure.run'}
+          actionLabel={moss ? 'Start watering' : 'Start timing'}
+          onAction={start}
         />
-        <ExperienceAction label={moss ? 'Start watering' : 'Start timing'} onPress={start} />
-      </View>
     );
   }
 

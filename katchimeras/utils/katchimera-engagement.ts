@@ -1,5 +1,5 @@
 import type { KingdomState } from '@/types/kingdom';
-import { themedQuestOffer, themedQuestOffers } from '@/utils/quests/themed';
+import { themedQuestOffer, themedQuestOffers, type ThemedQuestOffer } from '@/utils/quests/themed';
 
 // Katchimera Engagement T1 rule engine (docs/katchimera-engagement-v1.md):
 // one engagement unit per companion-card open, computed from the user's own
@@ -10,8 +10,8 @@ export type CompanionUnit = {
   /** Short line in the creature's voice — the insight/suggestion. */
   line: string;
   /** Optional quest offer (V1a: copy only; store + evaluators come next). */
-  quest?: { id: string; title: string; hint: string };
-  questOptions?: { id: string; title: string; hint: string }[];
+  quest?: ThemedQuestOffer;
+  questOptions?: ThemedQuestOffer[];
 };
 
 // The encounter registry records WHY each katchimera hatches (its trigger

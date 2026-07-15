@@ -11,6 +11,11 @@ import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 export type QuestDefinition = {
   id: string;
   family?: 'photo' | 'moment' | 'place' | 'movement' | 'note' | 'voice' | 'food' | 'studio' | 'sleep' | 'weather' | 'calendar';
+  presentation?: {
+    estimatedMinutes?: number;
+    categoryLabel?: string;
+    artworkKey?: string;
+  };
   execution?:
     | { kind: 'evidence' }
     | { kind: 'live_steps'; challengeId: 'step_sprint' | 'step_time_trial'; difficultyCurveId: string }
@@ -57,6 +62,44 @@ export type QuestDefinition = {
     allowCorroboration?: boolean;
   };
 };
+
+export type QuestPresentation = {
+  categoryLabel: string;
+  estimatedMinutes: number;
+  artworkKey?: string;
+};
+
+export function questPresentation(definition: QuestDefinition): QuestPresentation {
+  const family = definition.family ?? inferQuestFamily(definition);
+  const categoryLabel = definition.presentation?.categoryLabel ?? ({
+    photo: 'Photo', moment: 'Moment', place: 'Explore', movement: 'Movement', note: 'Reflect', voice: 'Voice',
+    food: 'Food', studio: 'Play', sleep: 'Calm', weather: 'Weather', calendar: 'Plan',
+  } as const)[family];
+  return {
+    categoryLabel,
+    estimatedMinutes: definition.presentation?.estimatedMinutes ?? estimatedMinutes(definition),
+    artworkKey: definition.presentation?.artworkKey,
+  };
+}
+
+function inferQuestFamily(definition: QuestDefinition): NonNullable<QuestDefinition['family']> {
+  const kind = definition.execution?.kind;
+  if (kind === 'live_steps') return 'movement';
+  if (kind === 'paced_breathing') return 'sleep';
+  if (kind === 'evidence') return 'photo';
+  if (kind) return 'studio';
+  return 'moment';
+}
+
+function estimatedMinutes(definition: QuestDefinition): number {
+  const execution = definition.execution;
+  if (execution?.kind === 'live_steps') return execution.challengeId === 'step_sprint' ? 1 : 5;
+  if (execution?.kind === 'paced_breathing' || execution?.kind === 'timing_zone') return 2;
+  if (execution?.kind === 'pattern_memory' || execution?.kind === 'sorting' || execution?.kind === 'matching' || execution?.kind === 'rhythm') return 3;
+  if (execution?.kind === 'trivia' || execution?.kind === 'word_game' || execution?.kind === 'word_connect' || execution?.kind === 'merge' || execution?.kind === 'block_jam') return 4;
+  if (definition.family === 'movement' || definition.family === 'place') return 10;
+  return 5;
+}
 
 function photoQualityCriterion(qualityId: string, label: string): Criterion {
   const thresholds = qualityThresholds(qualityId);

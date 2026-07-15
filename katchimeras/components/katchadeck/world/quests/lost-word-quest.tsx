@@ -25,6 +25,7 @@ import {
   type LostWordRoundState,
 } from '@/utils/quests/experiences/lost-word';
 import type { QuestResult } from '@/utils/quests/experiences/types';
+import { QuestExperiencePreview } from './quest-experience-ui';
 
 const KEYBOARD_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 
@@ -131,14 +132,15 @@ export function LostWordQuest({ config, seed, recentPuzzleIds, onAttemptStart, o
   };
 
   if (!started) return (
-    <View style={[styles.root, styles.gameRoot, compact && styles.gameRootCompact]}>
-      <Header eyebrow="LOST WORD" title="A word has slipped from Pagelet’s shelves" body="You have six guesses to find it. Finish the round to complete the quest, whether or not the word reveals itself." />
-      <View style={styles.info}>
-        <IconSymbol name="text.book.closed" size={19} color={Lantern.ember300} />
-        <ThemedText selectable style={styles.infoText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Five letters · six guesses · entirely on-device</ThemedText>
-      </View>
-      <Action label="Find the lost word" onPress={start} />
-    </View>
+    <QuestExperiencePreview
+      eyebrow="Lost word"
+      title="A word has slipped from Pagelet’s shelves"
+      body="You have six guesses to find it. A finished search still completes the quest."
+      icon="book.closed.fill"
+      meta="Five letters · six guesses · on-device"
+      actionLabel="Find the lost word"
+      onAction={start}
+    />
   );
 
   if (complete && showResult) {

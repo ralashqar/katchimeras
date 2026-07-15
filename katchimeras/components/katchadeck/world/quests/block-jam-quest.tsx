@@ -1,10 +1,9 @@
 import { BlurMask, Canvas, Group, LinearGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -26,12 +25,11 @@ import {
   type BlockJamState,
 } from '@/utils/quests/experiences/block-jam';
 import type { QuestResult } from '@/utils/quests/experiences/types';
-import { ExperienceAction, ExperienceHeader, ExperienceResult } from './quest-experience-ui';
+import { ExperienceResult, QuestExperiencePreview } from './quest-experience-ui';
 
 type Config = { packId: 'tasklet-desk'; rulesetId?: string; tier: 1 | 2 | 3; levelId: string; timeLimitMs?: number; parMoves?: number };
 type Props = { config: Config; best?: { movesUsed: number; durationMs: number } | null; onAttemptStart: (config: Record<string, unknown>) => string; onAttemptCancel: (id: string) => void; onComplete: (id: string, result: QuestResult) => void; onRunningChange: (running: boolean, id?: string | null) => void };
 
-const TASKLET = require('../../../../assets/images/katchimeras/cutouts/tasklet.png');
 const COLORS: Record<BlockJamColorId, { bright: string; mid: string; deep: string; label: string }> = {
   red: { bright: '#FF7A77', mid: '#F33E45', deep: '#A9142B', label: 'coral' },
   violet: { bright: '#C985FF', mid: '#9149E9', deep: '#52209D', label: 'violet' },
@@ -109,7 +107,7 @@ export function BlockJamQuest(props: Props) {
   };
   const undo = () => { setState((current) => blockJamReducer(level, current, { type: 'undo' })); setSelectedId(null); };
 
-  if (!started) return <Preview level={level} best={best} onStart={start} reduceMotion={reduceMotion} />;
+  if (!started) return <Preview level={level} best={best} onStart={start} />;
   if (state.status === 'won' && attempt.current) {
     const durationMs = Math.max(0, (finishedAt.current || Date.now()) - startedAt.current);
     const personalBest = !best || durationMs < best.durationMs || (durationMs === best.durationMs && state.movesUsed < best.movesUsed);
@@ -210,8 +208,17 @@ function ClearBurst({ block, door, start, cell, gap, pitch, boardWidth, boardHei
   return <Animated.View pointerEvents="none" style={[styles.piece, { height: pieceHeight, width: pieceWidth, zIndex: 40 }, style]}><BrickArt block={block} cell={cell} gap={gap} selected /></Animated.View>;
 }
 
-function Preview({ level, best, onStart, reduceMotion }: { level: BlockJamLevel; best: Props['best']; onStart: () => void; reduceMotion: boolean }) {
-  return <View style={styles.previewRoot}><ExperienceHeader eyebrow="TASKLET" title="Tasklet’s Block Jam" body="Unclog the desk. Experiment freely, open routes, and slide every connected color block through its matching edge rail before time runs out." /><Animated.View entering={FadeIn.duration(reduceMotion ? 80 : 240)} style={styles.previewScene}><PreviewBoard level={level} /><Image source={TASKLET} contentFit="contain" style={styles.tasklet} /><View style={styles.previewBadge}><ThemedText style={styles.previewBadgeText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{level.rows}×{level.columns} · {level.blocks.length} BLOCKS</ThemedText></View></Animated.View><View style={styles.previewFooter}><ThemedText style={styles.best} lightColor={best ? Lantern.auroraTeal : Lantern.moon500} darkColor={best ? Lantern.auroraTeal : Lantern.moon500}>{best ? `FASTEST ${formatCountdown(Math.max(1, Math.round(best.durationMs / 1000)))}` : `${formatCountdown(Math.ceil(level.timeLimitMs / 1000))} TO CLEAR · MOVES ARE FREE`}</ThemedText><ExperienceAction label="Clear the jam" onPress={onStart} /></View></View>;
+function Preview({ level, best, onStart }: { level: BlockJamLevel; best: Props['best']; onStart: () => void }) {
+  return <QuestExperiencePreview
+    eyebrow="Tasklet"
+    title="Tasklet’s Block Jam"
+    body="Open routes and slide every connected color block through its matching edge rail before time runs out."
+    media={<View style={styles.previewMediaBoard}><PreviewBoard level={level} /></View>}
+    mediaLabel={`${level.rows} by ${level.columns} Block Jam board with ${level.blocks.length} blocks`}
+    meta={best ? `Fastest · ${formatCountdown(Math.max(1, Math.round(best.durationMs / 1000)))}` : `${formatCountdown(Math.ceil(level.timeLimitMs / 1000))} to clear · moves are free`}
+    actionLabel="Clear the jam"
+    onAction={onStart}
+  />;
 }
 
 const PREVIEW_BOARD_CANVAS_STYLE = { backgroundColor: 'transparent', borderWidth: 0, overflow: 'hidden' as const };
@@ -241,5 +248,6 @@ function formatCountdown(totalSeconds: number): string {
 }
 
 const styles = StyleSheet.create({
+  previewMediaBoard: { alignItems: 'center', height: 128, justifyContent: 'center', transform: [{ scale: 0.68 }], width: 144 },
   root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0, padding: 4 }, topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: .8 }, progress: { fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 25 }, movePill: { alignItems: 'center', backgroundColor: 'rgba(125,232,205,.09)', borderColor: 'rgba(125,232,205,.25)', borderRadius: 16, borderWidth: 1, minWidth: 64, paddingHorizontal: 11, paddingVertical: 5 }, movePillWarning: { backgroundColor: 'rgba(255,110,95,.1)', borderColor: 'rgba(255,110,95,.36)' }, moveNumber: { fontSize: 21, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 23 }, moveLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, boardFrame: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 0 }, board: { borderRadius: 22, elevation: 14, overflow: 'visible', position: 'relative', shadowColor: '#05030A', shadowOffset: { width: 0, height: 16 }, shadowOpacity: .55, shadowRadius: 22 }, destination: { backgroundColor: 'rgba(255,241,181,.8)', borderColor: '#FFF4C9', borderRadius: 99, borderWidth: 1, position: 'absolute', zIndex: 6 }, piece: { left: 0, position: 'absolute', top: 0 }, railHit: { padding: 0, position: 'absolute', zIndex: 25 }, rail: { alignItems: 'center', borderRadius: 7, borderWidth: 2, elevation: 7, height: '100%', justifyContent: 'center', shadowOffset: { width: 0, height: 0 }, shadowOpacity: .7, shadowRadius: 9, width: '100%' }, arrow: { fontSize: 15, fontWeight: '900', lineHeight: 17 }, help: { fontSize: 11, lineHeight: 15, minHeight: 15, textAlign: 'center' }, controls: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' }, iconButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', width: 46 }, controlButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', paddingHorizontal: 20 }, controlText: { fontSize: 12, fontWeight: '800' }, disabled: { opacity: .3 }, jammed: { backgroundColor: 'rgba(242,110,95,.08)', borderColor: 'rgba(242,110,95,.3)', borderRadius: 15, borderWidth: 1, padding: 10 }, jammedTitle: { fontSize: 14, fontWeight: '900' }, jammedBody: { fontSize: 11, lineHeight: 15 }, previewRoot: { flex: 1, gap: 16, justifyContent: 'space-between', minHeight: 0, padding: 4 }, previewScene: { alignItems: 'flex-end', backgroundColor: 'rgba(108,115,226,.09)', borderColor: 'rgba(130,149,255,.24)', borderRadius: 25, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 230, overflow: 'hidden', padding: 16, position: 'relative' }, previewBoard: { backgroundColor: '#10152A', borderColor: '#3C456C', borderRadius: 18, borderWidth: 5, height: 128, marginBottom: 18, position: 'relative', transform: [{ rotate: '-3deg' }], width: 144 }, previewBrick: { borderRadius: 8, borderWidth: 1, height: 34, position: 'absolute', shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: .4, shadowRadius: 5 }, tasklet: { height: 190, marginBottom: -8, marginRight: -20, width: 154 }, previewBadge: { backgroundColor: Lantern.ember300, borderRadius: 999, left: 16, paddingHorizontal: 11, paddingVertical: 6, position: 'absolute', top: 14 }, previewBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: .5 }, previewFooter: { gap: 10 }, best: { fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: .8, textAlign: 'center' },
 });

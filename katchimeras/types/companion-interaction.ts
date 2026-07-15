@@ -5,6 +5,18 @@ import type { QuestNextAction, QuestRuntimeState } from '@/utils/quests/runtime'
 
 export type CompanionThread = 'quest' | 'insight' | 'reflection';
 
+export type CompanionQuestOfferViewModel = {
+  id: string;
+  title: string;
+  hint: string;
+  family?: 'photo' | 'moment' | 'place' | 'movement' | 'note' | 'voice' | 'food' | 'studio' | 'sleep' | 'weather' | 'calendar';
+  categoryLabel: string;
+  estimatedMinutes: number;
+  bondReward: number;
+  recommended: boolean;
+  artworkKey?: string;
+};
+
 export type CompanionNavigationIntent =
   | { kind: 'journal_flow'; flowId: 'food' | 'studio' | 'went_somewhere' | 'movement' | 'big_event' | 'general' }
   | { kind: 'memory_vault'; tab: 'photos' | 'notes' }

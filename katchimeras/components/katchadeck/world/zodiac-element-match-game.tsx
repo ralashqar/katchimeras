@@ -17,6 +17,8 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MeadowPrimaryAction, MeadowSurfaceCard } from '@/components/katchadeck/ui/meadow-interaction-primitives';
+import { Meadow } from '@/constants/meadow-theme';
 import { Lantern } from '@/constants/theme';
 import type { ZodiacElement } from '@/types/world-identity';
 import {
@@ -36,7 +38,6 @@ import { formatQuestDuration } from '@/utils/quests/experiences/duration';
 
 import {
   ExperienceAction,
-  ExperienceHeader,
   ExperienceResult,
   useQuestAppActive,
 } from './quests/quest-experience-ui';
@@ -284,14 +285,20 @@ export function ZodiacElementMatchGame({ config, seed, element, familiarName, co
 
   if (!started) return (
     <View style={styles.previewRoot}>
-      <OneShotScaleFade reduceMotion={reduceMotion}><ExperienceHeader eyebrow={pack.eyebrow} title={pack.title} body={pack.introduction} /></OneShotScaleFade>
-      <OneShotScaleFade delay={60} reduceMotion={reduceMotion} style={styles.previewCard}>
-        <View style={styles.previewGems}>{homeMotifs.map((motif, index) => <OneShotScaleFade key={motif.id} delay={120 + index * 45} reduceMotion={reduceMotion}><Image source={GEM_SOURCES[motif.asset]} contentFit="contain" style={styles.previewGem} /></OneShotScaleFade>)}</View>
-        <ThemedText selectable style={styles.previewTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{config.rows}×{config.columns} board · {config.moveBudget} moves</ThemedText>
-        <ThemedText selectable style={styles.previewBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Gather {config.targetCounts[0]} {element} gems for {familiarName}. Drag a gem, or tap two neighbours. Match four or more to make powerful clears.</ThemedText>
+      <OneShotScaleFade reduceMotion={reduceMotion} style={styles.previewHeading}>
+        <ThemedText style={styles.previewEyebrow} lightColor={accent} darkColor={accent}>{pack.eyebrow}</ThemedText>
+        <ThemedText selectable style={styles.previewDisplay} lightColor={Meadow.ink} darkColor={Meadow.ink}>{pack.title}</ThemedText>
+        <ThemedText selectable style={styles.previewIntro} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{pack.introduction}</ThemedText>
       </OneShotScaleFade>
-      {completedToday ? <ThemedText selectable style={styles.best} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>TODAY’S RITUAL COMPLETE · REPLAY FREELY</ThemedText> : null}
-      <OneShotScaleFade delay={190} reduceMotion={reduceMotion}><ExperienceAction label={completedToday ? 'Replay ritual' : 'Begin ritual'} onPress={start} /></OneShotScaleFade>
+      <OneShotScaleFade delay={60} reduceMotion={reduceMotion}>
+        <MeadowSurfaceCard style={styles.previewCard}>
+          <View style={styles.previewGems}>{homeMotifs.map((motif, index) => <OneShotScaleFade key={motif.id} delay={120 + index * 45} reduceMotion={reduceMotion}><Image source={GEM_SOURCES[motif.asset]} contentFit="contain" style={styles.previewGem} /></OneShotScaleFade>)}</View>
+          <ThemedText selectable style={styles.previewTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{config.rows}×{config.columns} board · {config.moveBudget} moves</ThemedText>
+          <ThemedText selectable style={styles.previewBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Gather {config.targetCounts[0]} {element} gems for {familiarName}. Drag a gem, or tap two neighbours. Match four or more to make powerful clears.</ThemedText>
+        </MeadowSurfaceCard>
+      </OneShotScaleFade>
+      {completedToday ? <ThemedText selectable style={styles.best} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>TODAY’S RITUAL COMPLETE · REPLAY FREELY</ThemedText> : null}
+      <OneShotScaleFade delay={190} reduceMotion={reduceMotion}><MeadowPrimaryAction label={completedToday ? 'Replay ritual' : 'Begin ritual'} icon="sparkles" onPress={start} /></OneShotScaleFade>
     </View>
   );
 
@@ -558,7 +565,11 @@ const styles = StyleSheet.create({
   victorySpark: { borderRadius: 999, height: 8, left: '50%', marginLeft: -4, marginTop: -4, position: 'absolute', top: '38%', width: 8 },
   victorySparkDiamond: { borderRadius: 2, height: 9, width: 9 },
   previewRoot: { flexGrow: 1, gap: 18, justifyContent: 'space-between', padding: 4 },
-  previewCard: { alignItems: 'center', backgroundColor: 'rgba(217,149,255,0.07)', borderColor: 'rgba(217,149,255,0.18)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, gap: 10, justifyContent: 'center', minHeight: 210, padding: 22 },
+  previewHeading: { gap: 5 },
+  previewEyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.05, textTransform: 'uppercase' },
+  previewDisplay: { fontSize: 27, fontWeight: '900', letterSpacing: -0.6, lineHeight: 32 },
+  previewIntro: { fontSize: 13.5, lineHeight: 20 },
+  previewCard: { alignItems: 'center', borderRadius: 22, gap: 10, justifyContent: 'center', minHeight: 210, padding: 22 },
   previewGems: { alignItems: 'center', flexDirection: 'row', height: 76, justifyContent: 'center' },
   previewGem: { height: 76, marginHorizontal: -5, width: 76 },
   previewTitle: { fontSize: 17, fontWeight: '900', textAlign: 'center' },

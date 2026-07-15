@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import type { QuestResult } from '@/utils/quests/experiences/types';
+import { QuestExperiencePreview } from './quest-experience-ui';
 
 type Config = { challengeId: 'step_sprint' | 'step_time_trial'; target: number; durationMs: number | null; tier: number };
 type Phase = 'intro' | 'starting' | 'countdown' | 'running' | 'failed' | 'cancelled' | 'success';
@@ -207,6 +208,18 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
       : Math.max(0, remaining! / duration);
   const ring = useMemo(() => arcPath(ratio), [ratio]);
 
+  if (phase === 'intro') return (
+    <QuestExperiencePreview
+      eyebrow={`Steppling · Tier ${config.tier}`}
+      title={config.challengeId === 'step_sprint' ? 'Quick feet' : 'Beat the trail clock'}
+      body={config.challengeId === 'step_sprint' ? `Reach ${config.target} live steps in one minute.` : `Reach ${config.target} live steps and set a time.`}
+      icon="figure.run"
+      meta="Motion sensors only · no GPS"
+      actionLabel="Start challenge"
+      onAction={() => void start()}
+    />
+  );
+
   return (
     <View style={styles.root}>
       <View style={styles.heading}>
@@ -247,7 +260,7 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
       ) : phase === 'success' && attemptId.current ? (
         <Action label="Complete and return" icon="checkmark" onPress={() => onComplete(attemptId.current!, { kind: 'live_steps', success: true, steps, target: config.target, durationMs: elapsedMs, personalBest: false })} />
       ) : (
-        <Action label={phase === 'intro' ? 'Start challenge' : 'Retry challenge'} icon="figure.walk" onPress={() => void start()} />
+        <Action label="Retry challenge" icon="figure.walk" onPress={() => void start()} />
       )}
     </View>
   );

@@ -17,8 +17,8 @@ import type { QuestResult } from '@/utils/quests/experiences/types';
 
 import {
   ExperienceAction,
-  ExperienceHeader,
   ExperienceResult,
+  QuestExperiencePreview,
   experienceStyles,
 } from './quest-experience-ui';
 
@@ -351,19 +351,15 @@ export function SortingQuest({
 
   if (!started) {
     return (
-      <View style={experienceStyles.root}>
-        <ExperienceHeader
+        <QuestExperiencePreview
           eyebrow={copy.eyebrow}
           title={copy.title}
           body={copy.body}
+          icon={packId === 'feastle-table' ? 'fork.knife' : 'circle.grid.2x2.fill'}
+          meta={bestDurationMs != null ? `Local fastest · ${formatQuestDuration(bestDurationMs)}` : null}
+          actionLabel={copy.start}
+          onAction={start}
         />
-        {bestDurationMs != null ? (
-          <ThemedText style={styles.bestTime} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
-            LOCAL FASTEST · {formatQuestDuration(bestDurationMs)}
-          </ThemedText>
-        ) : null}
-        <ExperienceAction label={copy.start} onPress={start} />
-      </View>
     );
   }
 

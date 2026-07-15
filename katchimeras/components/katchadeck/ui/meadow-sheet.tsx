@@ -39,9 +39,10 @@ type MeadowSheetProps = {
   variant?: 'compact' | 'tall' | 'full';
   showClose?: boolean;
   zIndex?: number;
+  surface?: 'night' | 'parchment';
 };
 
-export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%', variant = 'compact', showClose = true, zIndex = 50 }: MeadowSheetProps) {
+export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%', variant = 'compact', showClose = true, zIndex = 50, surface = 'night' }: MeadowSheetProps) {
   const window = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const dragY = useSharedValue(0);
@@ -92,6 +93,7 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
         exiting={SlideOutDown.duration(200)}
         style={[
           styles.sheet,
+          surface === 'parchment' && styles.parchmentSheet,
           dragStyle,
           {
             bottom: variant === 'full' ? 0 : variant === 'tall' ? tallBottomClearance : Meadow.overlay.bottomClearance,
@@ -130,8 +132,8 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
           {children}
         </View>
 
-        {showClose ? <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={10} onPress={onClose} style={styles.closeX}>
-          <IconSymbol name="xmark" size={12} color="rgba(251,243,228,0.75)" />
+        {showClose ? <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={10} onPress={onClose} style={[styles.closeX, surface === 'parchment' && styles.parchmentClose]}>
+          <IconSymbol name="xmark" size={12} color={surface === 'parchment' ? Meadow.inkSoft : 'rgba(251,243,228,0.75)'} />
         </Pressable> : null}
       </Animated.View>
     </View>
@@ -163,6 +165,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     position: 'absolute',
   },
+  parchmentSheet: {
+    backgroundColor: '#E6CDA7',
+    borderColor: 'rgba(110,74,38,0.34)',
+    boxShadow: '0 18px 48px rgba(48,30,14,0.48), inset 0 1px 0 rgba(255,248,230,0.62)',
+  },
   sheetContent: { gap: 8 },
   expandedContent: { flex: 1, minHeight: 0 },
   grabber: {
@@ -178,14 +185,15 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,248,230,0.18)',
     borderRadius: 999,
     borderWidth: 1,
-    height: 28,
+    height: 36,
     justifyContent: 'center',
     position: 'absolute',
-    right: 10,
-    top: 10,
-    width: 28,
+    right: 11,
+    top: 11,
+    width: 36,
     zIndex: 5,
   },
+  parchmentClose: { backgroundColor: 'rgba(255,248,232,0.46)', borderColor: Meadow.cardBorder, boxShadow: '-2px 3px 7px rgba(58,38,18,0.16), inset 0 1px 0 rgba(255,248,230,0.62)' },
   header: { gap: 1, paddingRight: 36 },
   kicker: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
   title: { fontSize: 16, fontWeight: '800', lineHeight: 20 },

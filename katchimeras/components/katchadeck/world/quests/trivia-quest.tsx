@@ -7,6 +7,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { advanceTriviaRound, answerTriviaQuestion, createTriviaRound, triviaRoundComplete, triviaRoundScore, type TriviaRoundState } from '@/utils/quests/experiences/trivia';
 import type { QuestResult } from '@/utils/quests/experiences/types';
+import { QuestExperiencePreview } from './quest-experience-ui';
 
 export function TriviaQuest({ config, seed, recentQuestionIds, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: {
   config: { packIds: ('film' | 'books' | 'city')[]; questionCount: number };
@@ -43,11 +44,15 @@ export function TriviaQuest({ config, seed, recentQuestionIds, onAttemptStart, o
   const elapsed = round ? Math.max(0, Date.now() - round.startedAt) : 0;
 
   if (!round) return (
-    <View style={styles.root}>
-      <Header title={title} body={`Five quick questions. Finish the round to complete the quest — your score and time are yours to beat.`} />
-      <View style={styles.info}><IconSymbol name="sparkles" size={18} color={Lantern.ember300} /><ThemedText style={styles.infoText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Questions and answers are predefined. No AI judges your result.</ThemedText></View>
-      <Action label="Play five questions" onPress={start} />
-    </View>
+    <QuestExperiencePreview
+      eyebrow="Quick trivia"
+      title={title}
+      body="Five predefined questions. Finish the round to complete the quest; your score and time are yours to beat."
+      icon={config.packIds.includes('film') ? 'film.fill' : config.packIds.includes('city') ? 'globe.americas.fill' : 'book.fill'}
+      meta="No AI judging"
+      actionLabel="Play five questions"
+      onAction={start}
+    />
   );
 
   if (finished && attemptId.current) return (

@@ -123,6 +123,28 @@ python scripts/generate-evolution-grid.py \
   --size 1024 \
   --quality low
 
+# Fully from scratch: the approved generic hatchling is used only to generate
+# a new species-specific stage 1. No existing creature/adult artwork is used;
+# all later stages, including adult and epic, grow from accepted history.
+python scripts/generate-evolution-grid.py \
+  --creature location_coffee_shop_baristabbit \
+  --strategy sequential \
+  --progression epic \
+  --from-scratch \
+  --size 1024 \
+  --quality low
+
+# Redraw one completed grid toward an authoritative original creature identity.
+# Image 1 preserves the grid/progression; image 2 controls character identity.
+python scripts/generate-evolution-grid.py \
+  --name Baristabbit \
+  --description "<concise authoritative identity>" \
+  --refine-grid assets/images/katchimeras/evolution-grids/<run>/baristabbit-evolution-grid.png \
+  --identity-reference assets/images/katchimeras/cutouts/baristabbit.png \
+  --model gpt \
+  --size 2048 \
+  --quality medium
+
 # Explicit inputs for a new or non-catalog creature.
 python scripts/generate-evolution-grid.py \
   --name moonling \

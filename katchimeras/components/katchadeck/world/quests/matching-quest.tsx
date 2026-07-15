@@ -29,8 +29,8 @@ import { worldAssetSource } from '@/utils/world-visuals';
 
 import {
   ExperienceAction,
-  ExperienceHeader,
   ExperienceResult,
+  QuestExperiencePreview,
   experienceStyles,
   useQuestAppActive,
 } from './quest-experience-ui';
@@ -180,32 +180,18 @@ export function MatchingQuest({
 
   if (!started) {
     return (
-      <View style={experienceStyles.root}>
-        <ExperienceHeader
+        <QuestExperiencePreview
           eyebrow={pack.eyebrow}
           title={pack.title}
-          body={
-            pack.completionRule === 'find_all'
-              ? `${pack.introduction} Find ${config.pairCount} pairs; take as many turns as you need.`
-              : `Find ${config.pairCount} matching artefact pairs before the move counter runs out.`
-          }
+          body={pack.completionRule === 'find_all'
+            ? `Find ${config.pairCount} matching ${theme === 'garden' ? 'plant' : 'food'} pairs. Take as many turns as you need.`
+            : `Find ${config.pairCount} matching artefact pairs before the move counter runs out.`}
+          media={<View style={styles.previewPair}>{baseDeck.slice(0, 2).map((card) => <View key={card.cardId} style={[styles.previewMiniCard, theme === 'garden' && styles.mossCardRevealed, theme === 'feast' && styles.feastCardRevealed]}><MotifVisual motif={card.motif} size={58} theme={theme} /></View>)}</View>}
+          mediaLabel={`A pair of ${theme} matching cards`}
+          meta={bestDurationMs != null ? `Local fastest · ${formatQuestDuration(bestDurationMs)}` : null}
+          actionLabel={theme === 'garden' ? 'Enter the garden' : theme === 'feast' ? 'Match the feast' : 'Open the gallery'}
+          onAction={start}
         />
-        {bestDurationMs != null ? (
-          <ThemedText style={styles.bestTime} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
-            LOCAL FASTEST · {formatQuestDuration(bestDurationMs)}
-          </ThemedText>
-        ) : null}
-        <ExperienceAction
-          label={
-            theme === 'garden'
-              ? 'Enter the garden'
-              : theme === 'feast'
-                ? 'Match the feast'
-                : 'Open the gallery'
-          }
-          onPress={start}
-        />
-      </View>
     );
   }
 
@@ -541,6 +527,8 @@ function MotifVisual({
 }
 
 const styles = StyleSheet.create({
+  previewPair: { alignItems: 'center', flexDirection: 'row', gap: 5, justifyContent: 'center', transform: [{ rotate: '-4deg' }] },
+  previewMiniCard: { alignItems: 'center', backgroundColor: '#2A2338', borderColor: 'rgba(255,248,232,0.22)', borderCurve: 'continuous', borderRadius: 10, borderWidth: 1, height: 62, justifyContent: 'center', width: 46 },
   progressRow: {
     alignItems: 'center',
     flexDirection: 'row',

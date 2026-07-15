@@ -2,11 +2,14 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 
 export type StatusTone = 'neutral' | 'warning' | 'success' | 'danger';
 
-export function StatusBadge({ label, tone }: { label: string; tone: StatusTone }) {
-  const color = tone === 'success' ? Lantern.auroraTeal : tone === 'warning' ? Lantern.ember300 : tone === 'danger' ? '#F3A0A0' : Lantern.moon300;
+export function StatusBadge({ label, tone, warm = false }: { label: string; tone: StatusTone; warm?: boolean }) {
+  const color = warm
+    ? tone === 'success' ? Meadow.leafDeep : tone === 'warning' ? Meadow.goldDeep : tone === 'danger' ? '#A84F43' : Meadow.inkSoft
+    : tone === 'success' ? Lantern.auroraTeal : tone === 'warning' ? Lantern.ember300 : tone === 'danger' ? '#F3A0A0' : Lantern.moon300;
   return (
     <View accessibilityRole="text" style={[styles.badge, { backgroundColor: `${color}18` }]}>
       <View style={[styles.dot, { backgroundColor: color }]} />
@@ -20,4 +23,3 @@ const styles = StyleSheet.create({
   dot: { borderRadius: 999, height: 7, width: 7 },
   text: { fontSize: 11.5, fontWeight: '900' },
 });
-

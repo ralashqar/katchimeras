@@ -1,38 +1,49 @@
 import { Image } from 'expo-image';
+import { type ReactNode } from 'react';
 import { type ImageSourcePropType, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AppFontFamilies } from '@/constants/theme';
+import { Meadow } from '@/constants/meadow-theme';
 
 export function CompanionHero({
-  name, image, accentColor, houseLevel, openingLine, kicker,
-}: { name: string; image: ImageSourcePropType; accentColor: string; houseLevel?: number; openingLine: string; kicker?: string }) {
+  name, image, houseLevel, kicker, children,
+}: { name: string; image: ImageSourcePropType; houseLevel?: number; openingLine?: string; kicker?: string; children?: ReactNode }) {
   const reduceMotion = useReducedMotion();
   return (
     <View style={styles.root}>
-      <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 300)} style={[styles.portrait, { backgroundColor: `${accentColor}1F` }]}>
-        <View style={[styles.halo, { backgroundColor: `${accentColor}24` }]} />
-        <Image source={image} style={styles.image} contentFit="contain" transition={reduceMotion ? 0 : 180} />
-      </Animated.View>
-      <View style={styles.copy}>
-        <ThemedText style={styles.kicker} lightColor={accentColor} darkColor={accentColor}>
-          {kicker ?? (houseLevel ? `Home level ${houseLevel}` : 'Kingdom companion')}
-        </ThemedText>
-        <ThemedText numberOfLines={2} adjustsFontSizeToFit style={styles.name} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{name}</ThemedText>
-        <ThemedText style={styles.opening} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{openingLine}</ThemedText>
+      <View style={styles.stage}>
+        <View style={styles.copy}>
+          <View style={styles.identityRow}>
+            <View style={styles.levelBadge}>
+              <IconSymbol name="house.fill" size={11} color={Meadow.goldDeep} />
+              <ThemedText style={styles.kicker} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+                {kicker ?? (houseLevel ? `Home · Level ${houseLevel}` : 'Kingdom companion')}
+              </ThemedText>
+            </View>
+          </View>
+          <ThemedText adjustsFontSizeToFit minimumFontScale={0.66} numberOfLines={1} selectable style={styles.name} lightColor={Meadow.ink} darkColor={Meadow.ink}>{name}</ThemedText>
+        </View>
+        <Animated.View entering={FadeIn.duration(reduceMotion ? 100 : 300)} pointerEvents="none" style={styles.artwork}>
+          <Image accessibilityLabel={`${name}, your Kingdom companion`} source={image} style={styles.image} contentFit="contain" transition={reduceMotion ? 0 : 180} />
+        </Animated.View>
       </View>
+      {children ? <View style={styles.navigationMask}>{children}</View> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { alignItems: 'center', flexDirection: 'row', gap: 16, minHeight: 126, paddingBottom: 4, paddingLeft: 4, paddingRight: 38, paddingTop: 4 },
-  portrait: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 28, height: 116, justifyContent: 'flex-end', overflow: 'hidden', position: 'relative', width: 116 },
-  halo: { borderRadius: 999, height: 96, position: 'absolute', top: 15, width: 96 },
-  image: { height: 112, width: 112 },
-  copy: { flex: 1, gap: 4, minWidth: 0 },
-  kicker: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' },
-  name: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 31, lineHeight: 34 },
-  opening: { fontSize: 13.5, lineHeight: 19 },
+  root: { paddingTop: 2 },
+  stage: { minHeight: 164, overflow: 'visible', position: 'relative' },
+  artwork: { bottom: -11, height: 190, left: -24, position: 'absolute', width: 190 },
+  image: { height: '100%', width: '100%' },
+  copy: { alignSelf: 'flex-end', gap: 5, minWidth: 0, paddingLeft: 5, paddingRight: 8, paddingTop: 50, width: '50%', zIndex: 1 },
+  identityRow: { alignItems: 'center', flexDirection: 'row', minHeight: 24 },
+  levelBadge: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(255,248,232,0.40)', borderColor: 'rgba(255,248,230,0.46)', borderRadius: 999, borderWidth: 1, boxShadow: '-1px 2px 4px rgba(58,38,18,0.12), inset 0 1px 0 rgba(255,248,230,0.58)', flexDirection: 'row', gap: 5, minHeight: 24, paddingHorizontal: 8 },
+  kicker: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '800', letterSpacing: 0.75, textTransform: 'uppercase' },
+  name: { fontFamily: AppFontFamilies.manrope, fontSize: 36, fontWeight: '800', letterSpacing: -1.35, lineHeight: 40 },
+  navigationMask: { backgroundColor: '#E6CDA7', borderCurve: 'continuous', borderRadius: 20, marginTop: -42, paddingTop: 2, position: 'relative', zIndex: 2 },
 });

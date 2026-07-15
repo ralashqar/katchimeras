@@ -128,6 +128,7 @@ export default function KingdomScreen() {
   const handleInsightAction = () => {
     const action = quests.selectedInsight?.action;
     if (!action) return;
+    quests.awardSelectedInsightBond();
     if (action.intent.kind === 'journal_flow') {
       setEmbeddedJournal({
         origin: 'insight',
@@ -260,11 +261,11 @@ export default function KingdomScreen() {
           questRuntime={quests.selectedQuestRuntime}
           questCaptureFeedback={quests.questCaptureFeedback}
           submissionItems={quests.selectedQuestItems}
-          offer={quests.selectedOffer}
+          offers={quests.selectedOffers}
+          selectedOfferId={quests.selectedOfferId}
+          onSelectOffer={quests.selectOffer}
           criteria={quests.questCriteria}
           onAccept={quests.acceptSelectedQuest}
-          offerCount={quests.selectedOfferCount}
-          onCycleOffer={quests.cycleSelectedOffer}
           onCashIn={quests.cashInSelectedQuest}
           onSubmitQuest={quests.submitSelectedQuest}
           onClarifyQuestMatch={quests.clarifySelectedQuestMatch}
@@ -290,6 +291,7 @@ export default function KingdomScreen() {
           onReviewReflection={(draft) => { void reviewReflection(draft); }}
           reflectionReviewPending={reflectionReviewPending}
           memorySaved={Boolean(savedOrigin)}
+          bondProgress={quests.selectedBondProgress}
         />
       ) : null}
       {reflectionReview ? (
@@ -305,6 +307,7 @@ export default function KingdomScreen() {
           onClose={() => { setReflectionReview(null); setReflectionDraft(null); quests.closeSelectedResident(); }}
           onSave={(submission) => {
             addManualJournalEntry(submission, 'today');
+            quests.awardSelectedReflectionBond(reflectionReview.source.sourceId);
             setReflectionReview(null);
             setSavedOrigin('reflection');
             if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

@@ -1,18 +1,26 @@
 import { useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
 import { InteractionThreadSwitcher, type InteractionThreadOption } from '@/components/katchadeck/ui/interaction-thread-switcher';
+import {
+  MeadowBackAction,
+  MeadowDetailRow,
+  MeadowInfoPanel,
+  MeadowNumberField,
+  MeadowPrimaryAction,
+  MeadowSecondaryAction,
+  MeadowSection,
+} from '@/components/katchadeck/ui/meadow-interaction-primitives';
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { CompanionHero } from '@/components/katchadeck/world/companion-hero';
-import { CompanionPrimaryAction, CompanionSecondaryAction, CompanionSection } from '@/components/katchadeck/world/companion-interaction-primitives';
 import { CompanionReflectionThread } from '@/components/katchadeck/world/companion-reflection-thread';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ZodiacElementMatchGame } from '@/components/katchadeck/world/zodiac-element-match-game';
+import { Meadow } from '@/constants/meadow-theme';
 import { zodiacFamiliarSource } from '@/constants/world-identity-art';
-import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { AppFontFamilies } from '@/constants/theme';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import type { WorldIdentityState } from '@/types/world-identity';
 import { resolveMatchThreeConfig } from '@/utils/quests/experiences/match-three';
@@ -128,33 +136,30 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
   }
 
   const footer = mode === 'profile'
-    ? <CompanionPrimaryAction label={completedToday ? 'Replay elemental ritual' : 'Begin elemental ritual'} icon="sparkles" onPress={() => setMode('game')} />
+    ? <MeadowPrimaryAction label={completedToday ? 'Replay elemental ritual' : 'Begin elemental ritual'} icon="sparkles" onPress={() => setMode('game')} />
     : mode === 'prompt'
-      ? <CompanionPrimaryAction label="Save reflection" icon="arrow.right" disabled={!reflectionDraft?.text.trim()} onPress={saveReflection} />
+      ? <MeadowPrimaryAction label="Save reflection" icon="arrow.right" disabled={!reflectionDraft?.text.trim()} onPress={saveReflection} />
       : mode === 'birthday'
-        ? <CompanionPrimaryAction label="Update star companion" icon="calendar" disabled={!proposedSign} onPress={updateBirthday} />
+        ? <MeadowPrimaryAction label="Update star companion" icon="calendar" disabled={!proposedSign} onPress={updateBirthday} />
         : null;
 
   return (
     <Modal animationType="none" navigationBarTranslucent onRequestClose={requestClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible>
       <GestureHandlerRootView style={styles.modalRoot}>
-        <MeadowSheet onClose={requestClose} variant={gameRunning ? 'full' : 'tall'}>
+        <MeadowSheet onClose={requestClose} surface={gameRunning ? 'night' : 'parchment'} variant={gameRunning ? 'full' : 'tall'}>
           <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8} style={styles.keyboard}>
-            {!gameRunning ? <CompanionHero
-              accentColor={profile.accent}
-              image={zodiacFamiliarSource(profile.element)}
-              kicker={`${profile.name} · ${profile.element}`}
-              name={profile.familiarName}
-              openingLine={profile.profileLine}
-            /> : null}
-
-            {!gameRunning && mode === 'birthday' ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Back to star profile" onPress={() => setMode('profile')} style={({ pressed }) => [styles.backRow, pressed && styles.pressed]}>
-                <IconSymbol name="chevron.left" size={16} color={Lantern.moon300} />
-                <ThemedText style={styles.backText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Back to profile</ThemedText>
-              </Pressable>
-            ) : !gameRunning ? (
-              <InteractionThreadSwitcher options={THREADS} value={mode as Thread} onChange={selectThread} />
+            {!gameRunning ? (
+              <CompanionHero
+                image={zodiacFamiliarSource(profile.element)}
+                kicker={`${profile.name} · ${profile.element}`}
+                name={profile.familiarName}
+                openingLine={profile.profileLine}>
+                {mode === 'birthday' ? (
+                  <MeadowBackAction label="Back to profile" onPress={() => setMode('profile')} />
+                ) : (
+                  <InteractionThreadSwitcher options={THREADS} value={mode as Thread} onChange={selectThread} />
+                )}
+              </CompanionHero>
             ) : null}
 
             <View style={styles.contentFrame}>
@@ -181,17 +186,14 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
                 <Animated.View key={mode} entering={FadeIn.duration(reduceMotion ? 100 : 210)} exiting={FadeOut.duration(100)}>
                   {mode === 'profile' ? (
                     <View style={styles.thread}>
-                      <CompanionSection label="Your celestial identity">
-                        <ProfileRow icon="calendar" label="Zodiac sign" value={`${profile.name} · ${profile.dateLabel}`} accent={profile.accent} />
-                        <ProfileRow icon="sparkles" label={`${profile.element} ritual · Tier ${gameConfig.tier}`} value={completedToday ? 'Gathered today' : `${gameConfig.targetCounts[0]} gems ready to gather`} accent={profile.accent} />
-                      </CompanionSection>
-                      <CompanionSection label="How this works">
-                        <View style={styles.infoPanel}>
-                          <ThemedText style={styles.infoTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>A playful daily ritual</ThemedText>
-                          <ThemedText style={styles.infoBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Your sign chooses the elemental gems you gather, then opens a reflection—not a prediction. It never changes what hatches.</ThemedText>
-                        </View>
-                      </CompanionSection>
-                      <CompanionSecondaryAction label="Edit birthday" icon="calendar" onPress={() => setMode('birthday')} />
+                      <MeadowSection label="Your celestial identity">
+                        <MeadowDetailRow icon="calendar" label="Zodiac sign" value={`${profile.name} · ${profile.dateLabel}`} accent={profile.accent} />
+                        <MeadowDetailRow icon="sparkles" label={`${profile.element} ritual · Tier ${gameConfig.tier}`} value={completedToday ? 'Gathered today' : `${gameConfig.targetCounts[0]} gems ready to gather`} accent={profile.accent} />
+                      </MeadowSection>
+                      <MeadowSection label="How this works">
+                        <MeadowInfoPanel title="A playful daily ritual" body="Your sign chooses the elemental gems you gather, then opens a reflection—not a prediction. It never changes what hatches." />
+                      </MeadowSection>
+                      <MeadowSecondaryAction label="Edit birthday" icon="calendar" onPress={() => setMode('birthday')} />
                     </View>
                   ) : null}
 
@@ -206,15 +208,15 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
 
                   {mode === 'birthday' ? (
                     <View style={styles.thread}>
-                      <CompanionSection label="Star companion settings">
-                        <ThemedText style={styles.threadTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Change your birthday</ThemedText>
-                        <ThemedText style={styles.threadBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Only the month and day are stored on this device.</ThemedText>
-                      </CompanionSection>
+                      <MeadowSection label="Star companion settings">
+                        <ThemedText style={styles.threadTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Change your birthday</ThemedText>
+                        <ThemedText selectable style={styles.threadBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Only the month and day are stored on this device.</ThemedText>
+                      </MeadowSection>
                       <View style={styles.birthdayRow}>
-                        <BirthdayField label="Month" value={birthMonth} onChange={(value) => setBirthMonth(value.replace(/\D/g, ''))} placeholder="MM" />
-                        <BirthdayField label="Day" value={birthDay} onChange={(value) => setBirthDay(value.replace(/\D/g, ''))} placeholder="DD" />
+                        <MeadowNumberField label="Month" value={birthMonth} onChangeText={(value) => setBirthMonth(value.replace(/\D/g, ''))} placeholder="MM" />
+                        <MeadowNumberField label="Day" value={birthDay} onChangeText={(value) => setBirthDay(value.replace(/\D/g, ''))} placeholder="DD" />
                       </View>
-                      {proposedSign ? <View style={styles.signResult}><ThemedText style={styles.signSymbol} lightColor={profile.accent} darkColor={profile.accent}>{zodiacProfile(proposedSign)?.symbol}</ThemedText><View style={styles.signCopy}><ThemedText style={styles.signName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{zodiacProfile(proposedSign)?.name}</ThemedText><ThemedText style={styles.signHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Your companion will update with this sign.</ThemedText></View></View> : null}
+                      {proposedSign ? <View style={styles.signResult}><ThemedText style={styles.signSymbol} lightColor={profile.accent} darkColor={profile.accent}>{zodiacProfile(proposedSign)?.symbol}</ThemedText><View style={styles.signCopy}><ThemedText style={styles.signName} lightColor={Meadow.ink} darkColor={Meadow.ink}>{zodiacProfile(proposedSign)?.name}</ThemedText><ThemedText style={styles.signHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Your companion will update with this sign.</ThemedText></View></View> : null}
                     </View>
                   ) : null}
                 </Animated.View>
@@ -229,67 +231,20 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
   );
 }
 
-function ProfileRow({ icon, label, value, accent }: { icon: 'calendar' | 'sparkles'; label: string; value: string; accent: string }) {
-  return (
-    <View style={styles.profileRow}>
-      <View style={[styles.profileIcon, { backgroundColor: `${accent}18` }]}><IconSymbol name={icon} size={18} color={accent} /></View>
-      <View style={styles.profileCopy}>
-        <ThemedText style={styles.profileLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{label}</ThemedText>
-        <ThemedText style={styles.profileValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{value}</ThemedText>
-      </View>
-    </View>
-  );
-}
-
-function BirthdayField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder: string }) {
-  return (
-    <View style={styles.field}>
-      <ThemedText style={styles.fieldLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{label}</ThemedText>
-      <TextInput
-        accessibilityLabel={`Birth ${label.toLowerCase()}`}
-        keyboardType="number-pad"
-        maxLength={2}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={Lantern.moon500}
-        selectionColor={Lantern.ember300}
-        style={styles.birthdayInput}
-        value={value}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   modalRoot: { flex: 1 },
   keyboard: { flex: 1, gap: 10, minHeight: 0 },
-  backRow: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Lantern.dusk700, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 5, minHeight: 42, paddingHorizontal: 12 },
-  backText: { fontSize: 12.5, fontWeight: '800' },
   contentFrame: { flex: 1, minHeight: 0 },
   gameFrame: { flex: 1, minHeight: 0 },
   scrollContent: { paddingBottom: 16, paddingHorizontal: 4 },
   thread: { gap: 24, paddingBottom: 20, paddingTop: 8 },
   threadTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 25, lineHeight: 31 },
   threadBody: { fontSize: 13.5, lineHeight: 20 },
-  profileRow: { alignItems: 'center', backgroundColor: Lantern.ink900, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 11, minHeight: 72, padding: 11 },
-  profileIcon: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 13, height: 48, justifyContent: 'center', width: 48 },
-  profileCopy: { flex: 1, gap: 2 },
-  profileLabel: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.35, textTransform: 'uppercase' },
-  profileValue: { fontSize: 13.5, fontWeight: '800', lineHeight: 19 },
-  infoPanel: { backgroundColor: Lantern.ink900, borderColor: Lantern.line, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 5, padding: 15 },
-  infoTitle: { fontSize: 14, fontWeight: '800' },
-  infoBody: { fontSize: 12.5, lineHeight: 19 },
-  status: { alignItems: 'flex-start', backgroundColor: 'rgba(125,232,205,0.07)', borderCurve: 'continuous', borderRadius: 16, flexDirection: 'row', gap: 8, padding: 12 },
-  statusText: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
   birthdayRow: { flexDirection: 'row', gap: 10 },
-  field: { flex: 1, gap: 7 },
-  fieldLabel: { fontSize: 12, fontWeight: '700' },
-  birthdayInput: { backgroundColor: Lantern.ink900, borderColor: Lantern.line, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, color: Lantern.moon50, fontFamily: AppFontFamilies.manrope, fontSize: 23, fontVariant: ['tabular-nums'], fontWeight: '800', minHeight: 62, paddingHorizontal: 14, textAlign: 'center' },
-  signResult: { alignItems: 'center', backgroundColor: Lantern.ink900, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 12, minHeight: 72, padding: 12 },
+  signResult: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.34)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-3px 4px 8px rgba(58,38,18,0.16), inset 0 1px 0 rgba(255,248,230,0.55)', flexDirection: 'row', gap: 12, minHeight: 72, padding: 12 },
   signSymbol: { fontSize: 34, lineHeight: 40 },
   signCopy: { flex: 1, gap: 2 },
   signName: { fontSize: 14.5, fontWeight: '800' },
   signHint: { fontSize: 11.5, lineHeight: 16 },
   footer: { paddingBottom: 2, paddingHorizontal: 4, paddingTop: 10 },
-  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

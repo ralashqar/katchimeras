@@ -30,7 +30,7 @@ import {
   type WordPathRoundState,
 } from '@/utils/quests/experiences/word-paths';
 import type { QuestResult } from '@/utils/quests/experiences/types';
-import { ExperienceAction, ExperienceHeader } from './quest-experience-ui';
+import { ExperienceAction, ExperienceHeader, QuestExperiencePreview } from './quest-experience-ui';
 
 type Config = { difficultyTier: 1 | 2 | 3 | 4 | 5; hintAllowance: 1; puzzleId?: string };
 type Point = { x: number; y: number };
@@ -195,15 +195,15 @@ export function WordPathsQuest({ config, seed, recentPuzzleIds, onAttemptStart, 
   };
 
   if (!started) return (
-    <View style={styles.previewRoot}>
-      <ExperienceHeader eyebrow="WORD PATHS" title="Words are tangled between Pagelet’s shelves" body="Trace through the letter wheel and uncover every crossing word. There is no clock and every path can be tried again." />
-      <View style={styles.previewCard}>
-        <View style={styles.previewGlyph}><IconSymbol name="book.closed.fill" size={24} color={Lantern.ember300} /></View>
-        <ThemedText selectable style={styles.previewTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{round.puzzle.letters.length} letters · {round.puzzle.words.length} hidden words</ThemedText>
-        <ThemedText selectable style={styles.previewBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Drag through letters to make a word. Shuffle as often as you like, and reveal one letter if a path stays hidden.</ThemedText>
-      </View>
-      <ExperienceAction label="Untangle the words" onPress={start} />
-    </View>
+    <QuestExperiencePreview
+      eyebrow="Word paths"
+      title="Words are tangled between Pagelet’s shelves"
+      body="Trace through the letter wheel and uncover every crossing word. Every path can be tried again."
+      icon="book.closed.fill"
+      meta={`${round.puzzle.letters.length} letters · ${round.puzzle.words.length} hidden words`}
+      actionLabel="Untangle the words"
+      onAction={start}
+    />
   );
 
   if (complete && showResult) {
@@ -420,11 +420,6 @@ function feedbackColor(feedback: WordPathFeedback): string {
 const styles = StyleSheet.create({
   root: { flex: 1, gap: 9, justifyContent: 'space-between', minHeight: 0, paddingHorizontal: 2, paddingTop: 2 },
   rootCompact: { gap: 5 },
-  previewRoot: { flex: 1, gap: 18, justifyContent: 'space-between', padding: 4 },
-  previewCard: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.06)', borderColor: 'rgba(255,195,107,0.15)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, gap: 10, padding: 22 },
-  previewGlyph: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.10)', borderRadius: 18, height: 54, justifyContent: 'center', width: 54 },
-  previewTitle: { fontSize: 15, fontWeight: '900', textAlign: 'center' },
-  previewBody: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
   topRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   kicker: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.95 },
   progress: { fontSize: 11.5, fontVariant: ['tabular-nums'], fontWeight: '800', paddingTop: 3 },

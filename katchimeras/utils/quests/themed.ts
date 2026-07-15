@@ -1,6 +1,15 @@
-import { questDefinition } from './definitions';
+import { questDefinition, questPresentation, type QuestDefinition } from './definitions';
 
-export type ThemedQuestOffer = { id: string; title: string; hint: string; weight?: number };
+export type ThemedQuestOffer = {
+  id: string;
+  title: string;
+  hint: string;
+  weight?: number;
+  family?: QuestDefinition['family'];
+  categoryLabel: string;
+  estimatedMinutes: number;
+  artworkKey?: string;
+};
 
 const CREATURE_QUEST_POOL: Record<string, string[]> = {
   bedrotte: ['quest-bedrotte-breathe', 'quest-early-night'],
@@ -77,7 +86,14 @@ export function themedQuestOffers(subtype: string, archetype: string, creatureKe
       const keys = definition.eligibility?.creatureKeys;
       return !keys?.length || keys.includes(creatureKey.toLowerCase());
     })
-    .map((definition) => ({ id: definition.id, title: definition.title, hint: definition.hint, weight: definition.eligibility?.weight }));
+    .map((definition) => ({
+      id: definition.id,
+      title: definition.title,
+      hint: definition.hint,
+      weight: definition.eligibility?.weight,
+      family: definition.family,
+      ...questPresentation(definition),
+    }));
 }
 
 export function themedQuestOffer(subtype: string, archetype: string, creatureKey = ''): ThemedQuestOffer | undefined {

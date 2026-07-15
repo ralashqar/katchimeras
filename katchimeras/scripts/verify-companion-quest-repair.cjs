@@ -32,6 +32,7 @@ const evaluatePath = path.join(tempDir, 'evaluate.js');
 fs.writeFileSync(evaluatePath, 'exports.questCriteriaStatus = () => [];');
 
 const devSettingsPath = transpile('utils/dev-settings.ts', 'dev-settings.js');
+const questOfferOrderPath = transpile('utils/quest-offer-order.ts', 'quest-offer-order.js');
 const questsPath = transpile('utils/katchimera-quests.ts', 'katchimera-quests.js');
 
 const stubs = {
@@ -39,6 +40,7 @@ const stubs = {
   '@/utils/quests/runtime': runtimePath,
   '@/utils/quests/evaluate': evaluatePath,
   '@/utils/dev-settings': devSettingsPath,
+  '@/utils/quest-offer-order': questOfferOrderPath,
 };
 
 const originalResolve = Module._resolveFilename;

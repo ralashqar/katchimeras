@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import { advanceBreathing, createBreathingState } from '@/utils/quests/experiences/paced-breathing';
 import type { QuestResult } from '@/utils/quests/experiences/types';
-import { ExperienceAction, ExperienceHeader, ExperienceResult, experienceStyles, useQuestAppActive } from './quest-experience-ui';
+import { ExperienceAction, ExperienceResult, QuestExperiencePreview, experienceStyles, useQuestAppActive } from './quest-experience-ui';
 
 type Config = { inhaleMs: number; exhaleMs: number; cycles: number; tier: number };
 export function PacedBreathingQuest({ config, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: QuestProps<Config>) {
@@ -16,7 +16,7 @@ export function PacedBreathingQuest({ config, onAttemptStart, onAttemptCancel, o
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const start = () => { attempt.current = onAttemptStart(config); startedAt.current = Date.now(); setStarted(true); onRunningChange(true, attempt.current); };
   const cancel = () => { if (attempt.current) onAttemptCancel(attempt.current); onRunningChange(false); setStarted(false); setState(createBreathingState()); };
-  if (!started) return <View style={experienceStyles.root}><ExperienceHeader eyebrow="BEDROTTE" title="Breathe with Bedrotte" body="Hold while the glow grows. Release and breathe out as it settles." /><ExperienceAction label="Begin breathing" onPress={start} /></View>;
+  if (!started) return <QuestExperiencePreview eyebrow="Bedrotte" title="Breathe with Bedrotte" body="Hold while the glow grows. Release and breathe out as it settles." icon="moon.stars.fill" mediaLabel="A breathing glow" actionLabel="Begin breathing" onAction={start} />;
   if (state.completed && attempt.current) return <ExperienceResult success title="A quieter moment" body="You stayed for every slow breath." metric={`${config.cycles} cycles`} onComplete={() => onComplete(attempt.current!, { kind: 'paced_breathing', success: true, completedCycles: config.cycles, durationMs: Date.now() - startedAt.current })} />;
   return <View style={experienceStyles.root}><View style={experienceStyles.center}><ThemedText style={styles.progress} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{state.cycle + 1} OF {config.cycles}</ThemedText><Pressable accessibilityRole="button" accessibilityLabel={`${state.phase}. Hold while breathing in and release while breathing out.`} onPressIn={() => { if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync(); }} style={styles.orbWrap}><Animated.View style={[styles.orb, animated]}><ThemedText style={styles.phase} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{state.phase === 'inhale' ? 'Breathe in' : 'Breathe out'}</ThemedText></Animated.View></Pressable><ThemedText style={experienceStyles.help} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{state.phase === 'inhale' ? 'Hold gently as the light expands' : 'Release as the light settles'}</ThemedText></View><ExperienceAction label="End session" quiet onPress={cancel} /></View>;
 }
