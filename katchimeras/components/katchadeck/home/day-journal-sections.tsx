@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
+import { BlurMask, Canvas, Group, RoundedRect, SweepGradient, vec } from '@shopify/react-native-skia';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, {
+import {
   cancelAnimation,
   Easing,
-  useAnimatedStyle,
+  useDerivedValue,
+  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -37,44 +38,104 @@ const STAT_ICON: Record<string, IconSymbolName> = {
   photos: 'camera.fill',
   moments: 'sparkles',
 };
-const ATTENTION_GOLD = '#FFC36B';
 // The 'Through the day' card is parked while the v3 layout settles.
 const SHOW_TIMELINE_SECTION = false;
 // The photos card is parked too (v5 mockup slims Today to egg + numbers).
 const SHOW_PHOTOS_SECTION = false;
+const ATTENTION_ORBIT_MS = 3000;
+const ATTENTION_FADE_OUT_MS = 300;
+const ATTENTION_PAUSE_MS = 1000;
+const ATTENTION_FADE_IN_MS = 300;
+const ATTENTION_CYCLE_MS = ATTENTION_ORBIT_MS + ATTENTION_PAUSE_MS;
 
 export type DayStatKey = 'steps' | 'places' | 'photos' | 'moments';
 
 // Attention highlight: a gold light that TRAVELS around the tile's border —
 // a rotating gradient blade clipped to a thin ring just outside the tile
-// (replaces the old solid cream fill, which read as a white highlight).
-// Sits behind the tile content; the tile's opaque face covers the middle.
+// A small light travels around the tile perimeter without replacing the tile's
+// existing bevel or border. Reduced-motion users receive a fixed highlight.
 function AttentionBorderSweep({ radius }: { radius: number }) {
-  const turn = useSharedValue(0);
+  const progress = useSharedValue(0);
+  const [size, setSize] = useState({ height: 0, width: 0 });
+  const reduceMotion = useReducedMotion();
   useEffect(() => {
-    turn.value = 0;
-    turn.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.linear }), -1);
-    return () => cancelAnimation(turn);
-  }, [turn]);
-  const spin = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 360}deg` }] }));
+    progress.value = reduceMotion ? 0.1 : 0;
+    if (!reduceMotion) progress.value = withRepeat(withTiming(1, { duration: ATTENTION_CYCLE_MS, easing: Easing.linear }), -1);
+    return () => cancelAnimation(progress);
+  }, [progress, reduceMotion]);
+  const gradientTransform = useDerivedValue(() => {
+    const elapsed = progress.value * ATTENTION_CYCLE_MS;
+    const orbitProgress = Math.min(elapsed / ATTENTION_ORBIT_MS, 1);
+    return [{ rotate: orbitProgress * Math.PI * 2 }];
+  });
+  const rimOpacity = useDerivedValue(() => {
+    if (reduceMotion) return 1;
+    const elapsed = progress.value * ATTENTION_CYCLE_MS;
+    if (elapsed < ATTENTION_FADE_IN_MS) {
+      return elapsed / ATTENTION_FADE_IN_MS;
+    }
+    const fadeOutStartsAt = ATTENTION_ORBIT_MS - ATTENTION_FADE_OUT_MS;
+    if (elapsed < fadeOutStartsAt) return 1;
+    if (elapsed < ATTENTION_ORBIT_MS) {
+      return 1 - (elapsed - fadeOutStartsAt) / ATTENTION_FADE_OUT_MS;
+    }
+    return 0;
+  });
+
+  const inset = 2;
+  const width = Math.max(0, size.width - inset * 2);
+  const height = Math.max(0, size.height - inset * 2);
+  const center = vec(size.width / 2, size.height / 2);
+  const colors = [
+    'rgba(255, 244, 210, 0)',
+    'rgba(255, 244, 210, 0)',
+    'rgba(229, 185, 91, 0.18)',
+    'rgba(255, 220, 139, 0.62)',
+    'rgba(255, 251, 231, 1)',
+    'rgba(255, 220, 139, 0.62)',
+    'rgba(229, 185, 91, 0.18)',
+    'rgba(255, 244, 210, 0)',
+    'rgba(255, 244, 210, 0)',
+  ];
+  const positions = [0, 0.27, 0.37, 0.45, 0.5, 0.55, 0.63, 0.73, 1];
+
   return (
-    <View pointerEvents="none" style={[styles.sweepRing, { borderRadius: radius }]}>
-      <Animated.View style={[styles.sweepBlade, spin]}>
-        <LinearGradient
-          // A sharp comet: transparent for most of the sweep, a short gold
-          // tail, and a bright crisp head — packed stops keep the falloff
-          // tight instead of a long soft smear.
-          colors={['rgba(233,185,78,0)', 'rgba(233,185,78,0)', `${ATTENTION_GOLD}CC`, '#FFF0C8']}
-          locations={[0, 0.62, 0.88, 1]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </Animated.View>
-      {/* Opaque cover leaves only a thin 2px band at the tile edge — the
-          comet orbits INSIDE the tile, so no parent can ever clip it. The
-          cover's own hairline gives the band a faint constant gold base. */}
-      <View style={[styles.sweepCover, { borderRadius: Math.max(4, radius - 2) }]} />
+    <View
+      onLayout={(event) => {
+        const { height: nextHeight, width: nextWidth } = event.nativeEvent.layout;
+        setSize((current) => current.height === nextHeight && current.width === nextWidth
+          ? current
+          : { height: nextHeight, width: nextWidth });
+      }}
+      pointerEvents="none"
+      style={[styles.sweepRing, { borderRadius: radius }]}>
+      {width > 0 && height > 0 ? (
+        <Canvas style={StyleSheet.absoluteFill}>
+          <Group opacity={rimOpacity}>
+            <RoundedRect
+              x={inset}
+              y={inset}
+              width={width}
+              height={height}
+              r={Math.max(4, radius - inset)}
+              style="stroke"
+              strokeWidth={3}>
+              <SweepGradient c={center} colors={colors} positions={positions} origin={center} transform={gradientTransform} />
+              <BlurMask blur={2.4} style="solid" />
+            </RoundedRect>
+            <RoundedRect
+              x={inset}
+              y={inset}
+              width={width}
+              height={height}
+              r={Math.max(4, radius - inset)}
+              style="stroke"
+              strokeWidth={1.25}>
+              <SweepGradient c={center} colors={colors} positions={positions} origin={center} transform={gradientTransform} />
+            </RoundedRect>
+          </Group>
+        </Canvas>
+      ) : null}
     </View>
   );
 }
@@ -266,9 +327,11 @@ export function DayJournalSections({
           return (
             <Pressable
               key={stat.key}
+              accessibilityLabel={`${stat.value} ${stat.label}${attention ? stat.key === 'photos' ? ', new photos ready to review' : ', needs review' : ''}`}
+              accessibilityRole="button"
               disabled={!stat.onPress}
               onPress={stat.onPress}
-              style={styles.statTile}>
+              style={({ pressed }) => [styles.statTile, pressed && stat.onPress ? styles.statTilePressed : null]}>
               {attention ? <AttentionBorderSweep radius={Meadow.radius.tile} /> : null}
               {/* Warm brown, never the creature accent — pastels vanish on cream. */}
               <IconSymbol
@@ -279,10 +342,17 @@ export function DayJournalSections({
               <ThemedText style={styles.statValue} lightColor={Meadow.ink} darkColor={Meadow.ink}>
                 <CountingValue value={stat.value} format={stat.format} />
               </ThemedText>
-              <ThemedText style={styles.statLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+              <ThemedText style={styles.statLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
                 {stat.label}
               </ThemedText>
-              {attention ? <View style={styles.statAlertDot} /> : null}
+              {attention ? (
+                stat.key === 'photos' ? (
+                  <View pointerEvents="none" style={styles.photoReviewBadge}>
+                    <IconSymbol name="sparkles" size={8} color={Meadow.ink} />
+                    <ThemedText style={styles.photoReviewBadgeLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>New</ThemedText>
+                  </View>
+                ) : <View style={styles.statAlertDot} />
+              ) : null}
             </Pressable>
           );
         })}
@@ -552,32 +622,13 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
     paddingVertical: 9,
+    position: 'relative',
   },
-  // The travelling border light (AttentionBorderSweep): a huge rotating
-  // gradient blade clipped to the tile, with an opaque cover leaving only a
-  // thin 2px band at the edge — the comet orbits inside the tile.
+  // Transparent tracking layer: the original tile border remains untouched.
   sweepRing: {
     ...StyleSheet.absoluteFillObject,
-    // Faint constant gold base so the border reads highlighted between passes.
-    borderColor: 'rgba(233, 169, 62, 0.35)',
-    borderWidth: 1,
-    overflow: 'hidden',
     position: 'absolute',
-  },
-  sweepBlade: {
-    height: '340%',
-    left: '-120%',
-    position: 'absolute',
-    top: '-120%',
-    width: '340%',
-  },
-  sweepCover: {
-    backgroundColor: Meadow.cardSoft,
-    bottom: 2,
-    left: 2,
-    position: 'absolute',
-    right: 2,
-    top: 2,
+    zIndex: 1,
   },
   categoryArt: {
     height: 34,
@@ -627,6 +678,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
     paddingVertical: 8,
+    position: 'relative',
+  },
+  statTilePressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   // Value + label sit as one tight caption block under the big icon.
   statValue: {
@@ -654,6 +710,29 @@ const styles = StyleSheet.create({
     right: 8,
     top: 8,
     width: 9,
+  },
+  photoReviewBadge: {
+    alignItems: 'center',
+    backgroundColor: Meadow.gold,
+    borderColor: Meadow.goldDeep,
+    borderRadius: 999,
+    borderWidth: 1,
+    boxShadow: '0 2px 6px rgba(58,38,18,0.24), inset 0 1px 0 rgba(255,248,230,0.52)',
+    flexDirection: 'row',
+    gap: 2,
+    minHeight: 18,
+    paddingHorizontal: 5,
+    position: 'absolute',
+    right: -5,
+    top: -6,
+    zIndex: 4,
+  },
+  photoReviewBadgeLabel: {
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+    lineHeight: 10,
+    textTransform: 'uppercase',
   },
   sectionCard: {
     backgroundColor: Meadow.card,

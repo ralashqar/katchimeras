@@ -133,7 +133,6 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
           return (
             <Group key={`board-${index}`}>
               <RoundedRect x={x} y={y} width={metrics.cell} height={metrics.cell} r={Math.max(5, metrics.cell * 0.17)} color="#191B32" />
-              <RoundedRect x={x + 2} y={y + 2} width={metrics.cell - 4} height={metrics.cell * 0.38} r={Math.max(3, metrics.cell * 0.12)} color="#252849" />
               {palette ? (
                 <Group>
                   <RoundedRect x={x} y={y} width={metrics.cell} height={metrics.cell} r={Math.max(5, metrics.cell * 0.17)} color={palette.deep} />
