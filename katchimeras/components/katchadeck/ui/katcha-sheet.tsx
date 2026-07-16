@@ -44,6 +44,7 @@ export type KatchaSheetHeader = {
 export type KatchaSheetProps = {
   children: ReactNode;
   footer?: ReactNode;
+  fullBleed?: boolean;
   header?: KatchaSheetHeader;
   keyboardAvoiding?: boolean;
   maxHeight?: number | `${number}%`;
@@ -61,6 +62,7 @@ export type KatchaSheetProps = {
 export function KatchaSheet({
   children,
   footer,
+  fullBleed = false,
   header,
   keyboardAvoiding = false,
   maxHeight = '74%',
@@ -155,7 +157,8 @@ export function KatchaSheet({
           style={[
             styles.content,
             expanded && styles.expanded,
-            size === 'full' && { paddingBottom: insets.bottom + 10, paddingHorizontal: Math.max(16, insets.left, insets.right), paddingTop: insets.top + 8 },
+            size === 'full' && !fullBleed && { paddingBottom: insets.bottom + 10, paddingHorizontal: Math.max(16, insets.left, insets.right), paddingTop: insets.top + 8 },
+            size === 'full' && fullBleed && styles.fullBleedContent,
           ]}>
           {header ? <KatchaSheetHeading header={header} surface={surface} /> : null}
           <View style={[styles.body, expanded && styles.expanded]}>{body}</View>
@@ -217,6 +220,7 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { gap: 8, position: 'absolute' },
   content: { gap: 10 },
+  fullBleedContent: { gap: 0, paddingBottom: 0, paddingHorizontal: 0, paddingTop: 0 },
   expanded: { flex: 1, minHeight: 0 },
   body: { minHeight: 0 },
   scroll: { minHeight: 0 },

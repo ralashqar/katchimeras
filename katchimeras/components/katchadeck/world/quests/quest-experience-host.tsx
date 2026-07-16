@@ -14,7 +14,7 @@ import type { MergeRoundConfig } from '@/utils/quests/experiences/merge';
 import { BlockJamQuest } from './block-jam-quest';
 import { BlockBlastQuest } from './block-blast-quest';
 
-export function QuestExperienceHost({ execution, config, seed, recentQuestionIds, recentPuzzleIds, recentWordPathPuzzleIds = [], recentSortingItemIds = [], sortingBestDurationMs = null, recentMatchingContentIds = [], matchingBestDurationMs = null, recentMergeOrderIds = [], mergeBest = null, blockJamBest = null, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: {
+export function QuestExperienceHost({ execution, config, seed, recentQuestionIds, recentPuzzleIds, recentWordPathPuzzleIds = [], recentSortingItemIds = [], sortingBestDurationMs = null, recentMatchingContentIds = [], matchingBestDurationMs = null, recentMergeOrderIds = [], mergeBest = null, blockJamBest = null, onAttemptStart, onAttemptCancel, onComplete, onRequestExit, onRunningChange }: {
   execution: InteractiveQuestExecution;
   config: Record<string, unknown>;
   seed: string;
@@ -31,6 +31,7 @@ export function QuestExperienceHost({ execution, config, seed, recentQuestionIds
   onAttemptStart: (config: Record<string, unknown>) => string;
   onAttemptCancel: (attemptId: string) => void;
   onComplete: (attemptId: string, result: QuestResult) => void;
+  onRequestExit?: () => void;
   onRunningChange: (running: boolean, attemptId?: string | null) => void;
 }) {
   if (execution.kind === 'live_steps') {
@@ -45,8 +46,8 @@ export function QuestExperienceHost({ execution, config, seed, recentQuestionIds
   if (execution.kind === 'timing_zone') return <TimingZoneQuest config={config as { challengeId: 'steppling-stride' | 'mossprout-tend'; attempts: number; targetHits: number; traversalMs: number; zoneWidth: number; tier: number }} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   if (execution.kind === 'pattern_memory') return <PatternMemoryQuest config={config as { rounds: number; targetRounds: number; startLength: number; maxLength: number; playbackMs: number; tier: number }} seed={seed} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   if (execution.kind === 'sorting') return <SortingQuest config={config as { itemCount: number; targetCorrect: number; tier: number }} packId={execution.packId} seed={seed} recentIds={recentSortingItemIds} bestDurationMs={sortingBestDurationMs} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
-  if (execution.kind === 'matching') return <MatchingQuest config={config as { pairCount: number; moveBudget: number; tier: number }} packId={execution.packId} seed={seed} recentIds={recentMatchingContentIds} bestDurationMs={matchingBestDurationMs} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
-  if (execution.kind === 'merge') return <MergeQuest config={config as MergeRoundConfig} packId={execution.packId} seed={seed} recentOrderIds={recentMergeOrderIds} best={mergeBest} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
+  if (execution.kind === 'matching') return <MatchingQuest config={config as { pairCount: number; moveBudget: number; tier: number }} packId={execution.packId} seed={seed} recentIds={recentMatchingContentIds} bestDurationMs={matchingBestDurationMs} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRequestExit={onRequestExit} onRunningChange={onRunningChange} />;
+  if (execution.kind === 'merge') return <MergeQuest config={config as MergeRoundConfig} packId={execution.packId} seed={seed} recentOrderIds={recentMergeOrderIds} best={mergeBest} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRequestExit={onRequestExit} onRunningChange={onRunningChange} />;
   if (execution.kind === 'block_jam') return <BlockJamQuest key={String(config.levelId)} config={config as { packId: 'tasklet-desk'; rulesetId?: string; tier: 1 | 2 | 3; levelId: string; timeLimitMs?: number; parMoves?: number }} best={blockJamBest} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   if (execution.kind === 'block_blast') return <BlockBlastQuest key={String(config.rulesetId ?? seed)} config={config as { packId: 'cheerlet-party'; rulesetId: 'cheerlet-block-party-v2'; boardSize?: 8; mode?: 'endless' }} seed={seed} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   return <RhythmQuest config={config as { phraseLengths: number[]; phrases: number; targetScore: number; bpm: number; hitWindowMs: number; tier: number }} seed={seed} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;

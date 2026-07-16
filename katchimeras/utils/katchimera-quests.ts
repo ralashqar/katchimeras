@@ -437,7 +437,7 @@ function withPersonalBest(state: CompanionQuestState, questId: string, result: Q
         item.success &&
         item.packId === result.packId &&
         item.ordersTotal === result.ordersTotal &&
-        (item.movesUsed < result.movesUsed || (item.movesUsed === result.movesUsed && item.durationMs <= result.durationMs))
+        (item.durationMs < result.durationMs || (item.durationMs === result.durationMs && item.movesUsed <= result.movesUsed))
       ),
     };
   }

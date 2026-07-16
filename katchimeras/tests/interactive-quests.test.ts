@@ -17,7 +17,7 @@ import { scoreTimingTap } from '@/utils/quests/experiences/timing-zone';
 import { createPattern, patternComplete, patternMatches } from '@/utils/quests/experiences/pattern-memory';
 import { createSortingRound, FEASTLE_SORTING_ITEMS, TASKLET_SORTING_ITEMS, validateSortingItems } from '@/utils/quests/experiences/sorting';
 import { formatQuestDuration } from '@/utils/quests/experiences/duration';
-import { createMatchingDeck, createMemoryMatchState, FEASTLE_MATCHING_MOTIFS, memoryMatchReducer, MOSSPROUT_MATCHING_MOTIFS, RELICOON_MATCHING_MOTIFS, shuffleMatchingDeck, validateMatchingMotifs } from '@/utils/quests/experiences/matching';
+import { createMatchingDeck, createMemoryMatchState, FEASTLE_MATCHING_MOTIFS, memoryMatchPresentation, memoryMatchReducer, MOSSPROUT_MATCHING_MOTIFS, RELICOON_MATCHING_MOTIFS, shuffleMatchingDeck, validateMatchingMotifs } from '@/utils/quests/experiences/matching';
 import { attemptMatchThreeSwap, createMatchThreeState, findMatchRuns, hasLegalMove, MATCH_THREE_DIFFICULTY, resolveMatchThreeConfig, type MatchThreeState, type MatchThreeTile } from '@/utils/quests/experiences/match-three';
 import { matchThreePack, validateMatchThreePack } from '@/utils/quests/experiences/match-three-packs';
 import { questDefinition } from '@/utils/quests/definitions';
@@ -536,6 +536,9 @@ test('Tasklet triage is deterministic, valid, tiered, and records readable elaps
 });
 
 test('Mossprout memory match uses deterministic garden assets and keeps legacy watering readable', () => {
+  assert.equal(memoryMatchPresentation('mossprout-garden'), 'memory_garden');
+  assert.equal(memoryMatchPresentation('relicoon-gallery'), 'standard');
+  assert.equal(memoryMatchPresentation('feastle-food'), 'standard');
   assert.equal(MOSSPROUT_MATCHING_MOTIFS.length, 12);
   assert.deepEqual(validateMatchingMotifs(MOSSPROUT_MATCHING_MOTIFS), []);
   assert.ok(MOSSPROUT_MATCHING_MOTIFS.every((motif) => motif.visual.kind === 'world_asset'));

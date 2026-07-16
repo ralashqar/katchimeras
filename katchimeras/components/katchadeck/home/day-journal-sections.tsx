@@ -1,21 +1,12 @@
 import { Image } from 'expo-image';
-import { BlurMask, Canvas, Group, RoundedRect, SweepGradient, vec } from '@shopify/react-native-skia';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import {
-  cancelAnimation,
-  Easing,
-  useDerivedValue,
-  useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { PlacesModal } from '@/components/katchadeck/home/places-modal';
 import { CATEGORY_ART, VARIANT_ART } from '@/components/katchadeck/home/today-category-ring';
+import { AnimatedBorderHighlight } from '@/components/katchadeck/ui/animated-border-highlight';
 import { Meadow } from '@/constants/meadow-theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { TodayCategoryState } from '@/utils/today-categories';
@@ -42,103 +33,8 @@ const STAT_ICON: Record<string, IconSymbolName> = {
 const SHOW_TIMELINE_SECTION = false;
 // The photos card is parked too (v5 mockup slims Today to egg + numbers).
 const SHOW_PHOTOS_SECTION = false;
-const ATTENTION_ORBIT_MS = 3000;
-const ATTENTION_FADE_OUT_MS = 300;
-const ATTENTION_PAUSE_MS = 1000;
-const ATTENTION_FADE_IN_MS = 300;
-const ATTENTION_CYCLE_MS = ATTENTION_ORBIT_MS + ATTENTION_PAUSE_MS;
 
 export type DayStatKey = 'steps' | 'places' | 'photos' | 'moments';
-
-// Attention highlight: a gold light that TRAVELS around the tile's border —
-// a rotating gradient blade clipped to a thin ring just outside the tile
-// A small light travels around the tile perimeter without replacing the tile's
-// existing bevel or border. Reduced-motion users receive a fixed highlight.
-function AttentionBorderSweep({ radius }: { radius: number }) {
-  const progress = useSharedValue(0);
-  const [size, setSize] = useState({ height: 0, width: 0 });
-  const reduceMotion = useReducedMotion();
-  useEffect(() => {
-    progress.value = reduceMotion ? 0.1 : 0;
-    if (!reduceMotion) progress.value = withRepeat(withTiming(1, { duration: ATTENTION_CYCLE_MS, easing: Easing.linear }), -1);
-    return () => cancelAnimation(progress);
-  }, [progress, reduceMotion]);
-  const gradientTransform = useDerivedValue(() => {
-    const elapsed = progress.value * ATTENTION_CYCLE_MS;
-    const orbitProgress = Math.min(elapsed / ATTENTION_ORBIT_MS, 1);
-    return [{ rotate: orbitProgress * Math.PI * 2 }];
-  });
-  const rimOpacity = useDerivedValue(() => {
-    if (reduceMotion) return 1;
-    const elapsed = progress.value * ATTENTION_CYCLE_MS;
-    if (elapsed < ATTENTION_FADE_IN_MS) {
-      return elapsed / ATTENTION_FADE_IN_MS;
-    }
-    const fadeOutStartsAt = ATTENTION_ORBIT_MS - ATTENTION_FADE_OUT_MS;
-    if (elapsed < fadeOutStartsAt) return 1;
-    if (elapsed < ATTENTION_ORBIT_MS) {
-      return 1 - (elapsed - fadeOutStartsAt) / ATTENTION_FADE_OUT_MS;
-    }
-    return 0;
-  });
-
-  const inset = 2;
-  const width = Math.max(0, size.width - inset * 2);
-  const height = Math.max(0, size.height - inset * 2);
-  const center = vec(size.width / 2, size.height / 2);
-  const colors = [
-    'rgba(255, 244, 210, 0)',
-    'rgba(255, 244, 210, 0)',
-    'rgba(229, 185, 91, 0.18)',
-    'rgba(255, 220, 139, 0.62)',
-    'rgba(255, 251, 231, 1)',
-    'rgba(255, 220, 139, 0.62)',
-    'rgba(229, 185, 91, 0.18)',
-    'rgba(255, 244, 210, 0)',
-    'rgba(255, 244, 210, 0)',
-  ];
-  const positions = [0, 0.27, 0.37, 0.45, 0.5, 0.55, 0.63, 0.73, 1];
-
-  return (
-    <View
-      onLayout={(event) => {
-        const { height: nextHeight, width: nextWidth } = event.nativeEvent.layout;
-        setSize((current) => current.height === nextHeight && current.width === nextWidth
-          ? current
-          : { height: nextHeight, width: nextWidth });
-      }}
-      pointerEvents="none"
-      style={[styles.sweepRing, { borderRadius: radius }]}>
-      {width > 0 && height > 0 ? (
-        <Canvas style={StyleSheet.absoluteFill}>
-          <Group opacity={rimOpacity}>
-            <RoundedRect
-              x={inset}
-              y={inset}
-              width={width}
-              height={height}
-              r={Math.max(4, radius - inset)}
-              style="stroke"
-              strokeWidth={3}>
-              <SweepGradient c={center} colors={colors} positions={positions} origin={center} transform={gradientTransform} />
-              <BlurMask blur={2.4} style="solid" />
-            </RoundedRect>
-            <RoundedRect
-              x={inset}
-              y={inset}
-              width={width}
-              height={height}
-              r={Math.max(4, radius - inset)}
-              style="stroke"
-              strokeWidth={1.25}>
-              <SweepGradient c={center} colors={colors} positions={positions} origin={center} transform={gradientTransform} />
-            </RoundedRect>
-          </Group>
-        </Canvas>
-      ) : null}
-    </View>
-  );
-}
 
 // A stat value that COUNTS to its new number instead of snapping — so live
 // step updates roll up. Eased over ~0.7s; formatting is applied per frame.
@@ -298,7 +194,7 @@ export function DayJournalSections({
                     disabled={!onCategoryPress}
                     onPress={() => onCategoryPress?.(category)}
                     style={styles.categoryTile}>
-                    {category.needsAttention ? <AttentionBorderSweep radius={Meadow.radius.tile} /> : null}
+                    {category.needsAttention ? <AnimatedBorderHighlight borderRadius={Meadow.radius.tile} /> : null}
                     {art ? (
                       <Image source={art} style={styles.categoryArt} contentFit="contain" />
                     ) : (
@@ -332,7 +228,7 @@ export function DayJournalSections({
               disabled={!stat.onPress}
               onPress={stat.onPress}
               style={({ pressed }) => [styles.statTile, pressed && stat.onPress ? styles.statTilePressed : null]}>
-              {attention ? <AttentionBorderSweep radius={Meadow.radius.tile} /> : null}
+              {attention ? <AnimatedBorderHighlight borderRadius={Meadow.radius.tile} /> : null}
               {/* Warm brown, never the creature accent — pastels vanish on cream. */}
               <IconSymbol
                 color={attention ? Meadow.goldDeep : Meadow.iconOnCard}
@@ -623,12 +519,6 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 9,
     position: 'relative',
-  },
-  // Transparent tracking layer: the original tile border remains untouched.
-  sweepRing: {
-    ...StyleSheet.absoluteFillObject,
-    position: 'absolute',
-    zIndex: 1,
   },
   categoryArt: {
     height: 34,

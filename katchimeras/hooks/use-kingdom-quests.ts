@@ -671,7 +671,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     ? companionQuestState.attempts.reduce<{ movesUsed: number; durationMs: number } | null>((best, attempt) => {
         const result = attempt.questId === selectedActiveQuest.questId && attempt.result?.kind === 'merge' ? attempt.result : null;
         if (!result?.success) return best;
-        if (!best || result.movesUsed < best.movesUsed || (result.movesUsed === best.movesUsed && result.durationMs < best.durationMs)) {
+        if (!best || result.durationMs < best.durationMs || (result.durationMs === best.durationMs && result.movesUsed < best.movesUsed)) {
           return { movesUsed: result.movesUsed, durationMs: result.durationMs };
         }
         return best;

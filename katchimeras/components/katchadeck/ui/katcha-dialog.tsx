@@ -18,6 +18,7 @@ type KatchaDialogProps = {
   onCancel: () => void;
   onConfirm?: () => void;
   open: boolean;
+  portal?: boolean;
   surface?: KatchaSurface;
   title: string;
   tone?: KatchaDialogTone;
@@ -31,6 +32,7 @@ export function KatchaDialog({
   onCancel,
   onConfirm,
   open,
+  portal = true,
   surface = 'parchment',
   title,
   tone = 'warning',
@@ -40,6 +42,32 @@ export function KatchaDialog({
   const resolvedIcon = icon ?? (tone === 'destructive' ? 'trash.fill' : tone === 'warning' ? 'exclamationmark.triangle.fill' : 'sparkles');
   const iconColor = tone === 'destructive' ? tokens.destructive : tone === 'warning' ? tokens.accentPressed : tokens.success;
 
+  const content = (
+    <KatchaSurfaceProvider surface={surface}>
+      <View style={[styles.scrim, { backgroundColor: tokens.scrim }]}>
+        <Animated.View
+          accessibilityLabel={`${title}. ${body}`}
+          accessibilityViewIsModal
+          entering={FadeIn.duration(reduceMotion ? 80 : 170)}
+          style={[styles.card, { backgroundColor: tokens.elevated, borderColor: tokens.borderStrong, boxShadow: tokens.shadow }]}>
+          <View style={[styles.icon, { backgroundColor: tokens.subtle, borderColor: tokens.border }]}>
+            <IconSymbol name={resolvedIcon} size={21} color={iconColor} />
+          </View>
+          <ThemedText style={styles.eyebrow} lightColor={tone === 'destructive' ? tokens.destructive : tokens.textTertiary} darkColor={tone === 'destructive' ? tokens.destructive : tokens.textTertiary}>
+            {tone === 'destructive' ? 'Please confirm' : tone === 'warning' ? 'Before you continue' : 'Good to know'}
+          </ThemedText>
+          <ThemedText style={styles.title} lightColor={tokens.text} darkColor={tokens.text}>{title}</ThemedText>
+          <ThemedText style={styles.body} lightColor={tokens.textSecondary} darkColor={tokens.textSecondary}>{body}</ThemedText>
+          <View style={styles.actions}>
+            <KatchaButton fullWidth label={cancelLabel} onPress={onCancel} size="compact" variant="primary" />
+            {onConfirm ? <KatchaButton fullWidth label={confirmLabel} icon={tone === 'destructive' ? 'trash.fill' : undefined} onPress={onConfirm} size="compact" variant={tone === 'destructive' ? 'destructive' : 'secondary'} /> : null}
+          </View>
+        </Animated.View>
+      </View>
+    </KatchaSurfaceProvider>
+  );
+
+  if (!portal) return open ? <View style={styles.inlineRoot}>{content}</View> : null;
   return (
     <Modal
       animationType="fade"
@@ -49,36 +77,14 @@ export function KatchaDialog({
       statusBarTranslucent
       transparent
       visible={open}>
-      <GestureHandlerRootView style={styles.root}>
-        <KatchaSurfaceProvider surface={surface}>
-          <View style={[styles.scrim, { backgroundColor: tokens.scrim }]}>
-            <Animated.View
-              accessibilityLabel={`${title}. ${body}`}
-              accessibilityViewIsModal
-              entering={FadeIn.duration(reduceMotion ? 80 : 170)}
-              style={[styles.card, { backgroundColor: tokens.elevated, borderColor: tokens.borderStrong, boxShadow: tokens.shadow }]}>
-              <View style={[styles.icon, { backgroundColor: tokens.subtle, borderColor: tokens.border }]}>
-                <IconSymbol name={resolvedIcon} size={21} color={iconColor} />
-              </View>
-              <ThemedText style={styles.eyebrow} lightColor={tone === 'destructive' ? tokens.destructive : tokens.textTertiary} darkColor={tone === 'destructive' ? tokens.destructive : tokens.textTertiary}>
-                {tone === 'destructive' ? 'Please confirm' : tone === 'warning' ? 'Before you continue' : 'Good to know'}
-              </ThemedText>
-              <ThemedText style={styles.title} lightColor={tokens.text} darkColor={tokens.text}>{title}</ThemedText>
-              <ThemedText style={styles.body} lightColor={tokens.textSecondary} darkColor={tokens.textSecondary}>{body}</ThemedText>
-              <View style={styles.actions}>
-                <KatchaButton fullWidth label={cancelLabel} onPress={onCancel} size="compact" variant="primary" />
-                {onConfirm ? <KatchaButton fullWidth label={confirmLabel} icon={tone === 'destructive' ? 'trash.fill' : undefined} onPress={onConfirm} size="compact" variant={tone === 'destructive' ? 'destructive' : 'secondary'} /> : null}
-              </View>
-            </Animated.View>
-          </View>
-        </KatchaSurfaceProvider>
-      </GestureHandlerRootView>
+      <GestureHandlerRootView style={styles.root}>{content}</GestureHandlerRootView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  inlineRoot: { ...StyleSheet.absoluteFillObject, zIndex: 1000 },
   scrim: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   card: { alignItems: 'flex-start', borderCurve: 'continuous', borderRadius: 26, borderWidth: 1, gap: 8, maxWidth: 360, padding: 22, width: '100%' },
   icon: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 44, justifyContent: 'center', marginBottom: 2, width: 44 },

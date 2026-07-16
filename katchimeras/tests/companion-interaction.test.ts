@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { HomeDayRecord } from '@/types/home';
+import type { InteractiveQuestExecution } from '@/utils/quests/experiences/types';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import {
   buildCompanionQuestViewModel,
   companionInteractionReducer,
+  companionQuestUsesFullBleed,
   companionReflectionIsDirty,
   createCompanionInteractionState,
   insightForArchetype,
@@ -13,6 +15,13 @@ import {
 import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
 import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import { evidenceProvider, isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
+
+test('Mossprout matching and Feastle merge attempts use the full-bleed game shell', () => {
+  assert.equal(companionQuestUsesFullBleed({ kind: 'matching', packId: 'mossprout-garden' } as InteractiveQuestExecution), true);
+  assert.equal(companionQuestUsesFullBleed({ kind: 'merge', packId: 'feastle-kitchen' } as InteractiveQuestExecution), true);
+  assert.equal(companionQuestUsesFullBleed({ kind: 'matching', packId: 'relicoon-gallery' } as InteractiveQuestExecution), false);
+  assert.equal(companionQuestUsesFullBleed(null), false);
+});
 
 function runtime(overrides: Partial<QuestRuntimeStatus> = {}): QuestRuntimeStatus {
   return {

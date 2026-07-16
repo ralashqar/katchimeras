@@ -8,6 +8,7 @@ import type {
 } from '@/types/companion-interaction';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
+import type { InteractiveQuestExecution } from '@/utils/quests/experiences/types';
 
 export function createCompanionInteractionState(input: {
   initialThread: CompanionThread;
@@ -49,6 +50,13 @@ export function companionInteractionReducer(
 
 export function companionReflectionIsDirty(state: CompanionInteractionState): boolean {
   return Boolean(state.reflectionDraft?.text.trim() || state.reflectionDraft?.audioUri);
+}
+
+export function companionQuestUsesFullBleed(execution: InteractiveQuestExecution | null): boolean {
+  return Boolean(
+    (execution?.kind === 'matching' && execution.packId === 'mossprout-garden') ||
+    (execution?.kind === 'merge' && execution.packId === 'feastle-kitchen'),
+  );
 }
 
 export function buildCompanionQuestViewModel(input: {

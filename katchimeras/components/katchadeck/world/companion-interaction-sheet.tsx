@@ -21,6 +21,7 @@ import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import {
   buildCompanionQuestViewModel,
   companionInteractionReducer,
+  companionQuestUsesFullBleed,
   companionReflectionIsDirty,
   createCompanionInteractionState,
 } from '@/utils/companion-interaction';
@@ -98,6 +99,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   }, createCompanionInteractionState);
   const [activeAttemptId, setActiveAttemptId] = useState<string | null>(null);
   const [endAttemptOpen, setEndAttemptOpen] = useState(false);
+  const [experienceInstance, setExperienceInstance] = useState(0);
   const contentRef = useRef<ScrollView>(null);
   const reduceMotion = useReducedMotion();
   const visual = getCreatureVisual(props.visualKey);
@@ -172,6 +174,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     else props.onCashIn();
   };
   const interactiveExecution = props.activeQuest?.execution ?? null;
+  const immersiveExperience = Boolean(activeAttemptId && companionQuestUsesFullBleed(interactiveExecution));
   const actionFooter = props.memorySaved
     ? null
     : state.thread === 'quest' && interactiveExecution
@@ -194,7 +197,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const entering = reduceMotion ? FadeIn.duration(100) : state.direction > 0 ? FadeInRight.duration(210) : FadeInLeft.duration(210);
 
   return (<>
-        <KatchaSheet onRequestClose={requestClose} showClose={!activeAttemptId} surface={activeAttemptId ? 'night' : 'parchment'} size={activeAttemptId ? 'full' : 'tall'}>
+        <KatchaSheet fullBleed={immersiveExperience} onRequestClose={requestClose} showClose={!activeAttemptId} surface={activeAttemptId ? 'night' : 'parchment'} size={activeAttemptId ? 'full' : 'tall'}>
       <KeyboardAvoidingView behavior={!activeAttemptId && process.env.EXPO_OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8} style={styles.keyboard}>
         {!activeAttemptId ? (
           <CompanionHero key="companion-hero" name={props.name} image={visual.source} houseLevel={props.houseLevel} openingLine={props.openingLine}>
@@ -225,6 +228,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ) : state.thread === 'quest' && interactiveExecution && props.onStartQuestAttempt && props.onCancelQuestAttempt && props.onCompleteInteractiveQuest ? (
                 <View style={!activeAttemptId ? styles.gamePreviewFrame : styles.activeExperience}>
                 <QuestExperienceHost
+                  key={experienceInstance}
                   execution={interactiveExecution}
                   config={props.activeQuest?.resolvedConfig ?? {}}
                   seed={props.activeQuest?.offerSeed ?? `${props.creatureId}:${props.activeQuest?.title}`}
@@ -245,6 +249,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     setActiveAttemptId(null);
                     selectThread('insight');
                   }}
+                  onRequestExit={() => setEndAttemptOpen(true)}
                   onRunningChange={(running, attemptId) => setActiveAttemptId(running ? attemptId ?? null : null)}
                 />
                 </View>
@@ -282,10 +287,27 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           </ScrollView>
         </View>
         {footer ? <View style={styles.footer}>{footer}</View> : null}
+        <KatchaDialog
+          body="Your current game progress will be lost. You can retry the quest from here."
+          cancelLabel="Keep playing"
+          confirmLabel="Exit game"
+          onCancel={() => setEndAttemptOpen(false)}
+          onConfirm={() => {
+            const attemptId = activeAttemptId;
+            setEndAttemptOpen(false);
+            setActiveAttemptId(null);
+            setExperienceInstance((current) => current + 1);
+            if (attemptId) props.onCancelQuestAttempt?.(attemptId);
+          }}
+          open={endAttemptOpen}
+          portal={false}
+          surface="night"
+          title="Exit this game?"
+          tone="destructive"
+        />
       </KeyboardAvoidingView>
         </KatchaSheet>
         <KatchaDialog body="Your reflection has not been saved yet." cancelLabel="Keep editing" confirmLabel="Discard" onCancel={() => dispatch({ type: 'keep_editing' })} onConfirm={props.onClose} open={state.discardOpen} title="Discard this answer?" tone="destructive" />
-        <KatchaDialog body="This run will be cancelled, but the quest will stay active so you can retry." cancelLabel="Keep playing" confirmLabel="End attempt" onCancel={() => setEndAttemptOpen(false)} onConfirm={() => { if (activeAttemptId) props.onCancelQuestAttempt?.(activeAttemptId); setActiveAttemptId(null); props.onClose(); }} open={endAttemptOpen} surface="night" title="End this attempt?" tone="destructive" />
   </>);
 }
 

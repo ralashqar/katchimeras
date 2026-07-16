@@ -20,7 +20,9 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
+import { AnimatedBorderHighlight } from '@/components/katchadeck/ui/animated-border-highlight';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import { FEASTLE_MERGE_ART } from '@/constants/feastle-merge-art';
@@ -42,7 +44,8 @@ import {
 import { formatQuestDuration } from '@/utils/quests/experiences/duration';
 import type { QuestResult } from '@/utils/quests/experiences/types';
 
-import { ExperienceResult, QuestExperiencePreview } from './quest-experience-ui';
+import { QuestExperiencePreview } from './quest-experience-ui';
+import { FeastleMergeFeastScreen } from './feastle-merge-feast-screen';
 
 type Props = {
   config: MergeRoundConfig;
@@ -53,6 +56,7 @@ type Props = {
   onAttemptStart: (config: Record<string, unknown>) => string;
   onAttemptCancel: (id: string) => void;
   onComplete: (id: string, result: QuestResult) => void;
+  onRequestExit?: () => void;
   onRunningChange: (running: boolean, id?: string | null) => void;
 };
 
@@ -62,13 +66,14 @@ const CHAIN_STYLE: Record<string, { color: string }> = {
   dessert: { color: '#D99B91' },
 };
 
-export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: Props) {
+export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, onAttemptStart, onAttemptCancel, onComplete, onRequestExit, onRunningChange }: Props) {
   const { width, height } = useWindowDimensions();
-  const gap = height < 680 ? 4 : 5;
-  const boardPadding = 6;
-  const boardBorder = 1;
-  const maxBoardWidth = Math.min(width - 36, 390);
-  const maxBoardHeight = Math.min(390, Math.max(292, height - 270));
+  const compact = height < 740;
+  const gap = compact ? 4 : 5;
+  const boardPadding = compact ? 5 : 7;
+  const boardBorder = 2;
+  const maxBoardWidth = Math.min(width - 28, 540);
+  const maxBoardHeight = Math.min(maxBoardWidth, Math.max(246, height - (compact ? 350 : 390)));
   const cellSize = Math.floor(Math.min(
     (maxBoardWidth - (boardPadding + boardBorder) * 2 - gap * (MERGE_BOARD_COLUMNS - 1)) / MERGE_BOARD_COLUMNS,
     (maxBoardHeight - (boardPadding + boardBorder) * 2 - gap * (MERGE_BOARD_ROWS - 1)) / MERGE_BOARD_ROWS,
@@ -86,7 +91,6 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   const [draggingCell, setDraggingCell] = useState<number | null>(null);
   const [hoveredCell, setHoveredCell] = useState<number | null>(null);
   const [dropLanding, setDropLanding] = useState<{ cell: number; offsetX: number; offsetY: number } | null>(null);
-  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const attempt = useRef<string | null>(null);
   const startedAt = useRef(0);
   const finishedAt = useRef<number | null>(null);
@@ -147,8 +151,6 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     setDropLanding(null);
     onRunningChange(false);
   };
-
-  const confirmReset = () => setLeaveDialogOpen(true);
 
   const spawn = () => {
     const nextPantryItem = state.pantry[0];
@@ -313,7 +315,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       title="Merge Feast"
       body={`Build two dishes across the pantry. Empty-space moves are free; draws and merges use one of ${config.moveBudget} actions.`}
       icon="fork.knife"
-      meta={best ? `Local best · ${best.movesUsed} actions · ${formatQuestDuration(best.durationMs)}` : 'Two orders · 36-cell pantry'}
+      meta={best ? `Fastest feast · ${formatQuestDuration(best.durationMs)}` : 'Two orders · 36-cell pantry'}
       actionLabel="Open the pantry"
       onAction={start}
     />;
@@ -328,31 +330,60 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       mergeCount: state.mergeCount, highestTier: state.highestTier,
       orderIds: state.orders.map((order) => order.id), contentIds: state.orders.map((order) => order.targetId), durationMs,
     };
-    return <ExperienceResult
-      success={success}
-      title={success ? 'Feastle’s orders are served' : 'The pantry is spent'}
-      body={success ? `Two dishes, ${state.mergeCount} merges, and not a crumb out of place.` : 'The same kitchen is ready for another try. Move items freely and merge before drawing too far ahead.'}
-      metric={`${state.movesUsed}/${config.moveBudget}`}
-      onRetry={reset}
-      onComplete={() => success ? onComplete(attempt.current!, result) : reset()}
-    />;
+    const finish = () => success ? onComplete(attempt.current!, result) : reset();
+    return (
+      <FeastleMergeFeastScreen finishedAt={finishedAt.current} onClose={onRequestExit ?? reset} startedAt={startedAt.current}>
+        <View accessibilityLiveRegion="polite" style={styles.resultFrame}>
+          <View style={[styles.resultCard, success ? styles.resultCardSuccess : styles.resultCardFailure]}>
+            <View style={styles.resultIcon}>
+              <IconSymbol color={success ? '#55762C' : '#A44E35'} name={success ? 'sparkles' : 'exclamationmark.triangle.fill'} size={30} />
+            </View>
+            <ThemedText style={styles.resultEyebrow} lightColor="#A85E20" darkColor="#A85E20">
+              {success ? 'Feast complete' : 'Pantry paused'}
+            </ThemedText>
+            <ThemedText style={styles.resultTitle} lightColor="#4A291B" darkColor="#4A291B">
+              {success ? 'Feastle’s orders are served' : 'The pantry is spent'}
+            </ThemedText>
+            <ThemedText style={styles.resultBody} lightColor="#71503B" darkColor="#71503B">
+              {success
+                ? `Two dishes, ${state.mergeCount} merges, and not a crumb out of place.`
+                : 'Move items freely and merge matching ingredients before drawing too far ahead.'}
+            </ThemedText>
+            <View accessibilityLabel={`Completion time ${formatQuestDuration(durationMs)}`} style={styles.scorePanel}>
+              <IconSymbol color="#B95519" name="timer" size={20} />
+              <ThemedText style={styles.scoreValue} lightColor="#4A291B" darkColor="#4A291B">{formatQuestDuration(durationMs)}</ThemedText>
+              <ThemedText style={styles.scoreLabel} lightColor="#856246" darkColor="#856246">Completion time</ThemedText>
+            </View>
+            <View style={styles.resultMetricRow}>
+              <ResultMetric label="Merges" value={String(state.mergeCount)} />
+              <ResultMetric label="Orders" value={`${state.orders.filter((order) => order.completed).length}/${state.orders.length}`} />
+            </View>
+            {success && best && durationMs < best.durationMs ? (
+              <ThemedText style={styles.best} lightColor="#7B5A1E" darkColor="#7B5A1E">New local best</ThemedText>
+            ) : null}
+          </View>
+          <KatchaSurfaceProvider surface="parchment">
+            <KatchaButton fullWidth icon={success ? 'arrow.right' : 'arrow.counterclockwise'} label={success ? 'Return to Feastle' : 'Try again'} onPress={finish} variant="primary" />
+          </KatchaSurfaceProvider>
+        </View>
+      </FeastleMergeFeastScreen>
+    );
   }
 
   const actionsLeft = config.moveBudget - state.movesUsed;
   const nextPantry = state.pantry[0] ?? null;
-  return <><View style={styles.root}>
-    <View style={styles.topLine}>
-      <ThemedText selectable style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>MERGE FEAST</ThemedText>
-      <View style={[styles.actionPill, actionsLeft <= 3 && styles.actionPillWarning]}>
-        <ThemedText selectable style={styles.actionNumber} lightColor={actionsLeft <= 3 ? '#F2A38B' : Lantern.moon50} darkColor={actionsLeft <= 3 ? '#F2A38B' : Lantern.moon50}>{actionsLeft}</ThemedText>
-        <ThemedText style={styles.actionLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>ACTIONS</ThemedText>
-      </View>
-    </View>
-
+  return <FeastleMergeFeastScreen onClose={onRequestExit ?? reset} startedAt={startedAt.current}><View style={styles.root}>
     <View accessibilityLabel="Feastle’s two orders" style={styles.orders}>
       {state.orders.map((order) => {
         const definition = mergeItemDefinition(order.targetId);
         const readyCell = state.board.findIndex((item) => item?.definitionId === order.targetId);
+        const progressTier = order.completed
+          ? definition.tier
+          : state.board.reduce((highest, item) => {
+              if (!item) return highest;
+              const itemDefinition = mergeItemDefinition(item.definitionId);
+              return itemDefinition.chainId === definition.chainId ? Math.max(highest, itemDefinition.tier) : highest;
+            }, 0);
         return <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${definition.name} order, ${order.completed ? 'served' : readyCell >= 0 ? 'ready to serve' : 'not ready'}`}
@@ -361,16 +392,29 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
           key={order.id}
           onPress={() => serve(readyCell, order.id)}
           style={({ pressed }) => [styles.order, order.completed && styles.orderComplete, readyCell >= 0 && !order.completed && styles.orderReady, pressed && styles.pressed]}>
-          <FoodArt item={definition} size={44} />
+          {readyCell >= 0 && !order.completed ? <AnimatedBorderHighlight borderRadius={19} inset={1} orbitDurationMs={2200} pauseDurationMs={850} /> : null}
+          <FoodArt item={definition} size={compact ? 48 : 56} />
           <View style={styles.orderCopy}>
-            <ThemedText numberOfLines={1} style={styles.orderName} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{definition.name}</ThemedText>
-            <ThemedText style={styles.orderStatus} lightColor={order.completed ? Lantern.auroraTeal : readyCell >= 0 ? Lantern.ember300 : Lantern.moon500} darkColor={order.completed ? Lantern.auroraTeal : readyCell >= 0 ? Lantern.ember300 : Lantern.moon500}>{order.completed ? 'SERVED' : readyCell >= 0 ? 'TAP TO SERVE' : `TIER ${definition.tier}`}</ThemedText>
+            <ThemedText numberOfLines={1} style={styles.orderName} lightColor="#4A291B" darkColor="#4A291B">{definition.name}</ThemedText>
+            <ThemedText style={styles.orderStatus} lightColor={order.completed ? '#55762C' : readyCell >= 0 ? '#A9581D' : '#76543C'} darkColor={order.completed ? '#55762C' : readyCell >= 0 ? '#A9581D' : '#76543C'}>{order.completed ? 'SERVED' : readyCell >= 0 ? 'TAP TO SERVE' : `TIER ${definition.tier}`}</ThemedText>
+            <View accessibilityLabel={`Tier progress ${progressTier} of ${definition.tier}`} style={styles.tierProgress}>
+              {Array.from({ length: definition.tier }, (_, index) => <View key={index} style={[styles.tierDot, index < progressTier && styles.tierDotFilled]} />)}
+            </View>
           </View>
+          {order.completed ? <View style={styles.servedBadge}><IconSymbol color="#FFF7D8" name="checkmark" size={12} /></View> : null}
         </Pressable>;
       })}
     </View>
 
-    <View ref={boardRef} accessibilityLabel="Six by six merge board" onLayout={measureBoard} style={[styles.board, { height: boardHeight, width: boardWidth, gap, padding: boardPadding }]}>
+    <View
+      ref={boardRef}
+      accessibilityLabel="Six by six merge board"
+      onLayout={measureBoard}
+      style={[
+        styles.board,
+        { height: boardHeight, width: boardWidth, gap, padding: boardPadding },
+        spawnedCell != null && styles.boardAnimating,
+      ]}>
       {state.board.map((item, index) => <MergeCell
         cellSize={cellSize}
         index={index}
@@ -397,17 +441,24 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     </View>
 
     <View style={styles.pantryRow}>
-      <Pressable accessibilityRole="button" accessibilityLabel={nextPantry ? `Draw ${mergeItemDefinition(nextPantry.definitionId).name} from pantry` : 'Pantry empty'} disabled={!nextPantry} onPress={spawn} style={({ pressed }) => [styles.pantry, !nextPantry && styles.disabled, pressed && styles.pressed]}>
-        <View style={styles.pantryIcon}><IconSymbol name="plus" size={19} color={Lantern.emberInk} /></View>
+      <Pressable accessibilityRole="button" accessibilityLabel={nextPantry ? `Draw ${mergeItemDefinition(nextPantry.definitionId).name} from pantry` : 'Pantry empty'} disabled={!nextPantry || actionsLeft <= 0} onPress={spawn} style={({ pressed }) => [styles.pantry, (!nextPantry || actionsLeft <= 0) && styles.disabled, pressed && styles.pressed]}>
+        <View style={styles.pantryIcon}><IconSymbol name="plus" size={28} color="#FFF4D5" /></View>
         <View style={styles.pantryCopy}>
-          <ThemedText style={styles.pantryTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{nextPantry ? 'Draw from pantry' : 'Pantry empty'}</ThemedText>
-          <ThemedText style={styles.pantryMeta} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{state.pantry.length} ITEMS LEFT</ThemedText>
+          <ThemedText style={styles.pantryTitle} lightColor="#4A291B" darkColor="#4A291B">Pantry</ThemedText>
+          <ThemedText numberOfLines={1} style={styles.pantryHint} lightColor="#76543C" darkColor="#76543C">{nextPantry ? 'Tap to generate an ingredient' : 'Every ingredient is on the board'}</ThemedText>
+          <View style={styles.pantryMetaPill}><IconSymbol color="#6B4A76" name="clock" size={11} /><ThemedText style={styles.pantryMeta} lightColor="#5F405F" darkColor="#5F405F">{state.pantry.length} items left</ThemedText></View>
         </View>
-        {nextPantry ? <FoodArt item={mergeItemDefinition(nextPantry.definitionId)} size={44} /> : null}
+        {nextPantry ? <FoodArt item={mergeItemDefinition(nextPantry.definitionId)} size={compact ? 46 : 52} /> : <Image accessibilityIgnoresInvertColors contentFit="contain" source={FEASTLE_MERGE_ART.pantry} style={styles.emptyPantryArt} />}
       </Pressable>
-      <Pressable accessibilityLabel="Leave Merge Feast" accessibilityRole="button" onPress={confirmReset} style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}><IconSymbol name="xmark" size={17} color={Lantern.moon300} /></Pressable>
     </View>
-  </View><KatchaDialog body="Your current board and order progress will be lost." cancelLabel="Keep playing" confirmLabel="Leave game" onCancel={() => setLeaveDialogOpen(false)} onConfirm={() => { setLeaveDialogOpen(false); reset(); }} open={leaveDialogOpen} surface="night" title="Leave Merge Feast?" tone="destructive" /></>;
+  </View></FeastleMergeFeastScreen>;
+}
+
+function ResultMetric({ label, value }: { label: string; value: string }) {
+  return <View style={styles.resultMetric}>
+    <ThemedText style={styles.resultMetricValue} lightColor="#4A291B" darkColor="#4A291B">{value}</ThemedText>
+    <ThemedText style={styles.resultMetricLabel} lightColor="#856246" darkColor="#856246">{label}</ThemedText>
+  </View>;
 }
 
 function MergeCell({ item, index, cellSize, merged, invalid, ready, reduceMotion, selected, selectionActive, compatible, dragging, emptyTarget, hovered, spawned, dropOffset, onDrop, onDragFinish, onDragOver, onPick, onAccessibleAction }: {
@@ -418,19 +469,32 @@ function MergeCell({ item, index, cellSize, merged, invalid, ready, reduceMotion
   const y = useSharedValue(0);
   const scale = useSharedValue(1);
   const landingScale = useSharedValue(1);
+  const invalidX = useSharedValue(0);
   const dropX = useSharedValue(dropOffset?.offsetX ?? 0);
   const dropY = useSharedValue(dropOffset?.offsetY ?? 0);
   useEffect(() => {
-    if (!spawned || reduceMotion) {
+    if ((!spawned && !merged) || reduceMotion) {
       landingScale.value = 1;
       return;
     }
-    landingScale.value = 0.97;
-    landingScale.value = withDelay(130, withSequence(
-      withTiming(1.045, { duration: 85, easing: Easing.out(Easing.cubic) }),
-      withTiming(1, { duration: 105, easing: Easing.out(Easing.quad) }),
+    landingScale.value = merged ? 0.92 : 0.97;
+    landingScale.value = withDelay(merged ? 30 : 110, withSequence(
+      withTiming(merged ? 1.12 : 1.055, { duration: merged ? 120 : 90, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration: merged ? 170 : 115, easing: Easing.out(Easing.quad) }),
     ));
-  }, [landingScale, reduceMotion, spawned]);
+  }, [landingScale, merged, reduceMotion, spawned]);
+  useEffect(() => {
+    if (!invalid || reduceMotion) {
+      invalidX.value = 0;
+      return;
+    }
+    invalidX.value = withSequence(
+      withTiming(-4, { duration: 45 }),
+      withTiming(4, { duration: 65 }),
+      withTiming(-3, { duration: 55 }),
+      withTiming(0, { duration: 70 }),
+    );
+  }, [invalid, invalidX, reduceMotion]);
   useEffect(() => {
     if (!dropOffset || reduceMotion) {
       dropX.value = 0;
@@ -475,7 +539,7 @@ function MergeCell({ item, index, cellSize, merged, invalid, ready, reduceMotion
           withTiming(1, { duration: 80, easing: settleEasing }),
         ));
     });
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }] }));
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value + invalidX.value }, { translateY: y.value }, { scale: scale.value }] }));
   const landingStyle = useAnimatedStyle(() => ({ transform: [{ translateX: dropX.value }, { translateY: dropY.value }, { scale: landingScale.value }] }));
   const definition = item ? mergeItemDefinition(item.definitionId) : null;
   const row = Math.floor(index / MERGE_BOARD_COLUMNS) + 1;
@@ -488,6 +552,7 @@ function MergeCell({ item, index, cellSize, merged, invalid, ready, reduceMotion
     accessibilityRole="button"
     onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === 'activate') onAccessibleAction(); }}
     style={[styles.cell, { height: cellSize, width: cellSize }, invalid && styles.cellInvalid, ready && styles.cellReady, selected && styles.cellSelected, compatible && styles.cellCompatible, emptyTarget && styles.cellEmptyTarget, spawned && styles.cellSpawned, hovered && styles.cellHovered, dragging && styles.cellDragging]}>
+    {compatible ? <AnimatedBorderHighlight borderRadius={11} fadeDurationMs={180} glowBlur={1.8} inset={1} orbitDurationMs={1450} pauseDurationMs={0} /> : null}
     {item && definition ? <GestureDetector gesture={gesture}>
       <Animated.View
         accessibilityHint={ready ? 'Drag upward to serve, or drag onto an identical item to merge.' : 'Drag onto an identical item to merge or an empty space to move.'}
@@ -558,49 +623,114 @@ function MergeParticle({ index, progress }: { index: number; progress: SharedVal
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, gap: 10, justifyContent: 'space-between', minHeight: 0, paddingHorizontal: 2 },
-  topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  kicker: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.1 },
-  actionPill: { alignItems: 'baseline', backgroundColor: 'rgba(201,194,232,0.08)', borderCurve: 'continuous', borderRadius: 999, flexDirection: 'row', gap: 5, paddingHorizontal: 12, paddingVertical: 6 },
-  actionPillWarning: { backgroundColor: 'rgba(242,163,139,0.10)' },
-  actionNumber: { fontSize: 16, fontVariant: ['tabular-nums'], fontWeight: '900' },
-  actionLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.8 },
-  orders: { flexDirection: 'row', gap: 8 },
-  order: { alignItems: 'center', backgroundColor: 'rgba(201,194,232,0.07)', borderColor: 'rgba(201,194,232,0.12)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, minHeight: 64, padding: 7 },
-  orderReady: { backgroundColor: 'rgba(255,195,107,0.10)', borderColor: 'rgba(255,195,107,0.55)' },
-  orderComplete: { backgroundColor: 'rgba(125,232,205,0.08)', borderColor: 'rgba(125,232,205,0.34)' },
+  root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0 },
+  orders: { flexDirection: 'row', gap: 7, zIndex: 2 },
+  order: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,240,206,0.97)',
+    borderColor: 'rgba(173,108,42,0.72)',
+    borderCurve: 'continuous',
+    borderRadius: 19,
+    borderWidth: 1,
+    boxShadow: '0 5px 13px rgba(56,30,13,0.3), inset 0 1px 0 rgba(255,255,255,0.82)',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 72,
+    padding: 7,
+    position: 'relative',
+  },
+  orderReady: { backgroundColor: '#FFE7AD', borderColor: '#D58C2C', boxShadow: '0 5px 14px rgba(83,43,14,0.34), inset 0 1px 0 rgba(255,255,255,0.9)' },
+  orderComplete: { backgroundColor: '#E5ECC1', borderColor: '#82964A' },
   orderCopy: { flex: 1, gap: 2, minWidth: 0 },
-  orderName: { fontSize: 11.5, fontWeight: '900' },
-  orderStatus: { fontSize: 8, fontWeight: '900', letterSpacing: 0.55 },
-  board: { alignSelf: 'center', backgroundColor: '#171217', borderColor: 'rgba(255,195,107,0.18)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 14px 30px rgba(8,5,10,0.34)' },
-  cell: { alignItems: 'center', backgroundColor: '#241B23', borderColor: 'rgba(255,255,255,0.052)', borderCurve: 'continuous', borderRadius: 12, borderWidth: 1, justifyContent: 'center', overflow: 'visible', position: 'relative', zIndex: 0 },
-  cellReady: { borderColor: 'rgba(255,195,107,0.56)', backgroundColor: '#2C2022' },
-  cellSelected: { borderColor: Lantern.auroraTeal, backgroundColor: 'rgba(125,232,205,0.10)' },
-  cellCompatible: { borderColor: 'rgba(255,195,107,0.76)', backgroundColor: 'rgba(255,195,107,0.12)', boxShadow: 'inset 0 0 12px rgba(255,195,107,0.10)' },
-  cellEmptyTarget: { borderColor: 'rgba(255,255,255,0.10)' },
-  cellSpawned: { backgroundColor: 'rgba(190,255,112,0.09)', borderColor: 'rgba(190,255,112,0.62)', boxShadow: 'inset 0 0 14px rgba(190,255,112,0.12)' },
-  cellHovered: { backgroundColor: 'rgba(246,243,255,0.12)', borderColor: 'rgba(246,243,255,0.90)', boxShadow: 'inset 0 0 0 1px rgba(246,243,255,0.24), 0 0 12px rgba(125,232,205,0.22)', zIndex: 2 },
-  cellDragging: { borderColor: 'rgba(255,225,174,0.48)', zIndex: 1000 },
-  cellInvalid: { borderColor: 'rgba(242,163,139,0.8)', backgroundColor: 'rgba(242,163,139,0.10)' },
+  orderName: { fontSize: 12, fontWeight: '900' },
+  orderStatus: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.5 },
+  tierProgress: { alignItems: 'center', flexDirection: 'row', gap: 3, paddingTop: 2 },
+  tierDot: { backgroundColor: 'rgba(117,82,56,0.16)', borderColor: 'rgba(117,82,56,0.46)', borderRadius: 999, borderWidth: 1, height: 8, width: 8 },
+  tierDotFilled: { backgroundColor: '#E9A92E', borderColor: '#C87A1D', boxShadow: '0 1px 3px rgba(180,102,20,0.34)' },
+  servedBadge: { alignItems: 'center', backgroundColor: '#6F8B3D', borderRadius: 999, height: 20, justifyContent: 'center', position: 'absolute', right: 5, top: 5, width: 20 },
+  board: {
+    alignSelf: 'center',
+    backgroundColor: '#493747',
+    borderColor: '#D79A4A',
+    borderCurve: 'continuous',
+    borderRadius: 26,
+    borderWidth: 2,
+    boxShadow: '0 14px 28px rgba(55,28,13,0.42), inset 0 2px 0 rgba(255,228,172,0.24), inset 0 -3px 0 rgba(47,28,42,0.48)',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    overflow: 'visible',
+  },
+  boardAnimating: { zIndex: 30 },
+  cell: { alignItems: 'center', backgroundColor: '#5A4656', borderColor: 'rgba(255,241,218,0.12)', borderCurve: 'continuous', borderRadius: 11, borderWidth: 1, justifyContent: 'center', overflow: 'visible', position: 'relative', zIndex: 0 },
+  cellReady: { backgroundColor: '#65504E', borderColor: 'rgba(255,206,105,0.72)', boxShadow: 'inset 0 0 12px rgba(255,193,75,0.12)' },
+  cellSelected: { backgroundColor: '#665465', borderColor: '#FFE09B', boxShadow: '0 0 10px rgba(255,206,105,0.34)' },
+  cellCompatible: { backgroundColor: '#6A554C', borderColor: '#FFD681', boxShadow: 'inset 0 0 12px rgba(255,195,107,0.18), 0 0 9px rgba(255,195,107,0.22)' },
+  cellEmptyTarget: { borderColor: 'rgba(255,241,218,0.2)' },
+  cellSpawned: { backgroundColor: '#64574A', borderColor: '#CDE06B', boxShadow: 'inset 0 0 14px rgba(190,255,112,0.13)', zIndex: 2000 },
+  cellHovered: { backgroundColor: '#73615F', borderColor: '#FFF0C3', boxShadow: 'inset 0 0 0 1px rgba(255,240,195,0.28), 0 0 12px rgba(255,207,112,0.34)', zIndex: 2 },
+  cellDragging: { borderColor: '#FFE1AE', zIndex: 1000 },
+  cellInvalid: { backgroundColor: '#6B454A', borderColor: '#F38A72', boxShadow: '0 0 9px rgba(243,102,79,0.28)' },
   dragItem: { alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1001 },
   landingItem: { alignItems: 'center', justifyContent: 'center' },
   foodArt: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, justifyContent: 'center' },
-  foodImage: { height: '92%', width: '92%' },
+  foodImage: { height: '96%', width: '96%' },
   foodArtBare: { backgroundColor: 'transparent', borderRadius: 0, borderWidth: 0 },
   foodImageBare: { height: '100%', width: '100%' },
-  tierBadge: { alignItems: 'center', borderRadius: 999, bottom: 3, height: 17, justifyContent: 'center', position: 'absolute', right: 3, width: 17 },
-  tierText: { fontSize: 9, fontWeight: '900' },
-  pantryRow: { flexDirection: 'row', gap: 8 },
-  pantry: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.08)', borderColor: 'rgba(255,195,107,0.22)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 10, minHeight: 58, paddingHorizontal: 10 },
-  pantryIcon: { alignItems: 'center', backgroundColor: Lantern.ember300, borderRadius: 12, height: 34, justifyContent: 'center', width: 34 },
-  pantryCopy: { flex: 1, gap: 2 },
-  pantryTitle: { fontSize: 12.5, fontWeight: '900' },
-  pantryMeta: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 },
-  cancel: { alignItems: 'center', borderColor: 'rgba(201,194,232,0.16)', borderRadius: 18, borderWidth: 1, justifyContent: 'center', width: 54 },
+  tierBadge: { alignItems: 'center', borderColor: 'rgba(91,51,25,0.42)', borderRadius: 999, borderWidth: 1, bottom: 2, height: 18, justifyContent: 'center', position: 'absolute', right: 2, width: 18 },
+  tierText: {
+    fontSize: 9,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    height: 16,
+    includeFontPadding: false,
+    lineHeight: 16,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    width: 16,
+  },
+  pantryRow: { flexDirection: 'row' },
+  pantry: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,240,206,0.98)',
+    borderColor: 'rgba(174,106,38,0.82)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1,
+    boxShadow: '0 6px 16px rgba(58,30,13,0.34), inset 0 1px 0 rgba(255,255,255,0.88)',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 68,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  pantryIcon: { alignItems: 'center', backgroundColor: '#EAA52D', borderColor: '#B96618', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '0 3px 8px rgba(119,62,12,0.3), inset 0 2px 0 rgba(255,239,173,0.62)', height: 50, justifyContent: 'center', width: 50 },
+  pantryCopy: { flex: 1, gap: 1, minWidth: 0 },
+  pantryTitle: { fontSize: 16, fontWeight: '900' },
+  pantryHint: { fontSize: 10.5, fontWeight: '700' },
+  pantryMetaPill: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(106,70,110,0.09)', borderRadius: 999, flexDirection: 'row', gap: 4, marginTop: 2, paddingHorizontal: 7, paddingVertical: 2 },
+  pantryMeta: { fontSize: 8.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  emptyPantryArt: { height: 48, width: 48 },
   burst: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', zIndex: 3 },
   mergeHalo: { backgroundColor: 'rgba(255,195,107,0.30)', borderRadius: 999, position: 'absolute' },
   mergeRing: { borderColor: 'rgba(255,225,174,0.92)', borderRadius: 999, borderWidth: 2, position: 'absolute' },
   crumb: { backgroundColor: '#FFE1AE', borderRadius: 999, height: 5, position: 'absolute', width: 5, boxShadow: '0 1px 4px rgba(255,195,107,0.42)' },
+  resultFrame: { alignSelf: 'center', flex: 1, gap: 14, justifyContent: 'center', maxWidth: 480, paddingHorizontal: 8, width: '100%' },
+  resultCard: { alignItems: 'center', backgroundColor: 'rgba(255,240,206,0.98)', borderColor: '#C98435', borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: '0 14px 30px rgba(57,29,13,0.4), inset 0 1px 0 rgba(255,255,255,0.86)', gap: 8, padding: 24 },
+  resultCardSuccess: { borderColor: '#8EA24E' },
+  resultCardFailure: { borderColor: '#C36A4E' },
+  resultIcon: { alignItems: 'center', backgroundColor: 'rgba(226,184,83,0.18)', borderRadius: 22, height: 58, justifyContent: 'center', width: 58 },
+  resultEyebrow: { fontSize: 11, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
+  resultTitle: { fontSize: 25, fontWeight: '900', lineHeight: 30, textAlign: 'center' },
+  resultBody: { fontSize: 13.5, lineHeight: 20, maxWidth: 340, textAlign: 'center' },
+  scorePanel: { alignItems: 'center', backgroundColor: 'rgba(233,169,46,0.15)', borderColor: 'rgba(185,85,25,0.28)', borderRadius: 18, borderWidth: 1, gap: 1, paddingHorizontal: 18, paddingVertical: 10, width: '100%' },
+  scoreValue: { fontSize: 28, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 32 },
+  scoreLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
+  resultMetricRow: { flexDirection: 'row', gap: 7, paddingTop: 4, width: '100%' },
+  resultMetric: { alignItems: 'center', backgroundColor: 'rgba(136,86,47,0.07)', borderColor: 'rgba(136,86,47,0.16)', borderRadius: 14, borderWidth: 1, flex: 1, gap: 2, paddingHorizontal: 5, paddingVertical: 8 },
+  resultMetricValue: { fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  resultMetricLabel: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.45, textTransform: 'uppercase' },
   best: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7, paddingTop: 4 },
   disabled: { opacity: 0.42 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },

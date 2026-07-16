@@ -1,6 +1,11 @@
 import { seededShuffle } from './trivia-packs';
 
 export type MemoryMatchPackId = 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food';
+export type MemoryMatchPresentation = 'memory_garden' | 'standard';
+
+export function memoryMatchPresentation(packId: MemoryMatchPackId): MemoryMatchPresentation {
+  return packId === 'mossprout-garden' ? 'memory_garden' : 'standard';
+}
 
 export type MemoryMatchVisual =
   | { kind: 'world_asset'; assetKey: string }
