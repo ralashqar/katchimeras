@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, ScrollView, StyleSheet, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useMemo, useState } from 'react';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
 import { InteractionThreadSwitcher, type InteractionThreadOption } from '@/components/katchadeck/ui/interaction-thread-switcher';
+import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import {
   MeadowBackAction,
   MeadowDetailRow,
@@ -13,7 +14,6 @@ import {
   MeadowSecondaryAction,
   MeadowSection,
 } from '@/components/katchadeck/ui/meadow-interaction-primitives';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { CompanionHero } from '@/components/katchadeck/world/companion-hero';
 import { CompanionReflectionThread } from '@/components/katchadeck/world/companion-reflection-thread';
 import { ThemedText } from '@/components/themed-text';
@@ -41,7 +41,7 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
   const [birthDay, setBirthDay] = useState(identity.birthDay ? String(identity.birthDay) : '');
   const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
   const [gameRunning, setGameRunning] = useState(false);
-  const closePromptOpen = useRef(false);
+  const [closePromptOpen, setClosePromptOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const profile = zodiacProfile(identity.zodiacSignId);
   const prompt = useMemo(() => profile ? promptForDay(profile.id) : null, [profile]);
@@ -110,29 +110,7 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
       return;
     }
 
-    if (closePromptOpen.current) return;
-    closePromptOpen.current = true;
-
-    const releasePrompt = () => {
-      closePromptOpen.current = false;
-    };
-
-    Alert.alert(
-      'Leave elemental ritual?',
-      'Your progress in this round will be lost.',
-      [
-        { text: 'Keep playing', style: 'cancel', onPress: releasePrompt },
-        {
-          text: 'Leave ritual',
-          style: 'destructive',
-          onPress: () => {
-            releasePrompt();
-            onClose();
-          },
-        },
-      ],
-      { cancelable: true, onDismiss: releasePrompt },
-    );
+    setClosePromptOpen(true);
   }
 
   const footer = mode === 'profile'
@@ -143,10 +121,8 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
         ? <MeadowPrimaryAction label="Update star companion" icon="calendar" disabled={!proposedSign} onPress={updateBirthday} />
         : null;
 
-  return (
-    <Modal animationType="none" navigationBarTranslucent onRequestClose={requestClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible>
-      <GestureHandlerRootView style={styles.modalRoot}>
-        <MeadowSheet onClose={requestClose} surface={gameRunning ? 'night' : 'parchment'} variant={gameRunning ? 'full' : 'tall'}>
+  return (<>
+        <KatchaSheet onRequestClose={requestClose} surface={gameRunning ? 'night' : 'parchment'} size={gameRunning ? 'full' : 'tall'}>
           <KeyboardAvoidingView behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8} style={styles.keyboard}>
             {!gameRunning ? (
               <CompanionHero
@@ -225,14 +201,22 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
 
             {footer && mode !== 'game' ? <View style={styles.footer}>{footer}</View> : null}
           </KeyboardAvoidingView>
-        </MeadowSheet>
-      </GestureHandlerRootView>
-    </Modal>
-  );
+        </KatchaSheet>
+    <KatchaDialog
+      body="Your progress in this round will be lost."
+      cancelLabel="Keep playing"
+      confirmLabel="Leave ritual"
+      onCancel={() => setClosePromptOpen(false)}
+      onConfirm={() => { setClosePromptOpen(false); onClose(); }}
+      open={closePromptOpen}
+      surface="night"
+      title="Leave elemental ritual?"
+      tone="destructive"
+    />
+  </>);
 }
 
 const styles = StyleSheet.create({
-  modalRoot: { flex: 1 },
   keyboard: { flex: 1, gap: 10, minHeight: 0 },
   contentFrame: { flex: 1, minHeight: 0 },
   gameFrame: { flex: 1, minHeight: 0 },

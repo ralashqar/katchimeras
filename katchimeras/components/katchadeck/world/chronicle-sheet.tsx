@@ -1,13 +1,12 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { DayChronicle, ChronicleTimeOfDay } from '@/utils/chronicle-engine';
 import { DayMemoryStrip } from '@/components/katchadeck/world/day-memory-strip';
-import { Meadow } from '@/constants/meadow-theme';
 
 // The Chronicle reader — "what was this day about?". A day theme + story summary,
 // what shaped the day, a light timeline, and linked memories. NOT a calendar list.
@@ -35,26 +34,8 @@ export function ChronicleSheet({ chronicle, day, onViewMemories, onClose }: Chro
   })).filter((group) => group.items.length > 0);
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
+    <KatchaSheet header={{ eyebrow: 'Chronicle', title: chronicle.title, subtitle: chronicle.summary }} onRequestClose={onClose} size="tall" surface="night">
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            Chronicle
-          </ThemedText>
-          <ThemedText type="hero" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {chronicle.title}
-          </ThemedText>
-          <ThemedText style={styles.summary} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            {chronicle.summary}
-          </ThemedText>
           {chronicle.contextNote ? (
             <View style={styles.contextPill}>
               <IconSymbol name="calendar" size={12} color={Lantern.ember300} />
@@ -121,33 +102,12 @@ export function ChronicleSheet({ chronicle, day, onViewMemories, onClose }: Chro
             Close
           </ThemedText>
         </Pressable>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 50 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: Meadow.overlay.sheetBg,
-    borderColor: Meadow.overlay.sheetBorder,
-    borderCurve: 'continuous',
-    borderRadius: 28,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    left: 12,
-    maxHeight: '78%',
-    paddingBottom: 14,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    position: 'absolute',
-    right: 12,
-  },
-  grabber: { alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 999, height: 4, marginBottom: 6, width: 38 },
   scroll: { gap: 10, paddingBottom: 4 },
-  kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
-  summary: { fontSize: 14, fontWeight: '500', lineHeight: 20 },
   contextPill: {
     alignItems: 'center',
     alignSelf: 'flex-start',

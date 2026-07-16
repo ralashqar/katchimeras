@@ -4,7 +4,8 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import { Lantern } from '@/constants/theme';
 import type { CuisineFamily, FoodMeaning, FoodMoment } from '@/types/home';
 import { CUISINE_DISPLAY, resolveFoodMomentDisplay } from '@/utils/memory-display';
@@ -13,6 +14,7 @@ import { CUISINE_DISPLAY, resolveFoodMomentDisplay } from '@/utils/memory-displa
 // calorie tracker. A two-step add (what + what it meant) and a small reader.
 
 type FoodType = { label: string; emoji: string };
+const PARCHMENT = KatchaSurfacePalette.parchment;
 const FOOD_TYPES: FoodType[] = [
   { label: 'Coffee', emoji: '☕' },
   { label: 'Meal', emoji: '🍽' },
@@ -83,14 +85,16 @@ export function FoodMomentSheet({
   };
 
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="A food memory"
-      title={
+    <KatchaSheet
+      header={{
+        eyebrow: 'A food memory',
+        title:
         !food
           ? 'What did you have?'
-          : `${food.emoji} ${food.label} · what did it mean?`
-      }>
+          : `${food.emoji} ${food.label} · what did it mean?`,
+      }}
+      onRequestClose={onClose}
+      surface="parchment">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {!food ? (
           <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
@@ -98,7 +102,7 @@ export function FoodMomentSheet({
               {FOOD_TYPES.map((option) => (
                 <Pressable key={option.label} onPress={() => setFood(option)} style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     {option.label}
                   </ThemedText>
                 </Pressable>
@@ -119,7 +123,7 @@ export function FoodMomentSheet({
                     pressed && styles.chipPressed,
                   ]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     {option.label}
                   </ThemedText>
                 </Pressable>
@@ -127,7 +131,7 @@ export function FoodMomentSheet({
             </View>
             {asksKind ? (
               <View style={styles.optionalSection}>
-                <ThemedText style={styles.optionalLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                <ThemedText style={styles.optionalLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
                   Meal detail · optional
                 </ThemedText>
                 <View style={styles.grid}>
@@ -139,7 +143,7 @@ export function FoodMomentSheet({
                       pressed && styles.chipPressed,
                     ]}>
                     <ThemedText style={styles.chipEmoji}>🍲</ThemedText>
-                    <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                    <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                       Home-made
                     </ThemedText>
                   </Pressable>
@@ -153,7 +157,7 @@ export function FoodMomentSheet({
                         pressed && styles.chipPressed,
                       ]}>
                       <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                      <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                      <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                         {option.label}
                       </ThemedText>
                     </Pressable>
@@ -164,7 +168,7 @@ export function FoodMomentSheet({
                   disabled={!meaning}
                   onPress={saveMeal}
                   style={({ pressed }) => [styles.saveMeal, !meaning && styles.saveMealDisabled, pressed && meaning && styles.chipPressed]}>
-                  <ThemedText style={styles.saveMealLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.saveMealLabel} lightColor={PARCHMENT.accentText} darkColor={PARCHMENT.accentText}>
                     Save meal
                   </ThemedText>
                 </Pressable>
@@ -178,14 +182,14 @@ export function FoodMomentSheet({
                 setMealDetail(null);
               }}
               style={styles.back}>
-              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              <ThemedText style={styles.backLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
                 Back
               </ThemedText>
             </Pressable>
           </Animated.View>
         )}
       </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -200,10 +204,15 @@ export function FoodVaultSheet({
   onClose: () => void;
 }) {
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="Food Vault"
-      title={foodMoments.length > 0 ? 'Today’s food memories' : 'Your food memories'}>
+    <KatchaSheet
+      header={{
+        eyebrow: 'Food Vault',
+        title: foodMoments.length > 0 ? 'Today’s food memories' : 'Your food memories',
+        subtitle: foodMoments.length > 0 ? `${foodMoments.length} ${foodMoments.length === 1 ? 'taste' : 'tastes'} kept from today.` : 'Meals, treats and small comforts will gather here.',
+      }}
+      onRequestClose={onClose}
+      size="tall"
+      surface="night">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.body}>
           {onAddFood ? (
@@ -249,7 +258,7 @@ export function FoodVaultSheet({
           })}
         </View>
       </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -265,11 +274,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(12,10,20,0.7)',
+    borderColor: PARCHMENT.border,
+    backgroundColor: PARCHMENT.elevated,
   },
-  chipPressed: { backgroundColor: 'rgba(40,34,60,0.9)' },
-  chipSelected: { borderColor: Lantern.ember300, backgroundColor: 'rgba(255,195,107,0.16)' },
+  chipPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  chipSelected: { borderColor: PARCHMENT.accent, backgroundColor: PARCHMENT.subtle },
   chipEmoji: { fontSize: 16 },
   chipLabel: { fontSize: 13, fontWeight: '700' },
   back: { alignSelf: 'flex-start', paddingTop: 2 },
@@ -279,8 +288,8 @@ const styles = StyleSheet.create({
   saveMeal: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: 'rgba(255,195,107,0.2)',
-    borderColor: 'rgba(255,195,107,0.55)',
+    backgroundColor: PARCHMENT.accent,
+    borderColor: PARCHMENT.accent,
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 14,

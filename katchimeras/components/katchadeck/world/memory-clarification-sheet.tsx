@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
-import { Lantern } from '@/constants/theme';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { ClassifiedMemory } from '@/types/home';
 import {
   answerClarification,
@@ -12,6 +12,8 @@ import {
   skipClarificationGoal,
   type ClarificationOption,
 } from '@/utils/intelligence/clarification';
+
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 type MemoryClarificationSheetProps = {
   memory: ClassifiedMemory;
@@ -50,23 +52,23 @@ export function MemoryClarificationSheet({ memory, onResolve, onClose }: MemoryC
   };
 
   return (
-    <MeadowSheet onClose={dismiss} kicker="A little context" title={node?.question ?? 'Keep this as it is?'}>
+    <KatchaSheet header={{ eyebrow: 'A little context', title: node?.question ?? 'Keep this as it is?' }} onRequestClose={() => dismiss()} surface="parchment">
       <View style={styles.options}>
         {(node?.options ?? []).map((option) => (
           <Pressable key={option.id} accessibilityRole="button" onPress={() => choose(option)} style={styles.option}>
             <ThemedText style={styles.emoji}>{option.emoji}</ThemedText>
-            <ThemedText style={styles.label} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            <ThemedText style={styles.label} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
               {option.label}
             </ThemedText>
           </Pressable>
         ))}
       </View>
       <Pressable accessibilityRole="button" onPress={skip} style={styles.skip}>
-        <ThemedText style={styles.skipLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+        <ThemedText style={styles.skipLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
           Skip
         </ThemedText>
       </Pressable>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 

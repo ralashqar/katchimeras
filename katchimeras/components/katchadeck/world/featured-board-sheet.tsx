@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -25,19 +25,8 @@ export function FeaturedBoardSheet({
   const featuredUri = day.featuredMemory?.thumbnailUri ?? null;
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View entering={SlideInDown.duration(260)} exiting={SlideOutDown.duration(200)} style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
+    <KatchaSheet header={{ eyebrow: 'Featured memory', title: 'Pick today’s cover', subtitle: 'Choose the image that should represent this day.' }} onRequestClose={onClose} size="tall" surface="night">
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            Featured memory
-          </ThemedText>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            Pick today’s cover
-          </ThemedText>
 
           {photos.length === 0 ? (
             <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
@@ -64,8 +53,7 @@ export function FeaturedBoardSheet({
             </View>
           )}
         </ScrollView>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 

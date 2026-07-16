@@ -75,6 +75,8 @@ const MAPPING = {
   'timer': 'timer',
   'mic.fill': 'mic',
   'square.and.pencil': 'edit',
+  'text.quote': 'format-quote',
+  'clock': 'schedule',
   'play.fill': 'play-arrow',
   'pause.fill': 'pause',
   'plus': 'add',

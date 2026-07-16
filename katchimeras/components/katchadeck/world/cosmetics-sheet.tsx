@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -34,25 +34,9 @@ type CosmeticsSheetProps = {
 export function CosmeticsSheet({ entries, balance, onSelect, onBuy, onClose }: CosmeticsSheetProps) {
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
+    <KatchaSheet header={{ eyebrow: 'Customize', title: 'Make your world yours', subtitle: 'Expressive changes never affect what hatches.' }} onRequestClose={onClose} size="tall" surface="night">
         <View style={styles.headRow}>
-          <View style={styles.headText}>
-            <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-              Customize
-            </ThemedText>
-            <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-              Make your world yours
-            </ThemedText>
-          </View>
+          <View style={styles.headText} />
           <View style={styles.balancePill}>
             <ThemedText style={styles.balanceMark} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
               ✦
@@ -87,8 +71,7 @@ export function CosmeticsSheet({ entries, balance, onSelect, onBuy, onClose }: C
             Done
           </ThemedText>
         </Pressable>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 

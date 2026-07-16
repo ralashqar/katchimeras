@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -17,21 +17,7 @@ type KeepsakeAlmanacSheetProps = {
 
 export function KeepsakeAlmanacSheet({ sections, onClose }: KeepsakeAlmanacSheetProps) {
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          📖 Almanac
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          How keepsakes are earned
-        </ThemedText>
+    <KatchaSheet header={{ eyebrow: '📖 Almanac', title: 'How keepsakes are earned', subtitle: 'A guide to the objects your days can grow.' }} onRequestClose={onClose} size="tall" surface="night">
 
         <ScrollView style={styles.list} showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
           {sections.map((section) => (
@@ -76,8 +62,7 @@ export function KeepsakeAlmanacSheet({ sections, onClose }: KeepsakeAlmanacSheet
             Close
           </ThemedText>
         </Pressable>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 

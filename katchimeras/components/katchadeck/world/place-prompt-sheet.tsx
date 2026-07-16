@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { Lantern } from '@/constants/theme';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 // "Location gives the where, you give the why." A detected place is shown; the
 // user picks what it was (category), then what it meant (feeling). Confirming
@@ -94,28 +96,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
   const [category, setCategory] = useState<PlaceCategory | null>(presetCategory ?? null);
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
-
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          {presetCategory ? `${presetCategory.emoji} ${presetCategory.label}` : isNew ? 'A new place' : 'A place you visited'}
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          {placeName}
-        </ThemedText>
-        {timeLabel ? (
-          <ThemedText style={styles.time} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            {timeLabel}
-          </ThemedText>
-        ) : null}
+    <KatchaSheet header={{ eyebrow: presetCategory ? `${presetCategory.emoji} ${presetCategory.label}` : isNew ? 'A new place' : 'A place you visited', title: placeName, subtitle: timeLabel ?? undefined }} onRequestClose={onClose} size="tall" surface="parchment">
 
         <ScrollView
           contentContainerStyle={styles.optionsContent}
@@ -123,7 +104,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
           style={styles.optionsScroll}>
           {!category ? (
             <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
-            <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            <ThemedText style={styles.question} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
               What was it?
             </ThemedText>
             <View style={styles.grid}>
@@ -133,7 +114,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
                   onPress={() => setCategory(option)}
                   style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     {option.label}
                   </ThemedText>
                 </Pressable>
@@ -142,7 +123,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
             </Animated.View>
           ) : (
             <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
-            <ThemedText style={styles.question} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            <ThemedText style={styles.question} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
               {presetCategory ? "What's happening there?" : `${category.emoji} ${category.label} · what did it mean?`}
             </ThemedText>
             <View style={styles.grid}>
@@ -152,7 +133,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
                   onPress={() => onConfirm(category, option)}
                   style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     {option.label}
                   </ThemedText>
                 </Pressable>
@@ -160,7 +141,7 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
             </View>
             {presetCategory ? null : (
               <Pressable accessibilityRole="button" onPress={() => setCategory(null)} style={styles.back}>
-                <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+                <ThemedText style={styles.backLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
                   Back
                 </ThemedText>
               </Pressable>
@@ -170,12 +151,11 @@ export function PlacePromptSheet({ placeName, timeLabel, isNew, presetCategory, 
         </ScrollView>
 
         <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-          <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          <ThemedText style={styles.closeLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
             Later
           </ThemedText>
         </Pressable>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 
@@ -214,10 +194,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(12,10,20,0.7)',
+    borderColor: PARCHMENT.border,
+    backgroundColor: PARCHMENT.elevated,
+    boxShadow: PARCHMENT.cardShadow,
   },
-  chipPressed: { backgroundColor: 'rgba(40,34,60,0.9)' },
+  chipPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
   chipEmoji: { fontSize: 16 },
   chipLabel: { fontSize: 13, fontWeight: '700' },
   back: { alignSelf: 'flex-start', paddingTop: 2 },

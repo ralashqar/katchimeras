@@ -198,7 +198,9 @@ Shared UI patterns now include:
 
 - `components/katchadeck/ui/action-tile.tsx`
 - `components/katchadeck/ui/segmented-control.tsx`
-- `components/katchadeck/ui/meadow-sheet.tsx`
+- `components/katchadeck/ui/katcha-sheet.tsx`
+- `components/katchadeck/ui/katcha-dialog.tsx`
+- `components/katchadeck/ui/katcha-surface.tsx`
 - `components/katchadeck/home/today-bottom-dock.tsx`
 - `components/katchadeck/home/microcopy-toast.tsx`
 - `components/katchadeck/home/day-comic-overlay.tsx`

@@ -4,8 +4,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { Image } from 'expo-image';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
-import { Lantern } from '@/constants/theme';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
+import { Meadow } from '@/constants/meadow-theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 
@@ -17,6 +18,7 @@ const MOOD_ART: Record<string, number> = {
   heavy: require('@/assets/images/katchimeras/today-icons/moods/heavy.webp'),
   stormy: require('@/assets/images/katchimeras/today-icons/moods/stormy.webp'),
 };
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 export type MoodMonumentChoiceId = 'energized' | 'good' | 'meh' | 'drained' | 'stressed';
 
@@ -52,10 +54,10 @@ export function MoodMonumentSheet({
   const editable = !!onChoose;
 
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="Mood Monument"
-      title={editable ? 'How did today feel overall?' : 'How this day felt'}>
+    <KatchaSheet
+      header={{ eyebrow: 'Mood Monument', title: editable ? 'How did today feel overall?' : 'How this day felt' }}
+      onRequestClose={() => onClose()}
+      surface="parchment">
       {/* All five moods on one compact grid (3 + 2), no per-mood captions. */}
       <View style={styles.choiceGrid}>
         {MOOD_CHOICES.map((choice) => (
@@ -71,13 +73,13 @@ export function MoodMonumentSheet({
 
       {!editable && onOpenSanctuary ? (
         <Pressable accessibilityRole="button" onPress={onOpenSanctuary} style={styles.secondaryButton}>
-          <IconSymbol name="sparkles" size={16} color={Lantern.moon50} />
-          <ThemedText style={styles.secondaryLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+          <IconSymbol name="sparkles" size={16} color={PARCHMENT.text} />
+          <ThemedText style={styles.secondaryLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
             View Sanctuary history
           </ThemedText>
         </Pressable>
       ) : null}
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -106,15 +108,25 @@ function MoodChoiceButton({
         onPress={handlePress}
         style={({ pressed }) => [
           styles.choice,
-          { borderColor: selected ? choice.accent : `${choice.accent}35`, backgroundColor: selected ? `${choice.accent}22` : 'rgba(255,255,255,0.045)' },
+          {
+            borderColor: selected ? `${choice.accent}D9` : Meadow.cardBorder,
+            backgroundColor: selected ? `${choice.accent}2E` : 'rgba(255,248,232,0.48)',
+            boxShadow: selected
+              ? `-3px 5px 11px rgba(58,38,18,0.22), 0 0 0 1px ${choice.accent}42, 0 0 14px ${choice.accent}24, inset 0 2px 0 rgba(255,253,242,0.78), inset 0 -2px 0 rgba(104,67,28,0.10)`
+              : '-3px 5px 10px rgba(58,38,18,0.22), 0 1px 1px rgba(255,252,238,0.70), inset 0 2px 0 rgba(255,253,242,0.72), inset 0 -2px 0 rgba(104,67,28,0.10)',
+          },
           pressed && !disabled ? styles.choicePressed : null,
         ]}>
+        <View pointerEvents="none" style={styles.bevelRim} />
+        <View pointerEvents="none" style={styles.rimLight} />
         {MOOD_ART[choice.state] ? (
-          <Image source={MOOD_ART[choice.state]} style={styles.choiceArt} contentFit="contain" />
+          <View style={[styles.artWell, selected && { backgroundColor: `${choice.accent}24` }]}>
+            <Image source={MOOD_ART[choice.state]} style={styles.choiceArt} contentFit="contain" />
+          </View>
         ) : (
           <IconSymbol name={choice.icon} size={22} color={choice.accent} />
         )}
-        <ThemedText style={styles.choiceLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        <ThemedText style={styles.choiceLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
           {choice.label}
         </ThemedText>
       </Pressable>
@@ -150,8 +162,39 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderCurve: 'continuous',
     borderWidth: 1,
+    position: 'relative',
   },
-  choicePressed: { transform: [{ scale: 0.98 }] },
+  choicePressed: {
+    boxShadow: '-1px 2px 4px rgba(58,38,18,0.16), inset 0 2px 3px rgba(104,67,28,0.13)',
+    transform: [{ translateY: 1 }, { scale: 0.98 }],
+  },
+  bevelRim: {
+    ...StyleSheet.absoluteFillObject,
+    borderBottomColor: 'rgba(104,67,28,0.20)',
+    borderCurve: 'continuous',
+    borderLeftColor: 'rgba(255,250,235,0.62)',
+    borderRadius: 14,
+    borderRightColor: 'rgba(104,67,28,0.14)',
+    borderTopColor: 'rgba(255,253,242,0.88)',
+    borderWidth: 1,
+    position: 'absolute',
+  },
+  rimLight: {
+    backgroundColor: 'rgba(255,255,247,0.68)',
+    borderRadius: 999,
+    height: 1,
+    left: 11,
+    position: 'absolute',
+    right: 11,
+    top: 2,
+  },
+  artWell: {
+    alignItems: 'center',
+    borderRadius: 999,
+    height: 34,
+    justifyContent: 'center',
+    width: 42,
+  },
   choiceArt: { height: 30, width: 30 },
   choiceLabel: { fontSize: 11.5, fontWeight: '800', textAlign: 'center' },
   secondaryButton: {
@@ -163,8 +206,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: PARCHMENT.borderStrong,
+    backgroundColor: PARCHMENT.subtle,
   },
   secondaryLabel: { fontSize: 13.5, fontWeight: '800' },
 });

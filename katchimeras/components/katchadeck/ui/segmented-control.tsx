@@ -1,11 +1,14 @@
 import { Pressable, StyleSheet, type StyleProp, type TextStyle, type ViewStyle, View } from 'react-native';
 
-import { KatchaDeckUI, Lantern } from '@/constants/theme';
+import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { KatchaDeckUI } from '@/constants/theme';
 
 export type SegmentedControlOption<TValue extends string> = {
   value: TValue;
   label: string;
+  icon?: IconSymbolName;
 };
 
 type SegmentedControlProps<TValue extends string> = {
@@ -31,10 +34,11 @@ export function SegmentedControl<TValue extends string>({
   activeTextColor,
   inactiveTextColor,
 }: SegmentedControlProps<TValue>) {
+  const { surface, tokens } = useKatchaSurface();
   const isBar = variant === 'bar';
 
   return (
-    <View style={[isBar ? styles.barContainer : styles.chipContainer, style]}>
+    <View style={[isBar ? styles.barContainer : styles.chipContainer, isBar && { backgroundColor: tokens.subtle, borderColor: tokens.border }, style]}>
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -45,16 +49,27 @@ export function SegmentedControl<TValue extends string>({
             onPress={() => onChange(option.value)}
             style={({ pressed }) => [
               isBar ? styles.barOption : styles.chipOption,
+              !isBar ? { backgroundColor: surface === 'parchment' ? tokens.elevated : tokens.subtle, borderColor: tokens.border } : null,
               active ? (isBar ? styles.barOptionActive : styles.chipOptionActive) : null,
+              active ? { backgroundColor: isBar ? tokens.elevated : surface === 'parchment' ? tokens.accent : `${tokens.accent}24`, borderColor: surface === 'parchment' ? tokens.accentPressed : tokens.borderStrong } : null,
               pressed ? styles.pressed : null,
               optionStyle,
             ]}>
-            <ThemedText
-              style={[isBar ? styles.barLabel : styles.chipLabel, labelStyle]}
-              lightColor={active ? activeTextColor ?? Lantern.ink900 : inactiveTextColor ?? Lantern.moon300}
-              darkColor={active ? activeTextColor ?? Lantern.ink900 : inactiveTextColor ?? Lantern.moon300}>
-              {option.label}
-            </ThemedText>
+            <View style={styles.optionLabelRow}>
+              {option.icon ? (
+                <IconSymbol
+                  color={active ? activeTextColor ?? tokens.text : inactiveTextColor ?? tokens.textSecondary}
+                  name={option.icon}
+                  size={15}
+                />
+              ) : null}
+              <ThemedText
+                style={[isBar ? styles.barLabel : styles.chipLabel, labelStyle]}
+                lightColor={active ? activeTextColor ?? tokens.text : inactiveTextColor ?? tokens.textSecondary}
+                darkColor={active ? activeTextColor ?? tokens.text : inactiveTextColor ?? tokens.textSecondary}>
+                {option.label}
+              </ThemedText>
+            </View>
           </Pressable>
         );
       })}
@@ -81,7 +96,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   barOptionActive: {
-    backgroundColor: Lantern.moon50,
+    backgroundColor: 'transparent',
   },
   barLabel: {
     fontSize: 13,
@@ -110,6 +125,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: KatchaDeckUI.typography.pill.fontWeight,
   },
+  optionLabelRow: { alignItems: 'center', flexDirection: 'row', gap: 7, justifyContent: 'center' },
   pressed: {
     opacity: 0.82,
   },

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   FadeIn,
@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import { FEASTLE_MERGE_ART } from '@/constants/feastle-merge-art';
@@ -85,6 +86,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   const [draggingCell, setDraggingCell] = useState<number | null>(null);
   const [hoveredCell, setHoveredCell] = useState<number | null>(null);
   const [dropLanding, setDropLanding] = useState<{ cell: number; offsetX: number; offsetY: number } | null>(null);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const attempt = useRef<string | null>(null);
   const startedAt = useRef(0);
   const finishedAt = useRef<number | null>(null);
@@ -146,16 +148,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     onRunningChange(false);
   };
 
-  const confirmReset = () => {
-    Alert.alert(
-      'Leave Merge Feast?',
-      'Your current board and order progress will be lost.',
-      [
-        { text: 'Keep playing', style: 'cancel' },
-        { text: 'Leave game', style: 'destructive', onPress: reset },
-      ],
-    );
-  };
+  const confirmReset = () => setLeaveDialogOpen(true);
 
   const spawn = () => {
     const nextPantryItem = state.pantry[0];
@@ -347,7 +340,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
 
   const actionsLeft = config.moveBudget - state.movesUsed;
   const nextPantry = state.pantry[0] ?? null;
-  return <View style={styles.root}>
+  return <><View style={styles.root}>
     <View style={styles.topLine}>
       <ThemedText selectable style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>MERGE FEAST</ThemedText>
       <View style={[styles.actionPill, actionsLeft <= 3 && styles.actionPillWarning]}>
@@ -414,7 +407,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       </Pressable>
       <Pressable accessibilityLabel="Leave Merge Feast" accessibilityRole="button" onPress={confirmReset} style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}><IconSymbol name="xmark" size={17} color={Lantern.moon300} /></Pressable>
     </View>
-  </View>;
+  </View><KatchaDialog body="Your current board and order progress will be lost." cancelLabel="Keep playing" confirmLabel="Leave game" onCancel={() => setLeaveDialogOpen(false)} onConfirm={() => { setLeaveDialogOpen(false); reset(); }} open={leaveDialogOpen} surface="night" title="Leave Merge Feast?" tone="destructive" /></>;
 }
 
 function MergeCell({ item, index, cellSize, merged, invalid, ready, reduceMotion, selected, selectionActive, compatible, dragging, emptyTarget, hovered, spawned, dropOffset, onDrop, onDragFinish, onDragOver, onPick, onAccessibleAction }: {

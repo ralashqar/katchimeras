@@ -89,10 +89,11 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     const prompt = dayPromptRegistry[answer.kind];
     const option = prompt?.options.find((candidate) => answer.choiceIds.includes(candidate.id));
     const meaning = answer.kind === 'meaning' ? MEANING_META[answer.choiceIds[0]] : null;
+    const photoIcon = answer.relatedAssetId ? photoSubjectIcon(day, answer.relatedAssetId) : null;
     push({
       id: `prompt:${answer.id}`,
       createdAt: answer.createdAt,
-      icon: meaning?.icon ?? option?.icon ?? prompt?.categoryIcon ?? 'sparkles',
+      icon: photoIcon ?? meaning?.icon ?? option?.icon ?? prompt?.categoryIcon ?? 'sparkles',
       accent: meaning?.accent ?? PROMPT_ACCENTS[answer.kind] ?? '#C9C2E8',
       label: answer.labels.join(' · '),
       category: PROMPT_CATEGORY[answer.kind] ?? prompt?.title.replace(/[?]$/, ''),
@@ -107,7 +108,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
       push({
         id: `hero:${hero.assetId}:${index}`,
         createdAt: hero.selectedAt,
-        icon: meta.icon,
+        icon: photoSubjectIcon(day, hero.assetId) ?? meta.icon,
         accent: meta.accent,
         label,
         category: 'Photo',
@@ -123,7 +124,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `capture:${captured.sourceId ?? `${captured.createdAt}:${index}`}`,
       createdAt: captured.createdAt,
-      icon: meta.icon,
+      icon: photoSubjectIcon(day, captured.sourceId) ?? meta.icon,
       accent: meta.accent,
       label: captured.label,
       category: 'Photo',
@@ -157,7 +158,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     push({
       id: `manual:${entry.id}`,
       createdAt: entry.createdAt,
-      icon: flow?.icon ?? 'plus.circle.fill',
+      icon: choice?.icon ?? flow?.icon ?? 'plus.circle.fill',
       accent: '#FFC36B',
       label: specific || choice?.label || flow?.title || 'Journal entry',
       category: choice?.label ?? flow?.title ?? 'Journal',
@@ -278,4 +279,68 @@ function studioMediaIcon(mediaType: string): IconSymbolName {
   if (mediaType === 'music') return 'music.note';
   if (mediaType === 'art') return 'paintbrush.fill';
   return 'sparkles';
+}
+
+/**
+ * Photo rows describe what the memory was about; the emotional archetype only
+ * supplies its accent. Capture review already commits the same flow/category
+ * chosen by manual journaling, so use that canonical choice icon first.
+ */
+function photoSubjectIcon(day: HomeDayRecord, sourceId?: string | null): IconSymbolName | null {
+  if (!sourceId) return null;
+
+  const compatibilityEntry = (day.manualJournalEntries ?? []).find(
+    (entry) => entry.sourceType === 'photo' && entry.sourceId === sourceId
+  );
+  const compatibilityIcon = compatibilityEntry
+    ? journalChoiceIcon(compatibilityEntry.flowId, compatibilityEntry.categoryId)
+    : null;
+  if (compatibilityIcon) return compatibilityIcon;
+
+  const record = (day.journalRecords ?? []).find(
+    (entry) => entry.source.kind === 'photo' && entry.source.sourceId === sourceId
+  );
+  const recordIcon = record ? journalChoiceIcon(record.flowId, record.categoryId) : null;
+  if (recordIcon) return recordIcon;
+
+  const studio = (day.studioMoments ?? []).find((entry) => entry.source === 'photo' && entry.sourceId === sourceId);
+  if (studio) return studioMediaIcon(studio.mediaType);
+
+  const memory = (day.classifiedMemories ?? []).find(
+    (entry) => entry.sourceType === 'photo' && entry.sourceId === sourceId
+  );
+  if (!memory) return null;
+  const facets = [...memory.facets].sort(
+    (left, right) => Number(!!right.confirmed) - Number(!!left.confirmed) || right.confidence - left.confidence
+  );
+  for (const facet of facets) {
+    const selection = journalSelectionForFacet(facet.key, facet.value);
+    if (!selection) continue;
+    const icon = journalChoiceIcon(selection.flowId, selection.categoryId);
+    if (icon) return icon;
+  }
+  return null;
+}
+
+function journalChoiceIcon(flowId: string, categoryId: string): IconSymbolName | null {
+  const flow = manualJournalFlow(flowId);
+  return flow?.choices.find((choice) => choice.id === categoryId)?.icon ?? flow?.icon ?? null;
+}
+
+function journalSelectionForFacet(key: string, value: string): { flowId: string; categoryId: string } | null {
+  if (key === 'media_type') {
+    const categoryId = ['book', 'film', 'show', 'game', 'music', 'art'].includes(value) ? value : 'other_media';
+    return { flowId: 'studio', categoryId };
+  }
+  if (key === 'device_activity') {
+    const categoryId = ({ gaming: 'game', working: 'focus', studying: 'learning', creating: 'creative' } as Record<string, string>)[value];
+    return categoryId ? { flowId: value === 'gaming' ? 'studio' : 'work', categoryId } : null;
+  }
+  if (key === 'food_kind' || key === 'food_item') {
+    const categoryId = ({ coffee: 'coffee', tea: 'tea', drink: 'drink', dessert: 'dessert', snack: 'snack', cooking: 'cooking' } as Record<string, string>)[value] ?? 'meal';
+    return { flowId: 'food', categoryId };
+  }
+  if (key === 'place_category') return { flowId: 'went_somewhere', categoryId: value === 'other' ? 'other_place' : value };
+  if (key === 'movement_mode' || key === 'activity_kind') return { flowId: 'movement', categoryId: value === 'sport' ? 'sport' : value };
+  return null;
 }

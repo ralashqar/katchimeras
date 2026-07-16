@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
 import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
-import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastStreakWord, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
+import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastOriginFromFootprintCenter, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastStreakWord, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestBlockBlastWorldOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
 import { hydrateBlockBlastProfile, type BlockBlastProfile } from '@/utils/quests/experiences/block-blast-profile';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
@@ -138,6 +138,13 @@ test('Block Party V2 starts a separate profile while carrying forward only the V
 test('Block Party drag targeting captures the nearest geometric cells generously at board boundaries', () => {
   const board = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
   const square = [{ row: 0, column: 0 }, { row: 0, column: 1 }, { row: 1, column: 0 }, { row: 1, column: 1 }];
+  assert.deepEqual(blockBlastOriginFromFootprintCenter(square, 3.5, 4.5), { row: 3, column: 4 }, 'piece and board footprint centers align one-to-one');
+  const tallCorner = [{ row: 0, column: 0 }, { row: 1, column: 0 }, { row: 2, column: 0 }, { row: 2, column: 1 }];
+  assert.deepEqual(blockBlastOriginFromFootprintCenter(tallCorner, 4, 3.5), { row: 3, column: 3 }, 'asymmetric pieces use their complete visual footprint center');
+  const boardFirstCellCenter = { x: 100, y: 200 };
+  assert.deepEqual(nearestBlockBlastWorldOrigin(board, square, { x: 280, y: 340 }, boardFirstCellCenter, 40), { row: 3, column: 4 }, 'world-space centers select the cells directly beneath a square piece');
+  assert.deepEqual(nearestBlockBlastWorldOrigin(board, square, { x: 280, y: 361 }, boardFirstCellCenter, 40), { row: 4, column: 4 }, 'crossing the world-space halfway point selects the next row');
+  assert.deepEqual(nearestBlockBlastWorldOrigin(board, tallCorner, { x: 240, y: 360 }, boardFirstCellCenter, 40), { row: 3, column: 3 }, 'every occupied cell in an asymmetric piece aligns with its corresponding board center');
   assert.deepEqual(nearestBlockBlastOrigin(square, -1.5, -1.4), { row: 0, column: 0 });
   assert.deepEqual(nearestBlockBlastOrigin(square, 7.4, 7.5), { row: 6, column: 6 });
   const lineFive = [{ row: 0, column: 0 }, { row: 0, column: 1 }, { row: 0, column: 2 }, { row: 0, column: 3 }, { row: 0, column: 4 }];

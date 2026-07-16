@@ -1,11 +1,12 @@
-import { BlurMask, Canvas, Group, LinearGradient, Rect, RoundedRect, vec } from '@shopify/react-native-skia';
+import { Canvas, Group, LinearGradient, RoundedRect, vec } from '@shopify/react-native-skia';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import {
@@ -31,12 +32,12 @@ type Config = { packId: 'tasklet-desk'; rulesetId?: string; tier: 1 | 2 | 3; lev
 type Props = { config: Config; best?: { movesUsed: number; durationMs: number } | null; onAttemptStart: (config: Record<string, unknown>) => string; onAttemptCancel: (id: string) => void; onComplete: (id: string, result: QuestResult) => void; onRunningChange: (running: boolean, id?: string | null) => void };
 
 const COLORS: Record<BlockJamColorId, { bright: string; mid: string; deep: string; label: string }> = {
-  red: { bright: '#FF7A77', mid: '#F33E45', deep: '#A9142B', label: 'coral' },
-  violet: { bright: '#C985FF', mid: '#9149E9', deep: '#52209D', label: 'violet' },
-  cyan: { bright: '#72F4F0', mid: '#22C8D4', deep: '#087B9B', label: 'cyan' },
-  lime: { bright: '#A9FF6D', mid: '#5EDC45', deep: '#258C37', label: 'lime' },
-  blue: { bright: '#79A8FF', mid: '#3972EA', deep: '#2240A1', label: 'blue' },
-  amber: { bright: '#FFE878', mid: '#FFC33F', deep: '#D47B16', label: 'amber' },
+  red: { bright: '#FFB19D', mid: '#EF796B', deep: '#A84149', label: 'coral' },
+  violet: { bright: '#D4B5FF', mid: '#9B72E8', deep: '#57419F', label: 'violet' },
+  cyan: { bright: '#9AE9DA', mid: '#52C6B6', deep: '#267B77', label: 'cyan' },
+  lime: { bright: '#C9EDA2', mid: '#89C965', deep: '#477F47', label: 'lime' },
+  blue: { bright: '#A9C8FF', mid: '#719BE8', deep: '#3D579E', label: 'blue' },
+  amber: { bright: '#FFE39A', mid: '#F4B855', deep: '#B46828', label: 'amber' },
 };
 
 export function BlockJamQuest(props: Props) {
@@ -48,6 +49,7 @@ export function BlockJamQuest(props: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [burst, setBurst] = useState<{ block: BlockJamBlockDefinition; door: BlockJamDoor; start: { x: number; y: number } } | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(() => Math.ceil(level.timeLimitMs / 1000));
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const attempt = useRef<string | null>(null); const startedAt = useRef(0); const finishedAt = useRef(0); const deadline = useRef(0);
   const reduceMotion = useReducedMotion(); const { width, height } = useWindowDimensions();
   const outer = 24; const gap = 2;
@@ -115,24 +117,24 @@ export function BlockJamQuest(props: Props) {
     return <ExperienceResult success title="Jam cleared" body={personalBest ? 'Tasklet has a glowing new fastest clear.' : 'Every bright block found its matching exit.'} metric={`${formatCountdown(Math.max(0, Math.round(durationMs / 1000)))} CLEAR`} onComplete={() => onComplete(attempt.current!, result)} />;
   }
 
-  return <View style={styles.root}>
+  return <><View style={styles.root}>
     <View style={styles.topLine}><View><ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>TASKLET · BLOCK JAM · TIER {level.tier}</ThemedText><ThemedText style={styles.progress} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{state.clearedBlockIds.length}/{level.blocks.length} sorted</ThemedText></View><View style={[styles.movePill, remainingSeconds <= 30 && styles.movePillWarning]}><ThemedText style={styles.moveNumber} lightColor={remainingSeconds <= 30 ? '#FF9B8C' : Lantern.moon50} darkColor={remainingSeconds <= 30 ? '#FF9B8C' : Lantern.moon50}>{formatCountdown(remainingSeconds)}</ThemedText><ThemedText style={styles.moveLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>TIME</ThemedText></View></View>
     <View style={styles.boardFrame}><View pointerEvents={state.status === 'playing' ? 'auto' : 'none'} accessibilityLabel={`${level.rows} by ${level.columns} color block puzzle`} style={[styles.board, { width: boardWidth, height: boardHeight }]}>
       <BoardSurface level={level} cell={cell} gap={gap} outer={outer} width={boardWidth} height={boardHeight} />
-      {level.doors.map((door) => <ExitRail key={door.id} door={door} cell={cell} pitch={pitch} outer={outer} boardWidth={boardWidth} boardHeight={boardHeight} active={exit?.id === door.id} onPress={() => selectedId && exit?.id === door.id && clear(selectedId, door)} reduceMotion={reduceMotion} />)}
+      {level.doors.map((door) => <ExitRail key={door.id} door={door} cell={cell} pitch={pitch} outer={outer} boardWidth={boardWidth} boardHeight={boardHeight} active={exit?.id === door.id} exiting={burst?.door.id === door.id} onPress={() => selectedId && exit?.id === door.id && clear(selectedId, door)} reduceMotion={reduceMotion} />)}
       {level.blocks.map((block, index) => state.clearedBlockIds.includes(block.id) || burst?.block.id === block.id ? null : <BrickPiece key={block.id} level={level} state={state} block={block} anchor={state.anchors[block.id]} reachable={reachableBlockJamAnchors(level, state, block.id)} exitOptions={blockJamExitOptions(level, state, block.id)} cell={cell} gap={gap} outer={outer} index={index} selected={selectedId === block.id} visible={boardReady} reduceMotion={reduceMotion} onPick={() => { setSelectedId(block.id); haptic('pick'); }} onMove={(anchor) => move(block.id, anchor)} onExit={(door, exitOptions) => clear(block.id, door, exitOptions)} />)}
       {burst ? <ClearBurst block={burst.block} door={burst.door} start={burst.start} cell={cell} gap={gap} pitch={pitch} boardWidth={boardWidth} boardHeight={boardHeight} reduceMotion={reduceMotion} /> : null}
     </View></View>
     {state.status === 'failed' ? <Animated.View entering={FadeInDown.duration(160)} style={styles.jammed}><ThemedText style={styles.jammedTitle} lightColor="#FF9B8C" darkColor="#FF9B8C">Time’s up</ThemedText><ThemedText style={styles.jammedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart for a fresh clock and keep experimenting with the layout.</ThemedText></Animated.View> : <ThemedText style={styles.help} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{selectedId ? 'Try dragging it to any open grid position.' : 'Drag connected blocks freely. Match each color to its glowing rail.'}</ThemedText>}
-    <View style={styles.controls}><Pressable disabled={!state.history.length || state.status !== 'playing'} onPress={undo} style={[styles.iconButton, (!state.history.length || state.status !== 'playing') && styles.disabled]}><IconSymbol name="arrow.counterclockwise" size={18} color={Lantern.moon300} /></Pressable><Pressable onPress={reset} style={styles.controlButton}><ThemedText style={styles.controlText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart</ThemedText></Pressable><Pressable onPress={() => Alert.alert('Leave Block Jam?', 'This layout will reset.', [{ text: 'Keep playing', style: 'cancel' }, { text: 'Leave', style: 'destructive', onPress: leave }])} style={styles.iconButton}><IconSymbol name="xmark" size={18} color={Lantern.moon300} /></Pressable></View>
-  </View>;
+    <View style={styles.controls}><Pressable disabled={!state.history.length || state.status !== 'playing'} onPress={undo} style={[styles.iconButton, (!state.history.length || state.status !== 'playing') && styles.disabled]}><IconSymbol name="arrow.counterclockwise" size={18} color={Lantern.moon300} /></Pressable><Pressable onPress={reset} style={styles.controlButton}><ThemedText style={styles.controlText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart</ThemedText></Pressable><Pressable accessibilityLabel="Leave Block Jam" accessibilityRole="button" onPress={() => setLeaveDialogOpen(true)} style={styles.iconButton}><IconSymbol name="xmark" size={18} color={Lantern.moon300} /></Pressable></View>
+  </View><KatchaDialog body="This layout will reset." cancelLabel="Keep playing" confirmLabel="Leave" onCancel={() => setLeaveDialogOpen(false)} onConfirm={() => { setLeaveDialogOpen(false); leave(); }} open={leaveDialogOpen} surface="night" title="Leave Block Jam?" tone="destructive" /></>;
 }
 
 function BoardSurface({ level, cell, gap, outer, width, height }: { level: BlockJamLevel; cell: number; gap: number; outer: number; width: number; height: number }) {
   const pitch = cell + gap;
-  return <Canvas style={StyleSheet.absoluteFill}><RoundedRect x={1} y={1} width={width - 2} height={height - 2} r={22}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#242A48', '#121629', '#090C19']} /></RoundedRect>
+  return <Canvas style={StyleSheet.absoluteFill}><RoundedRect x={1} y={1} width={width - 2} height={height - 2} r={24}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#2B2948', '#17162B', '#0D0C19']} /></RoundedRect>
     <RoundedRect x={outer - 7} y={outer - 7} width={level.columns * pitch - gap + 14} height={level.rows * pitch - gap + 14} r={13} color="#080B17" />
-    {Array.from({ length: level.rows * level.columns }, (_, index) => { const x = outer + (index % level.columns) * pitch; const y = outer + Math.floor(index / level.columns) * pitch; const fixed = level.fixedCells.includes(index); return <Group key={index}><RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(4, cell * .16)} color={fixed ? '#353B51' : '#171C32'} /><RoundedRect x={x + 2} y={y + 2} width={cell - 4} height={cell * .42} r={Math.max(3, cell * .12)} color={fixed ? '#485067' : '#222A47'} /><Rect x={x + 3} y={y + cell - 4} width={cell - 6} height={2} color="#070A14" /></Group>; })}
+    {Array.from({ length: level.rows * level.columns }, (_, index) => { const x = outer + (index % level.columns) * pitch; const y = outer + Math.floor(index / level.columns) * pitch; const fixed = level.fixedCells.includes(index); return <Group key={index}><RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(5, cell * .17)} color={fixed ? '#353B51' : '#191B32'} /><RoundedRect x={x + 2} y={y + 2} width={cell - 4} height={cell * .38} r={Math.max(3, cell * .12)} color={fixed ? '#485067' : '#252849'} /></Group>; })}
   </Canvas>;
 }
 
@@ -169,27 +171,40 @@ function BrickPiece({ level, state, block, anchor, reachable, exitOptions, cell,
     scale.value = withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) });
   });
   const style = useAnimatedStyle(() => ({ opacity: intro.value, transform: [{ translateX: x.value + dx.value }, { translateY: y.value + dy.value + (1 - intro.value) * 6 }, { scale: scale.value }] }));
-  return <GestureDetector gesture={gesture}><Animated.View pointerEvents={visible ? 'auto' : 'none'} style={[styles.piece, { width: columns * pitch - gap, height: rows * pitch - gap, zIndex: selected ? 20 : 10 }, style]}><Pressable accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${COLORS[block.colorId].label} block, ${block.cells.length} cells`} accessibilityHint="Drag freely, or tap to show reachable positions" onPress={onPick} style={StyleSheet.absoluteFill}><BrickArt block={block} cell={cell} gap={gap} selected={selected} /></Pressable></Animated.View></GestureDetector>;
+  return <GestureDetector gesture={gesture}><Animated.View pointerEvents={visible ? 'auto' : 'none'} style={[styles.piece, { width: columns * pitch - gap, height: rows * pitch - gap, zIndex: selected ? 20 : 10 }, style]}><Pressable accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${COLORS[block.colorId].label} block, ${block.cells.length} cells`} accessibilityHint="Drag freely, or tap to show reachable positions" onPress={onPick} style={StyleSheet.absoluteFill}><BrickArt block={block} cell={cell} gap={gap} /></Pressable></Animated.View></GestureDetector>;
 }
 
-function BrickArt({ block, cell, gap, selected }: { block: BlockJamBlockDefinition; cell: number; gap: number; selected: boolean }) {
+function BrickArt({ block, cell, gap }: { block: BlockJamBlockDefinition; cell: number; gap: number }) {
   const pitch = cell + gap; const columns = Math.max(...block.cells.map((part) => part.column)) + 1; const rows = Math.max(...block.cells.map((part) => part.row)) + 1; const palette = COLORS[block.colorId];
   return <Canvas style={{ width: columns * pitch - gap, height: rows * pitch - gap }}>
-    {selected ? block.cells.map((part, index) => <RoundedRect key={`selected-${index}`} x={part.column * pitch - 1} y={part.row * pitch - 1} width={cell + 2} height={cell + 2} r={Math.max(6, cell * .19)} color={palette.bright} opacity={.52}><BlurMask blur={4} style="solid" /></RoundedRect>) : null}
     {block.cells.map((part, index) => { const x = part.column * pitch; const y = part.row * pitch; return <Group key={index}>
-      {block.cells.some((other) => other.row === part.row && other.column === part.column + 1) ? <Rect x={x + cell - 3} y={y + 4} width={gap + 6} height={cell - 8} color={palette.mid} /> : null}
-      {block.cells.some((other) => other.column === part.column && other.row === part.row + 1) ? <Rect x={x + 4} y={y + cell - 3} width={cell - 8} height={gap + 6} color={palette.deep} /> : null}
       <RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(5, cell * .17)} color={palette.deep} />
       <RoundedRect x={x + 2} y={y + 2} width={cell - 4} height={cell - 5} r={Math.max(4, cell * .14)}><LinearGradient start={vec(x, y)} end={vec(x, y + cell)} colors={[palette.bright, palette.mid, palette.deep]} positions={[0, .48, 1]} /></RoundedRect>
-      <RoundedRect x={x + cell * .14} y={y + cell * .12} width={cell * .72} height={cell * .38} r={cell * .13} color="#FFFFFF" opacity={.17} />
+      <RoundedRect x={x + cell * .14} y={y + cell * .12} width={cell * .72} height={cell * .3} r={cell * .12} color="#FFFFFF" opacity={.17} />
     </Group>; })}
   </Canvas>;
 }
 
-function ExitRail({ door, cell, pitch, outer, boardWidth, boardHeight, active, onPress, reduceMotion }: { door: BlockJamDoor; cell: number; pitch: number; outer: number; boardWidth: number; boardHeight: number; active: boolean; onPress: () => void; reduceMotion: boolean }) {
-  const pulse = useSharedValue(active ? 1 : 0); useEffect(() => { pulse.value = active && !reduceMotion ? withRepeat(withSequence(withTiming(.35, { duration: 500 }), withTiming(1, { duration: 500 })), -1, true) : withTiming(active ? 1 : .42); }, [active, pulse, reduceMotion]); const animated = useAnimatedStyle(() => ({ opacity: pulse.value }));
+function ExitRail({ door, cell, pitch, outer, boardWidth, boardHeight, active, exiting, onPress, reduceMotion }: { door: BlockJamDoor; cell: number; pitch: number; outer: number; boardWidth: number; boardHeight: number; active: boolean; exiting: boolean; onPress: () => void; reduceMotion: boolean }) {
+  const energy = useSharedValue(exiting ? 1 : active ? .72 : .16);
+  useEffect(() => {
+    if (exiting) {
+      energy.value = reduceMotion
+        ? 1
+        : withSequence(withTiming(1, { duration: 85, easing: Easing.out(Easing.cubic) }), withRepeat(withSequence(withTiming(.78, { duration: 90 }), withTiming(1, { duration: 90 })), 2, false));
+    } else if (active && !reduceMotion) {
+      energy.value = withRepeat(withSequence(withTiming(.55, { duration: 440 }), withTiming(.82, { duration: 440 })), -1, false);
+    } else {
+      energy.value = withTiming(active ? .72 : .16, { duration: reduceMotion ? 30 : 150, easing: Easing.out(Easing.cubic) });
+    }
+  }, [active, energy, exiting, reduceMotion]);
+  const coreAnimated = useAnimatedStyle(() => ({ opacity: .48 + energy.value * .52, transform: [{ scale: 1 + energy.value * .035 }] }));
+  const auraAnimated = useAnimatedStyle(() => ({ opacity: energy.value * .72, transform: [{ scale: .94 + energy.value * .12 }] }));
   const horizontal = door.edge === 'top' || door.edge === 'bottom'; const long = door.span * cell + (door.span - 1) * (pitch - cell); const palette = COLORS[door.colorId]; const position = horizontal ? { width: long, height: 16, left: outer + door.offset * pitch, top: door.edge === 'top' ? 4 : boardHeight - 20 } : { width: 16, height: long, left: door.edge === 'left' ? 4 : boardWidth - 20, top: outer + door.offset * pitch };
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: !active }} accessibilityLabel={`${palette.label} exit`} disabled={!active} onPress={onPress} style={[styles.railHit, position]}><Animated.View style={[styles.rail, { borderColor: palette.bright, backgroundColor: palette.mid, shadowColor: palette.bright }, animated]}><ThemedText style={[styles.arrow, { transform: [{ rotate: door.edge === 'top' ? '0deg' : door.edge === 'right' ? '90deg' : door.edge === 'bottom' ? '180deg' : '-90deg' }] }]} lightColor="#FFFFFF" darkColor="#FFFFFF">↑</ThemedText></Animated.View></Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: !active }} accessibilityLabel={`${palette.label} exit`} disabled={!active} onPress={onPress} style={[styles.railHit, position]}>
+    <Animated.View style={[styles.railAura, { backgroundColor: palette.bright, boxShadow: `0 0 18px ${palette.bright}` }, auraAnimated]} />
+    <Animated.View style={[styles.rail, { borderColor: palette.bright, backgroundColor: palette.mid, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.55), 0 0 9px ${palette.bright}` }, coreAnimated]}><View style={styles.railSheen} /><ThemedText style={[styles.arrow, { transform: [{ rotate: door.edge === 'top' ? '0deg' : door.edge === 'right' ? '90deg' : door.edge === 'bottom' ? '180deg' : '-90deg' }] }]} lightColor="#FFFFFF" darkColor="#FFFFFF">↑</ThemedText></Animated.View>
+  </Pressable>;
 }
 
 function ClearBurst({ block, door, start, cell, gap, pitch, boardWidth, boardHeight, reduceMotion }: { block: BlockJamBlockDefinition; door: BlockJamDoor; start: { x: number; y: number }; cell: number; gap: number; pitch: number; boardWidth: number; boardHeight: number; reduceMotion: boolean }) {
@@ -205,7 +220,7 @@ function ClearBurst({ block, door, start, cell, gap, pitch, boardWidth, boardHei
     opacity.value = withDelay(travelDuration, withTiming(0, { duration: reduceMotion ? 10 : 75, easing: Easing.linear }));
   }, [opacity, reduceMotion, travel]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateX: startX + (targetX - startX) * travel.value }, { translateY: startY + (targetY - startY) * travel.value }, { scale: 1 - travel.value * .04 }] }));
-  return <Animated.View pointerEvents="none" style={[styles.piece, { height: pieceHeight, width: pieceWidth, zIndex: 40 }, style]}><BrickArt block={block} cell={cell} gap={gap} selected /></Animated.View>;
+  return <Animated.View pointerEvents="none" style={[styles.piece, { height: pieceHeight, width: pieceWidth, zIndex: 40 }, style]}><BrickArt block={block} cell={cell} gap={gap} /></Animated.View>;
 }
 
 function Preview({ level, best, onStart }: { level: BlockJamLevel; best: Props['best']; onStart: () => void }) {
@@ -229,14 +244,13 @@ function PreviewBoard({ level }: { level: BlockJamLevel }) {
   const pitch = cell + gap; const gridWidth = level.columns * cell + (level.columns - 1) * gap; const gridHeight = level.rows * cell + (level.rows - 1) * gap;
   const originX = (width - gridWidth) / 2; const originY = (height - gridHeight) / 2;
   return <View style={[styles.previewBoard, PREVIEW_BOARD_CANVAS_STYLE, { height, width }]}><Canvas style={StyleSheet.absoluteFill}>
-    <RoundedRect x={1} y={1} width={width - 2} height={height - 2} r={17}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#222A4A', '#0D1228']} /></RoundedRect>
+    <RoundedRect x={1} y={1} width={width - 2} height={height - 2} r={17}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#2B2948', '#17162B', '#0D0C19']} /></RoundedRect>
     <RoundedRect x={originX - 4} y={originY - 4} width={gridWidth + 8} height={gridHeight + 8} r={9} color="#070A17" />
-    {Array.from({ length: level.rows * level.columns }, (_, index) => { const x = originX + (index % level.columns) * pitch; const y = originY + Math.floor(index / level.columns) * pitch; return <RoundedRect key={`preview-cell-${index}`} x={x} y={y} width={cell} height={cell} r={Math.max(2, cell * .18)} color={level.fixedCells.includes(index) ? '#485067' : '#171D35'} />; })}
+    {Array.from({ length: level.rows * level.columns }, (_, index) => { const x = originX + (index % level.columns) * pitch; const y = originY + Math.floor(index / level.columns) * pitch; const fixed = level.fixedCells.includes(index); return <Group key={`preview-cell-${index}`}><RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(2, cell * .18)} color={fixed ? '#353B51' : '#191B32'} /><RoundedRect x={x + 1} y={y + 1} width={Math.max(1, cell - 2)} height={cell * .36} r={Math.max(1.5, cell * .12)} color={fixed ? '#485067' : '#252849'} /></Group>; })}
     {level.blocks.flatMap((block) => block.cells.map((part, index) => { const x = originX + (block.anchor.column + part.column) * pitch; const y = originY + (block.anchor.row + part.row) * pitch; const palette = COLORS[block.colorId]; return <Group key={`preview-${block.id}-${index}`}>
-      {block.cells.some((other) => other.row === part.row && other.column === part.column + 1) ? <Rect x={x + cell - 2} y={y + 2} width={gap + 4} height={cell - 4} color={palette.mid} /> : null}
-      {block.cells.some((other) => other.column === part.column && other.row === part.row + 1) ? <Rect x={x + 2} y={y + cell - 2} width={cell - 4} height={gap + 4} color={palette.deep} /> : null}
-      <RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(2.5, cell * .2)}><LinearGradient start={vec(x, y)} end={vec(x, y + cell)} colors={[palette.bright, palette.mid, palette.deep]} positions={[0, .5, 1]} /></RoundedRect>
-      <RoundedRect x={x + 2} y={y + 2} width={Math.max(2, cell - 4)} height={Math.max(2, cell * .3)} r={Math.max(1.5, cell * .12)} color="#FFFFFF" opacity={.16} />
+      <RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(2.5, cell * .2)} color={palette.deep} />
+      <RoundedRect x={x + 1} y={y + 1} width={cell - 2} height={cell - 2} r={Math.max(2, cell * .15)}><LinearGradient start={vec(x, y)} end={vec(x, y + cell)} colors={[palette.bright, palette.mid, palette.deep]} positions={[0, .52, 1]} /></RoundedRect>
+      <RoundedRect x={x + cell * .14} y={y + cell * .12} width={cell * .72} height={cell * .3} r={Math.max(1.5, cell * .12)} color="#FFFFFF" opacity={.17} />
     </Group>; }))}
     {level.doors.map((door) => { const palette = COLORS[door.colorId]; const horizontal = door.edge === 'top' || door.edge === 'bottom'; const railLength = door.span * cell + (door.span - 1) * gap; const x = horizontal ? originX + door.offset * pitch : door.edge === 'left' ? originX - 5 : originX + gridWidth + 2; const y = horizontal ? door.edge === 'top' ? originY - 5 : originY + gridHeight + 2 : originY + door.offset * pitch; return <RoundedRect key={`preview-door-${door.id}`} x={x} y={y} width={horizontal ? railLength : 3} height={horizontal ? 3 : railLength} r={2} color={palette.bright} />; })}
   </Canvas></View>;
@@ -249,5 +263,5 @@ function formatCountdown(totalSeconds: number): string {
 
 const styles = StyleSheet.create({
   previewMediaBoard: { alignItems: 'center', height: 128, justifyContent: 'center', transform: [{ scale: 0.68 }], width: 144 },
-  root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0, padding: 4 }, topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: .8 }, progress: { fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 25 }, movePill: { alignItems: 'center', backgroundColor: 'rgba(125,232,205,.09)', borderColor: 'rgba(125,232,205,.25)', borderRadius: 16, borderWidth: 1, minWidth: 64, paddingHorizontal: 11, paddingVertical: 5 }, movePillWarning: { backgroundColor: 'rgba(255,110,95,.1)', borderColor: 'rgba(255,110,95,.36)' }, moveNumber: { fontSize: 21, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 23 }, moveLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, boardFrame: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 0 }, board: { borderRadius: 22, elevation: 14, overflow: 'visible', position: 'relative', shadowColor: '#05030A', shadowOffset: { width: 0, height: 16 }, shadowOpacity: .55, shadowRadius: 22 }, destination: { backgroundColor: 'rgba(255,241,181,.8)', borderColor: '#FFF4C9', borderRadius: 99, borderWidth: 1, position: 'absolute', zIndex: 6 }, piece: { left: 0, position: 'absolute', top: 0 }, railHit: { padding: 0, position: 'absolute', zIndex: 25 }, rail: { alignItems: 'center', borderRadius: 7, borderWidth: 2, elevation: 7, height: '100%', justifyContent: 'center', shadowOffset: { width: 0, height: 0 }, shadowOpacity: .7, shadowRadius: 9, width: '100%' }, arrow: { fontSize: 15, fontWeight: '900', lineHeight: 17 }, help: { fontSize: 11, lineHeight: 15, minHeight: 15, textAlign: 'center' }, controls: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' }, iconButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', width: 46 }, controlButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', paddingHorizontal: 20 }, controlText: { fontSize: 12, fontWeight: '800' }, disabled: { opacity: .3 }, jammed: { backgroundColor: 'rgba(242,110,95,.08)', borderColor: 'rgba(242,110,95,.3)', borderRadius: 15, borderWidth: 1, padding: 10 }, jammedTitle: { fontSize: 14, fontWeight: '900' }, jammedBody: { fontSize: 11, lineHeight: 15 }, previewRoot: { flex: 1, gap: 16, justifyContent: 'space-between', minHeight: 0, padding: 4 }, previewScene: { alignItems: 'flex-end', backgroundColor: 'rgba(108,115,226,.09)', borderColor: 'rgba(130,149,255,.24)', borderRadius: 25, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 230, overflow: 'hidden', padding: 16, position: 'relative' }, previewBoard: { backgroundColor: '#10152A', borderColor: '#3C456C', borderRadius: 18, borderWidth: 5, height: 128, marginBottom: 18, position: 'relative', transform: [{ rotate: '-3deg' }], width: 144 }, previewBrick: { borderRadius: 8, borderWidth: 1, height: 34, position: 'absolute', shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: .4, shadowRadius: 5 }, tasklet: { height: 190, marginBottom: -8, marginRight: -20, width: 154 }, previewBadge: { backgroundColor: Lantern.ember300, borderRadius: 999, left: 16, paddingHorizontal: 11, paddingVertical: 6, position: 'absolute', top: 14 }, previewBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: .5 }, previewFooter: { gap: 10 }, best: { fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: .8, textAlign: 'center' },
+  root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0, padding: 4 }, topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: .8 }, progress: { fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 25 }, movePill: { alignItems: 'center', backgroundColor: 'rgba(125,232,205,.09)', borderColor: 'rgba(125,232,205,.25)', borderRadius: 16, borderWidth: 1, minWidth: 64, paddingHorizontal: 11, paddingVertical: 5 }, movePillWarning: { backgroundColor: 'rgba(255,110,95,.1)', borderColor: 'rgba(255,110,95,.36)' }, moveNumber: { fontSize: 21, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 23 }, moveLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, boardFrame: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 0 }, board: { borderCurve: 'continuous', borderRadius: 24, boxShadow: '0 18px 32px rgba(5,4,14,0.46)', overflow: 'visible', position: 'relative' }, destination: { backgroundColor: 'rgba(255,241,181,.8)', borderColor: '#FFF4C9', borderRadius: 99, borderWidth: 1, position: 'absolute', zIndex: 6 }, piece: { left: 0, position: 'absolute', top: 0 }, railHit: { padding: 0, position: 'absolute', zIndex: 25 }, railAura: { borderRadius: 10, bottom: -3, left: -3, position: 'absolute', right: -3, top: -3 }, rail: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 7, borderWidth: 2, height: '100%', justifyContent: 'center', overflow: 'hidden', width: '100%' }, railSheen: { backgroundColor: 'rgba(255,255,255,0.32)', borderRadius: 99, height: '28%', left: 3, position: 'absolute', right: 3, top: 2 }, arrow: { fontSize: 15, fontWeight: '900', lineHeight: 17 }, help: { fontSize: 11, lineHeight: 15, minHeight: 15, textAlign: 'center' }, controls: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' }, iconButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', width: 46 }, controlButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', paddingHorizontal: 20 }, controlText: { fontSize: 12, fontWeight: '800' }, disabled: { opacity: .3 }, jammed: { backgroundColor: 'rgba(242,110,95,.08)', borderColor: 'rgba(242,110,95,.3)', borderRadius: 15, borderWidth: 1, padding: 10 }, jammedTitle: { fontSize: 14, fontWeight: '900' }, jammedBody: { fontSize: 11, lineHeight: 15 }, previewRoot: { flex: 1, gap: 16, justifyContent: 'space-between', minHeight: 0, padding: 4 }, previewScene: { alignItems: 'flex-end', backgroundColor: 'rgba(108,115,226,.09)', borderColor: 'rgba(130,149,255,.24)', borderRadius: 25, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 230, overflow: 'hidden', padding: 16, position: 'relative' }, previewBoard: { backgroundColor: '#10152A', borderColor: '#3C456C', borderRadius: 18, borderWidth: 5, height: 128, marginBottom: 18, position: 'relative', transform: [{ rotate: '-3deg' }], width: 144 }, previewBrick: { borderRadius: 8, borderWidth: 1, height: 34, position: 'absolute', shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: .4, shadowRadius: 5 }, tasklet: { height: 190, marginBottom: -8, marginRight: -20, width: 154 }, previewBadge: { backgroundColor: Lantern.ember300, borderRadius: 999, left: 16, paddingHorizontal: 11, paddingVertical: 6, position: 'absolute', top: 14 }, previewBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: .5 }, previewFooter: { gap: 10 }, best: { fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: .8, textAlign: 'center' },
 });

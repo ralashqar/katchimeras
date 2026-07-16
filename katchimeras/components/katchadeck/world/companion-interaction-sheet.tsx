@@ -1,13 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Modal, ScrollView, StyleSheet, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { AppState, KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
-import { Meadow } from '@/constants/meadow-theme';
 import type { HomeVisualKey, MemoryQualityScore } from '@/types/home';
 import type {
   CompanionInsight,
@@ -27,7 +26,7 @@ import {
 } from '@/utils/companion-interaction';
 import { CompanionHero } from './companion-hero';
 import { CompanionInsightThread } from './companion-insight-thread';
-import { CompanionPrimaryAction, CompanionSecondaryAction } from './companion-interaction-primitives';
+import { CompanionPrimaryAction } from './companion-interaction-primitives';
 import { CompanionQuestChoices, CompanionQuestThread } from './companion-quest-thread';
 import { CompanionReflectionThread } from './companion-reflection-thread';
 import { CompanionThreadSwitcher } from './companion-thread-switcher';
@@ -194,10 +193,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   ) : actionFooter;
   const entering = reduceMotion ? FadeIn.duration(100) : state.direction > 0 ? FadeInRight.duration(210) : FadeInLeft.duration(210);
 
-  return (
-    <Modal animationType="none" navigationBarTranslucent onRequestClose={requestClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible>
-      <GestureHandlerRootView style={styles.modalRoot}>
-        <MeadowSheet onClose={requestClose} showClose={!activeAttemptId} surface={activeAttemptId ? 'night' : 'parchment'} variant={activeAttemptId ? 'full' : 'tall'}>
+  return (<>
+        <KatchaSheet onRequestClose={requestClose} showClose={!activeAttemptId} surface={activeAttemptId ? 'night' : 'parchment'} size={activeAttemptId ? 'full' : 'tall'}>
       <KeyboardAvoidingView behavior={!activeAttemptId && process.env.EXPO_OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8} style={styles.keyboard}>
         {!activeAttemptId ? (
           <CompanionHero key="companion-hero" name={props.name} image={visual.source} houseLevel={props.houseLevel} openingLine={props.openingLine}>
@@ -285,39 +282,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           </ScrollView>
         </View>
         {footer ? <View style={styles.footer}>{footer}</View> : null}
-        {state.discardOpen ? (
-          <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(120)} style={styles.discard}>
-            <View style={styles.discardPanel}>
-              <ThemedText style={styles.discardTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Discard this answer?</ThemedText>
-              <ThemedText style={styles.discardBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Your reflection has not been saved yet.</ThemedText>
-              <View style={styles.discardActions}>
-                <CompanionSecondaryAction label="Keep editing" onPress={() => dispatch({ type: 'keep_editing' })} />
-                <CompanionSecondaryAction label="Discard" icon="trash" destructive onPress={props.onClose} />
-              </View>
-            </View>
-          </Animated.View>
-        ) : null}
-        {endAttemptOpen ? (
-          <Animated.View entering={FadeIn.duration(150)} exiting={FadeOut.duration(120)} style={styles.discard}>
-            <View style={styles.discardPanel}>
-              <ThemedText style={styles.discardTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>End this attempt?</ThemedText>
-              <ThemedText style={styles.discardBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>This run will be cancelled, but the quest will stay active so you can retry.</ThemedText>
-              <View style={styles.discardActions}>
-                <CompanionSecondaryAction label="Keep playing" onPress={() => setEndAttemptOpen(false)} />
-                <CompanionSecondaryAction label="End attempt" icon="xmark" destructive onPress={() => { if (activeAttemptId) props.onCancelQuestAttempt?.(activeAttemptId); setActiveAttemptId(null); props.onClose(); }} />
-              </View>
-            </View>
-          </Animated.View>
-        ) : null}
       </KeyboardAvoidingView>
-        </MeadowSheet>
-      </GestureHandlerRootView>
-    </Modal>
-  );
+        </KatchaSheet>
+        <KatchaDialog body="Your reflection has not been saved yet." cancelLabel="Keep editing" confirmLabel="Discard" onCancel={() => dispatch({ type: 'keep_editing' })} onConfirm={props.onClose} open={state.discardOpen} title="Discard this answer?" tone="destructive" />
+        <KatchaDialog body="This run will be cancelled, but the quest will stay active so you can retry." cancelLabel="Keep playing" confirmLabel="End attempt" onCancel={() => setEndAttemptOpen(false)} onConfirm={() => { if (activeAttemptId) props.onCancelQuestAttempt?.(activeAttemptId); setActiveAttemptId(null); props.onClose(); }} open={endAttemptOpen} surface="night" title="End this attempt?" tone="destructive" />
+  </>);
 }
 
 const styles = StyleSheet.create({
-  modalRoot: { flex: 1 },
   keyboard: { flex: 1, gap: 8, minHeight: 0 },
   contentFrame: { flex: 1, minHeight: 0 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },
@@ -329,9 +301,4 @@ const styles = StyleSheet.create({
   saved: { alignItems: 'center', gap: 8, justifyContent: 'center', minHeight: 220, paddingHorizontal: 24 },
   savedTitle: { fontSize: 24, fontWeight: '900' },
   savedBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },
-  discard: { ...StyleSheet.absoluteFillObject, alignItems: 'center', backgroundColor: 'rgba(12,10,20,0.82)', justifyContent: 'center', zIndex: 10 },
-  discardPanel: { backgroundColor: '#E6CDA7', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, gap: 10, padding: 20, width: '88%' },
-  discardTitle: { fontSize: 19, fontWeight: '900' },
-  discardBody: { fontSize: 13.5, lineHeight: 20 },
-  discardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, paddingTop: 6 },
 });

@@ -4,7 +4,9 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import { dayAlbums, dayMemories } from '@/utils/day-memories';
@@ -15,6 +17,7 @@ import { dayAlbums, dayMemories } from '@/utils/day-memories';
 // Apple Photos + Notes + Voice Memos, merged.
 
 export type MemoryVaultTab = 'featured' | 'photos' | 'voice' | 'notes' | 'albums';
+const NIGHT = KatchaSurfacePalette.night;
 
 function formatDuration(ms: number | null | undefined): string | null {
   if (!ms || ms <= 0) return null;
@@ -55,23 +58,24 @@ export function MemoryVaultSheet({
   ];
 
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="Memory Vault"
-      title={memories.total > 0 ? `${memories.total} ${memories.total === 1 ? 'memory' : 'memories'} kept` : 'A quiet vault, so far'}
-      maxHeight="78%">
-      <View style={styles.tabs}>
-        {TABS.map((t) => (
-          <Pressable key={t.id} onPress={() => setTab(t.id)} style={[styles.tab, tab === t.id && styles.tabActive]}>
-            <ThemedText style={[styles.tabLabel, tab === t.id && styles.tabLabelActive]} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-              {t.label}
-              {t.count !== undefined && t.count > 0 ? ` ${t.count}` : ''}
-            </ThemedText>
-          </Pressable>
-        ))}
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+    <KatchaSheet
+      header={{
+        eyebrow: 'Memory Vault',
+        title: memories.total > 0 ? `${memories.total} ${memories.total === 1 ? 'memory' : 'memories'} kept` : 'A quiet vault, so far',
+        subtitle: 'Photos, notes and voices from this day.',
+      }}
+      onRequestClose={onClose}
+      scroll
+      scrollContentStyle={styles.scroll}
+      size="tall"
+      surface="night">
+      <SegmentedControl
+        options={TABS.map((item) => ({ value: item.id, label: `${item.label}${item.count ? ` ${item.count}` : ''}` }))}
+        onChange={setTab}
+        style={styles.tabs}
+        value={tab}
+        variant="bar"
+      />
         <Animated.View key={tab} entering={FadeInDown.duration(200)} style={styles.body}>
           {tab === 'featured' ? (
             featuredUri ? (
@@ -188,26 +192,21 @@ export function MemoryVaultSheet({
             )
           ) : null}
         </Animated.View>
-      </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
 const GAP = 8;
 const styles = StyleSheet.create({
-  tabs: { flexDirection: 'row', gap: 6, marginBottom: 4 },
-  tab: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.05)' },
-  tabActive: { backgroundColor: 'rgba(146,215,255,0.18)' },
-  tabLabel: { fontSize: 12.5, fontWeight: '700' },
-  tabLabelActive: { color: Lantern.moon50 },
-  scroll: { paddingBottom: 6, paddingTop: 8 },
+  tabs: { marginBottom: 4 },
+  scroll: { paddingBottom: 8 },
   body: { gap: 10 },
   emptyActionCard: { alignItems: 'flex-start', gap: 10, paddingVertical: 4 },
   featuredWrap: { gap: 10, alignItems: 'flex-start' },
   featured: { width: '100%', aspectRatio: 4 / 3, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)' },
   featuredEmpty: { gap: 10, paddingVertical: 8 },
-  pill: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(146,215,255,0.5)', backgroundColor: 'rgba(146,215,255,0.14)' },
-  pillPressed: { backgroundColor: 'rgba(146,215,255,0.24)' },
+  pill: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: NIGHT.borderStrong, backgroundColor: NIGHT.subtle, boxShadow: NIGHT.cardShadow },
+  pillPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
   pillLabel: { fontSize: 13.5, fontWeight: '800' },
   empty: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
@@ -224,7 +223,10 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 11,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: NIGHT.subtle,
+    borderColor: NIGHT.border,
+    borderWidth: 1,
+    boxShadow: '0 5px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.045)',
   },
   rowEmoji: { fontSize: 20, width: 26, textAlign: 'center' },
   rowText: { flex: 1, gap: 2 },

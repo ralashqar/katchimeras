@@ -8,11 +8,12 @@ import {
   useAudioRecorder,
 } from 'expo-audio';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
+import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
@@ -66,6 +67,7 @@ export default function NoteCaptureScreen() {
   const [semanticChoiceMade, setSemanticChoiceMade] = useState(false);
   const [journalReviewOpen, setJournalReviewOpen] = useState(false);
   const [journalRoute, setJournalRoute] = useState<JournalRouteProposal | null>(null);
+  const [captureError, setCaptureError] = useState<{ title: string; body: string } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const journalSourceId = useRef(`note-${Date.now().toString(36)}`).current;
   // Tracks press-and-hold intent so a release mid-setup cancels cleanly.
@@ -111,6 +113,7 @@ export default function NoteCaptureScreen() {
 
   const startRecording = async () => {
     if (recordingRef.current) return;
+    setCaptureError(null);
     recordingRef.current = true;
     setAudioUri(null);
     setText('');
@@ -120,7 +123,7 @@ export default function NoteCaptureScreen() {
     if (!permission.granted) {
       recordingRef.current = false;
       setRecording(false);
-      Alert.alert('Microphone needed', 'Allow microphone access to record a voice note.');
+      setCaptureError({ title: 'Microphone needed', body: 'Allow microphone access to record a voice note, then try again.' });
       return;
     }
     try {
@@ -132,7 +135,7 @@ export default function NoteCaptureScreen() {
     } catch {
       recordingRef.current = false;
       setRecording(false);
-      Alert.alert('Could not record', 'Recording is unavailable on this device build.');
+      setCaptureError({ title: 'Could not record', body: 'Recording is unavailable on this device build. You can still type your note.' });
       return;
     }
     timerRef.current = setInterval(() => {
@@ -166,6 +169,7 @@ export default function NoteCaptureScreen() {
   const submitMode = text.trim().length > 0 && !recording && !transcribing;
 
   const submit = async () => {
+    setCaptureError(null);
     if (recording) await stopRecording();
     setPhase('interpreting');
     try {
@@ -189,7 +193,7 @@ export default function NoteCaptureScreen() {
       setPhase('review');
     } catch {
       setPhase('input');
-      Alert.alert('Could not read that', 'Please try again.');
+      setCaptureError({ title: 'Could not read that', body: 'Please check your note and try again.' });
     }
   };
 
@@ -210,6 +214,16 @@ export default function NoteCaptureScreen() {
           <ThemedText style={styles.prompt} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
             Speak or type what stood out {targetLabel}.
           </ThemedText>
+
+          {captureError ? (
+            <KatchaInlineNotice
+              actionLabel="Dismiss"
+              body={captureError.body}
+              onAction={() => setCaptureError(null)}
+              title={captureError.title}
+              tone="danger"
+            />
+          ) : null}
 
           <View>
             <TextInput

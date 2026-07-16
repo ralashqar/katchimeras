@@ -3,8 +3,8 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
-import { Lantern } from '@/constants/theme';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { DayMovementKind } from '@/types/home';
 
 // Interpret a notably active day — the steps say "a lot moved today", the user says
@@ -25,6 +25,7 @@ const MOVEMENTS: MovementOption[] = [
   { movement: 'travel', label: 'A travel day', emoji: '✈️', tint: '#A78BFA' },
   { movement: 'mixed', label: 'A bit of everything', emoji: '🧭', tint: '#D3B7FF' },
 ];
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 const SUBTYPES: Partial<Record<DayMovementKind, { id: string; label: string; emoji: string }[]>> = {
   transit: [
@@ -65,7 +66,7 @@ export function StepsPromptSheet({
   };
 
   return (
-    <MeadowSheet onClose={onClose} kicker={stepsLine} title={selected ? 'What kind of route?' : 'How did you get around?'}>
+    <KatchaSheet header={{ eyebrow: stepsLine, title: selected ? 'What kind of route?' : 'How did you get around?' }} onRequestClose={() => onClose()} surface="parchment">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <Animated.View entering={FadeInDown.duration(220)} style={styles.grid}>
           {(subtypes ?? MOVEMENTS).map((option) => (
@@ -84,7 +85,7 @@ export function StepsPromptSheet({
                 pressed && styles.chipPressed,
               ]}>
               <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-              <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                 {option.label}
               </ThemedText>
             </Pressable>
@@ -93,15 +94,15 @@ export function StepsPromptSheet({
         {selected ? (
           <View style={styles.backRow}>
             <Pressable onPress={() => setSelected(null)}>
-              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Back</ThemedText>
+              <ThemedText style={styles.backLabel} lightColor={PARCHMENT.textTertiary} darkColor={PARCHMENT.textTertiary}>Back</ThemedText>
             </Pressable>
             <Pressable onPress={() => onConfirm({ movement: selected.movement, label: selected.label, emoji: selected.emoji })}>
-              <ThemedText style={styles.backLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Skip detail</ThemedText>
+              <ThemedText style={styles.backLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>Skip detail</ThemedText>
             </Pressable>
           </View>
         ) : null}
       </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -116,7 +117,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     borderRadius: 999,
     borderWidth: 1,
-    backgroundColor: 'rgba(12,10,20,0.7)',
+    backgroundColor: PARCHMENT.subtle,
   },
   chipPressed: { backgroundColor: 'rgba(40,34,60,0.9)' },
   chipEmoji: { fontSize: 16 },

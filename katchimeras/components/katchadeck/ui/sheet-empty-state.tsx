@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { Lantern } from '@/constants/theme';
+import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
 
 type SheetEmptyStateProps = {
   icon?: IconSymbolName;
@@ -11,16 +11,17 @@ type SheetEmptyStateProps = {
 };
 
 export function SheetEmptyState({ icon = 'sparkles', title, body }: SheetEmptyStateProps) {
+  const { tokens } = useKatchaSurface();
   return (
-    <View style={styles.wrap}>
-      <View style={styles.icon}>
-        <IconSymbol name={icon} size={18} color={Lantern.moon300} />
+    <View style={[styles.wrap, { backgroundColor: tokens.subtle, borderColor: tokens.border }]}>
+      <View style={[styles.icon, { backgroundColor: tokens.subtle }]}>
+        <IconSymbol name={icon} size={18} color={tokens.textSecondary} />
       </View>
-      <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+      <ThemedText style={styles.title} lightColor={tokens.text} darkColor={tokens.text}>
         {title}
       </ThemedText>
       {body ? (
-        <ThemedText style={styles.body} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+        <ThemedText style={styles.body} lightColor={tokens.textTertiary} darkColor={tokens.textTertiary}>
           {body}
         </ThemedText>
       ) : null}

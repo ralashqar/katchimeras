@@ -325,6 +325,94 @@ export function nearestBlockBlastOrigin(
   return { row: Math.round(clampedRow), column: Math.round(clampedColumn) };
 }
 
+export function blockBlastOriginFromFootprintCenter(
+  pieceCells: readonly BlockBlastCell[],
+  floatingCenterRow: number,
+  floatingCenterColumn: number,
+): { row: number; column: number } {
+  const minimumRow = Math.min(...pieceCells.map((cell) => cell.row));
+  const maximumRow = Math.max(...pieceCells.map((cell) => cell.row));
+  const minimumColumn = Math.min(...pieceCells.map((cell) => cell.column));
+  const maximumColumn = Math.max(...pieceCells.map((cell) => cell.column));
+  return {
+    row: floatingCenterRow - (minimumRow + maximumRow) / 2,
+    column: floatingCenterColumn - (minimumColumn + maximumColumn) / 2,
+  };
+}
+
+export function nearestBlockBlastWorldOrigin(
+  board: readonly (BlockBlastColorId | null)[],
+  pieceCells: readonly BlockBlastCell[],
+  floatingFootprintCenter: { x: number; y: number },
+  boardFirstCellCenter: { x: number; y: number },
+  pitch: number,
+  localSnapRadius = 1.65,
+  boardCaptureMargin = 0.85,
+): BlockBlastCell | null {
+  if (!pieceCells.length || pitch <= 0) return null;
+
+  const minimumPieceRow = Math.min(...pieceCells.map((cell) => cell.row));
+  const maximumPieceRow = Math.max(...pieceCells.map((cell) => cell.row));
+  const minimumPieceColumn = Math.min(...pieceCells.map((cell) => cell.column));
+  const maximumPieceColumn = Math.max(...pieceCells.map((cell) => cell.column));
+  const footprintCenterRow = (minimumPieceRow + maximumPieceRow) / 2;
+  const footprintCenterColumn = (minimumPieceColumn + maximumPieceColumn) / 2;
+  const floatingCellCenters = pieceCells.map((cell) => ({
+    cell,
+    x: floatingFootprintCenter.x + (cell.column - footprintCenterColumn) * pitch,
+    y: floatingFootprintCenter.y + (cell.row - footprintCenterRow) * pitch,
+  }));
+
+  const capturePadding = (0.5 + boardCaptureMargin) * pitch;
+  const boardLastCellCenterX = boardFirstCellCenter.x + (BLOCK_BLAST_BOARD_SIZE - 1) * pitch;
+  const boardLastCellCenterY = boardFirstCellCenter.y + (BLOCK_BLAST_BOARD_SIZE - 1) * pitch;
+  const floatingMinimumX = Math.min(...floatingCellCenters.map((center) => center.x));
+  const floatingMaximumX = Math.max(...floatingCellCenters.map((center) => center.x));
+  const floatingMinimumY = Math.min(...floatingCellCenters.map((center) => center.y));
+  const floatingMaximumY = Math.max(...floatingCellCenters.map((center) => center.y));
+  if (floatingMaximumX < boardFirstCellCenter.x - capturePadding
+    || floatingMinimumX > boardLastCellCenterX + capturePadding
+    || floatingMaximumY < boardFirstCellCenter.y - capturePadding
+    || floatingMinimumY > boardLastCellCenterY + capturePadding) return null;
+
+  const maximumOriginRow = BLOCK_BLAST_BOARD_SIZE - maximumPieceRow - 1;
+  const maximumOriginColumn = BLOCK_BLAST_BOARD_SIZE - maximumPieceColumn - 1;
+  const placementDistanceSquared = (row: number, column: number) => floatingCellCenters.reduce((total, center) => {
+    const boardCenterX = boardFirstCellCenter.x + (column + center.cell.column) * pitch;
+    const boardCenterY = boardFirstCellCenter.y + (row + center.cell.row) * pitch;
+    return total + (center.x - boardCenterX) ** 2 + (center.y - boardCenterY) ** 2;
+  }, 0) / floatingCellCenters.length;
+
+  let geometricOrigin: BlockBlastCell | null = null;
+  let geometricDistanceSquared = Number.POSITIVE_INFINITY;
+  for (let row = 0; row <= maximumOriginRow; row += 1) {
+    for (let column = 0; column <= maximumOriginColumn; column += 1) {
+      const distanceSquared = placementDistanceSquared(row, column);
+      if (distanceSquared < geometricDistanceSquared) {
+        geometricOrigin = { row, column };
+        geometricDistanceSquared = distanceSquared;
+      }
+    }
+  }
+  if (!geometricOrigin || canPlaceBlockBlastPiece(board, pieceCells, geometricOrigin.row, geometricOrigin.column)) return geometricOrigin;
+
+  let nearestValidOrigin: BlockBlastCell | null = null;
+  let nearestValidDistanceSquared = Number.POSITIVE_INFINITY;
+  for (let row = 0; row <= maximumOriginRow; row += 1) {
+    for (let column = 0; column <= maximumOriginColumn; column += 1) {
+      if (!canPlaceBlockBlastPiece(board, pieceCells, row, column)) continue;
+      const localDistanceSquared = (row - geometricOrigin.row) ** 2 + (column - geometricOrigin.column) ** 2;
+      if (localDistanceSquared > localSnapRadius ** 2) continue;
+      const distanceSquared = placementDistanceSquared(row, column);
+      if (distanceSquared < nearestValidDistanceSquared) {
+        nearestValidOrigin = { row, column };
+        nearestValidDistanceSquared = distanceSquared;
+      }
+    }
+  }
+  return nearestValidOrigin ?? geometricOrigin;
+}
+
 export function nearestSnappedBlockBlastOrigin(
   board: readonly (BlockBlastColorId | null)[],
   pieceCells: readonly BlockBlastCell[],

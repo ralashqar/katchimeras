@@ -20,7 +20,7 @@ import {
   BLOCK_BLAST_BOARD_SIZE,
   blockBlastClearCascadePhase,
   canPlaceBlockBlastPiece,
-  nearestSnappedBlockBlastOrigin,
+  nearestBlockBlastWorldOrigin,
   projectedBlockBlastLines,
   type BlockBlastCell,
   type BlockBlastColorId,
@@ -413,9 +413,7 @@ export function DraggableBlockBlastPiece({
 }) {
   const trayCell = Math.max(9.5, Math.min(14.5, metrics.cell * 0.38));
   const trayGap = trayCell * metrics.gap / metrics.cell;
-  const columns = Math.max(...piece.cells.map((part) => part.column)) + 1;
   const rows = Math.max(...piece.cells.map((part) => part.row)) + 1;
-  const pieceWidth = columns * metrics.pitch - metrics.gap;
   const pieceHeight = rows * metrics.pitch - metrics.gap;
   const fingerLift = Math.max(72, pieceHeight / 2 + 34);
   const translateX = useSharedValue(0);
@@ -426,6 +424,8 @@ export function DraggableBlockBlastPiece({
   const placedSuccessfully = useSharedValue(false);
   const grabOffsetX = useSharedValue(0);
   const grabOffsetY = useSharedValue(0);
+  const dragHomeCenterX = useSharedValue(0);
+  const dragHomeCenterY = useSharedValue(0);
   const hitboxWidth = useSharedValue(0);
   const hitboxHeight = useSharedValue(0);
   const lastHoverKey = useRef<string | null>(null);
@@ -435,20 +435,20 @@ export function DraggableBlockBlastPiece({
     if (!selected) scale.value = withTiming(1, { duration: reduceMotion ? 30 : 95, easing: CONTROLLED_EASE });
   }, [reduceMotion, scale, selected]);
 
-  const targetOrigin = (absoluteX: number, absoluteY: number, deltaX = 0, deltaY = 0): BlockBlastCell | null => {
+  const targetOrigin = (deltaX = 0, deltaY = 0): BlockBlastCell | null => {
     if (!boardFrame) return null;
-    const floatingCenterX = absoluteX + deltaX * (DRAG_DELTA_GAIN - 1);
-    const floatingCenterY = absoluteY + deltaY * (DRAG_DELTA_GAIN - 1) - fingerLift;
-    const floatingFirstCellCenterX = floatingCenterX - pieceWidth / 2 + metrics.cell / 2;
-    const floatingFirstCellCenterY = floatingCenterY - pieceHeight / 2 + metrics.cell / 2;
-    const boardFirstCellCenterX = boardFrame.x + metrics.outer + metrics.cell / 2;
-    const boardFirstCellCenterY = boardFrame.y + metrics.outer + metrics.cell / 2;
-    const targetColumn = (floatingFirstCellCenterX - boardFirstCellCenterX) / metrics.pitch;
-    const targetRow = (floatingFirstCellCenterY - boardFirstCellCenterY) / metrics.pitch;
-    return nearestSnappedBlockBlastOrigin(board, piece.cells, targetRow, targetColumn);
+    const floatingCenter = {
+      x: dragHomeCenterX.value + deltaX * DRAG_DELTA_GAIN + grabOffsetX.value,
+      y: dragHomeCenterY.value + deltaY * DRAG_DELTA_GAIN + grabOffsetY.value - fingerLift,
+    };
+    const boardFirstCellCenter = {
+      x: boardFrame.x + metrics.outer + metrics.cell / 2,
+      y: boardFrame.y + metrics.outer + metrics.cell / 2,
+    };
+    return nearestBlockBlastWorldOrigin(board, piece.cells, floatingCenter, boardFirstCellCenter, metrics.pitch);
   };
-  const updateHover = (absoluteX: number, absoluteY: number, deltaX = 0, deltaY = 0) => {
-    const origin = targetOrigin(absoluteX, absoluteY, deltaX, deltaY);
+  const updateHover = (deltaX = 0, deltaY = 0) => {
+    const origin = targetOrigin(deltaX, deltaY);
     const key = origin ? `${origin.row}:${origin.column}` : null;
     if (key === lastHoverKey.current) return;
     lastHoverKey.current = key;
@@ -473,9 +473,9 @@ export function DraggableBlockBlastPiece({
     scale.value = withTiming(1, { duration: reduceMotion ? 30 : 90, easing: CONTROLLED_EASE });
     opacity.value = withTiming(1, { duration: reduceMotion ? 30 : 70, easing: CONTROLLED_EASE });
   };
-  const finishDrag = (absoluteX: number, absoluteY: number, deltaX: number, deltaY: number) => {
+  const finishDrag = (deltaX: number, deltaY: number) => {
     if (placedSuccessfully.value) return;
-    const origin = targetOrigin(absoluteX, absoluteY, deltaX, deltaY);
+    const origin = targetOrigin(deltaX, deltaY);
     if (origin && canPlaceBlockBlastPiece(board, piece.cells, origin.row, origin.column)) {
       placedSuccessfully.value = true;
       returningToTray.value = true;
@@ -502,6 +502,8 @@ export function DraggableBlockBlastPiece({
     .onBegin((event) => {
       grabOffsetX.value = event.x - hitboxWidth.value / 2;
       grabOffsetY.value = event.y - hitboxHeight.value / 2;
+      dragHomeCenterX.value = event.absoluteX - event.x + hitboxWidth.value / 2;
+      dragHomeCenterY.value = event.absoluteY - event.y + hitboxHeight.value / 2;
     })
     .onStart((event) => {
       onPick();
@@ -512,24 +514,25 @@ export function DraggableBlockBlastPiece({
       opacity.value = 1;
       translateX.value = event.translationX * DRAG_DELTA_GAIN + grabOffsetX.value;
       translateY.value = event.translationY * DRAG_DELTA_GAIN + grabOffsetY.value - fingerLift;
-      scale.value = withTiming(metrics.cell / trayCell, { duration: reduceMotion ? 30 : 90, easing: CONTROLLED_EASE });
-      updateHover(event.absoluteX, event.absoluteY, event.translationX, event.translationY);
+      scale.value = metrics.cell / trayCell;
+      updateHover(event.translationX, event.translationY);
     })
     .onUpdate((event) => {
       if (placedSuccessfully.value) return;
       translateX.value = event.translationX * DRAG_DELTA_GAIN + grabOffsetX.value;
       translateY.value = event.translationY * DRAG_DELTA_GAIN + grabOffsetY.value - fingerLift;
-      updateHover(event.absoluteX, event.absoluteY, event.translationX, event.translationY);
+      updateHover(event.translationX, event.translationY);
     })
-    .onEnd((event) => finishDrag(event.absoluteX, event.absoluteY, event.translationX, event.translationY))
+    .onEnd((event) => finishDrag(event.translationX, event.translationY))
     .onFinalize(() => {
       if (!placedSuccessfully.value) returnToTray();
       clearHover();
     });
-  const animated = useAnimatedStyle(() => ({
+  const translated = useAnimatedStyle(() => ({
     opacity: placedSuccessfully.value ? 0 : opacity.value,
-    transform: [{ translateX: translateX.value }, { translateY: translateY.value }, { scale: scale.value }],
+    transform: [{ translateX: translateX.value }, { translateY: translateY.value }],
   }));
+  const scaled = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <GestureDetector gesture={gesture}>
@@ -545,8 +548,10 @@ export function DraggableBlockBlastPiece({
         onPress={onPick}
         style={({ pressed }) => [styles.pieceHitbox, pressed && styles.pieceHitboxPressed]}
       >
-        <Animated.View pointerEvents="none" style={[styles.trayPiece, { zIndex: selected ? 40 : 1 }, animated]}>
-          <BlockBlastPieceArt piece={piece} cell={trayCell} gap={trayGap} />
+        <Animated.View pointerEvents="none" style={[styles.trayPiece, { zIndex: selected ? 40 : 1 }, translated]}>
+          <Animated.View style={scaled}>
+            <BlockBlastPieceArt piece={piece} cell={trayCell} gap={trayGap} />
+          </Animated.View>
         </Animated.View>
       </Pressable>
     </GestureDetector>

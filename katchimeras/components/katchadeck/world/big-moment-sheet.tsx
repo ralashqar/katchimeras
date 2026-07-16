@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -21,22 +21,7 @@ export function BigMomentSheet({ bigMoments, notes, onClose }: BigMomentSheetPro
   const ordered = [...bigMoments].reverse(); // most recent first
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          {ordered.length === 1 ? 'A big moment' : 'Big moments'}
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          {ordered.length === 1 ? 'What made today matter' : 'What made the day matter'}
-        </ThemedText>
+    <KatchaSheet header={{ eyebrow: ordered.length === 1 ? 'A big moment' : 'Big moments', title: ordered.length === 1 ? 'What made today matter' : 'What made the day matter', subtitle: 'Milestones and memories that stood apart.' }} onRequestClose={onClose} size="tall" surface="night">
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
           {ordered.length === 0 ? (
@@ -73,8 +58,7 @@ export function BigMomentSheet({ bigMoments, notes, onClose }: BigMomentSheetPro
             Close
           </ThemedText>
         </Pressable>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 

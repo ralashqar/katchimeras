@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import { Lantern } from '@/constants/theme';
+
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 // "Name today's patch" (the namePatch quest). The user accepts a suggestion or
 // writes their own — it becomes the day's title (a Story Banner). Display-only.
@@ -26,13 +29,13 @@ export function NameDaySheet({ initialName, suggestion, onSave, onClose }: NameD
   };
 
   return (
-    <MeadowSheet onClose={onClose} kicker="Name this day" title="What was today?">
+    <KatchaSheet header={{ eyebrow: 'Name this day', title: 'What was today?' }} keyboardAvoiding onRequestClose={() => onClose()} surface="parchment">
       <View style={styles.body}>
         <TextInput
           value={value}
           onChangeText={setValue}
           placeholder="e.g. A slow Sunday"
-          placeholderTextColor={Lantern.moon500}
+          placeholderTextColor={PARCHMENT.textTertiary}
           style={styles.input}
           maxLength={40}
           returnKeyType="done"
@@ -42,7 +45,7 @@ export function NameDaySheet({ initialName, suggestion, onSave, onClose }: NameD
 
         {suggestion && suggestion.trim() && suggestion.trim() !== trimmed ? (
           <Pressable onPress={() => setValue(suggestion.trim())} style={styles.suggestion}>
-            <ThemedText style={styles.suggestionText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            <ThemedText style={styles.suggestionText} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
               Use “{suggestion.trim()}”
             </ThemedText>
           </Pressable>
@@ -58,7 +61,7 @@ export function NameDaySheet({ initialName, suggestion, onSave, onClose }: NameD
           </ThemedText>
         </Pressable>
       </View>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -70,9 +73,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(196,186,240,0.22)',
-    backgroundColor: 'rgba(12,10,20,0.7)',
-    color: Lantern.moon50,
+    backgroundColor: PARCHMENT.subtle,
+    borderColor: PARCHMENT.border,
+    color: PARCHMENT.text,
     fontSize: 16,
     fontWeight: '600',
   },

@@ -108,6 +108,26 @@ const journalPlaceTimeline = buildMomentTimeline(journalPlaceDay);
 check('manual place journal suppresses its compatibility place row', journalPlaceTimeline.length === 1, JSON.stringify(journalPlaceTimeline));
 check('manual place journal leads with its selected category', journalPlaceTimeline[0]?.category === 'Museum or gallery', JSON.stringify(journalPlaceTimeline));
 
+const studioSubtypeIcons = {
+  book: 'book.fill', film: 'film.fill', show: 'tv.fill', game: 'gamecontroller.fill',
+  music: 'music.note', podcast: 'waveform', art: 'paintbrush.fill', other_media: 'play.rectangle.fill',
+};
+const studioSubtypeDay = {
+  ...day,
+  promptAnswers: [], capturedMeanings: [], notes: [], foodMoments: [], studioMoments: [], confirmedPlaces: [],
+  stepsInterpretation: null, bigMoments: [], sleep: null,
+  manualJournalEntries: Object.keys(studioSubtypeIcons).map((categoryId, index) => ({
+    id: `studio-${categoryId}`, flowId: 'studio', flowVersion: 1, path: ['studio', categoryId], categoryId,
+    canonicalQualityIds: [], fields: { specific: `Title ${categoryId}` }, feeling: null, note: null,
+    sourceType: 'manual', sourceId: `manual-${categoryId}`, linkedNoteId: null, createdAt: at(20 + index),
+  })),
+};
+const studioSubtypeTimeline = buildMomentTimeline(studioSubtypeDay);
+for (const [categoryId, icon] of Object.entries(studioSubtypeIcons)) {
+  const entry = studioSubtypeTimeline.find((item) => item.id === `manual:studio-${categoryId}`);
+  check(`manual studio ${categoryId} uses its subtype icon`, entry?.icon === icon, JSON.stringify(entry));
+}
+
 const linkedPhotoDay = {
   ...day,
   notes: [
@@ -120,6 +140,19 @@ const linkedPhotoTimeline = buildMomentTimeline(linkedPhotoDay);
 const linkedPhoto = linkedPhotoTimeline.find((entry) => entry.id === 'capture:p1');
 check('linked photo note is grouped into the photo timeline item', linkedPhoto?.noteText === 'The detail I wanted to keep' && linkedPhoto.audioUri === 'file://note.m4a', JSON.stringify(linkedPhotoTimeline));
 check('linked photo note does not create a duplicate timeline item', !linkedPhotoTimeline.some((entry) => entry.id === 'note:photo-note'));
+check('photo timeline reuses its manual journal category icon', linkedPhoto?.icon === 'book.fill', JSON.stringify(linkedPhotoTimeline));
+
+const gamePhotoDay = {
+  ...day,
+  capturedMeanings: [{ archetype: 'calm', label: 'Unwinding', thumbnailUri: 'game-photo', sourceId: 'game-photo', createdAt: at(12) }],
+  manualJournalEntries: [{
+    id: 'game-photo-journal', flowId: 'studio', flowVersion: 1, path: ['studio', 'game'], categoryId: 'game',
+    canonicalQualityIds: ['media.game'], fields: { specific: 'A game' }, feeling: 'calm', note: null,
+    sourceType: 'photo', sourceId: 'game-photo', linkedNoteId: null, createdAt: at(12),
+  }],
+};
+const gamePhoto = buildMomentTimeline(gamePhotoDay).find((entry) => entry.id === 'capture:game-photo');
+check('game photo uses the game controller instead of its calm leaf', gamePhoto?.icon === 'gamecontroller.fill', JSON.stringify(gamePhoto));
 
 const todayCategoriesSource = fs.readFileSync(path.join(projectRoot, 'utils/today-categories.ts'), 'utf8');
 const journalSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-journal-sections.tsx'), 'utf8');

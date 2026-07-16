@@ -1,13 +1,12 @@
 import { Image } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { Lantern } from '@/constants/theme';
 import type { KingdomGift } from '@/utils/kingdom-decor';
 import { worldAssetSource } from '@/utils/world-visuals';
-import { Meadow } from '@/constants/meadow-theme';
 
 // The Kingdom's keepsake shelf — everything life has earned that isn't planted
 // yet, each with its art, name and provenance. Plant drops it at the camera
@@ -22,15 +21,7 @@ type KeepsakesSheetProps = {
 
 export function KeepsakesSheet({ gifts, onPlant, onDecorate, onOpenAlmanac, onClose }: KeepsakesSheetProps) {
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
+    <KatchaSheet maxHeight={520} onRequestClose={onClose} surface="night">
         <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
           🎁 Keepsakes
         </ThemedText>
@@ -87,36 +78,11 @@ export function KeepsakesSheet({ gifts, onPlant, onDecorate, onOpenAlmanac, onCl
           <KatchaButton label="Rearrange the Kingdom" variant="secondary" onPress={onDecorate} style={styles.actionBtn} />
           <KatchaButton label="Done" variant="primary" onPress={onClose} style={styles.actionBtn} />
         </View>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, elevation: 24, zIndex: 55 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 7, 15, 0.42)' },
-  sheet: {
-    backgroundColor: Meadow.overlay.sheetBg,
-    borderColor: Meadow.overlay.sheetBorder,
-    borderCurve: 'continuous',
-    borderRadius: 24,
-    borderWidth: 1,
-    boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
-    gap: 8,
-    left: 14,
-    maxHeight: 520,
-    padding: 18,
-    position: 'absolute',
-    right: 14,
-  },
-  grabber: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    borderRadius: 999,
-    height: 4,
-    marginBottom: 4,
-    width: 38,
-  },
   kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
   title: { fontSize: 18, fontWeight: '800', lineHeight: 23 },
   sub: { fontSize: 12.5, fontWeight: '700' },

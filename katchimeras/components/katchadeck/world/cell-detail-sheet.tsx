@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ActionTile } from '@/components/katchadeck/ui/action-tile';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { PLACE_CATEGORIES } from '@/components/katchadeck/world/place-prompt-sheet';
 import { DayMemoryStrip } from '@/components/katchadeck/world/day-memory-strip';
 import { Lantern } from '@/constants/theme';
@@ -75,12 +75,12 @@ const BIG_MOMENT_EMOJI: Record<string, string> = {
 
 export function CellDetailSheet({ day, cell, recentAvgSteps, onClose, onAddPhoto, onViewMemories }: CellDetailSheetProps) {
   return (
-    <MeadowSheet onClose={onClose} kicker={cell.sourceLabel} title={cell.summaryLabel}>
+    <KatchaSheet header={{ eyebrow: cell.sourceLabel, title: cell.summaryLabel }} onRequestClose={onClose} size="tall" surface="night">
 
       {cell.type === 'memory' ? <MemoryBody day={day} onAddPhoto={onAddPhoto} /> : null}
       {cell.type === 'journey' ? <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} /> : null}
       {cell.type === 'reflection' ? <ReflectionBody day={day} /> : null}
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -104,10 +104,11 @@ export function JourneyDetailSheet({
   const interpretation = day.stepsInterpretation;
   const interpretationDisplay = interpretation ? resolveMovementDisplay(interpretation) : null;
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="Journey"
-      title={interpretationDisplay ? `${interpretationDisplay.emoji} ${interpretationDisplay.label}` : 'How the day moved'}>
+    <KatchaSheet
+      header={{ eyebrow: 'Journey', title: interpretationDisplay ? `${interpretationDisplay.emoji} ${interpretationDisplay.label}` : 'How the day moved', subtitle: 'Movement, places and memories from today.' }}
+      onRequestClose={onClose}
+      size="tall"
+      surface="night">
       <JourneyBody day={day} recentAvgSteps={recentAvgSteps} onViewMemories={onViewMemories} />
       {!interpretation && onInterpret ? (
         <Pressable
@@ -120,7 +121,7 @@ export function JourneyDetailSheet({
           </ThemedText>
         </Pressable>
       ) : null}
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -136,12 +137,13 @@ export function NotesDetailSheet({
 }) {
   const notes = day.notes ?? [];
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="Notes"
-      title={notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} & moments` : 'Your notes'}>
+    <KatchaSheet
+      header={{ eyebrow: 'Notes', title: notes.length > 0 ? `${notes.length} ${notes.length === 1 ? 'note' : 'notes'} & moments` : 'Your notes', subtitle: 'Written and spoken pieces from today.' }}
+      onRequestClose={onClose}
+      size="tall"
+      surface="night">
       <NotesBody day={day} onAddNote={onAddNote} />
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -186,10 +188,11 @@ export function PlacesDetailSheet({
   }, [mapSummary]);
 
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="Crossroads"
-      title={nodes.length > 0 ? `${nodes.length} ${nodes.length === 1 ? 'place' : 'places'} today` : 'Where did you go?'}>
+    <KatchaSheet
+      header={{ eyebrow: 'Crossroads', title: nodes.length > 0 ? `${nodes.length} ${nodes.length === 1 ? 'place' : 'places'} today` : 'Where did you go?', subtitle: 'Stops, paths and place-linked memories.' }}
+      onRequestClose={onClose}
+      size="tall"
+      surface="night">
       <View style={styles.body}>
         <View style={styles.tileRow}>
           {onAddPlace ? <ActionTile icon="mappin.and.ellipse" title="Add place" tint="#E8C06A" onPress={onAddPlace} /> : null}
@@ -279,7 +282,7 @@ export function PlacesDetailSheet({
           );
         })}
       </View>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 

@@ -2,7 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { Lantern } from '@/constants/theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { Observation, ObservationKind } from '@/utils/observations-engine';
@@ -134,7 +134,7 @@ export function ObservatorySheet({
   const foundationAvailability = foundationSceneAvailability();
 
   return (
-    <MeadowSheet onClose={onClose} kicker="The Observatory" title="What Katchimera has noticed" maxHeight="80%">
+    <KatchaSheet header={{ eyebrow: 'The Observatory', title: 'What Katchimera has noticed', subtitle: 'Patterns and gentle observations across your days.' }} onRequestClose={onClose} size="tall" surface="night">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {strongest ? (
           <View style={styles.section}>
@@ -341,7 +341,7 @@ export function ObservatorySheet({
           </View>
         ) : null}
       </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 

@@ -6,9 +6,10 @@ import { DayPromptStrip, type FeedSourceRect } from '@/components/katchadeck/hom
 import { ThemedText } from '@/components/themed-text';
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { ActionTile } from '@/components/katchadeck/ui/action-tile';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { dayPromptMenuLabels } from '@/constants/day-prompts';
 import { Lantern } from '@/constants/theme';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { DayPromptKind } from '@/types/home';
 import type { DailySeed } from '@/utils/daily-seeds-engine';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
@@ -57,6 +58,7 @@ const MENU_SECTIONS: { id: PromptMenuSection; title: string }[] = [
 ];
 
 const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#FFB4A2'];
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 function sectionForPrompt(prompt: ActiveDayPrompt): PromptMenuSection {
   if (prompt.id === 'meaningful_photo') return 'capture';
@@ -82,7 +84,7 @@ export function MomentPromptSheet({
   const [selected, setSelected] = useState<ActiveDayPrompt | null>(initialPrompt);
 
   return (
-    <MeadowSheet onClose={onClose} title={selected ? undefined : 'Add to today'}>
+    <KatchaSheet header={selected ? undefined : { title: 'Add to today' }} onRequestClose={() => onClose()} surface="parchment">
       {selected ? (
         <DayPromptStrip
           prompt={selected}
@@ -107,7 +109,7 @@ export function MomentPromptSheet({
         <>
           {seeds && seeds.length > 0 ? (
             <View style={styles.seedSection}>
-              <ThemedText style={styles.seedHeading} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+              <ThemedText style={styles.seedHeading} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
                 Things that could shape today
               </ThemedText>
               <View style={styles.seedRow}>
@@ -120,7 +122,7 @@ export function MomentPromptSheet({
 
           {suggestions.length > 0 ? (
             <View style={styles.suggestionSection}>
-              <ThemedText style={styles.seedHeading} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
+              <ThemedText style={styles.seedHeading} lightColor={PARCHMENT.accentPressed} darkColor={PARCHMENT.accentPressed}>
                 Suggested now
               </ThemedText>
               <View style={styles.suggestionRow}>
@@ -142,7 +144,7 @@ export function MomentPromptSheet({
           ) : null}
 
           {prompts.length === 0 && quickCategories.length === 0 ? (
-            <ThemedText style={styles.empty} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+            <ThemedText style={styles.empty} lightColor={PARCHMENT.textTertiary} darkColor={PARCHMENT.textTertiary}>
               {"You've answered everything for now — the egg has what it needs today."}
             </ThemedText>
           ) : (
@@ -157,7 +159,7 @@ export function MomentPromptSheet({
 
                 return (
                   <View key={section.id} style={styles.menuSection}>
-                    <ThemedText style={styles.menuHeading} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                    <ThemedText style={styles.menuHeading} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
                       {section.title}
                     </ThemedText>
                     <View style={styles.categoryGrid}>
@@ -202,7 +204,7 @@ export function MomentPromptSheet({
           )}
         </>
       )}
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 

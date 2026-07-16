@@ -5,7 +5,6 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -21,7 +20,8 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated';
 
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { manualJournalArt } from '@/constants/manual-journal-art';
@@ -324,7 +324,7 @@ export function JournalComposer({
       : FadeInLeft.duration(210);
 
   return (
-    <MeadowSheet onClose={requestClose} surface="parchment" variant="tall">
+    <KatchaSheet onRequestClose={() => requestClose()} surface="parchment" size="tall">
       <KeyboardAvoidingView
         behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={12}
@@ -596,51 +596,19 @@ export function JournalComposer({
           </View>
         ) : null}
 
-        <Modal
-          animationType="fade"
-          navigationBarTranslucent
-          onRequestClose={() => setDiscardOpen(false)}
-          presentationStyle="overFullScreen"
-          statusBarTranslucent
-          transparent
-          visible={discardOpen}>
-          <View style={styles.discardOverlay}>
-            <Animated.View
-              accessibilityLabel="Discard draft confirmation"
-              accessibilityViewIsModal
-              entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(170)}
-              style={styles.discardCard}>
-              <View style={styles.discardIcon}>
-                <IconSymbol name="exclamationmark.triangle.fill" size={21} color="#8B5A16" />
-              </View>
-              <ThemedText style={styles.discardEyebrow} lightColor="#7A542C" darkColor="#7A542C">Unsaved draft</ThemedText>
-              <ThemedText style={styles.discardTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Discard this draft?</ThemedText>
-              <ThemedText style={styles.discardBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Your choices and note won’t be saved.</ThemedText>
-              <View style={styles.discardActions}>
-                <Pressable
-                  accessibilityHint="Returns to your journal with the draft intact"
-                  accessibilityLabel="Keep editing draft"
-                  accessibilityRole="button"
-                  onPress={() => setDiscardOpen(false)}
-                  style={({ pressed }) => [styles.keepEditing, pressed && styles.keepEditingPressed]}>
-                  <IconSymbol name="pencil" size={16} color={Meadow.ink} />
-                  <ThemedText style={styles.keepEditingText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Keep editing</ThemedText>
-                </Pressable>
-                <Pressable
-                  accessibilityHint="Permanently closes this unsaved draft"
-                  accessibilityLabel="Discard draft"
-                  accessibilityRole="button"
-                  onPress={discard}
-                  style={({ pressed }) => [styles.discardButton, pressed && styles.discardButtonPressed]}>
-                  <IconSymbol name="trash.fill" size={16} color="#FFF7EC" />
-                  <ThemedText style={styles.discardButtonText} lightColor="#FFF7EC" darkColor="#FFF7EC">Discard draft</ThemedText>
-                </Pressable>
-              </View>
-            </Animated.View>
-          </View>
-        </Modal>
+        <KatchaDialog
+          body="Your choices and note won’t be saved."
+          cancelLabel="Keep editing"
+          confirmLabel="Discard draft"
+          onCancel={() => setDiscardOpen(false)}
+          onConfirm={discard}
+          open={discardOpen}
+          surface="parchment"
+          title="Discard this draft?"
+          tone="destructive"
+        />
       </KeyboardAvoidingView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -912,17 +880,4 @@ const styles = StyleSheet.create({
   saveText: { fontFamily: AppFontFamilies.manrope, fontSize: 14.5, fontWeight: '800' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
-  discardOverlay: { alignItems: 'center', backgroundColor: 'rgba(24,17,12,0.76)', flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
-  discardCard: { alignItems: 'flex-start', backgroundColor: '#F0D9B1', borderColor: 'rgba(255,247,226,0.72)', borderCurve: 'continuous', borderRadius: 26, borderWidth: 1, boxShadow: '0 24px 64px rgba(35,20,10,0.52), inset 0 1px 0 rgba(255,250,235,0.74)', gap: 8, maxWidth: 360, padding: 22, width: '100%' },
-  discardIcon: { alignItems: 'center', backgroundColor: 'rgba(210,157,53,0.22)', borderColor: 'rgba(139,90,22,0.14)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 44, justifyContent: 'center', marginBottom: 2, width: 44 },
-  discardEyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
-  discardTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 29, lineHeight: 33 },
-  discardBody: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, lineHeight: 20, paddingBottom: 5 },
-  discardActions: { gap: 10, paddingTop: 8, width: '100%' },
-  keepEditing: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,247,218,0.74)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 14px rgba(105,70,24,0.20), inset 0 1px 0 rgba(255,250,228,0.68)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 },
-  keepEditingPressed: { backgroundColor: '#D8A943', transform: [{ scale: 0.985 }] },
-  keepEditingText: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
-  discardButton: { alignItems: 'center', backgroundColor: '#8C3F36', borderColor: 'rgba(255,226,214,0.25)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 14px rgba(83,29,24,0.24), inset 0 1px 0 rgba(255,238,228,0.16)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 },
-  discardButtonPressed: { backgroundColor: '#75322C', transform: [{ scale: 0.985 }] },
-  discardButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
 });

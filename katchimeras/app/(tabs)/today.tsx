@@ -241,24 +241,19 @@ export default function HomeScreen() {
   const {
     memoryVaultOpen,
     setMemoryVaultOpen,
-    memoryVaultTab,
     setMemoryVaultTab,
     foodPickerOpen,
     setFoodPickerOpen,
     foodVaultOpen,
-    setFoodVaultOpen,
     studioPickerOpen,
     setStudioPickerOpen,
     studioVaultOpen,
-    setStudioVaultOpen,
     sanctuaryOpen,
-    setSanctuaryOpen,
     moodSheetOpen,
     setMoodSheetOpen,
     sleepSheetOpen,
     setSleepSheetOpen,
     questBoardOpen,
-    setQuestBoardOpen,
     bigMomentPickerOpen,
     setBigMomentPickerOpen,
     placePromptOpen,
@@ -270,7 +265,6 @@ export default function HomeScreen() {
     journeySheetOpen,
     setJourneySheetOpen,
     nameSheetOpen,
-    setNameSheetOpen,
   } = sheets;
 
   // Quick TEXT note (tap the mic): an inline text box over the page — enter
@@ -781,23 +775,8 @@ export default function HomeScreen() {
         viewedDay={viewedDay}
         viewedIsForming={viewedIsForming}
         formingTarget={formingTarget}
-        memoryVaultOpen={memoryVaultOpen}
-        memoryVaultTab={memoryVaultTab}
-        foodPickerOpen={foodPickerOpen}
-        foodVaultOpen={foodVaultOpen}
-        studioPickerOpen={studioPickerOpen}
-        studioVaultOpen={studioVaultOpen}
-        sanctuaryOpen={sanctuaryOpen}
-        moodSheetOpen={moodSheetOpen}
-        sleepSheetOpen={sleepSheetOpen}
-        questBoardOpen={questBoardOpen}
-        bigMomentPickerOpen={bigMomentPickerOpen}
-        stepsSheetOpen={stepsSheetOpen}
-        journeySheetOpen={journeySheetOpen}
-        placesVaultOpen={placesVaultOpen}
+        sheets={sheets}
         observatoryOpen={observatoryOpen}
-        placePromptOpen={placePromptOpen}
-        nameSheetOpen={nameSheetOpen}
         foodFollowUp={foodFollowUp}
         studioFollowUp={studioFollowUp}
         suppressFollowUps={promptSheetOpen || isHatching || quickNoteOpen || clarificationMemory !== null}
@@ -810,22 +789,7 @@ export default function HomeScreen() {
         cloudIntelligenceEnabled={cloudIntelligenceEnabled}
         setCloudIntelligenceEnabled={setCloudIntelligenceEnabled}
         onOpenIntelligenceLab={() => router.push('/intelligence-lab')}
-        setMemoryVaultOpen={setMemoryVaultOpen}
-        setMemoryVaultTab={setMemoryVaultTab}
-        setFoodPickerOpen={setFoodPickerOpen}
-        setFoodVaultOpen={setFoodVaultOpen}
-        setStudioPickerOpen={setStudioPickerOpen}
-        setStudioVaultOpen={setStudioVaultOpen}
-        setSanctuaryOpen={setSanctuaryOpen}
-        setMoodSheetOpen={setMoodSheetOpen}
-        setSleepSheetOpen={setSleepSheetOpen}
-        setQuestBoardOpen={setQuestBoardOpen}
-        setBigMomentPickerOpen={setBigMomentPickerOpen}
-        setStepsSheetOpen={setStepsSheetOpen}
-        setJourneySheetOpen={setJourneySheetOpen}
-        setPlacesVaultOpen={setPlacesVaultOpen}
         setObservatoryOpen={setObservatoryOpen}
-        setNameSheetOpen={setNameSheetOpen}
         onCapturePhoto={openMomentCapture}
         onCaptureNote={openNoteCapture}
         openPromptSheet={openPromptSheet}

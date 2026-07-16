@@ -4,7 +4,8 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import { Lantern } from '@/constants/theme';
 import type { StudioMediaType, StudioMoment, StudioRating } from '@/types/home';
 import { resolveStudioMomentDisplay } from '@/utils/memory-display';
@@ -14,6 +15,7 @@ import { resolveStudioMomentDisplay } from '@/utils/memory-display';
 // landed) and a small reader, mirroring the Food Vault.
 
 type StudioType = { mediaType: StudioMediaType; label: string; emoji: string };
+const PARCHMENT = KatchaSurfacePalette.parchment;
 const STUDIO_TYPES: StudioType[] = [
   { mediaType: 'book', label: 'A book', emoji: '📖' },
   { mediaType: 'film', label: 'A film', emoji: '🎬' },
@@ -61,10 +63,13 @@ export function StudioMomentSheet({
   );
 
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="An inspiration"
-      title={media ? `${media.emoji} ${media.label} · how did it land?` : 'What did you take in?'}>
+    <KatchaSheet
+      header={{
+        eyebrow: 'An inspiration',
+        title: media ? `${media.emoji} ${media.label} · how did it land?` : 'What did you take in?',
+      }}
+      onRequestClose={onClose}
+      surface="parchment">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {!media ? (
           <Animated.View entering={FadeInDown.duration(220)} style={styles.section}>
@@ -72,7 +77,7 @@ export function StudioMomentSheet({
               {STUDIO_TYPES.map((option) => (
                 <Pressable key={option.mediaType} onPress={() => setMedia(option)} style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     {option.label}
                   </ThemedText>
                 </Pressable>
@@ -88,21 +93,21 @@ export function StudioMomentSheet({
                   onPress={() => onConfirm({ label: media.label, mediaType: media.mediaType, emoji: media.emoji, rating: option.id })}
                   style={({ pressed }) => [styles.chip, { borderColor: `${option.tint}66` }, pressed && styles.chipPressed]}>
                   <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
-                  <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     {option.label}
                   </ThemedText>
                 </Pressable>
               ))}
             </View>
             <Pressable accessibilityRole="button" onPress={() => setMedia(null)} style={styles.back}>
-              <ThemedText style={styles.backLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+              <ThemedText style={styles.backLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
                 Back
               </ThemedText>
             </Pressable>
           </Animated.View>
         )}
       </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -117,10 +122,15 @@ export function StudioVaultSheet({
   onClose: () => void;
 }) {
   return (
-    <MeadowSheet
-      onClose={onClose}
-      kicker="The Studio"
-      title={studioMoments.length > 0 ? 'Today’s inspirations' : 'Your inspirations'}>
+    <KatchaSheet
+      header={{
+        eyebrow: 'The Studio',
+        title: studioMoments.length > 0 ? 'Today’s inspirations' : 'Your inspirations',
+        subtitle: studioMoments.length > 0 ? `${studioMoments.length} ${studioMoments.length === 1 ? 'inspiration' : 'inspirations'} kept from today.` : 'Books, films, music and art will gather here.',
+      }}
+      onRequestClose={onClose}
+      size="tall"
+      surface="night">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.body}>
           {onAddStudio ? (
@@ -166,7 +176,7 @@ export function StudioVaultSheet({
           })}
         </View>
       </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -182,10 +192,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(12,10,20,0.7)',
+    borderColor: PARCHMENT.border,
+    backgroundColor: PARCHMENT.elevated,
   },
-  chipPressed: { backgroundColor: 'rgba(40,34,60,0.9)' },
+  chipPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   chipEmoji: { fontSize: 16 },
   chipLabel: { fontSize: 13, fontWeight: '700' },
   back: { alignSelf: 'flex-start', paddingTop: 2 },

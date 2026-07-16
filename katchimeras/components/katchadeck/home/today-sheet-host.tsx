@@ -14,14 +14,13 @@ import { SleepSheet } from '@/components/katchadeck/world/sleep-sheet';
 import { StepsPromptSheet } from '@/components/katchadeck/world/steps-prompt-sheet';
 import { StudioMomentSheet, StudioVaultSheet } from '@/components/katchadeck/world/studio-vault-sheet';
 import type { FoodMomentFollowUp, StudioMomentFollowUp } from '@/features/today/use-moment-follow-up-controller';
+import type { TodaySheetController } from '@/features/today/use-today-sheet-controller';
 import type { DayInputTarget, HomeDayRecord } from '@/types/home';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
 import type { Observation } from '@/utils/observations-engine';
 
 type FoodConfirmInput = Parameters<ComponentProps<typeof FoodMomentSheet>['onConfirm']>[0];
 type StudioConfirmInput = Parameters<ComponentProps<typeof StudioMomentSheet>['onConfirm']>[0];
-type MemoryVaultTab = ComponentProps<typeof MemoryVaultSheet>['initialTab'];
-
 type ActivePlace = {
   name: string;
   timeLabel: string | null;
@@ -32,23 +31,8 @@ type TodaySheetHostProps = {
   viewedDay: HomeDayRecord | null;
   viewedIsForming: boolean;
   formingTarget: DayInputTarget;
-  memoryVaultOpen: boolean;
-  memoryVaultTab: MemoryVaultTab;
-  foodPickerOpen: boolean;
-  foodVaultOpen: boolean;
-  studioPickerOpen: boolean;
-  studioVaultOpen: boolean;
-  sanctuaryOpen: boolean;
-  moodSheetOpen: boolean;
-  sleepSheetOpen: boolean;
-  questBoardOpen: boolean;
-  bigMomentPickerOpen: boolean;
-  stepsSheetOpen: boolean;
-  journeySheetOpen: boolean;
-  placesVaultOpen: boolean;
+  sheets: TodaySheetController;
   observatoryOpen: boolean;
-  placePromptOpen: boolean;
-  nameSheetOpen: boolean;
   foodFollowUp: FoodMomentFollowUp | null;
   studioFollowUp: StudioMomentFollowUp | null;
   suppressFollowUps: boolean;
@@ -61,22 +45,7 @@ type TodaySheetHostProps = {
   cloudIntelligenceEnabled: boolean;
   setCloudIntelligenceEnabled: (enabled: boolean) => void;
   onOpenIntelligenceLab?: () => void;
-  setMemoryVaultOpen: (open: boolean) => void;
-  setMemoryVaultTab: (tab: NonNullable<MemoryVaultTab>) => void;
-  setFoodPickerOpen: (open: boolean) => void;
-  setFoodVaultOpen: (open: boolean) => void;
-  setStudioPickerOpen: (open: boolean) => void;
-  setStudioVaultOpen: (open: boolean) => void;
-  setSanctuaryOpen: (open: boolean) => void;
-  setMoodSheetOpen: (open: boolean) => void;
-  setSleepSheetOpen: (open: boolean) => void;
-  setQuestBoardOpen: (open: boolean) => void;
-  setBigMomentPickerOpen: (open: boolean) => void;
-  setStepsSheetOpen: (open: boolean) => void;
-  setJourneySheetOpen: (open: boolean) => void;
-  setPlacesVaultOpen: (open: boolean) => void;
   setObservatoryOpen: (open: boolean) => void;
-  setNameSheetOpen: (open: boolean) => void;
   onCapturePhoto: () => void;
   onCaptureNote: () => void;
   openPromptSheet: () => void;
@@ -105,23 +74,8 @@ export function TodaySheetHost({
   viewedDay,
   viewedIsForming,
   formingTarget,
-  memoryVaultOpen,
-  memoryVaultTab,
-  foodPickerOpen,
-  foodVaultOpen,
-  studioPickerOpen,
-  studioVaultOpen,
-  sanctuaryOpen,
-  moodSheetOpen,
-  sleepSheetOpen,
-  questBoardOpen,
-  bigMomentPickerOpen,
-  stepsSheetOpen,
-  journeySheetOpen,
-  placesVaultOpen,
+  sheets,
   observatoryOpen,
-  placePromptOpen,
-  nameSheetOpen,
   foodFollowUp,
   studioFollowUp,
   suppressFollowUps,
@@ -134,22 +88,7 @@ export function TodaySheetHost({
   cloudIntelligenceEnabled,
   setCloudIntelligenceEnabled,
   onOpenIntelligenceLab,
-  setMemoryVaultOpen,
-  setMemoryVaultTab,
-  setFoodPickerOpen,
-  setFoodVaultOpen,
-  setStudioPickerOpen,
-  setStudioVaultOpen,
-  setSanctuaryOpen,
-  setMoodSheetOpen,
-  setSleepSheetOpen,
-  setQuestBoardOpen,
-  setBigMomentPickerOpen,
-  setStepsSheetOpen,
-  setJourneySheetOpen,
-  setPlacesVaultOpen,
   setObservatoryOpen,
-  setNameSheetOpen,
   onCapturePhoto,
   onCaptureNote,
   openPromptSheet,
@@ -173,6 +112,47 @@ export function TodaySheetHost({
   setMicrocopy,
   setDayName,
 }: TodaySheetHostProps) {
+  const {
+    memoryVaultOpen,
+    memoryVaultTab,
+    foodPickerOpen,
+    foodVaultOpen,
+    studioPickerOpen,
+    studioVaultOpen,
+    sanctuaryOpen,
+    moodSheetOpen,
+    sleepSheetOpen,
+    questBoardOpen,
+    bigMomentPickerOpen,
+    stepsSheetOpen,
+    journeySheetOpen,
+    placesVaultOpen,
+    placePromptOpen,
+    nameSheetOpen,
+    setMemoryVaultOpen,
+    setMemoryVaultTab,
+    setFoodPickerOpen,
+    setFoodVaultOpen,
+    setStudioPickerOpen,
+    setStudioVaultOpen,
+    setSanctuaryOpen,
+    setMoodSheetOpen,
+    setSleepSheetOpen,
+    setQuestBoardOpen,
+    setBigMomentPickerOpen,
+    setStepsSheetOpen,
+    setJourneySheetOpen,
+    setPlacesVaultOpen,
+    setNameSheetOpen,
+  } = sheets;
+
+  // React Native can retain an invisible interaction layer when one native
+  // Modal is removed in the same commit that another is mounted. Sequence
+  // reader-to-reader transitions so the first portal fully releases touches.
+  const transitionSheet = (close: () => void, open: () => void) => {
+    close();
+    setTimeout(open, 220);
+  };
   if (!viewedDay) {
     return null;
   }
@@ -289,12 +269,12 @@ export function TodaySheetHost({
       {sanctuaryOpen ? (
         <SanctuarySheet
           day={viewedDay}
-          onReflect={
+          onAddMoment={
             viewedIsForming
-              ? () => {
-                  setSanctuaryOpen(false);
-                  openPromptSheet();
-                }
+              ? () => transitionSheet(
+                  () => setSanctuaryOpen(false),
+                  () => openManualJournal()
+                )
               : undefined
           }
           onClose={() => setSanctuaryOpen(false)}
@@ -305,8 +285,10 @@ export function TodaySheetHost({
           day={viewedDay}
           onChoose={viewedIsForming ? handleConfirmMood : undefined}
           onOpenSanctuary={() => {
-            setMoodSheetOpen(false);
-            setSanctuaryOpen(true);
+            transitionSheet(
+              () => setMoodSheetOpen(false),
+              () => setSanctuaryOpen(true)
+            );
           }}
           onClose={() => setMoodSheetOpen(false)}
         />

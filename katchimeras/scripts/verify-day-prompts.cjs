@@ -378,11 +378,11 @@ check('manual quick actions deep-link to their hierarchical flows', [
 check('empty Food category opens the hierarchical food journal flow', actionRouterSource.includes("else openManualJournal('food')"));
 check('memory quest logging uses the same hierarchical flows', ['went_somewhere', 'big_event', 'food', 'studio'].every((flowId) => actionRouterSource.includes(`openManualJournal('${flowId}')`)));
 const manualJournalSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/manual-journal-sheet.tsx'), 'utf8');
-const meadowSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/ui/meadow-sheet.tsx'), 'utf8');
+const katchaSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/ui/katcha-sheet.tsx'), 'utf8');
 check('manual journal supports opening directly at a requested flow', manualJournalSource.includes("initialFlow ? 'category' : 'flow'") && manualJournalSource.includes('manualJournalFlow(initialFlowId)'));
 check('manual journal can prefill an editable media title', manualJournalSource.includes('initialChoiceId') && manualJournalSource.includes("useState(initialSpecific ?? '')"));
-check('manual journal uses the adaptive tall sheet', manualJournalSource.includes('variant="tall"'));
-check('tall sheets stay between the device safe-area insets', meadowSheetSource.includes('useSafeAreaInsets') && meadowSheetSource.includes('insets.top + 8') && meadowSheetSource.includes('availableTallHeight'));
+check('manual journal uses the adaptive tall sheet', manualJournalSource.includes('size="tall"'));
+check('tall sheets stay between the device safe-area insets', katchaSheetSource.includes('useSafeAreaInsets') && katchaSheetSource.includes('insets.top + 8') && katchaSheetSource.includes('availableTallHeight'));
 check('manual journal groups top-level destinations', manualJournalSource.includes('SECTION_ORDER') && manualJournalSource.includes('Culture & progress'));
 check('manual journal has a persistent three-step header', manualJournalSource.includes('Step ${step + 1} of 3') && manualJournalSource.includes('progressStepActive'));
 check('manual journal keeps Save memory outside the scrolling content', manualJournalSource.indexOf('</ScrollView>') < manualJournalSource.indexOf('style={styles.footer}') && manualJournalSource.includes('Save memory'));

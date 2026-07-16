@@ -1,12 +1,15 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SheetActionRow } from '@/components/katchadeck/ui/sheet-action-row';
 import { SheetEmptyState } from '@/components/katchadeck/ui/sheet-empty-state';
-import { Lantern } from '@/constants/theme';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
+
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 // Quest Board — the world's notice board. Surfaces the day's Memory Quests (the
 // same ones the dashboard offers); tapping one starts that capture. Optional and
@@ -24,43 +27,28 @@ export function QuestBoardSheet({
 }) {
   const remaining = quests.filter((quest) => !quest.completed).length;
   return (
-    <MeadowSheet onClose={onClose} kicker="Quest Board" title={remaining > 0 ? 'Ways to grow today' : 'All done for today'} variant="tall">
+    <KatchaSheet header={{ eyebrow: 'Quest Board', title: remaining > 0 ? 'Ways to grow today' : 'All done for today' }} onRequestClose={() => onClose()} size="tall" surface="parchment">
       <ScrollView style={styles.scrollFrame} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.list}>
           {placeRecovery ? (
             <View style={styles.recoveryCard}>
               <View style={styles.recoveryHead}>
                 <View style={styles.recoveryIcon}>
-                  <IconSymbol name="mappin.and.ellipse" size={18} color={Lantern.ember300} />
+                  <IconSymbol name="mappin.and.ellipse" size={18} color={PARCHMENT.accentPressed} />
                 </View>
                 <View style={styles.rowText}>
-                  <ThemedText style={styles.rowTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.rowTitle} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     Add places from today
                   </ThemedText>
-                  <ThemedText style={styles.recoveryBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                  <ThemedText style={styles.recoveryBody} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
                     {`${placeRecovery.stepsCount.toLocaleString()} steps, but no places were caught yet.`}
                   </ThemedText>
                 </View>
               </View>
               <View style={styles.recoveryActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={placeRecovery.onAddPlace}
-                  style={({ pressed }) => [styles.primaryRecoveryAction, pressed ? styles.rowPressed : null]}>
-                  <ThemedText style={styles.primaryRecoveryText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>
-                    Add current place
-                  </ThemedText>
-                </Pressable>
+                <KatchaButton label="Add current place" onPress={placeRecovery.onAddPlace} size="compact" />
                 {placeRecovery.onEnableTravelMemory ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={placeRecovery.onEnableTravelMemory}
-                    style={({ pressed }) => [styles.secondaryRecoveryAction, pressed ? styles.rowPressed : null]}>
-                    <IconSymbol name="mappin.and.ellipse" size={12} color={Lantern.ember300} />
-                    <ThemedText style={styles.secondaryRecoveryText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-                      {placeRecovery.travelMemoryLabel ?? 'Travel Memory'}
-                    </ThemedText>
-                  </Pressable>
+                  <KatchaButton icon="mappin.and.ellipse" label={placeRecovery.travelMemoryLabel ?? 'Travel Memory'} onPress={placeRecovery.onEnableTravelMemory} size="compact" variant="secondary" />
                 ) : null}
               </View>
             </View>
@@ -89,7 +77,7 @@ export function QuestBoardSheet({
           ) : null}
         </View>
       </ScrollView>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -128,7 +116,7 @@ const styles = StyleSheet.create({
   recoveryActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingLeft: 44 },
   primaryRecoveryAction: {
     borderRadius: 999,
-    backgroundColor: Lantern.ember300,
+    backgroundColor: PARCHMENT.accent,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
@@ -179,6 +167,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  checkDone: { backgroundColor: Lantern.ember300 },
+  checkDone: { backgroundColor: PARCHMENT.accent },
   empty: { fontSize: 14, fontWeight: '600', lineHeight: 20, paddingVertical: 8 },
 });

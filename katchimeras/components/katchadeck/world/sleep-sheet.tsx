@@ -3,8 +3,8 @@ import { useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
-import { Lantern } from '@/constants/theme';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { DaySleep, SleepQuality } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 
@@ -14,6 +14,7 @@ const SLEEP_ART: Record<string, number> = {
   normal: require('@/assets/images/katchimeras/today-icons/sleep/normal.webp'),
   low: require('@/assets/images/katchimeras/today-icons/sleep/low.webp'),
 };
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 // Sleep — how the day began. Never a score or a failure; low sleep is just a
 // softer, mistier morning. Just the three options (selected one highlighted)
@@ -40,13 +41,13 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
       : null;
 
   return (
-    <MeadowSheet onClose={onClose} kicker="Sleep" title={onSet ? 'How was your sleep?' : 'How the night went'}>
+    <KatchaSheet header={{ eyebrow: 'Sleep', title: onSet ? 'How was your sleep?' : 'How the night went' }} onRequestClose={() => onClose()} surface="parchment">
       {hours ? (
         <View style={styles.hoursRow}>
-          <ThemedText style={styles.hoursValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+          <ThemedText style={styles.hoursValue} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
             {hours}
           </ThemedText>
-          <ThemedText style={styles.hoursCaption} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          <ThemedText style={styles.hoursCaption} lightColor={PARCHMENT.textTertiary} darkColor={PARCHMENT.textTertiary}>
             last night · Apple Health
           </ThemedText>
         </View>
@@ -64,7 +65,7 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
           />
         ))}
       </View>
-    </MeadowSheet>
+    </KatchaSheet>
   );
 }
 
@@ -94,7 +95,7 @@ function SleepOptionTile({
           styles.chip,
           {
             borderColor: selected ? option.accent : `${option.accent}35`,
-            backgroundColor: selected ? `${option.accent}22` : 'rgba(255,255,255,0.045)',
+            backgroundColor: selected ? `${option.accent}32` : PARCHMENT.subtle,
           },
           pressed && onSet ? styles.chipPressed : null,
           !onSet && !selected ? styles.chipMuted : null,
@@ -104,7 +105,7 @@ function SleepOptionTile({
         ) : (
           <ThemedText style={styles.chipEmoji}>{option.emoji}</ThemedText>
         )}
-        <ThemedText style={styles.chipLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        <ThemedText style={styles.chipLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
           {option.label}
         </ThemedText>
       </Pressable>

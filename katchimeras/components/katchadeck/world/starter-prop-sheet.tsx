@@ -1,12 +1,13 @@
 import { Image as ExpoImage } from 'expo-image';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 
 import { ThemedText } from '@/components/themed-text';
-import { Lantern } from '@/constants/theme';
+import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { WorldPropDef } from '@/utils/world-props-catalog';
 import { worldAssetSource } from '@/utils/world-visuals';
 import { Meadow } from '@/constants/meadow-theme';
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
 export function StarterPropSheet({
   choices,
@@ -19,26 +20,8 @@ export function StarterPropSheet({
 }) {
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
+    <KatchaSheet header={{ eyebrow: 'First Seed', title: 'Plant the first thing your world should grow around', subtitle: 'Choose by intention. After this, real days unlock the rest.' }} onRequestClose={onClose} size="tall" surface="parchment">
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <ThemedText style={styles.kicker} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
-            First Seed
-          </ThemedText>
-          <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            Plant the first thing your world should grow around
-          </ThemedText>
-          <ThemedText style={styles.summary} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            This first prop is chosen by intention. After that, real days unlock the rest.
-          </ThemedText>
 
           <View style={styles.grid}>
             {choices.map((choice) => {
@@ -52,10 +35,10 @@ export function StarterPropSheet({
                   <View style={styles.imageWrap}>
                     {source ? <ExpoImage source={source} style={styles.image} contentFit="contain" /> : null}
                   </View>
-                  <ThemedText style={styles.choiceTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  <ThemedText style={styles.choiceTitle} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
                     {choice.name}
                   </ThemedText>
-                  <ThemedText style={styles.choiceBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300} numberOfLines={3}>
+                  <ThemedText style={styles.choiceBody} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary} numberOfLines={3}>
                     {choice.description}
                   </ThemedText>
                 </Pressable>
@@ -64,12 +47,11 @@ export function StarterPropSheet({
           </View>
         </ScrollView>
         <Pressable accessibilityRole="button" onPress={onClose} style={styles.close}>
-          <ThemedText style={styles.closeLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          <ThemedText style={styles.closeLabel} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
             Later
           </ThemedText>
         </Pressable>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 
@@ -104,17 +86,18 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 18,
     borderCurve: 'continuous',
-    backgroundColor: 'rgba(20,17,31,0.7)',
+    backgroundColor: PARCHMENT.subtle,
     borderWidth: 1,
-    borderColor: 'rgba(125,232,205,0.16)',
+    borderColor: PARCHMENT.border,
+    boxShadow: PARCHMENT.cardShadow,
   },
-  choicePressed: { backgroundColor: 'rgba(28,38,46,0.82)' },
+  choicePressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
   imageWrap: {
     alignItems: 'center',
     justifyContent: 'center',
     height: 70,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: PARCHMENT.elevated,
   },
   image: { width: 64, height: 64 },
   choiceTitle: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 },

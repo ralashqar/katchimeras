@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -74,22 +74,7 @@ export function DiscoveriesHallSheet({ entries, unlockedCount, totalCount, onClo
   }, [entries]);
 
   return (
-    <View style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(180)} style={styles.backdrop}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-
-      <Animated.View
-        entering={SlideInDown.duration(260)}
-        exiting={SlideOutDown.duration(200)}
-        style={[styles.sheet, { bottom: Meadow.overlay.bottomClearance }]}>
-        <View style={styles.grabber} />
-        <ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-          Hall of Discoveries
-        </ThemedText>
-        <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          {unlockedCount} of {totalCount} found
-        </ThemedText>
+    <KatchaSheet header={{ eyebrow: 'Hall of Discoveries', title: `${unlockedCount} of ${totalCount} found`, subtitle: 'The patterns, milestones and secrets your world has noticed.' }} onRequestClose={onClose} size="tall" surface="night">
         <View style={styles.filterRow}>
           {FILTERS.map((item) => (
             <Pressable
@@ -153,8 +138,7 @@ export function DiscoveriesHallSheet({ entries, unlockedCount, totalCount, onClo
             Close
           </ThemedText>
         </Pressable>
-      </Animated.View>
-    </View>
+    </KatchaSheet>
   );
 }
 

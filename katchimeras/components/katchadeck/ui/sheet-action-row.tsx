@@ -2,8 +2,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { Lantern } from '@/constants/theme';
 import { StatusBadge } from '@/components/katchadeck/ui/status-badge';
+import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
 
 type SheetActionRowProps = {
   emoji?: string;
@@ -30,6 +30,7 @@ export function SheetActionRow({
   disabled = false,
   onPress,
 }: SheetActionRowProps) {
+  const { tokens } = useKatchaSurface();
   const inactive = disabled || completed || !onPress;
   return (
     <Pressable
@@ -39,6 +40,7 @@ export function SheetActionRow({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
+        { backgroundColor: tokens.subtle },
         pressed && !inactive ? styles.rowPressed : null,
         completed ? styles.rowDone : null,
       ]}>
@@ -46,30 +48,30 @@ export function SheetActionRow({
         {emoji ? (
           <ThemedText style={styles.emoji}>{emoji}</ThemedText>
         ) : icon ? (
-          <IconSymbol name={icon} size={18} color={Lantern.moon300} />
+          <IconSymbol name={icon} size={18} color={tokens.textSecondary} />
         ) : null}
       </View>
       <View style={styles.text}>
-        <ThemedText style={styles.title} numberOfLines={2} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+        <ThemedText style={styles.title} numberOfLines={2} lightColor={tokens.text} darkColor={tokens.text}>
           {title}
         </ThemedText>
         {context ? (
-          <ThemedText style={styles.context} numberOfLines={1} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
+          <ThemedText style={styles.context} numberOfLines={1} lightColor={tokens.textTertiary} darkColor={tokens.textTertiary}>
             {context}
           </ThemedText>
         ) : null}
         {meta ? (
-          <ThemedText style={styles.meta} numberOfLines={1} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>
+          <ThemedText style={styles.meta} numberOfLines={1} lightColor={tokens.success} darkColor={tokens.success}>
             {meta}
           </ThemedText>
         ) : null}
         {statusLabel ? <StatusBadge label={statusLabel} tone={statusTone} /> : null}
       </View>
-      <View style={[styles.trailing, completed ? styles.trailingDone : null]}>
+      <View style={[styles.trailing, { backgroundColor: completed ? tokens.accent : tokens.subtle }, completed ? styles.trailingDone : null]}>
         <IconSymbol
           name={completed ? 'checkmark' : 'arrow.right'}
           size={13}
-          color={completed ? Lantern.emberInk : Lantern.moon300}
+          color={completed ? tokens.accentText : tokens.textSecondary}
         />
       </View>
     </Pressable>
@@ -88,7 +90,8 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   rowPressed: {
-    backgroundColor: 'rgba(40,34,60,0.9)',
+    opacity: 0.82,
+    transform: [{ scale: 0.985 }],
   },
   rowDone: {
     opacity: 0.58,
@@ -130,6 +133,6 @@ const styles = StyleSheet.create({
     width: 28,
   },
   trailingDone: {
-    backgroundColor: Lantern.ember300,
+    opacity: 1,
   },
 });
