@@ -1,16 +1,20 @@
-export const BLOCK_BLAST_RULESET = 'cheerlet-block-party-v1' as const;
+export const BLOCK_BLAST_RULESET = 'cheerlet-block-party-v2' as const;
+export const BLOCK_BLAST_LEGACY_RULESET = 'cheerlet-block-party-v1' as const;
 export const BLOCK_BLAST_PACK = 'cheerlet-party' as const;
 export const BLOCK_BLAST_BOARD_SIZE = 8;
+export const BLOCK_BLAST_TRAY_ALGORITHM_VERSION = 2 as const;
 
 export type BlockBlastColorId = 'rose' | 'amber' | 'teal' | 'coral' | 'blue';
 export type BlockBlastCell = { row: number; column: number };
 export type BlockBlastRotation = 0 | 1 | 2 | 3;
+export type BlockBlastShapeRole = 'standard' | 'rescue' | 'last_resort';
 export type BlockBlastShape = {
   id: string;
   familyId: string;
   rotation: BlockBlastRotation;
   cells: readonly BlockBlastCell[];
   weight: number;
+  role: BlockBlastShapeRole;
 };
 export type BlockBlastPiece = {
   id: string;
@@ -33,6 +37,7 @@ export type BlockBlastResolution = {
 
 export type BlockBlastState = {
   rulesetId: typeof BLOCK_BLAST_RULESET;
+  trayAlgorithmVersion: typeof BLOCK_BLAST_TRAY_ALGORITHM_VERSION;
   seed: string;
   board: (BlockBlastColorId | null)[];
   tray: BlockBlastPiece[];
@@ -56,33 +61,49 @@ export type BlockBlastAction =
 
 const COLORS: readonly BlockBlastColorId[] = ['rose', 'amber', 'teal', 'coral', 'blue'];
 
+// Mirrors the enabled PRESET_LIBRARY from the shared BlockTray implementation.
+// The wider catalog remains available for compatibility, but normal V2 refills
+// draw from this explicit pool so its signature pieces are not diluted.
+export const BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS = [
+  'line-4',
+  'line-5',
+  'j-4',
+  'l-4',
+  'square-2',
+  'z-4',
+  't-4',
+  'l-5',
+  'square-3',
+  'rectangle-2x3',
+] as const;
+
 const cells = (...coordinates: [number, number][]): readonly BlockBlastCell[] =>
   coordinates.map(([row, column]) => ({ row, column }));
 
 type BlockBlastShapeFamily = Omit<BlockBlastShape, 'id' | 'familyId' | 'rotation'> & { id: string };
 
 export const BLOCK_BLAST_SHAPE_FAMILIES: readonly BlockBlastShapeFamily[] = [
-  { id: 'single', cells: cells([0, 0]), weight: 5 },
-  { id: 'domino', cells: cells([0, 0], [0, 1]), weight: 5 },
-  { id: 'line-3', cells: cells([0, 0], [0, 1], [0, 2]), weight: 5 },
-  { id: 'corner-3', cells: cells([0, 0], [1, 0], [1, 1]), weight: 4 },
-  { id: 'square-2', cells: cells([0, 0], [0, 1], [1, 0], [1, 1]), weight: 4 },
-  { id: 'line-4', cells: cells([0, 0], [0, 1], [0, 2], [0, 3]), weight: 3 },
-  { id: 'l-4', cells: cells([0, 0], [1, 0], [2, 0], [2, 1]), weight: 3 },
-  { id: 'j-4', cells: cells([0, 1], [1, 1], [2, 0], [2, 1]), weight: 3 },
-  { id: 't-4', cells: cells([0, 0], [0, 1], [0, 2], [1, 1]), weight: 3 },
-  { id: 's-4', cells: cells([0, 1], [0, 2], [1, 0], [1, 1]), weight: 3 },
-  { id: 'z-4', cells: cells([0, 0], [0, 1], [1, 1], [1, 2]), weight: 3 },
-  { id: 'line-5', cells: cells([0, 0], [0, 1], [0, 2], [0, 3], [0, 4]), weight: 2 },
-  { id: 'l-5', cells: cells([0, 0], [1, 0], [2, 0], [2, 1], [2, 2]), weight: 2 },
-  { id: 'j-5', cells: cells([0, 2], [1, 2], [2, 0], [2, 1], [2, 2]), weight: 2 },
-  { id: 't-5', cells: cells([0, 0], [0, 1], [0, 2], [1, 1], [2, 1]), weight: 2 },
-  { id: 'plus-5', cells: cells([0, 1], [1, 0], [1, 1], [1, 2], [2, 1]), weight: 2 },
-  { id: 'u-5', cells: cells([0, 0], [0, 2], [1, 0], [1, 1], [1, 2]), weight: 2 },
-  { id: 'p-5', cells: cells([0, 0], [0, 1], [1, 0], [1, 1], [2, 0]), weight: 2 },
-  { id: 'q-5', cells: cells([0, 0], [0, 1], [1, 0], [1, 1], [2, 1]), weight: 2 },
-  { id: 'rectangle-2x3', cells: cells([0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]), weight: 2 },
-  { id: 'square-3', cells: cells([0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]), weight: 1 },
+  { id: 'single', cells: cells([0, 0]), weight: 5, role: 'last_resort' },
+  { id: 'domino', cells: cells([0, 0], [0, 1]), weight: 5, role: 'rescue' },
+  { id: 'line-3', cells: cells([0, 0], [0, 1], [0, 2]), weight: 5, role: 'rescue' },
+  { id: 'corner-3', cells: cells([0, 0], [1, 0], [1, 1]), weight: 4, role: 'rescue' },
+  { id: 'square-2', cells: cells([0, 0], [0, 1], [1, 0], [1, 1]), weight: 3, role: 'standard' },
+  { id: 'line-4', cells: cells([0, 0], [0, 1], [0, 2], [0, 3]), weight: 3, role: 'standard' },
+  { id: 'l-4', cells: cells([0, 0], [1, 0], [2, 0], [2, 1]), weight: 3, role: 'standard' },
+  { id: 'j-4', cells: cells([0, 1], [1, 1], [2, 0], [2, 1]), weight: 3, role: 'standard' },
+  { id: 't-4', cells: cells([0, 0], [0, 1], [0, 2], [1, 1]), weight: 3, role: 'standard' },
+  { id: 's-4', cells: cells([0, 1], [0, 2], [1, 0], [1, 1]), weight: 3, role: 'standard' },
+  { id: 'z-4', cells: cells([0, 0], [0, 1], [1, 1], [1, 2]), weight: 3, role: 'standard' },
+  { id: 'line-5', cells: cells([0, 0], [0, 1], [0, 2], [0, 3], [0, 4]), weight: 3, role: 'standard' },
+  { id: 'l-5', cells: cells([0, 0], [1, 0], [2, 0], [2, 1], [2, 2]), weight: 3, role: 'standard' },
+  { id: 'j-5', cells: cells([0, 2], [1, 2], [2, 0], [2, 1], [2, 2]), weight: 2, role: 'standard' },
+  { id: 't-5', cells: cells([0, 0], [0, 1], [0, 2], [1, 1], [2, 1]), weight: 2, role: 'standard' },
+  { id: 'plus-5', cells: cells([0, 1], [1, 0], [1, 1], [1, 2], [2, 1]), weight: 2, role: 'standard' },
+  { id: 'u-5', cells: cells([0, 0], [0, 2], [1, 0], [1, 1], [1, 2]), weight: 2, role: 'standard' },
+  { id: 'p-5', cells: cells([0, 0], [0, 1], [1, 0], [1, 1], [2, 0]), weight: 2, role: 'standard' },
+  { id: 'q-5', cells: cells([0, 0], [0, 1], [1, 0], [1, 1], [2, 1]), weight: 2, role: 'standard' },
+  { id: 'rectangle-2x3', cells: cells([0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]), weight: 3, role: 'standard' },
+  { id: 'square-3', cells: cells([0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]), weight: 3, role: 'standard' },
 ] as const;
 
 export const BLOCK_BLAST_SHAPES: readonly BlockBlastShape[] = BLOCK_BLAST_SHAPE_FAMILIES.flatMap((family) => {
@@ -92,6 +113,7 @@ export const BLOCK_BLAST_SHAPES: readonly BlockBlastShape[] = BLOCK_BLAST_SHAPE_
     familyId: family.id,
     rotation,
     cells: rotatedCells,
+    role: family.role,
     // A family keeps the same overall frequency regardless of how many unique rotations it has.
     weight: family.weight / rotations.length,
   }));
@@ -135,6 +157,7 @@ export function createBlockBlastState(seed: string, now = Date.now()): BlockBlas
   const generated = generateBlockBlastTray(board, initialRng, 0);
   return {
     rulesetId: BLOCK_BLAST_RULESET,
+    trayAlgorithmVersion: BLOCK_BLAST_TRAY_ALGORITHM_VERSION,
     seed,
     board,
     tray: generated.tray,
@@ -302,23 +325,32 @@ export function nearestSnappedBlockBlastOrigin(
   pieceCells: readonly BlockBlastCell[],
   targetRow: number,
   targetColumn: number,
-  localSnapRadius = 0.72,
+  localSnapRadius = 1.65,
 ): BlockBlastCell | null {
   const geometricOrigin = nearestBlockBlastOrigin(pieceCells, targetRow, targetColumn);
   if (!geometricOrigin || canPlaceBlockBlastPiece(board, pieceCells, geometricOrigin.row, geometricOrigin.column)) {
     return geometricOrigin;
   }
 
-  // Near a half-cell boundary, prefer an almost-equally-close valid neighbour.
-  // Keep the geometric (invalid) origin when the next valid position is farther
-  // away so a piece never jumps across occupied cells or to a remote opening.
+  const pieceRows = Math.max(...pieceCells.map((cell) => cell.row)) + 1;
+  const pieceColumns = Math.max(...pieceCells.map((cell) => cell.column)) + 1;
+  const maximumRow = BLOCK_BLAST_BOARD_SIZE - pieceRows;
+  const maximumColumn = BLOCK_BLAST_BOARD_SIZE - pieceColumns;
+  const clampedTargetRow = Math.max(0, Math.min(maximumRow, targetRow));
+  const clampedTargetColumn = Math.max(0, Math.min(maximumColumn, targetColumn));
+
+  // If the nearest geometric origin is blocked, search for the closest nearby
+  // origin where the complete piece fits. Measure from the board-clamped floating
+  // origin so placements along an edge remain as forgiving as interior ones.
+  // The radius includes cardinal and diagonal adjacent origins without allowing
+  // a jump of two or more cells to a remote board opening.
   let nearestValid: BlockBlastCell | null = null;
   let nearestDistanceSquared = Number.POSITIVE_INFINITY;
   const searchRadius = Math.ceil(localSnapRadius);
-  for (let row = Math.floor(targetRow) - searchRadius; row <= Math.ceil(targetRow) + searchRadius; row += 1) {
-    for (let column = Math.floor(targetColumn) - searchRadius; column <= Math.ceil(targetColumn) + searchRadius; column += 1) {
+  for (let row = Math.max(0, Math.floor(clampedTargetRow) - searchRadius); row <= Math.min(maximumRow, Math.ceil(clampedTargetRow) + searchRadius); row += 1) {
+    for (let column = Math.max(0, Math.floor(clampedTargetColumn) - searchRadius); column <= Math.min(maximumColumn, Math.ceil(clampedTargetColumn) + searchRadius); column += 1) {
       if (!canPlaceBlockBlastPiece(board, pieceCells, row, column)) continue;
-      const distanceSquared = (row - targetRow) ** 2 + (column - targetColumn) ** 2;
+      const distanceSquared = (row - clampedTargetRow) ** 2 + (column - clampedTargetColumn) ** 2;
       if (distanceSquared < nearestDistanceSquared) {
         nearestValid = { row, column };
         nearestDistanceSquared = distanceSquared;
@@ -335,35 +367,205 @@ export function hasAnyBlockBlastMove(
   return tray.some((piece) => !piece.used && validBlockBlastOrigins(board, piece.cells).length > 0);
 }
 
+type BlockBlastPieceLike = { cells: readonly BlockBlastCell[] };
+
+export function blockBlastTrayHasReservedPlacements(
+  board: readonly (BlockBlastColorId | null)[],
+  pieces: readonly BlockBlastPieceLike[],
+): boolean {
+  if (!pieces.length) return false;
+  const ordered = pieces
+    .map((piece, index) => ({ index, piece, originCount: validBlockBlastOrigins(board, piece.cells).length }))
+    .sort((left, right) => left.originCount - right.originCount || left.index - right.index);
+
+  const reserve = (shadowBoard: readonly (BlockBlastColorId | null)[], pieceIndex: number): boolean => {
+    if (pieceIndex >= ordered.length) return true;
+    const piece = ordered[pieceIndex].piece;
+    for (const origin of validBlockBlastOrigins(shadowBoard, piece.cells)) {
+      const next = [...shadowBoard];
+      piece.cells.forEach((cell) => {
+        next[boardIndex(origin.row + cell.row, origin.column + cell.column)] = 'rose';
+      });
+      if (reserve(next, pieceIndex + 1)) return true;
+    }
+    return false;
+  };
+
+  return ordered.every((entry) => entry.originCount > 0) && reserve(board, 0);
+}
+
+export function blockBlastTrayIsCompletable(
+  board: readonly (BlockBlastColorId | null)[],
+  pieces: readonly BlockBlastPieceLike[],
+  maximumVisitedStates = 20_000,
+): boolean {
+  if (!pieces.length) return false;
+  if (blockBlastTrayHasReservedPlacements(board, pieces)) return true;
+
+  const failed = new Set<string>();
+  let visitedStates = 0;
+  const search = (currentBoard: readonly (BlockBlastColorId | null)[], remaining: readonly number[]): boolean => {
+    if (!remaining.length) return true;
+    const key = `${remaining.join(',')}:${currentBoard.map((cell) => cell ? '1' : '0').join('')}`;
+    if (failed.has(key)) return false;
+    if (visitedStates >= maximumVisitedStates) return false;
+    visitedStates += 1;
+
+    for (const pieceIndex of remaining) {
+      const piece = pieces[pieceIndex];
+      const outcomes = validBlockBlastOrigins(currentBoard, piece.cells).map((origin) => {
+        const nextBoard = proofBoardAfterPlacement(currentBoard, piece.cells, origin);
+        return { nextBoard, origin, emptyCount: nextBoard.filter((cell) => cell == null).length };
+      }).sort((left, right) => right.emptyCount - left.emptyCount
+        || left.origin.row - right.origin.row
+        || left.origin.column - right.origin.column);
+      const nextRemaining = remaining.filter((candidate) => candidate !== pieceIndex);
+      for (const outcome of outcomes) {
+        if (search(outcome.nextBoard, nextRemaining)) return true;
+      }
+    }
+
+    failed.add(key);
+    return false;
+  };
+
+  return search(board, pieces.map((_, index) => index));
+}
+
 export function generateBlockBlastTray(
   board: readonly (BlockBlastColorId | null)[],
   startingRngState: number,
   generation: number,
 ): { tray: BlockBlastPiece[]; rngState: number } {
   let rngState = startingRngState || 1;
-  const playable = BLOCK_BLAST_SHAPES.filter((shape) => validBlockBlastOrigins(board, shape.cells).length > 0);
-  if (!playable.length) return { tray: [], rngState };
-  const selected: BlockBlastShape[] = [];
-  let pick: BlockBlastShape;
-  [pick, rngState] = weightedPick(playable, rngState);
-  selected.push(pick);
-  for (let index = 1; index < 3; index += 1) {
-    [pick, rngState] = weightedPick(BLOCK_BLAST_SHAPES, rngState);
-    selected.push(pick);
+  if (board.every(Boolean)) return { tray: [], rngState };
+  const primaryFamilies: ReadonlySet<string> = new Set(BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS);
+  const standardShapes = BLOCK_BLAST_SHAPES.filter((shape) => primaryFamilies.has(shape.familyId));
+  const rescueShapes = BLOCK_BLAST_SHAPES.filter((shape) => shape.role === 'rescue');
+  const sequenceFallbacks: BlockBlastShape[][] = [];
+  let selected: BlockBlastShape[] | null = null;
+
+  for (let attempt = 0; attempt < 32 && !selected; attempt += 1) {
+    const generated = pickDiverseShapes(standardShapes, 3, rngState, new Set(), 1);
+    rngState = generated.rngState;
+    if (!generated.shapes) continue;
+    if (blockBlastTrayHasReservedPlacements(board, generated.shapes)) selected = generated.shapes;
+    else sequenceFallbacks.push(generated.shapes);
   }
-  const tray: BlockBlastPiece[] = [];
-  for (let index = 0; index < selected.length; index += 1) {
+
+  for (let attempt = 0; attempt < 24 && !selected; attempt += 1) {
+    const rescueCount = 1 + attempt % 2;
+    const rescue = pickDiverseShapes(rescueShapes, rescueCount, rngState);
+    rngState = rescue.rngState;
+    if (!rescue.shapes) continue;
+    const usedFamilies = new Set(rescue.shapes.map((shape) => shape.familyId));
+    const standard = pickDiverseShapes(standardShapes, 3 - rescueCount, rngState, usedFamilies, 1);
+    rngState = standard.rngState;
+    if (!standard.shapes) continue;
+    const shuffled = seededShuffle([...rescue.shapes, ...standard.shapes], rngState);
+    rngState = shuffled.rngState;
+    if (blockBlastTrayHasReservedPlacements(board, shuffled.values)) selected = shuffled.values;
+    else sequenceFallbacks.push(shuffled.values);
+  }
+
+  const rescueLadder = [
+    ['domino', 'line-3', 'corner-3'],
+    ['domino', 'domino', 'corner-3'],
+    ['single', 'domino', 'corner-3'],
+    ['single', 'single', 'domino'],
+    ['single', 'single', 'single'],
+  ] as const;
+  for (const families of rescueLadder) {
+    for (let attempt = 0; attempt < 16 && !selected; attempt += 1) {
+      const candidate: BlockBlastShape[] = [];
+      for (const familyId of families) {
+        const familyShapes = BLOCK_BLAST_SHAPES.filter((shape) => shape.familyId === familyId);
+        const picked = weightedPick(familyShapes, rngState);
+        candidate.push(picked[0]);
+        rngState = picked[1];
+      }
+      const shuffled = seededShuffle(candidate, rngState);
+      rngState = shuffled.rngState;
+      if (blockBlastTrayHasReservedPlacements(board, shuffled.values)) selected = shuffled.values;
+      else sequenceFallbacks.push(shuffled.values);
+    }
+    if (selected) break;
+  }
+
+  // Only use a line-clear-dependent sequence after every bounded reserved
+  // standard, mixed, and emergency option has failed. In ordinary play this
+  // means all three visible pieces have valid, non-overlapping homes immediately.
+  if (!selected) {
+    selected = sequenceFallbacks.find((candidate) => blockBlastTrayIsCompletable(board, candidate)) ?? null;
+  }
+
+  if (!selected) return { tray: [], rngState };
+  const colors = seededShuffle([...COLORS], rngState);
+  rngState = colors.rngState;
+  const tray = selected.map((shape, index): BlockBlastPiece => ({
+    id: `tray-${generation}-${index}-${shape.id}-${rngState.toString(36)}`,
+    shapeId: shape.id,
+    cells: shape.cells,
+    colorId: colors.values[index],
+    used: false,
+  }));
+  return { tray, rngState };
+}
+
+function pickDiverseShapes(
+  pool: readonly BlockBlastShape[],
+  count: number,
+  startingRngState: number,
+  initialFamilies = new Set<string>(),
+  maximumLargePieces = Number.POSITIVE_INFINITY,
+): { shapes: BlockBlastShape[] | null; rngState: number } {
+  let rngState = startingRngState;
+  const families = new Set(initialFamilies);
+  const shapes: BlockBlastShape[] = [];
+  let largePieces = 0;
+  for (let index = 0; index < count; index += 1) {
+    const eligible = pool.filter((shape) => !families.has(shape.familyId)
+      && (shape.cells.length < 6 || largePieces < maximumLargePieces));
+    if (!eligible.length) return { shapes: null, rngState };
+    const picked = weightedPick(eligible, rngState);
+    const shape = picked[0];
+    rngState = picked[1];
+    shapes.push(shape);
+    families.add(shape.familyId);
+    if (shape.cells.length >= 6) largePieces += 1;
+  }
+  return { shapes, rngState };
+}
+
+function seededShuffle<T>(values: readonly T[], startingRngState: number): { values: T[]; rngState: number } {
+  const shuffled = [...values];
+  let rngState = startingRngState;
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const random = nextRandom(rngState);
     rngState = random.state;
-    tray.push({
-      id: `tray-${generation}-${index}-${rngState.toString(36)}`,
-      shapeId: selected[index].id,
-      cells: selected[index].cells,
-      colorId: COLORS[Math.floor(random.value * COLORS.length) % COLORS.length],
-      used: false,
-    });
+    const swapIndex = Math.floor(random.value * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
-  return { tray, rngState };
+  return { values: shuffled, rngState };
+}
+
+function proofBoardAfterPlacement(
+  board: readonly (BlockBlastColorId | null)[],
+  pieceCells: readonly BlockBlastCell[],
+  origin: BlockBlastCell,
+): (BlockBlastColorId | null)[] {
+  const next = [...board];
+  pieceCells.forEach((cell) => {
+    next[boardIndex(origin.row + cell.row, origin.column + cell.column)] = 'rose';
+  });
+  const cleared = completedLines(next);
+  cleared.rows.forEach((row) => {
+    for (let column = 0; column < BLOCK_BLAST_BOARD_SIZE; column += 1) next[boardIndex(row, column)] = null;
+  });
+  cleared.columns.forEach((column) => {
+    for (let row = 0; row < BLOCK_BLAST_BOARD_SIZE; row += 1) next[boardIndex(row, column)] = null;
+  });
+  return next;
 }
 
 export function blockBlastShapeIsConnected(shape: BlockBlastShape): boolean {

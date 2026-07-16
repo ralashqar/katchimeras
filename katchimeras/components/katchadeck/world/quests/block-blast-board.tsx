@@ -1,6 +1,6 @@
 import { Canvas, Group, LinearGradient as SkiaGradient, RoundedRect, vec } from '@shopify/react-native-skia';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -48,7 +48,7 @@ export type BoardMetrics = {
 export type WindowFrame = { x: number; y: number; width: number; height: number };
 
 const CONTROLLED_EASE = Easing.bezier(0.22, 1, 0.36, 1);
-const DRAG_DELTA_GAIN = 1.24;
+const DRAG_DELTA_GAIN = 1.42;
 
 export function blockBlastBoardMetrics(size: number): BoardMetrics {
   const outer = 10;
@@ -426,6 +426,7 @@ export function DraggableBlockBlastPiece({
   const grabOffsetY = useSharedValue(0);
   const hitboxWidth = useSharedValue(0);
   const hitboxHeight = useSharedValue(0);
+  const lastHoverKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (!selected) scale.value = withTiming(1, { duration: reduceMotion ? 30 : 95, easing: CONTROLLED_EASE });
@@ -445,7 +446,14 @@ export function DraggableBlockBlastPiece({
   };
   const updateHover = (absoluteX: number, absoluteY: number, deltaX = 0, deltaY = 0) => {
     const origin = targetOrigin(absoluteX, absoluteY, deltaX, deltaY);
+    const key = origin ? `${origin.row}:${origin.column}` : null;
+    if (key === lastHoverKey.current) return;
+    lastHoverKey.current = key;
     onHover(origin);
+  };
+  const clearHover = () => {
+    lastHoverKey.current = null;
+    onHover(null);
   };
   const returnToTray = () => {
     if (placedSuccessfully.value || returningToTray.value) return;
@@ -457,6 +465,7 @@ export function DraggableBlockBlastPiece({
     opacity.value = withTiming(1, { duration: reduceMotion ? 30 : 70, easing: CONTROLLED_EASE });
   };
   const finishDrag = (absoluteX: number, absoluteY: number, deltaX: number, deltaY: number) => {
+    if (placedSuccessfully.value) return;
     const origin = targetOrigin(absoluteX, absoluteY, deltaX, deltaY);
     if (origin && canPlaceBlockBlastPiece(board, piece.cells, origin.row, origin.column)) {
       placedSuccessfully.value = true;
@@ -466,7 +475,7 @@ export function DraggableBlockBlastPiece({
       cancelAnimation(scale);
       cancelAnimation(opacity);
       opacity.value = 0;
-      onHover(null);
+      clearHover();
       if (!onPlace(origin.row, origin.column)) {
         placedSuccessfully.value = false;
         returningToTray.value = false;
@@ -475,7 +484,7 @@ export function DraggableBlockBlastPiece({
     } else {
       returnToTray();
       onInvalid();
-      onHover(null);
+      clearHover();
     }
   };
   const gesture = Gesture.Pan()
@@ -487,6 +496,7 @@ export function DraggableBlockBlastPiece({
     })
     .onStart((event) => {
       onPick();
+      lastHoverKey.current = null;
       placedSuccessfully.value = false;
       returningToTray.value = false;
       opacity.value = 1;
@@ -496,6 +506,7 @@ export function DraggableBlockBlastPiece({
       updateHover(event.absoluteX, event.absoluteY, event.translationX, event.translationY);
     })
     .onUpdate((event) => {
+      if (placedSuccessfully.value) return;
       translateX.value = event.translationX * DRAG_DELTA_GAIN + grabOffsetX.value;
       translateY.value = event.translationY * DRAG_DELTA_GAIN + grabOffsetY.value - fingerLift;
       updateHover(event.absoluteX, event.absoluteY, event.translationX, event.translationY);
@@ -503,7 +514,7 @@ export function DraggableBlockBlastPiece({
     .onEnd((event) => finishDrag(event.absoluteX, event.absoluteY, event.translationX, event.translationY))
     .onFinalize(() => {
       if (!placedSuccessfully.value) returnToTray();
-      onHover(null);
+      clearHover();
     });
   const animated = useAnimatedStyle(() => ({
     opacity: placedSuccessfully.value ? 0 : opacity.value,

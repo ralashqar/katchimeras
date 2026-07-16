@@ -27,7 +27,7 @@ export type QuestDefinition = {
     | { kind: 'matching'; packId: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; difficultyCurveId: string }
     | { kind: 'merge'; packId: 'feastle-kitchen'; difficultyCurveId: 'feastle-merge-v1' }
     | { kind: 'block_jam'; packId: 'tasklet-desk'; difficultyCurveId: 'tasklet-desk-jam-v2' }
-    | { kind: 'block_blast'; packId: 'cheerlet-party'; rulesetId: 'cheerlet-block-party-v1' }
+    | { kind: 'block_blast'; packId: 'cheerlet-party'; rulesetId: 'cheerlet-block-party-v2' }
     | { kind: 'rhythm'; gameId: 'encora-echo'; difficultyCurveId: string }
     | {
         kind: 'word_game';
@@ -253,7 +253,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     id: 'quest-cheerlet-block-party', family: 'studio', title: 'Cheerlet’s Block Party',
     hint: 'Fit the party blocks together, clear rows and columns, and keep the celebration going.', criteria: [],
     presentation: { categoryLabel: 'Play', estimatedMinutes: 4, artworkKey: 'cheerlet' },
-    execution: { kind: 'block_blast', packId: 'cheerlet-party', rulesetId: 'cheerlet-block-party-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    execution: { kind: 'block_blast', packId: 'cheerlet-party', rulesetId: 'cheerlet-block-party-v2' }, requiresCapabilities: [], submissionMode: 'auto',
     eligibility: { creatureKeys: ['cheerlet'], cooldownDays: 1, weight: 5 },
   },
   'quest-feastle-memory': {

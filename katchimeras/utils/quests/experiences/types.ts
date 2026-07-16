@@ -37,7 +37,7 @@ export type QuestResult =
   | { kind: 'matching'; success: boolean; pairs: number; moves: number; durationMs: number; contentIds: string[]; packId?: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; personalBest?: boolean }
   | { kind: 'merge'; success: boolean; packId: 'feastle-kitchen'; ordersCompleted: number; ordersTotal: number; movesUsed: number; moveBudget: number; mergeCount: number; highestTier: number; orderIds: string[]; contentIds: string[]; durationMs: number; personalBest?: boolean }
   | { kind: 'block_jam'; success: boolean; rulesetId: 'tasklet-desk-jam-v2'; packId: 'tasklet-desk'; levelId: string; blocksCleared: number; totalBlocks: number; movesUsed: number; timeLimitMs: number; parMoves: number; undoCount: number; durationMs: number; personalBest?: boolean }
-  | { kind: 'block_blast'; success: true; rulesetId: 'cheerlet-block-party-v1'; packId: 'cheerlet-party'; score: number; linesCleared: number; piecesPlaced: number; maxCombo: number; durationMs: number; seed: string; personalBest?: boolean }
+  | { kind: 'block_blast'; success: true; rulesetId: 'cheerlet-block-party-v1' | 'cheerlet-block-party-v2'; packId: 'cheerlet-party'; score: number; linesCleared: number; piecesPlaced: number; maxCombo: number; durationMs: number; seed: string; personalBest?: boolean }
   | { kind: 'rhythm'; success: boolean; sequenceAccuracy: number; timingAccuracy: number; score: number; durationMs: number; personalBest?: boolean };
 
 export type QuestAttemptStatus = 'ready' | 'running' | 'succeeded' | 'failed' | 'cancelled';

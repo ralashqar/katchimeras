@@ -10,6 +10,7 @@ import { AppFontFamilies, Lantern } from '@/constants/theme';
 import {
   BLOCK_BLAST_PACK,
   BLOCK_BLAST_RULESET,
+  BLOCK_BLAST_TRAY_ALGORITHM_VERSION,
   blockBlastClearCascadePhase,
   blockBlastReducer,
   createBlockBlastState,
@@ -86,6 +87,16 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   const currentRunIsPersonalBest = Boolean(game && profile.bestRun?.seed === game.seed && profile.bestRun.score === game.score);
 
   useEffect(() => () => disposeBlockBlastSoundPlayers(players), [players]);
+
+  useEffect(() => {
+    if (!game || (game as Partial<BlockBlastState>).trayAlgorithmVersion === BLOCK_BLAST_TRAY_ALGORITHM_VERSION) return;
+    const next = started ? createBlockBlastState(`${seed}:${Date.now()}:${profile.totalRuns}:tray-v2`) : null;
+    setGame(next);
+    gameRef.current = next;
+    setSelectedPieceId(null);
+    setHover(null);
+    setProfile((current) => saveBlockBlastActiveRun(current, next));
+  }, [game, profile.totalRuns, seed, started]);
 
   useEffect(() => () => {
     clearHapticTimers.current.forEach((timer) => clearTimeout(timer));
@@ -178,28 +189,31 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
       return false;
     }
     setGame(next);
+    gameRef.current = next;
     setSelectedPieceId(null);
     setHover(null);
-    let nextProfile = saveBlockBlastActiveRun(loadBlockBlastProfile(), next);
-    const cleared = (next.lastResolution?.clearedRows.length ?? 0) + (next.lastResolution?.clearedColumns.length ?? 0);
-    if (cleared > 0) {
-      const combo = next.combo > 1;
-      if (next.lastResolution) scheduleClearCascadeHaptics(next.lastResolution, combo);
-      play(combo ? 'combo' : 'clear');
-      void AccessibilityInfo.announceForAccessibility(`${cleared} ${cleared === 1 ? 'line' : 'lines'} cleared. Score ${next.score}.`);
-    } else {
-      haptic('place');
-      play('place');
-    }
-    if (next.status === 'lost') {
-      const recorded = recordBlockBlastRun(nextProfile, next);
-      nextProfile = recorded.profile;
-      setLastPersonalBest(recorded.personalBest);
-      haptic('game_over');
-      play('game_over');
-      void AccessibilityInfo.announceForAccessibility(`No moves remain. Final score ${next.score}.${recorded.personalBest ? ' New personal best.' : ''}`);
-    }
-    setProfile(nextProfile);
+    setTimeout(() => {
+      let nextProfile = saveBlockBlastActiveRun(loadBlockBlastProfile(), next);
+      const cleared = (next.lastResolution?.clearedRows.length ?? 0) + (next.lastResolution?.clearedColumns.length ?? 0);
+      if (cleared > 0) {
+        const combo = next.combo > 1;
+        if (next.lastResolution) scheduleClearCascadeHaptics(next.lastResolution, combo);
+        play(combo ? 'combo' : 'clear');
+        void AccessibilityInfo.announceForAccessibility(`${cleared} ${cleared === 1 ? 'line' : 'lines'} cleared. Score ${next.score}.`);
+      } else {
+        haptic('place');
+        play('place');
+      }
+      if (next.status === 'lost') {
+        const recorded = recordBlockBlastRun(nextProfile, next);
+        nextProfile = recorded.profile;
+        setLastPersonalBest(recorded.personalBest);
+        haptic('game_over');
+        play('game_over');
+        void AccessibilityInfo.announceForAccessibility(`No moves remain. Final score ${next.score}.${recorded.personalBest ? ' New personal best.' : ''}`);
+      }
+      setProfile(nextProfile);
+    }, 0);
     return true;
   };
 

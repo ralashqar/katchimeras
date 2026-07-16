@@ -3,7 +3,8 @@ import test from 'node:test';
 
 import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
 import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
-import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
+import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
+import { hydrateBlockBlastProfile, type BlockBlastProfile } from '@/utils/quests/experiences/block-blast-profile';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
 import { LOST_WORD_PUZZLES, selectLostWordPuzzle, validateLostWordPuzzles } from '@/utils/quests/experiences/lost-word-puzzles';
@@ -44,7 +45,7 @@ test('the new companion quest pools lead with their reusable mini-game', () => {
   assert.equal(themedQuestOffers('live_music', 'culture', 'encora')[0]?.id, 'quest-encora-rhythm');
 });
 
-test('Block Party V1 ships connected, normalised shapes and deterministic fair trays', () => {
+test('Block Party V2 ships connected, role-classified shapes and deterministic fair trays', () => {
   assert.ok(BLOCK_BLAST_SHAPES.length >= 30);
   assert.ok(BLOCK_BLAST_SHAPES.every(blockBlastShapeIsConnected));
   assert.ok(BLOCK_BLAST_SHAPES.every(blockBlastShapeIsNormalised));
@@ -57,16 +58,81 @@ test('Block Party V1 ships connected, normalised shapes and deterministic fair t
   assert.deepEqual(new Set(rectangleRotations.map((shape) => `${Math.max(...shape.cells.map((cell) => cell.row)) + 1}x${Math.max(...shape.cells.map((cell) => cell.column)) + 1}`)), new Set(['2x3', '3x2']));
   assert.equal(BLOCK_BLAST_SHAPES.filter((shape) => shape.familyId === 'square-3')[0]?.cells.length, 9);
   assert.equal(BLOCK_BLAST_SHAPES.filter((shape) => shape.familyId === 'l-5').length, 4, 'asymmetric pieces expose every quarter-turn');
+  assert.ok(BLOCK_BLAST_SHAPES.filter((shape) => shape.role === 'standard').every((shape) => shape.cells.length >= 4));
+  assert.deepEqual(new Set(BLOCK_BLAST_SHAPES.filter((shape) => shape.role === 'rescue').map((shape) => shape.familyId)), new Set(['domino', 'line-3', 'corner-3']));
+  assert.deepEqual(new Set(BLOCK_BLAST_SHAPES.filter((shape) => shape.role === 'last_resort').map((shape) => shape.familyId)), new Set(['single']));
   const first = createBlockBlastState('cheerlet:test', 100);
   const second = createBlockBlastState('cheerlet:test', 100);
   assert.deepEqual(first.tray, second.tray);
   assert.equal(first.rulesetId, BLOCK_BLAST_RULESET);
+  assert.equal(BLOCK_BLAST_RULESET, 'cheerlet-block-party-v2');
   assert.equal(first.board.length, BLOCK_BLAST_BOARD_SIZE * BLOCK_BLAST_BOARD_SIZE);
-  assert.ok(first.tray.some((piece) => canPlaceBlockBlastPiece(first.board, piece.cells, 0, 0)));
+  assert.equal(first.tray.length, 3);
+  assert.equal(new Set(first.tray.map((piece) => BLOCK_BLAST_SHAPES.find((shape) => shape.id === piece.shapeId)?.familyId)).size, 3, 'open-board trays use distinct shape families');
+  assert.equal(new Set(first.tray.map((piece) => piece.colorId)).size, 3, 'tray colors are distinct when the palette allows it');
+  assert.ok(first.tray.every((piece) => BLOCK_BLAST_SHAPES.find((shape) => shape.id === piece.shapeId)?.role === 'standard'), 'open boards do not consume rescue pieces');
+  assert.ok(first.tray.filter((piece) => piece.cells.length >= 6).length <= 1, 'standard trays contain at most one large piece');
+  assert.equal(blockBlastTrayHasReservedPlacements(first.board, first.tray), true);
+  assert.equal(blockBlastTrayIsCompletable(first.board, first.tray), true);
+
+  const primaryFamilies = new Set<string>(BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS);
+  const observedPrimaryFamilies = new Set<string>();
+  for (let sample = 0; sample < 100; sample += 1) {
+    for (const piece of createBlockBlastState(`primary-pool:${sample}`, 100).tray) {
+      const familyId = BLOCK_BLAST_SHAPES.find((shape) => shape.id === piece.shapeId)?.familyId;
+      assert.ok(familyId && primaryFamilies.has(familyId), `open tray uses shared PRESET_LIBRARY family ${familyId}`);
+      observedPrimaryFamilies.add(familyId!);
+    }
+  }
+  assert.deepEqual(observedPrimaryFamilies, primaryFamilies, 'every enabled shared-code tray family appears across deterministic open-board samples');
 
   const crowded = Array.from({ length: 64 }, (_, index) => index === 63 ? null : 'rose' as const);
   const generated = generateBlockBlastTray(crowded, 123, 4);
-  assert.ok(generated.tray.some((piece) => piece.cells.length === 1), 'a constrained refill includes the only playable shape');
+  assert.equal(generated.tray.length, 3);
+  assert.equal(blockBlastTrayIsCompletable(crowded, generated.tray), true, 'a constrained refill is proven playable through its complete sequence');
+  assert.ok(generated.tray.some((piece) => piece.cells.length === 1), 'a one-cell opening reaches the deterministic last-resort ladder');
+
+  const threeSingles = Array.from({ length: 3 }, (_, index): BlockBlastPiece => ({ id: `single-${index}`, shapeId: 'single', cells: [{ row: 0, column: 0 }], colorId: 'teal', used: false }));
+  assert.equal(blockBlastTrayHasReservedPlacements(crowded, threeSingles), false, 'one empty cell cannot reserve three simultaneous footprints');
+  assert.equal(blockBlastTrayIsCompletable(crowded, threeSingles), true, 'filling the final cell clears lines and opens the verified continuation');
+  assert.deepEqual(generateBlockBlastTray(Array.from({ length: 64 }, () => 'rose'), 777, 9), { tray: [], rngState: 777 }, 'a board with no legal origin exits generation without consuming RNG');
+
+  for (let sample = 0; sample < 32; sample += 1) {
+    const sampledBoard = Array.from({ length: 64 }, (_, index) => ((index * 17 + sample * 13) % 10 < 5 + sample % 3 ? 'blue' as const : null));
+    const sampleTray = generateBlockBlastTray(sampledBoard, 1_000 + sample, sample);
+    assert.equal(sampleTray.tray.length, 3, `sample ${sample} generates a complete tray`);
+    assert.equal(blockBlastTrayIsCompletable(sampledBoard, sampleTray.tray), true, `sample ${sample} generates a proven tray`);
+    assert.equal(blockBlastTrayHasReservedPlacements(sampledBoard, sampleTray.tray), true, `sample ${sample} gives all three pieces immediate non-overlapping placements`);
+    assert.equal(new Set(sampleTray.tray.map((piece) => piece.colorId)).size, 3, `sample ${sample} keeps colors distinct`);
+  }
+});
+
+test('Block Party V2 starts a separate profile while carrying forward only the V1 sound preference', () => {
+  const activeRun = createBlockBlastState('cheerlet:v2-profile', 100);
+  const legacyPayload = {
+    schemaVersion: 1,
+    rulesetId: 'cheerlet-block-party-v1',
+    highScore: 99_999,
+    totalRuns: 12,
+    soundEnabled: false,
+    activeRun: { ...activeRun, rulesetId: 'cheerlet-block-party-v1' },
+  } as unknown as Partial<BlockBlastProfile>;
+  const migrated = hydrateBlockBlastProfile(legacyPayload, { soundEnabled: false });
+  assert.equal(migrated.rulesetId, 'cheerlet-block-party-v2');
+  assert.equal(migrated.highScore, 0, 'V1 scores are not compared with the V2 ruleset');
+  assert.equal(migrated.totalRuns, 0);
+  assert.equal(migrated.activeRun, null, 'V1 active runs are not resumed under V2');
+  assert.equal(migrated.soundEnabled, false, 'the non-scoring sound preference carries forward');
+
+  const current = hydrateBlockBlastProfile({ ...migrated, highScore: 420, totalRuns: 3, activeRun }, { soundEnabled: true });
+  assert.equal(current.highScore, 420);
+  assert.equal(current.totalRuns, 3);
+  assert.equal(current.activeRun?.seed, activeRun.seed);
+  assert.equal(current.soundEnabled, false, 'an existing V2 preference takes precedence over the legacy profile');
+
+  const { trayAlgorithmVersion: _staleVersion, ...staleRun } = activeRun;
+  const stale = hydrateBlockBlastProfile({ ...current, activeRun: staleRun as BlockBlastState }, null);
+  assert.equal(stale.activeRun, null, 'saved trays from the earlier V2 generator are invalidated instead of being shown again');
 });
 
 test('Block Party drag targeting captures the nearest geometric cells generously at board boundaries', () => {
@@ -82,8 +148,33 @@ test('Block Party drag targeting captures the nearest geometric cells generously
   const occupiedOrigin = nearestBlockBlastOrigin([{ row: 0, column: 0 }], 3.1, 3.1);
   assert.deepEqual(occupiedOrigin, { row: 3, column: 3 }, 'targeting chooses the closest geometric cell even when occupied');
   assert.equal(canPlaceBlockBlastPiece(board, [{ row: 0, column: 0 }], occupiedOrigin!.row, occupiedOrigin!.column), false);
-  assert.deepEqual(nearestSnappedBlockBlastOrigin(board, [{ row: 0, column: 0 }], 3.1, 3.1), { row: 3, column: 3 }, 'an occupied cell does not make a piece jump to a distant opening');
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(board, [{ row: 0, column: 0 }], 3.1, 3.1), { row: 3, column: 4 }, 'an adjacent fully valid origin catches a blocked nearest cell');
   assert.deepEqual(nearestSnappedBlockBlastOrigin(board, [{ row: 0, column: 0 }], 3.48, 3.48), { row: 3, column: 4 }, 'an almost-equidistant valid neighbour catches the piece seamlessly');
+
+  const verticalOnly = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
+  verticalOnly[3 * 8 + 2] = 'rose';
+  verticalOnly[3 * 8 + 3] = 'rose';
+  verticalOnly[3 * 8 + 4] = 'rose';
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(verticalOnly, [{ row: 0, column: 0 }], 2.9, 3), { row: 2, column: 3 }, 'a blocked origin snaps upward when the floating piece is closer above it');
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(verticalOnly, [{ row: 0, column: 0 }], 3.1, 3), { row: 4, column: 3 }, 'a blocked origin snaps downward when the floating piece is closer below it');
+
+  const diagonalOnly = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
+  diagonalOnly[3 * 8 + 3] = 'rose';
+  diagonalOnly[2 * 8 + 3] = 'rose';
+  diagonalOnly[3 * 8 + 2] = 'rose';
+  diagonalOnly[3 * 8 + 4] = 'rose';
+  diagonalOnly[4 * 8 + 3] = 'rose';
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(diagonalOnly, [{ row: 0, column: 0 }], 3, 3), { row: 2, column: 2 }, 'an immediately diagonal valid origin remains within the forgiving snap envelope');
+
+  const blockedNeighbourhood = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
+  for (let row = 2; row <= 4; row += 1) {
+    for (let column = 2; column <= 4; column += 1) blockedNeighbourhood[row * 8 + column] = 'rose';
+  }
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(blockedNeighbourhood, [{ row: 0, column: 0 }], 3.1, 3.1), { row: 3, column: 3 }, 'targeting does not jump to an opening outside the local snap radius');
+
+  const blockedCorner = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
+  blockedCorner[0] = 'rose';
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(blockedCorner, [{ row: 0, column: 0 }], -0.7, 0.05), { row: 0, column: 1 }, 'edge targeting measures nearby valid origins from the clamped board position');
 });
 
 test('Block Party clears simultaneous lines and applies placement, clear, and perfect-board scoring', () => {
