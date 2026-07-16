@@ -5,6 +5,7 @@ import { foundationSceneAvailability, isFoundationSceneAvailable } from '@/utils
 import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
 import type { PhotoAnalysisInput } from '@/utils/intelligence/photo-analysis';
 import { classifyScene, resolveSceneRead, type SceneRead } from '@/utils/scene-classify';
+import { isFoundationOnlyPhotoInterpretationEnabled } from '@/utils/photo-intelligence-mode';
 
 type Snapshot = { rawVision: PhotoVisionResult | null; vision: DayVisionSummary | null; scene: SceneRead | null; memory: ClassifiedMemory | null };
 
@@ -33,11 +34,12 @@ export function usePhotoAnalysisSession(input: {
       const vision = analyzed.summary;
       rawVisionRef.current = analyzed.rawVision;
       visionRef.current = vision;
-      const fastScene = classifyScene(vision);
       const foundationAvailable = !!vision && isFoundationSceneAvailable();
+      const isolateFoundation = foundationAvailable && isFoundationOnlyPhotoInterpretationEnabled();
+      const fastScene = isolateFoundation ? null : classifyScene(vision);
       const initialScene = foundationAvailable
         ? await resolveSceneRead(vision, input.photoUri, analyzed.rawVision)
-        : { ...fastScene, foundationStatus: 'unavailable' as const, foundationReason: foundationSceneAvailability().reason };
+        : { ...(fastScene ?? classifyScene(vision)), foundationStatus: 'unavailable' as const, foundationReason: foundationSceneAvailability().reason };
       if (!active) return;
       sceneRef.current = initialScene;
       committedRef.current = false;

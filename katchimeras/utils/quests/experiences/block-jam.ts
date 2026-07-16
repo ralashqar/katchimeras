@@ -221,6 +221,31 @@ export function absoluteBlockCells(piece: BlockJamBlockDefinition, anchor: Block
   return piece.cells.map((cell) => ({ row: anchor.row + cell.row, column: anchor.column + cell.column }));
 }
 
+export function nearestBlockJamPieceAtPoint(
+  levelDefinition: BlockJamLevel,
+  state: BlockJamState,
+  point: { x: number; y: number },
+  layout: { cell: number; gap: number; outer: number },
+  maxDistance = layout.cell,
+): string | null {
+  const pitch = layout.cell + layout.gap;
+  let nearest: { blockId: string; distance: number } | null = null;
+
+  for (const piece of levelDefinition.blocks) {
+    if (state.clearedBlockIds.includes(piece.id)) continue;
+    for (const occupied of absoluteBlockCells(piece, state.anchors[piece.id])) {
+      const left = layout.outer + occupied.column * pitch;
+      const top = layout.outer + occupied.row * pitch;
+      const dx = Math.max(left - point.x, 0, point.x - (left + layout.cell));
+      const dy = Math.max(top - point.y, 0, point.y - (top + layout.cell));
+      const distance = Math.hypot(dx, dy);
+      if (!nearest || distance < nearest.distance) nearest = { blockId: piece.id, distance };
+    }
+  }
+
+  return nearest && nearest.distance <= maxDistance ? nearest.blockId : null;
+}
+
 export function reachableBlockJamAnchors(levelDefinition: BlockJamLevel, state: BlockJamState, blockId: string): BlockJamAnchor[] {
   const piece = levelDefinition.blocks.find((candidate) => candidate.id === blockId); const start = state.anchors[blockId];
   if (!piece || !start || state.clearedBlockIds.includes(blockId)) return [];

@@ -55,7 +55,8 @@ export function companionReflectionIsDirty(state: CompanionInteractionState): bo
 export function companionQuestUsesFullBleed(execution: InteractiveQuestExecution | null): boolean {
   return Boolean(
     (execution?.kind === 'matching' && execution.packId === 'mossprout-garden') ||
-    (execution?.kind === 'merge' && execution.packId === 'feastle-kitchen'),
+    (execution?.kind === 'merge' && execution.packId === 'feastle-kitchen') ||
+    (execution?.kind === 'block_jam' && execution.packId === 'tasklet-desk'),
   );
 }
 

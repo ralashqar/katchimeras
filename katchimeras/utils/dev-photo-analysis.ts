@@ -5,8 +5,9 @@ import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence'
 import { classifiedMemoryConsistencyWarnings } from '@/utils/intelligence/consistency';
 import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 import { QUEST_DEFINITIONS } from '@/utils/quests/definitions';
+import { isFoundationOnlyPhotoInterpretationEnabled } from '@/utils/photo-intelligence-mode';
 
-const STORAGE_KEY = 'dev:last-photo-analysis:v1';
+const STORAGE_KEY = 'dev:last-photo-analysis:v2';
 
 export type DevQuestPhotoEvaluation = {
   questId: string;
@@ -22,11 +23,12 @@ export type DevQuestPhotoEvaluation = {
 };
 
 export type DevLastPhotoAnalysis = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   capturedAt: string;
   sourceId: string;
   thumbnailUri: string;
   questContext: { questId: string | null; creatureId: string | null };
+  interpretationMode: 'hybrid' | 'foundation_only';
   rawVision: PhotoVisionResult | null;
   visionSummary: DayVisionSummary | null;
   scene: SceneRead | null;
@@ -62,11 +64,12 @@ export function saveDevLastPhotoAnalysis(input: {
         })
       : null;
     const snapshot: DevLastPhotoAnalysis = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       capturedAt: new Date().toISOString(),
       sourceId: input.sourceId,
       thumbnailUri: input.thumbnailUri,
       questContext: { questId: input.questId ?? null, creatureId: input.creatureId ?? null },
+      interpretationMode: isFoundationOnlyPhotoInterpretationEnabled() ? 'foundation_only' : 'hybrid',
       rawVision: input.rawVision,
       visionSummary: input.visionSummary,
       scene: input.scene,

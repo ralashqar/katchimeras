@@ -23,6 +23,7 @@ function stub(name, source) {
 const notePath = transpile('utils/note-interpret.ts', 'note-interpret.js');
 const placePath = transpile('utils/place-categories.ts', 'place-categories.js');
 const counter = stub('counter.js', 'exports.calls = 0;');
+const foundationOnlyMode = stub('foundation-only-mode.js', 'exports.enabled = false; exports.isFoundationOnlyNoteRoutingEnabled = () => exports.enabled;');
 const stubs = {
   'expo-file-system': stub('file.js', 'exports.File = class { async base64() { return "encoded"; } };'),
   '@/utils/foundation-note': stub('foundation.js', 'exports.interpretNoteOnDevice = async () => null;'),
@@ -31,6 +32,7 @@ const stubs = {
   '@/utils/studio-detect': stub('studio.js', 'exports.detectStudioInText = () => ({ detected: false }); exports.isGenericStudioLabel = () => true;'),
   '@/utils/intelligence/semantic-fallback': stub('semantic.js', 'exports.classifyNoteSemantically = async () => null; exports.semanticMedia = () => null;'),
   '@/utils/journal-routing': stub('journal-routing.js', 'exports.registryJournalRoutes = () => [];'),
+  '@/utils/dev-settings': foundationOnlyMode,
   '@/types/home': stub('types.js', ''),
   '@/utils/day-map-engine': stub('day-map.js', 'exports.deriveDayMapSummary = () => ({ nodes: [{ id: "p1", latitude: 1, longitude: 2, startedAt: "2026-01-01T10:00:00Z", endedAt: "2026-01-01T10:30:00Z" }] });'),
   '@/utils/supabase': stub('supabase.js', `const counter = require(${JSON.stringify(counter)}); exports.supabase = { functions: { invoke: async () => { counter.calls += 1; return { data: { archetype: "energy", label: "Cloud note", categories: [{ clusterId: "p1", appleCategory: "Cafe" }] }, error: null }; } } };`),
@@ -44,6 +46,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
 const note = require(notePath);
 const places = require(placePath);
 const calls = require(counter);
+const foundationOnly = require(foundationOnlyMode);
 let failures = 0;
 function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
@@ -62,6 +65,9 @@ function check(label, condition) {
   check('explicit note opt-in permits cloud fallback', remote.intelligenceProvider === 'remoteLlm' && calls.calls === 1);
   const remotePlaces = await places.resolvePlaceSeedsForDay({ locations: [], moments: [] }, [], { allowRemote: true });
   check('explicit place action permits enrichment', remotePlaces[0] === 'coffee_shop' && calls.calls === 2);
+  foundationOnly.enabled = true;
+  const isolated = await note.interpretNote({ text: 'Foundation test' }, { allowRemote: true });
+  check('Foundation-only dev mode blocks cloud and deterministic routes', isolated.journalRoutes.length === 0 && calls.calls === 2);
   console.log(failures ? `\n${failures} local-policy check(s) FAILED.` : '\nAll local intelligence policy checks passed.');
   process.exit(failures ? 1 : 0);
 })().catch((error) => {

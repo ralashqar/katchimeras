@@ -168,6 +168,15 @@ function emojiFor(mediaType: StudioMediaType): string {
 // kinds. Keep this verb-led: "watched the football game" is media, while
 // "my son played football" is a real-world activity.
 function detectOtherConsumedMedia(text: string): StudioDetection | null {
+  // Team or competition names often sit between the watching verb and sport:
+  // “watched the England Argentina football game”. Keep the signal verb-led
+  // and reject participation wording such as “watched my son play football”.
+  const describedSport = text.match(
+    /\b(?:watched|watching|caught|saw)\s+(.{0,64}?\b(?:football|soccer|rugby|tennis|basketball|baseball|cricket|hockey|golf|boxing|formula\s*1|f1)\s+(?:game|match|race|final))\b/i
+  );
+  if (describedSport && !/\b(?:play|playing|practice|practise|training)\b/i.test(describedSport[1])) {
+    return { detected: true, mediaType: 'other', label: titleCase(describedSport[1].replace(/^(?:a|the)\s+/i, '')), emoji: '🏟️' };
+  }
   const sport = text.match(
     /\b(?:watched|watching|caught|saw)\s+(?:a\s+|the\s+)?((?:football|soccer|rugby|tennis|basketball|baseball|cricket|hockey|golf|boxing|formula\s*1|f1)(?:\s+(?:game|match|race|final))?|(?:sports?|game|match|race|final))\b/i
   );

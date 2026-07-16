@@ -11,7 +11,9 @@ export type JournalClassificationCatalogEntry = {
   aliases: string[];
 };
 
-type LanguageOverride = Partial<Pick<JournalClassificationCatalogEntry, 'definition' | 'examples' | 'exclusions' | 'aliases'>>;
+type LanguageOverride = Partial<Pick<JournalClassificationCatalogEntry, 'definition' | 'examples' | 'exclusions' | 'aliases'>> & {
+  suppressDefaultAliases?: boolean;
+};
 
 const LANGUAGE: Record<string, LanguageOverride> = {
   'went_somewhere.museum': { definition: 'A real visit to a museum, gallery, exhibition venue, or cultural collection.', examples: ['I went to the Natural History Museum', 'Visited an art gallery'], exclusions: ['I looked at a painting online'] },
@@ -28,7 +30,7 @@ const LANGUAGE: Record<string, LanguageOverride> = {
   'studio.book': { examples: ['I read a book', 'I listened to an audiobook'], aliases: ['novel', 'audiobook'] },
   'studio.film': { examples: ['I watched a movie', 'I saw a film at the cinema'], aliases: ['movie', 'cinema'], exclusions: ['I filmed a video'] },
   'studio.show': { examples: ['I watched a TV show', 'I finished a series'], aliases: ['tv', 'television', 'series', 'episode'] },
-  'studio.game': { examples: ['I played a video game', 'Finished a console game'], aliases: ['video game', 'videogame'] },
+  'studio.game': { examples: ['I played a video game', 'Finished a console game'], aliases: ['video game', 'videogame', 'gaming', 'console game', 'playstation', 'xbox', 'nintendo'], suppressDefaultAliases: true },
   'studio.music': { examples: ['I listened to an album', 'I discovered a song'], aliases: ['album', 'song', 'concert'] },
   'studio.podcast': { examples: ['I listened to a podcast'] },
   'studio.art': { definition: 'Art or an exhibition as the work being experienced, when a physical venue visit is not the main memory.', examples: ['I saw an inspiring sculpture', 'The exhibition stayed with me'] },
@@ -104,7 +106,10 @@ export const JOURNAL_CLASSIFICATION_CATALOG: JournalClassificationCatalogEntry[]
       definition: override.definition ?? `${flow.description ?? flow.title}: ${choice.label}.`,
       examples: override.examples ?? [defaultExample(flow.id, choice.label)],
       exclusions: override.exclusions ?? [],
-      aliases: [...new Set([choice.id, choice.label, ...(choice.routeAliases ?? []), ...(override.aliases ?? [])])],
+      aliases: [...new Set([
+        ...(override.suppressDefaultAliases ? [] : [choice.id, choice.label, ...(choice.routeAliases ?? [])]),
+        ...(override.aliases ?? []),
+      ])],
     };
   })
 );

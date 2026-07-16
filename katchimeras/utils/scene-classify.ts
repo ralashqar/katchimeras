@@ -12,6 +12,7 @@ import { ON_DEVICE_FIRST_POLICY } from '@/utils/intelligence/types';
 import { detectProminentPeopleInVision } from '@/utils/people-detect';
 import { summaryIsScreenContent } from '@/utils/photo-reality';
 import { classifyPhotoLabelsSemantically } from '@/utils/intelligence/semantic-fallback';
+import { isFoundationOnlyPhotoInterpretationEnabled } from '@/utils/photo-intelligence-mode';
 
 // Hierarchical "read the photo" layer. Instead of every detector flatly scanning
 // the same bag of Apple Vision labels, we first classify the photo into ONE
@@ -242,6 +243,7 @@ async function resolveFoundationSceneRead(
   rawVision?: PhotoVisionResult | null
 ): Promise<SceneRead | null> {
   if (!vision) return null;
+  const foundationOnly = isFoundationOnlyPhotoInterpretationEnabled();
   const tags = [
     ...(vision.concepts ?? []).map((concept) => concept.name),
     ...(vision.details ?? []),
@@ -257,9 +259,9 @@ async function resolveFoundationSceneRead(
         const mediaType = normalizeMediaKind(deep.mediaKind);
         if (mediaType) {
           // The heuristic OCR title backs up the LLM when it declined to name one.
-          const fallback = detectStudioInVision(vision);
+          const fallback = foundationOnly ? null : detectStudioInVision(vision);
           const heuristicTitle =
-            fallback.detected && fallback.label && !isGenericStudioLabel(fallback.label) ? fallback.label : null;
+            fallback?.detected && fallback.label && !isGenericStudioLabel(fallback.label) ? fallback.label : null;
           const title = deep.title ?? heuristicTitle;
           return {
             memoryDomain: normalizeMemoryDomain(deep.memoryDomain),
@@ -284,7 +286,7 @@ async function resolveFoundationSceneRead(
           type: deepType,
           label: SCENE_LABEL[deepType],
           detail: deep.subject,
-          food: deepType === 'food' ? enrichFoodDetectionWithCuisine(detectFoodInVision(vision), deep.subject) : undefined,
+          food: deepType === 'food' && !foundationOnly ? enrichFoodDetectionWithCuisine(detectFoodInVision(vision), deep.subject) : undefined,
           source: 'llm',
           supportingSubjects: deep.supportingSubjects,
           representation: deep.representation,
@@ -305,7 +307,7 @@ async function resolveFoundationSceneRead(
           type,
           label: SCENE_LABEL[type],
           detail: llm?.subject ?? null,
-          food: type === 'food' ? detectFoodInVision(vision) : undefined,
+          food: type === 'food' && !foundationOnly ? detectFoodInVision(vision) : undefined,
           source: 'llm',
         };
       }
@@ -327,6 +329,20 @@ export async function resolveSceneRead(
   rawVision?: PhotoVisionResult | null
 ): Promise<SceneRead> {
   if (!vision) return { type: 'other', label: SCENE_LABEL.other, source: 'rules' };
+  const foundationOnly = isFoundationOnlyPhotoInterpretationEnabled() && isFoundationSceneAvailable();
+  if (foundationOnly) {
+    const foundation = await resolveFoundationSceneRead(vision, imageUri, rawVision);
+    return foundation
+      ? { ...foundation, foundationStatus: 'used', foundationReason: null }
+      : {
+          type: 'other',
+          label: SCENE_LABEL.other,
+          source: 'llm',
+          promptVersion: 'foundation-only-failed',
+          foundationStatus: 'failed',
+          foundationReason: 'On-device model returned no usable structured read or timed out',
+        };
+  }
   const result = await runIntelligenceTask<DayVisionSummary, SceneRead>({
     task: 'classifyScene',
     input: vision,

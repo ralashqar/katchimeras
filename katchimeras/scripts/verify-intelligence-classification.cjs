@@ -19,6 +19,7 @@ const taxonomyPath = transpile('utils/intelligence/taxonomy.ts', 'taxonomy.js');
 const foodDetectPath = transpile('utils/food-detect.ts', 'food-detect.js');
 const studioDetectPath = transpile('utils/studio-detect.ts', 'studio-detect.js');
 const photoRealityPath = transpile('utils/photo-reality.ts', 'photo-reality.js');
+const photoIntelligenceModePath = transpile('utils/photo-intelligence-mode.ts', 'photo-intelligence-mode.js');
 const peopleDetectPath = transpile('utils/people-detect.ts', 'people-detect.js');
 const classificationPolicyPath = transpile('utils/intelligence/classification-policy.ts', 'classification-policy.js');
 const qualityRegistryPath = transpile('utils/intelligence/quality-registry.ts', 'quality-registry.js');
@@ -38,6 +39,7 @@ const stubs = {
   '@/utils/food-detect': foodDetectPath,
   '@/utils/studio-detect': studioDetectPath,
   '@/utils/photo-reality': photoRealityPath,
+  '@/utils/photo-intelligence-mode': photoIntelligenceModePath,
   '@/utils/people-detect': peopleDetectPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
   '@/utils/intelligence/photo-descriptor': photoDescriptorPath,
@@ -76,6 +78,21 @@ function summary(concepts, faces = 0) {
     details: [], maxFaceCount: faces, faceCoverage: faces ? 1 : 0, textTokens: [], analyzedPhotoCount: 1,
   };
 }
+
+global.__DEV__ = true;
+global.localStorage = { getItem: () => 'true' };
+const isolatedFoundationPhoto = classification.buildPhotoClassifiedMemory({
+  sourceId: 'foundation-only',
+  observedAt: '2026-07-16T12:00:00.000Z',
+  vision: summary(['city skyline']),
+  scene: { type: 'food', memoryDomain: 'food', label: 'Food', detail: 'ramen', source: 'llm', confidence: 0.91 },
+});
+check(
+  'Foundation-only photo mode does not independently classify Vision tags',
+  isolatedFoundationPhoto.dominantDomain === 'food' && !isolatedFoundationPhoto.observations.some((item) => item.value === 'city')
+);
+delete global.localStorage;
+delete global.__DEV__;
 
 const questionIds = questionRegistry.QUESTION_REGISTRY.map((item) => item.id);
 check('question registry ids are unique', new Set(questionIds).size === questionIds.length);

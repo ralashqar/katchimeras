@@ -16,9 +16,10 @@ import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/jour
 import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import { evidenceProvider, isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
 
-test('Mossprout matching and Feastle merge attempts use the full-bleed game shell', () => {
+test('Mossprout, Feastle, and Tasklet games use the full-bleed game shell', () => {
   assert.equal(companionQuestUsesFullBleed({ kind: 'matching', packId: 'mossprout-garden' } as InteractiveQuestExecution), true);
   assert.equal(companionQuestUsesFullBleed({ kind: 'merge', packId: 'feastle-kitchen' } as InteractiveQuestExecution), true);
+  assert.equal(companionQuestUsesFullBleed({ kind: 'block_jam', packId: 'tasklet-desk' } as InteractiveQuestExecution), true);
   assert.equal(companionQuestUsesFullBleed({ kind: 'matching', packId: 'relicoon-gallery' } as InteractiveQuestExecution), false);
   assert.equal(companionQuestUsesFullBleed(null), false);
 });

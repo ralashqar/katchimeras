@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
-import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
+import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, nearestBlockJamPieceAtPoint, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
 import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastOriginFromFootprintCenter, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastStreakWord, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestBlockBlastWorldOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
 import { hydrateBlockBlastProfile, type BlockBlastProfile } from '@/utils/quests/experiences/block-blast-profile';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
@@ -307,6 +307,25 @@ test('Block Jam rejects an exit when any trailing polyomino cell has a blocked s
   assert.equal(availableBlockJamDoor(level, blocked, 'target'), null, 'the lower-right cell would sweep through the blocker');
   const unblocked = { ...blocked, clearedBlockIds: ['blocker'] };
   assert.equal(availableBlockJamDoor(level, unblocked, 'target')?.id, 'cyan-exit');
+});
+
+test('Block Jam tap targeting chooses the nearest piece within one cell width', () => {
+  const level: BlockJamLevel = {
+    id: 'tap-target-fixture', rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter: 'tutorial', tier: 1,
+    rows: 5, columns: 6, parMoves: 2, timeLimitMs: 180_000, fixedCells: [],
+    blocks: [
+      { id: 'left', colorId: 'cyan', anchor: { row: 2, column: 1 }, cells: [{ row: 0, column: 0 }] },
+      { id: 'right', colorId: 'red', anchor: { row: 2, column: 4 }, cells: [{ row: 0, column: 0 }] },
+    ],
+    doors: [],
+  };
+  const state = createBlockJamState(level);
+  const layout = { cell: 20, gap: 2, outer: 10 };
+
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 66, y: 64 }, layout), 'left', 'nearby empty space selects the closest shape');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 108, y: 64 }, layout), 'right', 'a direct hit selects its piece');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 4, y: 4 }, layout), null, 'taps farther than one cell width select nothing');
+  assert.equal(nearestBlockJamPieceAtPoint(level, { ...state, clearedBlockIds: ['left'] }, { x: 66, y: 64 }, layout), null, 'cleared pieces are not selectable');
 });
 
 test('Block Jam moves are unlimited and only timeout can fail a live board', () => {

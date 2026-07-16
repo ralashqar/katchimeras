@@ -1,7 +1,7 @@
 import type { JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 
-const STORAGE_KEY = 'dev:last-note-analysis:v2';
+const STORAGE_KEY = 'dev:last-note-analysis:v3';
 
 export type DevNoteAnalysisStatus =
   | 'classified'
@@ -14,12 +14,13 @@ export type DevNoteAnalysisStatus =
   | 'native_error';
 
 export type DevLastNoteAnalysis = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   capturedAt: string;
   transcript: string;
   durationMs: number;
   firstPassDurationMs: number | null;
   retryDurationMs: number | null;
+  routingMode: 'hybrid' | 'foundation_only';
   foundationAvailable: boolean;
   nativeNoteSchemaVersion: number | null;
   status: DevNoteAnalysisStatus;
@@ -34,7 +35,7 @@ export type DevLastNoteAnalysis = {
 
 export function saveDevLastNoteAnalysis(input: Omit<DevLastNoteAnalysis, 'schemaVersion' | 'capturedAt'>): void {
   if (!__DEV__) return;
-  setStoredJson(STORAGE_KEY, { schemaVersion: 2, capturedAt: new Date().toISOString(), ...input } satisfies DevLastNoteAnalysis);
+  setStoredJson(STORAGE_KEY, { schemaVersion: 3, capturedAt: new Date().toISOString(), ...input } satisfies DevLastNoteAnalysis);
 }
 
 export function loadDevLastNoteAnalysis(): DevLastNoteAnalysis | null {

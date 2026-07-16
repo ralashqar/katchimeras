@@ -77,6 +77,31 @@ test('registry-wide evidence corrects generic birthday output without misrouting
   assert.equal(registryJournalRoutes("I baked my son's birthday cake")[0]?.id, 'food.cooking');
 });
 
+test('watched international football routes to live sport while played video games remain games', () => {
+  const transcript = 'I watched the England Argentina football game';
+  assert.equal(registryJournalRoutes(transcript)[0]?.id, 'studio.other_media');
+  assert.equal(registryJournalRoutes('I played a video game')[0]?.id, 'studio.game');
+  assert.notEqual(registryJournalRoutes('I played a football game')[0]?.id, 'studio.game');
+  const corrected = resolveFoundationRouteEvidence(
+    transcript,
+    { routeKey: 'studio.game', routeConfidence: 0.9 },
+    { routeKey: 'studio.other_media', routeConfidence: 0.88 }
+  );
+  assert.equal(corrected.selected?.id, 'studio.other_media');
+  const foundationOnly = resolveFoundationRouteEvidence(
+    transcript,
+    { routeKey: 'studio.game', routeConfidence: 0.9 },
+    null,
+    { includeRegistryEvidence: false }
+  );
+  assert.equal(foundationOnly.selected?.id, 'studio.game');
+  assert.deepEqual(foundationOnly.routes.map((route) => route.id), ['studio.game']);
+  assert.equal(
+    foundationAtomicNeedsRetry(transcript, { routeKey: 'studio.game', routeConfidence: 0.9 }, { includeRegistryEvidence: false }),
+    false
+  );
+});
+
 test('every manual journal category accepts canonical IDs, labels, and missing kind inference', () => {
   for (const flow of MANUAL_JOURNAL_FLOWS) {
     for (const choice of flow.choices) {

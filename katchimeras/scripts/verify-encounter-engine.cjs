@@ -48,6 +48,7 @@ const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'taxonomy
 const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-reality.js');
 const peopleDetectPath = transpileToTemp('utils/people-detect.ts', 'people-detect.js');
 const studioDetectPath = transpileToTemp('utils/studio-detect.ts', 'studio-detect.js');
+const photoIntelligenceModePath = transpileToTemp('utils/photo-intelligence-mode.ts', 'photo-intelligence-mode.js');
 const classificationPath = transpileToTemp('utils/intelligence/classification.ts', 'classification.js');
 const classificationPolicyPath = path.join(tempDir, 'classification-policy.js');
 fs.writeFileSync(classificationPolicyPath, 'exports.memoryRejectsDomain = () => false;');
@@ -73,6 +74,7 @@ const stubs = {
   '@/utils/photo-reality': photoRealityPath,
   '@/utils/people-detect': peopleDetectPath,
   '@/utils/studio-detect': studioDetectPath,
+  '@/utils/photo-intelligence-mode': photoIntelligenceModePath,
   '@/utils/intelligence/classification': classificationPath,
   '@/utils/intelligence/classification-policy': classificationPolicyPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,

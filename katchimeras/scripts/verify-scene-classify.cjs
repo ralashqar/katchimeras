@@ -26,6 +26,7 @@ const foodDetectPath = transpileToTemp('utils/food-detect.ts', 'food-detect.js')
 const studioDetectPath = transpileToTemp('utils/studio-detect.ts', 'studio-detect.js');
 const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-reality.js');
 const peopleDetectPath = transpileToTemp('utils/people-detect.ts', 'people-detect.js');
+const photoIntelligenceModePath = transpileToTemp('utils/photo-intelligence-mode.ts', 'photo-intelligence-mode.js');
 const intelligenceTypesPath = transpileToTemp('utils/intelligence/types.ts', 'intelligence-types.js');
 const foundationStub = path.join(tempDir, 'foundation-scene.js');
 fs.writeFileSync(foundationStub, 'exports.classifySceneOnDevice = async () => null;\nexports.readSceneOnDevice = async () => global.__foundationSceneRead ?? null;\nexports.isFoundationSceneAvailable = () => false;\nexports.foundationSceneAvailability = () => ({ available: false, reason: "native_module_missing" });\n');
@@ -53,6 +54,7 @@ const stubs = {
   '@/utils/intelligence/types': intelligenceTypesPath,
   '@/utils/photo-reality': photoRealityPath,
   '@/utils/people-detect': peopleDetectPath,
+  '@/utils/photo-intelligence-mode': photoIntelligenceModePath,
   '@/utils/intelligence/semantic-fallback': semanticStub,
 };
 const originalResolve = Module._resolveFilename;

@@ -8,6 +8,7 @@ import { detectStudioInText, isGenericStudioLabel } from '@/utils/studio-detect'
 import { classifyNoteSemantically, semanticMedia, type SemanticRead } from '@/utils/intelligence/semantic-fallback';
 import { supabase } from '@/utils/supabase';
 import { registryJournalRoutes } from '@/utils/journal-routing';
+import { isFoundationOnlyNoteRoutingEnabled } from '@/utils/dev-settings';
 
 // Client-side note interpreter, on-device first:
 //   1. Transcribe voice notes ON-DEVICE (Apple Speech) — audio never leaves the
@@ -112,6 +113,7 @@ export async function transcribeAudioNote(
 }
 
 export async function interpretNote(input: NoteInput, options: { allowRemote?: boolean } = {}): Promise<InterpretedNote> {
+  const foundationOnlyRouting = isFoundationOnlyNoteRoutingEnabled();
   // 1. Resolve a transcript: typed text, or an on-device transcription.
   let transcript = (input.text ?? '').trim();
   if (!transcript && input.audioUri) {
@@ -137,7 +139,7 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
       // Older native builds only return mood/title; in that case use the
       // Natural Language fallback for classification without discarding the
       // better Foundation phrasing.
-      const semantic = local.llmClassified
+      const semantic = local.llmClassified || foundationOnlyRouting
         ? null
         : await classifyNoteSemantically(transcript, input.audioUri ? 'voice_note' : 'text_note');
       const semanticResolvedMedia = semanticMedia(semantic, transcript);
@@ -149,7 +151,7 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
         // Older native prompts know only the original six media kinds. Strict,
         // verb-led local rules fill explicit watched sport/news and podcasts
         // without overriding a positive Foundation classification.
-        media: local.llmClassified ? local.media : semanticResolvedMedia ?? fallbackMedia,
+        media: local.llmClassified ? local.media : foundationOnlyRouting ? null : semanticResolvedMedia ?? fallbackMedia,
         food: local.food,
         llmClassified: local.llmClassified,
         semantic,
@@ -159,6 +161,18 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
         journalClassification: local.journalClassification,
         journalRoutes: local.journalRoutes,
         intelligenceProvider: 'appleFoundation',
+      };
+    }
+    // In this development mode, a missing or invalid Foundation response must
+    // stay unrouted so testers see the model's behavior without another
+    // classifier silently supplying a category.
+    if (foundationOnlyRouting) {
+      return {
+        ...interpretNoteText(transcript),
+        transcript,
+        journalClassification: null,
+        journalRoutes: [],
+        intelligenceProvider: 'deterministic',
       };
     }
     // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.

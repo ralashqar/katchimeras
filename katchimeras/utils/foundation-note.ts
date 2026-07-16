@@ -13,6 +13,7 @@ import {
   type FoundationAtomicRouteRead,
 } from '@/utils/journal-routing';
 import { saveDevLastNoteAnalysis, type DevNoteAnalysisStatus } from '@/utils/dev-note-analysis';
+import { isFoundationOnlyNoteRoutingEnabled } from '@/utils/dev-settings';
 
 // On-device interpretation of a note (typed or voice transcript) via Apple
 // Foundation Models (modules/katchimera-foundation). Present only on iOS 26+
@@ -92,6 +93,7 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
   const text = transcript.trim();
   if (!text) return null;
   const startedAt = Date.now();
+  const foundationOnlyRouting = isFoundationOnlyNoteRoutingEnabled();
   const foundationAvailable = isFoundationNoteAvailable();
   if (!nativeFoundation?.interpretNoteAsync || !foundationAvailable) {
     recordDevNote(text, startedAt, foundationAvailable, 'unavailable', nativeFoundation?.interpretNoteAsync ? 'foundation_model_unavailable' : 'native_note_reader_missing');
@@ -143,7 +145,7 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
     let retryRaw: (FoundationAtomicRouteRead & Record<string, unknown>) | null = null;
     let retryDurationMs: number | null = null;
     let retryFailure: 'timeout' | 'error' | null = null;
-    if (cleanString(raw.routeKey) && nativeFoundation.classifyNoteRouteAsync && foundationAtomicNeedsRetry(text, firstAtomic)) {
+    if (cleanString(raw.routeKey) && nativeFoundation.classifyNoteRouteAsync && foundationAtomicNeedsRetry(text, firstAtomic, { includeRegistryEvidence: !foundationOnlyRouting })) {
       const remaining = Math.max(0, TOTAL_TIMEOUT_MS - (Date.now() - startedAt));
       if (remaining >= 500) {
         const retryStartedAt = Date.now();
@@ -158,7 +160,7 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
         else retryFailure = retry.kind;
       }
     }
-    const decision = resolveFoundationRouteEvidence(text, firstAtomic, retryRaw);
+    const decision = resolveFoundationRouteEvidence(text, firstAtomic, retryRaw, { includeRegistryEvidence: !foundationOnlyRouting });
     const mediaRoute = media
       ? foundationNoteRoute({ provider: 'appleFoundation', llmClassified, mediaType: media.mediaType })
       : null;
@@ -212,6 +214,7 @@ function recordDevNote(
     durationMs: Date.now() - startedAt,
     firstPassDurationMs,
     retryDurationMs,
+    routingMode: isFoundationOnlyNoteRoutingEnabled() ? 'foundation_only' : 'hybrid',
     foundationAvailable,
     nativeNoteSchemaVersion: typeof schema === 'string' && /^\d+$/.test(schema) ? Number(schema) : null,
     status,

@@ -16,6 +16,7 @@ import type { SceneRead } from '@/utils/scene-classify';
 import { detectProminentPeopleInVision } from '@/utils/people-detect';
 import { summaryIsScreenContent } from '@/utils/photo-reality';
 import { detectStudioInVision, isGenericStudioLabel } from '@/utils/studio-detect';
+import { isFoundationOnlyPhotoInterpretationEnabled } from '@/utils/photo-intelligence-mode';
 
 import { canonicalizeSignal, seedIdForCanonicalSignal, textToSignals, visionResultToSignals, visionSummaryToSignals } from './taxonomy';
 import { memoryRejectsDomain } from './classification-policy';
@@ -48,14 +49,22 @@ type SceneVisualSupport = {
   reasons: string[];
 };
 
+function isFoundationOnlyPhotoInput(input: PhotoMemoryInput): boolean {
+  return isFoundationOnlyPhotoInterpretationEnabled() && input.scene?.source === 'llm';
+}
+
 export function buildPhotoClassifiedMemory(input: PhotoMemoryInput): ClassifiedMemory {
+  const foundationOnly = isFoundationOnlyPhotoInput(input);
+  // Foundation already consumed these Vision/OCR signals. In isolated mode,
+  // do not run them through the parallel canonical detectors a second time.
+  const interpretationInput = foundationOnly ? { ...input, vision: null, rawVision: null } : input;
   // Foundation text can refine an Apple Vision category, but it cannot create
   // one by itself. Keep the original scene available to the editor as a text
   // suggestion while excluding an uncorroborated generated read here.
-  const visualSupport = input.scene?.source === 'llm' ? sceneVisualSupport(input) : null;
-  const classificationInput = input.scene?.source === 'llm' && !visualSupport?.supported
-    ? { ...input, scene: null }
-    : input;
+  const visualSupport = !foundationOnly && input.scene?.source === 'llm' ? sceneVisualSupport(input) : null;
+  const classificationInput = !foundationOnly && input.scene?.source === 'llm' && !visualSupport?.supported
+    ? { ...interpretationInput, scene: null }
+    : interpretationInput;
   const descriptorScene = classificationInput.scene ?? (input.scene?.source === 'llm'
     ? { ...input.scene, type: 'other' as const, memoryDomain: 'other' as const, label: 'Visual context', detail: null, food: undefined, media: undefined, supportingSubjects: [], alternatives: [] }
     : null);
@@ -63,8 +72,8 @@ export function buildPhotoClassifiedMemory(input: PhotoMemoryInput): ClassifiedM
   const facets = photoFacets(classificationInput, initialObservations);
   const observations = addRecoveredPhotoFacetObservations(initialObservations, facets);
   const initialPhotoAnalysis = buildPhotoAnalysisDescriptor({
-    rawVision: input.rawVision,
-    vision: input.vision,
+    rawVision: classificationInput.rawVision,
+    vision: classificationInput.vision,
     scene: descriptorScene,
     observations,
     facets,
@@ -77,7 +86,7 @@ export function buildPhotoClassifiedMemory(input: PhotoMemoryInput): ClassifiedM
     confirmations: input.confirmations,
     primaryValues,
     supportingValues,
-    screenContent: photoAnalysis.representation.kind === 'screen_content' || summaryIsScreenContent(input.vision?.details),
+    screenContent: photoAnalysis.representation.kind === 'screen_content' || summaryIsScreenContent(classificationInput.vision?.details),
   });
   return buildMemory({
     id: `classified:photo:${input.sourceId}`,
@@ -784,7 +793,7 @@ function sceneMediaVisualSupport(input: PhotoMemoryInput): SceneVisualSupport {
 }
 
 function sceneMediaHasVisualSupport(input: PhotoMemoryInput): boolean {
-  return sceneMediaVisualSupport(input).supported;
+  return isFoundationOnlyPhotoInput(input) || sceneMediaVisualSupport(input).supported;
 }
 
 function sceneVisualSupport(input: PhotoMemoryInput): SceneVisualSupport {
@@ -856,7 +865,7 @@ function appleVisionSupportSignals(input: PhotoMemoryInput) {
 
 function calibratedSceneConfidence(input: PhotoMemoryInput): number {
   const base = input.scene?.source === 'llm' ? input.scene.confidence ?? 0.82 : input.scene?.source === 'semantic' ? input.scene.confidence ?? 0.72 : 0.55;
-  if (input.scene?.source !== 'llm') return base;
+  if (input.scene?.source !== 'llm' || isFoundationOnlyPhotoInput(input)) return base;
   const support = sceneVisualSupport(input);
   return Math.min(base, Math.min(1, support.confidence + 0.1));
 }
@@ -899,7 +908,7 @@ function photoObservations(input: PhotoMemoryInput): IntelligenceObservation[] {
     if (input.scene.media?.mediaType) push(input.scene.media.mediaType, confidence, provider, input.scene.media.title ?? input.scene.media.mediaType);
     if (input.scene.food?.label) push(input.scene.food.label, confidence, provider, input.scene.food.label);
     input.scene.supportingSubjects?.forEach((subject) => {
-      if (input.scene?.source !== 'llm') push(subject, confidence * 0.75, provider, subject);
+      if (input.scene?.source !== 'llm' || isFoundationOnlyPhotoInput(input)) push(subject, confidence * 0.75, provider, subject);
       else {
         const visualConfidence = visualSupportForSubject(input, subject);
         if (visualConfidence >= 0.35) push(subject, Math.min(confidence * 0.75, visualConfidence + 0.1), provider, subject);

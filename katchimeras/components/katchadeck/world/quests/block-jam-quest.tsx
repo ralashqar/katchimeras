@@ -3,12 +3,9 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
-import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Lantern } from '@/constants/theme';
 import {
   BLOCK_JAM_RULESET,
   availableBlockJamDoor,
@@ -17,6 +14,7 @@ import {
   blockJamLevel,
   blockJamReducer,
   createBlockJamState,
+  nearestBlockJamPieceAtPoint,
   reachableBlockJamAnchors,
   type BlockJamAnchor,
   type BlockJamBlockDefinition,
@@ -26,10 +24,11 @@ import {
   type BlockJamState,
 } from '@/utils/quests/experiences/block-jam';
 import type { QuestResult } from '@/utils/quests/experiences/types';
-import { ExperienceResult, QuestExperiencePreview } from './quest-experience-ui';
+import { QuestExperiencePreview } from './quest-experience-ui';
+import { TaskletBlockJamResultScreen, TaskletBlockJamScreen } from './tasklet-block-jam-screen';
 
 type Config = { packId: 'tasklet-desk'; rulesetId?: string; tier: 1 | 2 | 3; levelId: string; timeLimitMs?: number; parMoves?: number };
-type Props = { config: Config; best?: { movesUsed: number; durationMs: number } | null; onAttemptStart: (config: Record<string, unknown>) => string; onAttemptCancel: (id: string) => void; onComplete: (id: string, result: QuestResult) => void; onRunningChange: (running: boolean, id?: string | null) => void };
+type Props = { config: Config; best?: { movesUsed: number; durationMs: number } | null; onAttemptStart: (config: Record<string, unknown>) => string; onAttemptCancel: (id: string) => void; onComplete: (id: string, result: QuestResult) => void; onRequestExit?: () => void; onRunningChange: (running: boolean, id?: string | null) => void };
 
 const COLORS: Record<BlockJamColorId, { bright: string; mid: string; deep: string; label: string }> = {
   red: { bright: '#FFB19D', mid: '#EF796B', deep: '#A84149', label: 'coral' },
@@ -41,7 +40,7 @@ const COLORS: Record<BlockJamColorId, { bright: string; mid: string; deep: strin
 };
 
 export function BlockJamQuest(props: Props) {
-  const { config, best = null, onAttemptStart, onAttemptCancel, onComplete, onRunningChange } = props;
+  const { config, best = null, onAttemptStart, onAttemptCancel, onComplete, onRequestExit, onRunningChange } = props;
   const level = useMemo(() => blockJamLevel(config.levelId), [config.levelId]);
   const [state, setState] = useState(() => createBlockJamState(level));
   const [started, setStarted] = useState(false);
@@ -49,11 +48,12 @@ export function BlockJamQuest(props: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [burst, setBurst] = useState<{ block: BlockJamBlockDefinition; door: BlockJamDoor; start: { x: number; y: number } } | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(() => Math.ceil(level.timeLimitMs / 1000));
-  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const attempt = useRef<string | null>(null); const startedAt = useRef(0); const finishedAt = useRef(0); const deadline = useRef(0);
+  const exitTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const reduceMotion = useReducedMotion(); const { width, height } = useWindowDimensions();
-  const outer = 24; const gap = 2;
-  const maxBoard = Math.min(width - 42, 430, Math.max(280, height - 278));
+  const compact = height < 740;
+  const outer = compact ? 20 : 22; const gap = 2;
+  const maxBoard = Math.min(width - 22, 500, Math.max(264, height - (compact ? 260 : 300)));
   const cell = Math.max(25, Math.floor((maxBoard - outer * 2 - gap * (level.columns - 1)) / level.columns));
   const pitch = cell + gap; const gridWidth = level.columns * cell + (level.columns - 1) * gap; const gridHeight = level.rows * cell + (level.rows - 1) * gap;
   const boardWidth = gridWidth + outer * 2; const boardHeight = gridHeight + outer * 2;
@@ -67,6 +67,11 @@ export function BlockJamQuest(props: Props) {
     });
     return () => { cancelAnimationFrame(firstFrame); if (secondFrame) cancelAnimationFrame(secondFrame); };
   }, [started]);
+
+  useEffect(() => () => {
+    exitTimers.current.forEach(clearTimeout);
+    exitTimers.current = [];
+  }, []);
 
   useEffect(() => {
     if (!started || state.status !== 'playing' || burst) return;
@@ -85,7 +90,7 @@ export function BlockJamQuest(props: Props) {
     else void Haptics.notificationAsync(kind === 'clear' ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
   };
   const start = () => { const now = Date.now(); attempt.current = onAttemptStart({ ...config, rulesetId: BLOCK_JAM_RULESET, levelId: level.id, timeLimitMs: level.timeLimitMs, parMoves: level.parMoves }); startedAt.current = now; deadline.current = now + level.timeLimitMs; setRemainingSeconds(Math.ceil(level.timeLimitMs / 1000)); setStarted(true); onRunningChange(true, attempt.current); };
-  const reset = () => { const now = Date.now(); setState(createBlockJamState(level)); setSelectedId(null); setBurst(null); setRemainingSeconds(Math.ceil(level.timeLimitMs / 1000)); if (started) { startedAt.current = now; deadline.current = now + level.timeLimitMs; } };
+  const reset = () => { const now = Date.now(); exitTimers.current.forEach(clearTimeout); exitTimers.current = []; setState(createBlockJamState(level)); setSelectedId(null); setBurst(null); setRemainingSeconds(Math.ceil(level.timeLimitMs / 1000)); if (started) { startedAt.current = now; deadline.current = now + level.timeLimitMs; } };
   const leave = () => { if (attempt.current) onAttemptCancel(attempt.current); attempt.current = null; reset(); setStarted(false); onRunningChange(false); };
   const move = (blockId: string, anchor: BlockJamAnchor) => setState((current) => {
     const next = blockJamReducer(level, current, { type: 'move', blockId, anchor });
@@ -104,37 +109,76 @@ export function BlockJamQuest(props: Props) {
     if (options?.entryAnchor) setState((current) => blockJamReducer(level, current, { type: 'move', blockId, anchor: options.entryAnchor! }));
     setBurst({ block, door, start }); setSelectedId(null); haptic('clear');
     const exitDuration = reduceMotion ? 40 : 475;
-    setTimeout(() => setState((current) => { const next = blockJamReducer(level, current, { type: 'exit', blockId, doorId: door.id }); if (next.status === 'won') finishedAt.current = Date.now(); return next; }), exitDuration);
-    setTimeout(() => setBurst(null), exitDuration + 40);
+    exitTimers.current.push(setTimeout(() => setState((current) => { const next = blockJamReducer(level, current, { type: 'exit', blockId, doorId: door.id }); if (next.status === 'won') finishedAt.current = Date.now(); return next; }), exitDuration));
+    exitTimers.current.push(setTimeout(() => setBurst(null), exitDuration + 40));
   };
   const undo = () => { setState((current) => blockJamReducer(level, current, { type: 'undo' })); setSelectedId(null); };
+  const selectNearestPiece = (x: number, y: number) => {
+    const blockId = nearestBlockJamPieceAtPoint(level, state, { x, y }, { cell, gap, outer });
+    if (!blockId || blockId === selectedId) return;
+    setSelectedId(blockId);
+    haptic('pick');
+  };
 
   if (!started) return <Preview level={level} best={best} onStart={start} />;
   if (state.status === 'won' && attempt.current) {
     const durationMs = Math.max(0, (finishedAt.current || Date.now()) - startedAt.current);
     const personalBest = !best || durationMs < best.durationMs || (durationMs === best.durationMs && state.movesUsed < best.movesUsed);
     const result: QuestResult = { kind: 'block_jam', success: true, rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', levelId: level.id, blocksCleared: state.clearedBlockIds.length, totalBlocks: level.blocks.length, movesUsed: state.movesUsed, timeLimitMs: level.timeLimitMs, parMoves: level.parMoves, undoCount: state.undoCount, durationMs, personalBest };
-    return <ExperienceResult success title="Jam cleared" body={personalBest ? 'Tasklet has a glowing new fastest clear.' : 'Every bright block found its matching exit.'} metric={`${formatCountdown(Math.max(0, Math.round(durationMs / 1000)))} CLEAR`} onComplete={() => onComplete(attempt.current!, result)} />;
+    return <TaskletBlockJamResultScreen
+      blocks={state.clearedBlockIds.length}
+      completionTime={formatCountdown(Math.max(0, Math.round(durationMs / 1000)))}
+      firstClear={!best}
+      moves={state.movesUsed}
+      onClose={onRequestExit ?? leave}
+      onComplete={() => onComplete(attempt.current!, result)}
+      personalBest={personalBest}
+      undos={state.undoCount}
+    />;
   }
 
-  return <><View style={styles.root}>
-    <View style={styles.topLine}><View><ThemedText style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>TASKLET · BLOCK JAM · TIER {level.tier}</ThemedText><ThemedText style={styles.progress} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{state.clearedBlockIds.length}/{level.blocks.length} sorted</ThemedText></View><View style={[styles.movePill, remainingSeconds <= 30 && styles.movePillWarning]}><ThemedText style={styles.moveNumber} lightColor={remainingSeconds <= 30 ? '#FF9B8C' : Lantern.moon50} darkColor={remainingSeconds <= 30 ? '#FF9B8C' : Lantern.moon50}>{formatCountdown(remainingSeconds)}</ThemedText><ThemedText style={styles.moveLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>TIME</ThemedText></View></View>
-    <View style={styles.boardFrame}><View pointerEvents={state.status === 'playing' ? 'auto' : 'none'} accessibilityLabel={`${level.rows} by ${level.columns} color block puzzle`} style={[styles.board, { width: boardWidth, height: boardHeight }]}>
+  const instruction = state.status === 'failed'
+    ? 'Time’s up. Restart for a fresh clock and another try.'
+    : selectedId
+      ? 'Move the selected block through open cells toward its matching rail.'
+      : state.clearedBlockIds.length
+        ? 'Good sorting. Keep matching each color to its glowing rail.'
+        : 'Drag connected blocks. Match each color to its glowing rail.';
+
+  return <TaskletBlockJamScreen
+    failed={state.status === 'failed'}
+    instruction={instruction}
+    onClose={onRequestExit ?? leave}
+    onRestart={reset}
+    onUndo={undo}
+    remainingTime={formatCountdown(remainingSeconds)}
+    sorted={state.clearedBlockIds.length}
+    tier={level.tier}
+    total={level.blocks.length}
+    undoDisabled={!state.history.length || state.status !== 'playing'}
+    warning={remainingSeconds <= 30}>
+    <Pressable
+      accessible={false}
+      pointerEvents={state.status === 'playing' ? 'auto' : 'none'}
+      onPress={(event) => selectNearestPiece(event.nativeEvent.locationX, event.nativeEvent.locationY)}
+      style={[styles.board, { width: boardWidth, height: boardHeight }]}>
       <BoardSurface level={level} cell={cell} gap={gap} outer={outer} width={boardWidth} height={boardHeight} />
       {level.doors.map((door) => <ExitRail key={door.id} door={door} cell={cell} pitch={pitch} outer={outer} boardWidth={boardWidth} boardHeight={boardHeight} active={exit?.id === door.id} exiting={burst?.door.id === door.id} onPress={() => selectedId && exit?.id === door.id && clear(selectedId, door)} reduceMotion={reduceMotion} />)}
       {level.blocks.map((block, index) => state.clearedBlockIds.includes(block.id) || burst?.block.id === block.id ? null : <BrickPiece key={block.id} level={level} state={state} block={block} anchor={state.anchors[block.id]} reachable={reachableBlockJamAnchors(level, state, block.id)} exitOptions={blockJamExitOptions(level, state, block.id)} cell={cell} gap={gap} outer={outer} index={index} selected={selectedId === block.id} visible={boardReady} reduceMotion={reduceMotion} onPick={() => { setSelectedId(block.id); haptic('pick'); }} onMove={(anchor) => move(block.id, anchor)} onExit={(door, exitOptions) => clear(block.id, door, exitOptions)} />)}
       {burst ? <ClearBurst block={burst.block} door={burst.door} start={burst.start} cell={cell} gap={gap} pitch={pitch} boardWidth={boardWidth} boardHeight={boardHeight} reduceMotion={reduceMotion} /> : null}
-    </View></View>
-    {state.status === 'failed' ? <Animated.View entering={FadeInDown.duration(160)} style={styles.jammed}><ThemedText style={styles.jammedTitle} lightColor="#FF9B8C" darkColor="#FF9B8C">Time’s up</ThemedText><ThemedText style={styles.jammedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart for a fresh clock and keep experimenting with the layout.</ThemedText></Animated.View> : <ThemedText style={styles.help} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{selectedId ? 'Try dragging it to any open grid position.' : 'Drag connected blocks freely. Match each color to its glowing rail.'}</ThemedText>}
-    <View style={styles.controls}><Pressable disabled={!state.history.length || state.status !== 'playing'} onPress={undo} style={[styles.iconButton, (!state.history.length || state.status !== 'playing') && styles.disabled]}><IconSymbol name="arrow.counterclockwise" size={18} color={Lantern.moon300} /></Pressable><Pressable onPress={reset} style={styles.controlButton}><ThemedText style={styles.controlText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Restart</ThemedText></Pressable><Pressable accessibilityLabel="Leave Block Jam" accessibilityRole="button" onPress={() => setLeaveDialogOpen(true)} style={styles.iconButton}><IconSymbol name="xmark" size={18} color={Lantern.moon300} /></Pressable></View>
-  </View><KatchaDialog body="This layout will reset." cancelLabel="Keep playing" confirmLabel="Leave" onCancel={() => setLeaveDialogOpen(false)} onConfirm={() => { setLeaveDialogOpen(false); leave(); }} open={leaveDialogOpen} surface="night" title="Leave Block Jam?" tone="destructive" /></>;
+    </Pressable>
+  </TaskletBlockJamScreen>;
 }
 
 function BoardSurface({ level, cell, gap, outer, width, height }: { level: BlockJamLevel; cell: number; gap: number; outer: number; width: number; height: number }) {
   const pitch = cell + gap;
-  return <Canvas style={StyleSheet.absoluteFill}><RoundedRect x={1} y={1} width={width - 2} height={height - 2} r={24}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#2B2948', '#17162B', '#0D0C19']} /></RoundedRect>
-    <RoundedRect x={outer - 7} y={outer - 7} width={level.columns * pitch - gap + 14} height={level.rows * pitch - gap + 14} r={13} color="#080B17" />
-    {Array.from({ length: level.rows * level.columns }, (_, index) => { const x = outer + (index % level.columns) * pitch; const y = outer + Math.floor(index / level.columns) * pitch; const fixed = level.fixedCells.includes(index); return <Group key={index}><RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(5, cell * .17)} color={fixed ? '#353B51' : '#191B32'} />{fixed ? <RoundedRect x={x + 2} y={y + 2} width={cell - 4} height={cell * .38} r={Math.max(3, cell * .12)} color="#485067" /> : null}</Group>; })}
+  return <Canvas style={StyleSheet.absoluteFill}>
+    <RoundedRect x={0} y={0} width={width} height={height} r={25} color="#9A5F2D" />
+    <RoundedRect x={2} y={2} width={width - 4} height={height - 4} r={23}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#FFE6AF', '#DFA35A', '#B96F31']} /></RoundedRect>
+    <RoundedRect x={7} y={7} width={width - 14} height={height - 14} r={19} color="#5A3544" />
+    <RoundedRect x={10} y={10} width={width - 20} height={height - 20} r={17}><LinearGradient start={vec(0, 0)} end={vec(width, height)} colors={['#684154', '#3D293E', '#2B2032']} /></RoundedRect>
+    <RoundedRect x={outer - 6} y={outer - 6} width={level.columns * pitch - gap + 12} height={level.rows * pitch - gap + 12} r={13} color="#291D30" />
+    {Array.from({ length: level.rows * level.columns }, (_, index) => { const x = outer + (index % level.columns) * pitch; const y = outer + Math.floor(index / level.columns) * pitch; const fixed = level.fixedCells.includes(index); return <Group key={index}><RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(5, cell * .17)} color={fixed ? '#604E61' : '#493448'} />{fixed ? <RoundedRect x={x + 2} y={y + 2} width={cell - 4} height={cell * .38} r={Math.max(3, cell * .12)} color="#756276" /> : <RoundedRect x={x + 2} y={y + 2} width={cell - 4} height={2} r={1} color="#FFFFFF" opacity={.05} />}</Group>; })}
   </Canvas>;
 }
 
@@ -171,14 +215,14 @@ function BrickPiece({ level, state, block, anchor, reachable, exitOptions, cell,
     scale.value = withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) });
   });
   const style = useAnimatedStyle(() => ({ opacity: intro.value, transform: [{ translateX: x.value + dx.value }, { translateY: y.value + dy.value + (1 - intro.value) * 6 }, { scale: scale.value }] }));
-  return <GestureDetector gesture={gesture}><Animated.View pointerEvents={visible ? 'auto' : 'none'} style={[styles.piece, { width: columns * pitch - gap, height: rows * pitch - gap, zIndex: selected ? 20 : 10 }, style]}><Pressable accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${COLORS[block.colorId].label} block, ${block.cells.length} cells`} accessibilityHint="Drag freely, or tap to show reachable positions" onPress={onPick} style={StyleSheet.absoluteFill}><BrickArt block={block} cell={cell} gap={gap} /></Pressable></Animated.View></GestureDetector>;
+  return <GestureDetector gesture={gesture}><Animated.View pointerEvents={visible ? 'auto' : 'none'} style={[styles.piece, { width: columns * pitch - gap, height: rows * pitch - gap, zIndex: selected ? 20 : 10 }, style]}><Pressable accessibilityRole="button" accessibilityState={{ selected }} accessibilityLabel={`${COLORS[block.colorId].label} block, ${block.cells.length} cells`} accessibilityHint="Drag freely, or tap to show reachable positions" onPress={onPick} style={StyleSheet.absoluteFill}><BrickArt block={block} cell={cell} gap={gap} selected={selected} /></Pressable></Animated.View></GestureDetector>;
 }
 
-function BrickArt({ block, cell, gap }: { block: BlockJamBlockDefinition; cell: number; gap: number }) {
+function BrickArt({ block, cell, gap, selected = false }: { block: BlockJamBlockDefinition; cell: number; gap: number; selected?: boolean }) {
   const pitch = cell + gap; const columns = Math.max(...block.cells.map((part) => part.column)) + 1; const rows = Math.max(...block.cells.map((part) => part.row)) + 1; const palette = COLORS[block.colorId];
   return <Canvas style={{ width: columns * pitch - gap, height: rows * pitch - gap }}>
     {block.cells.map((part, index) => { const x = part.column * pitch; const y = part.row * pitch; return <Group key={index}>
-      <RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(5, cell * .17)} color={palette.deep} />
+      <RoundedRect x={x} y={y} width={cell} height={cell} r={Math.max(5, cell * .17)} color={selected ? palette.bright : palette.deep} />
       <RoundedRect x={x + 2} y={y + 2} width={cell - 4} height={cell - 5} r={Math.max(4, cell * .14)}><LinearGradient start={vec(x, y)} end={vec(x, y + cell)} colors={[palette.bright, palette.mid, palette.deep]} positions={[0, .48, 1]} /></RoundedRect>
       <RoundedRect x={x + cell * .14} y={y + cell * .12} width={cell * .72} height={cell * .3} r={cell * .12} color="#FFFFFF" opacity={.17} />
     </Group>; })}
@@ -263,5 +307,12 @@ function formatCountdown(totalSeconds: number): string {
 
 const styles = StyleSheet.create({
   previewMediaBoard: { alignItems: 'center', height: 128, justifyContent: 'center', transform: [{ scale: 0.68 }], width: 144 },
-  root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0, padding: 4 }, topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' }, kicker: { fontSize: 10, fontWeight: '900', letterSpacing: .8 }, progress: { fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 25 }, movePill: { alignItems: 'center', backgroundColor: 'rgba(125,232,205,.09)', borderColor: 'rgba(125,232,205,.25)', borderRadius: 16, borderWidth: 1, minWidth: 64, paddingHorizontal: 11, paddingVertical: 5 }, movePillWarning: { backgroundColor: 'rgba(255,110,95,.1)', borderColor: 'rgba(255,110,95,.36)' }, moveNumber: { fontSize: 21, fontVariant: ['tabular-nums'], fontWeight: '900', lineHeight: 23 }, moveLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1 }, boardFrame: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 0 }, board: { borderCurve: 'continuous', borderRadius: 24, boxShadow: '0 18px 32px rgba(5,4,14,0.46)', overflow: 'visible', position: 'relative' }, destination: { backgroundColor: 'rgba(255,241,181,.8)', borderColor: '#FFF4C9', borderRadius: 99, borderWidth: 1, position: 'absolute', zIndex: 6 }, piece: { left: 0, position: 'absolute', top: 0 }, railHit: { padding: 0, position: 'absolute', zIndex: 25 }, railAura: { borderRadius: 10, bottom: -3, left: -3, position: 'absolute', right: -3, top: -3 }, rail: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 7, borderWidth: 2, height: '100%', justifyContent: 'center', overflow: 'hidden', width: '100%' }, railSheen: { backgroundColor: 'rgba(255,255,255,0.32)', borderRadius: 99, height: '28%', left: 3, position: 'absolute', right: 3, top: 2 }, arrow: { fontSize: 15, fontWeight: '900', lineHeight: 17 }, help: { fontSize: 11, lineHeight: 15, minHeight: 15, textAlign: 'center' }, controls: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' }, iconButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', width: 46 }, controlButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,.16)', borderRadius: 14, borderWidth: 1, height: 40, justifyContent: 'center', paddingHorizontal: 20 }, controlText: { fontSize: 12, fontWeight: '800' }, disabled: { opacity: .3 }, jammed: { backgroundColor: 'rgba(242,110,95,.08)', borderColor: 'rgba(242,110,95,.3)', borderRadius: 15, borderWidth: 1, padding: 10 }, jammedTitle: { fontSize: 14, fontWeight: '900' }, jammedBody: { fontSize: 11, lineHeight: 15 }, previewRoot: { flex: 1, gap: 16, justifyContent: 'space-between', minHeight: 0, padding: 4 }, previewScene: { alignItems: 'flex-end', backgroundColor: 'rgba(108,115,226,.09)', borderColor: 'rgba(130,149,255,.24)', borderRadius: 25, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', minHeight: 230, overflow: 'hidden', padding: 16, position: 'relative' }, previewBoard: { backgroundColor: '#10152A', borderColor: '#3C456C', borderRadius: 18, borderWidth: 5, height: 128, marginBottom: 18, position: 'relative', transform: [{ rotate: '-3deg' }], width: 144 }, previewBrick: { borderRadius: 8, borderWidth: 1, height: 34, position: 'absolute', shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: .4, shadowRadius: 5 }, tasklet: { height: 190, marginBottom: -8, marginRight: -20, width: 154 }, previewBadge: { backgroundColor: Lantern.ember300, borderRadius: 999, left: 16, paddingHorizontal: 11, paddingVertical: 6, position: 'absolute', top: 14 }, previewBadgeText: { fontSize: 9, fontWeight: '900', letterSpacing: .5 }, previewFooter: { gap: 10 }, best: { fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: .8, textAlign: 'center' },
+  board: { borderCurve: 'continuous', borderRadius: 25, boxShadow: '0 16px 28px rgba(49,27,13,0.42)', overflow: 'visible', position: 'relative' },
+  piece: { left: 0, position: 'absolute', top: 0 },
+  railHit: { padding: 0, position: 'absolute', zIndex: 25 },
+  railAura: { borderRadius: 10, bottom: -3, left: -3, position: 'absolute', right: -3, top: -3 },
+  rail: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 7, borderWidth: 2, height: '100%', justifyContent: 'center', overflow: 'hidden', width: '100%' },
+  railSheen: { backgroundColor: 'rgba(255,255,255,0.32)', borderRadius: 99, height: '28%', left: 3, position: 'absolute', right: 3, top: 2 },
+  arrow: { fontSize: 15, fontWeight: '900', lineHeight: 17 },
+  previewBoard: { backgroundColor: '#33243A', borderColor: '#B9824D', borderRadius: 18, borderWidth: 5, height: 128, position: 'relative', width: 144 },
 });

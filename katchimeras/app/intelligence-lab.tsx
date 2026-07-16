@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -11,6 +11,12 @@ import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 import { QUEST_DEFINITIONS } from '@/utils/quests/definitions';
 import { loadDevLastPhotoAnalysis, type DevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { loadDevLastNoteAnalysis, type DevLastNoteAnalysis } from '@/utils/dev-note-analysis';
+import {
+  isFoundationOnlyNoteRoutingEnabled,
+  setFoundationOnlyNoteRoutingEnabled,
+  setFoundationOnlyPhotoInterpretationEnabled,
+} from '@/utils/dev-settings';
+import { isFoundationOnlyPhotoInterpretationEnabled } from '@/utils/photo-intelligence-mode';
 import { FOUNDATION_NOTE_SCHEMA_VERSION, foundationSceneAvailability } from '@/utils/foundation-scene';
 
 export default function IntelligenceLabScreen() {
@@ -18,6 +24,8 @@ export default function IntelligenceLabScreen() {
   const memories = selectedDay?.kind === 'day' ? selectedDay.classifiedMemories ?? [] : [];
   const [lastPhoto, setLastPhoto] = useState<DevLastPhotoAnalysis | null>(() => loadDevLastPhotoAnalysis());
   const [lastNote, setLastNote] = useState<DevLastNoteAnalysis | null>(() => loadDevLastNoteAnalysis());
+  const [foundationOnlyRouting, setFoundationOnlyRouting] = useState(() => isFoundationOnlyNoteRoutingEnabled());
+  const [foundationOnlyPhotos, setFoundationOnlyPhotos] = useState(() => isFoundationOnlyPhotoInterpretationEnabled());
   const foundationAvailability = foundationSceneAvailability();
   const lastPhotoJson = useMemo(() => lastPhoto ? JSON.stringify(lastPhoto, null, 2) : '', [lastPhoto]);
   const lastNoteJson = useMemo(() => lastNote ? JSON.stringify(lastNote, null, 2) : '', [lastNote]);
@@ -28,7 +36,19 @@ export default function IntelligenceLabScreen() {
   useFocusEffect(useCallback(() => {
     setLastPhoto(loadDevLastPhotoAnalysis());
     setLastNote(loadDevLastNoteAnalysis());
+    setFoundationOnlyRouting(isFoundationOnlyNoteRoutingEnabled());
+    setFoundationOnlyPhotos(isFoundationOnlyPhotoInterpretationEnabled());
   }, []));
+
+  const updateFoundationOnlyRouting = useCallback((enabled: boolean) => {
+    setFoundationOnlyNoteRoutingEnabled(enabled);
+    setFoundationOnlyRouting(enabled);
+  }, []);
+
+  const updateFoundationOnlyPhotos = useCallback((enabled: boolean) => {
+    setFoundationOnlyPhotoInterpretationEnabled(enabled);
+    setFoundationOnlyPhotos(enabled);
+  }, []);
 
   const shareLastPhotoJson = useCallback(() => {
     if (!lastPhotoJson) return;
@@ -80,6 +100,40 @@ export default function IntelligenceLabScreen() {
               Foundation Models is ready and photo and note interpretation stay on this device.
             </ThemedText>
           )}
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleCopy}>
+              <ThemedText style={styles.toggleTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Foundation-only note routing
+              </ThemedText>
+              <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                Default game behavior. Disables registry, regex, Natural Language, and cloud category fallbacks. Turn it off here to compare Hybrid routing.
+              </ThemedText>
+            </View>
+            <Switch
+              accessibilityLabel="Use Foundation-only note routing"
+              onValueChange={updateFoundationOnlyRouting}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: '#5B9B83' }}
+              thumbColor={foundationOnlyRouting ? '#A8E2C6' : '#D4CEDF'}
+              value={foundationOnlyRouting}
+            />
+          </View>
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleCopy}>
+              <ThemedText style={styles.toggleTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Foundation-only photo interpretation
+              </ThemedText>
+              <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                Development only. When Foundation is available, disables Natural Language, rule fallback, rule overrides, and direct Vision-tag classification after the model responds.
+              </ThemedText>
+            </View>
+            <Switch
+              accessibilityLabel="Use Foundation-only photo interpretation"
+              onValueChange={updateFoundationOnlyPhotos}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: '#5B9B83' }}
+              thumbColor={foundationOnlyPhotos ? '#A8E2C6' : '#D4CEDF'}
+              value={foundationOnlyPhotos}
+            />
+          </View>
         </View>
         {lastNote ? (
           <View style={[styles.card, styles.lastPhotoCard]}>
@@ -96,6 +150,9 @@ export default function IntelligenceLabScreen() {
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon50} darkColor={Lantern.moon50} selectable>
               “{lastNote.transcript}”
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={lastNote.routingMode === 'foundation_only' ? '#F3B36A' : '#A8E2C6'} darkColor={lastNote.routingMode === 'foundation_only' ? '#F3B36A' : '#A8E2C6'} selectable>
+              Routing mode: {lastNote.routingMode === 'foundation_only' ? 'Foundation only' : 'Hybrid'}
             </ThemedText>
             <ThemedText style={styles.line} lightColor={lastNote.fallbackReason ? '#F3B36A' : '#A8E2C6'} darkColor={lastNote.fallbackReason ? '#F3B36A' : '#A8E2C6'} selectable>
               Result: {lastNote.fallbackReason ?? 'valid structured journal route'}
@@ -133,6 +190,9 @@ export default function IntelligenceLabScreen() {
             <Image source={lastPhoto.thumbnailUri} style={styles.photo} contentFit="cover" transition={120} />
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Captured: {lastPhoto.capturedAt} · representation {lastPhoto.classifiedMemory?.photoAnalysis?.representation.kind ?? 'unknown'}
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={lastPhoto.interpretationMode === 'foundation_only' ? '#F3B36A' : '#A8E2C6'} darkColor={lastPhoto.interpretationMode === 'foundation_only' ? '#F3B36A' : '#A8E2C6'} selectable>
+              Interpretation mode: {lastPhoto.interpretationMode === 'foundation_only' ? 'Foundation only' : 'Hybrid'}
             </ThemedText>
             {focusedQuestEvaluation ? (
               <View style={styles.questDecision}>
@@ -307,6 +367,9 @@ const styles = StyleSheet.create({
   shareLabel: { fontSize: 12.5, fontWeight: '900' },
   json: { fontFamily: 'monospace', fontSize: 10.5, lineHeight: 15 },
   headingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  toggleRow: { alignItems: 'center', borderTopColor: 'rgba(255,255,255,0.1)', borderTopWidth: 1, flexDirection: 'row', gap: 14, marginTop: 4, paddingTop: 12 },
+  toggleCopy: { flex: 1, gap: 3 },
+  toggleTitle: { fontSize: 14, fontWeight: '800' },
   title: { fontSize: 18, fontWeight: '800', textTransform: 'capitalize' },
   provider: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
   line: { fontSize: 12.5, lineHeight: 18 },

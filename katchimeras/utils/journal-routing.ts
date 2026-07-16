@@ -1,6 +1,7 @@
 import type { DayEvidenceProvider, JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import { JOURNAL_CLASSIFICATION_CATALOG, journalCatalogEntry } from '@/utils/journal-classification-catalog';
 import { MANUAL_JOURNAL_FLOWS } from '@/utils/manual-journal-registry';
+import { detectStudioInText } from '@/utils/studio-detect';
 
 export type FoundationAtomicRouteRead = {
   routeKey?: unknown;
@@ -57,6 +58,10 @@ export function foundationAtomicRoutes(raw: FoundationAtomicRouteRead | null | u
 export function registryJournalRoutes(transcript: string): JournalRouteProposal[] {
   const text = normalizedPhrase(transcript);
   if (!text) return [];
+  const consumedMedia = detectStudioInText(transcript);
+  const consumedMediaRoute = consumedMedia.detected && consumedMedia.mediaType === 'other'
+    ? journalRouteForKey('studio.other_media', 0.97, 'Detected explicit watched or listened media')
+    : null;
   const candidates = JOURNAL_CLASSIFICATION_CATALOG.flatMap((entry) => {
     const genericDestination = entry.routeKey === 'general.other' || entry.categoryId.startsWith('other_') || entry.categoryId === 'milestone';
     const excluded = entry.exclusions.some((value) => phraseRelated(text, normalizedPhrase(value)));
@@ -70,13 +75,17 @@ export function registryJournalRoutes(transcript: string): JournalRouteProposal[
     const score = exactExample ? 0.98 : relatedExample ? 0.94 : bestAlias ? (bestAlias.includes(' ') ? 0.9 : 0.84) : 0;
     return score ? [journalRouteForKey(entry.routeKey, score, exactExample || relatedExample ? 'Matched a registry example' : `Matched journal signal “${bestAlias}”`)] : [];
   });
-  return rankJournalRoutes(candidates, 3);
+  return rankJournalRoutes([consumedMediaRoute, ...candidates], 3);
 }
 
-export function foundationAtomicNeedsRetry(transcript: string, raw: FoundationAtomicRouteRead | null | undefined): boolean {
+export function foundationAtomicNeedsRetry(
+  transcript: string,
+  raw: FoundationAtomicRouteRead | null | undefined,
+  options: { includeRegistryEvidence?: boolean } = {}
+): boolean {
   const routes = foundationAtomicRoutes(raw);
   const first = routes[0];
-  const registry = registryJournalRoutes(transcript)[0];
+  const registry = options.includeRegistryEvidence === false ? null : registryJournalRoutes(transcript)[0];
   if (!first || cleanId(raw?.routeKey) === 'ambiguous' || first.id === 'general.other') return true;
   if (first.confidence < 0.82 || first.confidence - (routes[1]?.confidence ?? 0) < 0.15) return true;
   return !!registry && registry.id !== first.id && registry.confidence >= 0.9;
@@ -85,12 +94,14 @@ export function foundationAtomicNeedsRetry(transcript: string, raw: FoundationAt
 export function resolveFoundationRouteEvidence(
   transcript: string,
   first: FoundationAtomicRouteRead | null | undefined,
-  retry: FoundationAtomicRouteRead | null | undefined
+  retry: FoundationAtomicRouteRead | null | undefined,
+  options: { includeRegistryEvidence?: boolean } = {}
 ): { routes: JournalRouteProposal[]; selected: JournalRouteProposal | null; decisionSource: JournalNoteClassification['decisionSource'] } {
+  const registryEvidence = options.includeRegistryEvidence === false ? [] : registryJournalRoutes(transcript);
   const evidence = [
     ...foundationAtomicRoutes(first, 'Apple Foundation first pass').map((route) => ({ route, source: 'foundation' as const })),
     ...foundationAtomicRoutes(retry, 'Apple Foundation focused retry').map((route) => ({ route, source: 'foundationRetry' as const })),
-    ...registryJournalRoutes(transcript).map((route) => ({ route, source: 'registry' as const })),
+    ...registryEvidence.map((route) => ({ route, source: 'registry' as const })),
   ];
   const grouped = new Map<string, typeof evidence>();
   for (const item of evidence) grouped.set(item.route.id, [...(grouped.get(item.route.id) ?? []), item]);
