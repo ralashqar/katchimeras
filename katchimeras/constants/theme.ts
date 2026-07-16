@@ -30,6 +30,7 @@ const BaseFonts =
 export const Fonts = BaseFonts;
 
 export const AppFontFamilies = {
+  bungee: 'Bungee',
   instrumentSerif: 'InstrumentSerif',
   manrope: 'Manrope',
 } as const;

@@ -356,6 +356,7 @@ export default function NoteCaptureScreen() {
       ) : null}
       {journalReviewOpen && result ? (
         <ManualJournalSheet
+          allowRemoteIntelligence={cloudIntelligenceEnabled}
           key={journalRoute?.id ?? 'note-journal-picker'}
           initialFlowId={journalRoute?.flowId}
           initialChoiceId={journalRoute?.choiceId}

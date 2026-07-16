@@ -395,6 +395,7 @@ export function DraggableBlockBlastPiece({
   reduceMotion,
   onPick,
   onHover,
+  onValidHoverChange,
   onPlace,
   onInvalid,
 }: {
@@ -406,6 +407,7 @@ export function DraggableBlockBlastPiece({
   reduceMotion: boolean;
   onPick: () => void;
   onHover: (origin: BlockBlastCell | null) => void;
+  onValidHoverChange: () => void;
   onPlace: (row: number, column: number) => boolean;
   onInvalid: () => void;
 }) {
@@ -427,6 +429,7 @@ export function DraggableBlockBlastPiece({
   const hitboxWidth = useSharedValue(0);
   const hitboxHeight = useSharedValue(0);
   const lastHoverKey = useRef<string | null>(null);
+  const lastValidHoverKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (!selected) scale.value = withTiming(1, { duration: reduceMotion ? 30 : 95, easing: CONTROLLED_EASE });
@@ -450,9 +453,15 @@ export function DraggableBlockBlastPiece({
     if (key === lastHoverKey.current) return;
     lastHoverKey.current = key;
     onHover(origin);
+    const validKey = origin && canPlaceBlockBlastPiece(board, piece.cells, origin.row, origin.column) ? key : null;
+    if (validKey !== lastValidHoverKey.current) {
+      lastValidHoverKey.current = validKey;
+      if (validKey) onValidHoverChange();
+    }
   };
   const clearHover = () => {
     lastHoverKey.current = null;
+    lastValidHoverKey.current = null;
     onHover(null);
   };
   const returnToTray = () => {
@@ -497,6 +506,7 @@ export function DraggableBlockBlastPiece({
     .onStart((event) => {
       onPick();
       lastHoverKey.current = null;
+      lastValidHoverKey.current = null;
       placedSuccessfully.value = false;
       returningToTray.value = false;
       opacity.value = 1;

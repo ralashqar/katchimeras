@@ -77,7 +77,7 @@ export default function KingdomScreen() {
   const [reflectionReviewPending, setReflectionReviewPending] = useState(false);
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
   const [savedOrigin, setSavedOrigin] = useState<'reflection' | 'insight' | 'quest' | null>(null);
-  const { addManualJournalEntry } = useHomeScreenState();
+  const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState();
 
   const hatches = useMemo<HatchRecord[]>(
     () =>
@@ -299,6 +299,7 @@ export default function KingdomScreen() {
       ) : null}
       {reflectionReview ? (
         <ManualJournalSheet
+          allowRemoteIntelligence={cloudIntelligenceEnabled}
           key={reflectionReview.route?.id ?? 'reflection-journal-picker'}
           initialFlowId={reflectionReview.route?.flowId}
           initialChoiceId={reflectionReview.route?.choiceId}
@@ -323,6 +324,7 @@ export default function KingdomScreen() {
       ) : null}
       {embeddedJournal ? (
         <ManualJournalSheet
+          allowRemoteIntelligence={cloudIntelligenceEnabled}
           initialFlowId={embeddedJournal.initialFlowId}
           initialChoiceId={embeddedJournal.initialChoiceId}
           initialNoteExpanded={embeddedJournal.noteExpanded}

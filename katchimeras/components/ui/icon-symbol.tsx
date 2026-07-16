@@ -81,6 +81,7 @@ const MAPPING = {
   'checkmark': 'check',
   'gearshape.fill': 'settings',
   'pencil': 'edit',
+  'trash.fill': 'delete',
   'diamond.fill': 'diamond',
   'flame.fill': 'local-fire-department',
   'chevron.down': 'keyboard-arrow-down',

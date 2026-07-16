@@ -1,9 +1,11 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { Image } from 'expo-image';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,9 +24,13 @@ import Animated, {
 import { MeadowSheet } from '@/components/katchadeck/ui/meadow-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { manualJournalArt } from '@/constants/manual-journal-art';
+import { Meadow } from '@/constants/meadow-theme';
+import { AppFontFamilies } from '@/constants/theme';
 import { useJournalVoiceDraft } from '@/hooks/use-journal-voice-draft';
 import type { JournalNoteDraft, JournalRouteProposal, JournalSource, ManualJournalSubmission } from '@/types/home';
+import { voiceJournalInputAdapter } from '@/utils/journal-input-adapters';
+import { shouldAutoRouteVoice } from '@/utils/manual-journal-voice-routing';
 import {
   MANUAL_JOURNAL_FLOWS,
   manualJournalFlow,
@@ -59,6 +65,7 @@ export type JournalComposerProps = {
   sourceId?: string | null;
   thumbnailUri?: string | null;
   journalSource?: JournalSource;
+  allowRemoteIntelligence?: boolean;
   onBackFromInitial?: () => void;
   returnToOriginOnBack?: boolean;
   onClose: () => void;
@@ -80,6 +87,7 @@ export function JournalComposer({
   sourceId,
   thumbnailUri,
   journalSource,
+  allowRemoteIntelligence = false,
   onBackFromInitial,
   returnToOriginOnBack = false,
   onClose,
@@ -101,18 +109,68 @@ export function JournalComposer({
   const [note, setNote] = useState(initialNote ?? '');
   const [noteExpanded, setNoteExpanded] = useState(initialNoteExpanded || !!initialNote || !!initialLinkedNote);
   const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(initialLinkedNote ?? null);
+  const [resolvedJournalSource, setResolvedJournalSource] = useState<JournalSource | undefined>(journalSource);
+  const [confirmedFacets, setConfirmedFacets] = useState(initialConfirmedFacets);
+  const [voiceRoutes, setVoiceRoutes] = useState<JournalRouteProposal[]>([]);
+  const [voiceRouting, setVoiceRouting] = useState(false);
+  const [activeSection, setActiveSection] = useState<ManualJournalSection>('everyday');
   const [discardOpen, setDiscardOpen] = useState(false);
   const longPressRef = useRef(false);
   const redoLongPressRef = useRef(false);
+  const quickVoiceRef = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
+  const sectionOffsets = useRef<Partial<Record<ManualJournalSection, number>>>({});
   const reduceMotion = useReducedMotion();
   const player = useAudioPlayer();
   const playerStatus = useAudioPlayerStatus(player);
-  const voice = useJournalVoiceDraft((draft) => {
+  const handleVoiceReady = useCallback(async (draft: JournalNoteDraft) => {
     setLinkedNote(draft);
     setNote(draft.text);
     setNoteExpanded(true);
-  });
+    const isQuickVoice = quickVoiceRef.current;
+    quickVoiceRef.current = false;
+    if (!isQuickVoice) return;
+    setVoiceRouting(true);
+    const source: Extract<JournalSource, { kind: 'voice_note' }> = {
+      kind: 'voice_note',
+      sourceId: sessionId,
+      audioUri: draft.audioUri ?? null,
+      durationMs: draft.durationMs ?? null,
+    };
+    setResolvedJournalSource(source);
+    try {
+      const input = { source, text: draft.text, audioUri: draft.audioUri ?? undefined };
+      const analysis = await voiceJournalInputAdapter.analyze(input, { allowRemote: allowRemoteIntelligence });
+      const transcript = analysis.transcript?.trim() ?? draft.text.trim();
+      setNote(transcript);
+      setLinkedNote({ ...draft, text: transcript });
+      setVoiceRoutes(analysis.routes);
+      const first = analysis.routes[0];
+      const second = analysis.routes[1];
+      if (first && shouldAutoRouteVoice(first, second)) {
+        const routedFlow = manualJournalFlow(first.flowId);
+        const routedChoice = routedFlow?.choices.find((item) => item.id === first.choiceId) ?? null;
+        if (routedFlow && routedChoice) {
+          setFlow(routedFlow);
+          setChoice(routedChoice);
+          setSpecific(analysis.suggestedSpecific ?? first.prefilledSpecific ?? '');
+          setContext(analysis.suggestedContext ?? null);
+          setFeeling(analysis.suggestedFeeling ?? null);
+          setConfirmedFacets(first.confirmedFacets);
+          setDirection(1);
+          setStage('details');
+        }
+      } else {
+        setDirection(-1);
+        setStage('flow');
+      }
+    } finally {
+      setVoiceRouting(false);
+    }
+  }, [allowRemoteIntelligence, sessionId]);
+  const voice = useJournalVoiceDraft(handleVoiceReady, { allowRemote: allowRemoteIntelligence });
+  const quickVoiceAvailable = sourceType === 'manual'
+    && (!resolvedJournalSource || resolvedJournalSource.kind === 'manual');
 
   const step = stage === 'flow' ? 0 : stage === 'category' ? 1 : 2;
   const dirty = !!choice || !!specific.trim() || !!context || !!feeling || !!note.trim() || !!linkedNote;
@@ -132,11 +190,13 @@ export function JournalComposer({
       .filter((item) => (item.section ?? 'other') === section)
       .sort((left, right) => FLOW_ORDER.indexOf(left.id) - FLOW_ORDER.indexOf(right.id)),
   })).filter((group) => group.flows.length > 0), []);
-  const suggestions = useMemo(() => suggestedRoutes.slice(0, 3).flatMap((route) => {
+  const suggestions = useMemo(() => [...voiceRoutes, ...suggestedRoutes]
+    .filter((route, index, routes) => routes.findIndex((candidate) => candidate.id === route.id) === index)
+    .slice(0, 3).flatMap((route) => {
     const suggestedFlow = manualJournalFlow(route.flowId);
     const suggestedChoice = suggestedFlow?.choices.find((item) => item.id === route.choiceId);
     return suggestedFlow && suggestedChoice ? [{ route, flow: suggestedFlow, choice: suggestedChoice }] : [];
-  }), [suggestedRoutes]);
+  }), [suggestedRoutes, voiceRoutes]);
 
   const goTo = (next: Stage, nextDirection: 1 | -1) => {
     setDirection(nextDirection);
@@ -165,6 +225,8 @@ export function JournalComposer({
     selectionHaptic();
     setFlow(suggestion.flow);
     setChoice(suggestion.choice);
+    setSpecific(suggestion.route.prefilledSpecific ?? specific);
+    setConfirmedFacets(suggestion.route.confirmedFacets);
     goTo('details', 1);
   };
   const back = () => {
@@ -223,8 +285,8 @@ export function JournalComposer({
         : trimmedNote
           ? { kind: 'text', text: trimmedNote }
           : null,
-      journalSource,
-      confirmedFacets: initialConfirmedFacets,
+      journalSource: resolvedJournalSource,
+      confirmedFacets,
     });
   };
   const toggleAudio = () => {
@@ -237,8 +299,23 @@ export function JournalComposer({
   };
   const startVoice = () => {
     longPressRef.current = true;
+    quickVoiceRef.current = false;
     impactHaptic();
     void voice.start();
+  };
+  const toggleQuickVoice = () => {
+    if (voice.phase === 'recording') {
+      void voice.stop();
+      return;
+    }
+    quickVoiceRef.current = true;
+    impactHaptic();
+    void voice.start();
+  };
+  const jumpToSection = (section: ManualJournalSection) => {
+    selectionHaptic();
+    setActiveSection(section);
+    scrollRef.current?.scrollTo({ y: Math.max(0, (sectionOffsets.current[section] ?? 0) - 8), animated: !reduceMotion });
   };
   const stageEntering = reduceMotion
     ? FadeIn.duration(100)
@@ -247,23 +324,24 @@ export function JournalComposer({
       : FadeInLeft.duration(210);
 
   return (
-    <MeadowSheet onClose={requestClose} variant="tall">
+    <MeadowSheet onClose={requestClose} surface="parchment" variant="tall">
       <KeyboardAvoidingView
         behavior={process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={12}
         style={styles.composer}>
         <JournalHeader
           canGoBack={stage !== 'flow' || !!onBackFromInitial}
+          compact={stage === 'flow'}
           kicker={sourceType === 'photo' ? 'Review photo memory' : 'Log something'}
           onBack={back}
           step={step}
-          subtitle={subtitle}
+          subtitle={stage === 'flow' ? undefined : subtitle}
           title={title}
         />
 
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, stage === 'flow' && styles.scrollContentFlow]}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -275,6 +353,28 @@ export function JournalComposer({
             layout={LinearTransition.duration(180)}>
             {stage === 'flow' ? (
               <View style={styles.sections}>
+                <ScrollView
+                  horizontal
+                  contentContainerStyle={styles.sectionTabs}
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.sectionTabsFrame}>
+                  {SECTION_ORDER.map((section) => {
+                    const selected = activeSection === section;
+                    return (
+                      <Pressable
+                        key={section}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        onPress={() => jumpToSection(section)}
+                        style={({ pressed }) => [styles.sectionTab, selected && styles.sectionTabSelected, pressed && styles.pressed]}>
+                        {selected ? <IconSymbol name="checkmark" size={12} color={Meadow.ink} /> : null}
+                        <ThemedText style={styles.sectionTabText} lightColor={selected ? Meadow.ink : Meadow.inkSoft} darkColor={selected ? Meadow.ink : Meadow.inkSoft}>
+                          {SECTION_LABELS[section]}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
                 {suggestions.length ? (
                   <View style={styles.section}>
                     <SectionLabel>Suggested for this note</SectionLabel>
@@ -288,7 +388,10 @@ export function JournalComposer({
                   </View>
                 ) : null}
                 {groupedFlows.map((group) => (
-                  <View key={group.section} style={styles.section}>
+                  <View
+                    key={group.section}
+                    onLayout={(event) => { sectionOffsets.current[group.section] = event.nativeEvent.layout.y; }}
+                    style={styles.section}>
                     <SectionLabel>{SECTION_LABELS[group.section]}</SectionLabel>
                     <View style={styles.flowList}>
                       {group.flows.map((item, index) => (
@@ -319,14 +422,14 @@ export function JournalComposer({
               <View style={styles.editor}>
                 <View style={styles.categorySummary}>
                   <View style={styles.summaryIcon}>
-                    <IconSymbol name={choice.icon} size={21} color={Lantern.ember300} />
+                    <IconSymbol name={choice.icon} size={21} color={Meadow.goldDeep} />
                   </View>
                   <View style={styles.summaryCopy}>
-                    <ThemedText style={styles.summaryKicker} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Memory type</ThemedText>
-                    <ThemedText style={styles.summaryTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{choice.label}</ThemedText>
+                    <ThemedText style={styles.summaryKicker} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>Memory type</ThemedText>
+                    <ThemedText style={styles.summaryTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{choice.label}</ThemedText>
                   </View>
                   <Pressable accessibilityRole="button" accessibilityLabel={`Change ${choice.label}`} hitSlop={6} onPress={back} style={({ pressed }) => [styles.change, pressed && styles.pressed]}>
-                    <ThemedText style={styles.changeText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>Change</ThemedText>
+                    <ThemedText style={styles.changeText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>Change</ThemedText>
                   </Pressable>
                 </View>
 
@@ -337,9 +440,9 @@ export function JournalComposer({
                     onChangeText={setSpecific}
                     onFocus={() => scrollRef.current?.scrollTo({ y: 70, animated: true })}
                     placeholder={choice.specificFieldPlaceholder ?? flow.specificFieldPlaceholder}
-                    placeholderTextColor={Lantern.moon500}
+                    placeholderTextColor={Meadow.inkSoft}
                     returnKeyType="done"
-                    selectionColor={Lantern.ember300}
+                    selectionColor={Meadow.goldDeep}
                     style={styles.input}
                     value={specific}
                   />
@@ -396,12 +499,12 @@ export function JournalComposer({
                       }}
                       onPressOut={() => { if (longPressRef.current) void voice.stop(); }}
                       style={({ pressed }) => [styles.noteDoor, pressed && styles.pressed]}>
-                      <View style={styles.noteDoorIcon}><IconSymbol name="square.and.pencil" size={19} color={Lantern.ember300} /></View>
+                      <View style={styles.noteDoorIcon}><IconSymbol name="square.and.pencil" size={19} color={Meadow.goldDeep} /></View>
                       <View style={styles.noteDoorCopy}>
-                        <ThemedText style={styles.noteDoorTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Add a note</ThemedText>
-                        <ThemedText style={styles.noteHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Tap to type · hold to speak</ThemedText>
+                        <ThemedText style={styles.noteDoorTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Add a note</ThemedText>
+                        <ThemedText style={styles.noteHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Tap to type · hold to speak</ThemedText>
                       </View>
-                      <IconSymbol name="chevron.right" size={18} color={Lantern.moon500} />
+                      <IconSymbol name="chevron.right" size={18} color={Meadow.inkSoft} />
                     </Pressable>
                   ) : (
                     <Animated.View entering={FadeIn.duration(180)} layout={LinearTransition.duration(180)} style={styles.noteEditor}>
@@ -411,8 +514,8 @@ export function JournalComposer({
                         onChangeText={setNote}
                         onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80)}
                         placeholder="A detail, thought, or memory…"
-                        placeholderTextColor={Lantern.moon500}
-                        selectionColor={Lantern.ember300}
+                        placeholderTextColor={Meadow.inkSoft}
+                        selectionColor={Meadow.goldDeep}
                         style={[styles.input, styles.noteInput]}
                         textAlignVertical="top"
                         value={note}
@@ -422,6 +525,7 @@ export function JournalComposer({
                         onPlay={toggleAudio}
                         onRedoLongPress={() => {
                           redoLongPressRef.current = true;
+                          quickVoiceRef.current = false;
                           impactHaptic();
                           void voice.start();
                         }}
@@ -438,21 +542,21 @@ export function JournalComposer({
                       {voice.phase === 'recording' ? <RecordingState elapsed={voice.elapsed} /> : null}
                       {voice.phase === 'transcribing' ? (
                         <View accessibilityRole="progressbar" style={styles.reading}>
-                          <ActivityIndicator color={Lantern.ember300} />
-                          <ThemedText style={styles.noteHint} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Transcribing on device…</ThemedText>
+                          <ActivityIndicator color={Meadow.goldDeep} />
+                          <ThemedText style={styles.noteHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Transcribing on device…</ThemedText>
                         </View>
                       ) : null}
-                      {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#FFB4A8" darkColor="#FFB4A8">{voice.error}</ThemedText> : null}
+                      {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
                     </Animated.View>
                   )}
                   {!noteExpanded && voice.phase === 'recording' ? <RecordingState elapsed={voice.elapsed} /> : null}
                   {!noteExpanded && voice.phase === 'transcribing' ? (
                     <View accessibilityRole="progressbar" style={styles.reading}>
-                      <ActivityIndicator color={Lantern.ember300} />
-                      <ThemedText style={styles.noteHint} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Transcribing on device…</ThemedText>
+                      <ActivityIndicator color={Meadow.goldDeep} />
+                      <ThemedText style={styles.noteHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Transcribing on device…</ThemedText>
                     </View>
                   ) : null}
-                  {!noteExpanded && voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#FFB4A8" darkColor="#FFB4A8">{voice.error}</ThemedText> : null}
+                  {!noteExpanded && voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
                 </EditorSection>
               </View>
             ) : null}
@@ -468,29 +572,73 @@ export function JournalComposer({
               disabled={voice.phase === 'transcribing'}
               onPress={save}
               style={({ pressed }) => [styles.save, pressed && styles.savePressed, voice.phase === 'transcribing' && styles.disabled]}>
-              <IconSymbol name="checkmark" size={18} color={Lantern.emberInk} />
-              <ThemedText style={styles.saveText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>Save memory</ThemedText>
+              <IconSymbol name="checkmark" size={18} color={Meadow.ink} />
+              <ThemedText style={styles.saveText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Save memory</ThemedText>
             </Pressable>
           </View>
         ) : null}
+        {stage === 'flow' && quickVoiceAvailable ? (
+          <View style={styles.footer}>
+            <Pressable
+              accessibilityHint="Records a voice memory, then suggests where it belongs"
+              accessibilityLabel={voice.phase === 'recording' ? 'Finish quick voice memory' : 'Quick add with voice'}
+              accessibilityRole="button"
+              disabled={voice.phase === 'transcribing' || voiceRouting}
+              onPress={toggleQuickVoice}
+              style={({ pressed }) => [styles.quickVoice, pressed && styles.savePressed, (voice.phase === 'transcribing' || voiceRouting) && styles.disabled]}>
+              {voice.phase === 'transcribing' || voiceRouting ? <ActivityIndicator color={Meadow.ink} /> : <IconSymbol name={voice.phase === 'recording' ? 'stop.fill' : 'mic.fill'} size={20} color={Meadow.ink} />}
+              <ThemedText style={styles.quickVoiceText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                {voice.phase === 'recording' ? `Finish recording · 0:${String(voice.elapsed).padStart(2, '0')}` : voice.phase === 'transcribing' || voiceRouting ? 'Finding the right place…' : 'Quick add with voice'}
+              </ThemedText>
+              {voice.phase === 'idle' || voice.phase === 'ready' ? <IconSymbol name="sparkles" size={16} color={Meadow.ink} /> : null}
+            </Pressable>
+            {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.footerError} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
+          </View>
+        ) : null}
 
-        {discardOpen ? (
-          <Animated.View accessibilityViewIsModal entering={FadeIn.duration(160)} exiting={FadeOut.duration(130)} style={styles.discardOverlay}>
-            <View style={styles.discardCard}>
-              <View style={styles.discardIcon}><IconSymbol name="exclamationmark.triangle.fill" size={22} color={Lantern.ember300} /></View>
-              <ThemedText style={styles.discardTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Discard this draft?</ThemedText>
-              <ThemedText style={styles.discardBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Your choices and note won’t be saved.</ThemedText>
+        <Modal
+          animationType="fade"
+          navigationBarTranslucent
+          onRequestClose={() => setDiscardOpen(false)}
+          presentationStyle="overFullScreen"
+          statusBarTranslucent
+          transparent
+          visible={discardOpen}>
+          <View style={styles.discardOverlay}>
+            <Animated.View
+              accessibilityLabel="Discard draft confirmation"
+              accessibilityViewIsModal
+              entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(170)}
+              style={styles.discardCard}>
+              <View style={styles.discardIcon}>
+                <IconSymbol name="exclamationmark.triangle.fill" size={21} color="#8B5A16" />
+              </View>
+              <ThemedText style={styles.discardEyebrow} lightColor="#7A542C" darkColor="#7A542C">Unsaved draft</ThemedText>
+              <ThemedText style={styles.discardTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Discard this draft?</ThemedText>
+              <ThemedText style={styles.discardBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Your choices and note won’t be saved.</ThemedText>
               <View style={styles.discardActions}>
-                <Pressable accessibilityRole="button" onPress={() => setDiscardOpen(false)} style={({ pressed }) => [styles.keepEditing, pressed && styles.pressed]}>
-                  <ThemedText style={styles.keepEditingText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Keep editing</ThemedText>
+                <Pressable
+                  accessibilityHint="Returns to your journal with the draft intact"
+                  accessibilityLabel="Keep editing draft"
+                  accessibilityRole="button"
+                  onPress={() => setDiscardOpen(false)}
+                  style={({ pressed }) => [styles.keepEditing, pressed && styles.keepEditingPressed]}>
+                  <IconSymbol name="pencil" size={16} color={Meadow.ink} />
+                  <ThemedText style={styles.keepEditingText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Keep editing</ThemedText>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={discard} style={({ pressed }) => [styles.discardButton, pressed && styles.pressed]}>
-                  <ThemedText style={styles.discardButtonText} lightColor="#FFB4A8" darkColor="#FFB4A8">Discard</ThemedText>
+                <Pressable
+                  accessibilityHint="Permanently closes this unsaved draft"
+                  accessibilityLabel="Discard draft"
+                  accessibilityRole="button"
+                  onPress={discard}
+                  style={({ pressed }) => [styles.discardButton, pressed && styles.discardButtonPressed]}>
+                  <IconSymbol name="trash.fill" size={16} color="#FFF7EC" />
+                  <ThemedText style={styles.discardButtonText} lightColor="#FFF7EC" darkColor="#FFF7EC">Discard draft</ThemedText>
                 </Pressable>
               </View>
-            </View>
-          </Animated.View>
-        ) : null}
+            </Animated.View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </MeadowSheet>
   );
@@ -502,34 +650,52 @@ export function ManualJournalSheet(props: JournalComposerProps) {
   return <JournalComposer {...props} />;
 }
 
-function JournalHeader({ canGoBack, kicker, onBack, step, subtitle, title }: {
+function JournalHeader({ canGoBack, compact, kicker, onBack, step, subtitle, title }: {
   canGoBack: boolean;
+  compact: boolean;
   kicker: string;
   onBack: () => void;
   step: number;
-  subtitle: string;
+  subtitle?: string;
   title: string;
 }) {
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, compact && styles.headerCompact]}>
       {canGoBack ? (
         <Pressable accessibilityLabel="Back" accessibilityRole="button" hitSlop={4} onPress={onBack} style={({ pressed }) => [styles.headerBack, pressed && styles.pressed]}>
-          <IconSymbol name="chevron.left" size={22} color={Lantern.moon300} />
+          <IconSymbol name="chevron.left" size={22} color={Meadow.inkSoft} />
         </Pressable>
       ) : null}
       <View style={[styles.headerCopy, canGoBack && styles.headerCopyWithBack]}>
         <View style={styles.progressRow} accessibilityLabel={`Step ${step + 1} of 3`} accessibilityRole="progressbar">
-          {[0, 1, 2].map((index) => <View key={index} style={[styles.progressSegment, index <= step && styles.progressSegmentActive]} />)}
+          {[0, 1, 2].map((index) => (
+            <View key={index} style={styles.progressStepWrap}>
+              {index > 0 ? <View style={[styles.progressLine, index <= step && styles.progressLineActive]} /> : null}
+              <View style={[styles.progressStep, index <= step && styles.progressStepActive]}>
+                <ThemedText style={styles.progressStepText} lightColor={index <= step ? Meadow.ink : Meadow.inkSoft} darkColor={index <= step ? Meadow.ink : Meadow.inkSoft}>{index + 1}</ThemedText>
+              </View>
+            </View>
+          ))}
         </View>
-        <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>{kicker}</ThemedText>
-        <ThemedText maxFontSizeMultiplier={1.35} style={styles.headerTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{title}</ThemedText>
-        <ThemedText maxFontSizeMultiplier={1.4} style={styles.headerSubtitle} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{subtitle}</ThemedText>
+        <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>{kicker}</ThemedText>
+        <ThemedText
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={1.35}
+          minimumFontScale={0.76}
+          numberOfLines={1}
+          style={styles.headerTitle}
+          lightColor={Meadow.ink}
+          darkColor={Meadow.ink}>
+          {title}
+        </ThemedText>
+        {subtitle ? <ThemedText maxFontSizeMultiplier={1.4} style={styles.headerSubtitle} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{subtitle}</ThemedText> : null}
       </View>
     </View>
   );
 }
 
 function FlowRow({ flow, onPress }: { flow: ManualJournalFlowDefinition; onPress: () => void }) {
+  const art = manualJournalArt(flow.id);
   return (
     <Pressable
       accessibilityHint={flow.description}
@@ -537,12 +703,12 @@ function FlowRow({ flow, onPress }: { flow: ManualJournalFlowDefinition; onPress
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.flowRow, pressed && styles.rowPressed]}>
-      <View style={styles.flowIcon}><IconSymbol name={flow.icon} size={22} color={Lantern.ember300} /></View>
+      <View style={styles.flowIcon}>{art ? <Image source={art} style={styles.flowArt} contentFit="contain" /> : <IconSymbol name={flow.icon} size={24} color={Meadow.goldDeep} />}</View>
       <View style={styles.flowCopy}>
-        <ThemedText maxFontSizeMultiplier={1.4} style={styles.flowTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{flow.shortTitle ?? flow.title}</ThemedText>
-        {flow.description ? <ThemedText maxFontSizeMultiplier={1.35} style={styles.flowDescription} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{flow.description}</ThemedText> : null}
+        <ThemedText maxFontSizeMultiplier={1.4} style={styles.flowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{flow.shortTitle ?? flow.title}</ThemedText>
+        {flow.description ? <ThemedText maxFontSizeMultiplier={1.35} style={styles.flowDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{flow.description}</ThemedText> : null}
       </View>
-      <IconSymbol name="chevron.right" size={18} color={Lantern.moon500} />
+      <IconSymbol name="chevron.right" size={18} color={Meadow.inkSoft} />
     </Pressable>
   );
 }
@@ -555,9 +721,9 @@ function ChoiceTile({ choice, onPress, quiet }: { choice: ManualJournalChoice; o
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.choiceTile, quiet && styles.choiceTileQuiet, pressed && styles.tilePressed]}>
-      <View style={[styles.choiceIcon, quiet && styles.choiceIconQuiet]}><IconSymbol name={choice.icon} size={21} color={Lantern.ember300} /></View>
-      <ThemedText maxFontSizeMultiplier={1.35} style={styles.choiceTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{choice.label}</ThemedText>
-      {quiet ? <IconSymbol name="chevron.right" size={17} color={Lantern.moon500} /> : null}
+      <View style={[styles.choiceIcon, quiet && styles.choiceIconQuiet]}><IconSymbol name={choice.icon} size={21} color={Meadow.goldDeep} /></View>
+      <ThemedText maxFontSizeMultiplier={1.35} style={styles.choiceTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{choice.label}</ThemedText>
+      {quiet ? <IconSymbol name="chevron.right" size={17} color={Meadow.inkSoft} /> : null}
     </Pressable>
   );
 }
@@ -572,7 +738,7 @@ function EditorSection({ children, label }: { children: ReactNode; label: string
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {
-  return <ThemedText maxFontSizeMultiplier={1.4} style={styles.sectionLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{children}</ThemedText>;
+  return <ThemedText maxFontSizeMultiplier={1.4} style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>{children}</ThemedText>;
 }
 
 function OptionChip({ label, onPress, selected }: { label: string; onPress: () => void; selected: boolean }) {
@@ -583,8 +749,8 @@ function OptionChip({ label, onPress, selected }: { label: string; onPress: () =
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [styles.optionChip, selected && styles.optionChipSelected, pressed && styles.pressed]}>
-      {selected ? <IconSymbol name="checkmark" size={13} color={Lantern.ember300} /> : null}
-      <ThemedText style={styles.optionText} lightColor={selected ? Lantern.moon50 : Lantern.moon300} darkColor={selected ? Lantern.moon50 : Lantern.moon300}>{label}</ThemedText>
+      {selected ? <IconSymbol name="checkmark" size={13} color={Meadow.ink} /> : null}
+      <ThemedText style={styles.optionText} lightColor={selected ? Meadow.ink : Meadow.inkSoft} darkColor={selected ? Meadow.ink : Meadow.inkSoft}>{label}</ThemedText>
     </Pressable>
   );
 }
@@ -597,9 +763,9 @@ function ReactionChip({ icon, label, onPress, selected }: { icon?: IconSymbolNam
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [styles.reaction, selected && styles.reactionSelected, pressed && styles.tilePressed]}>
-      {icon ? <IconSymbol name={icon} size={17} color={selected ? Lantern.ember300 : Lantern.moon300} /> : null}
-      <ThemedText style={styles.reactionText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{label}</ThemedText>
-      {selected ? <View style={styles.reactionCheck}><IconSymbol name="checkmark" size={11} color={Lantern.emberInk} /></View> : null}
+      {icon ? <IconSymbol name={icon} size={17} color={selected ? Meadow.goldDeep : Meadow.inkSoft} /> : null}
+      <ThemedText style={styles.reactionText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
+      {selected ? <View style={styles.reactionCheck}><IconSymbol name="checkmark" size={11} color={Meadow.ink} /></View> : null}
     </Pressable>
   );
 }
@@ -616,12 +782,12 @@ function VoiceControls({ linkedNote, onPlay, onRedoLongPress, onRedoPressOut, on
   return (
     <View style={styles.voiceRow}>
       <Pressable accessibilityLabel={playing ? 'Pause recording' : 'Play recording'} accessibilityRole="button" onPress={onPlay} style={({ pressed }) => [styles.voiceAction, pressed && styles.pressed]}>
-        <IconSymbol name={playing ? 'pause.fill' : 'play.fill'} size={15} color={Lantern.ember300} />
-        <ThemedText style={styles.voiceActionText} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{playing ? 'Pause' : 'Play'}</ThemedText>
+        <IconSymbol name={playing ? 'pause.fill' : 'play.fill'} size={15} color={Meadow.goldDeep} />
+        <ThemedText style={styles.voiceActionText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{playing ? 'Pause' : 'Play'}</ThemedText>
       </Pressable>
       <Pressable accessibilityHint="Hold for 350 milliseconds" accessibilityLabel="Redo recording" accessibilityRole="button" delayLongPress={350} onLongPress={onRedoLongPress} onPressOut={onRedoPressOut} style={({ pressed }) => [styles.voiceAction, pressed && styles.pressed]}>
-        <IconSymbol name="arrow.counterclockwise" size={15} color={Lantern.moon300} />
-        <ThemedText style={styles.voiceActionText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Hold to redo</ThemedText>
+        <IconSymbol name="arrow.counterclockwise" size={15} color={Meadow.inkSoft} />
+        <ThemedText style={styles.voiceActionText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Hold to redo</ThemedText>
       </Pressable>
       <Pressable accessibilityLabel="Remove recording" accessibilityRole="button" onPress={onRemove} style={({ pressed }) => [styles.voiceRemove, pressed && styles.pressed]}>
         <IconSymbol name="xmark" size={14} color="#FFB4A8" />
@@ -634,9 +800,9 @@ function RecordingState({ elapsed }: { elapsed: number }) {
   return (
     <View accessibilityLabel={`Recording, ${elapsed} seconds`} accessibilityRole="progressbar" style={styles.recordingState}>
       <View style={styles.recordingDot} />
-      <ThemedText style={styles.recordingText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>Recording</ThemedText>
-      <ThemedText style={styles.recordingTime} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>0:{String(elapsed).padStart(2, '0')}</ThemedText>
-      <ThemedText style={styles.recordingHint} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Release to finish</ThemedText>
+      <ThemedText style={styles.recordingText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>Recording</ThemedText>
+      <ThemedText style={styles.recordingTime} lightColor={Meadow.ink} darkColor={Meadow.ink}>0:{String(elapsed).padStart(2, '0')}</ThemedText>
+      <ThemedText style={styles.recordingHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Release to finish</ThemedText>
     </View>
   );
 }
@@ -657,88 +823,106 @@ function successHaptic() {
 
 const styles = StyleSheet.create({
   composer: { flex: 1, minHeight: 0 },
-  header: { minHeight: 126, paddingBottom: 14, paddingHorizontal: 4, paddingTop: 6 },
-  headerBack: { alignItems: 'center', height: 44, justifyContent: 'center', left: -5, position: 'absolute', top: 25, width: 44, zIndex: 2 },
+  header: { minHeight: 146, paddingBottom: 10, paddingHorizontal: 4, paddingTop: 4 },
+  headerCompact: { minHeight: 120 },
+  headerBack: { alignItems: 'center', height: 44, justifyContent: 'center', left: -5, position: 'absolute', top: 42, width: 44, zIndex: 2 },
   headerCopy: { gap: 4, paddingLeft: 4, paddingRight: 42 },
   headerCopyWithBack: { paddingLeft: 42 },
-  progressRow: { flexDirection: 'row', gap: 5, paddingBottom: 4, width: 94 },
-  progressSegment: { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 999, flex: 1, height: 3 },
-  progressSegmentActive: { backgroundColor: Lantern.ember300 },
-  kicker: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, letterSpacing: 1.15 },
-  headerTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 29, lineHeight: 33 },
-  headerSubtitle: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '500', lineHeight: 18 },
+  progressRow: { alignSelf: 'flex-start', flexDirection: 'row', paddingBottom: 7, width: 154 },
+  progressStepWrap: { alignItems: 'center', flex: 1, justifyContent: 'center', position: 'relative' },
+  progressLine: { backgroundColor: 'rgba(122,84,44,0.22)', height: 1, position: 'absolute', right: '50%', top: 16, width: '100%' },
+  progressLineActive: { backgroundColor: Meadow.goldDeep },
+  progressStep: { alignItems: 'center', backgroundColor: '#E6CDA7', borderColor: 'rgba(122,84,44,0.28)', borderRadius: 999, borderWidth: 1, height: 32, justifyContent: 'center', width: 32, zIndex: 1 },
+  progressStepActive: { backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', boxShadow: '0 3px 8px rgba(92,57,20,0.24), inset 0 1px 0 rgba(255,252,234,0.78)' },
+  progressStepText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '800' },
+  kicker: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800', letterSpacing: 1.15, textTransform: 'uppercase' },
+  headerTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 31, lineHeight: 35 },
+  headerSubtitle: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '600', lineHeight: 19 },
   scroll: { flex: 1, minHeight: 0 },
-  scrollContent: { paddingBottom: 28, paddingHorizontal: 4 },
-  sections: { gap: 24 },
+  scrollContent: { paddingBottom: 30, paddingHorizontal: 4 },
+  scrollContentFlow: { paddingHorizontal: 12 },
+  sections: { gap: 22 },
+  sectionTabsFrame: { marginHorizontal: -4 },
+  sectionTabs: { gap: 8, paddingHorizontal: 4, paddingBottom: 1 },
+  sectionTab: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.32)', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 40, paddingHorizontal: 13 },
+  sectionTabSelected: { backgroundColor: '#F1D69B', borderColor: Meadow.goldDeep, boxShadow: '-2px 3px 7px rgba(92,57,20,0.18), inset 0 1px 0 rgba(255,252,234,0.72)' },
+  sectionTabText: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800' },
   section: { gap: 9 },
-  sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.15, lineHeight: 18 },
+  sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '800', letterSpacing: 0.2, lineHeight: 18 },
   flowList: { gap: 7 },
-  flowRow: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.035)', borderCurve: 'continuous', borderRadius: 17, flexDirection: 'row', gap: 12, minHeight: 72, paddingHorizontal: 12, paddingVertical: 10 },
-  rowPressed: { backgroundColor: 'rgba(255,195,107,0.09)', transform: [{ scale: 0.988 }] },
-  flowIcon: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.1)', borderCurve: 'continuous', borderRadius: 13, height: 44, justifyContent: 'center', width: 44 },
+  flowRow: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.38)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-3px 4px 8px rgba(58,38,18,0.16), inset 0 1px 0 rgba(255,248,230,0.58)', flexDirection: 'row', gap: 12, minHeight: 76, paddingHorizontal: 11, paddingVertical: 9 },
+  rowPressed: { backgroundColor: 'rgba(255,244,204,0.55)', transform: [{ scale: 0.988 }] },
+  flowIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.54)', borderColor: 'rgba(255,248,230,0.56)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 56, justifyContent: 'center', overflow: 'hidden', width: 56 },
+  flowArt: { height: 52, width: 52 },
   flowCopy: { flex: 1, gap: 2 },
-  flowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '700', lineHeight: 20 },
-  flowDescription: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '500', lineHeight: 17 },
+  flowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '800', lineHeight: 20 },
+  flowDescription: { fontFamily: AppFontFamilies.manrope, fontSize: 11.75, fontWeight: '600', lineHeight: 16 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   halfTile: { width: '48.5%' },
   fullTile: { width: '100%' },
-  choiceTile: { backgroundColor: 'rgba(255,255,255,0.045)', borderColor: 'rgba(255,255,255,0.075)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 11, minHeight: 102, padding: 14 },
+  choiceTile: { backgroundColor: 'rgba(255,248,232,0.36)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.14), inset 0 1px 0 rgba(255,248,230,0.50)', gap: 11, minHeight: 102, padding: 14 },
   choiceTileQuiet: { alignItems: 'center', flexDirection: 'row', minHeight: 58, paddingVertical: 10 },
-  tilePressed: { backgroundColor: 'rgba(255,195,107,0.1)', borderColor: 'rgba(255,195,107,0.24)', transform: [{ scale: 0.975 }] },
-  choiceIcon: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.1)', borderCurve: 'continuous', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  tilePressed: { backgroundColor: 'rgba(255,244,204,0.58)', borderColor: Meadow.goldDeep, transform: [{ scale: 0.975 }] },
+  choiceIcon: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.18)', borderCurve: 'continuous', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   choiceIconQuiet: { height: 36, width: 36 },
   choiceTitle: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '700', lineHeight: 18 },
   editor: { gap: 26 },
-  categorySummary: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.07)', borderColor: 'rgba(255,195,107,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 11, padding: 12 },
-  summaryIcon: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.12)', borderCurve: 'continuous', borderRadius: 12, height: 42, justifyContent: 'center', width: 42 },
+  categorySummary: { alignItems: 'center', backgroundColor: 'rgba(255,244,204,0.42)', borderColor: 'rgba(169,129,54,0.28)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.12), inset 0 1px 0 rgba(255,252,234,0.60)', flexDirection: 'row', gap: 11, padding: 12 },
+  summaryIcon: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.22)', borderCurve: 'continuous', borderRadius: 12, height: 42, justifyContent: 'center', width: 42 },
   summaryCopy: { flex: 1, gap: 1 },
   summaryKicker: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', letterSpacing: 0.45, textTransform: 'uppercase' },
   summaryTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '700', lineHeight: 20 },
   change: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 8 },
   changeText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700' },
   editorSection: { gap: 10 },
-  input: { backgroundColor: 'rgba(255,255,255,0.055)', borderColor: 'rgba(255,255,255,0.11)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, color: Lantern.moon50, fontFamily: AppFontFamilies.manrope, fontSize: 16, minHeight: 56, paddingHorizontal: 15, paddingVertical: 13 },
+  input: { backgroundColor: 'rgba(255,248,232,0.42)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.52)', color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 16, minHeight: 56, paddingHorizontal: 15, paddingVertical: 13 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optionChip: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.1)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 44, paddingHorizontal: 13, paddingVertical: 9 },
-  optionChipSelected: { backgroundColor: 'rgba(255,195,107,0.11)', borderColor: 'rgba(255,195,107,0.5)' },
+  optionChip: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.30)', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 44, paddingHorizontal: 13, paddingVertical: 9 },
+  optionChipSelected: { backgroundColor: 'rgba(229,190,106,0.32)', borderColor: Meadow.goldDeep },
   optionText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '600' },
   reactionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  reaction: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.08)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexBasis: '47%', flexDirection: 'row', flexGrow: 1, gap: 8, minHeight: 50, paddingHorizontal: 11, paddingVertical: 10 },
-  reactionSelected: { backgroundColor: 'rgba(255,195,107,0.12)', borderColor: 'rgba(255,195,107,0.46)' },
+  reaction: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.32)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexBasis: '47%', flexDirection: 'row', flexGrow: 1, gap: 8, minHeight: 50, paddingHorizontal: 11, paddingVertical: 10 },
+  reactionSelected: { backgroundColor: 'rgba(229,190,106,0.32)', borderColor: Meadow.goldDeep },
   reactionText: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700', lineHeight: 16 },
-  reactionCheck: { alignItems: 'center', backgroundColor: Lantern.ember300, borderRadius: 999, height: 19, justifyContent: 'center', width: 19 },
-  noteDoor: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.035)', borderCurve: 'continuous', borderRadius: 16, flexDirection: 'row', gap: 11, minHeight: 68, padding: 11 },
-  noteDoorIcon: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.1)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  reactionCheck: { alignItems: 'center', backgroundColor: '#E7B951', borderRadius: 999, height: 19, justifyContent: 'center', width: 19 },
+  noteDoor: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.34)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 68, padding: 11 },
+  noteDoorIcon: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.18)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   noteDoorCopy: { flex: 1, gap: 2 },
   noteDoorTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '700' },
   noteHint: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '500', lineHeight: 16 },
   noteEditor: { gap: 10 },
   noteInput: { minHeight: 126, paddingTop: 14 },
   voiceRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  voiceAction: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.045)', borderRadius: 12, flexDirection: 'row', gap: 6, minHeight: 44, paddingHorizontal: 11 },
+  voiceAction: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.36)', borderColor: Meadow.cardBorder, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, minHeight: 44, paddingHorizontal: 11 },
   voiceActionText: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '700' },
   voiceRemove: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  recordingState: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.07)', borderRadius: 13, flexDirection: 'row', gap: 7, minHeight: 44, paddingHorizontal: 12 },
-  recordingDot: { backgroundColor: Lantern.ember500, borderRadius: 999, height: 8, width: 8 },
+  recordingState: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.20)', borderRadius: 13, flexDirection: 'row', gap: 7, minHeight: 44, paddingHorizontal: 12 },
+  recordingDot: { backgroundColor: '#C96A44', borderRadius: 999, height: 8, width: 8 },
   recordingText: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '700' },
   recordingTime: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '700' },
   recordingHint: { flex: 1, fontFamily: AppFontFamilies.manrope, fontSize: 11, textAlign: 'right' },
   reading: { alignItems: 'center', flexDirection: 'row', gap: 8, minHeight: 44 },
   error: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, lineHeight: 18 },
-  footer: { borderTopColor: 'rgba(255,255,255,0.07)', borderTopWidth: 1, paddingHorizontal: 4, paddingTop: 12 },
-  save: { alignItems: 'center', backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 16, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
-  savePressed: { backgroundColor: Lantern.ember500, transform: [{ scale: 0.985 }] },
+  footer: { borderTopColor: 'rgba(122,84,44,0.16)', borderTopWidth: 1, gap: 6, paddingHorizontal: 4, paddingTop: 12 },
+  save: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
+  quickVoice: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 56, paddingHorizontal: 18 },
+  quickVoiceText: { fontFamily: AppFontFamilies.manrope, fontSize: 14.5, fontWeight: '900' },
+  footerError: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '700', lineHeight: 16, textAlign: 'center' },
+  savePressed: { backgroundColor: '#D6A640', transform: [{ scale: 0.985 }] },
   saveText: { fontFamily: AppFontFamilies.manrope, fontSize: 14.5, fontWeight: '800' },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
-  discardOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', backgroundColor: 'rgba(8,6,14,0.78)', justifyContent: 'center', padding: 20, zIndex: 20 },
-  discardCard: { alignItems: 'center', backgroundColor: Lantern.ink800, borderColor: 'rgba(255,255,255,0.1)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, boxShadow: '0 20px 48px rgba(5,3,10,0.48)', gap: 9, maxWidth: 380, padding: 22, width: '100%' },
-  discardIcon: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.1)', borderRadius: 14, height: 46, justifyContent: 'center', width: 46 },
-  discardTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 27, lineHeight: 31, paddingTop: 3 },
-  discardBody: { fontFamily: AppFontFamilies.manrope, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  discardActions: { flexDirection: 'row', gap: 8, paddingTop: 8, width: '100%' },
-  keepEditing: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: 14, flex: 1, justifyContent: 'center', minHeight: 48 },
-  keepEditingText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '700' },
-  discardButton: { alignItems: 'center', borderColor: 'rgba(255,180,168,0.22)', borderRadius: 14, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 48 },
-  discardButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '700' },
+  discardOverlay: { alignItems: 'center', backgroundColor: 'rgba(24,17,12,0.76)', flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
+  discardCard: { alignItems: 'flex-start', backgroundColor: '#F0D9B1', borderColor: 'rgba(255,247,226,0.72)', borderCurve: 'continuous', borderRadius: 26, borderWidth: 1, boxShadow: '0 24px 64px rgba(35,20,10,0.52), inset 0 1px 0 rgba(255,250,235,0.74)', gap: 8, maxWidth: 360, padding: 22, width: '100%' },
+  discardIcon: { alignItems: 'center', backgroundColor: 'rgba(210,157,53,0.22)', borderColor: 'rgba(139,90,22,0.14)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 44, justifyContent: 'center', marginBottom: 2, width: 44 },
+  discardEyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
+  discardTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 29, lineHeight: 33 },
+  discardBody: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, lineHeight: 20, paddingBottom: 5 },
+  discardActions: { gap: 10, paddingTop: 8, width: '100%' },
+  keepEditing: { alignItems: 'center', backgroundColor: '#E7B951', borderColor: 'rgba(255,247,218,0.74)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 14px rgba(105,70,24,0.20), inset 0 1px 0 rgba(255,250,228,0.68)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 },
+  keepEditingPressed: { backgroundColor: '#D8A943', transform: [{ scale: 0.985 }] },
+  keepEditingText: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
+  discardButton: { alignItems: 'center', backgroundColor: '#8C3F36', borderColor: 'rgba(255,226,214,0.25)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 5px 14px rgba(83,29,24,0.24), inset 0 1px 0 rgba(255,238,228,0.16)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 },
+  discardButtonPressed: { backgroundColor: '#75322C', transform: [{ scale: 0.985 }] },
+  discardButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
 });

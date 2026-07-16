@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
 import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
-import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
+import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastStreakWord, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
 import { hydrateBlockBlastProfile, type BlockBlastProfile } from '@/utils/quests/experiences/block-blast-profile';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
@@ -178,6 +178,7 @@ test('Block Party drag targeting captures the nearest geometric cells generously
 });
 
 test('Block Party clears simultaneous lines and applies placement, clear, and perfect-board scoring', () => {
+  assert.deepEqual([1, 3, 5, 7, 9, 20].map(blockBlastStreakWord), ['GOOD', 'GREAT', 'EPIC', 'LEGENDARY', 'GODLIKE', 'GODLIKE']);
   const initial = createBlockBlastState('cheerlet:intersection', 100);
   const board = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
   for (let index = 1; index < 8; index += 1) {
@@ -196,8 +197,17 @@ test('Block Party clears simultaneous lines and applies placement, clear, and pe
   assert.deepEqual(next.lastResolution?.clearedColumns, [0]);
   assert.equal(next.lastResolution?.clearedIndices.length, 15);
   assert.equal(next.lastResolution?.perfectClear, true);
-  assert.equal(next.score, 910, '10 placement + 400 double line + 500 perfect clear');
+  assert.equal(next.score, 1010, '10 placement + 400 double line + 100 streak bonus + 500 perfect clear');
   assert.equal(next.linesCleared, 2);
+  assert.equal(next.combo, 2, 'a simultaneous row and column clear counts as a two-line streak');
+  assert.equal(next.maxCombo, 2);
+
+  const continued = blockBlastReducer(
+    { ...state, combo: 2, maxCombo: 2 },
+    { type: 'place', pieceId: single.id, row: 0, column: 0, now: 201 },
+  );
+  assert.equal(continued.combo, 4, 'two more lines extend a two-line streak to four');
+  assert.equal(blockBlastStreakWord(continued.combo), 'GREAT');
 });
 
 test('Block Party combo scoring resets and no-move detection considers every unused tray piece', () => {

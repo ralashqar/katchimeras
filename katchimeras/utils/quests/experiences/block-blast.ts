@@ -196,7 +196,7 @@ export function blockBlastReducer(state: BlockBlastState, action: BlockBlastActi
   clearedIndexSet.forEach((index) => { board[index] = null; });
 
   const clearedLineCount = cleared.rows.length + cleared.columns.length;
-  const combo = clearedLineCount ? state.combo + 1 : 0;
+  const combo = clearedLineCount ? state.combo + clearedLineCount : 0;
   const perfectClear = clearedLineCount > 0 && board.every((cell) => cell === null);
   const scoreDelta = piece.cells.length * 10
     + 100 * clearedLineCount * clearedLineCount
@@ -282,6 +282,11 @@ export function blockBlastClearCascadePhase(
   const rowPhase = rowLine >= 0 ? column + rowLine * 1.5 : Number.POSITIVE_INFINITY;
   const columnPhase = columnLine >= 0 ? row + columnLine * 1.5 : Number.POSITIVE_INFINITY;
   return Math.min(rowPhase, columnPhase);
+}
+
+export function blockBlastStreakWord(combo: number): 'GOOD' | 'GREAT' | 'EPIC' | 'LEGENDARY' | 'GODLIKE' {
+  const words = ['GOOD', 'GREAT', 'EPIC', 'LEGENDARY', 'GODLIKE'] as const;
+  return words[Math.min(words.length - 1, Math.floor(Math.max(0, combo - 1) / 2))];
 }
 
 export function validBlockBlastOrigins(

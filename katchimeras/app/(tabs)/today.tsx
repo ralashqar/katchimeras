@@ -727,6 +727,7 @@ export default function HomeScreen() {
       ) : null}
       {manualJournalOpen ? (
         <ManualJournalSheet
+          allowRemoteIntelligence={cloudIntelligenceEnabled}
           initialFlowId={manualJournalInitialFlowId}
           onClose={closeManualJournal}
           onSave={(submission) => {
@@ -739,6 +740,7 @@ export default function HomeScreen() {
       ) : null}
       {pendingJournalNote ? (
         <ManualJournalSheet
+          allowRemoteIntelligence={cloudIntelligenceEnabled}
           initialFlowId={pendingNoteRoute?.flowId}
           initialChoiceId={pendingNoteRoute?.choiceId}
           initialSpecific={pendingNoteRoute && (

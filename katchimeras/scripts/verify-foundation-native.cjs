@@ -132,7 +132,13 @@ for (const token of ['saveDevLastNoteAnalysis', "'timeout'", 'rawResponse', 'nor
 for (const token of ['loadDevLastNoteAnalysis', 'Last note analysis', 'Share note JSON']) {
   check(`Intelligence Lab exposes ${token}`, intelligenceLab.includes(token));
 }
-check('uncertain note routes render ranked journal suggestions', manualJournal.includes('Suggested for this note') && manualJournal.includes('suggestedRoutes.slice(0, 3)'));
+check(
+  'uncertain note routes render ranked journal suggestions',
+  manualJournal.includes('Suggested for this note')
+    && manualJournal.includes('const suggestions = useMemo')
+    && manualJournal.includes('[...voiceRoutes, ...suggestedRoutes]')
+    && manualJournal.includes('.slice(0, 3)')
+);
 
 const staticDeclarations = [...withFoundation.matchAll(/private static func\s+(\w+)/g)];
 check('all expected private methods remain inside the module source', staticDeclarations.length === 7, staticDeclarations.map((match) => match[1]).join(', '));

@@ -5,6 +5,7 @@ import type { HomeDayRecord, ManualJournalSubmission, StoredHomeDayRecord } from
 import { withManualJournalEntry } from '@/game/days/mutations/manual-journal';
 import { MANUAL_JOURNAL_FLOWS, validateManualJournalRegistry } from '@/utils/manual-journal-registry';
 import { buildMomentTimeline } from '@/utils/moment-timeline';
+import { shouldAutoRouteVoice } from '@/utils/manual-journal-voice-routing';
 
 function day(): StoredHomeDayRecord {
   return { id: 'day-1', isoDate: '2026-07-12', moments: [], locations: [], promptAnswers: [], notes: [], foodMoments: [], studioMoments: [], bigMoments: [], evidence: [], classifiedMemories: [] } as unknown as StoredHomeDayRecord;
@@ -19,6 +20,15 @@ test('registry exposes the eight human event branches', () => {
   assert.ok(MANUAL_JOURNAL_FLOWS.every((flow) => flow.choices.length >= 7));
   assert.ok(MANUAL_JOURNAL_FLOWS.every((flow) => flow.shortTitle && flow.description && flow.section));
   assert.deepEqual(new Set(MANUAL_JOURNAL_FLOWS.map((flow) => flow.section)), new Set(['everyday', 'culture', 'milestone', 'other']));
+});
+
+test('voice routing opens review only for one clearly dominant route', () => {
+  const route = (id: string, confidence: number) => ({
+    id, flowId: 'food', choiceId: 'meal', label: id, confidence, reasons: [], confirmedFacets: [],
+  });
+  assert.equal(shouldAutoRouteVoice(route('clear', 0.9), route('other', 0.7)), true);
+  assert.equal(shouldAutoRouteVoice(route('too-low', 0.8)), false);
+  assert.equal(shouldAutoRouteVoice(route('close-a', 0.88), route('close-b', 0.8)), false);
 });
 
 test('category-only park creates canonical quality and assignment without coordinates', () => {

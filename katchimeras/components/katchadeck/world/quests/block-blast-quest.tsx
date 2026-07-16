@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, AppState, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInDown, FadeInUp, ZoomIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOutUp, Keyframe, ZoomIn, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -13,6 +13,7 @@ import {
   BLOCK_BLAST_TRAY_ALGORITHM_VERSION,
   blockBlastClearCascadePhase,
   blockBlastReducer,
+  blockBlastStreakWord,
   createBlockBlastState,
   type BlockBlastCell,
   type BlockBlastResolution,
@@ -62,6 +63,15 @@ const CONTROLLED_EASE = Easing.bezier(0.22, 1, 0.36, 1);
 const CLEAR_HAPTIC_MAX_PER_SECOND = 20;
 const CLEAR_HAPTIC_INTERVAL_MS = Math.ceil(1000 / CLEAR_HAPTIC_MAX_PER_SECOND);
 const CLEAR_HAPTIC_VISUAL_OFFSET_MS = 170;
+const STREAK_VISIBLE_MS = 1_150;
+const STREAK_BOUNCE_IN = new Keyframe({
+  0: { opacity: 0, transform: [{ translateY: 14 }, { scale: 0.72 }] },
+  48: { opacity: 1, transform: [{ translateY: -2 }, { scale: 1.12 }] },
+  72: { opacity: 1, transform: [{ translateY: 0 }, { scale: 0.97 }] },
+  100: { opacity: 1, transform: [{ translateY: 0 }, { scale: 1 }] },
+}).duration(360);
+
+type StreakCallout = { id: number; combo: number };
 
 export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: Props) {
   const loadedProfile = useMemo(loadBlockBlastProfile, []);
@@ -73,11 +83,13 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   const [boardFrame, setBoardFrame] = useState<WindowFrame | null>(null);
   const [lastPersonalBest, setLastPersonalBest] = useState(false);
   const [resultReady, setResultReady] = useState(false);
+  const [streakCallout, setStreakCallout] = useState<StreakCallout | null>(null);
   const attempt = useRef<string | null>(null);
   const gameRef = useRef<BlockBlastState | null>(game);
   const boardRef = useRef<View>(null);
   const clearHapticTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
   const nextClearHapticAt = useRef(0);
+  const streakTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const players = useMemo(createBlockBlastSoundPlayers, []);
   const reduceMotion = useReducedMotion();
   const { width, height } = useWindowDimensions();
@@ -101,6 +113,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   useEffect(() => () => {
     clearHapticTimers.current.forEach((timer) => clearTimeout(timer));
     clearHapticTimers.current.clear();
+    if (streakTimer.current) clearTimeout(streakTimer.current);
   }, []);
 
   useEffect(() => {
@@ -140,6 +153,8 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     setHover(null);
     setLastPersonalBest(false);
     setResultReady(false);
+    setStreakCallout(null);
+    if (streakTimer.current) clearTimeout(streakTimer.current);
     setProfile((current) => saveBlockBlastActiveRun(current, next));
     return next;
   }, [profile.totalRuns, seed]);
@@ -151,9 +166,9 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     onRunningChange(true, attempt.current);
   };
 
-  const haptic = (kind: 'pick' | 'place' | 'invalid' | 'game_over') => {
+  const haptic = (kind: 'pick' | 'hover' | 'place' | 'invalid' | 'game_over') => {
     if (process.env.EXPO_OS !== 'ios') return;
-    if (kind === 'pick') void Haptics.selectionAsync();
+    if (kind === 'pick' || kind === 'hover') void Haptics.selectionAsync();
     else if (kind === 'place') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     else if (kind === 'invalid') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     else void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -188,13 +203,26 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
       haptic('invalid');
       return false;
     }
+    const cleared = (next.lastResolution?.clearedRows.length ?? 0) + (next.lastResolution?.clearedColumns.length ?? 0);
+    if (cleared > 0 && next.lastResolution) {
+      const callout = { id: next.lastResolution.id, combo: next.combo };
+      if (streakTimer.current) clearTimeout(streakTimer.current);
+      setStreakCallout(callout);
+      streakTimer.current = setTimeout(() => {
+        setStreakCallout((current) => current?.id === callout.id ? null : current);
+        streakTimer.current = null;
+      }, reduceMotion ? 650 : STREAK_VISIBLE_MS);
+    } else {
+      if (streakTimer.current) clearTimeout(streakTimer.current);
+      streakTimer.current = null;
+      setStreakCallout(null);
+    }
     setGame(next);
     gameRef.current = next;
     setSelectedPieceId(null);
     setHover(null);
     setTimeout(() => {
       let nextProfile = saveBlockBlastActiveRun(loadBlockBlastProfile(), next);
-      const cleared = (next.lastResolution?.clearedRows.length ?? 0) + (next.lastResolution?.clearedColumns.length ?? 0);
       if (cleared > 0) {
         const combo = next.combo > 1;
         if (next.lastResolution) scheduleClearCascadeHaptics(next.lastResolution, combo);
@@ -311,23 +339,31 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   return (
     <View style={styles.root}>
       <View style={styles.topLine}>
-        <View>
+        <View style={styles.brandCorner}>
           <ThemedText style={styles.kicker} lightColor={Lantern.auroraRose} darkColor={Lantern.auroraRose}>CHEERLET · BLOCK PARTY</ThemedText>
-          <Animated.View key={game.score} entering={FadeIn.duration(reduceMotion ? 60 : 110).easing(CONTROLLED_EASE)}>
-            <ThemedText selectable style={styles.score} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{formatScore(game.score)}</ThemedText>
-          </Animated.View>
+        </View>
+        <View style={styles.scoreCenter}>
+          <ThemedText style={styles.scoreLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>SCORE</ThemedText>
+          <AnimatedScore reduceMotion={reduceMotion} value={game.score} />
         </View>
         <View style={styles.topActions}>
-          {game.combo > 1 ? (
-            <Animated.View key={game.combo} entering={FadeInDown.duration(150).easing(CONTROLLED_EASE)} style={styles.comboPill}>
-              <ThemedText style={styles.comboText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>COMBO ×{game.combo}</ThemedText>
-            </Animated.View>
-          ) : null}
           <Pressable accessibilityRole="button" accessibilityLabel={profile.soundEnabled ? 'Mute game sounds' : 'Turn on game sounds'} onPress={toggleSound} style={styles.iconButton}>
             <IconSymbol name={profile.soundEnabled ? 'speaker.wave.2.fill' : 'speaker.slash.fill'} size={17} color={Lantern.moon300} />
           </Pressable>
         </View>
       </View>
+
+      {streakCallout ? (
+        <Animated.View
+          key={streakCallout.id}
+          entering={reduceMotion ? FadeIn.duration(80) : STREAK_BOUNCE_IN}
+          exiting={FadeOutUp.duration(reduceMotion ? 80 : 220).easing(CONTROLLED_EASE)}
+          pointerEvents="none"
+          style={styles.streakOverlay}
+        >
+          <StreakWordmark combo={streakCallout.combo} />
+        </Animated.View>
+      ) : null}
 
       <View style={styles.boardFrame}>
         <View ref={boardRef} onLayout={measureBoard}>
@@ -367,6 +403,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
                 reduceMotion={reduceMotion}
                 onPick={() => { measureBoard(); setSelectedPieceId(piece.id); haptic('pick'); }}
                 onHover={setHover}
+                onValidHoverChange={() => haptic('hover')}
                 onPlace={(row, column) => place(piece.id, row, column)}
                 onInvalid={() => haptic('invalid')}
               />
@@ -375,7 +412,6 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
         ))}
       </View>
 
-      <ThemedText style={styles.help} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{game.status === 'lost' ? 'The board is full.' : selectedPiece ? 'Tap a glowing origin, or drag the selected piece onto the board.' : 'Drag a piece onto the board. Complete rows or columns to clear them.'}</ThemedText>
       <Pressable accessibilityRole="button" onPress={saveAndLeave} style={({ pressed }) => [styles.leaveButton, pressed && styles.pressed]}>
         <ThemedText style={styles.leaveText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Save and leave</ThemedText>
       </Pressable>
@@ -394,6 +430,87 @@ function BlockPartyPreview() {
   );
 }
 
+function AnimatedScore({ value, reduceMotion }: { value: number; reduceMotion: boolean }) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const currentValue = useRef(value);
+
+  useEffect(() => {
+    const target = Math.max(0, Math.round(value));
+    const start = currentValue.current;
+    if (reduceMotion || target <= start) {
+      currentValue.current = target;
+      setDisplayValue(target);
+      return;
+    }
+
+    const startedAt = Date.now();
+    const duration = Math.min(520, 260 + Math.log10(Math.max(10, target - start)) * 80);
+    let frame: ReturnType<typeof requestAnimationFrame>;
+    const tick = () => {
+      const progress = Math.min(1, (Date.now() - startedAt) / duration);
+      const eased = 1 - (1 - progress) ** 3;
+      const next = Math.round(start + (target - start) * eased);
+      currentValue.current = next;
+      setDisplayValue(next);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [reduceMotion, value]);
+
+  return <ThemedText selectable style={styles.score} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{formatScore(displayValue)}</ThemedText>;
+}
+
+function streakColor(combo: number): string {
+  if (combo >= 9) return '#FFF1A8';
+  if (combo >= 7) return '#FFB4D2';
+  if (combo >= 5) return Lantern.ember300;
+  if (combo >= 3) return Lantern.auroraRose;
+  return Lantern.auroraTeal;
+}
+
+function StreakWordmark({ combo }: { combo: number }) {
+  const word = blockBlastStreakWord(combo);
+  const label = `${word} ×${combo}`;
+  const tone = streakColor(combo);
+  const fontSize = word.length >= 9 ? 31 : word.length >= 7 ? 35 : 43;
+  const sizing = { fontSize, lineHeight: fontSize + 10 };
+
+  return (
+    <View style={styles.streakWordmark}>
+      <ThemedText
+        accessible={false}
+        style={[styles.streakDisplayText, sizing, styles.streakGlow, { color: tone, textShadowColor: tone }]}
+      >
+        {label}
+      </ThemedText>
+      <ThemedText
+        accessible={false}
+        style={[styles.streakDisplayText, sizing, styles.streakExtrusion]}
+        lightColor="#241130"
+        darkColor="#241130"
+      >
+        {label}
+      </ThemedText>
+      <ThemedText
+        accessible={false}
+        style={[styles.streakDisplayText, sizing, styles.streakKeyline]}
+        lightColor="#10091C"
+        darkColor="#10091C"
+      >
+        {label}
+      </ThemedText>
+      <ThemedText
+        accessibilityLabel={`${word}, streak ${combo}`}
+        numberOfLines={1}
+        style={[styles.streakDisplayText, sizing, styles.streakFace, { color: tone }]}
+      >
+        {label}
+      </ThemedText>
+    </View>
+  );
+}
+
 function ResultStat({ label, value }: { label: string; value: number }) {
   return <View style={styles.stat}><ThemedText style={styles.statValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{formatScore(value)}</ThemedText><ThemedText style={styles.statLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{label}</ThemedText></View>;
 }
@@ -404,13 +521,21 @@ function formatScore(value: number): string {
 
 const styles = StyleSheet.create({
   root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0, padding: 4 },
-  topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 52 },
-  kicker: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.9 },
-  score: { fontSize: 27, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -0.6, lineHeight: 31 },
-  topActions: { alignItems: 'center', flexDirection: 'row', gap: 7 },
-  comboPill: { backgroundColor: 'rgba(255,195,107,0.09)', borderColor: 'rgba(255,195,107,0.28)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
-  comboText: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.55 },
+  topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 66, position: 'relative' },
+  brandCorner: { left: 2, maxWidth: 82, position: 'absolute' },
+  kicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.8, lineHeight: 11 },
+  scoreCenter: { alignItems: 'center', justifyContent: 'center' },
+  scoreLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.4, lineHeight: 10 },
+  score: { fontSize: 42, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -1.25, lineHeight: 46, textAlign: 'center' },
+  topActions: { alignItems: 'center', flexDirection: 'row', position: 'absolute', right: 2 },
   iconButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,0.16)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 39, justifyContent: 'center', width: 42 },
+  streakOverlay: { alignItems: 'center', left: 0, position: 'absolute', right: 0, top: '36%', zIndex: 200 },
+  streakWordmark: { alignItems: 'center', justifyContent: 'center', maxWidth: '94%' },
+  streakDisplayText: { fontFamily: AppFontFamilies.bungee, fontVariant: ['tabular-nums'], letterSpacing: 0.35, textAlign: 'center' },
+  streakGlow: { opacity: 0.34, position: 'absolute', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 18, transform: [{ scale: 1.055 }] },
+  streakExtrusion: { position: 'absolute', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 3, transform: [{ translateY: 6 }, { scale: 1.018 }] },
+  streakKeyline: { position: 'absolute', transform: [{ scaleX: 1.035 }, { scaleY: 1.075 }] },
+  streakFace: { textShadowColor: 'rgba(255,255,255,0.72)', textShadowOffset: { width: 0, height: -2 }, textShadowRadius: 1.5 },
   boardFrame: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 0, position: 'relative' },
   scoreDelta: { position: 'absolute', right: 14, top: 4 },
   scoreDeltaText: { fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900' },
@@ -423,7 +548,6 @@ const styles = StyleSheet.create({
   traySlotActive: { zIndex: 50 },
   traySlotUsed: { opacity: 0.48 },
   usedDot: { backgroundColor: 'rgba(201,194,232,0.18)', borderRadius: 99, height: 5, width: 5 },
-  help: { fontSize: 10.5, lineHeight: 14, minHeight: 14, textAlign: 'center' },
   leaveButton: { alignItems: 'center', alignSelf: 'center', minHeight: 34, justifyContent: 'center', paddingHorizontal: 18 },
   leaveText: { fontSize: 11.5, fontWeight: '800' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },

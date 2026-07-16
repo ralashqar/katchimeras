@@ -384,7 +384,7 @@ check('manual journal can prefill an editable media title', manualJournalSource.
 check('manual journal uses the adaptive tall sheet', manualJournalSource.includes('variant="tall"'));
 check('tall sheets stay between the device safe-area insets', meadowSheetSource.includes('useSafeAreaInsets') && meadowSheetSource.includes('insets.top + 8') && meadowSheetSource.includes('availableTallHeight'));
 check('manual journal groups top-level destinations', manualJournalSource.includes('SECTION_ORDER') && manualJournalSource.includes('Culture & progress'));
-check('manual journal has a persistent three-step header', manualJournalSource.includes('Step ${step + 1} of 3') && manualJournalSource.includes('progressSegmentActive'));
+check('manual journal has a persistent three-step header', manualJournalSource.includes('Step ${step + 1} of 3') && manualJournalSource.includes('progressStepActive'));
 check('manual journal keeps Save memory outside the scrolling content', manualJournalSource.indexOf('</ScrollView>') < manualJournalSource.indexOf('style={styles.footer}') && manualJournalSource.includes('Save memory'));
 check('manual journal keeps notes inline', !manualJournalSource.includes("type Stage = 'flow' | 'category' | 'details' | 'note'") && manualJournalSource.includes('noteExpanded'));
 check('manual journal protects dirty drafts from accidental dismissal', manualJournalSource.includes('Discard this draft?') && manualJournalSource.includes('if (dirty) setDiscardOpen(true)'));
