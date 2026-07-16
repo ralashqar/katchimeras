@@ -1,4 +1,4 @@
-import type { BigMomentType, DayEvidenceProvider, StoredHomeDayRecord } from '@/types/home';
+import type { BigMomentType, DayEvidenceProvider, JournalNoteClassification, JournalRouteProposal, StoredHomeDayRecord } from '@/types/home';
 import { buildNoteEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
 import { buildNoteClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import type { FoodDetection } from '@/utils/food-detect';
@@ -27,6 +27,8 @@ export type DayNoteInput = {
   semanticConfidence?: number | null;
   semanticEvaluated?: boolean;
   intelligenceProvider?: DayEvidenceProvider;
+  journalClassification?: JournalNoteClassification | null;
+  journalRoutes?: JournalRouteProposal[];
 };
 
 export function withNoteMemory(

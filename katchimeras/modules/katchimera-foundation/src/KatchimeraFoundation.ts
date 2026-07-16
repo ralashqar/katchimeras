@@ -20,6 +20,24 @@ type KatchimeraFoundationModuleShape = {
     mediaTitle?: unknown;
     mediaCreator?: unknown;
     food?: unknown;
+    classificationKind?: unknown;
+    flowId?: unknown;
+    categoryId?: unknown;
+    specific?: unknown;
+    context?: unknown;
+    journalFeeling?: unknown;
+    routeKey?: unknown;
+    alternativeRouteKey?: unknown;
+    routeConfidence?: unknown;
+    alternativeRouteConfidence?: unknown;
+    noteSchemaVersion?: unknown;
+  }>;
+  classifyNoteRouteAsync?: (transcript: string) => Promise<{
+    routeKey?: unknown;
+    alternativeRouteKey?: unknown;
+    routeConfidence?: unknown;
+    alternativeRouteConfidence?: unknown;
+    noteSchemaVersion?: unknown;
   }>;
 };
 

@@ -384,6 +384,40 @@ def build_grid_refinement_prompt(display_name: str, description: str) -> str:
         "No captions, stage numbers, text, letters, logos, UI labels, humans, extra creatures or scenery outside "
         "the nine panels. Output exactly one 3x3 grid, not separate images."
     )
+
+
+def build_three_stage_prompts(display_name: str, description: str) -> tuple[str, str]:
+    hatchling_prompt = (
+        "Create one isolated species-specific hatchling, not a grid. REFERENCE IMAGE 1 is the approved generic "
+        "hatchling and is authoritative for the egg-shell format, infant proportions, centered framing, huge eyes, "
+        "tiny paws gripping the open lower shell, shallow broken shell cap, camera, lighting and rounded premium 3D "
+        "project style. REFERENCE IMAGE 2 is the existing adult and is authoritative for species identity, face, "
+        "palette, markings, material language and signature anatomy. "
+        f"Redesign the hatchling as an unmistakable infant {display_name}. Identity: {description}. Preserve only "
+        "small newborn versions of the adult's ears, facial markings, core and primary motif. Do not copy the adult "
+        "body, pose, clothing or handheld props. The eggshell may use simple species palette and motif accents. "
+        "Exactly one complete centered hatchling on a perfectly uniform matte dark-plum background with generous "
+        "padding. No platform, scenery, extra creature, text, letters, numbers, logo, UI, human or photorealism."
+    )
+    child_prompt = (
+        "Create one isolated child-age character, not a grid. REFERENCE IMAGE 1 is the newly approved species "
+        "hatchling and is authoritative for the same individual, face, eyes, infant palette and project rendering. "
+        "REFERENCE IMAGE 2 is the existing adult destination and is authoritative for the final species identity, "
+        "signature anatomy, palette, materials and mature motif. "
+        f"Render the same {display_name} exactly halfway between those ages. Identity: {description}. The child is "
+        "fully out of the egg with no shell, roughly halfway between hatchling and adult body development: a larger "
+        "head and eyes than the adult, shorter limbs and softer proportions, but a clear standing body and confident "
+        "child pose. Develop the adult's ears, head feature, markings, core, tail and primary motif to about 50% of "
+        "their mature size and complexity. Do not merely shrink the adult and do not keep hatchling proportions. "
+        "HARD CHILD LIMITS: empty hands; no handheld object or drink; no waist pouch, apron, belt or adult equipment. "
+        "If the adult has a container-shaped helmet or face-enclosing hood, replace it with only a narrow open crown "
+        "rim or soft immature precursor that leaves the head and cheeks exposed. Do not copy the full adult hood. "
+        "Keep the pose youthful, balanced and curious rather than a mature working or heroic pose. Exactly one "
+        "complete centered character on a "
+        "perfectly uniform matte dark-plum background with generous padding. No egg, shell, platform, scenery, "
+        "extra creature, text, letters, numbers, logo, UI, human or photorealism."
+    )
+    return hatchling_prompt, child_prompt
     return (
         "Create one isolated full-body character render on a perfectly uniform matte dark-plum studio background. "
         f"This is stage {stage_index + 1} of 9 in {display_name}'s strict chronological growth sequence. "
@@ -976,6 +1010,138 @@ def process_sequential_assets(
     return write_review_grid(cells, output_dir, name), cells
 
 
+def write_three_stage_strip(cells: list[Path], output_dir: Path, name: str) -> Path:
+    if len(cells) != 3:
+        raise ValueError("Three-stage strip requires exactly three cells")
+    cell_size = 512
+    gutter = 18
+    width = cell_size * 3 + gutter * 4
+    height = cell_size + gutter * 2
+    canvas = Image.new("RGBA", (width, height), (24, 18, 39, 255))
+    draw = ImageDraw.Draw(canvas)
+    for index, cell_path in enumerate(cells):
+        x = gutter + index * (cell_size + gutter)
+        y = gutter
+        draw.rounded_rectangle(
+            (x, y, x + cell_size - 1, y + cell_size - 1),
+            radius=20,
+            fill=(44, 35, 61, 255),
+            outline=(91, 70, 112, 255),
+            width=2,
+        )
+        canvas.alpha_composite(Image.open(cell_path).convert("RGBA"), (x, y))
+    destination = output_dir / f"{slugify(name)}-three-stage-strip.png"
+    canvas.convert("RGB").save(destination, quality=95)
+    return destination
+
+
+def generate_three_stage_evolution(
+    *,
+    display_name: str,
+    description: str,
+    base_hatchling: Path,
+    adult: Path,
+    model: str,
+    size: int,
+    quality: str,
+    output_dir: Path,
+    reuse_hatchling: Path | None = None,
+) -> tuple[list[dict[str, Any]], list[Path], Path]:
+    """Generate hatchling and child from two-reference edits, then append the existing adult."""
+    hatchling_prompt, child_prompt = build_three_stage_prompts(display_name, description)
+    raw_dir = output_dir / "raw-stages"
+    matted_dir = output_dir / "matted-stages"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    matted_dir.mkdir(parents=True, exist_ok=True)
+
+    hatchling_matted = matted_dir / "stage-01-hatchling.png"
+    records: list[dict[str, Any]] = []
+    if reuse_hatchling is not None:
+        Image.open(reuse_hatchling).convert("RGBA").save(hatchling_matted, optimize=True)
+        records.append(
+            {
+                "index": 1,
+                "name": "hatchling",
+                "prompt": None,
+                "reusedFrom": reuse_hatchling,
+                "mattedPath": hatchling_matted,
+            }
+        )
+        print("stage 1: reused approved hatchling", flush=True)
+    else:
+        hatchling_raw = raw_dir / "stage-01-hatchling.png"
+        hatchling_url, hatchling_generation = submit_generation(
+            name=f"{display_name}-three-stage-hatchling",
+            prompt=hatchling_prompt,
+            hatchling=base_hatchling,
+            final=adult,
+            model=model,
+            size=size,
+            quality=quality,
+        )
+        download(hatchling_url, hatchling_raw)
+        hatchling_matte_url = matte_grid(
+            hatchling_raw,
+            f"{display_name}-three-stage-hatchling",
+            hatchling_matted,
+        )
+        records.append(
+            {
+                "index": 1,
+                "name": "hatchling",
+                "prompt": hatchling_prompt,
+                "generationUrl": hatchling_url,
+                "matteUrl": hatchling_matte_url,
+                "generationResponse": hatchling_generation,
+                "rawPath": hatchling_raw,
+                "mattedPath": hatchling_matted,
+            }
+        )
+        print("stage 1: generated hatchling and Heavy-matted", flush=True)
+
+    child_raw = raw_dir / "stage-02-child.png"
+    child_matted = matted_dir / "stage-02-child.png"
+    child_url, child_generation = submit_generation(
+        name=f"{display_name}-three-stage-child",
+        prompt=child_prompt,
+        hatchling=hatchling_matted,
+        final=adult,
+        model=model,
+        size=size,
+        quality=quality,
+    )
+    download(child_url, child_raw)
+    child_matte_url = matte_grid(child_raw, f"{display_name}-three-stage-child", child_matted)
+    print("stage 2: generated child and Heavy-matted", flush=True)
+
+    records.append(
+        {
+            "index": 2,
+            "name": "child",
+            "prompt": child_prompt,
+            "generationUrl": child_url,
+            "matteUrl": child_matte_url,
+            "generationResponse": child_generation,
+            "rawPath": child_raw,
+            "mattedPath": child_matted,
+        }
+    )
+
+    cells_dir = output_dir / "cells"
+    cells_dir.mkdir(parents=True, exist_ok=True)
+    source_paths = [hatchling_matted, child_matted, adult]
+    scales = (0.72, 0.84, 1.0)
+    names = ("hatchling", "child", "adult")
+    cells: list[Path] = []
+    for index, (source, scale, stage_name) in enumerate(zip(source_paths, scales, names), 1):
+        cell = contain_rgba_at_scale(Image.open(source), (512, 512), scale)
+        destination = cells_dir / f"stage-{index:02d}-{stage_name}.png"
+        cell.save(destination, optimize=True)
+        cells.append(destination)
+    strip = write_three_stage_strip(cells, output_dir, display_name)
+    return records, cells, strip
+
+
 def relative_to_root(path: Path) -> str:
     try:
         return path.resolve().relative_to(ROOT).as_posix()
@@ -997,6 +1163,15 @@ def main() -> None:
     )
     parser.add_argument("--refine-grid", help="existing 3x3 grid to redraw as reference image 1")
     parser.add_argument("--identity-reference", help="authoritative original creature image as reference image 2")
+    parser.add_argument(
+        "--three-stage",
+        action="store_true",
+        help="generate hatchling and child variants, then assemble them with the existing adult",
+    )
+    parser.add_argument(
+        "--reuse-hatchling",
+        help="approved species hatchling to reuse while regenerating only the three-stage child",
+    )
     parser.add_argument("--model", choices=("gpt", "seedream", "nano"), default="gpt")
     parser.add_argument(
         "--strategy",
@@ -1029,6 +1204,10 @@ def main() -> None:
         parser.error("--from-scratch requires --strategy sequential")
     if bool(args.refine_grid) != bool(args.identity_reference):
         parser.error("--refine-grid and --identity-reference must be provided together")
+    if args.three_stage and (args.from_scratch or args.refine_grid):
+        parser.error("--three-stage cannot be combined with --from-scratch or --refine-grid")
+    if args.reuse_hatchling and not args.three_stage:
+        parser.error("--reuse-hatchling requires --three-stage")
 
     if not args.creature and not args.name:
         parser.error("provide --creature or --name")
@@ -1065,6 +1244,75 @@ def main() -> None:
     if output_dir.exists() and any(output_dir.iterdir()) and not args.force:
         sys.exit(f"Output directory already contains files: {output_dir} (use --force)")
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.three_stage:
+        if final_path is None:
+            sys.exit("Three-stage generation requires an existing adult reference")
+        hatchling_prompt, child_prompt = build_three_stage_prompts(display_name, description)
+        prompt_path = output_dir / "prompt.txt"
+        prompt_path.write_text(
+            f"=== HATCHLING ===\n{hatchling_prompt}\n\n=== CHILD ===\n{child_prompt}\n",
+            encoding="utf-8",
+        )
+        manifest_path = output_dir / "manifest.json"
+        manifest: dict[str, Any] = {
+            "schemaVersion": 2,
+            "type": "katchimera-three-stage-evolution",
+            "name": display_name,
+            "model": args.model,
+            "quality": args.quality if args.model == "gpt" else None,
+            "renderSize": args.size,
+            "baseHatchlingReference": relative_to_root(hatchling_path),
+            "adultReference": relative_to_root(final_path),
+            "prompts": {"hatchling": hatchling_prompt, "child": child_prompt},
+        }
+        if args.dry_run:
+            manifest["status"] = "dry-run"
+            manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            print(f"wrote three-stage dry run to {output_dir}")
+            return
+        reuse_hatchling_path = Path(args.reuse_hatchling) if args.reuse_hatchling else None
+        if reuse_hatchling_path is not None and not reuse_hatchling_path.is_absolute():
+            reuse_hatchling_path = ROOT / reuse_hatchling_path
+        if reuse_hatchling_path is not None and not reuse_hatchling_path.exists():
+            sys.exit(f"Missing reusable hatchling: {reuse_hatchling_path}")
+        records, cells, strip = generate_three_stage_evolution(
+            display_name=display_name,
+            description=description,
+            base_hatchling=hatchling_path,
+            adult=final_path,
+            model=args.model,
+            size=args.size,
+            quality=args.quality,
+            output_dir=output_dir,
+            reuse_hatchling=reuse_hatchling_path,
+        )
+        serialized_records: list[dict[str, Any]] = []
+        for record in records:
+            serialized = {
+                key: value
+                for key, value in record.items()
+                if key not in {"rawPath", "mattedPath", "reusedFrom"}
+            }
+            if record.get("rawPath"):
+                serialized["rawPath"] = relative_to_root(Path(record["rawPath"]))
+            serialized["mattedPath"] = relative_to_root(Path(record["mattedPath"]))
+            if record.get("reusedFrom"):
+                serialized["reusedFrom"] = relative_to_root(Path(record["reusedFrom"]))
+            serialized_records.append(serialized)
+        manifest.update(
+            {
+                "generatedStages": serialized_records,
+                "cells": [relative_to_root(path) for path in cells],
+                "reviewStrip": relative_to_root(strip),
+                "status": "completed",
+                "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+        )
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        print(f"saved three-stage strip: {strip}")
+        print(f"saved manifest: {manifest_path}")
+        return
 
     if args.refine_grid:
         grid_path = Path(args.refine_grid)

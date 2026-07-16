@@ -56,6 +56,8 @@ const MAPPING = {
   'film.fill': 'movie',
   'book.fill': 'menu-book',
   'music.note': 'music-note',
+  'speaker.wave.2.fill': 'volume-up',
+  'speaker.slash.fill': 'volume-off',
   'gamecontroller.fill': 'sports-esports',
   'bed.double.fill': 'bed',
   'dumbbell.fill': 'fitness-center',

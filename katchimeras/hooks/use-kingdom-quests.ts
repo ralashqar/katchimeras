@@ -825,6 +825,12 @@ function resolveInteractiveConfig(
     seed,
     state.attempts.flatMap((attempt) => attempt.result?.kind === 'block_jam' && attempt.result.rulesetId === 'tasklet-desk-jam-v2' ? [attempt.result.levelId] : []).slice(-12),
   );
+  if (definition?.execution?.kind === 'block_blast') return {
+    packId: definition.execution.packId,
+    rulesetId: definition.execution.rulesetId,
+    boardSize: 8,
+    mode: 'endless',
+  };
   if (definition?.execution?.kind === 'rhythm') return resolveRhythmConfig(completedCount);
   return undefined;
 }

@@ -1063,6 +1063,20 @@ export type JournalRouteProposal = {
   prefilledSpecific?: string;
 };
 
+export type JournalNoteClassification = {
+  kind: 'categorized' | 'generic' | 'ambiguous';
+  flowId: string | null;
+  categoryId: string | null;
+  fields: {
+    specific: string | null;
+    context: string | null;
+  };
+  feeling: string | null;
+  provider: 'appleFoundation';
+  confidence?: number | null;
+  decisionSource?: 'foundation' | 'foundationRetry' | 'registryCorroborated' | 'generic' | 'legacy';
+};
+
 export type JournalDraft = {
   sessionId: string;
   source: JournalSource;

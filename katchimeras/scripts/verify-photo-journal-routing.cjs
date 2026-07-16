@@ -12,12 +12,14 @@ function transpile(source, name) {
 }
 const studio = transpile('utils/studio-detect.ts', 'studio.js');
 const registry = transpile('utils/manual-journal-registry.ts', 'registry.js');
+const classificationCatalog = transpile('utils/journal-classification-catalog.ts', 'classification-catalog.js');
 const journalRouting = transpile('utils/journal-routing.ts', 'journal-routing.js');
 const routingPath = transpile('utils/intelligence/photo-journal-routing.ts', 'routing.js');
 const original = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {
   if (request === '@/utils/studio-detect') return studio;
   if (request === '@/utils/manual-journal-registry') return registry;
+  if (request === '@/utils/journal-classification-catalog') return classificationCatalog;
   if (request === '@/utils/journal-routing') return journalRouting;
   if (request === '@/components/ui/icon-symbol') return path.join(temp, 'empty.js');
   if (request === '@/types/home' || request === '@/utils/scene-classify') return path.join(temp, 'empty.js');

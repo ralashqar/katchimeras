@@ -2,7 +2,7 @@ import type { JournalRouteProposal, JournalSource } from '@/types/home';
 import type { InterpretedNote } from '@/utils/note-interpret';
 import { interpretNote } from '@/utils/note-interpret';
 import type { JournalAnalysisContext, JournalDraftSeed, JournalInputAdapter, JournalSourceAnalysis } from '@/utils/journal-domain';
-import { journalRouteForAlias, journalRouteForQuality, rankJournalRoutes } from '@/utils/journal-routing';
+import { foundationNoteRoute } from '@/utils/journal-routing';
 
 export type NoteJournalInput = {
   source: Extract<JournalSource, { kind: 'text_note' | 'voice_note' }>;
@@ -52,27 +52,38 @@ export const voiceJournalInputAdapter: JournalInputAdapter<NoteJournalInput> = {
 
 export function noteAnalysis(interpreted: InterpretedNote): JournalSourceAnalysis {
   const ranked = noteRoutesForSignals(interpreted);
+  const classified = interpreted.journalClassification?.kind === 'categorized' || interpreted.journalClassification?.kind === 'generic';
+  const foundationMediaFallback = interpreted.intelligenceProvider === 'appleFoundation' && interpreted.llmClassified && !!interpreted.media;
   return {
     routes: ranked,
-    suggestedSpecific: interpreted.media?.title ?? interpreted.food ?? interpreted.label ?? null,
+    suggestedSpecific: classified || foundationMediaFallback
+      ? interpreted.journalClassification?.fields.specific ?? interpreted.media?.title ?? interpreted.food ?? interpreted.label ?? null
+      : null,
+    suggestedContext: interpreted.journalClassification?.fields.context ?? null,
+    suggestedFeeling: interpreted.journalClassification?.feeling ?? null,
     transcript: interpreted.transcript,
   };
 }
 
 export function noteRoutesForSignals(input: {
+  journalClassification?: InterpretedNote['journalClassification'];
   semanticCategoryId?: string | null;
   semanticConfidence?: number | null;
   media?: InterpretedNote['media'];
   food?: string | null;
   bigMoment?: { type: string; subject?: string | null };
   llmClassified?: boolean;
+  intelligenceProvider?: InterpretedNote['intelligenceProvider'];
+  journalRoutes?: InterpretedNote['journalRoutes'];
 }): JournalRouteProposal[] {
-  const routes: Array<JournalRouteProposal | null> = [];
-  if (input.semanticCategoryId) routes.push(journalRouteForQuality(input.semanticCategoryId, input.semanticConfidence ?? 0.72, 'Natural Language matched this category'));
-  if (input.media?.mediaType) routes.push(journalRouteForAlias(input.media.mediaType, input.llmClassified ? 0.9 : 0.78, 'The note explicitly describes media'));
-  if (input.food) routes.push(journalRouteForQuality('subject.food', input.llmClassified ? 0.9 : 0.78, 'The note explicitly describes food'));
-  if (input.bigMoment?.type) routes.push(journalRouteForAlias(input.bigMoment.type, 0.86, 'The note describes a milestone'));
-  return rankJournalRoutes(routes);
+  if (input.journalRoutes?.length) return input.journalRoutes;
+  const route = foundationNoteRoute({
+    classification: input.journalClassification,
+    provider: input.intelligenceProvider,
+    llmClassified: input.llmClassified,
+    mediaType: input.media?.mediaType ?? null,
+  });
+  return route ? [route] : [];
 }
 
 function seedNoteDraft(input: NoteJournalInput, analysis: JournalSourceAnalysis): JournalDraftSeed {
@@ -81,7 +92,8 @@ function seedNoteDraft(input: NoteJournalInput, analysis: JournalSourceAnalysis)
     source: input.source,
     flowId: route?.flowId ?? null,
     categoryId: route?.choiceId ?? null,
-    fields: { specific: analysis.suggestedSpecific ?? null, context: null },
+    fields: { specific: analysis.suggestedSpecific ?? null, context: analysis.suggestedContext ?? null },
+    feeling: analysis.suggestedFeeling ?? null,
     note: analysis.transcript ?? input.text ?? null,
     confirmedFacets: route?.confirmedFacets ?? [],
     attachments: [{

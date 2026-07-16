@@ -10,26 +10,35 @@ import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 import { QUEST_DEFINITIONS } from '@/utils/quests/definitions';
 import { loadDevLastPhotoAnalysis, type DevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
-import { foundationSceneAvailability } from '@/utils/foundation-scene';
+import { loadDevLastNoteAnalysis, type DevLastNoteAnalysis } from '@/utils/dev-note-analysis';
+import { FOUNDATION_NOTE_SCHEMA_VERSION, foundationSceneAvailability } from '@/utils/foundation-scene';
 
 export default function IntelligenceLabScreen() {
   const { selectedDay, personalEntities, cloudIntelligenceEnabled } = useHomeScreenState();
   const memories = selectedDay?.kind === 'day' ? selectedDay.classifiedMemories ?? [] : [];
   const [lastPhoto, setLastPhoto] = useState<DevLastPhotoAnalysis | null>(() => loadDevLastPhotoAnalysis());
+  const [lastNote, setLastNote] = useState<DevLastNoteAnalysis | null>(() => loadDevLastNoteAnalysis());
   const foundationAvailability = foundationSceneAvailability();
   const lastPhotoJson = useMemo(() => lastPhoto ? JSON.stringify(lastPhoto, null, 2) : '', [lastPhoto]);
+  const lastNoteJson = useMemo(() => lastNote ? JSON.stringify(lastNote, null, 2) : '', [lastNote]);
   const focusedQuestEvaluation = lastPhoto?.questContext.questId
     ? lastPhoto.questEvaluations.find((evaluation) => evaluation.questId === lastPhoto.questContext.questId) ?? null
     : null;
 
   useFocusEffect(useCallback(() => {
     setLastPhoto(loadDevLastPhotoAnalysis());
+    setLastNote(loadDevLastNoteAnalysis());
   }, []));
 
   const shareLastPhotoJson = useCallback(() => {
     if (!lastPhotoJson) return;
     void Share.share({ title: 'Katchimeras photo analysis', message: lastPhotoJson });
   }, [lastPhotoJson]);
+
+  const shareLastNoteJson = useCallback(() => {
+    if (!lastNoteJson) return;
+    void Share.share({ title: 'Katchimeras note analysis', message: lastNoteJson });
+  }, [lastNoteJson]);
 
   return (
     <>
@@ -53,16 +62,64 @@ export default function IntelligenceLabScreen() {
             {foundationAvailability.locale ? ` · device language ${foundationAvailability.locale}` : ''}
             {foundationAvailability.localeSupported === false ? ' · unsupported by the current model' : ''}
           </ThemedText>
+          <ThemedText
+            style={styles.line}
+            lightColor={foundationAvailability.noteSchemaVersion === FOUNDATION_NOTE_SCHEMA_VERSION ? '#A8E2C6' : '#F3B36A'}
+            darkColor={foundationAvailability.noteSchemaVersion === FOUNDATION_NOTE_SCHEMA_VERSION ? '#A8E2C6' : '#F3B36A'}
+            selectable>
+            Note routing: {foundationAvailability.noteSchemaVersion === FOUNDATION_NOTE_SCHEMA_VERSION
+              ? `schema v${FOUNDATION_NOTE_SCHEMA_VERSION} ready`
+              : `legacy native build${foundationAvailability.noteSchemaVersion ? ` (schema v${foundationAvailability.noteSchemaVersion})` : ''} · rebuild required`}
+          </ThemedText>
           {!foundationAvailability.available ? (
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               In Settings → Apple Intelligence &amp; Siri, turn Apple Intelligence on and make sure the iPhone language and Siri language use the same supported language. If they already match, leave the phone charging on Wi-Fi while the model finishes downloading, then restart the app.
             </ThemedText>
           ) : (
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
-              Foundation Models is ready and photo interpretation stays on this device.
+              Foundation Models is ready and photo and note interpretation stay on this device.
             </ThemedText>
           )}
         </View>
+        {lastNote ? (
+          <View style={[styles.card, styles.lastPhotoCard]}>
+            <View style={styles.headingRow}>
+              <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                Last note analysis
+              </ThemedText>
+              <ThemedText style={styles.provider} lightColor={lastNote.status === 'classified' || lastNote.status === 'media_fallback' ? '#A8E2C6' : '#F3B36A'} darkColor={lastNote.status === 'classified' || lastNote.status === 'media_fallback' ? '#A8E2C6' : '#F3B36A'}>
+                {lastNote.status.replaceAll('_', ' ').toUpperCase()}
+              </ThemedText>
+            </View>
+            <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              Captured: {lastNote.capturedAt} · {lastNote.durationMs}ms · native schema {lastNote.nativeNoteSchemaVersion ?? 'unknown'}
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={Lantern.moon50} darkColor={Lantern.moon50} selectable>
+              “{lastNote.transcript}”
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={lastNote.fallbackReason ? '#F3B36A' : '#A8E2C6'} darkColor={lastNote.fallbackReason ? '#F3B36A' : '#A8E2C6'} selectable>
+              Result: {lastNote.fallbackReason ?? 'valid structured journal route'}
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              Candidates: {lastNote.routeCandidates.length
+                ? lastNote.routeCandidates.map((route) => `${route.id} ${Math.round(route.confidence * 100)}%`).join(' · ')
+                : 'none'}
+              {lastNote.firstPassDurationMs !== null ? ` · first ${lastNote.firstPassDurationMs}ms` : ''}
+              {lastNote.retryDurationMs !== null ? ` · retry ${lastNote.retryDurationMs}ms` : ''}
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={Lantern.moon500} darkColor={Lantern.moon500} selectable>
+              Development-only trace. It contains the submitted note and stays in local app storage unless you share it.
+            </ThemedText>
+            <Pressable accessibilityRole="button" onPress={shareLastNoteJson} style={styles.shareButton}>
+              <ThemedText style={styles.shareLabel} lightColor={Lantern.ink950} darkColor={Lantern.ink950}>
+                Share note JSON
+              </ThemedText>
+            </Pressable>
+            <ThemedText style={styles.json} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              {lastNoteJson}
+            </ThemedText>
+          </View>
+        ) : null}
         {lastPhoto ? (
           <View style={[styles.card, styles.lastPhotoCard]}>
             <View style={styles.headingRow}>

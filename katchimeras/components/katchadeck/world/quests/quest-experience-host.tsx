@@ -12,6 +12,7 @@ import { RhythmQuest } from './rhythm-quest';
 import { MergeQuest } from './merge-quest';
 import type { MergeRoundConfig } from '@/utils/quests/experiences/merge';
 import { BlockJamQuest } from './block-jam-quest';
+import { BlockBlastQuest } from './block-blast-quest';
 
 export function QuestExperienceHost({ execution, config, seed, recentQuestionIds, recentPuzzleIds, recentWordPathPuzzleIds = [], recentSortingItemIds = [], sortingBestDurationMs = null, recentMatchingContentIds = [], matchingBestDurationMs = null, recentMergeOrderIds = [], mergeBest = null, blockJamBest = null, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: {
   execution: InteractiveQuestExecution;
@@ -47,5 +48,6 @@ export function QuestExperienceHost({ execution, config, seed, recentQuestionIds
   if (execution.kind === 'matching') return <MatchingQuest config={config as { pairCount: number; moveBudget: number; tier: number }} packId={execution.packId} seed={seed} recentIds={recentMatchingContentIds} bestDurationMs={matchingBestDurationMs} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   if (execution.kind === 'merge') return <MergeQuest config={config as MergeRoundConfig} packId={execution.packId} seed={seed} recentOrderIds={recentMergeOrderIds} best={mergeBest} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   if (execution.kind === 'block_jam') return <BlockJamQuest key={String(config.levelId)} config={config as { packId: 'tasklet-desk'; rulesetId?: string; tier: 1 | 2 | 3; levelId: string; timeLimitMs?: number; parMoves?: number }} best={blockJamBest} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
+  if (execution.kind === 'block_blast') return <BlockBlastQuest key={String(config.rulesetId ?? seed)} config={config as { packId: 'cheerlet-party'; rulesetId: 'cheerlet-block-party-v1'; boardSize?: 8; mode?: 'endless' }} seed={seed} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   return <RhythmQuest config={config as { phraseLengths: number[]; phrases: number; targetScore: number; bpm: number; hitWindowMs: number; tier: number }} seed={seed} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
 }

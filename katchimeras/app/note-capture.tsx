@@ -22,7 +22,7 @@ import { interpretNote, transcribeAudioNote, type InterpretedNote } from '@/util
 import type { DayInputTarget, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import { extractStudioTitle } from '@/utils/studio-detect';
 import { noteAnalysis } from '@/utils/journal-input-adapters';
-import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
+import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 
 const MAX_SECONDS = 30;
 const MEANING_TINT: Record<string, string> = {
@@ -47,7 +47,7 @@ export default function NoteCaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ target?: string }>();
   const insets = useSafeAreaInsets();
-  const { addNote, addManualJournalEntry, isTodayHatched, cloudIntelligenceEnabled } = useHomeScreenState();
+  const { addManualJournalEntry, isTodayHatched, cloudIntelligenceEnabled } = useHomeScreenState();
   const requestedTarget = parseCaptureTarget(params.target);
   const noteTarget: DayInputTarget = requestedTarget ?? (isTodayHatched ? 'tomorrow' : 'today');
   const targetLabel = noteTarget === 'tomorrow' ? 'tomorrow' : 'today';
@@ -184,36 +184,13 @@ export default function NoteCaptureScreen() {
       setSemanticChoiceMade(!interpreted.semantic?.needsClarification);
       setMarkBig(true);
       const analysis = noteAnalysis(interpreted);
-      setJournalRoute(journalRouteNeedsConfirmation(analysis.routes) ? null : analysis.routes[0] ?? null);
+      setJournalRoute(journalNoteRouteNeedsConfirmation(analysis.routes) ? null : analysis.routes[0] ?? null);
       setJournalReviewOpen(true);
       setPhase('review');
     } catch {
       setPhase('input');
       Alert.alert('Could not read that', 'Please try again.');
     }
-  };
-
-  const commit = () => {
-    if (!result) return;
-    addNote({
-      kind: audioUri ? 'voice' : 'text',
-      text: result.transcript || text.trim(),
-      audioUri,
-      durationMs: audioUri ? elapsed * 1000 : null,
-      archetype: result.archetype,
-      label: result.label,
-      bigMoment: result.bigMoment && markBig ? result.bigMoment : undefined,
-      media: result.media,
-      food: result.food,
-      llmClassified: result.llmClassified,
-      semanticCategoryId: result.semanticCategoryId,
-      semanticConfidence: result.semanticConfidence,
-      semanticEvaluated: result.semanticEvaluated,
-      intelligenceProvider: result.intelligenceProvider,
-    }, noteTarget);
-    // Celebratory flight into the Memory Vault (World consumes this on focus).
-    queueCaptureFeed({ photoUri: '', icon: 'square.and.pencil', accent: MEANING_TINT[result.archetype] ?? '#7DE8CD' });
-    safeGoBack(router);
   };
 
   return (
@@ -370,7 +347,7 @@ export default function NoteCaptureScreen() {
             </View>
           ) : null}
 
-          <Pressable disabled={!semanticChoiceMade} onPress={commit} style={[styles.cta, !semanticChoiceMade && styles.ctaDisabled]}>
+          <Pressable disabled={!semanticChoiceMade} onPress={() => setJournalReviewOpen(true)} style={[styles.cta, !semanticChoiceMade && styles.ctaDisabled]}>
             <ThemedText style={styles.ctaLabel} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>
               Add to {targetLabel}
             </ThemedText>
@@ -382,8 +359,17 @@ export default function NoteCaptureScreen() {
           key={journalRoute?.id ?? 'note-journal-picker'}
           initialFlowId={journalRoute?.flowId}
           initialChoiceId={journalRoute?.choiceId}
-          initialSpecific={result.media?.title ?? result.food ?? result.label}
+          initialSpecific={journalRoute && (
+            result.journalClassification?.kind === 'categorized' ||
+            result.journalClassification?.kind === 'generic' ||
+            (result.intelligenceProvider === 'appleFoundation' && result.llmClassified && result.media)
+          )
+            ? result.journalClassification?.fields.specific ?? result.media?.title ?? result.food ?? result.label
+            : null}
+          initialContext={journalRoute ? result.journalClassification?.fields.context : null}
+          initialFeeling={journalRoute ? result.journalClassification?.feeling : null}
           initialConfirmedFacets={journalRoute?.confirmedFacets}
+          suggestedRoutes={journalRoute ? undefined : result.journalRoutes}
           initialNote={result.transcript || text.trim()}
           initialLinkedNote={{
             kind: audioUri ? 'voice' : 'text',

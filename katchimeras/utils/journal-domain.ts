@@ -14,6 +14,8 @@ export type JournalAnalysisContext = { allowRemote?: boolean };
 export type JournalSourceAnalysis = {
   routes: JournalRouteProposal[];
   suggestedSpecific?: string | null;
+  suggestedContext?: string | null;
+  suggestedFeeling?: string | null;
   transcript?: string | null;
 };
 export type JournalDraftSeed = Pick<JournalDraft, 'source'> & Partial<Omit<JournalDraft, 'source'>>;

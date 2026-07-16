@@ -29,6 +29,20 @@ test('category-only park creates canonical quality and assignment without coordi
   assert.ok(result.classifiedMemories?.[0].assignments.some((assignment) => assignment.seedId === 'park'));
 });
 
+test('a place journal owns one specific Moments row while retaining its place projection', () => {
+  const result = withManualJournalEntry(
+    day(),
+    { ...submission('went_somewhere', 'museum', ['place.museum'], 'London'), note: 'I went to the Natural History Museum in London' },
+    new Date('2026-07-12T18:18:00Z')
+  );
+  assert.equal(result.confirmedPlaces?.[0]?.category, 'museum');
+  const timeline = buildMomentTimeline(result as unknown as HomeDayRecord);
+  assert.equal(timeline.length, 1);
+  assert.equal(timeline[0]?.category, 'Museum or gallery');
+  assert.equal(timeline[0]?.label, 'London');
+  assert.equal(timeline[0]?.noteText, 'I went to the Natural History Museum in London');
+});
+
 test('film title saves to Studio while rating remains genuinely absent', () => {
   const result = withManualJournalEntry(day(), submission('studio', 'film', ['media.film'], 'Dune: Part Two'), new Date('2026-07-12T13:00:00Z'));
   assert.equal(result.studioMoments?.[0].label, 'Dune: Part Two');

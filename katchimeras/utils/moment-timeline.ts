@@ -57,6 +57,11 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
   const entries: MomentTimelineEntry[] = [];
   const seen = new Set<string>();
   const manualSourceIds = new Set((day.manualJournalEntries ?? []).map((entry) => entry.id));
+  const journalPlaceProjectionIds = new Set(
+    (day.manualJournalEntries ?? [])
+      .filter((entry) => entry.flowId === 'went_somewhere')
+      .map((entry) => `place-${entry.id}`)
+  );
   const linkedJournalNoteIds = new Set((day.manualJournalEntries ?? []).map((entry) => entry.linkedNoteId).filter((id): id is string => !!id));
   const push = (entry: Omit<MomentTimelineEntry, 'time'>) => {
     const time = Date.parse(entry.createdAt);
@@ -155,7 +160,7 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
       icon: flow?.icon ?? 'plus.circle.fill',
       accent: '#FFC36B',
       label: specific || choice?.label || flow?.title || 'Journal entry',
-      category: flow?.title ?? 'Journal',
+      category: choice?.label ?? flow?.title ?? 'Journal',
       noteText: linkedNote?.text ?? entry.note,
       audioUri: linkedNote?.kind === 'voice' ? linkedNote.audioUri : null,
     });
@@ -192,6 +197,10 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
   }
 
   for (const place of day.confirmedPlaces ?? []) {
+    // Manual place journals are also projected into confirmedPlaces for maps,
+    // discoveries, and legacy readers. The canonical journal row owns the
+    // Moments timeline so the compatibility projection must not render twice.
+    if (journalPlaceProjectionIds.has(place.id)) continue;
     push({
       id: `place:${place.id}`,
       createdAt: place.confirmedAt,

@@ -108,11 +108,16 @@ export function MeadowSheet({ onClose, children, kicker, title, maxHeight = '74%
             maxHeight: expanded ? (variant === 'full' ? fullHeight : tallHeight) : maxHeight,
           },
         ]}>
-        {/* Dismiss surface: BELOW everything that follows, so it only receives
-            touches no content view claims (sheet padding, gaps, header band). */}
-        <GestureDetector gesture={dismissPan}>
-          <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
-        </GestureDetector>
+        {/* Full-screen experiences must own every pixel, including safe-area
+            gutters. Only sheet variants expose their empty background as a
+            tap/drag dismissal surface. */}
+        {variant === 'full' ? (
+          <Pressable accessible={false} onPress={() => undefined} style={StyleSheet.absoluteFill} />
+        ) : (
+          <GestureDetector gesture={dismissPan}>
+            <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
+          </GestureDetector>
+        )}
 
         {/* The grabber + header pass touches through to the dismiss surface —
             dragging the top band is the classic way to pull a sheet closed. */}

@@ -36,6 +36,7 @@ public final class KatchimeraFoundationModule: Module {
         let localeDetails = [
           "locale": locale.identifier,
           "localeSupported": model.supportsLocale(locale) ? "true" : "false",
+          "noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion,
         ]
         switch model.availability {
         case .available:
@@ -76,6 +77,22 @@ public final class KatchimeraFoundationModule: Module {
       if #available(iOS 26.0, *) {
         Task {
           let result = await Self.interpretNote(transcript: transcript)
+          promise.resolve(result)
+        }
+        return
+      }
+      #endif
+      promise.resolve([String: String]())
+    }
+
+    // Focused route-only retry for a generic, ambiguous, or low-confidence first
+    // pass. Kept separate so JS can enforce one shared latency budget and retain
+    // both raw decisions in developer diagnostics.
+    AsyncFunction("classifyNoteRouteAsync") { (transcript: String, promise: Promise) in
+      #if canImport(FoundationModels)
+      if #available(iOS 26.0, *) {
+        Task {
+          let result = await Self.classifyNoteRoute(transcript: transcript)
           promise.resolve(result)
         }
         return
@@ -265,6 +282,20 @@ public final class KatchimeraFoundationModule: Module {
         Empty otherwise.
       - food: when the note is about eating or drinking something specific, a short
         1-4 word name of the dish or drink (for example "a bowl of ramen"). Empty otherwise.
+      - routeKey: choose one atomic destination from the taxonomy below. Prefer a
+        specific destination whenever the note supports it. Use general.other only
+        when no specific destination fits, and ambiguous only when two destinations
+        remain genuinely tied after considering their definitions and exclusions.
+      - alternativeRouteKey: the second plausible destination only when it is close;
+        otherwise empty. Give calibrated confidence values for both decisions.
+      - specific: a concise name explicitly present or safely extracted from the note, such
+        as a person, place, activity, dish, work, project, or event. Empty rather than guessing.
+      - context: only a taxonomy option ID clearly stated by the note; otherwise empty.
+      - journalFeeling: only a feeling option ID clearly expressed by the note; otherwise empty.
+        Do not infer sensitive relationships beyond the user's words.
+
+      Journal taxonomy:
+      \(JournalNoteRouteCatalog.promptTaxonomy)
       """
     )
     let session = LanguageModelSession(instructions: instructions)
@@ -279,6 +310,50 @@ public final class KatchimeraFoundationModule: Module {
         "mediaTitle": response.content.mediaTitle,
         "mediaCreator": response.content.mediaCreator,
         "food": response.content.food,
+        "routeKey": response.content.routeKey,
+        "alternativeRouteKey": response.content.alternativeRouteKey,
+        "routeConfidence": String(response.content.routeConfidence),
+        "alternativeRouteConfidence": String(response.content.alternativeRouteConfidence),
+        "specific": response.content.specific,
+        "context": response.content.context,
+        "journalFeeling": response.content.journalFeeling,
+        "noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion,
+      ]
+    } catch {
+      return [:]
+    }
+  }
+  #endif
+
+  #if canImport(FoundationModels)
+  @available(iOS 26.0, *)
+  private static func classifyNoteRoute(transcript: String) async -> [String: String] {
+    guard case .available = SystemLanguageModel.default.availability else { return [:] }
+    let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return [:] }
+    let instructions = Instructions(
+      """
+      Classify one personal journal note into exactly one atomic journal route.
+      Consider the definitions, examples, and exclusions carefully. Prefer a
+      specific route over general.other. Use ambiguous only for a genuine tie.
+      Return a close alternative only when one exists, with calibrated confidence.
+
+      Journal taxonomy:
+      \(JournalNoteRouteCatalog.promptTaxonomy)
+      """
+    )
+    let session = LanguageModelSession(instructions: instructions)
+    do {
+      let response = try await session.respond(
+        to: Prompt("The note says: \"\(trimmed)\". Select the best route now."),
+        generating: NoteRouteDecision.self
+      )
+      return [
+        "routeKey": response.content.routeKey,
+        "alternativeRouteKey": response.content.alternativeRouteKey,
+        "routeConfidence": String(response.content.routeConfidence),
+        "alternativeRouteConfidence": String(response.content.alternativeRouteConfidence),
+        "noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion,
       ]
     } catch {
       return [:]
@@ -534,31 +609,6 @@ struct MeaningOption {
 struct MeaningOptionList {
   @Guide(description: "Exactly four options, one per feeling", .count(4))
   let options: [MeaningOption]
-}
-
-@available(iOS 26.0, *)
-@Generable
-struct NoteRead {
-  @Guide(description: "A short warm 2-4 word title for the moment (under 24 characters), specific to the note. No punctuation, no emoji, no quotes")
-  let title: String
-
-  @Guide(description: "The dominant feeling of the note", .anyOf(["calm", "energy", "together", "meaningful"]))
-  let feeling: String
-
-  @Guide(
-    description: "The kind of media the note mentions taking in; use other for watched sport/news, podcasts, livestreams, or another consumed format, otherwise none",
-    .anyOf(["none", "book", "film", "show", "game", "music", "art", "other"])
-  )
-  let mediaKind: String
-
-  @Guide(description: "The mentioned work's full official title with correct capitalization, completed from knowledge of the work when the transcript is lowercase or partial. Empty when no work was named or mediaKind is none. No quotes")
-  let mediaTitle: String
-
-  @Guide(description: "That work's author, director, or artist when confidently known. Empty otherwise. No quotes")
-  let mediaCreator: String
-
-  @Guide(description: "A short 1-4 word name of the dish or drink when the note is about eating or drinking something specific. Empty otherwise. No quotes")
-  let food: String
 }
 
 @available(iOS 26.0, *)

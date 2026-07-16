@@ -28,6 +28,8 @@ export type InlineVoiceNotePayload = {
   semanticConfidence?: number | null;
   semanticEvaluated?: boolean;
   intelligenceProvider: InterpretedNote['intelligenceProvider'];
+  journalClassification?: InterpretedNote['journalClassification'];
+  journalRoutes?: InterpretedNote['journalRoutes'];
 };
 
 type Options = {
@@ -91,6 +93,8 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
       semanticConfidence: result.semanticConfidence,
       semanticEvaluated: result.semanticEvaluated,
       intelligenceProvider: result.intelligenceProvider,
+      journalClassification: result.journalClassification,
+      journalRoutes: result.journalRoutes,
     });
     onSaved?.(result);
     setResult(null);

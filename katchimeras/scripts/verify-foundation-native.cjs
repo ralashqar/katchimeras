@@ -4,7 +4,16 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const swiftPath = path.join(root, 'modules', 'katchimera-foundation', 'ios', 'KatchimeraFoundationModule.swift');
 const easPath = path.join(root, 'eas.json');
+const foundationNotePath = path.join(root, 'utils', 'foundation-note.ts');
+const intelligenceLabPath = path.join(root, 'app', 'intelligence-lab.tsx');
+const manualJournalPath = path.join(root, 'components', 'katchadeck', 'home', 'manual-journal-sheet.tsx');
+const generatedNotePath = path.join(root, 'modules', 'katchimera-foundation', 'ios', 'JournalNoteRoute.generated.swift');
 const swift = fs.readFileSync(swiftPath, 'utf8');
+const generatedNote = fs.readFileSync(generatedNotePath, 'utf8');
+const allSwift = `${swift}\n${generatedNote}`;
+const foundationNote = fs.readFileSync(foundationNotePath, 'utf8');
+const intelligenceLab = fs.readFileSync(intelligenceLabPath, 'utf8');
+const manualJournal = fs.readFileSync(manualJournalPath, 'utf8');
 const lines = swift.split(/\r?\n/);
 
 let failures = 0;
@@ -72,6 +81,8 @@ for (const [name, source] of [['without FoundationModels', withoutFoundation], [
   const result = braceAudit(source);
   check(`${name} braces are balanced`, result.depth === 0 && result.minimum === 0, JSON.stringify(result));
 }
+const generatedBraceResult = braceAudit(generatedNote);
+check('generated note schema braces are balanced', generatedBraceResult.depth === 0 && generatedBraceResult.minimum === 0, JSON.stringify(generatedBraceResult));
 
 const forbiddenXcode26Tokens = [
   ['Attachment(', 'direct image attachments require a newer SDK'],
@@ -88,6 +99,7 @@ const requiredExports = [
   'availabilityInfo',
   'suggestMeaningsAsync',
   'interpretNoteAsync',
+  'classifyNoteRouteAsync',
   'readMemoryAsync',
   'readMemoryV2Async',
   'readSceneAsync',
@@ -99,11 +111,31 @@ for (const name of requiredExports) {
 
 const requiredTypes = ['MemoryRead', 'MeaningOptionList', 'NoteRead', 'SceneDeepRead', 'SceneClassification'];
 for (const name of requiredTypes) {
-  check(`generated type ${name} exists`, new RegExp(`(?:struct|class)\\s+${name}\\b`).test(swift));
+  check(`generated type ${name} exists`, new RegExp(`(?:struct|class)\\s+${name}\\b`).test(allSwift));
 }
 
+for (const field of ['routeKey', 'alternativeRouteKey', 'specific', 'context', 'journalFeeling']) {
+  check(`NoteRead exposes structured journal field ${field}`, new RegExp(`let\\s+${field}:\\s+String`).test(generatedNote));
+  check(`interpretNote returns structured journal field ${field}`, swift.includes(`"${field}": response.content.${field}`));
+}
+for (const field of ['routeConfidence', 'alternativeRouteConfidence']) {
+  check(`NoteRead exposes structured journal field ${field}`, new RegExp(`let\\s+${field}:\\s+Double`).test(generatedNote));
+  check(`interpretNote returns structured journal field ${field}`, swift.includes(`"${field}": String(response.content.${field})`));
+}
+check('availability diagnostics expose note schema v4', swift.includes('"noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion') && generatedNote.includes('schemaVersion = "4"'));
+check('NoteRead constrains atomic routes from every flow', ['went_somewhere.museum', 'food.meal', 'studio.film', 'movement.workout', 'people.my_child', 'work.learning', 'big_event.newHome', 'general.gratitude'].every((id) => generatedNote.includes(`"${id}"`)));
+check('focused retry uses the same generated taxonomy', swift.includes('classifyNoteRoute(transcript:') && swift.includes('JournalNoteRouteCatalog.promptTaxonomy'));
+
+for (const token of ['saveDevLastNoteAnalysis', "'timeout'", 'rawResponse', 'normalizedClassification']) {
+  check(`note diagnostics capture ${token}`, foundationNote.includes(token));
+}
+for (const token of ['loadDevLastNoteAnalysis', 'Last note analysis', 'Share note JSON']) {
+  check(`Intelligence Lab exposes ${token}`, intelligenceLab.includes(token));
+}
+check('uncertain note routes render ranked journal suggestions', manualJournal.includes('Suggested for this note') && manualJournal.includes('suggestedRoutes.slice(0, 3)'));
+
 const staticDeclarations = [...withFoundation.matchAll(/private static func\s+(\w+)/g)];
-check('all expected private methods remain inside the module source', staticDeclarations.length === 6, staticDeclarations.map((match) => match[1]).join(', '));
+check('all expected private methods remain inside the module source', staticDeclarations.length === 7, staticDeclarations.map((match) => match[1]).join(', '));
 
 const eas = JSON.parse(fs.readFileSync(easPath, 'utf8'));
 check(

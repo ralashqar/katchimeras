@@ -145,6 +145,25 @@ python scripts/generate-evolution-grid.py \
   --size 2048 \
   --quality medium
 
+# Production three-stage evolution: generate a species hatchling from the
+# approved base + existing adult, then generate one child from that hatchling +
+# adult. The adult itself is preserved unchanged.
+python scripts/generate-evolution-grid.py \
+  --creature location_coffee_shop_baristabbit \
+  --three-stage \
+  --model gpt \
+  --size 1024 \
+  --quality medium
+
+# Retry only the child while keeping an approved hatchling.
+python scripts/generate-evolution-grid.py \
+  --creature location_coffee_shop_baristabbit \
+  --three-stage \
+  --reuse-hatchling assets/images/katchimeras/evolution-grids/<run>/matted-stages/stage-01-hatchling.png \
+  --model gpt \
+  --size 1024 \
+  --quality medium
+
 # Explicit inputs for a new or non-catalog creature.
 python scripts/generate-evolution-grid.py \
   --name moonling \

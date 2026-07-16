@@ -27,6 +27,8 @@ import type {
   UserConfirmation,
   ClassifiedMemory,
   ManualJournalSubmission,
+  JournalNoteClassification,
+  JournalRouteProposal,
 } from '@/types/home';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 import { rememberPersonalContext } from '@/utils/intelligence/classification';
@@ -422,6 +424,8 @@ export function applyNoteForToday(
     semanticConfidence?: number | null;
     semanticEvaluated?: boolean;
     intelligenceProvider?: DayEvidenceProvider;
+    journalClassification?: JournalNoteClassification | null;
+    journalRoutes?: JournalRouteProposal[];
   },
   profile: OnboardingProfile,
   now: Date,

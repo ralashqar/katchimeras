@@ -48,7 +48,7 @@ export function journalSessionReducer(state: JournalSessionState, action: Journa
     case 'select_category':
       return {
         stage: 'details', direction: 1,
-        draft: { ...state.draft, categoryId: action.categoryId, fields: { specific: null, context: null }, feeling: null, note: null, attachments: [] },
+        draft: { ...state.draft, categoryId: action.categoryId, fields: { specific: null, context: null }, feeling: null },
       };
     case 'set_field':
       return { ...state, draft: { ...state.draft, fields: { ...state.draft.fields, [action.key]: action.value } } };

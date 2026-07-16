@@ -450,6 +450,14 @@ function withPersonalBest(state: CompanionQuestState, questId: string, result: Q
       ),
     };
   }
+  if (result.kind === 'block_blast') {
+    return {
+      ...result,
+      personalBest: !previous.some((item) =>
+        item.kind === 'block_blast' && item.rulesetId === result.rulesetId && item.score >= result.score
+      ),
+    };
+  }
   if (result.kind === 'rhythm') return { ...result, personalBest: !previous.some((item) => item.kind === 'rhythm' && (item.score > result.score || (item.score === result.score && item.durationMs <= result.durationMs))) };
   return result;
 }

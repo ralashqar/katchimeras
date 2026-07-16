@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
 import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
+import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
 import { LOST_WORD_PUZZLES, selectLostWordPuzzle, validateLostWordPuzzles } from '@/utils/quests/experiences/lost-word-puzzles';
@@ -36,9 +37,92 @@ test('the new companion quest pools lead with their reusable mini-game', () => {
   assert.equal(themedQuestOffers('social_gathering', 'memory', 'gatherglow')[0]?.id, 'quest-gatherglow-pattern');
   assert.equal(themedQuestOffers('feast', 'food', 'feastle')[0]?.id, 'quest-feastle-merge');
   assert.equal(themedQuestOffers('focus_work', 'craft', 'tasklet')[0]?.id, 'quest-tasklet-desk-jam');
+  assert.equal(themedQuestOffers('celebration', 'celebrate', 'cheerlet')[0]?.id, 'quest-cheerlet-block-party');
+  assert.equal(questDefinition('quest-cheerlet-block-party')?.execution?.kind, 'block_blast');
   assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-memory'));
   assert.equal(themedQuestOffers('museum', 'culture', 'relicoon')[0]?.id, 'quest-relicoon-match');
   assert.equal(themedQuestOffers('live_music', 'culture', 'encora')[0]?.id, 'quest-encora-rhythm');
+});
+
+test('Block Party V1 ships connected, normalised shapes and deterministic fair trays', () => {
+  assert.ok(BLOCK_BLAST_SHAPES.length >= 30);
+  assert.ok(BLOCK_BLAST_SHAPES.every(blockBlastShapeIsConnected));
+  assert.ok(BLOCK_BLAST_SHAPES.every(blockBlastShapeIsNormalised));
+  const familyIds = new Set(BLOCK_BLAST_SHAPES.map((shape) => shape.familyId));
+  for (const familyId of ['corner-3', 'square-2', 'line-5', 'l-5', 'j-5', 't-5', 'plus-5', 'u-5', 'p-5', 'q-5', 'rectangle-2x3', 'square-3']) {
+    assert.ok(familyIds.has(familyId), `missing key Block Party shape family ${familyId}`);
+  }
+  const rectangleRotations = BLOCK_BLAST_SHAPES.filter((shape) => shape.familyId === 'rectangle-2x3');
+  assert.equal(rectangleRotations.length, 2, 'the 2x3 block can arrive horizontally or vertically');
+  assert.deepEqual(new Set(rectangleRotations.map((shape) => `${Math.max(...shape.cells.map((cell) => cell.row)) + 1}x${Math.max(...shape.cells.map((cell) => cell.column)) + 1}`)), new Set(['2x3', '3x2']));
+  assert.equal(BLOCK_BLAST_SHAPES.filter((shape) => shape.familyId === 'square-3')[0]?.cells.length, 9);
+  assert.equal(BLOCK_BLAST_SHAPES.filter((shape) => shape.familyId === 'l-5').length, 4, 'asymmetric pieces expose every quarter-turn');
+  const first = createBlockBlastState('cheerlet:test', 100);
+  const second = createBlockBlastState('cheerlet:test', 100);
+  assert.deepEqual(first.tray, second.tray);
+  assert.equal(first.rulesetId, BLOCK_BLAST_RULESET);
+  assert.equal(first.board.length, BLOCK_BLAST_BOARD_SIZE * BLOCK_BLAST_BOARD_SIZE);
+  assert.ok(first.tray.some((piece) => canPlaceBlockBlastPiece(first.board, piece.cells, 0, 0)));
+
+  const crowded = Array.from({ length: 64 }, (_, index) => index === 63 ? null : 'rose' as const);
+  const generated = generateBlockBlastTray(crowded, 123, 4);
+  assert.ok(generated.tray.some((piece) => piece.cells.length === 1), 'a constrained refill includes the only playable shape');
+});
+
+test('Block Party drag targeting captures the nearest geometric cells generously at board boundaries', () => {
+  const board = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
+  const square = [{ row: 0, column: 0 }, { row: 0, column: 1 }, { row: 1, column: 0 }, { row: 1, column: 1 }];
+  assert.deepEqual(nearestBlockBlastOrigin(square, -1.5, -1.4), { row: 0, column: 0 });
+  assert.deepEqual(nearestBlockBlastOrigin(square, 7.4, 7.5), { row: 6, column: 6 });
+  const lineFive = [{ row: 0, column: 0 }, { row: 0, column: 1 }, { row: 0, column: 2 }, { row: 0, column: 3 }, { row: 0, column: 4 }];
+  assert.deepEqual(nearestBlockBlastOrigin(lineFive, 2, -4.5), { row: 2, column: 0 }, 'a long piece is captured while only its far edge overlaps the board');
+  assert.equal(nearestBlockBlastOrigin(square, -3, 0), null, 'pieces far away from the board are not captured');
+
+  board[3 * 8 + 3] = 'rose';
+  const occupiedOrigin = nearestBlockBlastOrigin([{ row: 0, column: 0 }], 3.1, 3.1);
+  assert.deepEqual(occupiedOrigin, { row: 3, column: 3 }, 'targeting chooses the closest geometric cell even when occupied');
+  assert.equal(canPlaceBlockBlastPiece(board, [{ row: 0, column: 0 }], occupiedOrigin!.row, occupiedOrigin!.column), false);
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(board, [{ row: 0, column: 0 }], 3.1, 3.1), { row: 3, column: 3 }, 'an occupied cell does not make a piece jump to a distant opening');
+  assert.deepEqual(nearestSnappedBlockBlastOrigin(board, [{ row: 0, column: 0 }], 3.48, 3.48), { row: 3, column: 4 }, 'an almost-equidistant valid neighbour catches the piece seamlessly');
+});
+
+test('Block Party clears simultaneous lines and applies placement, clear, and perfect-board scoring', () => {
+  const initial = createBlockBlastState('cheerlet:intersection', 100);
+  const board = Array.from({ length: 64 }, () => null) as BlockBlastState['board'];
+  for (let index = 1; index < 8; index += 1) {
+    board[index] = 'rose';
+    board[index * 8] = 'amber';
+  }
+  assert.deepEqual(projectedBlockBlastLines(board, [{ row: 0, column: 0 }], 0, 0), { rows: [0], columns: [0] });
+  assert.deepEqual(projectedBlockBlastLines(board, [{ row: 0, column: 0 }], 0, 1), { rows: [], columns: [] }, 'invalid placements never preview a clear');
+  assert.equal(blockBlastClearCascadePhase(0, [0], [0]), 0);
+  assert.equal(blockBlastClearCascadePhase(7, [0], [0]), 7);
+  assert.equal(blockBlastClearCascadePhase(56, [0], [0]), 7);
+  const single: BlockBlastPiece = { id: 'single', shapeId: 'single', cells: [{ row: 0, column: 0 }], colorId: 'teal', used: false };
+  const state: BlockBlastState = { ...initial, board, tray: [single], rngState: 42, score: 0, combo: 0 };
+  const next = blockBlastReducer(state, { type: 'place', pieceId: single.id, row: 0, column: 0, now: 200 });
+  assert.deepEqual(next.lastResolution?.clearedRows, [0]);
+  assert.deepEqual(next.lastResolution?.clearedColumns, [0]);
+  assert.equal(next.lastResolution?.clearedIndices.length, 15);
+  assert.equal(next.lastResolution?.perfectClear, true);
+  assert.equal(next.score, 910, '10 placement + 400 double line + 500 perfect clear');
+  assert.equal(next.linesCleared, 2);
+});
+
+test('Block Party combo scoring resets and no-move detection considers every unused tray piece', () => {
+  const initial = createBlockBlastState('cheerlet:loss', 100);
+  const board = Array.from({ length: 64 }, (_, index) => {
+    const row = Math.floor(index / 8); const column = index % 8;
+    return (row + column) % 2 === 0 ? 'blue' as const : null;
+  });
+  board[0] = null;
+  const single: BlockBlastPiece = { id: 'single', shapeId: 'single', cells: [{ row: 0, column: 0 }], colorId: 'rose', used: false };
+  const square: BlockBlastPiece = { id: 'square', shapeId: 'square-2', cells: [{ row: 0, column: 0 }, { row: 0, column: 1 }, { row: 1, column: 0 }, { row: 1, column: 1 }], colorId: 'amber', used: false };
+  const state: BlockBlastState = { ...initial, board, tray: [single, square], combo: 3, maxCombo: 3 };
+  const next = blockBlastReducer(state, { type: 'place', pieceId: single.id, row: 0, column: 0, now: 200 });
+  assert.equal(next.combo, 0);
+  assert.equal(next.score, 10);
+  assert.equal(next.status, 'lost');
 });
 
 test('interactive progression survives repeat-loop removal without double-counting normal completions', () => {

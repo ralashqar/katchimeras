@@ -24,7 +24,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useJournalVoiceDraft } from '@/hooks/use-journal-voice-draft';
-import type { JournalNoteDraft, JournalSource, ManualJournalSubmission } from '@/types/home';
+import type { JournalNoteDraft, JournalRouteProposal, JournalSource, ManualJournalSubmission } from '@/types/home';
 import {
   MANUAL_JOURNAL_FLOWS,
   manualJournalFlow,
@@ -48,10 +48,13 @@ export type JournalComposerProps = {
   initialFlowId?: string | null;
   initialChoiceId?: string | null;
   initialSpecific?: string | null;
+  initialContext?: string | null;
+  initialFeeling?: string | null;
   initialNote?: string | null;
   initialLinkedNote?: JournalNoteDraft | null;
   initialNoteExpanded?: boolean;
   initialConfirmedFacets?: ManualJournalSubmission['confirmedFacets'];
+  suggestedRoutes?: JournalRouteProposal[];
   sourceType?: 'manual' | 'photo';
   sourceId?: string | null;
   thumbnailUri?: string | null;
@@ -66,10 +69,13 @@ export function JournalComposer({
   initialFlowId,
   initialChoiceId,
   initialSpecific,
+  initialContext,
+  initialFeeling,
   initialNote,
   initialLinkedNote,
   initialNoteExpanded = false,
   initialConfirmedFacets,
+  suggestedRoutes = [],
   sourceType = 'manual',
   sourceId,
   thumbnailUri,
@@ -90,8 +96,8 @@ export function JournalComposer({
   const [flow, setFlow] = useState<ManualJournalFlowDefinition | null>(initialFlow);
   const [choice, setChoice] = useState<ManualJournalChoice | null>(initialChoice);
   const [specific, setSpecific] = useState(initialSpecific ?? '');
-  const [feeling, setFeeling] = useState<string | null>(null);
-  const [context, setContext] = useState<string | null>(null);
+  const [feeling, setFeeling] = useState<string | null>(initialFeeling ?? null);
+  const [context, setContext] = useState<string | null>(initialContext ?? null);
   const [note, setNote] = useState(initialNote ?? '');
   const [noteExpanded, setNoteExpanded] = useState(initialNoteExpanded || !!initialNote || !!initialLinkedNote);
   const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(initialLinkedNote ?? null);
@@ -126,6 +132,11 @@ export function JournalComposer({
       .filter((item) => (item.section ?? 'other') === section)
       .sort((left, right) => FLOW_ORDER.indexOf(left.id) - FLOW_ORDER.indexOf(right.id)),
   })).filter((group) => group.flows.length > 0), []);
+  const suggestions = useMemo(() => suggestedRoutes.slice(0, 3).flatMap((route) => {
+    const suggestedFlow = manualJournalFlow(route.flowId);
+    const suggestedChoice = suggestedFlow?.choices.find((item) => item.id === route.choiceId);
+    return suggestedFlow && suggestedChoice ? [{ route, flow: suggestedFlow, choice: suggestedChoice }] : [];
+  }), [suggestedRoutes]);
 
   const goTo = (next: Stage, nextDirection: 1 | -1) => {
     setDirection(nextDirection);
@@ -146,12 +157,14 @@ export function JournalComposer({
       setSpecific('');
       setFeeling(null);
       setContext(null);
-      setNote('');
-      setLinkedNote(null);
-      setNoteExpanded(false);
-      voice.reset();
     }
     setChoice(item);
+    goTo('details', 1);
+  };
+  const selectSuggestion = (suggestion: typeof suggestions[number]) => {
+    selectionHaptic();
+    setFlow(suggestion.flow);
+    setChoice(suggestion.choice);
     goTo('details', 1);
   };
   const back = () => {
@@ -206,7 +219,7 @@ export function JournalComposer({
       sourceId: sourceId ?? null,
       thumbnailUri: thumbnailUri ?? null,
       linkedNote: linkedNote
-        ? { ...linkedNote, text: trimmedNote }
+        ? { ...linkedNote, text: trimmedNote || linkedNote.text }
         : trimmedNote
           ? { kind: 'text', text: trimmedNote }
           : null,
@@ -262,6 +275,18 @@ export function JournalComposer({
             layout={LinearTransition.duration(180)}>
             {stage === 'flow' ? (
               <View style={styles.sections}>
+                {suggestions.length ? (
+                  <View style={styles.section}>
+                    <SectionLabel>Suggested for this note</SectionLabel>
+                    <View style={styles.categoryGrid}>
+                      {suggestions.map((suggestion) => (
+                        <View key={suggestion.route.id} style={styles.halfTile}>
+                          <ChoiceTile choice={suggestion.choice} onPress={() => selectSuggestion(suggestion)} quiet={false} />
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
                 {groupedFlows.map((group) => (
                   <View key={group.section} style={styles.section}>
                     <SectionLabel>{SECTION_LABELS[group.section]}</SectionLabel>

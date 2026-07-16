@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 2,
+  "type": "katchimera-three-stage-evolution",
+  "name": "Baristabbit",
+  "model": "gpt",
+  "quality": "medium",
+  "renderSize": 1024,
+  "baseHatchlingReference": "assets/images/katchimeras/hatchlings/base-hatchling-v2.png",
+  "adultReference": "assets/images/katchimeras/cutouts/baristabbit.png",
+  "prompts": {
+    "hatchling": "Create one isolated species-specific hatchling, not a grid. REFERENCE IMAGE 1 is the approved generic hatchling and is authoritative for the egg-shell format, infant proportions, centered framing, huge eyes, tiny paws gripping the open lower shell, shallow broken shell cap, camera, lighting and rounded premium 3D project style. REFERENCE IMAGE 2 is the existing adult and is authoritative for species identity, face, palette, markings, material language and signature anatomy. Redesign the hatchling as an unmistakable infant Baristabbit. Identity: Baristabbit is a cream-and-coffee-brown rabbit barista mascot with huge glossy brown eyes, bent latte-foam ears dusted with cocoa, a square ceramic coffee-cup hood with a handle, warm orange caramel belly core, little waist pouch, coffee-bean tail accents, oversized paws and a joyful energetic pose.. Preserve only small newborn versions of the adult's ears, facial markings, core and primary motif. Do not copy the adult body, pose, clothing or handheld props. The eggshell may use simple species palette and motif accents. Exactly one complete centered hatchling on a perfectly uniform matte dark-plum background with generous padding. No platform, scenery, extra creature, text, letters, numbers, logo, UI, human or photorealism.",
+    "child": "Create one isolated child-age character, not a grid. REFERENCE IMAGE 1 is the newly approved species hatchling and is authoritative for the same individual, face, eyes, infant palette and project rendering. REFERENCE IMAGE 2 is the existing adult destination and is authoritative for the final species identity, signature anatomy, palette, materials and mature motif. Render the same Baristabbit exactly halfway between those ages. Identity: Baristabbit is a cream-and-coffee-brown rabbit barista mascot with huge glossy brown eyes, bent latte-foam ears dusted with cocoa, a square ceramic coffee-cup hood with a handle, warm orange caramel belly core, little waist pouch, coffee-bean tail accents, oversized paws and a joyful energetic pose.. The child is fully out of the egg with no shell, roughly halfway between hatchling and adult body development: a larger head and eyes than the adult, shorter limbs and softer proportions, but a clear standing body and confident child pose. Develop the adult's ears, head feature, markings, core, tail and primary motif to about 50% of their mature size and complexity. Do not merely shrink the adult and do not keep hatchling proportions. HARD CHILD LIMITS: empty hands; no handheld object or drink; no waist pouch, apron, belt or adult equipment. If the adult has a container-shaped helmet or face-enclosing hood, replace it with only a narrow open crown rim or soft immature precursor that leaves the head and cheeks exposed. Do not copy the full adult hood. Keep the pose youthful, balanced and curious rather than a mature working or heroic pose. Exactly one complete centered character on a perfectly uniform matte dark-plum background with generous padding. No egg, shell, platform, scenery, extra creature, text, letters, numbers, logo, UI, human or photorealism."
+  },
+  "generatedStages": [
+    {
+      "index": 1,
+      "name": "hatchling",
+      "prompt": null,
+      "mattedPath": "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v2/matted-stages/stage-01-hatchling.png",
+      "reusedFrom": "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v1/matted-stages/stage-01-hatchling.png"
+    },
+    {
+      "index": 2,
+      "name": "child",
+      "prompt": "Create one isolated child-age character, not a grid. REFERENCE IMAGE 1 is the newly approved species hatchling and is authoritative for the same individual, face, eyes, infant palette and project rendering. REFERENCE IMAGE 2 is the existing adult destination and is authoritative for the final species identity, signature anatomy, palette, materials and mature motif. Render the same Baristabbit exactly halfway between those ages. Identity: Baristabbit is a cream-and-coffee-brown rabbit barista mascot with huge glossy brown eyes, bent latte-foam ears dusted with cocoa, a square ceramic coffee-cup hood with a handle, warm orange caramel belly core, little waist pouch, coffee-bean tail accents, oversized paws and a joyful energetic pose.. The child is fully out of the egg with no shell, roughly halfway between hatchling and adult body development: a larger head and eyes than the adult, shorter limbs and softer proportions, but a clear standing body and confident child pose. Develop the adult's ears, head feature, markings, core, tail and primary motif to about 50% of their mature size and complexity. Do not merely shrink the adult and do not keep hatchling proportions. HARD CHILD LIMITS: empty hands; no handheld object or drink; no waist pouch, apron, belt or adult equipment. If the adult has a container-shaped helmet or face-enclosing hood, replace it with only a narrow open crown rim or soft immature precursor that leaves the head and cheeks exposed. Do not copy the full adult hood. Keep the pose youthful, balanced and curious rather than a mature working or heroic pose. Exactly one complete centered character on a perfectly uniform matte dark-plum background with generous padding. No egg, shell, platform, scenery, extra creature, text, letters, numbers, logo, UI, human or photorealism.",
+      "generationUrl": "https://v3b.fal.media/files/b/0aa25d82/9KYdtKOXl0XYS3bgpmggi_uCcSTiZc.png",
+      "matteUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/cutouts/baristabbit-three-stage-child-evolution-grid/1784129368746.png",
+      "generationResponse": {
+        "status": "completed",
+        "imageUrl": "https://v3b.fal.media/files/b/0aa25d82/9KYdtKOXl0XYS3bgpmggi_uCcSTiZc.png",
+        "model": "openai/gpt-image-2/edit",
+        "mode": "single"
+      },
+      "rawPath": "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v2/raw-stages/stage-02-child.png",
+      "mattedPath": "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v2/matted-stages/stage-02-child.png"
+    }
+  ],
+  "cells": [
+    "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v2/cells/stage-01-hatchling.png",
+    "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v2/cells/stage-02-child.png",
+    "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v2/cells/stage-03-adult.png"
+  ],
+  "reviewStrip": "assets/images/katchimeras/evolution-grids/baristabbit-three-stage-medium-v2/baristabbit-three-stage-strip.png",
+  "status": "completed",
+  "generatedAt": "2026-07-15T15:29:30Z"
+}

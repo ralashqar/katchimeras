@@ -2,11 +2,12 @@ import { File } from 'expo-file-system';
 
 import { interpretNoteOnDevice } from '@/utils/foundation-note';
 import { interpretNoteText, type NoteInterpretation } from '@/utils/note-meaning';
-import type { DayEvidenceProvider, StudioMediaType } from '@/types/home';
+import type { DayEvidenceProvider, JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import { transcribeOnDevice } from '@/utils/speech-transcribe';
 import { detectStudioInText, isGenericStudioLabel } from '@/utils/studio-detect';
 import { classifyNoteSemantically, semanticMedia, type SemanticRead } from '@/utils/intelligence/semantic-fallback';
 import { supabase } from '@/utils/supabase';
+import { registryJournalRoutes } from '@/utils/journal-routing';
 
 // Client-side note interpreter, on-device first:
 //   1. Transcribe voice notes ON-DEVICE (Apple Speech) — audio never leaves the
@@ -33,6 +34,8 @@ export type InterpretedNote = NoteInterpretation & {
   semanticCategoryId?: string | null;
   semanticConfidence?: number | null;
   semanticEvaluated?: boolean;
+  journalClassification?: JournalNoteClassification | null;
+  journalRoutes?: JournalRouteProposal[];
 };
 
 type NoteInput = { text?: string; audioUri?: string; mimeType?: string };
@@ -153,7 +156,9 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
         semanticCategoryId: semantic?.selected?.categoryId ?? null,
         semanticConfidence: semantic?.selected?.score ?? null,
         semanticEvaluated: !!semantic,
-        intelligenceProvider: semantic ? 'appleNaturalLanguage' : 'appleFoundation',
+        journalClassification: local.journalClassification,
+        journalRoutes: local.journalRoutes,
+        intelligenceProvider: 'appleFoundation',
       };
     }
     // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.
@@ -172,6 +177,8 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
       semanticCategoryId: semantic?.selected?.categoryId ?? null,
       semanticConfidence: semantic?.selected?.score ?? null,
       semanticEvaluated: !!semantic,
+      journalClassification: null,
+      journalRoutes: registryJournalRoutes(transcript),
       intelligenceProvider: semantic ? 'appleNaturalLanguage' : 'deterministic',
     };
   }

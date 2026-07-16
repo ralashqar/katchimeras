@@ -14,6 +14,7 @@ type FoundationSceneModule = {
     reason?: unknown;
     locale?: unknown;
     localeSupported?: unknown;
+    noteSchemaVersion?: unknown;
   };
   classifySceneAsync?: (tags: string[], faceCount: number) => Promise<{ type?: unknown; subject?: unknown }>;
   // Deep read (newer builds): adds the media branch — when the photo is OF a
@@ -68,6 +69,7 @@ type FoundationSceneModule = {
 };
 
 export const FOUNDATION_MEMORY_PROMPT_VERSION = 1;
+export const FOUNDATION_NOTE_SCHEMA_VERSION = 4;
 
 export type FoundationUnavailableReason =
   | 'native_module_missing'
@@ -101,6 +103,7 @@ export function foundationSceneAvailability(): {
   reason: 'available' | FoundationUnavailableReason;
   locale?: string;
   localeSupported?: boolean;
+  noteSchemaVersion?: number;
 } {
   if (!nativeFoundation) return { available: false, reason: 'native_module_missing' };
   if (!nativeFoundation.readMemoryV2Async && !nativeFoundation.readMemoryAsync && !nativeFoundation.readSceneAsync && !nativeFoundation.classifySceneAsync) {
@@ -114,7 +117,10 @@ export function foundationSceneAvailability(): {
       : info?.localeSupported === 'false'
         ? false
         : undefined;
-    if (info?.status === 'available') return { available: true, reason: 'available', locale, localeSupported };
+    const noteSchemaVersion = typeof info?.noteSchemaVersion === 'string' && /^\d+$/.test(info.noteSchemaVersion)
+      ? Number(info.noteSchemaVersion)
+      : undefined;
+    if (info?.status === 'available') return { available: true, reason: 'available', locale, localeSupported, noteSchemaVersion };
     const knownReasons: FoundationUnavailableReason[] = [
       'apple_intelligence_not_enabled',
       'device_not_eligible',
@@ -124,7 +130,7 @@ export function foundationSceneAvailability(): {
       'unknown_unavailable_reason',
     ];
     if (typeof info?.reason === 'string' && knownReasons.includes(info.reason as FoundationUnavailableReason)) {
-      return { available: false, reason: info.reason as FoundationUnavailableReason, locale, localeSupported };
+      return { available: false, reason: info.reason as FoundationUnavailableReason, locale, localeSupported, noteSchemaVersion };
     }
     return nativeFoundation.isAvailable?.()
       ? { available: true, reason: 'available' }

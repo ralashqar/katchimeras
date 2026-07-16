@@ -27,6 +27,7 @@ export type QuestDefinition = {
     | { kind: 'matching'; packId: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; difficultyCurveId: string }
     | { kind: 'merge'; packId: 'feastle-kitchen'; difficultyCurveId: 'feastle-merge-v1' }
     | { kind: 'block_jam'; packId: 'tasklet-desk'; difficultyCurveId: 'tasklet-desk-jam-v2' }
+    | { kind: 'block_blast'; packId: 'cheerlet-party'; rulesetId: 'cheerlet-block-party-v1' }
     | { kind: 'rhythm'; gameId: 'encora-echo'; difficultyCurveId: string }
     | {
         kind: 'word_game';
@@ -96,7 +97,7 @@ function estimatedMinutes(definition: QuestDefinition): number {
   if (execution?.kind === 'live_steps') return execution.challengeId === 'step_sprint' ? 1 : 5;
   if (execution?.kind === 'paced_breathing' || execution?.kind === 'timing_zone') return 2;
   if (execution?.kind === 'pattern_memory' || execution?.kind === 'sorting' || execution?.kind === 'matching' || execution?.kind === 'rhythm') return 3;
-  if (execution?.kind === 'trivia' || execution?.kind === 'word_game' || execution?.kind === 'word_connect' || execution?.kind === 'merge' || execution?.kind === 'block_jam') return 4;
+  if (execution?.kind === 'trivia' || execution?.kind === 'word_game' || execution?.kind === 'word_connect' || execution?.kind === 'merge' || execution?.kind === 'block_jam' || execution?.kind === 'block_blast') return 4;
   if (definition.family === 'movement' || definition.family === 'place') return 10;
   return 5;
 }
@@ -247,6 +248,13 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     hint: 'Slide each scattered task into its matching tray before the desk jams.', criteria: [],
     execution: { kind: 'block_jam', packId: 'tasklet-desk', difficultyCurveId: 'tasklet-desk-jam-v2' }, requiresCapabilities: [], submissionMode: 'auto',
     eligibility: { creatureKeys: ['tasklet'], cooldownDays: 1, weight: 4 },
+  },
+  'quest-cheerlet-block-party': {
+    id: 'quest-cheerlet-block-party', family: 'studio', title: 'Cheerlet’s Block Party',
+    hint: 'Fit the party blocks together, clear rows and columns, and keep the celebration going.', criteria: [],
+    presentation: { categoryLabel: 'Play', estimatedMinutes: 4, artworkKey: 'cheerlet' },
+    execution: { kind: 'block_blast', packId: 'cheerlet-party', rulesetId: 'cheerlet-block-party-v1' }, requiresCapabilities: [], submissionMode: 'auto',
+    eligibility: { creatureKeys: ['cheerlet'], cooldownDays: 1, weight: 5 },
   },
   'quest-feastle-memory': {
     id: 'quest-feastle-memory', family: 'food', title: 'Feastle’s matching feast',

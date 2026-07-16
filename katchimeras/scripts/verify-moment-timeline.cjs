@@ -93,6 +93,21 @@ const heroDay = {
 };
 check('hero meaning is not duplicated by its prompt answer', buildMomentTimeline(heroDay).filter((entry) => entry.label === 'Worth keeping').length === 1);
 
+const journalPlaceDay = {
+  ...day,
+  promptAnswers: [], capturedMeanings: [], notes: [], foodMoments: [], studioMoments: [], stepsInterpretation: null, bigMoments: [], sleep: null,
+  manualJournalEntries: [{
+    id: 'manual-journal-museum', flowId: 'went_somewhere', flowVersion: 1,
+    path: ['went_somewhere', 'museum'], categoryId: 'museum', canonicalQualityIds: ['place.museum'],
+    fields: { specific: 'London' }, feeling: null, note: 'I went to the Natural History Museum in London',
+    sourceType: 'manual', sourceId: 'note-museum', linkedNoteId: null, createdAt: at(11),
+  }],
+  confirmedPlaces: [{ id: 'place-manual-journal-museum', category: 'museum', label: 'London', confirmedAt: at(11) }],
+};
+const journalPlaceTimeline = buildMomentTimeline(journalPlaceDay);
+check('manual place journal suppresses its compatibility place row', journalPlaceTimeline.length === 1, JSON.stringify(journalPlaceTimeline));
+check('manual place journal leads with its selected category', journalPlaceTimeline[0]?.category === 'Museum or gallery', JSON.stringify(journalPlaceTimeline));
+
 const linkedPhotoDay = {
   ...day,
   notes: [

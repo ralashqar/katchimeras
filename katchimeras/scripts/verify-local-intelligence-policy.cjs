@@ -30,6 +30,7 @@ const stubs = {
   '@/utils/speech-transcribe': stub('speech.js', 'exports.transcribeOnDevice = async () => "";'),
   '@/utils/studio-detect': stub('studio.js', 'exports.detectStudioInText = () => ({ detected: false }); exports.isGenericStudioLabel = () => true;'),
   '@/utils/intelligence/semantic-fallback': stub('semantic.js', 'exports.classifyNoteSemantically = async () => null; exports.semanticMedia = () => null;'),
+  '@/utils/journal-routing': stub('journal-routing.js', 'exports.registryJournalRoutes = () => [];'),
   '@/types/home': stub('types.js', ''),
   '@/utils/day-map-engine': stub('day-map.js', 'exports.deriveDayMapSummary = () => ({ nodes: [{ id: "p1", latitude: 1, longitude: 2, startedAt: "2026-01-01T10:00:00Z", endedAt: "2026-01-01T10:30:00Z" }] });'),
   '@/utils/supabase': stub('supabase.js', `const counter = require(${JSON.stringify(counter)}); exports.supabase = { functions: { invoke: async () => { counter.calls += 1; return { data: { archetype: "energy", label: "Cloud note", categories: [{ clusterId: "p1", appleCategory: "Cafe" }] }, error: null }; } } };`),

@@ -49,6 +49,8 @@ export function useNoteCaptureController({
             food: interpreted.food,
             llmClassified: interpreted.llmClassified,
             intelligenceProvider: interpreted.intelligenceProvider,
+            journalClassification: interpreted.journalClassification,
+            journalRoutes: interpreted.journalRoutes,
       });
     },
     [addNote, allowRemote, formingTarget, pulseEgg, setMicrocopy, startEggFeed, windowHeight, windowWidth]

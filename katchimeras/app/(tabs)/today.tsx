@@ -58,7 +58,7 @@ import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
 import { noteRoutesForSignals } from '@/utils/journal-input-adapters';
-import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
+import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -304,7 +304,7 @@ export default function HomeScreen() {
     startEggFeed,
   });
   const pendingNoteRoutes = useMemo(() => pendingJournalNote ? noteRoutesForSignals(pendingJournalNote) : [], [pendingJournalNote]);
-  const pendingNoteRoute = journalRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
+  const pendingNoteRoute = journalNoteRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
   const { recentAvgSteps, memoryQuests, categories } = useTodayCategoryModel({
     allDays,
     formingDay,
@@ -741,10 +741,19 @@ export default function HomeScreen() {
         <ManualJournalSheet
           initialFlowId={pendingNoteRoute?.flowId}
           initialChoiceId={pendingNoteRoute?.choiceId}
-          initialSpecific={pendingJournalNote.media?.title ?? pendingJournalNote.food ?? pendingJournalNote.label}
+          initialSpecific={pendingNoteRoute && (
+            pendingJournalNote.journalClassification?.kind === 'categorized' ||
+            pendingJournalNote.journalClassification?.kind === 'generic' ||
+            (pendingJournalNote.intelligenceProvider === 'appleFoundation' && pendingJournalNote.llmClassified && pendingJournalNote.media)
+          )
+            ? pendingJournalNote.journalClassification?.fields.specific ?? pendingJournalNote.media?.title ?? pendingJournalNote.food ?? pendingJournalNote.label
+            : null}
+          initialContext={pendingJournalNote.journalClassification?.fields.context}
+          initialFeeling={pendingJournalNote.journalClassification?.feeling}
           initialNote={pendingJournalNote.text}
           initialLinkedNote={{ kind: pendingJournalNote.kind, text: pendingJournalNote.text, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }}
           initialConfirmedFacets={pendingNoteRoute?.confirmedFacets}
+          suggestedRoutes={pendingNoteRoute ? undefined : pendingNoteRoutes}
           journalSource={pendingJournalNote.kind === 'voice'
             ? { kind: 'voice_note', sourceId: pendingJournalNote.captureId, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }
             : { kind: 'text_note', sourceId: pendingJournalNote.captureId }}

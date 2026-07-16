@@ -30,14 +30,17 @@ import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
 import { noteJournalInputAdapter } from '@/utils/journal-input-adapters';
-import { journalRouteNeedsConfirmation } from '@/utils/journal-routing';
+import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { loadWorldIdentity, saveWorldIdentity } from '@/utils/world-identity';
 
 type ReflectionReview = {
   draft: CompanionReflectionDraft;
   source: Extract<JournalSource, { kind: 'text_note' | 'voice_note' }>;
   route: JournalRouteProposal | null;
+  routes: JournalRouteProposal[];
   suggestedSpecific: string | null;
+  suggestedContext: string | null;
+  suggestedFeeling: string | null;
 };
 
 type EmbeddedJournalReview = {
@@ -165,10 +168,10 @@ export default function KingdomScreen() {
       : { kind: 'text_note', sourceId, origin };
     try {
       const analysis = await noteJournalInputAdapter.analyze({ source, text: draft.text, audioUri: draft.audioUri ?? undefined }, { allowRemote: false });
-      const route = journalRouteNeedsConfirmation(analysis.routes) ? null : analysis.routes[0] ?? null;
-      setReflectionReview({ draft, source, route, suggestedSpecific: analysis.suggestedSpecific ?? null });
+      const route = journalNoteRouteNeedsConfirmation(analysis.routes) ? null : analysis.routes[0] ?? null;
+      setReflectionReview({ draft, source, route, routes: analysis.routes, suggestedSpecific: analysis.suggestedSpecific ?? null, suggestedContext: analysis.suggestedContext ?? null, suggestedFeeling: analysis.suggestedFeeling ?? null });
     } catch {
-      setReflectionReview({ draft, source, route: null, suggestedSpecific: null });
+      setReflectionReview({ draft, source, route: null, routes: [], suggestedSpecific: null, suggestedContext: null, suggestedFeeling: null });
     } finally {
       setReflectionReviewPending(false);
     }
@@ -296,14 +299,18 @@ export default function KingdomScreen() {
       ) : null}
       {reflectionReview ? (
         <ManualJournalSheet
+          key={reflectionReview.route?.id ?? 'reflection-journal-picker'}
           initialFlowId={reflectionReview.route?.flowId}
           initialChoiceId={reflectionReview.route?.choiceId}
-          initialSpecific={reflectionReview.suggestedSpecific}
+          initialSpecific={reflectionReview.route ? reflectionReview.suggestedSpecific : null}
+          initialContext={reflectionReview.route ? reflectionReview.suggestedContext : null}
+          initialFeeling={reflectionReview.route ? reflectionReview.suggestedFeeling : null}
           initialNote={reflectionReview.draft.text}
           initialLinkedNote={reflectionReview.draft}
           initialConfirmedFacets={reflectionReview.route?.confirmedFacets}
+          suggestedRoutes={reflectionReview.route ? undefined : reflectionReview.routes}
           journalSource={reflectionReview.source}
-          onBackFromInitial={() => setReflectionReview(null)}
+          onBackFromInitial={() => setReflectionReview((current) => current ? { ...current, route: null, suggestedSpecific: null, suggestedContext: null, suggestedFeeling: null } : null)}
           onClose={() => { setReflectionReview(null); setReflectionDraft(null); quests.closeSelectedResident(); }}
           onSave={(submission) => {
             addManualJournalEntry(submission, 'today');
