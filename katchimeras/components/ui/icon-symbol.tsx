@@ -54,6 +54,10 @@ const MAPPING = {
   'camera.viewfinder': 'photo-camera',
   // Daylio-style "add to today" inputs (mood / sleep / activity / hobby).
   'film.fill': 'movie',
+  'tv.fill': 'tv',
+  'play.rectangle.fill': 'smart-display',
+  'sportscourt.fill': 'sports-soccer',
+  'newspaper.fill': 'newspaper',
   'book.fill': 'menu-book',
   'music.note': 'music-note',
   'speaker.wave.2.fill': 'volume-up',

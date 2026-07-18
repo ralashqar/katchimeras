@@ -14,7 +14,7 @@ import type { SceneRead } from '@/utils/scene-classify';
 import type { DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
-import { safeGoBack } from '@/utils/safe-navigation';
+import { safeDismissModal } from '@/utils/safe-navigation';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
 // on-device, asks what it meant (essence-based options), then feeds the day with
@@ -125,10 +125,12 @@ export default function PhotoEssenceRoute() {
         thumbnailUri: thumbnailUri || localUriRef.current || '',
         rawVision: rawVisionRef.current,
         visionSummary: vision,
-        scene,
-        confirmations,
-      });
-      safeGoBack(router);
+          scene,
+          confirmations,
+          journalClassification: reviewed?.journalClassification ?? null,
+          journalEnrichment: reviewed?.journalEnrichment ?? null,
+        });
+      safeDismissModal(router);
     },
     [assetId, thumbnailUri, params.capturedAt, captureTarget, dayScores, selectHeroPhoto, applyCapturedMoment, router]
   );
@@ -141,7 +143,7 @@ export default function PhotoEssenceRoute() {
         observedAt={params.capturedAt ?? null}
         analyze={analyze}
         onCommit={commit}
-        onClose={() => safeGoBack(router)}
+        onClose={() => safeDismissModal(router)}
       />
     </View>
   );

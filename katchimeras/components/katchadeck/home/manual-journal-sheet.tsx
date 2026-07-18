@@ -1,7 +1,7 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -60,6 +60,7 @@ export type JournalComposerProps = {
   initialLinkedNote?: JournalNoteDraft | null;
   initialNoteExpanded?: boolean;
   initialConfirmedFacets?: ManualJournalSubmission['confirmedFacets'];
+  liveSpecific?: string | null;
   suggestedRoutes?: JournalRouteProposal[];
   sourceType?: 'manual' | 'photo';
   sourceId?: string | null;
@@ -68,6 +69,7 @@ export type JournalComposerProps = {
   allowRemoteIntelligence?: boolean;
   onBackFromInitial?: () => void;
   returnToOriginOnBack?: boolean;
+  onRouteResolved?: (flowId: string, categoryId: string) => void;
   onClose: () => void;
   onSave: (submission: ManualJournalSubmission) => void;
 };
@@ -82,6 +84,7 @@ export function JournalComposer({
   initialLinkedNote,
   initialNoteExpanded = false,
   initialConfirmedFacets,
+  liveSpecific,
   suggestedRoutes = [],
   sourceType = 'manual',
   sourceId,
@@ -90,6 +93,7 @@ export function JournalComposer({
   allowRemoteIntelligence = false,
   onBackFromInitial,
   returnToOriginOnBack = false,
+  onRouteResolved,
   onClose,
   onSave,
 }: JournalComposerProps) {
@@ -115,6 +119,7 @@ export function JournalComposer({
   const [voiceRouting, setVoiceRouting] = useState(false);
   const [activeSection, setActiveSection] = useState<ManualJournalSection>('everyday');
   const [discardOpen, setDiscardOpen] = useState(false);
+  const specificEditedRef = useRef(false);
   const longPressRef = useRef(false);
   const redoLongPressRef = useRef(false);
   const quickVoiceRef = useRef(false);
@@ -172,6 +177,10 @@ export function JournalComposer({
   const quickVoiceAvailable = sourceType === 'manual'
     && (!resolvedJournalSource || resolvedJournalSource.kind === 'manual');
 
+  useEffect(() => {
+    if (!specificEditedRef.current && liveSpecific?.trim()) setSpecific(liveSpecific.trim());
+  }, [liveSpecific]);
+
   const step = stage === 'flow' ? 0 : stage === 'category' ? 1 : 2;
   const dirty = !!choice || !!specific.trim() || !!context || !!feeling || !!note.trim() || !!linkedNote;
   const title = stage === 'flow'
@@ -215,18 +224,22 @@ export function JournalComposer({
     // data when changing an already-selected category.
     if (choice && choice.id !== item.id) {
       setSpecific('');
+      specificEditedRef.current = false;
       setFeeling(null);
       setContext(null);
     }
     setChoice(item);
+    if (flow) onRouteResolved?.(flow.id, item.id);
     goTo('details', 1);
   };
   const selectSuggestion = (suggestion: typeof suggestions[number]) => {
     selectionHaptic();
     setFlow(suggestion.flow);
     setChoice(suggestion.choice);
+    specificEditedRef.current = false;
     setSpecific(suggestion.route.prefilledSpecific ?? specific);
     setConfirmedFacets(suggestion.route.confirmedFacets);
+    onRouteResolved?.(suggestion.flow.id, suggestion.choice.id);
     goTo('details', 1);
   };
   const back = () => {
@@ -437,7 +450,7 @@ export function JournalComposer({
                   <TextInput
                     accessibilityLabel={choice.specificFieldLabel ?? flow.specificFieldLabel}
                     autoCapitalize="sentences"
-                    onChangeText={setSpecific}
+                    onChangeText={(value) => { specificEditedRef.current = true; setSpecific(value); }}
                     onFocus={() => scrollRef.current?.scrollTo({ y: 70, animated: true })}
                     placeholder={choice.specificFieldPlaceholder ?? flow.specificFieldPlaceholder}
                     placeholderTextColor={Meadow.inkSoft}

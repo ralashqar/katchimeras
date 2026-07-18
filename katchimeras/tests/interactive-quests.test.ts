@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
-import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamReducer, createBlockJamState, nearestBlockJamPieceAtPoint, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
-import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastOriginFromFootprintCenter, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastStreakWord, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestBlockBlastWorldOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
+import { BLOCK_JAM_RULESET, availableBlockJamDoor, blockJamOccupancy, blockJamPath, blockJamPieceTargetAtPoint, blockJamReducer, createBlockJamState, nearestBlockJamPieceAtPoint, reachableBlockJamAnchors, TASKLET_DESK_JAM_LEVELS, validateBlockJamLevel, type BlockJamLevel } from '@/utils/quests/experiences/block-jam';
+import { blockJamDragAnchorAtPose, blockJamDragCollisionAt, blockJamDragExitAtPose, createBlockJamDragContext, resolveBlockJamDrag } from '@/utils/quests/experiences/block-jam-drag';
+import { blockJamSilhouettePath, blockJamSilhouetteSegments } from '@/utils/quests/experiences/block-jam-silhouette';
+import { BLOCK_BLAST_BOARD_SIZE, BLOCK_BLAST_PRIMARY_TRAY_FAMILY_IDS, BLOCK_BLAST_RULESET, BLOCK_BLAST_SHAPES, blockBlastClearCascadePhase, blockBlastOriginFromFootprintCenter, blockBlastReducer, blockBlastShapeIsConnected, blockBlastShapeIsNormalised, blockBlastStreakWord, blockBlastTrayHasReservedPlacements, blockBlastTrayIsCompletable, blockBlastValidOriginMask, canPlaceBlockBlastPiece, createBlockBlastState, generateBlockBlastTray, nearestBlockBlastOrigin, nearestBlockBlastWorldOrigin, nearestSnappedBlockBlastOrigin, projectedBlockBlastLines, type BlockBlastPiece, type BlockBlastState } from '@/utils/quests/experiences/block-blast';
 import { hydrateBlockBlastProfile, type BlockBlastProfile } from '@/utils/quests/experiences/block-blast-profile';
 import { canMergeItems, createMergeRound, FEASTLE_MERGE_ITEMS, MERGE_BOARD_COLUMNS, MERGE_BOARD_ROWS, MERGE_BOARD_SIZE, mergeBoardCellFromPoint, mergeRoundMinimumActions, mergeRoundReducer, readyOrderForItem, selectPantrySpawnCell, validateMergePack, type MergeRoundState } from '@/utils/quests/experiences/merge';
 import { evaluateLostWordGuess, createLostWordRound, lostWordReducer, lostWordRoundComplete } from '@/utils/quests/experiences/lost-word';
@@ -184,6 +186,22 @@ test('Block Party drag targeting captures the nearest geometric cells generously
   assert.deepEqual(nearestSnappedBlockBlastOrigin(blockedCorner, [{ row: 0, column: 0 }], -0.7, 0.05), { row: 0, column: 1 }, 'edge targeting measures nearby valid origins from the clamped board position');
 });
 
+test('Block Party compact placement masks exactly match placement rules', () => {
+  for (let sample = 0; sample < 24; sample += 1) {
+    const board = Array.from({ length: BLOCK_BLAST_BOARD_SIZE ** 2 }, (_, index) =>
+      ((index * 17 + sample * 11) % 7 < 2 ? 'rose' as const : null));
+    for (const shape of BLOCK_BLAST_SHAPES.filter((_, index) => index % 7 === sample % 7)) {
+      const mask = blockBlastValidOriginMask(board, shape.cells);
+      assert.equal(mask.length, BLOCK_BLAST_BOARD_SIZE ** 2);
+      for (let row = 0; row < BLOCK_BLAST_BOARD_SIZE; row += 1) {
+        for (let column = 0; column < BLOCK_BLAST_BOARD_SIZE; column += 1) {
+          assert.equal(mask[row * BLOCK_BLAST_BOARD_SIZE + column] === 1, canPlaceBlockBlastPiece(board, shape.cells, row, column));
+        }
+      }
+    }
+  }
+});
+
 test('Block Party clears simultaneous lines and applies placement, clear, and perfect-board scoring', () => {
   assert.deepEqual([1, 3, 5, 7, 9, 20].map(blockBlastStreakWord), ['GOOD', 'GREAT', 'EPIC', 'LEGENDARY', 'GODLIKE', 'GODLIKE']);
   const initial = createBlockBlastState('cheerlet:intersection', 100);
@@ -309,7 +327,7 @@ test('Block Jam rejects an exit when any trailing polyomino cell has a blocked s
   assert.equal(availableBlockJamDoor(level, unblocked, 'target')?.id, 'cyan-exit');
 });
 
-test('Block Jam tap targeting chooses the nearest piece within one cell width', () => {
+test('Block Jam tap targeting generously chooses the nearest piece within a firm threshold', () => {
   const level: BlockJamLevel = {
     id: 'tap-target-fixture', rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter: 'tutorial', tier: 1,
     rows: 5, columns: 6, parMoves: 2, timeLimitMs: 180_000, fixedCells: [],
@@ -323,9 +341,72 @@ test('Block Jam tap targeting chooses the nearest piece within one cell width', 
   const layout = { cell: 20, gap: 2, outer: 10 };
 
   assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 66, y: 64 }, layout), 'left', 'nearby empty space selects the closest shape');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 10, y: 64 }, layout), 'left', 'the default generous radius reaches beyond one cell width');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 75, y: 42 }, layout), 'left', 'the center of an empty adjacent tile selects its nearest piece');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 75, y: 64 }, layout), 'left', 'an exact distance tie resolves deterministically by piece order');
   assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 108, y: 64 }, layout), 'right', 'a direct hit selects its piece');
-  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 4, y: 4 }, layout), null, 'taps farther than one cell width select nothing');
-  assert.equal(nearestBlockJamPieceAtPoint(level, { ...state, clearedBlockIds: ['left'] }, { x: 66, y: 64 }, layout), null, 'cleared pieces are not selectable');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 0, y: 64 }, layout), null, 'the generous radius still has a firm maximum distance');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 4, y: 4 }, layout), null, 'distant corner taps select nothing');
+  assert.equal(nearestBlockJamPieceAtPoint(level, { ...state, clearedBlockIds: ['left'] }, { x: 66, y: 64 }, layout), null, 'cleared pieces are skipped without reaching beyond the one-tile threshold');
+
+  const nestedLevel: BlockJamLevel = {
+    ...level,
+    id: 'tap-target-nested-l-fixture',
+    rows: 4,
+    columns: 4,
+    blocks: [
+      { id: 'large-l', colorId: 'cyan', anchor: { row: 0, column: 0 }, cells: [{ row: 0, column: 0 }, { row: 1, column: 0 }, { row: 2, column: 0 }, { row: 2, column: 1 }, { row: 2, column: 2 }] },
+      { id: 'small-l', colorId: 'red', anchor: { row: 0, column: 1 }, cells: [{ row: 0, column: 0 }, { row: 0, column: 1 }, { row: 1, column: 1 }] },
+    ],
+  };
+  const nestedState = createBlockJamState(nestedLevel);
+  assert.equal(nearestBlockJamPieceAtPoint(nestedLevel, nestedState, { x: 43, y: 21 }, layout), 'small-l', 'an occupied cell inside a larger L bounding box belongs to the smaller nested piece');
+  assert.equal(nearestBlockJamPieceAtPoint(nestedLevel, nestedState, { x: 42, y: 43 }, layout), 'large-l', 'an empty concave corner resolves actual occupied-cell distance ties deterministically');
+});
+
+test('Block Jam targeting uses exactly one neighboring tile and ranks actual occupied cells', () => {
+  const level: BlockJamLevel = {
+    id: 'tile-target-fixture', rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter: 'tutorial', tier: 1,
+    rows: 6, columns: 6, parMoves: 2, timeLimitMs: 180_000, fixedCells: [], doors: [],
+    blocks: [
+      { id: 'first', colorId: 'cyan', anchor: { row: 2, column: 2 }, cells: [{ row: 0, column: 0 }] },
+      { id: 'second', colorId: 'red', anchor: { row: 2, column: 4 }, cells: [{ row: 0, column: 0 }] },
+    ],
+  };
+  const state = createBlockJamState(level);
+  const layout = { cell: 20, gap: 2, outer: 10 };
+
+  assert.deepEqual(blockJamPieceTargetAtPoint(level, state, { x: 64, y: 64 }, layout), {
+    blockId: 'first', cell: { row: 2, column: 2 }, distanceSquared: 0, exact: true,
+  }, 'a direct tile hit always owns the touch');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 42, y: 64 }, layout), 'first', 'an orthogonally adjacent empty tile selects');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 42, y: 42 }, layout), 'first', 'a diagonally adjacent empty tile selects');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 20, y: 64 }, layout), null, 'a tile two columns away is outside the capture range');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 86, y: 64 }, layout), 'first', 'equal distances resolve by stable level order');
+  assert.equal(nearestBlockJamPieceAtPoint(level, state, { x: 90, y: 64 }, layout), 'second', 'precise touch distance chooses the closer occupied cell within the same empty tile');
+  assert.equal(nearestBlockJamPieceAtPoint({ ...level, fixedCells: [13] }, state, { x: 42, y: 64 }, layout), null, 'fixed obstacle tiles do not provide empty-cell capture padding');
+});
+
+test('Block Jam selected outlines form one rounded union silhouette', () => {
+  const lShape = [{ row: 0, column: 0 }, { row: 1, column: 0 }, { row: 1, column: 1 }];
+  const path = blockJamSilhouettePath(lShape, { pitch: 32, width: 62, height: 62, radius: 6, padding: 8 });
+  assert.equal((path.match(/M /g) ?? []).length, 1, 'connected cells produce one perimeter rather than one path per cell');
+  assert.equal((path.match(/ Z/g) ?? []).length, 1, 'the union perimeter closes exactly once');
+  assert.ok((path.match(/Q /g) ?? []).length >= 6, 'outer corners and the inward bend use rounded quadratic corners');
+  assert.equal(path.includes('NaN'), false);
+  const segments = blockJamSilhouetteSegments(lShape, { pitch: 32, width: 62, height: 62, padding: 8 });
+  assert.equal(segments.length, 8, 'three joined cells expose only the eight outer boundary edges');
+  assert.equal(segments.some((segment) => segment.x1 === 40 && segment.x2 === 40 && Math.min(segment.y1, segment.y2) === 40 && Math.max(segment.y1, segment.y2) === 70), false, 'the shared internal cell edge is absent');
+
+  for (const level of TASKLET_DESK_JAM_LEVELS) {
+    for (const block of level.blocks) {
+      const columns = Math.max(...block.cells.map((cell) => cell.column)) + 1;
+      const rows = Math.max(...block.cells.map((cell) => cell.row)) + 1;
+      const candidate = blockJamSilhouettePath(block.cells, { pitch: 30, width: columns * 30 - 2, height: rows * 30 - 2, radius: 5, padding: 8 });
+      assert.equal((candidate.match(/M /g) ?? []).length, 1, `${level.id}/${block.id} has one connected silhouette`);
+      assert.equal(candidate.includes('NaN'), false, `${level.id}/${block.id} has finite silhouette geometry`);
+    }
+  }
 });
 
 test('Block Jam moves are unlimited and only timeout can fail a live board', () => {
@@ -337,6 +418,91 @@ test('Block Jam moves are unlimited and only timeout can fail a live board', () 
   const timedOut = blockJamReducer(level, moved, { type: 'timeout' });
   assert.equal(timedOut.status, 'failed');
   assert.equal(blockJamReducer(level, timedOut, { type: 'restart' }).status, 'playing');
+});
+
+test('Block Jam continuous dragging stops fast swipes and slides along obstacle faces', () => {
+  const level: BlockJamLevel = {
+    id: 'continuous-drag-fixture', rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter: 'tutorial', tier: 1,
+    rows: 5, columns: 5, parMoves: 2, timeLimitMs: 180_000, fixedCells: [4 * 5 + 4],
+    blocks: [
+      { id: 'moving', colorId: 'cyan', anchor: { row: 1, column: 0 }, cells: [{ row: 0, column: 0 }] },
+      { id: 'wall', colorId: 'red', anchor: { row: 1, column: 2 }, cells: [{ row: 0, column: 0 }] },
+    ],
+    doors: [],
+  };
+  const state = createBlockJamState(level);
+  const context = createBlockJamDragContext(level, state, level.blocks[0], state.anchors.moving, { cell: 30, gap: 2, outer: 20 });
+  const uncapped = { ...context, maxCatchUp: 200 };
+  const blocked = resolveBlockJamDrag(uncapped, { x: 0, y: 0 }, { x: 130, y: 0 });
+
+  assert.equal(blockJamDragCollisionAt(context, blocked.x, blocked.y), null, 'a resolved pose never overlaps its blocker');
+  assert.ok(blocked.x < context.pitch * 1.1, 'a fast swipe cannot tunnel through a full cell');
+  assert.equal(blocked.contactKey, 'block:wall');
+  assert.equal(blocked.contactAxis, 'x');
+  assert.deepEqual(blockJamDragAnchorAtPose(context, blocked), { row: 1, column: 1 }, 'the last physically reached grid cell remains available');
+
+  let sliding = { x: 0, y: 0 };
+  for (let index = 0; index < 8; index += 1) sliding = resolveBlockJamDrag(context, sliding, { x: 96, y: 64 });
+  assert.equal(blockJamDragCollisionAt(context, sliding.x, sliding.y), null);
+  assert.ok(sliding.y > context.pitch * .8, 'the unblocked tangent axis continues moving');
+  assert.ok(sliding.x > context.pitch * 1.5, 'the block catches up only after sliding beyond the obstacle');
+});
+
+test('Block Jam dragging hands a piece to its exit as soon as it reaches a valid exit anchor', () => {
+  const level: BlockJamLevel = {
+    id: 'drag-auto-exit-fixture', rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter: 'tutorial', tier: 1,
+    rows: 4, columns: 4, parMoves: 1, timeLimitMs: 180_000, fixedCells: [],
+    blocks: [{ id: 'moving', colorId: 'cyan', anchor: { row: 2, column: 1 }, cells: [{ row: 0, column: 0 }] }],
+    doors: [{ id: 'bottom-cyan', colorId: 'cyan', edge: 'bottom', offset: 1, span: 1 }],
+  };
+  const state = createBlockJamState(level);
+  const context = createBlockJamDragContext(level, state, level.blocks[0], state.anchors.moving, { cell: 30, gap: 2, outer: 20 });
+
+  assert.equal(blockJamDragExitAtPose(level, state, 'moving', context, { x: 0, y: 0 }), null, 'the starting anchor is not yet at its exit');
+  assert.deepEqual(blockJamDragExitAtPose(level, state, 'moving', context, { x: 0, y: context.pitch }), {
+    anchor: { row: 3, column: 1 },
+    door: level.doors[0],
+  });
+});
+
+test('Block Jam continuous dragging cannot cut a blocked corner or leave the board', () => {
+  const level: BlockJamLevel = {
+    id: 'continuous-corner-fixture', rulesetId: BLOCK_JAM_RULESET, packId: 'tasklet-desk', chapter: 'tutorial', tier: 1,
+    rows: 4, columns: 4, parMoves: 3, timeLimitMs: 180_000, fixedCells: [],
+    blocks: [
+      { id: 'moving', colorId: 'cyan', anchor: { row: 0, column: 0 }, cells: [{ row: 0, column: 0 }] },
+      { id: 'right', colorId: 'red', anchor: { row: 0, column: 1 }, cells: [{ row: 0, column: 0 }] },
+      { id: 'below', colorId: 'amber', anchor: { row: 1, column: 0 }, cells: [{ row: 0, column: 0 }] },
+    ],
+    doors: [],
+  };
+  const state = createBlockJamState(level);
+  const context = { ...createBlockJamDragContext(level, state, level.blocks[0], state.anchors.moving, { cell: 30, gap: 2, outer: 20 }), maxCatchUp: 200 };
+  const diagonal = resolveBlockJamDrag(context, { x: 0, y: 0 }, { x: 96, y: 96 });
+  const outside = resolveBlockJamDrag(context, { x: 0, y: 0 }, { x: -96, y: -96 });
+
+  assert.ok(diagonal.x < 4 && diagonal.y < 4, 'orthogonal blockers prevent diagonal corner cutting');
+  assert.equal(blockJamDragCollisionAt(context, diagonal.x, diagonal.y), null);
+  assert.ok(outside.x > -1 && outside.y > -1, 'board edges remain solid');
+  assert.equal(blockJamDragCollisionAt(context, outside.x, outside.y), null);
+});
+
+test('Block Jam drag resolution stays collision-free across deterministic stress trajectories', () => {
+  let seed = 0x9e3779b9;
+  const next = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 0x1_0000_0000; };
+
+  for (const level of TASKLET_DESK_JAM_LEVELS) {
+    const state = createBlockJamState(level);
+    for (const block of level.blocks) {
+      const context = createBlockJamDragContext(level, state, block, state.anchors[block.id], { cell: 28, gap: 2, outer: 20 });
+      let pose = { x: 0, y: 0 };
+      for (let step = 0; step < 40; step += 1) {
+        const target = { x: (next() * 2 - 1) * context.pitch * level.columns, y: (next() * 2 - 1) * context.pitch * level.rows };
+        pose = resolveBlockJamDrag(context, pose, target);
+        assert.equal(blockJamDragCollisionAt(context, pose.x, pose.y), null, `${level.id}/${block.id} overlaps after stress step ${step}`);
+      }
+    }
+  }
 });
 
 test('Lost Word includes 150 valid, unique, deterministic Pagelet puzzles', () => {

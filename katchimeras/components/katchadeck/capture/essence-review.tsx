@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
@@ -16,32 +16,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import {
   type MeaningTag,
 } from '@/utils/capture-energy';
 import { buildPhotoEvidence } from '@/utils/intelligence/evidence';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
-import {
-  answerClarification,
-  currentClarificationNode,
-  dismissClarification,
-  skipClarificationGoal,
-  type ClarificationOption,
-} from '@/utils/intelligence/clarification';
 import type { SceneRead } from '@/utils/scene-classify';
-import { pickProminentTags } from '@/utils/vision-signals';
-import {
-  fallbackPhotoJournalRoute,
-  photoJournalQuestion,
-  photoJournalRouteForConfirmation,
-  photoJournalRouteProposals,
-  photoJournalSuggestions,
-  type PhotoJournalRouteProposal,
-} from '@/utils/intelligence/photo-journal-routing';
-import type { ClassifiedMemory, DayVisionSummary, ManualJournalSubmission, StudioMediaType, UserConfirmation } from '@/types/home';
+import type { DayVisionSummary, JournalRouteProposal, ManualJournalSubmission, PhotoVisionResult, StudioMediaType, UserConfirmation } from '@/types/home';
 import { reviewPhotoJournalSubmission } from '@/utils/intelligence/photo-journal-commit';
 import { usePhotoAnalysisSession } from '@/hooks/use-photo-analysis-session';
+import { preparePhotoJournalAnalysis, enrichPhotoJournalRoute, type PhotoJournalCandidate, type PhotoJournalClassification, type PhotoJournalFieldProposal } from '@/utils/photo-journal-analysis';
+import { buildPhotoJournalEvidence, photoJournalEssenceLabels } from '@/utils/photo-journal-evidence';
+import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
+import { sceneFromPhotoSemanticFrame } from '@/utils/scene-classify';
+import type { PhotoSemanticFrame } from '@/utils/photo-semantic-frame';
+import { journalRouteForIds } from '@/utils/journal-routing';
 
 // The shared "read the moment" experience: a photo's on-device essence animates
 // into the centre, the user says what it meant, and the tags then stream down
@@ -49,6 +40,7 @@ import { usePhotoAnalysisSession } from '@/hooks/use-photo-analysis-session';
 // capture and the "this photo meant something" prompt — each provides how to get
 // the vision (`analyze`) and what to do with the answer (`onCommit`).
 type EssenceReviewState = 'analyzing' | 'essence' | 'absorbing';
+type JournalAnalysisState = 'waiting' | 'classifying' | 'refining' | 'ready' | 'failed';
 
 type EssenceTag = { id: string; label: string; accent: string };
 
@@ -84,24 +76,49 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
   const { height } = useWindowDimensions();
   const [state, setState] = useState<EssenceReviewState>('analyzing');
   const [tags, setTags] = useState<EssenceTag[]>([]);
-  const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
-  const [journalRoute, setJournalRoute] = useState<PhotoJournalRouteProposal | null>(null);
+  const [journalRoute, setJournalRoute] = useState<JournalRouteProposal | null>(null);
   const [journalPickerOpen, setJournalPickerOpen] = useState(false);
+  const [journalFlowId, setJournalFlowId] = useState<string | null>(null);
+  const [journalAnalysis, setJournalAnalysis] = useState<PhotoJournalClassification | null>(null);
+  const [journalAnalysisState, setJournalAnalysisState] = useState<JournalAnalysisState>('waiting');
+  const [journalSpecific, setJournalSpecific] = useState<string | null>(null);
+  const [journalEnrichment, setJournalEnrichment] = useState<PhotoJournalFieldProposal | null>(null);
+  const journalAnalysisStartedRef = useRef(false);
+  const journalRequestRef = useRef(0);
+  const enrichmentRequestRef = useRef(0);
+  const enrichmentRouteRef = useRef<string | null>(null);
+  const journalInteractionLockedRef = useRef(false);
   const intro = useSharedValue(0);
   const absorb = useSharedValue(0);
   const fallDistance = height * 0.5;
 
+  const startJournalAnalysis = (vision: DayVisionSummary | null, rawVision: PhotoVisionResult | null) => {
+    if (!vision || journalAnalysisStartedRef.current) {
+      if (!vision) setJournalAnalysisState('failed');
+      return;
+    }
+    journalAnalysisStartedRef.current = true;
+    const requestId = ++journalRequestRef.current;
+    const progressive = preparePhotoJournalAnalysis(vision, rawVision);
+    setTags(buildEssenceTags(rawVision, vision, progressive.initial.semanticFrame));
+    applyJournalAnalysis(progressive.initial);
+    if (!progressive.refinement || progressive.initial.selected) return;
+    setJournalAnalysisState('refining');
+    void progressive.refinement
+      .then((analysis) => {
+        if (journalRequestRef.current === requestId && !journalInteractionLockedRef.current) applyJournalAnalysis(analysis);
+      })
+      .catch(() => {
+        if (journalRequestRef.current === requestId && !journalInteractionLockedRef.current) setJournalAnalysisState(progressive.initial.kind === 'unrouted' ? 'failed' : 'ready');
+      });
+  };
+
   const { visionRef, rawVisionRef, sceneRef, memoryRef: clarificationRef, committedRef } = usePhotoAnalysisSession({
     analyze, photoUri, sourceId, observedAt,
-    onReady: ({ vision, memory }) => {
-      setClarificationMemory(memory);
-      setTags(buildEssenceTags(vision, memory));
+    onReady: ({ rawVision, vision, scene, memory }) => {
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
-    },
-    onUpgrade: ({ vision, memory }) => {
-      setClarificationMemory(memory);
-      setTags(buildEssenceTags(vision, memory));
+      startJournalAnalysis(vision, rawVision);
     },
   });
 
@@ -130,6 +147,8 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
       scene: sceneRef.current,
       memory,
       evidence,
+      journalClassification: journalAnalysis,
+      journalEnrichment,
     };
     setTimeout(
       () => onCommit(meaning, visionRef.current, label, sceneRef.current, memory?.confirmations ?? [], reviewed, journal),
@@ -137,22 +156,119 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     );
   };
 
-  const handleClarification = (option: ClarificationOption) => {
-    const memory = clarificationRef.current;
-    const node = memory ? currentClarificationNode(memory) : null;
-    if (!memory || !node || state !== 'essence') return;
-    const next = answerClarification(memory, node, option);
-    clarificationRef.current = next;
-    setClarificationMemory(next);
+  const startRouteEnrichment = (route: JournalRouteProposal, analysis = journalAnalysis) => {
+    const requestId = ++enrichmentRequestRef.current;
+    enrichmentRouteRef.current = route.id;
+    setJournalSpecific(route.prefilledSpecific ?? null);
+    setJournalEnrichment(null);
+    const vision = visionRef.current;
+    if (!vision) return;
+    void enrichPhotoJournalRoute(route, analysis?.visualSubject ?? null, vision, rawVisionRef.current).then((proposal) => {
+      if (enrichmentRequestRef.current !== requestId
+        || enrichmentRouteRef.current !== route.id
+        || proposal?.routeKey !== route.id
+        || !proposal.prefill) return;
+      setJournalEnrichment(proposal);
+      setJournalSpecific(proposal.value);
+    });
+  };
+
+  const clearJournalRoute = () => {
+    enrichmentRequestRef.current += 1;
+    enrichmentRouteRef.current = null;
+    setJournalRoute(null);
+    setJournalSpecific(null);
+    setJournalEnrichment(null);
+  };
+
+  const openJournalRoute = (route: JournalRouteProposal, analysis = journalAnalysis) => {
+    journalInteractionLockedRef.current = true;
+    setJournalRoute(route);
+    setJournalFlowId(route.flowId);
+    setJournalPickerOpen(false);
+    startRouteEnrichment(route, analysis);
     void Haptics.selectionAsync();
-    const route = photoJournalRouteForConfirmation(option.facetKey, option.facetValue);
-    if (route) {
-      setJournalRoute(route);
-      return;
-    }
-    if (next.promptState.status === 'answered') {
+  };
+
+  const applyJournalAnalysis = (analysis: PhotoJournalClassification) => {
+    setJournalAnalysis(analysis);
+    syncSemanticSnapshot(analysis);
+    setTags(buildEssenceTags(rawVisionRef.current, visionRef.current, analysis.semanticFrame));
+    setJournalAnalysisState(analysis.kind === 'unrouted' ? 'failed' : 'ready');
+    if (analysis.selected) {
+      openJournalRoute(analysis.selected, analysis);
+    } else if (analysis.kind === 'flow_only' && analysis.selectedFlowId) {
+      setJournalFlowId(analysis.selectedFlowId);
       setJournalPickerOpen(true);
     }
+  };
+
+  const syncSemanticSnapshot = (analysis: PhotoJournalClassification) => {
+    const frame = analysis.semanticFrame;
+    const vision = visionRef.current;
+    if (!frame || !vision || frame.stage !== 'foundation_reconciled') return;
+    const scene = sceneFromPhotoSemanticFrame(frame);
+    sceneRef.current = scene;
+    clarificationRef.current = buildPhotoClassifiedMemory({
+      sourceId: sourceId ?? photoUri ?? 'capture-preview',
+      observedAt: clarificationRef.current?.createdAt ?? observedAt ?? new Date().toISOString(),
+      vision,
+      rawVision: rawVisionRef.current,
+      scene,
+      confirmations: clarificationRef.current?.confirmations ?? [],
+    });
+  };
+
+  const handleJournalCandidate = (candidate: PhotoJournalCandidate) => {
+    journalInteractionLockedRef.current = true;
+    if (candidate.route) {
+      const confirmed = journalAnalysis ? {
+        ...journalAnalysis,
+        kind: 'exact' as const,
+        stage: 'enum_route' as const,
+        flowId: candidate.route.flowId,
+        categoryId: candidate.route.choiceId,
+        selected: candidate.route,
+        selectedFlowId: null,
+        reason: 'user_confirmed_foundation_category',
+        navigationAction: 'open_details' as const,
+      } : null;
+      if (confirmed) setJournalAnalysis(confirmed);
+      openJournalRoute(candidate.route, confirmed);
+      return;
+    }
+    setJournalFlowId(candidate.flowId);
+    setJournalPickerOpen(true);
+  };
+
+  const handleOrdinaryMoment = () => {
+    const route = journalRouteForIds('general', 'ordinary', 1, 'User chose an ordinary moment after automatic classification was unavailable');
+    if (route) openJournalRoute(route);
+  };
+
+  const handleJournalRouteResolved = (flowId: string, categoryId: string) => {
+    const route = journalRouteForIds(flowId, categoryId, 1, 'User selected this photo category');
+    if (!route) return;
+
+    // ManualJournalSheet already advances from category -> details itself.
+    // Do not close that sheet and mount a second one here: on iOS the outgoing
+    // sheet's dismissal can also dismiss the replacement, leaving the user on
+    // the photo review. We only adopt the resolved route in the parent so save
+    // and OCR enrichment use the category the user selected.
+    setJournalRoute(route);
+    setJournalFlowId(route.flowId);
+    setJournalAnalysis((current) => current ? {
+      ...current,
+      kind: 'exact',
+      stage: 'enum_route',
+      flowId: route.flowId,
+      categoryId: route.choiceId,
+      selected: route,
+      selectedFlowId: null,
+      reason: 'user_confirmed_manual_category',
+      navigationAction: 'open_details',
+    } : current);
+    startRouteEnrichment(route);
   };
 
   const handleJournalSave = (submission: ManualJournalSubmission) => {
@@ -163,8 +279,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     if (!reviewedSubmission) return;
     const { memory: confirmed, specific, choiceLabel, mediaType, reactionLabel } = reviewedSubmission;
     clarificationRef.current = confirmed;
-    setClarificationMemory(confirmed);
-    setJournalRoute(null);
+    clearJournalRoute();
     setJournalPickerOpen(false);
     if (mediaType) {
       const priorScene = sceneRef.current;
@@ -173,34 +288,22 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     commitMeaning(meaningForJournal(submission.feeling), specific || reactionLabel, submission, confirmed);
   };
 
-  const handleSkipClarification = () => {
-    const memory = clarificationRef.current;
-    if (!memory || state !== 'essence') return;
-    const skipped = skipClarificationGoal(memory);
-    clarificationRef.current = skipped;
-    setClarificationMemory(skipped);
-    if (skipped.promptState.status !== 'pending') {
-      setJournalPickerOpen(true);
-    }
-  };
-
-  const handleDoneClarifying = () => {
-    const memory = clarificationRef.current;
-    if (!memory || state !== 'essence') return;
-    const dismissed = dismissClarification(memory);
-    clarificationRef.current = dismissed;
-    setClarificationMemory(dismissed);
-    setJournalPickerOpen(true);
-  };
-
-  const plannedClarificationNode = clarificationMemory ? currentClarificationNode(clarificationMemory) : null;
-  const clarificationNode = plannedClarificationNode && !/reaction|meaning|title/.test(plannedClarificationNode.id) ? plannedClarificationNode : null;
-  const routeProposals = clarificationMemory ? photoJournalRouteProposals(clarificationMemory) : [];
-  const showRouteConfirmation = !clarificationNode && !journalRoute && !journalPickerOpen;
-  const displayedOptions = clarificationNode?.options ?? [];
-  const visibleRoutes = routeProposals.length ? routeProposals : [fallbackPhotoJournalRoute()];
-  const fieldSuggestions = journalRoute ? photoJournalSuggestions({ route: journalRoute, rawVision: rawVisionRef.current, vision: visionRef.current, scene: sceneRef.current }) : [];
-  const prefilledSpecific = journalRoute?.prefilledSpecific ?? fieldSuggestions[0]?.value ?? '';
+  const visibleCandidates = journalAnalysisState === 'ready' || journalAnalysisState === 'failed' || journalAnalysisState === 'refining'
+    ? (journalAnalysis?.candidates ?? []).slice(0, 3)
+    : [];
+  const routingQuestion = journalAnalysisState === 'classifying' || journalAnalysisState === 'waiting'
+    ? 'Choosing the right journal section...'
+    : journalAnalysisState === 'refining'
+      ? 'Refining the result...'
+    : journalAnalysisState === 'failed'
+      ? journalRoutingFailureMessage(journalAnalysis)
+    : !journalAnalysis
+    ? 'Choosing the right journal sectionâ€¦'
+    : journalAnalysis.reason === 'grounded_semantic_cross_flow_ambiguity'
+      ? 'What is this photo mainly about?'
+    : journalAnalysis.kind === 'ambiguous'
+      ? journalAnalysis.flowId ? 'Which kind fits this photo?' : 'What should this photo remember?'
+      : 'Choose the best journal section';
 
   return (
     <View style={styles.fill}>
@@ -249,44 +352,22 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
           {state === 'essence' ? (
             <Animated.View entering={FadeInDown.delay(220).duration(320)} style={styles.captured}>
               <ThemedText type="display" style={styles.meaningTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                {clarificationNode?.question ?? photoJournalQuestion(visibleRoutes)}
+                {routingQuestion}
               </ThemedText>
               <View style={styles.meaningGrid}>
-                {clarificationNode ? displayedOptions.map((option, index) => (
-                  <Animated.View key={option.id} entering={FadeInDown.delay(280 + index * 50).duration(280)}>
-                    <Pressable
-                      onPress={() => handleClarification(option as ClarificationOption)}
-                      style={styles.meaningChip}
-                      accessibilityRole="button">
-                      <ThemedText style={styles.meaningEmoji}>{option.emoji}</ThemedText>
-                      <ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                        {option.label}
-                      </ThemedText>
-                    </Pressable>
-                  </Animated.View>
-                )) : visibleRoutes.map((route, index) => (
-                  <Animated.View key={route.id} entering={FadeInDown.delay(280 + index * 50).duration(280)}>
-                    <Pressable onPress={() => setJournalRoute(route)} style={styles.meaningChip} accessibilityRole="button">
-                      <ThemedText style={styles.meaningEmoji}>✨</ThemedText><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{route.label}</ThemedText>
+                {journalAnalysisState === 'classifying' || journalAnalysisState === 'refining' || journalAnalysisState === 'waiting'
+                  ? <ActivityIndicator color={Lantern.ember300} size="small" />
+                  : null}
+                {visibleCandidates.map((candidate, index) => (
+                  <Animated.View key={candidate.id} entering={FadeInDown.delay(280 + index * 50).duration(280)}>
+                    <Pressable onPress={() => handleJournalCandidate(candidate)} style={styles.meaningChip} accessibilityRole="button">
+                      <IconSymbol name={candidate.icon} size={18} color={Lantern.moon50} /><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{candidate.label}</ThemedText>
                     </Pressable>
                   </Animated.View>
                 ))}
-                {showRouteConfirmation ? <Pressable onPress={() => setJournalPickerOpen(true)} style={styles.meaningChip} accessibilityRole="button"><ThemedText style={styles.meaningEmoji}>＋</ThemedText><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Something else</ThemedText></Pressable> : null}
+                {journalAnalysisState === 'failed' ? <Pressable onPress={handleOrdinaryMoment} style={styles.meaningChip} accessibilityRole="button"><IconSymbol name="circle.fill" size={18} color={Lantern.moon50} /><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>Something ordinary</ThemedText></Pressable> : null}
+                {journalAnalysis ? <Pressable onPress={() => { journalInteractionLockedRef.current = true; setJournalFlowId(journalAnalysis.flowId); setJournalPickerOpen(true); }} style={styles.meaningChip} accessibilityRole="button"><IconSymbol name={journalAnalysisState === 'failed' ? 'square.and.pencil' : 'plus'} size={18} color={Lantern.moon50} /><ThemedText style={styles.meaningLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{journalAnalysisState === 'failed' ? 'Classify manually' : 'Something else'}</ThemedText></Pressable> : null}
               </View>
-              {clarificationNode ? (
-                <View style={styles.clarificationActions}>
-                  <Pressable accessibilityRole="button" onPress={handleSkipClarification} style={styles.skipAction}>
-                    <ThemedText style={styles.skipLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                      Skip this
-                    </ThemedText>
-                  </Pressable>
-                  <Pressable accessibilityRole="button" onPress={handleDoneClarifying} style={styles.skipAction}>
-                    <ThemedText style={styles.skipLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                      Done
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              ) : null}
             </Animated.View>
           ) : null}
         </ScrollView>
@@ -296,17 +377,19 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
         <ManualJournalSheet
           initialFlowId={journalRoute.flowId}
           initialChoiceId={journalRoute.choiceId}
-          initialSpecific={prefilledSpecific}
+          initialSpecific={journalSpecific}
+          liveSpecific={journalSpecific}
           initialConfirmedFacets={journalRoute.confirmedFacets}
           sourceType="photo"
           sourceId={sourceId ?? photoUri}
           thumbnailUri={photoUri}
-          onBackFromInitial={() => setJournalRoute(null)}
+          onRouteResolved={handleJournalRouteResolved}
+          onBackFromInitial={clearJournalRoute}
           onClose={onClose}
           onSave={handleJournalSave}
         />
       ) : null}
-      {state === 'essence' && journalPickerOpen ? <ManualJournalSheet sourceType="photo" sourceId={sourceId ?? photoUri} thumbnailUri={photoUri} onBackFromInitial={() => setJournalPickerOpen(false)} onClose={onClose} onSave={handleJournalSave} /> : null}
+      {state === 'essence' && journalPickerOpen ? <ManualJournalSheet initialFlowId={journalFlowId} suggestedRoutes={journalAnalysis?.candidates.flatMap((candidate) => candidate.route ? [candidate.route] : [])} sourceType="photo" sourceId={sourceId ?? photoUri} thumbnailUri={photoUri} liveSpecific={journalSpecific} onRouteResolved={handleJournalRouteResolved} onBackFromInitial={() => setJournalPickerOpen(false)} onClose={onClose} onSave={handleJournalSave} /> : null}
     </View>
   );
 }
@@ -318,33 +401,30 @@ function meaningForJournal(reaction: string | null | undefined): MeaningTag {
   return 'calm';
 }
 
+function journalRoutingFailureMessage(analysis: PhotoJournalClassification | null): string {
+  void analysis;
+  return "We couldn't auto-classify this";
+}
+
 // The photo's essence = what the on-device vision read in it, as tags the user
 // can watch being captured into the day.
 function buildEssenceTags(
+  rawVision: PhotoVisionResult | null,
   vision: DayVisionSummary | null,
-  memory: ClassifiedMemory | null
+  semanticFrame?: PhotoSemanticFrame | null
 ): EssenceTag[] {
   const tags: EssenceTag[] = [];
   if (vision && vision.maxFaceCount >= 2) {
     tags.push({ id: 'together', label: 'Together', accent: '#F2C2A8' });
   }
-  // Lower confidence bar than the nightly line: a single snapped photo's weaker
-  // reads (a soda can, a plate) are still worth surfacing as essence tags.
-  const canonicalNames = (memory?.photoAnalysis?.subjects ?? [])
-    .filter((subject) => subject.role !== 'incidental' && subject.score >= 0.35)
-    .sort((left, right) => (left.role === 'primary' ? -1 : right.role === 'primary' ? 1 : right.score - left.score))
-    .map((subject) => subject.domain === 'media' ? subject.canonicalValue : subject.label || subject.canonicalValue)
-    .filter((name) => !/^(machine|material|structure|consumer electronics|wood processed|conveyance)$/i.test(name))
-    .filter((name, index, names) => {
-      const normalized = name.trim().toLocaleLowerCase();
-      return names.findIndex((candidate) => candidate.trim().toLocaleLowerCase() === normalized) === index;
-    });
-  const rawNames = canonicalNames.length > 0
-    ? canonicalNames.slice(0, 4)
-    : vision
-      ? pickProminentTags(vision, 4, 0.16)
-      : [];
-  const names = rawNames;
+  // The semantic frame has already ranked and bounded the visible Essence set.
+  // Render those selected keys directly so a second UI confidence threshold
+  // cannot turn Book + Document + Sign into a misleading single Sign chip.
+  const semanticNames = semanticFrame?.primaryEvidenceKeys
+    .map((key) => semanticFrame.hypotheses.find((item) => item.conceptKey === key)?.label ?? null)
+    .filter((label): label is string => !!label)
+    .slice(0, 4) ?? [];
+  const names = semanticNames.length ? semanticNames : vision ? photoJournalEssenceLabels(buildPhotoJournalEvidence(vision, rawVision), 4) : [];
   names.forEach((name, index) => {
     const normalizedId = name.trim().toLocaleLowerCase().replace(/\s+/g, '-');
     tags.push({ id: `subject-${normalizedId}-${index}`, label: humanizeTag(name), accent: TAG_PALETTE[tags.length % TAG_PALETTE.length] });

@@ -21,6 +21,7 @@ import {
 } from '@/utils/quests/experiences/block-blast';
 import {
   finishBlockBlastSession,
+  flushBlockBlastProfileSave,
   loadBlockBlastProfile,
   recordBlockBlastRun,
   saveBlockBlastActiveRun,
@@ -76,6 +77,7 @@ type StreakCallout = { id: number; combo: number };
 export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: Props) {
   const loadedProfile = useMemo(loadBlockBlastProfile, []);
   const [profile, setProfile] = useState<BlockBlastProfile>(loadedProfile);
+  const profileRef = useRef<BlockBlastProfile>(loadedProfile);
   const [game, setGame] = useState<BlockBlastState | null>(loadedProfile.activeRun);
   const [started, setStarted] = useState(false);
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
@@ -94,11 +96,14 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   const reduceMotion = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const boardSize = Math.max(248, Math.min(width - 34, 390, height - 315));
-  const metrics = blockBlastBoardMetrics(boardSize);
+  const metrics = useMemo(() => blockBlastBoardMetrics(boardSize), [boardSize]);
   const selectedPiece = game?.tray.find((piece) => piece.id === selectedPieceId && !piece.used) ?? null;
   const currentRunIsPersonalBest = Boolean(game && profile.bestRun?.seed === game.seed && profile.bestRun.score === game.score);
 
-  useEffect(() => () => disposeBlockBlastSoundPlayers(players), [players]);
+  useEffect(() => () => {
+    disposeBlockBlastSoundPlayers(players);
+    void flushBlockBlastProfileSave();
+  }, [players]);
 
   useEffect(() => {
     if (!game || (game as Partial<BlockBlastState>).trayAlgorithmVersion === BLOCK_BLAST_TRAY_ALGORITHM_VERSION) return;
@@ -131,10 +136,17 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return;
       const activeRun = gameRef.current;
-      if (activeRun) setProfile((current) => saveBlockBlastActiveRun(current, activeRun));
+      if (activeRun) {
+        const nextProfile = saveBlockBlastActiveRun(profileRef.current, activeRun);
+        profileRef.current = nextProfile;
+        setProfile(nextProfile);
+        void flushBlockBlastProfileSave();
+      }
     });
     return () => subscription.remove();
   }, []);
+
+  profileRef.current = profile;
 
   const play = useCallback((sound: BlockBlastSound) => {
     if (profile.soundEnabled) playBlockBlastSound(players, sound);
@@ -222,7 +234,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     setSelectedPieceId(null);
     setHover(null);
     setTimeout(() => {
-      let nextProfile = saveBlockBlastActiveRun(loadBlockBlastProfile(), next);
+      let nextProfile = saveBlockBlastActiveRun(profileRef.current, next);
       if (cleared > 0) {
         const combo = next.combo > 1;
         if (next.lastResolution) scheduleClearCascadeHaptics(next.lastResolution, combo);
@@ -240,13 +252,19 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
         play('game_over');
         void AccessibilityInfo.announceForAccessibility(`No moves remain. Final score ${next.score}.${recorded.personalBest ? ' New personal best.' : ''}`);
       }
+      profileRef.current = nextProfile;
       setProfile(nextProfile);
     }, 0);
     return true;
   };
 
   const saveAndLeave = () => {
-    if (game) setProfile((current) => saveBlockBlastActiveRun(current, game));
+    if (game) {
+      const nextProfile = saveBlockBlastActiveRun(profileRef.current, game);
+      profileRef.current = nextProfile;
+      setProfile(nextProfile);
+    }
+    void flushBlockBlastProfileSave();
     if (attempt.current) onAttemptCancel(attempt.current);
     attempt.current = null;
     setStarted(false);
@@ -271,7 +289,10 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     };
     const id = attempt.current;
     attempt.current = null;
-    setProfile((current) => finishBlockBlastSession(current));
+    const nextProfile = finishBlockBlastSession(profileRef.current);
+    profileRef.current = nextProfile;
+    setProfile(nextProfile);
+    void flushBlockBlastProfileSave();
     onRunningChange(false);
     onComplete(id, result);
   };

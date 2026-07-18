@@ -12,3 +12,12 @@ export function safeGoBack(router: Router, fallback: Href = '/(tabs)'): void {
   }
   router.replace(fallback);
 }
+
+/** Dismisses a modal route through the stack's modal API when possible. */
+export function safeDismissModal(router: Router, fallback: Href = '/(tabs)'): void {
+  if (router.canDismiss()) {
+    router.dismiss();
+    return;
+  }
+  safeGoBack(router, fallback);
+}

@@ -1,4 +1,4 @@
-import { getStoredJson, setStoredJson } from '@/utils/app-storage';
+import { getStoredJson, setStoredJsonAsync } from '@/utils/app-storage';
 import { type BlockBlastState } from '@/utils/quests/experiences/block-blast';
 import {
   hydrateBlockBlastProfile,
@@ -11,6 +11,10 @@ export type { BlockBlastProfile, BlockBlastRunSummary } from '@/utils/quests/exp
 
 const KEY = 'katchadeck.block-blast-v2';
 const LEGACY_KEY = 'katchadeck.block-blast-v1';
+const SAVE_DEBOUNCE_MS = 300;
+let pendingProfile: BlockBlastProfile | null = null;
+let pendingSave: ReturnType<typeof setTimeout> | null = null;
+let activeWrite: Promise<void> = Promise.resolve();
 
 export function loadBlockBlastProfile(): BlockBlastProfile {
   const stored = getStoredJson<Partial<BlockBlastProfile> | null>(KEY, null);
@@ -19,8 +23,20 @@ export function loadBlockBlastProfile(): BlockBlastProfile {
 }
 
 export function saveBlockBlastProfile(profile: BlockBlastProfile): BlockBlastProfile {
-  setStoredJson(KEY, profile);
+  pendingProfile = profile;
+  if (pendingSave) clearTimeout(pendingSave);
+  pendingSave = setTimeout(() => { void flushBlockBlastProfileSave(); }, SAVE_DEBOUNCE_MS);
   return profile;
+}
+
+export function flushBlockBlastProfileSave(): Promise<void> {
+  if (pendingSave) clearTimeout(pendingSave);
+  pendingSave = null;
+  const profile = pendingProfile;
+  pendingProfile = null;
+  if (!profile) return activeWrite;
+  activeWrite = activeWrite.then(() => setStoredJsonAsync(KEY, profile)).catch(() => undefined);
+  return activeWrite;
 }
 
 export function saveBlockBlastActiveRun(profile: BlockBlastProfile, activeRun: BlockBlastState | null): BlockBlastProfile {

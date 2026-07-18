@@ -1,13 +1,25 @@
 import type { DayEvidence, DayVisionSummary, PhotoVisionResult, UserConfirmation } from '@/types/home';
 import type { SceneRead } from '@/utils/scene-classify';
+import { foundationSceneAvailability, type FoundationPhotoPasses } from '@/utils/foundation-scene';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
 import { classifiedMemoryConsistencyWarnings } from '@/utils/intelligence/consistency';
 import { qualityThresholds } from '@/utils/intelligence/quality-registry';
 import { QUEST_DEFINITIONS } from '@/utils/quests/definitions';
-import { isFoundationOnlyPhotoInterpretationEnabled } from '@/utils/photo-intelligence-mode';
+import type { PhotoJournalAttempt, PhotoJournalClassification, PhotoJournalFieldProposal } from '@/utils/photo-journal-analysis';
+import { photoJournalEssenceLabels, type PhotoJournalEvidencePacket } from '@/utils/photo-journal-evidence';
+import type { PhotoSemanticFrame } from '@/utils/photo-semantic-frame';
 
-const STORAGE_KEY = 'dev:last-photo-analysis:v2';
+const STORAGE_KEY = 'dev:last-photo-analysis:v13';
+
+export type DevFoundationJournalExchange = {
+  stage: 'enum_route';
+  request: Record<string, unknown> | null;
+  response: Record<string, unknown> | null;
+  nativeRoundTripMs: number | null;
+  attempts: PhotoJournalAttempt[];
+  note: string | null;
+};
 
 export type DevQuestPhotoEvaluation = {
   questId: string;
@@ -23,12 +35,21 @@ export type DevQuestPhotoEvaluation = {
 };
 
 export type DevLastPhotoAnalysis = {
-  schemaVersion: 2;
+  schemaVersion: 13;
   capturedAt: string;
   sourceId: string;
   thumbnailUri: string;
   questContext: { questId: string | null; creatureId: string | null };
-  interpretationMode: 'hybrid' | 'foundation_only';
+  interpretationMode: 'hybrid_semantic_frame';
+  nativePhotoSchemaVersion: number | null;
+  nativeStructuredBridgeVersion: number | null;
+  foundationPasses: FoundationPhotoPasses | null;
+  journalClassification: PhotoJournalClassification | null;
+  foundationJournalModelTrace: DevFoundationJournalExchange | null;
+  semanticFrame: PhotoSemanticFrame | null;
+  journalEvidence: PhotoJournalEvidencePacket | null;
+  essenceTags: string[];
+  journalEnrichment: PhotoJournalFieldProposal | null;
   rawVision: PhotoVisionResult | null;
   visionSummary: DayVisionSummary | null;
   scene: SceneRead | null;
@@ -46,6 +67,8 @@ export function saveDevLastPhotoAnalysis(input: {
   visionSummary: DayVisionSummary | null;
   scene: SceneRead | null;
   confirmations: UserConfirmation[];
+  journalClassification?: PhotoJournalClassification | null;
+  journalEnrichment?: PhotoJournalFieldProposal | null;
   questId?: string | null;
   creatureId?: string | null;
 }): void {
@@ -64,12 +87,21 @@ export function saveDevLastPhotoAnalysis(input: {
         })
       : null;
     const snapshot: DevLastPhotoAnalysis = {
-      schemaVersion: 2,
+      schemaVersion: 13,
       capturedAt: new Date().toISOString(),
       sourceId: input.sourceId,
       thumbnailUri: input.thumbnailUri,
       questContext: { questId: input.questId ?? null, creatureId: input.creatureId ?? null },
-      interpretationMode: isFoundationOnlyPhotoInterpretationEnabled() ? 'foundation_only' : 'hybrid',
+      interpretationMode: 'hybrid_semantic_frame',
+      nativePhotoSchemaVersion: foundationSceneAvailability().photoSchemaVersion ?? input.scene?.photoSchemaVersion ?? null,
+      nativeStructuredBridgeVersion: foundationSceneAvailability().structuredBridgeVersion ?? null,
+      foundationPasses: input.scene?.foundationPasses ?? null,
+      journalClassification: input.journalClassification ?? null,
+      foundationJournalModelTrace: journalExchange(input.journalClassification?.enumResponse ?? null),
+      semanticFrame: input.journalClassification?.semanticFrame ?? null,
+      journalEvidence: input.journalClassification?.evidence ?? null,
+      essenceTags: input.journalClassification?.evidence ? photoJournalEssenceLabels(input.journalClassification.evidence) : [],
+      journalEnrichment: input.journalEnrichment ?? null,
       rawVision: input.rawVision,
       visionSummary: input.visionSummary,
       scene: input.scene,
@@ -81,6 +113,49 @@ export function saveDevLastPhotoAnalysis(input: {
     };
     setStoredJson(STORAGE_KEY, snapshot);
   }, 700);
+}
+
+function journalExchange(raw: Record<string, unknown> | null): DevFoundationJournalExchange | null {
+  if (!raw) return null;
+  const request = isRecord(raw?.modelRequest) ? raw.modelRequest : null;
+  const nativeRoundTripMs = finiteNumber(raw?.nativeRoundTripMs);
+  const response = raw ? Object.fromEntries(Object.entries(raw).filter(([key]) => key !== 'modelRequest')) : null;
+  const decisionBasis = typeof raw?.decisionBasis === 'string' ? raw.decisionBasis : null;
+  return {
+    stage: 'enum_route',
+    request,
+    response,
+    nativeRoundTripMs,
+    attempts: attemptsForRaw(raw),
+    note: decisionBasis,
+  };
+}
+
+function attemptsForRaw(raw: Record<string, unknown>): PhotoJournalAttempt[] {
+  if (typeof raw.attemptsJson !== 'string') return [];
+  try {
+    const parsed = JSON.parse(raw.attemptsJson) as Record<string, unknown>[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, 2).map((item) => ({
+      kind: item.kind === 'repair' || item.kind === 'simplified_retry' ? item.kind : 'primary',
+      status: item.status === 'invalid' || item.status === 'failed' || item.status === 'skipped' ? item.status : 'succeeded',
+      errorCode: typeof item.errorCode === 'string' && item.errorCode ? item.errorCode : null,
+      errorDescription: typeof item.errorDescription === 'string' && item.errorDescription ? item.errorDescription : null,
+      rawOutput: typeof item.rawOutput === 'string' && item.rawOutput ? item.rawOutput : null,
+      durationMs: finiteNumber(item.durationMs),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function finiteNumber(value: unknown): number | null {
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 export function loadDevLastPhotoAnalysis(): DevLastPhotoAnalysis | null {

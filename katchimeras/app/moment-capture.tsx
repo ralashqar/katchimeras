@@ -26,7 +26,7 @@ import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import { evaluatePhotoForQuest } from '@/utils/quests/photo-evaluation';
-import { safeGoBack } from '@/utils/safe-navigation';
+import { safeDismissModal } from '@/utils/safe-navigation';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
@@ -47,14 +47,17 @@ export default function MomentCaptureScreen() {
 
   const cameraRef = useRef<CameraView | null>(null);
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
+  const closingRef = useRef(false);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const questId = typeof params.questId === 'string' ? params.questId : null;
   const questCreatureId = typeof params.questCreatureId === 'string' ? params.questCreatureId : null;
 
   const closeCapture = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     cancelQuestCapture(questId);
-    safeGoBack(router);
+    safeDismissModal(router);
   }, [questId, router]);
 
   useEffect(() => {
@@ -136,6 +139,8 @@ export default function MomentCaptureScreen() {
           visionSummary: vision,
           scene,
           confirmations,
+          journalClassification: reviewed?.journalClassification ?? null,
+          journalEnrichment: reviewed?.journalEnrichment ?? null,
           questId,
           creatureId: questCreatureId,
         });
@@ -152,7 +157,8 @@ export default function MomentCaptureScreen() {
         }).memory;
         completeQuestCapture(questId, questCreatureId, photoUri, evaluatePhotoForQuest(memory, questId));
       }
-      safeGoBack(router);
+      closingRef.current = true;
+      safeDismissModal(router);
     },
     [applyCapturedMoment, captureTarget, dayScores, photoUri, questCreatureId, questId, router]
   );

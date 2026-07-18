@@ -22,6 +22,22 @@ const book = buildPhotoHierarchy({
 check('book cover is a book container', book.container.kind === 'book', book.container.kind);
 check('book cover does not become depicted nature or people', book.hypotheses[0]?.path.includes('media'));
 
+const childWithShirtText = buildPhotoHierarchy({
+  rawVision: {
+    labels: [{ name: 'child', confidence: 0.95 }, { name: 'clothing', confidence: 0.36 }],
+    text: ['THE AMAZING'], faceCount: 1, humanCount: 1, documentDetected: true, captureSource: 'camera',
+  },
+  scene: { type: 'social', label: 'Time with people', detail: 'A child', source: 'rules' },
+  observations: [
+    { key: 'signal', value: 'child', confidence: 0.95, provider: 'appleVision', raw: 'child' },
+    { key: 'signal', value: 'document', confidence: 0.3, provider: 'appleVision', raw: 'document' },
+  ],
+  facets: [{ key: 'person_subject', value: 'child', confidence: 0.95, confirmed: false, sensitive: true }],
+  subjects: [subject('child', 'people', 0.95), { ...subject('document', 'other', 0.3), role: 'supporting' }],
+});
+check('shirt OCR cannot turn a dominant physical child into a physical document', childWithShirtText.representation.kind === 'physical_scene', childWithShirtText.representation.kind);
+check('shirt OCR cannot turn a dominant physical child into a document container', childWithShirtText.container.kind === 'none', childWithShirtText.container.kind);
+
 const screenArt = buildPhotoHierarchy({
   rawVision: { labels: [{ name: 'computer screen illustration', confidence: 0.88 }], text: [], faceCount: 0, captureSource: 'camera' },
   scene: { type: 'media', label: 'An inspiration', media: { mediaType: 'art', title: null, creator: null }, representation: 'screen_content', source: 'llm' },

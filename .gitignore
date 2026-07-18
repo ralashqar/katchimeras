@@ -1,1 +1,5 @@
 __pycache__/
+
+# EAS/build artifacts generated inside the Expo project
+katchimeras/.tmp/
+katchimeras/dist/

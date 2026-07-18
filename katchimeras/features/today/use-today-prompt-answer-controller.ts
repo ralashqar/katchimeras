@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 import { photoPromptSignature } from '@/utils/today-categories';
 import type { DayInputTarget, DayPromptKind, HomeDayRecord } from '@/types/home';
+import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 
 type PromptAnswerInput = {
   kind: DayPromptKind;
@@ -39,6 +40,11 @@ export function useTodayPromptAnswerController({
   );
   const photoSig = useMemo(() => photoPromptSignature(formingPrompts), [formingPrompts]);
   const [handledPhotoSig, setHandledPhotoSig] = useState<string | null>(null);
+  const pendingPhotoNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (pendingPhotoNavigationRef.current) clearTimeout(pendingPhotoNavigationRef.current);
+  }, []);
 
   const dismissPhotoAlert = useCallback(() => setHandledPhotoSig(photoSig), [photoSig]);
 
@@ -69,14 +75,18 @@ export function useTodayPromptAnswerController({
     (photo: DayPromptPhotoCandidate, _from: FeedSourceRect) => {
       dismissPhotoAlert();
       closePromptSheet();
-      router.push({
-        pathname: '/photo-essence',
-        params: {
-          assetId: photo.assetId,
-          thumbnailUri: photo.thumbnailUri ?? '',
-          capturedAt: photo.capturedAt,
-          target: formingTarget,
-        },
+      if (pendingPhotoNavigationRef.current) clearTimeout(pendingPhotoNavigationRef.current);
+      pendingPhotoNavigationRef.current = runAfterNativeModalDismiss(() => {
+        pendingPhotoNavigationRef.current = null;
+        router.push({
+          pathname: '/photo-essence',
+          params: {
+            assetId: photo.assetId,
+            thumbnailUri: photo.thumbnailUri ?? '',
+            capturedAt: photo.capturedAt,
+            target: formingTarget,
+          },
+        });
       });
     },
     [closePromptSheet, dismissPhotoAlert, formingTarget, router]

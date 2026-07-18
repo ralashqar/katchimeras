@@ -2,9 +2,14 @@ import type { DayVisionSummary, MemoryDomain, PhotoVisionResult, StudioMediaType
 import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
 import {
   classifySceneOnDevice,
+  enrichPhotoAnchorOnDevice,
   foundationSceneAvailability,
   isFoundationSceneAvailable,
+  readPhotoAnchorOnDevice,
   readSceneOnDevice,
+  supportsFoundationPhotoSchemaV2,
+  type DeepSceneRead,
+  type FoundationPhotoPasses,
 } from '@/utils/foundation-scene';
 import { detectStudioInVision, isGenericStudioLabel } from '@/utils/studio-detect';
 import { runIntelligenceTask } from '@/utils/intelligence/run';
@@ -13,6 +18,7 @@ import { detectProminentPeopleInVision } from '@/utils/people-detect';
 import { summaryIsScreenContent } from '@/utils/photo-reality';
 import { classifyPhotoLabelsSemantically } from '@/utils/intelligence/semantic-fallback';
 import { isFoundationOnlyPhotoInterpretationEnabled } from '@/utils/photo-intelligence-mode';
+import type { PhotoSemanticFrame } from '@/utils/photo-semantic-frame';
 
 // Hierarchical "read the photo" layer. Instead of every detector flatly scanning
 // the same bag of Apple Vision labels, we first classify the photo into ONE
@@ -59,6 +65,10 @@ export type SceneRead = {
   promptVersion?: string | null;
   foundationStatus?: 'used' | 'unavailable' | 'failed';
   foundationReason?: string | null;
+  lockedRouteKey?: string | null;
+  ocrPurpose?: 'identity' | 'context' | 'ignore' | null;
+  photoSchemaVersion?: number | null;
+  foundationPasses?: FoundationPhotoPasses;
 };
 
 export const SCENE_LABEL: Record<SceneType, string> = {
@@ -73,6 +83,52 @@ export const SCENE_LABEL: Record<SceneType, string> = {
   document: 'Something noted',
   other: 'A moment',
 };
+
+export function sceneFromPhotoSemanticFrame(frame: PhotoSemanticFrame): SceneRead {
+  const primary = frame.hypotheses.find((item) => item.conceptKey === frame.primaryConceptKey) ?? frame.hypotheses[0] ?? null;
+  const domain = frame.domain ?? primary?.domain ?? 'other';
+  const type: SceneType = domain === 'media' ? 'media'
+    : domain === 'food' ? 'food'
+      : domain === 'people' ? 'social'
+        : domain === 'animal' ? 'pet'
+          : domain === 'place' ? 'place'
+            : domain === 'nature' ? 'nature'
+              : domain === 'movement' || domain === 'work' ? 'activity'
+                : frame.container.kind === 'screen' ? 'screen'
+                  : frame.container.kind === 'document' ? 'document'
+                    : 'other';
+  const mediaKind = primary ? semanticMediaKind(primary.label) : null;
+  return {
+    memoryDomain: domain,
+    type,
+    label: SCENE_LABEL[type],
+    detail: frame.primarySubject ?? primary?.label ?? null,
+    media: type === 'media' && mediaKind ? { mediaType: mediaKind, title: null, creator: null } : undefined,
+    source: frame.stage === 'foundation_reconciled' ? 'llm' : 'rules',
+    supportingSubjects: frame.hypotheses.slice(1, 5).map((item) => item.label),
+    representation: ['device_showing_content', 'native_digital_image', 'screenshot'].includes(frame.representation.kind) ? 'screen_content' : frame.representation.kind === 'unknown' ? 'unknown' : 'real_world',
+    representationV2: frame.representation.kind,
+    container: frame.container.kind,
+    confidence: primary?.score ?? 0.42,
+    alternatives: frame.alternativeConceptKey ? [frame.alternativeConceptKey] : [],
+    promptVersion: frame.stage === 'foundation_reconciled' ? 'photo-semantic-v2-ios26' : 'photo-evidence-v2',
+    foundationStatus: frame.foundation.status === 'used' ? 'used' : frame.foundation.status === 'unavailable' ? 'unavailable' : frame.foundation.status === 'failed' || frame.foundation.status === 'rejected' ? 'failed' : undefined,
+    foundationReason: frame.foundation.reason,
+  };
+}
+
+function semanticMediaKind(value: string): StudioMediaType | null {
+  if (/\bbook\b/.test(value)) return 'book';
+  if (/\b(film|movie)\b/.test(value)) return 'film';
+  // A television is a container. Until the bespoke media question is answered,
+  // it does not prove whether the user watched a show, film, news, or live sport.
+  if (/\b(show|series|episode)\b/.test(value)) return 'show';
+  if (/\b(television|tv|broadcast|screen|monitor)\b/.test(value)) return 'other';
+  if (/\bgame\b/.test(value)) return 'game';
+  if (/\b(music|album)\b/.test(value)) return 'music';
+  if (/\bart\b/.test(value)) return 'art';
+  return null;
+}
 
 const SCENE_TYPES = Object.keys(SCENE_LABEL) as SceneType[];
 
@@ -224,11 +280,86 @@ function enrichFoodDetectionWithCuisine(base: FoodDetection, subject: string | n
   };
 }
 
-const MEDIA_KINDS = new Set<StudioMediaType>(['book', 'film', 'show', 'game', 'music', 'art']);
+const MEDIA_KINDS = new Set<StudioMediaType>(['book', 'film', 'show', 'game', 'music', 'art', 'other']);
 
 function normalizeMediaKind(raw: string | null): StudioMediaType | null {
   const kind = raw?.trim().toLowerCase() ?? '';
   return (MEDIA_KINDS as Set<string>).has(kind) ? (kind as StudioMediaType) : null;
+}
+
+function sceneFromDeepRead(deep: DeepSceneRead, vision: DayVisionSummary, foundationOnly: boolean): SceneRead | null {
+  const deepType = normalizeType(deep.type);
+  if (!deepType) return null;
+  const shared = {
+    memoryDomain: normalizeMemoryDomain(deep.memoryDomain),
+    type: deepType,
+    label: SCENE_LABEL[deepType],
+    detail: deep.subject,
+    source: 'llm' as const,
+    supportingSubjects: deep.supportingSubjects,
+    representation: deep.representation,
+    representationV2: deep.representationV2,
+    container: deep.container,
+    confidence: deep.confidence,
+    alternatives: deep.alternatives,
+    promptVersion: deep.promptVersion,
+    lockedRouteKey: deep.lockedRouteKey,
+    ocrPurpose: deep.ocrPurpose,
+    photoSchemaVersion: deep.photoSchemaVersion,
+    foundationPasses: deep.foundationPasses,
+  };
+  if (deepType === 'media') {
+    const mediaType = normalizeMediaKind(deep.mediaKind);
+    if (!mediaType) return null;
+    const title = deep.title;
+    return { ...shared, detail: title ?? deep.subject, media: { mediaType, title, creator: deep.creator } };
+  }
+  return {
+    ...shared,
+    food: deepType === 'food' && !foundationOnly
+      ? enrichFoodDetectionWithCuisine(detectFoodInVision(vision), deep.subject)
+      : undefined,
+  };
+}
+
+function deepReadFromScene(scene: SceneRead): DeepSceneRead {
+  return {
+    memoryDomain: scene.memoryDomain ?? null,
+    type: scene.type,
+    subject: scene.detail ?? null,
+    mediaKind: scene.media?.mediaType ?? null,
+    title: scene.media?.title ?? null,
+    creator: scene.media?.creator ?? null,
+    representation: scene.representation ?? null,
+    representationV2: scene.representationV2 ?? null,
+    container: scene.container ?? null,
+    confidence: scene.confidence ?? null,
+    alternatives: scene.alternatives ?? [],
+    supportingSubjects: scene.supportingSubjects ?? [],
+    promptVersion: scene.promptVersion ?? null,
+    lockedRouteKey: scene.lockedRouteKey,
+    ocrPurpose: scene.ocrPurpose,
+    photoSchemaVersion: scene.photoSchemaVersion,
+    foundationPasses: scene.foundationPasses,
+  };
+}
+
+export async function resolveFoundationPhotoAnchor(
+  vision: DayVisionSummary,
+  rawVision?: PhotoVisionResult | null
+): Promise<SceneRead | null> {
+  const deep = await readPhotoAnchorOnDevice(vision, rawVision);
+  return deep ? sceneFromDeepRead(deep, vision, isFoundationOnlyPhotoInterpretationEnabled()) : null;
+}
+
+export async function enrichFoundationPhotoAnchor(
+  scene: SceneRead,
+  vision: DayVisionSummary,
+  rawVision?: PhotoVisionResult | null
+): Promise<SceneRead> {
+  if (!scene.lockedRouteKey) return scene;
+  const enriched = await enrichPhotoAnchorOnDevice(deepReadFromScene(scene), vision, rawVision);
+  return sceneFromDeepRead(enriched, vision, isFoundationOnlyPhotoInterpretationEnabled()) ?? scene;
 }
 
 // LLM-first hierarchical read: ask Apple Foundation Models to classify the scene,
@@ -244,6 +375,12 @@ async function resolveFoundationSceneRead(
 ): Promise<SceneRead | null> {
   if (!vision) return null;
   const foundationOnly = isFoundationOnlyPhotoInterpretationEnabled();
+  if (supportsFoundationPhotoSchemaV2()) {
+    const anchor = await readPhotoAnchorOnDevice(vision, rawVision);
+    if (!anchor) return null;
+    const enriched = await enrichPhotoAnchorOnDevice(anchor, vision, rawVision);
+    return sceneFromDeepRead(enriched, vision, foundationOnly);
+  }
   const tags = [
     ...(vision.concepts ?? []).map((concept) => concept.name),
     ...(vision.details ?? []),
@@ -331,6 +468,16 @@ export async function resolveSceneRead(
   if (!vision) return { type: 'other', label: SCENE_LABEL.other, source: 'rules' };
   const foundationOnly = isFoundationOnlyPhotoInterpretationEnabled() && isFoundationSceneAvailable();
   if (foundationOnly) {
+    if (!supportsFoundationPhotoSchemaV2()) {
+      return {
+        type: 'other',
+        label: SCENE_LABEL.other,
+        source: 'llm',
+        promptVersion: 'foundation-photo-schema-outdated',
+        foundationStatus: 'failed',
+        foundationReason: 'This development build needs the staged photo intelligence native module',
+      };
+    }
     const foundation = await resolveFoundationSceneRead(vision, imageUri, rawVision);
     return foundation
       ? { ...foundation, foundationStatus: 'used', foundationReason: null }

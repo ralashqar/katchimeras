@@ -5,7 +5,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
@@ -59,6 +59,7 @@ import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-i
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
 import { noteRoutesForSignals } from '@/utils/journal-input-adapters';
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
+import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -216,12 +217,6 @@ export default function HomeScreen() {
   const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
   const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
   const formingActivePrompt = onTomorrowForming ? tomorrowActivePrompt : activeDayPrompt;
-  const openMomentCapture = useCallback((questId?: string | null) => {
-    router.push({ pathname: '/moment-capture', params: { target: formingTarget, questId: questId ?? undefined } });
-  }, [formingTarget, router]);
-  const openNoteCapture = useCallback(() => {
-    router.push({ pathname: '/note-capture', params: { target: formingTarget } });
-  }, [formingTarget, router]);
   // While a prompt is showing, the page collapses to just the egg + prompt: the
   // forming quote and the add/camera buttons hide until it's answered/dismissed.
   const hasActivePrompt = isForming && Boolean(formingActivePrompt);
@@ -266,6 +261,37 @@ export default function HomeScreen() {
     setJourneySheetOpen,
     nameSheetOpen,
   } = sheets;
+
+  const pendingCaptureNavigationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pendingCaptureNavigationRef.current) clearTimeout(pendingCaptureNavigationRef.current);
+  }, []);
+
+  const navigateAfterTodayModalCloses = useCallback((navigate: () => void) => {
+    const nativeModalWasOpen = promptSheetOpen || sheets.activeSurface !== null;
+    closePromptSheet();
+    sheets.closeAllSheets();
+    if (pendingCaptureNavigationRef.current) clearTimeout(pendingCaptureNavigationRef.current);
+    if (nativeModalWasOpen) {
+      pendingCaptureNavigationRef.current = runAfterNativeModalDismiss(() => {
+        pendingCaptureNavigationRef.current = null;
+        navigate();
+      });
+      return;
+    }
+    navigate();
+  }, [closePromptSheet, promptSheetOpen, sheets]);
+
+  const openMomentCapture = useCallback((questId?: string | null) => {
+    navigateAfterTodayModalCloses(() => {
+      router.push({ pathname: '/moment-capture', params: { target: formingTarget, questId: questId ?? undefined } });
+    });
+  }, [formingTarget, navigateAfterTodayModalCloses, router]);
+  const openNoteCapture = useCallback(() => {
+    navigateAfterTodayModalCloses(() => {
+      router.push({ pathname: '/note-capture', params: { target: formingTarget } });
+    });
+  }, [formingTarget, navigateAfterTodayModalCloses, router]);
 
   // Quick TEXT note (tap the mic): an inline text box over the page — enter
   // interprets on-device and commits straight away, no full-screen flow.

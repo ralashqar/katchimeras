@@ -71,6 +71,12 @@ function inferRepresentation(input: HierarchyInput, text: string) {
     ids.push(input.scene?.representation === 'screen_content' ? 'foundation:representation' : 'vision:screen');
     return rankedRepresentation(input.rawVision?.captureSource === 'camera' ? 'device_showing_content' : 'native_digital_image', 0.84, ids);
   }
+  // OCR on clothing, packaging, or objects can set documentDetected even when
+  // the dominant photographed subject is plainly a person, animal, food, or
+  // place. Central physical subjects outrank that structural text hint.
+  if (hasDominantPhysicalSubject(input)) {
+    return rankedRepresentation('physical_scene', 0.9, ['subject:dominant-physical']);
+  }
   const art = ART.test(text);
   if (art && (input.rawVision?.documentDetected || POSTER.test(text))) {
     return rankedRepresentation('physical_artwork', 0.72, ['vision:art', 'vision:document']);
@@ -96,6 +102,7 @@ function inferContainer(input: HierarchyInput, text: string, representation: Pho
   if (foundationContainer && foundationContainer !== 'unknown') {
     return rankedContainer(foundationContainer, input.scene?.confidence ?? 0.8, ['foundation:container']);
   }
+  if (representation === 'physical_scene') return rankedContainer('none', 0.88, ['deterministic:physical-scene']);
   if (BOOK.test(text) || input.facets.some((item) => item.key === 'media_type' && item.value === 'book')) {
     return rankedContainer('book', input.rawVision?.documentDetected ? 0.88 : 0.72, ['vision:book']);
   }
@@ -104,8 +111,14 @@ function inferContainer(input: HierarchyInput, text: string, representation: Pho
   if (POSTER.test(text)) return rankedContainer('poster_or_print', 0.76, ['vision:poster']);
   if (PACKAGE.test(text)) return rankedContainer('packaging', 0.68, ['vision:packaging']);
   if (input.rawVision?.documentDetected || DOCUMENT.test(text)) return rankedContainer('document', 0.8, ['vision:document']);
-  if (representation === 'physical_scene') return rankedContainer('none', 0.78, ['deterministic:physical-scene']);
   return rankedContainer('unknown', 0.4, ['deterministic:insufficient-evidence']);
+}
+
+function hasDominantPhysicalSubject(input: HierarchyInput) {
+  const primary = input.subjects.find((subject) => subject.role === 'primary');
+  return !!primary
+    && primary.score >= 0.7
+    && ['people', 'animal', 'food', 'place', 'nature', 'movement', 'work', 'life_event'].includes(primary.domain);
 }
 
 function rankedContainer(kind: PhotoContainerKind, confidence: number, evidenceIds: string[]) {

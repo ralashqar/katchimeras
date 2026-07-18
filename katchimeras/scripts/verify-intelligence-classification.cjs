@@ -91,6 +91,30 @@ check(
   'Foundation-only photo mode does not independently classify Vision tags',
   isolatedFoundationPhoto.dominantDomain === 'food' && !isolatedFoundationPhoto.observations.some((item) => item.value === 'city')
 );
+const foundationBookCover = classification.buildPhotoClassifiedMemory({
+  sourceId: 'foundation-book-cover',
+  observedAt: '2026-07-16T12:05:00.000Z',
+  vision: summary(['document', 'book', 'textile', 'library']),
+  scene: {
+    type: 'media', memoryDomain: 'media', label: 'An inspiration',
+    detail: 'A Brief History of Time', source: 'llm', confidence: 0.99,
+    lockedRouteKey: 'media.book', representationV2: 'physical_document', container: 'book',
+    media: { mediaType: 'book', title: 'A Brief History of Time', creator: 'Stephen Hawking' },
+  },
+});
+check(
+  'staged Foundation book cover stays media after OCR adds an author name',
+  foundationBookCover.dominantDomain === 'media'
+    && foundationBookCover.facets.some((item) => item.key === 'media_type' && item.value === 'book')
+    && foundationBookCover.facets.some((item) => item.key === 'media_title' && item.value === 'A Brief History of Time')
+    && !foundationBookCover.facets.some((item) => item.key === 'person_subject'),
+  JSON.stringify(foundationBookCover)
+);
+check(
+  'book-cover author OCR cannot trigger the people relationship prompt',
+  foundationBookCover.promptState.graphId !== 'people-relationship',
+  JSON.stringify(foundationBookCover.promptState)
+);
 delete global.localStorage;
 delete global.__DEV__;
 

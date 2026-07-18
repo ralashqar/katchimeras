@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,32 +17,32 @@ const TASKLET_INK = '#4B2C20';
 
 type Props = {
   children: ReactNode;
+  deadlineMs: number;
   failed: boolean;
   instruction: string;
   onClose: () => void;
+  onExpire: () => void;
   onRestart: () => void;
   onUndo: () => void;
-  remainingTime: string;
   sorted: number;
   tier: number;
   total: number;
   undoDisabled: boolean;
-  warning: boolean;
 };
 
 export function TaskletBlockJamScreen({
   children,
+  deadlineMs,
   failed,
   instruction,
   onClose,
+  onExpire,
   onRestart,
   onUndo,
-  remainingTime,
   sorted,
   tier,
   total,
   undoDisabled,
-  warning,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
@@ -105,7 +105,7 @@ export function TaskletBlockJamScreen({
             </Animated.View>
           </View>
 
-          <TaskletTimer value={remainingTime} warning={warning} />
+          <TaskletTimer deadlineMs={deadlineMs} onExpire={onExpire} />
         </Animated.View>
 
         <View style={styles.boardArea}>{children}</View>
@@ -234,9 +234,29 @@ function TaskletResultMetric({ label, value }: { label: string; value: string })
   );
 }
 
-function TaskletTimer({ value, warning }: { value: string; warning: boolean }) {
+function TaskletTimer({ deadlineMs, onExpire }: { deadlineMs: number; onExpire: () => void }) {
   const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
+  const [remainingSeconds, setRemainingSeconds] = useState(() => Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000)));
+  const expired = useRef(false);
+
+  useEffect(() => {
+    expired.current = false;
+    const tick = () => {
+      const next = Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+      setRemainingSeconds((current) => current === next ? current : next);
+      if (next === 0 && !expired.current) {
+        expired.current = true;
+        onExpire();
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 250);
+    return () => clearInterval(timer);
+  }, [deadlineMs, onExpire]);
+
+  const warning = remainingSeconds <= 30;
+  const value = `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}`;
 
   useEffect(() => {
     if (!warning || reduceMotion) {

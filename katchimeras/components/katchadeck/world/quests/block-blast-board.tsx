@@ -11,13 +11,12 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
 import {
   BLOCK_BLAST_BOARD_SIZE,
+  blockBlastValidOriginMask,
   blockBlastClearCascadePhase,
   canPlaceBlockBlastPiece,
   nearestBlockBlastWorldOrigin,
@@ -72,12 +71,9 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
   reduceMotion: boolean;
   onCellPress: (row: number, column: number) => void;
 }) {
-  const metrics = blockBlastBoardMetrics(size);
+  const metrics = useMemo(() => blockBlastBoardMetrics(size), [size]);
   const validHover = Boolean(selectedPiece && hover && canPlaceBlockBlastPiece(state.board, selectedPiece.cells, hover.row, hover.column));
   const previewPalette = selectedPiece ? BLOCK_PARTY_COLORS[selectedPiece.colorId] : null;
-  const preview = useMemo(() => new Set(validHover && selectedPiece && hover
-    ? selectedPiece.cells.map((part) => `${hover.row + part.row},${hover.column + part.column}`)
-    : []), [hover, selectedPiece, validHover]);
   const linePreview = useMemo(() => {
     if (!validHover || !selectedPiece || !hover) return [];
     const lines = projectedBlockBlastLines(state.board, selectedPiece.cells, hover.row, hover.column);
@@ -93,17 +89,9 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
     }
     return [...phases].map(([index, phase]) => ({ index, phase }));
   }, [hover, selectedPiece, state.board, validHover]);
-  const validOrigins = useMemo(() => {
-    const origins = new Set<string>();
-    if (selectedPiece) {
-      for (let row = 0; row < BLOCK_BLAST_BOARD_SIZE; row += 1) {
-        for (let column = 0; column < BLOCK_BLAST_BOARD_SIZE; column += 1) {
-          if (canPlaceBlockBlastPiece(state.board, selectedPiece.cells, row, column)) origins.add(`${row},${column}`);
-        }
-      }
-    }
-    return origins;
-  }, [selectedPiece, state.board]);
+  const validOrigins = useMemo(() => selectedPiece
+    ? blockBlastValidOriginMask(state.board, selectedPiece.cells)
+    : EMPTY_ORIGIN_MASK, [selectedPiece, state.board]);
   const arrivalCells = useMemo(() => {
     if (!state.lastResolution) return [];
     const cleared = new Set(state.lastResolution.clearedIndices);
@@ -118,18 +106,59 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
       entering={reduceMotion ? ZoomIn.duration(80) : ZoomIn.duration(280).easing(CONTROLLED_EASE)}
       style={[styles.board, { height: size, width: size }]}
     >
-      <Canvas style={StyleSheet.absoluteFill}>
+      <StaticBlockBlastBoard board={state.board} metrics={metrics} size={size} />
+      {validHover && selectedPiece && hover && previewPalette ? (
+        <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
+          {selectedPiece.cells.map((part, index) => {
+            const row = hover.row + part.row;
+            const column = hover.column + part.column;
+            const x = metrics.outer + column * metrics.pitch;
+            const y = metrics.outer + row * metrics.pitch;
+            return (
+              <Group key={`preview-${index}`} opacity={0.4}>
+                <RoundedRect x={x} y={y} width={metrics.cell} height={metrics.cell} r={Math.max(5, metrics.cell * 0.17)} color={previewPalette.deep} />
+                <RoundedRect x={x + 2} y={y + 2} width={metrics.cell - 4} height={metrics.cell - 5} r={Math.max(4, metrics.cell * 0.14)}>
+                  <SkiaGradient start={vec(x, y)} end={vec(x, y + metrics.cell)} colors={[previewPalette.bright, previewPalette.mid, previewPalette.deep]} positions={[0, 0.52, 1]} />
+                </RoundedRect>
+                <RoundedRect x={x + metrics.cell * 0.14} y={y + metrics.cell * 0.12} width={metrics.cell * 0.72} height={metrics.cell * 0.3} r={metrics.cell * 0.12} color="#FFFFFF" opacity={0.17} />
+              </Group>
+            );
+          })}
+        </Canvas>
+      ) : null}
+      {arrivalCells.length ? <PlacementArrival key={`arrival-${state.lastResolution?.id}`} cells={arrivalCells} metrics={metrics} reduceMotion={reduceMotion} /> : null}
+      {linePreview.length ? <LineClearPreview cells={linePreview} metrics={metrics} reduceMotion={reduceMotion} /> : null}
+      <BoardHitTargets metrics={metrics} onCellPress={onCellPress} validOrigins={validOrigins} />
+      {state.lastResolution?.clearedCells.length ? (
+        <ClearBurst key={state.lastResolution.id} resolution={state.lastResolution} metrics={metrics} reduceMotion={reduceMotion} />
+      ) : null}
+    </Animated.View>
+  );
+});
+
+const EMPTY_ORIGIN_MASK = new Array<number>(BLOCK_BLAST_BOARD_SIZE * BLOCK_BLAST_BOARD_SIZE).fill(0);
+
+const StaticBlockBlastBoard = memo(function StaticBlockBlastBoard({
+  board,
+  metrics,
+  size,
+}: {
+  board: BlockBlastState['board'];
+  metrics: BoardMetrics;
+  size: number;
+}) {
+  return (
+    <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
         <RoundedRect x={1} y={1} width={size - 2} height={size - 2} r={24}>
           <SkiaGradient start={vec(0, 0)} end={vec(size, size)} colors={['#2B2948', '#17162B', '#0D0C19']} />
         </RoundedRect>
         <RoundedRect x={metrics.outer - 5} y={metrics.outer - 5} width={metrics.pitch * 8 - metrics.gap + 10} height={metrics.pitch * 8 - metrics.gap + 10} r={15} color="#090A15" />
-        {state.board.map((colorId, index) => {
+        {board.map((colorId, index) => {
           const row = Math.floor(index / 8);
           const column = index % 8;
           const x = metrics.outer + column * metrics.pitch;
           const y = metrics.outer + row * metrics.pitch;
           const palette = colorId ? BLOCK_PARTY_COLORS[colorId] : null;
-          const projected = preview.has(`${row},${column}`);
           return (
             <Group key={`board-${index}`}>
               <RoundedRect x={x} y={y} width={metrics.cell} height={metrics.cell} r={Math.max(5, metrics.cell * 0.17)} color="#191B32" />
@@ -142,25 +171,27 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
                   <RoundedRect x={x + metrics.cell * 0.14} y={y + metrics.cell * 0.12} width={metrics.cell * 0.72} height={metrics.cell * 0.3} r={metrics.cell * 0.12} color="#FFFFFF" opacity={0.17} />
                 </Group>
               ) : null}
-              {projected && previewPalette ? (
-                <Group opacity={0.4}>
-                  <RoundedRect x={x} y={y} width={metrics.cell} height={metrics.cell} r={Math.max(5, metrics.cell * 0.17)} color={previewPalette.deep} />
-                  <RoundedRect x={x + 2} y={y + 2} width={metrics.cell - 4} height={metrics.cell - 5} r={Math.max(4, metrics.cell * 0.14)}>
-                    <SkiaGradient start={vec(x, y)} end={vec(x, y + metrics.cell)} colors={[previewPalette.bright, previewPalette.mid, previewPalette.deep]} positions={[0, 0.52, 1]} />
-                  </RoundedRect>
-                  <RoundedRect x={x + metrics.cell * 0.14} y={y + metrics.cell * 0.12} width={metrics.cell * 0.72} height={metrics.cell * 0.3} r={metrics.cell * 0.12} color="#FFFFFF" opacity={0.17} />
-                </Group>
-              ) : null}
             </Group>
           );
         })}
-      </Canvas>
-      {arrivalCells.length ? <PlacementArrival key={`arrival-${state.lastResolution?.id}`} cells={arrivalCells} metrics={metrics} reduceMotion={reduceMotion} /> : null}
-      {linePreview.length ? <LineClearPreview cells={linePreview} metrics={metrics} reduceMotion={reduceMotion} /> : null}
+    </Canvas>
+  );
+});
+
+const BoardHitTargets = memo(function BoardHitTargets({
+  metrics,
+  onCellPress,
+  validOrigins,
+}: {
+  metrics: BoardMetrics;
+  onCellPress: (row: number, column: number) => void;
+  validOrigins: readonly number[];
+}) {
+  return <>
       {Array.from({ length: 64 }, (_, index) => {
         const row = Math.floor(index / 8);
         const column = index % 8;
-        const valid = validOrigins.has(`${row},${column}`);
+        const valid = validOrigins[index] === 1;
         return (
           <Pressable
             key={`hit-${index}`}
@@ -174,11 +205,7 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
           />
         );
       })}
-      {state.lastResolution?.clearedCells.length ? (
-        <ClearBurst key={state.lastResolution.id} resolution={state.lastResolution} metrics={metrics} reduceMotion={reduceMotion} />
-      ) : null}
-    </Animated.View>
-  );
+    </>;
 });
 
 function PlacementArrival({ cells, metrics, reduceMotion }: { cells: readonly { colorId: BlockBlastColorId; index: number }[]; metrics: BoardMetrics; reduceMotion: boolean }) {
@@ -226,27 +253,22 @@ function LineClearPreview({
   metrics: BoardMetrics;
   reduceMotion: boolean;
 }) {
+  const opacity = useSharedValue(reduceMotion ? 0.28 : 0.12);
+  useEffect(() => {
+    opacity.value = reduceMotion
+      ? 0.28
+      : withTiming(0.32, { duration: 260, easing: Easing.inOut(Easing.cubic) });
+    return () => cancelAnimation(opacity);
+  }, [opacity, reduceMotion]);
+  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {cells.map((cell) => <LineClearGlow key={`line-preview-${cell.index}`} {...cell} metrics={metrics} reduceMotion={reduceMotion} />)}
-    </View>
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
+      {cells.map((cell) => <LineClearGlow key={`line-preview-${cell.index}`} index={cell.index} metrics={metrics} />)}
+    </Animated.View>
   );
 }
 
-function LineClearGlow({ index, phase, metrics, reduceMotion }: { index: number; phase: number; metrics: BoardMetrics; reduceMotion: boolean }) {
-  const opacity = useSharedValue(reduceMotion ? 0.28 : 0.12);
-  useEffect(() => {
-    if (reduceMotion) {
-      opacity.value = 0.28;
-      return;
-    }
-    opacity.value = withDelay(phase * 42, withRepeat(withSequence(
-      withTiming(0.36, { duration: 220, easing: Easing.inOut(Easing.cubic) }),
-      withTiming(0.12, { duration: 260, easing: Easing.inOut(Easing.cubic) }),
-    ), -1));
-    return () => cancelAnimation(opacity);
-  }, [opacity, phase, reduceMotion]);
-  const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+function LineClearGlow({ index, metrics }: { index: number; metrics: BoardMetrics }) {
   const row = Math.floor(index / BLOCK_BLAST_BOARD_SIZE);
   const column = index % BLOCK_BLAST_BOARD_SIZE;
   return (
@@ -260,7 +282,6 @@ function LineClearGlow({ index, phase, metrics, reduceMotion }: { index: number;
           top: metrics.outer + row * metrics.pitch,
           width: metrics.cell,
         },
-        animatedStyle,
       ]}
     />
   );
@@ -385,7 +406,7 @@ export function BlockBlastPieceArt({ piece, cell, gap: gapOverride }: { piece: B
   );
 }
 
-export function DraggableBlockBlastPiece({
+export const DraggableBlockBlastPiece = memo(function DraggableBlockBlastPiece({
   piece,
   board,
   boardFrame,
@@ -555,7 +576,12 @@ export function DraggableBlockBlastPiece({
       </Pressable>
     </GestureDetector>
   );
-}
+}, (previous, next) => previous.piece === next.piece
+  && previous.board === next.board
+  && previous.boardFrame === next.boardFrame
+  && previous.metrics === next.metrics
+  && previous.selected === next.selected
+  && previous.reduceMotion === next.reduceMotion);
 
 const styles = StyleSheet.create({
   arrivalCell: { left: 0, overflow: 'hidden', position: 'absolute', top: 0 },

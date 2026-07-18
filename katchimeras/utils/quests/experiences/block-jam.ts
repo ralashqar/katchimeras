@@ -55,6 +55,12 @@ export type BlockJamAction =
 export type BlockJamExitOption = { door: BlockJamDoor; anchor: BlockJamAnchor; path: BlockJamAnchor[] };
 export type BlockJamSolutionStep = { blockId: string; action: 'move' | 'exit'; anchor?: BlockJamAnchor; doorId?: string };
 export type BlockJamSolution = { moves: number; steps: BlockJamSolutionStep[]; exploredStates: number };
+export type BlockJamPieceTarget = {
+  blockId: string;
+  cell: BlockJamCell;
+  distanceSquared: number;
+  exact: boolean;
+};
 
 const SHAPES = {
   dot: [[0,0]], dominoH: [[0,0],[0,1]], dominoV: [[0,0],[1,0]],
@@ -221,29 +227,52 @@ export function absoluteBlockCells(piece: BlockJamBlockDefinition, anchor: Block
   return piece.cells.map((cell) => ({ row: anchor.row + cell.row, column: anchor.column + cell.column }));
 }
 
+export function blockJamPieceTargetAtPoint(
+  levelDefinition: BlockJamLevel,
+  state: BlockJamState,
+  point: { x: number; y: number },
+  layout: { cell: number; gap: number; outer: number },
+): BlockJamPieceTarget | null {
+  const pitch = layout.cell + layout.gap;
+  const gridRight = layout.outer + levelDefinition.columns * pitch - layout.gap;
+  const gridBottom = layout.outer + levelDefinition.rows * pitch - layout.gap;
+  if (point.x < layout.outer || point.x > gridRight || point.y < layout.outer || point.y > gridBottom) return null;
+  const tappedCell = {
+    row: Math.min(levelDefinition.rows - 1, Math.floor((point.y - layout.outer) / pitch)),
+    column: Math.min(levelDefinition.columns - 1, Math.floor((point.x - layout.outer) / pitch)),
+  };
+  let nearest: BlockJamPieceTarget | null = null;
+
+  for (const piece of levelDefinition.blocks) {
+    if (state.clearedBlockIds.includes(piece.id)) continue;
+    const anchor = state.anchors[piece.id];
+    if (!anchor) continue;
+    for (const occupied of absoluteBlockCells(piece, anchor)) {
+      const rowDistance = Math.abs(occupied.row - tappedCell.row);
+      const columnDistance = Math.abs(occupied.column - tappedCell.column);
+      if (Math.max(rowDistance, columnDistance) > 1) continue;
+      const centerX = layout.outer + occupied.column * pitch + layout.cell / 2;
+      const centerY = layout.outer + occupied.row * pitch + layout.cell / 2;
+      const distanceSquared = (centerX - point.x) ** 2 + (centerY - point.y) ** 2;
+      const exact = rowDistance === 0 && columnDistance === 0;
+      if (!nearest || (exact && !nearest.exact) || (exact === nearest.exact && distanceSquared < nearest.distanceSquared)) {
+        nearest = { blockId: piece.id, cell: occupied, distanceSquared, exact };
+      }
+    }
+  }
+
+  if (nearest?.exact) return nearest;
+  const tappedIndex = tappedCell.row * levelDefinition.columns + tappedCell.column;
+  return levelDefinition.fixedCells.includes(tappedIndex) ? null : nearest;
+}
+
 export function nearestBlockJamPieceAtPoint(
   levelDefinition: BlockJamLevel,
   state: BlockJamState,
   point: { x: number; y: number },
   layout: { cell: number; gap: number; outer: number },
-  maxDistance = layout.cell,
 ): string | null {
-  const pitch = layout.cell + layout.gap;
-  let nearest: { blockId: string; distance: number } | null = null;
-
-  for (const piece of levelDefinition.blocks) {
-    if (state.clearedBlockIds.includes(piece.id)) continue;
-    for (const occupied of absoluteBlockCells(piece, state.anchors[piece.id])) {
-      const left = layout.outer + occupied.column * pitch;
-      const top = layout.outer + occupied.row * pitch;
-      const dx = Math.max(left - point.x, 0, point.x - (left + layout.cell));
-      const dy = Math.max(top - point.y, 0, point.y - (top + layout.cell));
-      const distance = Math.hypot(dx, dy);
-      if (!nearest || distance < nearest.distance) nearest = { blockId: piece.id, distance };
-    }
-  }
-
-  return nearest && nearest.distance <= maxDistance ? nearest.blockId : null;
+  return blockJamPieceTargetAtPoint(levelDefinition, state, point, layout)?.blockId ?? null;
 }
 
 export function reachableBlockJamAnchors(levelDefinition: BlockJamLevel, state: BlockJamState, blockId: string): BlockJamAnchor[] {

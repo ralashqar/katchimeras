@@ -17,9 +17,9 @@ export function reviewPhotoJournalSubmission(input: {
   const rawSpecific = input.submission.fields.specific;
   const specific = typeof rawSpecific === 'string' ? rawSpecific.trim() : '';
   const finalFacets = dedupe([
+    ...(choice.mediaType ? [{ key: 'media_type', value: choice.mediaType }] : []),
     ...(input.route?.confirmedFacets ?? []),
     ...(input.submission.confirmedFacets ?? []),
-    ...(choice.mediaType ? [{ key: 'media_type', value: choice.mediaType }] : []),
     ...(choice.mediaType && specific ? [{ key: 'media_title', value: specific }] : []),
     ...(flow.projectionKind === 'food' ? [{ key: 'food_item', value: specific || choice.label }] : []),
     ...(input.submission.feeling ? [{ key: flow.projectionKind === 'studio' ? 'media_rating' : 'journal_feeling', value: input.submission.feeling }] : []),

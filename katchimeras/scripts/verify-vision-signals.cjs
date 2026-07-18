@@ -162,7 +162,7 @@ check(
 );
 check('native Vision classifies salient regions independently', nativeVisionSource.includes('request.regionOfInterest = object.boundingBox'));
 check('native Vision returns region classifications', nativeVisionSource.includes('"regionClassifications": regionClassifications'));
-check('capture review passes raw Vision into classification', photoAnalysisSessionSource.includes('rawVision: analyzed.rawVision'));
+check('capture review passes raw Vision into downstream classification', photoAnalysisSessionSource.includes('rawVision,') && photoAnalysisSessionSource.includes('buildPhotoClassifiedMemory'));
 check('capture review returns the finalized memory and evidence', essenceReviewSource.includes('analysis: ReviewedPhotoAnalysis') && essenceReviewSource.includes('memory,\n      evidence'));
 check('Foundation exposes a backward-compatible spatial V2 reader', foundationSource.includes('AsyncFunction("readMemoryV2Async")'));
 

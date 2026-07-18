@@ -6,6 +6,7 @@ export type JournalProjectionKind = ManualJournalAdapter;
 export type ManualJournalSection = 'everyday' | 'culture' | 'milestone' | 'other';
 export type ManualJournalOption = { id: string; label: string };
 export type ManualJournalFeeling = { id: string; label: string; icon?: IconSymbolName };
+export type PhotoJournalEnrichmentMode = 'none' | 'food_fallback' | 'media_title' | 'place_name';
 
 export type ManualJournalChoice = {
   id: string;
@@ -24,6 +25,7 @@ export type ManualJournalChoice = {
   specificFieldPlaceholder?: string;
   routeAliases?: string[];
   confirmedFacets?: Array<{ key: string; value: string; sensitive?: boolean }>;
+  photoEnrichmentMode?: PhotoJournalEnrichmentMode;
 };
 
 export type ManualJournalFlowDefinition = {
@@ -42,6 +44,7 @@ export type ManualJournalFlowDefinition = {
   specificFieldLabel: string;
   specificFieldPlaceholder: string;
   feelings: ManualJournalFeeling[];
+  photoEnrichmentMode?: PhotoJournalEnrichmentMode;
 };
 
 const REACTIONS = [
@@ -80,20 +83,20 @@ const choice = (id: string, label: string, icon: IconSymbolName, qualityIds?: st
 
 export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
   {
-    id: 'went_somewhere', version: 1, title: 'Went somewhere', shortTitle: 'Places & days out', description: 'Places, trips and time away from home', section: 'everyday', icon: 'mappin.and.ellipse', adapter: 'place', projectionKind: 'place',
+    id: 'went_somewhere', version: 1, title: 'Went somewhere', shortTitle: 'Places & days out', description: 'Places, trips and time away from home', section: 'everyday', icon: 'mappin.and.ellipse', adapter: 'place', projectionKind: 'place', photoEnrichmentMode: 'place_name',
     choices: [
       choice('park', 'Park or green space', 'leaf.fill', ['place.park']), choice('city', 'City or town', 'building.2.fill', ['place.city']),
       choice('beach', 'Beach or coast', 'water.waves', ['place.beach']), choice('forest', 'Forest or trail', 'tree.fill', ['place.forest']),
       choice('garden', 'Garden', 'camera.macro', ['place.garden']), choice('museum', 'Museum or gallery', 'building.columns.fill', ['place.museum']),
       choice('cafe', 'Cafe', 'cup.and.saucer.fill', ['place.cafe']), choice('restaurant', 'Restaurant', 'fork.knife', ['place.restaurant']),
-      choice('street', 'Street or neighbourhood', 'map.fill', ['place.street']), choice('home', 'Home', 'house.fill', ['place.home']),
+      choice('street', 'Street or neighbourhood', 'map.fill', ['place.street']), { ...choice('home', 'Home', 'house.fill', ['place.home']), photoEnrichmentMode: 'none' },
       choice('travel', 'Day trip or travel', 'airplane'), choice('other_place', 'Somewhere else', 'mappin'),
     ],
     contextChoices: [{ id: 'day_out', label: 'Day out' }, { id: 'walk', label: 'A walk' }, { id: 'sightseeing', label: 'Sightseeing' }, { id: 'relaxing', label: 'Relaxing' }, { id: 'visiting', label: 'Visiting someone' }, { id: 'work', label: 'Work' }],
     detailTitle: 'What kind of time was it?', specificFieldLabel: 'Place name', specificFieldPlaceholder: 'Where did you go?', feelings: REACTIONS,
   },
   {
-    id: 'food', version: 1, title: 'Ate or drank', shortTitle: 'Food & drink', description: 'Meals, snacks, coffee and drinks', section: 'everyday', icon: 'fork.knife', adapter: 'food', projectionKind: 'food',
+    id: 'food', version: 1, title: 'Ate or drank', shortTitle: 'Food & drink', description: 'Meals, snacks, coffee and drinks', section: 'everyday', icon: 'fork.knife', adapter: 'food', projectionKind: 'food', photoEnrichmentMode: 'food_fallback',
     choices: [
       { ...choice('meal', 'A meal', 'fork.knife', ['subject.food']), specificFieldLabel: 'Meal or dish', specificFieldPlaceholder: 'What did you have?', detailChoices: [{ id: 'italian', label: 'Italian' }, { id: 'japanese', label: 'Japanese' }, { id: 'chinese', label: 'Chinese' }, { id: 'indian', label: 'Indian' }, { id: 'mexican', label: 'Mexican' }, { id: 'middle_eastern', label: 'Middle Eastern' }, { id: 'french', label: 'French' }, { id: 'greek', label: 'Greek' }, { id: 'home_cooked', label: 'Home-cooked' }] },
       { ...choice('snack', 'A snack', 'takeoutbag.and.cup.and.straw.fill', ['subject.food']), specificFieldLabel: 'Snack', specificFieldPlaceholder: 'What snack was it?' },
@@ -108,7 +111,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     feelings: [{ id: 'treat', label: 'A treat' }, { id: 'sharedMeal', label: 'Shared' }, { id: 'comfort', label: 'Comfort' }, { id: 'fuel', label: 'Fuel' }, { id: 'discovery', label: 'Discovery' }],
   },
   {
-    id: 'studio', version: 1, title: 'Watched, read or listened', shortTitle: 'Watched, read or listened', description: 'Books, films, games, music and art', section: 'culture', icon: 'book.fill', adapter: 'studio', projectionKind: 'studio',
+    id: 'studio', version: 1, title: 'Watched, read or listened', shortTitle: 'Watched, read or listened', description: 'Books, films, games, music and art', section: 'culture', icon: 'book.fill', adapter: 'studio', projectionKind: 'studio', photoEnrichmentMode: 'media_title',
     choices: [
       { ...choice('book', 'Book or audiobook', 'book.fill', ['media.book']), mediaType: 'book', specificFieldLabel: 'Book title', specificFieldPlaceholder: 'What was the book called?' },
       { ...choice('film', 'Film', 'film.fill', ['media.film']), mediaType: 'film', specificFieldLabel: 'Film title', specificFieldPlaceholder: 'What was the film called?' },
