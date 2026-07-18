@@ -569,7 +569,19 @@ export async function enrichPhotoJournalRoute(
   const value = cleanString(raw?.specific)?.slice(0, 120) ?? null;
   const confidence = cleanConfidence(raw?.confidence);
   if (!raw || lockedRouteKey !== route.id || !value || disposition === 'discard' || disposition === 'skipped') return null;
-  return { routeKey: route.id, value, confidence, provenance: 'appleFoundation', prefill: confidence >= 0.75, rawResponse: raw };
+  // Book titles have already passed the stricter OCR-index and semantic-role
+  // validator in foundation-scene. A low/missing model confidence must not
+  // throw away that grounded editable title after the loading state completes.
+  const validatedBookTitle = route.id === 'studio.book'
+    && cleanString(raw.semanticRole) === 'official_book_title';
+  return {
+    routeKey: route.id,
+    value,
+    confidence,
+    provenance: 'appleFoundation',
+    prefill: validatedBookTitle || confidence >= 0.75,
+    rawResponse: raw,
+  };
 }
 
 function validateFoodSpecificEvidence(

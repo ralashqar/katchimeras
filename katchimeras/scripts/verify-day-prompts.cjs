@@ -390,13 +390,29 @@ check('manual journal keeps Save memory outside the scrolling content', manualJo
 check('manual journal keeps notes inline', !manualJournalSource.includes("type Stage = 'flow' | 'category' | 'details' | 'note'") && manualJournalSource.includes('noteExpanded'));
 check('manual journal protects dirty drafts from accidental dismissal', manualJournalSource.includes('Discard this draft?') && manualJournalSource.includes('if (dirty) setDiscardOpen(true)'));
 check('manual journal exposes selected state to assistive technology', manualJournalSource.includes('accessibilityState={{ selected }}'));
+check('named Other media remains in the two-column category grid',
+  manualJournalSource.includes('function isCatchAllChoice')
+    && manualJournalSource.includes('/^(something else|somewhere else|other)$/i')
+    && !manualJournalSource.includes("choice.id.startsWith('other')"));
+check('photo Book title field has a trailing accessible enrichment spinner',
+  manualJournalSource.includes('liveSpecificLoading?: boolean')
+    && manualJournalSource.includes("choice?.id === 'book'")
+    && manualJournalSource.includes('Reading book title from photo')
+    && manualJournalSource.includes('styles.inputActivity'));
 const essenceReviewSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/capture/essence-review.tsx'), 'utf8');
 const photoJournalAnalysisSource = fs.readFileSync(path.join(projectRoot, 'utils/photo-journal-analysis.ts'), 'utf8');
 const photoJournalCommitSource = fs.readFileSync(path.join(projectRoot, 'utils/intelligence/photo-journal-commit.ts'), 'utf8');
 check('every photo route opens the shared editable journal flow', essenceReviewSource.includes('preparePhotoJournalAnalysis') && essenceReviewSource.includes('initialFlowId={journalRoute.flowId}') && essenceReviewSource.includes('onRouteResolved={handleJournalRouteResolved}'));
 const resolvedRouteHandler = essenceReviewSource.match(/const handleJournalRouteResolved[\s\S]*?\n  };/)?.[0] ?? '';
 check('photo category selection advances in the existing sheet instead of replacing it', resolvedRouteHandler.includes('setJournalRoute(route)') && !resolvedRouteHandler.includes('openJournalRoute(route)') && !resolvedRouteHandler.includes('setJournalPickerOpen(false)'));
+check('manual photo category selection does not mount a duplicate route sheet', essenceReviewSource.includes("state === 'essence' && journalRoute && !journalPickerOpen"));
 check('route-locked photo text can prefill a pristine editor without alternative chips', essenceReviewSource.includes('liveSpecific={journalSpecific}') && manualJournalSource.includes('!specificEditedRef.current') && !manualJournalSource.includes('initialSpecificSuggestions'));
+check('Book OCR pending state reaches the title field and clears after enrichment',
+  essenceReviewSource.includes("setJournalSpecificLoading(route.id === 'studio.book')")
+    && essenceReviewSource.includes('liveSpecificLoading={journalSpecificLoading}')
+    && essenceReviewSource.includes('setJournalSpecificLoading(false)'));
+check('accepted enrichment is retained before the optional prefill gate',
+  essenceReviewSource.indexOf('setJournalEnrichment(proposal)') < essenceReviewSource.indexOf('if (proposal.prefill) setJournalSpecific(proposal.value)'));
 check('machine title suggestions are confirmed only when the journal is saved', essenceReviewSource.includes('handleJournalSave') && photoJournalCommitSource.includes("{ key: 'media_title', value: specific }"));
 check('OCR enrichment runs only after a final journal route is selected', essenceReviewSource.includes('enrichPhotoJournalRoute(route') && essenceReviewSource.includes('openJournalRoute'));
 check('photo classification failure offers ordinary or manual actions without a false timeout claim', essenceReviewSource.includes("We couldn't auto-classify this") && essenceReviewSource.includes('Something ordinary') && essenceReviewSource.includes('Classify manually') && !essenceReviewSource.includes('Apple Intelligence took too long'));

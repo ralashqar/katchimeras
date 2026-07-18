@@ -61,6 +61,7 @@ export type JournalComposerProps = {
   initialNoteExpanded?: boolean;
   initialConfirmedFacets?: ManualJournalSubmission['confirmedFacets'];
   liveSpecific?: string | null;
+  liveSpecificLoading?: boolean;
   suggestedRoutes?: JournalRouteProposal[];
   sourceType?: 'manual' | 'photo';
   sourceId?: string | null;
@@ -85,6 +86,7 @@ export function JournalComposer({
   initialNoteExpanded = false,
   initialConfirmedFacets,
   liveSpecific,
+  liveSpecificLoading = false,
   suggestedRoutes = [],
   sourceType = 'manual',
   sourceId,
@@ -176,6 +178,10 @@ export function JournalComposer({
   const voice = useJournalVoiceDraft(handleVoiceReady, { allowRemote: allowRemoteIntelligence });
   const quickVoiceAvailable = sourceType === 'manual'
     && (!resolvedJournalSource || resolvedJournalSource.kind === 'manual');
+  const showBookTitleLoading = liveSpecificLoading
+    && sourceType === 'photo'
+    && flow?.id === 'studio'
+    && choice?.id === 'book';
 
   useEffect(() => {
     if (!specificEditedRef.current && liveSpecific?.trim()) setSpecific(liveSpecific.trim());
@@ -424,8 +430,8 @@ export function JournalComposer({
                   <Animated.View
                     key={item.id}
                     entering={reduceMotion ? undefined : FadeInRight.delay(Math.min(index * 24, 180)).duration(190)}
-                    style={isOtherChoice(item) ? styles.fullTile : styles.halfTile}>
-                    <ChoiceTile choice={item} onPress={() => selectChoice(item)} quiet={isOtherChoice(item)} />
+                    style={isCatchAllChoice(item) ? styles.fullTile : styles.halfTile}>
+                    <ChoiceTile choice={item} onPress={() => selectChoice(item)} quiet={isCatchAllChoice(item)} />
                   </Animated.View>
                 ))}
               </View>
@@ -447,18 +453,26 @@ export function JournalComposer({
                 </View>
 
                 <EditorSection label={choice.specificFieldLabel ?? flow.specificFieldLabel}>
-                  <TextInput
-                    accessibilityLabel={choice.specificFieldLabel ?? flow.specificFieldLabel}
-                    autoCapitalize="sentences"
-                    onChangeText={(value) => { specificEditedRef.current = true; setSpecific(value); }}
-                    onFocus={() => scrollRef.current?.scrollTo({ y: 70, animated: true })}
-                    placeholder={choice.specificFieldPlaceholder ?? flow.specificFieldPlaceholder}
-                    placeholderTextColor={Meadow.inkSoft}
-                    returnKeyType="done"
-                    selectionColor={Meadow.goldDeep}
-                    style={styles.input}
-                    value={specific}
-                  />
+                  <View style={styles.inputFrame}>
+                    <TextInput
+                      accessibilityLabel={choice.specificFieldLabel ?? flow.specificFieldLabel}
+                      accessibilityState={{ busy: showBookTitleLoading }}
+                      autoCapitalize="sentences"
+                      onChangeText={(value) => { specificEditedRef.current = true; setSpecific(value); }}
+                      onFocus={() => scrollRef.current?.scrollTo({ y: 70, animated: true })}
+                      placeholder={choice.specificFieldPlaceholder ?? flow.specificFieldPlaceholder}
+                      placeholderTextColor={Meadow.inkSoft}
+                      returnKeyType="done"
+                      selectionColor={Meadow.goldDeep}
+                      style={[styles.input, showBookTitleLoading && styles.inputWithActivity]}
+                      value={specific}
+                    />
+                    {showBookTitleLoading ? (
+                      <View pointerEvents="none" style={styles.inputActivity}>
+                        <ActivityIndicator accessibilityLabel="Reading book title from photo" color={Meadow.goldDeep} size="small" />
+                      </View>
+                    ) : null}
+                  </View>
                 </EditorSection>
 
                 {(choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices)?.length ? (
@@ -788,8 +802,10 @@ function RecordingState({ elapsed }: { elapsed: number }) {
   );
 }
 
-function isOtherChoice(choice: ManualJournalChoice) {
-  return choice.id.startsWith('other') || /something else|somewhere else/i.test(choice.label);
+function isCatchAllChoice(choice: ManualJournalChoice) {
+  // Only true escape-hatch choices span the row. Named categories such as
+  // "News, live sport or other" remain equal members of the category grid.
+  return /^(something else|somewhere else|other)$/i.test(choice.label.trim());
 }
 
 function selectionHaptic() {
@@ -856,7 +872,10 @@ const styles = StyleSheet.create({
   change: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 8 },
   changeText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700' },
   editorSection: { gap: 10 },
+  inputFrame: { position: 'relative' },
   input: { backgroundColor: 'rgba(255,248,232,0.42)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.52)', color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 16, minHeight: 56, paddingHorizontal: 15, paddingVertical: 13 },
+  inputWithActivity: { paddingRight: 48 },
+  inputActivity: { alignItems: 'center', bottom: 0, justifyContent: 'center', position: 'absolute', right: 15, top: 0 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   optionChip: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.30)', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 44, paddingHorizontal: 13, paddingVertical: 9 },
   optionChipSelected: { backgroundColor: 'rgba(229,190,106,0.32)', borderColor: Meadow.goldDeep },

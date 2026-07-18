@@ -399,6 +399,16 @@ void (async () => {
   const mismatchedBookEnrichment = await analysis.enrichPhotoJournalRoute(recoveredBookRoute.selected, 'book', bookCover.vision, bookCover.raw);
   check('OCR enrichment from a different locked route can never populate a Book field', mismatchedBookEnrichment === null, JSON.stringify(mismatchedBookEnrichment));
 
+  global.__enrichmentRaw = {
+    disposition: 'used', specific: 'A Brief History of Time', confidence: '0.62',
+    lockedRouteKey: 'studio.book', semanticRole: 'official_book_title', usedOcrIndexes: '2,3,4',
+  };
+  const groundedLowConfidenceBookTitle = await analysis.enrichPhotoJournalRoute(recoveredBookRoute.selected, 'book', bookCover.vision, bookCover.raw);
+  check('a validated official Book title is editable prefill even below the generic confidence threshold',
+    groundedLowConfidenceBookTitle?.value === 'A Brief History of Time'
+      && groundedLowConfidenceBookTitle?.prefill === true,
+    JSON.stringify(groundedLowConfidenceBookTitle));
+
   global.__semanticRaw = {
     failureKind: 'technical', durationMs: 3,
     rawResponse: { status: 'failed', errorCode: 'generation_failed', errorDescription: 'temporary model failure' },

@@ -82,6 +82,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
   const [journalAnalysis, setJournalAnalysis] = useState<PhotoJournalClassification | null>(null);
   const [journalAnalysisState, setJournalAnalysisState] = useState<JournalAnalysisState>('waiting');
   const [journalSpecific, setJournalSpecific] = useState<string | null>(null);
+  const [journalSpecificLoading, setJournalSpecificLoading] = useState(false);
   const [journalEnrichment, setJournalEnrichment] = useState<PhotoJournalFieldProposal | null>(null);
   const journalAnalysisStartedRef = useRef(false);
   const journalRequestRef = useRef(0);
@@ -161,16 +162,26 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     enrichmentRouteRef.current = route.id;
     setJournalSpecific(route.prefilledSpecific ?? null);
     setJournalEnrichment(null);
+    setJournalSpecificLoading(route.id === 'studio.book');
     const vision = visionRef.current;
-    if (!vision) return;
-    void enrichPhotoJournalRoute(route, analysis?.visualSubject ?? null, vision, rawVisionRef.current).then((proposal) => {
-      if (enrichmentRequestRef.current !== requestId
-        || enrichmentRouteRef.current !== route.id
-        || proposal?.routeKey !== route.id
-        || !proposal.prefill) return;
-      setJournalEnrichment(proposal);
-      setJournalSpecific(proposal.value);
-    });
+    if (!vision) {
+      setJournalSpecificLoading(false);
+      return;
+    }
+    void enrichPhotoJournalRoute(route, analysis?.visualSubject ?? null, vision, rawVisionRef.current)
+      .then((proposal) => {
+        if (enrichmentRequestRef.current !== requestId
+          || enrichmentRouteRef.current !== route.id
+          || proposal?.routeKey !== route.id) return;
+        setJournalEnrichment(proposal);
+        if (proposal.prefill) setJournalSpecific(proposal.value);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (enrichmentRequestRef.current === requestId && enrichmentRouteRef.current === route.id) {
+          setJournalSpecificLoading(false);
+        }
+      });
   };
 
   const clearJournalRoute = () => {
@@ -178,6 +189,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     enrichmentRouteRef.current = null;
     setJournalRoute(null);
     setJournalSpecific(null);
+    setJournalSpecificLoading(false);
     setJournalEnrichment(null);
   };
 
@@ -373,12 +385,13 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
         </ScrollView>
       ) : null}
 
-      {state === 'essence' && journalRoute ? (
+      {state === 'essence' && journalRoute && !journalPickerOpen ? (
         <ManualJournalSheet
           initialFlowId={journalRoute.flowId}
           initialChoiceId={journalRoute.choiceId}
           initialSpecific={journalSpecific}
           liveSpecific={journalSpecific}
+          liveSpecificLoading={journalSpecificLoading}
           initialConfirmedFacets={journalRoute.confirmedFacets}
           sourceType="photo"
           sourceId={sourceId ?? photoUri}
@@ -389,7 +402,7 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
           onSave={handleJournalSave}
         />
       ) : null}
-      {state === 'essence' && journalPickerOpen ? <ManualJournalSheet initialFlowId={journalFlowId} suggestedRoutes={journalAnalysis?.candidates.flatMap((candidate) => candidate.route ? [candidate.route] : [])} sourceType="photo" sourceId={sourceId ?? photoUri} thumbnailUri={photoUri} liveSpecific={journalSpecific} onRouteResolved={handleJournalRouteResolved} onBackFromInitial={() => setJournalPickerOpen(false)} onClose={onClose} onSave={handleJournalSave} /> : null}
+      {state === 'essence' && journalPickerOpen ? <ManualJournalSheet initialFlowId={journalFlowId} suggestedRoutes={journalAnalysis?.candidates.flatMap((candidate) => candidate.route ? [candidate.route] : [])} sourceType="photo" sourceId={sourceId ?? photoUri} thumbnailUri={photoUri} liveSpecific={journalSpecific} liveSpecificLoading={journalSpecificLoading} onRouteResolved={handleJournalRouteResolved} onBackFromInitial={() => setJournalPickerOpen(false)} onClose={onClose} onSave={handleJournalSave} /> : null}
     </View>
   );
 }

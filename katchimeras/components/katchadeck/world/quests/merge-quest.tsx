@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -15,6 +15,7 @@ import Animated, {
   useSharedValue,
   withDelay,
   withSequence,
+  withSpring,
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
@@ -60,6 +61,18 @@ type Props = {
   onRunningChange: (running: boolean, id?: string | null) => void;
 };
 
+type MergeFlight = {
+  id: number;
+  item: MergeBoardItem;
+  kind: 'move' | 'merge' | 'serve';
+  from: number;
+  to: number | null;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+};
+
 const CHAIN_STYLE: Record<string, { color: string }> = {
   pasta: { color: '#E8B76A' },
   stew: { color: '#D98763' },
@@ -83,6 +96,8 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   const reduceMotion = useReducedMotion();
   const initialRound = useMemo(() => createMergeRound(seed, config, recentOrderIds), [config, recentOrderIds, seed]);
   const [state, setState] = useState(initialRound);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [started, setStarted] = useState(false);
   const [mergedCell, setMergedCell] = useState<number | null>(null);
   const [spawnedCell, setSpawnedCell] = useState<number | null>(null);
@@ -90,42 +105,49 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
   const [draggingCell, setDraggingCell] = useState<number | null>(null);
   const [hoveredCell, setHoveredCell] = useState<number | null>(null);
-  const [dropLanding, setDropLanding] = useState<{ cell: number; offsetX: number; offsetY: number } | null>(null);
+  const [flights, setFlights] = useState<MergeFlight[]>([]);
   const attempt = useRef<string | null>(null);
   const startedAt = useRef(0);
   const finishedAt = useRef<number | null>(null);
   const boardRef = useRef<View>(null);
   const boardFrame = useRef<{ x: number; y: number; width: number; height: number } | null>(null);
+  const boardX = useSharedValue(0);
+  const boardY = useSharedValue(0);
+  const boardMeasuredWidth = useSharedValue(boardWidth);
+  const boardMeasuredHeight = useSharedValue(boardHeight);
+  const flightId = useRef(0);
   const spawnAnimationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dropLandingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (spawnAnimationTimer.current) clearTimeout(spawnAnimationTimer.current);
-    if (dropLandingTimer.current) clearTimeout(dropLandingTimer.current);
   }, []);
 
   const measureBoard = () => {
     boardRef.current?.measureInWindow((x, y, measuredWidth, measuredHeight) => {
       boardFrame.current = { x, y, width: measuredWidth, height: measuredHeight };
+      boardX.value = x;
+      boardY.value = y;
+      boardMeasuredWidth.value = measuredWidth;
+      boardMeasuredHeight.value = measuredHeight;
     });
   };
 
-  const haptic = (kind: 'pick' | 'move' | 'merge' | 'warning' | 'serve') => {
+  const haptic = useCallback((kind: 'pick' | 'move' | 'merge' | 'warning' | 'serve') => {
     if (process.env.EXPO_OS !== 'ios') return;
     if (kind === 'pick') void Haptics.selectionAsync();
     else if (kind === 'move') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     else if (kind === 'merge') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     else if (kind === 'warning') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     else void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
+  }, []);
 
-  const announce = (message: string) => { void AccessibilityInfo.announceForAccessibility(message); };
+  const announce = useCallback((message: string) => { void AccessibilityInfo.announceForAccessibility(message); }, []);
 
-  const commit = (next: MergeRoundState, message?: string) => {
-    if (next.status !== 'playing' && state.status === 'playing') finishedAt.current = Date.now();
+  const commit = useCallback((next: MergeRoundState, message?: string) => {
+    if (next.status !== 'playing' && stateRef.current.status === 'playing') finishedAt.current = Date.now();
     setState(next);
     if (message) announce(message);
-  };
+  }, [announce]);
 
   const start = () => {
     attempt.current = onAttemptStart({ ...config, packId, orderIds: initialRound.orders.map((order) => order.targetId) });
@@ -143,12 +165,11 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     setMergedCell(null);
     setSpawnedCell(null);
     if (spawnAnimationTimer.current) clearTimeout(spawnAnimationTimer.current);
-    if (dropLandingTimer.current) clearTimeout(dropLandingTimer.current);
     setInvalidCell(null);
     setSelectedCell(null);
     setDraggingCell(null);
     setHoveredCell(null);
-    setDropLanding(null);
+    setFlights([]);
     onRunningChange(false);
   };
 
@@ -174,49 +195,71 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     commit(next, `${mergeItemDefinition(next.board[cell]!.definitionId).name} added. ${config.moveBudget - next.movesUsed} actions left.`);
   };
 
-  const serve = (cell: number, orderId: string) => {
-    const item = state.board[cell];
+  const serve = useCallback((cell: number, orderId: string) => {
+    const current = stateRef.current;
+    const item = current.board[cell];
     if (!item) return;
     const name = mergeItemDefinition(item.definitionId).name;
-    const next = mergeRoundReducer(state, { type: 'serve', cell, orderId }, config.moveBudget);
-    if (next === state) return;
+    const next = mergeRoundReducer(current, { type: 'serve', cell, orderId }, config.moveBudget);
+    if (next === current) return;
     haptic('serve');
     commit(next, `${name} served. ${next.orders.filter((order) => order.completed).length} of ${next.orders.length} orders complete.`);
-  };
+  }, [commit, config.moveBudget, haptic]);
 
-  const dragOver = (absoluteX: number, absoluteY: number) => {
-    const frame = boardFrame.current;
-    if (!frame) return;
-    setHoveredCell(mergeBoardCellFromPoint({
-      absoluteX,
-      absoluteY,
-      boardX: frame.x,
-      boardY: frame.y,
-      boardWidth: frame.width,
-      boardHeight: frame.height,
-      inset: boardPadding + boardBorder,
-      gap,
-      cellSize,
-    }));
-  };
+  const dragOver = useCallback((cell: number | null) => {
+    setHoveredCell((current) => current === cell ? current : cell);
+  }, []);
 
-  const finishDrag = () => {
+  const finishDrag = useCallback(() => {
     setDraggingCell(null);
     setHoveredCell(null);
-  };
+  }, []);
 
-  const drop = (from: number, dx: number, dy: number, absoluteX: number, absoluteY: number) => {
+  const lockedCells = useMemo(() => {
+    const cells = new Set<number>();
+    flights.forEach((flight) => {
+      cells.add(flight.from);
+      if (flight.to != null) cells.add(flight.to);
+    });
+    return cells;
+  }, [flights]);
+  const lockedCellsRef = useRef(lockedCells);
+  lockedCellsRef.current = lockedCells;
+
+  const addFlight = useCallback((item: MergeBoardItem, kind: MergeFlight['kind'], from: number, to: number | null, dx: number, dy: number) => {
+    const pitch = cellSize + gap;
+    const inset = boardPadding + boardBorder;
+    const sourceX = inset + (from % MERGE_BOARD_COLUMNS) * pitch;
+    const sourceY = inset + Math.floor(from / MERGE_BOARD_COLUMNS) * pitch;
+    const targetX = to == null ? sourceX + dx : inset + (to % MERGE_BOARD_COLUMNS) * pitch;
+    const targetY = to == null ? sourceY + dy - cellSize * 1.35 : inset + Math.floor(to / MERGE_BOARD_COLUMNS) * pitch;
+    setFlights((current) => [...current, {
+      id: ++flightId.current,
+      item,
+      kind,
+      from,
+      to,
+      startX: sourceX + dx,
+      startY: sourceY + dy,
+      endX: targetX,
+      endY: targetY,
+    }]);
+  }, [boardBorder, boardPadding, cellSize, gap]);
+
+  const drop = useCallback((from: number, dx: number, dy: number, absoluteX: number, absoluteY: number): boolean => {
     setDraggingCell(null);
     setHoveredCell(null);
-    const source = state.board[from];
-    if (!source) return;
-    const ready = readyOrderForItem(state, from);
+    const current = stateRef.current;
+    const source = current.board[from];
+    if (!source || lockedCellsRef.current.has(from)) return false;
+    const ready = readyOrderForItem(current, from);
     if (ready && dy < -Math.max(84, cellSize * 1.7)) {
       serve(from, ready.id);
-      return;
+      if (!reduceMotion) addFlight(source, 'serve', from, null, dx, dy);
+      return true;
     }
     const frame = boardFrame.current;
-    if (!frame) return;
+    if (!frame) return false;
     const to = mergeBoardCellFromPoint({
       absoluteX,
       absoluteY,
@@ -228,52 +271,52 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       gap,
       cellSize,
     });
-    if (to == null) return;
-    if (to === from) return;
-    const target = state.board[to];
+    if (to == null || to === from || lockedCellsRef.current.has(to)) return false;
+    const target = current.board[to];
     const merging = canMergeItems(source, target);
-    const next = mergeRoundReducer(state, { type: 'move', from, to }, config.moveBudget);
-    if (next === state) {
+    const next = mergeRoundReducer(current, { type: 'move', from, to }, config.moveBudget);
+    if (next === current) {
       setInvalidCell(to);
       setTimeout(() => setInvalidCell(null), 260);
       haptic('warning');
       announce('Those items do not match.');
-      return;
+      return false;
     }
-    if (!reduceMotion) {
-      const sourceRow = Math.floor(from / MERGE_BOARD_COLUMNS);
-      const sourceColumn = from % MERGE_BOARD_COLUMNS;
-      const targetRow = Math.floor(to / MERGE_BOARD_COLUMNS);
-      const targetColumn = to % MERGE_BOARD_COLUMNS;
-      const pitch = cellSize + gap;
-      setDropLanding({
-        cell: to,
-        offsetX: dx - (targetColumn - sourceColumn) * pitch,
-        offsetY: dy - (targetRow - sourceRow) * pitch,
-      });
-      if (dropLandingTimer.current) clearTimeout(dropLandingTimer.current);
-      dropLandingTimer.current = setTimeout(() => {
-        setDropLanding(null);
-        dropLandingTimer.current = null;
-      }, 180);
-    }
+    if (!reduceMotion) addFlight(source, merging ? 'merge' : 'move', from, to, dx, dy);
     if (merging) {
       const upgraded = mergeItemDefinition(next.board[to]!.definitionId);
-      setMergedCell(to);
-      setTimeout(() => setMergedCell(null), reduceMotion ? 100 : 430);
+      if (reduceMotion) {
+        setMergedCell(to);
+        setTimeout(() => setMergedCell(null), 100);
+      }
       haptic('merge');
       commit(next, `Merged into ${upgraded.name}. ${config.moveBudget - next.movesUsed} actions left.`);
     } else {
       haptic('move');
       commit(next);
     }
-  };
+    return true;
+  }, [addFlight, announce, boardBorder, boardPadding, cellSize, commit, config.moveBudget, gap, haptic, reduceMotion, serve]);
 
-  const accessibleCellAction = (cell: number) => {
-    const item = state.board[cell];
+  const finishFlight = useCallback((id: number, kind: MergeFlight['kind'], to: number | null) => {
+    setFlights((current) => current.filter((flight) => flight.id !== id));
+    if (kind === 'merge' && to != null) {
+      setMergedCell(to);
+      setTimeout(() => setMergedCell((current) => current === to ? null : current), 430);
+    }
+  }, []);
+
+  const pickCell = useCallback((cell: number) => {
+    setDraggingCell(cell);
+    haptic('pick');
+  }, [haptic]);
+
+  const accessibleCellAction = useCallback((cell: number) => {
+    const current = stateRef.current;
+    const item = current.board[cell];
     if (selectedCell == null) {
       if (!item) return;
-      const ready = readyOrderForItem(state, cell);
+      const ready = readyOrderForItem(current, cell);
       if (ready) {
         serve(cell, ready.id);
         return;
@@ -288,8 +331,8 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       announce('Selection cleared.');
       return;
     }
-    const before = state;
-    const next = mergeRoundReducer(state, { type: 'move', from: selectedCell, to: cell }, config.moveBudget);
+    const before = current;
+    const next = mergeRoundReducer(current, { type: 'move', from: selectedCell, to: cell }, config.moveBudget);
     if (next === before) {
       haptic('warning');
       announce('That destination cannot accept the selected item.');
@@ -307,7 +350,16 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       haptic('move');
       commit(next, `${name} moved.`);
     }
-  };
+  }, [announce, commit, config.moveBudget, haptic, reduceMotion, selectedCell, serve]);
+
+  const readyDefinitionIds = useMemo(
+    () => new Set(state.orders.filter((order) => !order.completed).map((order) => order.targetId)),
+    [state.orders],
+  );
+  const hiddenFlightTargets = useMemo(
+    () => new Set(flights.flatMap((flight) => flight.to == null ? [] : [flight.to])),
+    [flights],
+  );
 
   if (!started) {
     return <QuestExperiencePreview
@@ -322,7 +374,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   }
 
   const durationMs = (finishedAt.current ?? Date.now()) - startedAt.current;
-  if (state.status !== 'playing' && attempt.current) {
+  if (state.status !== 'playing' && attempt.current && flights.length === 0) {
     const success = state.status === 'won';
     const result: QuestResult = {
       kind: 'merge', success, packId, ordersCompleted: state.orders.filter((order) => order.completed).length,
@@ -416,27 +468,40 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
         spawnedCell != null && styles.boardAnimating,
       ]}>
       {state.board.map((item, index) => <MergeCell
+        boardHeight={boardMeasuredHeight}
+        boardWidth={boardMeasuredWidth}
+        boardX={boardX}
+        boardY={boardY}
+        boardInset={boardPadding + boardBorder}
         cellSize={cellSize}
+        gap={gap}
         index={index}
         invalid={invalidCell === index}
-        item={item}
-        compatible={draggingCell != null && draggingCell !== index && canMergeItems(state.board[draggingCell], item)}
+        item={hiddenFlightTargets.has(index) ? null : item}
+        locked={lockedCells.has(index)}
+        compatible={!lockedCells.has(index) && draggingCell != null && draggingCell !== index && canMergeItems(state.board[draggingCell], item)}
         dragging={draggingCell === index}
-        emptyTarget={draggingCell != null && !item}
-        hovered={hoveredCell === index && draggingCell !== index}
-        key={`${index}:${item?.instanceId ?? 'empty'}`}
-        dropOffset={dropLanding?.cell === index ? dropLanding : null}
+        emptyTarget={!lockedCells.has(index) && draggingCell != null && !item}
+        hovered={!lockedCells.has(index) && hoveredCell === index && draggingCell !== index}
+        key={index}
         merged={mergedCell === index}
         onDrop={drop}
         onDragFinish={finishDrag}
         onDragOver={dragOver}
-        onPick={() => { measureBoard(); setDraggingCell(index); haptic('pick'); }}
-        onAccessibleAction={() => accessibleCellAction(index)}
-        ready={Boolean(item && state.orders.some((order) => !order.completed && order.targetId === item.definitionId))}
+        onPick={pickCell}
+        onAccessibleAction={accessibleCellAction}
+        ready={Boolean(item && readyDefinitionIds.has(item.definitionId))}
         reduceMotion={reduceMotion}
         selected={selectedCell === index}
         selectionActive={selectedCell != null}
         spawned={spawnedCell === index}
+      />)}
+      {flights.map((flight) => <MergeFlightOverlay
+        cellSize={cellSize}
+        flight={flight}
+        key={flight.id}
+        onComplete={finishFlight}
+        reduceMotion={reduceMotion}
       />)}
     </View>
 
@@ -461,129 +526,170 @@ function ResultMetric({ label, value }: { label: string; value: string }) {
   </View>;
 }
 
-function MergeCell({ item, index, cellSize, merged, invalid, ready, reduceMotion, selected, selectionActive, compatible, dragging, emptyTarget, hovered, spawned, dropOffset, onDrop, onDragFinish, onDragOver, onPick, onAccessibleAction }: {
-  item: MergeBoardItem | null; index: number; cellSize: number; merged: boolean; invalid: boolean; ready: boolean; reduceMotion: boolean; selected: boolean; selectionActive: boolean; compatible: boolean; dragging: boolean; emptyTarget: boolean; hovered: boolean; spawned: boolean; dropOffset: { offsetX: number; offsetY: number } | null;
-  onDrop: (index: number, dx: number, dy: number, absoluteX: number, absoluteY: number) => void; onDragFinish: () => void; onDragOver: (absoluteX: number, absoluteY: number) => void; onPick: () => void; onAccessibleAction: () => void;
-}) {
-  const x = useSharedValue(0);
-  const y = useSharedValue(0);
-  const scale = useSharedValue(1);
-  const landingScale = useSharedValue(1);
-  const invalidX = useSharedValue(0);
-  const dropX = useSharedValue(dropOffset?.offsetX ?? 0);
-  const dropY = useSharedValue(dropOffset?.offsetY ?? 0);
-  useEffect(() => {
-    if ((!spawned && !merged) || reduceMotion) {
-      landingScale.value = 1;
-      return;
-    }
-    landingScale.value = merged ? 0.92 : 0.97;
-    landingScale.value = withDelay(merged ? 30 : 110, withSequence(
-      withTiming(merged ? 1.12 : 1.055, { duration: merged ? 120 : 90, easing: Easing.out(Easing.cubic) }),
-      withTiming(1, { duration: merged ? 170 : 115, easing: Easing.out(Easing.quad) }),
-    ));
-  }, [landingScale, merged, reduceMotion, spawned]);
-  useEffect(() => {
-    if (!invalid || reduceMotion) {
-      invalidX.value = 0;
-      return;
-    }
-    invalidX.value = withSequence(
-      withTiming(-4, { duration: 45 }),
-      withTiming(4, { duration: 65 }),
-      withTiming(-3, { duration: 55 }),
-      withTiming(0, { duration: 70 }),
-    );
-  }, [invalid, invalidX, reduceMotion]);
-  useEffect(() => {
-    if (!dropOffset || reduceMotion) {
-      dropX.value = 0;
-      dropY.value = 0;
-      return;
-    }
-    dropX.value = dropOffset.offsetX;
-    dropY.value = dropOffset.offsetY;
-    const easing = Easing.out(Easing.cubic);
-    dropX.value = withTiming(0, { duration: 115, easing });
-    dropY.value = withTiming(0, { duration: 115, easing });
-  }, [dropOffset, dropX, dropY, reduceMotion]);
-  const gesture = Gesture.Pan()
-    .enabled(Boolean(item))
-    .minDistance(5)
-    .onBegin(() => {
-      scale.value = withTiming(1.035, { duration: reduceMotion ? 40 : 75, easing: Easing.out(Easing.cubic) });
-      runOnJS(onPick)();
-    })
-    .onUpdate((event) => {
-      x.value = event.translationX;
-      y.value = event.translationY;
-      runOnJS(onDragOver)(event.absoluteX, event.absoluteY);
-    })
-    .onEnd((event) => {
-      runOnJS(onDrop)(index, event.translationX, event.translationY, event.absoluteX, event.absoluteY);
-    })
-    .onFinalize(() => {
-      runOnJS(onDragFinish)();
-      const settleDuration = reduceMotion ? 55 : 135;
-      const releaseHold = reduceMotion ? 32 : 80;
-      const settleEasing = Easing.out(Easing.cubic);
-      // Keep the source tile at its exact final drag transform until the JS
-      // board commit mounts the destination tile. This prevents a one-frame
-      // flash back toward the source before a successful drop lands.
-      x.value = withDelay(releaseHold, withTiming(0, { duration: settleDuration, easing: settleEasing }));
-      y.value = withDelay(releaseHold, withTiming(0, { duration: settleDuration, easing: settleEasing }));
-      scale.value = withDelay(releaseHold, reduceMotion
-        ? withTiming(1, { duration: settleDuration, easing: settleEasing })
-        : withSequence(
-          withTiming(0.99, { duration: 55, easing: Easing.out(Easing.quad) }),
-          withTiming(1, { duration: 80, easing: settleEasing }),
-        ));
-    });
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value + invalidX.value }, { translateY: y.value }, { scale: scale.value }] }));
-  const landingStyle = useAnimatedStyle(() => ({ transform: [{ translateX: dropX.value }, { translateY: dropY.value }, { scale: landingScale.value }] }));
+type MergeCellProps = {
+  item: MergeBoardItem | null; index: number; cellSize: number; gap: number; boardInset: number;
+  boardX: SharedValue<number>; boardY: SharedValue<number>; boardWidth: SharedValue<number>; boardHeight: SharedValue<number>;
+  merged: boolean; invalid: boolean; ready: boolean; reduceMotion: boolean; selected: boolean; selectionActive: boolean; compatible: boolean; dragging: boolean; emptyTarget: boolean; hovered: boolean; spawned: boolean; locked: boolean;
+  onDrop: (index: number, dx: number, dy: number, absoluteX: number, absoluteY: number) => boolean;
+  onDragFinish: () => void; onDragOver: (cell: number | null) => void; onPick: (cell: number) => void; onAccessibleAction: (cell: number) => void;
+};
+
+const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, merged, invalid, ready, reduceMotion, selected, selectionActive, compatible, dragging, emptyTarget, hovered, spawned, locked, onDrop, onDragFinish, onDragOver, onPick, onAccessibleAction }: MergeCellProps) {
   const definition = item ? mergeItemDefinition(item.definitionId) : null;
   const row = Math.floor(index / MERGE_BOARD_COLUMNS) + 1;
   const column = (index % MERGE_BOARD_COLUMNS) + 1;
   const actionLabel = selected ? 'Clear selection' : item ? ready ? 'Serve order' : 'Select item' : 'Move selected item here';
   return <View
-    accessible={Boolean(item) || selectionActive}
+    accessible={!locked && (Boolean(item) || selectionActive)}
     accessibilityActions={[{ name: 'activate', label: actionLabel }]}
     accessibilityLabel={definition ? `${definition.name}, tier ${definition.tier}, row ${row}, column ${column}${ready ? ', order ready' : ''}${selected ? ', selected' : ''}` : `Empty cell, row ${row}, column ${column}`}
     accessibilityRole="button"
-    onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === 'activate') onAccessibleAction(); }}
+    onAccessibilityAction={(event) => { if (!locked && event.nativeEvent.actionName === 'activate') onAccessibleAction(index); }}
     style={[styles.cell, { height: cellSize, width: cellSize }, invalid && styles.cellInvalid, ready && styles.cellReady, selected && styles.cellSelected, compatible && styles.cellCompatible, emptyTarget && styles.cellEmptyTarget, spawned && styles.cellSpawned, hovered && styles.cellHovered, dragging && styles.cellDragging]}>
-    {compatible ? <AnimatedBorderHighlight borderRadius={11} fadeDurationMs={180} glowBlur={1.8} inset={1} orbitDurationMs={1450} pauseDurationMs={0} /> : null}
-    {item && definition ? <GestureDetector gesture={gesture}>
-      <Animated.View
-        accessibilityHint={ready ? 'Drag upward to serve, or drag onto an identical item to merge.' : 'Drag onto an identical item to merge or an empty space to move.'}
-        accessible={false}
-        entering={dropOffset && !reduceMotion
-          ? FadeIn.duration(30)
-          : spawned && !reduceMotion
-          ? SlideInDown.duration(175).easing(Easing.out(Easing.cubic))
-          : FadeIn.duration(reduceMotion ? 60 : 90).easing(Easing.out(Easing.cubic))}
-        exiting={FadeOut.duration(reduceMotion ? 60 : 130)}
-        style={[styles.dragItem, animatedStyle]}>
+    {item && definition && !locked ? <MergeItem
+      boardHeight={boardHeight}
+      boardInset={boardInset}
+      boardWidth={boardWidth}
+      boardX={boardX}
+      boardY={boardY}
+      cellSize={cellSize}
+      definition={definition}
+      gap={gap}
+      index={index}
+      onDragFinish={onDragFinish}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onPick={onPick}
+      ready={ready}
+      reduceMotion={reduceMotion}
+      spawned={spawned}
+    /> : null}
+    {merged && !reduceMotion ? <MergeCelebration size={cellSize} /> : null}
+  </View>;
+});
+
+function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, definition, ready, reduceMotion, spawned, onDrop, onDragFinish, onDragOver, onPick }: {
+  index: number; cellSize: number; gap: number; boardInset: number;
+  boardX: SharedValue<number>; boardY: SharedValue<number>; boardWidth: SharedValue<number>; boardHeight: SharedValue<number>;
+  definition: ReturnType<typeof mergeItemDefinition>; ready: boolean; reduceMotion: boolean; spawned: boolean;
+  onDrop: MergeCellProps['onDrop']; onDragFinish: () => void; onDragOver: (cell: number | null) => void; onPick: (cell: number) => void;
+}) {
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const landingScale = useSharedValue(1);
+  const releasePending = useSharedValue(0);
+  const lastHovered = useSharedValue(-2);
+  useEffect(() => {
+    if (!spawned || reduceMotion) {
+      landingScale.value = 1;
+      return;
+    }
+    landingScale.value = 0.97;
+    landingScale.value = withDelay(110, withSequence(
+      withTiming(1.055, { duration: 90, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration: 115, easing: Easing.out(Easing.quad) }),
+    ));
+  }, [landingScale, reduceMotion, spawned]);
+
+  const returnHome = () => {
+    const duration = reduceMotion ? 55 : 145;
+    const easing = Easing.out(Easing.cubic);
+    x.value = withTiming(0, { duration, easing });
+    y.value = withTiming(0, { duration, easing });
+    scale.value = withSequence(
+      withTiming(0.99, { duration: Math.min(55, duration), easing }),
+      withTiming(1, { duration: Math.max(1, duration - 55), easing }),
+    );
+    releasePending.value = 0;
+  };
+  const resolveDrop = (dx: number, dy: number, absoluteX: number, absoluteY: number) => {
+    if (!onDrop(index, dx, dy, absoluteX, absoluteY)) returnHome();
+  };
+  const gesture = Gesture.Pan()
+    .minDistance(5)
+    .onBegin(() => {
+      releasePending.value = 0;
+      lastHovered.value = -2;
+      scale.value = withTiming(1.035, { duration: reduceMotion ? 40 : 75, easing: Easing.out(Easing.cubic) });
+      runOnJS(onPick)(index);
+    })
+    .onUpdate((event) => {
+      x.value = event.translationX;
+      y.value = event.translationY;
+      const localX = event.absoluteX - boardX.value;
+      const localY = event.absoluteY - boardY.value;
+      let hovered = -1;
+      if (localX >= 0 && localY >= 0 && localX < boardWidth.value && localY < boardHeight.value) {
+        const pitch = cellSize + gap;
+        const column = Math.max(0, Math.min(MERGE_BOARD_COLUMNS - 1, Math.round((localX - boardInset - cellSize / 2) / pitch)));
+        const row = Math.max(0, Math.min(MERGE_BOARD_ROWS - 1, Math.round((localY - boardInset - cellSize / 2) / pitch)));
+        hovered = row * MERGE_BOARD_COLUMNS + column;
+      }
+      if (hovered !== lastHovered.value) {
+        lastHovered.value = hovered;
+        runOnJS(onDragOver)(hovered < 0 ? null : hovered);
+      }
+    })
+    .onEnd((event) => {
+      releasePending.value = 1;
+      runOnJS(resolveDrop)(event.translationX, event.translationY, event.absoluteX, event.absoluteY);
+    })
+    .onFinalize(() => {
+      runOnJS(onDragFinish)();
+      if (releasePending.value === 0) {
+        x.value = withSpring(0, { damping: 19, stiffness: 260 });
+        y.value = withSpring(0, { damping: 19, stiffness: 260 });
+        scale.value = withTiming(1, { duration: 90 });
+      }
+    });
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }] }));
+  const landingStyle = useAnimatedStyle(() => ({ transform: [{ scale: landingScale.value }] }));
+  return <GestureDetector gesture={gesture}>
+      <Animated.View accessible={false} entering={spawned && !reduceMotion ? SlideInDown.duration(175).easing(Easing.out(Easing.cubic)) : undefined} style={[styles.dragItem, animatedStyle]}>
         <Animated.View style={[styles.landingItem, landingStyle]}>
           <FoodArt bare item={definition} size={cellSize - 4} />
         </Animated.View>
       </Animated.View>
-    </GestureDetector> : null}
-    {merged && !reduceMotion ? <MergeCelebration size={cellSize} /> : null}
-  </View>;
+    </GestureDetector>;
 }
 
-function FoodArt({ item, size, bare = false }: { item: ReturnType<typeof mergeItemDefinition>; size: number; bare?: boolean }) {
+function MergeFlightOverlay({ flight, cellSize, reduceMotion, onComplete }: { flight: MergeFlight; cellSize: number; reduceMotion: boolean; onComplete: (id: number, kind: MergeFlight['kind'], to: number | null) => void }) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withTiming(1, {
+      duration: reduceMotion ? 1 : flight.kind === 'merge' ? 185 : 155,
+      easing: Easing.out(Easing.cubic),
+    }, (finished) => {
+      if (finished) runOnJS(onComplete)(flight.id, flight.kind, flight.to);
+    });
+  }, [flight.id, flight.kind, flight.to, onComplete, progress, reduceMotion]);
+  const style = useAnimatedStyle(() => ({
+    opacity: flight.kind === 'merge'
+      ? interpolate(progress.value, [0, 0.72, 1], [1, 1, 0])
+      : flight.kind === 'serve' ? interpolate(progress.value, [0, 1], [1, 0]) : 1,
+    transform: [
+      { translateX: interpolate(progress.value, [0, 1], [flight.startX, flight.endX]) },
+      { translateY: interpolate(progress.value, [0, 1], [flight.startY, flight.endY]) },
+      { scale: flight.kind === 'merge' ? interpolate(progress.value, [0, 0.72, 1], [1.035, 0.94, 0.42]) : 1 },
+    ],
+  }));
+  return <Animated.View pointerEvents="none" style={[styles.flight, { height: cellSize, width: cellSize }, style]}>
+    <FoodArt bare item={mergeItemDefinition(flight.item.definitionId)} size={cellSize - 4} />
+  </Animated.View>;
+}
+
+const FoodArt = memo(function FoodArt({ item, size, bare = false }: { item: ReturnType<typeof mergeItemDefinition>; size: number; bare?: boolean }) {
   const presentation = CHAIN_STYLE[item.chainId];
   return <View style={[
     styles.foodArt,
     { height: size, width: size },
     bare ? styles.foodArtBare : { backgroundColor: `${presentation.color}20`, borderColor: `${presentation.color}55` },
   ]}>
-    <Image source={FEASTLE_MERGE_ART[item.artKey]} contentFit="contain" transition={80} style={[styles.foodImage, bare && styles.foodImageBare]} />
+    <Image source={FEASTLE_MERGE_ART[item.artKey]} contentFit="contain" style={[styles.foodImage, bare && styles.foodImageBare]} />
     <View style={[styles.tierBadge, { backgroundColor: presentation.color }]}><ThemedText style={styles.tierText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{item.tier}</ThemedText></View>
   </View>;
-}
+});
 
 function MergeCelebration({ size }: { size: number }) {
   const progress = useSharedValue(0);
@@ -672,6 +778,7 @@ const styles = StyleSheet.create({
   cellDragging: { borderColor: '#FFE1AE', zIndex: 1000 },
   cellInvalid: { backgroundColor: '#6B454A', borderColor: '#F38A72', boxShadow: '0 0 9px rgba(243,102,79,0.28)' },
   dragItem: { alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1001 },
+  flight: { alignItems: 'center', justifyContent: 'center', left: 0, position: 'absolute', top: 0, zIndex: 3000 },
   landingItem: { alignItems: 'center', justifyContent: 'center' },
   foodArt: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, justifyContent: 'center' },
   foodImage: { height: '96%', width: '96%' },
