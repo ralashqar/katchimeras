@@ -556,6 +556,7 @@ const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardIns
       definition={definition}
       gap={gap}
       index={index}
+      invalid={invalid}
       onDragFinish={onDragFinish}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -568,16 +569,17 @@ const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardIns
   </View>;
 });
 
-function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, definition, ready, reduceMotion, spawned, onDrop, onDragFinish, onDragOver, onPick }: {
+function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, definition, invalid, ready, reduceMotion, spawned, onDrop, onDragFinish, onDragOver, onPick }: {
   index: number; cellSize: number; gap: number; boardInset: number;
   boardX: SharedValue<number>; boardY: SharedValue<number>; boardWidth: SharedValue<number>; boardHeight: SharedValue<number>;
-  definition: ReturnType<typeof mergeItemDefinition>; ready: boolean; reduceMotion: boolean; spawned: boolean;
+  definition: ReturnType<typeof mergeItemDefinition>; invalid: boolean; ready: boolean; reduceMotion: boolean; spawned: boolean;
   onDrop: MergeCellProps['onDrop']; onDragFinish: () => void; onDragOver: (cell: number | null) => void; onPick: (cell: number) => void;
 }) {
   const x = useSharedValue(0);
   const y = useSharedValue(0);
   const scale = useSharedValue(1);
   const landingScale = useSharedValue(1);
+  const invalidX = useSharedValue(0);
   const releasePending = useSharedValue(0);
   const lastHovered = useSharedValue(-2);
   useEffect(() => {
@@ -591,6 +593,19 @@ function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidt
       withTiming(1, { duration: 115, easing: Easing.out(Easing.quad) }),
     ));
   }, [landingScale, reduceMotion, spawned]);
+  useEffect(() => {
+    if (!invalid || reduceMotion) {
+      invalidX.value = 0;
+      return;
+    }
+    invalidX.value = withSequence(
+      withTiming(-4, { duration: 42 }),
+      withTiming(4, { duration: 58 }),
+      withTiming(-3, { duration: 52 }),
+      withTiming(2, { duration: 46 }),
+      withTiming(0, { duration: 58, easing: Easing.out(Easing.quad) }),
+    );
+  }, [invalid, invalidX, reduceMotion]);
 
   const returnHome = () => {
     const duration = reduceMotion ? 55 : 145;
@@ -643,7 +658,7 @@ function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidt
         scale.value = withTiming(1, { duration: 90 });
       }
     });
-  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }, { translateY: y.value }, { scale: scale.value }] }));
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value + invalidX.value }, { translateY: y.value }, { scale: scale.value }] }));
   const landingStyle = useAnimatedStyle(() => ({ transform: [{ scale: landingScale.value }] }));
   return <GestureDetector gesture={gesture}>
       <Animated.View accessible={false} entering={spawned && !reduceMotion ? SlideInDown.duration(175).easing(Easing.out(Easing.cubic)) : undefined} style={[styles.dragItem, animatedStyle]}>
