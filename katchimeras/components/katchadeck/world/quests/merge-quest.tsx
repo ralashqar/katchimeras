@@ -117,9 +117,12 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   const boardMeasuredHeight = useSharedValue(boardHeight);
   const flightId = useRef(0);
   const spawnAnimationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingCommitFrames = useRef(new Set<number>());
 
   useEffect(() => () => {
     if (spawnAnimationTimer.current) clearTimeout(spawnAnimationTimer.current);
+    pendingCommitFrames.current.forEach((frame) => cancelAnimationFrame(frame));
+    pendingCommitFrames.current.clear();
   }, []);
 
   const measureBoard = () => {
@@ -170,6 +173,8 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     setDraggingCell(null);
     setHoveredCell(null);
     setFlights([]);
+    pendingCommitFrames.current.forEach((frame) => cancelAnimationFrame(frame));
+    pendingCommitFrames.current.clear();
     onRunningChange(false);
   };
 
@@ -233,8 +238,9 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     const sourceY = inset + Math.floor(from / MERGE_BOARD_COLUMNS) * pitch;
     const targetX = to == null ? sourceX + dx : inset + (to % MERGE_BOARD_COLUMNS) * pitch;
     const targetY = to == null ? sourceY + dy - cellSize * 1.35 : inset + Math.floor(to / MERGE_BOARD_COLUMNS) * pitch;
+    const id = ++flightId.current;
     setFlights((current) => [...current, {
-      id: ++flightId.current,
+      id,
       item,
       kind,
       from,
@@ -244,6 +250,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       endX: targetX,
       endY: targetY,
     }]);
+    return id;
   }, [boardBorder, boardPadding, cellSize, gap]);
 
   const drop = useCallback((from: number, dx: number, dy: number, absoluteX: number, absoluteY: number): boolean => {
@@ -282,7 +289,26 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       announce('Those items do not match.');
       return false;
     }
-    if (!reduceMotion) addFlight(source, merging ? 'merge' : 'move', from, to, dx, dy);
+    if (!reduceMotion && !merging) {
+      // Mount the flight copy while the original dragged image is still
+      // painted. Commit on the following frame so there is never a blank
+      // handoff frame between the two native image views.
+      const activeFlightId = addFlight(source, 'move', from, to, dx, dy);
+      haptic('move');
+      const commitFrame = requestAnimationFrame(() => {
+        pendingCommitFrames.current.delete(commitFrame);
+        const latest = stateRef.current;
+        const updated = mergeRoundReducer(latest, { type: 'move', from, to }, config.moveBudget);
+        if (updated === latest) {
+          setFlights((flights) => flights.filter((flight) => flight.id !== activeFlightId));
+          return;
+        }
+        commit(updated);
+      });
+      pendingCommitFrames.current.add(commitFrame);
+      return true;
+    }
+    if (!reduceMotion) addFlight(source, 'merge', from, to, dx, dy);
     if (merging) {
       const upgraded = mergeItemDefinition(next.board[to]!.definitionId);
       if (reduceMotion) {
@@ -357,7 +383,11 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     [state.orders],
   );
   const hiddenFlightTargets = useMemo(
-    () => new Set(flights.flatMap((flight) => flight.to == null ? [] : [flight.to])),
+    () => new Set(flights.flatMap((flight) => flight.kind === 'merge' && flight.to != null ? [flight.to] : [])),
+    [flights],
+  );
+  const concealedMoveTargets = useMemo(
+    () => new Set(flights.flatMap((flight) => flight.kind === 'move' && flight.to != null ? [flight.to] : [])),
     [flights],
   );
 
@@ -474,6 +504,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
         boardY={boardY}
         boardInset={boardPadding + boardBorder}
         cellSize={cellSize}
+        concealed={concealedMoveTargets.has(index)}
         gap={gap}
         index={index}
         invalid={invalidCell === index}
@@ -529,12 +560,12 @@ function ResultMetric({ label, value }: { label: string; value: string }) {
 type MergeCellProps = {
   item: MergeBoardItem | null; index: number; cellSize: number; gap: number; boardInset: number;
   boardX: SharedValue<number>; boardY: SharedValue<number>; boardWidth: SharedValue<number>; boardHeight: SharedValue<number>;
-  merged: boolean; invalid: boolean; ready: boolean; reduceMotion: boolean; selected: boolean; selectionActive: boolean; compatible: boolean; dragging: boolean; emptyTarget: boolean; hovered: boolean; spawned: boolean; locked: boolean;
+  merged: boolean; invalid: boolean; ready: boolean; reduceMotion: boolean; selected: boolean; selectionActive: boolean; compatible: boolean; concealed: boolean; dragging: boolean; emptyTarget: boolean; hovered: boolean; spawned: boolean; locked: boolean;
   onDrop: (index: number, dx: number, dy: number, absoluteX: number, absoluteY: number) => boolean;
   onDragFinish: () => void; onDragOver: (cell: number | null) => void; onPick: (cell: number) => void; onAccessibleAction: (cell: number) => void;
 };
 
-const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, merged, invalid, ready, reduceMotion, selected, selectionActive, compatible, dragging, emptyTarget, hovered, spawned, locked, onDrop, onDragFinish, onDragOver, onPick, onAccessibleAction }: MergeCellProps) {
+const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, merged, invalid, ready, reduceMotion, selected, selectionActive, compatible, concealed, dragging, emptyTarget, hovered, spawned, locked, onDrop, onDragFinish, onDragOver, onPick, onAccessibleAction }: MergeCellProps) {
   const definition = item ? mergeItemDefinition(item.definitionId) : null;
   const row = Math.floor(index / MERGE_BOARD_COLUMNS) + 1;
   const column = (index % MERGE_BOARD_COLUMNS) + 1;
@@ -546,14 +577,16 @@ const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardIns
     accessibilityRole="button"
     onAccessibilityAction={(event) => { if (!locked && event.nativeEvent.actionName === 'activate') onAccessibleAction(index); }}
     style={[styles.cell, { height: cellSize, width: cellSize }, invalid && styles.cellInvalid, ready && styles.cellReady, selected && styles.cellSelected, compatible && styles.cellCompatible, emptyTarget && styles.cellEmptyTarget, spawned && styles.cellSpawned, hovered && styles.cellHovered, dragging && styles.cellDragging]}>
-    {item && definition && !locked ? <MergeItem
+    {item && definition ? <MergeItem
       boardHeight={boardHeight}
       boardInset={boardInset}
       boardWidth={boardWidth}
       boardX={boardX}
       boardY={boardY}
       cellSize={cellSize}
+      concealed={concealed}
       definition={definition}
+      enabled={!locked}
       gap={gap}
       index={index}
       invalid={invalid}
@@ -569,10 +602,10 @@ const MergeCell = memo(function MergeCell({ item, index, cellSize, gap, boardIns
   </View>;
 });
 
-function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, definition, invalid, ready, reduceMotion, spawned, onDrop, onDragFinish, onDragOver, onPick }: {
+function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidth, boardHeight, concealed, definition, enabled, invalid, ready, reduceMotion, spawned, onDrop, onDragFinish, onDragOver, onPick }: {
   index: number; cellSize: number; gap: number; boardInset: number;
   boardX: SharedValue<number>; boardY: SharedValue<number>; boardWidth: SharedValue<number>; boardHeight: SharedValue<number>;
-  definition: ReturnType<typeof mergeItemDefinition>; invalid: boolean; ready: boolean; reduceMotion: boolean; spawned: boolean;
+  concealed: boolean; definition: ReturnType<typeof mergeItemDefinition>; enabled: boolean; invalid: boolean; ready: boolean; reduceMotion: boolean; spawned: boolean;
   onDrop: MergeCellProps['onDrop']; onDragFinish: () => void; onDragOver: (cell: number | null) => void; onPick: (cell: number) => void;
 }) {
   const x = useSharedValue(0);
@@ -622,6 +655,7 @@ function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidt
     if (!onDrop(index, dx, dy, absoluteX, absoluteY)) returnHome();
   };
   const gesture = Gesture.Pan()
+    .enabled(enabled)
     .minDistance(5)
     .onBegin(() => {
       releasePending.value = 0;
@@ -661,7 +695,7 @@ function MergeItem({ index, cellSize, gap, boardInset, boardX, boardY, boardWidt
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value + invalidX.value }, { translateY: y.value }, { scale: scale.value }] }));
   const landingStyle = useAnimatedStyle(() => ({ transform: [{ scale: landingScale.value }] }));
   return <GestureDetector gesture={gesture}>
-      <Animated.View accessible={false} entering={spawned && !reduceMotion ? SlideInDown.duration(175).easing(Easing.out(Easing.cubic)) : undefined} style={[styles.dragItem, animatedStyle]}>
+      <Animated.View accessible={false} entering={spawned && !reduceMotion ? SlideInDown.duration(175).easing(Easing.out(Easing.cubic)) : undefined} style={[styles.dragItem, animatedStyle, concealed && styles.concealed]}>
         <Animated.View style={[styles.landingItem, landingStyle]}>
           <FoodArt bare item={definition} size={cellSize - 4} />
         </Animated.View>
@@ -793,6 +827,7 @@ const styles = StyleSheet.create({
   cellDragging: { borderColor: '#FFE1AE', zIndex: 1000 },
   cellInvalid: { backgroundColor: '#6B454A', borderColor: '#F38A72', boxShadow: '0 0 9px rgba(243,102,79,0.28)' },
   dragItem: { alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 1001 },
+  concealed: { opacity: 0 },
   flight: { alignItems: 'center', justifyContent: 'center', left: 0, position: 'absolute', top: 0, zIndex: 3000 },
   landingItem: { alignItems: 'center', justifyContent: 'center' },
   foodArt: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, justifyContent: 'center' },
