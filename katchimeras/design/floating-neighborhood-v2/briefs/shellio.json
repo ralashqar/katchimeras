@@ -1,0 +1,35 @@
+{
+  "key": "shellio",
+  "kind": "resident",
+  "concept": "A bright salt-air shoreline garden shaped by unhurried beach visits, smooth shells, and sunlit sea glass.",
+  "main_structure": "One broad open-front shell cabana at the rear with a few oversized scalloped canopy bands, warm cream supports, and one large sea-glass blue inset.",
+  "rear_props": [
+    "one chunky driftwood-style bench with a single oversized pearl cushion",
+    "two broad pearl lanterns"
+  ],
+  "side_props": [
+    "one large folded beach umbrella and one smooth shell planter on the upper-left edge",
+    "one shallow rounded blue rock pool and two broad sea-grass forms on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth sea-glass parapet made from broad rounded masses, without shell or coral texture",
+    "palette": ["clear turquoise", "warm shell cream", "sunwashed coral"],
+    "emblems": "four oversized simple scallop-shell emblems"
+  },
+  "cliff": {
+    "materials": ["large sunwashed sandstone blocks", "large muted coral-stone blocks", "a few broad translucent-looking sea-glass blocks"],
+    "palette": ["sandy cream", "soft coral", "sea-glass teal"]
+  },
+  "lighting": "soft bright coastal daylight with a warm sunlit rim and two broad pearl-lantern glows",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, text, watermark, external shadow",
+    "sand grains, foam flecks, tiny shells, tiny coral, flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

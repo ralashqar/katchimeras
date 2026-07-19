@@ -28,7 +28,7 @@ import type { EggVisualState } from '@/types/home';
 import type { WorldIdentityState } from '@/types/world-identity';
 import { homePreset, zodiacProfile } from '@/utils/world-identity';
 import { HEX_TILE_H, HEX_TILE_W, hexDrawDepth } from '@/utils/world-hex';
-import type { KingdomResidentLod } from '@/utils/kingdom-rendering';
+import { kingdomWorldViewPoint, type KingdomResidentLod } from '@/utils/kingdom-rendering';
 import type { KingdomTilePhase } from '@/utils/kingdom-tile-scheduler';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
 import {
@@ -58,12 +58,8 @@ type Props = {
 const CREATURE_SIZE = 58;
 const CREATURE_WORLD_SCALE = kingdomWorldViewConfig.katchimera.globalScale;
 const CREATURE_WORLD_SIZE = CREATURE_SIZE * CREATURE_WORLD_SCALE;
-const CREATURE_WORLD_HORIZONTAL_HEX_OFFSET = kingdomWorldViewConfig.katchimera.horizontalOffsetHexTileWidth;
-const CREATURE_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.katchimera.verticalOffsetHexTileHeight;
 const ZODIAC_WORLD_SCALE = kingdomWorldViewConfig.zodiac.globalScale;
 const ZODIAC_WORLD_SIZE = CREATURE_SIZE * ZODIAC_WORLD_SCALE;
-const ZODIAC_WORLD_HORIZONTAL_HEX_OFFSET = kingdomWorldViewConfig.zodiac.horizontalOffsetHexTileWidth;
-const ZODIAC_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.zodiac.verticalOffsetHexTileHeight;
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
 const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale;
@@ -132,8 +128,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
       if (tile.kind !== 'resident' || !tile.resident || !scheduler.readyTileIds.has(tile.id)) continue;
       const runtime = runtimeById.get(tile.id);
       if (!runtime || (!scheduler.visibleTileIds.has(tile.id) && runtime.phase !== 'exiting')) continue;
-      const x = tile.cx + HEX_TILE_W * CREATURE_WORLD_HORIZONTAL_HEX_OFFSET;
-      const y = tile.cy + HEX_TILE_H * CREATURE_WORLD_VERTICAL_HEX_OFFSET;
+      const { x, y } = kingdomWorldViewPoint(
+        { x: tile.cx, y: tile.cy },
+        kingdomWorldViewConfig.katchimera
+      );
       items.push({
         depth: hexDrawDepth({ x, y }, 4),
         node: (
@@ -158,8 +156,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     if (zodiacTile && zodiac && scheduler.readyTileIds.has(zodiacTile.id)) {
       const runtime = runtimeById.get(zodiacTile.id);
       if (runtime && (scheduler.visibleTileIds.has(zodiacTile.id) || runtime.phase === 'exiting')) {
-        const x = zodiacTile.cx + HEX_TILE_W * ZODIAC_WORLD_HORIZONTAL_HEX_OFFSET;
-        const y = zodiacTile.cy + HEX_TILE_H * ZODIAC_WORLD_VERTICAL_HEX_OFFSET;
+        const { x, y } = kingdomWorldViewPoint(
+          { x: zodiacTile.cx, y: zodiacTile.cy },
+          kingdomWorldViewConfig.zodiac
+        );
         items.push({
           depth: hexDrawDepth({ x, y }, 4),
           node: (
@@ -228,8 +228,10 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             })}
             {showEgg && centerRuntime ? (
               <KingdomEgg
-                x={scene.centerTile.cx + HEX_TILE_W * hexTileSelection.value.eggAnchor.xHexWidth}
-                y={scene.centerTile.cy + HEX_TILE_H * hexTileSelection.value.eggAnchor.yHexHeight}
+                {...kingdomWorldViewPoint(
+                  { x: scene.centerTile.cx, y: scene.centerTile.cy },
+                  kingdomWorldViewConfig.egg
+                )}
                 phase={centerRuntime.phase}
                 settled={!camera.isMoving}
                 onPress={camera.recenter}

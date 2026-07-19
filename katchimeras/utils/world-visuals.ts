@@ -465,7 +465,6 @@ export type KingdomHexTileVariant = {
 export type KingdomHexTileSelection = {
   center: KingdomHexTileSpec;
   default: KingdomHexTileSpec;
-  eggAnchor: { xHexWidth: number; yHexHeight: number };
   homes: Record<HomeArchetypeId, KingdomHexTileSpec>;
   layoutProfile: KingdomHexLayoutProfileId;
   residentTiles?: Partial<Record<HomeVisualKey, KingdomHexTileSpec>>;
@@ -520,6 +519,8 @@ export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_FLICKERBUN_HEX_TILE: ImageSourcePr
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_RELICOON_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_relicoon_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_vesperitt_hex_tile.webp');
 
 const KINGDOM_DEFAULT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
   thumb: require('../assets/images/katchimeras/world/hex/default_hex_tile_256.webp'),
@@ -680,6 +681,16 @@ const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HEX_TILE_SOURCES: KingdomHexTi
   thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_hex_tile_256.webp'),
   medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_hex_tile_512.webp'),
   full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HEX_TILE,
+};
+const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_hex_tile_512.webp'),
+  full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HEX_TILE,
+};
+const KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
+  thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_vesperitt_hex_tile_256.webp'),
+  medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_vesperitt_hex_tile_512.webp'),
+  full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE,
 };
 const homeHexTile = (
   source: ImageSourcePropType,
@@ -989,6 +1000,18 @@ const FLOATING_NEIGHBORHOOD_V2_RESIDENT_TILES: Partial<
     alphaBounds: hexTileAlphaBounds('floating_neighborhood_v2_gatherglow_hex_tile.webp'),
     faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
   },
+  shellio: {
+    source: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HEX_TILE,
+    sources: KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HEX_TILE_SOURCES,
+    alphaBounds: hexTileAlphaBounds('floating_neighborhood_v2_shellio_hex_tile.webp'),
+    faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+  },
+  vesperitt: {
+    source: KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE,
+    sources: KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE_SOURCES,
+    alphaBounds: hexTileAlphaBounds('floating_neighborhood_v2_vesperitt_hex_tile.webp'),
+    faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+  },
 };
 const FLOATING_NEIGHBORHOOD_V2_HOME_TILES: Record<HomeArchetypeId, KingdomHexTileSpec> = {
   explorer: FLOATING_NEIGHBORHOOD_V2_HOME_EXPLORER_TILE,
@@ -1021,7 +1044,6 @@ export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [
     selection: {
       center: FLOATING_HOME_BASE_TILE_V1,
       default: FLOATING_EMPTY_TILE_V1,
-      eggAnchor: { xHexWidth: 0, yHexHeight: -0.07 },
       homes: FLOATING_HOME_TILES_V1,
       layoutProfile: 'connected-floating-v1',
       residentTiles: FLOATING_RESIDENT_TILES_V1,
@@ -1032,11 +1054,10 @@ export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [
   {
     id: 'floating_neighborhood_v2',
     label: 'Floating neighbourhood v2',
-    description: 'Low-detail toy-diorama islands with bold bevels, a calm 14% air gap, and no bridges.',
+    description: 'Low-detail toy-diorama islands with bold bevels, a calm 16.8% air gap, and no bridges.',
     selection: {
       center: FLOATING_NEIGHBORHOOD_V2_HOME_TILE,
       default: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-      eggAnchor: { xHexWidth: 0, yHexHeight: 0.1 },
       homes: FLOATING_NEIGHBORHOOD_V2_HOME_TILES,
       layoutProfile: 'floating-neighborhood-v2',
       residentTiles: FLOATING_NEIGHBORHOOD_V2_RESIDENT_TILES,
@@ -1153,7 +1174,6 @@ export function kingdomHexTileSet(): KingdomHexTileSelection {
   return {
     center: center.tile,
     default: base.tile,
-    eggAnchor: { xHexWidth: 0, yHexHeight: 0.2 },
     homes: KINGDOM_HOME_HEX_TILES,
     layoutProfile: 'separated-v1',
     useCustomResidentTiles: true,

@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { KINGDOM_RENDERING } from '../constants/kingdom-rendering';
+import kingdomWorldViewConfig from '../constants/kingdom-world-view.json';
 import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
 import {
   cameraTranslationBounds,
   frameToRect,
   kingdomSceneMetrics,
+  kingdomWorldViewPoint,
   rectsIntersect,
   residentLodWithHysteresis,
   tileLodWithHysteresis,
@@ -52,6 +54,20 @@ function renderedAssetY(frame: { top: number; height: number }, assetY: number):
 function renderedAssetX(frame: { left: number; width: number }, assetX: number): number {
   return frame.left + (assetX / 1024) * frame.width;
 }
+
+test('home egg world placement is driven by kingdom-world-view JSON offsets', () => {
+  const center = { x: 400, y: 600 };
+  const point = kingdomWorldViewPoint(center, kingdomWorldViewConfig.egg);
+
+  assertClose(
+    point.x,
+    center.x + HEX_TILE_W * kingdomWorldViewConfig.egg.horizontalOffsetHexTileWidth
+  );
+  assertClose(
+    point.y,
+    center.y + HEX_TILE_H * kingdomWorldViewConfig.egg.verticalOffsetHexTileHeight
+  );
+});
 
 test('Kingdom sky cloud wrapping remains inside the overscanned viewport', () => {
   const viewportWidth = 390;
@@ -217,8 +233,9 @@ test('canonical face alignment ignores different overall island silhouettes', ()
 test('connected floating layout applies the measured two-percent seam overlap', () => {
   const center = hexToWorld({ q: 0, r: 0 }, 'connected-floating-v1');
   const southEast = hexToWorld({ q: 1, r: 0 }, 'connected-floating-v1');
-  assertClose(southEast.x - center.x, HEX_TILE_W * 0.75 * 0.98);
-  assertClose(southEast.y - center.y, HEX_TILE_H * 0.5 * 0.98);
+  const spacing = kingdomWorldViewConfig.hexTiles.layoutProfiles['connected-floating-v1'];
+  assertClose(southEast.x - center.x, HEX_TILE_W * 0.75 * spacing.horizontalSpacing);
+  assertClose(southEast.y - center.y, HEX_TILE_H * 0.5 * spacing.verticalSpacing);
 
   const centerPoints = hexTileTopPoints(center.x, center.y);
   const neighborPoints = hexTileTopPoints(southEast.x, southEast.y);
@@ -228,23 +245,24 @@ test('connected floating layout applies the measured two-percent seam overlap', 
   assert.ok(neighborPoints[3].y < centerPoints[1].y);
 });
 
-test('floating neighbourhood v2 applies a uniform fourteen-percent air gap', () => {
+test('floating neighbourhood v2 applies a uniform sixteen-point-eight-percent air gap', () => {
   const center = hexToWorld({ q: 0, r: 0 }, 'floating-neighborhood-v2');
   const southEast = hexToWorld({ q: 1, r: 0 }, 'floating-neighborhood-v2');
-  assertClose(southEast.x - center.x, HEX_TILE_W * 0.75 * 1.14);
-  assertClose(southEast.y - center.y, HEX_TILE_H * 0.5 * 1.14);
+  const spacing = kingdomWorldViewConfig.hexTiles.layoutProfiles['floating-neighborhood-v2'];
+  assertClose(southEast.x - center.x, HEX_TILE_W * 0.75 * spacing.horizontalSpacing);
+  assertClose(southEast.y - center.y, HEX_TILE_H * 0.5 * spacing.verticalSpacing);
   assert.ok(southEast.x > hexToWorld({ q: 1, r: 0 }, 'connected-floating-v1').x);
 });
 
-test('existing kingdom layout profile values remain unchanged', () => {
-  assert.deepEqual(KINGDOM_HEX_LAYOUT_PROFILES['connected-floating-v1'], {
-    horizontalSpacing: 0.98,
-    verticalSpacing: 0.98,
-  });
-  assert.deepEqual(KINGDOM_HEX_LAYOUT_PROFILES['separated-v1'], {
-    horizontalSpacing: 1.08,
-    verticalSpacing: 1.08 * 1.12,
-  });
+test('kingdom tile geometry and layout profiles are sourced from world-view JSON', () => {
+  assert.equal(HEX_TILE_W, kingdomWorldViewConfig.hexTiles.width);
+  assertClose(
+    HEX_TILE_H,
+    kingdomWorldViewConfig.hexTiles.width *
+      (Math.sqrt(3) / 2) *
+      kingdomWorldViewConfig.hexTiles.projectionTilt
+  );
+  assert.deepEqual(KINGDOM_HEX_LAYOUT_PROFILES, kingdomWorldViewConfig.hexTiles.layoutProfiles);
 });
 
 test('legacy separated layout retains breathing room between tiles', () => {

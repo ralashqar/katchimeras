@@ -1,3 +1,4 @@
+import json
 from math import sqrt
 from pathlib import Path
 
@@ -7,10 +8,14 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 HEX_DIR = ROOT / "assets/images/katchimeras/world/hex"
 OUT_DIR = ROOT / "design/floating-neighborhood-v2"
+WORLD_VIEW = json.loads((ROOT / "constants/kingdom-world-view.json").read_text(encoding="utf-8"))
+HEX_CONFIG = WORLD_VIEW["hexTiles"]
+V2_SPACING = HEX_CONFIG["layoutProfiles"]["floating-neighborhood-v2"]
 
-HEX_W = 490.0
-HEX_H = HEX_W * (sqrt(3) / 2) * 0.7
-SPACING = 1.14
+HEX_W = float(HEX_CONFIG["width"])
+HEX_H = HEX_W * (sqrt(3) / 2) * float(HEX_CONFIG["projectionTilt"])
+HORIZONTAL_SPACING = float(V2_SPACING["horizontalSpacing"])
+VERTICAL_SPACING = float(V2_SPACING["verticalSpacing"])
 VIEW_SCALE = 0.8
 CANVAS = (1400, 1150)
 CENTER = (700.0, 520.0)
@@ -19,8 +24,8 @@ FACE_BOUNDS = (46, 167, 978, 697)
 
 def center_for(q: int, r: int) -> tuple[float, float]:
     return (
-        CENTER[0] + HEX_W * 0.75 * SPACING * q * VIEW_SCALE,
-        CENTER[1] + HEX_H * SPACING * (r + q / 2) * VIEW_SCALE,
+        CENTER[0] + HEX_W * 0.75 * HORIZONTAL_SPACING * q * VIEW_SCALE,
+        CENTER[1] + HEX_H * VERTICAL_SPACING * (r + q / 2) * VIEW_SCALE,
     )
 
 
@@ -39,19 +44,21 @@ def paste_tile(canvas: Image.Image, filename: str, center: tuple[float, float]) 
 
 def paste_egg(canvas: Image.Image, center: tuple[float, float]) -> None:
     image = Image.open(ROOT / "assets/images/katchimeras/cutouts/egg-base.webp").convert("RGBA")
-    width = round(200 * 0.35 * VIEW_SCALE)
-    height = round(258 * 0.35 * VIEW_SCALE)
+    width = round(200 * WORLD_VIEW["egg"]["globalScale"] * VIEW_SCALE)
+    height = round(258 * WORLD_VIEW["egg"]["globalScale"] * VIEW_SCALE)
     image = image.resize((width, height), Image.Resampling.LANCZOS)
-    anchor_y = center[1] + HEX_H * 0.1 * VIEW_SCALE
-    canvas.alpha_composite(image, (round(center[0] - width / 2), round(anchor_y - height / 2)))
+    anchor_x = center[0] + HEX_W * WORLD_VIEW["egg"]["horizontalOffsetHexTileWidth"] * VIEW_SCALE
+    anchor_y = center[1] + HEX_H * WORLD_VIEW["egg"]["verticalOffsetHexTileHeight"] * VIEW_SCALE
+    canvas.alpha_composite(image, (round(anchor_x - width / 2), round(anchor_y - height / 2)))
 
 
 def paste_creature(canvas: Image.Image, key: str, center: tuple[float, float]) -> None:
     image = Image.open(ROOT / f"assets/images/katchimeras/cutouts/{key}.png").convert("RGBA")
-    size = round(116 * VIEW_SCALE)
+    size = round(58 * WORLD_VIEW["katchimera"]["globalScale"] * VIEW_SCALE)
     image.thumbnail((size, size), Image.Resampling.LANCZOS)
-    anchor_y = center[1] + HEX_H * 0.2 * VIEW_SCALE
-    left = round(center[0] - size / 2 + (size - image.width) / 2)
+    anchor_x = center[0] + HEX_W * WORLD_VIEW["katchimera"]["horizontalOffsetHexTileWidth"] * VIEW_SCALE
+    anchor_y = center[1] + HEX_H * WORLD_VIEW["katchimera"]["verticalOffsetHexTileHeight"] * VIEW_SCALE
+    left = round(anchor_x - size / 2 + (size - image.width) / 2)
     top = round(anchor_y - 94.54 * VIEW_SCALE + (size - image.height) / 2)
     canvas.alpha_composite(image, (left, top))
 
@@ -76,6 +83,8 @@ FILENAMES = {
     "relicoon": "floating_neighborhood_v2_relicoon_hex_tile.webp",
     "bedrotte": "floating_neighborhood_v2_bedrotte_hex_tile.webp",
     "gatherglow": "floating_neighborhood_v2_gatherglow_hex_tile.webp",
+    "shellio": "floating_neighborhood_v2_shellio_hex_tile.webp",
+    "vesperitt": "floating_neighborhood_v2_vesperitt_hex_tile.webp",
 }
 
 
@@ -206,6 +215,15 @@ def main() -> None:
         "qa-bedrotte-gatherglow-neighborhood.png",
         bedrotte_gatherglow_tiles,
         [(-1, 1, "bedrotte"), (1, 0, "gatherglow")],
+    )
+    shellio_vesperitt_tiles = [
+        (q, r, "shellio" if (q, r) == (-1, 1) else "vesperitt" if (q, r) == (1, 0) else kind)
+        for q, r, kind in base_tiles
+    ]
+    render(
+        "qa-shellio-vesperitt-neighborhood.png",
+        shellio_vesperitt_tiles,
+        [(-1, 1, "shellio"), (1, 0, "vesperitt")],
     )
     home_archetype_tiles = [
         (0, -1, "home-explorer"),

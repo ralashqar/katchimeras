@@ -1,0 +1,35 @@
+{
+  "key": "vesperitt",
+  "kind": "resident",
+  "concept": "A hushed small-hours observatory garden for the calm, clear stretch of night after the rest of the world has gone quiet.",
+  "main_structure": "One compact open-front observatory-study at the rear with a broad crescent-shaped indigo roof, one large moon window, and a simple built-in reading desk.",
+  "rear_props": [
+    "one broad blank star-chart desk with two oversized closed books",
+    "two large crescent lanterns"
+  ],
+  "side_props": [
+    "one chunky midnight-blue reading chair and one large closed book stack on the upper-left edge",
+    "one broad brass telescope and two rounded moonflower shrubs on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth deep-indigo garden wall with broad moonstone cap blocks",
+    "palette": ["deep indigo", "soft violet", "moonstone cream"],
+    "emblems": "four oversized simple crescent-moon emblems"
+  },
+  "cliff": {
+    "materials": ["large rounded midnight-slate blocks", "large muted violet stone blocks", "a few broad warm moonstone blocks"],
+    "palette": ["midnight blue", "muted violet", "warm cream"]
+  },
+  "lighting": "soft luminous midnight-blue ambient light with one broad moon-window glow and two warm crescent-lantern pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, text, watermark, external shadow",
+    "readable charts, star specks, fairy lights, tiny flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

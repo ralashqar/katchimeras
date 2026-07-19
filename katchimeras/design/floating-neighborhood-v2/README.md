@@ -1,7 +1,7 @@
 # Floating neighbourhood v2
 
 This proof pivots the Kingdom toward complete, self-contained floating islands
-with a uniform 14% axial gap. The previous connected-island proof remains
+with a uniform 16.8% axial gap. The previous connected-island proof remains
 available for comparison and production defaults are unchanged.
 
 For any new resident environment or home variant, use the canonical
@@ -210,6 +210,18 @@ lanterns. Its continuous terracotta wall, linked-loop emblems, and large
 biscuit/terracotta/honey cliff blocks carry the convivial identity while the
 entire bottom/front stage remains clear.
 
+Shellio uses one broad shell cabana, a chunky driftwood bench, folded beach
+umbrella, pearl lanterns, shell planters, a shallow rock pool, and broad
+sea-grass forms in a breezy rear-and-side frame. Its continuous sea-glass
+parapet, oversized scallop emblems, and large sandstone/coral/teal cliff blocks
+carry the shoreline identity without sand grains, foam flecks, or tiny shells.
+
+Vesperitt uses one open-front midnight observatory-study, a broad reading desk,
+chunky chair, oversized book stacks, crescent lanterns, brass telescope, and
+rounded moonflower shrubs. Its continuous indigo wall, oversized crescent
+emblems, and large midnight-slate/violet/moonstone cliff blocks carry the
+small-hours identity without star specks, readable charts, or fairy lights.
+
 ## Packaging and QA
 
 Use the canonical pipeline linked at the top of this file. It replaces the old
@@ -231,13 +243,16 @@ walking and garden habitats with their live creature sprites at production
 scale.
 `qa-skylo-mossprout-tasklet-refresh.png` verifies the refreshed city, garden,
 and focus-workshop habitats together with their live creatures, shared face
-alignment, 14% neighbourhood gaps, and clear front-stage anchors.
+alignment, 16.8% neighbourhood gaps, and clear front-stage anchors.
 `qa-pagelet-cheerlet-feastle-refresh.png` verifies the refreshed reading,
 celebration, and cooking habitats together with their live creatures, shared
-face alignment, 14% neighbourhood gaps, and clear front-stage anchors.
+face alignment, 16.8% neighbourhood gaps, and clear front-stage anchors.
 `qa-flickerbun-relicoon-neighborhood.png` verifies the cinema and museum
 habitats with their live creature sprites at production scale.
 `qa-bedrotte-gatherglow-neighborhood.png` verifies the restorative sleep and
 shared-hearth habitats with their live creature sprites at production scale.
+`qa-shellio-vesperitt-neighborhood.png` verifies the shoreline and small-hours
+habitats with their live creature sprites, JSON-driven 16.8% neighbourhood
+spacing, and production anchor offsets.
 `qa-six-home-archetypes.png` verifies all six persisted home identities with
 the live egg at the shared production anchor and scale.

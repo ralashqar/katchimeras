@@ -1,45 +1,24 @@
 // Hex-grid projection for the Kingdom map. This is intentionally separate from
 // utils/world-iso.ts so older day/world surfaces keep their diamond math.
 
+import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
+
 export type HexCoord = { q: number; r: number };
 export type HexPoint = { x: number; y: number };
-export type KingdomHexLayoutProfileId =
-  | 'separated-v1'
-  | 'connected-floating-v1'
-  | 'floating-neighborhood-v2';
+export type KingdomHexLayoutProfileId = keyof typeof kingdomWorldViewConfig.hexTiles.layoutProfiles;
 
 // Canonical guide size for generated tile art. The rendered top face is a
 // regular flat-top hex with one orthographic y-scale tilt, matching
 // design/hex-tile-clean-flat-regular-projected-widthfit-1024.png.
-export const HEX_TILE_W = 490;
-export const HEX_TILE_TILT = 0.7;
+export const HEX_TILE_W = kingdomWorldViewConfig.hexTiles.width;
+export const HEX_TILE_TILT = kingdomWorldViewConfig.hexTiles.projectionTilt;
 export const HEX_TILE_H = HEX_TILE_W * (Math.sqrt(3) / 2) * HEX_TILE_TILT;
-export const HEX_TILE_LIP = HEX_TILE_W * 0.0975;
-export const HEX_TILE_SPACING = 1.08;
-export const HEX_TILE_ART_Y_SPACING = 1.12;
+export const HEX_TILE_LIP = HEX_TILE_W * kingdomWorldViewConfig.hexTiles.lipWidthRatio;
 
 export const KINGDOM_HEX_LAYOUT_PROFILES: Record<
   KingdomHexLayoutProfileId,
   { horizontalSpacing: number; verticalSpacing: number }
-> = {
-  'separated-v1': {
-    horizontalSpacing: HEX_TILE_SPACING,
-    verticalSpacing: HEX_TILE_SPACING * HEX_TILE_ART_Y_SPACING,
-  },
-  'connected-floating-v1': {
-    // The generated grass edge stops at the mathematical face boundary.
-    // A measured 2% overlap hides antialias seams and internal cliff slivers
-    // while preserving the readable six-cell silhouette.
-    horizontalSpacing: 0.98,
-    verticalSpacing: 0.98,
-  },
-  'floating-neighborhood-v2': {
-    // Complete island silhouettes stay visually independent. A uniform 14%
-    // axial expansion leaves readable air between neighbouring top faces.
-    horizontalSpacing: 1.14,
-    verticalSpacing: 1.14,
-  },
-};
+> = kingdomWorldViewConfig.hexTiles.layoutProfiles;
 
 // Axial neighbour steps. Order starts east and walks counter-clockwise; the
 // ring helper below starts at south-west so ring traversal is stable and compact.

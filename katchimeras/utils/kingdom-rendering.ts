@@ -29,6 +29,21 @@ export type KingdomSize = {
 
 export type KingdomResidentLod = 'thumb' | 'medium';
 
+export type KingdomWorldViewPlacement = {
+  horizontalOffsetHexTileWidth: number;
+  verticalOffsetHexTileHeight: number;
+};
+
+export function kingdomWorldViewPoint(
+  center: { x: number; y: number },
+  placement: KingdomWorldViewPlacement
+): { x: number; y: number } {
+  return {
+    x: center.x + HEX_TILE_W * placement.horizontalOffsetHexTileWidth,
+    y: center.y + HEX_TILE_H * placement.verticalOffsetHexTileHeight,
+  };
+}
+
 export function kingdomSceneMetrics(
   residentCount: number,
   layoutProfile: KingdomHexLayoutProfileId = 'separated-v1'
