@@ -1095,20 +1095,6 @@ public final class KatchimeraFoundationModule: Module {
         Empty otherwise.
       - food: when the note is about eating or drinking something specific, a short
         1-4 word name of the dish or drink (for example "a bowl of ramen"). Empty otherwise.
-      - routeKey: choose one atomic destination from the taxonomy below. Prefer a
-        specific destination whenever the note supports it. Use general.other only
-        when no specific destination fits, and ambiguous only when two destinations
-        remain genuinely tied after considering their definitions and exclusions.
-      - alternativeRouteKey: the second plausible destination only when it is close;
-        otherwise empty. Give calibrated confidence values for both decisions.
-      - specific: a concise name explicitly present or safely extracted from the note, such
-        as a person, place, activity, dish, work, project, or event. Empty rather than guessing.
-      - context: only a taxonomy option ID clearly stated by the note; otherwise empty.
-      - journalFeeling: only a feeling option ID clearly expressed by the note; otherwise empty.
-        Do not infer sensitive relationships beyond the user's words.
-
-      Journal taxonomy:
-      \(JournalNoteRouteCatalog.promptTaxonomy)
       """
     )
     let session = LanguageModelSession(instructions: instructions)
@@ -1123,13 +1109,6 @@ public final class KatchimeraFoundationModule: Module {
         "mediaTitle": response.content.mediaTitle,
         "mediaCreator": response.content.mediaCreator,
         "food": response.content.food,
-        "routeKey": response.content.routeKey,
-        "alternativeRouteKey": response.content.alternativeRouteKey,
-        "routeConfidence": String(response.content.routeConfidence),
-        "alternativeRouteConfidence": String(response.content.alternativeRouteConfidence),
-        "specific": response.content.specific,
-        "context": response.content.context,
-        "journalFeeling": response.content.journalFeeling,
         "noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion,
       ]
     } catch {
@@ -1150,6 +1129,8 @@ public final class KatchimeraFoundationModule: Module {
       Consider the definitions, examples, and exclusions carefully. Prefer a
       specific route over general.other. Use ambiguous only for a genuine tie.
       Return a close alternative only when one exists, with calibrated confidence.
+      Also return a concise specific person, place, activity, food, work, project,
+      or event explicitly supported by the note. Use empty rather than guessing.
 
       Journal taxonomy:
       \(JournalNoteRouteCatalog.promptTaxonomy)
@@ -1166,6 +1147,7 @@ public final class KatchimeraFoundationModule: Module {
         "alternativeRouteKey": response.content.alternativeRouteKey,
         "routeConfidence": String(response.content.routeConfidence),
         "alternativeRouteConfidence": String(response.content.alternativeRouteConfidence),
+        "specific": response.content.specific,
         "noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion,
       ]
     } catch {

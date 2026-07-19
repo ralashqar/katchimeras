@@ -22,7 +22,7 @@ import { safeGoBack } from '@/utils/safe-navigation';
 import { interpretNote, transcribeAudioNote, type InterpretedNote } from '@/utils/note-interpret';
 import type { DayInputTarget, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import { extractStudioTitle } from '@/utils/studio-detect';
-import { noteAnalysis } from '@/utils/journal-input-adapters';
+import { noteAnalysis, noteSuggestedSpecific } from '@/utils/journal-input-adapters';
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 
 const MAX_SECONDS = 30;
@@ -379,7 +379,7 @@ export default function NoteCaptureScreen() {
             result.journalClassification?.kind === 'generic' ||
             (result.intelligenceProvider === 'appleFoundation' && result.llmClassified && result.media)
           )
-            ? result.journalClassification?.fields.specific ?? result.media?.title ?? result.food ?? result.label
+            ? noteSuggestedSpecific(result)
             : null}
           initialContext={journalRoute ? result.journalClassification?.fields.context : null}
           initialFeeling={journalRoute ? result.journalClassification?.feeling : null}

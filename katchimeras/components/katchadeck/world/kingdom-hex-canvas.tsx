@@ -66,8 +66,6 @@ const ZODIAC_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.zodiac.verticalO
 const EGG_STAGE_W = 200;
 const EGG_STAGE_H = 258;
 const EGG_WORLD_SCALE = kingdomWorldViewConfig.egg.globalScale;
-const EGG_WORLD_HORIZONTAL_HEX_OFFSET = kingdomWorldViewConfig.egg.horizontalOffsetHexTileWidth;
-const EGG_WORLD_VERTICAL_HEX_OFFSET = kingdomWorldViewConfig.egg.verticalOffsetHexTileHeight;
 const EGG_WORLD_W = EGG_STAGE_W * EGG_WORLD_SCALE;
 const EGG_WORLD_H = EGG_STAGE_H * EGG_WORLD_SCALE;
 const KINGDOM_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
@@ -228,8 +226,8 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
             })}
             {showEgg && centerRuntime ? (
               <KingdomEgg
-                x={scene.centerTile.cx + HEX_TILE_W * EGG_WORLD_HORIZONTAL_HEX_OFFSET}
-                y={scene.centerTile.cy + HEX_TILE_H * EGG_WORLD_VERTICAL_HEX_OFFSET}
+                x={scene.centerTile.cx + HEX_TILE_W * hexTileSelection.value.eggAnchor.xHexWidth}
+                y={scene.centerTile.cy + HEX_TILE_H * hexTileSelection.value.eggAnchor.yHexHeight}
                 phase={centerRuntime.phase}
                 settled={!camera.isMoving}
                 onPress={camera.recenter}

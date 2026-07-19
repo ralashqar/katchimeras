@@ -38,16 +38,24 @@ import {
 } from '@/utils/asset-lab';
 import {
   getDevKingdomBaseId,
+  getDevKingdomHexArtDirectionSetId,
   getDevKingdomHexBaseTileId,
   getDevKingdomHexCenterTileId,
   getDevKingdomHexVerticalAlignmentMode,
   setDevKingdomBaseId,
+  setDevKingdomHexArtDirectionSetId,
   setDevKingdomHexBaseTileId,
   setDevKingdomHexCenterTileId,
   setDevKingdomHexVerticalAlignmentMode,
 } from '@/utils/dev-asset-overrides';
 import type { KingdomHexVerticalAlignmentMode } from '@/utils/kingdom-tile-alignment';
-import { KINGDOM_HEX_BASE_TILE_VARIANTS, KINGDOM_HEX_CENTER_TILE_VARIANTS, worldAssetSource, worldBaseSource } from '@/utils/world-visuals';
+import {
+  KINGDOM_HEX_ART_DIRECTION_SETS,
+  KINGDOM_HEX_BASE_TILE_VARIANTS,
+  KINGDOM_HEX_CENTER_TILE_VARIANTS,
+  worldAssetSource,
+  worldBaseSource,
+} from '@/utils/world-visuals';
 
 // DEV TOOL — the World Asset Lab (v1: browse + audit). Every bundled world
 // asset by section, with its display name and UNLOCK PROVENANCE (what life
@@ -124,16 +132,26 @@ export default function DevAssetLabScreen() {
     () => getDevKingdomHexCenterTileId() ?? KINGDOM_HEX_CENTER_TILE_VARIANTS[0].id
   );
   const [hexBaseTileId, setHexBaseTileId] = useState(() => getDevKingdomHexBaseTileId() ?? KINGDOM_HEX_BASE_TILE_VARIANTS[0].id);
+  const [hexArtDirectionSetId, setHexArtDirectionSetId] = useState(() => getDevKingdomHexArtDirectionSetId());
   const [hexVerticalAlignmentMode, setHexVerticalAlignmentMode] = useState(() =>
     getDevKingdomHexVerticalAlignmentMode()
   );
   const applyHexCenterTile = (tileId: string) => {
+    setDevKingdomHexArtDirectionSetId(null);
+    setHexArtDirectionSetId(null);
     setDevKingdomHexCenterTileId(tileId === KINGDOM_HEX_CENTER_TILE_VARIANTS[0].id ? null : tileId);
     setHexCenterTileId(tileId);
   };
   const applyHexBaseTile = (tileId: string) => {
+    setDevKingdomHexArtDirectionSetId(null);
+    setHexArtDirectionSetId(null);
     setDevKingdomHexBaseTileId(tileId === KINGDOM_HEX_BASE_TILE_VARIANTS[0].id ? null : tileId);
     setHexBaseTileId(tileId);
+  };
+  const applyHexArtDirectionSet = (setId: string) => {
+    const next = hexArtDirectionSetId === setId ? null : setId;
+    setDevKingdomHexArtDirectionSetId(next);
+    setHexArtDirectionSetId(next);
   };
   const applyHexVerticalAlignment = (mode: KingdomHexVerticalAlignmentMode) => {
     setDevKingdomHexVerticalAlignmentMode(mode);
@@ -167,12 +185,54 @@ export default function DevAssetLabScreen() {
           <ThemedText style={styles.sectionTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
             Hex tiles
             <ThemedText style={styles.sectionCount} lightColor="#8C96B8" darkColor="#8C96B8">
-              {'  '}{KINGDOM_HEX_CENTER_TILE_VARIANTS.length + KINGDOM_HEX_BASE_TILE_VARIANTS.length}
+              {'  '}{KINGDOM_HEX_ART_DIRECTION_SETS.length + KINGDOM_HEX_CENTER_TILE_VARIANTS.length + KINGDOM_HEX_BASE_TILE_VARIANTS.length}
             </ThemedText>
           </ThemedText>
           <ThemedText style={styles.sectionBlurb} lightColor="#8C96B8" darkColor="#8C96B8">
-            Switch the center tile and resident/base tiles independently in the live World tab.
+            Apply a coherent art-direction set, or compare legacy center and resident tiles independently.
           </ThemedText>
+          <ThemedText style={styles.hexGroupTitle} lightColor="#E8EEFF" darkColor="#E8EEFF">
+            Art-direction sets
+          </ThemedText>
+          <View style={styles.hexSetGrid}>
+            {KINGDOM_HEX_ART_DIRECTION_SETS.map((set) => {
+              const active = hexArtDirectionSetId === set.id;
+              return (
+                <Pressable
+                  key={set.id}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => applyHexArtDirectionSet(set.id)}
+                  style={({ pressed }) => [styles.hexSetCard, active ? styles.hexSetCardActive : null, pressed ? styles.tilePressed : null]}>
+                  <View style={styles.hexPreviewRow}>
+                    <View style={styles.hexPreview}>
+                      <Image source={set.selection.default.source} style={styles.hexPreviewArt} contentFit="contain" transition={0} />
+                      <ThemedText style={styles.hexPreviewLabel} lightColor="#8C96B8" darkColor="#8C96B8">
+                        empty
+                      </ThemedText>
+                    </View>
+                    <View style={styles.hexPreview}>
+                      <Image source={set.selection.center.source} style={styles.hexPreviewArt} contentFit="contain" transition={0} />
+                      <ThemedText style={styles.hexPreviewLabel} lightColor="#8C96B8" darkColor="#8C96B8">
+                        home
+                      </ThemedText>
+                    </View>
+                  </View>
+                  <View style={styles.hexSetText}>
+                    <ThemedText style={styles.hexSetTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                      {set.label}
+                    </ThemedText>
+                    <ThemedText style={styles.hexSetDesc} lightColor="#AAB4D4" darkColor="#AAB4D4">
+                      {set.description}
+                    </ThemedText>
+                    <ThemedText style={styles.hexSetAction} lightColor={active ? '#A8E2C6' : '#FFC36B'} darkColor={active ? '#A8E2C6' : '#FFC36B'}>
+                      {active ? 'Live in Kingdom · tap to reset' : 'Use complete set'}
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
           <ThemedText style={styles.hexGroupTitle} lightColor="#E8EEFF" darkColor="#E8EEFF">
             Center tile
           </ThemedText>

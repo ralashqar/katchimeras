@@ -142,17 +142,29 @@ for (const name of requiredTypes) {
   check(`generated type ${name} exists`, new RegExp(`(?:struct|class)\\s+${name}\\b`).test(allSwift));
 }
 
-for (const field of ['routeKey', 'alternativeRouteKey', 'specific', 'context', 'journalFeeling']) {
-  check(`NoteRead exposes structured journal field ${field}`, new RegExp(`let\\s+${field}:\\s+String`).test(generatedNote));
-  check(`interpretNote returns structured journal field ${field}`, swift.includes(`"${field}": response.content.${field}`));
-}
-for (const field of ['routeConfidence', 'alternativeRouteConfidence']) {
-  check(`NoteRead exposes structured journal field ${field}`, new RegExp(`let\\s+${field}:\\s+Double`).test(generatedNote));
-  check(`interpretNote returns structured journal field ${field}`, swift.includes(`"${field}": String(response.content.${field})`));
-}
-check('availability diagnostics expose note schema v4', swift.includes('"noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion') && generatedNote.includes('schemaVersion = "4"'));
-check('NoteRead constrains atomic routes from every flow', ['went_somewhere.museum', 'food.meal', 'studio.film', 'movement.workout', 'people.my_child', 'work.learning', 'big_event.newHome', 'general.gratitude'].every((id) => generatedNote.includes(`"${id}"`)));
+check('NoteRead remains a small enrichment response',
+  ['title', 'feeling', 'mediaKind', 'mediaTitle', 'mediaCreator', 'food'].every((field) => new RegExp(`let\\s+${field}:\\s+String`).test(generatedNote))
+    && !/struct NoteRead[\s\S]*?let routeKey: String[\s\S]*?\n}/.test(generatedNote));
+check('availability diagnostics expose split-call note schema v5', swift.includes('"noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion') && generatedNote.includes('schemaVersion = "5"'));
+check('route-only decision constrains atomic routes from every flow', ['went_somewhere.museum', 'food.meal', 'studio.film', 'movement.workout', 'people.my_child', 'work.learning', 'big_event.newHome', 'general.gratitude'].every((id) => generatedNote.includes(`"${id}"`)));
 check('focused retry uses the same generated taxonomy', swift.includes('classifyNoteRoute(transcript:') && swift.includes('JournalNoteRouteCatalog.promptTaxonomy'));
+check('focused route returns the generated journal field text',
+  /struct NoteRouteDecision[\s\S]*?let specific: String[\s\S]*?\n}/.test(generatedNote)
+    && swift.includes('"specific": response.content.specific'));
+check('note routing always uses the focused Foundation call',
+  foundationNote.includes('if (nativeFoundation.classifyNoteRouteAsync)')
+    && !foundationNote.includes('if (cleanString(raw.routeKey) && nativeFoundation.classifyNoteRouteAsync'));
+check('the focused Foundation route supersedes retired combined routing fields',
+  foundationNote.includes('focusedAtomic ? null : firstAtomic')
+    && foundationNote.includes('focusedAtomic,\n      { includeRegistryEvidence'));
+check('an empty enrichment response can retain a successful Foundation route',
+  foundationNote.includes('if (!richResponseValid && !journalClassification) return null')
+    && foundationNote.includes('missing_or_invalid_label_or_archetype')
+    && foundationNote.includes('_focused_route_used'));
+check('older note builds receive route-locked Foundation field enrichment',
+  foundationNote.includes("taskId: 'note.specific.v1'")
+    && foundationNote.includes('The supplied journal route is already selected and immutable')
+    && foundationNote.includes('never the whole note'));
 check('availability diagnostics expose generic-bridge photo schema v13', swift.includes('"photoSchemaVersion": JournalNoteRouteCatalog.photoSchemaVersion') && generatedNote.includes('photoSchemaVersion = "13"') && swift.includes('"structuredBridgeVersion": "1"'));
 check('generic native bridge accepts bounded runtime string and enum schemas',
   swift.includes('AsyncFunction("generateStructuredAsync")')

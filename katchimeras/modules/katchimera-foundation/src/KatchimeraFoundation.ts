@@ -11,9 +11,8 @@ type KatchimeraFoundationModuleShape = {
     tags: string[],
     faceCount: number
   ) => Promise<{ label?: unknown; archetype?: unknown }[]>;
-  // Title + feeling + classification (media work / food) for a note. New builds
-  // include mediaKind ('none' when not media) + mediaTitle/mediaCreator/food;
-  // old builds return just { label, archetype }. {} on failure / unavailability.
+  // Lightweight enrichment for a note. Journal routing is deliberately a
+  // separate Foundation call so its large enum cannot invalidate this read.
   interpretNoteAsync: (transcript: string) => Promise<{
     label?: unknown;
     archetype?: unknown;
@@ -38,6 +37,7 @@ type KatchimeraFoundationModuleShape = {
     alternativeRouteKey?: unknown;
     routeConfidence?: unknown;
     alternativeRouteConfidence?: unknown;
+    specific?: unknown;
     noteSchemaVersion?: unknown;
   }>;
   classifyPhotoRouteAsync?: (

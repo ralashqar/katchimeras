@@ -35,7 +35,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "assets" / "images" / "katchimeras" / "world" / "hex"
-BIREFNET_HEAVY_MODEL = "General Use (Heavy)"
+BIREFNET_HEAVY_MODEL = "BiRefNet_lite"
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,6 +65,11 @@ def parse_args() -> argparse.Namespace:
         "--preserve-background-cutouts",
         action="store_true",
         help="Keep pure-black openings through arches transparent while restoring non-black source detail.",
+    )
+    parser.add_argument(
+        "--preserve-canvas",
+        action="store_true",
+        help="Keep the source square framing instead of trimming and recentering the matte.",
     )
     return parser.parse_args()
 
@@ -194,7 +199,7 @@ def matte(source: Path, args: argparse.Namespace, work: Path) -> Path:
             "imageBase64": file_b64(source),
             "outputName": args.key.replace("_", "-") + "-hex-matte",
             "model": BIREFNET_HEAVY_MODEL,
-            "operatingResolution": "2048x2048",
+            "operatingResolution": "1024x1024",
             "refineForeground": True,
         },
         timeout=300,
@@ -321,16 +326,21 @@ def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: P
         rgba = fill_internal_alpha_holes(rgba, source_img)
         rgba = restore_source_silhouette(rgba, source_img)
 
-    bbox = rgba.getchannel("A").getbbox()
-    if not bbox:
-        raise RuntimeError("Matted image has no opaque pixels.")
-    trimmed = rgba.crop(bbox)
     final_size = args.size
-    max_side = final_size - args.pad * 2
-    scale = min(max_side / trimmed.width, max_side / trimmed.height)
-    fitted = trimmed.resize((round(trimmed.width * scale), round(trimmed.height * scale)), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGBA", (final_size, final_size), (0, 0, 0, 0))
-    canvas.alpha_composite(fitted, ((final_size - fitted.width) // 2, (final_size - fitted.height) // 2))
+    if args.preserve_canvas:
+        canvas = rgba
+        if canvas.size != (final_size, final_size):
+            canvas = canvas.resize((final_size, final_size), Image.Resampling.LANCZOS)
+    else:
+        bbox = rgba.getchannel("A").getbbox()
+        if not bbox:
+            raise RuntimeError("Matted image has no opaque pixels.")
+        trimmed = rgba.crop(bbox)
+        max_side = final_size - args.pad * 2
+        scale = min(max_side / trimmed.width, max_side / trimmed.height)
+        fitted = trimmed.resize((round(trimmed.width * scale), round(trimmed.height * scale)), Image.Resampling.LANCZOS)
+        canvas = Image.new("RGBA", (final_size, final_size), (0, 0, 0, 0))
+        canvas.alpha_composite(fitted, ((final_size - fitted.width) // 2, (final_size - fitted.height) // 2))
 
     png_path = work / "final.png"
     canvas.save(png_path)

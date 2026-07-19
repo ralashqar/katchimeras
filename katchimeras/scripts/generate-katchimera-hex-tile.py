@@ -12,11 +12,13 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +31,7 @@ CAST_THEMES = {
     "gatherglow": "a warm hearth spirit who glows brighter in good company; shared-table gathering nook and lantern-lit convivial habitat",
     "mossprout": "gentle and grounded, delighted by green detours; lush park garden and mossy nature habitat",
     "pagelet": "cozy miniature bookshop and reading garden habitat with cream paper, warm walnut wood, burgundy ribbon accents, and amber lamplight",
+    "relicoon": "a curious museum explorer and keeper of meaningful finds; warm pocket museum, archive cabinets, artifact displays, and expedition keepsakes",
     "skylo": "a city-cool wanderer who carries skyline confidence and warm window-light glow; bright urban plaza and cozy street-corner habitat",
     "steppling": "a cheerful walking and hiking spirit who turns long walks, trails, route markers, footprints, and movement milestones into a cozy outdoor habitat",
     "tasklet": "a determined, competent little doer who loves a checked-off list; focused workshop and productivity garden habitat",
@@ -216,9 +219,6 @@ def load_env() -> tuple[str, str]:
     return url.rstrip("/"), key
 
 
-SUPABASE_URL, SUPABASE_KEY = load_env()
-
-
 def mime_for(path: Path) -> str:
     suffix = path.suffix.lower()
     return "image/webp" if suffix == ".webp" else "image/jpeg" if suffix in {".jpg", ".jpeg"} else "image/png"
@@ -229,12 +229,13 @@ def file_b64(path: Path) -> str:
 
 
 def call_function(name: str, payload: dict, *, timeout: int = 235) -> dict:
+    supabase_url, supabase_key = load_env()
     request = urllib.request.Request(
-        f"{SUPABASE_URL}/functions/v1/{name}",
+        f"{supabase_url}/functions/v1/{name}",
         data=json.dumps(payload).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {SUPABASE_KEY}",
-            "apikey": SUPABASE_KEY,
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
             "Content-Type": "application/json",
         },
         method="POST",
@@ -281,6 +282,10 @@ def generate_queued_tile(
         payload,
         timeout=120,
     )
+    if data.get("status") == "completed" and isinstance(data.get("imageUrl"), str):
+        return str(data["imageUrl"])
+    if data.get("status") == "completed" and isinstance(data.get("gridUrl"), str):
+        return str(data["gridUrl"])
     request_id = data.get("requestId")
     if not request_id:
         raise RuntimeError(f"{output_name}: generate-asset did not queue: {data}")
@@ -315,6 +320,47 @@ def structured_tile_prompt(*, reference: str, art_style: str, visuals: str, fram
             f"FRAMING\n{framing}",
         ]
     )
+
+
+def theme_from_brief(path: Path, *, visual_key: str, kind: str) -> tuple[str, dict]:
+    """Turn the portable JSON brief into one stable VISUALS paragraph."""
+    try:
+        brief = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Could not read environment brief {path}: {exc}") from None
+    expected_kind = "home" if kind == "floating-home-v2" else "resident"
+    if brief.get("key") != visual_key or brief.get("kind") != expected_kind:
+        raise SystemExit(
+            f"Brief must declare key={visual_key!r} and kind={expected_kind!r}; "
+            f"got key={brief.get('key')!r}, kind={brief.get('kind')!r}."
+        )
+
+    def joined(value: object) -> str:
+        return ", ".join(str(item) for item in value) if isinstance(value, list) else str(value or "")
+
+    perimeter = brief.get("perimeter") if isinstance(brief.get("perimeter"), dict) else {}
+    cliff = brief.get("cliff") if isinstance(brief.get("cliff"), dict) else {}
+    required = ("concept", "main_structure", "rear_props", "side_props", "lighting")
+    if any(not brief.get(field) for field in required) or not perimeter or not cliff:
+        raise SystemExit("Brief is incomplete; fill every creative field in new-environment-brief.json.")
+    theme = " ".join(
+        [
+            f"Concept: {brief['concept']}",
+            f"Main structure: {brief['main_structure']}",
+            f"Rear props: {joined(brief['rear_props'])}.",
+            f"Upper-side props: {joined(brief['side_props'])}.",
+            (
+                f"Perimeter: {perimeter.get('material', '')}; palette {joined(perimeter.get('palette'))}; "
+                f"emblems {perimeter.get('emblems', '')}."
+            ),
+            (
+                f"Cliff: materials {joined(cliff.get('materials'))}; "
+                f"palette {joined(cliff.get('palette'))}."
+            ),
+            f"Lighting: {brief['lighting']}",
+        ]
+    )
+    return theme, brief
 
 
 def prompt_for(visual_key: str, theme: str, variant_index: int) -> str:
@@ -363,6 +409,63 @@ def prompt_for_home(visual_key: str, theme: str) -> str:
     )
 
 
+def prompt_for_floating_v2(visual_key: str, theme: str) -> str:
+    return structured_tile_prompt(
+        reference=(
+            "Edit image 1. Preserve its exact square canvas, flat-top hex footprint, position, scale, "
+            "rotation, camera angle, perspective, deep tapered island silhouette, front stairs, and padding. "
+            "Keep the entire bottom/front half as uninterrupted smooth grass. Do not add a circle, "
+            "plaza, paving, pedestal, path, rug, ring, indentation, or character platform. Confine every "
+            "structure and floor prop to the rear half or the upper portions of the left and right side edges. "
+            "Build a richer U-shaped frame around the open stage; side details may extend toward the midpoint "
+            "but must not enter the bottom half or block the front stairs. You may retheme the perimeter "
+            "border and cliff materials as described. Keep a perfectly flat solid pure-black #000000 "
+            "background for BiRefNet Heavy. The supplied neutral island is the only image reference."
+        ),
+        art_style=(
+            "Match the Katchimeras premium stylized 3D toy-diorama finish: bold readable silhouettes, "
+            "rounded clay-like forms, broad smooth bevels, simplified materials, low-frequency detail, "
+            "large uninterrupted shapes, and soft warm lighting. Every feature must remain readable at 256px."
+        ),
+        visuals=theme,
+        framing=(
+            "Create a balanced rear-and-side silhouette with several large readable features. Keep the entire "
+            "bottom half and full front approach empty for the "
+            "separately rendered live creature. No text, creature, egg, nest, bridge, clouds, external shadow, "
+            "watermark, tiny texture, grass blades, pebbles, cracks, or prop clutter. The black background is "
+            "uniform with no gradient, floor, reflection, glow, haze, or cast shadow."
+        ),
+    )
+
+
+def prompt_for_floating_home_v2(visual_key: str, theme: str) -> str:
+    return structured_tile_prompt(
+        reference=(
+            "Edit image 1. Preserve its exact square canvas, flat-top hex footprint, position, scale, "
+            "rotation, camera angle, perspective, deep tapered island silhouette, front stairs, padding, "
+            "central circular stone plaza, and empty woven egg nest. The nest and plaza remain centered, "
+            "fully visible, and unchanged in size for the separately rendered live egg. Retheme the cottage, "
+            "continuous perimeter, cliff materials, planting, and habitat props as described. Keep the route "
+            "from the front stairs to the nest clear. Use the rear and upper side edges as a rich U-shaped "
+            "frame without placing objects in front of the nest. Keep a perfectly flat solid pure-black "
+            "#000000 background for BiRefNet Heavy. The supplied home island is the only image reference."
+        ),
+        art_style=(
+            "Match the Katchimeras premium stylized 3D toy-diorama finish: bold readable silhouettes, "
+            "rounded clay-like forms, broad smooth bevels, simplified materials, low-frequency detail, "
+            "large uninterrupted shapes, and soft warm lighting. Every feature must remain readable at 256px."
+        ),
+        visuals=theme,
+        framing=(
+            "Create one clear archetype-specific cottage silhouette with several large readable rear-and-side "
+            "features. Preserve a calm open floor around the nest and the entire front approach. No baked egg, "
+            "creature, bridge, clouds, external shadow, watermark, readable text, tiny texture, grass blades, "
+            "pebbles, cracks, or prop clutter. The black background is uniform with no gradient, floor, "
+            "reflection, glow, haze, or cast shadow."
+        ),
+    )
+
+
 def prompt_for_zodiac(visual_key: str, theme: str) -> str:
     return structured_tile_prompt(
         reference=(
@@ -385,20 +488,57 @@ def prompt_for_zodiac(visual_key: str, theme: str) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--visual-key", required=True)
     parser.add_argument("--count", type=int, default=1)
-    parser.add_argument("--base", default="assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2.webp")
+    parser.add_argument(
+        "--base",
+        help=(
+            "Reference image. V2 kinds select their canonical neutral/home source automatically; "
+            "legacy kinds retain the legacy grass default."
+        ),
+    )
     parser.add_argument("--creature", help="Path to Katchimera cutout; defaults to assets/images/katchimeras/cutouts/{visual-key}.png")
     parser.add_argument("--theme", help="Theme prompt override.")
+    parser.add_argument(
+        "--brief",
+        help="Checked-in JSON brief copied from design/floating-neighborhood-v2/new-environment-brief.json.",
+    )
     parser.add_argument("--quality", default="high")
     parser.add_argument("--gpt-size", type=int, default=2048)
-    parser.add_argument("--kind", choices=("resident", "home", "zodiac"), default="resident")
-    parser.add_argument("--model", choices=("gpt", "seedream"), default="gpt")
+    parser.add_argument("--kind", choices=("resident", "floating-v2", "floating-home-v2", "home", "zodiac"), default="resident")
+    parser.add_argument(
+        "--model",
+        choices=("nano", "gpt", "seedream"),
+        help="Generation route. V2 defaults to FAL Nano Banana 2; legacy kinds default to GPT.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Resolve and persist prompts/reference metadata without generating or downloading images.",
+    )
     args = parser.parse_args()
+    if args.count < 1:
+        sys.exit("--count must be at least 1.")
+    if args.theme and args.brief:
+        sys.exit("Use either --brief (preferred for v2) or --theme, not both.")
+    if args.model is None:
+        args.model = "nano" if args.kind in {"floating-v2", "floating-home-v2"} else "gpt"
 
     visual_key = args.visual_key
-    base_path = (ROOT / args.base).resolve()
+    default_base = (
+        "design/floating-neighborhood-v2/floating-neutral-source.png"
+        if args.kind == "floating-v2"
+        else "design/floating-neighborhood-v2/floating-home-source.png"
+        if args.kind == "floating-home-v2"
+        else "assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2.webp"
+    )
+    base_path = (ROOT / (args.base or default_base)).resolve()
+    if args.kind in {"floating-v2", "floating-home-v2"} and args.creature:
+        sys.exit(
+            "V2 generation never accepts a creature reference. Describe identity through --brief or --theme; "
+            "the live creature/egg is rendered separately."
+        )
     creature_path = (
         (ROOT / (args.creature or f"assets/images/katchimeras/cutouts/{visual_key}.png")).resolve()
         if args.kind == "resident" or args.creature
@@ -411,9 +551,32 @@ def main() -> None:
 
     out_dir = OUT_ROOT / visual_key
     out_dir.mkdir(parents=True, exist_ok=True)
-    if args.theme:
+    brief_path = (ROOT / args.brief).resolve() if args.brief else None
+    brief_data = None
+    if brief_path is not None:
+        if args.kind not in {"floating-v2", "floating-home-v2"}:
+            sys.exit("--brief is supported only for floating-v2 kinds.")
+        theme, brief_data = theme_from_brief(
+            brief_path,
+            visual_key=visual_key,
+            kind=args.kind,
+        )
+    elif (
+        args.kind == "floating-v2"
+        and not args.theme
+        and visual_key not in CAST_THEMES
+    ) or (
+        args.kind == "floating-home-v2"
+        and not args.theme
+        and visual_key not in HOME_THEMES
+    ):
+        sys.exit("New v2 keys require --brief (preferred) or an explicit --theme.")
+
+    if brief_path is not None:
+        pass
+    elif args.theme:
         theme = args.theme
-    elif args.kind == "home":
+    elif args.kind in {"home", "floating-home-v2"}:
         theme = HOME_THEMES.get(visual_key, f"a polished home themed to {visual_key}")
     elif args.kind == "zodiac":
         theme = ZODIAC_THEMES.get(visual_key, f"a polished celestial sanctuary themed to {visual_key}")
@@ -426,10 +589,44 @@ def main() -> None:
         prompt = (
             prompt_for_home(visual_key, theme)
             if args.kind == "home"
+            else prompt_for_floating_home_v2(visual_key, theme)
+            if args.kind == "floating-home-v2"
+            else prompt_for_floating_v2(visual_key, theme)
+            if args.kind == "floating-v2"
             else prompt_for_zodiac(visual_key, theme)
             if args.kind == "zodiac"
             else prompt_for(visual_key, theme, index)
         )
+        prompt_path = out_dir / f"candidate-{index}-prompt.txt"
+        prompt_path.write_text(prompt + "\n", encoding="utf-8")
+        record = {
+            "index": index,
+            "visualKey": visual_key,
+            "kind": args.kind,
+            "theme": theme,
+            "prompt": prompt,
+            "promptPath": str(prompt_path.relative_to(ROOT)),
+            "basePath": str(base_path.relative_to(ROOT)),
+            "baseSha256": hashlib.sha256(base_path.read_bytes()).hexdigest(),
+            "model": args.model,
+            "quality": args.quality,
+            "gptSize": args.gpt_size,
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "status": "dry-run" if args.dry_run else "generated",
+        }
+        if brief_path is not None:
+            record.update(
+                {
+                    "briefPath": str(brief_path.relative_to(ROOT)),
+                    "briefSha256": hashlib.sha256(brief_path.read_bytes()).hexdigest(),
+                    "brief": brief_data,
+                }
+            )
+        if args.dry_run:
+            records.append(record)
+            print(f"dry-run {output_name}: {prompt_path.relative_to(ROOT)}")
+            continue
+
         print(f"generating {output_name}...")
         image_url = generate_queued_tile(
             output_name=output_name,
@@ -442,7 +639,8 @@ def main() -> None:
         )
         out_path = out_dir / f"candidate-{index}.png"
         download(str(image_url), out_path)
-        records.append({"index": index, "url": image_url, "path": str(out_path), "model": args.model, "quality": args.quality, "gptSize": args.gpt_size})
+        record.update({"url": image_url, "path": str(out_path.relative_to(ROOT))})
+        records.append(record)
         print(f"  saved {out_path}")
 
     (out_dir / "candidates.json").write_text(json.dumps(records, indent=2), encoding="utf-8")

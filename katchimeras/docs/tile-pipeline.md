@@ -39,7 +39,9 @@ pixel is the wall bottom, not the face corner).
    auto-detected from the source corners. Skip with `--skip-rerender` when
    the source is already 2K-crisp.
 1. **BiRefNet heavy matte** — transparency comes from BiRefNet ONLY
-   (`General Use (Heavy)` @2048 + refineForeground). No chroma floods, no
+   (`BiRefNet_lite`, transported to FAL HTTP as its required mapped value
+   `General Use (Heavy)`, @1024 + refineForeground).
+   No chroma floods, no
    erosion, no alpha edits of any kind (hard rule; every hand-rolled alpha
    trick we tried caused user-visible artifacts).
 2. **Initial quad fit** — upper edges from the silhouette; L/R x from the

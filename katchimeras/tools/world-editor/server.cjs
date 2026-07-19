@@ -205,8 +205,8 @@ async function matteImage(inputPath, outputName) {
   const data = await callSupabaseFunction('remove-image-background', {
     imageBase64: fs.readFileSync(inputPath).toString('base64'),
     outputName: slugDash(outputName),
-    model: 'General Use (Heavy)',
-    operatingResolution: '2048x2048',
+    model: 'BiRefNet_lite',
+    operatingResolution: '1024x1024',
     refineForeground: true,
   });
   if (!data?.imageUrl) throw new Error(data?.error || 'Matting returned no image URL.');

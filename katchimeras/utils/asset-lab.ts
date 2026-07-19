@@ -181,7 +181,7 @@ export async function keepCell(options: { assetKey: string; cellUrl: string; mat
       body: {
         imageUrl: options.cellUrl,
         outputName: outputNameFor(options.assetKey),
-        model: 'General Use (Heavy)',
+        model: 'BiRefNet_lite',
       },
     });
     if (error) {

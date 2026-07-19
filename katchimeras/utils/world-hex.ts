@@ -3,6 +3,10 @@
 
 export type HexCoord = { q: number; r: number };
 export type HexPoint = { x: number; y: number };
+export type KingdomHexLayoutProfileId =
+  | 'separated-v1'
+  | 'connected-floating-v1'
+  | 'floating-neighborhood-v2';
 
 // Canonical guide size for generated tile art. The rendered top face is a
 // regular flat-top hex with one orthographic y-scale tilt, matching
@@ -13,6 +17,29 @@ export const HEX_TILE_H = HEX_TILE_W * (Math.sqrt(3) / 2) * HEX_TILE_TILT;
 export const HEX_TILE_LIP = HEX_TILE_W * 0.0975;
 export const HEX_TILE_SPACING = 1.08;
 export const HEX_TILE_ART_Y_SPACING = 1.12;
+
+export const KINGDOM_HEX_LAYOUT_PROFILES: Record<
+  KingdomHexLayoutProfileId,
+  { horizontalSpacing: number; verticalSpacing: number }
+> = {
+  'separated-v1': {
+    horizontalSpacing: HEX_TILE_SPACING,
+    verticalSpacing: HEX_TILE_SPACING * HEX_TILE_ART_Y_SPACING,
+  },
+  'connected-floating-v1': {
+    // The generated grass edge stops at the mathematical face boundary.
+    // A measured 2% overlap hides antialias seams and internal cliff slivers
+    // while preserving the readable six-cell silhouette.
+    horizontalSpacing: 0.98,
+    verticalSpacing: 0.98,
+  },
+  'floating-neighborhood-v2': {
+    // Complete island silhouettes stay visually independent. A uniform 14%
+    // axial expansion leaves readable air between neighbouring top faces.
+    horizontalSpacing: 1.14,
+    verticalSpacing: 1.14,
+  },
+};
 
 // Axial neighbour steps. Order starts east and walks counter-clockwise; the
 // ring helper below starts at south-west so ring traversal is stable and compact.
@@ -36,10 +63,14 @@ export function hexScale(a: HexCoord, scale: number): HexCoord {
 // Centre-to-centre screen projection for a flat-top axial hex grid. This is the
 // same regular-hex projection used by the tile guide: first regular flat-top
 // hex math, then one y-scale tilt.
-export function hexToWorld(hex: HexCoord): HexPoint {
+export function hexToWorld(
+  hex: HexCoord,
+  layoutProfile: KingdomHexLayoutProfileId = 'separated-v1'
+): HexPoint {
+  const spacing = KINGDOM_HEX_LAYOUT_PROFILES[layoutProfile];
   return {
-    x: HEX_TILE_W * 0.75 * HEX_TILE_SPACING * hex.q,
-    y: HEX_TILE_H * HEX_TILE_SPACING * HEX_TILE_ART_Y_SPACING * (hex.r + hex.q / 2),
+    x: HEX_TILE_W * 0.75 * spacing.horizontalSpacing * hex.q,
+    y: HEX_TILE_H * spacing.verticalSpacing * (hex.r + hex.q / 2),
   };
 }
 

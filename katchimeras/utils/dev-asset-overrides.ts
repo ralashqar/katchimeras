@@ -53,6 +53,22 @@ const DEV_HEX_CENTER_TILE_KEY = 'katchadeck.dev-kingdom-hex-center-tile-v2';
 const DEV_HEX_BASE_TILE_KEY = 'katchadeck.dev-kingdom-hex-base-tile-v1';
 let devKingdomHexCenterTileId: string | null | undefined;
 let devKingdomHexBaseTileId: string | null | undefined;
+const DEV_HEX_ART_DIRECTION_SET_KEY = 'katchadeck.dev-kingdom-hex-art-direction-set-v1';
+let devKingdomHexArtDirectionSetId: string | null | undefined;
+
+export function getDevKingdomHexArtDirectionSetId(): string | null {
+  if (!__DEV__) return null;
+  if (devKingdomHexArtDirectionSetId === undefined) {
+    devKingdomHexArtDirectionSetId = getStoredJson<string | null>(DEV_HEX_ART_DIRECTION_SET_KEY, null);
+  }
+  return devKingdomHexArtDirectionSetId ?? null;
+}
+
+export function setDevKingdomHexArtDirectionSetId(setId: string | null): void {
+  if (!__DEV__) return;
+  devKingdomHexArtDirectionSetId = setId;
+  setStoredJson(DEV_HEX_ART_DIRECTION_SET_KEY, setId);
+}
 
 export function getDevKingdomHexTileSetId(): string | null {
   return getDevKingdomHexBaseTileId();

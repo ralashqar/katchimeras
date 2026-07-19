@@ -21,7 +21,10 @@ const LANGUAGE: Record<string, LanguageOverride> = {
   'went_somewhere.restaurant': { examples: ['We went to a restaurant', 'Dinner at a diner'], aliases: ['diner'] },
   'went_somewhere.travel': { definition: 'A day out, destination visit, or travel where the place is the main memory.', examples: ['We took a day trip to York'] },
   'food.meal': { examples: ['I had ramen for dinner', 'We ate lunch together'], aliases: ['breakfast', 'lunch', 'dinner', 'brunch'] },
-  'food.snack': { examples: ['I had a snack', 'Ate some crisps'] },
+  'food.snack': {
+    examples: ['I had a snack', 'Ate some crisps', 'I ate an apple'],
+    exclusions: ['A food explicitly described as breakfast, lunch, dinner, or part of a meal'],
+  },
   'food.dessert': { examples: ['I ate birthday cake', 'We had dessert'], exclusions: ['It was my birthday'] },
   'food.coffee': { examples: ['I had a coffee', 'Drank a latte'] },
   'food.tea': { examples: ['I drank tea', 'Had a cup of tea'] },

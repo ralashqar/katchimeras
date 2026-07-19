@@ -21,6 +21,8 @@ export type KingdomTileArtFrame = {
   height: number;
 };
 
+export type KingdomTileFaceBounds = KingdomTileAlphaBounds;
+
 const TILE_ASSET_SIZE = 1024;
 
 function silhouetteCenteredTop(
@@ -41,17 +43,29 @@ function silhouetteCenteredTop(
 export function kingdomTileArtFrame({
   alignmentMode,
   assetBounds,
+  faceBounds,
   referenceBounds,
   target,
 }: {
   alignmentMode: KingdomHexVerticalAlignmentMode;
   assetBounds: KingdomTileAlphaBounds;
+  faceBounds?: KingdomTileFaceBounds;
   referenceBounds: KingdomTileAlphaBounds;
   target: KingdomTileFrameTarget;
 }): KingdomTileArtFrame {
   const targetWidth = target.right - target.left;
   const targetCenterX = (target.left + target.right) / 2;
   const targetCenterY = (target.top + target.bottom) / 2;
+  if (faceBounds) {
+    const faceWidth = faceBounds.right - faceBounds.left;
+    const renderedSize = targetWidth * (TILE_ASSET_SIZE / faceWidth);
+    return {
+      height: renderedSize,
+      left: target.left - (faceBounds.left / TILE_ASSET_SIZE) * renderedSize,
+      top: target.top - (faceBounds.top / TILE_ASSET_SIZE) * renderedSize,
+      width: renderedSize,
+    };
+  }
   const assetWidth = assetBounds.right - assetBounds.left;
   const renderedSize = targetWidth * (TILE_ASSET_SIZE / assetWidth);
   const assetCenterX = (assetBounds.left + assetBounds.right) / 2;

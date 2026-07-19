@@ -1,0 +1,35 @@
+{
+  "key": "gatherglow",
+  "kind": "resident",
+  "concept": "A welcoming shared-hearth gathering garden whose lantern warmth grows brighter in good company.",
+  "main_structure": "One broad open-front timber hearth pavilion at the rear with a simple glowing firebox and a gently arched amber roof.",
+  "rear_props": [
+    "one large shared supper table with four chunky stools placed close to the rear pavilion",
+    "two oversized hanging lanterns"
+  ],
+  "side_props": [
+    "one broad curved conversation bench and one lantern post on the upper-left edge",
+    "one simple tea trolley and two rounded ember planters on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth warm terracotta garden wall with broad rounded capstones",
+    "palette": ["burnished terracotta", "warm cream", "honey gold"],
+    "emblems": "four oversized linked-loop and ember emblems"
+  },
+  "cliff": {
+    "materials": ["large biscuit-sandstone blocks", "large terracotta blocks", "a few broad honey-gold stone blocks"],
+    "palette": ["biscuit cream", "terracotta", "muted honey gold"]
+  },
+  "lighting": "soft warm dusk lighting from one broad hearth glow and two or three large amber lanterns",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, text, watermark, external shadow",
+    "tiny tableware, food pieces, fairy lights, sparks, flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

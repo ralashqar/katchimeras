@@ -1,0 +1,35 @@
+{
+  "key": "bedrotte",
+  "kind": "resident",
+  "concept": "A blanket-warm evening sanctuary that treats staying home and restorative rest as something complete.",
+  "main_structure": "One compact open-front sleep nook at the rear with a broad pillow-shaped canopy, a simple tucked bed, and one warm amber window.",
+  "rear_props": [
+    "one large folded-blanket chest",
+    "two broad bedside lanterns"
+  ],
+  "side_props": [
+    "one chunky cushioned armchair with a draped blanket on the upper-left edge",
+    "two oversized pillow-shaped shrubs and one simple moon lamp on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth quilted-looking border made from broad upholstered masses, without tiny stitching",
+    "palette": ["dusty indigo", "soft lavender", "warm cream"],
+    "emblems": "four oversized simple crescent-and-pillow emblems"
+  },
+  "cliff": {
+    "materials": ["large rounded dusk-slate blocks", "large warm cream stone blocks", "a few broad plum timber blocks"],
+    "palette": ["dusk blue", "warm cream", "muted plum"]
+  },
+  "lighting": "soft evening-blue ambient light with three broad pools of warm amber sanctuary glow",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, text, watermark, external shadow",
+    "tiny stitching, fabric fibers, stars, flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

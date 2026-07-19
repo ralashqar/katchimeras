@@ -57,7 +57,7 @@ import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
-import { noteRoutesForSignals } from '@/utils/journal-input-adapters';
+import { noteRoutesForSignals, noteSuggestedSpecific } from '@/utils/journal-input-adapters';
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 
@@ -768,7 +768,7 @@ export default function HomeScreen() {
             pendingJournalNote.journalClassification?.kind === 'generic' ||
             (pendingJournalNote.intelligenceProvider === 'appleFoundation' && pendingJournalNote.llmClassified && pendingJournalNote.media)
           )
-            ? pendingJournalNote.journalClassification?.fields.specific ?? pendingJournalNote.media?.title ?? pendingJournalNote.food ?? pendingJournalNote.label
+            ? noteSuggestedSpecific(pendingJournalNote)
             : null}
           initialContext={pendingJournalNote.journalClassification?.fields.context}
           initialFeeling={pendingJournalNote.journalClassification?.feeling}

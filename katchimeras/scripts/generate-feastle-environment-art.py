@@ -221,8 +221,8 @@ def matte_if_needed(source: Path, output_name: str) -> Path:
         payload = {
             "imageBase64": base64.b64encode(handle.read()).decode("ascii"),
             "outputName": output_name,
-            "model": "General Use (Heavy)",
-            "operatingResolution": "2048x2048",
+            "model": "BiRefNet_lite",
+            "operatingResolution": "1024x1024",
             "refineForeground": True,
         }
     data = call_function("remove-image-background", payload, timeout=300)

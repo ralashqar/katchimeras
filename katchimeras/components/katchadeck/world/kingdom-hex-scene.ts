@@ -117,26 +117,34 @@ function artLayerFor(
   identity: Pick<WorldIdentityState, 'selectedHomeArchetypeId' | 'zodiacSignId'> | null | undefined,
   verticalAlignmentMode: KingdomHexVerticalAlignmentMode
 ): KingdomTileArtLayer {
+  const themedResidentTile =
+    tile.kind === 'resident' && tile.resident
+      ? hexTiles.residentTiles?.[tile.resident.creature.visualKey] ?? null
+      : null;
   const customResidentTile =
-    tile.kind === 'resident' && tile.resident ? katchimeraHexTileForCreature(tile.resident.creature) : null;
+    !themedResidentTile && hexTiles.useCustomResidentTiles && tile.kind === 'resident' && tile.resident
+      ? katchimeraHexTileForCreature(tile.resident.creature)
+      : null;
   const homeTile = identity?.selectedHomeArchetypeId
     ? hexTiles.homes[identity.selectedHomeArchetypeId]
     : hexTiles.center;
   const zodiacTile = identity?.zodiacSignId ? hexTiles.zodiacs[identity.zodiacSignId] : hexTiles.default;
-  const selected = customResidentTile ?? (tile.kind === 'home' ? homeTile : tile.kind === 'zodiac' ? zodiacTile : hexTiles.default);
+  const residentTile = themedResidentTile ?? customResidentTile;
+  const selected = residentTile ?? (tile.kind === 'home' ? homeTile : tile.kind === 'zodiac' ? zodiacTile : hexTiles.default);
   const baseBounds = tileAlphaBoundsOrBase('selected-base', hexTiles.default.alphaBounds, FULL_IMAGE_BOUNDS);
   const selectedBounds = tileAlphaBoundsOrBase(tile.id, selected.alphaBounds, baseBounds);
 
   return {
     id: tile.id,
     coord: tile.coord,
-    custom: Boolean(customResidentTile),
+    custom: Boolean(residentTile),
     depth: tile.depth,
-    fallbackSource: customResidentTile ? hexTiles.default.source : null,
-    fallbackSources: customResidentTile ? hexTiles.default.sources : undefined,
+    fallbackSource: residentTile ? hexTiles.default.source : null,
+    fallbackSources: residentTile ? hexTiles.default.sources : undefined,
     frame: kingdomTileArtFrame({
       alignmentMode: verticalAlignmentMode,
       assetBounds: selectedBounds,
+      faceBounds: selected.faceBounds,
       referenceBounds: baseBounds,
       target: tileVisibleBounds(tile.cx, tile.cy),
     }),
@@ -152,7 +160,10 @@ export function buildKingdomHexScene(
   verticalAlignmentMode: KingdomHexVerticalAlignmentMode = 'ground-bottom'
 ): KingdomHexScene {
   const hasZodiac = Boolean(identity?.zodiacSignId);
-  const metrics = kingdomSceneMetrics(residents.length + (hasZodiac ? 1 : 0));
+  const metrics = kingdomSceneMetrics(
+    residents.length + (hasZodiac ? 1 : 0),
+    hexTiles.layoutProfile
+  );
   const { width, height } = metrics;
   const rawTiles: Omit<KingdomTileRender, 'cx' | 'cy' | 'depth'>[] = [
     { id: CENTER_ID, kind: 'home', coord: { q: 0, r: 0 } },
@@ -167,7 +178,7 @@ export function buildKingdomHexScene(
 
   const tiles = rawTiles
     .map((tile) => {
-      const point = hexToWorld(tile.coord);
+      const point = hexToWorld(tile.coord, hexTiles.layoutProfile);
       const cx = point.x + metrics.centerX;
       const cy = point.y + metrics.centerY;
       return { ...tile, cx, cy, depth: hexDrawDepth({ x: cx, y: cy }) };

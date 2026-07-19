@@ -14,6 +14,13 @@ import {
 } from '../utils/kingdom-rendering';
 import { kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
 import {
+  HEX_TILE_H,
+  HEX_TILE_W,
+  KINGDOM_HEX_LAYOUT_PROFILES,
+  hexTileTopPoints,
+  hexToWorld,
+} from '../utils/world-hex';
+import {
   EMPTY_KINGDOM_TILE_SCHEDULER,
   kingdomTileSchedulerReducer,
 } from '../utils/kingdom-tile-scheduler';
@@ -148,6 +155,67 @@ test('different source silhouette widths resolve to the same canonical world wid
       TILE_TARGET.right - TILE_TARGET.left
     );
   }
+});
+
+test('canonical face alignment ignores different overall island silhouettes', () => {
+  const faceBounds = { left: 16, top: 158, right: 1009, bottom: 760 };
+  const empty = kingdomTileArtFrame({
+    alignmentMode: 'ground-bottom',
+    assetBounds: { left: 16, top: 158, right: 1009, bottom: 987 },
+    faceBounds,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+  const home = kingdomTileArtFrame({
+    alignmentMode: 'ground-bottom',
+    assetBounds: { left: 27, top: 160, right: 1013, bottom: 988 },
+    faceBounds,
+    referenceBounds: BASE_BOUNDS,
+    target: TILE_TARGET,
+  });
+  assert.deepEqual(home, empty);
+  assertClose(empty.left + (faceBounds.left / 1024) * empty.width, TILE_TARGET.left);
+  assertClose(empty.top + (faceBounds.top / 1024) * empty.height, TILE_TARGET.top);
+});
+
+test('connected floating layout applies the measured two-percent seam overlap', () => {
+  const center = hexToWorld({ q: 0, r: 0 }, 'connected-floating-v1');
+  const southEast = hexToWorld({ q: 1, r: 0 }, 'connected-floating-v1');
+  assertClose(southEast.x - center.x, HEX_TILE_W * 0.75 * 0.98);
+  assertClose(southEast.y - center.y, HEX_TILE_H * 0.5 * 0.98);
+
+  const centerPoints = hexTileTopPoints(center.x, center.y);
+  const neighborPoints = hexTileTopPoints(southEast.x, southEast.y);
+  assert.ok(neighborPoints[4].x < centerPoints[0].x);
+  assert.ok(neighborPoints[4].y < centerPoints[0].y);
+  assert.ok(neighborPoints[3].x < centerPoints[1].x);
+  assert.ok(neighborPoints[3].y < centerPoints[1].y);
+});
+
+test('floating neighbourhood v2 applies a uniform fourteen-percent air gap', () => {
+  const center = hexToWorld({ q: 0, r: 0 }, 'floating-neighborhood-v2');
+  const southEast = hexToWorld({ q: 1, r: 0 }, 'floating-neighborhood-v2');
+  assertClose(southEast.x - center.x, HEX_TILE_W * 0.75 * 1.14);
+  assertClose(southEast.y - center.y, HEX_TILE_H * 0.5 * 1.14);
+  assert.ok(southEast.x > hexToWorld({ q: 1, r: 0 }, 'connected-floating-v1').x);
+});
+
+test('existing kingdom layout profile values remain unchanged', () => {
+  assert.deepEqual(KINGDOM_HEX_LAYOUT_PROFILES['connected-floating-v1'], {
+    horizontalSpacing: 0.98,
+    verticalSpacing: 0.98,
+  });
+  assert.deepEqual(KINGDOM_HEX_LAYOUT_PROFILES['separated-v1'], {
+    horizontalSpacing: 1.08,
+    verticalSpacing: 1.08 * 1.12,
+  });
+});
+
+test('legacy separated layout retains breathing room between tiles', () => {
+  const connected = hexToWorld({ q: 1, r: 0 }, 'connected-floating-v1');
+  const separated = hexToWorld({ q: 1, r: 0 }, 'separated-v1');
+  assert.ok(separated.x > connected.x);
+  assert.ok(separated.y > connected.y);
 });
 
 test('scene dimensions stay stable while the kingdom grows to fifty residents', () => {

@@ -22,21 +22,23 @@ function check(condition, message) {
 }
 
 check(
-  edgeFunction.includes("const birefnetModel = 'General Use (Heavy)';"),
-  'shared background-removal function pins BiRefNet Heavy'
+  edgeFunction.includes("const birefnetModelEnum = 'BiRefNet_lite';") &&
+    edgeFunction.includes("const falModelInput = 'General Use (Heavy)';") &&
+    edgeFunction.includes('model: falModelInput'),
+  'shared background-removal function maps BiRefNet_lite to FAL HTTP Heavy'
 );
 check(
-  edgeFunction.includes('model: birefnetModel') && !edgeFunction.includes('body.model'),
+  edgeFunction.includes('model: falModelInput') && !edgeFunction.includes('body.model'),
   'callers cannot override the shared Heavy model'
 );
 check(
-  edgeFunction.includes("const operatingResolution = '2048x2048';") &&
+  edgeFunction.includes("const operatingResolution = '1024x1024';") &&
     edgeFunction.includes('refine_foreground: refineForeground'),
-  'shared matting uses 2048 resolution with foreground refinement'
+  'shared matting uses 1024 resolution with foreground refinement'
 );
-check(hexPipeline.includes('BIREFNET_HEAVY_MODEL = "General Use (Heavy)"'), 'hex tile pipeline declares Heavy');
-check(eggPipeline.includes("'model': 'General Use (Heavy)'"), 'egg pipeline no longer requests Light 2K');
-check(objectGridPipeline.includes("BIREFNET_MODEL = 'General Use (Heavy)'"), 'object grid pipeline no longer requests Light 2K');
+check(hexPipeline.includes('BIREFNET_HEAVY_MODEL = "BiRefNet_lite"'), 'hex tile pipeline declares the Heavy enum');
+check(eggPipeline.includes("'model': 'BiRefNet_lite'"), 'egg pipeline declares the Heavy enum');
+check(objectGridPipeline.includes("BIREFNET_MODEL = 'BiRefNet_lite'"), 'object grid pipeline declares the Heavy enum');
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('All BiRefNet model checks passed.');

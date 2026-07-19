@@ -157,7 +157,10 @@ food), use `--mode variants` and map the cells you want by eye when wiring.
 **Clean matting (BiRefNet).** Two levers, both needed for light objects:
 1. Objects render on a FLAT high-contrast CHROMA backdrop (`BACKDROP` — a bold solid
    colour the object doesn't use, like a green screen), NOT a low-contrast neutral bg.
-2. The matte uses BiRefNet **'General Use (Heavy)'** + `refine_foreground` at 2K.
+2. The matte uses BiRefNet **General Use (Heavy)** via the raw
+   `BiRefNet_lite` repository enum, plus `refine_foreground` at 1024. FAL's HTTP
+   v2 request schema requires the mapped value `General Use (Heavy)`; sending
+   `BiRefNet_lite` directly is rejected by that endpoint.
    The shared `remove-image-background` Edge Function enforces Heavy so callers cannot silently
    inherit fal's Light default (it must be deployed:
    `npx supabase functions deploy remove-image-background --project-ref <ref>`).

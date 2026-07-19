@@ -1,10 +1,9 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-import { type NoteArchetype } from '@/utils/note-meaning';
+import { interpretNoteText, type NoteArchetype } from '@/utils/note-meaning';
 import type { JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import {
   classificationForResolvedRoute,
-  foundationAtomicNeedsRetry,
   foundationNoteRoute,
   journalNoteRouteNeedsConfirmation,
   rankJournalRoutes,
@@ -14,6 +13,7 @@ import {
 } from '@/utils/journal-routing';
 import { saveDevLastNoteAnalysis, type DevNoteAnalysisStatus } from '@/utils/dev-note-analysis';
 import { isFoundationOnlyNoteRoutingEnabled } from '@/utils/dev-settings';
+import { MANUAL_JOURNAL_FLOWS } from '@/utils/manual-journal-registry';
 
 // On-device interpretation of a note (typed or voice transcript) via Apple
 // Foundation Models (modules/katchimera-foundation). Present only on iOS 26+
@@ -26,27 +26,30 @@ import { isFoundationOnlyNoteRoutingEnabled } from '@/utils/dev-settings';
 // is true only when the classification fields were present — an OLD native
 // build returns just {label, archetype}, and the caller then falls back to
 // the deterministic regex classifier.
+type FoundationNoteRaw = Record<string, unknown> & {
+  label?: unknown;
+  archetype?: unknown;
+  mediaKind?: unknown;
+  mediaTitle?: unknown;
+  mediaCreator?: unknown;
+  food?: unknown;
+  classificationKind?: unknown;
+  flowId?: unknown;
+  categoryId?: unknown;
+  specific?: unknown;
+  context?: unknown;
+  journalFeeling?: unknown;
+  routeKey?: unknown;
+  alternativeRouteKey?: unknown;
+  routeConfidence?: unknown;
+  alternativeRouteConfidence?: unknown;
+  noteSchemaVersion?: unknown;
+};
+
 type FoundationNoteModule = {
   isAvailable: () => boolean;
-  interpretNoteAsync: (transcript: string) => Promise<{
-    label?: unknown;
-    archetype?: unknown;
-    mediaKind?: unknown;
-    mediaTitle?: unknown;
-    mediaCreator?: unknown;
-    food?: unknown;
-    classificationKind?: unknown;
-    flowId?: unknown;
-    categoryId?: unknown;
-    specific?: unknown;
-    context?: unknown;
-    journalFeeling?: unknown;
-    routeKey?: unknown;
-    alternativeRouteKey?: unknown;
-    routeConfidence?: unknown;
-    alternativeRouteConfidence?: unknown;
-    noteSchemaVersion?: unknown;
-  }>;
+  generateStructuredAsync?: (requestJson: string) => Promise<string>;
+  interpretNoteAsync: (transcript: string) => Promise<FoundationNoteRaw>;
   classifyNoteRouteAsync?: (transcript: string) => Promise<FoundationAtomicRouteRead & { noteSchemaVersion?: unknown }>;
 };
 
@@ -101,21 +104,19 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
   }
   try {
     const outcome = await Promise.race([
-      nativeFoundation.interpretNoteAsync(text).then((raw) => ({ kind: 'response' as const, raw })),
+      nativeFoundation.interpretNoteAsync(text)
+        .then((raw) => ({ kind: 'response' as const, raw }))
+        .catch(() => ({ kind: 'error' as const })),
       new Promise<{ kind: 'timeout' }>((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), FIRST_PASS_TIMEOUT_MS)),
     ]);
-    if (outcome.kind === 'timeout') {
-      recordDevNote(text, startedAt, true, 'timeout', `foundation_exceeded_${FIRST_PASS_TIMEOUT_MS}ms`);
-      return null;
-    }
-    const raw = outcome.raw;
+    const raw: FoundationNoteRaw = outcome.kind === 'response' ? outcome.raw : {};
     const firstPassDurationMs = Date.now() - startedAt;
-    const label = typeof raw.label === 'string' ? raw.label.trim() : '';
-    const archetype = typeof raw.archetype === 'string' ? raw.archetype.trim().toLowerCase() : '';
-    if (!label || label.length > 40 || !VALID_ARCHETYPES.includes(archetype as NoteArchetype)) {
-      recordDevNote(text, startedAt, true, 'invalid_response', 'missing_or_invalid_label_or_archetype', raw);
-      return null;
-    }
+    const generatedLabel = typeof raw.label === 'string' ? raw.label.trim() : '';
+    const generatedArchetype = typeof raw.archetype === 'string' ? raw.archetype.trim().toLowerCase() : '';
+    const richResponseValid = !!generatedLabel && generatedLabel.length <= 40 && VALID_ARCHETYPES.includes(generatedArchetype as NoteArchetype);
+    const localPresentation = richResponseValid ? null : interpretNoteText(text);
+    const label = richResponseValid ? generatedLabel : localPresentation!.label;
+    const archetype = richResponseValid ? generatedArchetype as NoteArchetype : localPresentation!.archetype;
 
     // Classification: only trust it when the new-build fields are present AND
     // mediaKind is a value we know ('none' = classified as not-media).
@@ -145,7 +146,11 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
     let retryRaw: (FoundationAtomicRouteRead & Record<string, unknown>) | null = null;
     let retryDurationMs: number | null = null;
     let retryFailure: 'timeout' | 'error' | null = null;
-    if (cleanString(raw.routeKey) && nativeFoundation.classifyNoteRouteAsync && foundationAtomicNeedsRetry(text, firstAtomic, { includeRegistryEvidence: !foundationOnlyRouting })) {
+    // Routing is a separate Foundation task. Keeping the 75-value route enum
+    // out of NoteRead restores the small schema that was reliable before note
+    // routing was added. Always run this focused call when the native build
+    // exposes it; this also recovers current builds when NoteRead returns {}.
+    if (nativeFoundation.classifyNoteRouteAsync) {
       const remaining = Math.max(0, TOTAL_TIMEOUT_MS - (Date.now() - startedAt));
       if (remaining >= 500) {
         const retryStartedAt = Date.now();
@@ -160,21 +165,62 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
         else retryFailure = retry.kind;
       }
     }
-    const decision = resolveFoundationRouteEvidence(text, firstAtomic, retryRaw, { includeRegistryEvidence: !foundationOnlyRouting });
+    // When the focused call succeeds it is the sole Foundation routing read.
+    // Ignore route fields from schema-v4 NoteRead responses so the retired,
+    // overloaded call cannot compete with the dedicated route decision.
+    const focusedAtomic = cleanString(retryRaw?.routeKey) ? retryRaw : null;
+    const decision = resolveFoundationRouteEvidence(
+      text,
+      focusedAtomic ? null : firstAtomic,
+      focusedAtomic,
+      { includeRegistryEvidence: !foundationOnlyRouting }
+    );
     const mediaRoute = media
       ? foundationNoteRoute({ provider: 'appleFoundation', llmClassified, mediaType: media.mediaType })
       : null;
     const journalRoutes = decision.routes.length ? decision.routes : rankJournalRoutes([mediaRoute]);
     const selected = decision.selected ?? (journalRoutes.length === 1 && !journalNoteRouteNeedsConfirmation(journalRoutes) ? journalRoutes[0] : null);
-    const selectedRaw = retryRaw && decision.decisionSource === 'foundationRetry' ? { ...raw, ...retryRaw } : raw;
+    const selectedFoundationRaw = retryRaw ? { ...raw, ...retryRaw } : raw;
+    const hasGeneratedSpecific = !!(
+      cleanShort(selectedFoundationRaw.specific, 120)
+      || media?.title
+      || food
+    );
+    if (selected && !hasGeneratedSpecific && nativeFoundation.generateStructuredAsync) {
+      const remaining = Math.max(0, TOTAL_TIMEOUT_MS - (Date.now() - startedAt));
+      if (remaining >= 500) {
+        const enrichment = await enrichNoteSpecificOnDevice(text, selected, remaining);
+        if (enrichment?.specific) {
+          retryRaw = {
+            ...(retryRaw ?? {}),
+            specific: enrichment.specific,
+            specificEnrichment: enrichment.rawResponse,
+          };
+        }
+      }
+    }
+    const selectedRaw = retryRaw ? { ...raw, ...retryRaw } : raw;
+    const classificationSource = cleanString(raw.routeKey) || cleanString(retryRaw?.routeKey)
+      ? decision.decisionSource
+      : 'legacy';
     const journalClassification = selected
-      ? classificationForResolvedRoute(selected, selectedRaw, cleanString(raw.routeKey) ? decision.decisionSource : 'legacy')
+      ? classificationForResolvedRoute(selected, selectedRaw, classificationSource)
       : null;
     const status: DevNoteAnalysisStatus = journalClassification
       ? mediaRoute && !decision.routes.length ? 'media_fallback' : 'classified'
       : journalRoutes.length ? 'ambiguous' : 'unrouted';
-    const fallbackReason = retryRaw
-      ? 'focused_route_retry_used'
+    const focusedRouteUsed = !!cleanString(retryRaw?.routeKey);
+    const firstPassFailure = outcome.kind === 'timeout'
+      ? `foundation_exceeded_${FIRST_PASS_TIMEOUT_MS}ms`
+      : outcome.kind === 'error'
+        ? 'foundation_note_read_error'
+        : richResponseValid
+          ? null
+          : 'missing_or_invalid_label_or_archetype';
+    const fallbackReason = !richResponseValid && focusedRouteUsed
+      ? `${firstPassFailure ?? 'invalid_rich_response'}_focused_route_used`
+      : focusedRouteUsed
+        ? 'split_foundation_route_used'
       : retryFailure
         ? `focused_route_retry_${retryFailure}`
       : status === 'ambiguous'
@@ -186,11 +232,66 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
             : null;
     recordDevNote(text, startedAt, true, status, fallbackReason, raw, journalClassification, media, food, retryRaw, journalRoutes, firstPassDurationMs, retryDurationMs);
 
-    return { archetype: archetype as NoteArchetype, label, media, food, llmClassified, journalClassification, journalRoutes };
+    // A failed enrichment read must not erase a successful Foundation route.
+    // The local presentation is used only for a temporary title/mood on old
+    // builds; journalClassification and journalRoutes remain Foundation output.
+    if (!richResponseValid && !journalClassification) return null;
+    return { archetype, label, media, food, llmClassified, journalClassification, journalRoutes };
   } catch (error) {
     recordDevNote(text, startedAt, true, 'native_error', error instanceof Error ? error.message : 'unknown_native_error');
     return null;
   }
+}
+
+async function enrichNoteSpecificOnDevice(
+  transcript: string,
+  route: JournalRouteProposal,
+  timeoutMs: number
+): Promise<{ specific: string; rawResponse: Record<string, unknown> } | null> {
+  const flow = MANUAL_JOURNAL_FLOWS.find((item) => item.id === route.flowId);
+  const choice = flow?.choices.find((item) => item.id === route.choiceId);
+  if (!flow || !choice || !nativeFoundation?.generateStructuredAsync) return null;
+  const fieldLabel = choice.specificFieldLabel ?? flow.specificFieldLabel;
+  try {
+    const responseJson = await Promise.race([
+      nativeFoundation.generateStructuredAsync(JSON.stringify({
+        bridgeVersion: 1,
+        taskId: 'note.specific.v1',
+        instructions: [
+          'Extract one concise editable journal field value from a personal note.',
+          'The supplied journal route is already selected and immutable; never reclassify it.',
+          'Return the specific entity or title only, not the complete sentence and not commentary.',
+          'Preserve or restore normal title casing. You may safely normalize an explicitly named work using knowledge, but never invent an absent entity.',
+          'Examples: "I ate an apple" becomes "Apple"; "I read Harry Potter" becomes "Harry Potter".',
+          'Use an empty string when the note does not support a useful value.',
+        ].join(' '),
+        prompt: `Locked route: ${route.id}. Editable field: ${fieldLabel}. Note: ${JSON.stringify(transcript)}`,
+        fields: [{
+          name: 'specific',
+          description: `Concise ${fieldLabel.toLowerCase()} explicitly supported by the note; never the whole note`,
+          kind: 'string',
+        }],
+      })),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
+    if (!responseJson) return null;
+    const parsed: unknown = JSON.parse(responseJson);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const rawResponse = parsed as Record<string, unknown>;
+    if (rawResponse.status !== 'succeeded' || rawResponse.taskId !== 'note.specific.v1') return null;
+    const specific = cleanShort(rawResponse.specific, 120);
+    if (!specific || noteSpecificCopiesSentence(specific, transcript)) return null;
+    return { specific, rawResponse };
+  } catch {
+    return null;
+  }
+}
+
+function noteSpecificCopiesSentence(specific: string, transcript: string): boolean {
+  const normalizedSpecific = specific.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const normalizedTranscript = transcript.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  if (normalizedSpecific !== normalizedTranscript) return false;
+  return /^(?:i|we|my|our)\b/.test(normalizedTranscript) && normalizedTranscript.split(/\s+/).length >= 3;
 }
 
 function recordDevNote(
@@ -208,7 +309,7 @@ function recordDevNote(
   firstPassDurationMs: number | null = null,
   retryDurationMs: number | null = null
 ): void {
-  const schema = rawResponse?.noteSchemaVersion;
+  const schema = rawResponse?.noteSchemaVersion ?? retryResponse?.noteSchemaVersion;
   saveDevLastNoteAnalysis({
     transcript,
     durationMs: Date.now() - startedAt,

@@ -7,7 +7,8 @@ import { commandToJournalRecord } from '@/utils/journal-domain';
 import { JOURNAL_CLASSIFICATION_CATALOG } from '@/utils/journal-classification-catalog';
 import { MANUAL_JOURNAL_FLOWS } from '@/utils/manual-journal-registry';
 import { createJournalSession, journalDraftIsDirty, journalSessionReducer } from '@/utils/journal-session';
-import { classificationForResolvedRoute, foundationAtomicNeedsRetry, foundationAtomicRoutes, foundationNoteRoute, journalRouteForAlias, journalRouteForIds, journalRouteNeedsConfirmation, parseFoundationJournalClassification, rankJournalRoutes, registryJournalRoutes, resolveFoundationRouteEvidence } from '@/utils/journal-routing';
+import { noteSuggestedSpecific } from '@/utils/note-journal-specific';
+import { classificationForResolvedRoute, foundationAtomicNeedsRetry, foundationAtomicRoutes, foundationNoteRoute, journalNoteRouteNeedsConfirmation, journalRouteForAlias, journalRouteForIds, journalRouteNeedsConfirmation, parseFoundationJournalClassification, rankJournalRoutes, registryJournalRoutes, resolveFoundationRouteEvidence } from '@/utils/journal-routing';
 import { validateJournalProjections } from '@/utils/journal-selectors';
 
 const now = new Date('2026-07-13T12:00:00.000Z');
@@ -153,6 +154,61 @@ test('conflicting evidence remains editable suggestions instead of forcing a rou
   );
   assert.ok(decision.routes.length >= 2);
   assert.equal(decision.selected, null);
+});
+
+test('a clear Foundation note route opens its journal category and retains generated detail', () => {
+  const raw = {
+    routeKey: 'food.snack',
+    routeConfidence: 0.76,
+    alternativeRouteKey: '',
+    alternativeRouteConfidence: 0,
+    specific: 'Apple',
+  };
+  const decision = resolveFoundationRouteEvidence('I ate an apple', raw, null, { includeRegistryEvidence: false });
+  assert.equal(decision.selected?.id, 'food.snack');
+  assert.equal(journalNoteRouteNeedsConfirmation(decision.routes), false);
+  assert.equal(classificationForResolvedRoute(decision.selected!, raw, decision.decisionSource)?.fields.specific, 'Apple');
+});
+
+test('note fields use Foundation detail and never copy the display transcript label', () => {
+  const base = {
+    intelligenceProvider: 'appleFoundation' as const,
+    llmClassified: false,
+    media: null,
+    food: null,
+  };
+  assert.equal(noteSuggestedSpecific({
+    ...base,
+    journalClassification: {
+      kind: 'categorized', flowId: 'food', categoryId: 'snack', fields: { specific: null, context: null }, feeling: null, provider: 'appleFoundation',
+    },
+  }), null);
+  assert.equal(noteSuggestedSpecific({
+    ...base,
+    journalClassification: {
+      kind: 'categorized', flowId: 'food', categoryId: 'snack', fields: { specific: 'Apple', context: null }, feeling: null, provider: 'appleFoundation',
+    },
+  }), 'Apple');
+  assert.equal(noteSuggestedSpecific({
+    ...base,
+    llmClassified: true,
+    media: { mediaType: 'book', title: 'Harry Potter', creator: null },
+    journalClassification: {
+      kind: 'categorized', flowId: 'studio', categoryId: 'book', fields: { specific: null, context: null }, feeling: null, provider: 'appleFoundation',
+    },
+  }), 'Harry Potter');
+});
+
+test('note routing still asks for confirmation when confidence or candidate lead is weak', () => {
+  const lowConfidence = foundationAtomicRoutes({ routeKey: 'food.snack', routeConfidence: 0.7 });
+  const closeCandidates = foundationAtomicRoutes({
+    routeKey: 'food.snack',
+    routeConfidence: 0.8,
+    alternativeRouteKey: 'food.meal',
+    alternativeRouteConfidence: 0.7,
+  });
+  assert.equal(journalNoteRouteNeedsConfirmation(lowConfidence), true);
+  assert.equal(journalNoteRouteNeedsConfirmation(closeCandidates), true);
 });
 
 test('shared route resolver uses registry aliases and confidence boundaries', () => {

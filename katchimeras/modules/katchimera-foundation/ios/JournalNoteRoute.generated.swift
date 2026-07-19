@@ -4,7 +4,7 @@ import FoundationModels
 
 @available(iOS 26.0, *)
 enum JournalNoteRouteCatalog {
-  static let schemaVersion = "4"
+  static let schemaVersion = "5"
   static let photoSchemaVersion = "13"
   static let routeKeys: Set<String> = ["went_somewhere.park", "went_somewhere.city", "went_somewhere.beach", "went_somewhere.forest", "went_somewhere.garden", "went_somewhere.museum", "went_somewhere.cafe", "went_somewhere.restaurant", "went_somewhere.street", "went_somewhere.home", "went_somewhere.travel", "went_somewhere.other_place", "food.meal", "food.snack", "food.dessert", "food.coffee", "food.tea", "food.drink", "food.cooking", "food.other_food", "studio.book", "studio.film", "studio.show", "studio.game", "studio.music", "studio.podcast", "studio.art", "studio.other_media", "movement.walk", "movement.run", "movement.cycle", "movement.workout", "movement.sport", "movement.hike", "movement.errands", "movement.commute", "movement.travel", "movement.mixed", "people.partner", "people.my_child", "people.family", "people.friends", "people.group", "people.someone_new", "people.pet", "people.solo", "people.someone_else", "work.focus", "work.office", "work.learning", "work.planning", "work.creative", "work.admin", "work.progress", "work.other_work", "big_event.birthday", "big_event.anniversary", "big_event.firstTime", "big_event.holiday", "big_event.trip", "big_event.achievement", "big_event.baby", "big_event.wedding", "big_event.graduation", "big_event.newHome", "big_event.newJob", "big_event.reunion", "big_event.milestone", "general.highlight", "general.difficult", "general.gratitude", "general.new", "general.rest", "general.ordinary", "general.other"]
   static let promptTaxonomy = """
@@ -21,7 +21,7 @@ went_somewhere.home: Places, trips and time away from home: Home. Examples: “I
 went_somewhere.travel: A day out, destination visit, or travel where the place is the main memory. Examples: “We took a day trip to York”.
 went_somewhere.other_place: Places, trips and time away from home: Somewhere else. Examples: “I went to somewhere else”.
 food.meal: Meals, snacks, coffee and drinks: A meal. Examples: “I had ramen for dinner”; “We ate lunch together”.
-food.snack: Meals, snacks, coffee and drinks: A snack. Examples: “I had a snack”; “Ate some crisps”.
+food.snack: Meals, snacks, coffee and drinks: A snack. Examples: “I had a snack”; “Ate some crisps”; “I ate an apple”. Not: A food explicitly described as breakfast, lunch, dinner, or part of a meal.
 food.dessert: Meals, snacks, coffee and drinks: Dessert. Examples: “I ate birthday cake”; “We had dessert”. Not: It was my birthday.
 food.coffee: Meals, snacks, coffee and drinks: Coffee. Examples: “I had a coffee”; “Drank a latte”.
 food.tea: Meals, snacks, coffee and drinks: Tea. Examples: “I drank tea”; “Had a cup of tea”.
@@ -100,6 +100,9 @@ struct NoteRouteDecision {
 
   @Guide(description: "Confidence in alternativeRouteKey, or zero when it is empty", .range(0.0...1.0))
   let alternativeRouteConfidence: Double
+
+  @Guide(description: "A concise specific person, place, activity, food, work, project, or event explicitly supported by the note; otherwise empty")
+  let specific: String
 }
 
 @available(iOS 26.0, *)
@@ -141,26 +144,5 @@ struct NoteRead {
 
   @Guide(description: "A short dish or drink name when the note is about eating or drinking, otherwise empty")
   let food: String
-
-  @Guide(description: "The single best atomic journal route, or ambiguous only when no route clearly leads", .anyOf(["went_somewhere.park", "went_somewhere.city", "went_somewhere.beach", "went_somewhere.forest", "went_somewhere.garden", "went_somewhere.museum", "went_somewhere.cafe", "went_somewhere.restaurant", "went_somewhere.street", "went_somewhere.home", "went_somewhere.travel", "went_somewhere.other_place", "food.meal", "food.snack", "food.dessert", "food.coffee", "food.tea", "food.drink", "food.cooking", "food.other_food", "studio.book", "studio.film", "studio.show", "studio.game", "studio.music", "studio.podcast", "studio.art", "studio.other_media", "movement.walk", "movement.run", "movement.cycle", "movement.workout", "movement.sport", "movement.hike", "movement.errands", "movement.commute", "movement.travel", "movement.mixed", "people.partner", "people.my_child", "people.family", "people.friends", "people.group", "people.someone_new", "people.pet", "people.solo", "people.someone_else", "work.focus", "work.office", "work.learning", "work.planning", "work.creative", "work.admin", "work.progress", "work.other_work", "big_event.birthday", "big_event.anniversary", "big_event.firstTime", "big_event.holiday", "big_event.trip", "big_event.achievement", "big_event.baby", "big_event.wedding", "big_event.graduation", "big_event.newHome", "big_event.newJob", "big_event.reunion", "big_event.milestone", "general.highlight", "general.difficult", "general.gratitude", "general.new", "general.rest", "general.ordinary", "general.other", "ambiguous"]))
-  let routeKey: String
-
-  @Guide(description: "The second plausible atomic journal route, or empty when there is no close alternative", .anyOf(["", "went_somewhere.park", "went_somewhere.city", "went_somewhere.beach", "went_somewhere.forest", "went_somewhere.garden", "went_somewhere.museum", "went_somewhere.cafe", "went_somewhere.restaurant", "went_somewhere.street", "went_somewhere.home", "went_somewhere.travel", "went_somewhere.other_place", "food.meal", "food.snack", "food.dessert", "food.coffee", "food.tea", "food.drink", "food.cooking", "food.other_food", "studio.book", "studio.film", "studio.show", "studio.game", "studio.music", "studio.podcast", "studio.art", "studio.other_media", "movement.walk", "movement.run", "movement.cycle", "movement.workout", "movement.sport", "movement.hike", "movement.errands", "movement.commute", "movement.travel", "movement.mixed", "people.partner", "people.my_child", "people.family", "people.friends", "people.group", "people.someone_new", "people.pet", "people.solo", "people.someone_else", "work.focus", "work.office", "work.learning", "work.planning", "work.creative", "work.admin", "work.progress", "work.other_work", "big_event.birthday", "big_event.anniversary", "big_event.firstTime", "big_event.holiday", "big_event.trip", "big_event.achievement", "big_event.baby", "big_event.wedding", "big_event.graduation", "big_event.newHome", "big_event.newJob", "big_event.reunion", "big_event.milestone", "general.highlight", "general.difficult", "general.gratitude", "general.new", "general.rest", "general.ordinary", "general.other", "ambiguous"]))
-  let alternativeRouteKey: String
-
-  @Guide(description: "Confidence that routeKey is the best destination", .range(0.0...1.0))
-  let routeConfidence: Double
-
-  @Guide(description: "Confidence in alternativeRouteKey, or zero when it is empty", .range(0.0...1.0))
-  let alternativeRouteConfidence: Double
-
-  @Guide(description: "A concise specific name or detail explicitly supported by the note, otherwise empty")
-  let specific: String
-
-  @Guide(description: "An allowed context option ID explicitly supported by the note, otherwise empty")
-  let context: String
-
-  @Guide(description: "An allowed journal feeling option ID explicitly supported by the note, otherwise empty")
-  let journalFeeling: String
 }
 #endif

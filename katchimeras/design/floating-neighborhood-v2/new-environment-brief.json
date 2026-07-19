@@ -1,0 +1,35 @@
+{
+  "key": "replace_me",
+  "kind": "resident",
+  "concept": "One-sentence habitat identity.",
+  "main_structure": "One iconic rear landmark made from a few large forms.",
+  "rear_props": [
+    "large readable prop",
+    "large readable prop"
+  ],
+  "side_props": [
+    "upper-left framing prop",
+    "upper-right framing prop"
+  ],
+  "perimeter": {
+    "material": "continuous smooth hedge, parapet, or themed border",
+    "palette": ["primary", "accent"],
+    "emblems": "up to four oversized simple emblems"
+  },
+  "cliff": {
+    "materials": ["large block material A", "large block material B"],
+    "palette": ["primary", "secondary", "optional accent"]
+  },
+  "lighting": "soft warm lighting with at most two or three large practical lights",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, text, watermark, external shadow",
+    "tiny flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

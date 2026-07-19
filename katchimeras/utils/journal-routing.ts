@@ -217,8 +217,12 @@ export function journalRouteNeedsConfirmation(routes: JournalRouteProposal[]): b
 }
 
 export function journalNoteRouteNeedsConfirmation(routes: JournalRouteProposal[]): boolean {
-  const first = routes[0];
-  return !first || first.confidence < 0.82 || first.confidence - (routes[1]?.confidence ?? 0) < 0.15;
+  // Note routes are already constrained to the generated journal taxonomy and
+  // checked for a meaningful lead over the next candidate. Requiring 0.82 here
+  // caused valid, single-route Foundation decisions to be discarded after the
+  // model had already resolved them, which reopened the top-level picker and
+  // also prevented the model-generated detail from being seeded into the form.
+  return journalRouteNeedsConfirmation(routes);
 }
 
 function proposal(flowId: string, choiceId: string, label: string, confidence: number, reason: string, confirmedFacets: JournalRouteProposal['confirmedFacets']): JournalRouteProposal {

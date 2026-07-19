@@ -133,8 +133,8 @@ if not os.path.exists(matte_path):
     matte = call_retry('remove-image-background', {
         'imageBase64': file_b64(SRC),
         'outputName': args.key.replace('_', '-') + '-matte',
-        'model': 'General Use (Heavy)',
-        'operatingResolution': '2048x2048',
+        'model': 'BiRefNet_lite',
+        'operatingResolution': '1024x1024',
         'refineForeground': True,
     })
     assert matte.get('status') == 'completed', matte

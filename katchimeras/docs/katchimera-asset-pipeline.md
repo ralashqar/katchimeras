@@ -1,5 +1,10 @@
 # Katchimera asset pipeline
 
+> Creating a Floating Neighbourhood V2 resident environment or home island?
+> Use the dedicated [fresh-context environment runbook](floating-neighborhood-v2-environment-pipeline.md).
+> Its canonical bases, black-background prompt, Heavy matte settings, and
+> promotion flow supersede the generic character-art steps below for those tiles.
+
 How production art is made in this repo: prompt → FAL generation → BiRefNet
 matting (true alpha) → visual QA → crop → bundle → wire into the app. Every
 step is real and runnable; `scripts/asset-pipeline.py` is the CLI that drives
@@ -92,7 +97,9 @@ python scripts/asset-pipeline.py verify --in assets/images/katchimeras/cutouts/l
 any catalog Katchimera. Its default `guided-sheet` strategy passes the fixed
 base hatchling as the sole generation image reference, supplies the adult
 identity and every monotonic stage as text, and then runs the sheet through the
-deployed BiRefNet **General Use (Heavy)** matte. The exact hatchling and exact
+deployed BiRefNet **General Use (Heavy)** matte through the raw
+`BiRefNet_lite` repository enum. The HTTP request uses FAL's required mapped
+value `General Use (Heavy)`. The exact hatchling and exact
 existing adult cutout are stamped into stages one and nine after generation.
 This avoids both backward egg states and premature copying of the adult design.
 The default hatchling reference is the approved richer

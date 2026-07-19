@@ -3,6 +3,9 @@ import type { InterpretedNote } from '@/utils/note-interpret';
 import { interpretNote } from '@/utils/note-interpret';
 import type { JournalAnalysisContext, JournalDraftSeed, JournalInputAdapter, JournalSourceAnalysis } from '@/utils/journal-domain';
 import { foundationNoteRoute } from '@/utils/journal-routing';
+import { noteSuggestedSpecific } from '@/utils/note-journal-specific';
+
+export { noteSuggestedSpecific } from '@/utils/note-journal-specific';
 
 export type NoteJournalInput = {
   source: Extract<JournalSource, { kind: 'text_note' | 'voice_note' }>;
@@ -52,13 +55,9 @@ export const voiceJournalInputAdapter: JournalInputAdapter<NoteJournalInput> = {
 
 export function noteAnalysis(interpreted: InterpretedNote): JournalSourceAnalysis {
   const ranked = noteRoutesForSignals(interpreted);
-  const classified = interpreted.journalClassification?.kind === 'categorized' || interpreted.journalClassification?.kind === 'generic';
-  const foundationMediaFallback = interpreted.intelligenceProvider === 'appleFoundation' && interpreted.llmClassified && !!interpreted.media;
   return {
     routes: ranked,
-    suggestedSpecific: classified || foundationMediaFallback
-      ? interpreted.journalClassification?.fields.specific ?? interpreted.media?.title ?? interpreted.food ?? interpreted.label ?? null
-      : null,
+    suggestedSpecific: noteSuggestedSpecific(interpreted),
     suggestedContext: interpreted.journalClassification?.fields.context ?? null,
     suggestedFeeling: interpreted.journalClassification?.feeling ?? null,
     transcript: interpreted.transcript,

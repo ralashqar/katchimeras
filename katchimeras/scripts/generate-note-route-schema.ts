@@ -28,7 +28,7 @@ import FoundationModels
 
 @available(iOS 26.0, *)
 enum JournalNoteRouteCatalog {
-  static let schemaVersion = "4"
+  static let schemaVersion = "5"
   static let photoSchemaVersion = "13"
   static let routeKeys: Set<String> = [${swiftRouteValues}]
   static let promptTaxonomy = """
@@ -50,6 +50,9 @@ struct NoteRouteDecision {
 
   @Guide(description: "Confidence in alternativeRouteKey, or zero when it is empty", .range(0.0...1.0))
   let alternativeRouteConfidence: Double
+
+  @Guide(description: "A concise specific person, place, activity, food, work, project, or event explicitly supported by the note; otherwise empty")
+  let specific: String
 }
 
 @available(iOS 26.0, *)
@@ -91,27 +94,6 @@ struct NoteRead {
 
   @Guide(description: "A short dish or drink name when the note is about eating or drinking, otherwise empty")
   let food: String
-
-  @Guide(description: "The single best atomic journal route, or ambiguous only when no route clearly leads", .anyOf([${allowed}]))
-  let routeKey: String
-
-  @Guide(description: "The second plausible atomic journal route, or empty when there is no close alternative", .anyOf([${allowedAlternative}]))
-  let alternativeRouteKey: String
-
-  @Guide(description: "Confidence that routeKey is the best destination", .range(0.0...1.0))
-  let routeConfidence: Double
-
-  @Guide(description: "Confidence in alternativeRouteKey, or zero when it is empty", .range(0.0...1.0))
-  let alternativeRouteConfidence: Double
-
-  @Guide(description: "A concise specific name or detail explicitly supported by the note, otherwise empty")
-  let specific: String
-
-  @Guide(description: "An allowed context option ID explicitly supported by the note, otherwise empty")
-  let context: String
-
-  @Guide(description: "An allowed journal feeling option ID explicitly supported by the note, otherwise empty")
-  let journalFeeling: String
 }
 #endif
 `;

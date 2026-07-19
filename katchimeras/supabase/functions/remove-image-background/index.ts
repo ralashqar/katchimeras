@@ -12,8 +12,11 @@ const bucketName = 'katchimera-art-dev';
 // generator for "transparent background" (fake checkerboards) or chroma-keying
 // a greenscreen (fringes).
 const modelId = 'fal-ai/birefnet/v2';
-const birefnetModel = 'General Use (Heavy)';
-const operatingResolution = '2048x2048';
+// Repository-level model enum. FAL's HTTP v2 schema requires the mapped display
+// value in the request body; sending `BiRefNet_lite` directly returns HTTP 422.
+const birefnetModelEnum = 'BiRefNet_lite';
+const falModelInput = 'General Use (Heavy)';
+const operatingResolution = '1024x1024';
 const refineForeground = true;
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
@@ -85,7 +88,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         image_url: sourceUrl,
         output_format: 'png',
-        model: birefnetModel,
+        model: falModelInput,
         operating_resolution: operatingResolution,
         refine_foreground: refineForeground,
       }),
@@ -124,7 +127,8 @@ Deno.serve(async (req) => {
     return jsonResponse({
       status: 'completed',
       imageUrl: publicUrlData.publicUrl,
-      model: birefnetModel,
+      model: birefnetModelEnum,
+      falModelInput,
       operatingResolution,
       refineForeground,
     });

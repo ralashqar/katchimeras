@@ -235,7 +235,7 @@ def generate_grid(name, subject, ref_path, model, model_id, size, grid, mode, st
 
 
 # All production matting uses the slower, more accurate BiRefNet Heavy variant.
-BIREFNET_MODEL = 'General Use (Heavy)'
+BIREFNET_MODEL = 'BiRefNet_lite'
 
 
 def matte(image_url, out_name):
@@ -245,7 +245,7 @@ def matte(image_url, out_name):
         'imageUrl': image_url,
         'outputName': safe,
         'model': BIREFNET_MODEL,
-        'operatingResolution': '2048x2048',
+        'operatingResolution': '1024x1024',
         'refineForeground': True,
     })
     matted = data.get('imageUrl')
