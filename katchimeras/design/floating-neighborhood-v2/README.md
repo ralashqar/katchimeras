@@ -37,9 +37,13 @@ runbook.
 - Transparency comes from the repository's BiRefNet Heavy
   `remove-image-background` pipeline on FAL, with foreground refinement
   enabled.
-- Preserve the original square canvas through matting so shared face anchors do
-  not shift. Repair internal matte dropouts from non-black source pixels while
-  keeping intentional pure-black openings transparent.
+- The returned BiRefNet RGBA is authoritative along the complete exterior
+  boundary. A source-backed repair may restore torn-out interior pixels only
+  inside a three-pixel-eroded silhouette; it must never overwrite the protected
+  BiRefNet edge band.
+- Preserve the original square canvas through packaging so shared face anchors
+  do not shift. Matte caches are valid only when their recorded source SHA-256
+  matches the current source.
 - Inspect alpha edges against the dark Kingdom scene before packaging the
   1024/512/256 WebPs.
 
@@ -130,31 +134,33 @@ board, toolbox, rolled plans, and two lanterns in the rear-and-upper-side frame.
 Its continuous blue-green hedge and large slate/sandstone cliff blocks carry the
 theme without texture noise.
 
-Feastle uses one compact terracotta-roof oven, a single serving counter, soup
-pot, two-loaf basket, three-piece produce bowl, and two lanterns in the
-rear-and-upper-side frame. Its sage hedge, four oversized herb pots, and large
-biscuit/terracotta cliff blocks carry the theme. Both habitats leave the entire
-bottom/front half and stairs as uninterrupted grass for the live creature
-sprite. Neither generation received legacy Tasklet, Feastle, or resident-tile
+Feastle uses one compact terracotta-roof oven, a broad rear serving counter,
+soup pot, bread basket, fruit bowl, picnic bench, drink trolley, herb pots, and
+two broad lanterns in a rear-and-upper-side frame. Its sage border, oversized
+leaf emblems, and large biscuit/terracotta cliff blocks carry the theme. The
+entire bottom/front half and stairs remain uninterrupted grass for the live
+creature sprite. The generation received no legacy Feastle or resident-tile
 art.
 
-Cheerlet is the first simplified full surface-theme proof: one smooth teal hedge
-mass and four oversized coral flower accents replace the neutral border; large
-alternating cream and blush blocks replace the brown cliff; and one pavilion,
-one cake, two gifts, two three-balloon bunches, and two lanterns establish the
-celebration theme. Props form a rear-and-upper-side frame, leaving the unpaved
-bottom/front stage empty. There are no garlands, fairy lights, confetti, mineral
-specks, or leaf-by-leaf textures.
+Cheerlet uses one broad wavy teal pavilion, one small cake, two chunky gift
+blocks, two three-balloon bunches, two lanterns, and oversized coral flowers.
+Its smooth teal hedge and large alternating cream, coral, and muted-teal cliff
+blocks carry the celebration identity. Props form a rear-and-upper-side frame,
+leaving the unpaved bottom/front stage empty. There are no garlands, fairy
+lights, confetti, mineral specks, or leaf-by-leaf textures.
 
-Skylo uses one compact three-building city skyline, two large street lanterns,
-and one bench in the rear band. Its smooth slate-blue parapet with four gold
-light accents and alternating blue-gray/sandstone cliff blocks carry the city
-identity without roads, traffic, signs, or tiny window grids.
+Skylo uses one compact rounded art-deco city pavilion, a tall central tower,
+two large street lanterns, one bench, one street tree, and a blank transit
+shelter in the rear-and-upper-side frame. Its smooth slate-blue parapet with
+four gold light accents and alternating blue-gray/sandstone cliff blocks carry
+the city identity without roads, traffic, signs, or tiny window grids.
 
-Pagelet uses one compact cream library nook, two three-book shelves, a rear
-lectern with one open book, and large lanterns. Its smooth segmented burgundy
-border with four gold book emblems and alternating cream/burgundy cliff blocks
-carry the reading identity without leaf texture, loose pages, or book clutter.
+Pagelet uses one broad cream library pavilion with a curved burgundy roof,
+integrated shelves, a rear lectern with one open book, a chunky reading chair,
+book cart, and two broad reading lamps. Its smooth segmented burgundy border,
+oversized gold book emblems, and alternating cream, burgundy, and walnut cliff
+blocks carry the reading identity without leaf texture, loose pages, or book
+clutter.
 
 Steppling uses a compact hiking lodge, blank trail-map board, rest bench, water
 station, gear rack, waypoint posts, pine forms, stepping stones, and lanterns
@@ -163,10 +169,11 @@ four oversized orange footprint emblems and alternating slate-blue/sandstone
 cliff blocks carry the walking identity while leaving the bottom-half floor and
 front approach empty.
 
-Mossprout uses one compact leafy alcove, two moss mounds, a tiny rear pond, two
-oversized fern forms, and two lanterns. Its smooth deep-green border with four
-pale leaf emblems and large olive/umber/cream cliff blocks carry the garden
-identity without leaf-by-leaf texture or foreground clutter.
+Mossprout uses one broad leafy alcove, three moss boulders, a small rear pond,
+a chunky stump bench, a watering-stone ornament, oversized fern forms, and two
+lanterns. Its smooth deep-green border with four pale leaf emblems and large
+olive/umber/cream cliff blocks carry the garden identity without leaf-by-leaf
+texture or foreground clutter.
 
 Flickerbun uses a broad blank cinema screen, simple curtains, one chunky
 projector, paired velvet seats, popcorn forms, lanterns, and rounded moonflower
@@ -211,6 +218,12 @@ for direct comparison across all five themed resident treatments.
 `qa-steppling-mossprout-neighborhood.png` verifies the two FAL-generated
 walking and garden habitats with their live creature sprites at production
 scale.
+`qa-skylo-mossprout-tasklet-refresh.png` verifies the refreshed city, garden,
+and focus-workshop habitats together with their live creatures, shared face
+alignment, 14% neighbourhood gaps, and clear front-stage anchors.
+`qa-pagelet-cheerlet-feastle-refresh.png` verifies the refreshed reading,
+celebration, and cooking habitats together with their live creatures, shared
+face alignment, 14% neighbourhood gaps, and clear front-stage anchors.
 `qa-flickerbun-relicoon-neighborhood.png` verifies the cinema and museum
 habitats with their live creature sprites at production scale.
 `qa-bedrotte-gatherglow-neighborhood.png` verifies the restorative sleep and

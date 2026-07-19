@@ -1,0 +1,35 @@
+{
+  "key": "feastle",
+  "kind": "resident",
+  "concept": "A hearty open-air feast kitchen where one warm oven and a few generous ingredients turn an ordinary meal into a small celebration.",
+  "main_structure": "One compact cream-stone feast oven at the rear-left with a broad terracotta roof, a large arched fire opening, and one chunky chimney.",
+  "rear_props": [
+    "one broad serving counter holding one large soup pot, one two-loaf basket, and one three-piece produce bowl",
+    "two broad amber kitchen lanterns flanking the rear work area"
+  ],
+  "side_props": [
+    "one chunky picnic bench and one oversized herb pot on the upper-left edge",
+    "one compact drink trolley with one large pitcher and one oversized herb pot on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth sage-green kitchen-garden border with broad rounded segments",
+    "palette": ["sage green", "terracotta", "biscuit cream"],
+    "emblems": "four oversized simple terracotta herb-leaf emblems"
+  },
+  "cliff": {
+    "materials": ["large biscuit-sandstone blocks", "large terracotta blocks", "a few broad warm cream stone blocks"],
+    "palette": ["biscuit cream", "terracotta", "warm cream"]
+  },
+  "lighting": "soft warm daylight with one broad oven glow and two large amber lantern pools",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, paving, dining floor, path, or indentation",
+    "bridges, clouds, readable labels, text, watermark, external shadow",
+    "tiny food pieces, tableware clutter, crumbs, steam particles, tiny herbs, flowers, grass blades, pebbles, cracks, specks, or dense texture"
+  ]
+}

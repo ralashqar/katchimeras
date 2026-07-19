@@ -414,6 +414,9 @@ def prompt_for_floating_v2(visual_key: str, theme: str) -> str:
         reference=(
             "Edit image 1. Preserve its exact square canvas, flat-top hex footprint, position, scale, "
             "rotation, camera angle, perspective, deep tapered island silhouette, front stairs, and padding. "
+            "Copy the reference island's front geometry exactly: a broad straight front hex edge interrupted "
+            "by a centered stair entrance. The stairs are recessed into that edge; never turn the front into "
+            "a downward-pointing tip, triangular nose, projecting peninsula, or altered silhouette. "
             "Keep the entire bottom/front half as uninterrupted smooth grass. Do not add a circle, "
             "plaza, paving, pedestal, path, rug, ring, indentation, or character platform. Confine every "
             "structure and floor prop to the rear half or the upper portions of the left and right side edges. "

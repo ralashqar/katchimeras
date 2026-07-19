@@ -111,7 +111,7 @@ an existing canonical tile. The command:
 
 1. validates a square source of at least 1024px with black corners;
 2. saves the canonical `*-source.png`;
-3. calls the shared BiRefNet matte while preserving canvas and black cutouts;
+3. calls the shared BiRefNet matte and preserves its exterior RGBA unchanged;
 4. saves the canonical `*-alpha.png`;
 5. packages 1024/512/256 WebPs; and
 6. rebuilds `constants/kingdom-hex-tile-bounds.gen.ts`.
@@ -131,6 +131,13 @@ The shared matte request is fixed to this known-good FAL payload:
 Repository code names this selection `BiRefNet_lite`; the deployed edge
 function translates it to FAL's accepted `General Use (Heavy)` transport value.
 Do not send the enum directly to FAL HTTP.
+
+BiRefNet is the sole exterior-edge authority. Large grass floors may be removed
+by segmentation, so the pipeline restores source pixels only within a
+three-pixel-eroded interior silhouette. The protected boundary band receives no
+thresholding, RGB replacement, alpha contraction, or alpha feathering. The
+local matte cache is keyed by the source SHA-256 and must be invalidated whenever
+source pixels change.
 
 ## 5. Integrate the reviewed asset
 

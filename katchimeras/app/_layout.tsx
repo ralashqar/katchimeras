@@ -28,7 +28,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const themeColors = Colors[colorScheme === 'light' ? 'light' : 'dark'];
   const [fontsLoaded] = useFonts({
-    Bungee: require('@expo-google-fonts/bungee/400Regular/Bungee_400Regular.ttf'),
+    FredokaBold: require('@expo-google-fonts/fredoka/700Bold/Fredoka_700Bold.ttf'),
     InstrumentSerif: require('../assets/fonts/InstrumentSerif-Regular.ttf'),
     Manrope: require('../assets/fonts/Manrope-Variable.ttf'),
   });

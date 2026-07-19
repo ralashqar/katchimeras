@@ -1,0 +1,35 @@
+{
+  "key": "tasklet",
+  "kind": "resident",
+  "concept": "A confident focus workshop where plans, tools, and neatly organized supplies make the next useful step feel inviting.",
+  "main_structure": "One compact open-front workshop at the rear with a broad curved navy roof, warm timber walls, one large arched doorway, and two oversized amber windows.",
+  "rear_props": [
+    "one broad planning bench with a single large blank plan sheet",
+    "one large blank task board beside a chunky tool cabinet"
+  ],
+  "side_props": [
+    "one large toolbox, two rolled plans, and one broad focus lantern on the upper-left edge",
+    "two stacked storage crates, one oversized pencil-cup shape, and one broad focus lantern on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth blue-green workshop border with broad rounded capstones",
+    "palette": ["deep teal", "navy blue", "warm gold"],
+    "emblems": "four oversized simple gold leaf-shaped focus emblems"
+  },
+  "cliff": {
+    "materials": ["large slate-blue stone blocks", "large warm sandstone blocks", "a few broad honey-timber blocks"],
+    "palette": ["slate blue", "warm sandstone", "honey gold"]
+  },
+  "lighting": "soft clear daylight with warm workshop windows and two broad amber focus lanterns",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, paving, path, or indentation",
+    "bridges, clouds, readable writing, numbers, watermark, external shadow",
+    "tiny tools, paper clutter, checkmark clutter, flowers, grass blades, pebbles, cracks, specks, or dense texture"
+  ]
+}

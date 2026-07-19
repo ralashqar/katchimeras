@@ -1,0 +1,37 @@
+{
+  "key": "cheerlet",
+  "kind": "resident",
+  "concept": "A bright celebration garden that marks genuinely joyful moments with bold color, warm candlelight, and a welcoming party frame.",
+  "main_structure": "One broad open celebration pavilion at the rear with a smooth wavy teal roof, two chunky cream pillars, and one small cake on a rear pedestal beneath it.",
+  "rear_props": [
+    "two simple three-balloon bunches placed beside the pavilion",
+    "two large wrapped gift blocks with broad coral ribbons"
+  ],
+  "side_props": [
+    "one oversized coral flower form and one broad lantern on the upper-left edge",
+    "one oversized coral flower form and one broad lantern on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth teal celebration border made from broad rounded masses",
+    "palette": ["bright teal", "warm coral", "candle gold"],
+    "emblems": "four oversized simple coral flower-petal emblems"
+  },
+  "cliff": {
+    "materials": ["large warm cream stone blocks", "large blush-coral stone blocks", "a few broad muted-teal blocks"],
+    "palette": ["warm cream", "blush coral", "muted teal"]
+  },
+  "lighting": "clear cheerful daylight with two or three broad pools of warm candle and lantern glow",
+  "must_keep": [
+    "copy the neutral reference island's exact canonical camera, canvas, hex footprint, straight front rim, centered stair entrance, tapered underside, and transparent padding",
+    "the bottom outline must be the same broad floating-island underside as the neutral reference, with a flat front hex edge interrupted only by the centered stairs",
+    "the stairs must read as an entrance cut into the front edge, not as a point or projecting nose",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, paving, dance floor, path, or indentation",
+    "pointed front end, downward-pointing tip, triangular nose, projecting stair peninsula, altered hex silhouette, bridges, clouds, text, numbers, watermark, external shadow",
+    "confetti, garlands, bunting, fairy lights, tiny balloons, sprinkles, tiny flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

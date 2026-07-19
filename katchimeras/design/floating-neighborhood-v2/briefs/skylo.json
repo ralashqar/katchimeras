@@ -1,0 +1,35 @@
+{
+  "key": "skylo",
+  "kind": "resident",
+  "concept": "A bright pocket-city terrace that turns urban wandering, skyline energy, and warm windows into a welcoming habitat.",
+  "main_structure": "One compact rounded art-deco city pavilion at the rear, formed from a tall central tower and two broad stepped side buildings with a few oversized amber windows.",
+  "rear_props": [
+    "two large simple street lanterns",
+    "one broad curved city bench beneath the skyline"
+  ],
+  "side_props": [
+    "one chunky planter with a single rounded street tree on the upper-left edge",
+    "one compact blank transit shelter and one large planter on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth slate-blue city parapet with broad rounded capstones",
+    "palette": ["slate blue", "deep cobalt", "warm amber"],
+    "emblems": "four oversized simple gold window-light blocks"
+  },
+  "cliff": {
+    "materials": ["large blue-gray stone blocks", "large warm sandstone blocks", "a few broad muted-cobalt blocks"],
+    "palette": ["blue gray", "warm sandstone", "muted cobalt"]
+  },
+  "lighting": "clear soft daylight with three or four broad pools of warm amber window and lantern glow",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, road, crosswalk, path, or indentation",
+    "bridges, clouds, traffic, vehicles, text, signs with writing, watermark, external shadow",
+    "tiny window grids, bricks, flowers, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

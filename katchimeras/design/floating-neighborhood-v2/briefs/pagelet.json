@@ -1,0 +1,35 @@
+{
+  "key": "pagelet",
+  "kind": "resident",
+  "concept": "A warm pocket library where a few beloved books, soft lamplight, and a quiet reading corner make stories feel like a place.",
+  "main_structure": "One compact open-front cream library nook at the rear with a broad curved burgundy roof, one large arched doorway, and two rounded side wings.",
+  "rear_props": [
+    "two broad three-book shelves built into the library wings",
+    "one large lectern holding a single open blank book"
+  ],
+  "side_props": [
+    "one chunky cushioned reading chair, one three-book stack, and one broad reading lamp on the upper-left edge",
+    "one compact book cart with three oversized books and one broad reading lamp on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth burgundy library border with broad rounded segments",
+    "palette": ["warm burgundy", "cream paper", "antique gold"],
+    "emblems": "four oversized simple gold closed-book emblems"
+  },
+  "cliff": {
+    "materials": ["large warm cream stone blocks", "large burgundy stone blocks", "a few broad walnut timber blocks"],
+    "palette": ["warm cream", "burgundy", "walnut brown"]
+  },
+  "lighting": "soft warm daylight with three broad pools of amber reading-lamp glow",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, paving, path, or indentation",
+    "bridges, clouds, readable writing, letters, watermark, external shadow",
+    "tiny book spines, loose pages, paper scraps, dense shelves, flowers, grass blades, pebbles, cracks, specks, or clutter"
+  ]
+}

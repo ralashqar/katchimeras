@@ -2,8 +2,9 @@
 
 This mirrors the isometric tile pipeline's production stages, but intentionally
 does not apply the old diamond homography. Hex tile geometry is supplied to the
-FAL edit prompt via a guide image, then the result is matted, repaired, framed,
-and optimized.
+FAL edit prompt via a guide image, then the result is matted, framed, and
+optimized. BiRefNet remains authoritative at every exterior edge; a conservative
+source-backed repair restores only torn-out pixels safely inside the silhouette.
 
 Example:
   python scripts/hex-tile-pipeline.py ^
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import io
 import json
 import os
@@ -29,7 +31,7 @@ import urllib.request
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
@@ -60,11 +62,6 @@ def parse_args() -> argparse.Namespace:
         "--skip-bounds",
         action="store_true",
         help="Defer the shared alpha-bounds manifest rebuild (useful for parallel batches).",
-    )
-    parser.add_argument(
-        "--preserve-background-cutouts",
-        action="store_true",
-        help="Keep pure-black openings through arches transparent while restoring non-black source detail.",
     )
     parser.add_argument(
         "--preserve-canvas",
@@ -191,7 +188,14 @@ def rerender(args: argparse.Namespace, work: Path) -> Path:
 
 def matte(source: Path, args: argparse.Namespace, work: Path) -> Path:
     out_path = work / "matted.png"
-    if out_path.exists():
+    digest_path = work / "matted.source.sha256"
+    source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    if (
+        out_path.exists()
+        and digest_path.exists()
+        and digest_path.read_text(encoding="utf-8").strip() == source_digest
+    ):
+        print("matted cache hit for unchanged source", source_digest[:12])
         return out_path
     data = call_retry(
         "remove-image-background",
@@ -207,18 +211,12 @@ def matte(source: Path, args: argparse.Namespace, work: Path) -> Path:
     if data.get("status") != "completed" or not data.get("imageUrl"):
         raise RuntimeError(f"matte failed: {data}")
     download(str(data["imageUrl"]), out_path)
+    digest_path.write_text(source_digest + "\n", encoding="utf-8")
     return out_path
 
 
 def source_foreground_mask(source: Image.Image, target_size: tuple[int, int]) -> np.ndarray:
-    """Find the non-background tile silhouette from the source's black backdrop.
-
-    BiRefNet Heavy is still the matting source, but high-detail tile interiors
-    can contain dark/blue water, blank boards, or shadows that the matte may cut
-    out. Since our tile renders are intentionally on pure black, a flood fill of
-    black-ish pixels connected to the image border gives a conservative
-    foreground silhouette used to restore those internal cuts.
-    """
+    """Return the source silhouette while leaving border-connected black outside."""
 
     rgb = source.convert("RGB").resize(target_size, Image.Resampling.LANCZOS)
     arr = np.asarray(rgb).astype(np.int16)
@@ -244,60 +242,13 @@ def source_foreground_mask(source: Image.Image, target_size: tuple[int, int]) ->
     return ~outside
 
 
-def fill_internal_alpha_holes(rgba: Image.Image, source: Image.Image) -> Image.Image:
-    rgba = rgba.convert("RGBA")
-    source_rgb = source.convert("RGB").resize(rgba.size, Image.Resampling.LANCZOS)
-    alpha = np.asarray(rgba.getchannel("A")).copy()
-    not_opaque = alpha < 250
-    outside = np.zeros_like(not_opaque)
-    outside[0, :] = not_opaque[0, :]
-    outside[-1, :] = not_opaque[-1, :]
-    outside[:, 0] = not_opaque[:, 0]
-    outside[:, -1] = not_opaque[:, -1]
-    while True:
-        grown = outside.copy()
-        grown[1:, :] |= outside[:-1, :]
-        grown[:-1, :] |= outside[1:, :]
-        grown[:, 1:] |= outside[:, :-1]
-        grown[:, :-1] |= outside[:, 1:]
-        grown &= not_opaque
-        if grown.sum() == outside.sum():
-            break
-        outside = grown
-    holes = not_opaque & ~outside
-    if holes.sum() == 0:
-        return rgba
-    print("hole fill: restoring", int(holes.sum()), "px from source")
-    fixed = np.asarray(rgba).copy()
-    src = np.asarray(source_rgb)
-    fixed[..., :3] = np.where(holes[..., None], src, fixed[..., :3])
-    fixed[..., 3] = np.where(holes, 255, fixed[..., 3])
-    return Image.fromarray(fixed)
+def restore_interior_source_pixels(rgba: Image.Image, source: Image.Image) -> Image.Image:
+    """Restore BiRefNet dropouts without touching its antialiased exterior edge.
 
-
-def restore_source_silhouette(rgba: Image.Image, source: Image.Image) -> Image.Image:
-    rgba = rgba.convert("RGBA")
-    source_rgb = source.convert("RGB").resize(rgba.size, Image.Resampling.LANCZOS)
-    foreground = source_foreground_mask(source, rgba.size)
-    alpha = np.asarray(rgba.getchannel("A"))
-    restore = foreground & (alpha < 245)
-    if restore.sum() == 0:
-        return rgba
-    print("source silhouette restore:", int(restore.sum()), "px from source")
-    fixed = np.asarray(rgba).copy()
-    src = np.asarray(source_rgb)
-    fixed[..., :3] = np.where(restore[..., None], src, fixed[..., :3])
-    fixed[..., 3] = np.where(restore, 255, fixed[..., 3])
-    return Image.fromarray(fixed)
-
-
-def restore_nonblack_source_pixels(rgba: Image.Image, source: Image.Image) -> Image.Image:
-    """Repair matte dropouts without filling intentional pure-black openings.
-
-    Celestial arches and similar open structures can enclose background regions,
-    so border-connected flood fill cannot distinguish them from damaged grass.
-    The generation contract gives us a pure-black backdrop: restore only source
-    pixels that are visibly non-black and leave every black opening transparent.
+    The black-background source supplies the missing grass/interior RGB. A
+    three-pixel erosion creates a protected exterior band where BiRefNet RGBA
+    passes through byte-for-byte, avoiding the hard outline caused by the old
+    unrestricted non-black restoration.
     """
 
     rgba = rgba.convert("RGBA")
@@ -306,11 +257,15 @@ def restore_nonblack_source_pixels(rgba: Image.Image, source: Image.Image) -> Im
     max_channel = src.max(axis=2)
     min_channel = src.min(axis=2)
     nonblack = (max_channel >= 30) | ((max_channel - min_channel) >= 18)
+    foreground = source_foreground_mask(source, rgba.size)
+    safe_interior = np.asarray(
+        Image.fromarray((foreground.astype(np.uint8) * 255), mode="L").filter(ImageFilter.MinFilter(7))
+    ) == 255
     alpha = np.asarray(rgba.getchannel("A"))
-    restore = nonblack & (alpha < 245)
+    restore = nonblack & safe_interior & (alpha < 245)
     if restore.sum() == 0:
         return rgba
-    print("non-black source restore:", int(restore.sum()), "px from source")
+    print("interior source restore:", int(restore.sum()), "px; exterior BiRefNet edge unchanged")
     fixed = np.asarray(rgba).copy()
     fixed[..., :3] = np.where(restore[..., None], src, fixed[..., :3])
     fixed[..., 3] = np.where(restore, 255, fixed[..., 3])
@@ -319,12 +274,7 @@ def restore_nonblack_source_pixels(rgba: Image.Image, source: Image.Image) -> Im
 
 def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: Path) -> Path:
     rgba = Image.open(matted).convert("RGBA")
-    source_img = Image.open(source)
-    if args.preserve_background_cutouts:
-        rgba = restore_nonblack_source_pixels(rgba, source_img)
-    else:
-        rgba = fill_internal_alpha_holes(rgba, source_img)
-        rgba = restore_source_silhouette(rgba, source_img)
+    rgba = restore_interior_source_pixels(rgba, Image.open(source))
 
     final_size = args.size
     if args.preserve_canvas:

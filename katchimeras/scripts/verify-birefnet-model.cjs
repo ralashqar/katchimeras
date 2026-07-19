@@ -9,6 +9,10 @@ const edgeFunction = readFileSync(
   'utf8'
 );
 const hexPipeline = readFileSync(join(root, 'scripts', 'hex-tile-pipeline.py'), 'utf8');
+const floatingPromotion = readFileSync(
+  join(root, 'scripts', 'promote-floating-neighborhood-v2-tile.py'),
+  'utf8'
+);
 const eggPipeline = readFileSync(join(root, 'scripts', 'generate-egg.py'), 'utf8');
 const objectGridPipeline = readFileSync(join(root, 'scripts', 'generate-world-object-grid.py'), 'utf8');
 
@@ -37,6 +41,27 @@ check(
   'shared matting uses 1024 resolution with foreground refinement'
 );
 check(hexPipeline.includes('BIREFNET_HEAVY_MODEL = "BiRefNet_lite"'), 'hex tile pipeline declares the Heavy enum');
+check(
+  !hexPipeline.includes('restore_nonblack_source_pixels') &&
+    !hexPipeline.includes('restore_source_silhouette') &&
+    !hexPipeline.includes('fill_internal_alpha_holes'),
+  'hex tile pipeline excludes the old unrestricted alpha repairs'
+);
+check(
+  hexPipeline.includes('restore_interior_source_pixels') &&
+    hexPipeline.includes('ImageFilter.MinFilter(7)') &&
+    hexPipeline.includes('exterior BiRefNet edge unchanged'),
+  'hex tile repair is restricted to an eroded interior silhouette'
+);
+check(
+  hexPipeline.includes('matted.source.sha256') &&
+    hexPipeline.includes('hashlib.sha256(source.read_bytes()).hexdigest()'),
+  'hex tile matte cache is keyed by source SHA-256'
+);
+check(
+  floatingPromotion.includes('shutil.copy2(work / "final.png", alpha)'),
+  'floating tile promotion uses the boundary-safe repaired matte'
+);
 check(eggPipeline.includes("'model': 'BiRefNet_lite'"), 'egg pipeline declares the Heavy enum');
 check(objectGridPipeline.includes("BIREFNET_MODEL = 'BiRefNet_lite'"), 'object grid pipeline declares the Heavy enum');
 

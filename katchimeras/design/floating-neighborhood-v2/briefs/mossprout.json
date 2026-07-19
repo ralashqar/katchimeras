@@ -1,0 +1,35 @@
+{
+  "key": "mossprout",
+  "kind": "resident",
+  "concept": "A calm oversized pocket garden where moss, sheltering leaves, and a little water make every green detour feel restorative.",
+  "main_structure": "One broad leafy garden alcove at the rear, built from a few large overlapping moss and leaf masses with a clean dark opening.",
+  "rear_props": [
+    "one small smooth oval pond tucked against the rear-right edge",
+    "three large rounded moss boulders grouped beside the pond"
+  ],
+  "side_props": [
+    "one chunky stump bench and two oversized fern silhouettes on the upper-left edge",
+    "one large watering-stone ornament and two oversized fern silhouettes on the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth deep-green moss border made from broad rounded masses",
+    "palette": ["deep leaf green", "moss green", "pale lime"],
+    "emblems": "four oversized simple pale leaf emblems"
+  },
+  "cliff": {
+    "materials": ["large olive stone blocks", "large warm umber earth blocks", "a few broad cream limestone blocks"],
+    "palette": ["olive", "warm umber", "soft cream"]
+  },
+  "lighting": "soft filtered daylight with two broad warm garden lanterns and gentle cool light on the pond",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open grass",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, stepping stones, or indentation",
+    "bridges, clouds, text, watermark, external shadow",
+    "leaf-by-leaf texture, tiny flowers, mushrooms, grass blades, pebbles, cracks, specks, or dense clutter"
+  ]
+}

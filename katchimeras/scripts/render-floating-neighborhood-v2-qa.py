@@ -151,6 +151,44 @@ def main() -> None:
         steppling_mossprout_tiles,
         [(-1, 1, "steppling"), (1, 0, "mossprout")],
     )
+    refreshed_resident_tiles = [
+        (
+            q,
+            r,
+            "skylo"
+            if (q, r) == (0, -1)
+            else "tasklet"
+            if (q, r) == (-1, 1)
+            else "mossprout"
+            if (q, r) == (1, 0)
+            else kind,
+        )
+        for q, r, kind in base_tiles
+    ]
+    render(
+        "qa-skylo-mossprout-tasklet-refresh.png",
+        refreshed_resident_tiles,
+        [(0, -1, "skylo"), (-1, 1, "tasklet"), (1, 0, "mossprout")],
+    )
+    pagelet_cheerlet_feastle_tiles = [
+        (
+            q,
+            r,
+            "pagelet"
+            if (q, r) == (0, -1)
+            else "cheerlet"
+            if (q, r) == (-1, 1)
+            else "feastle"
+            if (q, r) == (1, 0)
+            else kind,
+        )
+        for q, r, kind in base_tiles
+    ]
+    render(
+        "qa-pagelet-cheerlet-feastle-refresh.png",
+        pagelet_cheerlet_feastle_tiles,
+        [(0, -1, "pagelet"), (-1, 1, "cheerlet"), (1, 0, "feastle")],
+    )
     flickerbun_relicoon_tiles = [
         (q, r, "flickerbun" if (q, r) == (-1, 1) else "relicoon" if (q, r) == (1, 0) else kind)
         for q, r, kind in base_tiles

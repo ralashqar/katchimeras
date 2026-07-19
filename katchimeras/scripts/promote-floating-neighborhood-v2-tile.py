@@ -32,6 +32,11 @@ def main() -> None:
     parser.add_argument("--kind", required=True, choices=("resident", "home"))
     parser.add_argument("--candidate", required=True, help="Approved 2048px source on pure black.")
     parser.add_argument("--replace", action="store_true", help="Allow replacing existing canonical art.")
+    parser.add_argument(
+        "--skip-bounds",
+        action="store_true",
+        help="Defer the shared bounds rebuild until a multi-asset batch is complete.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Validate and print commands without writing.")
     args = parser.parse_args()
 
@@ -86,7 +91,6 @@ def main() -> None:
         "--lod-sizes",
         "--workdir", str(work),
         "--skip-bounds",
-        "--preserve-background-cutouts",
         "--preserve-canvas",
     ]
     run(pipeline, dry_run=args.dry_run)
@@ -101,10 +105,11 @@ def main() -> None:
         "--skip-bounds",
     ]
     run(package, dry_run=args.dry_run)
-    run(
-        [sys.executable, str(ROOT / "scripts" / "generate-hex-tile-bounds.py")],
-        dry_run=args.dry_run,
-    )
+    if not args.skip_bounds:
+        run(
+            [sys.executable, str(ROOT / "scripts" / "generate-hex-tile-bounds.py")],
+            dry_run=args.dry_run,
+        )
     print("NEXT: inspect alpha/LODs, add the reviewed runtime mapping, render QA, then run npm run check.")
 
 

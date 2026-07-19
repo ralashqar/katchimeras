@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AmbientBackground } from '@/components/katchadeck/ambient-background';
 import {
   KingdomHexCanvas,
   kingdomResidentHexTiles,
@@ -16,7 +16,7 @@ import { ZodiacTileSheet } from '@/components/katchadeck/world/zodiac-tile-sheet
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { KatchaDeckUI, Lantern } from '@/constants/theme';
+import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
@@ -59,6 +59,7 @@ function hatchTimestamp(creature: KingdomCreature, index: number): number {
 }
 
 export default function KingdomScreen() {
+  const insets = useSafeAreaInsets();
   const archive = useAllDays();
   const { days } = archive;
   const kingdom = useMemo(() => deriveKingdom(days), [days]);
@@ -185,12 +186,6 @@ export default function KingdomScreen() {
 
   return (
     <GestureHandlerRootView style={styles.screen}>
-      <AmbientBackground
-        accentColor="rgba(125,232,205,0.12)"
-        colors={KatchaDeckUI.gradients.world}
-        meshColors={['rgba(125,232,205,0.12)', 'rgba(167,139,250,0.10)', 'rgba(255,195,107,0.07)', 'rgba(20,17,31,0.25)']}
-      />
-
       <View style={styles.stage}>
         <KingdomHexCanvas
           residents={residentTiles}
@@ -202,16 +197,16 @@ export default function KingdomScreen() {
           onSelectZodiac={() => setZodiacOpen(true)}
         />
 
-        <View pointerEvents="none" style={styles.header}>
-          <ThemedText type="onboardingLabel" style={styles.headerKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            Your Kingdom
+        <View pointerEvents="none" style={[styles.header, { top: insets.top + 12 }]}>
+          <ThemedText style={styles.headerKicker} lightColor="#FFD36E" darkColor="#FFD36E">
+            YOUR KINGDOM
           </ThemedText>
-          <ThemedText style={styles.headerSubtitle} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+          <ThemedText style={styles.headerSubtitle} lightColor="#F8FCFF" darkColor="#F8FCFF">
             {subtitle}
           </ThemedText>
         </View>
 
-        <View pointerEvents="box-none" style={styles.actionRail}>
+        <View pointerEvents="box-none" style={[styles.actionRail, { top: insets.top + 14 }]}>
           <Pressable accessibilityRole="button" accessibilityLabel="Hall of Discoveries" onPress={() => setDiscoveriesOpen(true)} style={styles.headerButton}>
             <IconSymbol name="star.fill" size={18} color={Lantern.moon50} />
           </Pressable>
@@ -345,34 +340,54 @@ export default function KingdomScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: Lantern.ink950, flex: 1 },
+  screen: { backgroundColor: '#55A9E2', flex: 1 },
   stage: { flex: 1 },
   header: {
     left: 20,
     position: 'absolute',
     right: 76,
-    top: 64,
+    zIndex: 30,
   },
-  headerKicker: { fontSize: 13, letterSpacing: 1.2 },
-  headerSubtitle: { fontSize: 12, fontWeight: '600', marginTop: 3 },
+  headerKicker: {
+    fontFamily: AppFontFamilies.fredokaBold,
+    fontSize: 28,
+    letterSpacing: 0.1,
+    lineHeight: 34,
+    textShadowColor: 'rgba(30,70,111,0.92)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 3,
+  },
+  headerSubtitle: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 13.5,
+    fontWeight: '800',
+    lineHeight: 19,
+    marginTop: 1,
+    textShadowColor: 'rgba(27,72,111,0.76)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
   actionRail: {
     alignItems: 'center',
     gap: 12,
     position: 'absolute',
     right: 14,
-    top: 64,
     zIndex: 30,
   },
   headerButton: {
     alignItems: 'center',
-    backgroundColor: 'rgba(28,24,48,0.86)',
-    borderColor: 'rgba(196,186,240,0.16)',
+    backgroundColor: 'rgba(77,106,193,0.42)',
+    borderColor: 'rgba(255,255,255,0.38)',
     borderCurve: 'continuous',
     borderRadius: 999,
     borderWidth: 1,
-    height: 40,
+    height: 46,
     justifyContent: 'center',
-    width: 40,
+    shadowColor: '#1B4B78',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    width: 46,
   },
   microcopy: {
     alignSelf: 'center',

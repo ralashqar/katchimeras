@@ -5,6 +5,7 @@ import {
   activeKingdomTileLod,
   EMPTY_KINGDOM_LOD_SCHEDULER,
   kingdomLodSchedulerReducer,
+  visibleKingdomTileLod,
 } from '@/utils/kingdom-lod-scheduler';
 import type { KingdomHexTileLod } from '@/utils/world-visuals';
 
@@ -19,7 +20,10 @@ export function useKingdomLodScheduler({ isMoving, requestedLod, renderedTiles, 
   const desired = useMemo(
     () =>
       Object.fromEntries(
-        renderedTiles.map(({ layer }) => [layer.id, visibleTileIds.has(layer.id) ? requestedLod : 'thumb'])
+        renderedTiles.map(({ layer }) => [
+          layer.id,
+          visibleTileIds.has(layer.id) ? visibleKingdomTileLod(requestedLod) : 'thumb',
+        ])
       ) as Record<string, KingdomHexTileLod>,
     [renderedTiles, requestedLod, visibleTileIds]
   );

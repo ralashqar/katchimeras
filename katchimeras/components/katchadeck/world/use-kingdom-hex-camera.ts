@@ -57,6 +57,8 @@ export function useKingdomHexCamera({
 }: UseKingdomHexCameraArgs) {
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
+  const skyOriginX = useSharedValue(0);
+  const skyOriginY = useSharedValue(0);
   const scale = useSharedValue(1);
   const panStartTx = useSharedValue(0);
   const panStartTy = useSharedValue(0);
@@ -121,6 +123,8 @@ export function useKingdomHexCamera({
       const clamped = clampCameraTranslation({ tx: nextTx, ty: nextTy }, viewport, scene, baseScale);
       tx.value = clamped.tx;
       ty.value = clamped.ty;
+      skyOriginX.value = clamped.tx;
+      skyOriginY.value = clamped.ty;
       scale.value = baseScale;
       pinchStartScale.value = baseScale;
       initializedRef.current = true;
@@ -139,10 +143,12 @@ export function useKingdomHexCamera({
       scene,
       scale.value
     );
+    skyOriginX.value += clamped.tx - tx.value;
+    skyOriginY.value += clamped.ty - ty.value;
     tx.value = clamped.tx;
     ty.value = clamped.ty;
     commitSnapshot(clamped.tx, clamped.ty, scale.value, false);
-  }, [baseScale, center.x, center.y, commitSnapshot, pinchStartScale, scale, scene, tx, ty, viewport]);
+  }, [baseScale, center.x, center.y, commitSnapshot, pinchStartScale, scale, scene, skyOriginX, skyOriginY, tx, ty, viewport]);
 
   const pan = useMemo(
     () =>
@@ -274,6 +280,7 @@ export function useKingdomHexCamera({
     isMoving: renderState.isMoving,
     recenter,
     residentLod: renderState.residentLod,
+    skyCamera: { originX: skyOriginX, originY: skyOriginY, translateX: tx, translateY: ty },
     snapshot: renderState.snapshot,
     tileLod: renderState.tileLod,
     worldStyle,

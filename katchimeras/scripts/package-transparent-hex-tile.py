@@ -43,7 +43,6 @@ def main() -> None:
         raise SystemExit("Transparent source must have transparent corners.")
 
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
-    canvas = source.resize((args.size, args.size), Image.Resampling.LANCZOS)
     outputs = [(args.size, OUT_ROOT / f"{args.key}.webp", args.quality)]
     outputs.extend(
         (lod_size, OUT_ROOT / f"{args.key}_{lod_size}.webp", 82 if lod_size >= 512 else 78)
@@ -51,7 +50,9 @@ def main() -> None:
         if 0 < lod_size < args.size
     )
     for size, path, quality in outputs:
-        image = canvas if size == args.size else canvas.resize((size, size), Image.Resampling.LANCZOS)
+        # Derive every LOD directly from the authoritative BiRefNet RGBA instead
+        # of cascading 2048 -> 1024 -> 512/256 resizes.
+        image = source if source.size == (size, size) else source.resize((size, size), Image.Resampling.LANCZOS)
         image.save(path, format="WEBP", quality=min(args.quality, quality), method=6)
         print(path.relative_to(ROOT), f"{path.stat().st_size // 1024} KB")
 

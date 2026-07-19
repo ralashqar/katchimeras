@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   iconButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,0.16)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 39, justifyContent: 'center', width: 42 },
   streakOverlay: { alignItems: 'center', left: 0, position: 'absolute', right: 0, top: '36%', zIndex: 200 },
   streakWordmark: { alignItems: 'center', justifyContent: 'center', maxWidth: '94%' },
-  streakDisplayText: { fontFamily: AppFontFamilies.bungee, fontVariant: ['tabular-nums'], letterSpacing: 0.35, textAlign: 'center' },
+  streakDisplayText: { fontFamily: AppFontFamilies.fredokaBold, fontVariant: ['tabular-nums'], letterSpacing: 0.1, textAlign: 'center' },
   streakGlow: { opacity: 0.34, position: 'absolute', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 18, transform: [{ scale: 1.055 }] },
   streakExtrusion: { position: 'absolute', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 3, transform: [{ translateY: 6 }, { scale: 1.018 }] },
   streakKeyline: { position: 'absolute', transform: [{ scaleX: 1.035 }, { scaleY: 1.075 }] },

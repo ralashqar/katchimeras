@@ -26,6 +26,12 @@ export const EMPTY_KINGDOM_LOD_SCHEDULER: KingdomLodSchedulerState = {
   priority: [],
 };
 
+/** Visible environment tiles must remain crisp even at the furthest zoom.
+ * Thumb (256px) remains available for off-screen tiles in the preload band. */
+export function visibleKingdomTileLod(requested: KingdomHexTileLod): KingdomHexTileLod {
+  return requested === 'thumb' ? 'medium' : requested;
+}
+
 function promote(state: KingdomLodSchedulerState): KingdomLodSchedulerState {
   if (state.paused) return state;
   let available = KINGDOM_RENDERING.maxConcurrentLodLoads - Object.keys(state.loading).length;

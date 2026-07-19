@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomHexResidentTile, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
+import { KingdomSkyBackground } from '@/components/katchadeck/world/kingdom-sky-background';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { useKingdomLodScheduler } from '@/components/katchadeck/world/use-kingdom-lod-scheduler';
 import { useKingdomTileScheduler } from '@/components/katchadeck/world/use-kingdom-tile-scheduler';
@@ -191,6 +192,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
 
   return (
     <View style={styles.root} onLayout={onLayout}>
+      <KingdomSkyBackground camera={camera.skyCamera} viewport={viewport} />
       {/* Recreate the native handler whenever this tab regains focus. A camera
           route can suspend a gesture mid-lifecycle on iOS; retaining that
           handler leaves the otherwise-visible Kingdom canvas unresponsive. */}

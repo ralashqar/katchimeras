@@ -25,10 +25,17 @@ import {
   kingdomTileSchedulerReducer,
 } from '../utils/kingdom-tile-scheduler';
 import {
+  activeKingdomTileLod,
   EMPTY_KINGDOM_LOD_SCHEDULER,
   kingdomLodSchedulerReducer,
+  visibleKingdomTileLod,
 } from '../utils/kingdom-lod-scheduler';
 import { createKingdomRendererFixture } from './fixtures/kingdom-renderer-fixture';
+import {
+  KINGDOM_SKY_LAYERS,
+  kingdomSkyMotionEnabled,
+  wrapKingdomCloudX,
+} from '../utils/kingdom-sky';
 
 const TILE_TARGET = { left: -245, top: -148, right: 245, bottom: 196 };
 const BASE_BOUNDS = { left: 14, top: 147, right: 1010, bottom: 876 };
@@ -45,6 +52,35 @@ function renderedAssetY(frame: { top: number; height: number }, assetY: number):
 function renderedAssetX(frame: { left: number; width: number }, assetX: number): number {
   return frame.left + (assetX / 1024) * frame.width;
 }
+
+test('Kingdom sky cloud wrapping remains inside the overscanned viewport', () => {
+  const viewportWidth = 390;
+  const cloudWidth = 240;
+  const overscan = 55;
+  const minimum = -overscan - cloudWidth;
+  const maximum = viewportWidth + overscan;
+  for (const value of [-4000, -620, -1, 0, 390, 4000]) {
+    const wrapped = wrapKingdomCloudX(value, viewportWidth, cloudWidth, overscan);
+    assert.ok(wrapped >= minimum && wrapped < maximum, `${wrapped} was outside wrap range`);
+  }
+});
+
+test('Kingdom sky layers have increasing camera parallax and faster foreground drift', () => {
+  assert.ok(KINGDOM_SKY_LAYERS.far.horizontalParallax < KINGDOM_SKY_LAYERS.middle.horizontalParallax);
+  assert.ok(KINGDOM_SKY_LAYERS.middle.horizontalParallax < KINGDOM_SKY_LAYERS.near.horizontalParallax);
+  assert.equal(KINGDOM_SKY_LAYERS.far.verticalParallax, KINGDOM_SKY_LAYERS.far.horizontalParallax / 2);
+  assert.equal(KINGDOM_SKY_LAYERS.middle.verticalParallax, KINGDOM_SKY_LAYERS.middle.horizontalParallax / 2);
+  assert.equal(KINGDOM_SKY_LAYERS.near.verticalParallax, KINGDOM_SKY_LAYERS.near.horizontalParallax / 2);
+  assert.ok(KINGDOM_SKY_LAYERS.far.durationMs > KINGDOM_SKY_LAYERS.middle.durationMs);
+  assert.ok(KINGDOM_SKY_LAYERS.middle.durationMs > KINGDOM_SKY_LAYERS.near.durationMs);
+});
+
+test('Kingdom sky motion stops for reduced motion, blur, and inactive app state', () => {
+  assert.equal(kingdomSkyMotionEnabled(true, true, false), true);
+  assert.equal(kingdomSkyMotionEnabled(true, true, true), false);
+  assert.equal(kingdomSkyMotionEnabled(false, true, false), false);
+  assert.equal(kingdomSkyMotionEnabled(true, false, false), false);
+});
 
 test('visible pixel bounds use alpha 16 and normalize draft dimensions to 1024', () => {
   const pixels = new Uint8Array(4 * 2 * 4);
@@ -245,6 +281,28 @@ test('tile LOD hysteresis prevents threshold oscillation', () => {
   assert.equal(tileLodWithHysteresis('medium', 821), 'full');
   assert.equal(tileLodWithHysteresis('full', 750), 'full');
   assert.equal(tileLodWithHysteresis('full', 699), 'medium');
+});
+
+test('visible environment tiles use at least 512px while off-screen preload may stay 256px', () => {
+  assert.equal(visibleKingdomTileLod('thumb'), 'medium');
+  assert.equal(visibleKingdomTileLod('medium'), 'medium');
+  assert.equal(visibleKingdomTileLod('full'), 'full');
+
+  const desired = {
+    visible: visibleKingdomTileLod('thumb'),
+    preload: 'thumb' as const,
+  };
+  let state = kingdomLodSchedulerReducer(EMPTY_KINGDOM_LOD_SCHEDULER, {
+    type: 'sync',
+    desired,
+    paused: false,
+    priority: ['visible', 'preload'],
+  });
+  assert.equal(activeKingdomTileLod(state, 'visible'), 'medium');
+  assert.equal(activeKingdomTileLod(state, 'preload'), 'thumb');
+
+  state = kingdomLodSchedulerReducer(state, { type: 'loaded', id: 'visible', lod: 'medium' });
+  assert.equal(state.loading.visible, undefined);
 });
 
 test('resident sprites use only 256 and 512 world LODs', () => {
