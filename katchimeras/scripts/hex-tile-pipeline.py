@@ -3,8 +3,8 @@
 This mirrors the isometric tile pipeline's production stages, but intentionally
 does not apply the old diamond homography. Hex tile geometry is supplied to the
 FAL edit prompt via a guide image, then the result is matted, framed, and
-optimized. BiRefNet remains authoritative at every exterior edge; a conservative
-source-backed repair restores only torn-out pixels safely inside the silhouette.
+optimized. BiRefNet supplies the exterior matte, then a source-backed invariant
+restores the complete enclosed interior, including dark shadows and AO.
 
 Example:
   python scripts/hex-tile-pipeline.py ^
@@ -33,6 +33,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageFilter
 
+from hex_tile_alpha import postprocess_hex_tile_edges, resize_rgba_premultiplied
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,7 +51,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-rerender", action="store_true", help="Matte/frame the source directly.")
     parser.add_argument("--size", type=int, default=1024, help="Final square asset size.")
     parser.add_argument("--pad", type=int, default=14, help="Final transparent border padding.")
-    parser.add_argument("--quality", type=int, default=86, help="Final WebP quality.")
+    parser.add_argument(
+        "--quality",
+        type=int,
+        default=95,
+        help="Maximum runtime WebP quality; 1024/512 default to 95 and 256 to 90.",
+    )
     parser.add_argument(
         "--lod-sizes",
         type=int,
@@ -62,6 +69,11 @@ def parse_args() -> argparse.Namespace:
         "--skip-bounds",
         action="store_true",
         help="Defer the shared alpha-bounds manifest rebuild (useful for parallel batches).",
+    )
+    parser.add_argument(
+        "--skip-package",
+        action="store_true",
+        help="Write the repaired final PNG only; a caller will package runtime assets separately.",
     )
     parser.add_argument(
         "--preserve-canvas",
@@ -216,7 +228,12 @@ def matte(source: Path, args: argparse.Namespace, work: Path) -> Path:
 
 
 def source_foreground_mask(source: Image.Image, target_size: tuple[int, int]) -> np.ndarray:
-    """Return the source silhouette while leaving border-connected black outside."""
+    """Find the enclosed source silhouette without mistaking dark AO for backdrop.
+
+    Only neutral near-black pixels connected to the canvas boundary are
+    background. Pure-black doorways, contact shadows, and ambient-occlusion
+    seams enclosed by the island therefore remain part of the foreground.
+    """
 
     rgb = source.convert("RGB").resize(target_size, Image.Resampling.LANCZOS)
     arr = np.asarray(rgb).astype(np.int16)
@@ -242,45 +259,44 @@ def source_foreground_mask(source: Image.Image, target_size: tuple[int, int]) ->
     return ~outside
 
 
-def restore_interior_source_pixels(rgba: Image.Image, source: Image.Image) -> Image.Image:
-    """Restore BiRefNet dropouts without touching its antialiased exterior edge.
+def restore_source_backed_interior(rgba: Image.Image, source: Image.Image) -> Image.Image:
+    """Restore BiRefNet interior tears while retaining its exterior antialiasing.
 
-    The black-background source supplies the missing grass/interior RGB. A
-    three-pixel erosion creates a protected exterior band where BiRefNet RGBA
-    passes through byte-for-byte, avoiding the hard outline caused by the old
-    unrestricted non-black restoration.
+    The source silhouette is eroded by three pixels to protect the complete
+    exterior edge band. Inside that safe region, source RGB is authoritative
+    and alpha is opaque, including for black/dark shadows and AO. This combines
+    source-backed hole repair with the earlier silhouette-aware boundary rule.
     """
 
     rgba = rgba.convert("RGBA")
     source_rgb = source.convert("RGB").resize(rgba.size, Image.Resampling.LANCZOS)
-    src = np.asarray(source_rgb).astype(np.int16)
-    max_channel = src.max(axis=2)
-    min_channel = src.min(axis=2)
-    nonblack = (max_channel >= 30) | ((max_channel - min_channel) >= 18)
+    src = np.asarray(source_rgb)
     foreground = source_foreground_mask(source, rgba.size)
     safe_interior = np.asarray(
-        Image.fromarray((foreground.astype(np.uint8) * 255), mode="L").filter(ImageFilter.MinFilter(7))
+        Image.fromarray(foreground.astype(np.uint8) * 255, mode="L").filter(ImageFilter.MinFilter(7))
     ) == 255
     alpha = np.asarray(rgba.getchannel("A"))
-    restore = nonblack & safe_interior & (alpha < 245)
+    restore = safe_interior & (alpha < 255)
     if restore.sum() == 0:
         return rgba
-    print("interior source restore:", int(restore.sum()), "px; exterior BiRefNet edge unchanged")
+    print("source-backed interior restore:", int(restore.sum()), "px; exterior edge preserved")
     fixed = np.asarray(rgba).copy()
     fixed[..., :3] = np.where(restore[..., None], src, fixed[..., :3])
     fixed[..., 3] = np.where(restore, 255, fixed[..., 3])
-    return Image.fromarray(fixed.astype(np.uint8))
+    return Image.fromarray(fixed)
 
 
 def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: Path) -> Path:
     rgba = Image.open(matted).convert("RGBA")
-    rgba = restore_interior_source_pixels(rgba, Image.open(source))
+    source_image = Image.open(source)
+    rgba = restore_source_backed_interior(rgba, source_image)
+    rgba = postprocess_hex_tile_edges(rgba, source_image)
 
     final_size = args.size
     if args.preserve_canvas:
         canvas = rgba
         if canvas.size != (final_size, final_size):
-            canvas = canvas.resize((final_size, final_size), Image.Resampling.LANCZOS)
+            canvas = resize_rgba_premultiplied(canvas, (final_size, final_size))
     else:
         bbox = rgba.getchannel("A").getbbox()
         if not bbox:
@@ -288,12 +304,18 @@ def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: P
         trimmed = rgba.crop(bbox)
         max_side = final_size - args.pad * 2
         scale = min(max_side / trimmed.width, max_side / trimmed.height)
-        fitted = trimmed.resize((round(trimmed.width * scale), round(trimmed.height * scale)), Image.Resampling.LANCZOS)
+        fitted = resize_rgba_premultiplied(
+            trimmed, (round(trimmed.width * scale), round(trimmed.height * scale))
+        )
         canvas = Image.new("RGBA", (final_size, final_size), (0, 0, 0, 0))
         canvas.alpha_composite(fitted, ((final_size - fitted.width) // 2, (final_size - fitted.height) // 2))
 
     png_path = work / "final.png"
     canvas.save(png_path)
+
+    if args.skip_package:
+        print("final png", png_path)
+        return png_path
 
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
     out_path = OUT_ROOT / f"{args.key}.webp"
@@ -301,9 +323,9 @@ def frame_and_save(matted: Path, source: Path, args: argparse.Namespace, work: P
     for lod_size in args.lod_sizes:
         if lod_size <= 0 or lod_size >= final_size:
             continue
-        lod = canvas.resize((lod_size, lod_size), Image.Resampling.LANCZOS)
+        lod = resize_rgba_premultiplied(canvas, (lod_size, lod_size))
         lod_path = OUT_ROOT / f"{args.key}_{lod_size}.webp"
-        lod_quality = 82 if lod_size >= 512 else 78
+        lod_quality = 95 if lod_size >= 512 else 90
         lod.save(lod_path, format="WEBP", quality=min(args.quality, lod_quality), method=6)
         print("bundled lod", lod_path, lod_path.stat().st_size // 1024, "KB")
 

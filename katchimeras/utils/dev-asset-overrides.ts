@@ -54,12 +54,23 @@ const DEV_HEX_BASE_TILE_KEY = 'katchadeck.dev-kingdom-hex-base-tile-v1';
 let devKingdomHexCenterTileId: string | null | undefined;
 let devKingdomHexBaseTileId: string | null | undefined;
 const DEV_HEX_ART_DIRECTION_SET_KEY = 'katchadeck.dev-kingdom-hex-art-direction-set-v1';
+const RETIRED_FLOATING_NEIGHBORHOOD_V2_PROOF_IDS = new Set([
+  'floating_neighborhood_v2_mossprout_edge_proof',
+  'floating_neighborhood_v2_mossprout_connected_edge_proof',
+]);
 let devKingdomHexArtDirectionSetId: string | null | undefined;
 
 export function getDevKingdomHexArtDirectionSetId(): string | null {
   if (!__DEV__) return null;
   if (devKingdomHexArtDirectionSetId === undefined) {
     devKingdomHexArtDirectionSetId = getStoredJson<string | null>(DEV_HEX_ART_DIRECTION_SET_KEY, null);
+  }
+  if (
+    devKingdomHexArtDirectionSetId !== null &&
+    RETIRED_FLOATING_NEIGHBORHOOD_V2_PROOF_IDS.has(devKingdomHexArtDirectionSetId)
+  ) {
+    devKingdomHexArtDirectionSetId = 'floating_neighborhood_v2';
+    setStoredJson(DEV_HEX_ART_DIRECTION_SET_KEY, devKingdomHexArtDirectionSetId);
   }
   return devKingdomHexArtDirectionSetId ?? null;
 }

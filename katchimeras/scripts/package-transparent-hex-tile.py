@@ -14,6 +14,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from hex_tile_alpha import resize_rgba_premultiplied
+
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "assets" / "images" / "katchimeras" / "world" / "hex"
@@ -24,7 +26,12 @@ def main() -> None:
     parser.add_argument("--source", required=True)
     parser.add_argument("--key", required=True)
     parser.add_argument("--size", type=int, default=1024)
-    parser.add_argument("--quality", type=int, default=86)
+    parser.add_argument(
+        "--quality",
+        type=int,
+        default=95,
+        help="Maximum runtime WebP quality; 1024/512 default to 95 and 256 to 90.",
+    )
     parser.add_argument("--lod-sizes", type=int, nargs="*", default=[512, 256])
     parser.add_argument(
         "--skip-bounds",
@@ -45,14 +52,18 @@ def main() -> None:
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
     outputs = [(args.size, OUT_ROOT / f"{args.key}.webp", args.quality)]
     outputs.extend(
-        (lod_size, OUT_ROOT / f"{args.key}_{lod_size}.webp", 82 if lod_size >= 512 else 78)
+        (lod_size, OUT_ROOT / f"{args.key}_{lod_size}.webp", 95 if lod_size >= 512 else 90)
         for lod_size in args.lod_sizes
         if 0 < lod_size < args.size
     )
     for size, path, quality in outputs:
         # Derive every LOD directly from the authoritative BiRefNet RGBA instead
         # of cascading 2048 -> 1024 -> 512/256 resizes.
-        image = source if source.size == (size, size) else source.resize((size, size), Image.Resampling.LANCZOS)
+        image = (
+            source
+            if source.size == (size, size)
+            else resize_rgba_premultiplied(source, (size, size))
+        )
         image.save(path, format="WEBP", quality=min(args.quality, quality), method=6)
         print(path.relative_to(ROOT), f"{path.stat().st_size // 1024} KB")
 

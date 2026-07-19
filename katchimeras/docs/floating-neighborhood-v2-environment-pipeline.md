@@ -111,10 +111,15 @@ an existing canonical tile. The command:
 
 1. validates a square source of at least 1024px with black corners;
 2. saves the canonical `*-source.png`;
-3. calls the shared BiRefNet matte and preserves its exterior RGBA unchanged;
+3. calls the shared BiRefNet matte and restores the enclosed source-backed interior;
 4. saves the canonical `*-alpha.png`;
 5. packages 1024/512/256 WebPs; and
 6. rebuilds `constants/kingdom-hex-tile-bounds.gen.ts`.
+
+Canonical source and alpha PNGs remain lossless and are never derived from a
+runtime WebP. Runtime packaging uses WebP quality 95 for the 1024 and 512 LODs,
+quality 90 for the off-screen 256 LOD, and derives each resolution directly
+from the canonical alpha PNG using premultiplied-alpha resizing.
 
 The shared matte request is fixed to this known-good FAL payload:
 
@@ -132,12 +137,21 @@ Repository code names this selection `BiRefNet_lite`; the deployed edge
 function translates it to FAL's accepted `General Use (Heavy)` transport value.
 Do not send the enum directly to FAL HTTP.
 
-BiRefNet is the sole exterior-edge authority. Large grass floors may be removed
-by segmentation, so the pipeline restores source pixels only within a
-three-pixel-eroded interior silhouette. The protected boundary band receives no
-thresholding, RGB replacement, alpha contraction, or alpha feathering. The
-local matte cache is keyed by the source SHA-256 and must be invalidated whenever
-source pixels change.
+BiRefNet can remove large grass floors, dark contact shadows, doorways, and
+ambient-occlusion seams. The post-matte repair first flood-fills only neutral
+near-black pixels connected to the source canvas boundary, which distinguishes
+the true backdrop from dark pixels enclosed by the island. It then erodes that
+foreground by three pixels and restores every non-opaque pixel in the safe
+interior from the source at alpha `255`. BiRefNet remains authoritative in the
+protected exterior edge band. The local matte cache is keyed by the source
+SHA-256 and must be invalidated whenever source pixels change.
+
+After interior restoration, the shared pipeline automatically performs the
+approved mild edge treatment: inward colour padding for partial-alpha pixels
+and a soft one-pixel contraction with a `0.45px` transition. It deliberately
+does not flood through connected dark pixels or travel deeper into the art.
+Canvas and LOD resizing uses premultiplied alpha so transparent RGB cannot
+produce a dark filtering fringe.
 
 ## 5. Integrate the reviewed asset
 

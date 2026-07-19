@@ -8,9 +8,11 @@ a reviewed code change because resident and home keys have different types.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from PIL import Image
@@ -24,6 +26,24 @@ def run(command: list[str], *, dry_run: bool) -> None:
     print(" ".join(command))
     if not dry_run:
         subprocess.run(command, cwd=ROOT, check=True)
+
+
+def replace_file(source: Path, destination: Path) -> None:
+    """Atomically replace an asset, tolerating transient Windows reader locks."""
+
+    temporary = destination.with_name(destination.name + ".replacement")
+    shutil.copy2(source, temporary)
+    try:
+        for attempt in range(20):
+            try:
+                os.replace(temporary, destination)
+                return
+            except OSError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.25)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -91,11 +111,12 @@ def main() -> None:
         "--lod-sizes",
         "--workdir", str(work),
         "--skip-bounds",
+        "--skip-package",
         "--preserve-canvas",
     ]
     run(pipeline, dry_run=args.dry_run)
     if not args.dry_run:
-        shutil.copy2(work / "final.png", alpha)
+        replace_file(work / "final.png", alpha)
 
     package = [
         sys.executable,

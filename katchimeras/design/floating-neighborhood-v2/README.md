@@ -37,15 +37,26 @@ runbook.
 - Transparency comes from the repository's BiRefNet Heavy
   `remove-image-background` pipeline on FAL, with foreground refinement
   enabled.
-- The returned BiRefNet RGBA is authoritative along the complete exterior
-  boundary. A source-backed repair may restore torn-out interior pixels only
-  inside a three-pixel-eroded silhouette; it must never overwrite the protected
-  BiRefNet edge band.
+- BiRefNet supplies the exterior matte. Flood-fill neutral near-black pixels
+  connected to the source canvas boundary to identify the true backdrop, then
+  erode the enclosed foreground by three pixels. Inside that protected
+  silhouette, restore source RGB at alpha `255`, including black/dark contact
+  shadows, doorways, and ambient-occlusion seams. Leave BiRefNet's outer
+  antialiased edge band unchanged.
 - Preserve the original square canvas through packaging so shared face anchors
   do not shift. Matte caches are valid only when their recorded source SHA-256
   matches the current source.
 - Inspect alpha edges against the dark Kingdom scene before packaging the
   1024/512/256 WebPs.
+- The shared pipeline automatically pulls partial-alpha edge colour inward and
+  applies a soft one-pixel contraction with a `0.45px` transition. It does not
+  flood through connected dark pixels or travel deeper into the artwork.
+- Resize canonical art and every runtime LOD in premultiplied-alpha space so
+  transparent RGB cannot create a dark fringe during filtering.
+- Keep the checked-in canonical `*-source.png` and `*-alpha.png` files as
+  lossless masters. Runtime WebPs use quality 95 at 1024/512 and quality 90 at
+  256; every LOD is resized directly from the canonical alpha rather than from
+  another runtime LOD.
 
 ## Low-frequency art contract
 
