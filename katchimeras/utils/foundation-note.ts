@@ -180,25 +180,6 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
       : null;
     const journalRoutes = decision.routes.length ? decision.routes : rankJournalRoutes([mediaRoute]);
     const selected = decision.selected ?? (journalRoutes.length === 1 && !journalNoteRouteNeedsConfirmation(journalRoutes) ? journalRoutes[0] : null);
-    const selectedFoundationRaw = retryRaw ? { ...raw, ...retryRaw } : raw;
-    const hasGeneratedSpecific = !!(
-      cleanShort(selectedFoundationRaw.specific, 120)
-      || media?.title
-      || food
-    );
-    if (selected && !hasGeneratedSpecific && nativeFoundation.generateStructuredAsync) {
-      const remaining = Math.max(0, TOTAL_TIMEOUT_MS - (Date.now() - startedAt));
-      if (remaining >= 500) {
-        const enrichment = await enrichNoteSpecificOnDevice(text, selected, remaining);
-        if (enrichment?.specific) {
-          retryRaw = {
-            ...(retryRaw ?? {}),
-            specific: enrichment.specific,
-            specificEnrichment: enrichment.rawResponse,
-          };
-        }
-      }
-    }
     const selectedRaw = retryRaw ? { ...raw, ...retryRaw } : raw;
     const classificationSource = cleanString(raw.routeKey) || cleanString(retryRaw?.routeKey)
       ? decision.decisionSource
@@ -283,15 +264,10 @@ async function classifyNoteRouteOnDevice(transcript: string, timeoutMs: number):
       instructions: [
         `The broad journal section ${flow.id} is already selected and immutable.`,
         'Choose exactly one supplied child route using its definition, examples, and exclusions.',
-        'Return a concise editable entity or title explicitly supported by the note, never the whole sentence.',
         'For food, a standalone fruit or small item is a snack unless the note identifies breakfast, lunch, dinner, or a meal.',
-        'For media, return only the named work title. Use an empty specific value rather than guessing.',
       ].join(' '),
-      prompt: `Allowed routes inside ${flow.id}:\n${childSummary}\n\nNote: ${JSON.stringify(transcript)}\nChoose one route and extract its concise field value.`,
-      fields: [
-        { name: 'routeKey', description: `Best route inside the locked ${flow.id} section`, kind: 'enum', values: candidates.map((entry) => entry.routeKey) },
-        { name: 'specific', description: `Concise ${flow.specificFieldLabel.toLowerCase()} supported by the note; never the whole note`, kind: 'string' },
-      ],
+      prompt: `Allowed routes inside ${flow.id}:\n${childSummary}\n\nNote: ${JSON.stringify(transcript)}\nChoose one route.`,
+      fields: [{ name: 'routeKey', description: `Best route inside the locked ${flow.id} section`, kind: 'enum', values: candidates.map((entry) => entry.routeKey) }],
     }, remaining);
     if (!childRun.response) {
       return { raw: null, durationMs: Date.now() - startedAt, failure: childRun.failure };
@@ -300,14 +276,12 @@ async function classifyNoteRouteOnDevice(transcript: string, timeoutMs: number):
     if (!routeKey || !candidates.some((entry) => entry.routeKey === routeKey)) {
       return { raw: null, durationMs: Date.now() - startedAt, failure: 'error' };
     }
-    const specific = cleanShort(childRun.response.specific, 120);
     return {
       raw: {
         routeKey,
         routeConfidence: 0.9,
         alternativeRouteKey: '',
         alternativeRouteConfidence: 0,
-        specific: specific && !noteSpecificCopiesSentence(specific, transcript) ? specific : '',
         routeStrategy: 'split_dynamic_v1',
         flowResponse: flowRun.response,
         childResponse: childRun.response,
@@ -364,11 +338,11 @@ async function runStructuredNoteTask(
   }
 }
 
-async function enrichNoteSpecificOnDevice(
+export async function extractNoteSpecificOnDevice(
   transcript: string,
   route: JournalRouteProposal,
-  timeoutMs: number
-): Promise<{ specific: string; rawResponse: Record<string, unknown> } | null> {
+  timeoutMs = 4500
+): Promise<string | null> {
   const flow = MANUAL_JOURNAL_FLOWS.find((item) => item.id === route.flowId);
   const choice = flow?.choices.find((item) => item.id === route.choiceId);
   if (!flow || !choice || !nativeFoundation?.generateStructuredAsync) return null;
@@ -402,7 +376,7 @@ async function enrichNoteSpecificOnDevice(
     if (rawResponse.status !== 'succeeded' || rawResponse.taskId !== 'note.specific.v1') return null;
     const specific = cleanShort(rawResponse.specific, 120);
     if (!specific || noteSpecificCopiesSentence(specific, transcript)) return null;
-    return { specific, rawResponse };
+    return specific;
   } catch {
     return null;
   }

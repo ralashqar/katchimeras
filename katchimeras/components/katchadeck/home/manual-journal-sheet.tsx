@@ -29,6 +29,7 @@ import { Meadow } from '@/constants/meadow-theme';
 import { AppFontFamilies } from '@/constants/theme';
 import { useJournalVoiceDraft } from '@/hooks/use-journal-voice-draft';
 import type { JournalNoteDraft, JournalRouteProposal, JournalSource, ManualJournalSubmission } from '@/types/home';
+import { extractNoteSpecificOnDevice } from '@/utils/foundation-note';
 import { voiceJournalInputAdapter } from '@/utils/journal-input-adapters';
 import { shouldAutoRouteVoice } from '@/utils/manual-journal-voice-routing';
 import {
@@ -119,12 +120,14 @@ export function JournalComposer({
   const [confirmedFacets, setConfirmedFacets] = useState(initialConfirmedFacets);
   const [voiceRoutes, setVoiceRoutes] = useState<JournalRouteProposal[]>([]);
   const [voiceRouting, setVoiceRouting] = useState(false);
+  const [noteSpecificLoading, setNoteSpecificLoading] = useState(false);
   const [activeSection, setActiveSection] = useState<ManualJournalSection>('everyday');
   const [discardOpen, setDiscardOpen] = useState(false);
   const specificEditedRef = useRef(false);
   const longPressRef = useRef(false);
   const redoLongPressRef = useRef(false);
   const quickVoiceRef = useRef(false);
+  const noteSpecificRequestRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Partial<Record<ManualJournalSection, number>>>({});
   const reduceMotion = useReducedMotion();
@@ -178,14 +181,42 @@ export function JournalComposer({
   const voice = useJournalVoiceDraft(handleVoiceReady, { allowRemote: allowRemoteIntelligence });
   const quickVoiceAvailable = sourceType === 'manual'
     && (!resolvedJournalSource || resolvedJournalSource.kind === 'manual');
-  const showBookTitleLoading = liveSpecificLoading
-    && sourceType === 'photo'
-    && flow?.id === 'studio'
-    && choice?.id === 'book';
+  const noteSource = resolvedJournalSource ?? journalSource;
+  const noteSourceKind = noteSource?.kind;
+  const noteSourceId = noteSource?.sourceId;
+  const showSpecificLoading = noteSpecificLoading || (
+    liveSpecificLoading
+      && sourceType === 'photo'
+      && flow?.id === 'studio'
+      && choice?.id === 'book'
+  );
 
   useEffect(() => {
     if (!specificEditedRef.current && liveSpecific?.trim()) setSpecific(liveSpecific.trim());
   }, [liveSpecific]);
+
+  useEffect(() => {
+    if (noteSourceKind !== 'text_note' && noteSourceKind !== 'voice_note') return;
+    const transcript = note.trim();
+    if (!flow || !choice || !transcript) return;
+    const requestKey = `${noteSourceId}:${flow.id}.${choice.id}`;
+    if (noteSpecificRequestRef.current === requestKey) return;
+    noteSpecificRequestRef.current = requestKey;
+    setNoteSpecificLoading(true);
+    void extractNoteSpecificOnDevice(transcript, {
+      id: `${flow.id}.${choice.id}`,
+      flowId: flow.id,
+      choiceId: choice.id,
+      label: choice.label,
+      confidence: 1,
+      reasons: ['Journal route selected before field enrichment'],
+      confirmedFacets: choice.confirmedFacets ?? [],
+    }).then((value) => {
+      if (noteSpecificRequestRef.current === requestKey && value && !specificEditedRef.current) setSpecific(value);
+    }).finally(() => {
+      if (noteSpecificRequestRef.current === requestKey) setNoteSpecificLoading(false);
+    });
+  }, [choice, flow, note, noteSourceId, noteSourceKind]);
 
   const step = stage === 'flow' ? 0 : stage === 'category' ? 1 : 2;
   const dirty = !!choice || !!specific.trim() || !!context || !!feeling || !!note.trim() || !!linkedNote;
@@ -456,7 +487,7 @@ export function JournalComposer({
                   <View style={styles.inputFrame}>
                     <TextInput
                       accessibilityLabel={choice.specificFieldLabel ?? flow.specificFieldLabel}
-                      accessibilityState={{ busy: showBookTitleLoading }}
+                      accessibilityState={{ busy: showSpecificLoading }}
                       autoCapitalize="sentences"
                       onChangeText={(value) => { specificEditedRef.current = true; setSpecific(value); }}
                       onFocus={() => scrollRef.current?.scrollTo({ y: 70, animated: true })}
@@ -464,12 +495,16 @@ export function JournalComposer({
                       placeholderTextColor={Meadow.inkSoft}
                       returnKeyType="done"
                       selectionColor={Meadow.goldDeep}
-                      style={[styles.input, showBookTitleLoading && styles.inputWithActivity]}
+                      style={[styles.input, showSpecificLoading && styles.inputWithActivity]}
                       value={specific}
                     />
-                    {showBookTitleLoading ? (
+                    {showSpecificLoading ? (
                       <View pointerEvents="none" style={styles.inputActivity}>
-                        <ActivityIndicator accessibilityLabel="Reading book title from photo" color={Meadow.goldDeep} size="small" />
+                        <ActivityIndicator
+                          accessibilityLabel={`${sourceType === 'photo' ? 'Reading' : 'Extracting'} ${choice.specificFieldLabel ?? flow.specificFieldLabel} from ${sourceType === 'photo' ? 'photo' : 'note'}`}
+                          color={Meadow.goldDeep}
+                          size="small"
+                        />
                       </View>
                     ) : null}
                   </View>

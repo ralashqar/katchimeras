@@ -170,7 +170,7 @@ test('a clear Foundation note route opens its journal category and retains gener
   assert.equal(classificationForResolvedRoute(decision.selected!, raw, decision.decisionSource)?.fields.specific, 'Apple');
 });
 
-test('note fields use Foundation detail and never copy the display transcript label', () => {
+test('Foundation note fields wait for route-locked extraction and never copy other read metadata', () => {
   const base = {
     intelligenceProvider: 'appleFoundation' as const,
     llmClassified: false,
@@ -196,7 +196,7 @@ test('note fields use Foundation detail and never copy the display transcript la
     journalClassification: {
       kind: 'categorized', flowId: 'studio', categoryId: 'book', fields: { specific: null, context: null }, feeling: null, provider: 'appleFoundation',
     },
-  }), 'Harry Potter');
+  }), null);
 });
 
 test('note routing still asks for confirmation when confidence or candidate lead is weak', () => {

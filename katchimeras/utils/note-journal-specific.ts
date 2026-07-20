@@ -23,10 +23,12 @@ export type NoteSpecificSource = {
 export function noteSuggestedSpecific(interpreted: NoteSpecificSource): string | null {
   const classified = interpreted.journalClassification?.kind === 'categorized'
     || interpreted.journalClassification?.kind === 'generic';
-  const foundationMediaFallback = interpreted.intelligenceProvider === 'appleFoundation'
-    && interpreted.llmClassified
-    && !!interpreted.media;
-  if (!classified && !foundationMediaFallback) return null;
+  if (interpreted.intelligenceProvider === 'appleFoundation') {
+    // Foundation note routing deliberately returns no field value. The shared
+    // journal composer runs the separate route-locked extraction after opening.
+    return classified ? interpreted.journalClassification?.fields.specific ?? null : null;
+  }
+  if (!classified) return null;
 
   return interpreted.journalClassification?.fields.specific
     ?? interpreted.media?.title

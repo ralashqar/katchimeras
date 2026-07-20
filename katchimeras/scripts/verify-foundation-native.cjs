@@ -164,6 +164,14 @@ check('note navigation is resolved before optional rich enrichment',
 check('note child routing receives only children of the locked flow',
   foundationNote.includes('JOURNAL_CLASSIFICATION_CATALOG.filter((entry) => entry.flowId === flow.id)')
     && foundationNote.includes('The broad journal section ${flow.id} is already selected and immutable'));
+check('note child routing cannot author the editable field',
+  foundationNote.includes("fields: [{ name: 'routeKey', description: `Best route inside the locked ${flow.id} section`")
+    && foundationNote.includes('Choose one route.`'));
+check('note field extraction runs after the journal composer opens',
+  foundationNote.includes('export async function extractNoteSpecificOnDevice(')
+    && manualJournal.includes('void extractNoteSpecificOnDevice(transcript')
+    && manualJournal.includes('setNoteSpecificLoading(true)')
+    && manualJournal.includes('specificEditedRef.current'));
 check('an empty enrichment response can retain a successful Foundation route',
   foundationNote.includes('if (!richResponseValid && !journalClassification) return null')
     && foundationNote.includes('missing_or_invalid_label_or_archetype')
