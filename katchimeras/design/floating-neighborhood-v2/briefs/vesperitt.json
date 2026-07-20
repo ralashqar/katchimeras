@@ -2,6 +2,7 @@
   "key": "vesperitt",
   "kind": "resident",
   "concept": "A hushed small-hours observatory garden for the calm, clear stretch of night after the rest of the world has gone quiet.",
+  "floor": "One broad continuous midnight-teal study carpet across the full top face, with smooth softly beveled shading and no fibers, constellations, stars, border, medallion, or repeated pattern.",
   "main_structure": "One compact open-front observatory-study at the rear with a broad crescent-shaped indigo roof, one large moon window, and a simple built-in reading desk.",
   "rear_props": [
     "one broad blank star-chart desk with two oversized closed books",
@@ -23,7 +24,7 @@
   "lighting": "soft luminous midnight-blue ambient light with one broad moon-window glow and two warm crescent-lantern pools",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open study carpet",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

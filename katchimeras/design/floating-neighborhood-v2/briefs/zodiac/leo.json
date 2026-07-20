@@ -1,0 +1,14 @@
+{
+  "key": "leo",
+  "kind": "zodiac",
+  "concept": "A radiant sun pavilion with confident warm forms and a generous theatrical glow.",
+  "floor": "One continuous smooth saffron-gold stone floor across the full top face, with broad sun-warmed shading and no grass, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One bold sun-mane-inspired pavilion at the rear, built from a large amber arch and seven oversized rounded ray slabs around a warm luminous disc.",
+  "rear_props": ["two broad stepped coral plinths", "two oversized low flame lanterns"],
+  "side_props": ["three large amber fan-leaf sculptures on the upper-left edge", "one broad cream sun bench and one coral urn on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded amber stone wall with broad cream cap blocks", "palette": ["amber", "saffron", "coral", "warm cream"], "emblems": "four oversized simple sun-ray insets"},
+  "cliff": {"materials": ["large rounded ochre blocks", "large muted coral stones", "a few broad warm-cream blocks"], "palette": ["ochre", "coral", "warm cream"]},
+  "lighting": "soft radiant afternoon light with one broad warm rear glow",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open saffron-stone floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, lion, animal, face, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, sparks, tiny rays, cracks, specks, or dense clutter"]
+}

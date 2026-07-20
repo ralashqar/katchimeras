@@ -2,6 +2,7 @@
   "key": "replace_me",
   "kind": "resident",
   "concept": "One-sentence habitat identity.",
+  "floor": "One broad, continuous theme-specific floor material with no small repeated texture.",
   "main_structure": "One iconic rear landmark made from a few large forms.",
   "rear_props": [
     "large readable prop",
@@ -23,7 +24,7 @@
   "lighting": "soft warm lighting with at most two or three large practical lights",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as a quiet open themed floor",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

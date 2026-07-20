@@ -1,0 +1,14 @@
+{
+  "key": "capricorn",
+  "kind": "zodiac",
+  "concept": "A steady mountain-star sanctuary expressing patient ascent through layered monumental stone.",
+  "floor": "One continuous smooth blue-slate floor across the full top face, with broad pine-teal shading and no grass, snow, cracks, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One angular summit arch at the rear made from three large stepped slate masses and two abstract outward-curling cream crown forms around a warm summit beacon.",
+  "rear_props": ["two broad layered climbing stones", "one oversized muted-gold beacon"],
+  "side_props": ["three large pine-teal crystal forms on the upper-left edge", "one chunky cream rest bench and two slate blocks on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded slate wall with broad pine-teal and cream cap blocks", "palette": ["slate blue", "pine teal", "cream", "muted gold"], "emblems": "four oversized stepped-peak insets"},
+  "cliff": {"materials": ["large rounded charcoal-slate blocks", "large pine-teal stones", "a few broad cream blocks"], "palette": ["charcoal slate", "pine teal", "warm cream"]},
+  "lighting": "soft high-mountain morning light with one restrained warm summit glow",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open blue-slate floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, goat, fish, animal, horns as an animal portrait, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, snow particles, watermark, external shadow, tiny rocks, cracks, or dense clutter"]
+}

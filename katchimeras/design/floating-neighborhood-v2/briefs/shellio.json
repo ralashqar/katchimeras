@@ -2,6 +2,7 @@
   "key": "shellio",
   "kind": "resident",
   "concept": "A bright salt-air shoreline garden shaped by unhurried beach visits, smooth shells, and sunlit sea glass.",
+  "floor": "One broad uninterrupted expanse of smooth sun-warmed sand across the full top face, with gentle large-scale shading but no visible grains, ripples, paving, grass, or scattered shells.",
   "main_structure": "One broad open-front shell cabana at the rear with a few oversized scalloped canopy bands, warm cream supports, and one large sea-glass blue inset.",
   "rear_props": [
     "one chunky driftwood-style bench with a single oversized pearl cushion",
@@ -23,7 +24,7 @@
   "lighting": "soft bright coastal daylight with a warm sunlit rim and two broad pearl-lantern glows",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open sand",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

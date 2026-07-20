@@ -521,6 +521,18 @@ export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_BEDROTTE_HEX_TILE: ImageSourceProp
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_GATHERGLOW_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_SHELLIO_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_hex_tile.webp');
 export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_vesperitt_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_ARIES_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_aries_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_TAURUS_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_taurus_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_GEMINI_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_gemini_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_CANCER_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_cancer_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_LEO_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_leo_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_VIRGO_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_virgo_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_LIBRA_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_libra_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_SCORPIO_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_scorpio_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_SAGITTARIUS_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_sagittarius_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_CAPRICORN_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_capricorn_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_AQUARIUS_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_aquarius_hex_tile.webp');
+export const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_PISCES_HEX_TILE: ImageSourcePropType = require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_pisces_hex_tile.webp');
 
 const KINGDOM_DEFAULT_HEX_TILE_SOURCES: KingdomHexTileLodSources = {
   thumb: require('../assets/images/katchimeras/world/hex/default_hex_tile_256.webp'),
@@ -691,6 +703,71 @@ const KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE_SOURCES: KingdomHexTil
   thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_vesperitt_hex_tile_256.webp'),
   medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_vesperitt_hex_tile_512.webp'),
   full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_VESPERITT_HEX_TILE,
+};
+const KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_HEX_TILE_SOURCES: Record<
+  ZodiacSignId,
+  KingdomHexTileLodSources
+> = {
+  aries: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_aries_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_aries_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_ARIES_HEX_TILE,
+  },
+  taurus: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_taurus_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_taurus_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_TAURUS_HEX_TILE,
+  },
+  gemini: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_gemini_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_gemini_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_GEMINI_HEX_TILE,
+  },
+  cancer: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_cancer_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_cancer_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_CANCER_HEX_TILE,
+  },
+  leo: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_leo_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_leo_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_LEO_HEX_TILE,
+  },
+  virgo: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_virgo_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_virgo_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_VIRGO_HEX_TILE,
+  },
+  libra: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_libra_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_libra_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_LIBRA_HEX_TILE,
+  },
+  scorpio: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_scorpio_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_scorpio_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_SCORPIO_HEX_TILE,
+  },
+  sagittarius: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_sagittarius_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_sagittarius_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_SAGITTARIUS_HEX_TILE,
+  },
+  capricorn: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_capricorn_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_capricorn_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_CAPRICORN_HEX_TILE,
+  },
+  aquarius: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_aquarius_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_aquarius_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_AQUARIUS_HEX_TILE,
+  },
+  pisces: {
+    thumb: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_pisces_hex_tile_256.webp'),
+    medium: require('../assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_pisces_hex_tile_512.webp'),
+    full: KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_PISCES_HEX_TILE,
+  },
 };
 const homeHexTile = (
   source: ImageSourcePropType,
@@ -1021,19 +1098,29 @@ const FLOATING_NEIGHBORHOOD_V2_HOME_TILES: Record<HomeArchetypeId, KingdomHexTil
   connector: FLOATING_NEIGHBORHOOD_V2_HOME_CONNECTOR_TILE,
   dreamer: FLOATING_NEIGHBORHOOD_V2_HOME_DREAMER_TILE,
 };
+const floatingNeighborhoodV2ZodiacTile = (signId: ZodiacSignId): KingdomHexTileSpec => {
+  const sources = KINGDOM_FLOATING_NEIGHBORHOOD_V2_ZODIAC_HEX_TILE_SOURCES[signId];
+  const assetName = `floating_neighborhood_v2_zodiac_${signId}_hex_tile.webp` as keyof typeof KINGDOM_HEX_TILE_ALPHA_BOUNDS;
+  return {
+    source: sources.full!,
+    sources,
+    alphaBounds: hexTileAlphaBounds(assetName),
+    faceBounds: FLOATING_NEIGHBORHOOD_V2_FACE_BOUNDS,
+  };
+};
 const FLOATING_NEIGHBORHOOD_V2_ZODIAC_TILES: Record<ZodiacSignId, KingdomHexTileSpec> = {
-  aries: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  taurus: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  gemini: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  cancer: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  leo: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  virgo: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  libra: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  scorpio: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  sagittarius: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  capricorn: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  aquarius: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
-  pisces: FLOATING_NEIGHBORHOOD_V2_NEUTRAL_TILE,
+  aries: floatingNeighborhoodV2ZodiacTile('aries'),
+  taurus: floatingNeighborhoodV2ZodiacTile('taurus'),
+  gemini: floatingNeighborhoodV2ZodiacTile('gemini'),
+  cancer: floatingNeighborhoodV2ZodiacTile('cancer'),
+  leo: floatingNeighborhoodV2ZodiacTile('leo'),
+  virgo: floatingNeighborhoodV2ZodiacTile('virgo'),
+  libra: floatingNeighborhoodV2ZodiacTile('libra'),
+  scorpio: floatingNeighborhoodV2ZodiacTile('scorpio'),
+  sagittarius: floatingNeighborhoodV2ZodiacTile('sagittarius'),
+  capricorn: floatingNeighborhoodV2ZodiacTile('capricorn'),
+  aquarius: floatingNeighborhoodV2ZodiacTile('aquarius'),
+  pisces: floatingNeighborhoodV2ZodiacTile('pisces'),
 };
 
 export const KINGDOM_HEX_ART_DIRECTION_SETS: KingdomHexArtDirectionSet[] = [

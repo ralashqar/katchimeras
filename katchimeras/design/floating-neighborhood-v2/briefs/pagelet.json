@@ -2,6 +2,7 @@
   "key": "pagelet",
   "kind": "resident",
   "concept": "A warm pocket library where a few beloved books, soft lamplight, and a quiet reading corner make stories feel like a place.",
+  "floor": "One broad continuous warm walnut library floor across the full top face, divided into only six to eight oversized smooth planks with no fine grain, tiny seams, loose pages, or rug.",
   "main_structure": "One compact open-front cream library nook at the rear with a broad curved burgundy roof, one large arched doorway, and two rounded side wings.",
   "rear_props": [
     "two broad three-book shelves built into the library wings",
@@ -23,7 +24,7 @@
   "lighting": "soft warm daylight with three broad pools of amber reading-lamp glow",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open walnut floor",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

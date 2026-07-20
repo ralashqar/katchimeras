@@ -2,6 +2,7 @@
   "key": "skylo",
   "kind": "resident",
   "concept": "A bright pocket-city terrace that turns urban wandering, skyline energy, and warm windows into a welcoming habitat.",
+  "floor": "One broad continuous blue-gray city-terrace floor across the full top face, formed from six to eight oversized smooth slabs without roads, crosswalks, cracks, or small paving texture.",
   "main_structure": "One compact rounded art-deco city pavilion at the rear, formed from a tall central tower and two broad stepped side buildings with a few oversized amber windows.",
   "rear_props": [
     "two large simple street lanterns",
@@ -23,7 +24,7 @@
   "lighting": "clear soft daylight with three or four broad pools of warm amber window and lantern glow",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open city-terrace floor",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

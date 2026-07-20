@@ -2,6 +2,7 @@
   "key": "tasklet",
   "kind": "resident",
   "concept": "A confident focus workshop where plans, tools, and neatly organized supplies make the next useful step feel inviting.",
+  "floor": "One broad continuous honey-timber workshop deck across the full top face, divided into only six to eight oversized smooth planks with no fine wood grain or small seams.",
   "main_structure": "One compact open-front workshop at the rear with a broad curved navy roof, warm timber walls, one large arched doorway, and two oversized amber windows.",
   "rear_props": [
     "one broad planning bench with a single large blank plan sheet",
@@ -23,7 +24,7 @@
   "lighting": "soft clear daylight with warm workshop windows and two broad amber focus lanterns",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open timber floor",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

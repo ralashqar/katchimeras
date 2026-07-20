@@ -1,7 +1,7 @@
 # Floating Neighbourhood V2 environment pipeline
 
-This is the canonical, fresh-context runbook for creating resident environments
-and home-archetype islands. Follow it even when earlier conversation history is
+This is the canonical, fresh-context runbook for creating resident environments,
+home-archetype islands, and zodiac sanctuaries. Follow it even when earlier conversation history is
 available. The longer visual history and approved examples live in
 `design/floating-neighborhood-v2/README.md`.
 
@@ -11,6 +11,8 @@ Generation is an image edit through FAL `fal-ai/nano-banana-2/edit`, selected by
 `--model nano` in the repository generator.
 
 - Resident environment: use only
+  `design/floating-neighborhood-v2/floating-neutral-source.png` as image input.
+- Zodiac sanctuary: use only
   `design/floating-neighborhood-v2/floating-neutral-source.png` as image input.
 - Home archetype: use only
   `design/floating-neighborhood-v2/floating-home-source.png` as image input.
@@ -38,11 +40,14 @@ For resident environments:
 
 - Retheme the habitat props, continuous perimeter, and large cliff blocks as a
   coordinated system.
+- Retheme the full top-face floor to suit the resident: sand, carpet, broad
+  timber, large stone slabs, smooth moss, and similar materials are valid.
 - Build a rich U-shaped frame across the rear and upper portions of both sides.
-- Keep the entire bottom/front half and stairs quiet, open, and grassy for the
-  separately rendered live creature.
-- Do not add a center circle, plaza, platform, ring, rug, paving, path, or
-  indentation.
+- Keep the entire bottom/front half and stairs quiet, open, continuous, and
+  free of props for the separately rendered live creature. “Open” constrains
+  occupancy, not floor material.
+- Do not add a center circle, raised or sunken plaza, platform, distinct rug,
+  path, ring, or indentation. A single uniform themed floor is not a platform.
 
 For home archetypes:
 
@@ -51,6 +56,16 @@ For home archetypes:
 - Retheme the cottage, perimeter, cliff blocks, planting, and rear/upper-side
   props while keeping the nest unobstructed for the separately rendered egg.
 
+For zodiac sanctuaries:
+
+- Retheme the full floor, perimeter, cliff blocks, rear landmark, and upper-side
+  props as a coordinated sign-specific environment.
+- Express the sign through architecture, material, palette, and a few abstract
+  celestial forms. Do not bake a familiar, animal, person, zodiac glyph, or
+  constellation diagram into the bitmap.
+- Keep the lower half open for the separately rendered element familiar, using
+  the same no-platform rule as resident environments.
+
 For both kinds, exclude baked creatures/eggs, bridges, bridge stubs, clouds,
 text, watermarks, external shadows, tiny flowers, grass blades, pebbles, cracks,
 specks, filigree, and dense prop clutter.
@@ -58,10 +73,13 @@ specks, filigree, and dense prop clutter.
 ## 1. Write the brief
 
 Copy `design/floating-neighborhood-v2/new-environment-brief.json` to
-`design/floating-neighborhood-v2/briefs/<key>.json`, check it in, and complete
-every field. Prefer one iconic landmark, two or three signature props, a clear
-perimeter treatment, and two or three cliff colors/materials. The brief is the
-portable creative input for another context window or agent.
+`design/floating-neighborhood-v2/briefs/<key>.json` for residents/homes or
+`design/floating-neighborhood-v2/briefs/zodiac/<sign>.json` for zodiac art,
+check it in, and complete
+every field, including `floor`. Prefer one iconic landmark, two or three
+signature props, a clear perimeter treatment, one broad low-frequency floor,
+and two or three cliff colors/materials. The brief is the portable creative
+input for another context window or agent.
 
 Pass that file through `--brief`; the generator deterministically constructs
 the theme paragraph and records both the brief and its SHA-256. `--theme` remains
@@ -81,6 +99,12 @@ Home example:
 
 ```powershell
 python scripts/generate-katchimera-hex-tile.py --visual-key explorer --kind floating-home-v2 --brief design/floating-neighborhood-v2/briefs/explorer.json --dry-run
+```
+
+Zodiac example:
+
+```powershell
+python scripts/generate-katchimera-hex-tile.py --visual-key aries --kind zodiac --brief design/floating-neighborhood-v2/briefs/zodiac/aries.json --dry-run
 ```
 
 Review `.tmp/katchimera-hex-tiles/<key>/candidate-1-prompt.txt` and
@@ -105,6 +129,10 @@ Dry-run the promotion first:
 ```powershell
 python scripts/promote-floating-neighborhood-v2-tile.py --key example --kind resident --candidate .tmp/katchimera-hex-tiles/example/candidate-1.png --dry-run
 ```
+
+Use `--kind zodiac` for a zodiac candidate. Zodiac canonical files use
+`floating-zodiac-<sign>-source.png` / `-alpha.png`, while production LODs use
+`floating_neighborhood_v2_zodiac_<sign>_hex_tile...`.
 
 Then run it without `--dry-run`. Add `--replace` only for an intentional redo of
 an existing canonical tile. The command:
@@ -161,6 +189,8 @@ Promotion intentionally stops before runtime mapping. In `utils/world-visuals.ts
 - create a `KingdomHexTileSpec` using the generated alpha bounds;
 - add residents to `FLOATING_NEIGHBORHOOD_V2_RESIDENT_TILES`, or homes to
   `FLOATING_NEIGHBORHOOD_V2_HOME_TILES` using the persisted archetype ID; and
+- add zodiac signs to `FLOATING_NEIGHBORHOOD_V2_ZODIAC_TILES` using the
+  persisted `ZodiacSignId`; and
 - retain the neutral fallback for unsupported residents.
 
 Static `require` calls are required by React Native bundling; do not construct

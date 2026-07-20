@@ -2,7 +2,7 @@
 """Matte, package, and register bounds for an approved floating-v2 candidate.
 
 This deliberately does not edit ``utils/world-visuals.ts``: runtime mapping is
-a reviewed code change because resident and home keys have different types.
+a reviewed code change because resident, home, and zodiac keys have different types.
 """
 
 from __future__ import annotations
@@ -48,8 +48,8 @@ def replace_file(source: Path, destination: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--key", required=True, help="Lowercase resident or home-archetype key.")
-    parser.add_argument("--kind", required=True, choices=("resident", "home"))
+    parser.add_argument("--key", required=True, help="Lowercase resident, home-archetype, or zodiac key.")
+    parser.add_argument("--kind", required=True, choices=("resident", "home", "zodiac"))
     parser.add_argument("--candidate", required=True, help="Approved 2048px source on pure black.")
     parser.add_argument("--replace", action="store_true", help="Allow replacing existing canonical art.")
     parser.add_argument(
@@ -76,10 +76,18 @@ def main() -> None:
     if any(max(rgb.getpixel(point)) > 5 for point in corners):
         raise SystemExit("Candidate corners must be pure black before matting.")
 
-    stem = f"floating-home-{key}" if args.kind == "home" else f"floating-{key}"
+    stem = (
+        f"floating-home-{key}"
+        if args.kind == "home"
+        else f"floating-zodiac-{key}"
+        if args.kind == "zodiac"
+        else f"floating-{key}"
+    )
     asset_key = (
         f"floating_neighborhood_v2_home_{key}_hex_tile"
         if args.kind == "home"
+        else f"floating_neighborhood_v2_zodiac_{key}_hex_tile"
+        if args.kind == "zodiac"
         else f"floating_neighborhood_v2_{key}_hex_tile"
     )
     source = DESIGN_ROOT / f"{stem}-source.png"

@@ -1,0 +1,14 @@
+{
+  "key": "aquarius",
+  "kind": "zodiac",
+  "concept": "An inventive sky-current laboratory shaped by flowing vessels, clean energy, and unexpected colour.",
+  "floor": "One continuous smooth turquoise glazed-stone floor across the full top face, with broad cyan-to-violet shading and no water, grass, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One oversized abstract sky-vessel sculpture at the rear pouring two broad solid cyan ribbon forms into a low architectural channel that ends well above the open stage.",
+  "rear_props": ["two large electric-blue crystal conduits", "one broad silver control plinth with no markings"],
+  "side_props": ["two oversized turquoise coil sculptures on the upper-left edge", "one chunky violet bench and one cyan vessel on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded turquoise wall with broad silver and violet cap blocks", "palette": ["turquoise", "cyan", "silver", "violet"], "emblems": "four oversized flowing-wave insets"},
+  "cliff": {"materials": ["large rounded deep-cyan blocks", "large muted violet stones", "a few broad silver-grey blocks"], "palette": ["deep cyan", "muted violet", "silver grey"]},
+  "lighting": "soft bright sky light with restrained cyan illumination visible only on the island surfaces; the surrounding background remains perfectly black",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open glazed-stone floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, person, animal, egg, or familiar baked into the bitmap", "open water, waterfall leaving the island, zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "background aura, cyan halo outside the silhouette, gradient background, bridges, clouds, watermark, external shadow, bubbles, electric specks, tiny controls, cracks, or dense clutter"]
+}

@@ -328,7 +328,13 @@ def theme_from_brief(path: Path, *, visual_key: str, kind: str) -> tuple[str, di
         brief = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise SystemExit(f"Could not read environment brief {path}: {exc}") from None
-    expected_kind = "home" if kind == "floating-home-v2" else "resident"
+    expected_kind = (
+        "home"
+        if kind == "floating-home-v2"
+        else "zodiac"
+        if kind == "zodiac"
+        else "resident"
+    )
     if brief.get("key") != visual_key or brief.get("kind") != expected_kind:
         raise SystemExit(
             f"Brief must declare key={visual_key!r} and kind={expected_kind!r}; "
@@ -340,12 +346,13 @@ def theme_from_brief(path: Path, *, visual_key: str, kind: str) -> tuple[str, di
 
     perimeter = brief.get("perimeter") if isinstance(brief.get("perimeter"), dict) else {}
     cliff = brief.get("cliff") if isinstance(brief.get("cliff"), dict) else {}
-    required = ("concept", "main_structure", "rear_props", "side_props", "lighting")
+    required = ("concept", "floor", "main_structure", "rear_props", "side_props", "lighting")
     if any(not brief.get(field) for field in required) or not perimeter or not cliff:
         raise SystemExit("Brief is incomplete; fill every creative field in new-environment-brief.json.")
     theme = " ".join(
         [
             f"Concept: {brief['concept']}",
+            f"Floor: {brief['floor']}",
             f"Main structure: {brief['main_structure']}",
             f"Rear props: {joined(brief['rear_props'])}.",
             f"Upper-side props: {joined(brief['side_props'])}.",
@@ -417,8 +424,12 @@ def prompt_for_floating_v2(visual_key: str, theme: str) -> str:
             "Copy the reference island's front geometry exactly: a broad straight front hex edge interrupted "
             "by a centered stair entrance. The stairs are recessed into that edge; never turn the front into "
             "a downward-pointing tip, triangular nose, projecting peninsula, or altered silhouette. "
-            "Keep the entire bottom/front half as uninterrupted smooth grass. Do not add a circle, "
-            "plaza, paving, pedestal, path, rug, ring, indentation, or character platform. Confine every "
+            "Retheme the full top-face floor with the material described in the brief; replacing the "
+            "reference grass is allowed and expected. Preserve the floor's exact elevation, flat shape, "
+            "outer boundary, and relationship to the stairs. Keep the entire bottom/front half as one "
+            "quiet, continuous, uncluttered floor surface. Use only broad low-frequency floor forms with "
+            "no granular texture or small repeated pattern. Do not add a center circle, raised or sunken "
+            "plaza, pedestal, distinct rug, path, ring, indentation, or character platform. Confine every "
             "structure and floor prop to the rear half or the upper portions of the left and right side edges. "
             "Build a richer U-shaped frame around the open stage; side details may extend toward the midpoint "
             "but must not enter the bottom half or block the front stairs. You may retheme the perimeter "
@@ -433,7 +444,7 @@ def prompt_for_floating_v2(visual_key: str, theme: str) -> str:
         visuals=theme,
         framing=(
             "Create a balanced rear-and-side silhouette with several large readable features. Keep the entire "
-            "bottom half and full front approach empty for the "
+            "bottom half and full front approach empty of props for the "
             "separately rendered live creature. No text, creature, egg, nest, bridge, clouds, external shadow, "
             "watermark, tiny texture, grass blades, pebbles, cracks, or prop clutter. The black background is "
             "uniform with no gradient, floor, reflection, glow, haze, or cast shadow."
@@ -472,21 +483,36 @@ def prompt_for_floating_home_v2(visual_key: str, theme: str) -> str:
 def prompt_for_zodiac(visual_key: str, theme: str) -> str:
     return structured_tile_prompt(
         reference=(
-            "Edit image 1. Preserve its exact hex footprint, position, scale, rotation, camera angle, "
-            "perspective, depth, grass edge, soil side walls, and square framing. Keep the existing grass "
-            "platform and soil walls unchanged. Do not increase the platform depth or move its corners. "
-            "Add structures only on the grass surface. Keep the flat pure-black background. The supplied "
-            "empty base tile is the only image reference."
+            "Edit image 1. Preserve its exact square canvas, flat-top hex footprint, position, scale, "
+            "rotation, camera angle, perspective, deep tapered island silhouette, front stairs, and padding. "
+            "Copy the reference island's front geometry exactly: a broad straight front hex edge interrupted "
+            "by a centered recessed stair entrance, never a point, nose, peninsula, or altered silhouette. "
+            "Retheme the complete top-face floor, continuous perimeter, and cliff materials as described while "
+            "preserving their exact elevation, footprint, outer boundary, and relationship to the stairs. "
+            "Keep the entire bottom/front half as one quiet continuous floor. Do not add a center circle, plaza, "
+            "pedestal, distinct rug, path, ring, indentation, or familiar platform. Confine structures and props "
+            "to the rear half and upper left/right sides, forming a rich U-shaped frame around the open stage. "
+            "Keep a perfectly flat solid pure-black #000000 background for BiRefNet Heavy. The supplied neutral "
+            "floating island is the only image reference."
         ),
         art_style=(
-            "Premium stylized 3D toy-diorama materials, rounded clay-like forms, soft bevels, simplified "
-            "surface detail, clean readable silhouettes, celestial lighting, and the same finish as image 1."
+            "Match the Katchimeras premium stylized 3D toy-diorama finish: bold readable silhouettes, rounded "
+            "clay-like forms, broad smooth bevels, simplified materials, low-frequency detail, large uninterrupted "
+            "shapes, and soft luminous lighting. Every feature must remain readable at 256px."
         ),
         visuals=(
             f"Create a unique {visual_key.title()} zodiac sanctuary. {theme} "
-            "No writing, zodiac glyph, character, creature, animal, or human."
+            "Express the sign through architecture, material, colour, and abstract celestial motifs only. "
+            "No writing, zodiac glyph, constellation diagram, character, creature, animal, or human."
         ),
-        framing=ZODIAC_TILE_FRAMING,
+        framing=(
+            "Create one clear celestial landmark at the rear with a few large sign-specific forms across both "
+            "upper sides. Preserve the entire bottom half and front approach as an unobstructed stage for the "
+            "separately rendered live zodiac familiar. Keep all additions inside the original silhouette. No egg, "
+            "nest, bridge, clouds, external shadow, watermark, tiny texture, grass blades, pebbles, cracks, star "
+            "specks, fairy lights, or prop clutter. The black background is uniform with no gradient, floor, "
+            "reflection, glow, haze, or cast shadow."
+        ),
     )
 
 
@@ -526,18 +552,18 @@ def main() -> None:
     if args.theme and args.brief:
         sys.exit("Use either --brief (preferred for v2) or --theme, not both.")
     if args.model is None:
-        args.model = "nano" if args.kind in {"floating-v2", "floating-home-v2"} else "gpt"
+        args.model = "nano" if args.kind in {"floating-v2", "floating-home-v2", "zodiac"} else "gpt"
 
     visual_key = args.visual_key
     default_base = (
         "design/floating-neighborhood-v2/floating-neutral-source.png"
-        if args.kind == "floating-v2"
+        if args.kind in {"floating-v2", "zodiac"}
         else "design/floating-neighborhood-v2/floating-home-source.png"
         if args.kind == "floating-home-v2"
         else "assets/images/katchimeras/world/hex/grass_hex_tile_dense_v2.webp"
     )
     base_path = (ROOT / (args.base or default_base)).resolve()
-    if args.kind in {"floating-v2", "floating-home-v2"} and args.creature:
+    if args.kind in {"floating-v2", "floating-home-v2", "zodiac"} and args.creature:
         sys.exit(
             "V2 generation never accepts a creature reference. Describe identity through --brief or --theme; "
             "the live creature/egg is rendered separately."
@@ -557,8 +583,8 @@ def main() -> None:
     brief_path = (ROOT / args.brief).resolve() if args.brief else None
     brief_data = None
     if brief_path is not None:
-        if args.kind not in {"floating-v2", "floating-home-v2"}:
-            sys.exit("--brief is supported only for floating-v2 kinds.")
+        if args.kind not in {"floating-v2", "floating-home-v2", "zodiac"}:
+            sys.exit("--brief is supported only for floating-v2 and zodiac kinds.")
         theme, brief_data = theme_from_brief(
             brief_path,
             visual_key=visual_key,
@@ -572,6 +598,10 @@ def main() -> None:
         args.kind == "floating-home-v2"
         and not args.theme
         and visual_key not in HOME_THEMES
+    ) or (
+        args.kind == "zodiac"
+        and not args.theme
+        and visual_key not in ZODIAC_THEMES
     ):
         sys.exit("New v2 keys require --brief (preferred) or an explicit --theme.")
 

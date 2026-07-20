@@ -1,0 +1,14 @@
+{
+  "key": "pisces",
+  "kind": "zodiac",
+  "concept": "A gentle dream-tide sanctuary with paired flowing forms, pearl light, and a calm imaginative mood.",
+  "floor": "One continuous smooth ocean-blue shellstone floor across the full top face, with broad lilac and aqua shading and no water, scales, grass, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One twin-fin-inspired arch at the rear built from two large mirrored aqua ribbon slabs around a luminous lilac pearl opening, abstract rather than animal-like.",
+  "rear_props": ["two oversized pearl star lamps with solid five-lobed forms", "two broad flowing blue ribbon sculptures"],
+  "side_props": ["three large rounded lilac shellstone forms on the upper-left edge", "one broad aqua rest bench and two pearl stones on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded ocean-blue wall with broad aqua and pearl cap blocks", "palette": ["ocean blue", "aqua", "lilac", "pearl"], "emblems": "four oversized plain pearl circular insets with no lines or glyphs"},
+  "cliff": {"materials": ["large rounded deep-ocean blocks", "large muted lilac stones", "a few broad pearl blocks"], "palette": ["deep ocean blue", "muted lilac", "pearl cream"]},
+  "lighting": "soft dreamlike moon light with two broad pearl lamp glows",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open shellstone floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, fish, fins as animals, animal face, egg, or familiar baked into the bitmap", "wave glyph, Aquarius symbol, repeated wavy lines, pool, open water, scales, zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, bubbles, star specks, tiny shells, cracks, or dense clutter"]
+}

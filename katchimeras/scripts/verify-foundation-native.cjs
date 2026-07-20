@@ -151,16 +151,23 @@ check('focused retry uses the same generated taxonomy', swift.includes('classify
 check('focused route returns the generated journal field text',
   /struct NoteRouteDecision[\s\S]*?let specific: String[\s\S]*?\n}/.test(generatedNote)
     && swift.includes('"specific": response.content.specific'));
-check('note routing always uses the focused Foundation call',
-  foundationNote.includes('if (nativeFoundation.classifyNoteRouteAsync)')
-    && !foundationNote.includes('if (cleanString(raw.routeKey) && nativeFoundation.classifyNoteRouteAsync'));
-check('the focused Foundation route supersedes retired combined routing fields',
+check('note routing uses two bounded Foundation tasks before the legacy focused call',
+  foundationNote.includes("taskId: 'note.flow.v1'")
+    && foundationNote.includes("taskId: 'note.child-route.v1'")
+    && foundationNote.includes('Compatibility only for native clients predating the generic structured'));
+check('the split Foundation route supersedes retired combined routing fields',
   foundationNote.includes('focusedAtomic ? null : firstAtomic')
     && foundationNote.includes('focusedAtomic,\n      { includeRegistryEvidence'));
+check('note navigation is resolved before optional rich enrichment',
+  foundationNote.indexOf('classifyNoteRouteOnDevice(text') < foundationNote.indexOf('nativeFoundation.interpretNoteAsync(text)')
+    && foundationNote.includes('foundation_note_read_skipped_after_route'));
+check('note child routing receives only children of the locked flow',
+  foundationNote.includes('JOURNAL_CLASSIFICATION_CATALOG.filter((entry) => entry.flowId === flow.id)')
+    && foundationNote.includes('The broad journal section ${flow.id} is already selected and immutable'));
 check('an empty enrichment response can retain a successful Foundation route',
   foundationNote.includes('if (!richResponseValid && !journalClassification) return null')
     && foundationNote.includes('missing_or_invalid_label_or_archetype')
-    && foundationNote.includes('_focused_route_used'));
+    && foundationNote.includes('_split_route_used'));
 check('older note builds receive route-locked Foundation field enrichment',
   foundationNote.includes("taskId: 'note.specific.v1'")
     && foundationNote.includes('The supplied journal route is already selected and immutable')

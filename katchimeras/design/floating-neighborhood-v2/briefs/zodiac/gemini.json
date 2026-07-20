@@ -1,0 +1,14 @@
+{
+  "key": "gemini",
+  "kind": "zodiac",
+  "concept": "A bright twin-wind observatory expressing curiosity, conversation, and mirrored motion.",
+  "floor": "One continuous smooth pale sky-blue plaster floor across the full top face, with one broad cream tonal sweep and no divided halves, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "Two matching compact crescent observatory arches at the rear, mirrored left and right around a clear open center, using large cream and sky-blue masses.",
+  "rear_props": ["two oversized paired floating star-orbs on sturdy short stands", "two broad mirrored ribbon-stream sculptures"],
+  "side_props": ["one chunky cream cloud-form bench on each upper side", "one large pale-gold lantern on each upper side"],
+  "perimeter": {"material": "one continuous rounded powder-blue wall with alternating broad cream cap sections", "palette": ["powder blue", "warm cream", "pale gold"], "emblems": "four oversized paired oval insets"},
+  "cliff": {"materials": ["large rounded sky-blue stone blocks", "large warm cream blocks", "a few broad pale-gold stones"], "palette": ["sky blue", "warm cream", "pale gold"]},
+  "lighting": "soft clear morning light with two balanced warm lantern pools",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as one quiet open plaster floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, animal, twins, people, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, split floor, or indentation", "bridges, clouds, watermark, external shadow, star specks, tiny props, cracks, or dense clutter"]
+}

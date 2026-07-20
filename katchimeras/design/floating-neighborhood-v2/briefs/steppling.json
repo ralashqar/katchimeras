@@ -1,0 +1,36 @@
+{
+  "key": "steppling",
+  "kind": "resident",
+  "concept": "A friendly trailhead rest stop built around daily walks, small journeys, and the satisfaction of another step forward.",
+  "floor": "One broad continuous expanse of smooth compacted trail earth across the full top face in warm muted ochre, with gentle large-scale shading but no grass, separate path, footprints, pebbles, cracks, grains, or repeated texture.",
+  "main_structure": "One compact open-front hiking lodge at the rear with a broad muted-blue roof, warm timber walls, and one glowing doorway.",
+  "rear_props": [
+    "one large blank trail-map board and one simple gear rack holding a single oversized rolled blanket",
+    "two broad trail lanterns"
+  ],
+  "side_props": [
+    "one chunky rest bench and one broad water station along the upper-left edge",
+    "two simple waypoint posts and two large pine forms along the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth sky-blue trail parapet made from broad rounded masses",
+    "palette": ["soft sky blue", "warm ochre", "muted slate"],
+    "emblems": "four oversized simple orange footprint emblems"
+  },
+  "cliff": {
+    "materials": ["large slate-blue stone blocks", "large warm sandstone blocks", "a few broad muted ochre blocks"],
+    "palette": ["slate blue", "warm sandstone", "muted ochre"]
+  },
+  "lighting": "clear soft trail daylight with one broad doorway glow and two restrained amber lantern glows",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open compacted trail earth",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, separate path, stepping-stone trail, or indentation",
+    "bridges, clouds, readable signs, text, watermark, external shadow",
+    "grass, flowers, footprints in the floor, tiny leaves, pine needles, pebbles, cracks, grains, specks, or dense hiking clutter"
+  ]
+}

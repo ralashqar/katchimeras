@@ -2,6 +2,7 @@
   "key": "bedrotte",
   "kind": "resident",
   "concept": "A blanket-warm evening sanctuary that treats staying home and restorative rest as something complete.",
+  "floor": "One broad continuous plush carpet across the full top face in muted dusk blue, with a smooth softly beveled surface and no fibers, seams, border, medallion, or repeated pattern.",
   "main_structure": "One compact open-front sleep nook at the rear with a broad pillow-shaped canopy, a simple tucked bed, and one warm amber window.",
   "rear_props": [
     "one large folded-blanket chest",
@@ -23,7 +24,7 @@
   "lighting": "soft evening-blue ambient light with three broad pools of warm amber sanctuary glow",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open carpet",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

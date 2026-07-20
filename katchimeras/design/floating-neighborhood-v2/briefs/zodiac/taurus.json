@@ -1,0 +1,14 @@
+{
+  "key": "taurus",
+  "kind": "zodiac",
+  "concept": "A grounded moon-earth sanctuary shaped by strength, comfort, and patient growth.",
+  "floor": "One continuous smooth jade-green packed-clay floor across the full top face, with broad soft shading and no grass, blades, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One broad low earth shrine at the rear with two abstract outward-curving cream stone buttresses and a large emerald moonstone doorway, suggesting strength without depicting an animal.",
+  "rear_props": ["two large rounded emerald crystal clusters", "one broad cream stone bench"],
+  "side_props": ["two oversized flowering topiary mounds on the upper-left edge", "three large jade boulders and one gold lantern on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded moss-jade stone wall with broad cream cap blocks", "palette": ["moss jade", "warm cream", "antique gold"], "emblems": "four oversized simple leaf-bud insets"},
+  "cliff": {"materials": ["large rounded deep-earth blocks", "large muted jade stones", "a few broad cream blocks"], "palette": ["earth brown", "muted jade", "warm cream"]},
+  "lighting": "soft moon-warm ambient light with restrained antique-gold lantern glow",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open jade-clay floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, animal, bull head, horns as an animal portrait, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, grass blades, tiny flowers, pebbles, cracks, specks, or dense clutter"]
+}

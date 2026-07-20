@@ -1,0 +1,14 @@
+{
+  "key": "libra",
+  "kind": "zodiac",
+  "concept": "A serene balanced sky pavilion built from paired forms, soft colour, and open breathing room.",
+  "floor": "One continuous smooth rose-cream marble floor across the full top face, with broad powder-blue shading and no veins, split halves, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "Two graceful matching powder-blue half-arches at the rear, mirrored around one broad cream horizon slab with a clear open center; everything is grounded and nothing hangs from a beam.",
+  "rear_props": ["two matching low powder-blue reflecting bowls with opaque glass surfaces", "two broad rose-and-cream balance-stone stacks of equal height"],
+  "side_props": ["one large rose planter and cream bench on each upper side", "two mirrored rounded blue stone sculptures"],
+  "perimeter": {"material": "one continuous rounded dusty-rose wall with broad powder-blue and cream caps", "palette": ["dusty rose", "powder blue", "cream", "pale gold"], "emblems": "four oversized paired-arc insets"},
+  "cliff": {"materials": ["large rounded rose-stone blocks", "large powder-blue stones", "a few broad cream blocks"], "palette": ["dusty rose", "powder blue", "cream"]},
+  "lighting": "soft balanced daylight with matching warm glows on both upper sides",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as one quiet open marble floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, person, animal, egg, or familiar baked into the bitmap", "weighing scales, hanging weights, suspended objects, zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, split floor, or indentation", "bridges, clouds, watermark, external shadow, tiny flowers, marble veins, cracks, or dense clutter"]
+}

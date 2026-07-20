@@ -63,6 +63,18 @@ def paste_creature(canvas: Image.Image, key: str, center: tuple[float, float]) -
     canvas.alpha_composite(image, (left, top))
 
 
+def paste_zodiac_familiar(canvas: Image.Image, element: str, center: tuple[float, float]) -> None:
+    image = Image.open(ROOT / f"assets/images/katchimeras/zodiac/familiar_{element}.webp").convert("RGBA")
+    base_size = 58.0
+    size = round(base_size * WORLD_VIEW["zodiac"]["globalScale"] * VIEW_SCALE)
+    image = image.resize((size, size), Image.Resampling.LANCZOS)
+    anchor_x = center[0] + HEX_W * WORLD_VIEW["zodiac"]["horizontalOffsetHexTileWidth"] * VIEW_SCALE
+    anchor_y = center[1] + HEX_H * WORLD_VIEW["zodiac"]["verticalOffsetHexTileHeight"] * VIEW_SCALE
+    left = round(anchor_x - size / 2)
+    top = round(anchor_y - base_size * 0.63 * VIEW_SCALE - (size - base_size * VIEW_SCALE))
+    canvas.alpha_composite(image, (left, top))
+
+
 FILENAMES = {
     "neutral": "floating_neighborhood_v2_neutral_hex_tile.webp",
     "home": "floating_neighborhood_v2_home_hex_tile.webp",
@@ -85,6 +97,18 @@ FILENAMES = {
     "gatherglow": "floating_neighborhood_v2_gatherglow_hex_tile.webp",
     "shellio": "floating_neighborhood_v2_shellio_hex_tile.webp",
     "vesperitt": "floating_neighborhood_v2_vesperitt_hex_tile.webp",
+    "zodiac-aries": "floating_neighborhood_v2_zodiac_aries_hex_tile.webp",
+    "zodiac-taurus": "floating_neighborhood_v2_zodiac_taurus_hex_tile.webp",
+    "zodiac-gemini": "floating_neighborhood_v2_zodiac_gemini_hex_tile.webp",
+    "zodiac-cancer": "floating_neighborhood_v2_zodiac_cancer_hex_tile.webp",
+    "zodiac-leo": "floating_neighborhood_v2_zodiac_leo_hex_tile.webp",
+    "zodiac-virgo": "floating_neighborhood_v2_zodiac_virgo_hex_tile.webp",
+    "zodiac-libra": "floating_neighborhood_v2_zodiac_libra_hex_tile.webp",
+    "zodiac-scorpio": "floating_neighborhood_v2_zodiac_scorpio_hex_tile.webp",
+    "zodiac-sagittarius": "floating_neighborhood_v2_zodiac_sagittarius_hex_tile.webp",
+    "zodiac-capricorn": "floating_neighborhood_v2_zodiac_capricorn_hex_tile.webp",
+    "zodiac-aquarius": "floating_neighborhood_v2_zodiac_aquarius_hex_tile.webp",
+    "zodiac-pisces": "floating_neighborhood_v2_zodiac_pisces_hex_tile.webp",
 }
 
 
@@ -102,6 +126,22 @@ def render(
         paste_egg(canvas, center_for(q, r))
     for q, r, key in creatures:
         paste_creature(canvas, key, center_for(q, r))
+    out = OUT_DIR / name
+    canvas.convert("RGB").save(out, quality=94)
+    print(out.relative_to(ROOT))
+
+
+def render_zodiac_neighborhood(
+    name: str,
+    signs: list[tuple[int, int, str, str]],
+) -> None:
+    tiles = [(0, 0, "neutral"), *((q, r, f"zodiac-{sign}") for q, r, sign, _ in signs)]
+    canvas = Image.new("RGBA", CANVAS, "#0b1020")
+    placed = [(center_for(q, r), kind) for q, r, kind in tiles]
+    for center, kind in sorted(placed, key=lambda item: (item[0][1], item[0][0])):
+        paste_tile(canvas, FILENAMES[kind], center)
+    for q, r, _, element in signs:
+        paste_zodiac_familiar(canvas, element, center_for(q, r))
     out = OUT_DIR / name
     canvas.convert("RGB").save(out, quality=94)
     print(out.relative_to(ROOT))
@@ -238,6 +278,29 @@ def main() -> None:
         home_archetype_tiles,
         [],
         [(q, r) for q, r, _ in home_archetype_tiles],
+    )
+    ring_coords = [(0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1)]
+    render_zodiac_neighborhood(
+        "qa-zodiac-fire-earth.png",
+        [
+            (*ring_coords[0], "aries", "fire"),
+            (*ring_coords[1], "leo", "fire"),
+            (*ring_coords[2], "sagittarius", "fire"),
+            (*ring_coords[3], "taurus", "earth"),
+            (*ring_coords[4], "virgo", "earth"),
+            (*ring_coords[5], "capricorn", "earth"),
+        ],
+    )
+    render_zodiac_neighborhood(
+        "qa-zodiac-air-water.png",
+        [
+            (*ring_coords[0], "gemini", "air"),
+            (*ring_coords[1], "libra", "air"),
+            (*ring_coords[2], "aquarius", "air"),
+            (*ring_coords[3], "cancer", "water"),
+            (*ring_coords[4], "scorpio", "water"),
+            (*ring_coords[5], "pisces", "water"),
+        ],
     )
 
 

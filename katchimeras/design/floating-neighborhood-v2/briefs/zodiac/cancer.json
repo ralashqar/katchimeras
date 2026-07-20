@@ -1,0 +1,14 @@
+{
+  "key": "cancer",
+  "kind": "zodiac",
+  "concept": "A protective moon-tide haven with soft shell architecture and calm pearl light.",
+  "floor": "One continuous smooth moon-blue sea-glass stone floor across the full top face, with broad pearly shading and no water, grass, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One large open shell-inspired alcove at the rear made from three broad rounded pearl slabs around a luminous moon-blue interior, abstract rather than animal-like.",
+  "rear_props": ["two oversized pearl lanterns", "one broad crescent-shaped cream bench"],
+  "side_props": ["three large rounded lavender shell-stone forms on the upper-left edge", "two broad moon-blue crystal forms on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded pearl-stone wall with broad moon-blue cap blocks", "palette": ["pearl cream", "moon blue", "soft lavender"], "emblems": "four oversized crescent-wave insets"},
+  "cliff": {"materials": ["large rounded blue-grey stone blocks", "large lavender stones", "a few broad pearl blocks"], "palette": ["blue grey", "soft lavender", "pearl cream"]},
+  "lighting": "soft moonlit ambient light with broad pearl lantern glow",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open sea-glass stone floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, crab, animal, egg, or familiar baked into the bitmap", "pool, open water, zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, bubbles, tiny shells, pebbles, cracks, specks, or dense clutter"]
+}

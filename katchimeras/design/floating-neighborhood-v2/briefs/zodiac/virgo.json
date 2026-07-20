@@ -1,0 +1,14 @@
+{
+  "key": "virgo",
+  "kind": "zodiac",
+  "concept": "A calm celestial harvest atelier shaped by care, craft, and ordered natural forms.",
+  "floor": "One continuous smooth wheat-cream cork floor across the full top face, with broad sage shading and no fibers, grain specks, grass, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One elegant leaf-and-grain-inspired workshop arch at the rear made from a few oversized sage and ivory forms around a blank pale-teal astrolabe disc.",
+  "rear_props": ["two broad orderly herb planters with one large leaf mass each", "one chunky wheat-sheaf sculpture"],
+  "side_props": ["one large sage cabinet and cream workbench on the upper-left edge", "two oversized wheat-gold leaf sculptures on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded sage wall with broad ivory cap blocks", "palette": ["sage", "ivory", "wheat gold", "pale teal"], "emblems": "four oversized simple leaf insets"},
+  "cliff": {"materials": ["large rounded warm limestone blocks", "large muted sage stones", "a few broad wheat-gold blocks"], "palette": ["warm limestone", "sage", "wheat gold"]},
+  "lighting": "soft clear morning light with restrained warm atelier glow",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open cork floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, person, maiden, animal, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, readable chart, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, tiny herbs, grain specks, cracks, or dense clutter"]
+}

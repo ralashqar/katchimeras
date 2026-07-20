@@ -72,8 +72,9 @@ runbook.
 
 ## Resident surface-theme contract
 
-Every resident may author three coordinated visual layers in its complete tile
-bitmap: habitat props, the perimeter hedge/topiary, and the deep cliff material.
+Every resident may author four coordinated visual layers in its complete tile
+bitmap: habitat props, the top-face floor, the perimeter hedge/topiary, and the
+deep cliff material.
 Camera, square canvas, flat-top face bounds, full island silhouette, cliff
 depth, front direction, padding, and runtime creature stage remain invariant.
 This allows real material and planting changes rather than a runtime tint while
@@ -82,9 +83,13 @@ keeping every themed island aligned to the same neighbourhood grid.
 ## Resident stage-layout contract
 
 - The bottom/front half of every resident island is an open, visually quiet
-  live-character stage made from uninterrupted grass.
-- Resident and neutral islands must not contain a center circle, plaza, paving,
-  pedestal, ring, indentation, or other character platform.
+  live-character stage. Its material follows the habitat theme: grass, smooth
+  sand, carpet, broad timber, large stone slabs, moss, and similar floors are
+  all valid.
+- “Open” means free of structures and props; it never means grass is mandatory.
+- Resident and neutral islands must not contain a center circle, raised or
+  sunken plaza, pedestal, distinct rug, ring, indentation, or other character
+  platform. A uniform themed floor across the face is allowed.
 - The front stairs, bottom half, and route into the live-character stage remain
   unobstructed.
 - Buildings and signature props may form a richer U-shaped composition across
@@ -147,11 +152,11 @@ theme without texture noise.
 
 Feastle uses one compact terracotta-roof oven, a broad rear serving counter,
 soup pot, bread basket, fruit bowl, picnic bench, drink trolley, herb pots, and
-two broad lanterns in a rear-and-upper-side frame. Its sage border, oversized
-leaf emblems, and large biscuit/terracotta cliff blocks carry the theme. The
-entire bottom/front half and stairs remain uninterrupted grass for the live
-creature sprite. The generation received no legacy Feastle or resident-tile
-art.
+two broad lanterns in a rear-and-upper-side frame. Six broad terracotta kitchen
+tiles replace the generic grass face. Its sage border, oversized leaf emblems,
+and large biscuit/terracotta cliff blocks carry the theme. The entire
+bottom/front half and stairs remain open for the live creature sprite. The
+generation received no legacy Feastle or resident-tile art.
 
 Cheerlet uses one broad wavy teal pavilion, one small cake, two chunky gift
 blocks, two three-balloon bunches, two lanterns, and oversized coral flowers.
@@ -162,47 +167,54 @@ lights, confetti, mineral specks, or leaf-by-leaf textures.
 
 Skylo uses one compact rounded art-deco city pavilion, a tall central tower,
 two large street lanterns, one bench, one street tree, and a blank transit
-shelter in the rear-and-upper-side frame. Its smooth slate-blue parapet with
-four gold light accents and alternating blue-gray/sandstone cliff blocks carry
-the city identity without roads, traffic, signs, or tiny window grids.
+shelter in the rear-and-upper-side frame. Six broad blue-gray terrace slabs
+replace the generic grass face. Its smooth slate-blue parapet with four gold
+light accents and alternating blue-gray/sandstone cliff blocks carry the city
+identity without roads, traffic, signs, or tiny window grids.
 
 Pagelet uses one broad cream library pavilion with a curved burgundy roof,
 integrated shelves, a rear lectern with one open book, a chunky reading chair,
-book cart, and two broad reading lamps. Its smooth segmented burgundy border,
-oversized gold book emblems, and alternating cream, burgundy, and walnut cliff
-blocks carry the reading identity without leaf texture, loose pages, or book
-clutter.
+book cart, and two broad reading lamps. Six broad walnut floor planks create a
+quiet indoor reading stage. Its smooth segmented burgundy border, oversized
+gold book emblems, and alternating cream, burgundy, and walnut cliff blocks
+carry the reading identity without leaf texture, loose pages, or book clutter.
 
 Steppling uses a compact hiking lodge, blank trail-map board, rest bench, water
-station, gear rack, waypoint posts, pine forms, stepping stones, and lanterns
-in a fuller rear-and-side U-shaped composition. Its smooth sky-blue border with
-four oversized orange footprint emblems and alternating slate-blue/sandstone
-cliff blocks carry the walking identity while leaving the bottom-half floor and
-front approach empty.
+station, gear rack, waypoint posts, pine forms, and lanterns in a fuller
+rear-and-side U-shaped composition. Broad smooth compacted ochre trail earth
+replaces the generic grass face without creating a separate path. Its smooth
+sky-blue border with four oversized orange footprint emblems and alternating
+slate-blue/sandstone cliff blocks carry the walking identity while leaving the
+bottom-half floor and front approach empty.
 
 Mossprout uses one broad leafy alcove, three moss boulders, a small rear pond,
 a chunky stump bench, a watering-stone ornament, oversized fern forms, and two
-lanterns. Its smooth deep-green border with four pale leaf emblems and large
-olive/umber/cream cliff blocks carry the garden identity without leaf-by-leaf
-texture or foreground clutter.
+lanterns. Four broad softly overlapping deep-moss cushion lobes replace the
+generic grass face without pits or dark footprint-like marks. Its smooth
+deep-green border with four pale leaf emblems and large olive/umber/cream cliff
+blocks carry the garden identity without leaf-by-leaf texture or foreground
+clutter.
 
 Flickerbun uses a broad blank cinema screen, simple curtains, one chunky
-projector, paired velvet seats, popcorn forms, lanterns, and rounded moonflower
-shrubs in a rear-and-side U-shaped composition. Its navy/burgundy border, gold
-reel emblems, and plum/navy/sandstone cliff blocks carry the cinema identity
-without tiny bulbs, film perforations, or a baked screen image.
+projector, paired velvet seats, popcorn forms, and lanterns in a rear-and-side
+U-shaped composition. A single broad midnight-navy cinema carpet covers the
+quiet open stage. Its navy/burgundy border, gold reel emblems, and
+plum/navy/sandstone cliff blocks carry the cinema identity without flowers,
+tiny bulbs, film perforations, or a baked screen image.
 
 Relicoon uses one compact museum pavilion, blank map cabinet, two simplified
 display cases, large vase and fossil-shell plinths, an expedition chest, rolled
-maps, lanterns, and topiary in a rear-and-side U-shaped composition. Its teal
+maps, and lanterns in a rear-and-side U-shaped composition. Six broad polished
+limestone floor slabs form its quiet open gallery stage. Its teal-and-cream
 border and terracotta/teal-gray/cream cliff blocks carry the archive identity
-without labels or archaeological clutter.
+without grass, labels, or archaeological clutter.
 
 Bedrotte uses one pillow-canopy sleep nook, a blanket chest, broad lanterns,
 one chunky armchair, pillow forms, and a moon lamp in a calm rear-and-side
-frame. Its continuous indigo/lavender upholstered border and large dusk-slate,
-cream, and plum cliff blocks carry the restorative evening identity without
-stitching or fabric noise.
+frame. A single broad plush carpet covers its quiet open stage. Its continuous
+indigo/lavender upholstered border and large dusk-slate, cream, and plum cliff
+blocks carry the restorative evening identity without stitching or fabric
+noise.
 
 Gatherglow uses one open-front shared-hearth pavilion, a rear supper table,
 chunky stools, a conversation bench, tea trolley, ember planters, and broad
@@ -212,7 +224,7 @@ entire bottom/front stage remains clear.
 
 Shellio uses one broad shell cabana, a chunky driftwood bench, folded beach
 umbrella, pearl lanterns, shell planters, a shallow rock pool, and broad
-sea-grass forms in a breezy rear-and-side frame. Its continuous sea-glass
+sea-grass forms around a broad uninterrupted sand floor. Its continuous sea-glass
 parapet, oversized scallop emblems, and large sandstone/coral/teal cliff blocks
 carry the shoreline identity without sand grains, foam flecks, or tiny shells.
 
@@ -221,6 +233,17 @@ chunky chair, oversized book stacks, crescent lanterns, brass telescope, and
 rounded moonflower shrubs. Its continuous indigo wall, oversized crescent
 emblems, and large midnight-slate/violet/moonstone cliff blocks carry the
 small-hours identity without star specks, readable charts, or fairy lights.
+
+## Zodiac sanctuary set
+
+The twelve v2 zodiac tiles use the neutral island as their sole image input and
+follow the same open-lower-stage contract as resident environments. Fire signs
+use ember, solar, and comet architecture; earth signs use jade earth, harvest
+cork, and mountain slate; air signs use paired sky forms, balanced rose marble,
+and turquoise current technology; water signs use moon-blue shellstone, deep
+plum crystal, and ocean-lilac dream forms. Every sign rethemes its full floor,
+continuous border, and cliff blocks without baking in a familiar, animal,
+zodiac glyph, constellation, or center platform.
 
 ## Packaging and QA
 
@@ -256,3 +279,7 @@ habitats with their live creature sprites, JSON-driven 16.8% neighbourhood
 spacing, and production anchor offsets.
 `qa-six-home-archetypes.png` verifies all six persisted home identities with
 the live egg at the shared production anchor and scale.
+`qa-zodiac-fire-earth.png` and `qa-zodiac-air-water.png` verify all twelve
+sign-specific islands with the same elemental familiar sources, production
+anchor offsets, v2 face alignment, and JSON-driven neighbourhood spacing used
+by the Kingdom renderer.

@@ -1,0 +1,14 @@
+{
+  "key": "scorpio",
+  "kind": "zodiac",
+  "concept": "A deep moon-crystal grotto expressing mystery and transformation through strong curled architecture.",
+  "floor": "One continuous smooth deep-plum slate floor across the full top face, with broad wine-violet shading and no grass, cracks, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One abstract curled moonstone spire at the rear, sweeping upward like a protective spiral beside a broad dark-violet grotto opening without depicting an animal or tail.",
+  "rear_props": ["two oversized deep-amethyst crystal clusters", "two broad red-violet star lamps with simple solid faces"],
+  "side_props": ["three large dark rounded stones on the upper-left edge", "one broad wine-coloured bench and one silver moonstone on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded dark-amethyst stone wall with broad silver-grey caps", "palette": ["deep amethyst", "wine", "silver grey"], "emblems": "four oversized abstract spiral insets"},
+  "cliff": {"materials": ["large rounded charcoal-violet blocks", "large dark plum stones", "a few broad silver-grey blocks"], "palette": ["charcoal violet", "deep plum", "silver grey"]},
+  "lighting": "soft moonlit violet ambient light with two restrained red-violet lamp pools",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open plum-slate floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, scorpion, animal, stinger, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, tiny crystals, star specks, cracks, or dense clutter"]
+}

@@ -1,0 +1,14 @@
+{
+  "key": "sagittarius",
+  "kind": "zodiac",
+  "concept": "An adventurous comet lookout shaped by direction, distance, and an optimistic horizon.",
+  "floor": "One continuous smooth cobalt-blue sandstone floor across the full top face, with broad coral dusk shading and no maps, arrows, grass, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One broad bow-curve observatory arch at the rear with a single large upward comet-fin ornament and a clear indigo horizon opening, abstract rather than a weapon.",
+  "rear_props": ["one chunky brass telescope", "two oversized coral travel stones"],
+  "side_props": ["one broad indigo supply chest and large compass-like blank disc on the upper-left edge", "three large cobalt trail-stone forms on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded cobalt wall with broad coral and cream cap blocks", "palette": ["cobalt", "coral", "indigo", "warm gold"], "emblems": "four oversized comet-fin insets without arrows"},
+  "cliff": {"materials": ["large rounded indigo stone blocks", "large muted coral stones", "a few broad cream blocks"], "palette": ["indigo", "muted coral", "warm cream"]},
+  "lighting": "soft clear dusk light with one broad warm horizon glow",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open cobalt-sandstone floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, centaur, horse, person, bow, arrow, weapon, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, readable map, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, star specks, tiny gear, cracks, or dense clutter"]
+}

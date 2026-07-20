@@ -1,0 +1,36 @@
+{
+  "key": "relicoon",
+  "kind": "resident",
+  "concept": "A warm pocket museum and expedition archive celebrating meaningful finds, old maps, and curious discoveries.",
+  "floor": "One broad continuous polished museum-stone floor across the full top face, formed from six to eight oversized warm limestone slabs with very shallow bevels and gentle large-scale tonal variation; no grass, carpet, tiny tiles, mosaic, cracks, dirt, or repeated texture.",
+  "main_structure": "One compact open-front museum pavilion at the rear with a broad terracotta arched roof, warm cream walls, one glowing doorway, and one large blank map cabinet integrated beside it.",
+  "rear_props": [
+    "two simplified glass display cases with one large abstract artifact shape in each",
+    "two broad archive lanterns"
+  ],
+  "side_props": [
+    "one oversized ceramic vase on a chunky plinth and one closed expedition chest along the upper-left edge",
+    "one oversized fossil-shell sculpture on a chunky plinth and two broad rolled maps along the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth museum parapet made from broad rounded teal stone masses with warm cream caps",
+    "palette": ["museum teal", "warm limestone cream", "muted terracotta"],
+    "emblems": "four oversized simple compass-and-archive emblems"
+  },
+  "cliff": {
+    "materials": ["large muted terracotta stone blocks", "large teal-gray archive stone blocks", "large warm limestone blocks"],
+    "palette": ["muted terracotta", "teal gray", "warm cream"]
+  },
+  "lighting": "soft warm gallery daylight with one broad doorway glow and two restrained amber lantern glows",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open polished museum stone",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, rug, path, or indentation",
+    "bridges, clouds, text, labels, watermark, external shadow",
+    "grass, flowers, topiary, tiny tiles, mosaic, artifact clutter, pottery fragments, tiny map markings, pebbles, cracks, specks, or dense detail"
+  ]
+}

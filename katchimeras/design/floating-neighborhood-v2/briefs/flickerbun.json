@@ -1,0 +1,36 @@
+{
+  "key": "flickerbun",
+  "kind": "resident",
+  "concept": "A cozy pocket cinema where a blank screen, velvet seats, and warm projector light turn quiet evenings into little adventures.",
+  "floor": "One broad continuous midnight-navy cinema carpet across the full top face, with a smooth softly beveled surface and subtle large-scale tonal variation but no fibers, stars, dots, stripes, medallion, seams, or repeated pattern.",
+  "main_structure": "One broad blank deep-blue cinema screen at the rear framed by two simple burgundy curtains and a chunky rounded navy canopy.",
+  "rear_props": [
+    "one large simplified projector with one oversized reel form",
+    "two broad amber cinema lanterns"
+  ],
+  "side_props": [
+    "one paired burgundy velvet seat and one chunky popcorn tub along the upper-left edge",
+    "one paired burgundy velvet seat and one compact popcorn stand along the upper-right edge"
+  ],
+  "perimeter": {
+    "material": "one continuous smooth upholstered cinema border made from broad navy and burgundy masses",
+    "palette": ["midnight navy", "deep burgundy", "warm gold"],
+    "emblems": "four oversized simple gold film-reel emblems"
+  },
+  "cliff": {
+    "materials": ["large plum stone blocks", "large navy stone blocks", "large warm sandstone blocks"],
+    "palette": ["muted plum", "midnight navy", "warm sandstone"]
+  },
+  "lighting": "soft dim cinema ambience with one broad cool screen fill and two restrained amber lantern glows",
+  "must_keep": [
+    "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
+    "entire bottom/front half as quiet open midnight-navy carpet",
+    "all additions inside the original silhouette"
+  ],
+  "must_exclude": [
+    "creature or egg baked into the bitmap",
+    "center circle, platform, plaza, ring, distinct rug, path, or indentation",
+    "bridges, clouds, image baked onto the screen, text, watermark, external shadow",
+    "grass, flowers, shrubs, carpet fibers, star patterns, tiny bulbs, film perforations, scattered popcorn, specks, or dense cinema clutter"
+  ]
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { existsSync, readFileSync } = require('node:fs');
+const { existsSync, readFileSync, readdirSync } = require('node:fs');
 const { join } = require('node:path');
 
 const root = join(__dirname, '..');
@@ -19,7 +19,51 @@ for (const relative of required) {
   }
 }
 
-JSON.parse(readFileSync(join(root, 'design/floating-neighborhood-v2/new-environment-brief.json'), 'utf8'));
+const briefTemplate = JSON.parse(readFileSync(join(root, 'design/floating-neighborhood-v2/new-environment-brief.json'), 'utf8'));
+if (!briefTemplate.floor) {
+  throw new Error('Floating-v2 brief template must require a theme-specific floor.');
+}
+const briefsDirectory = join(root, 'design/floating-neighborhood-v2/briefs');
+for (const filename of readdirSync(briefsDirectory).filter((name) => name.endsWith('.json'))) {
+  const brief = JSON.parse(readFileSync(join(briefsDirectory, filename), 'utf8'));
+  if (!brief.floor) {
+    throw new Error(`Floating-v2 brief ${filename} is missing its theme-specific floor.`);
+  }
+}
+const zodiacBriefsDirectory = join(briefsDirectory, 'zodiac');
+const zodiacSigns = [
+  'aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo',
+  'libra', 'scorpio', 'sagittarius', 'capricorn', 'aquarius', 'pisces',
+];
+for (const sign of zodiacSigns) {
+  const filename = `${sign}.json`;
+  const brief = JSON.parse(readFileSync(join(zodiacBriefsDirectory, filename), 'utf8'));
+  if (brief.key !== sign || brief.kind !== 'zodiac' || !brief.floor) {
+    throw new Error(`Floating-v2 zodiac brief ${filename} lost its key, kind, or floor contract.`);
+  }
+  for (const relative of [
+    `design/floating-neighborhood-v2/floating-zodiac-${sign}-source.png`,
+    `design/floating-neighborhood-v2/floating-zodiac-${sign}-alpha.png`,
+    `assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_${sign}_hex_tile.webp`,
+    `assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_${sign}_hex_tile_512.webp`,
+    `assets/images/katchimeras/world/hex/floating_neighborhood_v2_zodiac_${sign}_hex_tile_256.webp`,
+  ]) {
+    if (!existsSync(join(root, relative))) {
+      throw new Error(`Floating-v2 zodiac production set is missing ${relative}`);
+    }
+  }
+}
+const worldVisuals = readFileSync(join(root, 'utils/world-visuals.ts'), 'utf8');
+for (const sign of zodiacSigns) {
+  if (!worldVisuals.includes(`floatingNeighborhoodV2ZodiacTile('${sign}')`)) {
+    throw new Error(`Floating-v2 runtime mapping is missing zodiac sign ${sign}.`);
+  }
+}
+for (const filename of ['qa-zodiac-fire-earth.png', 'qa-zodiac-air-water.png']) {
+  if (!existsSync(join(root, 'design/floating-neighborhood-v2', filename))) {
+    throw new Error(`Floating-v2 zodiac QA is missing ${filename}.`);
+  }
+}
 const generator = readFileSync(join(root, 'scripts/generate-katchimera-hex-tile.py'), 'utf8');
 const generatorContracts = [
   'floating-neutral-source.png',
@@ -30,7 +74,9 @@ const generatorContracts = [
   'baseSha256',
   'V2 generation never accepts a creature reference',
   'pure-black #000000',
-  'Do not add a circle',
+  'Do not add a center circle',
+  'reference grass is allowed and expected',
+  'zodiac sanctuary',
 ];
 for (const contract of generatorContracts) {
   if (!generator.includes(contract)) {

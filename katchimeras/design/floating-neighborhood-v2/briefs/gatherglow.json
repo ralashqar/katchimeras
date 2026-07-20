@@ -2,6 +2,7 @@
   "key": "gatherglow",
   "kind": "resident",
   "concept": "A welcoming shared-hearth gathering garden whose lantern warmth grows brighter in good company.",
+  "floor": "One broad continuous warm terracotta hearth floor across the full top face, made from a few oversized softly beveled slabs without sparks, cracks, small grout, or a central gathering ring.",
   "main_structure": "One broad open-front timber hearth pavilion at the rear with a simple glowing firebox and a gently arched amber roof.",
   "rear_props": [
     "one large shared supper table with four chunky stools placed close to the rear pavilion",
@@ -23,7 +24,7 @@
   "lighting": "soft warm dusk lighting from one broad hearth glow and two or three large amber lanterns",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open hearth floor",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [

@@ -2,6 +2,7 @@
   "key": "feastle",
   "kind": "resident",
   "concept": "A hearty open-air feast kitchen where one warm oven and a few generous ingredients turn an ordinary meal into a small celebration.",
+  "floor": "One broad continuous warm terracotta kitchen floor across the full top face, formed from only six to eight oversized softly beveled tiles with no crumbs, cracks, or small grout pattern.",
   "main_structure": "One compact cream-stone feast oven at the rear-left with a broad terracotta roof, a large arched fire opening, and one chunky chimney.",
   "rear_props": [
     "one broad serving counter holding one large soup pot, one two-loaf basket, and one three-piece produce bowl",
@@ -23,12 +24,12 @@
   "lighting": "soft warm daylight with one broad oven glow and two large amber lantern pools",
   "must_keep": [
     "exact canonical camera, canvas, footprint, stairs, tapered underside, and padding",
-    "entire bottom/front half as quiet open grass",
+    "entire bottom/front half as quiet open terracotta floor",
     "all additions inside the original silhouette"
   ],
   "must_exclude": [
     "creature or egg baked into the bitmap",
-    "center circle, platform, plaza, ring, rug, paving, dining floor, path, or indentation",
+    "center circle, raised or sunken platform, plaza, ring, distinct rug, path, or indentation",
     "bridges, clouds, readable labels, text, watermark, external shadow",
     "tiny food pieces, tableware clutter, crumbs, steam particles, tiny herbs, flowers, grass blades, pebbles, cracks, specks, or dense texture"
   ]

@@ -1,0 +1,14 @@
+{
+  "key": "aries",
+  "kind": "zodiac",
+  "concept": "A brave first-spark sanctuary built from bold fire forms and warm sunrise stone.",
+  "floor": "One continuous smooth ember-coral clay floor across the full top face, with broad warm shading and no grass, tiles, symbols, rings, or repeated pattern.",
+  "main_structure": "One chunky curved ram-horn-inspired arch at the rear, built from two abstract symmetrical cream stone curls around a broad glowing sunrise slab without depicting an animal.",
+  "rear_props": ["two oversized low ember-crystal braziers", "one broad warm-gold solar stone"],
+  "side_props": ["three large rounded crimson rocks on the upper-left edge", "two broad coral flame-leaf sculptures on the upper-right edge"],
+  "perimeter": {"material": "one continuous rounded warm-cream stone wall with broad coral cap blocks", "palette": ["warm cream", "ember coral", "muted crimson"], "emblems": "four oversized abstract sun-ray notches"},
+  "cliff": {"materials": ["large rounded red sandstone blocks", "large warm ochre blocks", "a few broad cream stones"], "palette": ["terracotta", "ochre", "warm cream"]},
+  "lighting": "soft sunrise ambient light with two broad amber brazier glows",
+  "must_keep": ["exact canonical camera, canvas, footprint, stairs, tapered underside, and padding", "entire bottom/front half as quiet open ember-clay floor", "all additions inside the original silhouette"],
+  "must_exclude": ["creature, animal, ram head, egg, or familiar baked into the bitmap", "zodiac glyph, constellation, text, center circle, platform, plaza, ring, rug, path, or indentation", "bridges, clouds, watermark, external shadow, sparks, tiny stones, cracks, specks, or dense clutter"]
+}
