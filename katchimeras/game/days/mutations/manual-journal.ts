@@ -34,7 +34,7 @@ function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _
     id, flowId: flow.id, flowVersion: flow.version, path: submission.path, categoryId: submission.categoryId,
     canonicalQualityIds: submission.canonicalQualityIds, fields: submission.fields, feeling: submission.feeling ?? null,
     note: submission.note?.trim() || null, sourceType: submission.sourceType ?? 'manual', sourceId: submission.sourceId ?? null,
-    linkedNoteId, createdAt,
+    linkedNoteId, location: record.location ?? null, createdAt,
   };
   const specific = stringField(entry.fields.specific);
   const context = stringField(entry.fields.context);
@@ -89,6 +89,26 @@ function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _
       ? day.evidence
       : upsertEvidence(day.evidence, [noteSource ? evidence : { ...evidence, id: `evidence:manual:${id}`, sourceType: 'manual_log', sourceId: id }]),
     notes: linkedNote ? [...(day.notes ?? []), linkedNote] : day.notes,
+    locations: record.location
+      ? [
+          ...(day.locations ?? []).filter((point) => point.journalRecordId !== record.id),
+          {
+            id: `journal-location-${record.id}`,
+            lat: Number(record.location.latitude.toFixed(6)),
+            lng: Number(record.location.longitude.toFixed(6)),
+            capturedAt: createdAt,
+            type: locationTypeForJournalChoice(choice.id),
+            hasPhoto: record.source.kind === 'photo',
+            source: 'manual' as const,
+            momentId: null,
+            thumbnailUri: record.source.kind === 'photo' ? record.source.thumbnailUri ?? undefined : undefined,
+            accuracyMeters: record.location.accuracyMeters ?? undefined,
+            label: record.location.name,
+            address: record.location.address ?? undefined,
+            journalRecordId: record.id,
+          },
+        ].slice(-180)
+      : day.locations,
   };
   return applyJournalCompatibilityProjection(next, { record, entry, flow, choice, specific, context, linkedNoteId });
 }
@@ -110,9 +130,16 @@ function recordToLegacySubmission(record: JournalRecord): ManualJournalSubmissio
     confirmedFacets: record.confirmedFacets,
     journalSource: record.source,
     linkedNote: linked ? { kind: linked.kind, text: linked.text ?? '', audioUri: linked.uri ?? null, durationMs: linked.durationMs ?? null } : null,
+    location: record.location ?? null,
   };
 }
 
 function stringField(value: string | string[] | boolean | null | undefined): string { return typeof value === 'string' ? value.trim() : ''; }
 function archetypeForFeeling(value?: string | null): string { if (value === 'exciting') return 'energy'; if (value === 'loved' || value === 'liked') return 'together'; if (value === 'difficult') return 'meaningful'; return 'calm'; }
 function domainForAdapter(adapter: string): MemoryDomain { return ({ food: 'food', studio: 'media', place: 'place', movement: 'movement', relationship: 'people', work: 'work', big_event: 'life_event' } as Record<string, MemoryDomain>)[adapter] ?? 'other'; }
+function locationTypeForJournalChoice(choiceId: string): 'home' | 'cafe' | 'park' | 'unknown' {
+  if (choiceId === 'home') return 'home';
+  if (choiceId === 'cafe' || choiceId === 'restaurant') return 'cafe';
+  if (choiceId === 'park' || choiceId === 'garden' || choiceId === 'forest') return 'park';
+  return 'unknown';
+}

@@ -582,6 +582,11 @@ export type StoredHomeLocationPoint = {
   momentId?: string | null;
   thumbnailUri?: string;
   accuracyMeters?: number;
+  // User-confirmed journal places keep their chosen Apple Maps/manual label.
+  // Passive location samples omit these fields and continue to be reverse-geocoded.
+  label?: string;
+  address?: string;
+  journalRecordId?: string;
   // Perceptual hash of the attached photo (when one is present), used to
   // collapse visual near-duplicates during day-map album curation.
   similarityHash?: string;
@@ -1024,6 +1029,7 @@ export type ManualJournalEntry = {
   sourceType?: 'manual' | 'photo';
   sourceId?: string | null;
   linkedNoteId?: string | null;
+  location?: JournalLocationSelection | null;
   createdAt: string;
 };
 
@@ -1051,6 +1057,16 @@ export type JournalAttachment = {
 };
 
 export type JournalConfirmedFacet = { key: string; value: string; sensitive?: boolean };
+
+export type JournalLocationSelection = {
+  latitude: number;
+  longitude: number;
+  name: string;
+  address?: string | null;
+  placeId?: string | null;
+  source: 'apple_maps' | 'current_location' | 'manual_pin';
+  accuracyMeters?: number | null;
+};
 
 export type JournalRouteProposal = {
   id: string;
@@ -1087,6 +1103,7 @@ export type JournalDraft = {
   note: string | null;
   attachments: JournalAttachment[];
   confirmedFacets: JournalConfirmedFacet[];
+  location?: JournalLocationSelection | null;
 };
 
 export type JournalRecord = {
@@ -1103,6 +1120,7 @@ export type JournalRecord = {
   note: string | null;
   attachments: JournalAttachment[];
   confirmedFacets: JournalConfirmedFacet[];
+  location?: JournalLocationSelection | null;
   createdAt: string;
 };
 
@@ -1133,6 +1151,7 @@ export type ManualJournalSubmission = {
   sessionId?: string;
   confirmedFacets?: JournalConfirmedFacet[];
   journalSource?: JournalSource;
+  location?: JournalLocationSelection | null;
 };
 
 export type StoredHomeDayRecord = {

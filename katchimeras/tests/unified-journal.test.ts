@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { commitJournalRecord } from '@/game/days/mutations/manual-journal';
 import type { JournalCommitCommand, StoredHomeDayRecord } from '@/types/home';
-import { commandToJournalRecord } from '@/utils/journal-domain';
+import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
 import { JOURNAL_CLASSIFICATION_CATALOG } from '@/utils/journal-classification-catalog';
 import { MANUAL_JOURNAL_FLOWS } from '@/utils/manual-journal-registry';
 import { createJournalSession, journalDraftIsDirty, journalSessionReducer } from '@/utils/journal-session';
@@ -236,6 +236,48 @@ test('canonical commit is idempotent and creates compatibility projections', () 
   assert.equal(first.foodMoments?.[0]?.label, 'Ramen');
   assert.equal(repeated, first);
   assert.deepEqual(validateJournalProjections(first), []);
+});
+
+test('confirmed place locations persist once while non-place routes discard coordinates', () => {
+  const location = {
+    latitude: 51.4967,
+    longitude: -0.1764,
+    name: 'Natural History Museum',
+    address: 'Cromwell Road, London',
+    placeId: 'apple:natural-history-museum',
+    source: 'apple_maps' as const,
+    accuracyMeters: null,
+  };
+  const placeCommand = submissionToJournalCommand({
+    sessionId: 'place-note',
+    flowId: 'went_somewhere',
+    path: ['went_somewhere', 'museum'],
+    categoryId: 'museum',
+    canonicalQualityIds: [],
+    fields: { specific: 'Natural History Museum', context: null },
+    journalSource: { kind: 'text_note', sourceId: 'place-note' },
+    linkedNote: { kind: 'text', text: 'I went to the Natural History Museum' },
+    location,
+  }, now);
+  assert.ok(placeCommand);
+  const first = commitJournalRecord(baseDay(), placeCommand!, now);
+  const repeated = commitJournalRecord(first, placeCommand!, new Date(now.getTime() + 1_000));
+  assert.deepEqual(first.journalRecords?.[0]?.location, location);
+  assert.equal(first.locations.length, 1);
+  assert.equal(first.locations[0]?.label, 'Natural History Museum');
+  assert.equal(first.locations[0]?.journalRecordId, first.journalRecords?.[0]?.id);
+  assert.equal(repeated.locations.length, 1);
+
+  const foodCommand = submissionToJournalCommand({
+    sessionId: 'food-note',
+    flowId: 'food',
+    path: ['food', 'snack'],
+    categoryId: 'snack',
+    canonicalQualityIds: [],
+    fields: { specific: 'Apple', context: null },
+    location,
+  }, now);
+  assert.equal(foodCommand?.draft.location, null);
 });
 
 test('a categorized voice submission atomically preserves journal, note, and audio', () => {

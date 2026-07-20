@@ -3,6 +3,7 @@ import type {
   JournalCommitCommand,
   JournalDraft,
   JournalInputKind,
+  JournalLocationSelection,
   JournalRecord,
   JournalRouteProposal,
   JournalSource,
@@ -63,6 +64,7 @@ export function submissionToJournalCommand(submission: ManualJournalSubmission, 
     note: submission.note?.trim() || null,
     attachments,
     confirmedFacets: submission.confirmedFacets ?? choice.confirmedFacets ?? [],
+    location: flow.adapter === 'place' ? sanitizeJournalLocation(submission.location) : null,
   };
   return { idempotencyKey: journalIdempotencyKey(source, sessionId), draft };
 }
@@ -87,6 +89,7 @@ export function commandToJournalRecord(command: JournalCommitCommand, now: Date)
     note: draft.note,
     attachments: draft.attachments,
     confirmedFacets: draft.confirmedFacets,
+    location: flow.adapter === 'place' ? sanitizeJournalLocation(draft.location) : null,
     createdAt: now.toISOString(),
   };
 }
@@ -98,4 +101,18 @@ function stableHash(value: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(36);
+}
+
+function sanitizeJournalLocation(value?: JournalLocationSelection | null): JournalLocationSelection | null {
+  if (!value) return null;
+  const latitude = Number(value.latitude);
+  const longitude = Number(value.longitude);
+  const name = value.name.trim().slice(0, 160);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || !name) return null;
+  const address = value.address?.trim().slice(0, 320) || null;
+  const placeId = value.placeId?.trim().slice(0, 500) || null;
+  const accuracyMeters = value.accuracyMeters != null && Number.isFinite(value.accuracyMeters) && value.accuracyMeters >= 0
+    ? Math.min(value.accuracyMeters, 100_000)
+    : null;
+  return { latitude, longitude, name, address, placeId, source: value.source, accuracyMeters };
 }

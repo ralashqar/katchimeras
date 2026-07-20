@@ -22,13 +22,14 @@ import Animated, {
 
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { JournalLocationField } from '@/components/katchadeck/home/journal-location-field';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { manualJournalArt } from '@/constants/manual-journal-art';
 import { Meadow } from '@/constants/meadow-theme';
 import { AppFontFamilies } from '@/constants/theme';
 import { useJournalVoiceDraft } from '@/hooks/use-journal-voice-draft';
-import type { JournalNoteDraft, JournalRouteProposal, JournalSource, ManualJournalSubmission } from '@/types/home';
+import type { JournalLocationSelection, JournalNoteDraft, JournalRouteProposal, JournalSource, ManualJournalSubmission } from '@/types/home';
 import { extractNoteSpecificOnDevice } from '@/utils/foundation-note';
 import { voiceJournalInputAdapter } from '@/utils/journal-input-adapters';
 import { shouldAutoRouteVoice } from '@/utils/manual-journal-voice-routing';
@@ -61,6 +62,7 @@ export type JournalComposerProps = {
   initialLinkedNote?: JournalNoteDraft | null;
   initialNoteExpanded?: boolean;
   initialConfirmedFacets?: ManualJournalSubmission['confirmedFacets'];
+  initialLocation?: JournalLocationSelection | null;
   liveSpecific?: string | null;
   liveSpecificLoading?: boolean;
   suggestedRoutes?: JournalRouteProposal[];
@@ -86,6 +88,7 @@ export function JournalComposer({
   initialLinkedNote,
   initialNoteExpanded = false,
   initialConfirmedFacets,
+  initialLocation,
   liveSpecific,
   liveSpecificLoading = false,
   suggestedRoutes = [],
@@ -118,6 +121,7 @@ export function JournalComposer({
   const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(initialLinkedNote ?? null);
   const [resolvedJournalSource, setResolvedJournalSource] = useState<JournalSource | undefined>(journalSource);
   const [confirmedFacets, setConfirmedFacets] = useState(initialConfirmedFacets);
+  const [location, setLocation] = useState<JournalLocationSelection | null>(initialLocation ?? null);
   const [voiceRoutes, setVoiceRoutes] = useState<JournalRouteProposal[]>([]);
   const [voiceRouting, setVoiceRouting] = useState(false);
   const [noteSpecificLoading, setNoteSpecificLoading] = useState(false);
@@ -188,8 +192,11 @@ export function JournalComposer({
     liveSpecificLoading
       && sourceType === 'photo'
       && flow?.id === 'studio'
-      && choice?.id === 'book'
+    && choice?.id === 'book'
   );
+  const specificLoadingLabel = sourceType === 'photo' && flow?.id === 'studio' && choice?.id === 'book'
+    ? 'Reading book title from photo'
+    : `Extracting ${choice?.specificFieldLabel ?? flow?.specificFieldLabel ?? 'detail'} from note`;
 
   useEffect(() => {
     if (!specificEditedRef.current && liveSpecific?.trim()) setSpecific(liveSpecific.trim());
@@ -219,7 +226,7 @@ export function JournalComposer({
   }, [choice, flow, note, noteSourceId, noteSourceKind]);
 
   const step = stage === 'flow' ? 0 : stage === 'category' ? 1 : 2;
-  const dirty = !!choice || !!specific.trim() || !!context || !!feeling || !!note.trim() || !!linkedNote;
+  const dirty = !!choice || !!specific.trim() || !!context || !!feeling || !!note.trim() || !!linkedNote || !!location;
   const title = stage === 'flow'
     ? 'What would you like to keep?'
     : stage === 'category'
@@ -252,6 +259,7 @@ export function JournalComposer({
     selectionHaptic();
     setFlow(item);
     setChoice(null);
+    if (item.id !== 'went_somewhere') setLocation(null);
     goTo('category', 1);
   };
   const selectChoice = (item: ManualJournalChoice) => {
@@ -264,6 +272,7 @@ export function JournalComposer({
       specificEditedRef.current = false;
       setFeeling(null);
       setContext(null);
+      if (flow?.id !== 'went_somewhere') setLocation(null);
     }
     setChoice(item);
     if (flow) onRouteResolved?.(flow.id, item.id);
@@ -337,6 +346,7 @@ export function JournalComposer({
           : null,
       journalSource: resolvedJournalSource,
       confirmedFacets,
+      location: flow.id === 'went_somewhere' ? location : null,
     });
   };
   const toggleAudio = () => {
@@ -501,7 +511,7 @@ export function JournalComposer({
                     {showSpecificLoading ? (
                       <View pointerEvents="none" style={styles.inputActivity}>
                         <ActivityIndicator
-                          accessibilityLabel={`${sourceType === 'photo' ? 'Reading' : 'Extracting'} ${choice.specificFieldLabel ?? flow.specificFieldLabel} from ${sourceType === 'photo' ? 'photo' : 'note'}`}
+                          accessibilityLabel={specificLoadingLabel}
                           color={Meadow.goldDeep}
                           size="small"
                         />
@@ -509,6 +519,10 @@ export function JournalComposer({
                     ) : null}
                   </View>
                 </EditorSection>
+
+                {flow.id === 'went_somewhere' ? (
+                  <JournalLocationField onChange={setLocation} query={specific} value={location} />
+                ) : null}
 
                 {(choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices)?.length ? (
                   <EditorSection label={choice.contextTitle ?? 'A little more'}>
