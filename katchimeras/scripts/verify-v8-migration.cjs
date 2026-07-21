@@ -19,14 +19,17 @@ fs.writeFileSync(qualityRegistryPath, ts.transpileModule(qualitySource, {
 const typesPath = path.join(temp, 'types.js');
 const locationsPath = path.join(temp, 'locations.js');
 const questionsPath = path.join(temp, 'questions.js');
+const dailyCardPath = path.join(temp, 'daily-card.js');
 fs.writeFileSync(typesPath, '');
 fs.writeFileSync(locationsPath, 'exports.createFallbackLocationsForStoredDay = () => [];');
 fs.writeFileSync(questionsPath, 'exports.QUESTION_PLANNER_VERSION = 2; exports.questionIdForGraphNode = (graphId, nodeId) => graphId && nodeId ? `${graphId}.${nodeId}` : null;');
+fs.writeFileSync(dailyCardPath, 'exports.buildDailyCreatureCard = (day, creature, options) => ({ id: `card:${day.id}`, dayId: day.id, creatureId: creature.id, rarity: creature.rarity, provenance: options.mode });');
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {
   if (request === '@/types/home') return typesPath;
   if (request === '@/utils/intelligence/quality-registry') return qualityRegistryPath;
   if (request === '@/utils/intelligence/question-registry') return questionsPath;
+  if (request === '@/utils/daily-card') return dailyCardPath;
   if (request === '@/data/intelligence/memory-qualities.json') return path.join(root, 'data/intelligence/memory-qualities.json');
   if (request === './locations' && parent?.filename === migrationPath) return locationsPath;
   return originalResolve.call(this, request, parent, ...rest);
@@ -81,9 +84,9 @@ function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
   else { failures += 1; console.log(`FAIL  ${label}`); }
 }
-check('v9 upgrades to v12', upgraded.version === 12);
-check('v10 upgrades losslessly to v12', upgradedFromV10.version === 12 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
-check('v11 journals migrate to canonical records', upgradedFromV11.version === 12 && upgradedFromV11.today.journalRecords.length === 2);
+check('v9 upgrades to v14', upgraded.version === 14);
+check('v10 upgrades losslessly to v14', upgradedFromV10.version === 14 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
+check('v11 journals migrate to canonical records', upgradedFromV11.version === 14 && upgradedFromV11.today.journalRecords.length === 2);
 check('cloud intelligence remains opt-in', upgraded.cloudIntelligenceEnabled === false);
 check('personal entities initialize locally', Array.isArray(upgraded.personalEntities) && upgraded.personalEntities.length === 0);
 check('days are preserved', upgraded.archivedDays.length === 1 && upgraded.today.id === 'day-2026-07-10');
@@ -95,8 +98,9 @@ check('current classified-memory schema is never downgraded', currentState.archi
 check('legacy prompt state gains adaptive budget', upgraded.archivedDays[0].classifiedMemories[0].promptState.maxQuestions === 3);
 check('legacy prompt state gains planner metadata', upgraded.archivedDays[0].classifiedMemories[0].promptState.plannerVersion === 2 && Array.isArray(upgraded.archivedDays[0].classifiedMemories[0].promptState.askedQuestionIds));
 check('creature survives', upgraded.archivedDays[0].creature.id === 'waglet');
+check('hatched days gain a card', upgraded.archivedDays[0].card?.creatureId === 'waglet');
 check('prompt answer survives', upgraded.archivedDays[0].promptAnswers[0].choiceIds[0] === 'calm');
 check('location survives', upgraded.archivedDays[0].locations[0].id === 'loc-1');
 
-console.log(failures ? `\n${failures} v12 migration check(s) FAILED.` : '\nAll v12 migration checks passed.');
+console.log(failures ? `\n${failures} v14 migration check(s) FAILED.` : '\nAll v14 migration checks passed.');
 process.exit(failures ? 1 : 0);

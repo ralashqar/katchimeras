@@ -2,38 +2,44 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
+import { DailyCardThumbnail } from '@/components/katchadeck/cards/daily-card';
 import { CalendarMonth } from '@/components/katchadeck/collection/calendar-month';
-import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
+import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
+import { hydrateHomeState } from '@/game/days';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
 import { homeRepository } from '@/storage/repositories/home-repository';
-import type { StoredHomeState } from '@/types/home';
+import type { DailyCreatureCard, HomeRarityTier, StoredHomeState } from '@/types/home';
 import { bondStageLabel } from '@/utils/bond';
 import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
-import { hydrateHomeState } from '@/game/days';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
 
-type CollectionView = 'calendar' | 'dex';
+type CollectionView = 'cards' | 'calendar' | 'species';
+type CardFilters = { year: string; species: string; rarity: string; trait: string };
 
 const collectionViewOptions = [
+  { value: 'cards', label: 'Cards' },
   { value: 'calendar', label: 'Calendar' },
-  { value: 'dex', label: 'Dex' },
+  { value: 'species', label: 'Species' },
 ] as const;
 
+const EMPTY_FILTERS: CardFilters = { year: 'all', species: 'all', rarity: 'all', trait: 'all' };
 const auroraRing = require('../../assets/images/katchimeras/aurora-ring.png');
 
-const RARITY_COLOR: Record<string, string> = {
+const RARITY_COLOR: Record<HomeRarityTier, string> = {
   common: Lantern.moon500,
   rare: '#7DE8CD',
   epic: '#A78BFA',
@@ -43,7 +49,9 @@ const RARITY_COLOR: Record<string, string> = {
 export default function CollectionScreen() {
   const router = useRouter();
   const [state, setState] = useState<StoredHomeState | null>(null);
-  const [view, setView] = useState<CollectionView>('calendar');
+  const [view, setView] = useState<CollectionView>('cards');
+  const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
   const { days } = useAllDays();
   const { entries: discoveryEntries, unlockedCount: discoveriesUnlocked, totalCount: discoveriesTotal } = useDiscoveries();
@@ -62,7 +70,21 @@ export default function CollectionScreen() {
     return buildDex(state.encounterHistory, hatchedDays);
   }, [state]);
 
-  const hatchedTotal = days.filter((day) => day.creature !== null).length;
+  const cards = useMemo(
+    () => days.flatMap((day) => day.card ? [{ card: day.card, dayId: day.id }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),
+    [days]
+  );
+  const filterOptions = useMemo(() => buildFilterOptions(cards.map((entry) => entry.card)), [cards]);
+  const filteredCards = useMemo(
+    () => cards.filter(({ card }) =>
+      (filters.year === 'all' || card.isoDate.startsWith(filters.year)) &&
+      (filters.species === 'all' || card.speciesId === filters.species) &&
+      (filters.rarity === 'all' || card.rarity === filters.rarity) &&
+      (filters.trait === 'all' || card.traits.some((trait) => trait.id === filters.trait))
+    ),
+    [cards, filters]
+  );
+  const activeFilterCount = Object.values(filters).filter((value) => value !== 'all').length;
   const completion = dex && dex.total > 0 ? Math.round((dex.collected / dex.total) * 100) : 0;
 
   return (
@@ -72,201 +94,169 @@ export default function CollectionScreen() {
         colors={KatchaDeckUI.gradients.world}
         meshColors={['rgba(167,139,250,0.12)', 'rgba(125,232,205,0.08)', 'rgba(255,195,107,0.08)', 'rgba(20,17,31,0.2)']}
       />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}>
-        <Animated.View entering={presenceEnter()}>
+      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
+        <Animated.View entering={presenceEnter(20)}>
           <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            {view === 'calendar' ? 'Your days' : 'The Dex'}
+            {view === 'species' ? 'The species you have met' : 'Your life deck'}
           </ThemedText>
           <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-            {view === 'calendar' ? 'Every day, a creature.' : 'Every kind of day.'}
+            {view === 'cards' ? 'Your life, in cards.' : view === 'calendar' ? 'Every day became something.' : 'Every kind of day.'}
           </ThemedText>
           <ThemedText style={styles.subtitle} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-            {view === 'calendar'
-              ? `${hatchedTotal} ${hatchedTotal === 1 ? 'day' : 'days'} hatched · tap one to open its journal`
-              : dex
-                ? `${dex.collected} of ${dex.total} met · ${completion}% complete`
-                : 'Loading…'}
+            {view === 'species' && dex ? `${dex.collected} of ${dex.total} met · ${completion}% complete` : `${cards.length} ${cards.length === 1 ? 'card' : 'cards'} collected`}
           </ThemedText>
         </Animated.View>
 
-        <Animated.View entering={presenceEnter(30)}>
-          <SegmentedControl
-            options={collectionViewOptions}
-            value={view}
-            onChange={setView}
-            variant="bar"
-          />
-        </Animated.View>
+        <SegmentedControl options={collectionViewOptions} value={view} onChange={setView} variant="bar" />
 
-        <Animated.View entering={presenceEnter(40)}>
-          <KatchaButton label="Open the life map" onPress={() => router.push('/life-map')} variant="secondary" />
-        </Animated.View>
-
-        <Animated.View entering={presenceEnter(50)}>
-          <KatchaButton
-            label={`Discoveries · ${discoveriesUnlocked}/${discoveriesTotal}`}
-            onPress={() => setDiscoveriesOpen(true)}
-            variant="secondary"
-          />
-        </Animated.View>
+        {view === 'cards' ? (
+          <>
+            <View style={styles.actionRow}>
+              <KatchaButton label={activeFilterCount ? `Filters · ${activeFilterCount}` : 'Filter cards'} onPress={() => setFiltersOpen(true)} variant="secondary" />
+            </View>
+            {filteredCards.length ? (
+              <View style={styles.cardGrid}>
+                {filteredCards.map(({ card }) => (
+                  <View key={card.id} style={styles.cardCell}>
+                    <DailyCardThumbnail
+                      card={card}
+                      onPress={() => router.push({ pathname: '/card/[cardId]', params: { cardId: card.id } })}
+                    />
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <IconSymbol color={Lantern.moon500} name="rectangle.stack" size={34} />
+                <ThemedText type="subtitle" lightColor={Lantern.moon50} darkColor={Lantern.moon50}>No cards match</ThemedText>
+                <ThemedText style={styles.emptyText} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Reset the filters to bring the whole deck back.</ThemedText>
+              </View>
+            )}
+          </>
+        ) : null}
 
         {view === 'calendar' ? (
-          <Animated.View entering={presenceEnter(80)}>
+          <>
+            <View style={styles.actionRow}>
+              <KatchaButton label="Open the life map" onPress={() => router.push('/life-map')} variant="secondary" />
+              <KatchaButton label={`Discoveries · ${discoveriesUnlocked}/${discoveriesTotal}`} onPress={() => setDiscoveriesOpen(true)} variant="secondary" />
+            </View>
             <CalendarMonth
               days={days}
               onSelectDay={(dayId) => {
-                // Show the regular Home page for the chosen day instead of a
-                // separate page: hand the day to the Today tab and switch to it.
                 requestSelectedDay(dayId);
                 router.replace('/today');
               }}
             />
-          </Animated.View>
+          </>
         ) : null}
 
-        {view === 'dex'
-          ? dex?.categories.map((category, sectionIndex) => {
+        {view === 'species' ? dex?.categories.map((category) => {
           const entries = dex.entries.filter((entry) => entry.category === category.category);
           return (
-            <Animated.View key={category.category} entering={presenceEnter(80 + sectionIndex * 40)} style={styles.section}>
+            <View key={category.category} style={styles.section}>
               <View style={styles.sectionHeader}>
-                <ThemedText type="onboardingLabel" style={styles.sectionTitle} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                  {dexCategoryLabel[category.category]}
-                </ThemedText>
-                <ThemedText style={styles.sectionCount} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-                  {category.collected}/{category.total}
-                </ThemedText>
+                <ThemedText type="onboardingLabel" style={styles.sectionTitle} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{dexCategoryLabel[category.category]}</ThemedText>
+                <ThemedText style={styles.sectionCount} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{category.collected}/{category.total}</ThemedText>
               </View>
-              <View style={styles.grid}>
-                {entries.map((entry) => (
-                  <DexCell key={entry.speciesId} entry={entry} />
-                ))}
-              </View>
-            </Animated.View>
+              <View style={styles.speciesGrid}>{entries.map((entry) => <DexCell key={entry.speciesId} entry={entry} />)}</View>
+            </View>
           );
-        })
-          : null}
+        }) : null}
       </ScrollView>
 
+      {filtersOpen ? (
+        <KatchaSheet
+          header={{ eyebrow: 'Your deck', title: 'Filter cards', subtitle: `${filteredCards.length} cards match` }}
+          onRequestClose={() => setFiltersOpen(false)}
+          scroll
+          size="tall"
+          surface="night">
+          <FilterSection label="Year" options={filterOptions.years} value={filters.year} onChange={(year) => setFilters((current) => ({ ...current, year }))} />
+          <FilterSection label="Species" options={filterOptions.species} value={filters.species} onChange={(species) => setFilters((current) => ({ ...current, species }))} />
+          <FilterSection label="Rarity" options={filterOptions.rarities} value={filters.rarity} onChange={(rarity) => setFilters((current) => ({ ...current, rarity }))} />
+          <FilterSection label="Trait" options={filterOptions.traits} value={filters.trait} onChange={(trait) => setFilters((current) => ({ ...current, trait }))} />
+          <KatchaButton label="Reset filters" onPress={() => setFilters(EMPTY_FILTERS)} variant="secondary" />
+        </KatchaSheet>
+      ) : null}
+
       {discoveriesOpen ? (
-        <DiscoveriesHallSheet
-          entries={discoveryEntries}
-          unlockedCount={discoveriesUnlocked}
-          totalCount={discoveriesTotal}
-          onClose={() => setDiscoveriesOpen(false)}
-        />
+        <DiscoveriesHallSheet entries={discoveryEntries} unlockedCount={discoveriesUnlocked} totalCount={discoveriesTotal} onClose={() => setDiscoveriesOpen(false)} />
       ) : null}
     </View>
   );
 }
 
+function FilterSection({ label, options, value, onChange }: { label: string; options: { id: string; label: string }[]; value: string; onChange: (value: string) => void }) {
+  return (
+    <View style={styles.filterSection}>
+      <ThemedText type="onboardingLabel" style={styles.filterLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{label}</ThemedText>
+      <View style={styles.filterOptions}>
+        {options.map((option) => {
+          const selected = value === option.id;
+          return (
+            <Pressable key={option.id} accessibilityRole="button" accessibilityState={{ selected }} onPress={() => onChange(option.id)} style={[styles.filterChip, selected ? styles.filterChipSelected : null]}>
+              <ThemedText style={styles.filterChipText} lightColor={selected ? Lantern.ink950 : Lantern.moon300} darkColor={selected ? Lantern.ink950 : Lantern.moon300}>{option.label}</ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function buildFilterOptions(cards: DailyCreatureCard[]) {
+  const unique = (values: { id: string; label: string }[]) => Array.from(new Map(values.map((value) => [value.id, value])).values()).sort((left, right) => left.label.localeCompare(right.label));
+  const all = { id: 'all', label: 'All' };
+  return {
+    years: [all, ...unique(cards.map((card) => ({ id: card.isoDate.slice(0, 4), label: card.isoDate.slice(0, 4) })))],
+    species: [all, ...unique(cards.filter((card) => card.speciesId).map((card) => ({ id: card.speciesId!, label: card.creatureName })))],
+    rarities: [all, ...unique(cards.map((card) => ({ id: card.rarity, label: card.rarity.charAt(0).toUpperCase() + card.rarity.slice(1) })))],
+    traits: [all, ...unique(cards.flatMap((card) => card.traits.map((trait) => ({ id: trait.id, label: trait.label }))))],
+  };
+}
+
 function DexCell({ entry }: { entry: DexEntry }) {
   const source = homeCreatureVisuals[entry.visualKey]?.source ?? null;
-  const rarityColor = entry.highestRaritySeen ? RARITY_COLOR[entry.highestRaritySeen] ?? Lantern.moon500 : Lantern.moon500;
-
+  const rarityColor = entry.highestRaritySeen ? RARITY_COLOR[entry.highestRaritySeen] : Lantern.moon500;
   return (
     <View style={styles.gridItem}>
       <View style={styles.orb}>
         <Image contentFit="contain" source={auroraRing} style={StyleSheet.absoluteFill} transition={0} />
-        {source ? (
-          <Image
-            contentFit="contain"
-            source={source}
-            style={[styles.orbImage, entry.locked ? styles.lockedImage : null]}
-            transition={0}
-          />
-        ) : null}
+        {source ? <Image contentFit="contain" source={source} style={[styles.orbImage, entry.locked ? styles.lockedImage : null]} transition={0} /> : null}
       </View>
-      <ThemedText style={styles.orbName} lightColor={entry.locked ? Lantern.moon500 : Lantern.moon50} darkColor={entry.locked ? Lantern.moon500 : Lantern.moon50}>
-        {entry.locked ? '???' : entry.name}
-      </ThemedText>
-      {entry.locked ? (
-        <ThemedText style={styles.orbMeta} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-          Not yet met
-        </ThemedText>
-      ) : (
-        <ThemedText style={[styles.orbMeta, { color: rarityColor }]}>
-          {entry.highestRaritySeen ?? 'common'} · {bondStageLabel(entry.bondStage)}
-        </ThemedText>
-      )}
+      <ThemedText style={styles.orbName} lightColor={entry.locked ? Lantern.moon500 : Lantern.moon50} darkColor={entry.locked ? Lantern.moon500 : Lantern.moon50}>{entry.locked ? '???' : entry.name}</ThemedText>
+      <ThemedText style={[styles.orbMeta, { color: rarityColor }]}>{entry.locked ? 'Not yet met' : `${entry.highestRaritySeen ?? 'common'} · ${bondStageLabel(entry.bondStage)}`}</ThemedText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: Lantern.ink950,
-    flex: 1,
-  },
-  content: {
-    gap: KatchaDeckUI.spacing.lg,
-    paddingBottom: 140,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  kicker: {
-    fontSize: 11,
-  },
-  title: {
-    fontSize: 40,
-    lineHeight: 44,
-    marginTop: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 10,
-  },
-  section: {
-    gap: 14,
-  },
-  sectionHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    fontSize: 12,
-  },
-  sectionCount: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 18,
-    justifyContent: 'flex-start',
-  },
-  gridItem: {
-    alignItems: 'center',
-    width: 96,
-  },
-  orb: {
-    alignItems: 'center',
-    height: 84,
-    justifyContent: 'center',
-    width: 84,
-  },
-  orbImage: {
-    height: 62,
-    width: 62,
-  },
-  lockedImage: {
-    opacity: 0.12,
-  },
-  orbName: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 8,
-  },
-  orbMeta: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-    textTransform: 'capitalize',
-  },
+  screen: { backgroundColor: Lantern.ink950, flex: 1 },
+  content: { gap: KatchaDeckUI.spacing.lg, paddingBottom: 140, paddingHorizontal: 20, paddingTop: 24 },
+  kicker: { fontSize: 11 },
+  title: { fontSize: 38, lineHeight: 42, marginTop: 8 },
+  subtitle: { fontSize: 14, fontWeight: '600', marginTop: 10 },
+  actionRow: { gap: 10 },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  cardCell: { flexBasis: '47%', flexGrow: 1, maxWidth: '49%' },
+  empty: { alignItems: 'center', gap: 8, paddingVertical: 60 },
+  emptyText: { fontSize: 13, textAlign: 'center' },
+  section: { gap: 14 },
+  sectionHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: 12 },
+  sectionCount: { fontSize: 12, fontWeight: '700' },
+  speciesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 18 },
+  gridItem: { alignItems: 'center', width: 96 },
+  orb: { alignItems: 'center', height: 84, justifyContent: 'center', width: 84 },
+  orbImage: { height: 62, width: 62 },
+  lockedImage: { opacity: 0.12 },
+  orbName: { fontSize: 13, fontWeight: '700', marginTop: 8 },
+  orbMeta: { fontSize: 11, fontWeight: '600', marginTop: 2, textTransform: 'capitalize' },
+  filterSection: { gap: 9, paddingBottom: 8 },
+  filterLabel: { fontSize: 10 },
+  filterOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterChip: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.12)', borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  filterChipSelected: { backgroundColor: Lantern.ember300, borderColor: Lantern.ember300 },
+  filterChipText: { fontSize: 12, fontWeight: '700' },
 });

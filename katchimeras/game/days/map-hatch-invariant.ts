@@ -12,6 +12,7 @@ export function preserveVisibleHatchForMap(state: StoredHomeState, visibleDay: H
     ...target,
     state: 'hatched',
     creature: visibleDay.creature,
+    card: visibleDay.card,
     shareReadyAt: visibleDay.shareReadyAt,
     hatchCheckIn: visibleDay.hatchCheckIn,
     devForceReadyToHatch: undefined,

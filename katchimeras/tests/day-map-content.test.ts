@@ -93,7 +93,7 @@ test('map photo refresh enriches a hatched archive day without changing its memo
     creature: { id: 'creature-1' },
   } as unknown as StoredHomeDayRecord;
   const state = {
-    version: 12,
+    version: 14,
     today: { id: 'today', isoDate: '2026-07-21', moments: [], locations: [] },
     archivedDays: [archived],
   } as unknown as StoredHomeState;
@@ -127,7 +127,7 @@ test('photo roll refresh keeps distinct geotagged locations beyond the old five-
     locations: [],
   } as unknown as StoredHomeDayRecord;
   const state = {
-    version: 12,
+    version: 14,
     today: { id: 'today', isoDate: '2026-07-21', moments: [], locations: [] },
     archivedDays: [archived],
   } as unknown as StoredHomeState;
@@ -181,7 +181,7 @@ test('photo roll refresh removes stale passive pins while preserving manual and 
     ],
   } as unknown as StoredHomeDayRecord;
   const state = {
-    version: 12,
+    version: 14,
     today: { id: 'today', isoDate: '2026-07-21', moments: [], locations: [] },
     archivedDays: [archived],
   } as unknown as StoredHomeState;

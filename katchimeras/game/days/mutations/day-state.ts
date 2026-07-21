@@ -1,4 +1,5 @@
 import type { DayWeather, StoredHomeDayRecord, StoredHomeState } from '@/types/home';
+import { updateCardMemorySpark } from '@/utils/daily-card';
 
 export function withDayWeather(state: StoredHomeState, dayId: string, weather: DayWeather): StoredHomeState {
   return mapTodayAndArchived(state, (day) => (day.id === dayId ? { ...day, weather } : day));
@@ -14,14 +15,16 @@ export function withGeneratedReflection(
       return day;
     }
 
+    const creature = {
+      ...day.creature,
+      highlight: generated.highlight,
+      reflection: generated.reflection,
+      reflectionSource: 'generated' as const,
+    };
     return {
       ...day,
-      creature: {
-        ...day.creature,
-        highlight: generated.highlight,
-        reflection: generated.reflection,
-        reflectionSource: 'generated',
-      },
+      creature,
+      card: day.card ? updateCardMemorySpark(day.card, day, creature) : null,
     };
   });
 }

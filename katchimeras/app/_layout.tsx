@@ -86,6 +86,7 @@ export default function RootLayout() {
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="photo-essence" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="day-map/[dayId]" options={{ title: 'Day Map' }} />
+          <Stack.Screen name="card/[cardId]" options={{ title: 'Daily card' }} />
           <Stack.Screen name="life-map" options={{ headerShown: false, title: 'Life Map' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />

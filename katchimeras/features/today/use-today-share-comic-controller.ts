@@ -11,7 +11,10 @@ import type { HomeDayRecord } from '@/types/home';
 
 const COMIC_PHOTO_CONSENT_KEY = 'comic_photo_consent_v1';
 
-type ShareableDay = HomeDayRecord & { creature: NonNullable<HomeDayRecord['creature']> };
+type ShareableDay = HomeDayRecord & {
+  creature: NonNullable<HomeDayRecord['creature']>;
+  card: NonNullable<HomeDayRecord['card']>;
+};
 
 type UseTodayShareComicControllerParams = {
   shareableDay: ShareableDay | null;
@@ -38,8 +41,8 @@ export function useTodayShareComicController({ shareableDay }: UseTodayShareComi
       });
 
       await Share.share({
-        message: `${shareableDay.creature.name} - ${shareableDay.highlight ?? shareableDay.creature.highlight}`,
-        title: `${shareableDay.creature.name} day card`,
+        message: `${shareableDay.card.creatureName} — ${shareableDay.card.state.label}`,
+        title: `${shareableDay.card.creatureName} daily card`,
         url: uri,
       });
     } finally {

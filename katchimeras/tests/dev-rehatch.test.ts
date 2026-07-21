@@ -9,7 +9,7 @@ import { buildHatchCheckInPlan, hatchCheckInEligibility } from '@/utils/hatch-ch
 
 function state(): StoredHomeState {
   return {
-    version: 12,
+    version: 14,
     archivedDays: [],
     encounterHistory: {},
     personalEntities: [],
@@ -33,6 +33,7 @@ test('adaptive replay unhatches while preserving the day evidence', () => {
   const next = prepareTodayForDevRehatch(state(), 'adaptive');
   assert.equal(next.today.state, 'ready_to_hatch');
   assert.equal(next.today.creature, null);
+  assert.equal(next.today.card, null);
   assert.equal(next.today.hatchCheckIn, undefined);
   assert.equal(next.today.stepsCount, 8200);
   assert.equal(next.today.journalRecords?.[0]?.fields.specific, 'A Brief History of Time');

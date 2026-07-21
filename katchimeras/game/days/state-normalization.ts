@@ -4,6 +4,7 @@ import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { pruneRejectedDerivedMoments } from '@/utils/intelligence/classification-policy';
 import { CLASSIFIED_MEMORY_SCHEMA_VERSION, recalibrateClassifiedMemory, repairUrbanPhotoCentrality } from '@/utils/intelligence/classification';
 import { normalizeFoodEmoji } from '@/utils/food-detect';
+import { updateCardMemorySpark } from '@/utils/daily-card';
 
 import { tomorrowDateId, toLocalDateId } from './date';
 import { getDistanceMeters } from './geo';
@@ -70,7 +71,7 @@ export function normalizeStoredHomeState(
       : undefined;
 
   return {
-    version: 12,
+    version: 14,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
@@ -99,10 +100,13 @@ function updateStoredDayDerivedFields(
       return repairUrbanPhotoCentrality(recalibrated);
     }),
   };
-  const day = (emojiNormalizedDay.classifiedMemories ?? []).reduce(
+  const prunedDay = (emojiNormalizedDay.classifiedMemories ?? []).reduce(
     (current, memory) => pruneRejectedDerivedMoments(current, memory),
     emojiNormalizedDay
   );
+  const day = prunedDay.card && prunedDay.creature
+    ? { ...prunedDay, card: updateCardMemorySpark(prunedDay.card, prunedDay, prunedDay.creature) }
+    : prunedDay;
   const signature = dayInputSignature(day);
 
   if (!force && day.derivedSignature === signature) {

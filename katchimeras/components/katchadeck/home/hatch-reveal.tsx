@@ -12,9 +12,10 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
+import { DailyCard } from '@/components/katchadeck/cards/daily-card';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
-import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
+import type { DailyCreatureCard, EggVisualState, LocalCreatureRecord } from '@/types/home';
 import { resolveCreatureVariantSource } from '@/utils/creature-variant';
 import { getCreatureVisual } from '@/game/days';
 
@@ -29,6 +30,7 @@ type HatchRevealPhase = 'build' | 'hatch' | 'settle';
 
 type HatchRevealProps = {
   egg: EggVisualState;
+  card?: DailyCreatureCard | null;
   // The resolved creature (may briefly be null while the hatch finalizes — the
   // egg keeps shaking until it arrives).
   creature: LocalCreatureRecord | null;
@@ -38,12 +40,15 @@ type HatchRevealProps = {
   hideCaption?: boolean;
   // Optional cosmetic lantern-colour override for the egg's glow during the reveal.
   lanternColor?: string;
+  // When hosted inside the forming card, keep the reveal in the card's art
+  // window. The parent swaps to the completed DailyCard after onComplete.
+  embedded?: boolean;
 };
 
 // In-place hatch: the SAME egg widget already on the page rattles, cracks, then
 // shrinks away exactly as the hatched katchimera scales up in its spot — matching
 // the onboarding cinematic. No page change, no moved egg.
-export function HatchReveal({ egg, creature, onComplete, hideCaption = false, lanternColor }: HatchRevealProps) {
+export function HatchReveal({ egg, card, creature, onComplete, hideCaption = false, lanternColor, embedded = false }: HatchRevealProps) {
   const [phase, setPhase] = useState<HatchRevealPhase>('build');
   const [crackStage, setCrackStage] = useState<0 | 1 | 2>(0);
 
@@ -147,7 +152,11 @@ export function HatchReveal({ egg, creature, onComplete, hideCaption = false, la
           <LanternEgg crackStage={crackStage} egg={egg} lanternColor={lanternColor} />
         </Animated.View>
 
-        {heroSource ? (
+        {settled && card && !embedded ? (
+          <Animated.View entering={FadeIn.duration(360)} style={[styles.cardWrap, creatureStyle]}>
+            <DailyCard card={card} compact />
+          </Animated.View>
+        ) : heroSource ? (
           <Animated.View pointerEvents="none" style={[styles.creatureWrap, creatureStyle]}>
             <AnimatedImage
               contentFit="contain"
@@ -161,7 +170,7 @@ export function HatchReveal({ egg, creature, onComplete, hideCaption = false, la
         ) : null}
       </View>
 
-      {hideCaption ? null : (
+      {hideCaption || (settled && card) ? null : (
       <View style={styles.captionWrap}>
         {settled && creature ? (
           <Animated.View entering={FadeIn.duration(320)} style={styles.caption} key="settled">
@@ -205,6 +214,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 0,
+  },
+  cardWrap: {
+    alignItems: 'center',
+    bottom: -42,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: -42,
   },
   creatureGlow: {
     height: CREATURE_SIZE * 1.4,

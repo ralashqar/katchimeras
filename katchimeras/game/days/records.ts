@@ -22,6 +22,7 @@ export function createEmptyStoredDay(now: Date, _profile: OnboardingProfile): St
     promptAnswers: [],
     heroPhoto: null,
     creature: null,
+    card: null,
     storedNonce: makeStoredNonce(now),
   };
 }

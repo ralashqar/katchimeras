@@ -5,13 +5,14 @@ import {
   homeScorePresentation,
   homeVisualPools,
 } from '@/constants/home-mvp';
-import type { DayScores, HomeMoment, HomeScoreKey, StoredHomeDayRecord, StoredHomeState } from '@/types/home';
+import type { DayScores, HomeMoment, HomeScoreKey, LocalCreatureRecord, StoredHomeDayRecord, StoredHomeState } from '@/types/home';
 import type { EncounterHistoryMap } from '@/types/home';
 import { recordEncounterHatch } from '@/utils/encounter-engine';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { selectHatch, makeSeededRng } from '@/utils/hatch-selection';
 import { buildReflectionContext } from '@/utils/reflection-context';
 import { resolveVariantCellId } from '@/utils/creature-variant';
+import { buildDailyCreatureCard } from '@/utils/daily-card';
 import { stableHash } from './hash';
 import { resolveDayState, resolveHatchHour } from './lifecycle';
 import { computeDayScores, parsePathId, resolveRarity } from './scoring';
@@ -44,22 +45,30 @@ export function finalizeDayHatch(
   if (selection) {
     const encounterCreature = selection.creature;
     const context = buildReflectionContext({ ...day, creature: encounterCreature }, pastDays);
+    const sealedAt = day.shareReadyAt ?? now.toISOString();
+    const creature = {
+      ...encounterCreature,
+      mood: context.mood,
+      bondDepth: context.bondDepth,
+      variantCell: resolveVariantCellId(context.mood, context.bondDepth) ?? undefined,
+    };
     return {
       ...day,
       state: 'hatched',
       devForceReadyToHatch: undefined,
       devHatchReflectionMode: undefined,
-      shareReadyAt: day.shareReadyAt ?? now.toISOString(),
-      creature: {
-        ...encounterCreature,
-        mood: context.mood,
-        bondDepth: context.bondDepth,
-        variantCell: resolveVariantCellId(context.mood, context.bondDepth) ?? undefined,
-      },
+      shareReadyAt: sealedAt,
+      creature,
+      card: buildDailyCreatureCard({ ...day, creature }, creature, {
+        mode: 'live_hatch',
+        sealedAt,
+        pastDays,
+        scores,
+      }),
     };
   }
 
-  return finalizeFallbackHatch(day, profile, now, scores, primaryTrait, secondaryTrait);
+  return finalizeFallbackHatch(day, profile, now, scores, primaryTrait, secondaryTrait, pastDays);
 }
 
 export function triggerHatchForDay(
@@ -132,7 +141,8 @@ function finalizeFallbackHatch(
   now: Date,
   scores: DayScores,
   primaryTrait: HomeScoreKey,
-  secondaryTrait: HomeScoreKey
+  secondaryTrait: HomeScoreKey,
+  pastDays: readonly StoredHomeDayRecord[]
 ): StoredHomeDayRecord {
   const signature = [
     day.isoDate,
@@ -149,27 +159,35 @@ function finalizeFallbackHatch(
   const highlightMoment = pickHighlightMoment(day.moments, primaryTrait);
   const accentColor = homeCreatureVisuals[visualKey].accentColor;
 
+  const creature: LocalCreatureRecord = {
+    id: `creature-${day.isoDate}-${hash}`,
+    name,
+    primaryTrait,
+    secondaryTrait,
+    rarity,
+    visualKey,
+    accentColor,
+    highlightMomentId: highlightMoment?.id ?? null,
+    highlight: buildHatchedHighlight(day, highlightMoment, primaryTrait),
+    reflection: buildReflectionLine(profile, primaryTrait, secondaryTrait, day.selectedPathId),
+    motifTags: uniqueMomentLabels(day.moments).slice(0, 2),
+    encounterProfileId: null,
+    repeatDepth: 0,
+  };
+  const sealedAt = day.shareReadyAt ?? now.toISOString();
   return {
     ...day,
     state: 'hatched',
     devForceReadyToHatch: undefined,
     devHatchReflectionMode: undefined,
-    shareReadyAt: day.shareReadyAt ?? now.toISOString(),
-    creature: {
-      id: `creature-${day.isoDate}-${hash}`,
-      name,
-      primaryTrait,
-      secondaryTrait,
-      rarity,
-      visualKey,
-      accentColor,
-      highlightMomentId: highlightMoment?.id ?? null,
-      highlight: buildHatchedHighlight(day, highlightMoment, primaryTrait),
-      reflection: buildReflectionLine(profile, primaryTrait, secondaryTrait, day.selectedPathId),
-      motifTags: uniqueMomentLabels(day.moments).slice(0, 2),
-      encounterProfileId: null,
-      repeatDepth: 0,
-    },
+    shareReadyAt: sealedAt,
+    creature,
+    card: buildDailyCreatureCard({ ...day, creature }, creature, {
+      mode: 'live_hatch',
+      sealedAt,
+      pastDays,
+      scores,
+    }),
   };
 }
 

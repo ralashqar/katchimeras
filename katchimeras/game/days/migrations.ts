@@ -8,6 +8,7 @@ import type {
 } from '@/types/home';
 import { deriveMemoryQualities } from '@/utils/intelligence/quality-registry';
 import { QUESTION_PLANNER_VERSION, questionIdForGraphNode } from '@/utils/intelligence/question-registry';
+import { buildDailyCreatureCard, upgradeDailyCreatureCard } from '@/utils/daily-card';
 import { createFallbackLocationsForStoredDay } from './locations';
 
 type LegacyStoredHomeDayRecord = Omit<
@@ -90,6 +91,14 @@ type Version8StoredHomeState = Omit<StoredHomeState, 'version' | 'archivedDays' 
 type Version9StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 9 };
 type Version10StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 10 };
 type Version11StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 11 };
+type Version12StoredHomeDayRecord = Omit<StoredHomeDayRecord, 'card'> & { card?: StoredHomeDayRecord['card'] };
+type Version12StoredHomeState = Omit<StoredHomeState, 'version' | 'archivedDays' | 'today' | 'tomorrow'> & {
+  version: 12;
+  archivedDays: Version12StoredHomeDayRecord[];
+  today: Version12StoredHomeDayRecord;
+  tomorrow?: Version12StoredHomeDayRecord;
+};
+type Version13StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 13 };
 type Version7StoredHomeState = Omit<Version8StoredHomeState, 'version' | 'personalEntities' | 'cloudIntelligenceEnabled'> & {
   version: 7;
 };
@@ -97,6 +106,8 @@ type Version6StoredHomeState = Omit<Version7StoredHomeState, 'version'> & { vers
 
 export type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version13StoredHomeState
+  | Version12StoredHomeState
   | Version11StoredHomeState
   | Version10StoredHomeState
   | Version9StoredHomeState
@@ -110,9 +121,29 @@ export type UpgradeableStoredHomeState =
   | LegacyStoredHomeState;
 
 export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
+  if ('version' in inputState && inputState.version === 14) {
+    return {
+      ...inputState,
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
+      tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
+    };
+  }
+
+  if ('version' in inputState && inputState.version === 13) {
+    return {
+      ...inputState,
+      version: 14,
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
+      tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
+    };
+  }
+
   if ('version' in inputState && inputState.version === 12) {
     return {
       ...inputState,
+      version: 14,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -122,7 +153,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 11) {
     return {
       ...inputState,
-      version: 12,
+      version: 14,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -132,7 +163,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 10) {
     return {
       ...inputState,
-      version: 12,
+      version: 14,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -142,7 +173,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 9) {
     return {
       ...inputState,
-      version: 12,
+      version: 14,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -152,7 +183,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 8) {
     return {
       ...inputState,
-      version: 12,
+      version: 14,
       personalEntities: inputState.personalEntities ?? [],
       cloudIntelligenceEnabled: inputState.cloudIntelligenceEnabled === true,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -164,7 +195,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && (inputState.version === 7 || inputState.version === 6)) {
     return {
       ...inputState,
-      version: 12,
+      version: 14,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -177,7 +208,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 5) {
     return {
       ...inputState,
-      version: 12,
+      version: 14,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -189,7 +220,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
-      version: 12,
+      version: 14,
       encounterHistory: {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -200,7 +231,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 12,
+      version: 14,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
@@ -214,7 +245,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 12,
+      version: 14,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
@@ -229,7 +260,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 12,
+    version: 14,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -244,6 +275,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 function ensureStoredDayFields(
   day:
     | StoredHomeDayRecord
+    | Version12StoredHomeDayRecord
     | Version8StoredHomeDayRecord
     | Version5StoredHomeDayRecord
     | Version3StoredHomeDayRecord
@@ -284,7 +316,7 @@ function ensureStoredDayFields(
         schemaVersion: Math.max(memory.schemaVersion ?? 1, 5),
       }))
     : [];
-  return {
+  const normalized: StoredHomeDayRecord = {
     ...day,
     journalRecords: 'journalRecords' in day && Array.isArray(day.journalRecords)
       ? day.journalRecords
@@ -314,6 +346,21 @@ function ensureStoredDayFields(
           repeatDepth: day.creature.repeatDepth ?? 0,
         }
       : null,
+    card: 'card' in day ? day.card ?? null : null,
+  };
+  if (!normalized.creature) {
+    return normalized;
+  }
+  if (normalized.card) {
+    return { ...normalized, card: upgradeDailyCreatureCard(normalized.card, normalized, normalized.creature) };
+  }
+  const sealedAt = normalized.shareReadyAt ?? new Date(`${normalized.isoDate}T21:00:00`).toISOString();
+  return {
+    ...normalized,
+    card: buildDailyCreatureCard(normalized, normalized.creature, {
+      mode: 'legacy_backfill',
+      sealedAt,
+    }),
   };
 }
 

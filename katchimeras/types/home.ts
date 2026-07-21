@@ -890,6 +890,103 @@ export type KatchimeraFieldEcho = {
   reason: string | null; // the day's living reason, when it would have been rare+
 };
 
+export type CardTraitFamily =
+  | 'rhythm'
+  | 'movement'
+  | 'place_weather'
+  | 'mind'
+  | 'connection'
+  | 'memory'
+  | 'recovery';
+
+export type CardTrait = {
+  id: string;
+  family: CardTraitFamily;
+  label: string;
+  strength: number;
+  confidence: 'explicit' | 'confirmed' | 'inferred';
+  evidence: string[];
+};
+
+export type CardState = {
+  tone: 'calm' | 'restless' | 'gentle' | 'bold';
+  vitality: 'tired' | 'well_rested' | 'energised' | 'low_key' | 'steady';
+  label: string;
+};
+
+export type CardMemorySpark = {
+  caption: string;
+  photoUri: string | null;
+  source: 'featured_memory' | 'big_moment' | 'creature_highlight' | 'creature_reflection';
+  sourceId: string | null;
+};
+
+export type CardVisualTreatment = {
+  palette: [string, string];
+  frameTier: HomeRarityTier;
+  backdrop: 'meadow' | 'nature' | 'city' | 'cafe' | 'rain' | 'storm' | 'snow' | 'night' | 'dawn' | 'home';
+  motifs: string[];
+};
+
+export type CardFacetKey = 'mood' | 'energy' | 'sleep' | 'place' | 'social';
+
+export type CardFacet = {
+  key: CardFacetKey;
+  label: string;
+  value: string;
+  iconKey: string;
+  evidence: string[];
+};
+
+export type CardDayFacts = {
+  steps: number;
+  stepsLabel: string;
+  highlight: string;
+  highlightIconKey: string;
+  bonusTrait: CardTrait | null;
+};
+
+export type CardScene = {
+  backdrop: CardVisualTreatment['backdrop'];
+  lighting: 'day' | 'golden_hour' | 'dawn' | 'night';
+  weather: 'clear' | 'rain' | 'storm' | 'snow';
+  foregroundMotifs: string[];
+  compositionSeed: string;
+};
+
+export type DailyCreatureCard = {
+  id: string;
+  dayId: string;
+  isoDate: string;
+  schemaVersion: 1 | 2;
+  engineVersion: 'daily-card-v1' | 'daily-card-v2';
+  provenance: 'live_hatch' | 'legacy_backfill';
+  creatureId: string;
+  speciesId: string | null;
+  creatureName: string;
+  visualKey: HomeVisualKey;
+  variantCell?: string;
+  accentColor: string;
+  rarity: HomeRarityTier;
+  rarityReason: string | null;
+  meetingNumber: number;
+  bondStage: 0 | 1 | 2 | 3;
+  placeLabel: string | null;
+  state: CardState;
+  epithet: string;
+  traits: CardTrait[];
+  memorySpark: CardMemorySpark | null;
+  treatment: CardVisualTreatment;
+  // V2 collectible presentation. Optional only while a v1 save is entering
+  // the v14 migration; every newly built or normalized card receives them.
+  storyLine?: string;
+  facets?: Record<CardFacetKey, CardFacet>;
+  dayFacts?: CardDayFacts;
+  scene?: CardScene;
+  sealedInputSignature: string;
+  sealedAt: string;
+};
+
 // A meaning the user chose for a captured / essence photo. `archetype` is the
 // capture-energy MeaningTag (calm/energy/together/meaningful); `label` is the
 // human phrase they picked ("Working", "A slow sip").
@@ -1226,6 +1323,7 @@ export type StoredHomeDayRecord = {
   exactRouteSegments: StoredExactRouteSegment[];
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
+  card: DailyCreatureCard | null;
   promptAnswers: DayPromptAnswer[];
   hatchCheckIn?: HatchCheckIn;
   // Developer tools can replay the hatch at any hour and optionally exercise
@@ -1299,7 +1397,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 12;
+  version: 14;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

@@ -56,6 +56,7 @@ export function applyBackfilledDays(
       promptAnswers: [],
       heroPhoto: null,
       creature: null,
+      card: null,
       vision: day.vision ?? undefined,
     }));
 

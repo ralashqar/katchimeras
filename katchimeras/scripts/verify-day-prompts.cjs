@@ -386,7 +386,7 @@ check('journaled days ask meaning without repeating known facts', hatchCheckInPl
 check('a completed hatch reaches durable storage before map navigation can read it', hatchControllerSource.includes('storedStateRef.current = hatchedState') && hatchControllerSource.includes('homeRepository.save(hatchedState'));
 check('map hydration follows live repository identity instead of stale disk JSON', allDaysSource.includes('hydrationCache.state === stored') && !allDaysSource.includes('const raw = homeRepository.loadRaw()'));
 check('map photo refresh cannot downgrade a visible hatch', mapPhotoRefreshSource.includes('preserveVisibleHatchForMap(state, day)'));
-check('all home-state writers preserve finalized hatches at the storage boundary', homeStorageSource.includes('preserveFinalizedHatches(currentState, state)') && hatchIntegritySource.includes("state: 'hatched'") && hatchIntegritySource.includes('creature: finalized.creature'));
+check('all home-state writers preserve finalized hatches and cards at the storage boundary', homeStorageSource.includes('preserveFinalizedHatches(currentState, state)') && hatchIntegritySource.includes("state: 'hatched'") && hatchIntegritySource.includes('creature: day.creature ?? finalized.creature') && hatchIntegritySource.includes('card: day.card ?? finalized.card'));
 check('a synchronous hatch is requeued behind any older native async write', homeStorageSource.includes('if (deferredWrite) pendingDeferredState = protectedState'));
 check('only explicit developer reset controls can reverse a hatch', exploreSource.includes('allowHatchDowngrade: true'));
 check('developer hatch overrides are one-shot', hatchingSource.includes('devForceReadyToHatch: undefined') && hatchingSource.includes('devHatchReflectionMode: undefined'));

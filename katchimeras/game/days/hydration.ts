@@ -55,11 +55,12 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
         encounterProfileId: null,
         repeatDepth: 0,
       },
+      card: null,
     };
   });
 
   return {
-    version: 12,
+    version: 14,
     personalEntities: [],
     cloudIntelligenceEnabled: false,
     locationPermission: 'unknown',

@@ -139,6 +139,7 @@ export function toHatchablePastDay(
     promptAnswers: [],
     heroPhoto: null,
     creature: null,
+    card: null,
     placeCategorySeeds,
     // The photo subjects (dog/beach/museum/…) that make the hatch specific
     // rather than a generic step/place creature.

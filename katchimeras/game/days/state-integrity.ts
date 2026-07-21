@@ -23,12 +23,14 @@ export function preserveFinalizedHatches(
   let repaired = false;
   const protect = (day: StoredHomeDayRecord): StoredHomeDayRecord => {
     const finalized = currentDays.get(day.id);
-    if (!finalized?.creature || day.creature) return day;
+    if (!finalized?.creature) return day;
+    if (day.creature && (!finalized.card || day.card)) return day;
     repaired = true;
     return {
       ...day,
       state: 'hatched',
-      creature: finalized.creature,
+      creature: day.creature ?? finalized.creature,
+      card: day.card ?? finalized.card,
       shareReadyAt: day.shareReadyAt ?? finalized.shareReadyAt,
       hatchCheckIn: day.hatchCheckIn ?? finalized.hatchCheckIn,
       devForceReadyToHatch: undefined,

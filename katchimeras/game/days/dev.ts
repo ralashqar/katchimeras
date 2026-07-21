@@ -9,6 +9,7 @@ export function prepareTodayForDevRehatch(state: StoredHomeState, mode: DevRehat
       ...state.today,
       state: 'ready_to_hatch',
       creature: null,
+      card: null,
       shareReadyAt: null,
       hatchCheckIn: undefined,
       devForceReadyToHatch: true,
