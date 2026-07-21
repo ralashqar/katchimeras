@@ -54,7 +54,7 @@ import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-compo
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
-import { CARD_SCENE_TOP, COMPACT_CARD_SCENE_HEIGHT } from '@/utils/daily-card-layout';
+import { COMPACT_CARD_SCENE_HEIGHT, COMPACT_CARD_SCENE_TOP } from '@/utils/daily-card-layout';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
@@ -697,7 +697,7 @@ export default function HomeScreen() {
                 if (isDay) handleOpenDayMap(selectedDay.id);
               }}
               anchorHeight={todayCardSize.height}
-              centerOffsetY={(CARD_SCENE_TOP + COMPACT_CARD_SCENE_HEIGHT / 2) * todayCardSize.scale - todayCardSize.height / 2}
+              centerOffsetY={(COMPACT_CARD_SCENE_TOP + COMPACT_CARD_SCENE_HEIGHT / 2) * todayCardSize.scale - todayCardSize.height / 2}
               radius={Math.min(134, 835 * todayCardSize.scale * 0.5 + 18)}
             />
           ) : null}

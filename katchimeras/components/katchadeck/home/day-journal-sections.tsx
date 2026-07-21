@@ -490,17 +490,17 @@ function formatCompact(value: number): string {
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: 14,
+    gap: 10,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 7,
   },
   // Category doors row (mockup panel): the same 3D icon art the ring chips
   // used, on light tiles with the label tight beneath.
   categoryRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 7,
   },
   categoryTile: {
     alignItems: 'center',
@@ -509,20 +509,22 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: Meadow.radius.tile,
     borderWidth: 1,
-    boxShadow: '-3px 4px 8px rgba(58, 38, 18, 0.20), inset 0 1px 0 rgba(255, 248, 230, 0.55)',
+    boxShadow: '0 3px 7px rgba(58, 38, 18, 0.16), inset 0 1px 0 rgba(255, 248, 230, 0.68)',
     flex: 1,
-    gap: 4,
-    paddingVertical: 9,
+    gap: 1,
+    height: 58,
+    justifyContent: 'center',
+    paddingVertical: 4,
     position: 'relative',
   },
   categoryArt: {
-    height: 34,
-    width: 34,
+    height: 35,
+    width: 38,
   },
   categoryLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 13,
+    fontSize: 11.5,
+    fontWeight: '800',
+    lineHeight: 14,
   },
   categoryBadge: {
     alignItems: 'center',
@@ -546,9 +548,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   panelDivider: {
-    backgroundColor: 'rgba(122, 84, 44, 0.18)',
+    backgroundColor: 'rgba(122, 84, 44, 0.13)',
     height: 1,
-    marginVertical: 1,
   },
   statTile: {
     alignItems: 'center',
@@ -559,10 +560,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     // Bottom-LEFT drop shadow (light from the upper right) lifts each tile
     // off the card; the inset line is a soft top bevel.
-    boxShadow: '-3px 4px 8px rgba(58, 38, 18, 0.20), inset 0 1px 0 rgba(255, 248, 230, 0.55)',
+    boxShadow: '0 3px 7px rgba(58, 38, 18, 0.16), inset 0 1px 0 rgba(255, 248, 230, 0.68)',
     flex: 1,
-    gap: 4,
-    paddingVertical: 8,
+    gap: 1,
+    height: 76,
+    justifyContent: 'center',
+    paddingVertical: 4,
     position: 'relative',
   },
   statTilePressed: {
@@ -570,20 +573,21 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   statArt: {
-    height: 45,
-    width: 52,
+    height: 40,
+    width: 48,
   },
   // Value + label sit as one tight caption block under the big icon.
   statValue: {
-    fontSize: 15.5,
-    fontWeight: '800',
-    lineHeight: 18,
+    fontSize: 17.5,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    lineHeight: 20,
   },
   statLabel: {
     fontSize: 9.5,
     fontWeight: '700',
     lineHeight: 11,
-    marginTop: -3,
+    marginTop: -2,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
@@ -628,10 +632,10 @@ const styles = StyleSheet.create({
     borderColor: Meadow.cardBorder,
     borderCurve: 'continuous',
     borderRadius: Meadow.radius.card,
-    borderWidth: 1,
-    boxShadow: `${Meadow.cardShadow}, inset 0 1px 0 rgba(255, 248, 230, 0.5)`,
-    gap: 8,
-    padding: 11,
+    borderWidth: 1.25,
+    boxShadow: '0 7px 18px rgba(52, 34, 16, 0.22), inset 0 1px 0 rgba(255, 250, 236, 0.72), inset 0 -1px 0 rgba(151, 105, 54, 0.12)',
+    gap: 6,
+    padding: 8,
   },
   sectionLabel: {
     fontSize: Meadow.type.kicker,

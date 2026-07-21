@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { compactFacetValue, compactHighlight, formatCardSteps } from '../utils/daily-card-display';
-import type { CardFacet } from '../types/home';
+import { compactCardQuote, compactFacetValue, compactHighlight, formatCardSteps } from '../utils/daily-card-display';
+import type { CardFacet, DailyCreatureCard } from '../types/home';
 
 function facet(key: CardFacet['key'], value: string): CardFacet {
   return { evidence: [], iconKey: '', key, label: key, value };
@@ -25,4 +25,13 @@ test('card steps use a large compact counter format', () => {
   assert.equal(formatCardSteps(5000), '5k');
   assert.equal(formatCardSteps(5316), '5.3k');
   assert.equal(formatCardSteps(12_480), '12k');
+});
+
+test('hatched compact cards use their Memory Spark as the card quote', () => {
+  const card = {
+    memorySpark: { caption: 'Coffee with Mum before the rain arrived.', photoUri: null, source: 'big_moment', sourceId: 'moment-1' },
+    state: { tone: 'calm' },
+    traits: [],
+  } as unknown as DailyCreatureCard;
+  assert.equal(compactCardQuote(card), 'Coffee with Mum before the rain arrived.');
 });

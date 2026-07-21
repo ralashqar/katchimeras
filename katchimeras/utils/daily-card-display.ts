@@ -56,6 +56,11 @@ export function compactStoryLine(card: DailyCreatureCard): string {
   return `A ${tone} companion shaped by this day.`;
 }
 
+export function compactCardQuote(card: DailyCreatureCard): string {
+  const memorySpark = card.memorySpark?.caption.trim();
+  return memorySpark || compactStoryLine(card);
+}
+
 export function formatCardSteps(steps: number): string {
   const safeSteps = Math.max(0, Math.round(steps));
   if (safeSteps < 1000) return safeSteps.toLocaleString();

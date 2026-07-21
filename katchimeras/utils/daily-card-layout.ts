@@ -9,10 +9,24 @@ export const CARD_DESIGN_HEIGHT = FULL_CARD_DESIGN_HEIGHT;
 export const CARD_ASPECT_RATIO = FULL_CARD_ASPECT_RATIO;
 
 export const CARD_SCENE_TOP = 286;
+export const COMPACT_CARD_SCENE_TOP = 286;
 export const FULL_CARD_SCENE_HEIGHT = 770;
-export const COMPACT_CARD_SCENE_HEIGHT = 730;
-export const COMPACT_CARD_STORY_TOP = 1070;
-export const COMPACT_CARD_STORY_HEIGHT = 116;
+export const COMPACT_CARD_SCENE_HEIGHT = 820;
+export const COMPACT_CARD_STORY_TOP = 1052;
+export const COMPACT_CARD_STORY_HEIGHT = 174;
+
+// Runtime content slots matched to daily-card-frame-compact.png. Keeping these
+// together prevents the creature and promise cards from drifting apart when the
+// bespoke frame art changes.
+export const COMPACT_CARD_FRAME_RECTS = {
+  badge: { x: 77, y: 103, width: 156, height: 148 },
+  rarity: { x: 76, y: 263, width: 165, height: 74 },
+  name: { x: 269, y: 121, width: 423, height: 86 },
+  epithet: { x: 304, y: 224, width: 360, height: 62 },
+  date: { x: 732, y: 110, width: 128, height: 184 },
+  tag: { x: 708, y: 356, width: 148, height: 205 },
+  footer: { x: 92, y: 1024, width: 757, height: 218 },
+} as const;
 
 export const COMPACT_DAILY_CARD_MAX_WIDTH = 318;
 export const COMPACT_DAILY_CARD_HORIZONTAL_GUTTER = 54;

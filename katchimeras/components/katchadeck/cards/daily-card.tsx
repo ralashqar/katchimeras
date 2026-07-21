@@ -15,13 +15,16 @@ import {
 } from '@/components/katchadeck/cards/ornate-card-frame';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AppFontFamilies } from '@/constants/theme';
 import { getCreatureVisual } from '@/game/days';
 import type { CardFacet, CardFacetKey, DailyCreatureCard } from '@/types/home';
 import { resolveCreatureVariantSource } from '@/utils/creature-variant';
-import { compactFacetValue, compactHighlight, compactStoryLine, formatCardSteps } from '@/utils/daily-card-display';
+import { compactCardQuote, compactFacetValue, compactHighlight, compactStoryLine, formatCardSteps } from '@/utils/daily-card-display';
 import {
   CARD_SCENE_TOP,
+  COMPACT_CARD_FRAME_RECTS,
   COMPACT_CARD_SCENE_HEIGHT,
+  COMPACT_CARD_SCENE_TOP,
   COMPACT_CARD_STORY_HEIGHT,
   COMPACT_CARD_STORY_TOP,
   COMPACT_DAILY_CARD_HORIZONTAL_GUTTER,
@@ -176,20 +179,23 @@ function CardContent({ card, size, style, variant }: { card: DailyCreatureCard; 
 
 function CardStory({ card, compact, scale }: { card: DailyCreatureCard; compact: boolean; scale: number }) {
   const rect = compact
-    ? frameRect(scale, 82, COMPACT_CARD_STORY_TOP, 777, COMPACT_CARD_STORY_HEIGHT)
+    ? frameRect(scale, 108, COMPACT_CARD_STORY_TOP, 725, COMPACT_CARD_STORY_HEIGHT)
     : frameRect(scale, 72, 1047, 797, 47);
+  const story = compact
+    ? compactCardQuote(card)
+    : compactStoryLine(card);
   return (
     <View style={[rect, styles.centerBox]}>
       <ThemedText
         adjustsFontSizeToFit
         maxFontSizeMultiplier={1.15}
-        minimumFontScale={0.72}
-        numberOfLines={compact ? 2 : 1}
+        minimumFontScale={compact ? 0.78 : 0.72}
+        numberOfLines={compact ? 3 : 1}
         selectable={!compact}
-        style={[styles.story, scaledText(scale, compact ? 32 : 22, compact ? 38 : 26)]}
+        style={[styles.story, compact ? styles.compactStory : null, scaledText(scale, compact ? 42 : 22, compact ? 50 : 26)]}
         lightColor="#5A472E"
         darkColor="#5A472E">
-        ❧ {compactStoryLine(card)} ❧
+        ❧ {story} ❧
       </ThemedText>
     </View>
   );
@@ -198,12 +204,12 @@ function CardStory({ card, compact, scale }: { card: DailyCreatureCard; compact:
 function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact: boolean; scale: number }) {
   const date = formatCardDateParts(card.isoDate);
   const backdrop = card.scene?.backdrop ?? card.treatment.backdrop;
-  const badgeRect = compact ? frameRect(scale, 52, 78, 158, 154) : frameRect(scale, 61, 67, 126, 143);
-  const rarityRect = compact ? frameRect(scale, 66, 221, 139, 66) : frameRect(scale, 58, 218, 133, 58);
-  const nameRect = compact ? frameRect(scale, 215, 83, 520, 130) : frameRect(scale, 202, 67, 544, 135);
-  const epithetRect = compact ? frameRect(scale, 283, 235, 390, 63) : frameRect(scale, 278, 229, 385, 54);
-  const dateRect = compact ? frameRect(scale, 746, 82, 140, 194) : frameRect(scale, 755, 72, 127, 183);
-  const tagRect = compact ? frameRect(scale, 720, 329, 145, 184) : frameRect(scale, 750, 330, 112, 160);
+  const badgeRect = compact ? scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.badge) : frameRect(scale, 61, 67, 126, 143);
+  const rarityRect = compact ? scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.rarity) : frameRect(scale, 58, 218, 133, 58);
+  const nameRect = compact ? scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.name) : frameRect(scale, 202, 67, 544, 135);
+  const epithetRect = compact ? scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.epithet) : frameRect(scale, 278, 229, 385, 54);
+  const dateRect = compact ? scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.date) : frameRect(scale, 755, 72, 127, 183);
+  const tagRect = compact ? scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.tag) : frameRect(scale, 750, 330, 112, 160);
   return (
     <>
       <View style={[badgeRect, styles.badgeIcon]}>
@@ -228,7 +234,7 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
           minimumFontScale={0.64}
           numberOfLines={1}
           selectable={!compact}
-          style={[styles.centered, styles.name, scaledText(scale, compact ? 64 : 61, compact ? 71 : 68)]}
+          style={[styles.centered, styles.name, scaledText(scale, compact ? 58 : 58, compact ? 65 : 65)]}
           lightColor="#3E6522"
           darkColor="#3E6522">
           {card.creatureName.toUpperCase()}
@@ -246,7 +252,7 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
           ✦ {card.epithet} ✦
         </ThemedText>
       </View>
-      <View style={[dateRect, styles.dateStamp, compact ? { transform: [{ translateX: -6 * scale }, { translateY: -5 * scale }] } : null]}>
+      <View style={[dateRect, styles.dateStamp]}>
         <IconSymbol color="#70562E" name="calendar" size={Math.max(12, (compact ? 42 : 38) * scale)} />
         <ThemedText style={[styles.centered, styles.dateWeekday, scaledText(scale, compact ? 38 : 35, compact ? 39 : 38)]} lightColor="#59472E" darkColor="#59472E">{date.weekday}</ThemedText>
         <ThemedText style={[styles.centered, styles.dateValue, scaledText(scale, compact ? 36 : 34, 38)]} lightColor="#59472E" darkColor="#59472E">{date.dayMonth}</ThemedText>
@@ -278,13 +284,19 @@ function Scene({ card, compact, scale }: { card: DailyCreatureCard; compact: boo
   return (
     <LinearGradient
       colors={colors}
-      style={[frameRect(scale, 53, CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
+      style={[frameRect(scale, 53, compact ? COMPACT_CARD_SCENE_TOP : CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
       <Image cachePolicy="memory-disk" contentFit="cover" source={sceneSource} style={styles.sceneImage} transition={0} />
       <LinearGradient colors={['rgba(255,244,207,0.04)', `${colors[2]}88`]} style={StyleSheet.absoluteFill} />
       <View style={styles.sceneGlow} />
       {weather === 'rain' || weather === 'storm' ? <RainOverlay scale={scale} /> : null}
       {weather === 'snow' ? <SnowOverlay scale={scale} /> : null}
-      <Image cachePolicy="memory-disk" contentFit="contain" source={source} style={styles.creature} transition={0} />
+      <Image
+        cachePolicy="memory-disk"
+        contentFit="contain"
+        source={source}
+        style={[styles.creature, compact ? styles.compactCreature : null]}
+        transition={0}
+      />
     </LinearGradient>
   );
 }
@@ -477,6 +489,13 @@ export function frameRect(scale: number, x: number, y: number, width: number, he
   return { height: height * scale, left: x * scale, position: 'absolute' as const, top: y * scale, width: width * scale };
 }
 
+function scaledFrameSlot(
+  scale: number,
+  slot: { x: number; y: number; width: number; height: number }
+) {
+  return frameRect(scale, slot.x, slot.y, slot.width, slot.height);
+}
+
 function scaledText(scale: number, fontSize: number, lineHeight: number) {
   return { fontSize: fontSize * scale, lineHeight: lineHeight * scale };
 }
@@ -487,7 +506,13 @@ const styles = StyleSheet.create({
   centered: { textAlign: 'center' },
   badgeIcon: { alignItems: 'center', justifyContent: 'center' },
   rarity: { fontFamily: 'Manrope', fontWeight: '900', letterSpacing: 0.3 },
-  name: { fontFamily: 'Manrope', fontWeight: '900', letterSpacing: -1 },
+  name: {
+    fontFamily: AppFontFamilies.fredokaBold,
+    letterSpacing: -0.35,
+    textShadowColor: 'rgba(255,255,255,0.42)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
   epithet: { fontFamily: 'InstrumentSerif', fontStyle: 'italic' },
   dateStamp: { alignItems: 'center', justifyContent: 'center' },
   dateWeekday: { fontFamily: 'Manrope', fontWeight: '900' },
@@ -498,10 +523,12 @@ const styles = StyleSheet.create({
   sceneImage: { ...StyleSheet.absoluteFillObject, opacity: 0.82 },
   sceneGlow: { backgroundColor: 'rgba(255,229,153,0.34)', borderRadius: 999, height: '56%', position: 'absolute', top: '-10%', width: '62%' },
   creature: { bottom: '1%', height: '83%', position: 'absolute', width: '85%', zIndex: 2 },
+  compactCreature: { bottom: '5%' },
   weather: { ...StyleSheet.absoluteFillObject, zIndex: 3 },
   rainDrop: { backgroundColor: 'rgba(225,243,240,0.72)', position: 'absolute', transform: [{ rotate: '12deg' }], width: 1 },
   snowDot: { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 999, position: 'absolute' },
-  story: { alignItems: 'center', fontFamily: 'InstrumentSerif', fontStyle: 'italic', fontWeight: '600', justifyContent: 'center', paddingHorizontal: 8, textAlign: 'center', textAlignVertical: 'center' },
+  story: { alignItems: 'center', fontFamily: AppFontFamilies.instrumentSerif, fontStyle: 'italic', fontWeight: '600', justifyContent: 'center', paddingHorizontal: 8, textAlign: 'center', textAlignVertical: 'center' },
+  compactStory: { fontStyle: 'normal', fontWeight: '700', letterSpacing: 0.1 },
   row: { flexDirection: 'row' },
   facet: { alignItems: 'center', backgroundColor: 'rgba(255,250,235,0.52)', borderColor: 'rgba(125,91,40,0.22)', borderCurve: 'continuous', borderWidth: 1, boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.5), 0 1px 2px rgba(77,49,13,0.13)', flex: 1, justifyContent: 'center' },
   facetIcon: { alignItems: 'center', justifyContent: 'center' },

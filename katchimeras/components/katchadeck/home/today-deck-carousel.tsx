@@ -23,10 +23,12 @@ import {
 import { OrnateCardFrame } from '@/components/katchadeck/cards/ornate-card-frame';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AppFontFamilies } from '@/constants/theme';
 import type { HomeTimelineDay } from '@/types/home';
 import {
-  CARD_SCENE_TOP,
+  COMPACT_CARD_FRAME_RECTS,
   COMPACT_CARD_SCENE_HEIGHT,
+  COMPACT_CARD_SCENE_TOP,
   COMPACT_CARD_STORY_HEIGHT,
   COMPACT_CARD_STORY_TOP,
 } from '@/utils/daily-card-layout';
@@ -269,32 +271,32 @@ function PromiseCard({
       height={cardSize.height}
       variant="compact"
       width={cardSize.width}>
-      <View style={[frameRect(scale, 52, 78, 158, 154), styles.promiseBadge]}>
+      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.badge), styles.promiseBadge]}>
         <IconSymbol color="#FFF0B1" name={locked ? 'moon.fill' : 'sparkles'} size={Math.max(15, 52 * scale)} />
       </View>
-      <View style={[frameRect(scale, 66, 221, 139, 66), styles.centerBox]}>
+      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.rarity), styles.centerBox]}>
         <ThemedText numberOfLines={1} style={[styles.frameText, { fontSize: 29 * scale, lineHeight: 35 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{label}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 215, 83, 520, 130), styles.centerBox]}>
-        <ThemedText adjustsFontSizeToFit minimumFontScale={0.62} numberOfLines={1} style={[styles.promiseTitle, { fontSize: 60 * scale, lineHeight: 69 * scale }]} lightColor="#3E6522" darkColor="#3E6522">{title}</ThemedText>
+      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.name), styles.centerBox]}>
+        <ThemedText adjustsFontSizeToFit minimumFontScale={0.58} numberOfLines={1} style={[styles.promiseTitle, { fontSize: 58 * scale, lineHeight: 65 * scale }]} lightColor="#3E6522" darkColor="#3E6522">{title}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 283, 235, 390, 63), styles.centerBox]}>
+      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.epithet), styles.centerBox]}>
         <ThemedText numberOfLines={1} style={[styles.promiseRibbon, { fontSize: 35 * scale, lineHeight: 42 * scale }]} lightColor="#FFF7E8" darkColor="#FFF7E8">✦ {locked ? 'Arriving soon' : 'Forming today'} ✦</ThemedText>
       </View>
-      <View style={[frameRect(scale, 746, 82, 140, 194), styles.promiseDate, { transform: [{ translateX: -6 * scale }, { translateY: -5 * scale }] }]}>
+      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.date), styles.promiseDate]}>
         <IconSymbol color="#70562E" name="calendar" size={Math.max(13, 42 * scale)} />
         <ThemedText style={[styles.frameText, { fontSize: 38 * scale, lineHeight: 39 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.weekday}</ThemedText>
         <ThemedText style={[styles.promiseDateValue, { fontSize: 36 * scale, lineHeight: 38 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.dayMonth}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 720, 329, 145, 184), styles.promiseTag]}>
+      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.tag), styles.promiseTag]}>
         <IconSymbol color="#FFE4A1" name={locked ? 'moon.fill' : 'leaf.fill'} size={Math.max(11, 32 * scale)} />
         <ThemedText numberOfLines={2} style={[styles.promiseTagText, { fontSize: 27 * scale, lineHeight: 32 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{locked ? 'Mystery Day' : 'Card Forming'}</ThemedText>
       </View>
       {footerContent ? (
-        <View style={[frameRect(scale, 82, 1023, 777, 244), styles.promiseFooter]}>{footerContent}</View>
+        <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.footer), styles.promiseFooter]}>{footerContent}</View>
       ) : day.kind === 'day' && day.isToday ? null : (
-        <View style={[frameRect(scale, 82, COMPACT_CARD_STORY_TOP, 777, COMPACT_CARD_STORY_HEIGHT), styles.centerBox]}>
-          <ThemedText adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={2} style={[styles.promiseStory, { fontSize: 32 * scale, lineHeight: 38 * scale }]} lightColor="#6F5B3A" darkColor="#6F5B3A">❧ {locked ? 'Tomorrow’s mystery is gathering.' : 'Today’s card is forming.'} ❧</ThemedText>
+        <View style={[frameRect(scale, 108, COMPACT_CARD_STORY_TOP, 725, COMPACT_CARD_STORY_HEIGHT), styles.centerBox]}>
+          <ThemedText adjustsFontSizeToFit minimumFontScale={0.78} numberOfLines={3} style={[styles.promiseStory, { fontSize: 42 * scale, lineHeight: 50 * scale }]} lightColor="#6F5B3A" darkColor="#6F5B3A">❧ {locked ? 'Tomorrow’s mystery is gathering.' : 'Today’s card is forming.'} ❧</ThemedText>
         </View>
       )}
     </OrnateCardFrame>
@@ -305,7 +307,7 @@ function PromiseScene({ children, countdownContent, locked, scale }: { children?
   return (
     <LinearGradient
       colors={locked ? ['#403B4D', '#1C1923'] : ['#DDE8B4', '#82A267']}
-      style={[frameRect(scale, 53, CARD_SCENE_TOP, 835, COMPACT_CARD_SCENE_HEIGHT), styles.promiseScene, { borderRadius: 22 * scale }]}>
+      style={[frameRect(scale, 53, COMPACT_CARD_SCENE_TOP, 835, COMPACT_CARD_SCENE_HEIGHT), styles.promiseScene, { borderRadius: 22 * scale }]}>
       {children && !locked ? (
         <View style={[styles.activeEggHost, { transform: [{ translateY: -28 * scale }, { scale: 0.84 }] }]}>{children}</View>
       ) : locked ? (
@@ -328,6 +330,13 @@ function formatPromiseDate(isoDate: string) {
   };
 }
 
+function scaledFrameSlot(
+  scale: number,
+  slot: { x: number; y: number; width: number; height: number }
+) {
+  return frameRect(scale, slot.x, slot.y, slot.width, slot.height);
+}
+
 const styles = StyleSheet.create({
   stage: { alignItems: 'center', justifyContent: 'center', overflow: 'visible', width: '100%' },
   slot: { alignItems: 'center', justifyContent: 'center', position: 'absolute', width: 330 },
@@ -336,7 +345,15 @@ const styles = StyleSheet.create({
   promiseBadge: { alignItems: 'center', justifyContent: 'center' },
   centerBox: { alignItems: 'center', justifyContent: 'center' },
   frameText: { fontFamily: 'Manrope', fontWeight: '900', textAlign: 'center', textAlignVertical: 'center' },
-  promiseTitle: { fontFamily: 'Manrope', fontWeight: '900', letterSpacing: -1, textAlign: 'center', textAlignVertical: 'center' },
+  promiseTitle: {
+    fontFamily: AppFontFamilies.fredokaBold,
+    letterSpacing: -0.35,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    textShadowColor: 'rgba(255,255,255,0.42)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
   promiseRibbon: { fontFamily: 'InstrumentSerif', fontStyle: 'italic', textAlign: 'center', textAlignVertical: 'center' },
   promiseDate: { alignItems: 'center', justifyContent: 'center' },
   promiseDateValue: { fontFamily: 'InstrumentSerif', fontWeight: '700', textAlign: 'center' },
@@ -348,5 +365,5 @@ const styles = StyleSheet.create({
   promiseCountdown: { alignItems: 'center', left: 0, position: 'absolute', right: 0, zIndex: 5 },
   promiseFooter: { alignItems: 'center', justifyContent: 'center' },
   questionMark: { opacity: 0.82, zIndex: 2 },
-  promiseStory: { fontFamily: 'InstrumentSerif', fontStyle: 'italic', fontWeight: '600', textAlign: 'center', textAlignVertical: 'center' },
+  promiseStory: { fontFamily: AppFontFamilies.instrumentSerif, fontWeight: '700', letterSpacing: 0.1, textAlign: 'center', textAlignVertical: 'center' },
 });
