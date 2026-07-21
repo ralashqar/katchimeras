@@ -60,19 +60,8 @@ export function useDayLocationCapture({
         onPermissionResolved('denied');
         return;
       }
-
-      const requestedPermission = await Location.requestForegroundPermissionsAsync();
-      if (!active) {
-        return;
-      }
-
-      if (!requestedPermission.granted) {
-        onPermissionResolved('denied');
-        return;
-      }
-
-      onPermissionResolved('granted');
-      await captureAndWatch(Location);
+      // Permission is requested from onboarding or an explicit Places action.
+      // Mounting the Today tab must never trigger a system prompt by itself.
     }
 
     async function captureAndWatch(Location: typeof import('expo-location')) {

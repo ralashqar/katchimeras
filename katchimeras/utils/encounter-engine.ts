@@ -120,6 +120,18 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       });
     });
 
+  if (day.hatchCheckIn && day.hatchCheckIn.status !== 'skipped') {
+    day.hatchCheckIn.encounterSeedBias.forEach((bias) => {
+      signals.push({
+        seedId: bias.seedId,
+        intensity: clamp01(bias.intensity),
+        sourceMomentIds: [],
+        isRecovery: day.hatchCheckIn?.semanticTags.some((tag) => tag === 'tender_day' || tag === 'activity:resting') ?? false,
+        source: 'prompt',
+      });
+    });
+  }
+
   const coffeeIds = momentsByType.get('coffee') ?? [];
   if (coffeeIds.length > 0) {
     signals.push({

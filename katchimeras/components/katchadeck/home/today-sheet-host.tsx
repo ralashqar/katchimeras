@@ -1,13 +1,13 @@
 import type { ComponentProps } from 'react';
 
 import { BigMomentPickerSheet } from '@/components/katchadeck/world/big-moment-picker-sheet';
-import { JourneyDetailSheet, PlacesDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
+import { JourneyDetailSheet } from '@/components/katchadeck/world/cell-detail-sheet';
+import { TodayPlacesSheet } from '@/components/katchadeck/home/today-places-sheet';
 import { FoodMomentSheet, FoodVaultSheet } from '@/components/katchadeck/world/food-vault-sheet';
 import { MemoryVaultSheet } from '@/components/katchadeck/world/memory-vault-sheet';
 import { MoodMonumentSheet } from '@/components/katchadeck/world/mood-monument-sheet';
 import { NameDaySheet } from '@/components/katchadeck/world/name-day-sheet';
 import { ObservatorySheet } from '@/components/katchadeck/world/observatory-sheet';
-import { PlacePromptSheet } from '@/components/katchadeck/world/place-prompt-sheet';
 import { QuestBoardSheet } from '@/components/katchadeck/world/quest-board-sheet';
 import { SanctuarySheet } from '@/components/katchadeck/world/sanctuary-sheet';
 import { SleepSheet } from '@/components/katchadeck/world/sleep-sheet';
@@ -15,18 +15,12 @@ import { StepsPromptSheet } from '@/components/katchadeck/world/steps-prompt-she
 import { StudioMomentSheet, StudioVaultSheet } from '@/components/katchadeck/world/studio-vault-sheet';
 import type { FoodMomentFollowUp, StudioMomentFollowUp } from '@/features/today/use-moment-follow-up-controller';
 import type { TodaySheetController } from '@/features/today/use-today-sheet-controller';
-import type { DayInputTarget, HomeDayRecord } from '@/types/home';
+import type { DayInputTarget, HomeDayRecord, LocationPermissionState } from '@/types/home';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
 import type { Observation } from '@/utils/observations-engine';
 
 type FoodConfirmInput = Parameters<ComponentProps<typeof FoodMomentSheet>['onConfirm']>[0];
 type StudioConfirmInput = Parameters<ComponentProps<typeof StudioMomentSheet>['onConfirm']>[0];
-type ActivePlace = {
-  name: string;
-  timeLabel: string | null;
-  isNew: boolean;
-};
-
 type TodaySheetHostProps = {
   viewedDay: HomeDayRecord | null;
   viewedIsForming: boolean;
@@ -38,8 +32,6 @@ type TodaySheetHostProps = {
   suppressFollowUps: boolean;
   memoryQuests: MemoryQuest[];
   recentAvgSteps: number | null;
-  activePlace: ActivePlace | null;
-  placePreset: ComponentProps<typeof PlacePromptSheet>['presetCategory'];
   observations: Observation[];
   travelMemory: ComponentProps<typeof ObservatorySheet>['travelMemory'];
   cloudIntelligenceEnabled: boolean;
@@ -58,9 +50,12 @@ type TodaySheetHostProps = {
   handleSetSleep: NonNullable<ComponentProps<typeof SleepSheet>['onSet']>;
   handleConfirmSteps: ComponentProps<typeof StepsPromptSheet>['onConfirm'];
   handleQuest: (type: MemoryQuestType) => void;
-  handleConfirmPlaceFromVault: NonNullable<ComponentProps<typeof PlacesDetailSheet>['onConfirmPlace']>;
-  handleConfirmPlace: ComponentProps<typeof PlacePromptSheet>['onConfirm'];
-  closePlacePrompt: () => void;
+  locationPermission: LocationPermissionState;
+  saveDayPlace: (input: Parameters<ComponentProps<typeof TodayPlacesSheet>['onSavePlace']>[0], target?: DayInputTarget) => void;
+  enrichDayPlace: (input: Parameters<ComponentProps<typeof TodayPlacesSheet>['onEnrichPlace']>[0], target?: DayInputTarget) => void;
+  removeDayPlace: (id: string, target?: DayInputTarget) => void;
+  dismissPlaceCandidate: (id: string, target?: DayInputTarget) => void;
+  setLocationPermission: (permission: LocationPermissionState) => void;
   setFoodMomentMeaning: (input: { momentId: string; meaning: FoodConfirmInput['meaning'] }, target?: DayInputTarget) => void;
   setStudioMomentRating: (input: { momentId: string; rating: StudioConfirmInput['rating'] }, target?: DayInputTarget) => void;
   clearFoodFollowUp: () => void;
@@ -81,8 +76,6 @@ export function TodaySheetHost({
   suppressFollowUps,
   memoryQuests,
   recentAvgSteps,
-  activePlace,
-  placePreset,
   observations,
   travelMemory,
   cloudIntelligenceEnabled,
@@ -101,9 +94,12 @@ export function TodaySheetHost({
   handleSetSleep,
   handleConfirmSteps,
   handleQuest,
-  handleConfirmPlaceFromVault,
-  handleConfirmPlace,
-  closePlacePrompt,
+  locationPermission,
+  saveDayPlace,
+  enrichDayPlace,
+  removeDayPlace,
+  dismissPlaceCandidate,
+  setLocationPermission,
   setFoodMomentMeaning,
   setStudioMomentRating,
   clearFoodFollowUp,
@@ -127,7 +123,6 @@ export function TodaySheetHost({
     stepsSheetOpen,
     journeySheetOpen,
     placesVaultOpen,
-    placePromptOpen,
     nameSheetOpen,
     setMemoryVaultOpen,
     setMemoryVaultTab,
@@ -172,7 +167,6 @@ export function TodaySheetHost({
     journeySheetOpen ||
     placesVaultOpen ||
     observatoryOpen ||
-    placePromptOpen ||
     nameSheetOpen;
 
   return (
@@ -334,26 +328,18 @@ export function TodaySheetHost({
         />
       ) : null}
       {placesVaultOpen ? (
-        <PlacesDetailSheet
+        <TodayPlacesSheet
           day={viewedDay}
+          editable={viewedIsForming}
+          locationPermission={locationPermission}
+          target={formingTarget}
           onClose={() => setPlacesVaultOpen(false)}
-          onAddPlace={
-            viewedIsForming
-              ? () => {
-                  setPlacesVaultOpen(false);
-                  openManualJournal('went_somewhere');
-                }
-              : undefined
-          }
-          onOpenMap={() => {
-            setPlacesVaultOpen(false);
-            handleOpenDayMap(viewedDay.id);
-          }}
-          onConfirmPlace={viewedIsForming ? handleConfirmPlaceFromVault : undefined}
-          onOpenObservatory={() => {
-            setPlacesVaultOpen(false);
-            setObservatoryOpen(true);
-          }}
+          onDismissCandidate={(id) => dismissPlaceCandidate(id, formingTarget)}
+          onEnrichPlace={(input) => enrichDayPlace(input, formingTarget)}
+          onLocationPermissionChange={setLocationPermission}
+          onOpenMap={() => transitionSheet(() => setPlacesVaultOpen(false), () => handleOpenDayMap(viewedDay.id))}
+          onRemovePlace={(id) => removeDayPlace(id, formingTarget)}
+          onSavePlace={(input) => saveDayPlace(input, formingTarget)}
         />
       ) : null}
       {observatoryOpen ? (
@@ -378,16 +364,6 @@ export function TodaySheetHost({
               : undefined
           }
           onClose={() => setObservatoryOpen(false)}
-        />
-      ) : null}
-      {placePromptOpen && activePlace ? (
-        <PlacePromptSheet
-          placeName={placePreset && activePlace.name === 'A place you visited' ? 'Welcome back' : activePlace.name}
-          timeLabel={activePlace.timeLabel}
-          isNew={activePlace.isNew}
-          presetCategory={placePreset}
-          onConfirm={handleConfirmPlace}
-          onClose={closePlacePrompt}
         />
       ) : null}
       {nameSheetOpen ? (

@@ -30,6 +30,11 @@ export type CapturedMomentInput = {
   journal?: ManualJournalSubmission | null;
 };
 
+export type CapturedMomentOptions = {
+  allowHatched?: boolean;
+  journalOnly?: boolean;
+};
+
 export function withCapturedMoment(
   day: StoredHomeDayRecord,
   capture: CapturedMomentInput,
@@ -38,9 +43,10 @@ export function withCapturedMoment(
     studio: StudioDetection;
     studioDetail?: string | null;
   },
-  now: Date
+  now: Date,
+  options: CapturedMomentOptions = {}
 ): StoredHomeDayRecord {
-  if (day.state === 'hatched') {
+  if (day.state === 'hatched' && !options.allowHatched) {
     return day;
   }
 
@@ -73,7 +79,7 @@ export function withCapturedMoment(
 
   const captured: StoredHomeDayRecord = {
     ...day,
-    capturedEnergy: mergeCaptureEnergy(day.capturedEnergy, capture.energy),
+    capturedEnergy: options.journalOnly ? day.capturedEnergy : mergeCaptureEnergy(day.capturedEnergy, capture.energy),
     capturedMeanings:
       meaning && meaning.label.trim()
         ? appendCapturedMeaning(day.capturedMeanings, {
@@ -89,7 +95,7 @@ export function withCapturedMoment(
     classifiedMemories: classifiedMemory
       ? upsertClassifiedMemory(day.classifiedMemories, [classifiedMemory])
       : day.classifiedMemories,
-    foodMoments: detections.food.detected
+    foodMoments: !options.journalOnly && detections.food.detected
       ? appendFoodMoment(
           day.foodMoments,
           buildAutoFoodMoment(detections.food, {
@@ -101,7 +107,7 @@ export function withCapturedMoment(
           })
         )
       : day.foodMoments,
-    studioMoments: finalizedStudioDetection.detected
+    studioMoments: !options.journalOnly && finalizedStudioDetection.detected
       ? appendStudioMoment(
           day.studioMoments,
           buildAutoStudioMoment(finalizedStudioDetection, {

@@ -39,6 +39,7 @@ fs.writeFileSync(
 );
 const photoIntelligencePath = path.join(tempDir, 'photo-intelligence.js');
 fs.writeFileSync(photoIntelligencePath, 'exports.buildPhotoIntelligence = (input) => ({ memory: { id: `classified:${input.sourceId}` }, evidence: { id: input.sourceId, signals: [], sourceType: "photo" } });\n');
+const photoLocationPath = transpileTo('utils/photo-location.ts', 'utils/photo-location.js');
 
 transpileTo('game/days/date.ts', 'game/days/date.js');
 const recordsPath = transpileTo('game/days/records.ts', 'game/days/records.js');
@@ -50,6 +51,7 @@ const stubs = {
   '@/utils/intelligence/classification': classificationPath,
   '@/utils/intelligence/photo-intelligence': photoIntelligencePath,
   '@/utils/photo-curation': photoCurationPath,
+  '@/utils/photo-location': photoLocationPath,
   '@/utils/vision-signals': visionSignalsPath,
 };
 const originalResolve = Module._resolveFilename;

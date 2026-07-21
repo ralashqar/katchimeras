@@ -362,12 +362,53 @@ check('manual Watch / read starts by asking what it was', !todaySheetHostSource.
 check('automatic food follow-up cannot overlay any manual flow', todaySheetHostSource.includes('foodFollowUp && !blockingSheetOpen && !suppressFollowUps'));
 check('automatic studio follow-up cannot overlay any manual flow', todaySheetHostSource.includes('studioFollowUp && !blockingSheetOpen && !suppressFollowUps'));
 const todaySource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/today.tsx'), 'utf8');
+const hatchCheckInSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/hatch-check-in-sheet.tsx'), 'utf8');
+const hatchCheckInPlannerSource = fs.readFileSync(path.join(projectRoot, 'utils/hatch-check-in.ts'), 'utf8');
+const hatchControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-hatch-controller.ts'), 'utf8');
+const mapPhotoRefreshSource = fs.readFileSync(path.join(projectRoot, 'hooks/use-day-map-photo-refresh.ts'), 'utf8');
+const allDaysSource = fs.readFileSync(path.join(projectRoot, 'hooks/use-all-days.ts'), 'utf8');
+const hatchingSource = fs.readFileSync(path.join(projectRoot, 'game/days/hatching.ts'), 'utf8');
+const homeStorageSource = fs.readFileSync(path.join(projectRoot, 'utils/home-storage.ts'), 'utf8');
+const hatchIntegritySource = fs.readFileSync(path.join(projectRoot, 'game/days/state-integrity.ts'), 'utf8');
+const exploreSource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/explore.tsx'), 'utf8');
 const momentCaptureSource = fs.readFileSync(path.join(projectRoot, 'app/moment-capture.tsx'), 'utf8');
 check('all manual surfaces cancel pending food follow-up', todaySource.includes('suppressFoodFollowUp: anyManualSheetOpen'));
 check('all manual surfaces cancel pending studio follow-up', todaySource.includes('suppressStudioFollowUp: anyManualSheetOpen'));
 check('voice and written notes have distinct menu actions', todaySource.includes("id: 'voice_note'") && todaySource.includes("id: 'written_note'") && !todaySource.includes("title: 'Voice & note'"));
 check('manual menu is grouped into capture, context, and more', ['capture', 'context', 'more'].every((section) => todaySource.includes(`section: '${section}'`)));
 const actionRouterSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-today-action-router.ts'), 'utf8');
+const dayJournalSectionsSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-journal-sections.tsx'), 'utf8');
+check('Today replaces the quest mote with the compact day map action', todaySource.includes("id: 'map'") && todaySource.includes('categories={mapRingItems}') && !actionRouterSource.includes('ringCategories'));
+check('thin-day reveal opens the optional hatch check-in before finalization', todaySource.includes('hatchCheckInEligibility(selectedDay)') && todaySource.includes('<HatchCheckInSheet'));
+check('hatch check-in keeps an explicit hatch-now escape on every question', hatchCheckInSource.includes('label="Hatch now"') && hatchCheckInSource.includes('Skipping never changes whether your egg can hatch'));
+check('hatch reflection is capped at three adaptive taps', hatchCheckInSource.includes('question.step') && hatchCheckInSource.includes('question.total') && hatchCheckInPlannerSource.includes("['reconstruct.focus', 'reconstruct.category', 'reflection.meaning']"));
+check('journaled days ask meaning without repeating known facts', hatchCheckInPlannerSource.includes("['reflection.moment', 'reflection.meaning']") && hatchCheckInPlannerSource.includes("['reflection.meaning']"));
+check('a completed hatch reaches durable storage before map navigation can read it', hatchControllerSource.includes('storedStateRef.current = hatchedState') && hatchControllerSource.includes('homeRepository.save(hatchedState'));
+check('map hydration follows live repository identity instead of stale disk JSON', allDaysSource.includes('hydrationCache.state === stored') && !allDaysSource.includes('const raw = homeRepository.loadRaw()'));
+check('map photo refresh cannot downgrade a visible hatch', mapPhotoRefreshSource.includes('preserveVisibleHatchForMap(state, day)'));
+check('all home-state writers preserve finalized hatches at the storage boundary', homeStorageSource.includes('preserveFinalizedHatches(currentState, state)') && hatchIntegritySource.includes("state: 'hatched'") && hatchIntegritySource.includes('creature: finalized.creature'));
+check('a synchronous hatch is requeued behind any older native async write', homeStorageSource.includes('if (deferredWrite) pendingDeferredState = protectedState'));
+check('only explicit developer reset controls can reverse a hatch', exploreSource.includes('allowHatchDowngrade: true'));
+check('developer hatch overrides are one-shot', hatchingSource.includes('devForceReadyToHatch: undefined') && hatchingSource.includes('devHatchReflectionMode: undefined'));
+check('Today no longer renders the oversized memory map card', !dayJournalSectionsSource.includes('DayMapCard'));
+const dayMapRouteSource = fs.readFileSync(path.join(projectRoot, 'app/day-map/[dayId].tsx'), 'utf8');
+const dayMapSurfaceSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/day-map/day-map-surface.tsx'), 'utf8');
+const dayMapHeaderSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/day-map/day-map-header.tsx'), 'utf8');
+const dayMapDockSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/day-map/day-map-bottom-dock.tsx'), 'utf8');
+const dayMapPlaceSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/day-map/day-map-place-sheet.tsx'), 'utf8');
+const photoEssenceRouteSource = fs.readFileSync(path.join(projectRoot, 'app/photo-essence.tsx'), 'utf8');
+const dayActionsSource = fs.readFileSync(path.join(projectRoot, 'game/days/actions.ts'), 'utf8');
+check('Memory map keeps the Katchimera or egg in the illustrated header', dayMapRouteSource.includes('<DayMapHeader') && dayMapHeaderSource.includes('getCreatureVisual') && dayMapHeaderSource.includes('eggBase'));
+check('Memory map no longer invents a creature geographic pin', !dayMapSurfaceSource.includes('creature-catch-') && !dayMapSurfaceSource.includes('creatureMarkerCoordinate'));
+check('Memory map opens place details directly when a pin is selected', dayMapRouteSource.includes('setPlaceSheetOpen(Boolean(nodeId))') && dayMapRouteSource.includes('placeSheetOpen && selectedPlace'));
+check('Memory map pin selection has no intermediate callout bubble', !dayMapSurfaceSource.includes('Callout') && !dayMapSurfaceSource.includes('MapNodeCallout'));
+check('Memory map bottom dock is navigation-only and names adjacent dates', dayMapRouteSource.includes('<DayMapBottomDock') && dayMapDockSource.includes('Previous') && dayMapDockSource.includes('Next') && dayMapDockSource.includes('day.dateLabel') && !dayMapDockSource.includes('summaryTitle'));
+check('Memory map selection keeps custom pin artwork mounted and geometrically stable', dayMapSurfaceSource.includes('memo(function MapNodeMarker') && !dayMapSurfaceSource.includes('isSelected={interactive'));
+check('Memory map place details show photos before journal entries', dayMapPlaceSheetSource.indexOf('title="Added memories"') < dayMapPlaceSheetSource.indexOf('title="Journal memories"') && dayMapPlaceSheetSource.indexOf('title="From Photo Library"') < dayMapPlaceSheetSource.indexOf('title="Journal memories"'));
+check('Memory map journal entries reuse the Moments vertical timeline language', dayMapPlaceSheetSource.includes('KatchaBeveledCard') && dayMapPlaceSheetSource.includes('styles.railLine') && dayMapPlaceSheetSource.includes('styles.railHalo') && dayMapPlaceSheetSource.includes('styles.railDot'));
+check('Memory map photo timestamps include an explicit AM or PM period', dayMapPlaceSheetSource.includes("hour12: true") && dayMapPlaceSheetSource.includes("'en-US'"));
+check('Unjournaled map library photos launch the shared Essence review flow', dayMapPlaceSheetSource.includes('onJournalLibraryPhoto') && dayMapPlaceSheetSource.includes('journalAction') && dayMapRouteSource.includes("pathname: '/photo-essence'") && dayMapRouteSource.includes('dayId: day.id'));
+check('Map photo review commits to its original day without rewriting a hatched creature', photoEssenceRouteSource.includes('applyCapturedMomentToDay(explicitDayId') && dayActionsSource.includes('applyCapturedMomentForDay') && dayActionsSource.includes('journalOnly: historical'));
 check('every quick action closes state-backed sheets before opening', actionRouterSource.includes('sheets.closeAllSheets();'));
 check('manual quick actions deep-link to their hierarchical flows', [
   "id === 'place') openManualJournal('went_somewhere')",
@@ -390,6 +431,7 @@ check('manual journal keeps Save memory outside the scrolling content', manualJo
 check('manual journal keeps notes inline', !manualJournalSource.includes("type Stage = 'flow' | 'category' | 'details' | 'note'") && manualJournalSource.includes('noteExpanded'));
 check('manual journal protects dirty drafts from accidental dismissal', manualJournalSource.includes('Discard this draft?') && manualJournalSource.includes('if (dirty) setDiscardOpen(true)'));
 check('manual journal exposes selected state to assistive technology', manualJournalSource.includes('accessibilityState={{ selected }}'));
+check('photo journals replace place suggestions with a locked geotag notice', manualJournalSource.includes("sourceType === 'photo'") && manualJournalSource.includes('<PhotoLocationNotice') && manualJournalSource.includes('Photo location only'));
 check('named Other media remains in the two-column category grid',
   manualJournalSource.includes('function isCatchAllChoice')
     && manualJournalSource.includes('/^(something else|somewhere else|other)$/i')
@@ -425,7 +467,7 @@ check('photo Essence renders the selected top-four keys without a second confide
 check('photo prompt is no longer an independent absolute bottom overlay', essenceReviewSource.includes("captured: { alignItems: 'center', gap: 8, width: '100%' }"));
 const foodSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/food-vault-sheet.tsx'), 'utf8');
 check('vault add buttons deep-link to Food and Studio flows', todaySheetHostSource.includes("openManualJournal('food')") && todaySheetHostSource.includes("openManualJournal('studio')"));
-check('Places and Journey add actions deep-link to their hierarchical flows', todaySheetHostSource.includes("openManualJournal('went_somewhere')") && todaySheetHostSource.includes("openManualJournal('movement')"));
+check('Places uses its unified in-sheet add flow while Journey deep-links to movement', todaySheetHostSource.includes('<TodayPlacesSheet') && todaySheetHostSource.includes('onSavePlace=') && todaySheetHostSource.includes("openManualJournal('movement')"));
 check('manual food has no forced third question', !foodSheetSource.includes('· what kind?'));
 check('meal refinements remain optional on the meaning screen', foodSheetSource.includes('Meal detail · optional'));
 const placeSheetSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/place-prompt-sheet.tsx'), 'utf8');

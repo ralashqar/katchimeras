@@ -29,10 +29,11 @@ import { manualJournalArt } from '@/constants/manual-journal-art';
 import { Meadow } from '@/constants/meadow-theme';
 import { AppFontFamilies } from '@/constants/theme';
 import { useJournalVoiceDraft } from '@/hooks/use-journal-voice-draft';
-import type { JournalLocationSelection, JournalNoteDraft, JournalRouteProposal, JournalSource, ManualJournalSubmission } from '@/types/home';
+import type { JournalLocationSelection, JournalNoteDraft, JournalRouteProposal, JournalSource, ManualJournalSubmission, StoredHomeLocationPoint } from '@/types/home';
 import { extractNoteSpecificOnDevice } from '@/utils/foundation-note';
 import { voiceJournalInputAdapter } from '@/utils/journal-input-adapters';
 import { shouldAutoRouteVoice } from '@/utils/manual-journal-voice-routing';
+import { journalPlaceSearchQuery } from '@/utils/journal-place-search';
 import {
   MANUAL_JOURNAL_FLOWS,
   manualJournalFlow,
@@ -63,6 +64,7 @@ export type JournalComposerProps = {
   initialNoteExpanded?: boolean;
   initialConfirmedFacets?: ManualJournalSubmission['confirmedFacets'];
   initialLocation?: JournalLocationSelection | null;
+  dayLocationPoints?: StoredHomeLocationPoint[];
   liveSpecific?: string | null;
   liveSpecificLoading?: boolean;
   suggestedRoutes?: JournalRouteProposal[];
@@ -89,6 +91,7 @@ export function JournalComposer({
   initialNoteExpanded = false,
   initialConfirmedFacets,
   initialLocation,
+  dayLocationPoints,
   liveSpecific,
   liveSpecificLoading = false,
   suggestedRoutes = [],
@@ -121,7 +124,7 @@ export function JournalComposer({
   const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(initialLinkedNote ?? null);
   const [resolvedJournalSource, setResolvedJournalSource] = useState<JournalSource | undefined>(journalSource);
   const [confirmedFacets, setConfirmedFacets] = useState(initialConfirmedFacets);
-  const [location, setLocation] = useState<JournalLocationSelection | null>(initialLocation ?? null);
+  const [location, setLocation] = useState<JournalLocationSelection | null>(sourceType === 'photo' ? null : initialLocation ?? null);
   const [voiceRoutes, setVoiceRoutes] = useState<JournalRouteProposal[]>([]);
   const [voiceRouting, setVoiceRouting] = useState(false);
   const [noteSpecificLoading, setNoteSpecificLoading] = useState(false);
@@ -237,6 +240,9 @@ export function JournalComposer({
     : stage === 'category'
       ? 'What kind of moment was it?'
       : 'Add as much as you’d like.';
+  const locationSearchQuery = flow?.id === 'went_somewhere' && choice
+    ? journalPlaceSearchQuery(specific, noteSpecificLoading ? '' : choice.id)
+    : '';
   const groupedFlows = useMemo(() => SECTION_ORDER.map((section) => ({
     section,
     flows: MANUAL_JOURNAL_FLOWS
@@ -520,8 +526,10 @@ export function JournalComposer({
                   </View>
                 </EditorSection>
 
-                {flow.id === 'went_somewhere' ? (
-                  <JournalLocationField onChange={setLocation} query={specific} value={location} />
+                {flow.id === 'went_somewhere' ? sourceType === 'photo' ? (
+                  <PhotoLocationNotice />
+                ) : (
+                  <JournalLocationField dayLocationPoints={dayLocationPoints} onChange={setLocation} query={locationSearchQuery} value={location} />
                 ) : null}
 
                 {(choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices)?.length ? (
@@ -781,6 +789,21 @@ function EditorSection({ children, label }: { children: ReactNode; label: string
   );
 }
 
+function PhotoLocationNotice() {
+  return (
+    <View accessibilityLabel="Location comes only from this photo's original geotag" style={styles.photoLocationNotice}>
+      <View style={styles.photoLocationIcon}>
+        <IconSymbol name="location.fill" size={17} color={Meadow.goldDeep} />
+      </View>
+      <View style={styles.photoLocationCopy}>
+        <ThemedText style={styles.photoLocationTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Photo location only</ThemedText>
+        <ThemedText selectable style={styles.photoLocationBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>We’ll use the photo’s original geotag when it has one.</ThemedText>
+      </View>
+      <IconSymbol name="lock.fill" size={14} color={Meadow.inkSoft} />
+    </View>
+  );
+}
+
 function SectionLabel({ children }: { children: ReactNode }) {
   return <ThemedText maxFontSizeMultiplier={1.4} style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>{children}</ThemedText>;
 }
@@ -925,6 +948,11 @@ const styles = StyleSheet.create({
   input: { backgroundColor: 'rgba(255,248,232,0.42)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.52)', color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 16, minHeight: 56, paddingHorizontal: 15, paddingVertical: 13 },
   inputWithActivity: { paddingRight: 48 },
   inputActivity: { alignItems: 'center', bottom: 0, justifyContent: 'center', position: 'absolute', right: 15, top: 0 },
+  photoLocationNotice: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.34)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 66, paddingHorizontal: 12, paddingVertical: 10 },
+  photoLocationIcon: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.20)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  photoLocationCopy: { flex: 1, gap: 2 },
+  photoLocationTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '800', lineHeight: 18 },
+  photoLocationBody: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '600', lineHeight: 16 },
   optionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   optionChip: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.30)', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 44, paddingHorizontal: 13, paddingVertical: 9 },
   optionChipSelected: { backgroundColor: 'rgba(229,190,106,0.32)', borderColor: Meadow.goldDeep },

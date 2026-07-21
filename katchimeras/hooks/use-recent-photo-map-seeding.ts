@@ -4,7 +4,7 @@ import { InteractionManager } from 'react-native';
 
 import type { RecentPhotoAsset } from '@/types/home';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
-import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
+import { resolvePhotoLocation } from '@/utils/photo-location';
 import { analyzePassivePhoto, PASSIVE_FOUNDATION_DAILY_LIMIT } from '@/utils/intelligence/passive-photo-analysis';
 
 // Scan a multi-day window so photos land on the days they were actually taken
@@ -81,10 +81,8 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
           try {
             const info = await MediaLibrary.getAssetInfoAsync(asset.id);
             const exif = (info as { exif?: Record<string, unknown> | null }).exif ?? null;
-            const latitude = info.location?.latitude ?? resolvePhotoLatitude(exif) ?? undefined;
-            const longitude = info.location?.longitude ?? resolvePhotoLongitude(exif) ?? undefined;
-
-            if (latitude == null || longitude == null) {
+            const coordinate = resolvePhotoLocation(info.location?.latitude, info.location?.longitude, exif);
+            if (!coordinate) {
               continue;
             }
 
@@ -103,8 +101,8 @@ export function useRecentPhotoMapSeeding({ enabled, dayId, onSeed }: UseRecentPh
               height: asset.height,
               id: asset.id,
               isScreenshot,
-              latitude,
-              longitude,
+              latitude: coordinate.latitude,
+              longitude: coordinate.longitude,
               thumbnailUri: asset.uri,
               uri: asset.uri,
               width: asset.width,

@@ -16,7 +16,7 @@ import type {
   RadialMomentAction,
 } from '@/types/home';
 import { deriveInspirationSelection } from '@/game/days';
-import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
+import { resolvePhotoLocation } from '@/utils/photo-location';
 
 type UseAddMomentFlowOptions = {
   enabled: boolean;
@@ -223,6 +223,7 @@ export function useAddMomentFlow({
     }
 
     const selectedAsset = result.assets[0];
+    const selectedCoordinate = resolvePhotoLocation(null, null, selectedAsset.exif ?? null);
     beginAbsorption(
       {
         kind: 'photo',
@@ -238,9 +239,9 @@ export function useAddMomentFlow({
         metadata: {
           assetId: selectedAsset.assetId,
           height: selectedAsset.height,
-          latitude: resolvePhotoLatitude(selectedAsset.exif ?? null),
+          latitude: selectedCoordinate?.latitude,
           localUri: selectedAsset.uri,
-          longitude: resolvePhotoLongitude(selectedAsset.exif ?? null),
+          longitude: selectedCoordinate?.longitude,
           thumbnailUri: selectedAsset.uri,
           width: selectedAsset.width,
         },
@@ -358,25 +359,21 @@ export function useAddMomentFlow({
         return;
       }
 
-      let resolvedLocation = {
-        latitude: asset.latitude,
-        longitude: asset.longitude,
-      };
+      let resolvedLocation: { latitude: number | undefined; longitude: number | undefined } =
+        resolvePhotoLocation(asset.latitude, asset.longitude, null) ?? {
+          latitude: undefined,
+          longitude: undefined,
+        };
 
       if ((resolvedLocation.latitude == null || resolvedLocation.longitude == null) && asset.id) {
         try {
           const MediaLibrary = await import('expo-media-library');
           const info = await MediaLibrary.getAssetInfoAsync(asset.id);
-          resolvedLocation = {
-            latitude:
-              info.location?.latitude ??
-              resolvePhotoLatitude((info as { exif?: Record<string, unknown> | null }).exif ?? null) ??
-              undefined,
-            longitude:
-              info.location?.longitude ??
-              resolvePhotoLongitude((info as { exif?: Record<string, unknown> | null }).exif ?? null) ??
-              undefined,
-          };
+          resolvedLocation = resolvePhotoLocation(
+            info.location?.latitude,
+            info.location?.longitude,
+            (info as { exif?: Record<string, unknown> | null }).exif ?? null
+          ) ?? resolvedLocation;
         } catch {
           resolvedLocation = resolvedLocation;
         }

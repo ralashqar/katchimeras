@@ -2,6 +2,7 @@ import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { dayPromptRegistry } from '@/constants/day-prompts';
 import type { HomeDayRecord } from '@/types/home';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
+import { HATCH_CHECK_IN_FLOWS } from '@/utils/hatch-check-in';
 import {
   resolveBigMomentDisplay,
   resolveFoodMomentDisplay,
@@ -98,6 +99,24 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
       label: answer.labels.join(' · '),
       category: PROMPT_CATEGORY[answer.kind] ?? prompt?.title.replace(/[?]$/, ''),
       noteText: answer.noteText,
+    });
+  }
+
+  const checkIn = day.hatchCheckIn;
+  const checkInLabels = checkIn
+    ? checkIn.meaningLabel
+      ? [checkIn.anchorLabel ?? checkIn.categoryLabel ?? checkIn.flowLabel, checkIn.meaningLabel].filter((label): label is string => Boolean(label))
+      : [checkIn.moodLabel, checkIn.flowLabel, checkIn.categoryLabel].filter((label): label is string => Boolean(label))
+    : [];
+  if (checkIn && checkIn.status !== 'skipped' && checkInLabels.length > 0) {
+    const flow = HATCH_CHECK_IN_FLOWS.find((item) => item.id === checkIn.flowId);
+    push({
+      id: `hatch-check-in:${day.id}`,
+      createdAt: checkIn.completedAt ?? checkIn.updatedAt,
+      icon: flow?.icon ?? 'sparkles',
+      accent: flow?.accent ?? '#FFC36B',
+      label: checkInLabels.join(' · '),
+      category: checkIn.planVersion === 2 ? 'Daily reflection' : 'Hatch check-in',
     });
   }
 

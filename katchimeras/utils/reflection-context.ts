@@ -214,7 +214,8 @@ export function classifyMood(day: StoredHomeDayRecord): DayMood {
 }
 
 function hasPromptTag(day: StoredHomeDayRecord, tag: string): boolean {
-  return day.promptAnswers.some((answer) => !answer.dismissed && answer.semanticTags.includes(tag));
+  return day.promptAnswers.some((answer) => !answer.dismissed && answer.semanticTags.includes(tag)) ||
+    (day.hatchCheckIn?.status !== 'skipped' && day.hatchCheckIn?.semanticTags.includes(tag) === true);
 }
 
 // How deep the relationship is, by lifetime visits, with a current streak able

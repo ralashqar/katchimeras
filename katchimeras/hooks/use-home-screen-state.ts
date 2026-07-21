@@ -17,7 +17,11 @@ import type {
 import {
   addMomentToDay,
   answerDayPromptForToday,
+  answerHatchCheckInForDay,
+  startHatchCheckInForDay,
+  finishHatchCheckInForDay,
   answerHeroPhotoMeaningForToday,
+  applyCapturedMomentForDay,
   applyCapturedMomentForToday,
   applyNoteForToday,
   addManualJournalEntryForToday,
@@ -27,6 +31,8 @@ import {
   setStudioMomentRatingForToday,
   completeSeedForToday,
   confirmPlaceForToday,
+  dismissPlaceCandidateForToday,
+  enrichDayPlaceForToday,
   markBigMomentForToday,
   setSleepForToday,
   setStepsInterpretationForToday,
@@ -37,6 +43,8 @@ import {
   hydrateAllDays,
   hydrateHomeState,
   recordForegroundLocationSample,
+  removeDayPlaceForToday,
+  saveDayPlaceForToday,
   seedPhotoLocationsByDay,
   selectHeroPhotoForToday,
   selectPathForToday,
@@ -349,6 +357,24 @@ export function useHomeScreenState() {
     [mutateHomeState]
   );
 
+  const startHatchCheckIn = useCallback((dayId: string, reason: 'empty' | 'thin' | 'regular' | 'rich') => {
+    mutateHomeState((state, profile, now) => startHatchCheckInForDay(state, dayId, reason, profile, now));
+  }, [mutateHomeState]);
+
+  const answerHatchCheckIn = useCallback(
+    (dayId: string, input: { kind: 'flow' | 'category' | 'moment' | 'meaning'; id: string }) => {
+      mutateHomeState((state, profile, now) => answerHatchCheckInForDay(state, dayId, input, profile, now));
+    },
+    [mutateHomeState]
+  );
+
+  const finishHatchCheckIn = useCallback(
+    (dayId: string, status: 'completed' | 'partial' | 'skipped') => {
+      mutateHomeState((state, profile, now) => finishHatchCheckInForDay(state, dayId, status, profile, now));
+    },
+    [mutateHomeState]
+  );
+
   const dismissDayPrompt = useCallback(
     (kind: DayPromptKind, target: DayInputTarget = 'today') => {
       if (kind === 'meaningful_photo' && forceMeaningfulPhotoPrompt) {
@@ -476,6 +502,38 @@ export function useHomeScreenState() {
     [mutateHomeState]
   );
 
+  const applyCapturedMomentToDay = useCallback(
+    (
+      dayId: string,
+      capture: Parameters<typeof applyCapturedMomentForDay>[1],
+      observedAt?: string | null
+    ) => {
+      mutateHomeState((state, profile, now) =>
+        applyCapturedMomentForDay(state, capture, dayId, profile, now, observedAt)
+      );
+    },
+    [mutateHomeState]
+  );
+
+  const saveDayPlace = useCallback(
+    (input: Parameters<typeof saveDayPlaceForToday>[1], target: DayInputTarget = 'today') => {
+      mutateHomeState((state, profile, now) => saveDayPlaceForToday(state, input, profile, now, target));
+    },
+    [mutateHomeState]
+  );
+  const enrichDayPlace = useCallback(
+    (input: Parameters<typeof enrichDayPlaceForToday>[1], target: DayInputTarget = 'today') => {
+      mutateHomeState((state, profile, now) => enrichDayPlaceForToday(state, input, profile, now, target));
+    },
+    [mutateHomeState]
+  );
+  const removeDayPlace = useCallback((id: string, target: DayInputTarget = 'today') => {
+    mutateHomeState((state, profile, now) => removeDayPlaceForToday(state, id, profile, now, target));
+  }, [mutateHomeState]);
+  const dismissPlaceCandidate = useCallback((id: string, target: DayInputTarget = 'today') => {
+    mutateHomeState((state, profile, now) => dismissPlaceCandidateForToday(state, id, profile, now, target));
+  }, [mutateHomeState]);
+
   const addManualJournalEntry = useCallback(
     (input: Parameters<typeof addManualJournalEntryForToday>[1], target: DayInputTarget = 'today') => {
       mutateHomeState((state, profile, now) => addManualJournalEntryForToday(state, input, profile, now, target));
@@ -497,10 +555,15 @@ export function useHomeScreenState() {
     activeDayPrompt,
     availableDayPrompts,
     applyCapturedMoment,
+    applyCapturedMomentToDay,
     dailySeeds,
     completeSeed,
     addNote,
     confirmPlace,
+    saveDayPlace,
+    enrichDayPlace,
+    removeDayPlace,
+    dismissPlaceCandidate,
     markBigMoment,
     addManualJournalEntry,
     setSleep,
@@ -527,6 +590,9 @@ export function useHomeScreenState() {
     importingHealthRouteDayId,
     addMoment,
     answerDayPrompt,
+    startHatchCheckIn,
+    answerHatchCheckIn,
+    finishHatchCheckIn,
     answerPhotoMeaning,
     dismissDayPrompt,
     addForegroundLocationSample,

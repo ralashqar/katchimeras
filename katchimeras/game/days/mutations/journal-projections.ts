@@ -15,7 +15,33 @@ const PROJECTORS: Partial<Record<ManualJournalFlowDefinition['projectionKind'], 
     const moment: StudioMoment = { id: `studio-${entry.id}`, label: specific || choice.label, mediaType: choice.mediaType ?? 'other', emoji: EMOJI[choice.id] ?? '✨', rating: asStudioRating(entry.feeling), source: legacySource(record), sourceId: record.source.kind === 'photo' ? record.source.sourceId : entry.id, thumbnailUri: record.source.kind === 'photo' ? record.source.thumbnailUri ?? null : null, detail: entry.note, createdAt: entry.createdAt };
     return { ...day, studioMoments: [...(day.studioMoments ?? []), moment].slice(-12) };
   },
-  place(day, { entry, choice, specific, context }) { return { ...day, confirmedPlaces: [...(day.confirmedPlaces ?? []), { id: `place-${entry.id}`, category: choice.id, archetype: archetypeForFeeling(entry.feeling), label: specific || choice.label, meaningLabel: context ? humanize(context) : undefined, confirmedAt: entry.createdAt }] }; },
+  place(day, { record, entry, choice, specific, context }) {
+    const location = record.location;
+    const match = location ? (day.confirmedPlaces ?? []).find((place) =>
+      (location.placeId && place.placeId === location.placeId) ||
+      (Number.isFinite(place.latitude) && Number.isFinite(place.longitude) && geoDistance(
+        place.latitude!, place.longitude!, location.latitude, location.longitude
+      ) <= 75)
+    ) : null;
+    const id = match?.id ?? `place-${entry.id}`;
+    const place = {
+      ...(match ?? {}), id,
+      category: choice.id,
+      categoryLabel: choice.label,
+      archetype: archetypeForFeeling(entry.feeling),
+      label: specific || location?.name || choice.label,
+      name: location?.name || specific || match?.name,
+      meaningLabel: context ? humanize(context) : undefined,
+      confirmedAt: entry.createdAt,
+      latitude: location?.latitude ?? match?.latitude,
+      longitude: location?.longitude ?? match?.longitude,
+      address: location?.address ?? match?.address,
+      placeId: location?.placeId ?? match?.placeId,
+      locationSource: location?.source ?? match?.locationSource,
+      locationPointId: match?.locationPointId ?? (location ? `journal-location-${record.id}` : undefined),
+    };
+    return { ...day, confirmedPlaces: [...(day.confirmedPlaces ?? []).filter((candidate) => candidate.id !== id), place] };
+  },
   movement(day, { entry, choice, specific, context }) { return { ...day, stepsInterpretation: { movement: movementKind(choice.id), label: specific || choice.label, emoji: MOVEMENT_EMOJI[choice.id] ?? '⚡', subtype: context || undefined, createdAt: entry.createdAt } }; },
   big_event(day, { entry, choice, specific, linkedNoteId }) {
     if (!choice.bigMomentType) return day;
@@ -32,3 +58,4 @@ function asStudioRating(value?: string | null): StudioRating | null { return val
 function movementKind(value: string): DayMovementKind { if (value === 'sport') return 'workout'; return ['walk', 'run', 'cycle', 'workout', 'hike', 'errands', 'commute', 'travel', 'mixed'].includes(value) ? value as DayMovementKind : 'mixed'; }
 function archetypeForFeeling(value?: string | null): string { if (value === 'exciting') return 'energy'; if (value === 'loved' || value === 'liked') return 'together'; if (value === 'difficult') return 'meaningful'; return 'calm'; }
 function humanize(value: string): string { return value.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase()); }
+function geoDistance(aLat: number, aLng: number, bLat: number, bLng: number): number { const r = 6371000; const dLat = (bLat - aLat) * Math.PI / 180; const dLng = (bLng - aLng) * Math.PI / 180; const a = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * Math.PI / 180) * Math.cos(bLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2; return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); }

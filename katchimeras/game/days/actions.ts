@@ -4,6 +4,8 @@ import type {
   BigMomentType,
   CuisineFamily,
   DayEvidenceProvider,
+  HatchCheckInEligibilityReason,
+  HatchCheckInStatus,
   DayHeroPhoto,
   DayInputTarget,
   DayPromptAnswer,
@@ -59,6 +61,8 @@ import {
   withAppendedMoment,
   withCapturedMoment,
   withConfirmedPlace,
+  withDismissedPlaceCandidate,
+  withEnrichedDayPlace,
   withDayName,
   withDayForegroundLocationSample,
   withDayStepCount,
@@ -76,15 +80,21 @@ import {
   withManualFoodMoment,
   withManualStudioMoment,
   withManualJournalEntry,
+  withRemovedDayPlace,
+  withSavedDayPlace,
   withNoteMemory,
   withPromptAnswer,
+  withStartedHatchCheckIn,
+  withHatchCheckInAnswer,
+  withFinishedHatchCheckIn,
   withSeedCompletion,
   withSleep,
   withStepsInterpretation,
   withStudioMomentRating,
   withTodayStepCount,
+  type CapturedMomentInput,
 } from './mutations';
-import { withSeededPhotoLocationsByDay } from './photo-locations';
+import { withRefreshedPhotoLocationsForDay, withSeededPhotoLocationsByDay } from './photo-locations';
 import { createEmptyStoredDay, readInputDay, writeInputDay } from './records';
 import { normalizeStoredHomeState } from './state-normalization';
 import { toLocalDateId } from './date';
@@ -211,6 +221,54 @@ export function answerDayPromptForToday(
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
+export function startHatchCheckInForDay(
+  state: StoredHomeState,
+  dayId: string,
+  eligibilityReason: HatchCheckInEligibilityReason,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const day = dayById(state, dayId);
+  if (!day || day.state === 'hatched') return state;
+  return normalizeStoredHomeState(
+    replaceDayById(state, dayId, withStartedHatchCheckIn(day, eligibilityReason, now)),
+    profile,
+    now
+  );
+}
+
+export function answerHatchCheckInForDay(
+  state: StoredHomeState,
+  dayId: string,
+  input: { kind: 'flow' | 'category' | 'moment' | 'meaning'; id: string },
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const day = dayById(state, dayId);
+  if (!day || day.state === 'hatched') return state;
+  return normalizeStoredHomeState(
+    replaceDayById(state, dayId, withHatchCheckInAnswer(day, input, now)),
+    profile,
+    now
+  );
+}
+
+export function finishHatchCheckInForDay(
+  state: StoredHomeState,
+  dayId: string,
+  status: Exclude<HatchCheckInStatus, 'in_progress'>,
+  profile: OnboardingProfile,
+  now: Date
+): StoredHomeState {
+  const day = dayById(state, dayId);
+  if (!day || day.state === 'hatched') return state;
+  return normalizeStoredHomeState(
+    replaceDayById(state, dayId, withFinishedHatchCheckIn(day, status, now)),
+    profile,
+    now
+  );
+}
+
 export function completeSeedForToday(
   state: StoredHomeState,
   seedId: string,
@@ -238,6 +296,50 @@ export function confirmPlaceForToday(
   const nextDay = withConfirmedPlace(base, input, now);
 
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+export function saveDayPlaceForToday(
+  state: StoredHomeState,
+  input: { location: import('@/types/home').JournalLocationSelection; detectedNodeId?: string | null },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  return normalizeStoredHomeState(writeInputDay(state, target, withSavedDayPlace(base, input, now)), profile, now);
+}
+
+export function enrichDayPlaceForToday(
+  state: StoredHomeState,
+  input: { id: string; category: string; categoryLabel: string; archetype: string; meaningLabel: string },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  return normalizeStoredHomeState(writeInputDay(state, target, withEnrichedDayPlace(base, input, now)), profile, now);
+}
+
+export function removeDayPlaceForToday(
+  state: StoredHomeState,
+  id: string,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  return normalizeStoredHomeState(writeInputDay(state, target, withRemovedDayPlace(base, id)), profile, now);
+}
+
+export function dismissPlaceCandidateForToday(
+  state: StoredHomeState,
+  candidateId: string,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  return normalizeStoredHomeState(writeInputDay(state, target, withDismissedPlaceCandidate(base, candidateId)), profile, now);
 }
 
 export function markBigMomentForToday(
@@ -556,6 +658,16 @@ export function seedPhotoLocationsByDay(
   );
 }
 
+export function refreshPhotoLocationsForDay(
+  state: StoredHomeState,
+  dayId: string,
+  photos: RecentPhotoAsset[],
+  profile: OnboardingProfile,
+  now: Date
+) {
+  return normalizeStoredHomeState(withRefreshedPhotoLocationsForDay(state, dayId, photos), profile, now);
+}
+
 export function importHealthRoutesForDay(
   state: StoredHomeState,
   dayId: string,
@@ -600,17 +712,7 @@ export function selectPathForToday(
 
 export function applyCapturedMomentForToday(
   state: StoredHomeState,
-  capture: {
-    energy: Partial<DayScores>;
-    vision: DayVisionSummary | null;
-    sourceId?: string | null;
-    meaning?: { archetype: string; label: string; thumbnailUri?: string | null; sourceId?: string | null };
-    scene?: SceneRead;
-    confirmations?: UserConfirmation[];
-    classifiedMemory?: import('@/types/home').ClassifiedMemory | null;
-    evidence?: import('@/types/home').DayEvidence | null;
-    journal?: ManualJournalSubmission | null;
-  },
+  capture: CapturedMomentInput,
   profile: OnboardingProfile,
   now: Date,
   target: DayInputTarget = 'today'
@@ -619,6 +721,55 @@ export function applyCapturedMomentForToday(
   if (base.state === 'hatched') {
     return state;
   }
+  const applied = applyCaptureToDayRecord(state, base, capture, now);
+  return normalizeStoredHomeState(
+    { ...writeInputDay(state, target, applied.day), personalEntities: applied.personalEntities },
+    profile,
+    now
+  );
+}
+
+/**
+ * Commits a reviewed Photo Library frame to the calendar day it came from.
+ * Historical days are already hatched, so they accept the journal/intelligence
+ * record without retroactively changing the creature's earned energy.
+ */
+export function applyCapturedMomentForDay(
+  state: StoredHomeState,
+  capture: CapturedMomentInput,
+  dayId: string,
+  profile: OnboardingProfile,
+  now: Date,
+  observedAt?: string | null
+): StoredHomeState {
+  const base = dayById(state, dayId);
+  if (!base) return normalizeStoredHomeState(state, profile, now);
+
+  const eventDate = validDate(observedAt) ?? now;
+  const historical = base.state === 'hatched';
+  const applied = applyCaptureToDayRecord(state, base, capture, eventDate, {
+    allowHatched: true,
+    journalOnly: historical,
+  });
+  const sourceId = capture.sourceId ?? capture.meaning?.sourceId ?? null;
+  const nextDay = sourceId
+    ? { ...applied.day, usedPhotoAssetIds: Array.from(new Set([...(applied.day.usedPhotoAssetIds ?? []), sourceId])) }
+    : applied.day;
+  const nextState = replaceDayById(state, dayId, nextDay);
+  return normalizeStoredHomeState(
+    { ...nextState, personalEntities: applied.personalEntities },
+    profile,
+    now
+  );
+}
+
+function applyCaptureToDayRecord(
+  state: StoredHomeState,
+  base: StoredHomeState['today'],
+  capture: CapturedMomentInput,
+  eventDate: Date,
+  options: { allowHatched?: boolean; journalOnly?: boolean } = {}
+): { day: StoredHomeState['today']; personalEntities: StoredHomeState['personalEntities'] } {
   const meaning = capture.meaning;
   const scene = capture.scene ?? classifyScene(capture.vision);
   const hasJournal = !!capture.journal;
@@ -636,25 +787,47 @@ export function applyCapturedMomentForToday(
     base,
     capture,
     { food: foodDetection, studio: studioDetection, studioDetail },
-    now
+    eventDate,
+    options
   );
   const sourceId = capture.sourceId ?? capture.meaning?.sourceId ?? capture.meaning?.thumbnailUri ?? null;
   const classified = sourceId
     ? nextDay.classifiedMemories?.find((memory) => memory.sourceType === 'photo' && memory.sourceId === sourceId)
     : null;
-  if (!classified) return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
-  const remembered = rememberPersonalContext(state.personalEntities, classified, now);
+  if (!classified) return { day: nextDay, personalEntities: state.personalEntities };
+  const remembered = rememberPersonalContext(state.personalEntities, classified, eventDate);
   const dayWithEntity = {
     ...nextDay,
     classifiedMemories: nextDay.classifiedMemories?.map((memory) =>
       memory.id === remembered.memory.id ? remembered.memory : memory
     ),
   };
-  return normalizeStoredHomeState(
-    { ...writeInputDay(state, target, dayWithEntity), personalEntities: remembered.entities },
-    profile,
-    now
-  );
+  return { day: dayWithEntity, personalEntities: remembered.entities };
+}
+
+function dayById(state: StoredHomeState, dayId: string): StoredHomeState['today'] | null {
+  if (state.today.id === dayId) return state.today;
+  if (state.tomorrow?.id === dayId) return state.tomorrow;
+  return state.archivedDays.find((day) => day.id === dayId) ?? null;
+}
+
+function replaceDayById(
+  state: StoredHomeState,
+  dayId: string,
+  nextDay: StoredHomeState['today']
+): StoredHomeState {
+  if (state.today.id === dayId) return { ...state, today: nextDay };
+  if (state.tomorrow?.id === dayId) return { ...state, tomorrow: nextDay };
+  return {
+    ...state,
+    archivedDays: state.archivedDays.map((day) => day.id === dayId ? nextDay : day),
+  };
+}
+
+function validDate(value?: string | null): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function setDayWeatherForDay(

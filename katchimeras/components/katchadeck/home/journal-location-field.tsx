@@ -7,30 +7,44 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Meadow } from '@/constants/meadow-theme';
 import { AppFontFamilies } from '@/constants/theme';
-import type { JournalLocationSelection } from '@/types/home';
-import { appleMapSearchAvailable, searchApplePlaces, type ApplePlaceSearchResult, type PlaceSearchAnchor } from '@/utils/apple-map-search';
+import type { JournalLocationSelection, StoredHomeLocationPoint } from '@/types/home';
+import { appleMapSearchAvailable, searchApplePlacesAroundAnchors, type ApplePlaceSearchResult, type PlaceSearchAnchor } from '@/utils/apple-map-search';
+import { journalDaySearchAnchors, mergePlaceSearchAnchors } from '@/utils/journal-place-search';
+import { loadHomeAnchor } from '@/utils/home-location';
 import { resolvePlaceName } from '@/utils/place-names';
 
 type NativeMapsModule = typeof import('react-native-maps');
 
 export function JournalLocationField({
   query,
+  dayLocationPoints,
+  onPermissionResolved,
   value,
   onChange,
 }: {
   query: string;
+  dayLocationPoints?: StoredHomeLocationPoint[];
+  onPermissionResolved?: (permission: 'granted' | 'denied') => void;
   value: JournalLocationSelection | null;
   onChange: (location: JournalLocationSelection | null) => void;
 }) {
   const [anchor, setAnchor] = useState<PlaceSearchAnchor | null>(null);
   const [results, setResults] = useState<ApplePlaceSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [usingCurrent, setUsingCurrent] = useState(false);
+  const [locationAction, setLocationAction] = useState<'search' | 'attach' | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [nativeMaps, setNativeMaps] = useState<NativeMapsModule | null>(null);
   const searchId = useRef(0);
   const cleanQuery = query.trim();
+  const homeAnchor = useMemo(() => loadHomeAnchor(), []);
+  const dayAnchors = useMemo(() => journalDaySearchAnchors(dayLocationPoints, homeAnchor), [dayLocationPoints, homeAnchor]);
+  const searchAnchors = useMemo(() => mergePlaceSearchAnchors(dayAnchors, anchor), [anchor, dayAnchors]);
+  const searchStatus = dayAnchors.length > 0
+    ? 'Checking Apple Maps near places from your day…'
+    : anchor
+      ? 'Checking Apple Maps near you…'
+      : 'Searching Apple Maps…';
 
   useEffect(() => {
     if (process.env.EXPO_OS === 'web') return;
@@ -62,14 +76,14 @@ export function JournalLocationField({
     }
     setSearching(true);
     const timer = setTimeout(() => {
-      void searchApplePlaces(cleanQuery, anchor).then((places) => {
+      void searchApplePlacesAroundAnchors(cleanQuery, searchAnchors).then((places) => {
         if (searchId.current === id) setResults(places);
       }).finally(() => {
         if (searchId.current === id) setSearching(false);
       });
     }, 450);
     return () => clearTimeout(timer);
-  }, [anchor, cleanQuery]);
+  }, [cleanQuery, searchAnchors]);
 
   const chooseResult = (result: ApplePlaceSearchResult) => {
     onChange({
@@ -84,13 +98,35 @@ export function JournalLocationField({
     setDismissed(false);
   };
 
-  const attachCurrentLocation = async () => {
-    setUsingCurrent(true);
+  const readCurrentLocation = async (): Promise<Location.LocationObject | null> => {
+    let permission = await Location.getForegroundPermissionsAsync();
+    if (permission.status !== Location.PermissionStatus.GRANTED) permission = await Location.requestForegroundPermissionsAsync();
+    if (permission.status !== Location.PermissionStatus.GRANTED) {
+      onPermissionResolved?.('denied');
+      return null;
+    }
+    onPermissionResolved?.('granted');
+    return Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  };
+
+  const findNearby = async () => {
+    setLocationAction('search');
     try {
-      let permission = await Location.getForegroundPermissionsAsync();
-      if (permission.status !== Location.PermissionStatus.GRANTED) permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== Location.PermissionStatus.GRANTED) return;
-      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const location = await readCurrentLocation();
+      if (!location) return;
+      setAnchor({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+    } catch {
+      // Search remains usable without a current anchor.
+    } finally {
+      setLocationAction(null);
+    }
+  };
+
+  const attachCurrentLocation = async () => {
+    setLocationAction('attach');
+    try {
+      const location = await readCurrentLocation();
+      if (!location) return;
       const name = await resolvePlaceName(location.coords.latitude, location.coords.longitude);
       const nextAnchor = { latitude: location.coords.latitude, longitude: location.coords.longitude };
       setAnchor(nextAnchor);
@@ -105,7 +141,7 @@ export function JournalLocationField({
     } catch {
       // Location is optional; permission/device failures leave the entry editable.
     } finally {
-      setUsingCurrent(false);
+      setLocationAction(null);
     }
   };
 
@@ -138,7 +174,7 @@ export function JournalLocationField({
           {searching ? (
             <View accessibilityRole="progressbar" style={styles.statusRow}>
               <ActivityIndicator color={Meadow.goldDeep} size="small" />
-              <ThemedText style={styles.statusText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Looking near you in Apple Maps…</ThemedText>
+              <ThemedText style={styles.statusText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{searchStatus}</ThemedText>
             </View>
           ) : null}
           {results.length > 0 ? (
@@ -171,7 +207,8 @@ export function JournalLocationField({
             </ThemedText>
           ) : null}
           <View style={styles.actions}>
-            <LocationAction disabled={usingCurrent} icon="mappin.and.ellipse" label={usingCurrent ? 'Locating…' : 'Use current'} onPress={() => void attachCurrentLocation()} />
+            {!anchor ? <LocationAction disabled={locationAction !== null} icon="mappin.and.ellipse" label={locationAction === 'search' ? 'Locating…' : 'Find nearby'} onPress={() => void findNearby()} /> : null}
+            <LocationAction disabled={locationAction !== null} icon="mappin.and.ellipse" label={locationAction === 'attach' ? 'Locating…' : 'Use current'} onPress={() => void attachCurrentLocation()} />
             <LocationAction icon="map.fill" label="Choose on map" onPress={() => setPickerOpen(true)} />
             <LocationAction icon="xmark" label="No location" onPress={() => { onChange(null); setDismissed(true); }} />
           </View>

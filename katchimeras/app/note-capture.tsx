@@ -48,10 +48,15 @@ export default function NoteCaptureScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ target?: string }>();
   const insets = useSafeAreaInsets();
-  const { addManualJournalEntry, isTodayHatched, cloudIntelligenceEnabled } = useHomeScreenState();
+  const { addManualJournalEntry, isTodayHatched, cloudIntelligenceEnabled, selectedDay, tomorrowDay } = useHomeScreenState();
   const requestedTarget = parseCaptureTarget(params.target);
   const noteTarget: DayInputTarget = requestedTarget ?? (isTodayHatched ? 'tomorrow' : 'today');
   const targetLabel = noteTarget === 'tomorrow' ? 'tomorrow' : 'today';
+  const dayLocationPoints = noteTarget === 'tomorrow'
+    ? tomorrowDay?.locations
+    : selectedDay?.kind === 'day' && selectedDay.isToday
+      ? selectedDay.locations
+      : undefined;
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const player = useAudioPlayer();
   const playerStatus = useAudioPlayerStatus(player);
@@ -371,6 +376,7 @@ export default function NoteCaptureScreen() {
       {journalReviewOpen && result ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
+          dayLocationPoints={dayLocationPoints}
           key={journalRoute?.id ?? 'note-journal-picker'}
           initialFlowId={journalRoute?.flowId}
           initialChoiceId={journalRoute?.choiceId}

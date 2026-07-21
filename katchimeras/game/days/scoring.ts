@@ -35,6 +35,12 @@ export function computeDayScores(day: StoredHomeDayRecord) {
       });
     });
 
+  if (day.hatchCheckIn && day.hatchCheckIn.status !== 'skipped') {
+    scoreOrder.forEach((key) => {
+      nextScores[key] = clampScore(nextScores[key] + (day.hatchCheckIn?.scoreBias[key] ?? 0));
+    });
+  }
+
   if (day.capturedEnergy) {
     scoreOrder.forEach((key) => {
       nextScores[key] = clampScore(nextScores[key] + (day.capturedEnergy?.[key] ?? 0));

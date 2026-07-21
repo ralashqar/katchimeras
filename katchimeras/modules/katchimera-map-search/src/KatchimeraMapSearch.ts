@@ -8,6 +8,7 @@ export type NativeApplePlace = {
   latitude: number;
   longitude: number;
   distanceMeters?: number | null;
+  rank?: number;
 };
 
 type KatchimeraMapSearchModuleShape = {

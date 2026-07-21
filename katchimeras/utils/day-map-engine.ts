@@ -8,9 +8,12 @@ import type {
   StoredHomeLocationPoint,
 } from '@/types/home';
 import { curatePhotos, isBlackOrFlatFrame } from '@/utils/photo-curation';
+import { isPlausibleGeographicCoordinate } from '@/utils/photo-location';
 
 const CLUSTER_RADIUS_METERS = 150;
-const MAX_DAY_MAP_NODES = 5;
+// A photo-rich day often has more than five genuine stops. Keep enough distinct
+// clusters to represent the day without turning the map into an unbounded dump.
+const MAX_DAY_MAP_NODES = 12;
 
 type LocationCluster = {
   id: string;
@@ -23,11 +26,12 @@ export function deriveDayMapSummary(
   points: StoredHomeLocationPoint[],
   moments: HomeMoment[]
 ): DayMapSummary | null {
-  if (points.length === 0) {
+  const validPoints = points.filter((point) => isPlausibleGeographicCoordinate(point.lat, point.lng));
+  if (validPoints.length === 0) {
     return null;
   }
 
-  const sortedPoints = [...points].sort(
+  const sortedPoints = [...validPoints].sort(
     (left, right) => new Date(left.capturedAt).getTime() - new Date(right.capturedAt).getTime()
   );
   const clusters = clusterPoints(sortedPoints);
@@ -54,7 +58,7 @@ export function deriveDayMapSummary(
     path: nodes.length > 1 ? buildSmoothedPath(nodes) : [],
     primaryLocationId: pickPrimaryLocationId(nodes, moments),
     viewport: buildViewport(nodes),
-    totalSamples: points.length,
+    totalSamples: validPoints.length,
   };
 }
 
@@ -119,6 +123,9 @@ function createNode(cluster: LocationCluster): DayMapNode {
       (hasPhoto ? 0.22 : 0) +
       (linkedPoint?.momentId ? 0.08 : 0)
   );
+  const explicitLabelPoint = [...sortedPoints]
+    .reverse()
+    .find((point) => point.label?.trim());
 
   return {
     id: cluster.id,
@@ -133,6 +140,11 @@ function createNode(cluster: LocationCluster): DayMapNode {
     startedAt,
     endedAt,
     sampleCount: sortedPoints.length,
+    sourcePointIds: sortedPoints.map((point) => point.id),
+    sources: [...new Set(sortedPoints.map((point) => point.source))],
+    journalRecordIds: [...new Set(sortedPoints.map((point) => point.journalRecordId).filter((id): id is string => !!id))],
+    label: explicitLabelPoint?.label?.trim() || undefined,
+    address: explicitLabelPoint?.address?.trim() || undefined,
   };
 }
 
@@ -194,8 +206,8 @@ function pickPrimaryLocationId(nodes: DayMapNode[], moments: HomeMoment[]) {
   const ranked = [...nodes].sort((left, right) => {
     const leftMoment = left.linkedMomentId ? momentIndex.get(left.linkedMomentId) : null;
     const rightMoment = right.linkedMomentId ? momentIndex.get(right.linkedMomentId) : null;
-    const leftPhotoScore = left.hasPhoto || leftMoment?.type === 'photo' ? 1 : 0;
-    const rightPhotoScore = right.hasPhoto || rightMoment?.type === 'photo' ? 1 : 0;
+    const leftPhotoScore = primaryMemoryScore(left, leftMoment);
+    const rightPhotoScore = primaryMemoryScore(right, rightMoment);
 
     if (rightPhotoScore !== leftPhotoScore) {
       return rightPhotoScore - leftPhotoScore;
@@ -211,6 +223,12 @@ function pickPrimaryLocationId(nodes: DayMapNode[], moments: HomeMoment[]) {
   });
 
   return ranked[0]?.id ?? null;
+}
+
+function primaryMemoryScore(node: DayMapNode, moment: HomeMoment | null | undefined): number {
+  if (moment || node.linkedMomentId || (node.journalRecordIds?.length ?? 0) > 0) return 4;
+  if (node.label || node.type === 'home') return 3;
+  return node.hasPhoto ? 1 : 0;
 }
 
 function resolveClusterType(points: StoredHomeLocationPoint[]): HomeLocationType {

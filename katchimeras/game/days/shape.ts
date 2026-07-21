@@ -1,7 +1,7 @@
 import type { StoredHomeDayRecord } from '@/types/home';
 
 export function dayInputSignature(day: StoredHomeDayRecord): string {
-  return `${day.locations.length}|${day.moments.length}|${day.selectedPathId ?? ''}|${day.creature ? 1 : 0}`;
+  return `${day.locations.length}|${day.moments.length}|${day.selectedPathId ?? ''}|${day.hatchCheckIn?.moodId ?? ''}|${day.hatchCheckIn?.flowId ?? ''}|${day.hatchCheckIn?.categoryId ?? ''}|${day.creature ? 1 : 0}`;
 }
 
 export function dayHasShape(day: StoredHomeDayRecord) {
@@ -12,6 +12,7 @@ export function dayHasShape(day: StoredHomeDayRecord) {
     day.visitedPlaceCount > 0 ||
     day.locations.length > 0 ||
     day.promptAnswers.some((answer) => !answer.dismissed) ||
+    (day.hatchCheckIn != null && day.hatchCheckIn.status !== 'skipped') ||
     Boolean(day.heroPhoto)
   );
 }

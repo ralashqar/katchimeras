@@ -1,8 +1,9 @@
-import type { JournalCommitCommand, JournalRecord, ManualJournalEntry, ManualJournalSubmission, MemoryDomain, StoredHomeDayRecord } from '@/types/home';
+import type { JournalCommitCommand, JournalLocationSelection, JournalRecord, ManualJournalEntry, ManualJournalSubmission, MemoryDomain, StoredHomeDayRecord, StoredHomeLocationPoint } from '@/types/home';
 import { buildNoteEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
 import { applyManualJournalFacets, buildManualJournalClassifiedMemory, buildNoteClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
+import { isPlausibleGeographicCoordinate } from '@/utils/photo-location';
 import { applyJournalCompatibilityProjection } from './journal-projections';
 
 export function withManualJournalEntry(day: StoredHomeDayRecord, submission: ManualJournalSubmission, now: Date): StoredHomeDayRecord {
@@ -14,7 +15,7 @@ export function commitJournalRecord(day: StoredHomeDayRecord, command: JournalCo
   if (day.journalRecords?.some((item) => item.idempotencyKey === command.idempotencyKey)) return day;
   const record = commandToJournalRecord(command, now);
   if (!record) return day;
-  return projectJournalRecord(day, record, now);
+  return projectJournalRecord(day, assignAutomaticJournalLocation(day, record, now), now);
 }
 
 function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _now: Date): StoredHomeDayRecord {
@@ -80,6 +81,12 @@ function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _
     parentSourceId: submission.sourceType === 'photo' ? submission.sourceId ?? null : null,
     createdAt,
   } : null;
+  const matchingSavedPlace = record.location ? (day.confirmedPlaces ?? []).find((place) =>
+    (record.location?.placeId && place.placeId === record.location.placeId) ||
+    (Number.isFinite(place.latitude) && Number.isFinite(place.longitude) && coordinateDistance(
+      place.latitude!, place.longitude!, record.location!.latitude, record.location!.longitude
+    ) <= 75)
+  ) : null;
   const next: StoredHomeDayRecord = {
     ...day,
     journalRecords: [...(day.journalRecords ?? []), record].slice(-120),
@@ -89,7 +96,7 @@ function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _
       ? day.evidence
       : upsertEvidence(day.evidence, [noteSource ? evidence : { ...evidence, id: `evidence:manual:${id}`, sourceType: 'manual_log', sourceId: id }]),
     notes: linkedNote ? [...(day.notes ?? []), linkedNote] : day.notes,
-    locations: record.location
+    locations: record.location && !matchingSavedPlace?.locationPointId
       ? [
           ...(day.locations ?? []).filter((point) => point.journalRecordId !== record.id),
           {
@@ -99,7 +106,7 @@ function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _
             capturedAt: createdAt,
             type: locationTypeForJournalChoice(choice.id),
             hasPhoto: record.source.kind === 'photo',
-            source: 'manual' as const,
+            source: locationPointSource(record.location.source),
             momentId: null,
             thumbnailUri: record.source.kind === 'photo' ? record.source.thumbnailUri ?? undefined : undefined,
             accuracyMeters: record.location.accuracyMeters ?? undefined,
@@ -143,3 +150,88 @@ function locationTypeForJournalChoice(choiceId: string): 'home' | 'cafe' | 'park
   if (choiceId === 'park' || choiceId === 'garden' || choiceId === 'forest') return 'park';
   return 'unknown';
 }
+const CURRENT_LOCATION_WINDOW_MS = 30 * 60 * 1000;
+
+function assignAutomaticJournalLocation(
+  day: StoredHomeDayRecord,
+  record: JournalRecord,
+  now: Date
+): JournalRecord {
+  const points = (day.locations ?? []).filter((point) =>
+    isPlausibleGeographicCoordinate(point.lat, point.lng)
+  );
+  const associatedPhoto = record.source.kind === 'photo'
+    ? points.find((point) => photoPointMatchesRecord(point, record)) ?? null
+    : null;
+
+  // A photo journal can only inherit the source photo's own geotag. Do not
+  // substitute a live sample, home, manual pin, or Apple Maps suggestion when
+  // metadata is unavailable; an unlocated photo should remain unlocated.
+  if (record.source.kind === 'photo') {
+    return {
+      ...record,
+      location: associatedPhoto ? locationSelectionFromPoint(associatedPhoto, true) : null,
+    };
+  }
+
+  if (record.location) return record;
+  if (points.length === 0) return record;
+
+  const livePoints = points.filter((point) =>
+    point.source === 'foreground' || point.source === 'background' || point.source === 'manual'
+  );
+  const recentLivePoint = [...livePoints]
+    .filter((point) => Math.abs(now.getTime() - pointTime(point)) <= CURRENT_LOCATION_WINDOW_MS)
+    .sort((left, right) =>
+      Math.abs(now.getTime() - pointTime(left)) - Math.abs(now.getTime() - pointTime(right))
+    )[0] ?? null;
+  const homePoint = newestPoint(points.filter((point) => point.type === 'home'));
+  const fallbackPoint = newestPoint(livePoints);
+  const point = recentLivePoint ?? homePoint ?? fallbackPoint;
+  if (!point) return record;
+
+  return {
+    ...record,
+    location: locationSelectionFromPoint(point, false),
+  };
+}
+
+function photoPointMatchesRecord(point: StoredHomeLocationPoint, record: JournalRecord): boolean {
+  if (record.source.kind !== 'photo') return false;
+  return (
+    point.id === `camera-roll-photo-${record.source.sourceId}` ||
+    point.id.endsWith(record.source.sourceId) ||
+    Boolean(record.source.thumbnailUri && point.thumbnailUri === record.source.thumbnailUri)
+  );
+}
+
+function locationSelectionFromPoint(
+  point: StoredHomeLocationPoint,
+  fromPhoto: boolean
+): JournalLocationSelection {
+  return {
+    latitude: point.lat,
+    longitude: point.lng,
+    name: point.label?.trim() || (point.type === 'home' ? 'Home' : fromPhoto ? 'Photo location' : 'Location at the time'),
+    address: point.address?.trim() || null,
+    placeId: null,
+    source: fromPhoto ? 'photo_metadata' : 'day_location',
+    accuracyMeters: point.accuracyMeters ?? null,
+  };
+}
+
+function newestPoint(points: StoredHomeLocationPoint[]): StoredHomeLocationPoint | null {
+  return [...points].sort((left, right) => pointTime(right) - pointTime(left))[0] ?? null;
+}
+
+function pointTime(point: StoredHomeLocationPoint): number {
+  const time = new Date(point.capturedAt).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function locationPointSource(source: JournalLocationSelection['source']): 'manual' | 'photo_attachment' | 'foreground' {
+  if (source === 'photo_metadata') return 'photo_attachment';
+  if (source === 'day_location' || source === 'current_location') return 'foreground';
+  return 'manual';
+}
+function coordinateDistance(aLat: number, aLng: number, bLat: number, bLng: number): number { const r = 6371000; const dLat = (bLat - aLat) * Math.PI / 180; const dLng = (bLng - aLng) * Math.PI / 180; const a = Math.sin(dLat / 2) ** 2 + Math.cos(aLat * Math.PI / 180) * Math.cos(bLat * Math.PI / 180) * Math.sin(dLng / 2) ** 2; return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); }

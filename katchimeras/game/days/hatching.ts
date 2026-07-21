@@ -47,6 +47,8 @@ export function finalizeDayHatch(
     return {
       ...day,
       state: 'hatched',
+      devForceReadyToHatch: undefined,
+      devHatchReflectionMode: undefined,
       shareReadyAt: day.shareReadyAt ?? now.toISOString(),
       creature: {
         ...encounterCreature,
@@ -150,6 +152,8 @@ function finalizeFallbackHatch(
   return {
     ...day,
     state: 'hatched',
+    devForceReadyToHatch: undefined,
+    devHatchReflectionMode: undefined,
     shareReadyAt: day.shareReadyAt ?? now.toISOString(),
     creature: {
       id: `creature-${day.isoDate}-${hash}`,

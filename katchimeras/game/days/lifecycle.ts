@@ -11,6 +11,7 @@ export function resolveHatchHour(profile: OnboardingProfile) {
 }
 
 export function resolveDayState(day: StoredHomeDayRecord, now: Date, hatchHour: number): HomeDayState {
+  if (day.devForceReadyToHatch && !day.creature) return 'ready_to_hatch';
   return resolveDayLifecycleState({
     hasCreature: Boolean(day.creature),
     storedState: day.state,

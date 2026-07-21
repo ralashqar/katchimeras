@@ -11,6 +11,7 @@ import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchade
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
+import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { currentLanternColour } from '@/utils/cosmetics-storage';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
@@ -18,7 +19,7 @@ import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
-import { TodayCategoryRing } from '@/components/katchadeck/home/today-category-ring';
+import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
 import { DayComicOverlay } from '@/components/katchadeck/home/day-comic-overlay';
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
@@ -31,7 +32,6 @@ import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useBackfillStatus } from '@/utils/backfill-status';
-import { findUnconfirmedPlace } from '@/utils/today-categories';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
 import { usePromptSheetController } from '@/features/today/use-prompt-sheet-controller';
@@ -39,7 +39,6 @@ import { useMicrocopy } from '@/features/today/use-microcopy';
 import { useMomentFollowUpController } from '@/features/today/use-moment-follow-up-controller';
 import { useTodaySheetController } from '@/features/today/use-today-sheet-controller';
 import { useTodayActionRouter } from '@/features/today/use-today-action-router';
-import { usePlacePromptController } from '@/features/today/use-place-prompt-controller';
 import { useMorningPromptController } from '@/features/today/use-morning-prompt-controller';
 import { useObservatoryController } from '@/features/today/use-observatory-controller';
 import { useDiscoveryRevealController } from '@/features/today/use-discovery-reveal-controller';
@@ -60,6 +59,7 @@ import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
 import { noteRoutesForSignals, noteSuggestedSpecific } from '@/utils/journal-input-adapters';
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
+import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -83,33 +83,13 @@ const QUICK_PROMPT_CATEGORIES: {
   { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF', section: 'more' },
 ];
 
-
-
-// Short "h:mm am – h:mm pm" dwell window for a place picked from the reader
-// (same manual format as World, no Intl dependency).
-function fmtTime(iso?: string): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  let hours = date.getHours();
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours %= 12;
-  if (hours === 0) hours = 12;
-  return `${hours}:${minutes} ${ampm}`;
-}
-function formatTimeRange(start?: string, end?: string): string | null {
-  const startLabel = fmtTime(start);
-  const endLabel = fmtTime(end);
-  if (startLabel && endLabel && startLabel !== endLabel) return `${startLabel} – ${endLabel}`;
-  return startLabel ?? endLabel ?? null;
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
+  const [hatchCheckInOpen, setHatchCheckInOpen] = useState(false);
+  const [hatchAfterCheckIn, setHatchAfterCheckIn] = useState(false);
   const [manualJournalInitialFlowId, setManualJournalInitialFlowId] = useState<string | null>(null);
   const openManualJournal = useCallback((flowId?: string) => {
     setManualJournalInitialFlowId(flowId ?? null);
@@ -126,11 +106,17 @@ export default function HomeScreen() {
     activeDayPrompt,
     availableDayPrompts,
     answerDayPrompt,
+    startHatchCheckIn,
+    answerHatchCheckIn,
+    finishHatchCheckIn,
     answerPhotoMeaning,
     dismissDayPrompt,
     addNote,
     addManualJournalEntry,
-    confirmPlace,
+    saveDayPlace,
+    enrichDayPlace,
+    removeDayPlace,
+    dismissPlaceCandidate,
     markBigMoment,
     setSleep,
     setStepsInterpretation,
@@ -153,6 +139,8 @@ export default function HomeScreen() {
     cloudIntelligenceEnabled,
     setCloudIntelligenceEnabled,
     updateClassifiedMemory,
+    locationPermission,
+    setLocationPermission,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
@@ -194,6 +182,25 @@ export default function HomeScreen() {
     triggerHatchIfReady,
     refreshState,
   });
+  const handleRevealPress = useCallback(() => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) return;
+    const reason = hatchCheckInEligibility(selectedDay);
+    if (reason) {
+      if (!selectedDay.hatchCheckIn) startHatchCheckIn(selectedDay.id, reason);
+      setHatchCheckInOpen(true);
+      return;
+    }
+    void handleReveal();
+  }, [handleReveal, selectedDay, startHatchCheckIn]);
+
+  useEffect(() => {
+    if (!hatchAfterCheckIn || selectedDay?.kind !== 'day') return;
+    const status = selectedDay.hatchCheckIn?.status;
+    if (!status || status === 'in_progress') return;
+    setHatchAfterCheckIn(false);
+    void handleReveal();
+  }, [handleReveal, hatchAfterCheckIn, selectedDay]);
+
   function handleOpenDayMap(dayId: string) {
     router.push({
       pathname: '/day-map/[dayId]',
@@ -226,6 +233,19 @@ export default function HomeScreen() {
   // only exist while it's forming.
   const viewedDay: HomeDayRecord | null = isDay ? selectedDay : onTomorrowForming ? (tomorrowDay ?? null) : null;
   const viewedIsForming = isForming;
+  const mapRingItems = useMemo<TodayCategoryRingItem[]>(() => {
+    if (!isDay) return [];
+    const pinCount = selectedDay.dayMap?.nodes.length ?? 0;
+    return [{
+      id: 'map',
+      label: 'Map',
+      icon: 'map.fill',
+      count: pinCount,
+      countLabel: pinCount > 0 ? `${pinCount}` : undefined,
+      hasContent: pinCount > 0,
+      needsAttention: false,
+    }];
+  }, [isDay, selectedDay]);
 
   // --- Today-as-daily-hub: category ring, sheets, capture actions ---
   // (the same daily intelligence the World patch had, orbiting the egg instead)
@@ -251,8 +271,6 @@ export default function HomeScreen() {
     questBoardOpen,
     bigMomentPickerOpen,
     setBigMomentPickerOpen,
-    placePromptOpen,
-    setPlacePromptOpen,
     placesVaultOpen,
     setPlacesVaultOpen,
     stepsSheetOpen,
@@ -333,26 +351,6 @@ export default function HomeScreen() {
     formingPrompts,
     handledPhotoSig,
   });
-  // Places: the first detected-but-unconfirmed stop, plus manual "add this place".
-  const unconfirmedPlace = useMemo(() => (formingDay ? findUnconfirmedPlace(formingDay) : null), [formingDay]);
-  const {
-    activePlace,
-    placePreset,
-    closePlacePrompt,
-    handleConfirmPlaceFromVault,
-    handleConfirmPlace,
-  } = usePlacePromptController({
-    formingDay,
-    formingTarget,
-    unconfirmedPlace,
-    confirmPlace,
-    setPlacePromptOpen,
-    setPlacesVaultOpen,
-    pulseEgg,
-    setMicrocopy,
-    formatTimeRange,
-  });
-
   // Morning sequence — the ONLY auto prompts, as their real sheets: sleep
   // first (Apple Health answers it silently when it can), then mood, exactly
   // as if the user tapped the Sleep then Mood tiles. Keyed on the day's
@@ -390,7 +388,6 @@ export default function HomeScreen() {
     sleepSheetOpen ||
     questBoardOpen ||
     bigMomentPickerOpen ||
-    placePromptOpen ||
     placesVaultOpen ||
     stepsSheetOpen ||
     journeySheetOpen ||
@@ -436,7 +433,6 @@ export default function HomeScreen() {
   });
 
   const {
-    ringCategories,
     panelCategories,
     categoryById,
     statAttention,
@@ -529,7 +525,7 @@ export default function HomeScreen() {
     timelineDays,
     isTodayHatched,
     isHatching,
-    promptSheetOpen,
+    promptSheetOpen: promptSheetOpen || hatchCheckInOpen,
     comicOpen: Boolean(comicGen),
     selectTimelineDay,
     startEggFeed,
@@ -539,6 +535,7 @@ export default function HomeScreen() {
   // highest-rarity pending unlock first (same order as the World page).
   const flowBusy =
     isHatching ||
+    hatchCheckInOpen ||
     hasActivePrompt ||
     promptSheetOpen ||
     memoryVaultOpen ||
@@ -551,7 +548,6 @@ export default function HomeScreen() {
     sleepSheetOpen ||
     questBoardOpen ||
     bigMomentPickerOpen ||
-    placePromptOpen ||
     placesVaultOpen ||
     observatoryOpen ||
     stepsSheetOpen ||
@@ -647,7 +643,14 @@ export default function HomeScreen() {
               a day — read-only doors into that day's memories. Anchored to the
               258px art box so egg and creature days match exactly. */}
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
-            <TodayCategoryRing categories={ringCategories} onPress={handleCategoryPress} anchorHeight={258} centerOffsetY={24} />
+            <TodayCategoryRing
+              categories={mapRingItems}
+              onPress={() => {
+                if (isDay) handleOpenDayMap(selectedDay.id);
+              }}
+              anchorHeight={258}
+              centerOffsetY={24}
+            />
           ) : null}
           {isFormingToday && !isHatching ? (
             <HatchCountdown
@@ -696,7 +699,7 @@ export default function HomeScreen() {
           comicBusy={comicGen?.status === 'generating'}
           statAttention={isFormingToday ? statAttention : undefined}
           categories={panelCategories}
-          onReveal={handleReveal}
+          onReveal={handleRevealPress}
           onCamera={handleCameraPress}
           onMicTap={() => {
             if (voiceNote.phase === 'idle') setQuickNoteOpen(true);
@@ -717,6 +720,27 @@ export default function HomeScreen() {
       ) : null}
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
+
+      {hatchCheckInOpen && selectedDay?.kind === 'day' && selectedDay.hatchCheckIn?.status === 'in_progress' ? (
+        <HatchCheckInSheet
+          day={selectedDay}
+          onAnswer={(input) => {
+            answerHatchCheckIn(selectedDay.id, input);
+            pulseEgg();
+          }}
+          onClose={() => setHatchCheckInOpen(false)}
+          onComplete={() => {
+            finishHatchCheckIn(selectedDay.id, 'completed');
+            setHatchCheckInOpen(false);
+            setHatchAfterCheckIn(true);
+          }}
+          onHatchNow={() => {
+            finishHatchCheckIn(selectedDay.id, 'partial');
+            setHatchCheckInOpen(false);
+            setHatchAfterCheckIn(true);
+          }}
+        />
+      ) : null}
 
       {quickNoteOpen ? (
         <QuickNoteComposer onClose={() => setQuickNoteOpen(false)} onSubmit={handleQuickNoteSubmit} />
@@ -748,6 +772,7 @@ export default function HomeScreen() {
       {manualJournalOpen ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
+          dayLocationPoints={formingDay?.locations}
           initialFlowId={manualJournalInitialFlowId}
           onClose={closeManualJournal}
           onSave={(submission) => {
@@ -761,6 +786,7 @@ export default function HomeScreen() {
       {pendingJournalNote ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
+          dayLocationPoints={formingDay?.locations}
           initialFlowId={pendingNoteRoute?.flowId}
           initialChoiceId={pendingNoteRoute?.choiceId}
           initialSpecific={pendingNoteRoute && (
@@ -805,11 +831,9 @@ export default function HomeScreen() {
         observatoryOpen={observatoryOpen}
         foodFollowUp={foodFollowUp}
         studioFollowUp={studioFollowUp}
-        suppressFollowUps={promptSheetOpen || isHatching || quickNoteOpen || clarificationMemory !== null}
+        suppressFollowUps={promptSheetOpen || hatchCheckInOpen || isHatching || quickNoteOpen || clarificationMemory !== null}
         memoryQuests={memoryQuests}
         recentAvgSteps={recentAvgSteps}
-        activePlace={activePlace}
-        placePreset={placePreset}
         observations={observations}
         travelMemory={travelMemory}
         cloudIntelligenceEnabled={cloudIntelligenceEnabled}
@@ -828,9 +852,12 @@ export default function HomeScreen() {
         handleSetSleep={handleSetSleep}
         handleConfirmSteps={handleConfirmSteps}
         handleQuest={handleQuest}
-        handleConfirmPlaceFromVault={handleConfirmPlaceFromVault}
-        handleConfirmPlace={handleConfirmPlace}
-        closePlacePrompt={closePlacePrompt}
+        locationPermission={locationPermission}
+        saveDayPlace={saveDayPlace}
+        enrichDayPlace={enrichDayPlace}
+        removeDayPlace={removeDayPlace}
+        dismissPlaceCandidate={dismissPlaceCandidate}
+        setLocationPermission={setLocationPermission}
         setFoodMomentMeaning={setFoodMomentMeaning}
         setStudioMomentRating={setStudioMomentRating}
         clearFoodFollowUp={clearFoodFollowUp}

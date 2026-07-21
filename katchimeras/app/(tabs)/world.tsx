@@ -295,6 +295,7 @@ export default function KingdomScreen() {
       {reflectionReview ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
+          dayLocationPoints={today?.locations}
           key={reflectionReview.route?.id ?? 'reflection-journal-picker'}
           initialFlowId={reflectionReview.route?.flowId}
           initialChoiceId={reflectionReview.route?.choiceId}
@@ -320,6 +321,7 @@ export default function KingdomScreen() {
       {embeddedJournal ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
+          dayLocationPoints={today?.locations}
           initialFlowId={embeddedJournal.initialFlowId}
           initialChoiceId={embeddedJournal.initialChoiceId}
           initialNoteExpanded={embeddedJournal.noteExpanded}

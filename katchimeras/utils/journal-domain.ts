@@ -64,7 +64,9 @@ export function submissionToJournalCommand(submission: ManualJournalSubmission, 
     note: submission.note?.trim() || null,
     attachments,
     confirmedFacets: submission.confirmedFacets ?? choice.confirmedFacets ?? [],
-    location: flow.adapter === 'place' ? sanitizeJournalLocation(submission.location) : null,
+    // Photo journals derive location solely from their source asset during the
+    // day commit. Never let a search/current-location suggestion replace it.
+    location: flow.adapter === 'place' && source.kind !== 'photo' ? sanitizeJournalLocation(submission.location) : null,
   };
   return { idempotencyKey: journalIdempotencyKey(source, sessionId), draft };
 }

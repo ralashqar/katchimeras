@@ -1,6 +1,7 @@
 import { getStoredJson, getStoredRaw, removeStoredValue, setStoredJson, setStoredJsonAsync } from '@/utils/app-storage';
 import { HOME_STORAGE_KEY } from '@/constants/home-mvp';
 import type { StoredHomeState } from '@/types/home';
+import { preserveFinalizedHatches } from '@/game/days/state-integrity';
 
 const listeners = new Set<() => void>();
 let cachedHomeState: StoredHomeState | null | undefined;
@@ -20,9 +21,19 @@ export function loadStoredHomeStateRaw(): string | null {
   return getStoredRaw(HOME_STORAGE_KEY);
 }
 
-export function saveStoredHomeState(state: StoredHomeState, options?: { notify?: boolean }) {
-  cachedHomeState = state;
-  setStoredJson(HOME_STORAGE_KEY, state);
+export type HomeSaveOptions = { notify?: boolean; allowHatchDowngrade?: boolean };
+
+export function saveStoredHomeState(state: StoredHomeState, options?: HomeSaveOptions) {
+  const currentState = loadStoredHomeState();
+  const protectedState = options?.allowHatchDowngrade
+    ? state
+    : preserveFinalizedHatches(currentState, state);
+  warnIfHatchDowngradeWasPrevented(state, protectedState);
+  cachedHomeState = protectedState;
+  setStoredJson(HOME_STORAGE_KEY, protectedState);
+  // A pre-hatch async write may already be inside native storage. Queue the
+  // protected state behind it so the older write cannot become the final value.
+  if (deferredWrite) pendingDeferredState = protectedState;
   if (options?.notify !== false) {
     notifyHomeStateListeners();
   }
@@ -31,9 +42,14 @@ export function saveStoredHomeState(state: StoredHomeState, options?: { notify?:
 // The native localStorage shim writes to SQLite synchronously. Large home
 // archives can therefore block the JS thread for seconds. Hot UI mutations use
 // this coalescing async writer while reads are served immediately from memory.
-export function saveStoredHomeStateDeferred(state: StoredHomeState, options?: { notify?: boolean }) {
-  cachedHomeState = state;
-  pendingDeferredState = state;
+export function saveStoredHomeStateDeferred(state: StoredHomeState, options?: HomeSaveOptions) {
+  const currentState = loadStoredHomeState();
+  const protectedState = options?.allowHatchDowngrade
+    ? state
+    : preserveFinalizedHatches(currentState, state);
+  warnIfHatchDowngradeWasPrevented(state, protectedState);
+  cachedHomeState = protectedState;
+  pendingDeferredState = protectedState;
   if (options?.notify !== false) {
     notifyHomeStateListeners();
   }
@@ -80,4 +96,25 @@ export function subscribeHomeStateChanges(listener: () => void) {
 
 function notifyHomeStateListeners() {
   listeners.forEach((listener) => listener());
+}
+
+function warnIfHatchDowngradeWasPrevented(
+  requested: StoredHomeState,
+  protectedState: StoredHomeState
+) {
+  if (!__DEV__ || requested === protectedState) return;
+  const requestedDays = new Map(
+    [...requested.archivedDays, requested.today, ...(requested.tomorrow ? [requested.tomorrow] : [])]
+      .map((day) => [day.id, day] as const)
+  );
+  const repairedIds = [
+    ...protectedState.archivedDays,
+    protectedState.today,
+    ...(protectedState.tomorrow ? [protectedState.tomorrow] : []),
+  ]
+    .filter((day) => day.creature && !requestedDays.get(day.id)?.creature)
+    .map((day) => day.id);
+  if (repairedIds.length > 0) {
+    console.warn(`[Home storage] Prevented stale writer from unhatching: ${repairedIds.join(', ')}`);
+  }
 }

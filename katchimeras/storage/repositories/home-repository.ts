@@ -6,13 +6,14 @@ import {
   saveStoredHomeState,
   saveStoredHomeStateDeferred,
   subscribeHomeStateChanges,
+  type HomeSaveOptions,
 } from '@/utils/home-storage';
 
 export type HomeRepository = {
   load: () => StoredHomeState | null;
   loadRaw: () => string | null;
-  save: (state: StoredHomeState, options?: { notify?: boolean }) => void;
-  saveDeferred: (state: StoredHomeState, options?: { notify?: boolean }) => Promise<void>;
+  save: (state: StoredHomeState, options?: HomeSaveOptions) => void;
+  saveDeferred: (state: StoredHomeState, options?: HomeSaveOptions) => Promise<void>;
   clear: () => void;
   subscribe: (listener: () => void) => () => void;
 };

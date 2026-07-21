@@ -10,6 +10,7 @@ import { upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
 import { curatePhotos } from '@/utils/photo-curation';
 import { aggregatePhotoVision } from '@/utils/vision-signals';
+import { isPlausibleGeographicCoordinate } from '@/utils/photo-location';
 
 import { toLocalDateId } from './date';
 
@@ -33,7 +34,7 @@ export function withSeededPhotoLocationsByDay(
       latitude: normalizeCoordinate(photo.latitude),
       longitude: normalizeCoordinate(photo.longitude),
     }))
-    .filter((photo): photo is NormalizedPhoto => photo.latitude != null && photo.longitude != null)
+    .filter((photo): photo is NormalizedPhoto => isPlausibleGeographicCoordinate(photo.latitude, photo.longitude))
     .forEach((photo) => {
       const dateId = toLocalDateId(new Date(photo.createdAt));
       const bucket = geotaggedByDate.get(dateId) ?? [];
@@ -140,6 +141,58 @@ export function withSeededPhotoLocationsByDay(
   };
 }
 
+// Map-only refresh for one concrete day. Unlike the live Today seeder, this is
+// allowed to enrich an already-hatched archive day, but it only merges located
+// photo points: it never changes vision, evidence, scores, or narrative data.
+export function withRefreshedPhotoLocationsForDay(
+  state: StoredHomeState,
+  dayId: string,
+  photos: RecentPhotoAsset[]
+): StoredHomeState {
+  const target = [state.today, state.tomorrow, ...state.archivedDays].find((day) => day?.id === dayId) ?? null;
+  if (!target) return state;
+  const keepers = curatePhotos(photos).keepers
+    .filter((photo) => toLocalDateId(new Date(photo.createdAt)) === target.isoDate)
+    .map((photo) => ({
+      photo,
+      latitude: normalizeCoordinate(photo.latitude),
+      longitude: normalizeCoordinate(photo.longitude),
+    }))
+    .filter((item): item is typeof item & { latitude: number; longitude: number } =>
+      isPlausibleGeographicCoordinate(item.latitude, item.longitude)
+    );
+
+  // Replace only passive camera-roll imports. Manual pins, journal locations,
+  // route samples and moment-linked photo points are never touched.
+  const locations = (target.locations ?? []).filter((point) => !isPassiveCameraRollPoint(point));
+  for (const { photo, latitude, longitude } of keepers) {
+    const id = `camera-roll-photo-${photo.id}`;
+    const previous = locations.find((point) => point.id === id);
+    const point: StoredHomeLocationPoint = {
+      ...previous,
+      id,
+      lat: Number(latitude.toFixed(6)),
+      lng: Number(longitude.toFixed(6)),
+      capturedAt: new Date(photo.createdAt).toISOString(),
+      type: previous?.type ?? 'unknown',
+      hasPhoto: true,
+      source: 'photo_attachment',
+      momentId: previous?.momentId ?? null,
+      thumbnailUri: photo.thumbnailUri || photo.uri,
+      similarityHash: photo.similarityHash ?? previous?.similarityHash,
+      meanLuminance: photo.meanLuminance ?? previous?.meanLuminance,
+      luminanceRange: photo.luminanceRange ?? previous?.luminanceRange,
+    };
+    const index = locations.findIndex((candidate) => candidate.id === id);
+    if (index >= 0) locations[index] = point;
+    else locations.push(point);
+  }
+  const nextDay = { ...target, locations: locations.slice(-MAX_STORED_DAY_LOCATIONS) };
+  if (state.today.id === dayId) return { ...state, today: nextDay };
+  if (state.tomorrow?.id === dayId) return { ...state, tomorrow: nextDay };
+  return { ...state, archivedDays: state.archivedDays.map((day) => day.id === dayId ? nextDay : day) };
+}
+
 function normalizeCoordinate(value: unknown) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -151,4 +204,13 @@ function normalizeCoordinate(value: unknown) {
   }
 
   return null;
+}
+
+function isPassiveCameraRollPoint(point: StoredHomeLocationPoint): boolean {
+  return (
+    point.source === 'photo_attachment' &&
+    point.id.startsWith('camera-roll-photo-') &&
+    point.momentId == null &&
+    point.journalRecordId == null
+  );
 }

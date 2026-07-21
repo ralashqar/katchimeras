@@ -105,7 +105,10 @@ export function useHatchController({
 
     const profile = loadOnboardingProfile();
     let now = new Date();
-    const hydrated = hydrateHomeState(homeRepository.load() ?? storedStateRef.current, profile, now);
+    // Foreground mutations update the ref synchronously while repository writes
+    // are deferred. Prefer the ref so the final check-in tap always reaches the
+    // hatch even when disk persistence is still catching up.
+    const hydrated = hydrateHomeState(storedStateRef.current ?? homeRepository.load(), profile, now);
     let baseState = hydrated.state;
 
     const targetDay = findDay(baseState, selectedDay.id);
@@ -142,6 +145,12 @@ export function useHatchController({
     }
 
     const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
+    // Hatch completion is a rare terminal mutation, so persist it synchronously
+    // before the reveal can navigate away. Map/photo refreshes may save their
+    // own update as soon as the map opens; a deferred hatch write leaves a
+    // window where those readers can observe and re-save the pre-hatch egg.
+    storedStateRef.current = hatchedState;
+    homeRepository.save(hatchedState, { notify: false });
     setStoredState(hatchedState);
     void enhanceDayReflection(hatchedState, selectedDay.id);
     void (async () => {

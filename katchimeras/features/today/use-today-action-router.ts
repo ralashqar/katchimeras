@@ -39,8 +39,6 @@ export function useTodayActionRouter({
   openManualJournal,
   requestMicrophonePermission,
 }: UseTodayActionRouterParams) {
-  const ringCategories = useMemo(() => categories.filter((category) => category.id === 'quests'), [categories]);
-
   const panelCategories = useMemo(() => {
     const order = ['studio', 'mood', 'sleep', 'food'];
     return order
@@ -321,7 +319,6 @@ export function useTodayActionRouter({
   );
 
   return {
-    ringCategories,
     panelCategories,
     categoryById,
     statAttention,

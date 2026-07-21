@@ -3,6 +3,7 @@ import { useCallback, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { EssenceReview } from '@/components/katchadeck/capture/essence-review';
+import { useAllDays } from '@/hooks/use-all-days';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { buildCaptureEnergy, type MeaningTag } from '@/utils/capture-energy';
 import { queueCaptureFeed } from '@/utils/capture-feed-signal';
@@ -15,6 +16,7 @@ import type { DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, User
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import { safeDismissModal } from '@/utils/safe-navigation';
+import { markPhotoProcessed } from '@/utils/processed-photos';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
 // on-device, asks what it meant (essence-based options), then feeds the day with
@@ -27,13 +29,17 @@ export default function PhotoEssenceRoute() {
     thumbnailUri?: string;
     capturedAt?: string;
     target?: string;
+    dayId?: string;
   }>();
   const assetId = params.assetId ?? '';
   const thumbnailUri = params.thumbnailUri ?? '';
   const captureTarget = params.target === 'tomorrow' ? 'tomorrow' : 'today';
+  const explicitDayId = params.dayId ?? '';
 
-  const { selectedDay, applyCapturedMoment, selectHeroPhoto } = useHomeScreenState();
-  const dayScores = selectedDay?.kind === 'day' ? selectedDay.scores : null;
+  const { getDayById } = useAllDays();
+  const { selectedDay, applyCapturedMoment, applyCapturedMomentToDay, selectHeroPhoto } = useHomeScreenState();
+  const mapDay = explicitDayId ? getDayById(explicitDayId) : null;
+  const dayScores = mapDay?.scores ?? (selectedDay?.kind === 'day' ? selectedDay.scores : null);
   const localUriRef = useRef<string | null>(null);
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
 
@@ -92,7 +98,7 @@ export default function PhotoEssenceRoute() {
       const category = resolvedCategory && !categoryRejected
         ? resolvedCategory
         : { icon: 'sparkles' as const, accent: '#F1D4B4' };
-      if (assetId) {
+      if (assetId && !explicitDayId) {
         // Marks it the day's hero photo (and answers the meaningful-photo prompt
         // so it doesn't re-surface).
         selectHeroPhoto(
@@ -105,21 +111,26 @@ export default function PhotoEssenceRoute() {
           captureTarget
         );
       }
-      applyCapturedMoment(
-        {
-          energy,
-          vision,
-          sourceId: assetId,
-          meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null, sourceId: assetId },
-          scene: scene ?? undefined,
-          confirmations,
-          classifiedMemory: reviewed?.memory ?? null,
+      const capture = {
+        energy,
+        vision,
+        sourceId: assetId,
+        meaning: { archetype: meaning, label, thumbnailUri: thumbnailUri || localUriRef.current || null, sourceId: assetId },
+        scene: scene ?? undefined,
+        confirmations,
+        classifiedMemory: reviewed?.memory ?? null,
         evidence: reviewed?.evidence ?? null,
         journal,
-        },
-        captureTarget
-      );
-      queueCaptureFeed({ photoUri: thumbnailUri || localUriRef.current || '', icon: category.icon, accent: category.accent });
+      };
+      if (explicitDayId) {
+        applyCapturedMomentToDay(explicitDayId, capture, params.capturedAt ?? null);
+        if (assetId) markPhotoProcessed(assetId);
+      } else {
+        applyCapturedMoment(capture, captureTarget);
+      }
+      if (!explicitDayId || (mapDay?.isToday && mapDay.state !== 'hatched')) {
+        queueCaptureFeed({ photoUri: thumbnailUri || localUriRef.current || '', icon: category.icon, accent: category.accent });
+      }
       saveDevLastPhotoAnalysis({
         sourceId: assetId,
         thumbnailUri: thumbnailUri || localUriRef.current || '',
@@ -132,7 +143,7 @@ export default function PhotoEssenceRoute() {
         });
       safeDismissModal(router);
     },
-    [assetId, thumbnailUri, params.capturedAt, captureTarget, dayScores, selectHeroPhoto, applyCapturedMoment, router]
+    [applyCapturedMoment, applyCapturedMomentToDay, assetId, captureTarget, dayScores, explicitDayId, mapDay?.isToday, mapDay?.state, params.capturedAt, router, selectHeroPhoto, thumbnailUri]
   );
 
   return (

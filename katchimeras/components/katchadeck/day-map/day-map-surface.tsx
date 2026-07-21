@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
@@ -7,7 +7,6 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI } from '@/constants/theme';
 import type { DayMapNode, DayMapNodePhoto, HomeDayRecord, HomeLocationType, HomeMoment } from '@/types/home';
-import { getCreatureVisual } from '@/game/days';
 import { isPointAtHome, loadHomeAnchor } from '@/utils/home-location';
 
 type DayMapSurfaceProps = {
@@ -18,6 +17,12 @@ type DayMapSurfaceProps = {
   style?: StyleProp<ViewStyle>;
   detailMode?: 'compact' | 'bottom';
   detailBottomInset?: number;
+  selectedNodeId?: string | null;
+  visibleNodeIds?: ReadonlySet<string>;
+  libraryNodeIds?: ReadonlySet<string>;
+  onNodeSelect?: (nodeId: string | null) => void;
+  mapPadding?: { top: number; right: number; bottom: number; left: number };
+  fullBleed?: boolean;
 };
 
 type NativeMapsModule = typeof import('react-native-maps');
@@ -30,9 +35,15 @@ export function DayMapSurface({
   style,
   detailMode = 'compact',
   detailBottomInset = 0,
+  selectedNodeId: controlledSelectedNodeId,
+  visibleNodeIds,
+  libraryNodeIds,
+  onNodeSelect,
+  mapPadding,
+  fullBleed = false,
 }: DayMapSurfaceProps) {
   const [nativeMaps, setNativeMaps] = useState<NativeMapsModule | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(day.dayMap?.primaryLocationId ?? null);
+  const [internalSelectedNodeId, setInternalSelectedNodeId] = useState<string | null>(day.dayMap?.primaryLocationId ?? null);
   // The enlarged viewer holds the whole album it was opened from plus the
   // current index, so the user can page left/right without closing it.
   const [expandedAlbum, setExpandedAlbum] = useState<{ uris: string[]; index: number } | null>(null);
@@ -56,7 +67,7 @@ export function DayMapSurface({
   };
 
   useEffect(() => {
-    setSelectedNodeId(day.dayMap?.primaryLocationId ?? null);
+    setInternalSelectedNodeId(day.dayMap?.primaryLocationId ?? null);
     setExpandedAlbum(null);
   }, [day.dayMap?.primaryLocationId, day.id]);
 
@@ -110,43 +121,37 @@ export function DayMapSurface({
   // Re-type any node within the saved home radius as 'home', so the map shows the
   // home pin (and the detail reads "Home") wherever you actually were home.
   const homeAnchor = loadHomeAnchor();
-  const nodes = homeAnchor
+  const allNodes = homeAnchor
     ? day.dayMap.nodes.map((node) =>
         node.type !== 'home' && isPointAtHome(node.latitude, node.longitude, homeAnchor)
           ? { ...node, type: 'home' as const }
           : node
       )
     : day.dayMap.nodes;
-  const selectedNode =
-    nodes.find((node) => node.id === selectedNodeId) ??
-    nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ??
-    nodes[0] ??
-    null;
+  const nodes = visibleNodeIds ? allNodes.filter((node) => visibleNodeIds.has(node.id)) : allNodes;
+  const selectedNodeId = controlledSelectedNodeId !== undefined ? controlledSelectedNodeId : internalSelectedNodeId;
+  const selectedNode = selectedNodeId
+    ? nodes.find((node) => node.id === selectedNodeId) ?? null
+    : controlledSelectedNodeId !== undefined
+      ? null
+      : nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ?? nodes[0] ?? null;
   const selectedMoment = selectedNode?.linkedMomentId ? momentIndex.get(selectedNode.linkedMomentId) ?? null : null;
   const selectedThumbnailUri = selectedMoment?.metadata?.thumbnailUri ?? selectedNode?.photoThumbnailUri ?? null;
   const selectedAlbum = selectedNode?.photos ?? [];
-  const primaryNode = nodes.find((node) => node.id === day.dayMap?.primaryLocationId) ?? null;
-  const creatureVisual = day.creature ? getCreatureVisual(day.creature.visualKey) : null;
-  const creatureMarkerCoordinate =
-    day.creature && primaryNode && day.dayMap.viewport
-      ? {
-          latitude: primaryNode.latitude + day.dayMap.viewport.latitudeDelta * 0.08,
-          longitude: primaryNode.longitude + day.dayMap.viewport.longitudeDelta * 0.02,
-        }
-      : null;
-
   return (
-    <View style={[styles.shell, { minHeight: height }, style]}>
+    <View style={[styles.shell, fullBleed ? styles.fullBleed : null, { minHeight: height }, style]}>
       <MapView
         region={day.dayMap.viewport}
-        mapType="standard"
+        mapPadding={mapPadding}
+        mapType="mutedStandard"
         onPress={() => {
           if (ignoreNextMapPressRef.current) {
             ignoreNextMapPressRef.current = false;
             return;
           }
           if (interactive) {
-            setSelectedNodeId(null);
+            if (onNodeSelect) onNodeSelect(null);
+            else setInternalSelectedNodeId(null);
           }
         }}
         pitchEnabled={false}
@@ -160,6 +165,7 @@ export function DayMapSurface({
         showsUserLocation={false}
         style={StyleSheet.absoluteFill}
         toolbarEnabled={false}
+        userInterfaceStyle="dark"
         zoomControlEnabled={false}
         zoomEnabled={interactive}>
         {day.exactRouteSegments.map((segment) =>
@@ -188,55 +194,36 @@ export function DayMapSurface({
         ) : null}
         {nodes.map((node) => (
           <Marker
-            anchor={{ x: 0.5, y: 0.5 }}
+            anchor={{ x: 0.5, y: 0.92 }}
             coordinate={{ latitude: node.latitude, longitude: node.longitude }}
             key={node.id}
             tracksViewChanges={Boolean(node.photoThumbnailUri)}
             onPress={() => {
               ignoreNextMapPressRef.current = true;
               if (interactive) {
+                if (onNodeSelect) {
+                  onNodeSelect(node.id);
+                  return;
+                }
                 if (node.photos.length > 0 && selectedNode?.id === node.id) {
                   const uris = node.photos.map((photo) => photo.thumbnailUri);
                   const coverIndex = node.photoThumbnailUri ? uris.indexOf(node.photoThumbnailUri) : 0;
                   openExpandedAlbum(uris, coverIndex < 0 ? 0 : coverIndex);
                   return;
                 }
-                setSelectedNodeId(node.id);
+                setInternalSelectedNodeId(node.id);
               }
             }}>
             <MapNodeMarker
               accentColor={accentColor}
-              isPrimary={node.id === day.dayMap?.primaryLocationId}
-              isSelected={interactive && selectedNode?.id === node.id}
+              isLibraryOnly={libraryNodeIds?.has(node.id) ?? false}
               node={node}
             />
           </Marker>
         ))}
-        {creatureVisual && creatureMarkerCoordinate ? (
-          <Marker
-            anchor={{ x: 0.5, y: 1 }}
-            coordinate={creatureMarkerCoordinate}
-            key={`creature-catch-${day.id}`}
-            tracksViewChanges
-            onPress={() => {
-              ignoreNextMapPressRef.current = true;
-              if (interactive && primaryNode) {
-                setSelectedNodeId(primaryNode.id);
-              }
-            }}>
-            <View style={styles.creatureMarkerWrap}>
-              <View style={[styles.creatureMarkerHalo, { backgroundColor: `${creatureVisual.accentColor}2A` }]} />
-              <View style={[styles.creatureMarkerPlate, { borderColor: `${creatureVisual.accentColor}72` }]}>
-                <View style={styles.creatureMarkerInner}>
-                  <Image contentFit="contain" source={creatureVisual.source} style={styles.creatureMarkerImage} transition={0} />
-                </View>
-              </View>
-            </View>
-          </Marker>
-        ) : null}
       </MapView>
-      <View pointerEvents="none" style={styles.chrome} />
-      {interactive && selectedNode ? (
+      {!fullBleed ? <View pointerEvents="none" style={styles.chrome} /> : null}
+      {interactive && selectedNode && !onNodeSelect ? (
         <View
           style={[
             styles.detailWrap,
@@ -376,20 +363,18 @@ function ClusterAlbumStrip({
   );
 }
 
-function MapNodeMarker({
+const MapNodeMarker = memo(function MapNodeMarker({
   node,
   accentColor,
-  isSelected,
-  isPrimary,
+  isLibraryOnly,
 }: {
   node: DayMapNode;
   accentColor: string;
-  isSelected: boolean;
-  isPrimary: boolean;
+  isLibraryOnly: boolean;
 }) {
-  const markerTheme = resolveNodeTheme(node.type, accentColor);
-  const size = 16 + node.importance * 20 + (isSelected ? 2 : 0);
-  const haloSize = size + (isSelected ? 24 : 18);
+  const markerTheme = isLibraryOnly ? resolveLibraryNodeTheme() : resolveNodeTheme(node.type, accentColor);
+  const size = 16 + node.importance * 20;
+  const haloSize = size + 18;
 
   return (
     <View style={styles.markerWrap}>
@@ -397,13 +382,9 @@ function MapNodeMarker({
         style={[
           styles.markerHalo,
           {
-            backgroundColor: isSelected
-              ? markerTheme.primaryHalo
-              : isPrimary
-                ? markerTheme.primaryHalo
-                : markerTheme.halo,
+            backgroundColor: markerTheme.halo,
             height: haloSize,
-            opacity: isSelected ? 0.82 : 0.54,
+            opacity: 0.54,
             width: haloSize,
           },
         ]}
@@ -414,7 +395,7 @@ function MapNodeMarker({
             styles.photoMarkerFrame,
             {
               backgroundColor: markerTheme.photoCore,
-              borderColor: isSelected || isPrimary ? '#FFF7EA' : markerTheme.border,
+              borderColor: markerTheme.border,
               height: size + 10,
               width: size + 10,
             },
@@ -427,7 +408,7 @@ function MapNodeMarker({
             styles.markerCore,
             {
               backgroundColor: node.hasPhoto ? markerTheme.photoCore : markerTheme.core,
-              borderColor: isSelected || isPrimary ? '#FFF7EA' : markerTheme.border,
+              borderColor: markerTheme.border,
               height: size,
               width: size,
             },
@@ -435,9 +416,28 @@ function MapNodeMarker({
         />
       )}
       <View style={[styles.markerSpark, { backgroundColor: markerTheme.spark }]} />
-      {isPrimary ? <View style={styles.primaryBadge} /> : null}
+      <View style={[styles.markerTail, { backgroundColor: node.photoThumbnailUri ? markerTheme.photoCore : markerTheme.core }]} />
     </View>
   );
+}, (previous, next) => (
+  previous.accentColor === next.accentColor
+  && previous.isLibraryOnly === next.isLibraryOnly
+  && previous.node.id === next.node.id
+  && previous.node.type === next.node.type
+  && previous.node.importance === next.node.importance
+  && previous.node.hasPhoto === next.node.hasPhoto
+  && previous.node.photoThumbnailUri === next.node.photoThumbnailUri
+));
+
+function resolveLibraryNodeTheme() {
+  return {
+    halo: 'rgba(78, 143, 151, 0.26)',
+    primaryHalo: 'rgba(78, 143, 151, 0.44)',
+    core: '#4E8F97',
+    photoCore: '#79B9BB',
+    border: '#E7F5EF',
+    spark: '#F6FFFB',
+  };
 }
 
 function resolveNodeTheme(type: HomeLocationType, accentColor: string) {
@@ -606,6 +606,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  fullBleed: { borderRadius: 0 },
   chrome: {
     borderColor: 'rgba(255, 251, 247, 0.82)',
     borderRadius: KatchaDeckUI.radii.lg,
@@ -664,14 +665,13 @@ const styles = StyleSheet.create({
     top: 2,
     width: 5,
   },
-  primaryBadge: {
-    backgroundColor: '#FFF3E5',
-    borderRadius: 999,
-    height: 8,
+  markerTail: {
+    bottom: -4,
+    height: 11,
     position: 'absolute',
-    right: -3,
-    top: -3,
-    width: 8,
+    transform: [{ rotate: '45deg' }],
+    width: 11,
+    zIndex: -1,
   },
   detailWrap: {
     bottom: 12,
@@ -754,44 +754,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     height: 64,
     width: 64,
-  },
-  creatureMarkerWrap: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  creatureMarkerHalo: {
-    borderRadius: 24,
-    height: 74,
-    opacity: 0.84,
-    position: 'absolute',
-    transform: [{ translateY: 3 }],
-    width: 74,
-  },
-  creatureMarkerPlate: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 248, 240, 0.92)',
-    borderCurve: 'continuous',
-    borderRadius: 29,
-    borderWidth: 1.5,
-    boxShadow: '0 8px 22px rgba(19, 22, 34, 0.22)',
-    height: 58,
-    justifyContent: 'center',
-    padding: 4,
-    width: 58,
-  },
-  creatureMarkerInner: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    borderCurve: 'continuous',
-    borderRadius: 25,
-    height: '100%',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    width: '100%',
-  },
-  creatureMarkerImage: {
-    height: 44,
-    width: 44,
   },
   expandedPhotoOverlay: {
     alignItems: 'center',

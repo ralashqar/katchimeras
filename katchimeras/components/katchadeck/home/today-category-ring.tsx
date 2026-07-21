@@ -9,14 +9,19 @@ import { popEnter } from '@/components/katchadeck/motion';
 import { Meadow } from '@/constants/meadow-theme';
 import type { TodayCategoryState } from '@/utils/today-categories';
 
+export type TodayCategoryRingItem = Pick<
+  TodayCategoryState,
+  'label' | 'icon' | 'count' | 'countLabel' | 'hasContent' | 'needsAttention' | 'variant'
+> & { id: string };
+
 // The Today screen's life categories, arranged in a fixed ring around the egg.
 // Each icon is a door into its category sheet: dim while the day has nothing
 // there, lit once it holds content, and glowing gold when the category is
 // asking a contextual question (a new photo to read, a place to name, a steps
 // spike to interpret…). Taps pass through the empty space to the egg below.
 type TodayCategoryRingProps = {
-  categories: TodayCategoryState[];
-  onPress: (category: TodayCategoryState) => void;
+  categories: TodayCategoryRingItem[];
+  onPress: (category: TodayCategoryRingItem) => void;
   radius?: number;
   // Vertical nudge so the ring centers on the (lifted) egg, not the stage box.
   centerOffsetY?: number;
@@ -54,7 +59,7 @@ export function TodayCategoryRing({
         const sideIndex = onRight ? index : index - rightCount;
         const sideCount = onRight ? rightCount : categories.length - rightCount;
         // Even spacing top→bottom within the side's fan. A LONE chip (the
-        // quests compass, since the other categories moved into the numbers
+        // single action, since the other categories moved into the numbers
         // panel) sits at the egg's bottom-right instead of mid-height.
         const t = sideCount === 1 ? (categories.length === 1 ? 1 : 0.5) : sideIndex / (sideCount - 1);
         const y = (t - 0.5) * 2 * VERTICAL_SPAN;
@@ -115,7 +120,7 @@ function CategoryMote({
   translateY,
   enterDelay = 0,
 }: {
-  category: TodayCategoryState;
+  category: TodayCategoryRingItem;
   onPress: () => void;
   translateX: number;
   translateY: number;

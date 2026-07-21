@@ -122,6 +122,37 @@ export type DayPromptAnswer = {
   noteText?: string | null;
 };
 
+export type HatchCheckInStatus = 'in_progress' | 'completed' | 'partial' | 'skipped';
+export type HatchCheckInEligibilityReason = 'empty' | 'thin' | 'regular' | 'rich';
+export type HatchCheckInMode = 'reconstruct' | 'reflect';
+
+// A deliberately tiny, optional pre-hatch reflection. Its persisted plan adapts
+// to the day's signal level while remaining one aggregate timeline entry.
+export type HatchCheckIn = {
+  planVersion?: 2;
+  mode?: HatchCheckInMode;
+  questionPlan?: string[];
+  answeredQuestionIds?: string[];
+  status: HatchCheckInStatus;
+  eligibilityReason: HatchCheckInEligibilityReason;
+  moodId: string | null;
+  moodLabel: string | null;
+  flowId: string | null;
+  flowLabel: string | null;
+  categoryId: string | null;
+  categoryLabel: string | null;
+  anchorId?: string | null;
+  anchorLabel?: string | null;
+  meaningId?: string | null;
+  meaningLabel?: string | null;
+  semanticTags: string[];
+  scoreBias: Partial<DayScores>;
+  encounterSeedBias: DayPromptEncounterBias[];
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
 export type DayHeroPhoto = {
   assetId: string;
   thumbnailUri: string;
@@ -607,6 +638,10 @@ export type DayMapNodePhoto = {
   thumbnailUri: string;
   capturedAt: string;
   momentId: string | null;
+  // Derived display provenance. Older persisted/derived records omit these and
+  // the day-map content selector reconstructs them from source IDs.
+  sourceId?: string;
+  provenance?: 'logged' | 'photo_library';
   meanLuminance?: number;
   luminanceRange?: number;
 };
@@ -625,6 +660,13 @@ export type DayMapNode = {
   startedAt: string;
   endedAt: string;
   sampleCount: number;
+  // Stable provenance lets the Places UI connect a derived dwell cluster back
+  // to explicit journal/photo points without relying on the cluster id alone.
+  sourcePointIds?: string[];
+  sources?: HomeLocationSource[];
+  journalRecordIds?: string[];
+  label?: string;
+  address?: string;
 };
 
 export type DayMapViewport = {
@@ -971,6 +1013,17 @@ export type ConfirmedPlace = {
   label: string; // display label (the category's friendly name)
   meaningLabel?: string; // the category-specific "what it meant" phrase ("Focused", "A treat")
   confirmedAt: string;
+  // New place saves are location-first. `other_place` / `unassigned` mean the
+  // user has saved the where but has not optionally enriched it yet.
+  name?: string;
+  categoryLabel?: string;
+  latitude?: number;
+  longitude?: number;
+  address?: string | null;
+  placeId?: string | null;
+  locationSource?: JournalLocationSelection['source'] | 'detected';
+  locationPointId?: string;
+  detectedNodeId?: string;
 };
 
 // A written or spoken note attached to the day — a time-capsule entry. The
@@ -1064,7 +1117,7 @@ export type JournalLocationSelection = {
   name: string;
   address?: string | null;
   placeId?: string | null;
-  source: 'apple_maps' | 'current_location' | 'manual_pin';
+  source: 'apple_maps' | 'current_location' | 'manual_pin' | 'photo_metadata' | 'day_location';
   accuracyMeters?: number | null;
 };
 
@@ -1174,6 +1227,11 @@ export type StoredHomeDayRecord = {
   selectedPathId: string | null;
   creature: LocalCreatureRecord | null;
   promptAnswers: DayPromptAnswer[];
+  hatchCheckIn?: HatchCheckIn;
+  // Developer tools can replay the hatch at any hour and optionally exercise
+  // the low-signal hierarchy without deleting the day's real journal data.
+  devForceReadyToHatch?: boolean;
+  devHatchReflectionMode?: 'force_low_signal';
   heroPhoto: DayHeroPhoto | null;
   placeCategorySeeds?: string[];
   // Aggregated on-device vision read of the day's photos (optional — present
@@ -1205,6 +1263,9 @@ export type StoredHomeDayRecord = {
   // Places the user confirmed (category + meaning) for the day — drives the
   // Places cell + clears the places "!" once every detected place is confirmed.
   confirmedPlaces?: ConfirmedPlace[];
+  // Detected dwell clusters explicitly rejected by the user should not return
+  // every time the Today Places sheet is opened.
+  dismissedPlaceCandidateIds?: string[];
   // How the day began (sleep atmosphere) — manual one-tap for now.
   sleep?: DaySleep;
   // What a notably active day's steps MEANT (hike / walk / run...) — one-tap from

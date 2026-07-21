@@ -11,7 +11,7 @@ import { loadOnboardingProfile } from '@/utils/onboarding-state';
 // day-rollover still refreshes) means the previous derivation is still valid.
 // This also keeps the returned array REFERENCE stable, so downstream useMemos
 // (observations, step averages) skip too.
-let hydrationCache: { raw: string | null; dayKey: string; days: HomeDayRecord[] } | null = null;
+let hydrationCache: { state: ReturnType<typeof homeRepository.load>; dayKey: string; days: HomeDayRecord[] } | null = null;
 
 // Every persisted day hydrated to a HomeDayRecord — the data source for the
 // calendar and the per-day journal, which (unlike the Home timeline) must be able
@@ -32,14 +32,14 @@ export function useAllDays() {
 
   const days = useMemo(() => {
     const now = new Date();
-    const raw = homeRepository.loadRaw();
+    const stored = homeRepository.load();
     const dayKey = now.toDateString();
-    if (hydrationCache && hydrationCache.raw === raw && hydrationCache.dayKey === dayKey) {
+    if (hydrationCache && hydrationCache.state === stored && hydrationCache.dayKey === dayKey) {
       return hydrationCache.days;
     }
     const profile = loadOnboardingProfile();
-    const days = hydrateAllDays(homeRepository.load(), profile, now);
-    hydrationCache = { raw, dayKey, days };
+    const days = hydrateAllDays(stored, profile, now);
+    hydrationCache = { state: stored, dayKey, days };
     return days;
     // version bumps on focus to force a re-hydrate from storage.
     // eslint-disable-next-line react-hooks/exhaustive-deps

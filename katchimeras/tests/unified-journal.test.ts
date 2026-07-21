@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { commitJournalRecord } from '@/game/days/mutations/manual-journal';
+import { withCapturedMoment } from '@/game/days/mutations/capture';
 import type { JournalCommitCommand, StoredHomeDayRecord } from '@/types/home';
 import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
 import { JOURNAL_CLASSIFICATION_CATALOG } from '@/utils/journal-classification-catalog';
 import { MANUAL_JOURNAL_FLOWS } from '@/utils/manual-journal-registry';
 import { createJournalSession, journalDraftIsDirty, journalSessionReducer } from '@/utils/journal-session';
 import { noteSuggestedSpecific } from '@/utils/note-journal-specific';
+import { journalDaySearchAnchors, journalPlaceSearchQuery, mergePlaceSearchAnchors } from '@/utils/journal-place-search';
 import { classificationForResolvedRoute, foundationAtomicNeedsRetry, foundationAtomicRoutes, foundationNoteRoute, journalNoteRouteNeedsConfirmation, journalRouteForAlias, journalRouteForIds, journalRouteNeedsConfirmation, parseFoundationJournalClassification, rankJournalRoutes, registryJournalRoutes, resolveFoundationRouteEvidence } from '@/utils/journal-routing';
 import { validateJournalProjections } from '@/utils/journal-selectors';
 
@@ -15,6 +17,42 @@ const now = new Date('2026-07-13T12:00:00.000Z');
 function baseDay(): StoredHomeDayRecord {
   return { id: 'day', isoDate: '2026-07-13', state: 'forming', moments: [], locations: [], promptAnswers: [], evidence: [], classifiedMemories: [], manualJournalEntries: [], journalRecords: [], notes: [], foodMoments: [], studioMoments: [], bigMoments: [] } as unknown as StoredHomeDayRecord;
 }
+
+test('historical Photo Library review journals without changing hatched energy', () => {
+  const day = {
+    ...baseDay(),
+    state: 'hatched' as const,
+    capturedEnergy: { calm: 0.2 },
+    usedPhotoAssetIds: [],
+  };
+  const result = withCapturedMoment(
+    day,
+    {
+      energy: { energy: 0.9 },
+      vision: null,
+      sourceId: 'asset-map-photo',
+      meaning: { archetype: 'calm', label: 'Apple', thumbnailUri: 'ph://asset-map-photo', sourceId: 'asset-map-photo' },
+      journal: {
+        sessionId: 'asset-map-photo',
+        flowId: 'food',
+        path: ['food', 'snack'],
+        categoryId: 'snack',
+        canonicalQualityIds: ['subject.food'],
+        fields: { specific: 'Apple' },
+        sourceType: 'photo',
+        sourceId: 'asset-map-photo',
+        thumbnailUri: 'ph://asset-map-photo',
+      },
+    },
+    { food: { detected: false }, studio: { detected: false } },
+    now,
+    { allowHatched: true, journalOnly: true }
+  );
+
+  assert.deepEqual(result.capturedEnergy, { calm: 0.2 });
+  assert.equal(result.journalRecords?.[0]?.source.kind, 'photo');
+  assert.equal(result.journalRecords?.[0]?.fields.specific, 'Apple');
+});
 
 test('journal session reducer handles deep links and reversible navigation', () => {
   const initial = createJournalSession({ sessionId: 's1', source: { kind: 'manual', sourceId: 's1' }, flowId: 'food' });
@@ -69,6 +107,25 @@ test('I went to the national history museum routes to Places and days out, Museu
   assert.equal(classification?.categoryId, 'museum');
   assert.equal(classification?.fields.specific, 'National History Museum');
   assert.equal(foundationNoteRoute({ classification })?.id, 'went_somewhere.museum');
+});
+
+test('unnamed place notes search by category around meaningful locations from that day', () => {
+  assert.equal(journalPlaceSearchQuery('', 'museum'), 'museum or gallery');
+  assert.equal(journalPlaceSearchQuery('Natural History Museum', 'museum'), 'Natural History Museum');
+  assert.equal(journalPlaceSearchQuery('', 'cafe'), 'cafe');
+  assert.equal(journalPlaceSearchQuery('', 'other_place'), '');
+  const homeAnchor = { lat: 51.5000, lng: -0.1200, source: 'manual' as const, setAt: now.toISOString() };
+  const anchors = journalDaySearchAnchors([
+    { id: 'home-1', lat: 51.5000, lng: -0.1200, capturedAt: '2026-07-13T08:00:00.000Z', type: 'home', hasPhoto: false, source: 'foreground' },
+    { id: 'museum-1', lat: 51.4967, lng: -0.1764, capturedAt: '2026-07-13T12:00:00.000Z', type: 'unknown', hasPhoto: false, source: 'foreground' },
+    { id: 'museum-2', lat: 51.4968, lng: -0.1765, capturedAt: '2026-07-13T12:05:00.000Z', type: 'unknown', hasPhoto: true, source: 'photo_attachment' },
+  ], homeAnchor);
+  assert.equal(anchors.length, 1);
+  assert.ok(Math.abs(anchors[0]!.latitude - 51.49675) < 0.001);
+  assert.deepEqual(mergePlaceSearchAnchors(anchors, { latitude: 51.5000, longitude: -0.1200 }), [
+    anchors[0],
+    { latitude: 51.5000, longitude: -0.1200 },
+  ]);
 });
 
 test('registry-wide evidence corrects generic birthday output without misrouting birthday food', () => {
@@ -278,6 +335,71 @@ test('confirmed place locations persist once while non-place routes discard coor
     location,
   }, now);
   assert.equal(foodCommand?.draft.location, null);
+
+  const photoPlaceCommand = submissionToJournalCommand({
+    sessionId: 'photo-place',
+    flowId: 'went_somewhere',
+    path: ['went_somewhere', 'museum'],
+    categoryId: 'museum',
+    canonicalQualityIds: [],
+    fields: { specific: 'Natural History Museum', context: null },
+    sourceType: 'photo',
+    sourceId: 'photo-place-asset',
+    thumbnailUri: 'ph://photo-place-asset',
+    location,
+  }, now);
+  assert.equal(photoPlaceCommand?.draft.location, null);
+});
+
+test('new journal memories inherit the current day location and photo memories prefer their own geotag', () => {
+  const day = {
+    ...baseDay(),
+    locations: [
+      {
+        id: 'live-location', lat: 51.5, lng: -0.14, capturedAt: now.toISOString(), type: 'home',
+        hasPhoto: false, source: 'foreground', momentId: null, label: 'Home',
+      },
+      {
+        id: 'camera-roll-photo-book-cover', lat: 51.51, lng: -0.12, capturedAt: now.toISOString(), type: 'unknown',
+        hasPhoto: true, source: 'photo_attachment', momentId: null, thumbnailUri: 'ph://book-cover',
+      },
+    ],
+  } as unknown as StoredHomeDayRecord;
+  const foodCommand = submissionToJournalCommand({
+    sessionId: 'food-location', flowId: 'food', path: ['food', 'snack'], categoryId: 'snack',
+    canonicalQualityIds: [], fields: { specific: 'Apple', context: null },
+  }, now)!;
+  const withFood = commitJournalRecord(day, foodCommand, now);
+  assert.equal(withFood.journalRecords?.[0]?.location?.name, 'Home');
+  assert.equal(withFood.journalRecords?.[0]?.location?.source, 'day_location');
+  assert.equal(withFood.locations.find((point) => point.journalRecordId === withFood.journalRecords?.[0]?.id)?.lat, 51.5);
+
+  const photoCommand: JournalCommitCommand = {
+    idempotencyKey: 'photo:book-cover',
+    draft: {
+      sessionId: 'book-location', source: { kind: 'photo', sourceId: 'book-cover', thumbnailUri: 'ph://book-cover' },
+      flowId: 'studio', categoryId: 'book', fields: { specific: 'A Brief History of Time' }, feeling: null,
+      note: null, attachments: [], confirmedFacets: [],
+    },
+  };
+  const withPhoto = commitJournalRecord(day, photoCommand, now);
+  assert.equal(withPhoto.journalRecords?.[0]?.location?.source, 'photo_metadata');
+  assert.equal(withPhoto.journalRecords?.[0]?.location?.latitude, 51.51);
+  assert.equal(withPhoto.journalRecords?.[0]?.location?.longitude, -0.12);
+
+  const unmatchedPhotoCommand: JournalCommitCommand = {
+    idempotencyKey: 'photo:no-geotag',
+    draft: {
+      sessionId: 'no-geotag', source: { kind: 'photo', sourceId: 'no-geotag', thumbnailUri: 'ph://no-geotag' },
+      flowId: 'went_somewhere', categoryId: 'museum', fields: { specific: 'A museum' }, feeling: null,
+      note: null, attachments: [], confirmedFacets: [],
+      location: {
+        latitude: 40.7128, longitude: -74.006, name: 'Suggested place', source: 'apple_maps',
+      },
+    },
+  };
+  const withoutPhotoGeotag = commitJournalRecord(day, unmatchedPhotoCommand, now);
+  assert.equal(withoutPhotoGeotag.journalRecords?.[0]?.location, null);
 });
 
 test('a categorized voice submission atomically preserves journal, note, and audio', () => {

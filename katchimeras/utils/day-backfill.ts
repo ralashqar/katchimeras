@@ -10,7 +10,7 @@ import type {
   StoredHomeLocationPoint,
 } from '@/types/home';
 import { curatePhotos, type CuratablePhoto } from '@/utils/photo-curation';
-import { resolvePhotoLatitude, resolvePhotoLongitude } from '@/utils/photo-location';
+import { resolvePhotoLocation } from '@/utils/photo-location';
 import { computePhotoSignature } from '@/utils/photo-similarity';
 import { analyzePhoto, analyzePhotoLuminance, getPhotoThumbnailDataUri, isVisionAvailable } from '@/utils/photo-vision';
 import { aggregatePhotoVision } from '@/utils/vision-signals';
@@ -353,8 +353,9 @@ async function buildDayPhotos(
         const exif = (info as { exif?: Record<string, unknown> | null }).exif ?? null;
         localUri = (info as { localUri?: string }).localUri ?? asset.uri;
         // Coerce — native location fields can arrive as strings on some devices.
-        latitude = toFiniteNumber(info.location?.latitude) ?? resolvePhotoLatitude(exif) ?? null;
-        longitude = toFiniteNumber(info.location?.longitude) ?? resolvePhotoLongitude(exif) ?? null;
+        const coordinate = resolvePhotoLocation(info.location?.latitude, info.location?.longitude, exif);
+        latitude = coordinate?.latitude ?? null;
+        longitude = coordinate?.longitude ?? null;
       } catch {
         // Keep the photo anyway — base asset fields are enough to show it.
       }

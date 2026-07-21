@@ -88,7 +88,7 @@ export function applyDevScenario(scenarioId: DevScenarioId, now: Date): boolean 
     };
   }
 
-  homeRepository.save(nextState);
+  homeRepository.save(nextState, { allowHatchDowngrade: true });
   return true;
 }
 

@@ -32,7 +32,7 @@ import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals
 import { requestComicBeats } from '@/utils/day-reflection';
 import { encounterLiveCast } from '@/constants/encounter-cast';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
-import { getCreatureVisual, resetTodayInState } from '@/game/days';
+import { getCreatureVisual, prepareTodayForDevRehatch, resetTodayInState, type DevRehatchMode } from '@/game/days';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { isQuestLoopAfterCompleteEnabled, setQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
@@ -134,10 +134,40 @@ export default function ExploreScreen() {
           onPress: () => {
             const state = homeRepository.load();
             if (state) {
-              homeRepository.save(resetTodayInState(state, loadOnboardingProfile(), new Date()));
+              homeRepository.save(resetTodayInState(state, loadOnboardingProfile(), new Date()), {
+                allowHatchDowngrade: true,
+              });
             }
             clearTodayPatch();
             clearBaseCustomisation();
+            router.replace('/(tabs)');
+          },
+        },
+      ]
+    );
+  }
+
+  function handlePrepareTodayRehatch(mode: DevRehatchMode) {
+    const forceLowSignal = mode === 'force_low_signal';
+    Alert.alert(
+      forceLowSignal ? 'Force the low-signal hatch flow?' : 'Replay today’s adaptive hatch flow?',
+      forceLowSignal
+        ? 'Keeps today’s journal and passive data, but unhatches the egg and forces the three-step highlight → detail → meaning flow.'
+        : 'Keeps today’s journal and passive data, unhatches the egg, and lets the adaptive planner choose the questions again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: forceLowSignal ? 'Force low signal' : 'Unhatch egg',
+          onPress: () => {
+            const state = homeRepository.load();
+            if (!state) {
+              Alert.alert('No day available', 'Open Today once, then try this tool again.');
+              return;
+            }
+            const next = prepareTodayForDevRehatch(state, mode);
+            homeRepository.save(next, { allowHatchDowngrade: true });
+            setStoredState(next);
+            clearTodayPatch();
             router.replace('/(tabs)');
           },
         },
@@ -351,6 +381,16 @@ export default function ExploreScreen() {
               <View style={styles.devActions}>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
+                <KatchaButton
+                  label="Unhatch egg · replay adaptive questions"
+                  onPress={() => handlePrepareTodayRehatch('adaptive')}
+                  variant="secondary"
+                />
+                <KatchaButton
+                  label="Unhatch egg · force low-signal flow"
+                  onPress={() => handlePrepareTodayRehatch('force_low_signal')}
+                  variant="secondary"
+                />
                 <KatchaButton label="Open art lab" onPress={() => router.push('/art-lab')} variant="secondary" />
                 <KatchaButton label="🌍 World Base Lab (anchors)" onPress={() => router.push('/world-base-lab')} variant="secondary" />
                 <KatchaButton label="🏰 World Asset Lab (catalog)" onPress={() => router.push('/dev-asset-lab')} variant="secondary" />

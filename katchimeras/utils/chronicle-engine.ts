@@ -54,6 +54,7 @@ type ChronicleDayInput = Pick<
   | 'stepsCount'
   | 'stepsInterpretation'
   | 'studioMoments'
+  | 'hatchCheckIn'
   | 'creature'
 >;
 
@@ -132,6 +133,8 @@ function rankFacets(day: ChronicleDayInput, events: CalendarEventContext[]): str
   }
   // Books/films/shows the day took in read as Stories.
   if ((day.studioMoments?.length ?? 0) > 0) addFacet(facetScores, 'Stories', 1.4);
+  const checkInFacet = hatchCheckInFacet(day.hatchCheckIn?.flowId ?? null);
+  if (day.hatchCheckIn?.status !== 'skipped') addFacet(facetScores, checkInFacet, 1.6);
   for (const key of Object.keys(FACET)) {
     const value = (scores as Record<string, number>)[key] ?? 0;
     if (value > 0) addFacet(facetScores, FACET[key], value / 2);
@@ -167,6 +170,12 @@ function chronicleShaped(day: ChronicleDayInput, events: CalendarEventContext[])
   for (const moment of day.bigMoments ?? []) {
     shaped.push(resolveBigMomentDisplay(moment).label);
   }
+  if (day.hatchCheckIn?.status !== 'skipped') {
+    const reflection = [day.hatchCheckIn?.anchorLabel ?? day.hatchCheckIn?.categoryLabel, day.hatchCheckIn?.meaningLabel]
+      .filter((item): item is string => Boolean(item))
+      .join(' · ');
+    if (reflection) shaped.push(reflection);
+  }
   const places = placeCount(day);
   if (places > 0) shaped.push(`${places} ${places === 1 ? 'place' : 'places'} visited`);
   const memories = memoryCount(day);
@@ -193,6 +202,10 @@ function chronicleSummary(day: ChronicleDayInput, events: CalendarEventContext[]
   if (big && lead.length < 2) lead.push(resolveBigMomentDisplay(big).label.toLowerCase());
   // A named active day (a hike, a travel day) is a strong day-shaper.
   if (day.stepsInterpretation && lead.length < 2) lead.push(resolveMovementDisplay(day.stepsInterpretation).label.toLowerCase());
+  if (day.hatchCheckIn?.status !== 'skipped' && lead.length < 2) {
+    const reflection = day.hatchCheckIn?.meaningLabel ?? day.hatchCheckIn?.anchorLabel ?? day.hatchCheckIn?.categoryLabel;
+    if (reflection) lead.push(reflection.toLowerCase());
+  }
   const places = placeCount(day);
   if (places > 0 && lead.length < 2) lead.push(`${places} ${places === 1 ? 'place' : 'places'}`);
   const memories = memoryCount(day);
@@ -210,6 +223,17 @@ function chronicleSummary(day: ChronicleDayInput, events: CalendarEventContext[]
   const strongest = day.heroPhoto ? null : day.capturedMeanings?.[day.capturedMeanings.length - 1];
   if (strongest?.label) return `${sentence} The strongest memory: ${strongest.label.toLowerCase()}.`;
   return sentence;
+}
+
+function hatchCheckInFacet(flowId: string | null): string | null {
+  if (flowId === 'people') return 'Connection';
+  if (flowId === 'movement') return 'Movement';
+  if (flowId === 'went_somewhere') return 'Adventure';
+  if (flowId === 'studio') return 'Stories';
+  if (flowId === 'work') return 'Focus';
+  if (flowId === 'big_event') return 'Meaning';
+  if (flowId === 'food' || flowId === 'general') return 'Comfort';
+  return null;
 }
 
 function timeOfDayFromHour(hour: number): ChronicleTimeOfDay {
