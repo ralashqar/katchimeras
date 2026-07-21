@@ -52,7 +52,9 @@ import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-
 import { MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
+import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
+import { CARD_SCENE_TOP, COMPACT_CARD_SCENE_HEIGHT } from '@/utils/daily-card-layout';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
@@ -65,7 +67,7 @@ import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 // (same pattern as the photos/timeline sections in day-journal-sections).
 const SHOW_HATCHED_ACTION_DOCK = false;
 const SHOW_HATCHED_REFLECTION_CARD = false;
-const HERO_CARD_LIFT = 26;
+const HERO_CARD_LIFT = 12;
 
 // Mood + Sleep entries in the "+" menu — they open their own sheets instead of
 // the retired strip prompts (accents match those sheets' tiles).
@@ -659,14 +661,35 @@ export default function HomeScreen() {
             }
             days={timelineDays}
             disabled={isHatching || promptSheetOpen || hatchCheckInOpen || Boolean(comicGen)}
+            formingCountdown={isFormingToday ? (
+              <HatchCountdown
+                isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'}
+              />
+            ) : undefined}
+            formingFooter={isFormingToday ? (
+              <WorldActionStack
+                cameraBadge={categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined}
+                onAdd={() => openManualJournal()}
+                onCamera={handleCameraPress}
+                onMicPressIn={voiceNote.start}
+                onMicPressOut={() => {
+                  void voiceNote.stop();
+                }}
+                onMicTap={() => {
+                  if (voiceNote.phase === 'idle') setQuickNoteOpen(true);
+                }}
+                orientation="horizontal"
+                recording={voiceNote.isRecording}
+              />
+            ) : undefined}
             frameActive={isHatching || !isHatched}
             maxCardHeight={maxTodayCardHeight}
             onSelect={selectTimelineDay}
             selectedId={selectedDayId}
           />
           {/* The same category ring circles the hatched creature when revisiting
-              a day — read-only doors into that day's memories. Anchored to the
-              258px art box so egg and creature days match exactly. */}
+              a day — read-only doors into that day's memories. It follows the
+              compact scene geometry so egg and creature days match exactly. */}
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
             <TodayCategoryRing
               categories={mapRingItems}
@@ -674,14 +697,8 @@ export default function HomeScreen() {
                 if (isDay) handleOpenDayMap(selectedDay.id);
               }}
               anchorHeight={todayCardSize.height}
-              centerOffsetY={(286 + 385) * todayCardSize.scale - todayCardSize.height / 2}
+              centerOffsetY={(CARD_SCENE_TOP + COMPACT_CARD_SCENE_HEIGHT / 2) * todayCardSize.scale - todayCardSize.height / 2}
               radius={Math.min(134, 835 * todayCardSize.scale * 0.5 + 18)}
-            />
-          ) : null}
-          {isFormingToday && !isHatching ? (
-            <HatchCountdown
-              isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'}
-              style={styles.heroCountdown}
             />
           ) : null}
         </Animated.View>
@@ -719,6 +736,7 @@ export default function HomeScreen() {
           viewedDay={viewedDay}
           showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK}
           showHatchedReflectionCard={SHOW_HATCHED_REFLECTION_CARD}
+          showFormingActions={!isFormingToday}
           recording={voiceNote.isRecording}
           cameraBadge={categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined}
           sharingBusy={isDay ? sharingDayId === selectedDay.id : false}
@@ -965,9 +983,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: -24,
-  },
-  heroCountdown: {
-    marginTop: -32,
   },
   sectionGap: {
     gap: 16,

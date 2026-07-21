@@ -24,11 +24,19 @@ import { OrnateCardFrame } from '@/components/katchadeck/cards/ornate-card-frame
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { HomeTimelineDay } from '@/types/home';
+import {
+  CARD_SCENE_TOP,
+  COMPACT_CARD_SCENE_HEIGHT,
+  COMPACT_CARD_STORY_HEIGHT,
+  COMPACT_CARD_STORY_TOP,
+} from '@/utils/daily-card-layout';
 
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 
 type TodayDeckCarouselProps = {
   activeContent: ReactNode;
+  formingCountdown?: ReactNode;
+  formingFooter?: ReactNode;
   frameActive?: boolean;
   days: HomeTimelineDay[];
   disabled?: boolean;
@@ -53,7 +61,7 @@ const SWIPE_DISTANCE = 54;
 const SWIPE_VELOCITY = 520;
 const DECK_SPRING = { damping: 20, mass: 0.82, stiffness: 190 } as const;
 
-export function TodayDeckCarousel({ activeContent, frameActive = false, days, disabled = false, maxCardHeight, onSelect, selectedId }: TodayDeckCarouselProps) {
+export function TodayDeckCarousel({ activeContent, formingCountdown, formingFooter, frameActive = false, days, disabled = false, maxCardHeight, onSelect, selectedId }: TodayDeckCarouselProps) {
   const { width: windowWidth } = useWindowDimensions();
   const cardSize = resolveCompactDailyCardSize(windowWidth, maxCardHeight);
   const stride = Math.min(210, Math.max(168, windowWidth * NAVIGATION_DISTANCE_RATIO));
@@ -169,7 +177,12 @@ export function TodayDeckCarousel({ activeContent, frameActive = false, days, di
                 stride={stride}>
                 {isSelected ? (
                   frameActive && selected ? (
-                    <PromiseCard cardSize={cardSize} day={selected} locked={selected.kind === 'tomorrow' && !todayHatched}>
+                    <PromiseCard
+                      cardSize={cardSize}
+                      countdownContent={selected.kind === 'day' && selected.isToday ? formingCountdown : undefined}
+                      day={selected}
+                      footerContent={selected.kind === 'day' && selected.isToday ? formingFooter : undefined}
+                      locked={selected.kind === 'tomorrow' && !todayHatched}>
                       {activeContent}
                     </PromiseCard>
                   ) : activeContent
@@ -230,7 +243,21 @@ function renderDeckPreview(day: HomeTimelineDay, cardSize: DailyCardSize, locked
   return <PromiseCard cardSize={cardSize} day={day} locked={locked || day.kind === 'tomorrow'} />;
 }
 
-function PromiseCard({ cardSize, children, day, locked }: { cardSize: DailyCardSize; children?: ReactNode; day: HomeTimelineDay; locked: boolean }) {
+function PromiseCard({
+  cardSize,
+  children,
+  countdownContent,
+  day,
+  footerContent,
+  locked,
+}: {
+  cardSize: DailyCardSize;
+  children?: ReactNode;
+  countdownContent?: ReactNode;
+  day: HomeTimelineDay;
+  footerContent?: ReactNode;
+  locked: boolean;
+}) {
   const isTomorrow = day.kind === 'tomorrow';
   const label = isTomorrow ? 'TOMORROW' : day.isToday ? 'TODAY' : day.dayLabel.toUpperCase();
   const title = locked ? 'MYSTERY' : day.kind === 'day' && day.state === 'ready_to_hatch' ? 'READY TO HATCH' : 'KATCHIMERA EGG';
@@ -238,73 +265,58 @@ function PromiseCard({ cardSize, children, day, locked }: { cardSize: DailyCardS
   const scale = cardSize.scale;
   return (
     <OrnateCardFrame
-      background={<PromiseScene locked={locked} scale={scale}>{children}</PromiseScene>}
+      background={<PromiseScene countdownContent={countdownContent} locked={locked} scale={scale}>{children}</PromiseScene>}
       height={cardSize.height}
+      variant="compact"
       width={cardSize.width}>
-      <View style={[frameRect(scale, 61, 67, 126, 143), styles.promiseBadge]}>
+      <View style={[frameRect(scale, 52, 78, 158, 154), styles.promiseBadge]}>
         <IconSymbol color="#FFF0B1" name={locked ? 'moon.fill' : 'sparkles'} size={Math.max(15, 52 * scale)} />
       </View>
-      <View style={[frameRect(scale, 58, 218, 133, 58), styles.centerBox]}>
-        <ThemedText numberOfLines={1} style={[styles.frameText, { fontSize: 26 * scale, lineHeight: 31 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{label}</ThemedText>
+      <View style={[frameRect(scale, 66, 221, 139, 66), styles.centerBox]}>
+        <ThemedText numberOfLines={1} style={[styles.frameText, { fontSize: 29 * scale, lineHeight: 35 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{label}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 202, 67, 544, 135), styles.centerBox]}>
-        <ThemedText adjustsFontSizeToFit minimumFontScale={0.62} numberOfLines={1} style={[styles.promiseTitle, { fontSize: 55 * scale, lineHeight: 64 * scale }]} lightColor="#3E6522" darkColor="#3E6522">{title}</ThemedText>
+      <View style={[frameRect(scale, 215, 83, 520, 130), styles.centerBox]}>
+        <ThemedText adjustsFontSizeToFit minimumFontScale={0.62} numberOfLines={1} style={[styles.promiseTitle, { fontSize: 60 * scale, lineHeight: 69 * scale }]} lightColor="#3E6522" darkColor="#3E6522">{title}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 278, 229, 385, 54), styles.centerBox]}>
-        <ThemedText numberOfLines={1} style={[styles.promiseRibbon, { fontSize: 32 * scale, lineHeight: 38 * scale }]} lightColor="#FFF7E8" darkColor="#FFF7E8">✦ {locked ? 'Arriving soon' : 'Forming today'} ✦</ThemedText>
+      <View style={[frameRect(scale, 283, 235, 390, 63), styles.centerBox]}>
+        <ThemedText numberOfLines={1} style={[styles.promiseRibbon, { fontSize: 35 * scale, lineHeight: 42 * scale }]} lightColor="#FFF7E8" darkColor="#FFF7E8">✦ {locked ? 'Arriving soon' : 'Forming today'} ✦</ThemedText>
       </View>
-      <View style={[frameRect(scale, 755, 72, 127, 183), styles.promiseDate]}>
-        <IconSymbol color="#70562E" name="calendar" size={Math.max(12, 38 * scale)} />
-        <ThemedText style={[styles.frameText, { fontSize: 35 * scale, lineHeight: 38 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.weekday}</ThemedText>
-        <ThemedText style={[styles.promiseDateValue, { fontSize: 34 * scale, lineHeight: 38 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.dayMonth}</ThemedText>
+      <View style={[frameRect(scale, 746, 82, 140, 194), styles.promiseDate, { transform: [{ translateX: -6 * scale }, { translateY: -5 * scale }] }]}>
+        <IconSymbol color="#70562E" name="calendar" size={Math.max(13, 42 * scale)} />
+        <ThemedText style={[styles.frameText, { fontSize: 38 * scale, lineHeight: 39 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.weekday}</ThemedText>
+        <ThemedText style={[styles.promiseDateValue, { fontSize: 36 * scale, lineHeight: 38 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.dayMonth}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 750, 330, 112, 160), styles.promiseTag]}>
+      <View style={[frameRect(scale, 720, 329, 145, 184), styles.promiseTag]}>
         <IconSymbol color="#FFE4A1" name={locked ? 'moon.fill' : 'leaf.fill'} size={Math.max(11, 32 * scale)} />
-        <ThemedText numberOfLines={2} style={[styles.promiseTagText, { fontSize: 25 * scale, lineHeight: 28 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{locked ? 'Mystery Day' : 'Card Forming'}</ThemedText>
+        <ThemedText numberOfLines={2} style={[styles.promiseTagText, { fontSize: 27 * scale, lineHeight: 32 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{locked ? 'Mystery Day' : 'Card Forming'}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 72, 1047, 797, 57), styles.centerBox]}>
-        <ThemedText numberOfLines={2} style={[styles.promiseStory, { fontSize: 23 * scale, lineHeight: 28 * scale }]} lightColor="#6F5B3A" darkColor="#6F5B3A">❧ {locked ? 'Tomorrow is still gathering its magic.' : 'Today’s card is taking shape from the day as it is lived.'} ❧</ThemedText>
-      </View>
-      <PromiseSkeleton scale={scale} />
-      <View style={[frameRect(scale, 68, 1462, 805, 151), styles.promiseMemory]}>
-        <IconSymbol color="#FFE6A0" name="sparkles" size={Math.max(17, 58 * scale)} />
-        <View style={styles.promiseMemoryCopy}>
-          <ThemedText style={[styles.promiseMemoryTitle, { fontSize: 34 * scale, lineHeight: 39 * scale }]} lightColor="#F4D68A" darkColor="#F4D68A">Memory Spark ✦</ThemedText>
-          <ThemedText numberOfLines={2} style={[styles.promiseMemoryText, { fontSize: 23 * scale, lineHeight: 28 * scale }]} lightColor="#FFF8E8" darkColor="#FFF8E8">{locked ? 'Arriving tomorrow.' : 'Moments collected today will settle here.'}</ThemedText>
+      {footerContent ? (
+        <View style={[frameRect(scale, 82, 1023, 777, 244), styles.promiseFooter]}>{footerContent}</View>
+      ) : day.kind === 'day' && day.isToday ? null : (
+        <View style={[frameRect(scale, 82, COMPACT_CARD_STORY_TOP, 777, COMPACT_CARD_STORY_HEIGHT), styles.centerBox]}>
+          <ThemedText adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={2} style={[styles.promiseStory, { fontSize: 32 * scale, lineHeight: 38 * scale }]} lightColor="#6F5B3A" darkColor="#6F5B3A">❧ {locked ? 'Tomorrow’s mystery is gathering.' : 'Today’s card is forming.'} ❧</ThemedText>
         </View>
-      </View>
+      )}
     </OrnateCardFrame>
   );
 }
 
-function PromiseScene({ children, locked, scale }: { children?: ReactNode; locked: boolean; scale: number }) {
+function PromiseScene({ children, countdownContent, locked, scale }: { children?: ReactNode; countdownContent?: ReactNode; locked: boolean; scale: number }) {
   return (
     <LinearGradient
       colors={locked ? ['#403B4D', '#1C1923'] : ['#DDE8B4', '#82A267']}
-      style={[frameRect(scale, 53, 286, 835, 770), styles.promiseScene, { borderRadius: 22 * scale }]}>
+      style={[frameRect(scale, 53, CARD_SCENE_TOP, 835, COMPACT_CARD_SCENE_HEIGHT), styles.promiseScene, { borderRadius: 22 * scale }]}>
       {children && !locked ? (
-        <View style={styles.activeEggHost}>{children}</View>
+        <View style={[styles.activeEggHost, { transform: [{ translateY: -28 * scale }, { scale: 0.84 }] }]}>{children}</View>
       ) : locked ? (
         <ThemedText type="display" style={[styles.questionMark, { fontSize: 190 * scale, lineHeight: 205 * scale }]} lightColor="#C8BED7" darkColor="#C8BED7">?</ThemedText>
       ) : (
         <Image cachePolicy="memory-disk" contentFit="contain" source={eggBase} style={styles.promiseEgg} transition={0} />
       )}
+      {countdownContent && !locked ? (
+        <View pointerEvents="none" style={[styles.promiseCountdown, { bottom: 18 * scale }]}>{countdownContent}</View>
+      ) : null}
     </LinearGradient>
-  );
-}
-
-function PromiseSkeleton({ scale }: { scale: number }) {
-  const facetIcons = ['face.smiling', 'drop.fill', 'moon.fill', 'mappin', 'person.2.fill'] as const;
-  const factIcons = ['figure.walk', 'sparkles', 'leaf.fill'] as const;
-  return (
-    <>
-      <View style={[frameRect(scale, 58, 1100, 825, 203), styles.skeletonRow, { gap: 8 * scale }]}>
-        {facetIcons.map((icon) => <View key={icon} style={styles.skeletonFacet}><IconSymbol color="rgba(97,123,61,0.48)" name={icon} size={Math.max(12, 42 * scale)} /><ThemedText style={[styles.skeletonText, { fontSize: 20 * scale, lineHeight: 24 * scale }]} lightColor="rgba(99,78,45,0.52)" darkColor="rgba(99,78,45,0.52)">Forming</ThemedText></View>)}
-      </View>
-      <View style={[frameRect(scale, 58, 1312, 825, 126), styles.skeletonRow, { gap: 9 * scale }]}>
-        {factIcons.map((icon) => <View key={icon} style={styles.skeletonFact}><IconSymbol color="rgba(119,96,58,0.46)" name={icon} size={Math.max(13, 42 * scale)} /><ThemedText style={[styles.skeletonText, { fontSize: 20 * scale, lineHeight: 24 * scale }]} lightColor="rgba(99,78,45,0.52)" darkColor="rgba(99,78,45,0.52)">Forming</ThemedText></View>)}
-      </View>
-    </>
   );
 }
 
@@ -331,16 +343,10 @@ const styles = StyleSheet.create({
   promiseTag: { alignItems: 'center', gap: 2, justifyContent: 'center' },
   promiseTagText: { fontFamily: 'InstrumentSerif', fontWeight: '700', textAlign: 'center' },
   promiseScene: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  activeEggHost: { alignItems: 'center', height: '100%', justifyContent: 'center', transform: [{ scale: 0.72 }], width: '100%', zIndex: 2 },
-  promiseEgg: { height: '56%', width: '62%', zIndex: 2 },
+  activeEggHost: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%', zIndex: 2 },
+  promiseEgg: { height: '63%', transform: [{ translateY: -10 }], width: '69%', zIndex: 2 },
+  promiseCountdown: { alignItems: 'center', left: 0, position: 'absolute', right: 0, zIndex: 5 },
+  promiseFooter: { alignItems: 'center', justifyContent: 'center' },
   questionMark: { opacity: 0.82, zIndex: 2 },
   promiseStory: { fontFamily: 'InstrumentSerif', fontStyle: 'italic', fontWeight: '600', textAlign: 'center', textAlignVertical: 'center' },
-  skeletonRow: { flexDirection: 'row' },
-  skeletonFacet: { alignItems: 'center', backgroundColor: 'rgba(255,250,235,0.38)', borderColor: 'rgba(125,91,40,0.18)', borderCurve: 'continuous', borderWidth: 1, boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.42), 0 1px 2px rgba(77,49,13,0.1)', flex: 1, gap: 5, justifyContent: 'center' },
-  skeletonFact: { alignItems: 'center', backgroundColor: 'rgba(255,250,235,0.34)', borderColor: 'rgba(125,91,40,0.17)', borderCurve: 'continuous', borderWidth: 1, boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.4), 0 1px 2px rgba(77,49,13,0.1)', flex: 1, flexDirection: 'row', gap: 7, justifyContent: 'center' },
-  skeletonText: { fontFamily: 'InstrumentSerif', fontStyle: 'italic', textAlign: 'center' },
-  promiseMemory: { alignItems: 'center', flexDirection: 'row', gap: 12, paddingHorizontal: 14 },
-  promiseMemoryCopy: { flex: 1 },
-  promiseMemoryTitle: { fontFamily: 'InstrumentSerif', fontWeight: '700' },
-  promiseMemoryText: { fontFamily: 'InstrumentSerif', fontStyle: 'italic' },
 });

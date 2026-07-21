@@ -43,6 +43,21 @@ const TONE_LABEL: Record<CardState['tone'], string> = {
   bold: 'Bold',
 };
 
+const CARD_MOOD_STATE: Record<string, { iconState: string; label: string }> = {
+  energized: { iconState: 'radiant', label: 'Radiant' },
+  radiant: { iconState: 'radiant', label: 'Radiant' },
+  good: { iconState: 'light', label: 'Light' },
+  calm: { iconState: 'light', label: 'Light' },
+  loved: { iconState: 'light', label: 'Light' },
+  light: { iconState: 'light', label: 'Light' },
+  meh: { iconState: 'meh', label: 'Meh' },
+  drained: { iconState: 'heavy', label: 'Heavy' },
+  low: { iconState: 'heavy', label: 'Heavy' },
+  heavy: { iconState: 'heavy', label: 'Heavy' },
+  stressed: { iconState: 'stormy', label: 'Stormy' },
+  stormy: { iconState: 'stormy', label: 'Stormy' },
+};
+
 const VITALITY_LABEL: Record<CardState['vitality'], string> = {
   tired: 'Tired',
   well_rested: 'Well Rested',
@@ -137,7 +152,21 @@ export function upgradeDailyCreatureCard(
   day: StoredHomeDayRecord,
   creature: LocalCreatureRecord
 ): DailyCreatureCard {
-  if (card.schemaVersion === 2 && card.facets && card.dayFacts && card.scene && card.storyLine) return card;
+  if (card.schemaVersion === 2 && card.facets && card.dayFacts && card.scene && card.storyLine) {
+    const selectedPhoto = resolveDayPhoto(day);
+    const mood = resolveMoodFacet(day, card.state);
+    const moodChanged = card.facets.mood.value !== mood.value || card.facets.mood.iconKey !== mood.iconKey;
+    const photoChanged = Boolean(selectedPhoto && !card.memorySpark?.photoUri);
+    if (!moodChanged && !photoChanged) return card;
+    const memorySpark = card.memorySpark ?? resolveMemorySpark(day, creature);
+    return {
+      ...card,
+      facets: moodChanged ? { ...card.facets, mood } : card.facets,
+      memorySpark: photoChanged && memorySpark && selectedPhoto
+        ? { ...memorySpark, photoUri: selectedPhoto.uri }
+        : card.memorySpark,
+    };
+  }
   const rebuilt = buildDailyCreatureCard({ ...day, card: null, creature }, creature, {
     mode: card.provenance,
     sealedAt: card.sealedAt,
@@ -291,9 +320,7 @@ function resolveCardFacets(
   state: CardState,
   scores: DayScores
 ): Record<CardFacetKey, CardFacet> {
-  const explicitMood = day.hatchCheckIn?.moodLabel
-    ?? day.promptAnswers.find((answer) => !answer.dismissed && answer.kind === 'feeling')?.labels[0]
-    ?? TONE_LABEL[state.tone];
+  const mood = resolveMoodFacet(day, state);
   const energy = scores.energy >= 0.78 ? 'High' : scores.energy >= 0.56 ? 'Bright' : scores.energy >= 0.34 ? 'Steady' : scores.calm >= 0.5 ? 'Calm' : 'Low-key';
   const sleep = day.sleep?.totalSleepMinutes
     ? `${Math.floor(day.sleep.totalSleepMinutes / 60)}h ${day.sleep.totalSleepMinutes % 60}m`
@@ -308,11 +335,27 @@ function resolveCardFacets(
   const social = hasFamily ? 'Family time' : hasFriends ? 'With friends' : hasSolo ? 'Solo time' : day.moments.some((moment) => moment.type === 'social') ? 'Together' : 'Not noted';
   const facet = (key: CardFacetKey, label: string, value: string, iconKey: string, evidence: string[]): CardFacet => ({ key, label, value, iconKey, evidence });
   return {
-    mood: facet('mood', 'Mood', explicitMood, `mood:${state.tone}`, ['state:tone']),
+    mood,
     energy: facet('energy', 'Energy', energy, 'energy:droplet', ['score:energy']),
     sleep: facet('sleep', 'Sleep', sleep, 'sleep:moon', day.sleep ? ['sleep:logged'] : []),
     place: facet('place', 'Place', place, 'place:arch', confirmedPlace ? ['place:confirmed'] : location ? ['place:sample'] : []),
     social: facet('social', 'Social', social, 'social:companions', social === 'Not noted' ? [] : ['social:explicit']),
+  };
+}
+
+function resolveMoodFacet(day: StoredHomeDayRecord, state: CardState): CardFacet {
+  const answer = [...(day.promptAnswers ?? [])]
+    .reverse()
+    .find((candidate) => !candidate.dismissed && candidate.kind === 'feeling' && candidate.choiceIds.length > 0);
+  const rawMood = answer?.choiceIds[0] ?? answer?.labels[0] ?? day.hatchCheckIn?.moodLabel ?? TONE_LABEL[state.tone];
+  const resolved = CARD_MOOD_STATE[rawMood.trim().toLowerCase()]
+    ?? (state.tone === 'restless' ? CARD_MOOD_STATE.stormy : state.tone === 'bold' ? CARD_MOOD_STATE.radiant : CARD_MOOD_STATE.light);
+  return {
+    key: 'mood',
+    label: 'Mood',
+    value: resolved.label,
+    iconKey: `mood:${resolved.iconState}`,
+    evidence: answer ? ['mood:explicit'] : ['state:tone'],
   };
 }
 
@@ -378,24 +421,47 @@ function resolveEpithet(traits: CardTrait[], creature: LocalCreatureRecord): str
 }
 
 function resolveMemorySpark(day: StoredHomeDayRecord, creature: LocalCreatureRecord): CardMemorySpark | null {
+  const selectedPhoto = resolveDayPhoto(day);
   if (day.featuredMemory) {
     return {
       caption: creature.highlight || creature.reflection,
-      photoUri: day.featuredMemory.thumbnailUri ?? null,
+      photoUri: selectedPhoto?.uri ?? null,
       source: 'featured_memory',
       sourceId: day.featuredMemory.assetId ?? null,
     };
   }
   const bigMoment = day.bigMoments?.[0];
   if (bigMoment) {
-    return { caption: bigMoment.label, photoUri: null, source: 'big_moment', sourceId: bigMoment.id };
+    return { caption: bigMoment.label, photoUri: selectedPhoto?.uri ?? null, source: 'big_moment', sourceId: bigMoment.id };
   }
   if (creature.highlight) {
-    return { caption: creature.highlight, photoUri: null, source: 'creature_highlight', sourceId: creature.highlightMomentId };
+    return { caption: creature.highlight, photoUri: selectedPhoto?.uri ?? null, source: 'creature_highlight', sourceId: creature.highlightMomentId };
   }
   if (creature.reflection) {
-    return { caption: creature.reflection, photoUri: null, source: 'creature_reflection', sourceId: null };
+    return { caption: creature.reflection, photoUri: selectedPhoto?.uri ?? null, source: 'creature_reflection', sourceId: null };
   }
+  if (selectedPhoto) return { caption: 'A featured glimpse from this day.', photoUri: selectedPhoto.uri, source: 'featured_memory', sourceId: selectedPhoto.sourceId };
+  return null;
+}
+
+function resolveDayPhoto(day: StoredHomeDayRecord): { sourceId: string | null; uri: string } | null {
+  if (day.featuredMemory?.thumbnailUri) {
+    return { sourceId: day.featuredMemory.assetId ?? null, uri: day.featuredMemory.thumbnailUri };
+  }
+
+  const records = [...(day.journalRecords ?? [])].reverse();
+  for (const record of records) {
+    if (record.source.kind === 'photo' && record.source.thumbnailUri) {
+      return { sourceId: record.source.sourceId, uri: record.source.thumbnailUri };
+    }
+    const attachment = [...record.attachments].reverse().find((item) => item.kind === 'photo' && item.uri);
+    if (attachment?.uri) return { sourceId: attachment.id, uri: attachment.uri };
+  }
+
+  const moments = [...(day.moments ?? [])].reverse();
+  const photoMoment = moments.find((moment) => moment.type === 'photo' && (moment.metadata?.thumbnailUri || moment.metadata?.localUri));
+  const momentUri = photoMoment?.metadata?.thumbnailUri ?? photoMoment?.metadata?.localUri;
+  if (photoMoment && momentUri) return { sourceId: photoMoment.metadata?.assetId ?? photoMoment.id, uri: momentUri };
   return null;
 }
 

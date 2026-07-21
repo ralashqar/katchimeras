@@ -19,6 +19,7 @@ type TodayBottomDockProps = {
   viewedDay: HomeDayRecord | null;
   showHatchedActionDock: boolean;
   showHatchedReflectionCard: boolean;
+  showFormingActions?: boolean;
   recording: boolean;
   cameraBadge?: number;
   sharingBusy: boolean;
@@ -45,6 +46,7 @@ export function TodayBottomDock({
   viewedDay,
   showHatchedActionDock,
   showHatchedReflectionCard,
+  showFormingActions = true,
   recording,
   cameraBadge,
   sharingBusy,
@@ -72,7 +74,7 @@ export function TodayBottomDock({
               Reveal the hatch
             </ThemedText>
           </Pressable>
-        ) : isForming ? (
+        ) : isForming && showFormingActions ? (
           <View style={styles.addRow}>
             <WorldActionStack
               orientation="horizontal"

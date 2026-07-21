@@ -14,14 +14,20 @@ import {
   OrnateCardFrame,
 } from '@/components/katchadeck/cards/ornate-card-frame';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/game/days';
 import type { CardFacet, CardFacetKey, DailyCreatureCard } from '@/types/home';
 import { resolveCreatureVariantSource } from '@/utils/creature-variant';
+import { compactFacetValue, compactHighlight, compactStoryLine, formatCardSteps } from '@/utils/daily-card-display';
 import {
+  CARD_SCENE_TOP,
+  COMPACT_CARD_SCENE_HEIGHT,
+  COMPACT_CARD_STORY_HEIGHT,
+  COMPACT_CARD_STORY_TOP,
   COMPACT_DAILY_CARD_HORIZONTAL_GUTTER,
   COMPACT_DAILY_CARD_MAX_HEIGHT,
   COMPACT_DAILY_CARD_MAX_WIDTH,
+  FULL_CARD_SCENE_HEIGHT,
   type DailyCardSize,
   resolveCompactDailyCardSize,
   resolveDetailDailyCardSize,
@@ -68,7 +74,37 @@ const SCENE_COLORS: Record<NonNullable<DailyCreatureCard['scene']>['backdrop'], 
 const meadowScene = require('../../../assets/images/katchimeras/world/base/base_meadow.png');
 const cafeScene = require('../../../assets/images/katchimeras/environments/coffee_cafe/base.jpg');
 
-const FACET_ORDER: CardFacetKey[] = ['mood', 'energy', 'sleep', 'place', 'social'];
+const FACET_ORDER: CardFacetKey[] = ['mood', 'energy', 'sleep', 'place'];
+
+const FACET_ART: Partial<Record<CardFacetKey, number>> = {
+  place: require('../../../assets/images/katchimeras/card-icons/place.png'),
+};
+
+const ENERGY_ART = {
+  high: require('../../../assets/images/katchimeras/card-icons/energy.png'),
+  low: require('../../../assets/images/katchimeras/card-icons/energy-low.png'),
+  steady: require('../../../assets/images/katchimeras/card-icons/energy-steady.png'),
+} as const;
+
+const MOOD_ART: Record<string, number> = {
+  radiant: require('../../../assets/images/katchimeras/today-icons/moods/radiant.webp'),
+  light: require('../../../assets/images/katchimeras/today-icons/moods/light.webp'),
+  meh: require('../../../assets/images/katchimeras/today-icons/moods/meh.webp'),
+  heavy: require('../../../assets/images/katchimeras/today-icons/moods/heavy.webp'),
+  stormy: require('../../../assets/images/katchimeras/today-icons/moods/stormy.webp'),
+};
+
+const SLEEP_ART: Record<string, number> = {
+  good: require('../../../assets/images/katchimeras/today-icons/sleep/good.webp'),
+  low: require('../../../assets/images/katchimeras/today-icons/sleep/low.webp'),
+  normal: require('../../../assets/images/katchimeras/today-icons/sleep/normal.webp'),
+};
+
+const FACT_ART = {
+  steps: require('../../../assets/images/katchimeras/card-icons/steps.png'),
+  highlight: require('../../../assets/images/katchimeras/card-icons/highlight.png'),
+  trait: require('../../../assets/images/katchimeras/card-icons/trait.png'),
+} as const;
 
 export function CompactDailyCardSizeProvider({ children, size }: { children: ReactNode; size: DailyCardSize }) {
   return <CompactDailyCardSizeContext value={size}>{children}</CompactDailyCardSizeContext>;
@@ -98,38 +134,63 @@ export function DailyCard({ card, compact, frameSize, onPress, style, variant = 
 
 function CardContent({ card, size, style, variant }: { card: DailyCreatureCard; size: DailyCardSize; style?: StyleProp<ViewStyle>; variant: DailyCardVariant }) {
   const compact = variant === 'carousel';
+  if (compact) {
+    return (
+      <View style={style}>
+        <OrnateCardFrame
+          background={<Scene card={card} compact scale={size.scale} />}
+          height={size.height}
+          variant="compact"
+          width={size.width}>
+          <CardHeader card={card} compact scale={size.scale} />
+          <CardStory card={card} compact scale={size.scale} />
+        </OrnateCardFrame>
+      </View>
+    );
+  }
+
   const facets = resolveFacets(card);
   const facts = card.dayFacts;
   return (
     <View style={style}>
       <OrnateCardFrame
-        background={<Scene card={card} scale={size.scale} />}
+        background={<Scene card={card} compact={false} scale={size.scale} />}
         height={size.height}
+        variant="full"
         width={size.width}>
-        <CardHeader card={card} compact={compact} scale={size.scale} />
-        <View style={[frameRect(size.scale, 72, 1047, 797, 57), styles.centerBox]}>
-          <ThemedText
-            adjustsFontSizeToFit
-            maxFontSizeMultiplier={1.15}
-            minimumFontScale={0.72}
-            numberOfLines={2}
-            selectable={!compact}
-            style={[styles.story, scaledText(size.scale, 24, 29)]}
-            lightColor="#5A472E"
-            darkColor="#5A472E">
-            ❧ {card.storyLine ?? card.memorySpark?.caption ?? card.state.label} ❧
-          </ThemedText>
-        </View>
-        <View style={[frameRect(size.scale, 58, 1100, 825, 203), styles.row, { gap: 8 * size.scale }]}>
+        <CardHeader card={card} compact={false} scale={size.scale} />
+        <CardStory card={card} compact={false} scale={size.scale} />
+        <View style={[frameRect(size.scale, 58, 1102, 825, 178), styles.row, { gap: 10 * size.scale }]}>
           {FACET_ORDER.map((key) => <FacetCell facet={facets[key]} key={key} scale={size.scale} selectable={!compact} />)}
         </View>
-        <View style={[frameRect(size.scale, 58, 1312, 825, 126), styles.row, { gap: 9 * size.scale }]}>
-          <WideFact icon="figure.walk" label={facts?.stepsLabel ?? 'Steps'} scale={size.scale} selectable={!compact} value={(facts?.steps ?? 0).toLocaleString()} />
-          <WideFact icon="sparkles" label="Highlight" scale={size.scale} selectable={!compact} value={facts?.highlight ?? card.memorySpark?.caption ?? 'A quiet day'} />
-          <WideFact icon="leaf.fill" label="Bonus Trait" scale={size.scale} selectable={!compact} value={facts?.bonusTrait?.label ?? card.traits[0]?.label ?? 'One of a kind'} />
+        <View style={[frameRect(size.scale, 58, 1288, 825, 118), styles.row, { gap: 9 * size.scale }]}>
+          <StepsFact art={FACT_ART.steps} scale={size.scale} selectable={!compact} steps={facts?.steps ?? 0} />
+          <WideFact art={FACT_ART.highlight} label="Highlight" scale={size.scale} selectable={!compact} value={compactHighlight(facts?.highlight ?? card.memorySpark?.caption ?? 'A quiet day')} />
+          <WideFact art={FACT_ART.trait} label="Trait" scale={size.scale} selectable={!compact} value={facts?.bonusTrait?.label ?? card.traits[0]?.label ?? 'Unique'} />
         </View>
-        <MemoryStrip card={card} compact={compact} scale={size.scale} />
+        <MemoryStrip card={card} compact={false} scale={size.scale} />
       </OrnateCardFrame>
+    </View>
+  );
+}
+
+function CardStory({ card, compact, scale }: { card: DailyCreatureCard; compact: boolean; scale: number }) {
+  const rect = compact
+    ? frameRect(scale, 82, COMPACT_CARD_STORY_TOP, 777, COMPACT_CARD_STORY_HEIGHT)
+    : frameRect(scale, 72, 1047, 797, 47);
+  return (
+    <View style={[rect, styles.centerBox]}>
+      <ThemedText
+        adjustsFontSizeToFit
+        maxFontSizeMultiplier={1.15}
+        minimumFontScale={0.72}
+        numberOfLines={compact ? 2 : 1}
+        selectable={!compact}
+        style={[styles.story, scaledText(scale, compact ? 32 : 22, compact ? 38 : 26)]}
+        lightColor="#5A472E"
+        darkColor="#5A472E">
+        ❧ {compactStoryLine(card)} ❧
+      </ThemedText>
     </View>
   );
 }
@@ -137,61 +198,67 @@ function CardContent({ card, size, style, variant }: { card: DailyCreatureCard; 
 function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact: boolean; scale: number }) {
   const date = formatCardDateParts(card.isoDate);
   const backdrop = card.scene?.backdrop ?? card.treatment.backdrop;
+  const badgeRect = compact ? frameRect(scale, 52, 78, 158, 154) : frameRect(scale, 61, 67, 126, 143);
+  const rarityRect = compact ? frameRect(scale, 66, 221, 139, 66) : frameRect(scale, 58, 218, 133, 58);
+  const nameRect = compact ? frameRect(scale, 215, 83, 520, 130) : frameRect(scale, 202, 67, 544, 135);
+  const epithetRect = compact ? frameRect(scale, 283, 235, 390, 63) : frameRect(scale, 278, 229, 385, 54);
+  const dateRect = compact ? frameRect(scale, 746, 82, 140, 194) : frameRect(scale, 755, 72, 127, 183);
+  const tagRect = compact ? frameRect(scale, 720, 329, 145, 184) : frameRect(scale, 750, 330, 112, 160);
   return (
     <>
-      <View style={[frameRect(scale, 61, 67, 126, 143), styles.badgeIcon]}>
+      <View style={[badgeRect, styles.badgeIcon]}>
         <IconSymbol color="#FFF0B1" name="sparkles" size={Math.max(15, 54 * scale)} />
       </View>
-      <View style={[frameRect(scale, 58, 218, 133, 58), styles.centerBox]}>
+      <View style={[rarityRect, styles.centerBox]}>
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.15}
           minimumFontScale={0.76}
           numberOfLines={1}
-          style={[styles.centered, styles.rarity, scaledText(scale, 27, 32)]}
+          style={[styles.centered, styles.rarity, scaledText(scale, compact ? 29 : 27, compact ? 35 : 32)]}
           lightColor="#FFF0C7"
           darkColor="#FFF0C7">
           {card.rarity.toUpperCase()}
         </ThemedText>
       </View>
-      <View style={[frameRect(scale, 202, 67, 544, 135), styles.centerBox]}>
+      <View style={[nameRect, styles.centerBox]}>
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.15}
           minimumFontScale={0.64}
           numberOfLines={1}
           selectable={!compact}
-          style={[styles.centered, styles.name, scaledText(scale, 61, 68)]}
+          style={[styles.centered, styles.name, scaledText(scale, compact ? 64 : 61, compact ? 71 : 68)]}
           lightColor="#3E6522"
           darkColor="#3E6522">
           {card.creatureName.toUpperCase()}
         </ThemedText>
       </View>
-      <View style={[frameRect(scale, 278, 229, 385, 54), styles.centerBox]}>
+      <View style={[epithetRect, styles.centerBox]}>
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.15}
           minimumFontScale={0.72}
           numberOfLines={1}
-          style={[styles.centered, styles.epithet, scaledText(scale, 34, 39)]}
+          style={[styles.centered, styles.epithet, scaledText(scale, compact ? 35 : 34, compact ? 42 : 39)]}
           lightColor="#FFF7E8"
           darkColor="#FFF7E8">
           ✦ {card.epithet} ✦
         </ThemedText>
       </View>
-      <View style={[frameRect(scale, 755, 72, 127, 183), styles.dateStamp]}>
-        <IconSymbol color="#70562E" name="calendar" size={Math.max(12, 38 * scale)} />
-        <ThemedText style={[styles.centered, styles.dateWeekday, scaledText(scale, 35, 38)]} lightColor="#59472E" darkColor="#59472E">{date.weekday}</ThemedText>
-        <ThemedText style={[styles.centered, styles.dateValue, scaledText(scale, 34, 38)]} lightColor="#59472E" darkColor="#59472E">{date.dayMonth}</ThemedText>
+      <View style={[dateRect, styles.dateStamp, compact ? { transform: [{ translateX: -6 * scale }, { translateY: -5 * scale }] } : null]}>
+        <IconSymbol color="#70562E" name="calendar" size={Math.max(12, (compact ? 42 : 38) * scale)} />
+        <ThemedText style={[styles.centered, styles.dateWeekday, scaledText(scale, compact ? 38 : 35, compact ? 39 : 38)]} lightColor="#59472E" darkColor="#59472E">{date.weekday}</ThemedText>
+        <ThemedText style={[styles.centered, styles.dateValue, scaledText(scale, compact ? 36 : 34, 38)]} lightColor="#59472E" darkColor="#59472E">{date.dayMonth}</ThemedText>
       </View>
-      <View style={[frameRect(scale, 750, 330, 112, 160), styles.dayTag]}>
+      <View style={[tagRect, styles.dayTag]}>
         <IconSymbol color="#FFE4A1" name="leaf.fill" size={Math.max(11, 32 * scale)} />
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.15}
           minimumFontScale={0.72}
           numberOfLines={2}
-          style={[styles.centered, styles.dayTagText, scaledText(scale, 25, 28)]}
+          style={[styles.centered, styles.dayTagText, scaledText(scale, compact ? 27 : 25, compact ? 32 : 28)]}
           lightColor="#FFF0C7"
           darkColor="#FFF0C7">
           {sceneLabel(backdrop)}
@@ -201,7 +268,7 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
   );
 }
 
-function Scene({ card, scale }: { card: DailyCreatureCard; scale: number }) {
+function Scene({ card, compact, scale }: { card: DailyCreatureCard; compact: boolean; scale: number }) {
   const visual = getCreatureVisual(card.visualKey);
   const source = resolveCreatureVariantSource(card.visualKey, card.variantCell) ?? visual.source;
   const backdrop = card.scene?.backdrop ?? card.treatment.backdrop;
@@ -211,7 +278,7 @@ function Scene({ card, scale }: { card: DailyCreatureCard; scale: number }) {
   return (
     <LinearGradient
       colors={colors}
-      style={[frameRect(scale, 53, 286, 835, 770), styles.scene, { borderRadius: 22 * scale }]}>
+      style={[frameRect(scale, 53, CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
       <Image cachePolicy="memory-disk" contentFit="cover" source={sceneSource} style={styles.sceneImage} transition={0} />
       <LinearGradient colors={['rgba(255,244,207,0.04)', `${colors[2]}88`]} style={StyleSheet.absoluteFill} />
       <View style={styles.sceneGlow} />
@@ -232,42 +299,87 @@ function SnowOverlay({ scale }: { scale: number }) {
 
 function FacetCell({ facet, scale, selectable }: { facet: CardFacet; scale: number; selectable: boolean }) {
   return (
-    <View style={[styles.facet, { borderRadius: 20 * scale, paddingHorizontal: 5 * scale, paddingVertical: 13 * scale }]}>
+    <View style={[styles.facet, { borderRadius: 20 * scale, paddingHorizontal: 7 * scale, paddingVertical: 7 * scale }]}>
       <FacetIcon facet={facet} scale={scale} />
-      <ThemedText maxFontSizeMultiplier={1.15} numberOfLines={1} style={[styles.facetLabel, scaledText(scale, 20, 23)]} lightColor="#7A6746" darkColor="#7A6746">{facet.label}</ThemedText>
+      <ThemedText maxFontSizeMultiplier={1.15} numberOfLines={1} style={[styles.facetLabel, scaledText(scale, 17, 20)]} lightColor="#7A6746" darkColor="#7A6746">{facet.label}</ThemedText>
       <ThemedText
         adjustsFontSizeToFit
         maxFontSizeMultiplier={1.15}
         minimumFontScale={0.72}
-        numberOfLines={2}
+        numberOfLines={1}
         selectable={selectable}
-        style={[styles.facetValue, scaledText(scale, 29, 32)]}
+        style={[styles.facetValue, scaledText(scale, 27, 30)]}
         lightColor="#44351F"
         darkColor="#44351F">
-        {facet.value}
+        {compactFacetValue(facet)}
       </ThemedText>
     </View>
   );
 }
 
 function FacetIcon({ facet, scale }: { facet: CardFacet; scale: number }) {
-  const name: IconSymbolName = facet.key === 'mood' ? 'face.smiling' : facet.key === 'sleep' ? 'moon.fill' : facet.key === 'place' ? 'mappin' : facet.key === 'social' ? 'person.2.fill' : 'drop.fill';
-  return <View style={[styles.facetIcon, { height: 74 * scale }]}><IconSymbol color="#617B3D" name={name} size={Math.max(13, 45 * scale)} /></View>;
+  const art = resolveFacetArt(facet);
+  if (art) {
+    return (
+      <View style={[styles.facetIcon, { height: 82 * scale, width: '100%' }]}>
+        <Image contentFit="contain" source={art} style={{ height: 78 * scale, width: 78 * scale }} transition={0} />
+      </View>
+    );
+  }
+  return <View style={[styles.facetIcon, { height: 86 * scale }]}><IconSymbol color="#617B3D" name="person.2.fill" size={Math.max(13, 50 * scale)} /></View>;
 }
 
-function WideFact({ icon, label, scale, selectable, value }: { icon: IconSymbolName; label: string; scale: number; selectable: boolean; value: string }) {
+function resolveFacetArt(facet: CardFacet): number | undefined {
+  if (facet.key === 'mood') return MOOD_ART[facet.iconKey.split(':')[1]] ?? MOOD_ART.meh;
+  if (facet.key === 'energy') {
+    const value = facet.value.toLowerCase();
+    if (value === 'high' || value === 'bright') return ENERGY_ART.high;
+    if (value === 'calm' || value === 'low-key' || value === 'low') return ENERGY_ART.low;
+    return ENERGY_ART.steady;
+  }
+  if (facet.key === 'sleep') {
+    const value = facet.value.toLowerCase();
+    const loggedHours = Number.parseInt(value.match(/^(\d+)h/)?.[1] ?? '', 10);
+    if (value === 'good' || loggedHours >= 7) return SLEEP_ART.good;
+    if (value === 'low' || loggedHours < 6) return SLEEP_ART.low;
+    return SLEEP_ART.normal;
+  }
+  return FACET_ART[facet.key];
+}
+
+function StepsFact({ art, scale, selectable, steps }: { art: number; scale: number; selectable: boolean; steps: number }) {
   return (
-    <View style={[styles.wideFact, { borderRadius: 18 * scale, gap: 9 * scale, padding: 12 * scale }]}>
-      <IconSymbol color="#77603A" name={icon} size={Math.max(14, 46 * scale)} />
+    <View style={[styles.wideFact, { borderRadius: 18 * scale, gap: 7 * scale, paddingHorizontal: 8 * scale, paddingVertical: 5 * scale }]}>
+      <Image contentFit="contain" source={art} style={{ height: 88 * scale, width: 88 * scale }} transition={0} />
+      <View style={styles.stepsCopy}>
+        <ThemedText
+          selectable={selectable}
+          style={[styles.stepsValue, scaledText(scale, 39, 40)]}
+          lightColor="#483A27"
+          darkColor="#483A27">
+          {formatCardSteps(steps)}
+        </ThemedText>
+        <ThemedText style={[styles.stepsLabel, scaledText(scale, 14, 16)]} lightColor="#806C4A" darkColor="#806C4A">
+          Steps
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function WideFact({ art, label, scale, selectable, value }: { art: number; label: string; scale: number; selectable: boolean; value: string }) {
+  return (
+    <View style={[styles.wideFact, { borderRadius: 18 * scale, gap: 7 * scale, paddingHorizontal: 8 * scale, paddingVertical: 5 * scale }]}>
+      <Image contentFit="contain" source={art} style={{ height: 88 * scale, width: 88 * scale }} transition={0} />
       <View style={styles.wideCopy}>
-        <ThemedText maxFontSizeMultiplier={1.15} numberOfLines={1} style={[styles.wideLabel, scaledText(scale, 17, 20)]} lightColor="#806C4A" darkColor="#806C4A">{label}</ThemedText>
+        <ThemedText maxFontSizeMultiplier={1.15} numberOfLines={1} style={[styles.wideLabel, scaledText(scale, 15, 18)]} lightColor="#806C4A" darkColor="#806C4A">{label}</ThemedText>
         <ThemedText
           adjustsFontSizeToFit
           maxFontSizeMultiplier={1.15}
           minimumFontScale={0.68}
-          numberOfLines={2}
+          numberOfLines={1}
           selectable={selectable}
-          style={[styles.wideValue, scaledText(scale, 25, 28)]}
+          style={[styles.wideValue, scaledText(scale, 23, 26)]}
           lightColor="#483A27"
           darkColor="#483A27">
           {value}
@@ -302,17 +414,14 @@ function MemoryStrip({ card, compact, scale }: { card: DailyCreatureCard; compac
           cachePolicy="memory-disk"
           contentFit="cover"
           source={card.memorySpark.photoUri}
-          style={[styles.memoryPhoto, { borderRadius: 10 * scale, height: 126 * scale, left: 510 * scale, top: 7 * scale, width: 145 * scale }]}
+          style={[styles.memoryPhoto, { borderRadius: 12 * scale, height: 134 * scale, left: 510 * scale, top: 3 * scale, width: 276 * scale }]}
           transition={0}
         />
       ) : (
-        <View style={[styles.memoryPlaceholder, { height: 105 * scale, left: 535 * scale, top: 19 * scale, width: 105 * scale }]}>
-          <IconSymbol color="rgba(255,226,159,0.72)" name="photo.fill" size={Math.max(15, 42 * scale)} />
+        <View style={[styles.memoryPlaceholder, { height: 134 * scale, left: 510 * scale, top: 3 * scale, width: 276 * scale }]}>
+          <IconSymbol color="rgba(255,226,159,0.72)" name="photo.fill" size={Math.max(18, 62 * scale)} />
         </View>
       )}
-      <View style={[styles.memoryStamp, { height: 78 * scale, right: 18 * scale, width: 78 * scale }]}>
-        <IconSymbol color="#F4C65F" name="heart.fill" size={Math.max(12, 34 * scale)} />
-      </View>
     </View>
   );
 }
@@ -402,6 +511,9 @@ const styles = StyleSheet.create({
   wideCopy: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   wideLabel: { fontFamily: 'Manrope', fontWeight: '800', textAlign: 'center', textTransform: 'uppercase' },
   wideValue: { fontFamily: 'InstrumentSerif', fontWeight: '700', textAlign: 'center' },
+  stepsCopy: { alignItems: 'center', flex: 1, justifyContent: 'center' },
+  stepsValue: { fontFamily: 'Manrope', fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -0.7, textAlign: 'center' },
+  stepsLabel: { fontFamily: 'Manrope', fontWeight: '800', letterSpacing: 0.5, marginTop: -2, textAlign: 'center', textTransform: 'uppercase' },
   memory: { alignItems: 'center', flexDirection: 'row' },
   memorySeal: { alignItems: 'center', borderColor: '#E9D087', borderWidth: 1, justifyContent: 'center', position: 'absolute' },
   memoryCopy: { justifyContent: 'center', position: 'absolute' },
@@ -409,7 +521,6 @@ const styles = StyleSheet.create({
   memoryText: { fontFamily: 'InstrumentSerif', fontStyle: 'italic' },
   memoryPhoto: { borderColor: '#F3DFB0', borderWidth: 2, position: 'absolute', transform: [{ rotate: '-3deg' }] },
   memoryPlaceholder: { alignItems: 'center', borderColor: 'rgba(255,226,159,0.34)', borderRadius: 12, borderWidth: 1, justifyContent: 'center', position: 'absolute', transform: [{ rotate: '-3deg' }] },
-  memoryStamp: { alignItems: 'center', borderColor: 'rgba(244,198,95,0.55)', borderRadius: 999, borderWidth: 1, justifyContent: 'center', position: 'absolute' },
   thumbnail: { aspectRatio: 0.7, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1.5, boxShadow: '0 8px 18px rgba(9,7,4,0.22)', gap: 6, overflow: 'hidden', padding: 9 },
   thumbnailTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   thumbnailDate: { fontSize: 9, fontWeight: '800' },

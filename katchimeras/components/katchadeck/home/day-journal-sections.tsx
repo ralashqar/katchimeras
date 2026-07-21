@@ -22,12 +22,11 @@ const MEANING_META: Record<string, { icon: IconSymbolName; accent: string }> = {
 };
 const MEANING_FALLBACK: { icon: IconSymbolName; accent: string } = { icon: 'sparkles', accent: '#FFC36B' };
 
-const STAT_ICON: Record<string, IconSymbolName> = {
-  steps: 'figure.walk',
-  place: 'mappin.and.ellipse',
-  places: 'mappin.and.ellipse',
-  photos: 'camera.fill',
-  moments: 'sparkles',
+const STAT_ART: Record<DayStatKey, number> = {
+  steps: require('../../../assets/images/katchimeras/card-icons/steps.png'),
+  places: require('../../../assets/images/katchimeras/card-icons/place.png'),
+  photos: require('../../../assets/images/katchimeras/card-icons/photos.png'),
+  moments: require('../../../assets/images/katchimeras/card-icons/highlight.png'),
 };
 // The 'Through the day' card is parked while the v3 layout settles.
 const SHOW_TIMELINE_SECTION = false;
@@ -229,12 +228,8 @@ export function DayJournalSections({
               onPress={stat.onPress}
               style={({ pressed }) => [styles.statTile, pressed && stat.onPress ? styles.statTilePressed : null]}>
               {attention ? <AnimatedBorderHighlight borderRadius={Meadow.radius.tile} /> : null}
-              {/* Warm brown, never the creature accent — pastels vanish on cream. */}
-              <IconSymbol
-                color={attention ? Meadow.goldDeep : Meadow.iconOnCard}
-                name={STAT_ICON[stat.label] ?? 'sparkles'}
-                size={27}
-              />
+              {/* Bespoke storybook objects match the illustrated category row above. */}
+              <Image contentFit="contain" source={STAT_ART[stat.key]} style={styles.statArt} transition={0} />
               <ThemedText style={styles.statValue} lightColor={Meadow.ink} darkColor={Meadow.ink}>
                 <CountingValue value={stat.value} format={stat.format} />
               </ThemedText>
@@ -573,6 +568,10 @@ const styles = StyleSheet.create({
   statTilePressed: {
     opacity: 0.9,
     transform: [{ scale: 0.98 }],
+  },
+  statArt: {
+    height: 45,
+    width: 52,
   },
   // Value + label sit as one tight caption block under the big icon.
   statValue: {

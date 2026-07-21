@@ -96,6 +96,8 @@ test('daily card resolution is deterministic and keeps trait families distinct',
   assert.ok(first.traits.length >= 1 && first.traits.length <= 3);
   assert.equal(new Set(first.traits.map((trait) => trait.family)).size, first.traits.length);
   assert.equal(first.facets?.sleep.value, '7h 30m');
+  assert.equal(first.facets?.mood.value, 'Light');
+  assert.equal(first.facets?.mood.iconKey, 'mood:light');
   assert.equal(first.facets?.place.value, 'Riverwalk');
   assert.equal(first.dayFacts?.steps, 5316);
   assert.equal(first.scene?.backdrop, 'rain');
@@ -111,6 +113,35 @@ test('sensitive solo trait is never inferred from missing social evidence', () =
   assert.equal(card.traits.some((trait) => trait.id === 'solo_time'), false);
 });
 
+test('card mood labels and artwork keys mirror the five Mood button states', () => {
+  const cases = [
+    ['energized', 'Radiant', 'mood:radiant'],
+    ['good', 'Light', 'mood:light'],
+    ['meh', 'Meh', 'mood:meh'],
+    ['drained', 'Heavy', 'mood:heavy'],
+    ['stressed', 'Stormy', 'mood:stormy'],
+  ] as const;
+
+  for (const [choiceId, label, iconKey] of cases) {
+    const promptAnswers = [{
+      id: `prompt-${choiceId}`,
+      kind: 'feeling' as const,
+      choiceIds: [choiceId],
+      labels: [choiceId],
+      createdAt: '2026-07-20T20:00:00.000Z',
+      source: 'prompt_chip' as const,
+      semanticTags: [`feeling:${choiceId}`],
+      scoreBias: {},
+    }];
+    const card = buildDailyCreatureCard(makeDay({ promptAnswers }), creature, {
+      mode: 'live_hatch',
+      sealedAt: '2026-07-20T21:00:00.000Z',
+    });
+    assert.equal(card.facets?.mood.value, label);
+    assert.equal(card.facets?.mood.iconKey, iconKey);
+  }
+});
+
 test('memory updates preserve every sealed collectible field', () => {
   const day = makeDay();
   const card = buildDailyCreatureCard(day, creature, {
@@ -122,6 +153,33 @@ test('memory updates preserve every sealed collectible field', () => {
 
   assert.equal(updated.memorySpark?.caption, 'Dinner with old friends');
   assert.deepEqual({ ...updated, memorySpark: card.memorySpark }, card);
+});
+
+test('a journaled photo becomes the card featured image without explicit selection', () => {
+  const day = makeDay({
+    journalRecords: [{
+      id: 'journal-photo',
+      schemaVersion: 1,
+      idempotencyKey: 'journal-photo-key',
+      source: { kind: 'photo', sourceId: 'asset-cinema', thumbnailUri: 'file:///cinema.jpg' },
+      flowId: 'studio',
+      flowVersion: 1,
+      categoryId: 'film',
+      canonicalQualityIds: [],
+      fields: {},
+      feeling: null,
+      note: null,
+      attachments: [],
+      confirmedFacets: [],
+      createdAt: '2026-07-20T19:30:00.000Z',
+    }],
+  });
+  const card = buildDailyCreatureCard(day, creature, {
+    mode: 'live_hatch',
+    sealedAt: '2026-07-20T21:00:00.000Z',
+  });
+
+  assert.equal(card.memorySpark?.photoUri, 'file:///cinema.jpg');
 });
 
 test('v12 migration backfills one stable card without rerolling creature or rarity', () => {
