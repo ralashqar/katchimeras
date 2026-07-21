@@ -35,6 +35,7 @@ type HatchRevealProps = {
   // egg keeps shaking until it arrives).
   creature: LocalCreatureRecord | null;
   onComplete: () => void;
+  onSettled?: () => void;
   // Hide the built-in "Today became / name" caption — used when the host renders
   // its own header (e.g. the World page's "You hatched X" banner).
   hideCaption?: boolean;
@@ -48,7 +49,7 @@ type HatchRevealProps = {
 // In-place hatch: the SAME egg widget already on the page rattles, cracks, then
 // shrinks away exactly as the hatched katchimera scales up in its spot — matching
 // the onboarding cinematic. No page change, no moved egg.
-export function HatchReveal({ egg, card, creature, onComplete, hideCaption = false, lanternColor, embedded = false }: HatchRevealProps) {
+export function HatchReveal({ egg, card, creature, onComplete, onSettled, hideCaption = false, lanternColor, embedded = false }: HatchRevealProps) {
   const [phase, setPhase] = useState<HatchRevealPhase>('build');
   const [crackStage, setCrackStage] = useState<0 | 1 | 2>(0);
 
@@ -57,11 +58,14 @@ export function HatchReveal({ egg, card, creature, onComplete, hideCaption = fal
   const eggHatch = useSharedValue(0);
   const creatureProgress = useSharedValue(0);
   const creatureScale = useSharedValue(0.4);
+  const creatureReady = Boolean(creature);
 
   // Keep the latest onComplete without re-running the hatch timers each time the
   // parent re-renders (the creature arriving triggers several re-renders).
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const onSettledRef = useRef(onSettled);
+  onSettledRef.current = onSettled;
 
   // Build: rattle + a first crack while we WAIT for the hatch to be determined.
   useEffect(() => {
@@ -73,17 +77,20 @@ export function HatchReveal({ egg, card, creature, onComplete, hideCaption = fal
   // arrives → full crack → hatch → settle → done. A safety timeout completes even
   // if determination never lands, so the egg never shakes forever.
   useEffect(() => {
-    if (!creature) {
+    if (!creatureReady) {
       const safety = setTimeout(() => onCompleteRef.current(), 9000);
       return () => clearTimeout(safety);
     }
     const timers: ReturnType<typeof setTimeout>[] = [];
     setCrackStage(2);
     timers.push(setTimeout(() => setPhase('hatch'), 240));
-    timers.push(setTimeout(() => setPhase('settle'), 740));
+    timers.push(setTimeout(() => {
+      setPhase('settle');
+      onSettledRef.current?.();
+    }, 740));
     timers.push(setTimeout(() => onCompleteRef.current(), 1300));
     return () => timers.forEach(clearTimeout);
-  }, [creature]);
+  }, [creatureReady]);
 
   // Aggressive continuous rattle while building, one violent jolt at the hatch.
   useEffect(() => {

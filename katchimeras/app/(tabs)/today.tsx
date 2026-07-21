@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { DailyCard, resolveCompactDailyCardSize } from '@/components/katchadeck/cards/daily-card';
+import { resolveCompactDailyCardSize } from '@/components/katchadeck/cards/daily-card';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
@@ -49,11 +49,11 @@ import { useTodayShareComicController } from '@/features/today/use-today-share-c
 import { useTodayCategoryModel } from '@/features/today/use-today-category-model';
 import { useTodayNavigationController } from '@/features/today/use-today-navigation-controller';
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
-import { MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
+import { HOME_EGG_STAGE_TOP, MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
-import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
+import type { ClassifiedMemory, HomeDayRecord, HomeTimelineDay } from '@/types/home';
 import { COMPACT_CARD_SCENE_HEIGHT, COMPACT_CARD_SCENE_TOP } from '@/utils/daily-card-layout';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
@@ -96,6 +96,7 @@ export default function HomeScreen() {
     windowHeight - (insets.top + 24 + heroVerticalOffset) - 240
   );
   const todayCardSize = resolveCompactDailyCardSize(windowWidth, maxTodayCardHeight);
+  const promiseHeroTop = HOME_EGG_STAGE_TOP - 24 - (heroVerticalOffset - HERO_CARD_LIFT);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
   const [hatchCheckInOpen, setHatchCheckInOpen] = useState(false);
   const [hatchAfterCheckIn, setHatchAfterCheckIn] = useState(false);
@@ -189,7 +190,7 @@ export default function HomeScreen() {
     }
   }, [backfillStatus.completedVersion, refreshState]);
 
-  const { isHatching, hatchingEgg, handleReveal, handleHatchComplete } = useTodayHatchRevealController({
+  const { isHatching, hatchingEgg, hatchingDayId, handleReveal, handleHatchComplete } = useTodayHatchRevealController({
     selectedDay,
     triggerHatchIfReady,
     refreshState,
@@ -219,6 +220,10 @@ export default function HomeScreen() {
       params: { dayId },
     });
   }
+
+  const handleOpenCard = useCallback((cardId: string) => {
+    router.push({ pathname: '/card/[cardId]', params: { cardId } });
+  }, [router]);
 
   const isDay = selectedDay?.kind === 'day';
   const isHatched = isDay && selectedDay.state === 'hatched' && selectedDay.creature;
@@ -355,13 +360,14 @@ export default function HomeScreen() {
   });
   const pendingNoteRoutes = useMemo(() => pendingJournalNote ? noteRoutesForSignals(pendingJournalNote) : [], [pendingJournalNote]);
   const pendingNoteRoute = journalNoteRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
-  const { recentAvgSteps, memoryQuests, categories } = useTodayCategoryModel({
+  const { recentAvgSteps, memoryQuests, categories, categoriesLoading } = useTodayCategoryModel({
     allDays,
     formingDay,
     viewedDay,
     viewedIsForming,
     formingPrompts,
     handledPhotoSig,
+    timelineDays,
   });
   // Morning sequence — the ONLY auto prompts, as their real sheets: sleep
   // first (Apple Health answers it silently when it can), then mood, exactly
@@ -568,6 +574,79 @@ export default function HomeScreen() {
     !!studioFollowUp ||
     !!comicGen ||
     voiceNote.phase !== 'idle';
+  const deckCameraBadge = categoryById.get('photos')?.needsAttention
+    ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1)
+    : undefined;
+  const renderDeckFormingContent = useCallback((day: HomeTimelineDay, active: boolean, onRevealSettled?: () => void) => {
+    if (isHatching && active && hatchingEgg && day.id === hatchingDayId) {
+      return (
+        <HatchReveal
+          card={day.kind === 'day' ? day.card ?? null : null}
+          creature={day.kind === 'day' ? day.creature ?? null : null}
+          embedded
+          egg={hatchingEgg}
+          hideCaption
+          lanternColor={lanternColour}
+          onComplete={handleHatchComplete}
+          onSettled={onRevealSettled}
+        />
+      );
+    }
+    if (day.kind === 'day') {
+      if (day.state === 'hatched') return day.creature ? <CreatureHero creature={day.creature} compact /> : null;
+      return (
+        <LanternEgg
+          egg={day.egg}
+          onPress={active && day.canAddMoments ? () => openManualJournal() : undefined}
+          reactionKey={day.moments.length}
+          isReady={active && day.state === 'ready_to_hatch'}
+          feedKey={active ? eggFeedKey : 0}
+          interactive={active}
+          lanternColor={lanternColour}
+          scale={eggFraming.scale}
+          offsetY={eggFraming.offsetY}
+          membraneScale={eggFraming.membraneScale}
+          membraneOffsetY={eggFraming.membraneOffsetY}
+          shellScale={0.72}
+          shellOffsetY={0}
+        />
+      );
+    }
+    if (!tomorrowDay) return null;
+    return (
+      <LanternEgg
+        egg={tomorrowDay.egg}
+        onPress={active ? () => openManualJournal() : undefined}
+        reactionKey={tomorrowDay.moments.length}
+        feedKey={active ? eggFeedKey : 0}
+        interactive={active}
+        lanternColor={lanternColour}
+        scale={eggFraming.scale}
+        offsetY={eggFraming.offsetY}
+        membraneScale={eggFraming.membraneScale}
+        membraneOffsetY={eggFraming.membraneOffsetY}
+        shellScale={0.72}
+        shellOffsetY={0}
+      />
+    );
+  }, [eggFeedKey, eggFraming.membraneOffsetY, eggFraming.membraneScale, eggFraming.offsetY, eggFraming.scale, handleHatchComplete, hatchingDayId, hatchingEgg, isHatching, lanternColour, openManualJournal, tomorrowDay]);
+  const deckCountdown = useMemo(() => isFormingToday ? (
+    <HatchCountdown isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'} />
+  ) : undefined, [isFormingToday, selectedDay]);
+  const deckFooter = useMemo(() => isForming ? (
+    <WorldActionStack
+      cameraBadge={deckCameraBadge}
+      onAdd={openManualJournal}
+      onCamera={handleCameraPress}
+      onMicPressIn={voiceNote.start}
+      onMicPressOut={voiceNote.stop}
+      onMicTap={() => {
+        if (voiceNote.phase === 'idle') setQuickNoteOpen(true);
+      }}
+      orientation="horizontal"
+      recording={voiceNote.isRecording}
+    />
+  ) : undefined, [deckCameraBadge, handleCameraPress, isForming, openManualJournal, setQuickNoteOpen, voiceNote.isRecording, voiceNote.phase, voiceNote.start, voiceNote.stop]);
   return (
     <View style={styles.screen}>
       {/* The Meadow scene — the shared golden-hour backdrop (also behind
@@ -587,104 +666,16 @@ export default function HomeScreen() {
           entering={presenceEnter(70)}
           style={[styles.heroStage, { marginTop: heroVerticalOffset - HERO_CARD_LIFT }]}>
           <TodayDeckCarousel
-            activeContent={
-              isHatching && hatchingEgg ? (
-                <HatchReveal
-                  card={selectedDay?.kind === 'day' ? selectedDay.card ?? null : null}
-                  creature={selectedDay?.kind === 'day' ? selectedDay.creature ?? null : null}
-                  embedded
-                  egg={hatchingEgg}
-                  hideCaption
-                  lanternColor={lanternColour}
-                  onComplete={handleHatchComplete}
-                />
-              ) : isDay ? (
-                isHatched ? (
-                  selectedDay.card ? (
-                    <DailyCard
-                      card={selectedDay.card}
-                      compact
-                      onPress={() => router.push({ pathname: '/card/[cardId]', params: { cardId: selectedDay.card!.id } })}
-                    />
-                  ) : (
-                    <CreatureHero creature={selectedDay.creature!} compact />
-                  )
-                ) : (
-                  <LanternEgg
-                    egg={selectedDay.egg}
-                    onPress={selectedDay.canAddMoments ? () => openManualJournal() : undefined}
-                    reactionKey={selectedDay.moments.length}
-                    isReady={selectedDay.state === 'ready_to_hatch'}
-                    feedKey={eggFeedKey}
-                    lanternColor={lanternColour}
-                    scale={eggFraming.scale}
-                    offsetY={eggFraming.offsetY}
-                    membraneScale={eggFraming.membraneScale}
-                    membraneOffsetY={eggFraming.membraneOffsetY}
-                    shellScale={0.72}
-                    shellOffsetY={0}
-                  />
-                )
-              ) : onTomorrowForming ? (
-                <LanternEgg
-                  egg={tomorrowDay.egg}
-                  onPress={() => openManualJournal()}
-                  reactionKey={tomorrowDay.moments.length}
-                  feedKey={eggFeedKey}
-                  lanternColor={lanternColour}
-                  scale={eggFraming.scale}
-                  offsetY={eggFraming.offsetY}
-                  membraneScale={eggFraming.membraneScale}
-                  membraneOffsetY={eggFraming.membraneOffsetY}
-                  shellScale={0.72}
-                  shellOffsetY={0}
-                />
-              ) : (
-                <LanternEgg
-                  egg={{
-                    accentColor: '#A78BFA',
-                    haloColor: '#A78BFA',
-                    coreColor: 'rgba(201,194,232,0.3)',
-                    intensity: 0.26,
-                    shimmer: true,
-                    swirl: 0.2,
-                    label: 'Not yet formed',
-                  }}
-                  scale={eggFraming.scale}
-                  offsetY={eggFraming.offsetY}
-                  membraneScale={eggFraming.membraneScale}
-                  membraneOffsetY={eggFraming.membraneOffsetY}
-                  shellScale={0.72}
-                  shellOffsetY={0}
-                />
-              )
-            }
             days={timelineDays}
             disabled={isHatching || promptSheetOpen || hatchCheckInOpen || Boolean(comicGen)}
-            formingCountdown={isFormingToday ? (
-              <HatchCountdown
-                isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'}
-              />
-            ) : undefined}
-            formingFooter={isFormingToday ? (
-              <WorldActionStack
-                cameraBadge={categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined}
-                onAdd={() => openManualJournal()}
-                onCamera={handleCameraPress}
-                onMicPressIn={voiceNote.start}
-                onMicPressOut={() => {
-                  void voiceNote.stop();
-                }}
-                onMicTap={() => {
-                  if (voiceNote.phase === 'idle') setQuickNoteOpen(true);
-                }}
-                orientation="horizontal"
-                recording={voiceNote.isRecording}
-              />
-            ) : undefined}
-            frameActive={isHatching || !isHatched}
+            formingCountdown={deckCountdown}
+            formingFooter={deckFooter}
+            hatchingDayId={hatchingDayId}
             maxCardHeight={maxTodayCardHeight}
+            onOpenCard={handleOpenCard}
             onSelect={selectTimelineDay}
+            promiseHeroTop={promiseHeroTop}
+            renderFormingContent={renderDeckFormingContent}
             selectedId={selectedDayId}
           />
           {/* The same category ring circles the hatched creature when revisiting
@@ -696,9 +687,11 @@ export default function HomeScreen() {
               onPress={() => {
                 if (isDay) handleOpenDayMap(selectedDay.id);
               }}
-              anchorHeight={todayCardSize.height}
-              centerOffsetY={(COMPACT_CARD_SCENE_TOP + COMPACT_CARD_SCENE_HEIGHT / 2) * todayCardSize.scale - todayCardSize.height / 2}
-              radius={Math.min(134, 835 * todayCardSize.scale * 0.5 + 18)}
+              anchorHeight={isForming ? 258 : todayCardSize.height}
+              centerOffsetY={isForming
+                ? promiseHeroTop
+                : (COMPACT_CARD_SCENE_TOP + COMPACT_CARD_SCENE_HEIGHT / 2) * todayCardSize.scale - todayCardSize.height / 2}
+              radius={isForming ? 134 : Math.min(134, 835 * todayCardSize.scale * 0.5 + 18)}
             />
           ) : null}
         </Animated.View>
@@ -736,13 +729,15 @@ export default function HomeScreen() {
           viewedDay={viewedDay}
           showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK}
           showHatchedReflectionCard={SHOW_HATCHED_REFLECTION_CARD}
-          showFormingActions={!isFormingToday}
+          showFormingActions={false}
           recording={voiceNote.isRecording}
           cameraBadge={categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined}
+          momentCount={categoryById.get('reflection')?.count}
           sharingBusy={isDay ? sharingDayId === selectedDay.id : false}
           comicBusy={comicGen?.status === 'generating'}
           statAttention={isFormingToday ? statAttention : undefined}
           categories={panelCategories}
+          categoryDataLoading={categoriesLoading}
           onReveal={handleRevealPress}
           onCamera={handleCameraPress}
           onMicTap={() => {

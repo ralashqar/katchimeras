@@ -182,17 +182,18 @@ export function useHomeScreenState() {
     timelineDays.find((day) => day.kind === 'day' && day.isToday) ??
     timelineDays[0] ??
     null;
-  const selectedPromptDayId = selectedDay?.kind === 'day' ? selectedDay.id : null;
-  const selectedPromptDayIsToday = selectedDay?.kind === 'day' ? selectedDay.isToday : false;
-  const selectedPromptDayState = selectedDay?.kind === 'day' ? selectedDay.state : null;
+  // Photo suggestions belong to the actual current day, not whichever card is
+  // being viewed. The selected id is only an idle signal so carousel activity
+  // cancels/postpones scanning without clearing already-curated candidates.
+  const promptCandidateDay = viewModel.state.today;
   const {
     promptPhotoCandidates,
     forceMeaningfulPhotoPrompt,
     clearForcedMeaningfulPhotoPrompt,
   } = usePromptPhotoCandidates({
-    dayId: selectedPromptDayId,
-    isToday: selectedPromptDayIsToday,
-    dayState: selectedPromptDayState,
+    dayId: promptCandidateDay.id,
+    dayState: promptCandidateDay.state,
+    interactionKey: selectedDayId,
   });
   const { triggerHatchIfReady } = useHatchController({
     selectedDay,

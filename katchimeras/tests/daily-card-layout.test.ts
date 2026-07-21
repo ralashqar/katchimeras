@@ -7,6 +7,7 @@ import {
   COMPACT_DAILY_CARD_MAX_WIDTH,
   FULL_CARD_ASPECT_RATIO,
   resolveCompactDailyCardSize,
+  resolveCompactDailyCardSizeForWidth,
   resolveDetailDailyCardSize,
 } from '@/utils/daily-card-layout';
 
@@ -35,4 +36,11 @@ test('Today card is shorter than the detail card at the same width', () => {
   const detail = resolveDetailDailyCardSize(compact.width + 32);
   assert.equal(detail.width, compact.width);
   assert.ok(compact.height < detail.height);
+});
+
+test('deck cards preserve the exact compact frame geometry at grid width', () => {
+  const size = resolveCompactDailyCardSizeForWidth(164);
+  assert.equal(size.width, 164);
+  assert.equal(size.height, 164 / COMPACT_CARD_ASPECT_RATIO);
+  assert.equal(size.width / size.height, COMPACT_CARD_ASPECT_RATIO);
 });

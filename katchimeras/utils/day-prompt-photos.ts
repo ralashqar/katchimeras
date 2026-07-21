@@ -15,6 +15,7 @@ type PromptPhotoScanOptions = {
   mode: PromptPhotoScanMode;
   now?: Date;
   limit?: number;
+  signal?: AbortSignal;
 };
 
 type PromptPhotoAsset = {
@@ -40,18 +41,54 @@ const DEV_SCAN_SIZE = 80;
 // re-running within a few minutes can't surface anything new, so foreground
 // churn is served from the last result.
 let scanCache: { key: string; at: number; result: DayPromptPhotoCandidate[] } | null = null;
+type ProductionScanInFlight = {
+  controller: AbortController;
+  key: string;
+  promise: Promise<DayPromptPhotoCandidate[]>;
+};
+let productionScanInFlight: ProductionScanInFlight | null = null;
 const SCAN_TTL_MS = 3 * 60_000;
 
 export async function loadProductionDayPromptPhotoCandidates(
-  now: Date = new Date()
+  now: Date = new Date(),
+  signal?: AbortSignal
 ): Promise<DayPromptPhotoCandidate[]> {
   const key = now.toDateString();
+  if (signal?.aborted) return [];
   if (scanCache && scanCache.key === key && Date.now() - scanCache.at < SCAN_TTL_MS) {
     return scanCache.result;
   }
-  const result = await loadDayPromptPhotoCandidates({ mode: 'production', now, limit: PRODUCTION_CANDIDATE_LIMIT });
-  scanCache = { key, at: Date.now(), result };
-  return result;
+  if (productionScanInFlight?.key === key && !productionScanInFlight.controller.signal.aborted) {
+    return bindScanCancellation(productionScanInFlight, signal);
+  }
+
+  const controller = new AbortController();
+  let inFlight!: ProductionScanInFlight;
+  const promise = loadDayPromptPhotoCandidates({
+    mode: 'production',
+    now,
+    limit: PRODUCTION_CANDIDATE_LIMIT,
+    signal: controller.signal,
+  }).then((result) => {
+    if (!controller.signal.aborted) scanCache = { key, at: Date.now(), result };
+    return result;
+  }).finally(() => {
+    if (productionScanInFlight === inFlight) productionScanInFlight = null;
+  });
+  inFlight = { controller, key, promise };
+  productionScanInFlight = inFlight;
+  return bindScanCancellation(inFlight, signal);
+}
+
+function bindScanCancellation(inFlight: ProductionScanInFlight, signal?: AbortSignal) {
+  if (!signal) return inFlight.promise;
+  if (signal.aborted) {
+    inFlight.controller.abort();
+    return Promise.resolve([]);
+  }
+  const abort = () => inFlight.controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  return inFlight.promise.finally(() => signal.removeEventListener('abort', abort));
 }
 
 export async function loadDevRecentDayPromptPhotoCandidates(limit = 12): Promise<DayPromptPhotoCandidate[]> {
@@ -74,7 +111,9 @@ async function loadDayPromptPhotoCandidates({
   mode,
   now = new Date(),
   limit = PRODUCTION_CANDIDATE_LIMIT,
+  signal,
 }: PromptPhotoScanOptions): Promise<DayPromptPhotoCandidate[]> {
+  if (signal?.aborted) return [];
   const mediaLibraryNative = requireOptionalNativeModule('ExpoMediaLibrary');
   if (!mediaLibraryNative) {
     return [];
@@ -82,8 +121,9 @@ async function loadDayPromptPhotoCandidates({
 
   try {
     const MediaLibrary = await import('expo-media-library');
+    if (signal?.aborted) return [];
     const permission = await MediaLibrary.requestPermissionsAsync(false);
-    if (!permission.granted) {
+    if (!permission.granted || signal?.aborted) {
       return [];
     }
 
@@ -93,6 +133,7 @@ async function loadDayPromptPhotoCandidates({
       mediaType: MediaLibrary.MediaType.photo,
       sortBy: [['creationTime', false]],
     });
+    if (signal?.aborted) return [];
 
     const scanned: PromptPhotoAsset[] = [];
     const todayIso = toLocalDateId(now);
@@ -100,6 +141,7 @@ async function loadDayPromptPhotoCandidates({
     const allowedDates = new Set([todayIso, yesterdayIso]);
 
     for (const asset of page.assets) {
+      if (signal?.aborted) return [];
       if (mode === 'production' && !allowedDates.has(toLocalDateId(new Date(asset.creationTime)))) {
         continue;
       }
@@ -111,20 +153,26 @@ async function loadDayPromptPhotoCandidates({
 
       try {
         const info = await MediaLibrary.getAssetInfoAsync(asset.id);
+        if (signal?.aborted) return [];
         localUri = (info as { localUri?: string | null }).localUri ?? undefined;
       } catch {
         localUri = undefined;
       }
+      if (signal?.aborted) return [];
 
       if (!isScreenshot) {
         luminance = await analyzePhotoLuminance(asset.id);
+        if (signal?.aborted) return [];
         // MEMORY: hash a small native thumbnail, NEVER the full-res original —
         // decoding dozens of 12-48MP photos on foreground is what used to get
         // the app jetsam-killed. No thumbnail (older build) → no signature.
         const thumb = await getPhotoThumbnailDataUri(asset.id, 256);
+        if (signal?.aborted) return [];
         signature = thumb ? await computePhotoSignature(thumb) : null;
+        if (signal?.aborted) return [];
         // Let the UI breathe between photos.
         await new Promise((resolve) => setTimeout(resolve, 8));
+        if (signal?.aborted) return [];
       }
 
       scanned.push({
@@ -142,6 +190,8 @@ async function loadDayPromptPhotoCandidates({
         width: asset.width,
       });
     }
+
+    if (signal?.aborted) return [];
 
     // Drop photos the user has already added to a day (by asset id, or by
     // perceptual hash for re-saved duplicates) — these never prompt again, even

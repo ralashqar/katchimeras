@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { memo, useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
@@ -35,38 +35,18 @@ const SHOW_PHOTOS_SECTION = false;
 
 export type DayStatKey = 'steps' | 'places' | 'photos' | 'moments';
 
-// A stat value that COUNTS to its new number instead of snapping — so live
-// step updates roll up. Eased over ~0.7s; formatting is applied per frame.
-function CountingValue({ value, format }: { value: number; format: (value: number) => string }) {
-  const [display, setDisplay] = useState(value);
-  const prevRef = useRef(value);
-  useEffect(() => {
-    const from = prevRef.current;
-    if (from === value) return;
-    prevRef.current = value;
-    const started = Date.now();
-    const duration = 700;
-    let raf = 0;
-    const tick = () => {
-      const t = Math.min(1, (Date.now() - started) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setDisplay(Math.round(from + (value - from) * eased));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value]);
-  return <>{format(display)}</>;
-}
-
-export function DayJournalSections({
+function DayJournalSectionsComponent({
   day,
+  loadingStats,
+  momentCount,
   onStatPress,
   statAttention,
   categories,
   onCategoryPress,
 }: {
   day: HomeDayRecord;
+  loadingStats?: DayStatKey[];
+  momentCount?: number;
   // When set, every stat tile becomes a door into its category surface (steps →
   // journey sheet, places → Crossroads reader, …) instead of the built-in
   // places modal. Absent → legacy behaviour (hatched/archive views).
@@ -79,14 +59,17 @@ export function DayJournalSections({
   categories?: TodayCategoryState[];
   onCategoryPress?: (category: TodayCategoryState) => void;
 }) {
-  const photos = collectPhotos(day);
-  const meanings = collectMeanings(day);
+  // The media sections are parked on Today. Avoid traversing and prefetching
+  // their content during every deck selection while they are not rendered.
+  const photos = SHOW_PHOTOS_SECTION ? collectPhotos(day) : [];
+  const meanings = SHOW_PHOTOS_SECTION ? collectMeanings(day) : [];
   // A photo/meaning record can exist while its thumbnail is stale / yields no
   // pixels. Prefetch every thumbnail (photos AND meaning photos) up front and keep
   // only the URIs that actually load — so we never render an empty / grey box.
   const [loadableUris, setLoadableUris] = useState<Set<string>>(() => new Set());
   const [failedUris, setFailedUris] = useState<Set<string>>(() => new Set());
   useEffect(() => {
+    if (!SHOW_PHOTOS_SECTION) return;
     let active = true;
     setLoadableUris(new Set());
     setFailedUris(new Set());
@@ -129,128 +112,37 @@ export function DayJournalSections({
   const meaningUris = new Set(meanings.map((meaning) => meaning.thumbnailUri).filter(canShowUri));
   const extraPhotos = visiblePhotos.filter((photo) => !meaningUris.has(photo.thumbnailUri));
 
-  const timeline = buildDayTimeline(day);
-  const timelineGroups = timeline.length >= 1 ? buildTimelineGroups(timeline) : [];
+  const timeline = SHOW_TIMELINE_SECTION ? buildDayTimeline(day) : [];
+  const timelineGroups = SHOW_TIMELINE_SECTION && timeline.length >= 1 ? buildTimelineGroups(timeline) : [];
 
   const placeNodes = day.dayMap?.nodes ?? [];
   const accent = day.creature?.accentColor ?? day.egg?.accentColor ?? '#A7D5FF';
   const [placesOpen, setPlacesOpen] = useState(false);
 
-  const plain = (value: number) => `${value}`;
-  const stats: { key: DayStatKey; label: string; value: number; format: (value: number) => string; onPress?: () => void }[] = [
-    {
-      key: 'steps',
-      label: 'steps',
-      value: day.stepsCount,
-      format: formatCompact,
-      onPress: onStatPress ? () => onStatPress('steps') : undefined,
-    },
-    {
-      key: 'places',
-      label: day.visitedPlaceCount === 1 ? 'place' : 'places',
-      value: day.visitedPlaceCount,
-      format: plain,
-      onPress: onStatPress
-        ? () => onStatPress('places')
-        : placeNodes.length > 0
-          ? () => setPlacesOpen(true)
-          : undefined,
-    },
-    {
-      key: 'photos',
-      label: 'photos',
-      value: day.vision?.analyzedPhotoCount ?? photos.length,
-      format: plain,
-      onPress: onStatPress ? () => onStatPress('photos') : undefined,
-    },
+  const openPlaces = useCallback(() => setPlacesOpen(true), []);
+  const closePlaces = useCallback(() => setPlacesOpen(false), []);
+  const momentCountLoading = loadingStats?.includes('moments') ?? false;
+  const resolvedMomentCount = momentCountLoading ? 0 : momentCount ?? buildMomentTimeline(day).length;
     // "moments" = everything logged today (prompts, captures, meanings) — the
     // timeline entries. The legacy day.moments list is no longer written to.
-    {
-      key: 'moments',
-      label: 'moments',
-      value: timeline.length,
-      format: plain,
-      onPress: onStatPress ? () => onStatPress('moments') : undefined,
-    },
-  ];
-
   return (
     <View style={styles.wrap}>
       <View style={styles.sectionCard}>
-        {categories && categories.length > 0 ? (
-          <>
-            <View style={styles.categoryRow}>
-              {categories.map((category) => {
-                const art =
-                  (category.variant ? VARIANT_ART[category.id]?.[category.variant] : undefined) ??
-                  CATEGORY_ART[category.id];
-                const badge = category.countLabel ?? (category.count > 0 ? `${category.count}` : null);
-                return (
-                  <Pressable
-                    key={category.id}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${category.label}${badge ? ` (${badge})` : ''}`}
-                    disabled={!onCategoryPress}
-                    onPress={() => onCategoryPress?.(category)}
-                    style={styles.categoryTile}>
-                    {category.needsAttention ? <AnimatedBorderHighlight borderRadius={Meadow.radius.tile} /> : null}
-                    {art ? (
-                      <Image source={art} style={styles.categoryArt} contentFit="contain" />
-                    ) : (
-                      <IconSymbol name={category.icon} size={30} color={Meadow.iconOnCard} />
-                    )}
-                    <ThemedText numberOfLines={1} style={styles.categoryLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                      {category.label}
-                    </ThemedText>
-                    {badge ? (
-                      <View style={styles.categoryBadge} pointerEvents="none">
-                        <ThemedText style={styles.categoryBadgeLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                          {badge}
-                        </ThemedText>
-                      </View>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={styles.panelDivider} />
-          </>
-        ) : null}
-        <View style={styles.statsRow}>
-        {stats.map((stat) => {
-          const attention = !!statAttention?.[stat.key];
-          return (
-            <Pressable
-              key={stat.key}
-              accessibilityLabel={`${stat.value} ${stat.label}${attention ? stat.key === 'photos' ? ', new photos ready to review' : ', needs review' : ''}`}
-              accessibilityRole="button"
-              disabled={!stat.onPress}
-              onPress={stat.onPress}
-              style={({ pressed }) => [styles.statTile, pressed && stat.onPress ? styles.statTilePressed : null]}>
-              {attention ? <AnimatedBorderHighlight borderRadius={Meadow.radius.tile} /> : null}
-              {/* Bespoke storybook objects match the illustrated category row above. */}
-              <Image contentFit="contain" source={STAT_ART[stat.key]} style={styles.statArt} transition={0} />
-              <ThemedText style={styles.statValue} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                <CountingValue value={stat.value} format={stat.format} />
-              </ThemedText>
-              <ThemedText style={styles.statLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-                {stat.label}
-              </ThemedText>
-              {attention ? (
-                stat.key === 'photos' ? (
-                  <View pointerEvents="none" style={styles.photoReviewBadge}>
-                    <IconSymbol name="sparkles" size={8} color={Meadow.ink} />
-                    <ThemedText style={styles.photoReviewBadgeLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>New</ThemedText>
-                  </View>
-                ) : <View style={styles.statAlertDot} />
-              ) : null}
-            </Pressable>
-          );
-        })}
-        </View>
+        <CategoryTiles categories={categories} onCategoryPress={onCategoryPress} />
+        {categories && categories.length > 0 ? <View style={styles.panelDivider} /> : null}
+        <StatTiles
+          loadingStats={loadingStats}
+          momentCount={resolvedMomentCount}
+          onOpenPlaces={placeNodes.length > 0 ? openPlaces : undefined}
+          onStatPress={onStatPress}
+          photoCount={day.vision?.analyzedPhotoCount ?? photos.length}
+          placeCount={day.visitedPlaceCount}
+          statAttention={statAttention}
+          steps={day.stepsCount}
+        />
       </View>
 
-      <PlacesModal accentColor={accent} nodes={placeNodes} onClose={() => setPlacesOpen(false)} visible={placesOpen} />
+      {placesOpen ? <PlacesModal accentColor={accent} nodes={placeNodes} onClose={closePlaces} visible /> : null}
 
       {SHOW_PHOTOS_SECTION && (meanings.length > 0 || visiblePhotos.length > 0) ? (
         <View style={styles.sectionCard}>
@@ -353,6 +245,153 @@ export function DayJournalSections({
     </View>
   );
 }
+
+const CategoryTiles = memo(function CategoryTiles({
+  categories,
+  onCategoryPress,
+}: {
+  categories?: TodayCategoryState[];
+  onCategoryPress?: (category: TodayCategoryState) => void;
+}) {
+  if (!categories || categories.length === 0) return null;
+  return (
+    <View style={styles.categoryRow}>
+      {categories.map((category) => {
+        const art =
+          (category.variant ? VARIANT_ART[category.id]?.[category.variant] : undefined) ??
+          CATEGORY_ART[category.id];
+        const badge = category.countLabel ?? (category.count > 0 ? `${category.count}` : null);
+        return (
+          <Pressable
+            key={category.id}
+            accessibilityRole="button"
+            accessibilityLabel={`${category.label}${badge ? ` (${badge})` : ''}`}
+            disabled={!onCategoryPress}
+            onPress={() => onCategoryPress?.(category)}
+            style={styles.categoryTile}>
+            {category.needsAttention ? <AnimatedBorderHighlight borderRadius={Meadow.radius.tile} /> : null}
+            {art ? (
+              <Image source={art} style={styles.categoryArt} contentFit="contain" transition={0} />
+            ) : (
+              <IconSymbol name={category.icon} size={30} color={Meadow.iconOnCard} />
+            )}
+            <ThemedText numberOfLines={1} style={styles.categoryLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+              {category.label}
+            </ThemedText>
+            {badge ? (
+              <View style={styles.categoryBadge} pointerEvents="none">
+                <ThemedText style={styles.categoryBadgeLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                  {badge}
+                </ThemedText>
+              </View>
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
+
+const StatTiles = memo(function StatTiles({
+  loadingStats,
+  momentCount,
+  onOpenPlaces,
+  onStatPress,
+  photoCount,
+  placeCount,
+  statAttention,
+  steps,
+}: {
+  loadingStats?: DayStatKey[];
+  momentCount: number;
+  onOpenPlaces?: () => void;
+  onStatPress?: (key: DayStatKey) => void;
+  photoCount: number;
+  placeCount: number;
+  statAttention?: Partial<Record<DayStatKey, boolean>>;
+  steps: number;
+}) {
+  const plain = (value: number) => `${value}`;
+  const stats: {
+    key: DayStatKey;
+    label: string;
+    value: number;
+    format: (value: number) => string;
+    onPress?: () => void;
+  }[] = [
+    {
+      key: 'steps',
+      label: 'steps',
+      value: steps,
+      format: formatCompact,
+      onPress: onStatPress ? () => onStatPress('steps') : undefined,
+    },
+    {
+      key: 'places',
+      label: placeCount === 1 ? 'place' : 'places',
+      value: placeCount,
+      format: plain,
+      onPress: onStatPress ? () => onStatPress('places') : onOpenPlaces,
+    },
+    {
+      key: 'photos',
+      label: 'photos',
+      value: photoCount,
+      format: plain,
+      onPress: onStatPress ? () => onStatPress('photos') : undefined,
+    },
+    {
+      key: 'moments',
+      label: 'moments',
+      value: momentCount,
+      format: plain,
+      onPress: onStatPress ? () => onStatPress('moments') : undefined,
+    },
+  ];
+
+  return (
+    <View style={styles.statsRow}>
+      {stats.map((stat) => {
+        const attention = !!statAttention?.[stat.key];
+        const loading = loadingStats?.includes(stat.key) ?? false;
+        return (
+          <Pressable
+            key={stat.key}
+            accessibilityLabel={loading
+              ? `Loading ${stat.label}`
+              : `${stat.value} ${stat.label}${attention ? stat.key === 'photos' ? ', new photos ready to review' : ', needs review' : ''}`}
+            accessibilityRole="button"
+            disabled={!stat.onPress}
+            onPress={stat.onPress}
+            style={({ pressed }) => [styles.statTile, pressed && stat.onPress ? styles.statTilePressed : null]}>
+            {attention ? <AnimatedBorderHighlight borderRadius={Meadow.radius.tile} /> : null}
+            <Image contentFit="contain" source={STAT_ART[stat.key]} style={styles.statArt} transition={0} />
+            {loading ? (
+              <ActivityIndicator color={Meadow.inkSoft} size="small" style={styles.statLoading} />
+            ) : (
+              <ThemedText style={styles.statValue} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                {stat.format(stat.value)}
+              </ThemedText>
+            )}
+            <ThemedText style={styles.statLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+              {stat.label}
+            </ThemedText>
+            {attention ? (
+              stat.key === 'photos' ? (
+                <View pointerEvents="none" style={styles.photoReviewBadge}>
+                  <IconSymbol name="sparkles" size={8} color={Meadow.ink} />
+                  <ThemedText style={styles.photoReviewBadgeLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>New</ThemedText>
+                </View>
+              ) : <View style={styles.statAlertDot} />
+            ) : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+});
+
+export const DayJournalSections = memo(DayJournalSectionsComponent);
 
 function collectPhotos(day: HomeDayRecord): { id: string; thumbnailUri: string }[] {
   if (!day.dayMap) {
@@ -582,6 +621,9 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
     fontWeight: '900',
     lineHeight: 20,
+  },
+  statLoading: {
+    height: 20,
   },
   statLabel: {
     fontSize: 9.5,

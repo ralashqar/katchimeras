@@ -2,11 +2,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { DailyCardThumbnail } from '@/components/katchadeck/cards/daily-card';
+import { DailyCard } from '@/components/katchadeck/cards/daily-card';
 import { CalendarMonth } from '@/components/katchadeck/collection/calendar-month';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
@@ -26,6 +26,7 @@ import { bondStageLabel } from '@/utils/bond';
 import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
+import { resolveCompactDailyCardSizeForWidth } from '@/utils/daily-card-layout';
 
 type CollectionView = 'cards' | 'calendar' | 'species';
 type CardFilters = { year: string; species: string; rarity: string; trait: string };
@@ -38,6 +39,8 @@ const collectionViewOptions = [
 
 const EMPTY_FILTERS: CardFilters = { year: 'all', species: 'all', rarity: 'all', trait: 'all' };
 const auroraRing = require('../../assets/images/katchimeras/aurora-ring.png');
+const CARD_GRID_GAP = 12;
+const SCREEN_HORIZONTAL_PADDING = 20;
 
 const RARITY_COLOR: Record<HomeRarityTier, string> = {
   common: Lantern.moon500,
@@ -48,6 +51,7 @@ const RARITY_COLOR: Record<HomeRarityTier, string> = {
 
 export default function CollectionScreen() {
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
   const [state, setState] = useState<StoredHomeState | null>(null);
   const [view, setView] = useState<CollectionView>('cards');
   const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
@@ -86,6 +90,11 @@ export default function CollectionScreen() {
   );
   const activeFilterCount = Object.values(filters).filter((value) => value !== 'all').length;
   const completion = dex && dex.total > 0 ? Math.round((dex.collected / dex.total) * 100) : 0;
+  const deckColumnCount = windowWidth >= 700 ? 3 : 2;
+  const deckCardSize = useMemo(() => {
+    const availableWidth = windowWidth - (SCREEN_HORIZONTAL_PADDING * 2) - (CARD_GRID_GAP * (deckColumnCount - 1));
+    return resolveCompactDailyCardSizeForWidth(Math.floor(availableWidth / deckColumnCount));
+  }, [deckColumnCount, windowWidth]);
 
   return (
     <View style={styles.screen}>
@@ -117,10 +126,13 @@ export default function CollectionScreen() {
             {filteredCards.length ? (
               <View style={styles.cardGrid}>
                 {filteredCards.map(({ card }) => (
-                  <View key={card.id} style={styles.cardCell}>
-                    <DailyCardThumbnail
+                  <View key={card.id} style={[styles.cardCell, { width: deckCardSize.width }]}>
+                    <DailyCard
                       card={card}
+                      compact
+                      frameSize={deckCardSize}
                       onPress={() => router.push({ pathname: '/card/[cardId]', params: { cardId: card.id } })}
+                      renderTier="focused"
                     />
                   </View>
                 ))}
@@ -233,13 +245,13 @@ function DexCell({ entry }: { entry: DexEntry }) {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: Lantern.ink950, flex: 1 },
-  content: { gap: KatchaDeckUI.spacing.lg, paddingBottom: 140, paddingHorizontal: 20, paddingTop: 24 },
+  content: { gap: KatchaDeckUI.spacing.lg, paddingBottom: 140, paddingHorizontal: SCREEN_HORIZONTAL_PADDING, paddingTop: 24 },
   kicker: { fontSize: 11 },
   title: { fontSize: 38, lineHeight: 42, marginTop: 8 },
   subtitle: { fontSize: 14, fontWeight: '600', marginTop: 10 },
   actionRow: { gap: 10 },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  cardCell: { flexBasis: '47%', flexGrow: 1, maxWidth: '49%' },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GRID_GAP, justifyContent: 'center' },
+  cardCell: { alignItems: 'center' },
   empty: { alignItems: 'center', gap: 8, paddingVertical: 60 },
   emptyText: { fontSize: 13, textAlign: 'center' },
   section: { gap: 14 },

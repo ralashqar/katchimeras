@@ -38,6 +38,15 @@ export type DailyCardSize = {
   width: number;
 };
 
+export function resolveCompactDailyCardSizeForWidth(width: number): DailyCardSize {
+  const resolvedWidth = Math.max(1, width);
+  return {
+    height: resolvedWidth / COMPACT_CARD_ASPECT_RATIO,
+    scale: resolvedWidth / CARD_DESIGN_WIDTH,
+    width: resolvedWidth,
+  };
+}
+
 export function resolveCompactDailyCardSize(
   viewportWidth: number,
   maxHeight = COMPACT_DAILY_CARD_MAX_HEIGHT
@@ -45,7 +54,7 @@ export function resolveCompactDailyCardSize(
   const widthLimit = Math.max(176, viewportWidth - COMPACT_DAILY_CARD_HORIZONTAL_GUTTER);
   const heightLimit = Math.max(240, maxHeight);
   const width = Math.min(COMPACT_DAILY_CARD_MAX_WIDTH, widthLimit, heightLimit * COMPACT_CARD_ASPECT_RATIO);
-  return { height: width / COMPACT_CARD_ASPECT_RATIO, scale: width / CARD_DESIGN_WIDTH, width };
+  return resolveCompactDailyCardSizeForWidth(width);
 }
 
 export function resolveDetailDailyCardSize(viewportWidth: number): DailyCardSize {

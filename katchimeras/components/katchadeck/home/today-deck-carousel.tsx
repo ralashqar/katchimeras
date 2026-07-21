@@ -1,369 +1,215 @@
-import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  interpolate,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  type SharedValue,
-} from 'react-native-reanimated';
+import { memo, Profiler, type ProfilerOnRenderCallback, type ReactNode, useCallback, useMemo } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 
 import {
   CompactDailyCardSizeProvider,
   DailyCard,
   type DailyCardSize,
-  frameRect,
   resolveCompactDailyCardSize,
 } from '@/components/katchadeck/cards/daily-card';
-import { OrnateCardFrame } from '@/components/katchadeck/cards/ornate-card-frame';
-import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AppFontFamilies } from '@/constants/theme';
-import type { HomeTimelineDay } from '@/types/home';
+import { DeckCardHitTarget, deckSlotStyles, DeckVisualSlot } from '@/components/katchadeck/home/today-deck/deck-slot';
 import {
-  COMPACT_CARD_FRAME_RECTS,
-  COMPACT_CARD_SCENE_HEIGHT,
-  COMPACT_CARD_SCENE_TOP,
-  COMPACT_CARD_STORY_HEIGHT,
-  COMPACT_CARD_STORY_TOP,
-} from '@/utils/daily-card-layout';
-
-const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
+  allDeckIndices,
+  isHatchTransitionActive,
+  resolveDeckStride,
+} from '@/components/katchadeck/home/today-deck/deck-navigation';
+import { FormingEggItem } from '@/components/katchadeck/home/today-deck/forming-egg-item';
+import { HatchCardTransition } from '@/components/katchadeck/home/today-deck/hatch-card-transition';
+import { useDeckController } from '@/components/katchadeck/home/today-deck/use-deck-controller';
+import { DECK_PERF_ENABLED, useDeckPerformanceProbe } from '@/components/katchadeck/home/today-deck/use-deck-performance-probe';
+import type { HomeTimelineDay } from '@/types/home';
 
 type TodayDeckCarouselProps = {
-  activeContent: ReactNode;
-  formingCountdown?: ReactNode;
-  formingFooter?: ReactNode;
-  frameActive?: boolean;
   days: HomeTimelineDay[];
   disabled?: boolean;
+  formingCountdown?: ReactNode;
+  formingFooter?: ReactNode;
+  hatchingDayId?: string | null;
   maxCardHeight: number;
+  onOpenCard?: (cardId: string) => void;
   onSelect: (dayId: string) => void;
+  promiseHeroTop?: number;
+  renderFormingContent: (day: HomeTimelineDay, active: boolean, onRevealSettled?: () => void) => ReactNode;
   selectedId: string;
 };
 
-type DeckTrackCardProps = {
-  accessibilityLabel?: string;
-  active: boolean;
-  children: ReactNode;
-  cardIndex: number;
-  cardSize: DailyCardSize;
-  focusedIndex: SharedValue<number>;
-  onPress?: () => void;
-  stride: number;
+const reportDeckCommit: ProfilerOnRenderCallback = (_id, phase, actualDuration) => {
+  if (DECK_PERF_ENABLED && actualDuration > 8) {
+    console.warn('[today-deck] slow React commit', { actualDuration, phase });
+  }
 };
 
-const NAVIGATION_DISTANCE_RATIO = 0.48;
-const SWIPE_DISTANCE = 54;
-const SWIPE_VELOCITY = 520;
-const DECK_SPRING = { damping: 20, mass: 0.82, stiffness: 190 } as const;
-
-export function TodayDeckCarousel({ activeContent, formingCountdown, formingFooter, frameActive = false, days, disabled = false, maxCardHeight, onSelect, selectedId }: TodayDeckCarouselProps) {
+export function TodayDeckCarousel({
+  days,
+  disabled = false,
+  formingCountdown,
+  formingFooter,
+  hatchingDayId,
+  maxCardHeight,
+  onOpenCard,
+  onSelect,
+  promiseHeroTop,
+  renderFormingContent,
+  selectedId,
+}: TodayDeckCarouselProps) {
   const { width: windowWidth } = useWindowDimensions();
-  const cardSize = resolveCompactDailyCardSize(windowWidth, maxCardHeight);
-  const stride = Math.min(210, Math.max(168, windowWidth * NAVIGATION_DISTANCE_RATIO));
-  const initialIndex = Math.max(0, days.findIndex((day) => day.id === selectedId));
-  const focusedIndex = useSharedValue(initialIndex);
-  const gestureOriginIndex = useSharedValue(initialIndex);
-  const gestureActive = useSharedValue(0);
-  const pendingIndexRef = useRef<number | null>(null);
-  const initializedRef = useRef(false);
-
-  const selectedIndex = useMemo(() => days.findIndex((day) => day.id === selectedId), [days, selectedId]);
-  const selected = selectedIndex >= 0 ? days[selectedIndex] : null;
+  const cardSize = useMemo(
+    () => resolveCompactDailyCardSize(windowWidth, maxCardHeight),
+    [maxCardHeight, windowWidth]
+  );
+  const stride = resolveDeckStride(windowWidth);
   const todayHatched = days.some((day) => day.kind === 'day' && day.isToday && day.state === 'hatched');
   const maxNavigableIndex = Math.max(0, days.length - (todayHatched ? 1 : 2));
+  const {
+    focusedIndex,
+    navigateToIndex,
+    swipeGesture,
+    transitionActive,
+  } = useDeckController({
+    days,
+    disabled,
+    maxNavigableIndex,
+    onSelect,
+    selectedId,
+    stride,
+  });
+  useDeckPerformanceProbe(transitionActive);
 
-  useLayoutEffect(() => {
-    if (selectedIndex < 0) return;
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      focusedIndex.value = selectedIndex;
-      gestureOriginIndex.value = selectedIndex;
-      return;
-    }
-    if (pendingIndexRef.current === selectedIndex) {
-      gestureOriginIndex.value = selectedIndex;
-      return;
-    }
-    pendingIndexRef.current = null;
-    focusedIndex.value = withSpring(selectedIndex, DECK_SPRING);
-    gestureOriginIndex.value = selectedIndex;
-  }, [focusedIndex, gestureOriginIndex, selectedIndex]);
-
-  const beginNavigation = useCallback((targetIndex: number) => {
-    const target = days[targetIndex];
-    if (!target) return;
-    pendingIndexRef.current = targetIndex;
-    onSelect(target.id);
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-  }, [days, onSelect]);
-
-  const completeNavigation = useCallback((targetIndex: number) => {
-    if (pendingIndexRef.current !== targetIndex) return;
-    pendingIndexRef.current = null;
-  }, []);
-
-  const navigateToIndex = useCallback((targetIndex: number) => {
-    if (disabled) return;
-    const clampedTarget = Math.max(0, Math.min(maxNavigableIndex, targetIndex));
-    if (clampedTarget === selectedIndex) {
-      focusedIndex.value = withSpring(clampedTarget, DECK_SPRING);
-      return;
-    }
-    beginNavigation(clampedTarget);
-    focusedIndex.value = withSpring(clampedTarget, DECK_SPRING, () => {
-      runOnJS(completeNavigation)(clampedTarget);
-    });
-  }, [beginNavigation, completeNavigation, disabled, focusedIndex, maxNavigableIndex, selectedIndex]);
-
-  const swipeGesture = useMemo(
-    () => Gesture.Pan()
-      .activeOffsetX([-18, 18])
-      .failOffsetY([-16, 16])
-      .enabled(!disabled)
-      .onBegin(() => {
-        gestureActive.value = 1;
-        gestureOriginIndex.value = focusedIndex.value;
-      })
-      .onUpdate((event) => {
-        if (gestureActive.value === 0) return;
-        const rawIndex = gestureOriginIndex.value - event.translationX / stride;
-        if (rawIndex < 0) focusedIndex.value = rawIndex * 0.18;
-        else if (rawIndex > maxNavigableIndex) focusedIndex.value = maxNavigableIndex + (rawIndex - maxNavigableIndex) * 0.18;
-        else focusedIndex.value = rawIndex;
-      })
-      .onEnd((event) => {
-        if (gestureActive.value === 0) return;
-        gestureActive.value = 0;
-        const wantsPrevious = event.translationX > SWIPE_DISTANCE || event.velocityX > SWIPE_VELOCITY;
-        const wantsNext = event.translationX < -SWIPE_DISTANCE || event.velocityX < -SWIPE_VELOCITY;
-        const origin = Math.round(gestureOriginIndex.value);
-        const requestedTarget = wantsPrevious ? origin - 1 : wantsNext ? origin + 1 : origin;
-        const target = Math.max(0, Math.min(maxNavigableIndex, requestedTarget));
-        if (target !== origin) runOnJS(beginNavigation)(target);
-        focusedIndex.value = withSpring(target, DECK_SPRING, () => {
-          if (target !== origin) runOnJS(completeNavigation)(target);
-        });
-      })
-      .onFinalize(() => {
-        if (gestureActive.value === 0) return;
-        gestureActive.value = 0;
-        focusedIndex.value = withSpring(gestureOriginIndex.value, DECK_SPRING);
-      }),
-    [beginNavigation, completeNavigation, disabled, focusedIndex, gestureActive, gestureOriginIndex, maxNavigableIndex, stride]
+  // Keep the complete deck mounted. The recent deck is deliberately small,
+  // and stable card instances are more valuable here than virtualization:
+  // returning to a distant card must never wait for its frame/art to remount.
+  const deckIndices = useMemo(
+    () => allDeckIndices(days.length),
+    [days.length]
   );
 
-  return (
+  const deck = (
     <CompactDailyCardSizeProvider size={cardSize}>
-      <GestureDetector gesture={swipeGesture}>
-        <View style={[styles.stage, { height: cardSize.height }]}>
-          {days.map((day, cardIndex) => {
-            const isSelected = day.id === selectedId;
-            const isAdjacent = Math.abs(cardIndex - selectedIndex) === 1;
-            const unlocked = day.kind !== 'tomorrow' || todayHatched;
+        <GestureDetector gesture={swipeGesture}>
+          <View style={[styles.stage, { height: cardSize.height }]}>
+          {deckIndices.map((cardIndex) => {
+            const day = days[cardIndex];
+            if (!day || shouldHideTomorrow(day, todayHatched)) return null;
+            const active = day.id === selectedId;
             return (
-              <DeckTrackCard
-                key={day.id}
-                accessibilityLabel={cardIndex < selectedIndex ? 'View previous day' : 'View next day'}
-                active={isSelected}
+              <DeckVisualSlot
+                active={active}
                 cardIndex={cardIndex}
                 cardSize={cardSize}
                 focusedIndex={focusedIndex}
-                onPress={!disabled && isAdjacent && unlocked ? () => navigateToIndex(cardIndex) : undefined}
+                key={day.id}
                 stride={stride}>
-                {isSelected ? (
-                  frameActive && selected ? (
-                    <PromiseCard
-                      cardSize={cardSize}
-                      countdownContent={selected.kind === 'day' && selected.isToday ? formingCountdown : undefined}
-                      day={selected}
-                      footerContent={selected.kind === 'day' && selected.isToday ? formingFooter : undefined}
-                      locked={selected.kind === 'tomorrow' && !todayHatched}>
-                      {activeContent}
-                    </PromiseCard>
-                  ) : activeContent
-                ) : renderDeckPreview(day, cardSize, !unlocked)}
-              </DeckTrackCard>
+                <DeckItem
+                  active={active}
+                  cardSize={cardSize}
+                  day={day}
+                  formingCountdown={active ? formingCountdown : undefined}
+                  formingFooter={active ? formingFooter : undefined}
+                  hatchingDayId={hatchingDayId}
+                  onOpenCard={onOpenCard}
+                  promiseHeroTop={promiseHeroTop}
+                  renderFormingContent={renderFormingContent}
+                  renderTier={active ? 'focused' : 'neighbor'}
+                  todayHatched={todayHatched}
+                />
+              </DeckVisualSlot>
             );
           })}
-        </View>
-      </GestureDetector>
+          <View pointerEvents="box-none" style={deckSlotStyles.hitLayer}>
+            {deckIndices.map((cardIndex) => {
+              const day = days[cardIndex];
+              if (!day || day.id === selectedId || shouldHideTomorrow(day, todayHatched)) return null;
+              return (
+                <DeckCardHitTarget
+                  accessibilityLabel={`View ${day.kind === 'tomorrow' ? 'tomorrow' : day.isoDate}`}
+                  cardIndex={cardIndex}
+                  cardSize={cardSize}
+                  focusedIndex={focusedIndex}
+                  key={`hit-${day.id}`}
+                  onPress={() => navigateToIndex(cardIndex)}
+                  stride={stride}
+                />
+              );
+            })}
+          </View>
+          </View>
+        </GestureDetector>
     </CompactDailyCardSizeProvider>
   );
+  return DECK_PERF_ENABLED ? <Profiler id="today-deck" onRender={reportDeckCommit}>{deck}</Profiler> : deck;
 }
 
-function DeckTrackCard({ accessibilityLabel, active, children, cardIndex, cardSize, focusedIndex, onPress, stride }: DeckTrackCardProps) {
-  const animatedStyle = useAnimatedStyle(() => {
-    const relativePosition = cardIndex - focusedIndex.value;
-    const distance = Math.min(2, Math.abs(relativePosition));
-    return {
-      opacity: interpolate(distance, [0, 1, 1.72, 2], [1, 0.72, 0.05, 0]),
-      transform: [
-        { translateX: relativePosition * stride },
-        { translateY: interpolate(distance, [0, 1, 2], [0, 26, 40]) },
-        { rotate: `${interpolate(relativePosition, [-2, -1, 0, 1, 2], [-11, -8, 0, 8, 11])}deg` },
-        { scale: interpolate(distance, [0, 1, 2], [1, 0.69, 0.56]) },
-      ],
-      zIndex: Math.round(interpolate(distance, [0, 2], [30, 1])),
-    };
-  }, [cardIndex, stride]);
-
-  return (
-    <Animated.View
-      accessibilityElementsHidden={!active && !onPress}
-      importantForAccessibility={!active && !onPress ? 'no-hide-descendants' : 'auto'}
-      pointerEvents={active || onPress ? 'box-none' : 'none'}
-      style={[styles.slot, { height: cardSize.height }, animatedStyle]}>
-      <View
-        accessibilityElementsHidden={Boolean(onPress)}
-        importantForAccessibility={onPress ? 'no-hide-descendants' : 'auto'}
-        pointerEvents={onPress ? 'none' : 'auto'}
-        style={styles.cardHost}>
-        {children}
-      </View>
-      {onPress ? (
-        <Pressable
-          accessibilityHint="Moves this day into the center"
-          accessibilityLabel={accessibilityLabel}
-          accessibilityRole="button"
-          onPress={onPress}
-          style={[styles.cardHitTarget, { height: cardSize.height, width: cardSize.width }]}
-        />
-      ) : null}
-    </Animated.View>
-  );
-}
-
-function renderDeckPreview(day: HomeTimelineDay, cardSize: DailyCardSize, locked = false): ReactNode {
-  if (day.kind === 'day' && day.state === 'hatched' && day.card) return <DailyCard card={day.card} compact frameSize={cardSize} />;
-  return <PromiseCard cardSize={cardSize} day={day} locked={locked || day.kind === 'tomorrow'} />;
-}
-
-function PromiseCard({
+const DeckItem = memo(function DeckItem({
+  active,
   cardSize,
-  children,
-  countdownContent,
   day,
-  footerContent,
-  locked,
+  formingCountdown,
+  formingFooter,
+  hatchingDayId,
+  onOpenCard,
+  promiseHeroTop,
+  renderFormingContent,
+  renderTier,
+  todayHatched,
 }: {
+  active: boolean;
   cardSize: DailyCardSize;
-  children?: ReactNode;
-  countdownContent?: ReactNode;
   day: HomeTimelineDay;
-  footerContent?: ReactNode;
-  locked: boolean;
+  formingCountdown?: ReactNode;
+  formingFooter?: ReactNode;
+  hatchingDayId?: string | null;
+  onOpenCard?: (cardId: string) => void;
+  promiseHeroTop?: number;
+  renderFormingContent: (day: HomeTimelineDay, active: boolean, onRevealSettled?: () => void) => ReactNode;
+  renderTier: 'focused' | 'neighbor' | 'buffer';
+  todayHatched: boolean;
 }) {
-  const isTomorrow = day.kind === 'tomorrow';
-  const label = isTomorrow ? 'TOMORROW' : day.isToday ? 'TODAY' : day.dayLabel.toUpperCase();
-  const title = locked ? 'MYSTERY' : day.kind === 'day' && day.state === 'ready_to_hatch' ? 'READY TO HATCH' : 'KATCHIMERA EGG';
-  const date = formatPromiseDate(day.isoDate);
-  const scale = cardSize.scale;
+  const cardId = day.kind === 'day' ? day.card?.id : undefined;
+  const handleOpenCard = useCallback(() => {
+    if (cardId && onOpenCard) onOpenCard(cardId);
+  }, [cardId, onOpenCard]);
+
+  if (isHatchTransitionActive({ active, dayId: day.id, hatchingDayId })) {
+    return (
+      <HatchCardTransition
+        cardSize={cardSize}
+        day={day}
+        promiseHeroTop={promiseHeroTop}
+        renderReveal={(onSettled) => renderFormingContent(day, active, onSettled)}
+      />
+    );
+  }
+
+  if (day.kind === 'day' && day.state === 'hatched' && day.card) {
+    return (
+      <DailyCard
+        card={day.card}
+        compact
+        frameSize={cardSize}
+        onPress={active && onOpenCard ? handleOpenCard : undefined}
+        renderTier={renderTier}
+      />
+    );
+  }
+
+  const locked = day.kind === 'tomorrow' && !todayHatched;
   return (
-    <OrnateCardFrame
-      background={<PromiseScene countdownContent={countdownContent} locked={locked} scale={scale}>{children}</PromiseScene>}
-      height={cardSize.height}
-      variant="compact"
-      width={cardSize.width}>
-      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.badge), styles.promiseBadge]}>
-        <IconSymbol color="#FFF0B1" name={locked ? 'moon.fill' : 'sparkles'} size={Math.max(15, 52 * scale)} />
-      </View>
-      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.rarity), styles.centerBox]}>
-        <ThemedText numberOfLines={1} style={[styles.frameText, { fontSize: 29 * scale, lineHeight: 35 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{label}</ThemedText>
-      </View>
-      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.name), styles.centerBox]}>
-        <ThemedText adjustsFontSizeToFit minimumFontScale={0.58} numberOfLines={1} style={[styles.promiseTitle, { fontSize: 58 * scale, lineHeight: 65 * scale }]} lightColor="#3E6522" darkColor="#3E6522">{title}</ThemedText>
-      </View>
-      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.epithet), styles.centerBox]}>
-        <ThemedText numberOfLines={1} style={[styles.promiseRibbon, { fontSize: 35 * scale, lineHeight: 42 * scale }]} lightColor="#FFF7E8" darkColor="#FFF7E8">✦ {locked ? 'Arriving soon' : 'Forming today'} ✦</ThemedText>
-      </View>
-      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.date), styles.promiseDate]}>
-        <IconSymbol color="#70562E" name="calendar" size={Math.max(13, 42 * scale)} />
-        <ThemedText style={[styles.frameText, { fontSize: 38 * scale, lineHeight: 39 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.weekday}</ThemedText>
-        <ThemedText style={[styles.promiseDateValue, { fontSize: 36 * scale, lineHeight: 38 * scale }]} lightColor="#59472E" darkColor="#59472E">{date.dayMonth}</ThemedText>
-      </View>
-      <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.tag), styles.promiseTag]}>
-        <IconSymbol color="#FFE4A1" name={locked ? 'moon.fill' : 'leaf.fill'} size={Math.max(11, 32 * scale)} />
-        <ThemedText numberOfLines={2} style={[styles.promiseTagText, { fontSize: 27 * scale, lineHeight: 32 * scale }]} lightColor="#FFF0C7" darkColor="#FFF0C7">{locked ? 'Mystery Day' : 'Card Forming'}</ThemedText>
-      </View>
-      {footerContent ? (
-        <View style={[scaledFrameSlot(scale, COMPACT_CARD_FRAME_RECTS.footer), styles.promiseFooter]}>{footerContent}</View>
-      ) : day.kind === 'day' && day.isToday ? null : (
-        <View style={[frameRect(scale, 108, COMPACT_CARD_STORY_TOP, 725, COMPACT_CARD_STORY_HEIGHT), styles.centerBox]}>
-          <ThemedText adjustsFontSizeToFit minimumFontScale={0.78} numberOfLines={3} style={[styles.promiseStory, { fontSize: 42 * scale, lineHeight: 50 * scale }]} lightColor="#6F5B3A" darkColor="#6F5B3A">❧ {locked ? 'Tomorrow’s mystery is gathering.' : 'Today’s card is forming.'} ❧</ThemedText>
-        </View>
-      )}
-    </OrnateCardFrame>
+    <FormingEggItem
+      cardSize={cardSize}
+      countdownContent={active && day.kind === 'day' && day.isToday ? formingCountdown : undefined}
+      footerContent={active ? formingFooter : undefined}
+      heroTop={promiseHeroTop}
+      locked={locked}>
+      {renderFormingContent(day, active)}
+    </FormingEggItem>
   );
-}
+});
 
-function PromiseScene({ children, countdownContent, locked, scale }: { children?: ReactNode; countdownContent?: ReactNode; locked: boolean; scale: number }) {
-  return (
-    <LinearGradient
-      colors={locked ? ['#403B4D', '#1C1923'] : ['#DDE8B4', '#82A267']}
-      style={[frameRect(scale, 53, COMPACT_CARD_SCENE_TOP, 835, COMPACT_CARD_SCENE_HEIGHT), styles.promiseScene, { borderRadius: 22 * scale }]}>
-      {children && !locked ? (
-        <View style={[styles.activeEggHost, { transform: [{ translateY: -28 * scale }, { scale: 0.84 }] }]}>{children}</View>
-      ) : locked ? (
-        <ThemedText type="display" style={[styles.questionMark, { fontSize: 190 * scale, lineHeight: 205 * scale }]} lightColor="#C8BED7" darkColor="#C8BED7">?</ThemedText>
-      ) : (
-        <Image cachePolicy="memory-disk" contentFit="contain" source={eggBase} style={styles.promiseEgg} transition={0} />
-      )}
-      {countdownContent && !locked ? (
-        <View pointerEvents="none" style={[styles.promiseCountdown, { bottom: 18 * scale }]}>{countdownContent}</View>
-      ) : null}
-    </LinearGradient>
-  );
-}
-
-function formatPromiseDate(isoDate: string) {
-  const date = new Date(`${isoDate}T12:00:00`);
-  return {
-    dayMonth: date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
-    weekday: date.toLocaleDateString(undefined, { weekday: 'short' }),
-  };
-}
-
-function scaledFrameSlot(
-  scale: number,
-  slot: { x: number; y: number; width: number; height: number }
-) {
-  return frameRect(scale, slot.x, slot.y, slot.width, slot.height);
+function shouldHideTomorrow(day: HomeTimelineDay, todayHatched: boolean) {
+  return day.kind === 'tomorrow' && !todayHatched;
 }
 
 const styles = StyleSheet.create({
   stage: { alignItems: 'center', justifyContent: 'center', overflow: 'visible', width: '100%' },
-  slot: { alignItems: 'center', justifyContent: 'center', position: 'absolute', width: 330 },
-  cardHost: { alignItems: 'center', justifyContent: 'center' },
-  cardHitTarget: { alignSelf: 'center', position: 'absolute' },
-  promiseBadge: { alignItems: 'center', justifyContent: 'center' },
-  centerBox: { alignItems: 'center', justifyContent: 'center' },
-  frameText: { fontFamily: 'Manrope', fontWeight: '900', textAlign: 'center', textAlignVertical: 'center' },
-  promiseTitle: {
-    fontFamily: AppFontFamilies.fredokaBold,
-    letterSpacing: -0.35,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    textShadowColor: 'rgba(255,255,255,0.42)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
-  },
-  promiseRibbon: { fontFamily: 'InstrumentSerif', fontStyle: 'italic', textAlign: 'center', textAlignVertical: 'center' },
-  promiseDate: { alignItems: 'center', justifyContent: 'center' },
-  promiseDateValue: { fontFamily: 'InstrumentSerif', fontWeight: '700', textAlign: 'center' },
-  promiseTag: { alignItems: 'center', gap: 2, justifyContent: 'center' },
-  promiseTagText: { fontFamily: 'InstrumentSerif', fontWeight: '700', textAlign: 'center' },
-  promiseScene: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  activeEggHost: { alignItems: 'center', height: '100%', justifyContent: 'center', width: '100%', zIndex: 2 },
-  promiseEgg: { height: '63%', transform: [{ translateY: -10 }], width: '69%', zIndex: 2 },
-  promiseCountdown: { alignItems: 'center', left: 0, position: 'absolute', right: 0, zIndex: 5 },
-  promiseFooter: { alignItems: 'center', justifyContent: 'center' },
-  questionMark: { opacity: 0.82, zIndex: 2 },
-  promiseStory: { fontFamily: AppFontFamilies.instrumentSerif, fontWeight: '700', letterSpacing: 0.1, textAlign: 'center', textAlignVertical: 'center' },
 });

@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { createContext, type ReactNode, use } from 'react';
+import { createContext, memo, type ReactNode, use } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -15,6 +15,7 @@ import {
 } from '@/components/katchadeck/cards/ornate-card-frame';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { CREATURE_LOD_SOURCES } from '@/constants/creature-lod-sources.gen';
 import { AppFontFamilies } from '@/constants/theme';
 import { getCreatureVisual } from '@/game/days';
 import type { CardFacet, CardFacetKey, DailyCreatureCard } from '@/types/home';
@@ -37,6 +38,7 @@ import {
 } from '@/utils/daily-card-layout';
 
 type DailyCardVariant = 'carousel' | 'detail';
+export type DailyCardRenderTier = 'focused' | 'neighbor' | 'buffer';
 
 export type { DailyCardSize } from '@/utils/daily-card-layout';
 export { resolveCompactDailyCardSize } from '@/utils/daily-card-layout';
@@ -46,6 +48,7 @@ type DailyCardProps = {
   compact?: boolean;
   frameSize?: DailyCardSize;
   onPress?: () => void;
+  renderTier?: DailyCardRenderTier;
   style?: StyleProp<ViewStyle>;
   variant?: DailyCardVariant;
 };
@@ -54,12 +57,17 @@ export { COMPACT_DAILY_CARD_HORIZONTAL_GUTTER, COMPACT_DAILY_CARD_MAX_HEIGHT, CO
 
 const CompactDailyCardSizeContext = createContext<DailyCardSize | null>(null);
 
-const RARITY_COLORS: Record<DailyCreatureCard['rarity'], string> = {
-  common: '#87734B',
-  rare: '#47704E',
-  epic: '#66508F',
-  legendary: '#A66A20',
-};
+function areDailyCardPropsEqual(previous: DailyCardProps, next: DailyCardProps) {
+  return previous.card.id === next.card.id
+    && previous.card.sealedAt === next.card.sealedAt
+    && previous.compact === next.compact
+    && previous.frameSize?.height === next.frameSize?.height
+    && previous.frameSize?.width === next.frameSize?.width
+    && previous.onPress === next.onPress
+    && previous.renderTier === next.renderTier
+    && previous.style === next.style
+    && previous.variant === next.variant;
+}
 
 const SCENE_COLORS: Record<NonNullable<DailyCreatureCard['scene']>['backdrop'], [string, string, string]> = {
   meadow: ['#DCE7B6', '#8EB371', '#6F8C55'],
@@ -74,7 +82,7 @@ const SCENE_COLORS: Record<NonNullable<DailyCreatureCard['scene']>['backdrop'], 
   home: ['#F1DFC2', '#BE956C', '#795B43'],
 };
 
-const meadowScene = require('../../../assets/images/katchimeras/world/base/base_meadow.png');
+const meadowScene = require('../../../assets/images/katchimeras/world/base/base_meadow.webp');
 const cafeScene = require('../../../assets/images/katchimeras/environments/coffee_cafe/base.jpg');
 
 const FACET_ORDER: CardFacetKey[] = ['mood', 'energy', 'sleep', 'place'];
@@ -113,16 +121,25 @@ export function CompactDailyCardSizeProvider({ children, size }: { children: Rea
   return <CompactDailyCardSizeContext value={size}>{children}</CompactDailyCardSizeContext>;
 }
 
-export function DailyCard({ card, compact, frameSize, onPress, style, variant = compact ? 'carousel' : 'detail' }: DailyCardProps) {
-  const window = useWindowDimensions();
+export const DailyCard = memo(function DailyCard({ card, compact, frameSize, onPress, renderTier = 'focused', style, variant = compact ? 'carousel' : 'detail' }: DailyCardProps) {
   const inheritedSize = use(CompactDailyCardSizeContext);
-  const isCarousel = variant === 'carousel';
-  const defaultCompactMaxHeight = Math.max(312, window.height - 260);
-  const size = isCarousel
-    ? frameSize ?? inheritedSize ?? resolveCompactDailyCardSize(window.width, defaultCompactMaxHeight)
-    : resolveDetailDailyCardSize(window.width);
-  const content = <CardContent card={card} size={size} style={style} variant={variant} />;
+  const fixedSize = variant === 'carousel' ? frameSize ?? inheritedSize : null;
+  if (fixedSize) {
+    return <ResolvedDailyCard card={card} onPress={onPress} renderTier={renderTier} size={fixedSize} style={style} variant={variant} />;
+  }
+  return <ResponsiveDailyCard card={card} onPress={onPress} renderTier={renderTier} style={style} variant={variant} />;
+}, areDailyCardPropsEqual);
 
+function ResponsiveDailyCard({ card, onPress, renderTier, style, variant }: Omit<DailyCardProps, 'compact' | 'frameSize' | 'variant'> & { variant: DailyCardVariant }) {
+  const window = useWindowDimensions();
+  const defaultCompactMaxHeight = Math.max(312, window.height - 260);
+  const size = variant === 'carousel'
+    ? resolveCompactDailyCardSize(window.width, defaultCompactMaxHeight)
+    : resolveDetailDailyCardSize(window.width);
+  return <ResolvedDailyCard card={card} onPress={onPress} renderTier={renderTier} size={size} style={style} variant={variant} />;
+}
+
+function ResolvedDailyCard({ card, onPress, renderTier = 'focused', size, style, variant }: Omit<DailyCardProps, 'compact' | 'frameSize' | 'variant'> & { size: DailyCardSize; variant: DailyCardVariant }) {
   return (
     <Pressable
       accessibilityLabel={onPress ? `Open ${card.creatureName} card` : `${card.creatureName}, ${card.rarity} daily card`}
@@ -130,18 +147,18 @@ export function DailyCard({ card, compact, frameSize, onPress, style, variant = 
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => pressed ? styles.pressed : null}>
-      {content}
+      <CardContent card={card} renderTier={renderTier} size={size} style={style} variant={variant} />
     </Pressable>
   );
 }
 
-function CardContent({ card, size, style, variant }: { card: DailyCreatureCard; size: DailyCardSize; style?: StyleProp<ViewStyle>; variant: DailyCardVariant }) {
+const CardContent = memo(function CardContent({ card, renderTier, size, style, variant }: { card: DailyCreatureCard; renderTier: DailyCardRenderTier; size: DailyCardSize; style?: StyleProp<ViewStyle>; variant: DailyCardVariant }) {
   const compact = variant === 'carousel';
   if (compact) {
     return (
       <View style={style}>
         <OrnateCardFrame
-          background={<Scene card={card} compact scale={size.scale} />}
+          background={<Scene card={card} compact renderTier={renderTier} scale={size.scale} />}
           height={size.height}
           variant="compact"
           width={size.width}>
@@ -157,7 +174,7 @@ function CardContent({ card, size, style, variant }: { card: DailyCreatureCard; 
   return (
     <View style={style}>
       <OrnateCardFrame
-        background={<Scene card={card} compact={false} scale={size.scale} />}
+        background={<Scene card={card} compact={false} renderTier="focused" scale={size.scale} />}
         height={size.height}
         variant="full"
         width={size.width}>
@@ -175,7 +192,13 @@ function CardContent({ card, size, style, variant }: { card: DailyCreatureCard; 
       </OrnateCardFrame>
     </View>
   );
-}
+}, (previous, next) => previous.card.id === next.card.id
+  && previous.card.sealedAt === next.card.sealedAt
+  && (previous.renderTier === 'buffer') === (next.renderTier === 'buffer')
+  && previous.size.height === next.size.height
+  && previous.size.width === next.size.width
+  && previous.style === next.style
+  && previous.variant === next.variant);
 
 function CardStory({ card, compact, scale }: { card: DailyCreatureCard; compact: boolean; scale: number }) {
   const rect = compact
@@ -274,9 +297,11 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
   );
 }
 
-function Scene({ card, compact, scale }: { card: DailyCreatureCard; compact: boolean; scale: number }) {
+function Scene({ card, compact, renderTier, scale }: { card: DailyCreatureCard; compact: boolean; renderTier: DailyCardRenderTier; scale: number }) {
   const visual = getCreatureVisual(card.visualKey);
-  const source = resolveCreatureVariantSource(card.visualKey, card.variantCell) ?? visual.source;
+  const variantSource = resolveCreatureVariantSource(card.visualKey, card.variantCell);
+  const compactSource = CREATURE_LOD_SOURCES[renderTier === 'buffer' ? 'thumb' : 'medium'][card.visualKey];
+  const source = variantSource ?? (compact ? compactSource : null) ?? visual.source;
   const backdrop = card.scene?.backdrop ?? card.treatment.backdrop;
   const colors = SCENE_COLORS[backdrop];
   const weather = card.scene?.weather ?? (backdrop === 'rain' || backdrop === 'storm' || backdrop === 'snow' ? backdrop : 'clear');
@@ -287,9 +312,9 @@ function Scene({ card, compact, scale }: { card: DailyCreatureCard; compact: boo
       style={[frameRect(scale, 53, compact ? COMPACT_CARD_SCENE_TOP : CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
       <Image cachePolicy="memory-disk" contentFit="cover" source={sceneSource} style={styles.sceneImage} transition={0} />
       <LinearGradient colors={['rgba(255,244,207,0.04)', `${colors[2]}88`]} style={StyleSheet.absoluteFill} />
-      <View style={styles.sceneGlow} />
-      {weather === 'rain' || weather === 'storm' ? <RainOverlay scale={scale} /> : null}
-      {weather === 'snow' ? <SnowOverlay scale={scale} /> : null}
+      {renderTier !== 'buffer' ? <View style={styles.sceneGlow} /> : null}
+      {renderTier !== 'buffer' && (weather === 'rain' || weather === 'storm') ? <RainOverlay scale={scale} /> : null}
+      {renderTier !== 'buffer' && weather === 'snow' ? <SnowOverlay scale={scale} /> : null}
       <Image
         cachePolicy="memory-disk"
         contentFit="contain"
@@ -450,32 +475,12 @@ function resolveFacets(card: DailyCreatureCard): Record<CardFacetKey, CardFacet>
   };
 }
 
-export function DailyCardThumbnail({ card, onPress }: Pick<DailyCardProps, 'card' | 'onPress'>) {
-  const visual = getCreatureVisual(card.visualKey);
-  const source = resolveCreatureVariantSource(card.visualKey, card.variantCell) ?? visual.source;
-  const accent = RARITY_COLORS[card.rarity];
-  const colors = SCENE_COLORS[card.scene?.backdrop ?? card.treatment.backdrop];
-  return (
-    <Pressable accessibilityLabel={`Open ${card.creatureName} card`} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.thumbnail, { borderColor: accent }, pressed ? styles.pressed : null]}>
-      <LinearGradient colors={['#FFF9EA', '#E8D2A6']} style={StyleSheet.absoluteFill} />
-      <View style={styles.thumbnailTop}><ThemedText style={styles.thumbnailDate} lightColor="#705E41" darkColor="#705E41">{formatCardDate(card.isoDate)}</ThemedText><View style={[styles.rarityDot, { backgroundColor: accent }]} /></View>
-      <LinearGradient colors={colors} style={styles.thumbnailArt}><Image cachePolicy="memory-disk" contentFit="contain" source={source} style={styles.thumbnailCreature} transition={0} /></LinearGradient>
-      <ThemedText numberOfLines={1} type="display" style={styles.thumbnailName} lightColor="#3D311F" darkColor="#3D311F">{card.creatureName}</ThemedText>
-      <ThemedText numberOfLines={1} style={styles.thumbnailState} lightColor="#715E41" darkColor="#715E41">{card.epithet}</ThemedText>
-    </Pressable>
-  );
-}
-
 function formatCardDateParts(isoDate: string): { dayMonth: string; weekday: string } {
   const date = new Date(`${isoDate}T12:00:00`);
   return {
     dayMonth: date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
     weekday: date.toLocaleDateString(undefined, { weekday: 'short' }),
   };
-}
-
-function formatCardDate(isoDate: string): string {
-  return new Date(`${isoDate}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 function sceneLabel(backdrop: NonNullable<DailyCreatureCard['scene']>['backdrop']): string {
@@ -548,12 +553,4 @@ const styles = StyleSheet.create({
   memoryText: { fontFamily: 'InstrumentSerif', fontStyle: 'italic' },
   memoryPhoto: { borderColor: '#F3DFB0', borderWidth: 2, position: 'absolute', transform: [{ rotate: '-3deg' }] },
   memoryPlaceholder: { alignItems: 'center', borderColor: 'rgba(255,226,159,0.34)', borderRadius: 12, borderWidth: 1, justifyContent: 'center', position: 'absolute', transform: [{ rotate: '-3deg' }] },
-  thumbnail: { aspectRatio: 0.7, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1.5, boxShadow: '0 8px 18px rgba(9,7,4,0.22)', gap: 6, overflow: 'hidden', padding: 9 },
-  thumbnailTop: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  thumbnailDate: { fontSize: 9, fontWeight: '800' },
-  rarityDot: { borderRadius: 999, height: 8, width: 8 },
-  thumbnailArt: { alignItems: 'center', borderRadius: 14, flex: 1, justifyContent: 'flex-end', overflow: 'hidden' },
-  thumbnailCreature: { height: '96%', width: '96%' },
-  thumbnailName: { fontSize: 17, lineHeight: 19, textAlign: 'center' },
-  thumbnailState: { fontSize: 9, fontStyle: 'italic', fontWeight: '700', textAlign: 'center' },
 });

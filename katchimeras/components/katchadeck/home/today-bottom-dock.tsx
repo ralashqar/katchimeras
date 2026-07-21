@@ -1,7 +1,9 @@
+import { Profiler, type ProfilerOnRenderCallback, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { DayJournalSections, type DayStatKey } from '@/components/katchadeck/home/day-journal-sections';
+import { DECK_PERF_ENABLED } from '@/components/katchadeck/home/today-deck/use-deck-performance-probe';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
 import { popEnter, presenceEnter } from '@/components/katchadeck/motion';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
@@ -22,10 +24,12 @@ type TodayBottomDockProps = {
   showFormingActions?: boolean;
   recording: boolean;
   cameraBadge?: number;
+  momentCount?: number;
   sharingBusy: boolean;
   comicBusy: boolean;
   statAttention?: Partial<Record<DayStatKey, boolean>>;
   categories: TodayCategoryState[];
+  categoryDataLoading?: boolean;
   onReveal: () => void;
   onCamera: () => void;
   onMicTap: () => void;
@@ -39,6 +43,14 @@ type TodayBottomDockProps = {
   onCategoryPress: (category: TodayCategoryState) => void;
 };
 
+const LOADING_INDICATOR_DELAY_MS = 120;
+
+const reportDockCommit: ProfilerOnRenderCallback = (_id, phase, actualDuration) => {
+  if (DECK_PERF_ENABLED && actualDuration > 6) {
+    console.warn('[today-dock] slow React commit', { actualDuration, phase });
+  }
+};
+
 export function TodayBottomDock({
   canHatch,
   isForming,
@@ -49,10 +61,12 @@ export function TodayBottomDock({
   showFormingActions = true,
   recording,
   cameraBadge,
+  momentCount,
   sharingBusy,
   comicBusy,
   statAttention,
   categories,
+  categoryDataLoading = false,
   onReveal,
   onCamera,
   onMicTap,
@@ -65,6 +79,81 @@ export function TodayBottomDock({
   onStatPress,
   onCategoryPress,
 }: TodayBottomDockProps) {
+  const [stagedJournal, setStagedJournal] = useState(() => ({
+    day: viewedDay,
+    heavyDataLoading: false,
+    momentCount,
+    statAttention,
+  }));
+  const [stagedCategories, setStagedCategories] = useState(categories);
+  const [showHeavyLoading, setShowHeavyLoading] = useState(false);
+  const statPressRef = useRef(onStatPress);
+  const categoryPressRef = useRef(onCategoryPress);
+  statPressRef.current = onStatPress;
+  categoryPressRef.current = onCategoryPress;
+
+  useEffect(() => {
+    if (!categoryDataLoading) {
+      setShowHeavyLoading((current) => current ? false : current);
+      return;
+    }
+    const timer = setTimeout(() => setShowHeavyLoading(true), LOADING_INDICATOR_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [categoryDataLoading, viewedDay?.id]);
+
+  // Keep the dock out of the selected-card commit. The raw counters are a
+  // small first-frame update; the illustrated category row follows after a
+  // breathing frame. Splitting those subtrees prevents eight image/text tiles
+  // from reconciling together or landing on the haptic frame.
+  useEffect(() => {
+    // Keep the prior, complete dock for brief cache misses. Only replace a
+    // value with a spinner when the work exceeds the anti-flicker delay.
+    if (categoryDataLoading && !showHeavyLoading) return;
+    let categoryWaitFrame: ReturnType<typeof requestAnimationFrame> | null = null;
+    let categoryFrame: ReturnType<typeof requestAnimationFrame> | null = null;
+    const statsFrame = requestAnimationFrame(() => {
+      setStagedJournal((current) => (
+        current.day === viewedDay &&
+        current.heavyDataLoading === categoryDataLoading &&
+        current.momentCount === momentCount &&
+        current.statAttention === statAttention
+          ? current
+          : { day: viewedDay, heavyDataLoading: categoryDataLoading, momentCount, statAttention }
+      ));
+      if (categoryDataLoading) return;
+      categoryWaitFrame = requestAnimationFrame(() => {
+        categoryFrame = requestAnimationFrame(() => {
+          setStagedCategories((current) => current === categories ? current : categories);
+        });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(statsFrame);
+      if (categoryWaitFrame !== null) cancelAnimationFrame(categoryWaitFrame);
+      if (categoryFrame !== null) cancelAnimationFrame(categoryFrame);
+    };
+  }, [categories, categoryDataLoading, momentCount, showHeavyLoading, statAttention, viewedDay]);
+
+  const handleStatPress = useCallback((key: DayStatKey) => {
+    statPressRef.current(key);
+  }, []);
+  const handleCategoryPress = useCallback((category: TodayCategoryState) => {
+    categoryPressRef.current(category);
+  }, []);
+  const journalSections = stagedJournal.day ? (
+    <Animated.View entering={presenceEnter(200)}>
+      <DayJournalSections
+        day={stagedJournal.day}
+        momentCount={stagedJournal.momentCount}
+        loadingStats={stagedJournal.heavyDataLoading ? ['moments'] : undefined}
+        onStatPress={handleStatPress}
+        statAttention={stagedJournal.statAttention}
+        categories={stagedCategories}
+        onCategoryPress={handleCategoryPress}
+      />
+    </Animated.View>
+  ) : null;
+
   return (
     <View pointerEvents="box-none" style={styles.bottomDock}>
       <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
@@ -104,17 +193,9 @@ export function TodayBottomDock({
         </View>
       ) : null}
       {isHatched && showHatchedReflectionCard && viewedDay?.creature ? <ReflectionCard creature={viewedDay.creature} /> : null}
-      {viewedDay ? (
-        <Animated.View entering={presenceEnter(200)}>
-          <DayJournalSections
-            day={viewedDay}
-            onStatPress={onStatPress}
-            statAttention={statAttention}
-            categories={categories}
-            onCategoryPress={onCategoryPress}
-          />
-        </Animated.View>
-      ) : null}
+      {DECK_PERF_ENABLED
+        ? <Profiler id="today-dock" onRender={reportDockCommit}>{journalSections}</Profiler>
+        : journalSections}
     </View>
   );
 }
