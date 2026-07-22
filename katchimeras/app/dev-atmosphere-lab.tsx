@@ -1,0 +1,235 @@
+import { Image } from 'expo-image';
+import { Redirect, router, Stack } from 'expo-router';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+  type GestureResponderEvent,
+  useWindowDimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { AtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
+import { StaticKingdomSkyBackground } from '@/components/katchadeck/world/kingdom-sky-background';
+import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
+import { useDevAtmosphereState } from '@/hooks/use-dev-atmosphere-state';
+import {
+  ATMOSPHERE_PRESETS,
+  atmosphereParticleCount,
+  resolvedAtmosphereQuality,
+  type AtmosphereQuality,
+  type AtmosphereSettings,
+} from '@/utils/atmosphere';
+import { resetDevAtmosphereState, setDevAtmosphereState } from '@/utils/dev-atmosphere-settings';
+import { safeGoBack } from '@/utils/safe-navigation';
+
+const PREVIEW_TILE = require('../assets/images/katchimeras/world/hex/floating_feastle_hex_tile_v1.webp');
+type PreviewMode = 'sky' | 'today' | 'kingdom';
+
+export default function DevAtmosphereLabScreen() {
+  if (!DEV_DEBUG_NAV_ENABLED) return <Redirect href="/(tabs)/today" />;
+  return <AtmosphereLab />;
+}
+
+function AtmosphereLab() {
+  const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
+  const devState = useDevAtmosphereState();
+  const [preview, setPreview] = useState<PreviewMode>('today');
+  const [simulateReducedMotion, setSimulateReducedMotion] = useState(false);
+  const [showBackground, setShowBackground] = useState(true);
+  const [showForeground, setShowForeground] = useState(true);
+  const fps = useApproximateFps();
+  const quality = resolvedAtmosphereQuality(devState.settings.quality, width);
+  const particleCount = atmosphereParticleCount(devState.settings.preset, devState.settings.quality, width, devState.settings.intensity);
+  const updateSettings = (patch: Partial<AtmosphereSettings>) => {
+    setDevAtmosphereState({ ...devState, settings: { ...devState.settings, ...patch } });
+  };
+  const tileWidth = Math.min(width * (preview === 'kingdom' ? 1.18 : 1.02), 620);
+
+  return (
+    <View style={styles.screen}>
+      <Stack.Screen options={{ headerShown: false, title: 'Atmosphere Lab' }} />
+      <StaticKingdomSkyBackground />
+      {showBackground ? <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} settings={devState.settings} /> : null}
+      {preview === 'sky' ? null : (
+        <View pointerEvents="none" style={styles.environmentStage}>
+          <Image cachePolicy="memory-disk" contentFit="contain" source={PREVIEW_TILE} style={{ height: tileWidth, width: tileWidth }} transition={0} />
+        </View>
+      )}
+      {showForeground ? <AtmosphereLayer plane="foreground" reduceMotionOverride={simulateReducedMotion} settings={devState.settings} /> : null}
+
+      <Pressable accessibilityLabel="Close Atmosphere Lab" accessibilityRole="button" hitSlop={10} onPress={() => safeGoBack(router)} style={[styles.exitButton, { top: insets.top + 10 }]}>
+        <IconSymbol color="#F8FBFF" name="xmark" size={15} />
+      </Pressable>
+
+      <View pointerEvents="none" style={[styles.diagnostics, { top: insets.top + 12 }]}>
+        <ThemedText selectable style={styles.diagnosticText} lightColor="#F8FBFF" darkColor="#F8FBFF">
+          {fps} JS fps · {particleCount} particles · {quality} · {Math.round(width)}×{Math.round(height)}
+        </ThemedText>
+        <ThemedText selectable style={styles.diagnosticText} lightColor="#C8D7EF" darkColor="#C8D7EF">
+          {devState.settings.paused || simulateReducedMotion ? 'frozen' : 'active'} · {devState.settings.preset}
+        </ThemedText>
+      </View>
+
+      <View style={[styles.controlsShell, { paddingBottom: insets.bottom + 10 }]}>
+        <ScrollView contentContainerStyle={styles.controlsContent} contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}>
+          <View style={styles.headingRow}>
+            <View style={styles.headingCopy}>
+              <ThemedText selectable style={styles.eyebrow} lightColor="#F2C875" darkColor="#F2C875">DEV TOOL</ThemedText>
+              <ThemedText selectable style={styles.title} lightColor="#F8FBFF" darkColor="#F8FBFF">Atmosphere Lab</ThemedText>
+            </View>
+            <Pressable accessibilityRole="button" onPress={resetDevAtmosphereState} style={({ pressed }) => [styles.resetButton, pressed ? styles.pressed : null]}>
+              <ThemedText style={styles.resetLabel} lightColor="#E8EEFF" darkColor="#E8EEFF">Reset</ThemedText>
+            </Pressable>
+          </View>
+
+          <ControlGroup label="Effect">
+            <ChipRow options={ATMOSPHERE_PRESETS.map((preset) => ({ id: preset.id, label: preset.label }))} selected={devState.settings.preset} onSelect={(preset) => updateSettings({ preset })} />
+          </ControlGroup>
+          <DevSlider label="Intensity" maximum={1} minimum={0} onChange={(intensity) => updateSettings({ intensity })} step={0.05} value={devState.settings.intensity} valueLabel={`${Math.round(devState.settings.intensity * 100)}%`} />
+          <DevSlider label="Wind" maximum={1} minimum={-1} onChange={(wind) => updateSettings({ wind })} step={0.1} value={devState.settings.wind} valueLabel={windLabel(devState.settings.wind)} />
+
+          <ControlGroup label="Quality">
+            <ChipRow<AtmosphereQuality> options={['auto', 'low', 'medium', 'high'].map((id) => ({ id: id as AtmosphereQuality, label: id }))} selected={devState.settings.quality} onSelect={(qualityOption) => updateSettings({ quality: qualityOption })} />
+          </ControlGroup>
+          <ControlGroup label="Preview">
+            <ChipRow<PreviewMode> options={[{ id: 'sky', label: 'Sky only' }, { id: 'today', label: 'Today' }, { id: 'kingdom', label: 'Kingdom' }]} selected={preview} onSelect={setPreview} />
+          </ControlGroup>
+          <ToggleRow label="Pause animation" value={devState.settings.paused} onChange={(paused) => updateSettings({ paused })} />
+          <ToggleRow label="Simulate Reduce Motion" value={simulateReducedMotion} onChange={setSimulateReducedMotion} />
+          <ToggleRow
+            label="Also apply to Kingdom"
+            value={devState.target === 'both'}
+            onChange={(enabled) => setDevAtmosphereState({ ...devState, target: enabled ? 'both' : 'today' })}
+          />
+          <View style={styles.togglePair}>
+            <ToggleRow compact label="Background plane" value={showBackground} onChange={setShowBackground} />
+            <ToggleRow compact label="Foreground plane" value={showForeground} onChange={setShowForeground} />
+          </View>
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+function ControlGroup({ children, label }: { children: ReactNode; label: string }) {
+  return <View style={styles.controlGroup}><ThemedText selectable style={styles.controlLabel} lightColor="#AAB8D0" darkColor="#AAB8D0">{label}</ThemedText>{children}</View>;
+}
+
+function ChipRow<T extends string>({ onSelect, options, selected }: { onSelect: (id: T) => void; options: { id: T; label: string }[]; selected: T }) {
+  return (
+    <View style={styles.chipRow}>
+      {options.map((option) => {
+        const active = option.id === selected;
+        return (
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} key={option.id} onPress={() => onSelect(option.id)} style={({ pressed }) => [styles.chip, active ? styles.chipActive : null, pressed ? styles.pressed : null]}>
+            <ThemedText style={styles.chipLabel} lightColor={active ? '#FFF5D4' : '#D8E0F0'} darkColor={active ? '#FFF5D4' : '#D8E0F0'}>{option.label}</ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function DevSlider({ label, maximum, minimum, onChange, step, value, valueLabel }: { label: string; maximum: number; minimum: number; onChange: (value: number) => void; step: number; value: number; valueLabel: string }) {
+  const [trackWidth, setTrackWidth] = useState(1);
+  const ratio = (value - minimum) / (maximum - minimum);
+  const adjust = (direction: -1 | 1) => onChange(Math.max(minimum, Math.min(maximum, Math.round((value + direction * step) / step) * step)));
+  const setFromPress = (event: GestureResponderEvent) => {
+    const raw = minimum + (event.nativeEvent.locationX / trackWidth) * (maximum - minimum);
+    onChange(Math.max(minimum, Math.min(maximum, Math.round(raw / step) * step)));
+  };
+
+  return (
+    <View style={styles.sliderGroup}>
+      <View style={styles.sliderHeader}>
+        <ThemedText selectable style={styles.controlLabel} lightColor="#AAB8D0" darkColor="#AAB8D0">{label}</ThemedText>
+        <ThemedText selectable style={styles.sliderValue} lightColor="#F2C875" darkColor="#F2C875">{valueLabel}</ThemedText>
+      </View>
+      <View style={styles.sliderRow}>
+        <Pressable accessibilityLabel={`Decrease ${label}`} accessibilityRole="button" onPress={() => adjust(-1)} style={styles.stepButton}><ThemedText style={styles.stepLabel} lightColor="#F8FBFF" darkColor="#F8FBFF">−</ThemedText></Pressable>
+        <Pressable accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]} accessibilityRole="adjustable" accessibilityValue={{ max: maximum, min: minimum, now: value, text: valueLabel }} onAccessibilityAction={(event) => adjust(event.nativeEvent.actionName === 'decrement' ? -1 : 1)} onLayout={(event) => setTrackWidth(Math.max(1, event.nativeEvent.layout.width))} onPress={setFromPress} style={styles.sliderTrack}>
+          <View style={[styles.sliderFill, { width: `${ratio * 100}%` }]} />
+          <View style={[styles.sliderThumb, { left: `${ratio * 100}%` }]} />
+        </Pressable>
+        <Pressable accessibilityLabel={`Increase ${label}`} accessibilityRole="button" onPress={() => adjust(1)} style={styles.stepButton}><ThemedText style={styles.stepLabel} lightColor="#F8FBFF" darkColor="#F8FBFF">+</ThemedText></Pressable>
+      </View>
+    </View>
+  );
+}
+
+function ToggleRow({ compact = false, label, onChange, value }: { compact?: boolean; label: string; onChange: (value: boolean) => void; value: boolean }) {
+  return <View style={[styles.toggleRow, compact ? styles.toggleCompact : null]}><ThemedText selectable style={styles.toggleLabel} lightColor="#E8EEFF" darkColor="#E8EEFF">{label}</ThemedText><Switch value={value} onValueChange={onChange} /></View>;
+}
+
+function useApproximateFps(): number {
+  const [fps, setFps] = useState(60);
+  const frameCount = useRef(0);
+  const startedAt = useRef(0);
+  useEffect(() => {
+    let frame = 0;
+    let cancelled = false;
+    const tick = (now: number) => {
+      if (cancelled) return;
+      if (!startedAt.current) startedAt.current = now;
+      frameCount.current += 1;
+      const elapsed = now - startedAt.current;
+      if (elapsed >= 750) {
+        setFps(Math.round((frameCount.current * 1000) / elapsed));
+        frameCount.current = 0;
+        startedAt.current = now;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => { cancelled = true; cancelAnimationFrame(frame); };
+  }, []);
+  return fps;
+}
+
+function windLabel(wind: number): string {
+  if (Math.abs(wind) < 0.05) return 'Still';
+  return `${Math.round(Math.abs(wind) * 100)}% ${wind < 0 ? 'left' : 'right'}`;
+}
+
+const styles = StyleSheet.create({
+  screen: { backgroundColor: '#173C65', flex: 1, overflow: 'hidden' },
+  environmentStage: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', transform: [{ translateY: -26 }] },
+  exitButton: { alignItems: 'center', backgroundColor: 'rgba(8,14,27,0.78)', borderColor: 'rgba(255,255,255,0.24)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, height: 38, justifyContent: 'center', position: 'absolute', right: 14, width: 38, zIndex: 30 },
+  diagnostics: { backgroundColor: 'rgba(8,14,27,0.66)', borderCurve: 'continuous', borderRadius: 12, gap: 2, left: 14, paddingHorizontal: 10, paddingVertical: 7, position: 'absolute', zIndex: 25 },
+  diagnosticText: { fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '700' },
+  controlsShell: { backgroundColor: 'rgba(8,12,24,0.94)', borderColor: 'rgba(226,235,255,0.18)', borderCurve: 'continuous', borderTopLeftRadius: 28, borderTopRightRadius: 28, borderTopWidth: 1, bottom: 0, maxHeight: '49%', position: 'absolute', width: '100%', zIndex: 40 },
+  controlsContent: { gap: 13, paddingHorizontal: 18, paddingTop: 15 },
+  headingRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  headingCopy: { gap: 1 },
+  eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.6 },
+  title: { fontFamily: 'FredokaBold', fontSize: 25, lineHeight: 29 },
+  resetButton: { backgroundColor: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.17)', borderCurve: 'continuous', borderRadius: 999, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+  resetLabel: { fontSize: 12, fontWeight: '800' },
+  controlGroup: { gap: 7 },
+  controlLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  chip: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(220,232,255,0.16)', borderCurve: 'continuous', borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 7 },
+  chipActive: { backgroundColor: 'rgba(242,200,117,0.2)', borderColor: '#F2C875' },
+  chipLabel: { fontSize: 11.5, fontWeight: '800', textTransform: 'capitalize' },
+  pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
+  sliderGroup: { gap: 7 },
+  sliderHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
+  sliderValue: { fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '800' },
+  sliderRow: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  sliderTrack: { backgroundColor: 'rgba(255,255,255,0.1)', borderCurve: 'continuous', borderRadius: 999, flex: 1, height: 12, justifyContent: 'center' },
+  sliderFill: { backgroundColor: '#E7B95D', borderRadius: 999, height: 12 },
+  sliderThumb: { backgroundColor: '#FFF5D4', borderColor: '#A87521', borderRadius: 8, borderWidth: 1, height: 16, marginLeft: -8, position: 'absolute', width: 16 },
+  stepButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)', borderCurve: 'continuous', borderRadius: 16, height: 30, justifyContent: 'center', width: 30 },
+  stepLabel: { fontSize: 18, fontWeight: '700', lineHeight: 20 },
+  toggleRow: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.045)', borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', justifyContent: 'space-between', minHeight: 44, paddingHorizontal: 12 },
+  togglePair: { flexDirection: 'row', gap: 8 },
+  toggleCompact: { flex: 1 },
+  toggleLabel: { flexShrink: 1, fontSize: 12, fontWeight: '700' },
+});

@@ -183,6 +183,7 @@ const styles = StyleSheet.create({
   center: {
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 30,
   },
   slot: {
     alignItems: 'center',

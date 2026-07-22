@@ -23,6 +23,12 @@
     "_comment": "Today-only countdown placement below the egg. Positive values lower the panel relative to the fixed hero stage.",
     "verticalLowerStageHeightRatio": 0.14
   },
+  "hexNeighborhood": {
+    "_comment": "Today day-tile world row. Distances use Kingdom's floating-neighborhood-v2 projected neighbour vector. Edge targets cover the visible neighbour and surrounding vertical overscan while leaving the selected hero centre interactive.",
+    "cameraDurationMs": 260,
+    "edgeTapVerticalOverscan": 150,
+    "edgeTapWidth": 118
+  },
   "homeEnvironment": {
     "_comment": "Today-only global environment framing. fitToViewport is the compact whole-tile experiment; disable it to restore the close-up zoom camera. The tile remains the anchor for its resident and egg.",
     "cloudsEnabled": false,
@@ -33,7 +39,7 @@
       "hoverDistance": 3,
       "hoverEnabled": true,
       "hoverHalfCycleMs": 2100,
-      "maxPinchScale": 1.45,
+      "maxPinchScale": 2,
       "resetSpring": {
         "damping": 17,
         "mass": 0.7,

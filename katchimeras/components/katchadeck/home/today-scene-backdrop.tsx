@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
+import { DevAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import { StaticKingdomSkyBackground } from '@/components/katchadeck/world/kingdom-sky-background';
 import type { TodayFullSpreadScene } from '@/utils/today-full-spread-scenes';
 
@@ -30,6 +31,7 @@ export function TodaySceneBackdrop({ scene }: TodaySceneBackdropProps) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <StaticKingdomSkyBackground />
+      <DevAtmosphereLayer plane="background" target="today" />
       {scene ? (
         <Animated.View
           key={scene.id}

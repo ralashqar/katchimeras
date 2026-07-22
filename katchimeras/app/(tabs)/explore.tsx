@@ -395,6 +395,7 @@ export default function ExploreScreen() {
                 <KatchaButton label="🌍 World Base Lab (anchors)" onPress={() => router.push('/world-base-lab')} variant="secondary" />
                 <KatchaButton label="🏰 World Asset Lab (catalog)" onPress={() => router.push('/dev-asset-lab')} variant="secondary" />
                 <KatchaButton label="Katchimera Hex Tile Lab" onPress={() => router.push('/dev-katchimera-tile-lab')} variant="secondary" />
+                <KatchaButton label="Atmosphere Lab" onPress={() => router.push('/dev-atmosphere-lab')} variant="secondary" />
                 <KatchaButton label="🧩 Tile Layout Lab (iso adjacency)" onPress={() => router.push('/dev-tile-lab')} variant="secondary" />
                 <KatchaButton label="Analyze a photo (vision)" onPress={handleAnalyzePickedPhoto} variant="secondary" />
                 <KatchaButton label="Last photo intelligence (JSON)" onPress={() => router.push('/intelligence-lab')} variant="secondary" />

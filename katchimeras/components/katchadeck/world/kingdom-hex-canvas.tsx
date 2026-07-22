@@ -17,6 +17,7 @@ import type { KingdomHexResidentTile, KingdomTileRender } from '@/components/kat
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
 import { KingdomSkyBackground } from '@/components/katchadeck/world/kingdom-sky-background';
+import { DevAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { useKingdomLodScheduler } from '@/components/katchadeck/world/use-kingdom-lod-scheduler';
 import { useKingdomTileScheduler } from '@/components/katchadeck/world/use-kingdom-tile-scheduler';
@@ -193,6 +194,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
   return (
     <View style={styles.root} onLayout={onLayout}>
       <KingdomSkyBackground camera={camera.skyCamera} viewport={viewport} />
+      <DevAtmosphereLayer plane="background" target="kingdom" />
       {/* Recreate the native handler whenever this tab regains focus. A camera
           route can suspend a gesture mid-lifecycle on iOS; retaining that
           handler leaves the otherwise-visible Kingdom canvas unresponsive. */}
@@ -249,6 +251,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           </Animated.View>
         </View>
       </GestureDetector>
+      <DevAtmosphereLayer plane="foreground" target="kingdom" />
       <Pressable accessibilityRole="button" accessibilityLabel="Recenter kingdom" onPress={camera.recenter} style={styles.recenter}>
         <IconSymbol name="scope" size={22} color={Lantern.moon50} />
       </Pressable>

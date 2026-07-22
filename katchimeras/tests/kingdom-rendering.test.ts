@@ -21,6 +21,11 @@ import {
   todayKingdomHeroLayout,
 } from '../utils/today-kingdom-hero-layout';
 import {
+  todayHexCameraTarget,
+  todayHexDayWorldPosition,
+  todayHexKingdomSpacing,
+} from '../utils/today-hex-neighborhood-layout';
+import {
   HEX_TILE_H,
   HEX_TILE_W,
   KINGDOM_HEX_LAYOUT_PROFILES,
@@ -59,6 +64,30 @@ function renderedAssetY(frame: { top: number; height: number }, assetY: number):
 function renderedAssetX(frame: { left: number; width: number }, assetX: number): number {
   return frame.left + (assetX / 1024) * frame.width;
 }
+
+test('Today day tiles retain a stable alternating row while the camera recenters selection', () => {
+  const viewportWidth = 400;
+  const spacing = todayHexKingdomSpacing(viewportWidth, 18, 1.15);
+  const first = todayHexDayWorldPosition(0, spacing.horizontalStride, spacing.verticalStep);
+  const second = todayHexDayWorldPosition(1, spacing.horizontalStride, spacing.verticalStep);
+  const third = todayHexDayWorldPosition(2, spacing.horizontalStride, spacing.verticalStep);
+  const camera = todayHexCameraTarget(1, spacing.horizontalStride, spacing.verticalStep);
+
+  assert.deepEqual(first, { x: 0, y: 0 });
+  assertClose(second.x, (viewportWidth - 36) * 1.15 * 0.75 * 1.168);
+  assertClose(
+    second.y,
+    (viewportWidth - 36) * 1.15 * (HEX_TILE_H / HEX_TILE_W) * 0.5 * 1.168,
+  );
+  assertClose(third.x, second.x * 2);
+  assert.equal(third.y, 0);
+  assertClose(camera.x, -second.x);
+  assertClose(camera.y, -second.y);
+  assert.deepEqual(
+    { x: second.x + camera.x, y: second.y + camera.y },
+    { x: 0, y: 0 },
+  );
+});
 
 test('home egg world placement is driven by kingdom-world-view JSON offsets', () => {
   const center = { x: 400, y: 600 };

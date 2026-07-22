@@ -193,6 +193,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 14,
     paddingVertical: 13,
+    position: 'relative',
+    zIndex: 45,
   },
   header: {
     alignItems: 'flex-start',

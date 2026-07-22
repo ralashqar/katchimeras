@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -8,7 +9,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { useEffect } from 'react';
+import { memo, useEffect } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -39,6 +40,7 @@ type CreatureHeroProps = {
   // Compact: the art plus ONE tight card (tag over name) sitting exactly where
   // the forming egg's "Hatches in" card sits — no weather, no rarity line.
   compact?: boolean;
+  hideCompactCard?: boolean;
   hideKingdomEnvironmentArt?: boolean;
   kingdomEnvironment?: boolean;
   kingdomHomeArchetypeId?: HomeArchetypeId | null;
@@ -46,12 +48,13 @@ type CreatureHeroProps = {
 
 // Lantern hero: the creature floats free over the ink - no membrane ring, no
 // plate, no motif orbits. Halo and float are the only ornament.
-export function CreatureHero({
+export const CreatureHero = memo(function CreatureHero({
   creature,
   subtitle,
   hideSubtitle = false,
   weather,
   compact = false,
+  hideCompactCard = false,
   hideKingdomEnvironmentArt = false,
   kingdomEnvironment = false,
   kingdomHomeArchetypeId,
@@ -83,6 +86,16 @@ export function CreatureHero({
   const glow = useSharedValue(0.2);
 
   useEffect(() => {
+    cancelAnimation(float);
+    cancelAnimation(glow);
+    // Kingdom-style Today tiles already share one environment hover transform;
+    // their local float/glow styles are not rendered. Avoid keeping two
+    // invisible infinite animations alive for every neighbouring day.
+    if (compact && kingdomEnvironment) {
+      float.value = 0;
+      glow.value = 0.2;
+      return;
+    }
     float.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 2300, easing: Easing.inOut(Easing.sin) }),
@@ -100,7 +113,11 @@ export function CreatureHero({
       -1,
       false
     );
-  }, [float, glow]);
+    return () => {
+      cancelAnimation(float);
+      cancelAnimation(glow);
+    };
+  }, [compact, float, glow, kingdomEnvironment]);
 
   const visualStyle = useAnimatedStyle(() => ({
     transform: kingdomEnvironment
@@ -160,26 +177,29 @@ export function CreatureHero({
             </Animated.View>
           </TodayFallbackCloudScene>
         </View>
-        <View
-          style={[
-            styles.compactCard,
-            kingdomEnvironment
-              ? {
-                  transform: [{
-                    translateY: todayScene.homeKatchimera.nameCardOffsetY
-                      + TODAY_KINGDOM_STAGE_HEIGHT
-                        * todayScene.homeKatchimera.nameCardAdditionalStageHeightRatio,
-                  }],
-                }
-              : null,
-          ]}>
-          <ThemedText type="onboardingLabel" style={styles.compactKicker} lightColor="rgba(251, 243, 228, 0.88)" darkColor="rgba(251, 243, 228, 0.88)">
-            {buildCreatureKicker(creature)}
-          </ThemedText>
-          <ThemedText type="display" style={styles.compactName} lightColor="#F2D48A" darkColor="#F2D48A">
-            {creature.name}
-          </ThemedText>
-        </View>
+        {hideCompactCard ? null : (
+          <View
+            key={`${creature.id}-compact-name`}
+            style={[
+              styles.compactCard,
+              kingdomEnvironment
+                ? {
+                    transform: [{
+                      translateY: todayScene.homeKatchimera.nameCardOffsetY
+                        + TODAY_KINGDOM_STAGE_HEIGHT
+                          * todayScene.homeKatchimera.nameCardAdditionalStageHeightRatio,
+                    }],
+                  }
+                : null,
+            ]}>
+            <ThemedText numberOfLines={1} type="onboardingLabel" style={styles.compactKicker} lightColor="rgba(251, 243, 228, 0.88)" darkColor="rgba(251, 243, 228, 0.88)">
+              {buildCreatureKicker(creature)}
+            </ThemedText>
+            <ThemedText numberOfLines={1} type="display" style={styles.compactName} lightColor="#F2D48A" darkColor="#F2D48A">
+              {creature.name}
+            </ThemedText>
+          </View>
+        )}
       </View>
     );
   }
@@ -226,7 +246,7 @@ export function CreatureHero({
       </View>
     </View>
   );
-}
+});
 
 function buildCreatureKicker(creature: LocalCreatureRecord) {
   const encounterCue = creature.encounterProfileId ? creature.motifTags[0] ?? null : null;
@@ -280,6 +300,7 @@ const styles = StyleSheet.create({
   // pill (user-tuned pair).
   compactCard: {
     alignItems: 'center',
+    alignSelf: 'center',
     backgroundColor: 'rgba(31, 27, 22, 0.78)',
     borderColor: 'rgba(255, 245, 220, 0.36)',
     borderCurve: 'continuous',
@@ -287,19 +308,26 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     boxShadow: '0 5px 16px rgba(13, 12, 15, 0.26), inset 0 1px 0 rgba(255, 248, 230, 0.22)',
     gap: 0,
+    justifyContent: 'center',
     marginTop: -14,
+    maxWidth: 330,
+    minHeight: 62,
+    minWidth: 240,
     overflow: 'hidden',
     paddingHorizontal: 26,
     paddingVertical: 9,
+    zIndex: 10,
   },
   compactKicker: {
     fontSize: 11,
     letterSpacing: 0.6,
+    textAlign: 'center',
   },
   compactName: {
     fontSize: 27,
     fontStyle: 'italic',
     lineHeight: 33,
+    textAlign: 'center',
   },
   stage: {
     alignItems: 'center',

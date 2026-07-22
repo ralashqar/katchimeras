@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
     left: 16,
     position: 'absolute',
     right: 16,
+    zIndex: 45,
   },
   ctaArea: {
     marginTop: 12,

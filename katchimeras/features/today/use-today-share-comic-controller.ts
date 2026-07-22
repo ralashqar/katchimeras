@@ -23,17 +23,22 @@ type UseTodayShareComicControllerParams = {
 export function useTodayShareComicController({ shareableDay }: UseTodayShareComicControllerParams) {
   const [sharingDayId, setSharingDayId] = useState<string | null>(null);
   const [comicGen, setComicGen] = useState<DayComicGenerationState | null>(null);
+  const [postcardDay, setPostcardDay] = useState<ShareableDay | null>(null);
   const postcardRef = useRef<View>(null);
   const comicShotRef = useRef<View>(null);
 
   const handleShareDay = useCallback(async () => {
-    if (!shareableDay || !shareableDay.shareReadyAt || !postcardRef.current) {
-      return;
-    }
+    if (!shareableDay || !shareableDay.shareReadyAt) return;
 
-    setSharingDayId(shareableDay.id);
+    const day = shareableDay;
+    setSharingDayId(day.id);
+    // Export art is 1080×1536 and expensive to reconcile. It must not exist in
+    // the ordinary tile-selection tree; mount it only for an explicit export.
+    setPostcardDay(day);
 
     try {
+      await waitForPresentationFrames(2);
+      if (!postcardRef.current) return;
       const uri = await captureRef(postcardRef.current, {
         format: 'png',
         quality: 1,
@@ -41,12 +46,13 @@ export function useTodayShareComicController({ shareableDay }: UseTodayShareComi
       });
 
       await Share.share({
-        message: `${shareableDay.card.creatureName} — ${shareableDay.card.state.label}`,
-        title: `${shareableDay.card.creatureName} daily card`,
+        message: `${day.card.creatureName} — ${day.card.state.label}`,
+        title: `${day.card.creatureName} daily card`,
         url: uri,
       });
     } finally {
-      setSharingDayId((current) => (current === shareableDay.id ? null : current));
+      setSharingDayId((current) => (current === day.id ? null : current));
+      setPostcardDay((current) => (current?.id === day.id ? null : current));
     }
   }, [shareableDay]);
 
@@ -116,6 +122,7 @@ export function useTodayShareComicController({ shareableDay }: UseTodayShareComi
   return {
     sharingDayId,
     comicGen,
+    postcardDay,
     postcardRef,
     comicShotRef,
     closeComic: () => setComicGen(null),
@@ -124,4 +131,17 @@ export function useTodayShareComicController({ shareableDay }: UseTodayShareComi
     handleRetryComic,
     handleShareGeneratedComic,
   };
+}
+
+function waitForPresentationFrames(count: number): Promise<void> {
+  return new Promise((resolve) => {
+    const next = (remaining: number) => {
+      if (remaining <= 0) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(() => next(remaining - 1));
+    };
+    next(count);
+  });
 }
