@@ -1,7 +1,5 @@
 import type { ImageSourcePropType } from 'react-native';
 
-import { CREATURE_LOD_SOURCES } from '@/constants/creature-lod-sources.gen';
-import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { KINGDOM_HEX_TILE_ALPHA_BOUNDS } from '@/constants/kingdom-hex-tile-bounds.gen';
 import { WORLD_OBJECT_LOD_SOURCES, type WorldObjectLod } from '@/constants/world-asset-lod-sources.gen';
 import { PROMOTED_WORLD_SOURCES } from '@/constants/world-asset-sources.gen';
@@ -15,6 +13,7 @@ import {
 import type { KingdomHexLayoutProfileId } from '@/utils/world-hex';
 import type { HomeVisualKey } from '@/types/home';
 import type { HomeArchetypeId, ZodiacSignId } from '@/types/world-identity';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
 
 export type { WorldObjectLod };
 
@@ -1295,15 +1294,7 @@ export function worldAssetSource(assetKey: string, lod: WorldObjectLod = 'full')
   }
   if (assetKey.startsWith(CREATURE_PREFIX)) {
     const key = assetKey.slice(CREATURE_PREFIX.length) as HomeVisualKey;
-    if (lod !== 'full') {
-      const exact = CREATURE_LOD_SOURCES[lod][key];
-      if (exact) return exact;
-      if (lod === 'thumb') {
-        const medium = CREATURE_LOD_SOURCES.medium[key];
-        if (medium) return medium;
-      }
-    }
-    return homeCreatureVisuals[key]?.source ?? null;
+    return resolveCreatureArtSource(key, { lod });
   }
   if (lod !== 'full') {
     const exact = WORLD_OBJECT_LOD_SOURCES[lod][assetKey];

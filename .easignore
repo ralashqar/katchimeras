@@ -63,6 +63,8 @@ __pycache__/
 # Generated from the union of iOS/Android Metro assets plus native config assets.
 /katchimeras/assets/images/katchimeras/baristabbit.png
 /katchimeras/assets/images/katchimeras/bedrotte.png
+/katchimeras/assets/images/katchimeras/cards/daily-card-frame-black.png
+/katchimeras/assets/images/katchimeras/cards/daily-card-frame-compact-black.png
 /katchimeras/assets/images/katchimeras/cutouts_lod/pulsepounce_256.webp
 /katchimeras/assets/images/katchimeras/cutouts_lod/pulsepounce_512.webp
 /katchimeras/assets/images/katchimeras/cutouts/_egg_backup/egg-base.png
@@ -72,7 +74,6 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/cutouts/egg-crack-1.png
 /katchimeras/assets/images/katchimeras/cutouts/egg-crack-2.png
 /katchimeras/assets/images/katchimeras/cutouts/pagelet.png
-/katchimeras/assets/images/katchimeras/environments/coffee_cafe/base.jpg
 /katchimeras/assets/images/katchimeras/environments/coffee_cafe/base.png
 /katchimeras/assets/images/katchimeras/environments/coffee_cafe/foreground.webp
 /katchimeras/assets/images/katchimeras/environments/coffee_cafe/guide_slots.png
@@ -1127,6 +1128,7 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/world/sky/kingdom-cloud-mid-tall-1024.webp
 /katchimeras/assets/images/katchimeras/world/sky/kingdom-cloud-mid-wide-1024.webp
 /katchimeras/assets/images/katchimeras/world/sky/kingdom-cloud-near-bank-512.webp
+/katchimeras/assets/images/katchimeras/world/today/generic-tile-surround-meadow-v1.webp
 /katchimeras/assets/images/katchimeras/world/today/nav_wood.png
 /katchimeras/assets/images/katchimeras/world/today/nav_wood.webp
 /katchimeras/assets/images/katchimeras/world/today/today_bg_prev.png

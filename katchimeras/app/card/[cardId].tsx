@@ -28,7 +28,7 @@ export default function CardDetailRoute() {
         showsVerticalScrollIndicator={false}>
         {card && day ? (
           <>
-            <DailyCard card={card} />
+            <DailyCard card={card} sceneArt="kingdom" />
             <View style={styles.section}>
               <ThemedText type="subtitle" style={styles.sectionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                 Collector notes

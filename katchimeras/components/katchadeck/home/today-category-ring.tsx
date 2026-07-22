@@ -199,13 +199,13 @@ const styles = StyleSheet.create({
   },
   mote: {
     alignItems: 'center',
-    backgroundColor: 'rgba(43, 34, 22, 0.52)',
-    borderColor: 'rgba(255, 245, 220, 0.38)',
+    backgroundColor: 'rgba(31, 27, 22, 0.78)',
+    borderColor: 'rgba(255, 245, 220, 0.48)',
     borderCurve: 'continuous',
     borderRadius: 22,
     borderWidth: 1.2,
     // Inner top-light — the glassy bevel the target panels have.
-    boxShadow: 'inset 0 1px 0 rgba(255, 248, 230, 0.35)',
+    boxShadow: '0 4px 14px rgba(13, 12, 15, 0.28), inset 0 1px 0 rgba(255, 248, 230, 0.38)',
     height: 66,
     justifyContent: 'center',
     overflow: 'hidden',

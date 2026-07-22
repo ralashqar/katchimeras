@@ -117,6 +117,12 @@ function bundledTileForVisualKey(visualKey: HomeVisualKey): KingdomHexTileSpec |
 }
 
 export function katchimeraHexTileForCreature(creature: KingdomCreature): KingdomHexTileSpec | null {
+  return katchimeraHexTileForIdentity(creature);
+}
+
+export function katchimeraHexTileForIdentity(
+  creature: Pick<KingdomCreature, 'creatureId' | 'visualKey'>
+): KingdomHexTileSpec | null {
   const overrides = manifest();
   const creatureOverride = overrides.byCreatureId[creature.creatureId];
   if (creatureOverride) return overrideToSpec(creatureOverride);

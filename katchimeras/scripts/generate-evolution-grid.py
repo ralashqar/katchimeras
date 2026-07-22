@@ -388,33 +388,32 @@ def build_grid_refinement_prompt(display_name: str, description: str) -> str:
 
 def build_three_stage_prompts(display_name: str, description: str) -> tuple[str, str]:
     hatchling_prompt = (
-        "Perform a tightly constrained species reskin of REFERENCE IMAGE 1, not a new composition and not a hybrid "
-        "of both reference silhouettes. Create one isolated species-specific hatchling, not a grid. "
-        "GEOMETRY LOCK — REFERENCE IMAGE 1 is the edit target and is absolutely authoritative for the complete "
-        "composition: preserve its exact square framing, straight-on camera angle, centered pixel placement, overall "
-        "subject bounding box, top/bottom/side margins, scale, upright symmetry, head-to-egg ratio, round infant head "
-        "shape, huge-eye proportions, tiny paws and their positions, open lower eggshell position and dimensions, "
-        "shallow cracked eggshell cap shape and thickness, lighting direction, and soft studio shadow. Keep the outer "
-        "silhouette and visual mass as close to REFERENCE IMAGE 1 as possible. The two infant appendages at the top "
-        "must emerge from the same points and remain within the same footprint occupied by its two sprouts. "
-        "IDENTITY ONLY — REFERENCE IMAGE 2 supplies only species palette, facial markings, material accents, a tiny "
-        "newborn interpretation of signature anatomy, and the primary motif. It does not control framing, camera, "
-        "pose, body shape, head shape, egg geometry, cap geometry, scale, or silhouette. "
-        f"Reskin the base as an unmistakable infant {display_name}. Identity: {description}. Translate the adult "
-        "identity into restrained newborn details only: infant ears constrained to the base sprout footprint, simple "
-        "face markings, a small core, and sparse motif accents on the existing eggshell. "
-        "Do not add, inherit, or imply the adult's face-enclosing headwear, helmet, ceramic cup hood, cup rim, handle, "
-        "clothing, pouch, equipment, adult body, adult pose, handheld prop, or oversized signature structure. Do not "
-        "enlarge, shrink, rotate, tilt, shift, crop, lower, raise, or reframe the character. Do not replace or deepen "
-        "the shallow cracked shell cap. Exactly one complete centered hatchling on a perfectly uniform matte "
-        "dark-plum background. No platform, scenery, extra creature, text, letters, numbers, logo, UI, human or "
+        "Create one isolated species-specific hatchling, not a grid. REFERENCE IMAGE 1 is a STAGING REFERENCE ONLY. "
+        "Use it only for the overall newborn-in-an-egg concept, centered full-body framing, approximate baby scale and "
+        "proportions, open lower base eggshell, cracked upper shell idea, and compact emerging pose. Do not borrow its "
+        "rendering style, lighting style, surface finish, materials, botanical anatomy, leaf ears, sprouts, tail, face "
+        "shape, markings, green palette, shell decoration, or Mossprout identity. "
+        "REFERENCE IMAGE 2 is the absolute authority for both SPECIES IDENTITY and ART DIRECTION. Match its rendering "
+        "style, dimensionality, material treatment, texture character, lighting, shadows, colour grading, eye rendering, "
+        "facial design and polish. Reimagine that exact adult as its recognizable baby self emerging from the egg: "
+        "preserve its characteristic head and cheek shape, species ears or appendages, facial markings, palette, eye "
+        "colour, material language, inner glow and a small newborn version "
+        "of its signature motif. The baby must look genetically related to REFERENCE IMAGE 2 at first glance rather "
+        "than like REFERENCE IMAGE 1 recoloured. Allow the head, face, ears, paws, shell design, cap silhouette and pose "
+        "to change substantially wherever needed for species recognition, while keeping a compact head-dominant infant "
+        "body partially nested in an eggshell. "
+        f"Render an unmistakable infant {display_name}. Identity: {description}. Keep adult equipment embryonic: turn "
+        "large tools, food, clothing or carried props into a tiny crest, body marking, shell emblem or subtle anatomy "
+        "cue; do not simply place the adult prop in the baby's hands. Use an eggshell decorated for this species, not "
+        "the botanical shell from reference image 1. Exactly one complete centered hatchling on a perfectly uniform "
+        "matte dark-plum background. No platform, scenery, extra creature, text, letters, numbers, logo, UI, human or "
         "photorealism."
     )
     child_prompt = (
         "Create one isolated child-age character, not a grid. REFERENCE IMAGE 1 is the newly approved species "
-        "hatchling and is authoritative for the same individual, face, eyes, infant palette and project rendering. "
-        "REFERENCE IMAGE 2 is the existing adult destination and is authoritative for the final species identity, "
-        "signature anatomy, palette, materials and mature motif. "
+        "hatchling and is authoritative for age continuity, the same individual, face and infant proportions. "
+        "REFERENCE IMAGE 2 is the existing adult destination and remains authoritative for art direction, rendering "
+        "style, lighting, materials, final species identity, signature anatomy, palette and mature motif. "
         f"Render the same {display_name} exactly halfway between those ages. Identity: {description}. The child is "
         "fully out of the egg with no shell, roughly halfway between hatchling and adult body development: a larger "
         "head and eyes than the adult, shorter limbs and softer proportions, but a clear standing body and confident "
@@ -1061,7 +1060,8 @@ def generate_three_stage_evolution(
     quality: str,
     output_dir: Path,
     reuse_hatchling: Path | None = None,
-) -> tuple[list[dict[str, Any]], list[Path], Path]:
+    hatchling_only: bool = False,
+) -> tuple[list[dict[str, Any]], list[Path], Path | None]:
     """Generate hatchling and child from two-reference edits, then append the existing adult."""
     hatchling_prompt, child_prompt = build_three_stage_prompts(display_name, description)
     raw_dir = output_dir / "raw-stages"
@@ -1113,6 +1113,9 @@ def generate_three_stage_evolution(
             }
         )
         print("stage 1: generated hatchling and Heavy-matted", flush=True)
+
+    if hatchling_only:
+        return records, [], None
 
     child_raw = raw_dir / "stage-02-child.png"
     child_matted = matted_dir / "stage-02-child.png"
@@ -1187,6 +1190,11 @@ def main() -> None:
         "--reuse-hatchling",
         help="approved species hatchling to reuse while regenerating only the three-stage child",
     )
+    parser.add_argument(
+        "--hatchling-only",
+        action="store_true",
+        help="with --three-stage, generate and matte only the species hatchling",
+    )
     parser.add_argument("--model", choices=("gpt", "seedream", "nano"), default="gpt")
     parser.add_argument(
         "--strategy",
@@ -1223,6 +1231,10 @@ def main() -> None:
         parser.error("--three-stage cannot be combined with --from-scratch or --refine-grid")
     if args.reuse_hatchling and not args.three_stage:
         parser.error("--reuse-hatchling requires --three-stage")
+    if args.hatchling_only and not args.three_stage:
+        parser.error("--hatchling-only requires --three-stage")
+    if args.hatchling_only and args.reuse_hatchling:
+        parser.error("--hatchling-only cannot be combined with --reuse-hatchling")
 
     if not args.creature and not args.name:
         parser.error("provide --creature or --name")
@@ -1301,6 +1313,7 @@ def main() -> None:
             quality=args.quality,
             output_dir=output_dir,
             reuse_hatchling=reuse_hatchling_path,
+            hatchling_only=args.hatchling_only,
         )
         serialized_records: list[dict[str, Any]] = []
         for record in records:
@@ -1315,17 +1328,18 @@ def main() -> None:
             if record.get("reusedFrom"):
                 serialized["reusedFrom"] = relative_to_root(Path(record["reusedFrom"]))
             serialized_records.append(serialized)
-        manifest.update(
-            {
-                "generatedStages": serialized_records,
-                "cells": [relative_to_root(path) for path in cells],
-                "reviewStrip": relative_to_root(strip),
-                "status": "completed",
-                "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            }
-        )
+        completed: dict[str, Any] = {
+            "generatedStages": serialized_records,
+            "cells": [relative_to_root(path) for path in cells],
+            "status": "completed",
+            "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        if strip is not None:
+            completed["reviewStrip"] = relative_to_root(strip)
+        manifest.update(completed)
         manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-        print(f"saved three-stage strip: {strip}")
+        if strip is not None:
+            print(f"saved three-stage strip: {strip}")
         print(f"saved manifest: {manifest_path}")
         return
 

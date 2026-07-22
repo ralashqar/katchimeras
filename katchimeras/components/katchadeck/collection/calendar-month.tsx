@@ -4,8 +4,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { Lantern } from '@/constants/theme';
+import { getCreatureVisual } from '@/game/days';
 import type { HomeDayRecord } from '@/types/home';
 
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
@@ -189,7 +189,7 @@ function DayCell({
   onPress?: () => void;
 }) {
   const creature = record?.creature ?? null;
-  const visual = creature ? homeCreatureVisuals[creature.visualKey]?.source ?? null : null;
+  const visual = creature ? getCreatureVisual(creature.visualKey).source : null;
   const ring = creature ? RARITY_RING[creature.rarity] ?? RARITY_RING.common : RARITY_RING.common;
   const accent = creature?.accentColor ?? Lantern.moon500;
 

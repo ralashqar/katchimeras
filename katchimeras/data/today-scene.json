@@ -13,5 +13,40 @@
     "_comment": "Glass dome + ripple rings RELATIVE to the egg: scale around centre, offsetY in dp.",
     "scale": 1,
     "offsetY": 10
+  },
+  "homeEgg": {
+    "_comment": "Today-only scale and placement relative to the fixed hero stage. Positive vertical values lower the egg without moving its Kingdom environment.",
+    "scale": 1.1,
+    "verticalLowerStageHeightRatio": 0
+  },
+  "homeHatchCountdown": {
+    "_comment": "Today-only countdown placement below the egg. Positive values lower the panel relative to the fixed hero stage.",
+    "verticalLowerStageHeightRatio": 0.14
+  },
+  "homeEnvironment": {
+    "_comment": "Today-only global environment framing. fitToViewport is the compact whole-tile experiment; disable it to restore the close-up zoom camera. The tile remains the anchor for its resident and egg.",
+    "cloudsEnabled": false,
+    "fitHorizontalPadding": 18,
+    "fitScale": 1.15,
+    "fitToViewport": true,
+    "motion": {
+      "hoverDistance": 3,
+      "hoverEnabled": true,
+      "hoverHalfCycleMs": 2100,
+      "maxPinchScale": 1.45,
+      "resetSpring": {
+        "damping": 17,
+        "mass": 0.7,
+        "stiffness": 230
+      }
+    },
+    "verticalLowerStageHeightRatio": 0.1,
+    "zoomScale": 1.1
+  },
+  "homeKatchimera": {
+    "_comment": "Home/Today-only framing for hatched Katchimeras. verticalLiftCreatureHeightRatio lifts relative to rendered creature height; nameCardOffsetY moves the title card down in dp; nameCardAdditionalStageHeightRatio adds a responsive offset based on the Today hero stage. Kingdom placement is unchanged.",
+    "verticalLiftCreatureHeightRatio": 0.2,
+    "nameCardOffsetY": 24,
+    "nameCardAdditionalStageHeightRatio": 0.15
   }
 }

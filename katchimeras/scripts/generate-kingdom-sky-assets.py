@@ -24,7 +24,9 @@ STYLE = (
     'low visual frequency, a few large rounded cloud lobes, strong clean silhouette, broad smooth bevels, '
     'simplified matte material, soft ivory highlights, restrained powder-blue and very subtle warm peach '
     'underside shading, soft daylight from upper left, readable when displayed at 256 pixels. Fully contained '
-    'with generous empty padding. Perfectly flat solid pure black #000000 background, no floor, no horizon, '
+    'with generous empty padding. The complete silhouette is soft and rounded on every side; the underside '
+    'has clearly visible pillowy scallops at varied heights. Never form a flat base, straight lower edge, rigid '
+    'shelf, or platform shape. Perfectly flat solid pure black #000000 background, no floor, no horizon, '
     'no cast shadow, no external shadow, no background gradient.'
 )
 

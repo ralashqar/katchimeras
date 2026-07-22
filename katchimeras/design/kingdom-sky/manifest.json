@@ -1,181 +1,102 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-07-19T12:37:03.939391+00:00",
-  "referencePolicy": "Photo 1 informs composition only and is never passed to generation.",
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-22T08:00:00.000Z",
+  "generation": {
+    "provider": "OpenAI image generation",
+    "mode": "reference-guided edit",
+    "background": "uniform #00FF00 chroma key"
+  },
+  "matte": {
+    "method": "local chroma-key soft matte",
+    "transparentThreshold": 18,
+    "opaqueThreshold": 185,
+    "edgeContract": 1,
+    "edgeFeather": 0.4,
+    "despill": true
+  },
+  "artDirection": "Cozy premium 3D clay cloud sprites with a rounded, scalloped underside and no flat shelf, platform, or cropped edge.",
   "assets": [
     {
       "id": "kingdom-cloud-far-bank",
-      "status": "generated",
-      "prompt": "A single stylized cloud asset for the Katchimeras mobile game. Premium friendly 3D toy-diorama art, low visual frequency, a few large rounded cloud lobes, strong clean silhouette, broad smooth bevels, simplified matte material, soft ivory highlights, restrained powder-blue and very subtle warm peach underside shading, soft daylight from upper left, readable when displayed at 256 pixels. Fully contained with generous empty padding. Perfectly flat solid pure black #000000 background, no floor, no horizon, no cast shadow, no external shadow, no background gradient. A long low broad distant cloud bank, gently asymmetrical, made from four to six large merged lobes. No island, land, grass, stone, building, bridge, creature, egg, character, UI, icon, text, letters, numbers, watermark, sun, stars, rain, lightning, fog overlay, wispy strands, tiny bubbles, noisy texture, photorealism, high-frequency detail, or multiple disconnected clouds.",
-      "generation": {
-        "provider": "fal",
-        "model": "fal-ai/nano-banana-2",
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/concept/kingdom-sky-cloud/kingdom-cloud-far-bank/1784464555627-aee919c1-9b6a-487c-aafd-fec8790ba8cb.png"
-      },
-      "matte": {
-        "modelEnum": "BiRefNet_lite",
-        "falModel": "General Use (Heavy)",
-        "operatingResolution": "1024x1024",
-        "refineForeground": true,
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/cutouts/kingdom-cloud-far-bank/1784464560560.png"
-      },
+      "brief": "Broad, low, airy distant bank made from many softly rounded puffs.",
+      "promptInvariant": "Organic rounded silhouette on every side, visibly pillowy lower lobes, no flat horizontal base.",
       "geometry": {
-        "sourceSize": [
-          512,
-          512
-        ],
-        "alphaBounds": [
-          27,
-          145,
-          485,
-          354
-        ],
-        "trimmedSize": [
-          500,
-          251
-        ]
+        "sourceSize": [1254, 1254],
+        "alphaBounds": [73, 376, 1180, 837],
+        "trimmedSize": [1207, 561]
       },
       "designAlpha": "design/kingdom-sky/kingdom-cloud-far-bank-alpha.png",
       "outputs": {
         "1024": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-far-bank-1024.webp",
-          "sha256": "6ad49bf643fc62fad6de2c910f16dabdab592fa8005b3893b3d88435db4e56a1"
+          "sha256": "c96fbd92eec49a6789fde436c4542075fec7b10ee395e863a206b760cb4c55cc"
         },
         "512": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-far-bank-512.webp",
-          "sha256": "5c0268df48857dfc3f1f3431d8b5ee250d6d62a72f53b1cf8113b9d9dd77bef8"
+          "sha256": "393ca6edcaa359a22b4d91171b92fb04e50d9cbca5b73fb69d55273fc13ae8dd"
         }
       }
     },
     {
       "id": "kingdom-cloud-mid-wide",
-      "status": "generated",
-      "prompt": "A single stylized cloud asset for the Katchimeras mobile game. Premium friendly 3D toy-diorama art, low visual frequency, a few large rounded cloud lobes, strong clean silhouette, broad smooth bevels, simplified matte material, soft ivory highlights, restrained powder-blue and very subtle warm peach underside shading, soft daylight from upper left, readable when displayed at 256 pixels. Fully contained with generous empty padding. Perfectly flat solid pure black #000000 background, no floor, no horizon, no cast shadow, no external shadow, no background gradient. A wide mid-distance cloud cluster, asymmetrical, made from five to seven large merged lobes. No island, land, grass, stone, building, bridge, creature, egg, character, UI, icon, text, letters, numbers, watermark, sun, stars, rain, lightning, fog overlay, wispy strands, tiny bubbles, noisy texture, photorealism, high-frequency detail, or multiple disconnected clouds.",
-      "generation": {
-        "provider": "fal",
-        "model": "fal-ai/nano-banana-2",
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/concept/kingdom-sky-cloud/kingdom-cloud-mid-wide/1784464573395-5932ad16-e434-44bc-bd4d-b3fd12e2226b.png"
-      },
-      "matte": {
-        "modelEnum": "BiRefNet_lite",
-        "falModel": "General Use (Heavy)",
-        "operatingResolution": "1024x1024",
-        "refineForeground": true,
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/cutouts/kingdom-cloud-mid-wide/1784464577318.png"
-      },
+      "brief": "Medium-width asymmetrical drifting cloud with a taller left crown and tapered right side.",
+      "promptInvariant": "Organic rounded silhouette on every side, visibly pillowy lower lobes, no flat horizontal base.",
       "geometry": {
-        "sourceSize": [
-          512,
-          512
-        ],
-        "alphaBounds": [
-          31,
-          128,
-          481,
-          377
-        ],
-        "trimmedSize": [
-          490,
-          289
-        ]
+        "sourceSize": [1254, 1254],
+        "alphaBounds": [46, 275, 1207, 968],
+        "trimmedSize": [1254, 797]
       },
       "designAlpha": "design/kingdom-sky/kingdom-cloud-mid-wide-alpha.png",
       "outputs": {
         "1024": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-mid-wide-1024.webp",
-          "sha256": "0fa667505b4dd56ba6ccdc667730b80c8d7a173e65e0c1b6cfc37c7e4b6d4c89"
+          "sha256": "e088742f7e47a6a1d0b8bf0d8f88a73d9af746edea4d821b6edfd2c4ae9ec6f2"
         },
         "512": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-mid-wide-512.webp",
-          "sha256": "a5d30dd782b434e571e6606a0888c25bef8a74cb3d86aab7414f66c5d3f694ec"
+          "sha256": "082e7588cd50327892af2b2048af7eb4aeb9157ea73a39363a7cbe7a6a3ddbbf"
         }
       }
     },
     {
       "id": "kingdom-cloud-mid-tall",
-      "status": "generated",
-      "prompt": "A single stylized cloud asset for the Katchimeras mobile game. Premium friendly 3D toy-diorama art, low visual frequency, a few large rounded cloud lobes, strong clean silhouette, broad smooth bevels, simplified matte material, soft ivory highlights, restrained powder-blue and very subtle warm peach underside shading, soft daylight from upper left, readable when displayed at 256 pixels. Fully contained with generous empty padding. Perfectly flat solid pure black #000000 background, no floor, no horizon, no cast shadow, no external shadow, no background gradient. A taller compact rounded cloud cluster, asymmetrical, made from four to six stacked merged lobes. No island, land, grass, stone, building, bridge, creature, egg, character, UI, icon, text, letters, numbers, watermark, sun, stars, rain, lightning, fog overlay, wispy strands, tiny bubbles, noisy texture, photorealism, high-frequency detail, or multiple disconnected clouds.",
-      "generation": {
-        "provider": "fal",
-        "model": "fal-ai/nano-banana-2",
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/concept/kingdom-sky-cloud/kingdom-cloud-mid-tall/1784464592606-a75b217b-4bad-48bf-a490-63b5563467e9.png"
-      },
-      "matte": {
-        "modelEnum": "BiRefNet_lite",
-        "falModel": "General Use (Heavy)",
-        "operatingResolution": "1024x1024",
-        "refineForeground": true,
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/cutouts/kingdom-cloud-mid-tall/1784464597375.png"
-      },
+      "brief": "Compact tall cloud tuft with a high crown and playful uneven underside.",
+      "promptInvariant": "Organic rounded silhouette on every side, visibly pillowy lower lobes, no flat horizontal base.",
       "geometry": {
-        "sourceSize": [
-          512,
-          512
-        ],
-        "alphaBounds": [
-          68,
-          94,
-          445,
-          418
-        ],
-        "trimmedSize": [
-          411,
-          358
-        ]
+        "sourceSize": [1254, 1254],
+        "alphaBounds": [105, 178, 1149, 1080],
+        "trimmedSize": [1138, 996]
       },
       "designAlpha": "design/kingdom-sky/kingdom-cloud-mid-tall-alpha.png",
       "outputs": {
         "1024": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-mid-tall-1024.webp",
-          "sha256": "cba99d08ef21cbf079b51282436145149b733d7f0c8c649a2ac1f709f73dfada"
+          "sha256": "64a1f4b578e5bdfd796810b478b3b45ab4945a70a67a27887393157f7f7a6606"
         },
         "512": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-mid-tall-512.webp",
-          "sha256": "9ca01fff9851d7729fba97419df8e0491f4f0a93694ed0105d66c547b932d9c1"
+          "sha256": "33fed0833e90df8ca42b9d17c23b8a9bd3c1fa21d74c520c77bb46444a0743e9"
         }
       }
     },
     {
       "id": "kingdom-cloud-near-bank",
-      "status": "generated",
-      "prompt": "A single stylized cloud asset for the Katchimeras mobile game. Premium friendly 3D toy-diorama art, low visual frequency, a few large rounded cloud lobes, strong clean silhouette, broad smooth bevels, simplified matte material, soft ivory highlights, restrained powder-blue and very subtle warm peach underside shading, soft daylight from upper left, readable when displayed at 256 pixels. Fully contained with generous empty padding. Perfectly flat solid pure black #000000 background, no floor, no horizon, no cast shadow, no external shadow, no background gradient. A large broad foreground edge cloud bank with a bold simple silhouette and five to seven large merged lobes. No island, land, grass, stone, building, bridge, creature, egg, character, UI, icon, text, letters, numbers, watermark, sun, stars, rain, lightning, fog overlay, wispy strands, tiny bubbles, noisy texture, photorealism, high-frequency detail, or multiple disconnected clouds.",
-      "generation": {
-        "provider": "fal",
-        "model": "fal-ai/nano-banana-2",
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/concept/kingdom-sky-cloud/kingdom-cloud-near-bank/1784464613988-b9dab2a8-43fc-4ab5-8259-509f1711eeae.png"
-      },
-      "matte": {
-        "modelEnum": "BiRefNet_lite",
-        "falModel": "General Use (Heavy)",
-        "operatingResolution": "1024x1024",
-        "refineForeground": true,
-        "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/cutouts/kingdom-cloud-near-bank/1784464617940.png"
-      },
+      "brief": "Large richly layered foreground bank designed to softly veil a floating tile's lower stair edge.",
+      "promptInvariant": "Organic rounded silhouette on every side, deep overlapping lower scallops, no flat horizontal base.",
       "geometry": {
-        "sourceSize": [
-          512,
-          512
-        ],
-        "alphaBounds": [
-          21,
-          127,
-          491,
-          373
-        ],
-        "trimmedSize": [
-          512,
-          288
-        ]
+        "sourceSize": [1254, 1254],
+        "alphaBounds": [36, 322, 1219, 940],
+        "trimmedSize": [1254, 724]
       },
       "designAlpha": "design/kingdom-sky/kingdom-cloud-near-bank-alpha.png",
       "outputs": {
         "1024": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-near-bank-1024.webp",
-          "sha256": "bde6f0de57e1c6834ce71feed4638a3c1c6047e6675b0b085177416b44e1e5c4"
+          "sha256": "84bff8295921bdd57a7bf95d6a4b45b9a159054440884341daacdc28844f4027"
         },
         "512": {
           "path": "assets/images/katchimeras/world/sky/kingdom-cloud-near-bank-512.webp",
-          "sha256": "8935093139a1f8a41dc0b2130574b9b4dc2e4173bca258a49b78aa27ec882fa6"
+          "sha256": "603714de015cc9a37903fa15a2bbfbe5ea602decb13c981dfd708c0b00a09922"
         }
       }
     }

@@ -15,11 +15,9 @@ import {
 } from '@/components/katchadeck/cards/ornate-card-frame';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { CREATURE_LOD_SOURCES } from '@/constants/creature-lod-sources.gen';
 import { AppFontFamilies } from '@/constants/theme';
-import { getCreatureVisual } from '@/game/days';
 import type { CardFacet, CardFacetKey, DailyCreatureCard } from '@/types/home';
-import { resolveCreatureVariantSource } from '@/utils/creature-variant';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { compactCardQuote, compactFacetValue, compactHighlight, compactStoryLine, formatCardSteps } from '@/utils/daily-card-display';
 import {
   CARD_SCENE_TOP,
@@ -36,8 +34,11 @@ import {
   resolveCompactDailyCardSize,
   resolveDetailDailyCardSize,
 } from '@/utils/daily-card-layout';
+import { kingdomResidentTileForIdentity } from '@/utils/kingdom-surface-tiles';
+import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 
 type DailyCardVariant = 'carousel' | 'detail';
+export type DailyCardSceneArt = 'day' | 'kingdom';
 export type DailyCardRenderTier = 'focused' | 'neighbor' | 'buffer';
 
 export type { DailyCardSize } from '@/utils/daily-card-layout';
@@ -49,6 +50,7 @@ type DailyCardProps = {
   frameSize?: DailyCardSize;
   onPress?: () => void;
   renderTier?: DailyCardRenderTier;
+  sceneArt?: DailyCardSceneArt;
   style?: StyleProp<ViewStyle>;
   variant?: DailyCardVariant;
 };
@@ -65,6 +67,7 @@ function areDailyCardPropsEqual(previous: DailyCardProps, next: DailyCardProps) 
     && previous.frameSize?.width === next.frameSize?.width
     && previous.onPress === next.onPress
     && previous.renderTier === next.renderTier
+    && previous.sceneArt === next.sceneArt
     && previous.style === next.style
     && previous.variant === next.variant;
 }
@@ -121,25 +124,25 @@ export function CompactDailyCardSizeProvider({ children, size }: { children: Rea
   return <CompactDailyCardSizeContext value={size}>{children}</CompactDailyCardSizeContext>;
 }
 
-export const DailyCard = memo(function DailyCard({ card, compact, frameSize, onPress, renderTier = 'focused', style, variant = compact ? 'carousel' : 'detail' }: DailyCardProps) {
+export const DailyCard = memo(function DailyCard({ card, compact, frameSize, onPress, renderTier = 'focused', sceneArt = 'day', style, variant = compact ? 'carousel' : 'detail' }: DailyCardProps) {
   const inheritedSize = use(CompactDailyCardSizeContext);
   const fixedSize = variant === 'carousel' ? frameSize ?? inheritedSize : null;
   if (fixedSize) {
-    return <ResolvedDailyCard card={card} onPress={onPress} renderTier={renderTier} size={fixedSize} style={style} variant={variant} />;
+    return <ResolvedDailyCard card={card} onPress={onPress} renderTier={renderTier} sceneArt={sceneArt} size={fixedSize} style={style} variant={variant} />;
   }
-  return <ResponsiveDailyCard card={card} onPress={onPress} renderTier={renderTier} style={style} variant={variant} />;
+  return <ResponsiveDailyCard card={card} onPress={onPress} renderTier={renderTier} sceneArt={sceneArt} style={style} variant={variant} />;
 }, areDailyCardPropsEqual);
 
-function ResponsiveDailyCard({ card, onPress, renderTier, style, variant }: Omit<DailyCardProps, 'compact' | 'frameSize' | 'variant'> & { variant: DailyCardVariant }) {
+function ResponsiveDailyCard({ card, onPress, renderTier, sceneArt, style, variant }: Omit<DailyCardProps, 'compact' | 'frameSize' | 'variant'> & { variant: DailyCardVariant }) {
   const window = useWindowDimensions();
   const defaultCompactMaxHeight = Math.max(312, window.height - 260);
   const size = variant === 'carousel'
     ? resolveCompactDailyCardSize(window.width, defaultCompactMaxHeight)
     : resolveDetailDailyCardSize(window.width);
-  return <ResolvedDailyCard card={card} onPress={onPress} renderTier={renderTier} size={size} style={style} variant={variant} />;
+  return <ResolvedDailyCard card={card} onPress={onPress} renderTier={renderTier} sceneArt={sceneArt} size={size} style={style} variant={variant} />;
 }
 
-function ResolvedDailyCard({ card, onPress, renderTier = 'focused', size, style, variant }: Omit<DailyCardProps, 'compact' | 'frameSize' | 'variant'> & { size: DailyCardSize; variant: DailyCardVariant }) {
+function ResolvedDailyCard({ card, onPress, renderTier = 'focused', sceneArt, size, style, variant }: Omit<DailyCardProps, 'compact' | 'frameSize' | 'variant'> & { size: DailyCardSize; variant: DailyCardVariant }) {
   return (
     <Pressable
       accessibilityLabel={onPress ? `Open ${card.creatureName} card` : `${card.creatureName}, ${card.rarity} daily card`}
@@ -147,18 +150,18 @@ function ResolvedDailyCard({ card, onPress, renderTier = 'focused', size, style,
       disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => pressed ? styles.pressed : null}>
-      <CardContent card={card} renderTier={renderTier} size={size} style={style} variant={variant} />
+      <CardContent card={card} renderTier={renderTier} sceneArt={sceneArt} size={size} style={style} variant={variant} />
     </Pressable>
   );
 }
 
-const CardContent = memo(function CardContent({ card, renderTier, size, style, variant }: { card: DailyCreatureCard; renderTier: DailyCardRenderTier; size: DailyCardSize; style?: StyleProp<ViewStyle>; variant: DailyCardVariant }) {
+const CardContent = memo(function CardContent({ card, renderTier, sceneArt = 'day', size, style, variant }: { card: DailyCreatureCard; renderTier: DailyCardRenderTier; sceneArt?: DailyCardSceneArt; size: DailyCardSize; style?: StyleProp<ViewStyle>; variant: DailyCardVariant }) {
   const compact = variant === 'carousel';
   if (compact) {
     return (
       <View style={style}>
         <OrnateCardFrame
-          background={<Scene card={card} compact renderTier={renderTier} scale={size.scale} />}
+          background={<Scene card={card} compact renderTier={renderTier} scale={size.scale} sceneArt={sceneArt} />}
           height={size.height}
           variant="compact"
           width={size.width}>
@@ -174,7 +177,7 @@ const CardContent = memo(function CardContent({ card, renderTier, size, style, v
   return (
     <View style={style}>
       <OrnateCardFrame
-        background={<Scene card={card} compact={false} renderTier="focused" scale={size.scale} />}
+        background={<Scene card={card} compact={false} renderTier="focused" scale={size.scale} sceneArt={sceneArt} />}
         height={size.height}
         variant="full"
         width={size.width}>
@@ -197,6 +200,7 @@ const CardContent = memo(function CardContent({ card, renderTier, size, style, v
   && (previous.renderTier === 'buffer') === (next.renderTier === 'buffer')
   && previous.size.height === next.size.height
   && previous.size.width === next.size.width
+  && previous.sceneArt === next.sceneArt
   && previous.style === next.style
   && previous.variant === next.variant);
 
@@ -297,29 +301,39 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
   );
 }
 
-function Scene({ card, compact, renderTier, scale }: { card: DailyCreatureCard; compact: boolean; renderTier: DailyCardRenderTier; scale: number }) {
-  const visual = getCreatureVisual(card.visualKey);
-  const variantSource = resolveCreatureVariantSource(card.visualKey, card.variantCell);
-  const compactSource = CREATURE_LOD_SOURCES[renderTier === 'buffer' ? 'thumb' : 'medium'][card.visualKey];
-  const source = variantSource ?? (compact ? compactSource : null) ?? visual.source;
+function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCreatureCard; compact: boolean; renderTier: DailyCardRenderTier; scale: number; sceneArt: DailyCardSceneArt }) {
+  const source = resolveCreatureArtSource(card.visualKey, {
+    lod: compact ? (renderTier === 'buffer' ? 'thumb' : 'medium') : 'full',
+    variantCell: card.variantCell,
+  });
   const backdrop = card.scene?.backdrop ?? card.treatment.backdrop;
   const colors = SCENE_COLORS[backdrop];
   const weather = card.scene?.weather ?? (backdrop === 'rain' || backdrop === 'storm' || backdrop === 'snow' ? backdrop : 'clear');
   const sceneSource = backdrop === 'cafe' || backdrop === 'home' || backdrop === 'city' ? cafeScene : meadowScene;
+  const kingdomTile = sceneArt === 'kingdom' ? kingdomResidentTileForIdentity(card) : null;
+  const kingdomSource = kingdomTile
+    ? kingdomHexTileSourceForLod(kingdomTile, compact ? 'thumb' : 'medium')
+    : null;
   return (
     <LinearGradient
       colors={colors}
       style={[frameRect(scale, 53, compact ? COMPACT_CARD_SCENE_TOP : CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
-      <Image cachePolicy="memory-disk" contentFit="cover" source={sceneSource} style={styles.sceneImage} transition={0} />
-      <LinearGradient colors={['rgba(255,244,207,0.04)', `${colors[2]}88`]} style={StyleSheet.absoluteFill} />
-      {renderTier !== 'buffer' ? <View style={styles.sceneGlow} /> : null}
-      {renderTier !== 'buffer' && (weather === 'rain' || weather === 'storm') ? <RainOverlay scale={scale} /> : null}
-      {renderTier !== 'buffer' && weather === 'snow' ? <SnowOverlay scale={scale} /> : null}
+      {kingdomSource ? (
+        <Image cachePolicy="memory-disk" contentFit="contain" source={kingdomSource} style={styles.kingdomSceneImage} transition={0} />
+      ) : (
+        <Image cachePolicy="memory-disk" contentFit="cover" source={sceneSource} style={styles.sceneImage} transition={0} />
+      )}
+      <LinearGradient
+        colors={kingdomSource ? ['rgba(255,244,207,0.01)', 'rgba(38,43,28,0.24)'] : ['rgba(255,244,207,0.04)', `${colors[2]}88`]}
+        style={StyleSheet.absoluteFill}
+      />
+      {!kingdomSource && renderTier !== 'buffer' && (weather === 'rain' || weather === 'storm') ? <RainOverlay scale={scale} /> : null}
+      {!kingdomSource && renderTier !== 'buffer' && weather === 'snow' ? <SnowOverlay scale={scale} /> : null}
       <Image
         cachePolicy="memory-disk"
         contentFit="contain"
         source={source}
-        style={[styles.creature, compact ? styles.compactCreature : null]}
+        style={[styles.creature, compact ? styles.compactCreature : null, kingdomSource ? styles.kingdomCreature : null]}
         transition={0}
       />
     </LinearGradient>
@@ -526,9 +540,10 @@ const styles = StyleSheet.create({
   dayTagText: { fontFamily: 'InstrumentSerif', fontWeight: '700' },
   scene: { alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' },
   sceneImage: { ...StyleSheet.absoluteFillObject, opacity: 0.82 },
-  sceneGlow: { backgroundColor: 'rgba(255,229,153,0.34)', borderRadius: 999, height: '56%', position: 'absolute', top: '-10%', width: '62%' },
+  kingdomSceneImage: { bottom: '-64%', height: '194%', left: '-47%', position: 'absolute', width: '194%' },
   creature: { bottom: '1%', height: '83%', position: 'absolute', width: '85%', zIndex: 2 },
   compactCreature: { bottom: '5%' },
+  kingdomCreature: { bottom: '26%', height: '61%', width: '65%' },
   weather: { ...StyleSheet.absoluteFillObject, zIndex: 3 },
   rainDrop: { backgroundColor: 'rgba(225,243,240,0.72)', position: 'absolute', transform: [{ rotate: '12deg' }], width: 1 },
   snowDot: { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 999, position: 'absolute' },

@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -13,10 +13,23 @@ import { useEffect } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/game/days';
-import { resolveCreatureVariantSource } from '@/utils/creature-variant';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { weatherIconName, weatherLabel } from '@/utils/day-weather';
 import type { DayWeather, LocalCreatureRecord } from '@/types/home';
+import type { HomeArchetypeId } from '@/types/world-identity';
 import { Lantern } from '@/constants/theme';
+import todayScene from '@/data/today-scene.json';
+import {
+  kingdomHomeTileForIdentity,
+  kingdomResidentTileForIdentity,
+  kingdomSurfaceTileAlignment,
+} from '@/utils/kingdom-surface-tiles';
+import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
+import {
+  TODAY_KINGDOM_STAGE_HEIGHT,
+  todayKingdomHeroLayout,
+} from '@/utils/today-kingdom-hero-layout';
+import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
 
 type CreatureHeroProps = {
   creature: LocalCreatureRecord;
@@ -26,16 +39,46 @@ type CreatureHeroProps = {
   // Compact: the art plus ONE tight card (tag over name) sitting exactly where
   // the forming egg's "Hatches in" card sits — no weather, no rarity line.
   compact?: boolean;
+  hideKingdomEnvironmentArt?: boolean;
+  kingdomEnvironment?: boolean;
+  kingdomHomeArchetypeId?: HomeArchetypeId | null;
 };
 
 // Lantern hero: the creature floats free over the ink - no membrane ring, no
 // plate, no motif orbits. Halo and float are the only ornament.
-export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather, compact = false }: CreatureHeroProps) {
+export function CreatureHero({
+  creature,
+  subtitle,
+  hideSubtitle = false,
+  weather,
+  compact = false,
+  hideKingdomEnvironmentArt = false,
+  kingdomEnvironment = false,
+  kingdomHomeArchetypeId,
+}: CreatureHeroProps) {
+  const { width: windowWidth } = useWindowDimensions();
   const visual = getCreatureVisual(creature.visualKey);
   // Prefer the day's expression cutout (mood × bond depth) when one exists for
   // this creature; otherwise fall back to the single base cutout.
-  const variantSource = resolveCreatureVariantSource(creature.visualKey, creature.variantCell);
-  const heroSource = variantSource ?? visual.source;
+  const heroSource = resolveCreatureArtSource(creature.visualKey, {
+    variantCell: creature.variantCell,
+  });
+  const kingdomTile = kingdomEnvironment ? kingdomResidentTileForIdentity(creature) : null;
+  // Today uses the forming egg's home tile as its canonical camera/framing
+  // plate. Resident days keep their bespoke environment art, but no longer
+  // jump vertically because their bitmap bounds differ from the home tile.
+  const kingdomAnchorTile = kingdomEnvironment
+    ? kingdomHomeTileForIdentity(kingdomHomeArchetypeId)
+    : null;
+  const kingdomLayout = todayKingdomHeroLayout(
+    windowWidth,
+    kingdomTile ? kingdomSurfaceTileAlignment(kingdomTile) : undefined,
+    kingdomAnchorTile ? kingdomSurfaceTileAlignment(kingdomAnchorTile) : undefined,
+  );
+  const kingdomTileSource = kingdomTile
+    ? kingdomHexTileSourceForLod(kingdomTile, kingdomLayout.tileSize > 512 ? 'full' : 'medium')
+    : null;
+  const usesKingdomLayout = Boolean(kingdomEnvironment && kingdomTileSource);
   const float = useSharedValue(0);
   const glow = useSharedValue(0.2);
 
@@ -60,8 +103,10 @@ export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather
   }, [float, glow]);
 
   const visualStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -float.value * 9 }, { scale: 1 + glow.value * 0.03 }],
-  }));
+    transform: kingdomEnvironment
+      ? []
+      : [{ translateY: -float.value * 9 }, { scale: 1 + glow.value * 0.03 }],
+  }), [kingdomEnvironment]);
 
   const haloStyle = useAnimatedStyle(() => ({
     opacity: 0.26 + glow.value * 0.22,
@@ -72,12 +117,62 @@ export function CreatureHero({ creature, subtitle, hideSubtitle = false, weather
     return (
       <View style={styles.shellCompact}>
         <View style={styles.stage}>
-          <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
-          <Animated.View style={visualStyle}>
-            <Image contentFit="contain" source={heroSource} style={styles.image} transition={0} />
-          </Animated.View>
+          <TodayFallbackCloudScene
+            enabled={usesKingdomLayout && !hideKingdomEnvironmentArt}
+            focusY={kingdomLayout.creatureTop + kingdomLayout.creatureSize / 2}
+            environment={kingdomTileSource && !hideKingdomEnvironmentArt ? (
+              <Image
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                pointerEvents="none"
+                source={kingdomTileSource}
+                style={[
+                  styles.kingdomTile,
+                  {
+                    height: kingdomLayout.tileFrame.height,
+                    marginLeft: kingdomLayout.tileFrame.left,
+                    top: kingdomLayout.tileFrame.top,
+                    width: kingdomLayout.tileFrame.width,
+                  },
+                ]}
+                transition={0}
+              />
+            ) : usesKingdomLayout ? null : (
+              <Animated.View style={[styles.halo, { backgroundColor: `${visual.accentColor}2E` }, haloStyle]} />
+            )}
+            frontTop={kingdomLayout.tileFaceBottomY}>
+            <Animated.View
+              style={[
+                usesKingdomLayout
+                  ? {
+                      height: kingdomLayout.creatureSize,
+                      left: '50%',
+                      marginLeft: -kingdomLayout.creatureSize / 2,
+                      position: 'absolute',
+                      top: kingdomLayout.creatureTop,
+                      width: kingdomLayout.creatureSize,
+                      zIndex: 3,
+                    }
+                  : null,
+                visualStyle,
+              ]}>
+              <Image pointerEvents="none" contentFit="contain" source={heroSource} style={usesKingdomLayout ? StyleSheet.absoluteFill : styles.image} transition={0} />
+            </Animated.View>
+          </TodayFallbackCloudScene>
         </View>
-        <View style={styles.compactCard}>
+        <View
+          style={[
+            styles.compactCard,
+            kingdomEnvironment
+              ? {
+                  transform: [{
+                    translateY: todayScene.homeKatchimera.nameCardOffsetY
+                      + TODAY_KINGDOM_STAGE_HEIGHT
+                        * todayScene.homeKatchimera.nameCardAdditionalStageHeightRatio,
+                  }],
+                }
+              : null,
+          ]}>
           <ThemedText type="onboardingLabel" style={styles.compactKicker} lightColor="rgba(251, 243, 228, 0.88)" darkColor="rgba(251, 243, 228, 0.88)">
             {buildCreatureKicker(creature)}
           </ThemedText>
@@ -178,17 +273,19 @@ const styles = StyleSheet.create({
   },
   shellCompact: {
     alignItems: 'center',
+    width: '100%',
   },
   // Same skin as the HatchCountdown card, but LARGER and LOWER — the hatched
   // name is the day's headline, while the forming clock stays a small tucked
   // pill (user-tuned pair).
   compactCard: {
     alignItems: 'center',
-    backgroundColor: 'rgba(40, 32, 22, 0.6)',
-    borderColor: 'rgba(255, 245, 220, 0.3)',
+    backgroundColor: 'rgba(31, 27, 22, 0.78)',
+    borderColor: 'rgba(255, 245, 220, 0.36)',
     borderCurve: 'continuous',
     borderRadius: 22,
     borderWidth: 1.2,
+    boxShadow: '0 5px 16px rgba(13, 12, 15, 0.26), inset 0 1px 0 rgba(255, 248, 230, 0.22)',
     gap: 0,
     marginTop: -14,
     overflow: 'hidden',
@@ -219,6 +316,10 @@ const styles = StyleSheet.create({
   image: {
     height: 248,
     width: 248,
+  },
+  kingdomTile: {
+    left: '50%',
+    position: 'absolute',
   },
   copy: {
     alignItems: 'center',

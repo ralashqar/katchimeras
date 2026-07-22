@@ -4,8 +4,8 @@ import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { encounterLiveCast } from '@/constants/encounter-cast';
-import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { Lantern } from '@/constants/theme';
+import { getCreatureVisual } from '@/game/days';
 import type { LocalCreatureRecord } from '@/types/home';
 
 // seedId → the human category label the hatch engine uses ("Coffee shop").
@@ -96,7 +96,7 @@ export function CreatureProvenance({ creature }: { creature: LocalCreatureRecord
             Almost caught
           </ThemedText>
           {echoes.map((echo) => {
-            const source = homeCreatureVisuals[echo.visualKey]?.source ?? null;
+            const source = getCreatureVisual(echo.visualKey).source;
             const rarityColor = RARITY_COLOR[echo.rarity] ?? Lantern.moon500;
             return (
               <View key={echo.speciesId} style={styles.echoRow}>

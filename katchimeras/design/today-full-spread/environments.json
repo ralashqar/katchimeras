@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "width": 945,
+    "height": 1680,
+    "aspectRatio": "9:16",
+    "webpQuality": 92,
+    "maxProductionBytes": 650000
+  },
+  "styleGuide": "assets/images/katchimeras/world/today/feastle-full-spread.webp",
+  "environments": {
+    "feastle": {
+      "displayName": "Feastle",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_feastle_hex_tile.webp",
+      "theme": "a warm open-air feast courtyard and cottage kitchen with a glowing bread oven, clay floor tiles, herb pots, produce baskets, wooden prep tables, lanterns, and a welcoming garden entrance",
+      "palette": "terracotta, baked cream, herb green, warm amber, and clear sky blue",
+      "signature": "the rounded bread oven and open central tiled gathering floor",
+      "archivedFullSpread": {
+        "id": "feastle-courtyard-v1",
+        "asset": "assets/images/katchimeras/world/today/feastle-full-spread.webp",
+        "reason": "Today now uses the shared Kingdom hex-tile environment"
+      }
+    },
+    "flickerbun": {
+      "displayName": "Flickerbun",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_flickerbun_hex_tile.webp",
+      "theme": "a cozy moonlit story cinema courtyard with a tiny projection booth, velvet seating, warm snack nook, film-reel shapes, soft lamps, and an open viewing stage",
+      "palette": "deep plum, indigo, burgundy velvet, moonlit blue, and warm projector gold",
+      "signature": "the blank outdoor cinema screen and projector-lit central stage",
+      "archivedFullSpread": {
+        "id": "flickerbun-moonlit-cinema-v1",
+        "asset": "assets/images/katchimeras/world/today/flickerbun-full-spread.webp",
+        "reason": "Today now uses the shared Kingdom hex-tile environment"
+      }
+    },
+    "cheerlet": {
+      "displayName": "Cheerlet",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_cheerlet_hex_tile.webp",
+      "theme": "a bright celebration garden with chunky bunting, candle lanterns, rounded balloon-like topiary, flower clusters, gift-like blocks without writing, and a clear party lawn",
+      "palette": "sunny yellow, coral, mint, cream, and celebratory gold",
+      "signature": "the lantern-and-bunting arch framing an open celebration lawn"
+    },
+    "gatherglow": {
+      "displayName": "Gatherglow",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_gatherglow_hex_tile.webp",
+      "theme": "a lantern-lit shared-table garden with a welcoming hearth pavilion, communal table, curved benches, glowing jars, warm cushions, and a broad open gathering floor",
+      "palette": "coral, rose, warm cream, leaf green, and honey gold",
+      "signature": "the communal table beneath a glowing gathering pavilion"
+    },
+    "mossprout": {
+      "displayName": "Mossprout",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_mossprout_hex_tile.webp",
+      "theme": "a lush pocket-park garden after rain with a tiny pond, mossy stone path, rounded greenhouse alcove, ferns, oversized leaves, flowers, benches, and gentle garden lamps",
+      "palette": "moss green, leaf green, rainwater blue, cream stone, and warm lamplight",
+      "signature": "the rain-kissed pond and leafy greenhouse garden",
+      "archivedFullSpread": {
+        "id": "mossprout-garden-gate-v1",
+        "asset": "assets/images/katchimeras/world/today/mossprout-full-spread.webp",
+        "reason": "Today now uses the shared Kingdom hex-tile environment"
+      }
+    },
+    "pagelet": {
+      "displayName": "Pagelet",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_pagelet_hex_tile.webp",
+      "theme": "a miniature open-air bookshop and reading garden with curved wooden shelves, oversized blank books, a reading chair, paper-leaf plants, ribbon markers, and amber lamps",
+      "palette": "cream paper, warm walnut, burgundy ribbon, sage, and amber light",
+      "signature": "the curved book alcove and lantern-lit reading court"
+    },
+    "relicoon": {
+      "displayName": "Relicoon",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_relicoon_hex_tile.webp",
+      "theme": "a warm pocket museum courtyard with rounded archive cabinets, artifact display alcoves, expedition cases, map-table shapes without writing, brass lamps, and an open discovery floor",
+      "palette": "teal, sandstone, warm walnut, parchment cream, and antique brass",
+      "signature": "the softly lit museum arch and central discovery court"
+    },
+    "skylo": {
+      "displayName": "Skylo",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_skylo_hex_tile.webp",
+      "theme": "a bright cozy city-corner plaza with toy-like skyline buildings, warm apartment windows, rounded street trees, a small cafe bench, smooth paving, and an open urban stage",
+      "palette": "sky blue, teal, warm brick, cream stone, and window-light gold",
+      "signature": "the friendly skyline canyon opening onto a sunlit plaza"
+    },
+    "steppling": {
+      "displayName": "Steppling",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_steppling_hex_tile.webp",
+      "theme": "a sunny trailhead and river-walk garden with a winding path, rounded stepping stones, blank route markers, a small lookout, pine shrubs, rest bench, and an open walking stage",
+      "palette": "sunlit green, river blue, sandstone, pine, and warm orange",
+      "signature": "the winding trail leading from the foreground to a small lookout"
+    },
+    "tasklet": {
+      "displayName": "Tasklet",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_tasklet_hex_tile.webp",
+      "theme": "a focused outdoor maker workshop with a tidy workbench, blank planning board, drafting table, supply crates, blue focus lamps, clipped hedges, and a clean central work court",
+      "palette": "honey wood, muted blue, sage, cream, and brass",
+      "signature": "the organized workshop pavilion facing an uncluttered project court"
+    },
+    "vesperitt": {
+      "displayName": "Vesperitt",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_vesperitt_hex_tile.webp",
+      "theme": "a quiet midnight study and stargazing courtyard with a brass telescope, curved bookshelves, moonflower planters, indigo cushions, desk lamps, and an open nocturnal stage",
+      "palette": "indigo, violet, moonlit blue, antique brass, and warm lamp gold",
+      "signature": "the crescent observatory alcove overlooking a calm study court"
+    },
+    "bedrotte": {
+      "displayName": "Bedrotte",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_bedrotte_hex_tile.webp",
+      "theme": "a sleepy blanket-fort garden with rounded daybeds, cloud-soft cushions, dim bedside lanterns, a tiny tea shelf, calm night plants, and a spacious restful center",
+      "palette": "dusty blue, lavender, warm cream, muted rose, and soft amber",
+      "signature": "the cozy blanket pavilion and moonlit resting court"
+    },
+    "shellio": {
+      "displayName": "Shellio",
+      "reference": "assets/images/katchimeras/world/hex/floating_neighborhood_v2_shellio_hex_tile.webp",
+      "theme": "a gentle coastal shell garden with rounded tide pools, pearly stone arches, driftwood benches, broad sea plants, warm lanterns, and a clear sandy central terrace",
+      "palette": "aqua, pearl cream, coral, sea-glass green, and sunset gold",
+      "signature": "the shell arch and shallow tide pools around an open terrace"
+    }
+  }
+}

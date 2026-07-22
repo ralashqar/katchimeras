@@ -3,10 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { forwardRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { getCreatureVisual } from '@/game/days';
 import type { HomeDayRecord } from '@/types/home';
 import { formatMeetingLabel } from '@/utils/daily-card';
-import { resolveCreatureVariantSource } from '@/utils/creature-variant';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
 
 type ShareableCardDay = HomeDayRecord & {
   creature: NonNullable<HomeDayRecord['creature']>;
@@ -20,8 +19,7 @@ const CARD_HEIGHT = 1536;
 
 export const MemoryPostcard = forwardRef<View, MemoryPostcardProps>(function MemoryPostcard({ day }, ref) {
   const { card } = day;
-  const visual = getCreatureVisual(card.visualKey);
-  const source = resolveCreatureVariantSource(card.visualKey, card.variantCell) ?? visual.source;
+  const source = resolveCreatureArtSource(card.visualKey, { variantCell: card.variantCell });
   const facets = card.facets ? ['mood', 'energy', 'sleep', 'place', 'social'].map((key) => card.facets![key as keyof typeof card.facets]) : [
     { label: 'Mood', value: card.state.tone },
     { label: 'Energy', value: card.state.vitality },

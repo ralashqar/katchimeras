@@ -3,19 +3,26 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { resolveCompactDailyCardSize } from '@/components/katchadeck/cards/daily-card';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { currentLanternColour } from '@/utils/cosmetics-storage';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
-import { TodayDeckCarousel } from '@/components/katchadeck/home/today-deck-carousel';
+import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
+import { TodayHeroCrossfade } from '@/components/katchadeck/home/today-hero-crossfade';
+import { TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
+import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
+import {
+  TodayEnvironmentMotionProvider,
+  useTodayEnvironmentMotion,
+} from '@/components/katchadeck/home/today-environment-motion';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
 import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
@@ -49,12 +56,10 @@ import { useTodayShareComicController } from '@/features/today/use-today-share-c
 import { useTodayCategoryModel } from '@/features/today/use-today-category-model';
 import { useTodayNavigationController } from '@/features/today/use-today-navigation-controller';
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
-import { HOME_EGG_STAGE_TOP, MeadowSceneBackdrop, todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
+import { todayEggFraming } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
-import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
-import type { ClassifiedMemory, HomeDayRecord, HomeTimelineDay } from '@/types/home';
-import { COMPACT_CARD_SCENE_HEIGHT, COMPACT_CARD_SCENE_TOP } from '@/utils/daily-card-layout';
+import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
@@ -62,12 +67,15 @@ import { noteRoutesForSignals, noteSuggestedSpecific } from '@/utils/journal-inp
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
+import { loadWorldIdentity } from '@/utils/world-identity';
+import { todayFullSpreadSceneForVisualKey } from '@/utils/today-full-spread-scenes';
+import todayScene from '@/data/today-scene.json';
+import { TODAY_KINGDOM_STAGE_HEIGHT } from '@/utils/today-kingdom-hero-layout';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
 const SHOW_HATCHED_ACTION_DOCK = false;
 const SHOW_HATCHED_REFLECTION_CARD = false;
-const HERO_CARD_LIFT = 12;
 
 // Mood + Sleep entries in the "+" menu — they open their own sheets instead of
 // the retired strip prompts (accents match those sheets' tiles).
@@ -90,13 +98,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const heroVerticalOffset = Math.min(34, Math.max(12, Math.round((windowHeight - 680) * 0.16)));
-  const maxTodayCardHeight = Math.max(
-    260,
-    windowHeight - (insets.top + 24 + heroVerticalOffset) - 240
-  );
-  const todayCardSize = resolveCompactDailyCardSize(windowWidth, maxTodayCardHeight);
-  const promiseHeroTop = HOME_EGG_STAGE_TOP - 24 - (heroVerticalOffset - HERO_CARD_LIFT);
+  const [homeArchetypeId, setHomeArchetypeId] = useState(() => loadWorldIdentity().selectedHomeArchetypeId);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
   const [hatchCheckInOpen, setHatchCheckInOpen] = useState(false);
   const [hatchAfterCheckIn, setHatchAfterCheckIn] = useState(false);
@@ -159,6 +161,12 @@ export default function HomeScreen() {
   const { eggFeed, eggFeedKey, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
   const { promptSheetOpen, initialPrompt, openPromptSheet, closePromptSheet } = usePromptSheetController();
 
+  useFocusEffect(
+    useCallback(() => {
+      setHomeArchetypeId(loadWorldIdentity().selectedHomeArchetypeId);
+    }, [])
+  );
+
   const shareableDay =
     selectedDay?.kind === 'day' && selectedDay.state === 'hatched' && selectedDay.creature && selectedDay.card
       ? (selectedDay as HomeDayRecord & {
@@ -190,7 +198,7 @@ export default function HomeScreen() {
     }
   }, [backfillStatus.completedVersion, refreshState]);
 
-  const { isHatching, hatchingEgg, hatchingDayId, handleReveal, handleHatchComplete } = useTodayHatchRevealController({
+  const { isHatching, hatchingEgg, handleReveal, handleHatchComplete } = useTodayHatchRevealController({
     selectedDay,
     triggerHatchIfReady,
     refreshState,
@@ -221,12 +229,11 @@ export default function HomeScreen() {
     });
   }
 
-  const handleOpenCard = useCallback((cardId: string) => {
-    router.push({ pathname: '/card/[cardId]', params: { cardId } });
-  }, [router]);
-
   const isDay = selectedDay?.kind === 'day';
   const isHatched = isDay && selectedDay.state === 'hatched' && selectedDay.creature;
+  const fullSpreadScene = isHatched
+    ? todayFullSpreadSceneForVisualKey(selectedDay.creature!.visualKey)
+    : null;
   const isFormingToday = isDay && selectedDay.isToday && selectedDay.state !== 'hatched';
 
   // Once today has hatched, the Tomorrow page becomes a forming egg the user can
@@ -536,11 +543,15 @@ export default function HomeScreen() {
     }, [handleQuestActionIntent, openManualJournal, setJourneySheetOpen, setMemoryVaultOpen, setMemoryVaultTab, setPlacesVaultOpen, setSleepSheetOpen])
   );
 
-  useTodayNavigationController({
+  const { swipeGesture } = useTodayNavigationController({
     windowWidth,
     windowHeight,
     selectedDayId,
     timelineDays,
+    isTodayHatched,
+    isHatching,
+    promptSheetOpen: promptSheetOpen || hatchCheckInOpen,
+    comicOpen: Boolean(comicGen),
     selectTimelineDay,
     startEggFeed,
   });
@@ -574,124 +585,115 @@ export default function HomeScreen() {
     !!studioFollowUp ||
     !!comicGen ||
     voiceNote.phase !== 'idle';
-  const deckCameraBadge = categoryById.get('photos')?.needsAttention
-    ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1)
-    : undefined;
-  const renderDeckFormingContent = useCallback((day: HomeTimelineDay, active: boolean, onRevealSettled?: () => void) => {
-    if (isHatching && active && hatchingEgg && day.id === hatchingDayId) {
-      return (
-        <HatchReveal
-          card={day.kind === 'day' ? day.card ?? null : null}
-          creature={day.kind === 'day' ? day.creature ?? null : null}
-          embedded
-          egg={hatchingEgg}
-          hideCaption
-          lanternColor={lanternColour}
-          onComplete={handleHatchComplete}
-          onSettled={onRevealSettled}
-        />
-      );
-    }
-    if (day.kind === 'day') {
-      if (day.state === 'hatched') return day.creature ? <CreatureHero creature={day.creature} compact /> : null;
-      return (
-        <LanternEgg
-          egg={day.egg}
-          onPress={active && day.canAddMoments ? () => openManualJournal() : undefined}
-          reactionKey={day.moments.length}
-          isReady={active && day.state === 'ready_to_hatch'}
-          feedKey={active ? eggFeedKey : 0}
-          interactive={active}
-          lanternColor={lanternColour}
-          scale={eggFraming.scale}
-          offsetY={eggFraming.offsetY}
-          membraneScale={eggFraming.membraneScale}
-          membraneOffsetY={eggFraming.membraneOffsetY}
-          shellScale={0.72}
-          shellOffsetY={0}
-        />
-      );
-    }
-    if (!tomorrowDay) return null;
-    return (
-      <LanternEgg
-        egg={tomorrowDay.egg}
-        onPress={active ? () => openManualJournal() : undefined}
-        reactionKey={tomorrowDay.moments.length}
-        feedKey={active ? eggFeedKey : 0}
-        interactive={active}
-        lanternColor={lanternColour}
-        scale={eggFraming.scale}
-        offsetY={eggFraming.offsetY}
-        membraneScale={eggFraming.membraneScale}
-        membraneOffsetY={eggFraming.membraneOffsetY}
-        shellScale={0.72}
-        shellOffsetY={0}
-      />
-    );
-  }, [eggFeedKey, eggFraming.membraneOffsetY, eggFraming.membraneScale, eggFraming.offsetY, eggFraming.scale, handleHatchComplete, hatchingDayId, hatchingEgg, isHatching, lanternColour, openManualJournal, tomorrowDay]);
-  const deckCountdown = useMemo(() => isFormingToday ? (
-    <HatchCountdown isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'} />
-  ) : undefined, [isFormingToday, selectedDay]);
-  const deckFooter = useMemo(() => isForming ? (
-    <WorldActionStack
-      cameraBadge={deckCameraBadge}
-      onAdd={openManualJournal}
-      onCamera={handleCameraPress}
-      onMicPressIn={voiceNote.start}
-      onMicPressOut={voiceNote.stop}
-      onMicTap={() => {
-        if (voiceNote.phase === 'idle') setQuickNoteOpen(true);
-      }}
-      orientation="horizontal"
-      recording={voiceNote.isRecording}
-    />
-  ) : undefined, [deckCameraBadge, handleCameraPress, isForming, openManualJournal, setQuickNoteOpen, voiceNote.isRecording, voiceNote.phase, voiceNote.start, voiceNote.stop]);
+  const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
+    enabled: !flowBusy,
+  });
+  const pageGesture = Gesture.Simultaneous(swipeGesture, environmentGesture);
   return (
+    <TodayEnvironmentMotionProvider motion={environmentMotion}>
+    <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
-      {/* The Meadow scene — the shared golden-hour backdrop (also behind
-          onboarding + Hatch Your Past, so the egg's world never changes). */}
-      <MeadowSceneBackdrop />
+      <TodaySceneBackdrop scene={fullSpreadScene} />
       {/* Today is a FIXED composition — no page scrolling; everything anchors.
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
           for layout parity but is locked. */}
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 24 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
         contentInsetAdjustmentBehavior="never"
         scrollEnabled={false}
         bounces={false}
         showsVerticalScrollIndicator={false}>
+        <Animated.View entering={presenceEnter(20)} style={styles.timelineLayer}>
+          <LanternTimeline days={timelineDays} onSelect={selectTimelineDay} selectedId={selectedDayId} />
+        </Animated.View>
+
         <Animated.View
           ref={heroStageRef}
           entering={presenceEnter(70)}
-          style={[styles.heroStage, { marginTop: heroVerticalOffset - HERO_CARD_LIFT }]}>
-          <TodayDeckCarousel
-            days={timelineDays}
-            disabled={isHatching || promptSheetOpen || hatchCheckInOpen || Boolean(comicGen)}
-            formingCountdown={deckCountdown}
-            formingFooter={deckFooter}
-            hatchingDayId={hatchingDayId}
-            maxCardHeight={maxTodayCardHeight}
-            onOpenCard={handleOpenCard}
-            onSelect={selectTimelineDay}
-            promiseHeroTop={promiseHeroTop}
-            renderFormingContent={renderDeckFormingContent}
-            selectedId={selectedDayId}
-          />
+          style={styles.heroStage}>
+          <TodayHeroCrossfade transitionKey={selectedDayId}>
+          {isHatching && hatchingEgg ? (
+            <HatchReveal
+              creature={selectedDay?.kind === 'day' ? selectedDay.creature ?? null : null}
+              egg={hatchingEgg}
+              lanternColor={lanternColour}
+              onComplete={handleHatchComplete}
+            />
+          ) : isDay ? (
+            isHatched ? (
+              <CreatureHero
+                creature={selectedDay.creature!}
+                compact
+                hideKingdomEnvironmentArt={Boolean(fullSpreadScene)}
+                kingdomEnvironment
+                kingdomHomeArchetypeId={homeArchetypeId}
+              />
+            ) : (
+              <TodayKingdomEggHero homeArchetypeId={homeArchetypeId}>
+                <LanternEgg
+                  egg={selectedDay.egg}
+                  onPress={selectedDay.canAddMoments ? () => openManualJournal() : undefined}
+                  reactionKey={selectedDay.moments.length}
+                  isReady={selectedDay.state === 'ready_to_hatch'}
+                  feedKey={eggFeedKey}
+                  lanternColor={lanternColour}
+                  shellScale={0.926}
+                  shellOffsetY={0}
+                  showGlow={false}
+                  showMembrane
+                />
+              </TodayKingdomEggHero>
+            )
+          ) : onTomorrowForming && tomorrowDay ? (
+            <LanternEgg
+              egg={tomorrowDay.egg}
+              onPress={() => openManualJournal()}
+              reactionKey={tomorrowDay.moments.length}
+              feedKey={eggFeedKey}
+              lanternColor={lanternColour}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
+              shellScale={0.72}
+              shellOffsetY={0}
+            />
+          ) : (
+            <LanternEgg
+              egg={{
+                accentColor: '#A78BFA',
+                haloColor: '#A78BFA',
+                coreColor: 'rgba(201,194,232,0.3)',
+                intensity: 0.26,
+                shimmer: true,
+                swirl: 0.2,
+                label: 'Not yet formed',
+              }}
+              scale={eggFraming.scale}
+              offsetY={eggFraming.offsetY}
+              membraneScale={eggFraming.membraneScale}
+              membraneOffsetY={eggFraming.membraneOffsetY}
+              shellScale={0.72}
+              shellOffsetY={0}
+            />
+          )}
+          </TodayHeroCrossfade>
           {/* The same category ring circles the hatched creature when revisiting
-              a day — read-only doors into that day's memories. It follows the
-              compact scene geometry so egg and creature days match exactly. */}
+              a day, anchored to the shared 258px egg/creature art stage. */}
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
             <TodayCategoryRing
               categories={mapRingItems}
               onPress={() => {
                 if (isDay) handleOpenDayMap(selectedDay.id);
               }}
-              anchorHeight={isForming ? 258 : todayCardSize.height}
-              centerOffsetY={isForming
-                ? promiseHeroTop
-                : (COMPACT_CARD_SCENE_TOP + COMPACT_CARD_SCENE_HEIGHT / 2) * todayCardSize.scale - todayCardSize.height / 2}
-              radius={isForming ? 134 : Math.min(134, 835 * todayCardSize.scale * 0.5 + 18)}
+              anchorHeight={258}
+              centerOffsetY={24}
+            />
+          ) : null}
+          {isFormingToday && !isHatching ? (
+            <HatchCountdown
+              isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'}
+              style={styles.heroCountdown}
             />
           ) : null}
         </Animated.View>
@@ -729,7 +731,6 @@ export default function HomeScreen() {
           viewedDay={viewedDay}
           showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK}
           showHatchedReflectionCard={SHOW_HATCHED_REFLECTION_CARD}
-          showFormingActions={false}
           recording={voiceNote.isRecording}
           cameraBadge={categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined}
           momentCount={categoryById.get('reflection')?.count}
@@ -951,6 +952,8 @@ export default function HomeScreen() {
         onShare={handleShareGeneratedComic}
       />
     </View>
+    </GestureDetector>
+    </TodayEnvironmentMotionProvider>
   );
 }
 
@@ -961,8 +964,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    // Fixed page (no scroll): the anchored card ends just above the floating
-    // tab bar (top edge ~96 from the screen bottom) with breathing room.
+    // Fixed page (no scroll): the hero and bottom dock retain their historical
+    // anchors above the floating tab bar.
     paddingBottom: 116,
     paddingHorizontal: 24,
   },
@@ -977,7 +980,19 @@ const styles = StyleSheet.create({
   heroStage: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: -24,
+    marginTop: 26,
+    position: 'relative',
+    zIndex: 1,
+  },
+  timelineLayer: {
+    position: 'relative',
+    zIndex: 20,
+  },
+  heroCountdown: {
+    marginTop:
+      -32
+      + TODAY_KINGDOM_STAGE_HEIGHT
+        * todayScene.homeHatchCountdown.verticalLowerStageHeightRatio,
   },
   sectionGap: {
     gap: 16,

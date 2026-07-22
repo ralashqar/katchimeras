@@ -51,6 +51,7 @@ type LanternEggProps = {
   // membrane interaction, and optionally no glass/ripple membrane art.
   interactive?: boolean;
   showMembrane?: boolean;
+  showGlow?: boolean;
 };
 
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
@@ -82,6 +83,7 @@ export function LanternEgg({
   shellOffsetY = -26,
   interactive = true,
   showMembrane = true,
+  showGlow = true,
 }: LanternEggProps) {
   const pressProgress = useSharedValue(0);
   const ripple = useSharedValue(1);
@@ -204,6 +206,7 @@ export function LanternEgg({
 
   const panGesture = Gesture.Pan()
     .enabled(interactive)
+    .maxPointers(1)
     .minDistance(10)
     .onBegin(() => {
       pressProgress.value = withTiming(1, { duration: 140, easing: Easing.out(Easing.cubic) });
@@ -291,14 +294,16 @@ export function LanternEgg({
             ? { height: 258 * scale, transform: [{ translateY: offsetY }, { scale }] }
             : null,
         ]}>
-        <AnimatedImage
-          contentFit="contain"
-          pointerEvents="none"
-          source={softGlow}
-          style={[styles.glow, glowStyle]}
-          tintColor={lanternColor ?? egg.haloColor}
-          transition={0}
-        />
+        {showGlow ? (
+          <AnimatedImage
+            contentFit="contain"
+            pointerEvents="none"
+            source={softGlow}
+            style={[styles.glow, glowStyle]}
+            tintColor={lanternColor ?? egg.haloColor}
+            transition={0}
+          />
+        ) : null}
         {showMembrane ? (
           <>
             <AnimatedImage

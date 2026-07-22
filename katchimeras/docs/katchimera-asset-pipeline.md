@@ -189,6 +189,23 @@ Outputs live under
 `cells/stage-01.png` through `stage-09.png`, the assembled review grid, the
 exact prompt, and `manifest.json` with generation provenance.
 
+#### Publishing a hatchling in the app
+
+After approving and matting a species hatchling, copy the accepted transparent
+cutout to `assets/images/katchimeras/hatchlings/<visual-key>.png`, then run:
+
+```bash
+npm run world:hatchlings:lod
+```
+
+This creates the 512px and 256px WebP runtime variants and regenerates
+`constants/creature-hatchling-sources.gen.ts`. Runtime creature art prefers the
+hatchling source and automatically falls back to the regular cutout when a
+species has no published hatchling. The regular source remains available as
+the reserved `grown` stage. For the current first pass, the approved
+`base-hatchling-v2.png` is explicitly aliased to Mossprout by the publisher;
+adding a dedicated `mossprout.png` supersedes that alias automatically.
+
 ## QA gates (do not skip — taste is human)
 
 After downloading, **Read the PNG** and judge against the art bible's five gates:

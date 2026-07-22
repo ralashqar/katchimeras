@@ -1,8 +1,8 @@
 import { useIsFocused } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useEffect, useState } from 'react';
-import { AppState, StyleSheet, View } from 'react-native';
+import { memo, useEffect, useMemo, useState } from 'react';
+import { AppState, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -128,18 +128,37 @@ export const KingdomSkyBackground = memo(function KingdomSkyBackground({ camera,
       <LinearGradient colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)']} start={{ x: 0.5, y: 1 }} end={{ x: 0.5, y: 0.18 }} style={StyleSheet.absoluteFill} />
       {viewport.width > 0 && viewport.height > 0 ? (
         <>
-          <Cloud baseX={-0.36} baseY={0.08} camera={camera} layer="far" opacity={0.58} parallaxEnabled={motionEnabled} progress={farProgress} source={CLOUDS.farBank} viewport={viewport} widthRatio={0.62} />
-          <Cloud baseX={0.52} baseY={0.43} camera={camera} layer="far" mirrored opacity={0.52} parallaxEnabled={motionEnabled} progress={farProgress} source={CLOUDS.farBank} viewport={viewport} widthRatio={0.56} />
-          <Cloud baseX={0.58} baseY={0.04} camera={camera} layer="middle" opacity={0.78} parallaxEnabled={motionEnabled} progress={middleProgress} source={CLOUDS.midTall} viewport={viewport} widthRatio={0.46} />
-          <Cloud baseX={-0.25} baseY={0.34} camera={camera} layer="middle" mirrored opacity={0.76} parallaxEnabled={motionEnabled} progress={middleProgress} source={CLOUDS.midWide} viewport={viewport} widthRatio={0.58} />
-          <Cloud baseX={0.62} baseY={0.66} camera={camera} layer="middle" opacity={0.72} parallaxEnabled={motionEnabled} progress={middleProgress} source={CLOUDS.midWide} viewport={viewport} widthRatio={0.54} />
-          <Cloud baseX={-0.46} baseY={0.72} camera={camera} layer="near" opacity={0.88} parallaxEnabled={motionEnabled} progress={nearProgress} source={CLOUDS.nearBank} viewport={viewport} widthRatio={0.9} />
-          <Cloud baseX={0.72} baseY={0.51} camera={camera} layer="near" mirrored opacity={0.84} parallaxEnabled={motionEnabled} progress={nearProgress} source={CLOUDS.nearBank} viewport={viewport} widthRatio={0.84} />
+          <Cloud baseX={-0.36} baseY={0.08} camera={camera} layer="far" opacity={1} parallaxEnabled={motionEnabled} progress={farProgress} source={CLOUDS.farBank} viewport={viewport} widthRatio={0.62} />
+          <Cloud baseX={0.52} baseY={0.43} camera={camera} layer="far" mirrored opacity={1} parallaxEnabled={motionEnabled} progress={farProgress} source={CLOUDS.farBank} viewport={viewport} widthRatio={0.56} />
+          <Cloud baseX={0.58} baseY={0.04} camera={camera} layer="middle" opacity={1} parallaxEnabled={motionEnabled} progress={middleProgress} source={CLOUDS.midTall} viewport={viewport} widthRatio={0.46} />
+          <Cloud baseX={-0.25} baseY={0.34} camera={camera} layer="middle" mirrored opacity={1} parallaxEnabled={motionEnabled} progress={middleProgress} source={CLOUDS.midWide} viewport={viewport} widthRatio={0.58} />
+          <Cloud baseX={0.62} baseY={0.66} camera={camera} layer="middle" opacity={1} parallaxEnabled={motionEnabled} progress={middleProgress} source={CLOUDS.midWide} viewport={viewport} widthRatio={0.54} />
+          <Cloud baseX={-0.46} baseY={0.72} camera={camera} layer="near" opacity={1} parallaxEnabled={motionEnabled} progress={nearProgress} source={CLOUDS.nearBank} viewport={viewport} widthRatio={0.9} />
+          <Cloud baseX={0.72} baseY={0.51} camera={camera} layer="near" mirrored opacity={1} parallaxEnabled={motionEnabled} progress={nearProgress} source={CLOUDS.nearBank} viewport={viewport} widthRatio={0.84} />
         </>
       ) : null}
     </View>
   );
 });
+
+// Surfaces outside the pannable Kingdom map can share the exact sky direction
+// and autonomous cloud drift without inventing a fake gesture camera. Shared
+// values remain stable for the lifetime of the screen, so the sky never resets
+// when the Today content changes.
+export function StaticKingdomSkyBackground() {
+  const { height, width } = useWindowDimensions();
+  const originX = useSharedValue(0);
+  const originY = useSharedValue(0);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const camera = useMemo(
+    () => ({ originX, originY, translateX, translateY }),
+    [originX, originY, translateX, translateY],
+  );
+  const viewport = useMemo(() => ({ height, width }), [height, width]);
+
+  return <KingdomSkyBackground camera={camera} viewport={viewport} />;
+}
 
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },

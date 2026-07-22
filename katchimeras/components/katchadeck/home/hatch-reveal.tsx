@@ -16,8 +16,7 @@ import { DailyCard } from '@/components/katchadeck/cards/daily-card';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
 import type { DailyCreatureCard, EggVisualState, LocalCreatureRecord } from '@/types/home';
-import { resolveCreatureVariantSource } from '@/utils/creature-variant';
-import { getCreatureVisual } from '@/game/days';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
@@ -147,7 +146,7 @@ export function HatchReveal({ egg, card, creature, onComplete, onSettled, hideCa
   }));
 
   const heroSource = creature
-    ? resolveCreatureVariantSource(creature.visualKey, creature.variantCell) ?? getCreatureVisual(creature.visualKey).source
+    ? resolveCreatureArtSource(creature.visualKey, { variantCell: creature.variantCell })
     : null;
   const accent = creature?.accentColor ?? egg.accentColor;
   const settled = phase === 'settle';

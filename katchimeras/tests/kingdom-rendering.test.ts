@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import { KINGDOM_RENDERING } from '../constants/kingdom-rendering';
 import kingdomWorldViewConfig from '../constants/kingdom-world-view.json';
+import todayScene from '../data/today-scene.json';
 import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
 import {
   cameraTranslationBounds,
@@ -15,6 +16,10 @@ import {
   visibleWorldRect,
 } from '../utils/kingdom-rendering';
 import { kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
+import {
+  TODAY_KINGDOM_TILE_CENTER_Y,
+  todayKingdomHeroLayout,
+} from '../utils/today-kingdom-hero-layout';
 import {
   HEX_TILE_H,
   HEX_TILE_W,
@@ -67,6 +72,73 @@ test('home egg world placement is driven by kingdom-world-view JSON offsets', ()
     point.y,
     center.y + HEX_TILE_H * kingdomWorldViewConfig.egg.verticalOffsetHexTileHeight
   );
+});
+
+test('Today applies its resident and egg framing ratios while enlarging the tile', () => {
+  const faceBounds = { left: 46, top: 167, right: 978, bottom: 697 };
+  const assetBounds = { left: 14, top: 110, right: 1010, bottom: 900 };
+  const layout = todayKingdomHeroLayout(390, {
+    alignmentMode: 'ground-bottom',
+    assetBounds,
+    faceBounds,
+    referenceBounds: assetBounds,
+  });
+  const kingdomCreatureWorldSize = 58 * kingdomWorldViewConfig.katchimera.globalScale;
+  const kingdomEggWorldWidth = 200 * kingdomWorldViewConfig.egg.globalScale;
+  const kingdomScale = layout.logicalTileWidth / HEX_TILE_W;
+  const expectedCreatureTop = TODAY_KINGDOM_TILE_CENTER_Y + (
+    HEX_TILE_H * kingdomWorldViewConfig.katchimera.verticalOffsetHexTileHeight
+    - 58 * 0.63
+    - (kingdomCreatureWorldSize - 58)
+  ) * kingdomScale
+    - layout.creatureSize * todayScene.homeKatchimera.verticalLiftCreatureHeightRatio;
+  const expectedEggCenterY = TODAY_KINGDOM_TILE_CENTER_Y
+    + HEX_TILE_H * kingdomWorldViewConfig.egg.verticalOffsetHexTileHeight * kingdomScale;
+  const renderedFaceTop = layout.tileFrame.top
+    + (faceBounds.top / 1024) * layout.tileFrame.height;
+  const expectedFaceTop = TODAY_KINGDOM_TILE_CENTER_Y - (HEX_TILE_H * kingdomScale) / 2;
+
+  assertClose(
+    layout.tileSize,
+    todayScene.homeEnvironment.fitToViewport
+      ? (390 - todayScene.homeEnvironment.fitHorizontalPadding * 2)
+        * todayScene.homeEnvironment.fitScale
+      : 390 * 1.15 * 1.2 * 1.2 * 1.2 * todayScene.homeEnvironment.zoomScale,
+  );
+  assertClose(layout.tileFrame.width, layout.tileSize);
+  assertClose(renderedFaceTop, expectedFaceTop);
+  assertClose(layout.creatureSize / layout.logicalTileWidth, kingdomCreatureWorldSize / HEX_TILE_W);
+  assertClose(
+    (layout.eggStageScale * 196) / layout.logicalTileWidth,
+    (kingdomEggWorldWidth * todayScene.homeEgg.scale) / HEX_TILE_W,
+  );
+  assertClose(layout.creatureTop, expectedCreatureTop);
+  assertClose(layout.eggCenterY, expectedEggCenterY);
+});
+
+test('Today anchors every visible environment bottom before placing its resident', () => {
+  const faceBounds = { left: 46, top: 167, right: 978, bottom: 697 };
+  const referenceBounds = { left: 43, top: 98, right: 981, bottom: 952 };
+  const homeAlignment = {
+    alignmentMode: 'ground-bottom' as const,
+    assetBounds: { left: 43, top: 54, right: 988, bottom: 1014 },
+    faceBounds,
+    referenceBounds,
+  };
+  const residentAlignment = {
+    alignmentMode: 'ground-bottom' as const,
+    assetBounds: { left: 42, top: 35, right: 982, bottom: 952 },
+    faceBounds,
+    referenceBounds,
+  };
+  const home = todayKingdomHeroLayout(390, homeAlignment);
+  const resident = todayKingdomHeroLayout(390, residentAlignment, homeAlignment);
+  const expectedResidentShift = ((1014 - 952) / 1024) * home.tileSize;
+
+  assertClose(resident.environmentBottomY, home.environmentBottomY);
+  assertClose(resident.tileFrame.top - home.tileFrame.top, expectedResidentShift);
+  assertClose(resident.tileCenterY - home.tileCenterY, expectedResidentShift);
+  assertClose(resident.creatureTop - home.creatureTop, expectedResidentShift);
 });
 
 test('Kingdom sky cloud wrapping remains inside the overscanned viewport', () => {

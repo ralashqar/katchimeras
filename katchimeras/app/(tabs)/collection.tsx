@@ -15,9 +15,8 @@ import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
 import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
-import { hydrateHomeState } from '@/game/days';
+import { getCreatureVisual, hydrateHomeState } from '@/game/days';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
 import { homeRepository } from '@/storage/repositories/home-repository';
@@ -133,6 +132,7 @@ export default function CollectionScreen() {
                       frameSize={deckCardSize}
                       onPress={() => router.push({ pathname: '/card/[cardId]', params: { cardId: card.id } })}
                       renderTier="focused"
+                      sceneArt="kingdom"
                     />
                   </View>
                 ))}
@@ -229,7 +229,7 @@ function buildFilterOptions(cards: DailyCreatureCard[]) {
 }
 
 function DexCell({ entry }: { entry: DexEntry }) {
-  const source = homeCreatureVisuals[entry.visualKey]?.source ?? null;
+  const source = getCreatureVisual(entry.visualKey).source;
   const rarityColor = entry.highestRaritySeen ? RARITY_COLOR[entry.highestRaritySeen] : Lantern.moon500;
   return (
     <View style={styles.gridItem}>

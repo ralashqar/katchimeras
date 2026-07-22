@@ -8,11 +8,22 @@ import type {
   StoredHomeDayRecord,
 } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
+import { resolveCreatureArtSource, type CreatureGrowthStage } from '@/utils/creature-art';
 import { parsePathId } from './scoring';
 import { clampScore, scoreOrder } from './scores';
 
-export function getCreatureVisual(visualKey: LocalCreatureRecord['visualKey']) {
-  return homeCreatureVisuals[visualKey];
+export function getCreatureVisual(
+  visualKey: LocalCreatureRecord['visualKey'],
+  stage: CreatureGrowthStage = 'hatchling',
+) {
+  const visual = homeCreatureVisuals[visualKey];
+  return {
+    ...visual,
+    // Keep both identities available: the app defaults to the just-hatched
+    // form, while growth can opt into the untouched mature source later.
+    grownSource: visual.source,
+    source: resolveCreatureArtSource(visualKey, { stage }),
+  };
 }
 
 export function deriveEggVisualState(

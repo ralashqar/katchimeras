@@ -87,8 +87,14 @@ Deno.serve(async (req) => {
     resolution?: '1K' | '2K';
     // GPT branch square output size in px (default 1024).
     gptImageSize?: number;
+    // Optional non-square output. When both are supplied they take precedence
+    // over gptImageSize; used by the canonical 9:16 Today scene pipeline.
+    gptImageWidth?: number;
+    gptImageHeight?: number;
     // GPT Image 2 quality. Medium is the editor default to reduce latency/cost.
     gptQuality?: 'low' | 'medium' | 'high';
+    // Nano Banana supports named ratios such as 1:1 and 9:16.
+    aspectRatio?: string;
     // GPT branch: ask the model for a natively TRANSPARENT background PNG
     // (no matting needed — more reliable than BiRefNet/flood-fill for props).
     transparentBackground?: boolean;
@@ -216,13 +222,23 @@ Deno.serve(async (req) => {
 
     const gptSide =
       typeof body.gptImageSize === 'number' && body.gptImageSize >= 256 ? Math.min(4096, Math.round(body.gptImageSize)) : 1024;
+    const gptWidth =
+      typeof body.gptImageWidth === 'number' && body.gptImageWidth >= 256
+        ? Math.min(4096, Math.round(body.gptImageWidth))
+        : gptSide;
+    const gptHeight =
+      typeof body.gptImageHeight === 'number' && body.gptImageHeight >= 256
+        ? Math.min(4096, Math.round(body.gptImageHeight))
+        : gptSide;
     const gptQuality = body.gptQuality === 'low' || body.gptQuality === 'high' ? body.gptQuality : 'medium';
+    const aspectRatio =
+      typeof body.aspectRatio === 'string' && /^\d+:\d+$/.test(body.aspectRatio) ? body.aspectRatio : '1:1';
     const falBody =
       modelEndpoint === MODEL_ENDPOINTS.gpt
         ? {
             prompt,
             image_urls: imageUrls,
-            image_size: { width: gptSide, height: gptSide },
+            image_size: { width: gptWidth, height: gptHeight },
             quality: gptQuality,
             ...(body.transparentBackground ? { background: 'transparent', output_format: 'png' } : {}),
           }
@@ -235,7 +251,7 @@ Deno.serve(async (req) => {
               output_format: 'png',
               enable_safety_checker: true,
             }
-        : { prompt, image_urls: imageUrls, aspect_ratio: '1:1', resolution: body.resolution ?? '2K' };
+        : { prompt, image_urls: imageUrls, aspect_ratio: aspectRatio, resolution: body.resolution ?? '2K' };
 
     if (modelEndpoint === MODEL_ENDPOINTS.gpt || modelEndpoint === MODEL_ENDPOINTS.seedream) {
       // Slow model → queue; the caller polls. (Sync fal.run 504s the gateway.)
