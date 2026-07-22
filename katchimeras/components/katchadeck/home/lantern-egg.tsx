@@ -20,6 +20,7 @@ import type { EggVisualState } from '@/types/home';
 
 type LanternEggProps = {
   egg: EggVisualState;
+  highResolution?: boolean;
   onPress?: () => void;
   reactionKey?: number;
   crackStage?: 0 | 1 | 2;
@@ -69,6 +70,7 @@ const DRAG_LIMIT = 60;
 // can't blur, so softness is baked into the asset and tinted per day.)
 export function LanternEgg({
   egg,
+  highResolution = false,
   onPress,
   reactionKey = 0,
   crackStage = 0,
@@ -333,7 +335,13 @@ export function LanternEgg({
           </>
         ) : null}
         <Animated.View style={liftStyle}>
-          <EggShell crackStage={crackStage} egg={egg} motion={motion} reactionKey={reactionKey} />
+          <EggShell
+            crackStage={crackStage}
+            egg={egg}
+            highResolution={highResolution}
+            motion={motion}
+            reactionKey={reactionKey}
+          />
         </Animated.View>
       </View>
     </GestureDetector>

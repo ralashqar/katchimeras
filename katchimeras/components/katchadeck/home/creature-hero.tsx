@@ -44,6 +44,7 @@ type CreatureHeroProps = {
   hideKingdomEnvironmentArt?: boolean;
   kingdomEnvironment?: boolean;
   kingdomHomeArchetypeId?: HomeArchetypeId | null;
+  pinchStrength?: number;
 };
 
 // Lantern hero: the creature floats free over the ink - no membrane ring, no
@@ -58,6 +59,7 @@ export const CreatureHero = memo(function CreatureHero({
   hideKingdomEnvironmentArt = false,
   kingdomEnvironment = false,
   kingdomHomeArchetypeId,
+  pinchStrength = 1,
 }: CreatureHeroProps) {
   const { width: windowWidth } = useWindowDimensions();
   const visual = getCreatureVisual(creature.visualKey);
@@ -137,6 +139,7 @@ export const CreatureHero = memo(function CreatureHero({
           <TodayFallbackCloudScene
             enabled={usesKingdomLayout && !hideKingdomEnvironmentArt}
             focusY={kingdomLayout.creatureTop + kingdomLayout.creatureSize / 2}
+            pinchStrength={pinchStrength}
             environment={kingdomTileSource && !hideKingdomEnvironmentArt ? (
               <Image
                 cachePolicy="memory-disk"

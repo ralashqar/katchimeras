@@ -25,6 +25,7 @@ export type EggAuraMotionValues = {
 
 type EggShellProps = {
   egg: EggVisualState;
+  highResolution?: boolean;
   motion: EggAuraMotionValues;
   reactionKey?: number;
   // 0 = whole shell, 1 = first glowing cracks, 2 = bursting. The stages are
@@ -41,12 +42,21 @@ const MAX_TILT_DEG = 9;
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.webp');
 const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.webp');
+const eggBaseHighResolution = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const eggCrackOneHighResolution = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
+const eggCrackTwoHighResolution = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 // Pure artwork egg: the render plus crack overlays, breathing. No procedural
 // glow capsules, rings, or sparks - the glow is baked into the art.
-export function EggShell({ egg: _egg, motion, reactionKey = 0, crackStage = 0 }: EggShellProps) {
+export function EggShell({
+  egg: _egg,
+  highResolution = false,
+  motion,
+  reactionKey = 0,
+  crackStage = 0,
+}: EggShellProps) {
   const breathe = useSharedValue(0);
   const reaction = useSharedValue(0);
   const crackOne = useSharedValue(0);
@@ -113,9 +123,37 @@ export function EggShell({ egg: _egg, motion, reactionKey = 0, crackStage = 0 }:
     <Animated.View pointerEvents="none" style={[styles.eggWrap, shellStyle]}>
       {/* allowDownscaling=false keeps the full-res texture, so the egg stays crisp
           when the World view shrinks it then zooms back in (it's drawn small there). */}
-      <Image contentFit="contain" allowDownscaling={false} source={eggBase} style={styles.eggImage} transition={0} />
-      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackOne} style={[styles.eggImage, crackOneStyle]} transition={0} />
-      <AnimatedImage contentFit="contain" allowDownscaling={false} source={eggCrackTwo} style={[styles.eggImage, crackTwoStyle]} transition={0} />
+      <Image
+        allowDownscaling={false}
+        cachePolicy="memory-disk"
+        contentFit="contain"
+        priority="high"
+        source={highResolution ? eggBaseHighResolution : eggBase}
+        style={styles.eggImage}
+        transition={0}
+      />
+      {crackStage >= 1 ? (
+        <AnimatedImage
+          allowDownscaling={false}
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          priority="high"
+          source={highResolution ? eggCrackOneHighResolution : eggCrackOne}
+          style={[styles.eggImage, crackOneStyle]}
+          transition={0}
+        />
+      ) : null}
+      {crackStage >= 2 ? (
+        <AnimatedImage
+          allowDownscaling={false}
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          priority="high"
+          source={highResolution ? eggCrackTwoHighResolution : eggCrackTwo}
+          style={[styles.eggImage, crackTwoStyle]}
+          transition={0}
+        />
+      ) : null}
     </Animated.View>
   );
 }

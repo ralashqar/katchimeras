@@ -40,6 +40,7 @@
       "hoverEnabled": true,
       "hoverHalfCycleMs": 2100,
       "maxPinchScale": 2,
+      "neighborPinchStrength": 0.08,
       "resetSpring": {
         "damping": 17,
         "mass": 0.7,

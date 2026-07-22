@@ -21,6 +21,7 @@ type TodayHexNeighborhoodProps = {
   foreground?: ReactNode;
   onSelect: (dayId: string) => void;
   renderDay: (day: HomeTimelineDay, active: boolean) => ReactNode;
+  renderDayOverlay?: (day: HomeTimelineDay, active: boolean) => ReactNode;
   selectedId: string;
 };
 
@@ -35,6 +36,7 @@ export function TodayHexNeighborhood({
   foreground,
   onSelect,
   renderDay,
+  renderDayOverlay,
   selectedId,
 }: TodayHexNeighborhoodProps) {
   const { width: viewportWidth } = useWindowDimensions();
@@ -51,6 +53,19 @@ export function TodayHexNeighborhood({
     todayScene.homeEnvironment.fitScale,
   );
   const cameraStyle = useAnimatedStyle(() => {
+    const position = todayHexCameraPositionForProgress(
+      cameraProgress.value,
+      spacing.horizontalStride,
+      spacing.verticalStep,
+    );
+    return {
+      transform: [
+        { translateX: position.x },
+        { translateY: position.y },
+      ],
+    };
+  });
+  const overlayCameraStyle = useAnimatedStyle(() => {
     const position = todayHexCameraPositionForProgress(
       cameraProgress.value,
       spacing.horizontalStride,
@@ -104,6 +119,35 @@ export function TodayHexNeighborhood({
       </Animated.View>
 
       {foreground ? <View pointerEvents="none" style={styles.foreground}>{foreground}</View> : null}
+
+      {renderDayOverlay ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.world, styles.overlayWorld, { top: verticalOverscan }, overlayCameraStyle]}>
+          {visibleDays.map((day, index) => {
+            const point = todayHexDayWorldPosition(
+              index,
+              spacing.horizontalStride,
+              spacing.verticalStep,
+            );
+            return (
+              <View
+                key={`${day.id}-ui`}
+                pointerEvents="none"
+                style={[
+                  styles.slot,
+                  {
+                    left: point.x - viewportWidth / 2,
+                    top: point.y,
+                    width: viewportWidth,
+                  },
+                ]}>
+                {renderDayOverlay(day, day.id === selectedId)}
+              </View>
+            );
+          })}
+        </Animated.View>
+      ) : null}
 
       {previous ? (
         <Pressable
@@ -201,5 +245,8 @@ const styles = StyleSheet.create({
     left: '50%',
     position: 'absolute',
     top: 0,
+  },
+  overlayWorld: {
+    zIndex: 9,
   },
 });

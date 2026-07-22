@@ -26,6 +26,7 @@ const CREATURE_BASE_SIZE = 58;
 const CREATURE_WORLD_SIZE = CREATURE_BASE_SIZE * kingdomWorldViewConfig.katchimera.globalScale;
 const EGG_STAGE_WIDTH = 200;
 const EGG_SHELL_WIDTH = 196;
+const EGG_SHELL_HEIGHT = 224;
 const TILE_ASSET_SIZE = 1024;
 const FULL_IMAGE_BOUNDS = { left: 0, top: 0, right: 1024, bottom: 1024 };
 
@@ -126,5 +127,26 @@ export function todayKingdomHeroLayout(
     tileFaceBottomY,
     tileFrame,
     tileSize,
+  };
+}
+
+/** Top edge for UI that must sit fully below the scaled Today egg shell. */
+export function todayEggCountdownTop(eggCenterY: number, eggStageScale: number): number {
+  const shellBottom = eggCenterY
+    + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio
+    + (EGG_SHELL_HEIGHT * eggStageScale) / 2;
+  return shellBottom
+    + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeHatchCountdown.verticalLowerStageHeightRatio;
+}
+
+/** Final native-layout frame for Today's egg. Avoids a small transformed
+ * subtree that iOS can cache before the user pinches into it. */
+export function todayEggStageFrame(eggCenterY: number, eggStageScale: number) {
+  const height = TODAY_KINGDOM_STAGE_HEIGHT * eggStageScale;
+  const centerY = eggCenterY
+    + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio;
+  return {
+    height,
+    top: centerY - height / 2,
   };
 }

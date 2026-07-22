@@ -106,14 +106,18 @@ export function TodayEnvironmentMotionProvider({
 export function TodayEnvironmentMotionLayer({
   children,
   focusY,
+  pinchStrength = 1,
 }: {
   children: ReactNode;
   focusY: number;
+  pinchStrength?: number;
 }) {
   const motion = use(MotionContext);
   const pivotOffsetY = focusY - TODAY_KINGDOM_STAGE_HEIGHT / 2;
+  const resolvedPinchStrength = Math.min(1, Math.max(0, pinchStrength));
   const anchorStyle = useAnimatedStyle(() => {
-    const scale = motion?.pinchScale.value ?? 1;
+    const sharedScale = motion?.pinchScale.value ?? 1;
+    const scale = 1 + (sharedScale - 1) * resolvedPinchStrength;
     return {
       // A normal scale uses the stage centre. This compensating translation
       // keeps the supplied subject centre fixed while the scale changes.
@@ -121,10 +125,13 @@ export function TodayEnvironmentMotionLayer({
         translateY: (motion?.hoverY.value ?? 0) + (1 - scale) * pivotOffsetY,
       }],
     };
-  }, [pivotOffsetY]);
-  const scaleStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: motion?.pinchScale.value ?? 1 }],
-  }));
+  }, [pivotOffsetY, resolvedPinchStrength]);
+  const scaleStyle = useAnimatedStyle(() => {
+    const sharedScale = motion?.pinchScale.value ?? 1;
+    return {
+      transform: [{ scale: 1 + (sharedScale - 1) * resolvedPinchStrength }],
+    };
+  }, [resolvedPinchStrength]);
 
   return (
     <Animated.View

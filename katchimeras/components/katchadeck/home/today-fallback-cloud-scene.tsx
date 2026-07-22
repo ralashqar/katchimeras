@@ -88,6 +88,7 @@ type TodayFallbackCloudSceneProps = {
   environment: ReactNode;
   focusY?: number;
   frontTop: number;
+  pinchStrength?: number;
 };
 
 /**
@@ -100,6 +101,7 @@ export const TodayFallbackCloudScene = memo(function TodayFallbackCloudScene({
   environment,
   focusY = TODAY_KINGDOM_TILE_CENTER_Y,
   frontTop,
+  pinchStrength = 1,
 }: TodayFallbackCloudSceneProps) {
   const { width: viewportWidth } = useWindowDimensions();
   const isFocused = useIsFocused();
@@ -118,8 +120,8 @@ export const TodayFallbackCloudScene = memo(function TodayFallbackCloudScene({
   if (!cloudsEnabled || viewportWidth <= 0) {
     return (
       <>
-        <TodayEnvironmentMotionLayer focusY={focusY}>{environment}</TodayEnvironmentMotionLayer>
-        <TodayEnvironmentMotionLayer focusY={focusY}>{children}</TodayEnvironmentMotionLayer>
+        <TodayEnvironmentMotionLayer focusY={focusY} pinchStrength={pinchStrength}>{environment}</TodayEnvironmentMotionLayer>
+        <TodayEnvironmentMotionLayer focusY={focusY} pinchStrength={pinchStrength}>{children}</TodayEnvironmentMotionLayer>
       </>
     );
   }
@@ -132,7 +134,7 @@ export const TodayFallbackCloudScene = memo(function TodayFallbackCloudScene({
         tracks={REAR_TRACKS}
         viewportWidth={viewportWidth}
       />
-      <TodayEnvironmentMotionLayer focusY={focusY}>{environment}</TodayEnvironmentMotionLayer>
+      <TodayEnvironmentMotionLayer focusY={focusY} pinchStrength={pinchStrength}>{environment}</TodayEnvironmentMotionLayer>
       <LinearGradient
         colors={[
           'rgba(7, 17, 38, 0.36)',
@@ -163,7 +165,7 @@ export const TodayFallbackCloudScene = memo(function TodayFallbackCloudScene({
       />
       {/* Subjects remain above the lower mist; the cloud plane masks the tile
           and stair base, not the creature or interactive egg. */}
-      <TodayEnvironmentMotionLayer focusY={focusY}>{children}</TodayEnvironmentMotionLayer>
+      <TodayEnvironmentMotionLayer focusY={focusY} pinchStrength={pinchStrength}>{children}</TodayEnvironmentMotionLayer>
     </Fragment>
   );
 });

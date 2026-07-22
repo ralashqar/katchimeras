@@ -12,12 +12,14 @@ import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
-import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { currentLanternColour } from '@/utils/cosmetics-storage';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { TodayHexNeighborhood } from '@/components/katchadeck/home/today-hex-neighborhood';
-import { TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
+import {
+  TodayKingdomEggHero,
+  TodayKingdomEggOverlay,
+} from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
 import { DevAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import {
@@ -37,6 +39,7 @@ import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
+import todayScene from '@/data/today-scene.json';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useBackfillStatus } from '@/utils/backfill-status';
@@ -68,7 +71,6 @@ import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
-import todayScene from '@/data/today-scene.json';
 import { TODAY_KINGDOM_STAGE_HEIGHT } from '@/utils/today-kingdom-hero-layout';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
@@ -154,7 +156,7 @@ export default function HomeScreen() {
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const tabBarHeight = useBottomTabBarHeight();
   const backfillStatus = useBackfillStatus();
-  const { eggFeed, eggFeedKey, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
+  const { eggFeed, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
   const { promptSheetOpen, initialPrompt, openPromptSheet, closePromptSheet } = usePromptSheetController();
 
   useFocusEffect(
@@ -547,35 +549,35 @@ export default function HomeScreen() {
           hideCompactCard={!active}
           kingdomEnvironment
           kingdomHomeArchetypeId={homeArchetypeId}
+          pinchStrength={active ? 1 : todayScene.homeEnvironment.motion.neighborPinchStrength}
         />
       );
     }
 
     return (
-      <TodayKingdomEggHero homeArchetypeId={homeArchetypeId}>
-        <LanternEgg
-          egg={day?.egg ?? {
-            accentColor: '#A78BFA',
-            haloColor: '#A78BFA',
-            coreColor: 'rgba(201,194,232,0.3)',
-            intensity: 0.26,
-            shimmer: true,
-            swirl: 0.2,
-            label: 'Not yet formed',
-          }}
-          feedKey={active ? eggFeedKey : undefined}
-          isReady={day?.state === 'ready_to_hatch'}
-          lanternColor={lanternColour}
-          onPress={active && day?.canAddMoments ? () => openManualJournal() : undefined}
-          reactionKey={day?.moments.length ?? 0}
-          shellOffsetY={0}
-          shellScale={0.926}
-          showGlow={false}
-          showMembrane
-        />
-      </TodayKingdomEggHero>
+      <TodayKingdomEggHero
+        homeArchetypeId={homeArchetypeId}
+        onEggPress={active && day?.canAddMoments ? () => openManualJournal() : undefined}
+        pinchStrength={active ? 1 : todayScene.homeEnvironment.motion.neighborPinchStrength}
+      />
     );
-  }, [eggFeedKey, homeArchetypeId, lanternColour, openManualJournal, tomorrowDay]);
+  }, [homeArchetypeId, openManualJournal, tomorrowDay]);
+
+  const renderTimelineOverlay = useCallback((timelineDay: HomeTimelineDay, active: boolean) => {
+    if (
+      !active ||
+      timelineDay.kind !== 'day' ||
+      !timelineDay.isToday ||
+      timelineDay.state === 'hatched'
+    ) {
+      return null;
+    }
+    return (
+      <TodayKingdomEggOverlay homeArchetypeId={homeArchetypeId}>
+        <HatchCountdown isReady={timelineDay.state === 'ready_to_hatch'} />
+      </TodayKingdomEggOverlay>
+    );
+  }, [homeArchetypeId]);
 
   const { cameraProgress, navigateToDay, swipeGesture } = useTodayNavigationController({
     windowWidth,
@@ -663,6 +665,7 @@ export default function HomeScreen() {
               onSelect={navigateToDay}
               selectedId={selectedDayId}
               renderDay={renderTimelineHero}
+              renderDayOverlay={renderTimelineOverlay}
             />
           )}
           {/* The same category ring circles the hatched creature when revisiting
@@ -675,12 +678,6 @@ export default function HomeScreen() {
               }}
               anchorHeight={258}
               centerOffsetY={24}
-            />
-          ) : null}
-          {isFormingToday && !isHatching ? (
-            <HatchCountdown
-              isReady={selectedDay.kind === 'day' && selectedDay.state === 'ready_to_hatch'}
-              style={styles.heroCountdown}
             />
           ) : null}
         </Animated.View>
@@ -980,15 +977,6 @@ const styles = StyleSheet.create({
   timelineLayer: {
     position: 'relative',
     zIndex: 20,
-  },
-  heroCountdown: {
-    elevation: 35,
-    marginTop:
-      -32
-      + TODAY_KINGDOM_STAGE_HEIGHT
-        * todayScene.homeHatchCountdown.verticalLowerStageHeightRatio,
-    position: 'relative',
-    zIndex: 35,
   },
   sectionGap: {
     gap: 16,
