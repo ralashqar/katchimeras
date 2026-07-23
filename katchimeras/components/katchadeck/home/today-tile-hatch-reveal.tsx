@@ -1,0 +1,391 @@
+import { Image } from 'expo-image';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+
+import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
+import { buildCreatureKicker } from '@/components/katchadeck/home/creature-hero';
+import { ThemedText } from '@/components/themed-text';
+import todayScene from '@/data/today-scene.json';
+import type { HomeArchetypeId } from '@/types/world-identity';
+import type { TodayHatchPresentation, TodayHatchPhase } from '@/utils/today-hatch-presentation';
+import {
+  kingdomHomeTileForIdentity,
+  kingdomResidentTileForIdentity,
+  kingdomSurfaceTileAlignment,
+} from '@/utils/kingdom-surface-tiles';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
+import {
+  TODAY_KINGDOM_STAGE_HEIGHT,
+  todayEggStageFrame,
+  todayKingdomHeroLayout,
+} from '@/utils/today-kingdom-hero-layout';
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
+const softGlow = require('../../../assets/images/katchimeras/soft-glow.png');
+const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const eggCrackOne = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
+const eggCrackTwo = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+
+type TodayTileHatchRevealProps = {
+  homeArchetypeId?: HomeArchetypeId | null;
+  onAssetsReady?: () => void;
+  presentation: TodayHatchPresentation;
+};
+
+export function TodayTileHatchReveal({
+  homeArchetypeId,
+  onAssetsReady,
+  presentation,
+}: TodayTileHatchRevealProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
+  const homeTile = kingdomHomeTileForIdentity(homeArchetypeId);
+  const creature = presentation.committedDay?.creature ?? null;
+  const residentTile = creature ? kingdomResidentTileForIdentity(creature) : homeTile;
+  const homeAlignment = kingdomSurfaceTileAlignment(homeTile);
+  const homeLayout = todayKingdomHeroLayout(windowWidth, homeAlignment);
+  const residentLayout = todayKingdomHeroLayout(
+    windowWidth,
+    kingdomSurfaceTileAlignment(residentTile),
+    homeAlignment,
+  );
+  const homeSource = kingdomHexTileSourceForLod(homeTile, homeLayout.tileSize > 512 ? 'full' : 'medium');
+  const residentSource = kingdomHexTileSourceForLod(
+    residentTile,
+    residentLayout.tileSize > 512 ? 'full' : 'medium',
+  );
+  const creatureSource = creature
+    ? resolveCreatureArtSource(creature.visualKey, { variantCell: creature.variantCell })
+    : null;
+  const [residentReady, setResidentReady] = useState(false);
+  const [creatureReady, setCreatureReady] = useState(false);
+
+  useEffect(() => {
+    setResidentReady(false);
+    setCreatureReady(false);
+  }, [creature?.id]);
+
+  useEffect(() => {
+    if (creature && residentReady && creatureReady) onAssetsReady?.();
+  }, [creature, creatureReady, onAssetsReady, residentReady]);
+
+  const eggExit = useSharedValue(0);
+  const creatureEntry = useSharedValue(0);
+  const worldShift = useSharedValue(0);
+  const titleEntry = useSharedValue(0);
+  const shake = useSharedValue(0);
+  const crackOne = useSharedValue(0);
+  const crackTwo = useSharedValue(0);
+
+  useEffect(() => {
+    const phase = presentation.phase;
+    const quick = reduceMotion;
+    crackOne.value = withTiming(phaseAtLeast(phase, 'preparing') ? 1 : 0, {
+      duration: quick ? 1 : 260,
+    });
+    crackTwo.value = withTiming(phaseAtLeast(phase, 'cracking') ? 1 : 0, {
+      duration: quick ? 1 : 240,
+    });
+    if (phase === 'preparing' || phase === 'cracking') {
+      cancelAnimation(shake);
+      shake.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: quick ? 1 : 62, easing: Easing.linear }),
+          withTiming(-1, { duration: quick ? 1 : 62, easing: Easing.linear }),
+        ),
+        -1,
+        true,
+      );
+    }
+    if (phaseAtLeast(phase, 'revealing')) {
+      cancelAnimation(shake);
+      shake.value = withTiming(0, { duration: quick ? 1 : 90 });
+      eggExit.value = withTiming(1, {
+        duration: quick ? 120 : 260,
+        easing: Easing.out(Easing.cubic),
+      });
+      creatureEntry.value = withTiming(1, {
+        duration: quick ? 150 : 480,
+        easing: quick ? Easing.out(Easing.cubic) : Easing.out(Easing.back(1.45)),
+      });
+    }
+    if (phaseAtLeast(phase, 'world_shift')) {
+      worldShift.value = withTiming(1, {
+        duration: quick ? 150 : 520,
+        easing: Easing.inOut(Easing.cubic),
+      });
+    }
+    if (phaseAtLeast(phase, 'settling')) {
+      titleEntry.value = withTiming(1, {
+        duration: quick ? 120 : 300,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+  }, [crackOne, crackTwo, creatureEntry, eggExit, presentation.phase, reduceMotion, shake, titleEntry, worldShift]);
+
+  useEffect(() => () => cancelAnimation(shake), [shake]);
+
+  const homeEnvironmentStyle = useAnimatedStyle(() => ({ opacity: 1 - worldShift.value }));
+  const residentEnvironmentStyle = useAnimatedStyle(() => ({ opacity: worldShift.value }));
+  const eggStyle = useAnimatedStyle(() => ({
+    opacity: 1 - eggExit.value,
+    transform: [
+      { translateX: shake.value * 7 },
+      { rotateZ: `${shake.value * 4}deg` },
+      { scale: 1 - eggExit.value * 0.78 },
+    ],
+  }));
+  const creatureStyle = useAnimatedStyle(() => ({
+    opacity: creatureEntry.value,
+    transform: [
+      { translateY: 18 - creatureEntry.value * 18 },
+      { scale: 0.55 + creatureEntry.value * 0.45 },
+    ],
+  }));
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: creatureEntry.value * 0.72,
+    transform: [{ scale: 0.72 + creatureEntry.value * 0.36 }],
+  }));
+  const titleStyle = useAnimatedStyle(() => ({
+    opacity: titleEntry.value,
+    transform: [{ translateY: 10 - titleEntry.value * 10 }],
+  }));
+  const crackOneStyle = useAnimatedStyle(() => ({ opacity: crackOne.value * (1 - crackTwo.value * 0.65) }));
+  const crackTwoStyle = useAnimatedStyle(() => ({ opacity: crackTwo.value }));
+  const eggScale = homeLayout.eggStageScale;
+  const eggFrame = todayEggStageFrame(homeLayout.eggCenterY, eggScale);
+  const eggWidth = 200 * eggScale;
+
+  return (
+    <View pointerEvents="none" style={styles.stage}>
+      <TodayFallbackCloudScene
+        focusY={homeLayout.eggCenterY}
+        frontTop={Math.max(homeLayout.tileFaceBottomY, residentLayout.tileFaceBottomY)}
+        environment={(
+          <>
+            <AnimatedImage
+              cachePolicy="memory-disk"
+              contentFit="contain"
+              pointerEvents="none"
+              source={homeSource}
+              style={[
+                styles.tile,
+                {
+                  height: homeLayout.tileFrame.height,
+                  marginLeft: homeLayout.tileFrame.left,
+                  top: homeLayout.tileFrame.top,
+                  width: homeLayout.tileFrame.width,
+                },
+                homeEnvironmentStyle,
+              ]}
+              transition={0}
+            />
+            {creature ? (
+              <AnimatedImage
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                pointerEvents="none"
+                priority="high"
+                onLoad={() => setResidentReady(true)}
+                source={residentSource}
+                style={[
+                  styles.tile,
+                  {
+                    height: residentLayout.tileFrame.height,
+                    marginLeft: residentLayout.tileFrame.left,
+                    top: residentLayout.tileFrame.top,
+                    width: residentLayout.tileFrame.width,
+                  },
+                  residentEnvironmentStyle,
+                ]}
+                transition={0}
+              />
+            ) : null}
+          </>
+        )}>
+        <Animated.View
+          style={[
+            styles.egg,
+            {
+              height: eggFrame.height,
+              marginLeft: -eggWidth / 2,
+              top: eggFrame.top,
+              width: eggWidth,
+            },
+            eggStyle,
+          ]}>
+          {presentation.egg ? (
+            <>
+              <Image
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                priority="high"
+                source={eggBase}
+                style={StyleSheet.absoluteFill}
+                transition={0}
+              />
+              <AnimatedImage
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                priority="high"
+                source={eggCrackOne}
+                style={[StyleSheet.absoluteFill, crackOneStyle]}
+                transition={0}
+              />
+              <AnimatedImage
+                allowDownscaling={false}
+                cachePolicy="memory-disk"
+                contentFit="contain"
+                priority="high"
+                source={eggCrackTwo}
+                style={[StyleSheet.absoluteFill, crackTwoStyle]}
+                transition={0}
+              />
+            </>
+          ) : null}
+        </Animated.View>
+
+        {creature && creatureSource ? (
+          <Animated.View
+            style={[
+              styles.creature,
+              {
+                height: residentLayout.creatureSize,
+                marginLeft: -residentLayout.creatureSize / 2,
+                top: residentLayout.creatureTop,
+                width: residentLayout.creatureSize,
+              },
+              creatureStyle,
+            ]}>
+            <AnimatedImage
+              contentFit="contain"
+              source={softGlow}
+              style={[styles.glow, glowStyle]}
+              tintColor={creature.accentColor}
+              transition={0}
+            />
+            <Image
+              allowDownscaling={false}
+              cachePolicy="memory-disk"
+              contentFit="contain"
+              pointerEvents="none"
+              priority="high"
+              onLoad={() => setCreatureReady(true)}
+              source={creatureSource}
+              style={StyleSheet.absoluteFill}
+              transition={0}
+            />
+          </Animated.View>
+        ) : null}
+      </TodayFallbackCloudScene>
+
+      {creature ? (
+        <Animated.View
+          style={[
+            styles.nameCard,
+            {
+              top: TODAY_KINGDOM_STAGE_HEIGHT - 14
+                + todayScene.homeKatchimera.nameCardOffsetY
+                + TODAY_KINGDOM_STAGE_HEIGHT
+                  * todayScene.homeKatchimera.nameCardAdditionalStageHeightRatio,
+            },
+            titleStyle,
+          ]}>
+          <ThemedText selectable type="onboardingLabel" style={styles.kicker} lightColor="rgba(251,243,228,0.88)" darkColor="rgba(251,243,228,0.88)">
+            {buildCreatureKicker(creature)}
+          </ThemedText>
+          <ThemedText selectable type="display" style={styles.name} lightColor="#F2D48A" darkColor="#F2D48A">
+            {creature.name}
+          </ThemedText>
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
+
+function phaseAtLeast(phase: TodayHatchPhase, target: TodayHatchPhase): boolean {
+  const order: TodayHatchPhase[] = [
+    'idle',
+    'preparing',
+    'cracking',
+    'revealing',
+    'world_shift',
+    'settling',
+    'tomorrow_arrival',
+  ];
+  return order.indexOf(phase) >= order.indexOf(target);
+}
+
+const styles = StyleSheet.create({
+  creature: {
+    left: '50%',
+    position: 'absolute',
+    zIndex: 4,
+  },
+  egg: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    left: '50%',
+    position: 'absolute',
+    zIndex: 4,
+  },
+  glow: {
+    bottom: '-20%',
+    left: '-20%',
+    position: 'absolute',
+    right: '-20%',
+    top: '-20%',
+  },
+  kicker: {
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textAlign: 'center',
+  },
+  name: {
+    fontSize: 27,
+    fontStyle: 'italic',
+    lineHeight: 32,
+    textAlign: 'center',
+  },
+  nameCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(31,27,22,0.82)',
+    borderColor: 'rgba(255,245,220,0.38)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1.2,
+    boxShadow: '0 5px 16px rgba(13,12,15,0.28), inset 0 1px 0 rgba(255,248,230,0.22)',
+    justifyContent: 'center',
+    maxWidth: 330,
+    minHeight: 62,
+    minWidth: 240,
+    overflow: 'hidden',
+    paddingHorizontal: 26,
+    paddingVertical: 9,
+    position: 'absolute',
+    zIndex: 10,
+  },
+  stage: {
+    alignItems: 'center',
+    height: TODAY_KINGDOM_STAGE_HEIGHT,
+    width: '100%',
+  },
+  tile: {
+    left: '50%',
+    position: 'absolute',
+  },
+});

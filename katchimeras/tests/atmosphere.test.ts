@@ -3,11 +3,23 @@ import test from 'node:test';
 
 import {
   atmosphereParticleCount,
+  atmospherePresetUsesAuthoredSprites,
+  atmosphereParticleFamily,
   atmospherePresetForWeather,
+  atmospherePresetSeedOffset,
   atmosphereTargetIncludes,
   generateAtmosphereParticles,
   resolvedAtmosphereQuality,
 } from '../utils/atmosphere';
+
+test('authored sprite effects are limited to the polished atlas families', () => {
+  assert.equal(atmospherePresetUsesAuthoredSprites('falling_leaves'), true);
+  assert.equal(atmospherePresetUsesAuthoredSprites('petal_drift'), true);
+  assert.equal(atmospherePresetUsesAuthoredSprites('celebration_drift'), true);
+  assert.equal(atmospherePresetUsesAuthoredSprites('dandelion_seeds'), true);
+  assert.equal(atmospherePresetUsesAuthoredSprites('rain'), false);
+  assert.equal(atmospherePresetUsesAuthoredSprites('golden_motes'), false);
+});
 
 test('atmosphere particle layouts are deterministic and normalized', () => {
   const first = generateAtmosphereParticles(12, 407);
@@ -35,6 +47,19 @@ test('automatic atmosphere quality and particle caps stay bounded', () => {
   assert.equal(atmosphereParticleCount('storm', 'high', 390, 1), 88);
   assert.equal(atmosphereParticleCount('fog', 'high', 390, 1), 0);
   assert.ok(atmosphereParticleCount('rain', 'medium', 390, 0) < 56);
+  assert.equal(atmosphereParticleCount('celebration_drift', 'medium', 390, 1), 30);
+  assert.equal(atmosphereParticleCount('golden_motes', 'medium', 390, 1), 26);
+  assert.equal(atmosphereParticleCount('journey_breeze', 'medium', 390, 1), 22);
+  assert.equal(atmosphereParticleCount('quiet_dust', 'medium', 390, 1), 18);
+});
+
+test('expressive presets resolve into distinct deterministic particle families', () => {
+  assert.equal(atmosphereParticleFamily('celebration_drift'), 'drift');
+  assert.equal(atmosphereParticleFamily('fireflies'), 'glow');
+  assert.equal(atmosphereParticleFamily('journey_breeze'), 'streak');
+  assert.equal(atmosphereParticleFamily('dream_wisps'), 'sparse');
+  assert.notEqual(atmospherePresetSeedOffset('fireflies'), atmospherePresetSeedOffset('golden_motes'));
+  assert.equal(atmospherePresetSeedOffset('fireflies'), atmospherePresetSeedOffset('fireflies'));
 });
 
 test('stored weather resolves without introducing render-time weather work', () => {

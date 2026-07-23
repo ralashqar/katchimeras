@@ -19,10 +19,12 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { useDevAtmosphereState } from '@/hooks/use-dev-atmosphere-state';
 import {
-  ATMOSPHERE_PRESETS,
+  EXPRESSIVE_ATMOSPHERE_PRESETS,
+  PHYSICAL_ATMOSPHERE_PRESETS,
   atmosphereParticleCount,
   resolvedAtmosphereQuality,
   type AtmosphereQuality,
+  type AtmosphereRenderer,
   type AtmosphereSettings,
 } from '@/utils/atmosphere';
 import { resetDevAtmosphereState, setDevAtmosphereState } from '@/utils/dev-atmosphere-settings';
@@ -46,9 +48,20 @@ function AtmosphereLab() {
   const [showForeground, setShowForeground] = useState(true);
   const fps = useApproximateFps();
   const quality = resolvedAtmosphereQuality(devState.settings.quality, width);
-  const particleCount = atmosphereParticleCount(devState.settings.preset, devState.settings.quality, width, devState.settings.intensity);
-  const updateSettings = (patch: Partial<AtmosphereSettings>) => {
+  const particleCount = atmosphereParticleCount(devState.settings.preset, devState.settings.quality, width, devState.settings.intensity)
+    + atmosphereParticleCount(devState.accentSettings.preset, devState.accentSettings.quality, width, devState.accentSettings.intensity);
+  const updatePhysical = (patch: Partial<AtmosphereSettings>) => {
     setDevAtmosphereState({ ...devState, settings: { ...devState.settings, ...patch } });
+  };
+  const updateExpressive = (patch: Partial<AtmosphereSettings>) => {
+    setDevAtmosphereState({ ...devState, accentSettings: { ...devState.accentSettings, ...patch } });
+  };
+  const updateBoth = (patch: Partial<AtmosphereSettings>) => {
+    setDevAtmosphereState({
+      ...devState,
+      accentSettings: { ...devState.accentSettings, ...patch },
+      settings: { ...devState.settings, ...patch },
+    });
   };
   const tileWidth = Math.min(width * (preview === 'kingdom' ? 1.18 : 1.02), 620);
 
@@ -56,13 +69,23 @@ function AtmosphereLab() {
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, title: 'Atmosphere Lab' }} />
       <StaticKingdomSkyBackground />
-      {showBackground ? <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} settings={devState.settings} /> : null}
+      {showBackground ? (
+        <>
+          <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.settings} />
+          <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.accentSettings} />
+        </>
+      ) : null}
       {preview === 'sky' ? null : (
         <View pointerEvents="none" style={styles.environmentStage}>
           <Image cachePolicy="memory-disk" contentFit="contain" source={PREVIEW_TILE} style={{ height: tileWidth, width: tileWidth }} transition={0} />
         </View>
       )}
-      {showForeground ? <AtmosphereLayer plane="foreground" reduceMotionOverride={simulateReducedMotion} settings={devState.settings} /> : null}
+      {showForeground ? (
+        <>
+          <AtmosphereLayer plane="foreground" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.settings} />
+          <AtmosphereLayer plane="foreground" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.accentSettings} />
+        </>
+      ) : null}
 
       <Pressable accessibilityLabel="Close Atmosphere Lab" accessibilityRole="button" hitSlop={10} onPress={() => safeGoBack(router)} style={[styles.exitButton, { top: insets.top + 10 }]}>
         <IconSymbol color="#F8FBFF" name="xmark" size={15} />
@@ -73,7 +96,7 @@ function AtmosphereLab() {
           {fps} JS fps · {particleCount} particles · {quality} · {Math.round(width)}×{Math.round(height)}
         </ThemedText>
         <ThemedText selectable style={styles.diagnosticText} lightColor="#C8D7EF" darkColor="#C8D7EF">
-          {devState.settings.paused || simulateReducedMotion ? 'frozen' : 'active'} · {devState.settings.preset}
+          {devState.settings.paused || simulateReducedMotion ? 'frozen' : 'active'} · {devState.renderer} · {devState.settings.preset} + {devState.accentSettings.preset}
         </ThemedText>
       </View>
 
@@ -89,19 +112,32 @@ function AtmosphereLab() {
             </Pressable>
           </View>
 
-          <ControlGroup label="Effect">
-            <ChipRow options={ATMOSPHERE_PRESETS.map((preset) => ({ id: preset.id, label: preset.label }))} selected={devState.settings.preset} onSelect={(preset) => updateSettings({ preset })} />
+          <ControlGroup label="Physical weather">
+            <ChipRow options={PHYSICAL_ATMOSPHERE_PRESETS.map((preset) => ({ id: preset.id, label: preset.label }))} selected={devState.settings.preset} onSelect={(preset) => updatePhysical({ preset })} />
           </ControlGroup>
-          <DevSlider label="Intensity" maximum={1} minimum={0} onChange={(intensity) => updateSettings({ intensity })} step={0.05} value={devState.settings.intensity} valueLabel={`${Math.round(devState.settings.intensity * 100)}%`} />
-          <DevSlider label="Wind" maximum={1} minimum={-1} onChange={(wind) => updateSettings({ wind })} step={0.1} value={devState.settings.wind} valueLabel={windLabel(devState.settings.wind)} />
+          <DevSlider label="Weather intensity" maximum={1} minimum={0} onChange={(intensity) => updatePhysical({ intensity })} step={0.05} value={devState.settings.intensity} valueLabel={`${Math.round(devState.settings.intensity * 100)}%`} />
+          <DevSlider label="Weather wind" maximum={1} minimum={-1} onChange={(wind) => updatePhysical({ wind })} step={0.1} value={devState.settings.wind} valueLabel={windLabel(devState.settings.wind)} />
+
+          <ControlGroup label="Memory atmosphere">
+            <ChipRow options={EXPRESSIVE_ATMOSPHERE_PRESETS.map((preset) => ({ id: preset.id, label: preset.label }))} selected={devState.accentSettings.preset} onSelect={(preset) => updateExpressive({ preset })} />
+          </ControlGroup>
+          <DevSlider label="Memory intensity" maximum={1} minimum={0} onChange={(intensity) => updateExpressive({ intensity })} step={0.05} value={devState.accentSettings.intensity} valueLabel={`${Math.round(devState.accentSettings.intensity * 100)}%`} />
+          <DevSlider label="Memory wind" maximum={1} minimum={-1} onChange={(wind) => updateExpressive({ wind })} step={0.1} value={devState.accentSettings.wind} valueLabel={windLabel(devState.accentSettings.wind)} />
 
           <ControlGroup label="Quality">
-            <ChipRow<AtmosphereQuality> options={['auto', 'low', 'medium', 'high'].map((id) => ({ id: id as AtmosphereQuality, label: id }))} selected={devState.settings.quality} onSelect={(qualityOption) => updateSettings({ quality: qualityOption })} />
+            <ChipRow<AtmosphereQuality> options={['auto', 'low', 'medium', 'high'].map((id) => ({ id: id as AtmosphereQuality, label: id }))} selected={devState.settings.quality} onSelect={(qualityOption) => updateBoth({ quality: qualityOption })} />
+          </ControlGroup>
+          <ControlGroup label="Expressive particle renderer">
+            <ChipRow<AtmosphereRenderer>
+              options={[{ id: 'atlas', label: 'Authored sprites' }, { id: 'legacy', label: 'Legacy paths' }]}
+              selected={devState.renderer}
+              onSelect={(renderer) => setDevAtmosphereState({ ...devState, renderer })}
+            />
           </ControlGroup>
           <ControlGroup label="Preview">
             <ChipRow<PreviewMode> options={[{ id: 'sky', label: 'Sky only' }, { id: 'today', label: 'Today' }, { id: 'kingdom', label: 'Kingdom' }]} selected={preview} onSelect={setPreview} />
           </ControlGroup>
-          <ToggleRow label="Pause animation" value={devState.settings.paused} onChange={(paused) => updateSettings({ paused })} />
+          <ToggleRow label="Pause animation" value={devState.settings.paused && devState.accentSettings.paused} onChange={(paused) => updateBoth({ paused })} />
           <ToggleRow label="Simulate Reduce Motion" value={simulateReducedMotion} onChange={setSimulateReducedMotion} />
           <ToggleRow
             label="Also apply to Kingdom"

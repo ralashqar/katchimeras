@@ -251,7 +251,7 @@ export const CreatureHero = memo(function CreatureHero({
   );
 });
 
-function buildCreatureKicker(creature: LocalCreatureRecord) {
+export function buildCreatureKicker(creature: LocalCreatureRecord) {
   const encounterCue = creature.encounterProfileId ? creature.motifTags[0] ?? null : null;
   if (!encounterCue) {
     return creature.rarity;

@@ -19,12 +19,20 @@ test('continuous Today camera path lands exactly on every hex target', () => {
   }
 });
 
-test('continuous Today camera path moves smoothly between alternating rows', () => {
+test('continuous Today camera path lerps in a straight line between alternating rows', () => {
   assert.deepEqual(todayHexCameraPositionForProgress(0, 240, 96), { x: -0, y: -0 });
+
+  const quarterDown = todayHexCameraPositionForProgress(0.25, 240, 96);
+  assert.ok(Math.abs(quarterDown.x + 60) < 0.000_001);
+  assert.ok(Math.abs(quarterDown.y + 24) < 0.000_001);
 
   const halfwayDown = todayHexCameraPositionForProgress(0.5, 240, 96);
   assert.ok(Math.abs(halfwayDown.x + 120) < 0.000_001);
   assert.ok(Math.abs(halfwayDown.y + 48) < 0.000_001);
+
+  const quarterUp = todayHexCameraPositionForProgress(1.25, 240, 96);
+  assert.ok(Math.abs(quarterUp.x + 300) < 0.000_001);
+  assert.ok(Math.abs(quarterUp.y + 72) < 0.000_001);
 
   const halfwayUp = todayHexCameraPositionForProgress(1.5, 240, 96);
   assert.ok(Math.abs(halfwayUp.x + 360) < 0.000_001);

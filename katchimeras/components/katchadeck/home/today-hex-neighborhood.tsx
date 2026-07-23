@@ -1,8 +1,11 @@
-import { memo, type ReactNode, useMemo } from 'react';
+import { memo, type ReactNode, useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   type SharedValue,
   useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 
 import todayScene from '@/data/today-scene.json';
@@ -19,6 +22,7 @@ type TodayHexNeighborhoodProps = {
   cameraProgress: SharedValue<number>;
   days: HomeTimelineDay[];
   foreground?: ReactNode;
+  interactionLocked?: boolean;
   onSelect: (dayId: string) => void;
   renderDay: (day: HomeTimelineDay, active: boolean) => ReactNode;
   renderDayOverlay?: (day: HomeTimelineDay, active: boolean) => ReactNode;
@@ -34,6 +38,7 @@ export function TodayHexNeighborhood({
   cameraProgress,
   days,
   foreground,
+  interactionLocked = false,
   onSelect,
   renderDay,
   renderDayOverlay,
@@ -42,10 +47,9 @@ export function TodayHexNeighborhood({
   const { width: viewportWidth } = useWindowDimensions();
   const config = todayScene.hexNeighborhood;
   const verticalOverscan = config.edgeTapVerticalOverscan;
-  const visibleDays = useMemo(
-    () => days.filter((day) => day.kind === 'day' || allowTomorrow),
-    [allowTomorrow, days],
-  );
+  // Tomorrow stays mounted but invisible before the hatch so its local art is
+  // decoded before the entrance animation needs it.
+  const visibleDays = useMemo(() => days, [days]);
   const selectedIndex = Math.max(0, visibleDays.findIndex((day) => day.id === selectedId));
   const spacing = todayHexKingdomSpacing(
     viewportWidth,
@@ -79,7 +83,8 @@ export function TodayHexNeighborhood({
     };
   });
   const previous = visibleDays[selectedIndex - 1] ?? null;
-  const next = visibleDays[selectedIndex + 1] ?? null;
+  const candidateNext = visibleDays[selectedIndex + 1] ?? null;
+  const next = candidateNext?.kind === 'tomorrow' && !allowTomorrow ? null : candidateNext;
 
   return (
     <View
@@ -104,6 +109,7 @@ export function TodayHexNeighborhood({
             spacing.verticalStep,
           );
           const active = day.id === selectedId;
+          const visible = day.kind !== 'tomorrow' || allowTomorrow;
           return <HexDaySlot
             active={active}
             cameraProgress={cameraProgress}
@@ -113,6 +119,7 @@ export function TodayHexNeighborhood({
             left={point.x - viewportWidth / 2}
             renderDay={renderDay}
             top={point.y}
+            visible={visible}
             width={viewportWidth}
           />;
         })}
@@ -149,7 +156,7 @@ export function TodayHexNeighborhood({
         </Animated.View>
       ) : null}
 
-      {previous ? (
+      {!interactionLocked && previous ? (
         <Pressable
           accessibilityLabel={`View ${previous.dayLabel}`}
           accessibilityRole="button"
@@ -158,7 +165,7 @@ export function TodayHexNeighborhood({
           style={[styles.edgeTarget, styles.leftTarget, { width: config.edgeTapWidth }]}
         />
       ) : null}
-      {next ? (
+      {!interactionLocked && next ? (
         <Pressable
           accessibilityLabel={`View ${next.dayLabel}`}
           accessibilityRole="button"
@@ -179,6 +186,7 @@ type HexDaySlotProps = {
   left: number;
   renderDay: (day: HomeTimelineDay, active: boolean) => ReactNode;
   top: number;
+  visible: boolean;
   width: number;
 };
 
@@ -190,23 +198,37 @@ const HexDaySlot = memo(function HexDaySlot({
   left,
   renderDay,
   top,
+  visible,
   width,
 }: HexDaySlotProps) {
+  const reduceMotion = useReducedMotion();
+  const visibilityProgress = useSharedValue(visible ? 1 : 0);
+  useEffect(() => {
+    visibilityProgress.value = withTiming(visible ? 1 : 0, {
+      duration: reduceMotion ? 120 : 320,
+    });
+  }, [reduceMotion, visibilityProgress, visible]);
   const stackingStyle = useAnimatedStyle(() => ({
     // Neighbour tiles overlap. Promote whichever tile is physically nearest
     // the camera centre instead of flipping layers when React selection lands.
     zIndex: Math.max(1, 1000 - Math.round(Math.abs(cameraProgress.value - index) * 100)),
   }));
+  const visibilityStyle = useAnimatedStyle(() => ({
+    opacity: visibilityProgress.value,
+    transform: [{ scale: 0.94 + visibilityProgress.value * 0.06 }],
+  }));
 
   return (
     <Animated.View
-      pointerEvents={active ? 'box-none' : 'none'}
+      pointerEvents={active && visible ? 'box-none' : 'none'}
       style={[
         styles.slot,
         { left, top, width },
         stackingStyle,
       ]}>
-      {renderDay(day, active)}
+      <Animated.View pointerEvents="box-none" style={[styles.slotContent, visibilityStyle]}>
+        {renderDay(day, active)}
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -233,6 +255,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: '100%',
     position: 'absolute',
+  },
+  slotContent: {
+    alignItems: 'center',
+    height: '100%',
+    width: '100%',
   },
   viewport: {
     left: '50%',

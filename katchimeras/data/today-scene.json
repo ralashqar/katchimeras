@@ -17,7 +17,7 @@
   "homeEgg": {
     "_comment": "Today-only scale and placement relative to the fixed hero stage. Positive vertical values lower the egg without moving its Kingdom environment.",
     "scale": 1.1,
-    "verticalLowerStageHeightRatio": 0
+    "verticalLowerStageHeightRatio": -0.02
   },
   "homeHatchCountdown": {
     "_comment": "Today-only countdown placement below the egg. Positive values lower the panel relative to the fixed hero stage.",

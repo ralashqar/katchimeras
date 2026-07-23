@@ -1,18 +1,25 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { Meadow } from '@/constants/meadow-theme';
 import { getCreatureVisual } from '@/game/days';
 import type { HomeDayRecord, HomeTimelineDay } from '@/types/home';
+import {
+  todayHatchShowsResident,
+  todayHatchShowsTomorrow,
+  type TodayHatchPresentation,
+} from '@/utils/today-hatch-presentation';
 
 const auroraRing = require('../../../assets/images/katchimeras/aurora-ring.png');
 const eggBase = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 
 type LanternTimelineProps = {
   days: HomeTimelineDay[];
+  hatchPresentation?: TodayHatchPresentation;
+  interactionLocked?: boolean;
   selectedId: string;
   onSelect: (dayId: string) => void;
 };
@@ -21,10 +28,18 @@ const POINTER_HALF = 7;
 
 // The pre-card Today navigator: four recent days plus tomorrow. The selected
 // pointer glides between stable buttons while the hero below swaps in place.
-export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineProps) {
+export function LanternTimeline({
+  days,
+  hatchPresentation,
+  interactionLocked = false,
+  selectedId,
+  onSelect,
+}: LanternTimelineProps) {
   const dayRecords = days.filter((day): day is HomeDayRecord => day.kind === 'day').slice(-4);
   const tomorrow = days.find((day) => day.kind === 'tomorrow');
-  const todayHatched = dayRecords.some((day) => day.isToday && day.state === 'hatched');
+  const hatchingToday = Boolean(hatchPresentation?.daySnapshot?.isToday);
+  const todayHatched = dayRecords.some((day) => day.isToday && day.state === 'hatched')
+    && (!hatchingToday || todayHatchShowsTomorrow(hatchPresentation?.phase ?? 'idle'));
 
   const centersRef = useRef<Record<string, number>>({});
   const selectedIdRef = useRef(selectedId);
@@ -64,7 +79,10 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
     <View style={styles.row}>
       {dayRecords.map((day) => {
         const selected = day.id === selectedId;
-        const hatched = day.state === 'hatched' && day.creature;
+        const isHatchTarget = hatchPresentation?.dayId === day.id;
+        const hatched = day.state === 'hatched'
+          && day.creature
+          && (!isHatchTarget || todayHatchShowsResident(hatchPresentation?.phase ?? 'idle'));
         const label = day.isToday ? 'TODAY' : day.dayLabel.slice(0, 3).toUpperCase();
 
         return (
@@ -72,13 +90,19 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
             accessibilityLabel={`View ${day.isToday ? 'today' : day.dayLabel}`}
             accessibilityRole="button"
             accessibilityState={{ selected }}
+            disabled={interactionLocked}
             key={day.id}
             onLayout={handleItemLayout(day.id)}
             onPress={() => onSelect(day.id)}
             style={styles.item}>
             <View style={[styles.orb, selected && !day.isToday ? styles.orbSelected : null]}>
-              {hatched ? (
-                <>
+              <Animated.View
+                entering={FadeIn.duration(220)}
+                exiting={FadeOut.duration(180)}
+                key={hatched ? `${day.id}-resident` : `${day.id}-egg`}
+                style={styles.orbContent}>
+                {hatched ? (
+                  <>
                   <View style={styles.orbBack} />
                   <Image contentFit="contain" source={auroraRing} style={StyleSheet.absoluteFill} transition={0} />
                   <Image
@@ -87,12 +111,13 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
                     style={styles.creature}
                     transition={0}
                   />
-                </>
-              ) : (
-                <View style={[styles.eggRing, day.isToday ? styles.eggRingToday : null]}>
-                  <Image contentFit="contain" source={eggBase} style={styles.egg} transition={0} />
-                </View>
-              )}
+                  </>
+                ) : (
+                  <View style={[styles.eggRing, day.isToday ? styles.eggRingToday : null]}>
+                    <Image contentFit="contain" source={eggBase} style={styles.egg} transition={0} />
+                  </View>
+                )}
+              </Animated.View>
             </View>
             <ThemedText
               style={[styles.label, selected ? styles.labelSelected : null]}
@@ -109,20 +134,26 @@ export function LanternTimeline({ days, selectedId, onSelect }: LanternTimelineP
           accessibilityLabel={todayHatched ? 'View tomorrow' : 'Tomorrow is locked'}
           accessibilityRole="button"
           accessibilityState={{ disabled: !todayHatched, selected: tomorrow.id === selectedId }}
-          disabled={!todayHatched}
+          disabled={!todayHatched || interactionLocked}
           onLayout={handleItemLayout(tomorrow.id)}
           onPress={() => onSelect(tomorrow.id)}
           style={styles.item}>
           <View style={[styles.orb, tomorrow.id === selectedId ? styles.orbSelected : null]}>
-            <View style={styles.emptyRing}>
-              {todayHatched ? (
-                <Image contentFit="contain" source={eggBase} style={styles.egg} transition={0} />
-              ) : (
-                <ThemedText style={styles.emptyMark} lightColor="rgba(251,243,228,0.75)" darkColor="rgba(251,243,228,0.75)">
-                  ?
-                </ThemedText>
-              )}
-            </View>
+            <Animated.View
+              entering={FadeIn.duration(220)}
+              exiting={FadeOut.duration(180)}
+              key={todayHatched ? 'tomorrow-egg' : 'tomorrow-locked'}
+              style={styles.orbContent}>
+              <View style={styles.emptyRing}>
+                {todayHatched ? (
+                  <Image contentFit="contain" source={eggBase} style={styles.egg} transition={0} />
+                ) : (
+                  <ThemedText style={styles.emptyMark} lightColor="rgba(251,243,228,0.75)" darkColor="rgba(251,243,228,0.75)">
+                    ?
+                  </ThemedText>
+                )}
+              </View>
+            </Animated.View>
           </View>
           <ThemedText
             style={[styles.label, tomorrow.id === selectedId ? styles.labelSelected : null]}
@@ -163,6 +194,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     boxShadow: `0 0 12px ${Meadow.goldSoft}`,
     transform: [{ scale: 1.08 }],
+  },
+  orbContent: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   creature: {
     height: 42,

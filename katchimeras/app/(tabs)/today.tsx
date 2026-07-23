@@ -10,9 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
-import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
-import { currentLanternColour } from '@/utils/cosmetics-storage';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { TodayHexNeighborhood } from '@/components/katchadeck/home/today-hex-neighborhood';
@@ -21,7 +19,8 @@ import {
   TodayKingdomEggOverlay,
 } from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
-import { DevAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
+import { TodayTileHatchReveal } from '@/components/katchadeck/home/today-tile-hatch-reveal';
+import { ResolvedAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import {
   TodayEnvironmentMotionProvider,
   useTodayEnvironmentMotion,
@@ -72,6 +71,8 @@ import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
 import { TODAY_KINGDOM_STAGE_HEIGHT } from '@/utils/today-kingdom-hero-layout';
+import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
+import { todayHatchShowsResident, todayHatchShowsTomorrow } from '@/utils/today-hatch-presentation';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -156,7 +157,7 @@ export default function HomeScreen() {
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const tabBarHeight = useBottomTabBarHeight();
   const backfillStatus = useBackfillStatus();
-  const { eggFeed, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
+  const { eggFeed, eggFeedKey, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
   const { promptSheetOpen, initialPrompt, openPromptSheet, closePromptSheet } = usePromptSheetController();
 
   useFocusEffect(
@@ -197,10 +198,14 @@ export default function HomeScreen() {
     }
   }, [backfillStatus.completedVersion, refreshState]);
 
-  const { isHatching, hatchingEgg, handleReveal, handleHatchComplete } = useTodayHatchRevealController({
+  const {
+    isHatching,
+    presentation: hatchPresentation,
+    handleHatchAssetsReady,
+    handleReveal,
+  } = useTodayHatchRevealController({
     selectedDay,
     triggerHatchIfReady,
-    refreshState,
   });
   const handleRevealPress = useCallback(() => {
     if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) return;
@@ -237,9 +242,6 @@ export default function HomeScreen() {
   // + which day/prompts to use are unified here so the same UI drives both.
   const onTomorrowForming = selectedDay?.kind === 'tomorrow' && isTodayHatched;
   const isForming = isFormingToday || onTomorrowForming;
-  // Cosmetic lantern-colour override (Discovery-unlocked), read from storage so the
-  // today page reflects the same choice as the World tab. Undefined = natural.
-  const lanternColour = currentLanternColour();
   const formingTarget = onTomorrowForming ? 'tomorrow' : 'today';
   const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
   const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
@@ -253,6 +255,17 @@ export default function HomeScreen() {
   // only exist while it's forming.
   const viewedDay: HomeDayRecord | null = isDay ? selectedDay : onTomorrowForming ? (tomorrowDay ?? null) : null;
   const viewedIsForming = isForming;
+  const hatchShowsResident = todayHatchShowsResident(hatchPresentation.phase);
+  const hatchShowsTomorrow = todayHatchShowsTomorrow(hatchPresentation.phase);
+  const hatchIsCurrentToday = Boolean(hatchPresentation.daySnapshot?.isToday);
+  const atmosphereDay = isHatching && !hatchShowsResident
+    ? hatchPresentation.daySnapshot
+    : viewedDay;
+  const dayAtmosphere = useMemo(() => resolveDayAtmosphere(atmosphereDay), [atmosphereDay]);
+  const dayAtmosphereSettings = useMemo(
+    () => atmosphereSettingsForPlan(dayAtmosphere),
+    [dayAtmosphere],
+  );
   const mapRingItems = useMemo<TodayCategoryRingItem[]>(() => {
     if (!isDay) return [];
     const pinCount = selectedDay.dayMap?.nodes.length ?? 0;
@@ -271,6 +284,9 @@ export default function HomeScreen() {
   // (the same daily intelligence the World patch had, orbiting the egg instead)
 
   const { microcopy, setMicrocopy } = useMicrocopy();
+  useEffect(() => {
+    if (hatchPresentation.error) setMicrocopy(hatchPresentation.error);
+  }, [hatchPresentation.error, setMicrocopy]);
 
   const sheets = useTodaySheetController();
   const {
@@ -540,6 +556,15 @@ export default function HomeScreen() {
   );
 
   const renderTimelineHero = useCallback((timelineDay: HomeTimelineDay, active: boolean) => {
+    if (active && isHatching && hatchPresentation.dayId === timelineDay.id) {
+      return (
+        <TodayTileHatchReveal
+          homeArchetypeId={homeArchetypeId}
+          onAssetsReady={handleHatchAssetsReady}
+          presentation={hatchPresentation}
+        />
+      );
+    }
     const day = timelineDay.kind === 'day' ? timelineDay : tomorrowDay;
     if (day?.state === 'hatched' && day.creature) {
       return (
@@ -556,16 +581,21 @@ export default function HomeScreen() {
 
     return (
       <TodayKingdomEggHero
+        accentColor={day?.egg.accentColor}
+        coreColor={day?.egg.coreColor}
+        feedbackKey={active ? eggFeedKey : 0}
         homeArchetypeId={homeArchetypeId}
+        isReady={active && day?.state === 'ready_to_hatch'}
         onEggPress={active && day?.canAddMoments ? () => openManualJournal() : undefined}
         pinchStrength={active ? 1 : todayScene.homeEnvironment.motion.neighborPinchStrength}
       />
     );
-  }, [homeArchetypeId, openManualJournal, tomorrowDay]);
+  }, [eggFeedKey, handleHatchAssetsReady, hatchPresentation, homeArchetypeId, isHatching, openManualJournal, tomorrowDay]);
 
   const renderTimelineOverlay = useCallback((timelineDay: HomeTimelineDay, active: boolean) => {
     if (
       !active ||
+      isHatching ||
       timelineDay.kind !== 'day' ||
       !timelineDay.isToday ||
       timelineDay.state === 'hatched'
@@ -577,7 +607,7 @@ export default function HomeScreen() {
         <HatchCountdown isReady={timelineDay.state === 'ready_to_hatch'} />
       </TodayKingdomEggOverlay>
     );
-  }, [homeArchetypeId]);
+  }, [homeArchetypeId, isHatching]);
 
   const { cameraProgress, navigateToDay, swipeGesture } = useTodayNavigationController({
     windowWidth,
@@ -629,7 +659,7 @@ export default function HomeScreen() {
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
-      <TodaySceneBackdrop scene={null} />
+      <TodaySceneBackdrop atmospheres={dayAtmosphereSettings} scene={null} />
       {/* Today is a FIXED composition — no page scrolling; everything anchors.
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
           for layout parity but is locked. */}
@@ -640,34 +670,35 @@ export default function HomeScreen() {
         bounces={false}
         showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter(20)} style={styles.timelineLayer}>
-          <LanternTimeline days={timelineDays} onSelect={navigateToDay} selectedId={selectedDayId} />
+          <LanternTimeline
+            days={timelineDays}
+            hatchPresentation={hatchPresentation}
+            interactionLocked={isHatching}
+            onSelect={navigateToDay}
+            selectedId={selectedDayId}
+          />
         </Animated.View>
 
         <Animated.View
           ref={heroStageRef}
           entering={presenceEnter(70)}
           style={styles.heroStage}>
-          {isHatching && hatchingEgg ? (
-            <HatchReveal
-              creature={selectedDay?.kind === 'day' ? selectedDay.creature ?? null : null}
-              egg={hatchingEgg}
-              lanternColor={lanternColour}
-              onComplete={handleHatchComplete}
-            />
-          ) : (
-            <TodayHexNeighborhood
-              allowTomorrow={isTodayHatched}
-              cameraProgress={cameraProgress}
-              days={selectedDay && !timelineDays.some((day) => day.id === selectedDay.id)
-                ? [selectedDay]
-                : timelineDays}
-              foreground={<DevAtmosphereLayer plane="foreground" target="today" />}
-              onSelect={navigateToDay}
-              selectedId={selectedDayId}
-              renderDay={renderTimelineHero}
-              renderDayOverlay={renderTimelineOverlay}
-            />
-          )}
+          <TodayHexNeighborhood
+            allowTomorrow={
+              isTodayHatched
+              && (!isHatching || !hatchIsCurrentToday || hatchShowsTomorrow)
+            }
+            cameraProgress={cameraProgress}
+            days={selectedDay && !timelineDays.some((day) => day.id === selectedDay.id)
+              ? [selectedDay]
+              : timelineDays}
+            foreground={<ResolvedAtmosphereLayer plane="foreground" settings={dayAtmosphereSettings} target="today" />}
+            interactionLocked={isHatching}
+            onSelect={navigateToDay}
+            selectedId={selectedDayId}
+            renderDay={renderTimelineHero}
+            renderDayOverlay={renderTimelineOverlay}
+          />
           {/* The same category ring circles the hatched creature when revisiting
               a day, anchored to the shared 258px egg/creature art stage. */}
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (

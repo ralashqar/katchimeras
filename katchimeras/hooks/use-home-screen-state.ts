@@ -85,6 +85,7 @@ export function useHomeScreenState() {
     const now = new Date();
     const profile = loadOnboardingProfile();
     const repositoryState = homeRepository.load();
+    const previousTodayId = storedStateRef.current?.today.id ?? null;
     // Focus and repository events commonly point at the exact state already in
     // memory. Avoid cloning/normalizing the whole archive merely because a
     // screen regained focus. Timed/foreground refreshes still force lifecycle
@@ -96,6 +97,11 @@ export function useHomeScreenState() {
 
     setStoredState(hydrated.state);
     setSelectedDayId((current) => {
+      // Follow a selected Today across midnight. The old tile stays immediately
+      // to the left while the prepared Tomorrow record becomes centered Today.
+      if (previousTodayId && previousTodayId !== hydrated.todayId && current === previousTodayId) {
+        return hydrated.todayId;
+      }
       // Keep an explicit selection when it's still a real day — either in the
       // recent timeline window OR anywhere in the archive (so a day opened from
       // the calendar / life-map survives re-derives). We deliberately do NOT

@@ -20,6 +20,12 @@ import { ensureDayVision } from '@/utils/photo-vision';
 import { resolvePlaceSeedsForDay } from '@/utils/place-categories';
 import { syncWidgetState } from '@/utils/widget-state';
 import { homeRepository } from '@/storage/repositories/home-repository';
+import { markArrivalPending } from '@/utils/kingdom-arrival';
+
+export type HatchCommitResult =
+  | { status: 'hatched'; day: StoredHomeDayRecord }
+  | { status: 'not_ready' }
+  | { status: 'failed'; reason: string };
 
 type HatchControllerParams = {
   selectedDay: HomeTimelineDay | null;
@@ -98,68 +104,84 @@ export function useHatchController({
     });
   }, [setStoredState]);
 
-  const triggerHatchIfReady = useCallback(async () => {
+  const triggerHatchIfReady = useCallback(async (): Promise<HatchCommitResult> => {
     if (!selectedDay || selectedDay.kind !== 'day') {
-      return;
+      return { status: 'not_ready' };
     }
 
-    const profile = loadOnboardingProfile();
-    let now = new Date();
-    // Foreground mutations update the ref synchronously while repository writes
-    // are deferred. Prefer the ref so the final check-in tap always reaches the
-    // hatch even when disk persistence is still catching up.
-    const hydrated = hydrateHomeState(storedStateRef.current ?? homeRepository.load(), profile, now);
-    let baseState = hydrated.state;
+    try {
+      const profile = loadOnboardingProfile();
+      let now = new Date();
+      // Foreground mutations update the ref synchronously while repository writes
+      // are deferred. Prefer the ref so the final check-in tap always reaches the
+      // hatch even when disk persistence is still catching up.
+      const hydrated = hydrateHomeState(storedStateRef.current ?? homeRepository.load(), profile, now);
+      let baseState = hydrated.state;
 
-    const targetDay = findDay(baseState, selectedDay.id);
+      const targetDay = findDay(baseState, selectedDay.id);
+      if (!targetDay) return { status: 'not_ready' };
 
-    if (targetDay && targetDay.placeCategorySeeds === undefined && targetDay.locations.length > 0) {
-      try {
-        const seeds = await Promise.race([
-          resolvePlaceSeedsForDay(
-            targetDay,
-            baseState.archivedDays.filter((day) => day.id !== targetDay.id)
-          ),
-          new Promise<string[]>((resolve) => {
-            setTimeout(() => resolve([]), 2500);
-          }),
-        ]);
-        now = new Date();
-        baseState = setPlaceCategorySeedsForDay(baseState, selectedDay.id, seeds, profile, now);
-      } catch {
-        // Hatch proceeds without resolved place seeds.
+      // Both enrichments read the same immutable day snapshot. Resolve them in
+      // parallel so the anticipation phase is bounded by one timeout rather
+      // than two sequential network/classification waits.
+      const shouldResolvePlaces = targetDay.placeCategorySeeds === undefined
+        && targetDay.locations.length > 0;
+      const shouldResolveWeather = targetDay.weather === undefined
+        && targetDay.locations.length > 0;
+      const [resolvedSeeds, resolvedWeather] = await Promise.all([
+        shouldResolvePlaces
+          ? Promise.race([
+              resolvePlaceSeedsForDay(
+                targetDay,
+                baseState.archivedDays.filter((day) => day.id !== targetDay.id),
+              ).catch(() => []),
+              new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+            ])
+          : Promise.resolve<string[] | undefined>(undefined),
+        shouldResolveWeather
+          ? Promise.race([
+              ensureDayWeather(targetDay).catch(() => null),
+              new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+            ])
+          : Promise.resolve(undefined),
+      ]);
+      now = new Date();
+      if (resolvedSeeds !== undefined) {
+        baseState = setPlaceCategorySeedsForDay(baseState, selectedDay.id, resolvedSeeds, profile, now);
       }
-    }
+      if (resolvedWeather) {
+        baseState = setDayWeatherForDay(baseState, selectedDay.id, resolvedWeather, profile, now);
+      }
 
-    const weatherTarget = findDay(baseState, selectedDay.id);
-    if (weatherTarget && weatherTarget.weather === undefined && weatherTarget.locations.length > 0) {
-      try {
-        const weather = await ensureDayWeather(weatherTarget);
-        if (weather) {
-          now = new Date();
-          baseState = setDayWeatherForDay(baseState, selectedDay.id, weather, profile, now);
+      const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
+      const hatchedDay = findDay(hatchedState, selectedDay.id);
+      if (!hatchedDay?.creature || hatchedDay.state !== 'hatched') {
+        return { status: 'not_ready' };
+      }
+
+      // The hatch is durable before any presentation begins. A suspended app
+      // can therefore reopen directly onto the resident without replaying or
+      // losing the arrival.
+      storedStateRef.current = hatchedState;
+      homeRepository.save(hatchedState, { notify: false });
+      setStoredState(hatchedState);
+      markArrivalPending();
+      void enhanceDayReflection(hatchedState, selectedDay.id);
+      void (async () => {
+        const permission = await getHatchNotificationPermission();
+        if (permission === 'undetermined') {
+          await requestHatchNotificationPermission();
         }
-      } catch {
-        // Hatch proceeds without resolved weather.
-      }
+        await syncHatchNotification(hatchedState, profile);
+      })();
+      return { status: 'hatched', day: hatchedDay };
+    } catch (error) {
+      console.warn('Hatch finalization failed', error);
+      return {
+        status: 'failed',
+        reason: error instanceof Error ? error.message : 'The hatch could not be completed.',
+      };
     }
-
-    const hatchedState = triggerHatchForDay(baseState, selectedDay.id, profile, now);
-    // Hatch completion is a rare terminal mutation, so persist it synchronously
-    // before the reveal can navigate away. Map/photo refreshes may save their
-    // own update as soon as the map opens; a deferred hatch write leaves a
-    // window where those readers can observe and re-save the pre-hatch egg.
-    storedStateRef.current = hatchedState;
-    homeRepository.save(hatchedState, { notify: false });
-    setStoredState(hatchedState);
-    void enhanceDayReflection(hatchedState, selectedDay.id);
-    void (async () => {
-      const permission = await getHatchNotificationPermission();
-      if (permission === 'undetermined') {
-        await requestHatchNotificationPermission();
-      }
-      await syncHatchNotification(hatchedState, profile);
-    })();
   }, [enhanceDayReflection, selectedDay, setStoredState, storedStateRef]);
 
   return { triggerHatchIfReady };

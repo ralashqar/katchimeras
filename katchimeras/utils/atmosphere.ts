@@ -1,8 +1,32 @@
 import type { WeatherCondition } from '@/types/home';
 
-export type AtmospherePresetId = 'none' | 'rain' | 'snow' | 'fog' | 'smog' | 'storm';
+export type PhysicalAtmospherePresetId =
+  | 'none'
+  | 'rain'
+  | 'snow'
+  | 'fog'
+  | 'smog'
+  | 'storm'
+  | 'heat_shimmer';
+export type ExpressiveAtmospherePresetId =
+  | 'none'
+  | 'celebration_drift'
+  | 'golden_motes'
+  | 'fireflies'
+  | 'petal_drift'
+  | 'falling_leaves'
+  | 'dandelion_seeds'
+  | 'cozy_embers'
+  | 'dream_wisps'
+  | 'idea_sparks'
+  | 'journey_breeze'
+  | 'memory_shimmer'
+  | 'social_ribbons'
+  | 'quiet_dust';
+export type AtmospherePresetId = PhysicalAtmospherePresetId | ExpressiveAtmospherePresetId;
 export type AtmospherePlane = 'background' | 'foreground';
 export type AtmosphereQuality = 'auto' | 'low' | 'medium' | 'high';
+export type AtmosphereRenderer = 'atlas' | 'legacy';
 export type AtmosphereTarget = 'off' | 'today' | 'kingdom' | 'both';
 
 export type AtmosphereSettings = {
@@ -24,13 +48,36 @@ export type AtmosphereParticle = {
   y: number;
 };
 
-export const ATMOSPHERE_PRESETS: readonly { id: AtmospherePresetId; label: string }[] = [
+export const PHYSICAL_ATMOSPHERE_PRESETS: readonly { id: PhysicalAtmospherePresetId; label: string }[] = [
   { id: 'none', label: 'None' },
   { id: 'rain', label: 'Rain' },
   { id: 'snow', label: 'Snow' },
   { id: 'fog', label: 'Fog' },
   { id: 'smog', label: 'Smog' },
   { id: 'storm', label: 'Storm' },
+  { id: 'heat_shimmer', label: 'Heat shimmer' },
+] as const;
+
+export const EXPRESSIVE_ATMOSPHERE_PRESETS: readonly { id: ExpressiveAtmospherePresetId; label: string }[] = [
+  { id: 'none', label: 'None' },
+  { id: 'celebration_drift', label: 'Celebration drift' },
+  { id: 'golden_motes', label: 'Golden motes' },
+  { id: 'fireflies', label: 'Fireflies' },
+  { id: 'petal_drift', label: 'Petal drift' },
+  { id: 'falling_leaves', label: 'Falling leaves' },
+  { id: 'dandelion_seeds', label: 'Dandelion seeds' },
+  { id: 'cozy_embers', label: 'Cozy embers' },
+  { id: 'dream_wisps', label: 'Dream wisps' },
+  { id: 'idea_sparks', label: 'Idea sparks' },
+  { id: 'journey_breeze', label: 'Journey breeze' },
+  { id: 'memory_shimmer', label: 'Memory shimmer' },
+  { id: 'social_ribbons', label: 'Social ribbons' },
+  { id: 'quiet_dust', label: 'Quiet dust' },
+] as const;
+
+export const ATMOSPHERE_PRESETS: readonly { id: AtmospherePresetId; label: string }[] = [
+  ...PHYSICAL_ATMOSPHERE_PRESETS,
+  ...EXPRESSIVE_ATMOSPHERE_PRESETS.filter((preset) => preset.id !== 'none'),
 ] as const;
 
 export const DEFAULT_ATMOSPHERE_SETTINGS: AtmosphereSettings = {
@@ -42,11 +89,34 @@ export const DEFAULT_ATMOSPHERE_SETTINGS: AtmosphereSettings = {
   wind: 0.18,
 };
 
-const PARTICLE_CAPS = {
-  low: { rain: 32, snow: 20 },
-  medium: { rain: 56, snow: 36 },
-  high: { rain: 88, snow: 56 },
+type AtmosphereParticleFamily = 'rain' | 'snow' | 'drift' | 'glow' | 'sparse' | 'streak';
+
+const PARTICLE_CAPS: Record<Exclude<AtmosphereQuality, 'auto'>, Record<AtmosphereParticleFamily, number>> = {
+  low: { drift: 18, glow: 16, rain: 32, snow: 20, sparse: 11, streak: 14 },
+  medium: { drift: 30, glow: 26, rain: 56, snow: 36, sparse: 18, streak: 22 },
+  high: { drift: 46, glow: 40, rain: 88, snow: 56, sparse: 28, streak: 34 },
 } as const;
+
+export function atmosphereParticleFamily(preset: AtmospherePresetId): AtmosphereParticleFamily | null {
+  if (preset === 'rain' || preset === 'storm') return 'rain';
+  if (preset === 'snow') return 'snow';
+  if (preset === 'golden_motes' || preset === 'fireflies' || preset === 'cozy_embers' || preset === 'idea_sparks' || preset === 'memory_shimmer') return 'glow';
+  if (preset === 'journey_breeze' || preset === 'social_ribbons') return 'streak';
+  if (preset === 'dream_wisps' || preset === 'quiet_dust' || preset === 'dandelion_seeds') return 'sparse';
+  if (preset === 'celebration_drift' || preset === 'petal_drift' || preset === 'falling_leaves') return 'drift';
+  return null;
+}
+
+export function atmospherePresetHasForeground(preset: AtmospherePresetId): boolean {
+  return atmosphereParticleFamily(preset) !== null || preset === 'storm';
+}
+
+export function atmospherePresetUsesAuthoredSprites(preset: AtmospherePresetId): boolean {
+  return preset === 'celebration_drift'
+    || preset === 'petal_drift'
+    || preset === 'falling_leaves'
+    || preset === 'dandelion_seeds';
+}
 
 export function clampAtmosphereUnit(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -73,7 +143,7 @@ export function atmosphereParticleCount(
   intensity: number,
 ): number {
   const resolved = resolvedAtmosphereQuality(quality, viewportWidth);
-  const family = preset === 'snow' ? 'snow' : preset === 'rain' || preset === 'storm' ? 'rain' : null;
+  const family = atmosphereParticleFamily(preset);
   if (!family) return 0;
   const density = 0.35 + clampAtmosphereUnit(intensity) * 0.65;
   return Math.round(PARTICLE_CAPS[resolved][family] * density);
@@ -100,6 +170,15 @@ export function generateAtmosphereParticles(count: number, seed: number): Atmosp
     x: random(),
     y: random(),
   }));
+}
+
+export function atmospherePresetSeedOffset(preset: AtmospherePresetId): number {
+  let hash = 2166136261;
+  for (let index = 0; index < preset.length; index += 1) {
+    hash ^= preset.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 export function atmospherePresetForWeather(condition: WeatherCondition | null | undefined): AtmospherePresetId {

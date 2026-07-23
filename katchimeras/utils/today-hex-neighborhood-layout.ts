@@ -65,9 +65,9 @@ export function todayHexCameraTarget(
 /**
  * Continuous camera path through the alternating Today hex row.
  *
- * Integer progress values land exactly on a day. Fractional values follow a
- * single smooth zig-zag arc between neighbours, keeping both camera axes on
- * one animation clock instead of starting/cancelling independent timings.
+ * Integer progress values land exactly on a day. Fractional values linearly
+ * interpolate between the two neighbouring world points, so the camera always
+ * travels along a straight segment with no vertical arc or bounce.
  */
 export function todayHexCameraPositionForProgress(
   progress: number,
@@ -75,9 +75,12 @@ export function todayHexCameraPositionForProgress(
   verticalStep: number,
 ): TodayHexWorldPoint {
   'worklet';
-  const alternatingVerticalProgress = (1 - Math.cos(Math.PI * progress)) / 2;
+  const fromIndex = Math.floor(progress);
+  const segmentProgress = progress - fromIndex;
+  const fromY = fromIndex % 2 === 0 ? 0 : verticalStep;
+  const toY = fromIndex % 2 === 0 ? verticalStep : 0;
   return {
     x: -progress * horizontalStride,
-    y: -alternatingVerticalProgress * verticalStep,
+    y: -(fromY + (toY - fromY) * segmentProgress),
   };
 }
