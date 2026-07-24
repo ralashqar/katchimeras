@@ -13,6 +13,7 @@ import { computeLivingRarity, computeDaySpanMeters, maxRarity, type LivingRarity
 import { resolveBondStage, type BondStage } from '@/utils/bond';
 import { buildVisionSignals } from '@/utils/vision-signals';
 import { assignmentSignals } from '@/utils/intelligence/classification';
+import { photoPlaceEncounterSignals } from '@/utils/photo-place-gameplay';
 
 // Where a signal came from — drives Hatch Engine v2 weighting (explicit
 // moment/prompt input counts as "intent") and the day-tag field's grouping.
@@ -70,6 +71,19 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       sourceMomentIds: [],
       isRecovery: false,
       source: 'place',
+    });
+  });
+
+  // Per-photo MapKit resolution is source-bound and already fused with that
+  // photo's OCR/visual evidence. Only confirmed or high-confidence decisions
+  // enter the hatch field; ambiguous alternatives never influence a hatch.
+  photoPlaceEncounterSignals(day.photoPlaceResolutions).forEach((placeSignal) => {
+    signals.push({
+      seedId: placeSignal.seedId,
+      intensity: placeSignal.intensity,
+      sourceMomentIds: [],
+      isRecovery: placeSignal.isRecovery,
+      source: placeSignal.userConfirmed ? 'prompt' : 'place',
     });
   });
 

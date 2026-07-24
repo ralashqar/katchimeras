@@ -27,6 +27,8 @@ import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence'
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import { evaluatePhotoForQuest } from '@/utils/quests/photo-evaluation';
 import { safeDismissModal } from '@/utils/safe-navigation';
+import { resolvePhotoPlace } from '@/utils/photo-place-resolution';
+import type { PhotoPlaceResolution } from '@/types/photo-place';
 
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
@@ -47,6 +49,7 @@ export default function MomentCaptureScreen() {
 
   const cameraRef = useRef<CameraView | null>(null);
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
+  const placeResolutionRef = useRef<PhotoPlaceResolution | null>(null);
   const closingRef = useRef(false);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -91,11 +94,48 @@ export default function MomentCaptureScreen() {
     }
     const result = await analyzePhoto(photoUri);
     rawVisionRef.current = result ? { ...result, captureSource: 'camera' } : null;
+    let coordinate: { latitude: number; longitude: number } | undefined;
+    let horizontalAccuracyMeters: number | undefined;
+    try {
+      const Location = await import('expo-location');
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.granted) {
+        const position = await Location.getLastKnownPositionAsync({
+          maxAge: 2 * 60 * 1000,
+          requiredAccuracy: 100,
+        });
+        if (position) {
+          coordinate = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+          horizontalAccuracyMeters = position.coords.accuracy ?? undefined;
+        }
+      }
+    } catch {
+      coordinate = undefined;
+    }
+    placeResolutionRef.current = await resolvePhotoPlace({
+      photoId: photoUri,
+      coordinate,
+      horizontalAccuracyMeters,
+      capturedAt: new Date().toISOString(),
+      ocrText: [
+        ...(result?.recognizedText?.map((item) => item.text) ?? []),
+        ...(result?.text ?? []),
+      ],
+      visualTags: (result?.labels ?? []).map((label) => ({
+        label: label.name,
+        confidence: label.confidence,
+      })),
+      imageSource: 'camera',
+    });
     return {
       rawVision: rawVisionRef.current,
       summary: result
         ? aggregatePhotoVision([{ ...result, captureSource: 'camera' }], CAPTURE_PHOTO_CONFIDENCE_FLOOR)
         : null,
+      placeResolution: placeResolutionRef.current,
     };
   }, [photoUri]);
 
@@ -126,6 +166,7 @@ export default function MomentCaptureScreen() {
           confirmations,
           classifiedMemory: reviewed?.memory ?? null,
           evidence: reviewed?.evidence ?? null,
+          placeResolution: reviewed?.placeResolution ?? placeResolutionRef.current,
           journal,
         },
         captureTarget
@@ -155,7 +196,12 @@ export default function MomentCaptureScreen() {
           scene,
           confirmations,
         }).memory;
-        completeQuestCapture(questId, questCreatureId, photoUri, evaluatePhotoForQuest(memory, questId));
+        completeQuestCapture(
+          questId,
+          questCreatureId,
+          photoUri,
+          evaluatePhotoForQuest(memory, questId, reviewed?.placeResolution ?? placeResolutionRef.current)
+        );
       }
       closingRef.current = true;
       safeDismissModal(router);

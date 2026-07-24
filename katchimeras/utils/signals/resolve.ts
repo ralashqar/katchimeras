@@ -4,6 +4,7 @@ import type { FactKey, Facts } from './facts';
 import { dayDetailProvider } from './providers/day-detail';
 import { evidenceProvider } from './providers/evidence';
 import { photoLabelsProvider } from './providers/photo-labels';
+import { photoPlaceProvider } from './providers/photo-place';
 import { sleepProvider } from './providers/sleep';
 import { weatherProvider } from './providers/weather';
 
@@ -69,6 +70,7 @@ const PROVIDERS: SignalProvider[] = [
   evidenceProvider,
   sleepProvider,
   photoLabelsProvider,
+  photoPlaceProvider,
   weatherProvider,
 ];
 

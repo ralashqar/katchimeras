@@ -140,7 +140,14 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
       });
   };
 
-  const { visionRef, rawVisionRef, sceneRef, memoryRef: clarificationRef, committedRef } = usePhotoAnalysisSession({
+  const {
+    visionRef,
+    rawVisionRef,
+    sceneRef,
+    memoryRef: clarificationRef,
+    placeResolutionRef,
+    committedRef,
+  } = usePhotoAnalysisSession({
     analyze, photoUri, sourceId, observedAt,
     onReady: ({ rawVision, vision, scene, memory }) => {
       setState('essence');
@@ -174,6 +181,7 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
       scene: sceneRef.current,
       memory,
       evidence,
+      placeResolution: placeResolutionRef.current,
       journalClassification: journalAnalysis,
       journalEnrichment,
     };

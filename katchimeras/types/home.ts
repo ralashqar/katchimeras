@@ -1,4 +1,5 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
+import type { PhotoPlaceResolution } from '@/types/photo-place';
 
 export type InspirationCategory = 'calm' | 'motivation' | 'reflection' | 'energy' | 'gratitude';
 export type HomeMomentType =
@@ -1386,6 +1387,10 @@ export type StoredHomeDayRecord = {
   // Versioned, explainable classification records. Legacy `vision` and
   // `evidence` remain readable compatibility surfaces during the v8 rollout.
   classifiedMemories?: ClassifiedMemory[];
+  // Source-bound, on-device place evidence for captured or reviewed photos.
+  // Precise coordinates never leave local state and historical hatches remain
+  // immutable when this optional enrichment is added later.
+  photoPlaceResolutions?: PhotoPlaceResolution[];
   manualJournalEntries?: ManualJournalEntry[];
   // Canonical, reviewed journal inputs. Older arrays below remain materialized
   // compatibility projections while their readers migrate to journal selectors.
@@ -1524,6 +1529,7 @@ export type RecentPhotoAsset = {
   // On-device vision read of this frame (labels/OCR/face count), when analysed.
   vision?: PhotoVisionResult;
   visionSummary?: DayVisionSummary;
+  placeResolution?: PhotoPlaceResolution;
   sceneRead?: {
     memoryDomain?: MemoryDomain | null;
     type: 'media' | 'food' | 'social' | 'screen' | 'nature' | 'pet' | 'activity' | 'place' | 'document' | 'other';

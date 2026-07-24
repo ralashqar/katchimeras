@@ -7,6 +7,10 @@ import {
   type PhotoJournalEvidencePacket,
   type PhotoJournalRouteSupport,
 } from '@/utils/photo-journal-evidence';
+import {
+  journalModelFlowIdForInternalFlow,
+  type JournalModelFlowId,
+} from '@/utils/journal-model-flow';
 
 export type PhotoSemanticUnresolvedFacet =
   | 'none'
@@ -39,15 +43,7 @@ export type PhotoTopLevel =
 
 export type PhotoModelConfidence = 'high' | 'medium' | 'low';
 
-export type PhotoModelFlowId =
-  | 'place'
-  | 'food'
-  | 'media'
-  | 'movement'
-  | 'people'
-  | 'work'
-  | 'event'
-  | 'other';
+export type PhotoModelFlowId = JournalModelFlowId;
 
 export type PhotoTopLevelDecision = {
   primaryEvidenceKey: string;
@@ -148,12 +144,7 @@ export function photoSemanticFlowForTopLevel(topLevel: PhotoTopLevel): PhotoSema
 
 /** Clear model vocabulary for the app's legacy/manual journal flow IDs. */
 export function photoModelFlowIdForSemanticFlow(flowId: string): PhotoModelFlowId | null {
-  if (flowId === 'went_somewhere' || flowId === 'place') return 'place';
-  if (flowId === 'studio' || flowId === 'media') return 'media';
-  if (flowId === 'big_event' || flowId === 'event') return 'event';
-  if (flowId === 'general' || flowId === 'other' || flowId === 'ordinary') return 'other';
-  if (flowId === 'food' || flowId === 'movement' || flowId === 'people' || flowId === 'work') return flowId;
-  return null;
+  return journalModelFlowIdForInternalFlow(flowId);
 }
 
 export function photoTopLevelForSemanticFlow(flowId: string): Exclude<PhotoTopLevel, 'ambiguous'> | null {

@@ -1,8 +1,8 @@
 import type { FoundationAtomicRouteRead } from '@/utils/journal-routing';
 import { JOURNAL_CLASSIFICATION_CATALOG } from '@/utils/journal-classification-catalog';
+import { journalModelFlowIdForInternalFlow } from '@/utils/journal-model-flow';
 import { MANUAL_JOURNAL_FLOWS } from '@/utils/manual-journal-registry';
 
-const FLOW_ROUTE_TIMEOUT_MS = 3500;
 export const FOUNDATION_CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
 
 export type FoundationConfidenceLevel = typeof FOUNDATION_CONFIDENCE_LEVELS[number];
@@ -31,114 +31,73 @@ export type StructuredNoteTaskRunner = (
   timeoutMs: number
 ) => Promise<{ response: Record<string, unknown> | null; failure: 'timeout' | 'error' | null }>;
 
+const NOTE_ROUTE_KEYS = JOURNAL_CLASSIFICATION_CATALOG.map((entry) => entry.routeKey);
+
+function compactRouteDescription(routeKey: string): string {
+  const entry = JOURNAL_CLASSIFICATION_CATALOG.find((candidate) => candidate.routeKey === routeKey)!;
+  const flow = MANUAL_JOURNAL_FLOWS.find((candidate) => candidate.id === entry.flowId);
+  const generatedPrefix = flow?.description ? `${flow.description}: ` : '';
+  const definition = generatedPrefix && entry.definition.startsWith(generatedPrefix)
+    ? entry.label
+    : entry.definition.replace(/\.$/, '');
+  const exclusions = entry.exclusions.length ? `; not ${entry.exclusions.join(' or ')}` : '';
+  return `${entry.routeKey}: ${definition}${exclusions}`;
+}
+
+const NOTE_ROUTE_CATALOG = NOTE_ROUTE_KEYS.map(compactRouteDescription).join('\n');
+
 export async function classifyNoteRouteWithRunner(
   transcript: string,
   timeoutMs: number,
   runner: StructuredNoteTaskRunner
 ): Promise<FoundationRouteRun> {
   const startedAt = Date.now();
-  const flows = MANUAL_JOURNAL_FLOWS.map((flow) => flow.id);
-  const flowSummary = MANUAL_JOURNAL_FLOWS
-    .map((flow) => `${flow.id}: ${flow.shortTitle ?? flow.title}. ${flow.description ?? ''}`.trim())
-    .join('\n');
-  const flowRun = await runner({
-    taskId: 'note.flow.v1',
+  const run = await runner({
+    taskId: 'note.atomic-route.v3',
     instructions: [
-      'Choose the single best broad journal section for one personal note.',
-      'Select only from the supplied section IDs. Base the choice on what the person actually did.',
-      'Watched a movie, watched a show, read a book, played a video game, or listened to media means studio.',
-      'Examples: "I watched X movie" is studio. "I read X" is studio. "I went for a run" is movement.',
-      'Use general only when no more specific supplied section fits.',
-      'Report high confidence only when the note clearly names the relevant action or subject; otherwise medium or low.',
+      'Choose the single best journal category for the note.',
+      'Classify the lived memory, not just a recognised noun or brand.',
+      'Time or play with a named relationship usually belongs to that people category.',
+      'Use studio.game only for an explicit video, computer or console game, not toys, building sets or board games.',
+      'Use high confidence only when one category clearly fits.',
     ].join(' '),
-    prompt: `Journal sections:\n${flowSummary}\n\nNote: ${JSON.stringify(transcript)}\nChoose the best section ID.`,
+    prompt: `Note: ${JSON.stringify(transcript)}\n\nCategories:\n${NOTE_ROUTE_CATALOG}`,
     fields: [
-      { name: 'flowId', description: 'Best supplied broad journal section ID', kind: 'enum', values: flows },
-      { name: 'confidence', description: 'Independent confidence in the broad section choice', kind: 'enum', values: [...FOUNDATION_CONFIDENCE_LEVELS] },
+      { name: 'routeKey', description: 'Best category ID', kind: 'enum', values: NOTE_ROUTE_KEYS },
+      { name: 'confidence', description: 'Confidence in this category choice', kind: 'enum', values: [...FOUNDATION_CONFIDENCE_LEVELS] },
     ],
     sampling: 'greedy',
-  }, Math.min(FLOW_ROUTE_TIMEOUT_MS, timeoutMs));
-  if (!flowRun.response) return emptyFoundationRouteRun(Date.now() - startedAt, flowRun.failure);
+  }, timeoutMs);
 
-  const flowId = cleanString(flowRun.response.flowId);
-  const topLevelConfidence = confidenceLevel(flowRun.response.confidence);
-  const flow = MANUAL_JOURNAL_FLOWS.find((candidate) => candidate.id === flowId);
-  if (!flow || !topLevelConfidence) return emptyFoundationRouteRun(Date.now() - startedAt, 'error');
+  if (!run.response) return emptyFoundationRouteRun(Date.now() - startedAt, run.failure);
 
-  if (topLevelConfidence !== 'high') {
-    return {
-      raw: null,
-      suggestedFlowId: flow.id,
-      topLevelConfidence,
-      subcategoryConfidence: null,
-      topLevelResponse: flowRun.response,
-      subcategoryResponse: null,
-      durationMs: Date.now() - startedAt,
-      failure: null,
-    };
-  }
-
-  const remaining = Math.max(0, timeoutMs - (Date.now() - startedAt));
-  if (remaining < 500) {
-    return {
-      ...emptyFoundationRouteRun(Date.now() - startedAt, 'timeout'),
-      suggestedFlowId: flow.id,
-      topLevelConfidence,
-      topLevelResponse: flowRun.response,
-    };
-  }
-
-  const candidates = JOURNAL_CLASSIFICATION_CATALOG.filter((entry) => entry.flowId === flow.id);
-  const childSummary = candidates.map((entry) => {
-    const examples = entry.examples.map((example) => JSON.stringify(example)).join(', ');
-    const exclusions = entry.exclusions.length ? ` Exclude: ${entry.exclusions.join('; ')}.` : '';
-    return `${entry.routeKey}: ${entry.definition} Examples: ${examples}.${exclusions}`;
-  }).join('\n');
-  const childRun = await runner({
-    taskId: 'note.child-route.v1',
-    instructions: [
-      `Choose exactly one subcategory within the already selected ${flow.id} journal section.`,
-      'Start the classification again from the original note. Use only the note, definitions, examples, and exclusions below.',
-      'Do not infer confidence from the fact that the broad section was selected.',
-      'For studio: watched a movie means film; read or listened to an audiobook means book; watched an episode or series means show.',
-      'For food, a standalone fruit or small item is a snack unless the note identifies breakfast, lunch, dinner, or a meal.',
-      'Report high confidence only when the original note clearly distinguishes the selected subcategory.',
-    ].join(' '),
-    prompt: `Original note: ${JSON.stringify(transcript)}\n\nAllowed subcategories inside ${flow.id}:\n${childSummary}\n\nChoose the best subcategory from scratch.`,
-    fields: [
-      { name: 'routeKey', description: `Best route inside the selected ${flow.id} section`, kind: 'enum', values: candidates.map((entry) => entry.routeKey) },
-      { name: 'confidence', description: 'Independent confidence in this subcategory choice based only on the original note', kind: 'enum', values: [...FOUNDATION_CONFIDENCE_LEVELS] },
-    ],
-    sampling: 'greedy',
-  }, remaining);
-  if (!childRun.response) {
-    return {
-      ...emptyFoundationRouteRun(Date.now() - startedAt, childRun.failure),
-      suggestedFlowId: flow.id,
-      topLevelConfidence,
-      topLevelResponse: flowRun.response,
-    };
-  }
-
-  const routeKey = cleanString(childRun.response.routeKey);
-  const subcategoryConfidence = confidenceLevel(childRun.response.confidence);
-  if (!routeKey || !subcategoryConfidence || !candidates.some((entry) => entry.routeKey === routeKey)) {
+  const routeKey = cleanString(run.response.routeKey);
+  const confidence = confidenceLevel(run.response.confidence);
+  const route = routeKey
+    ? JOURNAL_CLASSIFICATION_CATALOG.find((entry) => entry.routeKey === routeKey)
+    : null;
+  if (!route || !confidence) {
     return {
       ...emptyFoundationRouteRun(Date.now() - startedAt, 'error'),
-      suggestedFlowId: flow.id,
-      topLevelConfidence,
-      topLevelResponse: flowRun.response,
-      subcategoryResponse: childRun.response,
+      subcategoryResponse: run.response,
     };
   }
 
+  const modelFlowId = journalModelFlowIdForInternalFlow(route.flowId);
+  const derivedFlowResponse = {
+    flowId: modelFlowId,
+    confidence,
+    derivedFrom: 'atomic_route',
+  };
   return {
-    raw: { routeKey, routeStrategy: 'strict_two_pass_v2' },
-    suggestedFlowId: flow.id,
-    topLevelConfidence,
-    subcategoryConfidence,
-    topLevelResponse: flowRun.response,
-    subcategoryResponse: childRun.response,
+    raw: { routeKey: route.routeKey, routeStrategy: 'atomic_single_pass_v3' },
+    suggestedFlowId: route.flowId,
+    // These legacy fields remain populated for the existing review UI. Both
+    // now describe the same atomic decision; there is no separate broad pass.
+    topLevelConfidence: confidence,
+    subcategoryConfidence: confidence,
+    topLevelResponse: derivedFlowResponse,
+    subcategoryResponse: run.response,
     durationMs: Date.now() - startedAt,
     failure: null,
   };

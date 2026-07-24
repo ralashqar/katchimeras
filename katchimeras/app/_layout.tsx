@@ -82,6 +82,7 @@ export default function RootLayout() {
           <Stack.Screen name="world-base-lab" options={{ title: 'World Base Lab' }} />
           <Stack.Screen name="dev-atmosphere-lab" options={{ title: 'Atmosphere Lab', headerShown: false }} />
           <Stack.Screen name="dev-katchimera-tile-lab" options={{ title: 'Katchimera Tile Lab' }} />
+          <Stack.Screen name="dev-photo-place-lab" options={{ title: 'Photo Place Lab' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />
           <Stack.Screen name="moment-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
           <Stack.Screen name="note-capture" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }} />
@@ -89,6 +90,7 @@ export default function RootLayout() {
           <Stack.Screen name="day-map/[dayId]" options={{ title: 'Day Map' }} />
           <Stack.Screen name="card/[cardId]" options={{ title: 'Daily card' }} />
           <Stack.Screen name="life-map" options={{ headerShown: false, title: 'Life Map' }} />
+          <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
         </Stack>

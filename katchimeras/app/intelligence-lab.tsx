@@ -153,16 +153,16 @@ export default function IntelligenceLabScreen() {
               Result: {lastNote.fallbackReason ?? 'valid structured journal route'}
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
-              Top level: {lastNote.topLevelFlowId ?? 'none'} ({lastNote.topLevelConfidence ?? 'no confidence'})
-              {' · '}subcategory: {lastNote.routeCandidates[0]?.id ?? 'not run'} ({lastNote.subcategoryConfidence ?? 'no confidence'})
+              Atomic route: {lastNote.routeCandidates[0]?.id ?? 'none'} ({lastNote.subcategoryConfidence ?? 'no confidence'})
+              {' · '}flow: {lastNote.topLevelFlowId ?? 'none'}
               {' · '}sampling: greedy
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Candidates: {lastNote.routeCandidates.length
                 ? lastNote.routeCandidates.map((route) => `${route.id} ${Math.round(route.confidence * 100)}%`).join(' · ')
                 : 'none'}
-              {lastNote.firstPassDurationMs !== null ? ` · first ${lastNote.firstPassDurationMs}ms` : ''}
-              {lastNote.retryDurationMs !== null ? ` · retry ${lastNote.retryDurationMs}ms` : ''}
+              {lastNote.firstPassDurationMs !== null ? ` · enrichment ${lastNote.firstPassDurationMs}ms` : ''}
+              {lastNote.retryDurationMs !== null ? ` · routing ${lastNote.retryDurationMs}ms` : ''}
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon500} darkColor={Lantern.moon500} selectable>
               Development-only trace. It contains the submitted note and stays in local app storage unless you share it.

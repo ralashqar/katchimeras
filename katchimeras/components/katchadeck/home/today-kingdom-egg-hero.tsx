@@ -251,6 +251,25 @@ export function TodayKingdomEggOverlay({ children, homeArchetypeId }: TodayKingd
   );
 }
 
+/** Camera-synchronised UI anchor immediately above the active egg. */
+export function TodayKingdomEggAboveOverlay({ children, homeArchetypeId }: TodayKingdomEggOverlayProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const tile = kingdomHomeTileForIdentity(homeArchetypeId);
+  const layout = todayKingdomHeroLayout(windowWidth, kingdomSurfaceTileAlignment(tile));
+  const eggFrame = todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.aboveEgg,
+        { top: Math.max(4, eggFrame.top - 50) },
+      ]}>
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   stage: {
     alignItems: 'center',
@@ -284,5 +303,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     zIndex: 10,
+  },
+  aboveEgg: {
+    alignItems: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    zIndex: 20,
   },
 });

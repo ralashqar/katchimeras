@@ -60,6 +60,7 @@ const deviceActivityPath = path.join(tempDir, 'device-activity.js');
 fs.writeFileSync(deviceActivityPath, 'exports.detectDeviceContext = () => ({ deviceKind: null, deviceConfidence: 0, candidates: [], selected: null, strong: false }); exports.isDeviceSignal = () => false;');
 const questionRegistryPath = path.join(tempDir, 'question-registry.js');
 fs.writeFileSync(questionRegistryPath, 'exports.QUESTION_PLANNER_VERSION = 3; exports.questionPlannerMode = () => "on"; exports.planNextQuestion = () => null; exports.questionIdForGraphNode = (graphId, nodeId) => graphId && nodeId ? `${graphId}.${nodeId}` : null;');
+const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 'photo-place-gameplay.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const hatchPastPath = transpileToTemp('utils/hatch-your-past.ts', 'hatch-your-past.js');
 
@@ -81,6 +82,7 @@ const stubs = {
   '@/utils/intelligence/photo-descriptor': photoDescriptorPath,
   '@/utils/intelligence/device-activity': deviceActivityPath,
   '@/utils/intelligence/question-registry': questionRegistryPath,
+  '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
   '@/utils/encounter-engine': enginePath,
   '@/types/home': {},
   '@/types/katchimera': {},

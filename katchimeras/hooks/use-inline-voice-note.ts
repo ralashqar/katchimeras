@@ -1,16 +1,13 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { useAudioNoteCapture } from '@/hooks/use-audio-note-capture';
 import { interpretNote, type InterpretedNote } from '@/utils/note-interpret';
-import { extractStudioTitle } from '@/utils/studio-detect';
-import type { StudioMediaType } from '@/types/home';
 
-// Hold-to-record voice note: record → on-device transcribe + interpret →
-// accept/discard. Owns the recorder + phase state; the screen renders
-// <InlineVoiceNote/> from what this returns and provides the save.
-// Recording is capped at 30 seconds.
+// Hold-to-record voice note: record → on-device transcribe + atomic note route
+// → journal review. The review sheet is the confirmation surface, so this hook
+// only owns recording and analysis progress. Recording is capped at 30 seconds.
 
-export type InlineVoiceNotePhase = 'idle' | 'recording' | 'analyzing' | 'confirm';
+export type InlineVoiceNotePhase = 'idle' | 'recording' | 'analyzing';
 
 export type InlineVoiceNotePayload = {
   kind: 'voice';
@@ -20,7 +17,6 @@ export type InlineVoiceNotePayload = {
   archetype: InterpretedNote['archetype'];
   label: string;
   bigMoment?: InterpretedNote['bigMoment'];
-  // On-device LLM classification, passed through to the engine verbatim.
   media?: InterpretedNote['media'];
   food?: InterpretedNote['food'];
   llmClassified?: boolean;
@@ -37,40 +33,45 @@ export type InlineVoiceNotePayload = {
 
 type Options = {
   allowRemote?: boolean;
-  // Persist the accepted note (screen binds addNote + its today/tomorrow target).
+  // Creates the pending journal draft; the shared journal sheet persists it.
   saveNote: (note: InlineVoiceNotePayload) => void;
-  // Recording just stopped and interpretation started — fly the mote into the egg.
   onAnalyzing?: () => void;
-  // The note was accepted and saved.
   onSaved?: (result: InterpretedNote) => void;
 };
 
 export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote = false }: Options) {
   const [phase, setPhase] = useState<InlineVoiceNotePhase>('idle');
-  const [result, setResult] = useState<InterpretedNote | null>(null);
-  const [markBig, setMarkBig] = useState(true);
-  const [semanticChoiceMade, setSemanticChoiceMade] = useState(false);
-  const audioRef = useRef<string | null>(null);
-  const durationRef = useRef(0);
   const capture = useAudioNoteCapture(async ({ audioUri, durationMs }) => {
-    audioRef.current = audioUri;
-    durationRef.current = durationMs;
     setPhase('analyzing');
     onAnalyzing?.();
     try {
       const interpreted = await interpretNote({ audioUri }, { allowRemote });
-      setResult(interpreted);
-      setSemanticChoiceMade(!interpreted.semantic?.needsClarification);
-      setMarkBig(true);
-      setPhase('confirm');
-    } catch {
+      saveNote({
+        kind: 'voice',
+        text: interpreted.transcript,
+        audioUri,
+        durationMs,
+        archetype: interpreted.archetype,
+        label: interpreted.label,
+        bigMoment: interpreted.bigMoment,
+        media: interpreted.media,
+        food: interpreted.food,
+        llmClassified: interpreted.llmClassified,
+        semanticCategoryId: interpreted.semanticCategoryId,
+        semanticConfidence: interpreted.semanticConfidence,
+        semanticEvaluated: interpreted.semanticEvaluated,
+        intelligenceProvider: interpreted.intelligenceProvider,
+        journalClassification: interpreted.journalClassification,
+        journalRoutes: interpreted.journalRoutes,
+        suggestedJournalFlowId: interpreted.suggestedJournalFlowId,
+        topLevelConfidence: interpreted.topLevelConfidence,
+        subcategoryConfidence: interpreted.subcategoryConfidence,
+      });
+      onSaved?.(interpreted);
+    } finally {
       setPhase('idle');
     }
   });
-
-  const stop = async () => {
-    await capture.stop();
-  };
 
   const start = async () => {
     if (phase !== 'idle') return;
@@ -79,69 +80,11 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
     if (!started) setPhase('idle');
   };
 
-  const accept = () => {
-    if (!result || !semanticChoiceMade) return;
-    saveNote({
-      kind: 'voice',
-      text: result.transcript,
-      audioUri: audioRef.current,
-      durationMs: durationRef.current,
-      archetype: result.archetype,
-      label: result.label,
-      bigMoment: result.bigMoment && markBig ? result.bigMoment : undefined,
-      media: result.media,
-      food: result.food,
-      llmClassified: result.llmClassified,
-      semanticCategoryId: result.semanticCategoryId,
-      semanticConfidence: result.semanticConfidence,
-      semanticEvaluated: result.semanticEvaluated,
-      intelligenceProvider: result.intelligenceProvider,
-      journalClassification: result.journalClassification,
-      journalRoutes: result.journalRoutes,
-      suggestedJournalFlowId: result.suggestedJournalFlowId,
-      topLevelConfidence: result.topLevelConfidence,
-      subcategoryConfidence: result.subcategoryConfidence,
-    });
-    onSaved?.(result);
-    setResult(null);
-    audioRef.current = null;
-    setPhase('idle');
-  };
-
-  const discard = () => {
-    setResult(null);
-    audioRef.current = null;
-    setPhase('idle');
-  };
-
-  const chooseSemantic = (categoryId: string | null) => {
-    setResult((current) => {
-      if (!current) return current;
-      if (!categoryId) return { ...current, media: null, semanticCategoryId: null, semanticConfidence: null, intelligenceProvider: 'manual' };
-      const mediaType = categoryId.startsWith('media.') ? categoryId.slice('media.'.length) as StudioMediaType : null;
-      return {
-        ...current,
-        media: mediaType ? { mediaType, title: extractStudioTitle(current.transcript), creator: null } : null,
-        semanticCategoryId: categoryId,
-        semanticConfidence: 1,
-        intelligenceProvider: 'manual',
-      };
-    });
-    setSemanticChoiceMade(true);
-  };
-
   return {
     phase,
     elapsed: capture.elapsed,
-    result,
-    markBig,
-    toggleMarkBig: () => setMarkBig((value) => !value),
     isRecording: phase === 'recording',
     start,
-    stop,
-    accept,
-    chooseSemantic,
-    semanticChoiceMade,
-    discard,
+    stop: capture.stop,
   };
 }

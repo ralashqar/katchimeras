@@ -3,9 +3,16 @@ import { useEffect, useRef } from 'react';
 import type { ClassifiedMemory, DayVisionSummary, PhotoVisionResult } from '@/types/home';
 import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
 import type { PhotoAnalysisInput } from '@/utils/intelligence/photo-analysis';
+import type { PhotoPlaceResolution } from '@/types/photo-place';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 
-type Snapshot = { rawVision: PhotoVisionResult | null; vision: DayVisionSummary | null; scene: SceneRead | null; memory: ClassifiedMemory | null };
+type Snapshot = {
+  rawVision: PhotoVisionResult | null;
+  vision: DayVisionSummary | null;
+  scene: SceneRead | null;
+  memory: ClassifiedMemory | null;
+  placeResolution: PhotoPlaceResolution | null;
+};
 
 // Capture has one immutable Vision snapshot. Journal routing consumes that
 // snapshot independently; this hook only builds downstream memory/quest data
@@ -21,6 +28,7 @@ export function usePhotoAnalysisSession(input: {
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const sceneRef = useRef<SceneRead | null>(null);
   const memoryRef = useRef<ClassifiedMemory | null>(null);
+  const placeResolutionRef = useRef<PhotoPlaceResolution | null>(null);
   const committedRef = useRef(false);
   const onReady = useRef(input.onReady);
   onReady.current = input.onReady;
@@ -32,6 +40,7 @@ export function usePhotoAnalysisSession(input: {
       if (!active) return;
       const vision = analyzed.summary;
       const rawVision = analyzed.rawVision;
+      const placeResolution = analyzed.placeResolution ?? null;
       const scene = vision ? classifyScene(vision) : null;
       const memory = vision ? buildPhotoClassifiedMemory({
         sourceId: input.sourceId ?? input.photoUri ?? 'capture-preview',
@@ -44,13 +53,14 @@ export function usePhotoAnalysisSession(input: {
       rawVisionRef.current = rawVision;
       sceneRef.current = scene;
       memoryRef.current = memory;
+      placeResolutionRef.current = placeResolution;
       committedRef.current = false;
-      onReady.current({ rawVision, vision, scene, memory });
+      onReady.current({ rawVision, vision, scene, memory, placeResolution });
     }).catch(() => {
-      if (active) onReady.current({ rawVision: null, vision: null, scene: null, memory: null });
+      if (active) onReady.current({ rawVision: null, vision: null, scene: null, memory: null, placeResolution: null });
     });
     return () => { active = false; };
   }, [input.analyze, input.photoUri, input.sourceId]);
 
-  return { visionRef, rawVisionRef, sceneRef, memoryRef, committedRef };
+  return { visionRef, rawVisionRef, sceneRef, memoryRef, placeResolutionRef, committedRef };
 }

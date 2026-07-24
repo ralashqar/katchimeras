@@ -514,6 +514,10 @@ export default function OnboardingScreen() {
             title="Steps"
           />
           <PermissionRow
+            body="A photo’s own location can suggest a place and shape eligible quests or hatch possibilities. Suggestions stay editable."
+            title="Photo places"
+          />
+          <PermissionRow
             body="Quick tags, photos, and inspiration moments stay available either way."
             title="Manual moments"
           />

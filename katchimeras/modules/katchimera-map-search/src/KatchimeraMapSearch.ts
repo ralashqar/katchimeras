@@ -1,5 +1,7 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
+import type { NativePlaceLookupResult } from '@/types/photo-place';
+
 export type NativeApplePlace = {
   id: string;
   name: string;
@@ -19,6 +21,11 @@ type KatchimeraMapSearchModuleShape = {
     longitude: number | null,
     radiusMeters: number
   ) => Promise<NativeApplePlace[]>;
+  resolveNearbyPlacesAsync: (
+    latitude: number,
+    longitude: number,
+    radiusMeters: number
+  ) => Promise<NativePlaceLookupResult>;
 };
 
 export default requireOptionalNativeModule<KatchimeraMapSearchModuleShape>('KatchimeraMapSearch');

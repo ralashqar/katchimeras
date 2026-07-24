@@ -3,6 +3,7 @@ import * as Location from 'expo-location';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Link, type Href } from 'expo-router';
 
 import { JournalLocationField } from '@/components/katchadeck/home/journal-location-field';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
@@ -49,18 +50,38 @@ export function TodayPlacesSheet({
   const [query, setQuery] = useState('');
   const [candidateNames, setCandidateNames] = useState<Record<string, { name: string; address: string | null }>>({});
   const candidates = useMemo(() => detectedPlaceCandidates(day, loadHomeAnchor()), [day]);
+  const photoPlaceNames = useMemo(() => {
+    const resolutions = new Map(
+      (day.photoPlaceResolutions ?? []).map((resolution) => [resolution.photoId, resolution])
+    );
+    return Object.fromEntries(candidates.flatMap((candidate) => {
+      const resolution = candidate.node.photos
+        .map((photo) => photo.sourceId ? resolutions.get(photo.sourceId) : null)
+        .find((item) => item?.selectedCandidate?.name || item?.alternatives[0]?.name);
+      const place = resolution?.selectedCandidate ?? resolution?.alternatives[0];
+      if (!place?.name) return [];
+      return [[candidate.id, {
+        name: place.name,
+        address: resolution?.address?.formattedAddress ?? null,
+      }] as const];
+    }));
+  }, [candidates, day.photoPlaceResolutions]);
+  const displayNames = useMemo(
+    () => ({ ...photoPlaceNames, ...candidateNames }),
+    [candidateNames, photoPlaceNames]
+  );
   const saved = day.confirmedPlaces ?? [];
 
   useEffect(() => {
     let active = true;
-    const unresolved = candidates.filter((candidate) => !candidate.node.label && !candidateNames[candidate.id]);
+    const unresolved = candidates.filter((candidate) => !candidate.node.label && !displayNames[candidate.id]);
     if (!unresolved.length) return;
     void Promise.all(unresolved.map(async (candidate) => {
       const place = await resolvePlaceName(candidate.node.latitude, candidate.node.longitude);
       return [candidate.id, { name: place.primary, address: place.locality }] as const;
     })).then((entries) => { if (active) setCandidateNames((current) => ({ ...current, ...Object.fromEntries(entries) })); });
     return () => { active = false; };
-  }, [candidateNames, candidates]);
+  }, [candidateNames, candidates, displayNames]);
 
   const save = (location: JournalLocationSelection, detectedNodeId?: string) => {
     onSavePlace({ location, detectedNodeId }, target);
@@ -79,7 +100,7 @@ export function TodayPlacesSheet({
       {mode.kind === 'overview' ? (
         <PlacesOverview
           candidates={candidates}
-          candidateNames={candidateNames}
+          candidateNames={displayNames}
           editable={editable}
           locationPermission={locationPermission}
           saved={saved}
@@ -92,7 +113,7 @@ export function TodayPlacesSheet({
           onOpenDetails={(place) => setMode({ kind: 'details', place })}
           onOpenMap={onOpenMap}
           onSaveCandidate={(candidate) => {
-            const resolved = candidateNames[candidate.id];
+            const resolved = displayNames[candidate.id];
             save({ ...candidate.selection, name: resolved?.name ?? candidate.selection.name, address: resolved?.address ?? candidate.selection.address }, candidate.id);
           }}
         />
@@ -206,6 +227,12 @@ function PlacesOverview({ candidates, candidateNames, editable, locationPermissi
 
       {editable ? <Pressable accessibilityRole="button" onPress={onAdd} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}><IconSymbol name="plus" size={17} color={Meadow.ink} /><ThemedText style={styles.addButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Add a place</ThemedText></Pressable> : null}
       {onOpenMap && (saved.length || candidates.length) ? <Pressable accessibilityRole="button" onPress={onOpenMap} style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}><IconSymbol name="map.fill" size={16} color={Meadow.goldDeep} /><ThemedText style={styles.mapButtonText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>View day map</ThemedText></Pressable> : null}
+      <Link href={'/location-privacy' as Href} asChild>
+        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.mapButton, pressed && styles.pressed]}>
+          <IconSymbol name="gearshape.fill" size={16} color={Meadow.inkSoft} />
+          <ThemedText style={styles.mapButtonText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Photo place privacy</ThemedText>
+        </Pressable>
+      </Link>
     </ScrollView>
   );
 }

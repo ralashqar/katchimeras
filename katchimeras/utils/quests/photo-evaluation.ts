@@ -1,4 +1,5 @@
 import type { ClassifiedMemory, MemoryQualityCentrality, NormalizedImageRegion } from '@/types/home';
+import type { PhotoPlaceResolution, PlaceType } from '@/types/photo-place';
 import { qualityDefinition, qualityThresholds } from '@/utils/intelligence/quality-registry';
 
 import { questDefinition } from './definitions';
@@ -22,12 +23,26 @@ export type PhotoQuestEvaluation = {
     | 'below_threshold'
     | 'not_detected'
     | 'time_window_match'
-    | 'outside_time_window';
+    | 'outside_time_window'
+    | 'place_hybrid_match'
+    | 'place_confirmed'
+    | 'place_needs_confirmation'
+    | 'place_already_known'
+    | 'place_mismatch'
+    | 'place_unavailable';
   reason: string;
 };
 
-export function evaluatePhotoForQuest(memory: ClassifiedMemory, questId: string): PhotoQuestEvaluation {
+export function evaluatePhotoForQuest(
+  memory: ClassifiedMemory,
+  questId: string,
+  placeResolution?: PhotoPlaceResolution | null
+): PhotoQuestEvaluation {
   const definition = questDefinition(questId);
+  const requiredPlaceType = requiredPhotoPlaceType(questId);
+  if (requiredPlaceType) {
+    return evaluatePhotoPlaceForQuest(memory, questId, requiredPlaceType, placeResolution);
+  }
   const timeCriterion = definition?.criteria.find(
     (item) => item.fact === 'evidence.items' && item.op === 'evidenceIncludes' &&
       (item.value === 'time.late_night' || item.value === 'time.before_8am')
@@ -102,6 +117,123 @@ export function evaluatePhotoForQuest(memory: ClassifiedMemory, questId: string)
     reasonCode: centralityPass ? 'below_threshold' : 'incidental',
     reason: centralityPass ? `The ${qualityId} score was below ${thresholds.review.toFixed(2)}.` : `The ${qualityId} evidence was only incidental.`,
   };
+}
+
+function evaluatePhotoPlaceForQuest(
+  memory: ClassifiedMemory,
+  questId: string,
+  requiredPlaceType: PlaceType,
+  resolution?: PhotoPlaceResolution | null
+): PhotoQuestEvaluation {
+  const evidenceId = `photo:${memory.sourceId}`;
+  const candidate =
+    resolution?.selectedCandidate ??
+    (resolution?.status === 'needs_confirmation' ? resolution.alternatives[0] : undefined);
+  const requestedLabel = requiredPlaceType.replaceAll('_', ' ');
+  if (!resolution || resolution.status === 'no_location' || resolution.status === 'unresolved' || !candidate) {
+    return {
+      status: 'no_match',
+      questId,
+      qualityId: null,
+      score: 0,
+      centrality: null,
+      evidenceId,
+      requestedLabel,
+      reasonCode: 'place_unavailable',
+      reason: 'This photo has no reliable place evidence for the requested location.',
+    };
+  }
+  if (!placeTypeMatches(candidate.normalizedCategory, requiredPlaceType)) {
+    return {
+      status: 'no_match',
+      questId,
+      qualityId: null,
+      score: candidate.confidenceScore,
+      centrality: null,
+      evidenceId,
+      requestedLabel,
+      reasonCode: 'place_mismatch',
+      reason: `The strongest place evidence was ${candidate.normalizedCategory}, not ${requiredPlaceType}.`,
+    };
+  }
+  if (
+    questId === 'quest-new-cafe' &&
+    candidate.evidence.personalHistoryScore > 0
+  ) {
+    return {
+      status: 'no_match',
+      questId,
+      qualityId: null,
+      score: candidate.confidenceScore,
+      centrality: null,
+      evidenceId,
+      requestedLabel,
+      reasonCode: 'place_already_known',
+      reason: 'This café was selected before, so it does not count as somewhere new.',
+    };
+  }
+  if (candidate.userConfirmed) {
+    return {
+      status: 'ready',
+      questId,
+      qualityId: null,
+      score: candidate.confidenceScore,
+      centrality: 'primary',
+      evidenceId,
+      requestedLabel,
+      reasonCode: 'place_confirmed',
+      reason: `The user confirmed this photo was taken at a ${requestedLabel}.`,
+    };
+  }
+  const hybrid =
+    candidate.confidenceScore >= 0.8 &&
+    (candidate.evidence.categoryVisualScore >= 0.6 || candidate.evidence.ocrNameScore >= 0.85);
+  if (hybrid && (resolution.status === 'resolved' || resolution.status === 'category_only')) {
+    return {
+      status: 'ready',
+      questId,
+      qualityId: null,
+      score: candidate.confidenceScore,
+      centrality: 'primary',
+      evidenceId,
+      requestedLabel,
+      reasonCode: 'place_hybrid_match',
+      reason: `Photo location and image evidence both support ${requestedLabel}.`,
+    };
+  }
+  return {
+    status: 'possible',
+    questId,
+    qualityId: null,
+    score: candidate.confidenceScore,
+    centrality: 'supporting',
+    evidenceId,
+    requestedLabel,
+    reasonCode: 'place_needs_confirmation',
+    reason: `The photo may have been taken at a ${requestedLabel}, but needs confirmation.`,
+  };
+}
+
+function requiredPhotoPlaceType(
+  questId: string
+): PlaceType | null {
+  const explicit: Record<string, PlaceType> = {
+    'quest-new-cafe': 'cafe',
+    'quest-new-park': 'park',
+    'quest-visit-beach': 'beach',
+    'quest-visit-forest': 'nature',
+    'quest-visit-garden': 'park',
+    'quest-visit-museum': 'museum',
+  };
+  return explicit[questId] ?? null;
+}
+
+function placeTypeMatches(actual: PlaceType, required: PlaceType): boolean {
+  if (actual === required) return true;
+  if (required === 'museum') return actual === 'gallery';
+  if (required === 'park') return actual === 'playground' || actual === 'nature';
+  if (required === 'nature') return actual === 'park' || actual === 'beach';
+  return false;
 }
 
 function matchedSubjectForQuality(memory: ClassifiedMemory, qualityId: string) {

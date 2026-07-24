@@ -362,6 +362,9 @@ check('manual Watch / read starts by asking what it was', !todaySheetHostSource.
 check('automatic food follow-up cannot overlay any manual flow', todaySheetHostSource.includes('foodFollowUp && !blockingSheetOpen && !suppressFollowUps'));
 check('automatic studio follow-up cannot overlay any manual flow', todaySheetHostSource.includes('studioFollowUp && !blockingSheetOpen && !suppressFollowUps'));
 const todaySource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/today.tsx'), 'utf8');
+const inlineVoiceSource = fs.readFileSync(path.join(projectRoot, 'hooks/use-inline-voice-note.ts'), 'utf8');
+const inlineVoiceUiSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/inline-voice-note.tsx'), 'utf8');
+const noteInterpretSource = fs.readFileSync(path.join(projectRoot, 'utils/note-interpret.ts'), 'utf8');
 const hatchCheckInSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/hatch-check-in-sheet.tsx'), 'utf8');
 const hatchCheckInPlannerSource = fs.readFileSync(path.join(projectRoot, 'utils/hatch-check-in.ts'), 'utf8');
 const hatchControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-hatch-controller.ts'), 'utf8');
@@ -375,6 +378,19 @@ const momentCaptureSource = fs.readFileSync(path.join(projectRoot, 'app/moment-c
 check('all manual surfaces cancel pending food follow-up', todaySource.includes('suppressFoodFollowUp: anyManualSheetOpen'));
 check('all manual surfaces cancel pending studio follow-up', todaySource.includes('suppressStudioFollowUp: anyManualSheetOpen'));
 check('voice and written notes have distinct menu actions', todaySource.includes("id: 'voice_note'") && todaySource.includes("id: 'written_note'") && !todaySource.includes("title: 'Voice & note'"));
+check('voice recording and reading progress sit above the active egg',
+  todaySource.includes('<TodayKingdomEggAboveOverlay')
+    && todaySource.includes('<InlineVoiceNote')
+    && inlineVoiceUiSource.includes('Reading…')
+    && inlineVoiceUiSource.includes('release to finish'));
+check('finished voice notes open atomic journal review without an old confirmation card',
+  inlineVoiceSource.includes('const interpreted = await interpretNote({ audioUri }')
+    && inlineVoiceSource.indexOf('saveNote({') < inlineVoiceSource.indexOf("setPhase('idle')")
+    && !inlineVoiceSource.includes("'confirm'")
+    && !inlineVoiceSource.includes('const accept ='));
+check('voice and written transcripts share the Foundation atomic note interpreter',
+  noteInterpretSource.includes('transcript = await transcribeOnDevice(input.audioUri)')
+    && noteInterpretSource.includes('const local = await interpretNoteOnDevice(transcript)'));
 check('manual menu is grouped into capture, context, and more', ['capture', 'context', 'more'].every((section) => todaySource.includes(`section: '${section}'`)));
 const actionRouterSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-today-action-router.ts'), 'utf8');
 const dayJournalSectionsSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-journal-sections.tsx'), 'utf8');

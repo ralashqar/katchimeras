@@ -19,6 +19,7 @@ const registry = transpile('utils/manual-journal-registry.ts', 'registry.js');
 const catalog = transpile('utils/journal-classification-catalog.ts', 'catalog.js');
 const studio = transpile('utils/studio-detect.ts', 'studio.js');
 const journalRouting = transpile('utils/journal-routing.ts', 'journal-routing.js');
+const journalModelFlow = transpile('utils/journal-model-flow.ts', 'journal-model-flow.js');
 const evidencePath = transpile('utils/photo-journal-evidence.ts', 'evidence.js');
 const semanticPath = transpile('utils/photo-semantic-frame.ts', 'semantic.js');
 const analysisPath = transpile('utils/photo-journal-analysis.ts', 'analysis.js');
@@ -53,6 +54,7 @@ Module._resolveFilename = function (request, ...args) {
   if (request === '@/utils/journal-classification-catalog') return catalog;
   if (request === '@/utils/studio-detect') return studio;
   if (request === '@/utils/journal-routing') return journalRouting;
+  if (request === '@/utils/journal-model-flow') return journalModelFlow;
   if (request === '@/utils/photo-journal-evidence') return evidencePath;
   if (request === '@/utils/photo-semantic-frame') return semanticPath;
   if (request === '@/utils/foundation-scene') return foundationStub;

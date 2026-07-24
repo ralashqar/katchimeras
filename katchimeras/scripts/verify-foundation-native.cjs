@@ -5,6 +5,7 @@ const root = path.join(__dirname, '..');
 const swiftPath = path.join(root, 'modules', 'katchimera-foundation', 'ios', 'KatchimeraFoundationModule.swift');
 const easPath = path.join(root, 'eas.json');
 const foundationNotePath = path.join(root, 'utils', 'foundation-note.ts');
+const foundationNoteRoutingPath = path.join(root, 'utils', 'foundation-note-routing.ts');
 const intelligenceLabPath = path.join(root, 'app', 'intelligence-lab.tsx');
 const manualJournalPath = path.join(root, 'components', 'katchadeck', 'home', 'manual-journal-sheet.tsx');
 const foundationScenePath = path.join(root, 'utils', 'foundation-scene.ts');
@@ -14,6 +15,7 @@ const swift = fs.readFileSync(swiftPath, 'utf8');
 const generatedNote = fs.readFileSync(generatedNotePath, 'utf8');
 const allSwift = `${swift}\n${generatedNote}`;
 const foundationNote = fs.readFileSync(foundationNotePath, 'utf8');
+const foundationNoteRouting = fs.readFileSync(foundationNoteRoutingPath, 'utf8');
 const intelligenceLab = fs.readFileSync(intelligenceLabPath, 'utf8');
 const manualJournal = fs.readFileSync(manualJournalPath, 'utf8');
 const foundationScene = fs.readFileSync(foundationScenePath, 'utf8');
@@ -145,39 +147,46 @@ for (const name of requiredTypes) {
 check('NoteRead remains a small enrichment response',
   ['title', 'feeling', 'mediaKind', 'mediaTitle', 'mediaCreator', 'food'].every((field) => new RegExp(`let\\s+${field}:\\s+String`).test(generatedNote))
     && !/struct NoteRead[\s\S]*?let routeKey: String[\s\S]*?\n}/.test(generatedNote));
-check('availability diagnostics expose strict two-pass note schema v6', swift.includes('"noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion') && generatedNote.includes('schemaVersion = "6"'));
+check('availability diagnostics expose note schema v6', swift.includes('"noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion') && generatedNote.includes('schemaVersion = "6"'));
 check('route-only decision constrains atomic routes from every flow', ['went_somewhere.museum', 'food.meal', 'studio.film', 'movement.workout', 'people.my_child', 'work.learning', 'big_event.newHome', 'general.gratitude'].every((id) => generatedNote.includes(`"${id}"`)));
 check('focused retry uses the same generated taxonomy', swift.includes('classifyNoteRoute(transcript:') && swift.includes('JournalNoteRouteCatalog.promptTaxonomy'));
 check('focused route returns the generated journal field text',
   /struct NoteRouteDecision[\s\S]*?let specific: String[\s\S]*?\n}/.test(generatedNote)
     && swift.includes('"specific": response.content.specific'));
-check('note routing uses exactly two bounded Foundation classification tasks',
-  foundationNote.includes("taskId: 'note.flow.v1'")
-    && foundationNote.includes("taskId: 'note.child-route.v1'")
-    && !foundationNote.includes('Compatibility only for native clients predating the generic structured'));
+check('note routing uses one atomic Foundation classification task',
+  foundationNoteRouting.includes("taskId: 'note.atomic-route.v3'")
+    && !foundationNoteRouting.includes("taskId: 'note.flow.v2'")
+    && !foundationNoteRouting.includes("taskId: 'note.child-route.v1'"));
+check('atomic note routing derives the review flow from the selected category',
+  foundationNoteRouting.includes('journalModelFlowIdForInternalFlow(route.flowId)')
+    && foundationNoteRouting.includes("derivedFrom: 'atomic_route'")
+    && foundationNoteRouting.includes('suggestedFlowId: route.flowId'));
 check('strict routing has no registry or media route fallback',
   !foundationNote.includes('resolveFoundationRouteEvidence(')
     && !foundationNote.includes('registryJournalRoutes(')
     && !foundationNote.includes('foundationNoteRoute({'));
-check('both note classification passes request greedy sampling',
-  (foundationNote.match(/sampling: 'greedy'/g) ?? []).length === 2
+check('atomic note classification requests greedy sampling once',
+  (foundationNoteRouting.match(/sampling: 'greedy'/g) ?? []).length === 1
     && swift.includes('GenerationOptions(sampling: .greedy)'));
-check('top-level and subcategory confidences are independent',
-  foundationNote.includes("name: 'confidence', description: 'Independent confidence in the broad section choice'")
-    && foundationNote.includes("name: 'confidence', description: 'Independent confidence in this subcategory choice based only on the original note'")
-    && foundationNote.includes('Do not infer confidence from the fact that the broad section was selected.')
-    && !foundationNote.includes('routeConfidence: 0.9'));
-check('low-confidence top level stops before subcategory generation',
-  foundationNote.indexOf("if (topLevelConfidence !== 'high')") < foundationNote.indexOf("taskId: 'note.child-route.v1'"));
+check('atomic note route has one categorical confidence',
+  foundationNoteRouting.includes("{ name: 'confidence', description: 'Confidence in this category choice'")
+    && foundationNoteRouting.includes('topLevelConfidence: confidence')
+    && foundationNoteRouting.includes('subcategoryConfidence: confidence')
+    && !foundationNoteRouting.includes('routeConfidence: 0.9'));
+check('atomic note taxonomy is concise and covers the complete catalog',
+  foundationNoteRouting.includes('const NOTE_ROUTE_KEYS = JOURNAL_CLASSIFICATION_CATALOG.map')
+    && foundationNoteRouting.includes('Categories:\\n${NOTE_ROUTE_CATALOG}')
+    && !foundationNoteRouting.includes('Examples:'));
 check('note navigation is resolved before optional rich enrichment',
   foundationNote.indexOf('classifyNoteRouteOnDevice(text') < foundationNote.indexOf('nativeFoundation.interpretNoteAsync(text)')
     && foundationNote.includes('foundation_note_read_skipped_after_route'));
-check('note child routing receives only children of the locked flow',
-  foundationNote.includes('JOURNAL_CLASSIFICATION_CATALOG.filter((entry) => entry.flowId === flow.id)')
-    && foundationNote.includes('Start the classification again from the original note.'));
-check('note child routing cannot author the editable field',
-  foundationNote.includes("{ name: 'routeKey', description: `Best route inside the selected ${flow.id} section`")
-    && !foundationNote.includes("taskId: 'note.child-route.v1',\n      instructions: [\n        'Return a concise editable"));
+check('note atomic routing allows categories from every flow',
+  foundationNoteRouting.includes("{ name: 'routeKey', description: 'Best category ID'")
+    && foundationNoteRouting.includes('values: NOTE_ROUTE_KEYS')
+    && foundationNoteRouting.includes("routeStrategy: 'atomic_single_pass_v3'"));
+check('note atomic routing cannot author an editable field',
+  !foundationNoteRouting.includes("name: 'specific'")
+    && !foundationNoteRouting.includes("description: 'Specific"));
 check('note field extraction runs after the journal composer opens',
   foundationNote.includes('export async function extractNoteSpecificOnDevice(')
     && manualJournal.includes('void extractNoteSpecificOnDevice(transcript')
@@ -186,7 +195,10 @@ check('note field extraction runs after the journal composer opens',
 check('an empty enrichment response can retain a successful Foundation route',
   foundationNote.includes('if (!richResponseValid && !journalClassification && !routeRun.suggestedFlowId) return null')
     && foundationNote.includes('missing_or_invalid_label_or_archetype')
-    && foundationNote.includes('_split_route_used'));
+    && foundationNote.includes('_atomic_route_used'));
+check('note enrichment cannot override the accepted atomic route',
+  foundationNote.includes("selected?.flowId === 'studio'")
+    && foundationNote.includes("selected?.flowId === 'food'"));
 check('older note builds receive route-locked Foundation field enrichment',
   foundationNote.includes("taskId: 'note.specific.v1'")
     && foundationNote.includes('The supplied journal route is already selected and immutable')

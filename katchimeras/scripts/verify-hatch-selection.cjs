@@ -49,6 +49,7 @@ const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-realit
 const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'intelligence-taxonomy.js');
 const classificationPath = path.join(tempDir, 'intelligence-classification.js');
 fs.writeFileSync(classificationPath, 'exports.assignmentSignals = () => [];');
+const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 'photo-place-gameplay.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const selectionPath = transpileToTemp('utils/hatch-selection.ts', 'hatch-selection.js');
 
@@ -62,6 +63,7 @@ const stubs = {
   '@/utils/photo-reality': photoRealityPath,
   '@/utils/intelligence/taxonomy': taxonomyPath,
   '@/utils/intelligence/classification': classificationPath,
+  '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
   '@/utils/encounter-engine': enginePath,
   '@/utils/hatch-selection': selectionPath,
   '@/types/home': {},

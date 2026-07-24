@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -16,6 +15,7 @@ import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { TodayHexNeighborhood } from '@/components/katchadeck/home/today-hex-neighborhood';
 import type { TodayTileRenderMode } from '@/components/katchadeck/home/today-hex-neighborhood';
 import {
+  TodayKingdomEggAboveOverlay,
   TodayKingdomEggHero,
   TodayKingdomEggOverlay,
 } from '@/components/katchadeck/home/today-kingdom-egg-hero';
@@ -157,7 +157,6 @@ export default function HomeScreen() {
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
-  const tabBarHeight = useBottomTabBarHeight();
   const backfillStatus = useBackfillStatus();
   const { eggFeed, eggFeedKey, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
   const { promptSheetOpen, initialPrompt, openPromptSheet, closePromptSheet } = usePromptSheetController();
@@ -714,6 +713,14 @@ export default function HomeScreen() {
             renderDay={renderTimelineHero}
             renderDayOverlay={renderTimelineOverlay}
           />
+          {voiceNote.phase !== 'idle' ? (
+            <TodayKingdomEggAboveOverlay homeArchetypeId={homeArchetypeId}>
+              <InlineVoiceNote
+                elapsed={voiceNote.elapsed}
+                phase={voiceNote.phase}
+              />
+            </TodayKingdomEggAboveOverlay>
+          ) : null}
           {/* The same category ring circles the hatched creature when revisiting
               a day, anchored to the shared 258px egg/creature art stage. */}
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
@@ -944,21 +951,6 @@ export default function HomeScreen() {
         setMicrocopy={setMicrocopy}
         setDayName={setDayName}
       />
-      {voiceNote.phase !== 'idle' ? (
-        <InlineVoiceNote
-          phase={voiceNote.phase}
-          elapsed={voiceNote.elapsed}
-          result={voiceNote.result}
-          markBig={voiceNote.markBig}
-          onToggleBig={voiceNote.toggleMarkBig}
-          onAccept={voiceNote.accept}
-          onDiscard={voiceNote.discard}
-          onChooseSemantic={voiceNote.chooseSemantic}
-          semanticChoiceMade={voiceNote.semanticChoiceMade}
-          bottom={tabBarHeight}
-        />
-      ) : null}
-
       <MicrocopyToast message={microcopy} />
 
       {celebrateDiscovery && !flowBusy ? (

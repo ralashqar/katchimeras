@@ -8,6 +8,7 @@ import type { HomeDayRecord, RecentPhotoAsset } from '@/types/home';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { resolvePhotoLocation } from '@/utils/photo-location';
+import { resolvePhotoPlace } from '@/utils/photo-place-resolution';
 
 export type DayMapPhotoPermission = 'checking' | 'granted' | 'limited' | 'denied' | 'unavailable';
 
@@ -15,6 +16,8 @@ const PHOTO_PAGE_SIZE = 200;
 const MAX_PHOTO_PAGES = 20;
 const MAX_PHOTOS_PER_DAY = 160;
 const INFO_BATCH_SIZE = 8;
+const MAX_PLACE_RESOLUTIONS_PER_DAY = 24;
+const PLACE_BATCH_SIZE = 4;
 
 export function useDayMapPhotoRefresh(day: HomeDayRecord | null, onStored: () => void) {
   const [permission, setPermission] = useState<DayMapPhotoPermission>('checking');
@@ -54,6 +57,30 @@ export function useDayMapPhotoRefresh(day: HomeDayRecord | null, onStored: () =>
           assets.slice(index, index + INFO_BATCH_SIZE).map((asset) => toLocatedPhoto(MediaLibrary, asset))
         );
         photos.push(...batch.filter((photo): photo is RecentPhotoAsset => photo != null));
+      }
+      for (
+        let index = 0;
+        index < Math.min(photos.length, MAX_PLACE_RESOLUTIONS_PER_DAY);
+        index += PLACE_BATCH_SIZE
+      ) {
+        const batch = photos.slice(index, index + PLACE_BATCH_SIZE);
+        const resolutions = await Promise.all(
+          batch.map((photo) =>
+            resolvePhotoPlace({
+              photoId: photo.id,
+              coordinate:
+                photo.latitude != null && photo.longitude != null
+                  ? { latitude: photo.latitude, longitude: photo.longitude }
+                  : undefined,
+              capturedAt: new Date(photo.createdAt).toISOString(),
+              imageSource: 'photo_library',
+            })
+          )
+        );
+        resolutions.forEach((resolution, offset) => {
+          const photo = photos[index + offset];
+          if (photo) photo.placeResolution = resolution;
+        });
       }
       // A successful scan replaces the prior passive-photo points even when no
       // valid geotags remain. This removes corrupt pins imported by older code.

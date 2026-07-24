@@ -5,6 +5,7 @@ import type {
   StoredHomeLocationPoint,
   StoredHomeState,
 } from '@/types/home';
+import type { PhotoPlaceResolution } from '@/types/photo-place';
 import { upsertEvidence } from '@/utils/intelligence/evidence';
 import { upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
@@ -187,7 +188,20 @@ export function withRefreshedPhotoLocationsForDay(
     if (index >= 0) locations[index] = point;
     else locations.push(point);
   }
-  const nextDay = { ...target, locations: locations.slice(-MAX_STORED_DAY_LOCATIONS) };
+  const resolutions = keepers
+    .map(({ photo }) => photo.placeResolution)
+    .filter((resolution): resolution is PhotoPlaceResolution => resolution != null);
+  const photoPlaceResolutions = resolutions.reduce<PhotoPlaceResolution[]>((rows, resolution) => {
+    const index = rows.findIndex((item) => item.photoId === resolution.photoId);
+    if (index >= 0) rows[index] = resolution;
+    else rows.push(resolution);
+    return rows;
+  }, [...(target.photoPlaceResolutions ?? [])]);
+  const nextDay = {
+    ...target,
+    locations: locations.slice(-MAX_STORED_DAY_LOCATIONS),
+    photoPlaceResolutions,
+  };
   if (state.today.id === dayId) return { ...state, today: nextDay };
   if (state.tomorrow?.id === dayId) return { ...state, tomorrow: nextDay };
   return { ...state, archivedDays: state.archivedDays.map((day) => day.id === dayId ? nextDay : day) };

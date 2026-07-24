@@ -17,6 +17,9 @@ import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
 import { safeDismissModal } from '@/utils/safe-navigation';
 import { markPhotoProcessed } from '@/utils/processed-photos';
+import { resolvePhotoLocation } from '@/utils/photo-location';
+import { resolvePhotoPlace } from '@/utils/photo-place-resolution';
+import type { PhotoPlaceResolution } from '@/types/photo-place';
 
 // "This photo meant something" → opens the chosen photo full, reads its essence
 // on-device, asks what it meant (essence-based options), then feeds the day with
@@ -42,6 +45,7 @@ export default function PhotoEssenceRoute() {
   const dayScores = mapDay?.scores ?? (selectedDay?.kind === 'day' ? selectedDay.scores : null);
   const localUriRef = useRef<string | null>(null);
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
+  const placeResolutionRef = useRef<PhotoPlaceResolution | null>(null);
 
   // Load the asset's decodable local file (camera-roll candidates only carry a
   // thumbnail), then read it on-device. Best-effort — null degrades gracefully.
@@ -73,14 +77,39 @@ export default function PhotoEssenceRoute() {
           Number.isFinite(Number(assetInfo.location?.longitude)),
       } : null;
       rawVisionRef.current = enrichedResult;
+      const coordinate = resolvePhotoLocation(
+        assetInfo.location?.latitude,
+        assetInfo.location?.longitude,
+        (info as { exif?: Record<string, unknown> | null }).exif ?? null
+      );
+      placeResolutionRef.current = await resolvePhotoPlace(
+        {
+          photoId: assetId,
+          coordinate: coordinate ?? undefined,
+          capturedAt: params.capturedAt,
+          ocrText: [
+            ...(result?.recognizedText?.map((item) => item.text) ?? []),
+            ...(result?.text ?? []),
+          ],
+          visualTags: (result?.labels ?? []).map((label) => ({
+            label: label.name,
+            confidence: label.confidence,
+          })),
+          imageSource: 'photo_library',
+        },
+        // A passive library scan may already have stored a geography-only
+        // result. Re-score now that OCR and visual evidence are available.
+        { force: true }
+      );
       return {
         rawVision: enrichedResult,
         summary: enrichedResult ? aggregatePhotoVision([enrichedResult], CAPTURE_PHOTO_CONFIDENCE_FLOOR) : null,
+        placeResolution: placeResolutionRef.current,
       };
     } catch {
       return { rawVision: null, summary: null };
     }
-  }, [assetId]);
+  }, [assetId, params.capturedAt]);
 
   const commit = useCallback(
     // `scene` is the hierarchical read EssenceReview resolved (and showed).
@@ -120,6 +149,7 @@ export default function PhotoEssenceRoute() {
         confirmations,
         classifiedMemory: reviewed?.memory ?? null,
         evidence: reviewed?.evidence ?? null,
+        placeResolution: reviewed?.placeResolution ?? placeResolutionRef.current,
         journal,
       };
       if (explicitDayId) {

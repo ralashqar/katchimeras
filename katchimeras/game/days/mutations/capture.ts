@@ -1,4 +1,5 @@
 import type { ClassifiedMemory, DayEvidence, DayScores, DayVisionSummary, ManualJournalSubmission, StoredHomeDayRecord, UserConfirmation } from '@/types/home';
+import type { PhotoPlaceResolution } from '@/types/photo-place';
 import { mergeCaptureEnergy } from '@/utils/capture-energy';
 import type { FoodDetection } from '@/utils/food-detect';
 import { upsertEvidence } from '@/utils/intelligence/evidence';
@@ -25,6 +26,7 @@ export type CapturedMomentInput = {
   scene?: SceneRead;
   confirmations?: UserConfirmation[];
   classifiedMemory?: ClassifiedMemory | null;
+  placeResolution?: PhotoPlaceResolution | null;
   evidence?: DayEvidence | null;
   meaning?: { archetype: string; label: string; thumbnailUri?: string | null; sourceId?: string | null };
   journal?: ManualJournalSubmission | null;
@@ -95,6 +97,9 @@ export function withCapturedMoment(
     classifiedMemories: classifiedMemory
       ? upsertClassifiedMemory(day.classifiedMemories, [classifiedMemory])
       : day.classifiedMemories,
+    photoPlaceResolutions: capture.placeResolution
+      ? upsertPlaceResolution(day.photoPlaceResolutions, capture.placeResolution)
+      : day.photoPlaceResolutions,
     foodMoments: !options.journalOnly && detections.food.detected
       ? appendFoodMoment(
           day.foodMoments,
@@ -122,4 +127,15 @@ export function withCapturedMoment(
       : day.studioMoments,
   };
   return capture.journal ? withManualJournalEntry(captured, capture.journal, now) : captured;
+}
+
+function upsertPlaceResolution(
+  existing: PhotoPlaceResolution[] | undefined,
+  resolution: PhotoPlaceResolution
+): PhotoPlaceResolution[] {
+  const rows = [...(existing ?? [])];
+  const index = rows.findIndex((item) => item.photoId === resolution.photoId);
+  if (index >= 0) rows[index] = resolution;
+  else rows.push(resolution);
+  return rows;
 }

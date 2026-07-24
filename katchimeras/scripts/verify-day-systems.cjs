@@ -56,6 +56,7 @@ fs.writeFileSync(classificationPath, 'exports.assignmentSignals = () => [];');
 const classificationPolicyPath = path.join(tempDir, 'intelligence-classification-policy.js');
 fs.writeFileSync(classificationPolicyPath, 'exports.visionSignalIsRejected = () => false;');
 const photoSubjectProjectionPath = transpileToTemp('utils/intelligence/photo-subject-projection.ts', 'photo-subject-projection.js');
+const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 'photo-place-gameplay.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const dayTagsPath = transpileToTemp('utils/day-tags.ts', 'day-tags.js');
 const dexPath = transpileToTemp('utils/dex.ts', 'dex.js');
@@ -72,6 +73,7 @@ const stubs = {
   '@/utils/intelligence/classification': classificationPath,
   '@/utils/intelligence/classification-policy': classificationPolicyPath,
   '@/utils/intelligence/photo-subject-projection': photoSubjectProjectionPath,
+  '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
   '@/utils/encounter-engine': enginePath,
   '@/utils/day-tags': dayTagsPath,
   '@/utils/dex': dexPath,
