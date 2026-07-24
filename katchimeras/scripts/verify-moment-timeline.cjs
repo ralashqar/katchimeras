@@ -159,9 +159,19 @@ check('game photo uses the game controller instead of its calm leaf', gamePhoto?
 const todayCategoriesSource = fs.readFileSync(path.join(projectRoot, 'utils/today-categories.ts'), 'utf8');
 const journalSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-journal-sections.tsx'), 'utf8');
 const sanctuarySource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/sanctuary-sheet.tsx'), 'utf8');
+const cardViewerSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/cards/daily-card-viewer.tsx'), 'utf8');
 check('Moments badge uses the shared projection', todayCategoriesSource.includes('buildMomentTimeline(day).length'));
 check('Today timeline uses the shared projection', journalSource.includes('buildMomentTimeline(day).map'));
-check('pressed Moments reader uses the shared projection', sanctuarySource.includes('buildMomentTimeline(day).map'));
+check(
+  'pressed Moments reader uses the shared projection',
+  sanctuarySource.includes('buildMomentTimeline(day)') && sanctuarySource.includes('<CompactMomentList')
+);
+check(
+  'daily card back uses the shared projection and compact Moments list',
+  cardViewerSource.includes('buildMomentTimeline(day)')
+    && cardViewerSource.includes('<CompactMomentList')
+    && cardViewerSource.includes('<DailyCardBackFrame')
+);
 
 Module._resolveFilename = originalResolve;
 fs.rmSync(tempDir, { recursive: true, force: true });

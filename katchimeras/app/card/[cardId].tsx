@@ -1,11 +1,14 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
-import { DailyCard } from '@/components/katchadeck/cards/daily-card';
+import { DailyCardViewer } from '@/components/katchadeck/cards/daily-card-viewer';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
+import type { DailyCardFace } from '@/utils/daily-card-flip';
 
 export default function CardDetailRoute() {
   const { cardId } = useLocalSearchParams<{ cardId?: string }>();
@@ -13,6 +16,8 @@ export default function CardDetailRoute() {
   const decodedId = cardId ? decodeURIComponent(cardId) : '';
   const day = days.find((candidate) => candidate.card?.id === decodedId) ?? null;
   const card = day?.card ?? null;
+  const [cardFace, setCardFace] = useState<DailyCardFace>('front');
+  const handleFaceChange = useCallback((face: DailyCardFace) => setCardFace(face), []);
 
   return (
     <View style={styles.screen}>
@@ -25,31 +30,34 @@ export default function CardDetailRoute() {
       <ScrollView
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
+        directionalLockEnabled
         showsVerticalScrollIndicator={false}>
         {card && day ? (
           <>
-            <DailyCard card={card} sceneArt="kingdom" />
-            <View style={styles.section}>
-              <ThemedText type="subtitle" style={styles.sectionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                Collector notes
-              </ThemedText>
-              {card.rarityReason ? (
-                <View style={styles.factCard}>
-                  <ThemedText style={styles.factLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>WHY IT WAS {card.rarity.toUpperCase()}</ThemedText>
-                  <ThemedText selectable style={styles.factText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                    Only from {card.rarityReason}.
-                  </ThemedText>
-                </View>
-              ) : null}
-              {day.creature?.fieldEchoes?.length ? (
-                <View style={styles.factCard}>
-                  <ThemedText style={styles.factLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>ALMOST CAUGHT</ThemedText>
-                  <ThemedText selectable style={styles.factText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                    {day.creature.fieldEchoes.slice(0, 2).map((echo) => `${echo.name} · ${Math.round(echo.probability * 100)}%`).join('\n')}
-                  </ThemedText>
-                </View>
-              ) : null}
-            </View>
+            <DailyCardViewer card={card} day={day} onFaceChange={handleFaceChange} />
+            {cardFace === 'front' ? (
+              <Animated.View entering={FadeInDown.duration(220)} exiting={FadeOutDown.duration(160)} style={styles.section}>
+                <ThemedText type="subtitle" style={styles.sectionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+                  Collector notes
+                </ThemedText>
+                {card.rarityReason ? (
+                  <View style={styles.factCard}>
+                    <ThemedText style={styles.factLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>WHY IT WAS {card.rarity.toUpperCase()}</ThemedText>
+                    <ThemedText selectable style={styles.factText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                      Only from {card.rarityReason}.
+                    </ThemedText>
+                  </View>
+                ) : null}
+                {day.creature?.fieldEchoes?.length ? (
+                  <View style={styles.factCard}>
+                    <ThemedText style={styles.factLabel} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>ALMOST CAUGHT</ThemedText>
+                    <ThemedText selectable style={styles.factText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                      {day.creature.fieldEchoes.slice(0, 2).map((echo) => `${echo.name} · ${Math.round(echo.probability * 100)}%`).join('\n')}
+                    </ThemedText>
+                  </View>
+                ) : null}
+              </Animated.View>
+            ) : null}
           </>
         ) : (
           <View style={styles.empty}>

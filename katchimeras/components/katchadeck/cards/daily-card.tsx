@@ -126,7 +126,7 @@ export function CompactDailyCardSizeProvider({ children, size }: { children: Rea
 
 export const DailyCard = memo(function DailyCard({ card, compact, frameSize, onPress, renderTier = 'focused', sceneArt = 'day', style, variant = compact ? 'carousel' : 'detail' }: DailyCardProps) {
   const inheritedSize = use(CompactDailyCardSizeContext);
-  const fixedSize = variant === 'carousel' ? frameSize ?? inheritedSize : null;
+  const fixedSize = frameSize ?? (variant === 'carousel' ? inheritedSize : null);
   if (fixedSize) {
     return <ResolvedDailyCard card={card} onPress={onPress} renderTier={renderTier} sceneArt={sceneArt} size={fixedSize} style={style} variant={variant} />;
   }

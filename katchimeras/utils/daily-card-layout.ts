@@ -32,6 +32,11 @@ export const COMPACT_DAILY_CARD_MAX_WIDTH = 318;
 export const COMPACT_DAILY_CARD_HORIZONTAL_GUTTER = 54;
 export const COMPACT_DAILY_CARD_MAX_HEIGHT = COMPACT_DAILY_CARD_MAX_WIDTH / COMPACT_CARD_ASPECT_RATIO;
 
+export const DAILY_CARD_BACK_RECTS = {
+  header: { x: 112, y: 326, width: 717, height: 110 },
+  moments: { x: 95, y: 450, width: 751, height: 1005 },
+} as const;
+
 export type DailyCardSize = {
   height: number;
   scale: number;

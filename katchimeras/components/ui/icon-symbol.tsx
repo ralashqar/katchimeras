@@ -24,6 +24,7 @@ const MAPPING = {
   'star.fill': 'star',
   'sparkles': 'auto-awesome',
   'arrow.counterclockwise': 'refresh',
+  'rectangle.portrait.and.arrow.right': 'flip',
   'xmark': 'close',
   'figure.walk': 'directions-walk',
   'mappin.and.ellipse': 'location-on',
