@@ -145,59 +145,83 @@ for (const name of requiredTypes) {
 check('NoteRead remains a small enrichment response',
   ['title', 'feeling', 'mediaKind', 'mediaTitle', 'mediaCreator', 'food'].every((field) => new RegExp(`let\\s+${field}:\\s+String`).test(generatedNote))
     && !/struct NoteRead[\s\S]*?let routeKey: String[\s\S]*?\n}/.test(generatedNote));
-check('availability diagnostics expose split-call note schema v5', swift.includes('"noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion') && generatedNote.includes('schemaVersion = "5"'));
+check('availability diagnostics expose strict two-pass note schema v6', swift.includes('"noteSchemaVersion": JournalNoteRouteCatalog.schemaVersion') && generatedNote.includes('schemaVersion = "6"'));
 check('route-only decision constrains atomic routes from every flow', ['went_somewhere.museum', 'food.meal', 'studio.film', 'movement.workout', 'people.my_child', 'work.learning', 'big_event.newHome', 'general.gratitude'].every((id) => generatedNote.includes(`"${id}"`)));
 check('focused retry uses the same generated taxonomy', swift.includes('classifyNoteRoute(transcript:') && swift.includes('JournalNoteRouteCatalog.promptTaxonomy'));
 check('focused route returns the generated journal field text',
   /struct NoteRouteDecision[\s\S]*?let specific: String[\s\S]*?\n}/.test(generatedNote)
     && swift.includes('"specific": response.content.specific'));
-check('note routing uses two bounded Foundation tasks before the legacy focused call',
+check('note routing uses exactly two bounded Foundation classification tasks',
   foundationNote.includes("taskId: 'note.flow.v1'")
     && foundationNote.includes("taskId: 'note.child-route.v1'")
-    && foundationNote.includes('Compatibility only for native clients predating the generic structured'));
-check('the split Foundation route supersedes retired combined routing fields',
-  foundationNote.includes('focusedAtomic ? null : firstAtomic')
-    && foundationNote.includes('focusedAtomic,\n      { includeRegistryEvidence'));
+    && !foundationNote.includes('Compatibility only for native clients predating the generic structured'));
+check('strict routing has no registry or media route fallback',
+  !foundationNote.includes('resolveFoundationRouteEvidence(')
+    && !foundationNote.includes('registryJournalRoutes(')
+    && !foundationNote.includes('foundationNoteRoute({'));
+check('both note classification passes request greedy sampling',
+  (foundationNote.match(/sampling: 'greedy'/g) ?? []).length === 2
+    && swift.includes('GenerationOptions(sampling: .greedy)'));
+check('top-level and subcategory confidences are independent',
+  foundationNote.includes("name: 'confidence', description: 'Independent confidence in the broad section choice'")
+    && foundationNote.includes("name: 'confidence', description: 'Independent confidence in this subcategory choice based only on the original note'")
+    && foundationNote.includes('Do not infer confidence from the fact that the broad section was selected.')
+    && !foundationNote.includes('routeConfidence: 0.9'));
+check('low-confidence top level stops before subcategory generation',
+  foundationNote.indexOf("if (topLevelConfidence !== 'high')") < foundationNote.indexOf("taskId: 'note.child-route.v1'"));
 check('note navigation is resolved before optional rich enrichment',
   foundationNote.indexOf('classifyNoteRouteOnDevice(text') < foundationNote.indexOf('nativeFoundation.interpretNoteAsync(text)')
     && foundationNote.includes('foundation_note_read_skipped_after_route'));
 check('note child routing receives only children of the locked flow',
   foundationNote.includes('JOURNAL_CLASSIFICATION_CATALOG.filter((entry) => entry.flowId === flow.id)')
-    && foundationNote.includes('The broad journal section ${flow.id} is already selected and immutable'));
+    && foundationNote.includes('Start the classification again from the original note.'));
 check('note child routing cannot author the editable field',
-  foundationNote.includes("fields: [{ name: 'routeKey', description: `Best route inside the locked ${flow.id} section`")
-    && foundationNote.includes('Choose one route.`'));
+  foundationNote.includes("{ name: 'routeKey', description: `Best route inside the selected ${flow.id} section`")
+    && !foundationNote.includes("taskId: 'note.child-route.v1',\n      instructions: [\n        'Return a concise editable"));
 check('note field extraction runs after the journal composer opens',
   foundationNote.includes('export async function extractNoteSpecificOnDevice(')
     && manualJournal.includes('void extractNoteSpecificOnDevice(transcript')
     && manualJournal.includes('setNoteSpecificLoading(true)')
     && manualJournal.includes('specificEditedRef.current'));
 check('an empty enrichment response can retain a successful Foundation route',
-  foundationNote.includes('if (!richResponseValid && !journalClassification) return null')
+  foundationNote.includes('if (!richResponseValid && !journalClassification && !routeRun.suggestedFlowId) return null')
     && foundationNote.includes('missing_or_invalid_label_or_archetype')
     && foundationNote.includes('_split_route_used'));
 check('older note builds receive route-locked Foundation field enrichment',
   foundationNote.includes("taskId: 'note.specific.v1'")
     && foundationNote.includes('The supplied journal route is already selected and immutable')
     && foundationNote.includes('never the whole note'));
-check('availability diagnostics expose generic-bridge photo schema v13', swift.includes('"photoSchemaVersion": JournalNoteRouteCatalog.photoSchemaVersion') && generatedNote.includes('photoSchemaVersion = "13"') && swift.includes('"structuredBridgeVersion": "1"'));
+check('availability diagnostics expose native bridge schema v14 and app prompt contract v16',
+  swift.includes('"photoSchemaVersion": JournalNoteRouteCatalog.photoSchemaVersion')
+    && generatedNote.includes('photoSchemaVersion = "14"')
+    && foundationScene.includes('FOUNDATION_PHOTO_SCHEMA_VERSION = 16')
+    && swift.includes('"structuredBridgeVersion": "1"'));
+check('installed photo schema v13 remains compatible with the dynamic bridge',
+  foundationScene.includes('FOUNDATION_PHOTO_MIN_COMPATIBLE_SCHEMA_VERSION = 13')
+    && foundationScene.includes('(availability.photoSchemaVersion ?? 0) >= FOUNDATION_PHOTO_MIN_COMPATIBLE_SCHEMA_VERSION'));
 check('generic native bridge accepts bounded runtime string and enum schemas',
   swift.includes('AsyncFunction("generateStructuredAsync")')
     && swift.includes('request.fields.count <= 16')
     && swift.includes('DynamicGenerationSchema(type: String.self)')
     && swift.includes('field.kind == "enum"')
     && swift.includes('requestJson.utf8.count <= 64_000'));
-check('active photo passes use the generic bridge with specialized compatibility fallbacks',
-  foundationScene.includes("mode === 'primary' ? 'photo.top-level.v2' : mode === 'retry' ? 'photo.top-level.retry.v2' : 'photo.top-level.repair.v2'")
-    && foundationScene.includes("name: 'topLevel'")
-    && foundationScene.includes("taskId: 'photo.top-level-ambiguity.v1'")
-    && foundationScene.includes("compatibilityFallback: 'interpretPhotoSemanticsAsync'")
-    && !foundationScene.includes("name: 'flowKey', description: 'Broad journal flow for primary subject'")
-    && foundationScene.includes("runGenericRouteTask(evidence, 'photo.child-route.v1')")
+check('active photo passes use fresh greedy generic bridge tasks',
+  foundationScene.includes("mode === 'primary' ? 'photo.top-level.v4' : mode === 'retry' ? 'photo.top-level.retry.v4' : 'photo.top-level.repair.v4'")
+    && foundationScene.includes("name: 'flowId'")
+    && foundationScene.includes("name: 'confidence'")
+    && foundationScene.includes("sampling: 'greedy'")
+    && foundationScene.includes('lockedPrincipalEvidenceKey = frame.primaryEvidenceKeys[0]')
+    && foundationScene.includes("runGenericRouteTask('photo.child-route.v4')")
+    && foundationScene.includes("taskId: 'photo.child-route-verifier.v1'")
     && foundationScene.includes("'photo.book-ocr.v1'")
     && foundationScene.includes('generateStructuredTask('));
 check('photo journal bridge receives taxonomy and prompts dynamically', swift.includes('taskInstructions: String') && swift.includes('candidateIds: [String]') && swift.includes('candidateDescriptions: [String]'));
-check('live photo routing uses the generic task bridge with a bounded route enum', foundationScene.includes('runGenericRouteTask') && foundationScene.includes("name: 'routeKey'") && foundationScene.includes("outputSchema: 'PhotoRouteDecision.routeKey'"));
+check('live photo routing uses the generic task bridge with bounded route, confidence, and grounding enums',
+  foundationScene.includes('runGenericRouteTask')
+    && foundationScene.includes("name: 'routeKey'")
+    && foundationScene.includes("outputSchema: 'PhotoRouteDecision.routeKey+confidence+independentGrounding'")
+    && foundationScene.includes("name: 'evidenceKey'")
+    && foundationScene.includes("values: ['none', ...semanticFrame.classificationEvidenceKeys]"));
 check('photo route schema is restricted at runtime to evidence-supported route keys', swift.includes('DynamicGenerationSchema(name: "routeKey", anyOf: allowedRouteKeys)') && swift.includes('JournalNoteRouteCatalog.routeKeys.contains(cleanKey)'));
 const photoRouteMethod = swift.slice(swift.indexOf('private static func classifyPhotoRoute'), swift.indexOf('private static func suggest'));
 check('photo route prompt treats input as visual evidence rather than note prose', photoRouteMethod.includes('The input is') && photoRouteMethod.includes('visual evidence, never journal prose') && !photoRouteMethod.includes('The note says:'));

@@ -4,15 +4,14 @@ import { interpretNoteText, type NoteArchetype } from '@/utils/note-meaning';
 import type { JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import {
   classificationForResolvedRoute,
-  foundationNoteRoute,
-  journalNoteRouteNeedsConfirmation,
-  rankJournalRoutes,
-  resolveFoundationRouteEvidence,
-  parseFoundationJournalClassification,
+  journalRouteForKey,
   type FoundationAtomicRouteRead,
 } from '@/utils/journal-routing';
+import {
+  classifyNoteRouteWithRunner as runStrictTwoPassFoundationRoute,
+  type FoundationConfidenceLevel,
+} from '@/utils/foundation-note-routing';
 import { saveDevLastNoteAnalysis, type DevNoteAnalysisStatus } from '@/utils/dev-note-analysis';
-import { isFoundationOnlyNoteRoutingEnabled } from '@/utils/dev-settings';
 import { MANUAL_JOURNAL_FLOWS } from '@/utils/manual-journal-registry';
 import { JOURNAL_CLASSIFICATION_CATALOG } from '@/utils/journal-classification-catalog';
 
@@ -61,12 +60,19 @@ const VALID_MEDIA_KINDS: StudioMediaType[] = ['book', 'film', 'show', 'game', 'm
 const FIRST_PASS_TIMEOUT_MS = 3000;
 const TOTAL_TIMEOUT_MS = 9000;
 const FLOW_ROUTE_TIMEOUT_MS = 3500;
+const FOUNDATION_CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
 
 type FoundationRouteRun = {
-  raw: (FoundationAtomicRouteRead & Record<string, unknown>) | null;
+  raw: (Record<string, unknown>) | null;
+  suggestedFlowId: string | null;
+  topLevelConfidence: FoundationConfidenceLevel | null;
+  subcategoryConfidence: FoundationConfidenceLevel | null;
+  topLevelResponse: Record<string, unknown> | null;
+  subcategoryResponse: Record<string, unknown> | null;
   durationMs: number;
   failure: 'timeout' | 'error' | null;
 };
+export type { FoundationConfidenceLevel } from '@/utils/foundation-note-routing';
 
 export type OnDeviceNoteRead = {
   archetype: NoteArchetype;
@@ -81,6 +87,9 @@ export type OnDeviceNoteRead = {
   llmClassified: boolean;
   journalClassification: JournalNoteClassification | null;
   journalRoutes: JournalRouteProposal[];
+  suggestedJournalFlowId: string | null;
+  topLevelConfidence: FoundationConfidenceLevel | null;
+  subcategoryConfidence: FoundationConfidenceLevel | null;
 };
 
 export function isFoundationNoteAvailable(): boolean {
@@ -104,7 +113,6 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
   const text = transcript.trim();
   if (!text) return null;
   const startedAt = Date.now();
-  const foundationOnlyRouting = isFoundationOnlyNoteRoutingEnabled();
   const foundationAvailable = isFoundationNoteAvailable();
   if (!nativeFoundation?.interpretNoteAsync || !foundationAvailable) {
     recordDevNote(text, startedAt, foundationAvailable, 'unavailable', nativeFoundation?.interpretNoteAsync ? 'foundation_model_unavailable' : 'native_note_reader_missing');
@@ -150,46 +158,24 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
           }
         : null;
     const food = llmClassified ? cleanShort(raw.food, 60) : null;
-    const parsedLegacy = parseFoundationJournalClassification(raw);
-    const firstAtomic: FoundationAtomicRouteRead = cleanString(raw.routeKey)
-      ? raw
-      : parsedLegacy?.flowId && parsedLegacy.categoryId
-        ? {
-            routeKey: `${parsedLegacy.flowId}.${parsedLegacy.categoryId}`,
-            routeConfidence: parsedLegacy.kind === 'generic' ? 0.68 : 0.9,
-            specific: raw.specific,
-            context: raw.context,
-            journalFeeling: raw.journalFeeling,
-          }
-        : raw;
-    let retryRaw = routeRun.raw;
+    const retryRaw = routeRun.raw;
     const retryDurationMs = routeRun.durationMs;
     const retryFailure = routeRun.failure;
-    // When the focused call succeeds it is the sole Foundation routing read.
-    // Ignore route fields from schema-v4 NoteRead responses so the retired,
-    // overloaded call cannot compete with the dedicated route decision.
-    const focusedAtomic = cleanString(retryRaw?.routeKey) ? retryRaw : null;
-    const decision = resolveFoundationRouteEvidence(
-      text,
-      focusedAtomic ? null : firstAtomic,
-      focusedAtomic,
-      { includeRegistryEvidence: !foundationOnlyRouting }
-    );
-    const mediaRoute = media
-      ? foundationNoteRoute({ provider: 'appleFoundation', llmClassified, mediaType: media.mediaType })
-      : null;
-    const journalRoutes = decision.routes.length ? decision.routes : rankJournalRoutes([mediaRoute]);
-    const selected = decision.selected ?? (journalRoutes.length === 1 && !journalNoteRouteNeedsConfirmation(journalRoutes) ? journalRoutes[0] : null);
+    const journalRoutes = retryRaw?.routeKey
+      ? [journalRouteForKey(
+          String(retryRaw.routeKey),
+          confidenceValue(routeRun.subcategoryConfidence),
+          `Apple Foundation selected this subcategory with ${routeRun.subcategoryConfidence ?? 'unknown'} confidence`
+        )].filter((route): route is JournalRouteProposal => !!route)
+      : [];
+    const selected = routeRun.subcategoryConfidence === 'high' ? journalRoutes[0] ?? null : null;
     const selectedRaw = retryRaw ? { ...raw, ...retryRaw } : raw;
-    const classificationSource = cleanString(raw.routeKey) || cleanString(retryRaw?.routeKey)
-      ? decision.decisionSource
-      : 'legacy';
     const journalClassification = selected
-      ? classificationForResolvedRoute(selected, selectedRaw, classificationSource)
+      ? classificationForResolvedRoute(selected, selectedRaw, 'foundation')
       : null;
     const status: DevNoteAnalysisStatus = journalClassification
-      ? mediaRoute && !decision.routes.length ? 'media_fallback' : 'classified'
-      : journalRoutes.length ? 'ambiguous' : 'unrouted';
+      ? 'classified'
+      : journalRoutes.length || routeRun.suggestedFlowId ? 'ambiguous' : 'unrouted';
     const focusedRouteUsed = !!cleanString(retryRaw?.routeKey);
     const firstPassFailure = outcome.kind === 'timeout'
       ? `foundation_enrichment_exceeded_${readTimeout}ms`
@@ -206,20 +192,48 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
         ? 'split_foundation_route_used'
       : retryFailure
         ? `split_route_${retryFailure}`
+      : routeRun.topLevelConfidence !== 'high'
+        ? `top_level_${routeRun.topLevelConfidence ?? 'invalid'}_needs_confirmation`
+      : routeRun.subcategoryConfidence !== 'high'
+        ? `subcategory_${routeRun.subcategoryConfidence ?? 'invalid'}_needs_confirmation`
       : status === 'ambiguous'
         ? 'route_candidates_need_confirmation'
-        : status === 'media_fallback'
-          ? 'structured_route_missing_using_media_kind'
-          : status === 'unrouted'
-            ? 'no_valid_structured_route_or_supported_fallback'
-            : null;
-    recordDevNote(text, startedAt, true, status, fallbackReason, raw, journalClassification, media, food, retryRaw, journalRoutes, firstPassDurationMs, retryDurationMs);
+        : status === 'unrouted'
+          ? 'no_valid_two_pass_foundation_route'
+          : null;
+    recordDevNote(
+      text,
+      startedAt,
+      true,
+      status,
+      fallbackReason,
+      raw,
+      journalClassification,
+      media,
+      food,
+      retryRaw,
+      journalRoutes,
+      firstPassDurationMs,
+      retryDurationMs,
+      routeRun
+    );
 
     // A failed enrichment read must not erase a successful Foundation route.
     // The local presentation is used only for a temporary title/mood on old
     // builds; journalClassification and journalRoutes remain Foundation output.
-    if (!richResponseValid && !journalClassification) return null;
-    return { archetype, label, media, food, llmClassified, journalClassification, journalRoutes };
+    if (!richResponseValid && !journalClassification && !routeRun.suggestedFlowId) return null;
+    return {
+      archetype,
+      label,
+      media,
+      food,
+      llmClassified,
+      journalClassification,
+      journalRoutes,
+      suggestedJournalFlowId: routeRun.suggestedFlowId,
+      topLevelConfidence: routeRun.topLevelConfidence,
+      subcategoryConfidence: routeRun.subcategoryConfidence,
+    };
   } catch (error) {
     recordDevNote(text, startedAt, true, 'native_error', error instanceof Error ? error.message : 'unknown_native_error');
     return null;
@@ -227,92 +241,164 @@ export async function interpretNoteOnDevice(transcript: string): Promise<OnDevic
 }
 
 async function classifyNoteRouteOnDevice(transcript: string, timeoutMs: number): Promise<FoundationRouteRun> {
+  if (!nativeFoundation?.generateStructuredAsync) return emptyRouteRun(0, 'error');
+  return runStrictTwoPassFoundationRoute(transcript, timeoutMs, runStructuredNoteTask);
+}
+
+async function classifyNoteRouteWithRunnerReference(
+  transcript: string,
+  timeoutMs: number,
+  runner: StructuredNoteTaskRunner
+): Promise<FoundationRouteRun> {
   const startedAt = Date.now();
-  if (nativeFoundation?.generateStructuredAsync) {
     const flows = MANUAL_JOURNAL_FLOWS.map((flow) => flow.id);
     const flowSummary = MANUAL_JOURNAL_FLOWS
       .map((flow) => `${flow.id}: ${flow.shortTitle ?? flow.title}. ${flow.description ?? ''}`.trim())
       .join('\n');
-    const flowRun = await runStructuredNoteTask({
+    const flowRun = await runner({
       taskId: 'note.flow.v1',
       instructions: [
         'Choose the single best broad journal section for one personal note.',
-        'Select only from the supplied section IDs. Prefer a concrete subject or action over a generic moment.',
-        'Eating or drinking is food; consuming a book, film, show, game, music, podcast, news, or watched sport is studio.',
+        'Select only from the supplied section IDs. Base the choice on what the person actually did.',
+        'Watched a movie, watched a show, read a book, played a video game, or listened to media means studio.',
+        'Examples: "I watched X movie" is studio. "I read X" is studio. "I went for a run" is movement.',
         'Use general only when no more specific supplied section fits.',
+        'Report high confidence only when the note clearly names the relevant action or subject; otherwise medium or low.',
       ].join(' '),
       prompt: `Journal sections:\n${flowSummary}\n\nNote: ${JSON.stringify(transcript)}\nChoose the best section ID.`,
-      fields: [{ name: 'flowId', description: 'Best supplied broad journal section ID', kind: 'enum', values: flows }],
+      fields: [
+        { name: 'flowId', description: 'Best supplied broad journal section ID', kind: 'enum', values: flows },
+        { name: 'confidence', description: 'Independent confidence in the broad section choice', kind: 'enum', values: [...FOUNDATION_CONFIDENCE_LEVELS] },
+      ],
+      sampling: 'greedy',
     }, Math.min(FLOW_ROUTE_TIMEOUT_MS, timeoutMs));
     if (!flowRun.response) {
-      return { raw: null, durationMs: Date.now() - startedAt, failure: flowRun.failure };
+      return emptyRouteRun(Date.now() - startedAt, flowRun.failure);
     }
     const flowId = cleanString(flowRun.response.flowId);
+    const topLevelConfidence = confidenceLevel(flowRun.response.confidence);
     const flow = MANUAL_JOURNAL_FLOWS.find((candidate) => candidate.id === flowId);
-    if (!flow) return { raw: null, durationMs: Date.now() - startedAt, failure: 'error' };
+    if (!flow || !topLevelConfidence) return emptyRouteRun(Date.now() - startedAt, 'error');
+
+    // A non-high top-level decision must be confirmed by the person before a
+    // subcategory is considered. This prevents a second model call from
+    // silently turning an uncertain broad section into a confident route.
+    if (topLevelConfidence !== 'high') {
+      return {
+        raw: null,
+        suggestedFlowId: flow.id,
+        topLevelConfidence,
+        subcategoryConfidence: null,
+        topLevelResponse: flowRun.response,
+        subcategoryResponse: null,
+        durationMs: Date.now() - startedAt,
+        failure: null,
+      };
+    }
 
     const remaining = Math.max(0, timeoutMs - (Date.now() - startedAt));
-    if (remaining < 500) return { raw: null, durationMs: Date.now() - startedAt, failure: 'timeout' };
+    if (remaining < 500) {
+      return {
+        ...emptyRouteRun(Date.now() - startedAt, 'timeout'),
+        suggestedFlowId: flow.id,
+        topLevelConfidence,
+        topLevelResponse: flowRun.response,
+      };
+    }
     const candidates = JOURNAL_CLASSIFICATION_CATALOG.filter((entry) => entry.flowId === flow.id);
     const childSummary = candidates.map((entry) => {
       const examples = entry.examples.map((example) => JSON.stringify(example)).join(', ');
       const exclusions = entry.exclusions.length ? ` Exclude: ${entry.exclusions.join('; ')}.` : '';
       return `${entry.routeKey}: ${entry.definition} Examples: ${examples}.${exclusions}`;
     }).join('\n');
-    const childRun = await runStructuredNoteTask({
+    const childRun = await runner({
       taskId: 'note.child-route.v1',
       instructions: [
-        `The broad journal section ${flow.id} is already selected and immutable.`,
-        'Choose exactly one supplied child route using its definition, examples, and exclusions.',
+        `Choose exactly one subcategory within the already selected ${flow.id} journal section.`,
+        'Start the classification again from the original note. Use only the note, definitions, examples, and exclusions below.',
+        'Do not infer confidence from the fact that the broad section was selected.',
+        'For studio: watched a movie means film; read or listened to an audiobook means book; watched an episode or series means show.',
         'For food, a standalone fruit or small item is a snack unless the note identifies breakfast, lunch, dinner, or a meal.',
+        'Report high confidence only when the original note clearly distinguishes the selected subcategory.',
       ].join(' '),
-      prompt: `Allowed routes inside ${flow.id}:\n${childSummary}\n\nNote: ${JSON.stringify(transcript)}\nChoose one route.`,
-      fields: [{ name: 'routeKey', description: `Best route inside the locked ${flow.id} section`, kind: 'enum', values: candidates.map((entry) => entry.routeKey) }],
+      prompt: `Original note: ${JSON.stringify(transcript)}\n\nAllowed subcategories inside ${flow.id}:\n${childSummary}\n\nChoose the best subcategory from scratch.`,
+      fields: [
+        { name: 'routeKey', description: `Best route inside the selected ${flow.id} section`, kind: 'enum', values: candidates.map((entry) => entry.routeKey) },
+        { name: 'confidence', description: 'Independent confidence in this subcategory choice based only on the original note', kind: 'enum', values: [...FOUNDATION_CONFIDENCE_LEVELS] },
+      ],
+      sampling: 'greedy',
     }, remaining);
     if (!childRun.response) {
-      return { raw: null, durationMs: Date.now() - startedAt, failure: childRun.failure };
+      return {
+        ...emptyRouteRun(Date.now() - startedAt, childRun.failure),
+        suggestedFlowId: flow.id,
+        topLevelConfidence,
+        topLevelResponse: flowRun.response,
+      };
     }
     const routeKey = cleanString(childRun.response.routeKey);
-    if (!routeKey || !candidates.some((entry) => entry.routeKey === routeKey)) {
-      return { raw: null, durationMs: Date.now() - startedAt, failure: 'error' };
+    const subcategoryConfidence = confidenceLevel(childRun.response.confidence);
+    if (!routeKey || !subcategoryConfidence || !candidates.some((entry) => entry.routeKey === routeKey)) {
+      return {
+        ...emptyRouteRun(Date.now() - startedAt, 'error'),
+        suggestedFlowId: flow.id,
+        topLevelConfidence,
+        topLevelResponse: flowRun.response,
+        subcategoryResponse: childRun.response,
+      };
     }
     return {
       raw: {
         routeKey,
-        routeConfidence: 0.9,
-        alternativeRouteKey: '',
-        alternativeRouteConfidence: 0,
-        routeStrategy: 'split_dynamic_v1',
-        flowResponse: flowRun.response,
-        childResponse: childRun.response,
+        routeStrategy: 'strict_two_pass_v2',
       },
+      suggestedFlowId: flow.id,
+      topLevelConfidence,
+      subcategoryConfidence,
+      topLevelResponse: flowRun.response,
+      subcategoryResponse: childRun.response,
       durationMs: Date.now() - startedAt,
       failure: null,
     };
-  }
-
-  // Compatibility only for native clients predating the generic structured
-  // bridge. New clients never pay for the monolithic 75-route schema.
-  if (nativeFoundation?.classifyNoteRouteAsync) {
-    const result = await Promise.race([
-      nativeFoundation.classifyNoteRouteAsync(transcript)
-        .then((value) => ({ kind: 'response' as const, value }))
-        .catch(() => ({ kind: 'error' as const })),
-      new Promise<{ kind: 'timeout' }>((resolve) => setTimeout(() => resolve({ kind: 'timeout' }), timeoutMs)),
-    ]);
-    return result.kind === 'response'
-      ? { raw: result.value as FoundationAtomicRouteRead & Record<string, unknown>, durationMs: Date.now() - startedAt, failure: null }
-      : { raw: null, durationMs: Date.now() - startedAt, failure: result.kind };
-  }
-  return { raw: null, durationMs: Date.now() - startedAt, failure: 'error' };
 }
 
-type StructuredNoteTask = {
+export type StructuredNoteTask = {
   taskId: string;
   instructions: string;
   prompt: string;
   fields: Array<{ name: string; description: string; kind: 'string' | 'enum'; values?: string[] }>;
+  sampling?: 'greedy';
 };
+
+export type StructuredNoteTaskRunner = (
+  task: StructuredNoteTask,
+  timeoutMs: number
+) => Promise<{ response: Record<string, unknown> | null; failure: 'timeout' | 'error' | null }>;
+
+function emptyRouteRun(durationMs: number, failure: FoundationRouteRun['failure']): FoundationRouteRun {
+  return {
+    raw: null,
+    suggestedFlowId: null,
+    topLevelConfidence: null,
+    subcategoryConfidence: null,
+    topLevelResponse: null,
+    subcategoryResponse: null,
+    durationMs,
+    failure,
+  };
+}
+
+function confidenceLevel(value: unknown): FoundationConfidenceLevel | null {
+  return typeof value === 'string' && FOUNDATION_CONFIDENCE_LEVELS.includes(value.trim().toLowerCase() as FoundationConfidenceLevel)
+    ? value.trim().toLowerCase() as FoundationConfidenceLevel
+    : null;
+}
+
+function confidenceValue(value: FoundationConfidenceLevel | null): number {
+  if (value === 'high') return 0.95;
+  if (value === 'medium') return 0.6;
+  return 0.35;
+}
 
 async function runStructuredNoteTask(
   task: StructuredNoteTask,
@@ -356,7 +442,7 @@ export async function extractNoteSpecificOnDevice(
           'Extract one concise editable journal field value from a personal note.',
           'The supplied journal route is already selected and immutable; never reclassify it.',
           'Return the specific entity or title only, not the complete sentence and not commentary.',
-          'Preserve or restore normal title casing. You may safely normalize an explicitly named work using knowledge, but never invent an absent entity.',
+          'Preserve the explicitly supplied words and normalize ordinary title casing, but do not complete or guess a title from world knowledge.',
           'Examples: "I ate an apple" becomes "Apple"; "I read Harry Potter" becomes "Harry Potter".',
           'Use an empty string when the note does not support a useful value.',
         ].join(' '),
@@ -402,7 +488,8 @@ function recordDevNote(
   retryResponse: Record<string, unknown> | null = null,
   routeCandidates: JournalRouteProposal[] = [],
   firstPassDurationMs: number | null = null,
-  retryDurationMs: number | null = null
+  retryDurationMs: number | null = null,
+  routeRun: FoundationRouteRun | null = null
 ): void {
   const schema = rawResponse?.noteSchemaVersion ?? retryResponse?.noteSchemaVersion;
   saveDevLastNoteAnalysis({
@@ -410,7 +497,7 @@ function recordDevNote(
     durationMs: Date.now() - startedAt,
     firstPassDurationMs,
     retryDurationMs,
-    routingMode: isFoundationOnlyNoteRoutingEnabled() ? 'foundation_only' : 'hybrid',
+    routingMode: 'foundation_only',
     foundationAvailable,
     nativeNoteSchemaVersion: typeof schema === 'string' && /^\d+$/.test(schema) ? Number(schema) : null,
     status,
@@ -421,6 +508,11 @@ function recordDevNote(
     normalizedFood,
     retryResponse,
     routeCandidates,
+    topLevelFlowId: routeRun?.suggestedFlowId ?? null,
+    topLevelConfidence: routeRun?.topLevelConfidence ?? null,
+    subcategoryConfidence: routeRun?.subcategoryConfidence ?? null,
+    topLevelResponse: routeRun?.topLevelResponse ?? null,
+    subcategoryResponse: routeRun?.subcategoryResponse ?? null,
   });
 }
 

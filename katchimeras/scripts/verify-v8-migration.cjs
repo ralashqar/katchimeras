@@ -20,16 +20,33 @@ const typesPath = path.join(temp, 'types.js');
 const locationsPath = path.join(temp, 'locations.js');
 const questionsPath = path.join(temp, 'questions.js');
 const dailyCardPath = path.join(temp, 'daily-card.js');
+const daySkyPath = path.join(temp, 'day-sky.js');
 fs.writeFileSync(typesPath, '');
 fs.writeFileSync(locationsPath, 'exports.createFallbackLocationsForStoredDay = () => [];');
 fs.writeFileSync(questionsPath, 'exports.QUESTION_PLANNER_VERSION = 2; exports.questionIdForGraphNode = (graphId, nodeId) => graphId && nodeId ? `${graphId}.${nodeId}` : null;');
 fs.writeFileSync(dailyCardPath, 'exports.buildDailyCreatureCard = (day, creature, options) => ({ id: `card:${day.id}`, dayId: day.id, creatureId: creature.id, rarity: creature.rarity, provenance: options.mode });');
+fs.writeFileSync(daySkyPath, `
+const derive = (day) => ({ intensity: 0, mood: "neutral", seed: 407, version: 1, weather: day.weather?.condition === "fog" ? "foggy" : "clear" });
+exports.deriveDaySkySnapshot = derive;
+exports.reconcileDaySkySnapshot = (day) => {
+  if (day.state !== "hatched" || !day.creature) return day;
+  const skyPolicy = day.skyPolicy
+    ?? (day.card?.provenance === "live_hatch" ? "live_frozen" : "historical_adaptive");
+  if (skyPolicy === "live_frozen") {
+    return { ...day, sky: day.sky ?? derive(day), skyPolicy };
+  }
+  if (day.creature.reflectionSource !== "generated") {
+    return { ...day, sky: undefined, skyPolicy };
+  }
+  return { ...day, sky: derive(day), skyPolicy };
+};`);
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {
   if (request === '@/types/home') return typesPath;
   if (request === '@/utils/intelligence/quality-registry') return qualityRegistryPath;
   if (request === '@/utils/intelligence/question-registry') return questionsPath;
   if (request === '@/utils/daily-card') return dailyCardPath;
+  if (request === '@/utils/day-sky') return daySkyPath;
   if (request === '@/data/intelligence/memory-qualities.json') return path.join(root, 'data/intelligence/memory-qualities.json');
   if (request === './locations' && parent?.filename === migrationPath) return locationsPath;
   return originalResolve.call(this, request, parent, ...rest);
@@ -84,9 +101,9 @@ function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
   else { failures += 1; console.log(`FAIL  ${label}`); }
 }
-check('v9 upgrades to v14', upgraded.version === 14);
-check('v10 upgrades losslessly to v14', upgradedFromV10.version === 14 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
-check('v11 journals migrate to canonical records', upgradedFromV11.version === 14 && upgradedFromV11.today.journalRecords.length === 2);
+check('v9 upgrades to v16', upgraded.version === 16);
+check('v10 upgrades losslessly to v16', upgradedFromV10.version === 16 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
+check('v11 journals migrate to canonical records', upgradedFromV11.version === 16 && upgradedFromV11.today.journalRecords.length === 2);
 check('cloud intelligence remains opt-in', upgraded.cloudIntelligenceEnabled === false);
 check('personal entities initialize locally', Array.isArray(upgraded.personalEntities) && upgraded.personalEntities.length === 0);
 check('days are preserved', upgraded.archivedDays.length === 1 && upgraded.today.id === 'day-2026-07-10');
@@ -99,8 +116,9 @@ check('legacy prompt state gains adaptive budget', upgraded.archivedDays[0].clas
 check('legacy prompt state gains planner metadata', upgraded.archivedDays[0].classifiedMemories[0].promptState.plannerVersion === 2 && Array.isArray(upgraded.archivedDays[0].classifiedMemories[0].promptState.askedQuestionIds));
 check('creature survives', upgraded.archivedDays[0].creature.id === 'waglet');
 check('hatched days gain a card', upgraded.archivedDays[0].card?.creatureId === 'waglet');
+check('legacy hatch waits for enrichment before storing sky', upgraded.archivedDays[0].sky === undefined && upgraded.archivedDays[0].skyPolicy === 'historical_adaptive');
 check('prompt answer survives', upgraded.archivedDays[0].promptAnswers[0].choiceIds[0] === 'calm');
 check('location survives', upgraded.archivedDays[0].locations[0].id === 'loc-1');
 
-console.log(failures ? `\n${failures} v14 migration check(s) FAILED.` : '\nAll v14 migration checks passed.');
+console.log(failures ? `\n${failures} v16 migration check(s) FAILED.` : '\nAll v16 migration checks passed.');
 process.exit(failures ? 1 : 0);

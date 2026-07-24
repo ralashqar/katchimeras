@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "canvas": {
+    "width": 945,
+    "height": 1680,
+    "aspectRatio": "9:16",
+    "webpQuality": 92,
+    "maxProductionBytes": 650000
+  },
+  "bootstrapReference": "assets/images/katchimeras/world/today/generic-tile-surround-meadow-v1.webp",
+  "scenes": {
+    "clear_day": {
+      "displayName": "Clear Day",
+      "role": "master",
+      "brief": "bright calm high-altitude daylight, expansive clean blue atmosphere, ivory toy-like cloud banks, and a few tiny distant floating cliff-islands at the far side edges",
+      "palette": "clear sky blue, soft ivory, pale atmospheric cyan, tiny touches of fresh green on distant islands",
+      "approved": {
+        "id": "clear-sky-islands-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/clear-day.webp",
+        "sha256": "90575e1f5ab16be94e01f28753b8d4d10864cc43a42cac40c2b184d37dddc229"
+      }
+    },
+    "radiant_golden": {
+      "displayName": "Radiant Golden",
+      "brief": "golden-hour warmth across an expansive high-altitude sky, luminous cloud rims, tiny distant floating cliff-islands, magical but not sunset-dark",
+      "palette": "honey gold, apricot, warm cream, clear blue",
+      "approved": {
+        "id": "radiant-golden-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/radiant-golden.webp",
+        "sha256": "98064c14ffc60eeb5915ded5e1e63dd8e424ce175a0aff2859a2d84dec5ae17d"
+      }
+    },
+    "celebration_connected": {
+      "displayName": "Celebration Connected",
+      "brief": "joyful shared-day sky with coral and rose light, buoyant cloud shapes and restrained festive colour on tiny distant floating islands",
+      "palette": "coral, rose, peach, cream, celebratory gold",
+      "approved": {
+        "id": "celebration-connected-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/celebration-connected.webp",
+        "sha256": "206b16f1fbf047365ab3bf9a997f195a464c5c0f75a189db3edf429695763506"
+      }
+    },
+    "garden_bloom": {
+      "displayName": "Garden Bloom",
+      "brief": "fresh spring sky with verdant tiny floating garden-islands far at the side edges, soft flower colour accents and clear post-morning light",
+      "palette": "leaf green, mint, petal pink, butter cream, soft blue",
+      "approved": {
+        "id": "garden-bloom-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/garden-bloom.webp",
+        "sha256": "fedbf8a85ba92e62d4984b3f17e89b72490d893dcfe049e9f8194de28ce0e506"
+      }
+    },
+    "autumn_hearth": {
+      "displayName": "Autumn Hearth",
+      "brief": "cozy late-afternoon high sky, amber foliage limited to tiny distant floating islands at the outer edges, hearth-like horizon glow and settled comforting air",
+      "palette": "amber, russet, caramel, warm cream, muted blue",
+      "approved": {
+        "id": "autumn-hearth-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/autumn-hearth.webp",
+        "sha256": "3169519cff7b2b3a8a859c6b8b5a33c2a59df9e323d9246d638e2e985cc15689"
+      }
+    },
+    "twilight_reflective": {
+      "displayName": "Twilight Reflective",
+      "brief": "quiet blue-hour sky, soft violet atmospheric distance, a few subtle luminous points and calm dreamlike depth around distant floating cliff silhouettes",
+      "palette": "indigo, violet, moonlit blue, dusty rose, pearl",
+      "approved": {
+        "id": "twilight-reflective-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/twilight-reflective.webp",
+        "sha256": "79fb0504d5f1f3ca233838430a56cec85185ab55120f4c3d3e3083cde6da4af5"
+      }
+    },
+    "inspired_journey": {
+      "displayName": "Inspired Journey",
+      "brief": "open airy high-altitude distance suggesting movement and possibility, long soft cloud bands, teal-cyan clarity and a loose trail of tiny faraway floating islands",
+      "palette": "cyan, teal, sky blue, pale jade, warm white",
+      "approved": {
+        "id": "inspired-journey-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/inspired-journey.webp",
+        "sha256": "5e65ee4f8815c5da787699b4fbc31cb806e80051b772cc66641ce0753cc2fcff"
+      }
+    },
+    "rain_overcast": {
+      "displayName": "Rain Overcast",
+      "brief": "rain-heavy overcast high sky, layered slate cloud banks, softened distant floating cliff silhouettes and wet atmospheric depth without painted raindrops",
+      "palette": "slate blue, rainwater teal, cool gray, muted green",
+      "approved": {
+        "id": "rain-overcast-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/rain-overcast.webp",
+        "sha256": "bd407b5fba73e3fed420eb93ceeeeb843c5d77b2f561dbdf393dc18543b18ff6"
+      }
+    },
+    "mist_cold": {
+      "displayName": "Mist Cold",
+      "brief": "pale high-altitude mist and cold quiet air, softly obscured distant floating cliff forms, pearl-gray cloud veil and subtle frosted light without visible falling snow",
+      "palette": "pearl, pale blue, cool gray, desaturated sage",
+      "approved": {
+        "id": "mist-cold-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/mist-cold.webp",
+        "sha256": "6d42628d631338f66e9ef64a68509a18c5c4946c5e6a57dfddf89f81a214d848"
+      }
+    },
+    "storm": {
+      "displayName": "Storm",
+      "brief": "dramatic but friendly approaching storm in an expansive high sky, deep layered blue-gray clouds, tiny distant floating cliff silhouettes and a cool light break without lightning",
+      "palette": "deep navy, blue gray, steel, cool silver",
+      "approved": {
+        "id": "storm-sky-v1",
+        "asset": "assets/images/katchimeras/world/today-atmosphere/storm.webp",
+        "sha256": "8756d45a1208a9620fbc0e1d809b82e3cffd28e0eb4c33514fc7b37927f7b70c"
+      }
+    }
+  }
+}

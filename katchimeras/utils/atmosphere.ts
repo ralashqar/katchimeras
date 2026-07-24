@@ -89,19 +89,20 @@ export const DEFAULT_ATMOSPHERE_SETTINGS: AtmosphereSettings = {
   wind: 0.18,
 };
 
-type AtmosphereParticleFamily = 'rain' | 'snow' | 'drift' | 'glow' | 'sparse' | 'streak';
+type AtmosphereParticleFamily = 'breeze' | 'rain' | 'snow' | 'drift' | 'glow' | 'sparse' | 'streak';
 
 const PARTICLE_CAPS: Record<Exclude<AtmosphereQuality, 'auto'>, Record<AtmosphereParticleFamily, number>> = {
-  low: { drift: 18, glow: 16, rain: 32, snow: 20, sparse: 11, streak: 14 },
-  medium: { drift: 30, glow: 26, rain: 56, snow: 36, sparse: 18, streak: 22 },
-  high: { drift: 46, glow: 40, rain: 88, snow: 56, sparse: 28, streak: 34 },
+  low: { breeze: 7, drift: 18, glow: 16, rain: 32, snow: 20, sparse: 11, streak: 14 },
+  medium: { breeze: 10, drift: 30, glow: 26, rain: 56, snow: 36, sparse: 18, streak: 22 },
+  high: { breeze: 14, drift: 46, glow: 40, rain: 88, snow: 56, sparse: 28, streak: 34 },
 } as const;
 
 export function atmosphereParticleFamily(preset: AtmospherePresetId): AtmosphereParticleFamily | null {
   if (preset === 'rain' || preset === 'storm') return 'rain';
   if (preset === 'snow') return 'snow';
   if (preset === 'golden_motes' || preset === 'fireflies' || preset === 'cozy_embers' || preset === 'idea_sparks' || preset === 'memory_shimmer') return 'glow';
-  if (preset === 'journey_breeze' || preset === 'social_ribbons') return 'streak';
+  if (preset === 'journey_breeze') return 'breeze';
+  if (preset === 'social_ribbons') return 'streak';
   if (preset === 'dream_wisps' || preset === 'quiet_dust' || preset === 'dandelion_seeds') return 'sparse';
   if (preset === 'celebration_drift' || preset === 'petal_drift' || preset === 'falling_leaves') return 'drift';
   return null;
@@ -115,7 +116,10 @@ export function atmospherePresetUsesAuthoredSprites(preset: AtmospherePresetId):
   return preset === 'celebration_drift'
     || preset === 'petal_drift'
     || preset === 'falling_leaves'
-    || preset === 'dandelion_seeds';
+    || preset === 'dandelion_seeds'
+    || preset === 'dream_wisps'
+    || preset === 'journey_breeze'
+    || preset === 'social_ribbons';
 }
 
 export function clampAtmosphereUnit(value: number): number {
@@ -147,6 +151,19 @@ export function atmosphereParticleCount(
   if (!family) return 0;
   const density = 0.35 + clampAtmosphereUnit(intensity) * 0.65;
   return Math.round(PARTICLE_CAPS[resolved][family] * density);
+}
+
+export function atmosphereLayerParticleCount(
+  preset: AtmospherePresetId,
+  quality: AtmosphereQuality,
+  viewportWidth: number,
+  intensity: number,
+  densityScale = 1,
+): number {
+  return Math.round(
+    atmosphereParticleCount(preset, quality, viewportWidth, intensity)
+    * clampAtmosphereUnit(densityScale)
+  );
 }
 
 // Mulberry32 gives stable art direction across renders without a runtime random

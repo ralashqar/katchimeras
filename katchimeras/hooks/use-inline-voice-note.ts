@@ -30,6 +30,9 @@ export type InlineVoiceNotePayload = {
   intelligenceProvider: InterpretedNote['intelligenceProvider'];
   journalClassification?: InterpretedNote['journalClassification'];
   journalRoutes?: InterpretedNote['journalRoutes'];
+  suggestedJournalFlowId?: InterpretedNote['suggestedJournalFlowId'];
+  topLevelConfidence?: InterpretedNote['topLevelConfidence'];
+  subcategoryConfidence?: InterpretedNote['subcategoryConfidence'];
 };
 
 type Options = {
@@ -95,6 +98,9 @@ export function useInlineVoiceNote({ saveNote, onAnalyzing, onSaved, allowRemote
       intelligenceProvider: result.intelligenceProvider,
       journalClassification: result.journalClassification,
       journalRoutes: result.journalRoutes,
+      suggestedJournalFlowId: result.suggestedJournalFlowId,
+      topLevelConfidence: result.topLevelConfidence,
+      subcategoryConfidence: result.subcategoryConfidence,
     });
     onSaved?.(result);
     setResult(null);

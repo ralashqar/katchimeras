@@ -28,8 +28,8 @@ import FoundationModels
 
 @available(iOS 26.0, *)
 enum JournalNoteRouteCatalog {
-  static let schemaVersion = "5"
-  static let photoSchemaVersion = "13"
+  static let schemaVersion = "6"
+  static let photoSchemaVersion = "14"
   static let routeKeys: Set<String> = [${swiftRouteValues}]
   static let promptTaxonomy = """
 ${taxonomy}

@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { getCreatureVisual } from '@/game/days';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
+import type { CreatureHatchlingLod } from '@/constants/creature-hatchling-sources.gen';
 import { weatherIconName, weatherLabel } from '@/utils/day-weather';
 import type { DayWeather, LocalCreatureRecord } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
@@ -45,6 +46,7 @@ type CreatureHeroProps = {
   kingdomEnvironment?: boolean;
   kingdomHomeArchetypeId?: HomeArchetypeId | null;
   pinchStrength?: number;
+  artLod?: CreatureHatchlingLod;
 };
 
 // Lantern hero: the creature floats free over the ink - no membrane ring, no
@@ -60,12 +62,14 @@ export const CreatureHero = memo(function CreatureHero({
   kingdomEnvironment = false,
   kingdomHomeArchetypeId,
   pinchStrength = 1,
+  artLod = 'full',
 }: CreatureHeroProps) {
   const { width: windowWidth } = useWindowDimensions();
   const visual = getCreatureVisual(creature.visualKey);
   // Prefer the day's expression cutout (mood × bond depth) when one exists for
   // this creature; otherwise fall back to the single base cutout.
   const heroSource = resolveCreatureArtSource(creature.visualKey, {
+    lod: artLod,
     variantCell: creature.variantCell,
   });
   const kingdomTile = kingdomEnvironment ? kingdomResidentTileForIdentity(creature) : null;

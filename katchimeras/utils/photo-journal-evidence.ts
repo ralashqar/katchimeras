@@ -5,7 +5,16 @@ export type PhotoJournalEvidenceSignal = {
   id: string;
   name: string;
   confidence: number;
-  sources: ('aggregate' | 'raw' | 'detail')[];
+  sources: ('aggregate' | 'raw' | 'detail' | 'human' | 'face' | 'animal')[];
+  clusterKey: string;
+  memberLabels: string[];
+  maxDetectorConfidence: number;
+  corroboratedConfidence: number;
+  sourceReliability: number;
+  sourceAdjustedConfidence: number;
+  spatialContribution: number;
+  salience: number;
+  rankReasons: string[];
 };
 
 export type PhotoJournalOcrLine = {
@@ -31,6 +40,7 @@ export type PhotoJournalEvidencePacket = {
   maxHumanCoverage: number;
   documentDetected: boolean;
   dominantCoverage: number;
+  classifiedRegionCount: number;
   spatial: string[];
   ocr: PhotoJournalOcrContext;
 };
@@ -54,27 +64,26 @@ export type PhotoEvidenceEligibility = {
   eligibilityReason: string | null;
 };
 
+type RawEvidenceObservation = {
+  name: string;
+  confidence: number;
+  sources: PhotoJournalEvidenceSignal['sources'];
+};
+
+// Labels intentionally excluded from the visible Essence layer. These are
+// broad classifier descriptions rather than useful subjects of a memory.
+// The Foundation prompt consumes this same filtered Essence layer and never
+// receives these labels through a separate background channel.
 const GENERIC_ESSENCE_LABELS = new Set([
   'consumer electronics', 'machine', 'material', 'structure', 'furniture',
   'wood processed', 'container', 'adult', 'people', 'textile',
 ]);
 
-const DISPLAY_SPECIFICITY: Record<string, number> = {
-  television: 0.55,
-  book: 0.5,
-  'screen content': 0.42,
-  'computer monitor': 0.32,
-  'device monitor': 0.32,
-  computer: 0.18,
-  screenshot: 0.16,
-  document: 0.08,
-};
-
 export function buildPhotoJournalEvidence(
   vision: DayVisionSummary,
   rawVision: PhotoVisionResult | null
 ): PhotoJournalEvidencePacket {
-  const merged = new Map<string, PhotoJournalEvidenceSignal>();
+  const merged = new Map<string, RawEvidenceObservation>();
   const add = (name: string, confidence: number, source: PhotoJournalEvidenceSignal['sources'][number]) => {
     const clean = normalizeName(name);
     if (!clean) return;
@@ -85,15 +94,22 @@ export function buildPhotoJournalEvidence(
       if (!prior.sources.includes(source)) prior.sources.push(source);
       return;
     }
-    merged.set(key, { id: `vision:${key.replace(/[^a-z0-9]+/g, '-')}`, name: clean, confidence: clamp01(confidence), sources: [source] });
+    merged.set(key, { name: clean, confidence: clamp01(confidence), sources: [source] });
   };
 
   for (const concept of vision.concepts ?? []) add(concept.name, concept.peakConfidence, 'aggregate');
   for (const label of rawVision?.labels ?? []) add(label.name, label.confidence, 'raw');
   for (const detail of vision.details ?? []) add(detail, 0.3, 'detail');
+  const strongestHuman = maximumRegionConfidence(rawVision?.humans);
+  const strongestFace = maximumRegionConfidence(rawVision?.faces);
+  if (strongestHuman > 0) add('person', strongestHuman, 'human');
+  if (strongestFace > 0) add('person', strongestFace, 'face');
+  for (const animal of rawVision?.animals ?? []) {
+    if (animal.confidence > 0) add(animal.kind === 'unknown' ? 'animal' : animal.kind, animal.confidence, 'animal');
+  }
 
-  const signals = [...merged.values()]
-    .sort((left, right) => right.confidence - left.confidence)
+  const signals = clusterPhotoEvidence([...merged.values()], rawVision)
+    .sort((left, right) => right.salience - left.salience || right.maxDetectorConfidence - left.maxDetectorConfidence)
     .slice(0, 24);
 
   const faces = Math.max(0, Math.trunc(rawVision?.faceCount ?? vision.maxFaceCount ?? 0));
@@ -112,6 +128,7 @@ export function buildPhotoJournalEvidence(
     maxHumanCoverage,
     documentDetected: rawVision?.documentDetected === true,
     dominantCoverage: dominantSubjectCoverage,
+    classifiedRegionCount: rawVision?.regionClassifications?.length ?? 0,
     spatial: spatialDescriptions(rawVision).slice(0, 4),
     ocr: buildPhotoJournalOcrContext({
       signals,
@@ -235,16 +252,12 @@ export function prioritizedFoundationSignals(
   return [...primary, ...backgroundPhotoEvidenceSignals(packet, primary, limit - primary.length)];
 }
 
-/** Richer bounded context for top-level classification; the first four remain the visible Essence chips. */
+/** The Foundation classifier receives up to eight signals from the same filtered Essence pipeline. */
 export function photoClassificationEvidenceSignals(
   packet: PhotoJournalEvidencePacket,
   limit = 8
 ): PhotoJournalEvidenceSignal[] {
-  const visible = visiblePhotoEssenceEvidence(packet).signals;
-  const visibleIds = new Set(visible.map((signal) => signal.id));
-  const remaining = prioritizedFoundationSignals(packet, Math.max(limit, 8))
-    .filter((signal) => !visibleIds.has(signal.id));
-  return [...visible, ...remaining].slice(0, Math.max(4, Math.min(8, limit)));
+  return primaryPhotoEvidenceSignals(packet, Math.max(1, Math.min(8, limit)));
 }
 
 /**
@@ -258,16 +271,14 @@ export function primaryPhotoEvidenceSignals(
   packet: PhotoJournalEvidencePacket,
   limit = 5
 ): PhotoJournalEvidenceSignal[] {
-  const specific = packet.signals
+  const eligible = packet.signals
     .filter((signal) => photoEvidenceEligibility(signal).primaryEligible)
-    .filter((signal) => !GENERIC_ESSENCE_LABELS.has(normalizeName(signal.name).toLocaleLowerCase()))
-    .map((signal) => ({ signal, rank: displayRank(signal) }))
-    .sort((left, right) => right.rank - left.rank || right.signal.confidence - left.signal.confidence);
-  const source = specific.length
-    ? specific
-    : packet.signals
-      .filter((signal) => photoEvidenceEligibility(signal).primaryEligible)
-      .map((signal) => ({ signal, rank: displayRank(signal) }));
+    .map((signal) => ({ signal, rank: signal.salience }))
+    .sort((left, right) => right.rank - left.rank || right.signal.maxDetectorConfidence - left.signal.maxDetectorConfidence);
+  const specific = eligible.filter(({ signal }) =>
+    signal.memberLabels.some((label) => !isGenericEssenceLabel(label))
+  );
+  const source = specific.length ? specific : eligible;
   const selected = source
     .filter(({ signal }) => signal.confidence >= 0.28)
     .map(({ signal }) => signal);
@@ -283,8 +294,8 @@ export function backgroundPhotoEvidenceSignals(
   return dedupeSignalGroups(
     packet.signals
       .filter((signal) => !primaryIds.has(signal.id))
-      .filter((signal) => !GENERIC_ESSENCE_LABELS.has(normalizeName(signal.name).toLocaleLowerCase()))
-      .sort((left, right) => right.confidence - left.confidence),
+      .filter((signal) => signal.memberLabels.some((label) => !isGenericEssenceLabel(label)))
+      .sort((left, right) => right.salience - left.salience),
     limit
   );
 }
@@ -293,7 +304,7 @@ export function rankPhotoJournalRouteSupport(packet: PhotoJournalEvidencePacket)
   return JOURNAL_CLASSIFICATION_CATALOG.map((entry) => {
     const terms = routeVisualTerms(entry.routeKey, entry.categoryId, entry.label, entry.aliases);
     const matches = packet.signals
-      .filter((signal) => terms.some((term) => visualTermMatches(signal.name, term)))
+      .filter((signal) => signal.memberLabels.some((label) => terms.some((term) => visualTermMatches(label, term))))
       .sort((left, right) => right.confidence - left.confidence);
     return {
       routeKey: entry.routeKey,
@@ -322,17 +333,13 @@ export function visiblePhotoEssenceEvidence(packet: PhotoJournalEvidencePacket, 
 }
 
 export function photoEvidenceSelectionRank(signal: PhotoJournalEvidenceSignal): number {
-  const directSourceCount = Number(signal.sources.includes('aggregate')) + Number(signal.sources.includes('raw'));
-  return signal.confidence + Math.max(0, directSourceCount - 1) * 0.04;
-}
-
-function displayRank(signal: PhotoJournalEvidenceSignal): number {
-  const name = normalizeName(signal.name).toLocaleLowerCase();
-  return signal.confidence + (DISPLAY_SPECIFICITY[name] ?? 0);
+  return signal.salience;
 }
 
 export function photoEvidenceEligibility(signal: PhotoJournalEvidenceSignal): PhotoEvidenceEligibility {
-  const hasDirectObservation = signal.sources.includes('aggregate') || signal.sources.includes('raw');
+  const hasDirectObservation = signal.sources.some((source) =>
+    source === 'aggregate' || source === 'raw' || source === 'human' || source === 'face' || source === 'animal'
+  );
   if (!hasDirectObservation) {
     return {
       selectionRank: photoEvidenceSelectionRank(signal),
@@ -348,27 +355,170 @@ export function photoEvidenceEligibility(signal: PhotoJournalEvidenceSignal): Ph
 }
 
 function dedupeSignalGroups(signals: PhotoJournalEvidenceSignal[], limit: number): PhotoJournalEvidenceSignal[] {
-  const selected: PhotoJournalEvidenceSignal[] = [];
-  const groups = new Set<string>();
-  for (const signal of signals) {
-    const group = foundationSignalGroup(signal.name);
-    if (groups.has(group)) continue;
-    groups.add(group);
-    selected.push(signal);
-    if (selected.length >= Math.max(1, limit)) break;
-  }
-  return selected;
+  return signals.slice(0, Math.max(1, limit));
 }
 
 function normalizeName(value: string): string {
   return value.trim().replaceAll('_', ' ').replace(/\s+/g, ' ');
 }
 
-function foundationSignalGroup(value: string): string {
-  const name = normalizeName(value).toLocaleLowerCase();
-  if (name === 'computer monitor' || name === 'device monitor') return 'monitor';
-  if (name === 'stuffed animal' || name === 'stuffed animals') return 'stuffed animals';
-  return name;
+function isGenericEssenceLabel(value: string): boolean {
+  return GENERIC_ESSENCE_LABELS.has(normalizeName(value).toLocaleLowerCase());
+}
+
+function clusterPhotoEvidence(
+  observations: RawEvidenceObservation[],
+  rawVision: PhotoVisionResult | null
+): PhotoJournalEvidenceSignal[] {
+  const parents = observations.map((_, index) => index);
+  const find = (index: number): number => {
+    if (parents[index] !== index) parents[index] = find(parents[index]);
+    return parents[index];
+  };
+  const union = (left: number, right: number) => {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parents[rightRoot] = leftRoot;
+  };
+  for (let left = 0; left < observations.length; left += 1) {
+    for (let right = left + 1; right < observations.length; right += 1) {
+      if (labelsBelongToSameCluster(observations[left].name, observations[right].name)) union(left, right);
+    }
+  }
+  const groups = new Map<number, RawEvidenceObservation[]>();
+  observations.forEach((observation, index) => {
+    const root = find(index);
+    groups.set(root, [...(groups.get(root) ?? []), observation]);
+  });
+  return [...groups.values()].map((members) => buildEvidenceCluster(members, rawVision));
+}
+
+function buildEvidenceCluster(
+  members: RawEvidenceObservation[],
+  rawVision: PhotoVisionResult | null
+): PhotoJournalEvidenceSignal {
+  const representative = [...members].sort((left, right) =>
+    right.confidence - left.confidence
+    || right.name.length - left.name.length
+    || left.name.localeCompare(right.name)
+  )[0];
+  const directMembers = members.filter((member) => member.sources.some((source) =>
+    source === 'aggregate' || source === 'raw' || source === 'human' || source === 'face' || source === 'animal'
+  ));
+  const corroboratingMembers = directMembers.length ? directMembers : members;
+  const maxDetectorConfidence = Math.max(...corroboratingMembers.map((member) => member.confidence), 0);
+  const noisyOr = 1 - corroboratingMembers.reduce((remaining, member) => remaining * (1 - clamp01(member.confidence)), 1);
+  const corroboratedConfidence = Math.min(maxDetectorConfidence + 0.2, noisyOr);
+  const memberLabels = [...new Set(members.map((member) => normalizeName(member.name)))];
+  const sources = [...new Set(members.flatMap((member) => member.sources))] as PhotoJournalEvidenceSignal['sources'];
+  const sourceReliability = evidenceSourceReliability(sources);
+  const sourceAdjustedConfidence = corroboratedConfidence * sourceReliability;
+  const spatialContribution = Math.max(
+    clusterSpatialContribution(members.map((member) => member.name), rawVision),
+    observationSpatialContribution(sources, rawVision)
+  );
+  const salience = clamp01(sourceAdjustedConfidence + spatialContribution);
+  const clusterKey = canonicalVisualPhrase(representative.name) || normalizeName(representative.name).toLocaleLowerCase();
+  const rankReasons = [
+    `max_detector=${maxDetectorConfidence.toFixed(3)}`,
+    `distinct_variants=${corroboratingMembers.length}`,
+    `corroborated=${corroboratedConfidence.toFixed(3)}`,
+    `source_reliability=${sourceReliability.toFixed(3)}`,
+    `source_adjusted=${sourceAdjustedConfidence.toFixed(3)}`,
+    spatialContribution > 0 ? `spatial=${spatialContribution.toFixed(3)}` : 'spatial=none',
+  ];
+  return {
+    id: `vision:${clusterKey.replace(/[^a-z0-9]+/g, '-')}`,
+    name: representative.name,
+    confidence: salience,
+    sources,
+    clusterKey,
+    memberLabels,
+    maxDetectorConfidence,
+    corroboratedConfidence,
+    sourceReliability,
+    sourceAdjustedConfidence,
+    spatialContribution,
+    salience,
+    rankReasons,
+  };
+}
+
+/**
+ * Aggregate concepts have survived the app's generic-label filter and
+ * canonicalisation pass. Dedicated subject detectors are direct observations.
+ * Raw-only whole-image labels remain usable, but receive less trust because
+ * that channel intentionally contains broad material/scene classifications.
+ */
+function evidenceSourceReliability(sources: PhotoJournalEvidenceSignal['sources']): number {
+  const hasSemanticLabel = sources.includes('aggregate') || sources.includes('raw');
+  const hasHuman = sources.includes('human');
+  const hasFace = sources.includes('face');
+  if (sources.includes('animal')) return 1;
+  if ((hasHuman && hasFace) || ((hasHuman || hasFace) && hasSemanticLabel)) return 1;
+  // A lone rectangle detector is useful evidence, but it can fire on tall,
+  // high-contrast objects. Keep it eligible without letting its box area turn
+  // an uncorroborated moderate-confidence observation into a certain person.
+  if (hasFace) return 0.9;
+  if (hasHuman) return 0.8;
+  if (sources.includes('aggregate') && sources.includes('raw')) return 1;
+  if (sources.includes('aggregate')) return 0.95;
+  if (sources.includes('raw')) return 0.82;
+  return 0.6;
+}
+
+function observationSpatialContribution(
+  sources: PhotoJournalEvidenceSignal['sources'],
+  rawVision: PhotoVisionResult | null
+): number {
+  const regions = [
+    ...(sources.includes('human') ? rawVision?.humans ?? [] : []),
+    ...(sources.includes('face') ? rawVision?.faces ?? [] : []),
+    ...(sources.includes('animal')
+      ? (rawVision?.animals ?? []).flatMap((animal) => animal.region ? [animal.region] : [])
+      : []),
+  ];
+  return Math.min(0.2, regions.reduce((best, region) => {
+    const area = clamp01(region.width * region.height);
+    const centerX = region.x + region.width / 2;
+    const centerY = region.y + region.height / 2;
+    const distance = Math.hypot(centerX - 0.5, centerY - 0.5);
+    const centrality = 1 - Math.min(1, distance / Math.SQRT1_2);
+    return Math.max(best, (0.15 * area + 0.05 * centrality) * clamp01(region.confidence));
+  }, 0));
+}
+
+function labelsBelongToSameCluster(left: string, right: string): boolean {
+  const leftPhrase = canonicalVisualPhrase(left);
+  const rightPhrase = canonicalVisualPhrase(right);
+  if (!leftPhrase || !rightPhrase) return false;
+  if (leftPhrase === rightPhrase) return true;
+  const leftTokens = leftPhrase.split(' ');
+  const rightTokens = rightPhrase.split(' ');
+  const leftContainsRight = rightTokens.every((token) => leftTokens.includes(token));
+  const rightContainsLeft = leftTokens.every((token) => rightTokens.includes(token));
+  if (leftContainsRight || rightContainsLeft) return true;
+  return leftTokens.length >= 2 && leftTokens.length <= 3
+    && rightTokens.length >= 2 && rightTokens.length <= 3
+    && leftTokens[leftTokens.length - 1] === rightTokens[rightTokens.length - 1];
+}
+
+function clusterSpatialContribution(labels: string[], rawVision: PhotoVisionResult | null): number {
+  let best = 0;
+  for (const classification of rawVision?.regionClassifications ?? []) {
+    const region = classification.region;
+    const area = clamp01(region.width * region.height);
+    const centerX = region.x + region.width / 2;
+    const centerY = region.y + region.height / 2;
+    const distance = Math.hypot(centerX - 0.5, centerY - 0.5);
+    const centrality = 1 - Math.min(1, distance / Math.SQRT1_2);
+    for (const label of classification.labels) {
+      if (!labels.some((member) => labelsBelongToSameCluster(member, label.name))) continue;
+      const contribution = (0.15 * area + 0.05 * centrality) * clamp01(label.confidence);
+      best = Math.max(best, contribution);
+    }
+  }
+  return Math.min(0.2, best);
 }
 
 const VISUAL_TERM_STOP_WORDS = new Set([
@@ -376,10 +526,7 @@ const VISUAL_TERM_STOP_WORDS = new Set([
 ]);
 
 function routeVisualTerms(routeKey: string, categoryId: string, label: string, aliases: string[]): string[] {
-  const visualAliases = routeKey === 'studio.show'
-    ? aliases.filter((alias) => !['tv', 'television'].includes(canonicalVisualPhrase(alias)))
-    : aliases;
-  return [...new Set([categoryId, label, ...visualAliases]
+  return [...new Set([categoryId, label, ...aliases]
     .map(canonicalVisualPhrase)
     .filter((term) => term && !VISUAL_TERM_STOP_WORDS.has(term)))];
 }
@@ -428,6 +575,10 @@ function dominantCoverage(rawVision: PhotoVisionResult | null): number {
 
 function maximumRegionCoverage(regions: { width: number; height: number }[] | undefined): number {
   return (regions ?? []).reduce((maximum, region) => Math.max(maximum, clamp01(region.width * region.height)), 0);
+}
+
+function maximumRegionConfidence(regions: { confidence: number }[] | undefined): number {
+  return (regions ?? []).reduce((maximum, region) => Math.max(maximum, clamp01(region.confidence)), 0);
 }
 
 function spatialDescriptions(rawVision: PhotoVisionResult | null): string[] {

@@ -37,9 +37,22 @@ export type PhotoTopLevel =
   | 'ordinary'
   | 'ambiguous';
 
+export type PhotoModelConfidence = 'high' | 'medium' | 'low';
+
+export type PhotoModelFlowId =
+  | 'place'
+  | 'food'
+  | 'media'
+  | 'movement'
+  | 'people'
+  | 'work'
+  | 'event'
+  | 'other';
+
 export type PhotoTopLevelDecision = {
   primaryEvidenceKey: string;
   topLevel: PhotoTopLevel;
+  confidence: PhotoModelConfidence;
   rawResponse: Record<string, unknown>;
   durationMs: number;
 };
@@ -133,6 +146,25 @@ export function photoSemanticFlowForTopLevel(topLevel: PhotoTopLevel): PhotoSema
   return topLevel;
 }
 
+/** Clear model vocabulary for the app's legacy/manual journal flow IDs. */
+export function photoModelFlowIdForSemanticFlow(flowId: string): PhotoModelFlowId | null {
+  if (flowId === 'went_somewhere' || flowId === 'place') return 'place';
+  if (flowId === 'studio' || flowId === 'media') return 'media';
+  if (flowId === 'big_event' || flowId === 'event') return 'event';
+  if (flowId === 'general' || flowId === 'other' || flowId === 'ordinary') return 'other';
+  if (flowId === 'food' || flowId === 'movement' || flowId === 'people' || flowId === 'work') return flowId;
+  return null;
+}
+
+export function photoTopLevelForSemanticFlow(flowId: string): Exclude<PhotoTopLevel, 'ambiguous'> | null {
+  if (flowId === 'went_somewhere' || flowId === 'place') return 'place';
+  if (flowId === 'studio' || flowId === 'media') return 'media';
+  if (flowId === 'big_event' || flowId === 'event') return 'event';
+  if (flowId === 'general' || flowId === 'other' || flowId === 'ordinary') return 'ordinary';
+  if (flowId === 'people' || flowId === 'food' || flowId === 'movement' || flowId === 'work') return flowId;
+  return null;
+}
+
 export function photoSemanticDomainForTopLevel(topLevel: PhotoTopLevel): MemoryDomain {
   if (topLevel === 'place') return 'place';
   if (topLevel === 'media') return 'media';
@@ -197,7 +229,12 @@ export function buildPhotoSemanticFrame(evidence: PhotoJournalEvidencePacket): P
 export function reconcilePhotoSemanticFrame(
   base: PhotoSemanticFrame,
   decision: PhotoTopLevelDecision | null,
-  failure?: { status: 'unavailable' | 'failed'; reason: string; durationMs?: number | null },
+  failure?: {
+    status: 'unavailable' | 'failed';
+    reason: string;
+    durationMs?: number | null;
+    rawResponse?: Record<string, unknown> | null;
+  },
   attempts: PhotoSemanticAttempt[] = []
 ): PhotoSemanticFrame {
   if (!decision) {
@@ -206,7 +243,7 @@ export function reconcilePhotoSemanticFrame(
       foundation: {
         status: failure?.status ?? 'failed',
         durationMs: failure?.durationMs ?? null,
-        rawResponse: null,
+        rawResponse: failure?.rawResponse ?? null,
         reason: failure?.reason ?? 'Foundation returned no grounded top-level decision',
         attempts,
       },
@@ -237,12 +274,14 @@ export function reconcilePhotoTopLevelAmbiguity(
   const primaryIssue = photoTopLevelDecisionIssue(base, {
     primaryEvidenceKey: decision.primaryEvidenceKey,
     topLevel: decision.primaryTopLevel,
+    confidence: 'low',
     rawResponse: decision.rawResponse,
     durationMs: decision.durationMs,
   });
   const alternativeIssue = photoTopLevelDecisionIssue(base, {
     primaryEvidenceKey: decision.alternativeEvidenceKey,
     topLevel: decision.alternativeTopLevel,
+    confidence: 'low',
     rawResponse: decision.rawResponse,
     durationMs: decision.durationMs,
   });
@@ -273,9 +312,7 @@ function resolvedFrame(
   const flowKey = photoSemanticFlowForTopLevel(topLevel);
   const domain = photoSemanticDomainForTopLevel(topLevel);
   const alternativeFlowKey = alternativeTopLevel ? photoSemanticFlowForTopLevel(alternativeTopLevel) : null;
-  const unresolvedFacet: PhotoSemanticUnresolvedFacet = topLevel === 'people'
-    ? 'relationship'
-    : topLevel === 'ambiguous'
+  const unresolvedFacet: PhotoSemanticUnresolvedFacet = topLevel === 'ambiguous'
       ? 'primary_subject'
       : 'none';
   const container: PhotoSemanticFrame['container'] = topLevel === 'ambiguous'
@@ -317,97 +354,34 @@ function resolvedFrame(
 
 export function photoTopLevelDecisionIssue(base: PhotoSemanticFrame, decision: PhotoTopLevelDecision): string | null {
   if (!base.primaryEvidenceKeys.includes(decision.primaryEvidenceKey)) return 'Foundation selected evidence outside visible Essence';
-  const signal = base.evidence.signals.find((item) => item.id === decision.primaryEvidenceKey);
-  const anchoredTopLevel = signal ? directTopLevelAnchor(signal.name) : null;
-  if (anchoredTopLevel && decision.topLevel !== anchoredTopLevel) {
-    return `Foundation top level ${decision.topLevel} conflicts with explicit ${anchoredTopLevel} evidence ${decision.primaryEvidenceKey}`;
-  }
-  const selectedPeopleOrPet = signalDenotesPeopleOrPets(signal?.name ?? '');
-  const depictedMediaContext = hasDepictionContainerEvidence(base);
-  if (selectedPeopleOrPet && decision.topLevel !== 'people' && !(decision.topLevel === 'media' && depictedMediaContext)) {
-    return `Foundation top level ${decision.topLevel} conflicts with explicit people evidence ${decision.primaryEvidenceKey}`;
-  }
-  if (decision.topLevel === 'people' && !selectedPeopleOrPet) {
-    return `Foundation selected People for non-people primary evidence ${decision.primaryEvidenceKey}`;
-  }
-  if (decision.topLevel === 'people' && selectedPeopleOrPet && likelyDepictedPerson(base, decision.primaryEvidenceKey)) {
-    return `Foundation selected People for person evidence likely depicted inside the dominant media container`;
-  }
   return null;
-}
-
-/**
- * Last-resort recovery for a completed but contradictory Foundation answer.
- * Only the first ranked visible Essence item may recover the result, and only
- * when that label has an unambiguous ontology anchor. Supporting context and
- * OCR can therefore never become the fallback subject.
- */
-export function groundedPhotoTopLevelFallback(
-  base: PhotoSemanticFrame,
-  previousFailureReason: string
-): PhotoTopLevelDecision | null {
-  const primaryEvidenceKey = base.primaryEvidenceKeys[0];
-  if (!primaryEvidenceKey) return null;
-  const signal = base.evidence.signals.find((item) => item.id === primaryEvidenceKey);
-  const topLevel = signal ? directTopLevelAnchor(signal.name) : null;
-  if (!topLevel) return null;
-  const decision: PhotoTopLevelDecision = {
-    primaryEvidenceKey,
-    topLevel,
-    durationMs: 0,
-    rawResponse: {
-      status: 'succeeded',
-      taskId: 'photo.top-level.grounded-fallback.v1',
-      primaryEvidenceKey,
-      topLevel,
-      reason: 'first_ranked_visible_essence_has_unambiguous_top_level',
-      previousFailureReason,
-    },
-  };
-  return photoTopLevelDecisionIssue(base, decision) ? null : decision;
-}
-
-function directTopLevelAnchor(value: string): PhotoTopLevel | null {
-  const label = normalize(value);
-  if (/\b(book|publication|paperback|hardcover|hardback|novel|document|television|tv|screen|monitor|film|movie|series|episode|video game|gameplay|podcast|album|music|artwork|painting)\b/.test(label)) return 'media';
-  return null;
-}
-
-function hasDepictionContainerEvidence(frame: PhotoSemanticFrame): boolean {
-  return frame.classificationEvidenceKeys.some((key) => {
-    const label = frame.evidence.signals.find((signal) => signal.id === key)?.name ?? '';
-    return /\b(television|tv|screen|monitor|book|publication|document|poster|print|artwork|painting)\b/.test(normalize(label));
-  });
-}
-
-function likelyDepictedPerson(frame: PhotoSemanticFrame, peopleEvidenceKey: string): boolean {
-  const peopleIndex = frame.primaryEvidenceKeys.indexOf(peopleEvidenceKey);
-  if (peopleIndex <= 0) return false;
-  const leadingLabel = frame.evidence.signals.find((signal) => signal.id === frame.primaryEvidenceKeys[0])?.name ?? '';
-  const leadingMediaContainer = /\b(television|tv|screen|monitor|book|publication|document|poster|print|artwork|painting)\b/.test(normalize(leadingLabel));
-  if (!leadingMediaContainer) return false;
-  const substantialPhysicalHuman = frame.evidence.maxHumanCoverage >= 0.18 || frame.evidence.maxFaceCoverage >= 0.03;
-  return !substantialPhysicalHuman;
-}
-
-function signalDenotesPeopleOrPets(value: string): boolean {
-  return /\b(person|people|human|child|baby|adult|man|woman|boy|girl|family|friend|couple|crowd|dog|cat|pet|animal)\b/.test(normalize(value));
 }
 
 export function photoTopLevelEvidenceText(frame: PhotoSemanticFrame): string {
   const visible = visiblePhotoEssenceEvidence(frame.evidence);
-  const visibleIds = new Set(frame.primaryEvidenceKeys);
+  const lockedPrincipalKey = frame.primaryEvidenceKeys[0] ?? null;
   const signals = frame.classificationEvidenceKeys.map((key, index) => {
     const signal = frame.evidence.signals.find((item) => item.id === key);
     if (!signal) return null;
-    const role = visibleIds.has(key) ? 'visible_primary_candidate' : 'supporting_context';
-    return `${index + 1}. ${key}=${signal.name} score ${signal.confidence.toFixed(2)} role ${role} sources ${signal.sources.join('+')}`;
+    const role = key === lockedPrincipalKey ? 'locked_principal_essence' : 'filtered_essence_context';
+    return [
+      `${index + 1}. ${key}=${signal.name}`,
+      `members [${signal.memberLabels.join(' | ')}]`,
+      `maxDetector ${signal.maxDetectorConfidence.toFixed(3)}`,
+      `corroborated ${signal.corroboratedConfidence.toFixed(3)}`,
+      `sourceReliability ${signal.sourceReliability.toFixed(3)}`,
+      `sourceAdjusted ${signal.sourceAdjustedConfidence.toFixed(3)}`,
+      `spatial ${signal.spatialContribution.toFixed(3)}`,
+      `salience ${signal.salience.toFixed(3)}`,
+      `role ${role}`,
+      `sources ${signal.sources.join('+')}`,
+      `ranking [${signal.rankReasons.join(' | ')}]`,
+    ].join('; ');
   }).filter(Boolean).join('\n') || 'none';
-  const ocr = frame.evidence.ocr.status === 'included'
-    ? `Raw OCR supporting evidence only (never a primary evidence key):\n${frame.evidence.ocr.lines.map((line, index) => `OCR ${index + 1}: ${JSON.stringify(line.text)} confidence ${line.confidence.toFixed(2)}`).join('\n')}`
-    : `Raw OCR: ${frame.evidence.ocr.status} (${frame.evidence.ocr.reason}); no OCR text supplied.`;
-  const spatial = frame.evidence.spatial.length ? frame.evidence.spatial.join(' | ') : 'none';
-  return `Classification visual evidence (visible Essence first):\n${signals}\nRepresentation ${visible.representation}; faces ${visible.faceCount}; humans ${visible.humanCount}; max face coverage ${frame.evidence.maxFaceCoverage.toFixed(3)}; max human coverage ${frame.evidence.maxHumanCoverage.toFixed(3)}; document ${frame.evidence.documentDetected ? 'yes' : 'no'}; dominant coverage ${frame.evidence.dominantCoverage.toFixed(2)}; spatial evidence ${spatial}.\n${ocr}`;
+  const dominantRegion = frame.evidence.classifiedRegionCount > 0
+    ? `dominant coverage ${frame.evidence.dominantCoverage.toFixed(2)}; ${frame.evidence.classifiedRegionCount} classified region(s)`
+    : `dominant coverage ${frame.evidence.dominantCoverage.toFixed(2)} is unlabelled and must not be attributed to any evidence cluster`;
+  return `Filtered Essence evidence only (up to eight clusters; OCR and unfiltered raw labels excluded):\n${signals}\nLocked principal evidence: ${lockedPrincipalKey ?? 'none'}.\nRepresentation ${visible.representation}; faces ${visible.faceCount}; humans ${visible.humanCount}; max face coverage ${frame.evidence.maxFaceCoverage.toFixed(3)}; max human coverage ${frame.evidence.maxHumanCoverage.toFixed(3)}; ${dominantRegion}. Spatial ranking is already represented by each filtered Essence cluster's spatial contribution; no additional labels are supplied.`;
 }
 
 export function photoSemanticFrameText(frame: PhotoSemanticFrame): string {

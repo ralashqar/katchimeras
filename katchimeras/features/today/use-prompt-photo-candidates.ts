@@ -11,12 +11,18 @@ import {
 type PromptPhotoCandidateParams = {
   dayId: string | null;
   dayState: string | null;
+  enabled?: boolean;
   interactionKey: string;
 };
 
 const PHOTO_SCAN_IDLE_DELAY_MS = 900;
 
-export function usePromptPhotoCandidates({ dayId, dayState, interactionKey }: PromptPhotoCandidateParams) {
+export function usePromptPhotoCandidates({
+  dayId,
+  dayState,
+  enabled = true,
+  interactionKey,
+}: PromptPhotoCandidateParams) {
   const [promptPhotoCandidates, setPromptPhotoCandidates] = useState<DayPromptPhotoCandidate[]>([]);
   const [forceMeaningfulPhotoPrompt, setForceMeaningfulPhotoPrompt] = useState(false);
 
@@ -27,7 +33,7 @@ export function usePromptPhotoCandidates({ dayId, dayState, interactionKey }: Pr
   }, []);
 
   useEffect(() => {
-    if (!dayId || dayState === 'hatched') {
+    if (!enabled || !dayId || dayState === 'hatched') {
       setPromptPhotoCandidates((current) => current.length === 0 ? current : []);
       setForceMeaningfulPhotoPrompt((current) => current ? false : current);
       return;
@@ -64,7 +70,7 @@ export function usePromptPhotoCandidates({ dayId, dayState, interactionKey }: Pr
       if (idleTimer !== null) clearTimeout(idleTimer);
       abortController.abort();
     };
-  }, [dayId, dayState, interactionKey]);
+  }, [dayId, dayState, enabled, interactionKey]);
 
   return {
     promptPhotoCandidates,

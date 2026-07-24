@@ -23,16 +23,24 @@ export type ScheduledKingdomTile = {
 
 type Args = {
   camera: KingdomCameraSnapshot;
+  cameraReady: boolean;
   isMoving: boolean;
   scene: KingdomHexScene;
   viewport: KingdomSize;
 };
 
-export function useKingdomTileScheduler({ camera, isMoving, scene, viewport }: Args) {
+export function useKingdomTileScheduler({ camera, cameraReady, isMoving, scene, viewport }: Args) {
   const [state, dispatch] = useReducer(kingdomTileSchedulerReducer, EMPTY_KINGDOM_TILE_SCHEDULER);
   const layerById = useMemo(() => new Map(scene.tileArtLayers.map((layer) => [layer.id, layer])), [scene.tileArtLayers]);
 
   const visibility = useMemo(() => {
+    if (!cameraReady) {
+      return {
+        preloadIds: [scene.centerTile.id],
+        priority: [scene.centerTile.id],
+        visibleIds: new Set([scene.centerTile.id]),
+      };
+    }
     const viewportRect = visibleWorldRect(viewport, scene, camera, 0);
     const preloadRect = visibleWorldRect(viewport, scene, camera, KINGDOM_RENDERING.preloadMarginScreenPx);
     if (!viewportRect || !preloadRect) {
@@ -44,19 +52,24 @@ export function useKingdomTileScheduler({ camera, isMoving, scene, viewport }: A
     for (const layer of scene.tileArtLayers) {
       const frame = frameToRect(layer.frame);
       if (rectsIntersect(frame, viewportRect)) visibleIds.add(layer.id);
-      priorityLayers.push(layer);
+      // Keep the native image surface bounded to the camera neighborhood.
+      // The previous scheduler queued every Kingdom tile, so an apparently
+      // idle map steadily decoded the entire world and retained it in memory.
+      if (layer.id === scene.centerTile.id || rectsIntersect(frame, preloadRect)) {
+        priorityLayers.push(layer);
+      }
     }
 
     const viewportCenter = screenPointToWorld({ x: viewport.width / 2, y: viewport.height / 2 }, scene, camera);
     priorityLayers.sort((a, b) => {
+      if (a.id === scene.centerTile.id) return -1;
+      if (b.id === scene.centerTile.id) return 1;
       const aFrame = frameToRect(a.frame);
       const bFrame = frameToRect(b.frame);
       const zoneDelta =
         Number(!visibleIds.has(a.id)) - Number(!visibleIds.has(b.id)) ||
         Number(!rectsIntersect(aFrame, preloadRect)) - Number(!rectsIntersect(bFrame, preloadRect));
       if (zoneDelta) return zoneDelta;
-      if (a.id === scene.centerTile.id) return -1;
-      if (b.id === scene.centerTile.id) return 1;
       const aCenterX = a.frame.left + a.frame.width / 2;
       const aCenterY = a.frame.top + a.frame.height / 2;
       const bCenterX = b.frame.left + b.frame.width / 2;
@@ -68,7 +81,7 @@ export function useKingdomTileScheduler({ camera, isMoving, scene, viewport }: A
 
     const priority = priorityLayers.map((layer) => layer.id);
     return { preloadIds: priority, priority, visibleIds };
-  }, [camera, scene, viewport]);
+  }, [camera, cameraReady, scene, viewport]);
 
   useEffect(() => {
     dispatch({ type: 'sync', paused: isMoving, preloadIds: visibility.preloadIds, priority: visibility.priority });

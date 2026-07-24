@@ -550,6 +550,51 @@ export type DayWeather = {
   source: 'vision' | 'forecast';
 };
 
+export type SkyWeatherId =
+  | 'clear'
+  | 'partly_cloudy'
+  | 'overcast'
+  | 'foggy'
+  | 'rainy'
+  | 'snowy'
+  | 'stormy'
+  | 'hot';
+
+export type SkyMoodId =
+  | 'neutral'
+  | 'radiant'
+  | 'celebratory'
+  | 'garden'
+  | 'autumn'
+  | 'hearth'
+  | 'twilight'
+  | 'inspired'
+  | 'journey'
+  | 'connected'
+  | 'reflective';
+
+export type DayBackgroundSceneId =
+  | 'clear_day'
+  | 'radiant_golden'
+  | 'celebration_connected'
+  | 'garden_bloom'
+  | 'autumn_hearth'
+  | 'twilight_reflective'
+  | 'inspired_journey'
+  | 'rain_overcast'
+  | 'mist_cold'
+  | 'storm';
+
+export type DaySkySnapshot = {
+  intensity: number;
+  mood: SkyMoodId;
+  seed: number;
+  version: 1;
+  weather: SkyWeatherId;
+};
+
+export type DaySkyPolicy = 'live_frozen' | 'historical_adaptive';
+
 export type DayVisionSummary = {
   concepts: DayVisionConcept[];
   // The most salient *specific* raw labels, un-canonicalised ("marble
@@ -1347,6 +1392,10 @@ export type StoredHomeDayRecord = {
   journalRecords?: JournalRecord[];
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
+  // Live hatches freeze their sky. Reconstructed historical days keep an
+  // adaptive snapshot that is refreshed as retrospective evidence changes.
+  sky?: DaySkySnapshot;
+  skyPolicy?: DaySkyPolicy;
   // Energy captured through the camera (Moment Capture): score deltas that fold
   // into the day's scores alongside moments + prompt answers. See
   // utils/capture-energy.ts.
@@ -1397,7 +1446,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 14;
+  version: 16;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

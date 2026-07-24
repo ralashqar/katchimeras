@@ -13,9 +13,14 @@ import { AppState, StyleSheet, useWindowDimensions, View, type ViewStyle } from 
 import Animated, { FadeIn, FadeOut, useDerivedValue, useFrameCallback, useReducedMotion, useSharedValue } from 'react-native-reanimated';
 
 import { useDevAtmosphereState } from '@/hooks/use-dev-atmosphere-state';
-import { SpriteAtmosphereAtlas } from '@/components/katchadeck/world/sprite-atmosphere-atlas';
 import {
-  atmosphereParticleCount,
+  DreamWispSpriteAtlas,
+  JourneyBreezeSpriteAtlas,
+  SocialRibbonSpriteAtlas,
+  SpriteAtmosphereAtlas,
+} from '@/components/katchadeck/world/sprite-atmosphere-atlas';
+import {
+  atmosphereLayerParticleCount,
   atmospherePresetHasForeground,
   atmospherePresetUsesAuthoredSprites,
   atmospherePresetSeedOffset,
@@ -28,6 +33,7 @@ import {
 
 type AtmosphereLayerProps = {
   active?: boolean;
+  densityScale?: number;
   plane: AtmospherePlane;
   reduceMotionOverride?: boolean;
   renderer?: AtmosphereRenderer;
@@ -37,6 +43,7 @@ type AtmosphereLayerProps = {
 
 export const AtmosphereLayer = memo(function AtmosphereLayer({
   active = true,
+  densityScale = 1,
   plane,
   reduceMotionOverride = false,
   renderer = 'atlas',
@@ -73,6 +80,7 @@ export const AtmosphereLayer = memo(function AtmosphereLayer({
       style={[styles.layer, style]}>
       <AtmosphereCanvas
         active={motionActive}
+        densityScale={densityScale}
         plane={plane}
         reduceMotion={deviceReduceMotion || reduceMotionOverride}
         renderer={renderer}
@@ -83,30 +91,47 @@ export const AtmosphereLayer = memo(function AtmosphereLayer({
 });
 
 export const DevAtmosphereLayer = memo(function DevAtmosphereLayer({
+  active = true,
   plane,
   style,
   target,
 }: {
+  active?: boolean;
   plane: AtmospherePlane;
   style?: ViewStyle;
   target: 'today' | 'kingdom';
 }) {
   const devState = useDevAtmosphereState();
   if (!atmosphereTargetIncludes(devState.target, target)) return null;
+  const layers = [devState.settings, devState.accentSettings].filter(
+    (layer) => layer.preset !== 'none'
+      && (plane === 'background' || atmospherePresetHasForeground(layer.preset))
+  );
   return (
     <>
-      <AtmosphereLayer plane={plane} renderer={devState.renderer} settings={devState.settings} style={style} />
-      <AtmosphereLayer plane={plane} renderer={devState.renderer} settings={devState.accentSettings} style={style} />
+      {layers.map((layer, index) => (
+        <AtmosphereLayer
+          active={active}
+          densityScale={index === 0 ? 1 : 0.6}
+          key={`${layer.preset}-${layer.seed}-${index}`}
+          plane={plane}
+          renderer={devState.renderer}
+          settings={layer}
+          style={style}
+        />
+      ))}
     </>
   );
 });
 
 export const ResolvedAtmosphereLayer = memo(function ResolvedAtmosphereLayer({
+  active = true,
   plane,
   settings,
   style,
   target = 'today',
 }: {
+  active?: boolean;
   plane: AtmospherePlane;
   settings: readonly AtmosphereSettings[];
   style?: ViewStyle;
@@ -115,13 +140,18 @@ export const ResolvedAtmosphereLayer = memo(function ResolvedAtmosphereLayer({
   const devState = useDevAtmosphereState();
   const devOverride = atmosphereTargetIncludes(devState.target, target)
     && (devState.settings.preset !== 'none' || devState.accentSettings.preset !== 'none');
-  const layers = devOverride
+  const layers = (devOverride
     ? [devState.settings, devState.accentSettings]
-    : settings;
+    : settings).filter(
+      (layer) => layer.preset !== 'none'
+        && (plane === 'background' || atmospherePresetHasForeground(layer.preset))
+    );
   return (
     <>
       {layers.map((layer, index) => (
         <AtmosphereLayer
+          active={active}
+          densityScale={index === 0 ? 1 : 0.6}
           key={`${layer.preset}-${layer.seed}-${index}`}
           plane={plane}
           renderer={devOverride ? devState.renderer : 'atlas'}
@@ -135,12 +165,14 @@ export const ResolvedAtmosphereLayer = memo(function ResolvedAtmosphereLayer({
 
 function AtmosphereCanvas({
   active,
+  densityScale,
   plane,
   reduceMotion,
   renderer,
   settings,
 }: {
   active: boolean;
+  densityScale: number;
   plane: AtmospherePlane;
   reduceMotion: boolean;
   renderer: AtmosphereRenderer;
@@ -149,7 +181,13 @@ function AtmosphereCanvas({
   const { height, width } = useWindowDimensions();
   const elapsed = useSharedValue(0);
   const count = plane === 'foreground'
-    ? atmosphereParticleCount(settings.preset, settings.quality, width, settings.intensity)
+    ? atmosphereLayerParticleCount(
+        settings.preset,
+        settings.quality,
+        width,
+        settings.intensity,
+        densityScale,
+      )
     : 0;
   const particles = useMemo(
     () => generateAtmosphereParticles(
@@ -158,7 +196,13 @@ function AtmosphereCanvas({
     ),
     [count, settings.preset, settings.seed],
   );
-  const useAtlasSprites = renderer === 'atlas'
+  // These effects have no acceptable vector fallback: their identity is the
+  // rendered artwork. Keep them authored even when the dev lab is comparing
+  // another effect against the legacy renderer.
+  const requiresAuthoredSprites = settings.preset === 'journey_breeze'
+    || settings.preset === 'dream_wisps'
+    || settings.preset === 'social_ribbons';
+  const useAtlasSprites = (renderer === 'atlas' || requiresAuthoredSprites)
     && atmospherePresetUsesAuthoredSprites(settings.preset);
 
   useEffect(() => {
@@ -170,10 +214,15 @@ function AtmosphereCanvas({
     elapsed.value += Math.min(frame.timeSincePreviousFrame ?? 16.67, 34);
   }, false);
 
+  const needsContinuousClock = plane === 'foreground'
+    || settings.preset === 'fog'
+    || settings.preset === 'smog'
+    || settings.preset === 'heat_shimmer';
+
   useEffect(() => {
-    frameCallback.setActive(active);
+    frameCallback.setActive(active && needsContinuousClock);
     return () => frameCallback.setActive(false);
-  }, [active, frameCallback]);
+  }, [active, frameCallback, needsContinuousClock]);
 
   const precipitationPath = usePathValue((path) => {
     'worklet';
@@ -214,6 +263,9 @@ function AtmosphereCanvas({
     'worklet';
     if (plane !== 'foreground') return;
     const preset = settings.preset;
+    // Never redraw these authored effects as procedural paths. If an atlas
+    // asset is still loading, an empty frame is preferable to a style pop.
+    if (preset === 'journey_breeze' || preset === 'dream_wisps') return;
     const expressive = preset !== 'none'
       && preset !== 'rain'
       && preset !== 'snow'
@@ -235,7 +287,7 @@ function AtmosphereCanvas({
         || preset === 'golden_motes'
         || preset === 'idea_sparks'
         || preset === 'memory_shimmer';
-      const horizontal = preset === 'journey_breeze' || preset === 'social_ribbons';
+      const horizontal = preset === 'social_ribbons';
       let x: number;
       let y: number;
 
@@ -255,11 +307,7 @@ function AtmosphereCanvas({
         x = ((x % (width + 40)) + width + 40) % (width + 40) - 20;
       }
 
-      if (preset === 'journey_breeze') {
-        const length = 12 + particle.size * 22;
-        path.moveTo(x - length / 2, y);
-        path.cubicTo(x - length * 0.1, y - 2, x + length * 0.2, y + 2, x + length / 2, y);
-      } else if (preset === 'social_ribbons') {
+      if (preset === 'social_ribbons') {
         const length = 14 + particle.size * 24;
         path.moveTo(x - length / 2, y);
         path.cubicTo(x - length * 0.18, y - 7, x + length * 0.15, y + 7, x + length / 2, y);
@@ -294,10 +342,6 @@ function AtmosphereCanvas({
         path.moveTo(x, y - arm);
         path.lineTo(x, y + arm);
         path.addCircle(x, y, Math.max(0.7, size * 0.35));
-      } else if (preset === 'dream_wisps') {
-        const length = size * 4.2;
-        path.moveTo(x - length / 2, y);
-        path.cubicTo(x - length * 0.15, y - size, x + length * 0.15, y + size, x + length / 2, y);
       } else {
         path.addCircle(x, y, size * (preset === 'quiet_dust' ? 0.45 : 0.72));
       }
@@ -393,18 +437,58 @@ function AtmosphereCanvas({
           <Rect x={0} y={0} width={width} height={height} color="#EEF8FF" opacity={stormFlash} />
         ) : null}
         {plane === 'foreground' && useAtlasSprites ? (
-          <SpriteAtmosphereAtlas
-            elapsed={elapsed}
-            height={height}
-            intensity={settings.intensity}
-            particles={particles}
-            preset={settings.preset}
-            reduceMotion={reduceMotion}
-            width={width}
-            wind={settings.wind}
-          />
+          <>
+            {settings.preset === 'journey_breeze' ? (
+              <JourneyBreezeSpriteAtlas
+                elapsed={elapsed}
+                height={height}
+                intensity={settings.intensity}
+                particles={particles}
+                reduceMotion={reduceMotion}
+                width={width}
+                wind={settings.wind}
+              />
+            ) : null}
+            {settings.preset === 'dream_wisps' ? (
+              <DreamWispSpriteAtlas
+                elapsed={elapsed}
+                height={height}
+                intensity={settings.intensity}
+                particles={particles}
+                reduceMotion={reduceMotion}
+                width={width}
+                wind={settings.wind}
+              />
+            ) : null}
+            {settings.preset === 'social_ribbons' ? (
+              <SocialRibbonSpriteAtlas
+                elapsed={elapsed}
+                height={height}
+                intensity={settings.intensity}
+                particles={particles}
+                reduceMotion={reduceMotion}
+                width={width}
+                wind={settings.wind}
+              />
+            ) : null}
+            {settings.preset !== 'dream_wisps'
+            && settings.preset !== 'social_ribbons' ? (
+              <SpriteAtmosphereAtlas
+                elapsed={elapsed}
+                height={height}
+                intensity={settings.intensity}
+                particles={particles}
+                preset={settings.preset}
+                reduceMotion={reduceMotion}
+                width={width}
+                wind={settings.wind}
+              />
+            ) : null}
+          </>
         ) : null}
-        {plane === 'foreground' && expressiveStyle && !useAtlasSprites ? (
+        {plane === 'foreground'
+        && expressiveStyle
+        && !useAtlasSprites ? (
           <>
             {expressiveStyle.glow ? (
               <Path
@@ -428,6 +512,13 @@ function AtmosphereCanvas({
                 <LinearGradient
                   colors={['#FFB65A', '#F7E27A', '#F49BC4', '#8ED8D1', '#A997F2']}
                   end={vec(width, height)}
+                  start={vec(0, 0)}
+                />
+              ) : null}
+              {settings.preset === 'journey_breeze' ? (
+                <LinearGradient
+                  colors={['rgba(224,255,245,0)', '#E8FFF4', '#B9E9D8', 'rgba(224,255,245,0)']}
+                  end={vec(width, 0)}
                   start={vec(0, 0)}
                 />
               ) : null}
@@ -478,7 +569,7 @@ function expressiveAtmosphereStyle(preset: AtmosphereSettings['preset']): Expres
     case 'idea_sparks':
       return { background: '#7054A5', backgroundOpacity: 0.035, blur: 6, color: '#F6D57B', glow: true, opacity: 0.9, stroke: true, strokeWidth: 1.45 };
     case 'journey_breeze':
-      return { background: '#58A9B2', backgroundOpacity: 0.025, blur: 2, color: '#D9F6ED', glow: false, opacity: 0.66, stroke: true, strokeWidth: 1.35 };
+      return { background: '#58A9B2', backgroundOpacity: 0.022, blur: 5, color: '#D9F6ED', glow: true, opacity: 0.58, stroke: true, strokeWidth: 1.55 };
     case 'memory_shimmer':
       return { background: '#D7A4DD', backgroundOpacity: 0.035, blur: 7, color: '#FFF1B3', glow: true, opacity: 0.88, stroke: true, strokeWidth: 1.5 };
     case 'social_ribbons':

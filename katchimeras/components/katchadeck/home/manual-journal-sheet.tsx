@@ -68,6 +68,8 @@ export type JournalComposerProps = {
   liveSpecific?: string | null;
   liveSpecificLoading?: boolean;
   suggestedRoutes?: JournalRouteProposal[];
+  suggestedFlowId?: string | null;
+  suggestedChoiceId?: string | null;
   sourceType?: 'manual' | 'photo';
   sourceId?: string | null;
   thumbnailUri?: string | null;
@@ -95,6 +97,8 @@ export function JournalComposer({
   liveSpecific,
   liveSpecificLoading = false,
   suggestedRoutes = [],
+  suggestedFlowId,
+  suggestedChoiceId,
   sourceType = 'manual',
   sourceId,
   thumbnailUri,
@@ -462,7 +466,7 @@ export function JournalComposer({
                     <View style={styles.flowList}>
                       {group.flows.map((item, index) => (
                         <Animated.View key={item.id} entering={reduceMotion ? undefined : FadeInRight.delay(Math.min(index * 28, 150)).duration(190)}>
-                          <FlowRow flow={item} onPress={() => selectFlow(item)} />
+                          <FlowRow flow={item} onPress={() => selectFlow(item)} suggested={item.id === suggestedFlowId} />
                         </Animated.View>
                       ))}
                     </View>
@@ -478,7 +482,7 @@ export function JournalComposer({
                     key={item.id}
                     entering={reduceMotion ? undefined : FadeInRight.delay(Math.min(index * 24, 180)).duration(190)}
                     style={isCatchAllChoice(item) ? styles.fullTile : styles.halfTile}>
-                    <ChoiceTile choice={item} onPress={() => selectChoice(item)} quiet={isCatchAllChoice(item)} />
+                    <ChoiceTile choice={item} onPress={() => selectChoice(item)} quiet={isCatchAllChoice(item)} suggested={item.id === suggestedChoiceId} />
                   </Animated.View>
                 ))}
               </View>
@@ -746,7 +750,7 @@ function JournalHeader({ canGoBack, compact, kicker, onBack, step, subtitle, tit
   );
 }
 
-function FlowRow({ flow, onPress }: { flow: ManualJournalFlowDefinition; onPress: () => void }) {
+function FlowRow({ flow, onPress, suggested = false }: { flow: ManualJournalFlowDefinition; onPress: () => void; suggested?: boolean }) {
   const art = manualJournalArt(flow.id);
   return (
     <Pressable
@@ -754,10 +758,11 @@ function FlowRow({ flow, onPress }: { flow: ManualJournalFlowDefinition; onPress
       accessibilityLabel={flow.shortTitle ?? flow.title}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.flowRow, pressed && styles.rowPressed]}>
+      style={({ pressed }) => [styles.flowRow, suggested && styles.suggestedTile, pressed && styles.rowPressed]}>
       <View style={styles.flowIcon}>{art ? <Image source={art} style={styles.flowArt} contentFit="contain" /> : <IconSymbol name={flow.icon} size={24} color={Meadow.goldDeep} />}</View>
       <View style={styles.flowCopy}>
         <ThemedText maxFontSizeMultiplier={1.4} style={styles.flowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{flow.shortTitle ?? flow.title}</ThemedText>
+        {suggested ? <ThemedText style={styles.suggestedLabel} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>AI suggestion · tap to confirm</ThemedText> : null}
         {flow.description ? <ThemedText maxFontSizeMultiplier={1.35} style={styles.flowDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{flow.description}</ThemedText> : null}
       </View>
       <IconSymbol name="chevron.right" size={18} color={Meadow.inkSoft} />
@@ -765,16 +770,17 @@ function FlowRow({ flow, onPress }: { flow: ManualJournalFlowDefinition; onPress
   );
 }
 
-function ChoiceTile({ choice, onPress, quiet }: { choice: ManualJournalChoice; onPress: () => void; quiet: boolean }) {
+function ChoiceTile({ choice, onPress, quiet, suggested = false }: { choice: ManualJournalChoice; onPress: () => void; quiet: boolean; suggested?: boolean }) {
   return (
     <Pressable
       accessibilityHint={choice.description}
       accessibilityLabel={choice.label}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.choiceTile, quiet && styles.choiceTileQuiet, pressed && styles.tilePressed]}>
+      style={({ pressed }) => [styles.choiceTile, quiet && styles.choiceTileQuiet, suggested && styles.suggestedTile, pressed && styles.tilePressed]}>
       <View style={[styles.choiceIcon, quiet && styles.choiceIconQuiet]}><IconSymbol name={choice.icon} size={21} color={Meadow.goldDeep} /></View>
       <ThemedText maxFontSizeMultiplier={1.35} style={styles.choiceTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{choice.label}</ThemedText>
+      {suggested ? <ThemedText style={styles.suggestedLabel} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>AI suggestion · tap to confirm</ThemedText> : null}
       {quiet ? <IconSymbol name="chevron.right" size={17} color={Meadow.inkSoft} /> : null}
     </Pressable>
   );
@@ -931,6 +937,8 @@ const styles = StyleSheet.create({
   fullTile: { width: '100%' },
   choiceTile: { backgroundColor: 'rgba(255,248,232,0.36)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.14), inset 0 1px 0 rgba(255,248,230,0.50)', gap: 11, minHeight: 102, padding: 14 },
   choiceTileQuiet: { alignItems: 'center', flexDirection: 'row', minHeight: 58, paddingVertical: 10 },
+  suggestedTile: { borderColor: Meadow.goldDeep, borderWidth: 2 },
+  suggestedLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '700', letterSpacing: 0.2 },
   tilePressed: { backgroundColor: 'rgba(255,244,204,0.58)', borderColor: Meadow.goldDeep, transform: [{ scale: 0.975 }] },
   choiceIcon: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.18)', borderCurve: 'continuous', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   choiceIconQuiet: { height: 36, width: 36 },

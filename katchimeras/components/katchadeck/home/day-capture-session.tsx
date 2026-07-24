@@ -17,7 +17,7 @@ export function DayCaptureSession() {
     setLocationPermission,
     setTodayStepCount,
     timelineDays,
-  } = useHomeScreenState();
+  } = useHomeScreenState({ enableInteractiveServices: false });
 
   const today = useMemo(
     () => timelineDays.find((day) => day.kind === 'day' && day.isToday) ?? null,

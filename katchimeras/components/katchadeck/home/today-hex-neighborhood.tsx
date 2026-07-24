@@ -24,10 +24,16 @@ type TodayHexNeighborhoodProps = {
   foreground?: ReactNode;
   interactionLocked?: boolean;
   onSelect: (dayId: string) => void;
-  renderDay: (day: HomeTimelineDay, active: boolean) => ReactNode;
+  renderedIndices: readonly number[];
+  renderDay: (
+    day: HomeTimelineDay,
+    mode: TodayTileRenderMode,
+  ) => ReactNode;
   renderDayOverlay?: (day: HomeTimelineDay, active: boolean) => ReactNode;
   selectedId: string;
 };
+
+export type TodayTileRenderMode = 'active' | 'neighbor' | 'transit';
 
 /**
  * A stable miniature Kingdom row for Today. Tiles retain fixed world points;
@@ -40,6 +46,7 @@ export function TodayHexNeighborhood({
   foreground,
   interactionLocked = false,
   onSelect,
+  renderedIndices,
   renderDay,
   renderDayOverlay,
   selectedId,
@@ -47,8 +54,6 @@ export function TodayHexNeighborhood({
   const { width: viewportWidth } = useWindowDimensions();
   const config = todayScene.hexNeighborhood;
   const verticalOverscan = config.edgeTapVerticalOverscan;
-  // Tomorrow stays mounted but invisible before the hatch so its local art is
-  // decoded before the entrance animation needs it.
   const visibleDays = useMemo(() => days, [days]);
   const selectedIndex = Math.max(0, visibleDays.findIndex((day) => day.id === selectedId));
   const spacing = todayHexKingdomSpacing(
@@ -85,7 +90,6 @@ export function TodayHexNeighborhood({
   const previous = visibleDays[selectedIndex - 1] ?? null;
   const candidateNext = visibleDays[selectedIndex + 1] ?? null;
   const next = candidateNext?.kind === 'tomorrow' && !allowTomorrow ? null : candidateNext;
-
   return (
     <View
       accessibilityRole="adjustable"
@@ -102,7 +106,9 @@ export function TodayHexNeighborhood({
       <Animated.View
         pointerEvents="box-none"
         style={[styles.world, { top: verticalOverscan }, cameraStyle]}>
-        {visibleDays.map((day, index) => {
+        {renderedIndices.map((index) => {
+          const day = visibleDays[index];
+          if (!day) return null;
           const point = todayHexDayWorldPosition(
             index,
             spacing.horizontalStride,
@@ -110,6 +116,11 @@ export function TodayHexNeighborhood({
           );
           const active = day.id === selectedId;
           const visible = day.kind !== 'tomorrow' || allowTomorrow;
+          const mode: TodayTileRenderMode = active
+            ? 'active'
+            : Math.abs(index - selectedIndex) <= 1
+              ? 'neighbor'
+              : 'transit';
           return <HexDaySlot
             active={active}
             cameraProgress={cameraProgress}
@@ -117,6 +128,7 @@ export function TodayHexNeighborhood({
             index={index}
             key={day.id}
             left={point.x - viewportWidth / 2}
+            mode={mode}
             renderDay={renderDay}
             top={point.y}
             visible={visible}
@@ -131,7 +143,9 @@ export function TodayHexNeighborhood({
         <Animated.View
           pointerEvents="none"
           style={[styles.world, styles.overlayWorld, { top: verticalOverscan }, overlayCameraStyle]}>
-          {visibleDays.map((day, index) => {
+          {renderedIndices.map((index) => {
+            const day = visibleDays[index];
+            if (!day || day.id !== selectedId) return null;
             const point = todayHexDayWorldPosition(
               index,
               spacing.horizontalStride,
@@ -184,7 +198,11 @@ type HexDaySlotProps = {
   day: HomeTimelineDay;
   index: number;
   left: number;
-  renderDay: (day: HomeTimelineDay, active: boolean) => ReactNode;
+  mode: TodayTileRenderMode;
+  renderDay: (
+    day: HomeTimelineDay,
+    mode: TodayTileRenderMode,
+  ) => ReactNode;
   top: number;
   visible: boolean;
   width: number;
@@ -196,6 +214,7 @@ const HexDaySlot = memo(function HexDaySlot({
   day,
   index,
   left,
+  mode,
   renderDay,
   top,
   visible,
@@ -227,7 +246,7 @@ const HexDaySlot = memo(function HexDaySlot({
         stackingStyle,
       ]}>
       <Animated.View pointerEvents="box-none" style={[styles.slotContent, visibilityStyle]}>
-        {renderDay(day, active)}
+        {renderDay(day, mode)}
       </Animated.View>
     </Animated.View>
   );

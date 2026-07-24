@@ -1,14 +1,11 @@
 import { File } from 'expo-file-system';
 
-import { interpretNoteOnDevice } from '@/utils/foundation-note';
+import { interpretNoteOnDevice, type FoundationConfidenceLevel } from '@/utils/foundation-note';
 import { interpretNoteText, type NoteInterpretation } from '@/utils/note-meaning';
 import type { DayEvidenceProvider, JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
 import { transcribeOnDevice } from '@/utils/speech-transcribe';
-import { detectStudioInText, isGenericStudioLabel } from '@/utils/studio-detect';
-import { classifyNoteSemantically, semanticMedia, type SemanticRead } from '@/utils/intelligence/semantic-fallback';
+import type { SemanticRead } from '@/utils/intelligence/semantic-fallback';
 import { supabase } from '@/utils/supabase';
-import { registryJournalRoutes } from '@/utils/journal-routing';
-import { isFoundationOnlyNoteRoutingEnabled } from '@/utils/dev-settings';
 
 // Client-side note interpreter, on-device first:
 //   1. Transcribe voice notes ON-DEVICE (Apple Speech) — audio never leaves the
@@ -16,9 +13,9 @@ import { isFoundationOnlyNoteRoutingEnabled } from '@/utils/dev-settings';
 //   2. Interpret the transcript (title + mood) ON-DEVICE (Foundation Models) —
 //      the text never leaves the phone either. Big Moments are detected by the
 //      local rules and merged in.
-//   3. The deterministic local interpreter is the default fallback. The edge
-//      function is considered only after an explicit cloud-assistance opt-in;
-//      voice audio is never uploaded merely because a local model is absent.
+//   3. Foundation Models is the exclusive automatic journal classifier.
+//      Unavailable or uncertain classification opens manual review instead of
+//      invoking a second classifier.
 
 const TIMEOUT_MS = 9000;
 
@@ -26,7 +23,7 @@ export type InterpretedNote = NoteInterpretation & {
   transcript: string;
   // On-device LLM classification (new native builds only). When llmClassified
   // is true the engine trusts these verbatim — media null = "not about media";
-  // when false/undefined the engine falls back to the deterministic rules.
+  // when false/undefined no alternate journal classifier is invoked.
   media?: { mediaType: StudioMediaType; title: string | null; creator: string | null } | null;
   food?: string | null;
   llmClassified?: boolean;
@@ -37,6 +34,9 @@ export type InterpretedNote = NoteInterpretation & {
   semanticEvaluated?: boolean;
   journalClassification?: JournalNoteClassification | null;
   journalRoutes?: JournalRouteProposal[];
+  suggestedJournalFlowId?: string | null;
+  topLevelConfidence?: FoundationConfidenceLevel | null;
+  subcategoryConfidence?: FoundationConfidenceLevel | null;
 };
 
 type NoteInput = { text?: string; audioUri?: string; mimeType?: string };
@@ -54,33 +54,6 @@ async function audioToBase64(uri: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-// Call the edge function and parse a full interpretation, or null on any failure.
-async function interpretViaEdge(
-  body: { text?: string; audioBase64?: string; mimeType?: string },
-  fallbackText: string
-): Promise<InterpretedNote | null> {
-  try {
-    const { data, error } = await withTimeout(
-      supabase.functions.invoke('interpret-voice-note', { body }),
-      TIMEOUT_MS
-    );
-    if (!error && data && typeof data.archetype === 'string' && typeof data.label === 'string') {
-      const big = data.bigMoment;
-      return {
-        archetype: data.archetype,
-        label: data.label,
-        bigMoment:
-          big && typeof big.type === 'string' ? { type: big.type, subject: big.subject ?? null } : undefined,
-        transcript: typeof data.transcript === 'string' ? data.transcript : fallbackText,
-        intelligenceProvider: 'remoteLlm',
-      };
-    }
-  } catch {
-    // fall through
-  }
-  return null;
 }
 
 // Transcribe a voice clip to editable text (no meaning inference yet). On-device
@@ -113,7 +86,6 @@ export async function transcribeAudioNote(
 }
 
 export async function interpretNote(input: NoteInput, options: { allowRemote?: boolean } = {}): Promise<InterpretedNote> {
-  const foundationOnlyRouting = isFoundationOnlyNoteRoutingEnabled();
   // 1. Resolve a transcript: typed text, or an on-device transcription.
   let transcript = (input.text ?? '').trim();
   if (!transcript && input.audioUri) {
@@ -127,22 +99,6 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
     const local = await interpretNoteOnDevice(transcript);
     if (local) {
       const rule = interpretNoteText(transcript);
-      const explicitMedia = detectStudioInText(transcript);
-      const fallbackMedia = explicitMedia.detected && explicitMedia.mediaType
-        ? {
-            mediaType: explicitMedia.mediaType,
-            title: explicitMedia.label && !isGenericStudioLabel(explicitMedia.label) ? explicitMedia.label : null,
-            creator: null,
-          }
-        : null;
-      // A current Foundation response with an explicit `none` is authoritative.
-      // Older native builds only return mood/title; in that case use the
-      // Natural Language fallback for classification without discarding the
-      // better Foundation phrasing.
-      const semantic = local.llmClassified || foundationOnlyRouting
-        ? null
-        : await classifyNoteSemantically(transcript, input.audioUri ? 'voice_note' : 'text_note');
-      const semanticResolvedMedia = semanticMedia(semantic, transcript);
       return {
         archetype: local.archetype,
         label: local.label,
@@ -151,60 +107,39 @@ export async function interpretNote(input: NoteInput, options: { allowRemote?: b
         // Older native prompts know only the original six media kinds. Strict,
         // verb-led local rules fill explicit watched sport/news and podcasts
         // without overriding a positive Foundation classification.
-        media: local.llmClassified ? local.media : foundationOnlyRouting ? null : semanticResolvedMedia ?? fallbackMedia,
+        media: local.llmClassified ? local.media : null,
         food: local.food,
         llmClassified: local.llmClassified,
-        semantic,
-        semanticCategoryId: semantic?.selected?.categoryId ?? null,
-        semanticConfidence: semantic?.selected?.score ?? null,
-        semanticEvaluated: !!semantic,
+        semantic: null,
+        semanticCategoryId: null,
+        semanticConfidence: null,
+        semanticEvaluated: false,
         journalClassification: local.journalClassification,
         journalRoutes: local.journalRoutes,
+        suggestedJournalFlowId: local.suggestedJournalFlowId,
+        topLevelConfidence: local.topLevelConfidence,
+        subcategoryConfidence: local.subcategoryConfidence,
         intelligenceProvider: 'appleFoundation',
       };
     }
-    // In this development mode, a missing or invalid Foundation response must
-    // stay unrouted so testers see the model's behavior without another
-    // classifier silently supplying a category.
-    if (foundationOnlyRouting) {
-      return {
-        ...interpretNoteText(transcript),
-        transcript,
-        journalClassification: null,
-        journalRoutes: [],
-        intelligenceProvider: 'deterministic',
-      };
-    }
-    // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.
-    if (options.allowRemote === true) {
-      const edge = await interpretViaEdge({ text: transcript }, transcript);
-      if (edge) return edge;
-    }
-    // 2c. On-device rules.
-    const semantic = await classifyNoteSemantically(transcript, input.audioUri ? 'voice_note' : 'text_note');
-    const media = semanticMedia(semantic, transcript);
+    // A missing Foundation result stays unrouted for manual review.
     return {
       ...interpretNoteText(transcript),
       transcript,
-      media,
-      semantic,
-      semanticCategoryId: semantic?.selected?.categoryId ?? null,
-      semanticConfidence: semantic?.selected?.score ?? null,
-      semanticEvaluated: !!semantic,
+      semantic: null,
+      semanticEvaluated: false,
       journalClassification: null,
-      journalRoutes: registryJournalRoutes(transcript),
-      intelligenceProvider: semantic ? 'appleNaturalLanguage' : 'deterministic',
+      journalRoutes: [],
+      intelligenceProvider: 'deterministic',
     };
+    // 2b. Cloud interpretation of the TEXT (Claude) — audio still never leaves.
   }
 
   // 3. No transcript (on-device transcription unavailable) but we have audio →
   //    upload it for server transcription + interpretation (Whisper + Claude).
   if (input.audioUri && options.allowRemote === true) {
-    const base64 = await audioToBase64(input.audioUri);
-    if (base64) {
-      const edge = await interpretViaEdge({ audioBase64: base64, mimeType: input.mimeType ?? 'audio/m4a' }, '');
-      if (edge) return edge;
-    }
+    const remoteTranscript = await transcribeAudioNote(input.audioUri, input.mimeType ?? 'audio/m4a', { allowRemote: true });
+    if (remoteTranscript) return interpretNote({ text: remoteTranscript }, { allowRemote: false });
   }
 
   // 4. Nothing usable.

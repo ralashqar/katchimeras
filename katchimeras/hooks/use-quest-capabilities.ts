@@ -12,7 +12,10 @@ import {
   type QuestCapabilityMap,
 } from '@/utils/capabilities/quest-capabilities';
 
-export function useQuestCapabilities(state: StoredHomeState | null | undefined): {
+export function useQuestCapabilities(
+  state: StoredHomeState | null | undefined,
+  options: { refreshMicrophoneOnMount?: boolean } = {},
+): {
   capabilities: QuestCapabilityMap;
   refreshMicrophonePermission: () => Promise<PermissionResponse | null>;
   requestMicrophonePermission: () => Promise<PermissionResponse | null>;
@@ -41,8 +44,10 @@ export function useQuestCapabilities(state: StoredHomeState | null | undefined):
   }, []);
 
   useEffect(() => {
-    void refreshMicrophonePermission();
-  }, [refreshMicrophonePermission]);
+    if (options.refreshMicrophoneOnMount !== false) {
+      void refreshMicrophonePermission();
+    }
+  }, [options.refreshMicrophoneOnMount, refreshMicrophonePermission]);
 
   return {
     capabilities: useMemo(

@@ -33,6 +33,7 @@ import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification'
 import { sceneFromPhotoSemanticFrame } from '@/utils/scene-classify';
 import type { PhotoSemanticFrame } from '@/utils/photo-semantic-frame';
 import { journalRouteForIds } from '@/utils/journal-routing';
+import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 
 // The shared "read the moment" experience: a photo's on-device essence animates
 // into the centre, the user says what it meant, and the tags then stream down
@@ -71,7 +72,7 @@ type EssenceReviewProps = {
   onClose: () => void;
 };
 
-export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommit, onClose }: EssenceReviewProps) {
+export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt, onCommit, onClose }: EssenceReviewProps) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const [state, setState] = useState<EssenceReviewState>('analyzing');
@@ -93,6 +94,27 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
   const absorb = useSharedValue(0);
   const fallDistance = height * 0.5;
 
+  const cacheDevelopmentAnalysis = (
+    analysis: PhotoJournalClassification,
+    vision: DayVisionSummary,
+    rawVision: PhotoVisionResult | null
+  ) => {
+    const semanticScene = analysis.semanticFrame?.stage === 'foundation_reconciled'
+      ? sceneFromPhotoSemanticFrame(analysis.semanticFrame)
+      : sceneRef.current;
+    saveDevLastPhotoAnalysis({
+      sourceId: sourceId ?? photoUri ?? 'capture-preview',
+      thumbnailUri: photoUri ?? '',
+      rawVision,
+      visionSummary: vision,
+      scene: semanticScene,
+      confirmations: clarificationRef.current?.confirmations ?? [],
+      journalClassification: analysis,
+      journalEnrichment: null,
+      questId: questId ?? null,
+    });
+  };
+
   const startJournalAnalysis = (vision: DayVisionSummary | null, rawVision: PhotoVisionResult | null) => {
     if (!vision || journalAnalysisStartedRef.current) {
       if (!vision) setJournalAnalysisState('failed');
@@ -101,12 +123,16 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     journalAnalysisStartedRef.current = true;
     const requestId = ++journalRequestRef.current;
     const progressive = preparePhotoJournalAnalysis(vision, rawVision);
+    cacheDevelopmentAnalysis(progressive.initial, vision, rawVision);
     setTags(buildEssenceTags(rawVision, vision, progressive.initial.semanticFrame));
     applyJournalAnalysis(progressive.initial);
     if (!progressive.refinement || progressive.initial.selected) return;
     setJournalAnalysisState('refining');
     void progressive.refinement
       .then((analysis) => {
+        // Persist the completed model trace even if the review UI was closed or
+        // the user chose not to journal/save this photo.
+        cacheDevelopmentAnalysis(analysis, vision, rawVision);
         if (journalRequestRef.current === requestId && !journalInteractionLockedRef.current) applyJournalAnalysis(analysis);
       })
       .catch(() => {
@@ -209,6 +235,9 @@ export function EssenceReview({ photoUri, analyze, sourceId, observedAt, onCommi
     setJournalAnalysisState(analysis.kind === 'unrouted' ? 'failed' : 'ready');
     if (analysis.selected) {
       openJournalRoute(analysis.selected, analysis);
+    } else if (analysis.reason?.startsWith('foundation_top_level_')) {
+      setJournalFlowId(null);
+      setJournalPickerOpen(true);
     } else if (analysis.kind === 'flow_only' && analysis.selectedFlowId) {
       setJournalFlowId(analysis.selectedFlowId);
       setJournalPickerOpen(true);

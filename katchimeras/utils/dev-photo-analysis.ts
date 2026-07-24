@@ -10,7 +10,12 @@ import type { PhotoJournalAttempt, PhotoJournalClassification, PhotoJournalField
 import { photoJournalEssenceLabels, type PhotoJournalEvidencePacket } from '@/utils/photo-journal-evidence';
 import type { PhotoSemanticFrame } from '@/utils/photo-semantic-frame';
 
-const STORAGE_KEY = 'dev:last-photo-analysis:v13';
+const STORAGE_KEY = 'dev:last-photo-analysis:v15';
+
+export type DevFoundationPromptSnapshot = {
+  topLevel: Record<string, unknown> | null;
+  subcategory: Record<string, unknown> | null;
+};
 
 export type DevFoundationJournalExchange = {
   stage: 'enum_route';
@@ -35,7 +40,7 @@ export type DevQuestPhotoEvaluation = {
 };
 
 export type DevLastPhotoAnalysis = {
-  schemaVersion: 13;
+  schemaVersion: 15;
   capturedAt: string;
   sourceId: string;
   thumbnailUri: string;
@@ -46,6 +51,7 @@ export type DevLastPhotoAnalysis = {
   foundationPasses: FoundationPhotoPasses | null;
   journalClassification: PhotoJournalClassification | null;
   foundationJournalModelTrace: DevFoundationJournalExchange | null;
+  foundationRoutingPrompts: DevFoundationPromptSnapshot;
   semanticFrame: PhotoSemanticFrame | null;
   journalEvidence: PhotoJournalEvidencePacket | null;
   essenceTags: string[];
@@ -87,7 +93,7 @@ export function saveDevLastPhotoAnalysis(input: {
         })
       : null;
     const snapshot: DevLastPhotoAnalysis = {
-      schemaVersion: 13,
+      schemaVersion: 15,
       capturedAt: new Date().toISOString(),
       sourceId: input.sourceId,
       thumbnailUri: input.thumbnailUri,
@@ -98,6 +104,10 @@ export function saveDevLastPhotoAnalysis(input: {
       foundationPasses: input.scene?.foundationPasses ?? null,
       journalClassification: input.journalClassification ?? null,
       foundationJournalModelTrace: journalExchange(input.journalClassification?.enumResponse ?? null),
+      foundationRoutingPrompts: {
+        topLevel: modelRequestFrom(input.journalClassification?.semanticFrame?.foundation.rawResponse ?? null),
+        subcategory: modelRequestFrom(input.journalClassification?.enumResponse ?? null),
+      },
       semanticFrame: input.journalClassification?.semanticFrame ?? null,
       journalEvidence: input.journalClassification?.evidence ?? null,
       essenceTags: input.journalClassification?.evidence ? photoJournalEssenceLabels(input.journalClassification.evidence) : [],
@@ -113,6 +123,10 @@ export function saveDevLastPhotoAnalysis(input: {
     };
     setStoredJson(STORAGE_KEY, snapshot);
   }, 700);
+}
+
+function modelRequestFrom(raw: Record<string, unknown> | null): Record<string, unknown> | null {
+  return isRecord(raw?.modelRequest) ? raw.modelRequest : null;
 }
 
 function journalExchange(raw: Record<string, unknown> | null): DevFoundationJournalExchange | null {

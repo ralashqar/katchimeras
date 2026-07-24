@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { useIsFocused } from '@react-navigation/native';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -31,6 +32,7 @@ import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
 import { noteJournalInputAdapter } from '@/utils/journal-input-adapters';
 import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
+import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
 import { loadWorldIdentity, saveWorldIdentity } from '@/utils/world-identity';
 
 type ReflectionReview = {
@@ -59,6 +61,7 @@ function hatchTimestamp(creature: KingdomCreature, index: number): number {
 }
 
 export default function KingdomScreen() {
+  const isFocused = useIsFocused();
   const insets = useSafeAreaInsets();
   const archive = useAllDays();
   const { days } = archive;
@@ -78,7 +81,10 @@ export default function KingdomScreen() {
   const [reflectionReviewPending, setReflectionReviewPending] = useState(false);
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
   const [savedOrigin, setSavedOrigin] = useState<'reflection' | 'insight' | 'quest' | null>(null);
-  const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState();
+  const [questExperienceActive, setQuestExperienceActive] = useState(false);
+  const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState({
+    enableInteractiveServices: false,
+  });
 
   const hatches = useMemo<HatchRecord[]>(
     () =>
@@ -92,6 +98,10 @@ export default function KingdomScreen() {
   const residentTiles = useMemo(() => kingdomResidentHexTiles(residents, kingdom.creatures), [kingdom.creatures, residents]);
   const eggVisual = useMemo(() => days.find((day) => day.isToday)?.egg ?? days[days.length - 1]?.egg ?? null, [days]);
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
+  const kingdomBackground = useMemo(
+    () => todayAtmosphereBackgroundForDay(today, days),
+    [days, today]
+  );
   const yesterday = useMemo(() => {
     if (!today) return null;
     const index = days.findIndex((day) => day.id === today.id);
@@ -187,15 +197,18 @@ export default function KingdomScreen() {
   return (
     <GestureHandlerRootView style={styles.screen}>
       <View style={styles.stage}>
-        <KingdomHexCanvas
-          residents={residentTiles}
-          identity={identity}
-          eggVisual={eggVisual}
-          residentStatusGlyphs={quests.residentStatusGlyphs}
-          onSelectResident={quests.selectResident}
-          onSelectHome={() => setHomeIdentityOpen(true)}
-          onSelectZodiac={() => setZodiacOpen(true)}
-        />
+        {isFocused && !questExperienceActive ? (
+          <KingdomHexCanvas
+            background={kingdomBackground}
+            residents={residentTiles}
+            identity={identity}
+            eggVisual={eggVisual}
+            residentStatusGlyphs={quests.residentStatusGlyphs}
+            onSelectResident={quests.selectResident}
+            onSelectHome={() => setHomeIdentityOpen(true)}
+            onSelectZodiac={() => setZodiacOpen(true)}
+          />
+        ) : null}
 
         <View pointerEvents="none" style={[styles.header, { top: insets.top + 12 }]}>
           <ThemedText style={styles.headerKicker} lightColor="#FFD36E" darkColor="#FFD36E">
@@ -239,6 +252,7 @@ export default function KingdomScreen() {
 
       {quests.selectedResident && !reflectionReview && !embeddedJournal ? (
         <CompanionInteractionSheet
+          onExperienceActiveChange={setQuestExperienceActive}
           creatureId={quests.selectedResident.creature.creatureId}
           name={quests.selectedResident.creature.name}
           visualKey={quests.selectedResident.creature.visualKey}

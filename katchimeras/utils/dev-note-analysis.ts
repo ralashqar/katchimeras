@@ -1,4 +1,5 @@
 import type { JournalNoteClassification, JournalRouteProposal, StudioMediaType } from '@/types/home';
+import type { FoundationConfidenceLevel } from '@/utils/foundation-note-routing';
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 
 const STORAGE_KEY = 'dev:last-note-analysis:v3';
@@ -31,6 +32,11 @@ export type DevLastNoteAnalysis = {
   normalizedClassification: JournalNoteClassification | null;
   normalizedMedia: { mediaType: StudioMediaType; title: string | null; creator: string | null } | null;
   normalizedFood: string | null;
+  topLevelFlowId: string | null;
+  topLevelConfidence: FoundationConfidenceLevel | null;
+  subcategoryConfidence: FoundationConfidenceLevel | null;
+  topLevelResponse: Record<string, unknown> | null;
+  subcategoryResponse: Record<string, unknown> | null;
 };
 
 export function saveDevLastNoteAnalysis(input: Omit<DevLastNoteAnalysis, 'schemaVersion' | 'capturedAt'>): void {

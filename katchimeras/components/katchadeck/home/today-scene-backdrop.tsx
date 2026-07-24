@@ -1,21 +1,18 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
 
-import { ResolvedAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
-import type { AtmosphereSettings } from '@/utils/atmosphere';
-import { StaticKingdomSkyBackground } from '@/components/katchadeck/world/kingdom-sky-background';
+import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { TodayFullSpreadScene } from '@/utils/today-full-spread-scenes';
 
 type TodaySceneBackdropProps = {
-  atmospheres: readonly AtmosphereSettings[];
+  background: TodayAtmosphereBackground;
   scene: TodayFullSpreadScene | null;
 };
 
-// Kingdom sky remains mounted underneath so moving between a full-spread day
-// and an ordinary hex-tile day always has a ready, non-blank background.
-export function TodaySceneBackdrop({ atmospheres, scene }: TodaySceneBackdropProps) {
+export function TodaySceneBackdrop({ background, scene }: TodaySceneBackdropProps) {
+  const reduceMotion = useReducedMotion();
   const verticalGrade = scene
     ? [
         'rgba(8, 18, 40, 0.46)',
@@ -32,8 +29,15 @@ export function TodaySceneBackdrop({ atmospheres, scene }: TodaySceneBackdropPro
 
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <StaticKingdomSkyBackground />
-      <ResolvedAtmosphereLayer plane="background" settings={atmospheres} target="today" />
+      <Image
+        cachePolicy="memory-disk"
+        contentFit="cover"
+        pointerEvents="none"
+        recyclingKey={background.id}
+        source={background.source}
+        style={StyleSheet.absoluteFill}
+        transition={reduceMotion ? 0 : 200}
+      />
       {scene ? (
         <Animated.View
           key={scene.id}

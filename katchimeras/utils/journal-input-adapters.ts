@@ -2,7 +2,6 @@ import type { JournalRouteProposal, JournalSource } from '@/types/home';
 import type { InterpretedNote } from '@/utils/note-interpret';
 import { interpretNote } from '@/utils/note-interpret';
 import type { JournalAnalysisContext, JournalDraftSeed, JournalInputAdapter, JournalSourceAnalysis } from '@/utils/journal-domain';
-import { foundationNoteRoute } from '@/utils/journal-routing';
 import { noteSuggestedSpecific } from '@/utils/note-journal-specific';
 
 export { noteSuggestedSpecific } from '@/utils/note-journal-specific';
@@ -75,14 +74,7 @@ export function noteRoutesForSignals(input: {
   intelligenceProvider?: InterpretedNote['intelligenceProvider'];
   journalRoutes?: InterpretedNote['journalRoutes'];
 }): JournalRouteProposal[] {
-  if (input.journalRoutes?.length) return input.journalRoutes;
-  const route = foundationNoteRoute({
-    classification: input.journalClassification,
-    provider: input.intelligenceProvider,
-    llmClassified: input.llmClassified,
-    mediaType: input.media?.mediaType ?? null,
-  });
-  return route ? [route] : [];
+  return input.journalRoutes ?? [];
 }
 
 function seedNoteDraft(input: NoteJournalInput, analysis: JournalSourceAnalysis): JournalDraftSeed {

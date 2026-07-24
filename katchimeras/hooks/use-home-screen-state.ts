@@ -70,7 +70,18 @@ import { usePromptPhotoCandidates } from '@/features/today/use-prompt-photo-cand
 import { useHomeStateMutation } from '@/features/today/use-home-state-mutation';
 import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 
-export function useHomeScreenState() {
+type HomeScreenStateOptions = {
+  /**
+   * Media-library discovery and microphone probing are screen services, not
+   * repository concerns. Background consumers opt out so they cannot duplicate
+   * Today's expensive native permission/media work.
+   */
+  enableInteractiveServices?: boolean;
+};
+
+export function useHomeScreenState({
+  enableInteractiveServices = true,
+}: HomeScreenStateOptions = {}) {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
@@ -199,6 +210,7 @@ export function useHomeScreenState() {
   } = usePromptPhotoCandidates({
     dayId: promptCandidateDay.id,
     dayState: promptCandidateDay.state,
+    enabled: enableInteractiveServices,
     interactionKey: selectedDayId,
   });
   const { triggerHatchIfReady } = useHatchController({
@@ -255,7 +267,10 @@ export function useHomeScreenState() {
         forceMeaningfulPhoto: forceMeaningfulPhotoPrompt,
       })
     : [];
-  const { capabilities: questCapabilities, requestMicrophonePermission } = useQuestCapabilities(viewModel.state);
+  const { capabilities: questCapabilities, requestMicrophonePermission } = useQuestCapabilities(
+    viewModel.state,
+    { refreshMicrophoneOnMount: enableInteractiveServices },
+  );
 
   const addMoment = useCallback((momentInput: AddMomentInput, target: DayInputTarget = 'today') => {
     mutateHomeState((state, profile, now) => addMomentToDay(state, profile, momentInput, now, target));

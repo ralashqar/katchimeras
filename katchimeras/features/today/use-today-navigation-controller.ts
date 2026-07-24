@@ -8,13 +8,18 @@ import {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { startTransition, useCallback, useEffect, useRef } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import todayScene from '@/data/today-scene.json';
 import { consumeCaptureFeed } from '@/utils/capture-feed-signal';
 import { consumeSelectedDay } from '@/utils/selected-day-signal';
 import type { HomeTimelineDay } from '@/types/home';
+import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
+import {
+  todayTileTransitionIndices,
+  todayTileWindowIndices,
+} from '@/utils/today-tile-window';
 
 type UseTodayNavigationControllerParams = {
   windowWidth: number;
@@ -45,24 +50,64 @@ export function useTodayNavigationController({
   const reduceMotion = useReducedMotion();
   const initialIndex = Math.max(0, timelineDays.findIndex((day) => day.id === selectedDayId));
   const cameraProgress = useSharedValue(initialIndex);
+  const cameraTransitionActive = useSharedValue(0);
+  useScenePerformanceProbe('today-camera', cameraTransitionActive);
   const visualIndexRef = useRef(initialIndex);
+  const transitionTokenRef = useRef(0);
+  const [renderedIndices, setRenderedIndices] = useState(() =>
+    todayTileWindowIndices(initialIndex, timelineDays.length)
+  );
+
+  const commitCameraSettled = useCallback((targetIndex: number) => {
+    if (visualIndexRef.current !== targetIndex) return;
+    setRenderedIndices(todayTileWindowIndices(targetIndex, timelineDays.length));
+  }, [timelineDays.length]);
 
   const animateCameraTo = useCallback((targetIndex: number) => {
+    const fromIndex = visualIndexRef.current;
+    const transitionToken = transitionTokenRef.current + 1;
+    transitionTokenRef.current = transitionToken;
     visualIndexRef.current = targetIndex;
-    cameraProgress.value = reduceMotion
-      ? targetIndex
-      : withTiming(targetIndex, {
+    setRenderedIndices(todayTileTransitionIndices(fromIndex, targetIndex, timelineDays.length));
+
+    const startCamera = () => {
+      if (transitionTokenRef.current !== transitionToken) return;
+      if (reduceMotion) {
+        cameraTransitionActive.value = 0;
+        cameraProgress.value = targetIndex;
+        commitCameraSettled(targetIndex);
+        return;
+      }
+      cameraTransitionActive.value = 1;
+      cameraProgress.value = withTiming(targetIndex, {
           duration: todayScene.hexNeighborhood.cameraDurationMs,
           easing: Easing.out(Easing.cubic),
+        }, (finished) => {
+          if (finished) {
+            cameraTransitionActive.value = 0;
+            runOnJS(commitCameraSettled)(targetIndex);
+          }
         });
-  }, [cameraProgress, reduceMotion]);
+    };
+
+    // Adjacent targets are already in the settled three-tile window. A distant
+    // top-bar jump first commits its temporary corridor, then starts the camera.
+    if (Math.abs(targetIndex - fromIndex) > 1) {
+      requestAnimationFrame(startCamera);
+    } else {
+      startCamera();
+    }
+  }, [cameraProgress, cameraTransitionActive, commitCameraSettled, reduceMotion, timelineDays.length]);
 
   const navigateToDay = useCallback((dayId: string) => {
     const targetIndex = timelineDays.findIndex((day) => day.id === dayId);
     if (targetIndex < 0) {
       // Archive selections outside the recent strip have a one-item scene.
+      transitionTokenRef.current += 1;
       visualIndexRef.current = 0;
+      cameraTransitionActive.value = 0;
       cameraProgress.value = 0;
+      setRenderedIndices([0]);
     } else {
       animateCameraTo(targetIndex);
     }
@@ -71,7 +116,7 @@ export function useTodayNavigationController({
     // larger semantic day update as non-urgent so React/native tree work cannot
     // get ahead of the first movement frame.
     startTransition(() => selectTimelineDay(dayId));
-  }, [animateCameraTo, cameraProgress, selectTimelineDay, timelineDays]);
+  }, [animateCameraTo, cameraProgress, cameraTransitionActive, selectTimelineDay, timelineDays]);
 
   // Keep externally driven selections (reset, rollover, hydration repair) in
   // sync without restarting transitions initiated through navigateToDay.
@@ -80,6 +125,12 @@ export function useTodayNavigationController({
     if (visualIndexRef.current === selectedIndex) return;
     animateCameraTo(selectedIndex);
   }, [animateCameraTo, selectedDayId, timelineDays]);
+
+  useEffect(() => {
+    const current = Math.max(0, Math.min(timelineDays.length - 1, visualIndexRef.current));
+    visualIndexRef.current = current;
+    setRenderedIndices(todayTileWindowIndices(current, timelineDays.length));
+  }, [timelineDays.length]);
 
   const goToAdjacentDay = useCallback(
     (direction: number) => {
@@ -138,5 +189,5 @@ export function useTodayNavigationController({
       }
     });
 
-  return { cameraProgress, navigateToDay, swipeGesture };
+  return { cameraProgress, navigateToDay, renderedIndices, swipeGesture };
 }

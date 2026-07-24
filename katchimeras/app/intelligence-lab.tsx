@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -12,17 +12,17 @@ import { QUEST_DEFINITIONS } from '@/utils/quests/definitions';
 import { loadDevLastPhotoAnalysis, type DevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { loadDevLastNoteAnalysis, type DevLastNoteAnalysis } from '@/utils/dev-note-analysis';
 import {
-  isFoundationOnlyNoteRoutingEnabled,
-  setFoundationOnlyNoteRoutingEnabled,
-} from '@/utils/dev-settings';
-import { FOUNDATION_NOTE_SCHEMA_VERSION, FOUNDATION_PHOTO_SCHEMA_VERSION, foundationSceneAvailability } from '@/utils/foundation-scene';
+  FOUNDATION_NOTE_SCHEMA_VERSION,
+  FOUNDATION_PHOTO_MIN_COMPATIBLE_SCHEMA_VERSION,
+  FOUNDATION_PHOTO_SCHEMA_VERSION,
+  foundationSceneAvailability,
+} from '@/utils/foundation-scene';
 
 export default function IntelligenceLabScreen() {
   const { selectedDay, personalEntities, cloudIntelligenceEnabled } = useHomeScreenState();
   const memories = selectedDay?.kind === 'day' ? selectedDay.classifiedMemories ?? [] : [];
   const [lastPhoto, setLastPhoto] = useState<DevLastPhotoAnalysis | null>(() => loadDevLastPhotoAnalysis());
   const [lastNote, setLastNote] = useState<DevLastNoteAnalysis | null>(() => loadDevLastNoteAnalysis());
-  const [foundationOnlyRouting, setFoundationOnlyRouting] = useState(() => isFoundationOnlyNoteRoutingEnabled());
   const foundationAvailability = foundationSceneAvailability();
   const lastPhotoJson = useMemo(() => lastPhoto ? JSON.stringify(lastPhoto, null, 2) : '', [lastPhoto]);
   const lastNoteJson = useMemo(() => lastNote ? JSON.stringify(lastNote, null, 2) : '', [lastNote]);
@@ -33,6 +33,24 @@ export default function IntelligenceLabScreen() {
     }, null, 2) : '',
     [lastPhoto]
   );
+  const topLevelPhotoPromptJson = useMemo(
+    () => lastPhoto?.foundationRoutingPrompts?.topLevel
+      ? JSON.stringify(lastPhoto.foundationRoutingPrompts.topLevel, null, 2)
+      : '',
+    [lastPhoto]
+  );
+  const subcategoryPhotoPromptJson = useMemo(
+    () => lastPhoto?.foundationRoutingPrompts?.subcategory
+      ? JSON.stringify(lastPhoto.foundationRoutingPrompts.subcategory, null, 2)
+      : '',
+    [lastPhoto]
+  );
+  const principalPhotoSignal = useMemo(() => {
+    const principalKey = lastPhoto?.semanticFrame?.primaryEvidenceKeys[0];
+    return principalKey
+      ? lastPhoto?.journalEvidence?.signals.find((signal) => signal.id === principalKey) ?? null
+      : null;
+  }, [lastPhoto]);
   const focusedQuestEvaluation = lastPhoto?.questContext.questId
     ? lastPhoto.questEvaluations.find((evaluation) => evaluation.questId === lastPhoto.questContext.questId) ?? null
     : null;
@@ -40,13 +58,7 @@ export default function IntelligenceLabScreen() {
   useFocusEffect(useCallback(() => {
     setLastPhoto(loadDevLastPhotoAnalysis());
     setLastNote(loadDevLastNoteAnalysis());
-    setFoundationOnlyRouting(isFoundationOnlyNoteRoutingEnabled());
   }, []));
-
-  const updateFoundationOnlyRouting = useCallback((enabled: boolean) => {
-    setFoundationOnlyNoteRoutingEnabled(enabled);
-    setFoundationOnlyRouting(enabled);
-  }, []);
 
   const shareLastPhotoJson = useCallback(() => {
     if (!lastPhotoJson) return;
@@ -101,7 +113,9 @@ export default function IntelligenceLabScreen() {
             selectable>
             Photo analysis: {foundationAvailability.photoSchemaVersion === FOUNDATION_PHOTO_SCHEMA_VERSION
               ? `enum routing + OCR schema v${FOUNDATION_PHOTO_SCHEMA_VERSION} ready`
-              : `legacy native build${foundationAvailability.photoSchemaVersion ? ` (schema v${foundationAvailability.photoSchemaVersion})` : ''} · rebuild required`}
+              : (foundationAvailability.photoSchemaVersion ?? 0) >= FOUNDATION_PHOTO_MIN_COMPATIBLE_SCHEMA_VERSION
+                ? `compatible native schema v${foundationAvailability.photoSchemaVersion} · v${FOUNDATION_PHOTO_SCHEMA_VERSION} rebuild optional`
+                : `legacy native build${foundationAvailability.photoSchemaVersion ? ` (schema v${foundationAvailability.photoSchemaVersion})` : ''} · rebuild required`}
           </ThemedText>
           {!foundationAvailability.available ? (
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
@@ -112,23 +126,9 @@ export default function IntelligenceLabScreen() {
               Foundation Models is ready and photo and note interpretation stay on this device.
             </ThemedText>
           )}
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleCopy}>
-              <ThemedText style={styles.toggleTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-                Foundation-only note routing
-              </ThemedText>
-              <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-                Default game behavior. Disables registry, regex, Natural Language, and cloud category fallbacks. Turn it off here to compare Hybrid routing.
-              </ThemedText>
-            </View>
-            <Switch
-              accessibilityLabel="Use Foundation-only note routing"
-              onValueChange={updateFoundationOnlyRouting}
-              trackColor={{ false: 'rgba(255,255,255,0.18)', true: '#5B9B83' }}
-              thumbColor={foundationOnlyRouting ? '#A8E2C6' : '#D4CEDF'}
-              value={foundationOnlyRouting}
-            />
-          </View>
+          <ThemedText style={styles.line} lightColor="#A8E2C6" darkColor="#A8E2C6">
+            Note routing is strict Foundation-only: independent top-level and subcategory passes with greedy sampling and no alternate classifier.
+          </ThemedText>
         </View>
         {lastNote ? (
           <View style={[styles.card, styles.lastPhotoCard]}>
@@ -151,6 +151,11 @@ export default function IntelligenceLabScreen() {
             </ThemedText>
             <ThemedText style={styles.line} lightColor={lastNote.fallbackReason ? '#F3B36A' : '#A8E2C6'} darkColor={lastNote.fallbackReason ? '#F3B36A' : '#A8E2C6'} selectable>
               Result: {lastNote.fallbackReason ?? 'valid structured journal route'}
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              Top level: {lastNote.topLevelFlowId ?? 'none'} ({lastNote.topLevelConfidence ?? 'no confidence'})
+              {' · '}subcategory: {lastNote.routeCandidates[0]?.id ?? 'not run'} ({lastNote.subcategoryConfidence ?? 'no confidence'})
+              {' · '}sampling: greedy
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Candidates: {lastNote.routeCandidates.length
@@ -187,7 +192,7 @@ export default function IntelligenceLabScreen() {
               Captured: {lastPhoto.capturedAt} · representation {lastPhoto.classifiedMemory?.photoAnalysis?.representation.kind ?? 'unknown'}
             </ThemedText>
             <ThemedText style={styles.line} lightColor="#A8E2C6" darkColor="#A8E2C6" selectable>
-              Journal routing: deterministic semantic frame â†’ optional grounded Foundation refinement â†’ route
+              Journal routing: salience-ranked evidence cluster â†’ Foundation broad flow â†’ independent Foundation child route
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Semantic frame: {lastPhoto.semanticFrame
@@ -201,11 +206,16 @@ export default function IntelligenceLabScreen() {
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Journal route: {lastPhoto.journalClassification
-                ? `${lastPhoto.journalClassification.stage}/${lastPhoto.journalClassification.kind} · ${lastPhoto.journalClassification.selected?.id ?? lastPhoto.journalClassification.selectedFlowId ?? 'none'} · source ${lastPhoto.journalClassification.provider} · candidates ${lastPhoto.journalClassification.candidates.map((candidate) => `${candidate.id} ${Math.round(candidate.confidence * 100)}%`).join(', ') || 'none'}`
+                ? `${lastPhoto.journalClassification.stage}/${lastPhoto.journalClassification.kind} · ${lastPhoto.journalClassification.selected?.id ?? lastPhoto.journalClassification.selectedFlowId ?? 'none'} · top ${lastPhoto.journalClassification.topLevelConfidence ?? 'not run'} · child ${lastPhoto.journalClassification.subcategoryConfidence ?? 'not run'} · source ${lastPhoto.journalClassification.provider} · candidates ${lastPhoto.journalClassification.candidates.map((candidate) => `${candidate.id} ${Math.round(candidate.confidence * 100)}%`).join(', ') || 'none'}`
                 : 'not recorded'}
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Essence tags: {lastPhoto.essenceTags.join(' · ') || 'none'}
+            </ThemedText>
+            <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              Principal salience: {principalPhotoSignal
+                ? `${principalPhotoSignal.id} ${principalPhotoSignal.salience.toFixed(3)} · members ${principalPhotoSignal.memberLabels.join(' / ')} · ${principalPhotoSignal.rankReasons.join(', ')}`
+                : 'none'}
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
               Foundation attempts: {lastPhoto.journalClassification
@@ -214,6 +224,18 @@ export default function IntelligenceLabScreen() {
             </ThemedText>
             <ThemedText style={styles.line} lightColor={Lantern.ember300} darkColor={Lantern.ember300} selectable>
               Semantic frame and optional Foundation request/response trace
+            </ThemedText>
+            <ThemedText style={styles.decisionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50} selectable>
+              Assembled top-level Foundation prompt
+            </ThemedText>
+            <ThemedText style={styles.json} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              {topLevelPhotoPromptJson || 'Not recorded for this capture.'}
+            </ThemedText>
+            <ThemedText style={styles.decisionTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50} selectable>
+              Assembled subcategory Foundation prompt
+            </ThemedText>
+            <ThemedText style={styles.json} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              {subcategoryPhotoPromptJson || 'Not run or not recorded for this capture.'}
             </ThemedText>
             <View style={styles.traceActions}>
               <Pressable

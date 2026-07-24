@@ -14,6 +14,7 @@ import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-s
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { TodayHexNeighborhood } from '@/components/katchadeck/home/today-hex-neighborhood';
+import type { TodayTileRenderMode } from '@/components/katchadeck/home/today-hex-neighborhood';
 import {
   TodayKingdomEggHero,
   TodayKingdomEggOverlay,
@@ -72,6 +73,7 @@ import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
 import { TODAY_KINGDOM_STAGE_HEIGHT } from '@/utils/today-kingdom-hero-layout';
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
+import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
 import { todayHatchShowsResident, todayHatchShowsTomorrow } from '@/utils/today-hatch-presentation';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
@@ -265,6 +267,10 @@ export default function HomeScreen() {
   const dayAtmosphereSettings = useMemo(
     () => atmosphereSettingsForPlan(dayAtmosphere),
     [dayAtmosphere],
+  );
+  const dayBackground = useMemo(
+    () => todayAtmosphereBackgroundForDay(atmosphereDay, allDays),
+    [allDays, atmosphereDay],
   );
   const mapRingItems = useMemo<TodayCategoryRingItem[]>(() => {
     if (!isDay) return [];
@@ -555,7 +561,11 @@ export default function HomeScreen() {
     }, [handleQuestActionIntent, openManualJournal, setJourneySheetOpen, setMemoryVaultOpen, setMemoryVaultTab, setPlacesVaultOpen, setSleepSheetOpen])
   );
 
-  const renderTimelineHero = useCallback((timelineDay: HomeTimelineDay, active: boolean) => {
+  const renderTimelineHero = useCallback((
+    timelineDay: HomeTimelineDay,
+    mode: TodayTileRenderMode,
+  ) => {
+    const active = mode === 'active';
     if (active && isHatching && hatchPresentation.dayId === timelineDay.id) {
       return (
         <TodayTileHatchReveal
@@ -569,6 +579,7 @@ export default function HomeScreen() {
     if (day?.state === 'hatched' && day.creature) {
       return (
         <CreatureHero
+          artLod={active ? 'medium' : 'thumb'}
           compact
           creature={day.creature}
           hideCompactCard={!active}
@@ -609,7 +620,7 @@ export default function HomeScreen() {
     );
   }, [homeArchetypeId, isHatching]);
 
-  const { cameraProgress, navigateToDay, swipeGesture } = useTodayNavigationController({
+  const { cameraProgress, navigateToDay, renderedIndices, swipeGesture } = useTodayNavigationController({
     windowWidth,
     windowHeight,
     selectedDayId,
@@ -659,7 +670,10 @@ export default function HomeScreen() {
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
-      <TodaySceneBackdrop atmospheres={dayAtmosphereSettings} scene={null} />
+      <TodaySceneBackdrop
+        background={dayBackground}
+        scene={null}
+      />
       {/* Today is a FIXED composition — no page scrolling; everything anchors.
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
           for layout parity but is locked. */}
@@ -695,6 +709,7 @@ export default function HomeScreen() {
             foreground={<ResolvedAtmosphereLayer plane="foreground" settings={dayAtmosphereSettings} target="today" />}
             interactionLocked={isHatching}
             onSelect={navigateToDay}
+            renderedIndices={renderedIndices}
             selectedId={selectedDayId}
             renderDay={renderTimelineHero}
             renderDayOverlay={renderTimelineOverlay}
@@ -842,8 +857,16 @@ export default function HomeScreen() {
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
           dayLocationPoints={formingDay?.locations}
-          initialFlowId={pendingNoteRoute?.flowId}
+          initialFlowId={pendingNoteRoute?.flowId ?? (
+            pendingJournalNote.topLevelConfidence === 'high' && pendingJournalNote.subcategoryConfidence !== 'high'
+              ? pendingJournalNote.suggestedJournalFlowId
+              : undefined
+          )}
           initialChoiceId={pendingNoteRoute?.choiceId}
+          suggestedFlowId={pendingJournalNote.topLevelConfidence !== 'high' ? pendingJournalNote.suggestedJournalFlowId : null}
+          suggestedChoiceId={pendingJournalNote.topLevelConfidence === 'high' && pendingJournalNote.subcategoryConfidence !== 'high'
+            ? pendingNoteRoutes[0]?.choiceId
+            : null}
           initialSpecific={pendingNoteRoute && (
             pendingJournalNote.journalClassification?.kind === 'categorized' ||
             pendingJournalNote.journalClassification?.kind === 'generic' ||

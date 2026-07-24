@@ -30,6 +30,7 @@ type TodayKingdomEggHeroProps = {
   coreColor?: string;
   feedbackKey?: number;
   homeArchetypeId?: HomeArchetypeId | null;
+  hideKingdomEnvironmentArt?: boolean;
   isReady?: boolean;
   onEggPress?: () => void;
   pinchStrength?: number;
@@ -49,6 +50,7 @@ export function TodayKingdomEggHero({
   coreColor = '#FFF1B8',
   feedbackKey = 0,
   homeArchetypeId,
+  hideKingdomEnvironmentArt = false,
   isReady = false,
   onEggPress,
   pinchStrength = 1,
@@ -142,7 +144,7 @@ export function TodayKingdomEggHero({
         focusY={layout.eggCenterY
           + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio}
         pinchStrength={pinchStrength}
-        environment={(
+        environment={hideKingdomEnvironmentArt ? null : (
           <Image
             cachePolicy="memory-disk"
             contentFit="contain"

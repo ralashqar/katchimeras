@@ -330,6 +330,7 @@ public final class KatchimeraFoundationModule: Module {
     let instructions: String
     let prompt: String
     let fields: [StructuredBridgeField]
+    let sampling: String?
   }
 
   private struct StructuredBridgeField: Decodable {
@@ -386,7 +387,11 @@ public final class KatchimeraFoundationModule: Module {
     do {
       let schema = try GenerationSchema(root: root, dependencies: [])
       let session = LanguageModelSession(instructions: Instructions(request.instructions))
-      let response = try await session.respond(to: Prompt(request.prompt), schema: schema)
+      let response = try await session.respond(
+        to: Prompt(request.prompt),
+        schema: schema,
+        options: request.sampling == "greedy" ? GenerationOptions(sampling: .greedy) : GenerationOptions()
+      )
       var result: [String: String] = [
         "status": "succeeded",
         "bridgeVersion": "1",

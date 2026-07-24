@@ -40,6 +40,7 @@ import {
 } from '@/utils/intelligence/classification-policy';
 import { detectFoodInText, detectFoodInVision, type FoodDetection } from '@/utils/food-detect';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
+import { reconcileDaySkySnapshot } from '@/utils/day-sky';
 import {
   detectStudioInText,
   detectStudioInVision,
@@ -368,7 +369,7 @@ export function addManualJournalEntryForToday(
   // affect rollover or map-derived fields. Avoid re-normalizing the full
   // archive for a foreground button tap; hydration still owns migrations and
   // lifecycle transitions.
-  return writeInputDay(state, target, nextDay);
+  return writeInputDay(state, target, reconcileDaySkySnapshot(nextDay));
 }
 
 export function addFoodMomentForToday(
@@ -528,6 +529,9 @@ export function applyNoteForToday(
     intelligenceProvider?: DayEvidenceProvider;
     journalClassification?: JournalNoteClassification | null;
     journalRoutes?: JournalRouteProposal[];
+    suggestedJournalFlowId?: string | null;
+    topLevelConfidence?: 'high' | 'medium' | 'low' | null;
+    subcategoryConfidence?: 'high' | 'medium' | 'low' | null;
   },
   profile: OnboardingProfile,
   now: Date,

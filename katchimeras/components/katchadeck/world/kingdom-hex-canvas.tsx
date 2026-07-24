@@ -1,4 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View, type ImageSourcePropType } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -16,8 +17,6 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomHexResidentTile, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { SeamlessWorldImage } from '@/components/katchadeck/world/seamless-world-image';
-import { KingdomSkyBackground } from '@/components/katchadeck/world/kingdom-sky-background';
-import { DevAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import { useKingdomHexCamera } from '@/components/katchadeck/world/use-kingdom-hex-camera';
 import { useKingdomLodScheduler } from '@/components/katchadeck/world/use-kingdom-lod-scheduler';
 import { useKingdomTileScheduler } from '@/components/katchadeck/world/use-kingdom-tile-scheduler';
@@ -27,11 +26,17 @@ import { zodiacFamiliarSource } from '@/constants/world-identity-art';
 import { Lantern } from '@/constants/theme';
 import type { EggVisualState } from '@/types/home';
 import type { WorldIdentityState } from '@/types/world-identity';
+import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import { homePreset, zodiacProfile } from '@/utils/world-identity';
 import { HEX_TILE_H, HEX_TILE_W, hexDrawDepth } from '@/utils/world-hex';
-import { kingdomWorldViewPoint, type KingdomResidentLod } from '@/utils/kingdom-rendering';
+import {
+  kingdomWorldViewPoint,
+  screenPointToWorld,
+  type KingdomResidentLod,
+} from '@/utils/kingdom-rendering';
 import type { KingdomTilePhase } from '@/utils/kingdom-tile-scheduler';
 import { getDevKingdomHexVerticalAlignmentMode } from '@/utils/dev-asset-overrides';
+import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 import {
   kingdomHexTileSet,
   kingdomHexTileSourceForLod,
@@ -46,6 +51,7 @@ export type KingdomHexCenterRef = () => { col: number; row: number; plotId: stri
 export type KingdomResidentStatusGlyph = 'offer' | 'active' | 'ready';
 
 type Props = {
+  background: TodayAtmosphereBackground;
   residents: KingdomHexResidentTile[];
   identity?: WorldIdentityState | null;
   eggVisual?: EggVisualState | null;
@@ -70,6 +76,7 @@ const KINGDOM_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/e
 const TILE_WORLD_LOD_WIDTH = HEX_TILE_W * 1.03;
 
 export const KingdomHexCanvas = memo(function KingdomHexCanvas({
+  background,
   residents,
   identity,
   eggVisual,
@@ -106,7 +113,18 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     tileWorldWidth: TILE_WORLD_LOD_WIDTH,
     viewport,
   });
-  const scheduler = useKingdomTileScheduler({ camera: camera.snapshot, isMoving: camera.isMoving, scene, viewport });
+  const cameraTransitionActive = useSharedValue(camera.isMoving ? 1 : 0);
+  useEffect(() => {
+    cameraTransitionActive.value = camera.isMoving ? 1 : 0;
+  }, [camera.isMoving, cameraTransitionActive]);
+  useScenePerformanceProbe('kingdom-camera', cameraTransitionActive);
+  const scheduler = useKingdomTileScheduler({
+    camera: camera.snapshot,
+    cameraReady: camera.ready,
+    isMoving: camera.isMoving,
+    scene,
+    viewport,
+  });
   const lodScheduler = useKingdomLodScheduler({
     isMoving: camera.isMoving,
     requestedLod: camera.tileLod,
@@ -117,7 +135,37 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
     () => new Map(scheduler.renderedTiles.map((item) => [item.layer.id, item.runtime])),
     [scheduler.renderedTiles]
   );
-
+  const promotedFullTileId = useMemo(() => {
+    if (camera.isMoving || camera.tileLod !== 'full' || viewport.width <= 0 || viewport.height <= 0) {
+      return null;
+    }
+    const center = screenPointToWorld(
+      { x: viewport.width / 2, y: viewport.height / 2 },
+      scene,
+      camera.snapshot,
+    );
+    let nearestId: string | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const layer of scene.tileArtLayers) {
+      if (!scheduler.visibleTileIds.has(layer.id)) continue;
+      const x = layer.frame.left + layer.frame.width / 2;
+      const y = layer.frame.top + layer.frame.height / 2;
+      const distance = (x - center.x) ** 2 + (y - center.y) ** 2;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestId = layer.id;
+      }
+    }
+    return nearestId;
+  }, [
+    camera.isMoving,
+    camera.snapshot,
+    camera.tileLod,
+    scene,
+    scheduler.visibleTileIds,
+    viewport.height,
+    viewport.width,
+  ]);
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setViewport((current) => (current.width === width && current.height === height ? current : { width, height }));
@@ -193,8 +241,14 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
 
   return (
     <View style={styles.root} onLayout={onLayout}>
-      <KingdomSkyBackground camera={camera.skyCamera} viewport={viewport} />
-      <DevAtmosphereLayer plane="background" target="kingdom" />
+      <Image
+        cachePolicy="memory-disk"
+        contentFit="cover"
+        pointerEvents="none"
+        recyclingKey={background.id}
+        source={background.source}
+        style={StyleSheet.absoluteFill}
+      />
       {/* Recreate the native handler whenever this tab regains focus. A camera
           route can suspend a gesture mid-lifecycle on iOS; retaining that
           handler leaves the otherwise-visible Kingdom canvas unresponsive. */}
@@ -202,7 +256,12 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.scene, { width: scene.width, height: scene.height }, camera.worldStyle]}>
             {scheduler.renderedTiles.map(({ layer, runtime }) => {
-              const lod = lodScheduler.lodFor(layer.id);
+              const scheduledLod = lodScheduler.lodFor(layer.id);
+              const lod: KingdomHexTileLod = layer.id === promotedFullTileId
+                ? 'full'
+                : scheduledLod === 'full'
+                  ? 'medium'
+                  : scheduledLod;
               const source = kingdomHexTileSourceForLod(layer, lod);
               const fallbackSource = layer.fallbackSource
                 ? kingdomHexTileSourceForLod(
@@ -219,7 +278,7 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
                   source={source}
                   fallbackSource={fallbackSource}
                   phase={runtime.phase}
-                  priority={layer.id === scene.centerTile.id ? 'high' : scheduler.visibleTileIds.has(layer.id) ? 'normal' : 'low'}
+                  priority={lod === 'full' || layer.id === scene.centerTile.id ? 'high' : scheduler.visibleTileIds.has(layer.id) ? 'normal' : 'low'}
                   settled={!camera.isMoving}
                   onExited={scheduler.markExited}
                   onFailed={scheduler.markFailed}
@@ -251,7 +310,6 @@ export const KingdomHexCanvas = memo(function KingdomHexCanvas({
           </Animated.View>
         </View>
       </GestureDetector>
-      <DevAtmosphereLayer plane="foreground" target="kingdom" />
       <Pressable accessibilityRole="button" accessibilityLabel="Recenter kingdom" onPress={camera.recenter} style={styles.recenter}>
         <IconSymbol name="scope" size={22} color={Lantern.moon50} />
       </Pressable>

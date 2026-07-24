@@ -2,12 +2,11 @@ import type { DayVisionSummary, JournalRouteProposal, PhotoVisionResult } from '
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import {
   enrichPhotoJournalOnDevice,
+  classifyPhotoJournalEnumOnDevice,
   FOUNDATION_PHOTO_SCHEMA_VERSION,
   foundationSceneAvailability,
-  repairPhotoSemanticFrameOnDevice,
   refinePhotoSemanticFrameOnDevice,
   retryPhotoTopLevelOnDevice,
-  resolvePhotoTopLevelAmbiguityOnDevice,
   supportsFoundationPhotoJournalSchema,
 } from '@/utils/foundation-scene';
 import {
@@ -19,10 +18,9 @@ import {
 } from '@/utils/photo-journal-evidence';
 import {
   buildPhotoSemanticFrame,
-  groundedPhotoTopLevelFallback,
   photoSemanticFlowForTopLevel,
   reconcilePhotoSemanticFrame,
-  reconcilePhotoTopLevelAmbiguity,
+  type PhotoModelConfidence,
   type PhotoSemanticAttempt,
   type PhotoSemanticFrame,
   type PhotoTopLevelDecision,
@@ -103,21 +101,10 @@ export type PhotoJournalClassification = {
   attempts: PhotoJournalAttempt[];
   decisionBasis: PhotoJournalDecisionBasis | null;
   semanticFrame?: PhotoSemanticFrame | null;
-  specificEvidence?: PhotoJournalSpecificEvidenceDiagnostic | null;
   reason: string | null;
   navigationAction: 'open_details' | 'open_flow' | 'confirm_candidates' | 'manual';
-};
-
-export type PhotoJournalSpecificEvidenceRole = 'concrete_subject' | 'generic_class' | 'container' | 'not_applicable';
-
-export type PhotoJournalSpecificEvidenceDiagnostic = {
-  evidenceKey: string | null;
-  role: PhotoJournalSpecificEvidenceRole | null;
-  label: string | null;
-  confidence: number | null;
-  prefill: string | null;
-  accepted: boolean;
-  reason: string;
+  topLevelConfidence?: PhotoModelConfidence | null;
+  subcategoryConfidence?: PhotoModelConfidence | null;
 };
 
 export type ProgressivePhotoJournalAnalysis = {
@@ -156,82 +143,49 @@ export function preparePhotoJournalAnalysis(
     });
     return { initial: classificationFromSemanticFrame(frame, null), refinement: null };
   }
-  const refinement = refinePhotoJournalAnalysis(baseFrame);
+  const refinement = refinePhotoJournalAnalysis(baseFrame, vision, rawVision);
   return { initial, refinement };
 }
 
-async function refinePhotoJournalAnalysis(baseFrame: PhotoSemanticFrame): Promise<PhotoJournalClassification> {
+async function refinePhotoJournalAnalysis(
+  baseFrame: PhotoSemanticFrame,
+  vision: DayVisionSummary,
+  rawVision: PhotoVisionResult | null
+): Promise<PhotoJournalClassification> {
   let result = await withSemanticTimeout(refinePhotoSemanticFrameOnDevice(baseFrame));
   let attempts: PhotoSemanticAttempt[] = [semanticAttempt('primary', result, 'Foundation top-level classification timed out')];
 
-  // Technical execution failures retry the same small two-field task. They are
-  // not semantic disagreements and must never be sent to repair or ambiguity.
-  if (!result || isPhotoTopLevelFailure(result, 'technical')) {
+  // Retry transport failures and malformed output as a fresh, identical greedy
+  // classification. Never show the previous answer to the retrying model.
+  if (!result || isPhotoTopLevelFailure(result)) {
     result = await withSemanticTimeout(retryPhotoTopLevelOnDevice(baseFrame));
     attempts = [...attempts, semanticAttempt('technical_retry', result, 'Foundation top-level retry timed out')];
   }
 
-  let semantic = photoTopLevelDecision(result);
-  let frame = reconcilePhotoSemanticFrame(baseFrame, semantic, semantic
+  const semantic = photoTopLevelDecision(result);
+  const frame = reconcilePhotoSemanticFrame(baseFrame, semantic, semantic
     ? undefined
-    : { status: 'failed', reason: photoTopLevelFailureReason(result, 'Foundation top-level task failed') }, attempts);
+    : {
+        status: 'failed',
+        reason: photoTopLevelFailureReason(result, 'Foundation top-level task failed'),
+        durationMs: result?.durationMs ?? null,
+        rawResponse: result?.rawResponse ?? null,
+      }, attempts);
 
-  // Repair is reserved for a response that completed but violated the grounded
-  // two-field contract. A transport/model failure has no semantic object to fix.
-  if (!semantic && isPhotoTopLevelFailure(result, 'invalid_output')) {
-    const rejectedPrimaryEvidenceKey = typeof result.rawResponse?.primaryEvidenceKey === 'string'
-      && baseFrame.primaryEvidenceKeys.includes(result.rawResponse.primaryEvidenceKey)
-      ? result.rawResponse.primaryEvidenceKey
-      : null;
-    // A containment rejection means the selected subject itself was wrong
-    // (for example Person depicted inside a leading Television). Let repair
-    // choose another visible primary instead of locking it to that Person.
-    const repairPrimaryEvidenceKey = result.reason.includes('likely depicted inside')
-      ? null
-      : rejectedPrimaryEvidenceKey;
-    const repair = await withSemanticTimeout(repairPhotoSemanticFrameOnDevice(
-      baseFrame,
-      result.rawResponse ?? {},
-      result.reason,
-      repairPrimaryEvidenceKey
-    ));
-    attempts = [...attempts, semanticAttempt('repair', repair, 'Foundation top-level repair timed out')];
-    semantic = photoTopLevelDecision(repair);
-    if (!semantic) {
-      // If Foundation contradicts the grounded contract twice, preserve an
-      // obvious first-ranked ontology anchor rather than showing an unrouted
-      // error. This cannot use a secondary chip or OCR.
-      const fallback = groundedPhotoTopLevelFallback(
-        baseFrame,
-        photoTopLevelFailureReason(repair, 'Foundation top-level repair failed')
-      );
-      if (fallback) {
-        attempts = [...attempts, semanticAttempt('grounded_fallback', fallback, 'No grounded top-level fallback')];
-        semantic = fallback;
-      }
-    }
-    frame = reconcilePhotoSemanticFrame(baseFrame, semantic, semantic
-      ? undefined
-      : { status: 'failed', reason: photoTopLevelFailureReason(repair, 'Foundation top-level repair failed') }, attempts);
+  const broad = classificationFromSemanticFrame(frame, frame.foundation.rawResponse);
+  if (!semantic || semantic.confidence !== 'high' || frame.unresolvedFacet !== 'none') {
+    return broad;
+  }
+  // A photo can establish that a person is central, but it cannot establish
+  // the user's relationship to that person. People is therefore always the
+  // final automatic photo-routing level; the user chooses its child category.
+  if (frame.flowKey === 'people') {
+    return { ...broad, reason: 'photo_people_subcategory_requires_user_selection' };
   }
 
-  // Only an explicit valid `ambiguous` decision starts the separate grounded
-  // two-alternative pass. Technical failures now remain technical failures.
-  if (frame.stage === 'foundation_reconciled' && frame.flowKey === 'ambiguous') {
-    const ambiguity = await withSemanticTimeout(resolvePhotoTopLevelAmbiguityOnDevice(baseFrame));
-    const ambiguityAttempt: PhotoSemanticAttempt = {
-      kind: 'ambiguity', status: ambiguity ? 'used' : 'failed',
-      durationMs: ambiguity?.durationMs ?? null, rawResponse: ambiguity?.rawResponse ?? null,
-      reason: ambiguity ? null : 'Foundation returned no grounded top-level alternatives',
-    };
-    attempts = [...attempts, ambiguityAttempt];
-    frame = reconcilePhotoTopLevelAmbiguity(baseFrame, ambiguity, attempts);
-  }
-  const grounded = classificationFromSemanticFrame(frame, frame.foundation.rawResponse);
-  // The photo classifier deliberately stops at the broad journal section. The
-  // manual journal owns all child choices consistently for books, screens,
-  // places, food, and every other top-level result.
-  return grounded;
+  const childRaw = await withSemanticTimeout(classifyPhotoJournalEnumOnDevice(vision, rawVision, frame));
+  if (!childRaw) return { ...broad, reason: 'foundation_child_route_failed' };
+  return normalizePhotoJournalEnumRoute(childRaw, frame.evidence, frame);
 }
 
 function isPhotoTopLevelFailure(
@@ -280,6 +234,7 @@ function classificationFromSemanticFrame(
   if (!frame.subjectAnchor || photoSemanticFlowForTopLevel(frame.subjectAnchor.topLevel) !== frame.flowKey) {
     return unrouted(rawResponse, frame.evidence, 'semantic_subject_anchor_flow_mismatch', frame);
   }
+  const topLevelConfidence = cleanModelConfidence(rawResponse?.confidence);
   const semanticAlternatives = groundedSemanticFlowCandidates(frame);
   if (semanticAlternatives.length === 2) {
     return {
@@ -288,24 +243,25 @@ function classificationFromSemanticFrame(
       visualSubject: frame.primarySubject, provider: 'appleFoundation', rawResponse,
       enumResponse: rawResponse, evidence: frame.evidence, attempts: [], decisionBasis: null,
       semanticFrame: frame, reason: 'grounded_semantic_cross_flow_ambiguity', navigationAction: 'confirm_candidates',
+      topLevelConfidence, subcategoryConfidence: null,
     };
   }
   if (frame.flowKey === 'ambiguous' || !frame.flowKey) {
     return unrouted(rawResponse, frame.evidence, 'semantic_flow_ambiguous', frame);
   }
-  if (frame.flowKey === 'people' || frame.unresolvedFacet === 'relationship') {
-    return {
-      kind: 'flow_only', stage: 'enum_route', flowId: 'people', categoryId: null,
-      candidates: [flowCandidate('people', primaryEvidenceConfidence(frame))], selected: null, selectedFlowId: 'people',
-      visualSubject: frame.primarySubject,
-      provider: 'appleFoundation',
-      rawResponse, enumResponse: rawResponse, evidence: frame.evidence, attempts: [],
-      decisionBasis: null, semanticFrame: frame, reason: 'photo_relationship_requires_confirmation',
-      navigationAction: 'open_flow',
-    };
-  }
   if (frame.unresolvedFacet === 'primary_subject') {
     return unrouted(rawResponse, frame.evidence, 'semantic_primary_subject_requires_manual_classification', frame);
+  }
+  if (topLevelConfidence !== 'high') {
+    return {
+      kind: 'ambiguous', stage: 'enum_route', flowId: null, categoryId: null,
+      candidates: [flowCandidate(frame.flowKey, modelConfidenceScore(topLevelConfidence))],
+      selected: null, selectedFlowId: null, visualSubject: frame.primarySubject,
+      provider: 'appleFoundation', rawResponse, enumResponse: rawResponse, evidence: frame.evidence,
+      attempts: [], decisionBasis: null, semanticFrame: frame,
+      reason: `foundation_top_level_${topLevelConfidence ?? 'missing'}_confidence`,
+      navigationAction: 'manual', topLevelConfidence, subcategoryConfidence: null,
+    };
   }
   return {
     kind: 'flow_only', stage: 'enum_route', flowId: frame.flowKey, categoryId: null,
@@ -316,6 +272,7 @@ function classificationFromSemanticFrame(
     decisionBasis: null, semanticFrame: frame,
     reason: frame.unresolvedFacet === 'none' ? 'semantic_child_route_pending' : `semantic_${frame.unresolvedFacet}_requires_confirmation`,
     navigationAction: 'open_flow',
+    topLevelConfidence, subcategoryConfidence: null,
   };
 }
 
@@ -325,7 +282,7 @@ export function normalizePhotoJournalEnumRoute(
   semanticFrame: PhotoSemanticFrame | null = null
 ): PhotoJournalClassification {
   if (semanticFrame?.stage === 'foundation_reconciled') {
-    if (semanticFrame.flowKey === 'people' || semanticFrame.unresolvedFacet !== 'none') {
+    if (semanticFrame.unresolvedFacet !== 'none') {
       return classificationFromSemanticFrame(semanticFrame, raw);
     }
     return normalizeSemanticChildRoute(raw, evidence, semanticFrame);
@@ -419,19 +376,6 @@ export function normalizePhotoJournalEnumRoute(
     confidenceSource: directPhotoSchema ? 'vision_evidence' : 'legacy_model_authored',
   });
 
-  // A photo can establish that people are central, but cannot safely establish
-  // partner/family/friend relationships. Let the user choose within People.
-  if (top.flowId === 'people') {
-    return {
-      kind: 'flow_only', stage: 'enum_route', flowId: 'people', categoryId: null,
-      candidates: [flowCandidate('people', routeScore)], selected: null, selectedFlowId: 'people',
-      visualSubject: evidenceSubject(evidence), provider: semanticFrame?.stage === 'evidence_prepared' ? 'deterministic' : 'appleFoundation', rawResponse: raw,
-      enumResponse: raw, evidence, attempts: [], decisionBasis: { ...decisionBasis, autoRouteAllowed: false, reasons: [...decisionBasis.reasons, 'relationship_requires_confirmation'] },
-      semanticFrame,
-      reason: 'photo_relationship_requires_confirmation', navigationAction: 'open_flow',
-    };
-  }
-
   if (autoRouteAllowed && primary?.route) {
     return {
       kind: 'exact', stage: 'enum_route', flowId: primary.flowId, categoryId: primary.route.choiceId,
@@ -460,38 +404,69 @@ function normalizeSemanticChildRoute(
 ): PhotoJournalClassification {
   const flowId = frame.flowKey && frame.flowKey !== 'ambiguous' ? frame.flowKey : null;
   if (!flowId) return unrouted(raw, evidence, 'semantic_child_route_has_no_locked_flow', frame);
+  if (flowId === 'people') {
+    const topLevelConfidence = cleanModelConfidence(frame.foundation.rawResponse?.confidence);
+    return {
+      kind: 'flow_only', stage: 'enum_route', flowId, categoryId: null,
+      candidates: [flowCandidate(flowId, modelConfidenceScore(topLevelConfidence))],
+      selected: null, selectedFlowId: flowId,
+      visualSubject: frame.primarySubject, provider: 'appleFoundation', rawResponse: raw,
+      enumResponse: raw, evidence, attempts: [], decisionBasis: null,
+      semanticFrame: frame, reason: 'photo_people_subcategory_requires_user_selection',
+      navigationAction: 'open_flow', topLevelConfidence,
+      subcategoryConfidence: cleanModelConfidence(raw.confidence),
+    };
+  }
   if (cleanString(raw.stage) !== 'enum_route' || cleanString(raw.status) === 'technical_failure') {
     return classificationFromSemanticFrame(frame, raw);
   }
   const routeKey = cleanString(raw.routeKey);
-  if (!routeKey || routeKey === 'ambiguous') {
+  const subcategoryConfidence = cleanModelConfidence(raw.confidence);
+  const topLevelConfidence = cleanModelConfidence(frame.foundation.rawResponse?.confidence);
+  if (!routeKey || !subcategoryConfidence) {
     return {
       ...classificationFromSemanticFrame(frame, raw),
-      reason: routeKey === 'ambiguous' ? 'semantic_child_route_ambiguous' : 'semantic_child_route_empty',
+      topLevelConfidence,
+      subcategoryConfidence,
+      reason: !routeKey ? 'semantic_child_route_empty' : 'semantic_child_confidence_missing',
     };
   }
-  const baseRoute = journalRouteForKey(routeKey, 0, 'Apple Foundation selected a child of the evidence-locked journal flow');
+  const confidenceScore = modelConfidenceScore(subcategoryConfidence);
+  const baseRoute = journalRouteForKey(routeKey, confidenceScore, 'Apple Foundation selected a child of the evidence-locked journal flow');
   if (!baseRoute || baseRoute.flowId !== flowId) {
     return {
       ...classificationFromSemanticFrame(frame, raw),
-      specificEvidence: rejectedSpecificEvidence(raw, baseRoute ? 'child_route_escaped_locked_flow' : 'child_route_invalid'),
+      topLevelConfidence,
+      subcategoryConfidence,
       reason: baseRoute ? 'semantic_child_route_escaped_locked_flow' : 'semantic_child_route_invalid',
     };
   }
-  const specificEvidence = validateFoodSpecificEvidence(raw, frame, baseRoute);
-  const support = semanticChildRouteSupport(routeKey, frame, specificEvidence);
-  if (!support || support.support < ROUTE_MIN_EVIDENCE_SUPPORT) {
+  const verificationVerdict = cleanString(raw.verificationVerdict);
+  const verificationEvidenceKey = cleanString(raw.verificationEvidenceKey);
+  const verificationConfidence = cleanModelConfidence(raw.verificationConfidence);
+  const independentlyGrounded = verificationVerdict === 'supported'
+    && verificationConfidence === 'high'
+    && verificationEvidenceKey !== null
+    && verificationEvidenceKey !== 'none'
+    && frame.classificationEvidenceKeys.includes(verificationEvidenceKey);
+  if (subcategoryConfidence !== 'high' || !independentlyGrounded) {
+    const reason = subcategoryConfidence !== 'high'
+      ? `foundation_child_${subcategoryConfidence}_confidence`
+      : verificationVerdict === 'not_distinguishable'
+        ? 'foundation_child_not_visually_distinguishable'
+        : `foundation_child_verification_${cleanString(raw.verificationStatus) ?? 'missing'}`;
     return {
-      ...classificationFromSemanticFrame(frame, raw),
-      specificEvidence,
-      reason: 'semantic_child_route_lacks_independent_support',
+      kind: 'flow_only', stage: 'enum_route', flowId, categoryId: null,
+      candidates: [flowCandidate(flowId, modelConfidenceScore(topLevelConfidence))],
+      selected: null, selectedFlowId: flowId,
+      visualSubject: frame.primarySubject, provider: 'appleFoundation', rawResponse: raw,
+      enumResponse: raw, evidence, attempts: [], decisionBasis: null,
+      semanticFrame: frame, reason,
+      navigationAction: 'open_flow', topLevelConfidence, subcategoryConfidence,
     };
   }
-  const routeWithConfidence = { ...baseRoute, confidence: support.support };
-  const route = specificEvidence.accepted && specificEvidence.prefill
-    ? { ...routeWithConfidence, prefilledSpecific: specificEvidence.prefill }
-    : routeWithConfidence;
-  const candidateBase = routeCandidate(routeKey, support.support, support, 'foundation_primary', null);
+  const route = baseRoute;
+  const candidateBase = routeCandidate(routeKey, confidenceScore, undefined, 'foundation_primary', confidenceScore);
   if (!candidateBase) return classificationFromSemanticFrame(frame, raw);
   const candidate = { ...candidateBase, route };
   return {
@@ -501,51 +476,21 @@ function normalizeSemanticChildRoute(
     enumResponse: raw, evidence, attempts: [], decisionBasis: {
       autoRouteAllowed: true,
       checks: {
-        outputConsistent: true, confidenceSource: 'vision_evidence', modelConfidence: null,
-        minimumModelConfidence: null, modelLead: null, minimumModelLead: null,
-        evidenceSupport: support.support, minimumEvidenceSupport: ROUTE_MIN_EVIDENCE_SUPPORT,
+        outputConsistent: true, confidenceSource: 'legacy_model_authored', modelConfidence: confidenceScore,
+        minimumModelConfidence: modelConfidenceScore('high'), modelLead: null, minimumModelLead: null,
+        evidenceSupport: 0, minimumEvidenceSupport: 0,
         competingRouteKey: null, competingEvidenceSupport: 0, competitorMargin: 0,
       },
-      rejectedAlternatives: [], reasons: ['semantic_flow_locked', 'child_route_validated_inside_locked_flow', 'independent_route_support_met'],
+      rejectedAlternatives: [], reasons: [
+        'semantic_flow_locked',
+        'child_route_validated_inside_locked_flow',
+        'independent_child_confidence_high',
+        'independent_child_grounding_verified',
+      ],
     },
-    semanticFrame: frame, specificEvidence, reason: null, navigationAction: 'open_details',
+    semanticFrame: frame, reason: null, navigationAction: 'open_details',
+    topLevelConfidence, subcategoryConfidence,
   };
-}
-
-function semanticChildRouteSupport(
-  routeKey: string,
-  frame: PhotoSemanticFrame,
-  specificEvidence: PhotoJournalSpecificEvidenceDiagnostic
-): PhotoJournalRouteSupport | null {
-  const direct = rankPhotoJournalRouteSupport(frame.evidence).find((item) => item.routeKey === routeKey) ?? null;
-  if (direct && direct.support >= ROUTE_MIN_EVIDENCE_SUPPORT) return direct;
-
-  // Food child names such as "snack" are not normally visible in Vision. A
-  // concrete, model-selected Essence ID is valid route evidence because the ID
-  // itself is supplied and verified rather than invented text.
-  if (routeKey.startsWith('food.') && specificEvidence.accepted && specificEvidence.confidence !== null) {
-    return {
-      routeKey,
-      support: specificEvidence.confidence,
-      supportingSignals: specificEvidence.label ? [specificEvidence.label] : [],
-    };
-  }
-
-  // A physical book is itself sufficient support for the only book child; OCR
-  // remains enrichment and never participates in this routing decision.
-  if (routeKey === 'studio.book'
-    && frame.subjectAnchor?.topLevel === 'media'
-    && /\b(book|publication|paperback|hardcover|hardback|novel)\b/i.test(frame.subjectAnchor.label)) {
-    const bookSupport = frame.evidence.documentDetected
-      ? Math.max(frame.subjectAnchor.confidence, 0.72)
-      : Math.max(frame.subjectAnchor.confidence, Math.min(1, frame.subjectAnchor.selectionRank));
-    return {
-      routeKey,
-      support: bookSupport,
-      supportingSignals: [frame.subjectAnchor.label],
-    };
-  }
-  return direct;
 }
 
 export async function enrichPhotoJournalRoute(
@@ -559,9 +504,6 @@ export async function enrichPhotoJournalRoute(
   if (!flow || !choice) return null;
   const enrichmentMode = choice.photoEnrichmentMode ?? flow.photoEnrichmentMode ?? 'none';
   if (enrichmentMode === 'none' || !supportsFoundationPhotoJournalSchema()) return null;
-  // A validated visual Food value is already grounded in a visible Essence ID.
-  // Do not let lower-quality menu or packaging OCR replace it asynchronously.
-  if (enrichmentMode === 'food_fallback' && route.prefilledSpecific?.trim()) return null;
   const fieldLabel = choice.specificFieldLabel ?? flow.specificFieldLabel;
   const raw = await enrichPhotoJournalOnDevice(route.id, fieldLabel, visualSubject, vision, rawVision);
   const lockedRouteKey = cleanString(raw?.lockedRouteKey);
@@ -582,55 +524,6 @@ export async function enrichPhotoJournalRoute(
     prefill: validatedBookTitle || confidence >= 0.75,
     rawResponse: raw,
   };
-}
-
-function validateFoodSpecificEvidence(
-  raw: Record<string, unknown>,
-  frame: PhotoSemanticFrame,
-  route: JournalRouteProposal
-): PhotoJournalSpecificEvidenceDiagnostic {
-  const evidenceKey = cleanString(raw.specificEvidenceKey);
-  const role = cleanSpecificEvidenceRole(raw.specificEvidenceRole);
-  if (!evidenceKey || evidenceKey === 'none') {
-    return { evidenceKey: null, role, label: null, confidence: null, prefill: null, accepted: false, reason: 'no_specific_evidence_selected' };
-  }
-  const signal = frame.evidence.signals.find((item) => item.id === evidenceKey) ?? null;
-  const diagnostic = {
-    evidenceKey,
-    role,
-    label: signal?.name ?? null,
-    confidence: signal?.confidence ?? null,
-    prefill: null,
-    accepted: false,
-    reason: 'not_validated',
-  } satisfies PhotoJournalSpecificEvidenceDiagnostic;
-  if (frame.flowKey !== 'food' || route.flowId !== 'food') return { ...diagnostic, reason: 'visual_prefill_not_enabled_for_flow' };
-  if (!frame.primaryEvidenceKeys.includes(evidenceKey) || !signal) return { ...diagnostic, reason: 'evidence_not_visible_or_eligible' };
-  if (role !== 'concrete_subject') return { ...diagnostic, reason: 'evidence_role_not_concrete_subject' };
-  if (signal.confidence < 0.6) return { ...diagnostic, reason: 'evidence_confidence_below_threshold' };
-  const prefill = displayEvidenceLabel(signal.name);
-  if (!prefill) return { ...diagnostic, reason: 'evidence_label_empty' };
-  return { ...diagnostic, prefill, accepted: true, reason: 'accepted_visible_food_subject' };
-}
-
-function rejectedSpecificEvidence(raw: Record<string, unknown>, reason: string): PhotoJournalSpecificEvidenceDiagnostic {
-  const evidenceKey = cleanString(raw.specificEvidenceKey);
-  return {
-    evidenceKey: evidenceKey && evidenceKey !== 'none' ? evidenceKey : null,
-    role: cleanSpecificEvidenceRole(raw.specificEvidenceRole),
-    label: null,
-    confidence: null,
-    prefill: null,
-    accepted: false,
-    reason,
-  };
-}
-
-function cleanSpecificEvidenceRole(value: unknown): PhotoJournalSpecificEvidenceRole | null {
-  const role = cleanString(value);
-  return role && ['concrete_subject', 'generic_class', 'container', 'not_applicable'].includes(role)
-    ? role as PhotoJournalSpecificEvidenceRole
-    : null;
 }
 
 function displayEvidenceLabel(value: string): string {
@@ -799,6 +692,16 @@ function unrouted(
 
 function cleanString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function cleanModelConfidence(value: unknown): PhotoModelConfidence | null {
+  return value === 'high' || value === 'medium' || value === 'low' ? value : null;
+}
+
+function modelConfidenceScore(value: PhotoModelConfidence | null): number {
+  if (value === 'high') return 0.95;
+  if (value === 'medium') return 0.6;
+  return 0.35;
 }
 
 function cleanConfidence(value: unknown): number {

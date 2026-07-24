@@ -378,8 +378,16 @@ export default function NoteCaptureScreen() {
           allowRemoteIntelligence={cloudIntelligenceEnabled}
           dayLocationPoints={dayLocationPoints}
           key={journalRoute?.id ?? 'note-journal-picker'}
-          initialFlowId={journalRoute?.flowId}
+          initialFlowId={journalRoute?.flowId ?? (
+            result.topLevelConfidence === 'high' && result.subcategoryConfidence !== 'high'
+              ? result.suggestedJournalFlowId
+              : undefined
+          )}
           initialChoiceId={journalRoute?.choiceId}
+          suggestedFlowId={result.topLevelConfidence !== 'high' ? result.suggestedJournalFlowId : null}
+          suggestedChoiceId={result.topLevelConfidence === 'high' && result.subcategoryConfidence !== 'high'
+            ? result.journalRoutes?.[0]?.choiceId
+            : null}
           initialSpecific={journalRoute && (
             result.journalClassification?.kind === 'categorized' ||
             result.journalClassification?.kind === 'generic' ||

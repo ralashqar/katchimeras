@@ -4,8 +4,8 @@ import FoundationModels
 
 @available(iOS 26.0, *)
 enum JournalNoteRouteCatalog {
-  static let schemaVersion = "5"
-  static let photoSchemaVersion = "13"
+  static let schemaVersion = "6"
+  static let photoSchemaVersion = "14"
   static let routeKeys: Set<String> = ["went_somewhere.park", "went_somewhere.city", "went_somewhere.beach", "went_somewhere.forest", "went_somewhere.garden", "went_somewhere.museum", "went_somewhere.cafe", "went_somewhere.restaurant", "went_somewhere.street", "went_somewhere.home", "went_somewhere.travel", "went_somewhere.other_place", "food.meal", "food.snack", "food.dessert", "food.coffee", "food.tea", "food.drink", "food.cooking", "food.other_food", "studio.book", "studio.film", "studio.show", "studio.game", "studio.music", "studio.podcast", "studio.art", "studio.other_media", "movement.walk", "movement.run", "movement.cycle", "movement.workout", "movement.sport", "movement.hike", "movement.errands", "movement.commute", "movement.travel", "movement.mixed", "people.partner", "people.my_child", "people.family", "people.friends", "people.group", "people.someone_new", "people.pet", "people.solo", "people.someone_else", "work.focus", "work.office", "work.learning", "work.planning", "work.creative", "work.admin", "work.progress", "work.other_work", "big_event.birthday", "big_event.anniversary", "big_event.firstTime", "big_event.holiday", "big_event.trip", "big_event.achievement", "big_event.baby", "big_event.wedding", "big_event.graduation", "big_event.newHome", "big_event.newJob", "big_event.reunion", "big_event.milestone", "general.highlight", "general.difficult", "general.gratitude", "general.new", "general.rest", "general.ordinary", "general.other"]
   static let promptTaxonomy = """
 went_somewhere.park: Places, trips and time away from home: Park or green space. Examples: “I went to park or green space”.

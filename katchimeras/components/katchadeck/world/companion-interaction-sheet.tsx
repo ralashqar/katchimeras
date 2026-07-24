@@ -90,9 +90,11 @@ export type CompanionInteractionSheetProps = {
   reflectionReviewPending?: boolean;
   memorySaved?: boolean;
   bondProgress: CompanionBondProgress;
+  onExperienceActiveChange?: (active: boolean) => void;
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
+  const onExperienceActiveChange = props.onExperienceActiveChange;
   const [state, dispatch] = useReducer(companionInteractionReducer, {
     initialThread: props.initialThread,
     reflectionDraft: props.initialReflectionDraft,
@@ -175,6 +177,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   };
   const interactiveExecution = props.activeQuest?.execution ?? null;
   const immersiveExperience = Boolean(activeAttemptId && companionQuestUsesFullBleed(interactiveExecution));
+  useEffect(() => {
+    onExperienceActiveChange?.(Boolean(activeAttemptId));
+    return () => onExperienceActiveChange?.(false);
+  }, [activeAttemptId, onExperienceActiveChange]);
   const actionFooter = props.memorySaved
     ? null
     : state.thread === 'quest' && interactiveExecution

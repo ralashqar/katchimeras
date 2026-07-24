@@ -142,6 +142,28 @@ export function clampCameraTranslation(
   };
 }
 
+export function kingdomCameraSnapshotForTarget(
+  viewport: KingdomSize,
+  scene: KingdomSize,
+  target: { x: number; y: number },
+  scale: number,
+  screenPoint: { x: number; y: number } = {
+    x: viewport.width / 2,
+    y: viewport.height / 2,
+  },
+): KingdomCameraSnapshot {
+  const translation = clampCameraTranslation(
+    {
+      tx: screenPoint.x - scene.width / 2 - (target.x - scene.width / 2) * scale,
+      ty: screenPoint.y - scene.height / 2 - (target.y - scene.height / 2) * scale,
+    },
+    viewport,
+    scene,
+    scale,
+  );
+  return { ...translation, scale };
+}
+
 export function tileLodWithHysteresis(current: KingdomHexTileLod | null, screenWidth: number): KingdomHexTileLod {
   const thresholds = KINGDOM_RENDERING.tileLod;
 

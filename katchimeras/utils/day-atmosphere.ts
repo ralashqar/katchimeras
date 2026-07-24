@@ -14,6 +14,7 @@ export type DayAtmosphereReason = {
 
 export type DayAtmospherePlan = {
   expressive: AtmosphereSettings | null;
+  expressiveCandidates: DayExpressiveAtmosphereCandidate[];
   expressiveReasons: DayAtmosphereReason[];
   physical: AtmosphereSettings | null;
   physicalReasons: DayAtmosphereReason[];
@@ -21,7 +22,12 @@ export type DayAtmospherePlan = {
   version: 1;
 };
 
-type Candidate = Exclude<ExpressiveAtmospherePresetId, 'none'>;
+export type DayExpressiveAtmosphereCandidate = {
+  preset: Exclude<ExpressiveAtmospherePresetId, 'none'>;
+  score: number;
+};
+
+type Candidate = DayExpressiveAtmosphereCandidate['preset'];
 
 const CANDIDATE_ORDER: readonly Candidate[] = [
   'celebration_drift',
@@ -60,6 +66,7 @@ export function resolveDayAtmosphere(day: StoredHomeDayRecord | null | undefined
   if (!day) {
     return {
       expressive: null,
+      expressiveCandidates: [],
       expressiveReasons: [],
       physical: null,
       physicalReasons: [],
@@ -174,10 +181,12 @@ export function resolveDayAtmosphere(day: StoredHomeDayRecord | null | undefined
     add('idea_sparks', 2.6, 'Something inspiring was saved', 'moment');
   }
 
-  const winner = CANDIDATE_ORDER
+  const expressiveCandidates = CANDIDATE_ORDER
     .map((preset, priority) => ({ preset, priority, score: scores.get(preset) ?? 0 }))
-    .filter((candidate) => candidate.score >= 2)
-    .sort((left, right) => right.score - left.score || left.priority - right.priority)[0] ?? null;
+    .filter((candidate) => candidate.score > 0)
+    .sort((left, right) => right.score - left.score || left.priority - right.priority)
+    .map(({ preset, score }) => ({ preset, score }));
+  const winner = expressiveCandidates.find((candidate) => candidate.score >= 2) ?? null;
   const expressiveReasons = winner
     ? [...(reasons.get(winner.preset) ?? [])]
         .sort((left, right) => right.weight - left.weight)
@@ -194,6 +203,7 @@ export function resolveDayAtmosphere(day: StoredHomeDayRecord | null | undefined
 
   return {
     expressive,
+    expressiveCandidates,
     expressiveReasons,
     physical,
     physicalReasons,

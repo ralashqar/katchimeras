@@ -101,6 +101,10 @@ export function TodayEnvironmentMotionProvider({
   return <MotionContext value={motion}>{children}</MotionContext>;
 }
 
+export function useTodayEnvironmentMotionValues() {
+  return use(MotionContext);
+}
+
 /** Keeps environment and resident layers on the same transform without
  * placing them in one z-plane; foreground atmosphere can still sit between. */
 export function TodayEnvironmentMotionLayer({

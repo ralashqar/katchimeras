@@ -51,6 +51,9 @@ export function useNoteCaptureController({
             intelligenceProvider: interpreted.intelligenceProvider,
             journalClassification: interpreted.journalClassification,
             journalRoutes: interpreted.journalRoutes,
+            suggestedJournalFlowId: interpreted.suggestedJournalFlowId,
+            topLevelConfidence: interpreted.topLevelConfidence,
+            subcategoryConfidence: interpreted.subcategoryConfidence,
       });
     },
     [addNote, allowRemote, formingTarget, pulseEgg, setMicrocopy, startEggFeed, windowHeight, windowWidth]

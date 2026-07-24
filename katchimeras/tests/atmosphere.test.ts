@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   atmosphereParticleCount,
+  atmosphereLayerParticleCount,
   atmospherePresetUsesAuthoredSprites,
   atmosphereParticleFamily,
   atmospherePresetForWeather,
@@ -17,6 +18,9 @@ test('authored sprite effects are limited to the polished atlas families', () =>
   assert.equal(atmospherePresetUsesAuthoredSprites('petal_drift'), true);
   assert.equal(atmospherePresetUsesAuthoredSprites('celebration_drift'), true);
   assert.equal(atmospherePresetUsesAuthoredSprites('dandelion_seeds'), true);
+  assert.equal(atmospherePresetUsesAuthoredSprites('dream_wisps'), true);
+  assert.equal(atmospherePresetUsesAuthoredSprites('journey_breeze'), true);
+  assert.equal(atmospherePresetUsesAuthoredSprites('social_ribbons'), true);
   assert.equal(atmospherePresetUsesAuthoredSprites('rain'), false);
   assert.equal(atmospherePresetUsesAuthoredSprites('golden_motes'), false);
 });
@@ -49,14 +53,15 @@ test('automatic atmosphere quality and particle caps stay bounded', () => {
   assert.ok(atmosphereParticleCount('rain', 'medium', 390, 0) < 56);
   assert.equal(atmosphereParticleCount('celebration_drift', 'medium', 390, 1), 30);
   assert.equal(atmosphereParticleCount('golden_motes', 'medium', 390, 1), 26);
-  assert.equal(atmosphereParticleCount('journey_breeze', 'medium', 390, 1), 22);
+  assert.equal(atmosphereParticleCount('journey_breeze', 'medium', 390, 1), 10);
   assert.equal(atmosphereParticleCount('quiet_dust', 'medium', 390, 1), 18);
+  assert.equal(atmosphereLayerParticleCount('journey_breeze', 'medium', 390, 1, 0.6), 6);
 });
 
 test('expressive presets resolve into distinct deterministic particle families', () => {
   assert.equal(atmosphereParticleFamily('celebration_drift'), 'drift');
   assert.equal(atmosphereParticleFamily('fireflies'), 'glow');
-  assert.equal(atmosphereParticleFamily('journey_breeze'), 'streak');
+  assert.equal(atmosphereParticleFamily('journey_breeze'), 'breeze');
   assert.equal(atmosphereParticleFamily('dream_wisps'), 'sparse');
   assert.notEqual(atmospherePresetSeedOffset('fireflies'), atmospherePresetSeedOffset('golden_motes'));
   assert.equal(atmospherePresetSeedOffset('fireflies'), atmospherePresetSeedOffset('fireflies'));

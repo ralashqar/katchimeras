@@ -31,6 +31,8 @@ export function applyBackfilledDays(
       byIsoDate.delete(day.isoDate);
       return {
         ...day,
+        sky: undefined,
+        skyPolicy: 'historical_adaptive' as const,
         stepsCount: Math.max(day.stepsCount, incoming.stepsCount),
         locations: day.locations.length > 0 ? day.locations : incoming.locations,
         vision: day.vision ?? incoming.vision ?? undefined,
@@ -57,6 +59,7 @@ export function applyBackfilledDays(
       heroPhoto: null,
       creature: null,
       card: null,
+      skyPolicy: 'historical_adaptive' as const,
       vision: day.vision ?? undefined,
     }));
 

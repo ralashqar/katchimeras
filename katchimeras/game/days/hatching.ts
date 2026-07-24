@@ -13,6 +13,7 @@ import { selectHatch, makeSeededRng } from '@/utils/hatch-selection';
 import { buildReflectionContext } from '@/utils/reflection-context';
 import { resolveVariantCellId } from '@/utils/creature-variant';
 import { buildDailyCreatureCard } from '@/utils/daily-card';
+import { deriveDaySkySnapshot } from '@/utils/day-sky';
 import { stableHash } from './hash';
 import { resolveDayState, resolveHatchHour } from './lifecycle';
 import { computeDayScores, parsePathId, resolveRarity } from './scoring';
@@ -58,6 +59,8 @@ export function finalizeDayHatch(
       devForceReadyToHatch: undefined,
       devHatchReflectionMode: undefined,
       shareReadyAt: sealedAt,
+      sky: deriveDaySkySnapshot(day),
+      skyPolicy: 'live_frozen',
       creature,
       card: buildDailyCreatureCard({ ...day, creature }, creature, {
         mode: 'live_hatch',
@@ -181,6 +184,8 @@ function finalizeFallbackHatch(
     devForceReadyToHatch: undefined,
     devHatchReflectionMode: undefined,
     shareReadyAt: sealedAt,
+    sky: deriveDaySkySnapshot(day),
+    skyPolicy: 'live_frozen',
     creature,
     card: buildDailyCreatureCard({ ...day, creature }, creature, {
       mode: 'live_hatch',

@@ -12,6 +12,7 @@ import {
 
 import {
   clampCameraTranslation,
+  kingdomCameraSnapshotForTarget,
   residentLodWithHysteresis,
   tileLodWithHysteresis,
   type KingdomCameraSnapshot,
@@ -57,8 +58,6 @@ export function useKingdomHexCamera({
 }: UseKingdomHexCameraArgs) {
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
-  const skyOriginX = useSharedValue(0);
-  const skyOriginY = useSharedValue(0);
   const scale = useSharedValue(1);
   const panStartTx = useSharedValue(0);
   const panStartTy = useSharedValue(0);
@@ -70,6 +69,9 @@ export function useKingdomHexCamera({
   const initializedRef = useRef(false);
   const previousSceneRef = useRef(scene);
   const decayCompletions = useSharedValue(0);
+  const [ready, setReady] = useState(false);
+  const centerX = center.x;
+  const centerY = center.y;
 
   const baseScale = useMemo(
     () =>
@@ -118,18 +120,21 @@ export function useKingdomHexCamera({
     if (!viewport.width || !viewport.height || !scene.width || !scene.height) return;
 
     if (!initializedRef.current) {
-      const nextTx = viewport.width / 2 - scene.width / 2 - (center.x - scene.width / 2) * baseScale;
-      const nextTy = viewport.height / 2 - scene.height / 2 - (center.y - scene.height / 2) * baseScale - viewport.height * 0.02;
-      const clamped = clampCameraTranslation({ tx: nextTx, ty: nextTy }, viewport, scene, baseScale);
-      tx.value = clamped.tx;
-      ty.value = clamped.ty;
-      skyOriginX.value = clamped.tx;
-      skyOriginY.value = clamped.ty;
-      scale.value = baseScale;
-      pinchStartScale.value = baseScale;
+      const home = kingdomCameraSnapshotForTarget(
+        viewport,
+        scene,
+        { x: centerX, y: centerY },
+        baseScale,
+        { x: viewport.width / 2, y: viewport.height / 2 - viewport.height * 0.02 },
+      );
+      tx.value = home.tx;
+      ty.value = home.ty;
+      scale.value = home.scale;
+      pinchStartScale.value = home.scale;
       initializedRef.current = true;
       previousSceneRef.current = scene;
-      commitSnapshot(clamped.tx, clamped.ty, baseScale, false);
+      commitSnapshot(home.tx, home.ty, home.scale, false);
+      setReady(true);
       return;
     }
 
@@ -143,12 +148,10 @@ export function useKingdomHexCamera({
       scene,
       scale.value
     );
-    skyOriginX.value += clamped.tx - tx.value;
-    skyOriginY.value += clamped.ty - ty.value;
     tx.value = clamped.tx;
     ty.value = clamped.ty;
     commitSnapshot(clamped.tx, clamped.ty, scale.value, false);
-  }, [baseScale, center.x, center.y, commitSnapshot, pinchStartScale, scale, scene, skyOriginX, skyOriginY, tx, ty, viewport]);
+  }, [baseScale, centerX, centerY, commitSnapshot, pinchStartScale, scale, scene, tx, ty, viewport]);
 
   const pan = useMemo(
     () =>
@@ -278,9 +281,9 @@ export function useKingdomHexCamera({
     focusResident,
     gesture,
     isMoving: renderState.isMoving,
+    ready,
     recenter,
     residentLod: renderState.residentLod,
-    skyCamera: { originX: skyOriginX, originY: skyOriginY, translateX: tx, translateY: ty },
     snapshot: renderState.snapshot,
     tileLod: renderState.tileLod,
     worldStyle,

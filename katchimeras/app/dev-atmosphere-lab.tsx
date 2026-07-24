@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { Redirect, router, Stack } from 'expo-router';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -18,6 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { useDevAtmosphereState } from '@/hooks/use-dev-atmosphere-state';
+import type { SkyMoodId, SkyWeatherId } from '@/types/home';
 import {
   EXPRESSIVE_ATMOSPHERE_PRESETS,
   PHYSICAL_ATMOSPHERE_PRESETS,
@@ -27,6 +28,8 @@ import {
   type AtmosphereRenderer,
   type AtmosphereSettings,
 } from '@/utils/atmosphere';
+import { todayAtmosphereBackgroundForSky } from '@/utils/day-background-scene';
+import { SKY_MOOD_OPTIONS, SKY_WEATHER_OPTIONS } from '@/utils/day-sky';
 import { resetDevAtmosphereState, setDevAtmosphereState } from '@/utils/dev-atmosphere-settings';
 import { safeGoBack } from '@/utils/safe-navigation';
 
@@ -46,6 +49,18 @@ function AtmosphereLab() {
   const [simulateReducedMotion, setSimulateReducedMotion] = useState(false);
   const [showBackground, setShowBackground] = useState(true);
   const [showForeground, setShowForeground] = useState(true);
+  const [useBespokeBackground, setUseBespokeBackground] = useState(true);
+  const [skyWeather, setSkyWeather] = useState<SkyWeatherId>('clear');
+  const [skyMood, setSkyMood] = useState<SkyMoodId>('neutral');
+  const [skyIntensity, setSkyIntensity] = useState(0.65);
+  const sky = useMemo(() => ({
+    intensity: skyIntensity,
+    mood: skyMood,
+    seed: devState.accentSettings.seed,
+    version: 1 as const,
+    weather: skyWeather,
+  }), [devState.accentSettings.seed, skyIntensity, skyMood, skyWeather]);
+  const bespokeBackground = useMemo(() => todayAtmosphereBackgroundForSky(sky), [sky]);
   const fps = useApproximateFps();
   const quality = resolvedAtmosphereQuality(devState.settings.quality, width);
   const particleCount = atmosphereParticleCount(devState.settings.preset, devState.settings.quality, width, devState.settings.intensity)
@@ -68,8 +83,19 @@ function AtmosphereLab() {
   return (
     <View style={styles.screen}>
       <Stack.Screen options={{ headerShown: false, title: 'Atmosphere Lab' }} />
-      <StaticKingdomSkyBackground />
-      {showBackground ? (
+      {useBespokeBackground && bespokeBackground ? (
+        <Image
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          recyclingKey={bespokeBackground.id}
+          source={bespokeBackground.source}
+          style={StyleSheet.absoluteFill}
+          transition={simulateReducedMotion ? 0 : 200}
+        />
+      ) : (
+        <StaticKingdomSkyBackground sky={sky} />
+      )}
+      {showBackground && !(useBespokeBackground && bespokeBackground) ? (
         <>
           <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.settings} />
           <AtmosphereLayer plane="background" reduceMotionOverride={simulateReducedMotion} renderer={devState.renderer} settings={devState.accentSettings} />
@@ -98,6 +124,12 @@ function AtmosphereLab() {
         <ThemedText selectable style={styles.diagnosticText} lightColor="#C8D7EF" darkColor="#C8D7EF">
           {devState.settings.paused || simulateReducedMotion ? 'frozen' : 'active'} · {devState.renderer} · {devState.settings.preset} + {devState.accentSettings.preset}
         </ThemedText>
+        <ThemedText selectable style={styles.diagnosticText} lightColor="#C8D7EF" darkColor="#C8D7EF">
+          sky v{sky.version} · {sky.weather} + {sky.mood} · {Math.round(sky.intensity * 100)}%
+        </ThemedText>
+        <ThemedText selectable style={styles.diagnosticText} lightColor="#C8D7EF" darkColor="#C8D7EF">
+          scene · {bespokeBackground?.sceneId ?? 'fallback dynamic sky'}
+        </ThemedText>
       </View>
 
       <View style={[styles.controlsShell, { paddingBottom: insets.bottom + 10 }]}>
@@ -124,6 +156,14 @@ function AtmosphereLab() {
           <DevSlider label="Memory intensity" maximum={1} minimum={0} onChange={(intensity) => updateExpressive({ intensity })} step={0.05} value={devState.accentSettings.intensity} valueLabel={`${Math.round(devState.accentSettings.intensity * 100)}%`} />
           <DevSlider label="Memory wind" maximum={1} minimum={-1} onChange={(wind) => updateExpressive({ wind })} step={0.1} value={devState.accentSettings.wind} valueLabel={windLabel(devState.accentSettings.wind)} />
 
+          <ControlGroup label="Sky weather">
+            <ChipRow<SkyWeatherId> options={SKY_WEATHER_OPTIONS.map((option) => ({ ...option }))} selected={skyWeather} onSelect={setSkyWeather} />
+          </ControlGroup>
+          <ControlGroup label="Sky journal mood">
+            <ChipRow<SkyMoodId> options={SKY_MOOD_OPTIONS.map((option) => ({ ...option }))} selected={skyMood} onSelect={setSkyMood} />
+          </ControlGroup>
+          <DevSlider label="Sky mood strength" maximum={1} minimum={0} onChange={setSkyIntensity} step={0.05} value={skyIntensity} valueLabel={`${Math.round(skyIntensity * 100)}%`} />
+
           <ControlGroup label="Quality">
             <ChipRow<AtmosphereQuality> options={['auto', 'low', 'medium', 'high'].map((id) => ({ id: id as AtmosphereQuality, label: id }))} selected={devState.settings.quality} onSelect={(qualityOption) => updateBoth({ quality: qualityOption })} />
           </ControlGroup>
@@ -139,6 +179,7 @@ function AtmosphereLab() {
           </ControlGroup>
           <ToggleRow label="Pause animation" value={devState.settings.paused && devState.accentSettings.paused} onChange={(paused) => updateBoth({ paused })} />
           <ToggleRow label="Simulate Reduce Motion" value={simulateReducedMotion} onChange={setSimulateReducedMotion} />
+          <ToggleRow label="Use bespoke scene plate" value={useBespokeBackground} onChange={setUseBespokeBackground} />
           <ToggleRow
             label="Also apply to Kingdom"
             value={devState.target === 'both'}

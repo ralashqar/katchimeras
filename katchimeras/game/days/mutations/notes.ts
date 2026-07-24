@@ -29,6 +29,9 @@ export type DayNoteInput = {
   intelligenceProvider?: DayEvidenceProvider;
   journalClassification?: JournalNoteClassification | null;
   journalRoutes?: JournalRouteProposal[];
+  suggestedJournalFlowId?: string | null;
+  topLevelConfidence?: 'high' | 'medium' | 'low' | null;
+  subcategoryConfidence?: 'high' | 'medium' | 'low' | null;
 };
 
 export function withNoteMemory(

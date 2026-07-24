@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 import { KINGDOM_RENDERING } from '../constants/kingdom-rendering';
@@ -8,12 +10,14 @@ import { visiblePixelBoundsFromRgba } from '../utils/alpha-bounds';
 import {
   cameraTranslationBounds,
   frameToRect,
+  kingdomCameraSnapshotForTarget,
   kingdomSceneMetrics,
   kingdomWorldViewPoint,
   rectsIntersect,
   residentLodWithHysteresis,
   tileLodWithHysteresis,
   visibleWorldRect,
+  screenPointToWorld,
 } from '../utils/kingdom-rendering';
 import { kingdomTileArtFrame } from '../utils/kingdom-tile-alignment';
 import {
@@ -101,6 +105,63 @@ test('home egg world placement is driven by kingdom-world-view JSON offsets', ()
     point.y,
     center.y + HEX_TILE_H * kingdomWorldViewConfig.egg.verticalOffsetHexTileHeight
   );
+});
+
+test('Kingdom entry camera places the home tile at the requested screen anchor', () => {
+  const viewport = { width: 390, height: 844 };
+  const scene = { width: 3200, height: 3000 };
+  const home = { x: 1600, y: 1500 };
+  const screenAnchor = { x: viewport.width / 2, y: viewport.height * 0.48 };
+  const snapshot = kingdomCameraSnapshotForTarget(
+    viewport,
+    scene,
+    home,
+    0.75,
+    screenAnchor,
+  );
+
+  const resolved = screenPointToWorld(screenAnchor, scene, snapshot);
+  assertClose(resolved.x, home.x);
+  assertClose(resolved.y, home.y);
+});
+
+test('Kingdom entry discards stale camera state and bootstraps loading from home', () => {
+  const worldSource = fs.readFileSync(
+    path.join(process.cwd(), 'app', '(tabs)', 'world.tsx'),
+    'utf8',
+  );
+  const schedulerSource = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'use-kingdom-tile-scheduler.ts'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(worldSource, /initialCameraSnapshot/);
+  assert.doesNotMatch(worldSource, /cameraSnapshotRef/);
+  assert.match(schedulerSource, /if \(!cameraReady\)/);
+  assert.match(schedulerSource, /preloadIds: \[scene\.centerTile\.id\]/);
+  assert.match(schedulerSource, /priority: \[scene\.centerTile\.id\]/);
+});
+
+test('Kingdom uses the resolved Today sky plate without legacy clouds or atmosphere layers', () => {
+  const worldSource = fs.readFileSync(
+    path.join(process.cwd(), 'app', '(tabs)', 'world.tsx'),
+    'utf8',
+  );
+  const canvasSource = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-hex-canvas.tsx'),
+    'utf8',
+  );
+  const cameraSource = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'use-kingdom-hex-camera.ts'),
+    'utf8',
+  );
+
+  assert.match(worldSource, /todayAtmosphereBackgroundForDay\(today, days\)/);
+  assert.match(worldSource, /background=\{kingdomBackground\}/);
+  assert.match(canvasSource, /source=\{background\.source\}/);
+  assert.match(canvasSource, /cachePolicy="memory-disk"/);
+  assert.doesNotMatch(canvasSource, /KingdomSkyBackground|DevAtmosphereLayer/);
+  assert.doesNotMatch(cameraSource, /skyCamera|skyOrigin/);
 });
 
 test('Today applies its resident and egg framing ratios while enlarging the tile', () => {
