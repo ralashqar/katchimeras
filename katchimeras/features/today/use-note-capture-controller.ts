@@ -61,7 +61,10 @@ export function useNoteCaptureController({
 
   const voiceNote = useInlineVoiceNote({
     allowRemote,
-    saveNote: (note) => setPendingJournalNote({ ...note, captureId: `note-${Date.now().toString(36)}` }),
+    saveNote: (note) => {
+      setQuickNoteOpen(false);
+      setPendingJournalNote({ ...note, captureId: `note-${Date.now().toString(36)}` });
+    },
     onAnalyzing: () => {
       const from: FeedSourceRect = { x: windowWidth / 2 + 40, y: windowHeight - 260, w: 60, h: 60 };
       startEggFeed(from, { label: 'mic' }, () => {});

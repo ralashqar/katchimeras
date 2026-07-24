@@ -713,7 +713,7 @@ export default function HomeScreen() {
             renderDay={renderTimelineHero}
             renderDayOverlay={renderTimelineOverlay}
           />
-          {voiceNote.phase !== 'idle' ? (
+          {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
             <TodayKingdomEggAboveOverlay homeArchetypeId={homeArchetypeId}>
               <InlineVoiceNote
                 elapsed={voiceNote.elapsed}
@@ -820,7 +820,16 @@ export default function HomeScreen() {
       ) : null}
 
       {quickNoteOpen ? (
-        <QuickNoteComposer onClose={() => setQuickNoteOpen(false)} onSubmit={handleQuickNoteSubmit} />
+        <QuickNoteComposer
+          onClose={() => setQuickNoteOpen(false)}
+          onSubmit={handleQuickNoteSubmit}
+          onVoiceStart={voiceNote.start}
+          onVoiceStop={() => {
+            void voiceNote.stop();
+          }}
+          voiceElapsed={voiceNote.elapsed}
+          voicePhase={voiceNote.phase}
+        />
       ) : null}
 
       {promptSheetOpen ? (

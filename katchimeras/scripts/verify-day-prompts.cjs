@@ -365,6 +365,8 @@ const todaySource = fs.readFileSync(path.join(projectRoot, 'app/(tabs)/today.tsx
 const inlineVoiceSource = fs.readFileSync(path.join(projectRoot, 'hooks/use-inline-voice-note.ts'), 'utf8');
 const inlineVoiceUiSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/world/inline-voice-note.tsx'), 'utf8');
 const noteInterpretSource = fs.readFileSync(path.join(projectRoot, 'utils/note-interpret.ts'), 'utf8');
+const quickNoteSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/quick-note-composer.tsx'), 'utf8');
+const noteCaptureControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-note-capture-controller.ts'), 'utf8');
 const hatchCheckInSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/hatch-check-in-sheet.tsx'), 'utf8');
 const hatchCheckInPlannerSource = fs.readFileSync(path.join(projectRoot, 'utils/hatch-check-in.ts'), 'utf8');
 const hatchControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-hatch-controller.ts'), 'utf8');
@@ -391,6 +393,21 @@ check('finished voice notes open atomic journal review without an old confirmati
 check('voice and written transcripts share the Foundation atomic note interpreter',
   noteInterpretSource.includes('transcript = await transcribeOnDevice(input.audioUri)')
     && noteInterpretSource.includes('const local = await interpretNoteOnDevice(transcript)'));
+check('tapped note composer offers a central hold-to-record path',
+  quickNoteSource.includes('Tap and hold to record')
+    && quickNoteSource.includes('delayLongPress={250}')
+    && quickNoteSource.includes('onLongPress={startVoice}')
+    && todaySource.includes('voicePhase={voiceNote.phase}'));
+check('voice composer instructions use a readable translucent panel',
+  quickNoteSource.includes('style={styles.voiceCopyPanel}')
+    && quickNoteSource.includes("backgroundColor: 'rgba(16,14,25,0.88)'")
+    && quickNoteSource.includes("borderCurve: 'continuous'"));
+check('note composer replaces its text field with shared voice progress',
+  quickNoteSource.includes("const voiceActive = voicePhase !== 'idle'")
+    && quickNoteSource.includes('<InlineVoiceNote elapsed={voiceElapsed} phase={voicePhase}')
+    && quickNoteSource.indexOf('voiceActive ? (') < quickNoteSource.indexOf('<TextInput'));
+check('composer voice completion closes text overlay before journal review',
+  noteCaptureControllerSource.indexOf('setQuickNoteOpen(false)') < noteCaptureControllerSource.indexOf('setPendingJournalNote({ ...note'));
 check('manual menu is grouped into capture, context, and more', ['capture', 'context', 'more'].every((section) => todaySource.includes(`section: '${section}'`)));
 const actionRouterSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-today-action-router.ts'), 'utf8');
 const dayJournalSectionsSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-journal-sections.tsx'), 'utf8');
