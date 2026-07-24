@@ -9,8 +9,6 @@ import {
   withSpring,
 } from 'react-native-reanimated';
 
-import type { HomeTimelineDay } from '@/types/home';
-
 import {
   clampDeckIndex,
   DECK_SPRING,
@@ -19,8 +17,12 @@ import {
   resolveSwipeTarget,
 } from './deck-navigation';
 
+type DeckItemIdentity = {
+  id: string;
+};
+
 type UseDeckControllerParams = {
-  days: HomeTimelineDay[];
+  days: readonly DeckItemIdentity[];
   disabled: boolean;
   maxNavigableIndex: number;
   onSelect: (dayId: string) => void;
@@ -166,7 +168,7 @@ export function useDeckController({
       .activeOffsetX([-18, 18])
       .failOffsetY([-16, 16])
       .enabled(!disabled)
-      .onBegin(() => {
+      .onStart(() => {
         cancelAnimation(focusedIndex);
         transitionToken.value += 1;
         transitionActive.value = 1;

@@ -368,6 +368,7 @@ const noteInterpretSource = fs.readFileSync(path.join(projectRoot, 'utils/note-i
 const quickNoteSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/quick-note-composer.tsx'), 'utf8');
 const noteCaptureControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-note-capture-controller.ts'), 'utf8');
 const hatchCheckInSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/hatch-check-in-sheet.tsx'), 'utf8');
+const todayBottomDockSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/today-bottom-dock.tsx'), 'utf8');
 const hatchCheckInPlannerSource = fs.readFileSync(path.join(projectRoot, 'utils/hatch-check-in.ts'), 'utf8');
 const hatchControllerSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-hatch-controller.ts'), 'utf8');
 const mapPhotoRefreshSource = fs.readFileSync(path.join(projectRoot, 'hooks/use-day-map-photo-refresh.ts'), 'utf8');
@@ -414,6 +415,19 @@ const dayJournalSectionsSource = fs.readFileSync(path.join(projectRoot, 'compone
 check('Today replaces the quest mote with the compact day map action', todaySource.includes("id: 'map'") && todaySource.includes('categories={mapRingItems}') && !actionRouterSource.includes('ringCategories'));
 check('thin-day reveal opens the optional hatch check-in before finalization', todaySource.includes('hatchCheckInEligibility(selectedDay)') && todaySource.includes('<HatchCheckInSheet'));
 check('hatch check-in keeps an explicit hatch-now escape on every question', hatchCheckInSource.includes('label="Hatch now"') && hatchCheckInSource.includes('Skipping never changes whether your egg can hatch'));
+check('hatch entry and escape actions share the highlighted primary CTA',
+  todayBottomDockSource.includes('label="Reveal the hatch"')
+    && todayBottomDockSource.includes('<KatchaButton')
+    && hatchCheckInSource.includes('fullWidth glow icon="sparkles" label="Hatch now"')
+    && !todayBottomDockSource.includes('styles.hatchCta'));
+check('hatch check-in stays safe-area bounded and scrollable at every answer count',
+  hatchCheckInSource.includes('size="tall"')
+    && hatchCheckInSource.includes('scrollContentStyle={styles.scrollContent}')
+    && !hatchCheckInSource.includes('question.choices.length > 6'));
+check('hatch check-in uses a stable two-column answer grid with a full-width odd tail',
+  hatchCheckInSource.includes("width: '48.5%'")
+    && hatchCheckInSource.includes('wide={question.choices.length % 2 === 1')
+    && hatchCheckInSource.includes("wideChoice: { width: '100%' }"));
 check('hatch reflection is capped at three adaptive taps', hatchCheckInSource.includes('question.step') && hatchCheckInSource.includes('question.total') && hatchCheckInPlannerSource.includes("['reconstruct.focus', 'reconstruct.category', 'reflection.meaning']"));
 check('journaled days ask meaning without repeating known facts', hatchCheckInPlannerSource.includes("['reflection.moment', 'reflection.meaning']") && hatchCheckInPlannerSource.includes("['reflection.meaning']"));
 check('a completed hatch reaches durable storage before map navigation can read it', hatchControllerSource.includes('storedStateRef.current = hatchedState') && hatchControllerSource.includes('homeRepository.save(hatchedState'));

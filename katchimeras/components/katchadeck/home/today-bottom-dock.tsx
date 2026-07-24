@@ -6,10 +6,10 @@ import { DayJournalSections, type DayStatKey } from '@/components/katchadeck/hom
 import { DECK_PERF_ENABLED } from '@/components/katchadeck/home/today-deck/use-deck-performance-probe';
 import { ReflectionCard } from '@/components/katchadeck/home/reflection-card';
 import { popEnter, presenceEnter } from '@/components/katchadeck/motion';
+import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
-import { Meadow } from '@/constants/meadow-theme';
 import type { HomeDayRecord } from '@/types/home';
 import type { TodayCategoryState } from '@/utils/today-categories';
 import { ThemedText } from '@/components/themed-text';
@@ -158,11 +158,14 @@ export function TodayBottomDock({
     <View pointerEvents="box-none" style={styles.bottomDock}>
       <Animated.View entering={presenceEnter(160)} style={styles.ctaArea}>
         {canHatch ? (
-          <Pressable accessibilityRole="button" onPress={onReveal} style={styles.hatchCta}>
-            <ThemedText style={styles.hatchCtaLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-              Reveal the hatch
-            </ThemedText>
-          </Pressable>
+          <KatchaButton
+            fullWidth
+            glow
+            icon="sparkles"
+            label="Reveal the hatch"
+            onPress={onReveal}
+            variant="primary"
+          />
         ) : isForming && showFormingActions ? (
           <View style={styles.addRow}>
             <WorldActionStack
@@ -243,21 +246,6 @@ const styles = StyleSheet.create({
   },
   ctaArea: {
     marginTop: 12,
-  },
-  hatchCta: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    backgroundColor: Meadow.gold,
-    borderColor: Meadow.goldDeep,
-    borderCurve: 'continuous',
-    borderRadius: 999,
-    borderWidth: 1,
-    boxShadow: '0 6px 18px rgba(233,185,78,0.35)',
-    paddingVertical: 15,
-  },
-  hatchCtaLabel: {
-    fontSize: 16,
-    fontWeight: '800',
   },
   addRow: {
     alignItems: 'center',

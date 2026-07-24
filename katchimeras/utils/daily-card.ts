@@ -16,6 +16,7 @@ import type {
 import { resolveBondStage } from '@/utils/bond';
 import { buildReflectionContext } from '@/utils/reflection-context';
 import { dayInputSignature } from '@/game/days/shape';
+import { resolveDailyCardGlyphs } from '@/utils/daily-card-glyphs';
 
 type CardBuildMode = 'live_hatch' | 'legacy_backfill';
 
@@ -28,7 +29,7 @@ type BuildDailyCreatureCardOptions = {
 
 type TraitCandidate = CardTrait;
 
-const CARD_ENGINE_VERSION = 'daily-card-v2' as const;
+const CARD_ENGINE_VERSION = 'daily-card-v3' as const;
 
 const CONFIDENCE_RANK: Record<CardTrait['confidence'], number> = {
   explicit: 3,
@@ -114,12 +115,16 @@ export function buildDailyCreatureCard(
   const treatment = resolveTreatment(dayWithCreature, creature, traits);
   const facets = resolveCardFacets(dayWithCreature, state, scores);
   const dayFacts = resolveDayFacts(dayWithCreature, creature, traits);
+  const dayGlyphs = resolveDailyCardGlyphs(dayWithCreature, {
+    pastDays: options.pastDays,
+    traits,
+  });
 
   return {
     id: `card:${day.id}`,
     dayId: day.id,
     isoDate: day.isoDate,
-    schemaVersion: 2,
+    schemaVersion: 3,
     engineVersion: CARD_ENGINE_VERSION,
     provenance: options.mode,
     creatureId: creature.id,
@@ -141,6 +146,7 @@ export function buildDailyCreatureCard(
     storyLine: resolveStoryLine(dayWithCreature, state, traits, facets),
     facets,
     dayFacts,
+    dayGlyphs,
     scene: resolveScene(dayWithCreature, treatment, traits),
     sealedInputSignature: dayInputSignature(dayWithCreature),
     sealedAt: options.sealedAt,
@@ -152,7 +158,7 @@ export function upgradeDailyCreatureCard(
   day: StoredHomeDayRecord,
   creature: LocalCreatureRecord
 ): DailyCreatureCard {
-  if (card.schemaVersion === 2 && card.facets && card.dayFacts && card.scene && card.storyLine) {
+  if (card.schemaVersion === 3 && card.facets && card.dayFacts && card.dayGlyphs && card.scene && card.storyLine) {
     const selectedPhoto = resolveDayPhoto(day);
     const mood = resolveMoodFacet(day, card.state);
     const moodChanged = card.facets.mood.value !== mood.value || card.facets.mood.iconKey !== mood.iconKey;

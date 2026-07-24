@@ -33,23 +33,25 @@ export function HatchCheckInSheet({
 
   return (
     <KatchaSheet
-      footer={<KatchaButton fullWidth label="Hatch now" onPress={onHatchNow} variant="secondary" />}
+      footer={<KatchaButton fullWidth glow icon="sparkles" label="Hatch now" onPress={onHatchNow} variant="primary" />}
       header={{
         eyebrow: isReflection ? 'Give the day its meaning' : 'A little more can shape the hatch',
         title: question.title,
         subtitle: question.subtitle,
         step: { current: question.step, total: question.total },
       }}
-      maxHeight="78%"
       onRequestClose={onClose}
-      scroll={question.choices.length > 6}
+      scroll
+      scrollContentStyle={styles.scrollContent}
+      size="tall"
       surface="parchment">
       <View accessibilityLabel={`${question.title}. Step ${question.step} of ${question.total}.`} style={styles.grid}>
-        {question.choices.map((choice) => (
+        {question.choices.map((choice, index) => (
           <ChoiceButton
             choice={choice}
             key={choice.id}
             suggested={choice.id === question.suggestedId}
+            wide={question.choices.length % 2 === 1 && index === question.choices.length - 1}
             onPress={() => {
               onAnswer({ kind: question.kind, id: choice.id });
               if (question.step === question.total) onComplete();
@@ -64,18 +66,38 @@ export function HatchCheckInSheet({
   );
 }
 
-function ChoiceButton({ choice, suggested, onPress }: { choice: HatchCheckInChoice; suggested: boolean; onPress: () => void }) {
+function ChoiceButton({
+  choice,
+  suggested,
+  wide,
+  onPress,
+}: {
+  choice: HatchCheckInChoice;
+  suggested: boolean;
+  wide: boolean;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityHint={suggested ? 'Suggested from signals already on this device' : undefined}
       accessibilityLabel={`${choice.label}${suggested ? ', suggested' : ''}`}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.choice, suggested && styles.suggestedChoice, pressed && styles.pressed]}>
+      style={({ pressed }) => [
+        styles.choice,
+        wide && styles.wideChoice,
+        suggested && styles.suggestedChoice,
+        pressed && styles.pressed,
+      ]}>
       <View style={[styles.iconWell, { backgroundColor: `${choice.accent}2E` }]}>
         <IconSymbol color={PARCHMENT.text} name={choice.icon} size={20} />
       </View>
-      <ThemedText numberOfLines={2} style={styles.choiceLabel} lightColor={PARCHMENT.text} darkColor={PARCHMENT.text}>
+      <ThemedText
+        maxFontSizeMultiplier={1.2}
+        numberOfLines={2}
+        style={styles.choiceLabel}
+        lightColor={PARCHMENT.text}
+        darkColor={PARCHMENT.text}>
         {choice.label}
       </ThemedText>
       {suggested ? (
@@ -88,7 +110,14 @@ function ChoiceButton({ choice, suggested, onPress }: { choice: HatchCheckInChoi
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 2 },
+  scrollContent: { paddingBottom: 2 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    paddingTop: 2,
+  },
   choice: {
     alignItems: 'center',
     backgroundColor: PARCHMENT.subtle,
@@ -96,14 +125,16 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     borderRadius: 16,
     borderWidth: 1,
-    flexBasis: '47%',
-    flexGrow: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     gap: 5,
     justifyContent: 'center',
-    minHeight: 94,
+    minHeight: 88,
     paddingHorizontal: 8,
     paddingVertical: 10,
+    width: '48.5%',
   },
+  wideChoice: { width: '100%' },
   suggestedChoice: { borderColor: '#C89532', backgroundColor: 'rgba(255,211,107,0.22)' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   iconWell: { alignItems: 'center', borderRadius: 999, height: 34, justifyContent: 'center', width: 34 },

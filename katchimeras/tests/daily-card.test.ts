@@ -88,8 +88,8 @@ test('daily card resolution is deterministic and keeps trait families distinct',
 
   assert.deepEqual(first, second);
   assert.equal(first.id, `card:${day.id}`);
-  assert.equal(first.schemaVersion, 2);
-  assert.equal(first.engineVersion, 'daily-card-v2');
+  assert.equal(first.schemaVersion, 3);
+  assert.equal(first.engineVersion, 'daily-card-v3');
   assert.equal(first.state.label, 'Calm & Well Rested');
   assert.equal(first.meetingNumber, 4);
   assert.equal(first.bondStage, 0);
@@ -100,6 +100,7 @@ test('daily card resolution is deterministic and keeps trait families distinct',
   assert.equal(first.facets?.mood.iconKey, 'mood:light');
   assert.equal(first.facets?.place.value, 'Riverwalk');
   assert.equal(first.dayFacts?.steps, 5316);
+  assert.deepEqual(first.dayGlyphs?.map((glyph) => glyph.key), ['food', 'nature']);
   assert.equal(first.scene?.backdrop, 'rain');
   assert.match(first.storyLine ?? '', /rain-softened day/);
 });
@@ -205,7 +206,7 @@ test('v12 migration backfills one stable card without rerolling creature or rari
   assert.equal(card?.provenance, 'legacy_backfill');
   assert.equal(card?.creatureId, creature.id);
   assert.equal(card?.rarity, 'rare');
-  assert.equal(card?.schemaVersion, 2);
+  assert.equal(card?.schemaVersion, 3);
   assert.deepEqual(migratedAgain.archivedDays[0].card, card);
 });
 
@@ -215,7 +216,7 @@ test('v13 migration enriches a v1 card without changing its collectible identity
     mode: 'live_hatch',
     sealedAt: '2026-07-20T21:00:00.000Z',
   });
-  const { storyLine: _storyLine, facets: _facets, dayFacts: _dayFacts, scene: _scene, ...v1Fields } = built;
+  const { storyLine: _storyLine, facets: _facets, dayFacts: _dayFacts, dayGlyphs: _dayGlyphs, scene: _scene, ...v1Fields } = built;
   const v1Card = { ...v1Fields, schemaVersion: 1 as const, engineVersion: 'daily-card-v1' as const };
   const v13State = {
     version: 13 as const,
@@ -232,10 +233,10 @@ test('v13 migration enriches a v1 card without changing its collectible identity
   const migrated = upgradeStoredHomeState(v13State);
   const card = migrated.archivedDays[0].card;
   assert.equal(migrated.version, 16);
-  assert.equal(card?.schemaVersion, 2);
+  assert.equal(card?.schemaVersion, 3);
   assert.equal(card?.id, built.id);
   assert.equal(card?.creatureId, built.creatureId);
   assert.equal(card?.rarity, built.rarity);
   assert.deepEqual(card?.traits, built.traits);
-  assert.ok(card?.facets && card.dayFacts && card.scene && card.storyLine);
+  assert.ok(card?.facets && card.dayFacts && card.dayGlyphs && card.scene && card.storyLine);
 });

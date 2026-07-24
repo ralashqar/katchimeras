@@ -15,9 +15,17 @@ import {
 } from '@/components/katchadeck/cards/ornate-card-frame';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
 import { AppFontFamilies } from '@/constants/theme';
-import type { CardFacet, CardFacetKey, DailyCreatureCard } from '@/types/home';
+import type {
+  CardDayGlyph,
+  CardDayGlyphKey,
+  CardFacet,
+  CardFacetKey,
+  DailyCreatureCard,
+} from '@/types/home';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
+import { resolveDailyCardSkySceneId } from '@/utils/daily-card-scene';
 import { compactCardQuote, compactFacetValue, compactHighlight, compactStoryLine, formatCardSteps } from '@/utils/daily-card-display';
 import {
   CARD_SCENE_TOP,
@@ -62,6 +70,8 @@ const CompactDailyCardSizeContext = createContext<DailyCardSize | null>(null);
 function areDailyCardPropsEqual(previous: DailyCardProps, next: DailyCardProps) {
   return previous.card.id === next.card.id
     && previous.card.sealedAt === next.card.sealedAt
+    && previous.card.schemaVersion === next.card.schemaVersion
+    && dayGlyphSignature(previous.card) === dayGlyphSignature(next.card)
     && previous.compact === next.compact
     && previous.frameSize?.height === next.frameSize?.height
     && previous.frameSize?.width === next.frameSize?.width
@@ -120,6 +130,17 @@ const FACT_ART = {
   trait: require('../../../assets/images/katchimeras/card-icons/trait.png'),
 } as const;
 
+const DAY_GLYPH_ART: Record<CardDayGlyphKey, number> = {
+  movement: require('../../../assets/images/katchimeras/card-glyphs/movement.png'),
+  connection: require('../../../assets/images/katchimeras/card-glyphs/connection.png'),
+  milestone: require('../../../assets/images/katchimeras/card-glyphs/milestone.png'),
+  explore: require('../../../assets/images/katchimeras/card-glyphs/explore.png'),
+  nature: require('../../../assets/images/katchimeras/card-glyphs/nature.png'),
+  food: require('../../../assets/images/katchimeras/card-glyphs/food.png'),
+  culture: require('../../../assets/images/katchimeras/card-glyphs/culture.png'),
+  focus: require('../../../assets/images/katchimeras/card-glyphs/focus.png'),
+};
+
 export function CompactDailyCardSizeProvider({ children, size }: { children: ReactNode; size: DailyCardSize }) {
   return <CompactDailyCardSizeContext value={size}>{children}</CompactDailyCardSizeContext>;
 }
@@ -145,7 +166,7 @@ function ResponsiveDailyCard({ card, onPress, renderTier, sceneArt, style, varia
 function ResolvedDailyCard({ card, onPress, renderTier = 'focused', sceneArt, size, style, variant }: Omit<DailyCardProps, 'compact' | 'frameSize' | 'variant'> & { size: DailyCardSize; variant: DailyCardVariant }) {
   return (
     <Pressable
-      accessibilityLabel={onPress ? `Open ${card.creatureName} card` : `${card.creatureName}, ${card.rarity} daily card`}
+      accessibilityLabel={cardAccessibilityLabel(card, Boolean(onPress))}
       accessibilityRole={onPress ? 'button' : undefined}
       disabled={!onPress}
       onPress={onPress}
@@ -197,6 +218,8 @@ const CardContent = memo(function CardContent({ card, renderTier, sceneArt = 'da
   );
 }, (previous, next) => previous.card.id === next.card.id
   && previous.card.sealedAt === next.card.sealedAt
+  && previous.card.schemaVersion === next.card.schemaVersion
+  && dayGlyphSignature(previous.card) === dayGlyphSignature(next.card)
   && (previous.renderTier === 'buffer') === (next.renderTier === 'buffer')
   && previous.size.height === next.size.height
   && previous.size.width === next.size.width
@@ -314,12 +337,42 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
   const kingdomSource = kingdomTile
     ? kingdomHexTileSourceForLod(kingdomTile, compact ? 'thumb' : 'medium')
     : null;
+  const skySource = TODAY_ATMOSPHERE_BACKGROUND_SOURCES[
+    resolveDailyCardSkySceneId(card)
+  ].source;
+  const kingdomEnvironmentSize = (compact ? 670 : 650) * scale;
+  const kingdomEnvironmentBottom = (compact ? -30 : -25) * scale;
   return (
     <LinearGradient
       colors={colors}
       style={[frameRect(scale, 53, compact ? COMPACT_CARD_SCENE_TOP : CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
       {kingdomSource ? (
-        <Image cachePolicy="memory-disk" contentFit="contain" source={kingdomSource} style={styles.kingdomSceneImage} transition={0} />
+        <Image
+          cachePolicy="memory-disk"
+          contentFit="cover"
+          pointerEvents="none"
+          source={skySource}
+          style={styles.cardSkyImage}
+          transition={0}
+        />
+      ) : null}
+      {kingdomSource ? (
+        <Image
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          pointerEvents="none"
+          source={kingdomSource}
+          style={[
+            styles.kingdomSceneImage,
+            {
+              bottom: kingdomEnvironmentBottom,
+              height: kingdomEnvironmentSize,
+              marginLeft: -kingdomEnvironmentSize / 2,
+              width: kingdomEnvironmentSize,
+            },
+          ]}
+          transition={0}
+        />
       ) : (
         <Image cachePolicy="memory-disk" contentFit="cover" source={sceneSource} style={styles.sceneImage} transition={0} />
       )}
@@ -336,7 +389,57 @@ function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCrea
         style={[styles.creature, compact ? styles.compactCreature : null, kingdomSource ? styles.kingdomCreature : null]}
         transition={0}
       />
+      <CardGlyphStrip compact={compact} glyphs={card.dayGlyphs ?? []} scale={scale} />
     </LinearGradient>
+  );
+}
+
+function CardGlyphStrip({
+  compact,
+  glyphs,
+  scale,
+}: {
+  compact: boolean;
+  glyphs: readonly CardDayGlyph[];
+  scale: number;
+}) {
+  if (glyphs.length === 0) return null;
+  const diameter = (compact ? 74 : 62) * scale;
+  const compactHalfIconOffset = compact ? diameter / 2 : 0;
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      pointerEvents="none"
+      style={[
+        styles.dayGlyphStrip,
+        {
+          bottom: (compact ? 78 : 46) * scale + compactHalfIconOffset,
+          gap: 10 * scale,
+          right: 18 * scale + compactHalfIconOffset,
+        },
+      ]}>
+      {[...glyphs].reverse().map((glyph) => (
+        <View
+          key={glyph.key}
+          style={[
+            styles.dayGlyphCircle,
+            {
+              borderRadius: diameter / 2,
+              borderWidth: Math.max(1, 2.5 * scale),
+              height: diameter,
+              width: diameter,
+            },
+          ]}>
+          <Image
+            contentFit="contain"
+            source={DAY_GLYPH_ART[glyph.key]}
+            style={{ height: diameter * 0.68, width: diameter * 0.68 }}
+            transition={0}
+          />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -504,6 +607,18 @@ function sceneLabel(backdrop: NonNullable<DailyCreatureCard['scene']>['backdrop'
   return labels[backdrop];
 }
 
+function dayGlyphSignature(card: DailyCreatureCard): string {
+  return (card.dayGlyphs ?? []).map((glyph) => glyph.key).join(':');
+}
+
+function cardAccessibilityLabel(card: DailyCreatureCard, opensCard: boolean): string {
+  const base = opensCard
+    ? `Open ${card.creatureName} card`
+    : `${card.creatureName}, ${card.rarity} daily card`;
+  const highlights = (card.dayGlyphs ?? []).map((glyph) => glyph.label);
+  return highlights.length > 0 ? `${base}. Day highlights: ${highlights.join(', ')}` : base;
+}
+
 export function frameRect(scale: number, x: number, y: number, width: number, height: number) {
   return { height: height * scale, left: x * scale, position: 'absolute' as const, top: y * scale, width: width * scale };
 }
@@ -539,12 +654,22 @@ const styles = StyleSheet.create({
   dayTag: { alignItems: 'center', gap: 2, justifyContent: 'center' },
   dayTagText: { fontFamily: 'InstrumentSerif', fontWeight: '700' },
   scene: { alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' },
+  cardSkyImage: { ...StyleSheet.absoluteFillObject },
   sceneImage: { ...StyleSheet.absoluteFillObject, opacity: 0.82 },
-  kingdomSceneImage: { bottom: '-64%', height: '194%', left: '-47%', position: 'absolute', width: '194%' },
+  kingdomSceneImage: { left: '50%', position: 'absolute', zIndex: 1 },
   creature: { bottom: '1%', height: '83%', position: 'absolute', width: '85%', zIndex: 2 },
   compactCreature: { bottom: '5%' },
   kingdomCreature: { bottom: '26%', height: '61%', width: '65%' },
   weather: { ...StyleSheet.absoluteFillObject, zIndex: 3 },
+  dayGlyphStrip: { alignItems: 'center', flexDirection: 'row', position: 'absolute', zIndex: 4 },
+  dayGlyphCircle: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(35,39,29,0.82)',
+    borderColor: '#D9AF61',
+    borderCurve: 'continuous',
+    boxShadow: '0 2px 5px rgba(38,25,10,0.28), inset 0 1px 1px rgba(255,244,207,0.22)',
+    justifyContent: 'center',
+  },
   rainDrop: { backgroundColor: 'rgba(225,243,240,0.72)', position: 'absolute', transform: [{ rotate: '12deg' }], width: 1 },
   snowDot: { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 999, position: 'absolute' },
   story: { alignItems: 'center', fontFamily: AppFontFamilies.instrumentSerif, fontStyle: 'italic', fontWeight: '600', justifyContent: 'center', paddingHorizontal: 8, textAlign: 'center', textAlignVertical: 'center' },

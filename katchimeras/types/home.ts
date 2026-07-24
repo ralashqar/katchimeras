@@ -992,6 +992,24 @@ export type CardDayFacts = {
   bonusTrait: CardTrait | null;
 };
 
+export type CardDayGlyphKey =
+  | 'movement'
+  | 'connection'
+  | 'milestone'
+  | 'explore'
+  | 'nature'
+  | 'food'
+  | 'culture'
+  | 'focus';
+
+export type CardDayGlyph = {
+  key: CardDayGlyphKey;
+  label: string;
+  strength: number;
+  confidence: 'explicit' | 'confirmed' | 'inferred';
+  evidence: string[];
+};
+
 export type CardScene = {
   backdrop: CardVisualTreatment['backdrop'];
   lighting: 'day' | 'golden_hour' | 'dawn' | 'night';
@@ -1004,8 +1022,8 @@ export type DailyCreatureCard = {
   id: string;
   dayId: string;
   isoDate: string;
-  schemaVersion: 1 | 2;
-  engineVersion: 'daily-card-v1' | 'daily-card-v2';
+  schemaVersion: 1 | 2 | 3;
+  engineVersion: 'daily-card-v1' | 'daily-card-v2' | 'daily-card-v3';
   provenance: 'live_hatch' | 'legacy_backfill';
   creatureId: string;
   speciesId: string | null;
@@ -1028,6 +1046,7 @@ export type DailyCreatureCard = {
   storyLine?: string;
   facets?: Record<CardFacetKey, CardFacet>;
   dayFacts?: CardDayFacts;
+  dayGlyphs?: CardDayGlyph[];
   scene?: CardScene;
   sealedInputSignature: string;
   sealedAt: string;
