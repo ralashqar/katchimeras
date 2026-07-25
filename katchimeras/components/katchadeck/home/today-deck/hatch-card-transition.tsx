@@ -54,7 +54,7 @@ export function HatchCardTransition({
       </Animated.View>
       {day.kind === 'day' && day.card ? (
         <Animated.View style={[StyleSheet.absoluteFill, styles.layer, frameStyle]}>
-          <DailyCard card={day.card} compact frameSize={cardSize} renderTier="focused" />
+          <DailyCard card={day.card} compact frameSize={cardSize} renderTier="focused" sceneArt="kingdom" />
         </Animated.View>
       ) : null}
     </View>

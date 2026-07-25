@@ -30,6 +30,7 @@ export function OrnateCardFrame({
       <View style={styles.canvas}>
         {background}
         <Image
+          allowDownscaling={false}
           cachePolicy="memory-disk"
           contentFit="fill"
           pointerEvents="none"

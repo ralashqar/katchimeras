@@ -13,6 +13,7 @@ import {
 import {
   OrnateCardFrame,
 } from '@/components/katchadeck/cards/ornate-card-frame';
+import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
@@ -23,6 +24,7 @@ import type {
   CardFacet,
   CardFacetKey,
   DailyCreatureCard,
+  WeatherCondition,
 } from '@/types/home';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { resolveDailyCardSkySceneId } from '@/utils/daily-card-scene';
@@ -170,7 +172,7 @@ function ResolvedDailyCard({ card, onPress, renderTier = 'focused', sceneArt, si
       accessibilityRole={onPress ? 'button' : undefined}
       disabled={!onPress}
       onPress={onPress}
-      style={({ pressed }) => pressed ? styles.pressed : null}>
+      style={({ pressed }) => (pressed ? styles.pressed : null)}>
       <CardContent card={card} renderTier={renderTier} sceneArt={sceneArt} size={size} style={style} variant={variant} />
     </Pressable>
   );
@@ -325,70 +327,121 @@ function CardHeader({ card, compact, scale }: { card: DailyCreatureCard; compact
 }
 
 function Scene({ card, compact, renderTier, scale, sceneArt }: { card: DailyCreatureCard; compact: boolean; renderTier: DailyCardRenderTier; scale: number; sceneArt: DailyCardSceneArt }) {
+  // Cards animate between carousel positions and into the expanded viewer. Keep
+  // visible cards on their full source so those transforms never enlarge a
+  // thumbnail that was decoded for a smaller slot.
+  const imageLod = compact && renderTier === 'buffer' ? 'medium' : 'full';
+  const imagePriority = renderTier === 'focused' ? 'high' : renderTier === 'neighbor' ? 'normal' : 'low';
   const source = resolveCreatureArtSource(card.visualKey, {
-    lod: compact ? (renderTier === 'buffer' ? 'thumb' : 'medium') : 'full',
+    lod: imageLod,
     variantCell: card.variantCell,
   });
   const backdrop = card.scene?.backdrop ?? card.treatment.backdrop;
   const colors = SCENE_COLORS[backdrop];
-  const weather = card.scene?.weather ?? (backdrop === 'rain' || backdrop === 'storm' || backdrop === 'snow' ? backdrop : 'clear');
+  const weatherModifier = card.scene?.atmosphere?.weatherModifier;
+  const weather = weatherModifier?.condition
+    ?? card.scene?.weather
+    ?? (backdrop === 'rain' || backdrop === 'storm' || backdrop === 'snow' ? backdrop : 'clear');
+  const weatherStrength = weatherModifier?.strength ?? 0;
   const sceneSource = backdrop === 'cafe' || backdrop === 'home' || backdrop === 'city' ? cafeScene : meadowScene;
-  const kingdomTile = sceneArt === 'kingdom' ? kingdomResidentTileForIdentity(card) : null;
+  const environmentVisualKey = card.scene?.environment?.visualKey ?? card.visualKey;
+  const kingdomTile = sceneArt === 'kingdom'
+    ? kingdomResidentTileForIdentity({ visualKey: environmentVisualKey })
+    : null;
   const kingdomSource = kingdomTile
-    ? kingdomHexTileSourceForLod(kingdomTile, compact ? 'thumb' : 'medium')
+    ? kingdomHexTileSourceForLod(kingdomTile, imageLod)
     : null;
   const skySource = TODAY_ATMOSPHERE_BACKGROUND_SOURCES[
     resolveDailyCardSkySceneId(card)
   ].source;
-  const kingdomEnvironmentSize = (compact ? 670 : 650) * scale;
-  const kingdomEnvironmentBottom = (compact ? -30 : -25) * scale;
+  const kingdomEnvironmentSize = (compact ? 785 : 763) * scale;
+  const kingdomEnvironmentBottom = (compact ? 0 : 5) * scale;
+  const kingdomCreatureFrameSize = Math.min(
+    835 * 0.389,
+    (compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT) * 0.3651,
+  ) * scale;
   return (
     <LinearGradient
       colors={colors}
       style={[frameRect(scale, 53, compact ? COMPACT_CARD_SCENE_TOP : CARD_SCENE_TOP, 835, compact ? COMPACT_CARD_SCENE_HEIGHT : FULL_CARD_SCENE_HEIGHT), styles.scene, { borderRadius: 22 * scale }]}>
-      {kingdomSource ? (
-        <Image
-          cachePolicy="memory-disk"
-          contentFit="cover"
-          pointerEvents="none"
-          source={skySource}
-          style={styles.cardSkyImage}
-          transition={0}
+        {kingdomSource ? (
+          <Image
+            allowDownscaling={false}
+            cachePolicy="memory-disk"
+            contentFit="cover"
+            pointerEvents="none"
+            priority={imagePriority}
+            source={skySource}
+            style={styles.cardSkyImage}
+            transition={0}
+          />
+        ) : null}
+        {kingdomSource ? (
+          <Image
+            allowDownscaling={false}
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            pointerEvents="none"
+            priority={imagePriority}
+            source={kingdomSource}
+            style={[
+              styles.kingdomSceneImage,
+              {
+                bottom: kingdomEnvironmentBottom,
+                height: kingdomEnvironmentSize,
+                marginLeft: -kingdomEnvironmentSize / 2,
+                width: kingdomEnvironmentSize,
+              },
+            ]}
+            transition={0}
+          />
+        ) : (
+          <Image allowDownscaling={false} cachePolicy="memory-disk" contentFit="cover" priority={imagePriority} source={sceneSource} style={styles.sceneImage} transition={0} />
+        )}
+        <LinearGradient
+          colors={kingdomSource ? ['rgba(255,244,207,0.01)', 'rgba(38,43,28,0.24)'] : ['rgba(255,244,207,0.04)', `${colors[2]}88`]}
+          style={StyleSheet.absoluteFill}
         />
-      ) : null}
-      {kingdomSource ? (
-        <Image
-          cachePolicy="memory-disk"
-          contentFit="contain"
-          pointerEvents="none"
-          source={kingdomSource}
-          style={[
-            styles.kingdomSceneImage,
-            {
-              bottom: kingdomEnvironmentBottom,
-              height: kingdomEnvironmentSize,
-              marginLeft: -kingdomEnvironmentSize / 2,
-              width: kingdomEnvironmentSize,
-            },
-          ]}
-          transition={0}
-        />
-      ) : (
-        <Image cachePolicy="memory-disk" contentFit="cover" source={sceneSource} style={styles.sceneImage} transition={0} />
-      )}
-      <LinearGradient
-        colors={kingdomSource ? ['rgba(255,244,207,0.01)', 'rgba(38,43,28,0.24)'] : ['rgba(255,244,207,0.04)', `${colors[2]}88`]}
-        style={StyleSheet.absoluteFill}
-      />
-      {!kingdomSource && renderTier !== 'buffer' && (weather === 'rain' || weather === 'storm') ? <RainOverlay scale={scale} /> : null}
-      {!kingdomSource && renderTier !== 'buffer' && weather === 'snow' ? <SnowOverlay scale={scale} /> : null}
-      <Image
-        cachePolicy="memory-disk"
-        contentFit="contain"
-        source={source}
-        style={[styles.creature, compact ? styles.compactCreature : null, kingdomSource ? styles.kingdomCreature : null]}
-        transition={0}
-      />
+        {weatherModifier ? <WeatherTint condition={weatherModifier.condition} strength={weatherStrength} /> : null}
+        {renderTier !== 'buffer' && (weather === 'rain' || weather === 'storm') ? <RainOverlay scale={scale} strength={weatherStrength || 1} /> : null}
+        {renderTier !== 'buffer' && weather === 'snow' ? <SnowOverlay scale={scale} strength={weatherStrength || 1} /> : null}
+        {kingdomSource ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.kingdomCreatureFrame,
+              {
+                bottom: '41%',
+                height: kingdomCreatureFrameSize,
+                marginLeft: -kingdomCreatureFrameSize / 2,
+                width: kingdomCreatureFrameSize,
+              },
+            ]}>
+            <CreatureGroundShadow
+              frameSize={kingdomCreatureFrameSize}
+              visualKey={card.visualKey}
+            />
+            <Image
+              allowDownscaling={false}
+              cachePolicy="memory-disk"
+              contentFit="contain"
+              priority={imagePriority}
+              source={source}
+              style={StyleSheet.absoluteFill}
+              transition={0}
+            />
+          </View>
+        ) : (
+          <Image
+            allowDownscaling={false}
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            priority={imagePriority}
+            source={source}
+            style={[styles.creature, compact ? styles.compactCreature : null]}
+            transition={0}
+          />
+        )}
       <CardGlyphStrip compact={compact} glyphs={card.dayGlyphs ?? []} scale={scale} />
     </LinearGradient>
   );
@@ -443,12 +496,31 @@ function CardGlyphStrip({
   );
 }
 
-function RainOverlay({ scale }: { scale: number }) {
-  return <View pointerEvents="none" style={styles.weather}>{[8, 21, 35, 50, 66, 81, 94].map((left, index) => <View key={left} style={[styles.rainDrop, { height: Math.max(10, 40 * scale), left: `${left}%`, top: `${5 + (index % 3) * 12}%` }]} />)}</View>;
+function WeatherTint({ condition, strength }: { condition: WeatherCondition; strength: number }) {
+  const color = weatherTintColor(condition, strength);
+  return color ? <View pointerEvents="none" style={[styles.weatherTint, { backgroundColor: color }]} /> : null;
 }
 
-function SnowOverlay({ scale }: { scale: number }) {
-  return <View pointerEvents="none" style={styles.weather}>{[9, 23, 38, 53, 69, 83, 94].map((left, index) => <View key={left} style={[styles.snowDot, { height: Math.max(3, 12 * scale), left: `${left}%`, top: `${7 + (index % 4) * 13}%`, width: Math.max(3, 12 * scale) }]} />)}</View>;
+function RainOverlay({ scale, strength }: { scale: number; strength: number }) {
+  return <View pointerEvents="none" style={[styles.weather, { opacity: Math.min(0.72, 0.28 + strength) }]}>{[8, 21, 35, 50, 66, 81, 94].map((left, index) => <View key={left} style={[styles.rainDrop, { height: Math.max(10, 40 * scale), left: `${left}%`, top: `${5 + (index % 3) * 12}%` }]} />)}</View>;
+}
+
+function SnowOverlay({ scale, strength }: { scale: number; strength: number }) {
+  return <View pointerEvents="none" style={[styles.weather, { opacity: Math.min(0.8, 0.35 + strength) }]}>{[9, 23, 38, 53, 69, 83, 94].map((left, index) => <View key={left} style={[styles.snowDot, { height: Math.max(3, 12 * scale), left: `${left}%`, top: `${7 + (index % 4) * 13}%`, width: Math.max(3, 12 * scale) }]} />)}</View>;
+}
+
+function weatherTintColor(condition: WeatherCondition, strength: number): string | null {
+  const alpha = Math.max(0, Math.min(0.25, strength));
+  if (alpha === 0) return null;
+  switch (condition) {
+    case 'clear': return `rgba(255,220,143,${alpha * 0.22})`;
+    case 'partly_cloudy': return `rgba(210,220,222,${alpha * 0.28})`;
+    case 'cloudy': return `rgba(112,126,136,${alpha * 0.48})`;
+    case 'fog': return `rgba(225,232,226,${alpha * 0.72})`;
+    case 'rain': return `rgba(68,92,108,${alpha * 0.52})`;
+    case 'snow': return `rgba(224,239,241,${alpha * 0.6})`;
+    case 'storm': return `rgba(45,43,68,${alpha * 0.7})`;
+  }
 }
 
 function FacetCell({ facet, scale, selectable }: { facet: CardFacet; scale: number; selectable: boolean }) {
@@ -635,7 +707,6 @@ function scaledText(scale: number, fontSize: number, lineHeight: number) {
 }
 
 const styles = StyleSheet.create({
-  pressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   centerBox: { alignItems: 'center', justifyContent: 'center' },
   centered: { textAlign: 'center' },
   badgeIcon: { alignItems: 'center', justifyContent: 'center' },
@@ -653,14 +724,16 @@ const styles = StyleSheet.create({
   dateValue: { fontFamily: 'InstrumentSerif', fontWeight: '700' },
   dayTag: { alignItems: 'center', gap: 2, justifyContent: 'center' },
   dayTagText: { fontFamily: 'InstrumentSerif', fontWeight: '700' },
+  pressed: { opacity: 0.9, transform: [{ scale: 0.985 }] },
   scene: { alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' },
   cardSkyImage: { ...StyleSheet.absoluteFillObject },
   sceneImage: { ...StyleSheet.absoluteFillObject, opacity: 0.82 },
   kingdomSceneImage: { left: '50%', position: 'absolute', zIndex: 1 },
   creature: { bottom: '1%', height: '83%', position: 'absolute', width: '85%', zIndex: 2 },
   compactCreature: { bottom: '5%' },
-  kingdomCreature: { bottom: '26%', height: '61%', width: '65%' },
+  kingdomCreatureFrame: { left: '50%', position: 'absolute', zIndex: 2 },
   weather: { ...StyleSheet.absoluteFillObject, zIndex: 3 },
+  weatherTint: { ...StyleSheet.absoluteFillObject, zIndex: 2 },
   dayGlyphStrip: { alignItems: 'center', flexDirection: 'row', position: 'absolute', zIndex: 4 },
   dayGlyphCircle: {
     alignItems: 'center',

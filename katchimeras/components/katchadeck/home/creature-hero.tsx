@@ -13,11 +13,12 @@ import { memo, useEffect } from 'react';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { getCreatureVisual } from '@/game/days';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import type { CreatureHatchlingLod } from '@/constants/creature-hatchling-sources.gen';
 import { weatherIconName, weatherLabel } from '@/utils/day-weather';
-import type { DayWeather, LocalCreatureRecord } from '@/types/home';
+import type { DayWeather, HomeVisualKey, LocalCreatureRecord } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import { Lantern } from '@/constants/theme';
 import todayScene from '@/data/today-scene.json';
@@ -43,11 +44,14 @@ type CreatureHeroProps = {
   compact?: boolean;
   hideCompactCard?: boolean;
   hideKingdomEnvironmentArt?: boolean;
+  environmentVisualKey?: HomeVisualKey;
   kingdomEnvironment?: boolean;
   kingdomHomeArchetypeId?: HomeArchetypeId | null;
   pinchStrength?: number;
   artLod?: CreatureHatchlingLod;
 };
+
+export const TODAY_KATCHIMERA_SCALE = 1.15;
 
 // Lantern hero: the creature floats free over the ink - no membrane ring, no
 // plate, no motif orbits. Halo and float are the only ornament.
@@ -59,6 +63,7 @@ export const CreatureHero = memo(function CreatureHero({
   compact = false,
   hideCompactCard = false,
   hideKingdomEnvironmentArt = false,
+  environmentVisualKey,
   kingdomEnvironment = false,
   kingdomHomeArchetypeId,
   pinchStrength = 1,
@@ -72,7 +77,9 @@ export const CreatureHero = memo(function CreatureHero({
     lod: artLod,
     variantCell: creature.variantCell,
   });
-  const kingdomTile = kingdomEnvironment ? kingdomResidentTileForIdentity(creature) : null;
+  const kingdomTile = kingdomEnvironment
+    ? kingdomResidentTileForIdentity({ visualKey: environmentVisualKey ?? creature.visualKey })
+    : null;
   // Today uses the forming egg's home tile as its canonical camera/framing
   // plate. Resident days keep their bespoke environment art, but no longer
   // jump vertically because their bitmap bounds differ from the home tile.
@@ -84,6 +91,9 @@ export const CreatureHero = memo(function CreatureHero({
     kingdomTile ? kingdomSurfaceTileAlignment(kingdomTile) : undefined,
     kingdomAnchorTile ? kingdomSurfaceTileAlignment(kingdomAnchorTile) : undefined,
   );
+  const todayCreatureSize = kingdomLayout.creatureSize * TODAY_KATCHIMERA_SCALE;
+  const todayCreatureTop = kingdomLayout.creatureTop
+    - (todayCreatureSize - kingdomLayout.creatureSize) / 2;
   const kingdomTileSource = kingdomTile
     ? kingdomHexTileSourceForLod(kingdomTile, kingdomLayout.tileSize > 512 ? 'full' : 'medium')
     : null;
@@ -169,17 +179,23 @@ export const CreatureHero = memo(function CreatureHero({
               style={[
                 usesKingdomLayout
                   ? {
-                      height: kingdomLayout.creatureSize,
+                      height: todayCreatureSize,
                       left: '50%',
-                      marginLeft: -kingdomLayout.creatureSize / 2,
+                      marginLeft: -todayCreatureSize / 2,
                       position: 'absolute',
-                      top: kingdomLayout.creatureTop,
-                      width: kingdomLayout.creatureSize,
+                      top: todayCreatureTop,
+                      width: todayCreatureSize,
                       zIndex: 3,
                     }
                   : null,
                 visualStyle,
               ]}>
+              {usesKingdomLayout ? (
+                <CreatureGroundShadow
+                  frameSize={todayCreatureSize}
+                  visualKey={creature.visualKey}
+                />
+              ) : null}
               <Image pointerEvents="none" contentFit="contain" source={heroSource} style={usesKingdomLayout ? StyleSheet.absoluteFill : styles.image} transition={0} />
             </Animated.View>
           </TodayFallbackCloudScene>

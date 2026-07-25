@@ -21,6 +21,7 @@ HOME_TYPES = ROOT / "types" / "home.ts"
 HATCHLING_ROOT = ROOT / "assets" / "images" / "katchimeras" / "hatchlings"
 LOD_ROOT = ROOT / "assets" / "images" / "katchimeras" / "hatchlings_lod"
 MANIFEST = ROOT / "constants" / "creature-hatchling-sources.gen.ts"
+ALPHA_THRESHOLD = 16
 
 # The approved v2 base is Mossprout's stage-one art for the current experiment.
 # A future ``mossprout.png`` in HATCHLING_ROOT automatically supersedes it.
@@ -62,16 +63,43 @@ def require_path(path: Path) -> str:
     return f"../{path.relative_to(ROOT).as_posix()}"
 
 
+def normalized_alpha_bounds(source: Path) -> tuple[float, float, float, float]:
+    with Image.open(source) as image:
+        converted = image.convert("RGBA")
+        alpha = converted.getchannel("A").point(
+            lambda value: 255 if value >= ALPHA_THRESHOLD else 0
+        )
+        bounds = alpha.getbbox()
+        if not bounds:
+            return (0, 0, 1, 1)
+        left, top, right, bottom = bounds
+        return (
+            left / converted.width,
+            top / converted.height,
+            right / converted.width,
+            bottom / converted.height,
+        )
+
+
 def write_manifest(
     full: dict[str, Path],
     medium: dict[str, Path],
     thumb: dict[str, Path],
+    alpha_bounds: dict[str, tuple[float, float, float, float]],
 ) -> None:
     def block(entries: dict[str, Path]) -> str:
         return "\n".join(
             f"    {key}: require('{require_path(path)}'),"
             for key, path in sorted(entries.items())
         )
+
+    bounds_block = "\n".join(
+        (
+            f"  {key}: {{ left: {left:.6f}, top: {top:.6f}, "
+            f"right: {right:.6f}, bottom: {bottom:.6f} }},"
+        )
+        for key, (left, top, right, bottom) in sorted(alpha_bounds.items())
+    )
 
     MANIFEST.write_text(
         "\n".join(
@@ -81,6 +109,7 @@ def write_manifest(
                 "import type { HomeVisualKey } from '@/types/home';",
                 "",
                 "export type CreatureHatchlingLod = 'full' | 'medium' | 'thumb';",
+                "export type CreatureHatchlingAlphaBounds = { left: number; top: number; right: number; bottom: number };",
                 "",
                 "export const CREATURE_HATCHLING_SOURCES: Record<CreatureHatchlingLod, Partial<Record<HomeVisualKey, ImageSourcePropType>>> = {",
                 "  full: {",
@@ -92,6 +121,11 @@ def write_manifest(
                 "  thumb: {",
                 block(thumb),
                 "  },",
+                "};",
+                "",
+                f"export const CREATURE_HATCHLING_ALPHA_THRESHOLD = {ALPHA_THRESHOLD};",
+                "export const CREATURE_HATCHLING_ALPHA_BOUNDS: Partial<Record<HomeVisualKey, CreatureHatchlingAlphaBounds>> = {",
+                bounds_block,
                 "};",
                 "",
             ]
@@ -106,6 +140,7 @@ def main() -> None:
     parser.add_argument("--thumb", type=int, default=256)
     parser.add_argument("--quality", type=int, default=88)
     parser.add_argument("--report-only", action="store_true")
+    parser.add_argument("--manifest-only", action="store_true")
     args = parser.parse_args()
 
     sources = hatchling_sources()
@@ -118,18 +153,25 @@ def main() -> None:
         return
 
     LOD_ROOT.mkdir(parents=True, exist_ok=True)
-    for stale in LOD_ROOT.glob("*.webp"):
-        stale.unlink()
-
-    medium = {
-        key: make_lod(path, key, args.medium, args.quality)
-        for key, path in sources.items()
-    }
-    thumb = {
-        key: make_lod(path, key, args.thumb, args.quality)
-        for key, path in sources.items()
-    }
-    write_manifest(sources, medium, thumb)
+    if args.manifest_only:
+        medium = {key: LOD_ROOT / f"{key}_{args.medium}.webp" for key in sources}
+        thumb = {key: LOD_ROOT / f"{key}_{args.thumb}.webp" for key in sources}
+        missing = [path for path in [*medium.values(), *thumb.values()] if not path.exists()]
+        if missing:
+            raise RuntimeError(f"Missing existing LOD asset: {missing[0].relative_to(ROOT)}")
+    else:
+        for stale in LOD_ROOT.glob("*.webp"):
+            stale.unlink()
+        medium = {
+            key: make_lod(path, key, args.medium, args.quality)
+            for key, path in sources.items()
+        }
+        thumb = {
+            key: make_lod(path, key, args.thumb, args.quality)
+            for key, path in sources.items()
+        }
+    alpha_bounds = {key: normalized_alpha_bounds(path) for key, path in sources.items()}
+    write_manifest(sources, medium, thumb, alpha_bounds)
     print(f"Wrote {MANIFEST.relative_to(ROOT)}")
 
 

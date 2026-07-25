@@ -153,37 +153,60 @@ check('focused retry uses the same generated taxonomy', swift.includes('classify
 check('focused route returns the generated journal field text',
   /struct NoteRouteDecision[\s\S]*?let specific: String[\s\S]*?\n}/.test(generatedNote)
     && swift.includes('"specific": response.content.specific'));
-check('note routing uses one atomic Foundation classification task',
-  foundationNoteRouting.includes("taskId: 'note.atomic-route.v3'")
+check('note routing runs an area pass then a category pass',
+  foundationNoteRouting.includes("taskId: 'note.area.v1'")
+    && foundationNoteRouting.includes("taskId: 'note.category.v1'")
+    && foundationNoteRouting.indexOf("taskId: 'note.area.v1'") < foundationNoteRouting.indexOf("taskId: 'note.category.v1'")
     && !foundationNoteRouting.includes("taskId: 'note.flow.v2'")
     && !foundationNoteRouting.includes("taskId: 'note.child-route.v1'"));
-check('atomic note routing derives the review flow from the selected category',
-  foundationNoteRouting.includes('journalModelFlowIdForInternalFlow(route.flowId)')
-    && foundationNoteRouting.includes("derivedFrom: 'atomic_route'")
-    && foundationNoteRouting.includes('suggestedFlowId: route.flowId'));
+check('note routing returns internal ids to the app and model ids to the model',
+  foundationNoteRouting.includes('journalModelFlowIdForInternalFlow(entry.flowId)')
+    && foundationNoteRouting.includes('internalJournalFlowIdForModelFlow(area)')
+    && foundationNoteRouting.includes('suggestedFlowId: chosen.entry.flowId')
+    && foundationNoteRouting.includes('routeKey: chosen.entry.routeKey'));
 check('strict routing has no registry or media route fallback',
   !foundationNote.includes('resolveFoundationRouteEvidence(')
     && !foundationNote.includes('registryJournalRoutes(')
     && !foundationNote.includes('foundationNoteRoute({'));
-check('atomic note classification requests greedy sampling once',
-  (foundationNoteRouting.match(/sampling: 'greedy'/g) ?? []).length === 1
+check('every note classification pass requests greedy sampling',
+  (foundationNoteRouting.match(/sampling: 'greedy'/g) ?? []).length === 2
     && swift.includes('GenerationOptions(sampling: .greedy)'));
-check('atomic note route has one categorical confidence',
-  foundationNoteRouting.includes("{ name: 'confidence', description: 'Confidence in this category choice'")
-    && foundationNoteRouting.includes('topLevelConfidence: confidence')
-    && foundationNoteRouting.includes('subcategoryConfidence: confidence')
+check('each note pass carries its own categorical confidence',
+  (foundationNoteRouting.match(/confidenceField\('(area|category)'\)/g) ?? []).length === 2
+    && foundationNoteRouting.includes('`Confidence in this ${subject} choice`')
     && !foundationNoteRouting.includes('routeConfidence: 0.9'));
-check('atomic note taxonomy is concise and covers the complete catalog',
-  foundationNoteRouting.includes('const NOTE_ROUTE_KEYS = JOURNAL_CLASSIFICATION_CATALOG.map')
-    && foundationNoteRouting.includes('Categories:\\n${NOTE_ROUTE_CATALOG}')
-    && !foundationNoteRouting.includes('Examples:'));
+check('the area pass offers a recoverable alternative rather than a locked choice',
+  foundationNoteRouting.includes("{ name: 'alternativeArea', description: 'Second plausible area, or none'")
+    && foundationNoteRouting.includes('values: [NO_ALTERNATIVE, ...MODEL_AREA_IDS]')
+    && foundationNoteRouting.includes('const areas = alternative && alternative !== area ? [area, alternative] : [area]')
+    && foundationNoteRouting.includes("'two_stage_alternative_area_v1'")
+    && foundationNoteRouting.includes("weakestConfidence(categoryConfidence, 'medium')"));
+check('a failed category pass still yields the area for manual review',
+  foundationNoteRouting.includes('suggestedFlowId: internalJournalFlowIdForModelFlow(area)')
+    && foundationNoteRouting.includes('subcategoryConfidence: null'));
+check('every area carries a boundary description and every category its examples',
+  foundationNoteRouting.includes('const AREA_DESCRIPTIONS: Record<string, string>')
+    && foundationNoteRouting.includes('Not studying, revising or learning a subject')
+    && foundationNoteRouting.includes('MODEL_AREA_IDS.map((areaId)')
+    && foundationNoteRouting.includes('areas.map(areaSection)')
+    && foundationNoteRouting.includes('entry.examples.map(')
+    && foundationNoteRouting.includes('e.g. '));
+check('the note taxonomy is instructions, and the prompt is only the note',
+  foundationNoteRouting.includes('instructions: AREA_INSTRUCTIONS')
+    && (foundationNoteRouting.match(/prompt: notePrompt\(transcript\)/g) ?? []).length === 2
+    && /return `Note: \$\{JSON\.stringify\(transcript\)\}`;/.test(foundationNoteRouting));
 check('note navigation is resolved before optional rich enrichment',
   foundationNote.indexOf('classifyNoteRouteOnDevice(text') < foundationNote.indexOf('nativeFoundation.interpretNoteAsync(text)')
     && foundationNote.includes('foundation_note_read_skipped_after_route'));
-check('note atomic routing allows categories from every flow',
-  foundationNoteRouting.includes("{ name: 'routeKey', description: 'Best category ID'")
-    && foundationNoteRouting.includes('values: NOTE_ROUTE_KEYS')
-    && foundationNoteRouting.includes("routeStrategy: 'atomic_single_pass_v3'"));
+check('note routing covers the complete catalog in clear model vocabulary',
+  foundationNoteRouting.includes("{ name: 'routeKey', description: 'Best category ID from the listed areas'")
+    && foundationNoteRouting.includes('const MODEL_ROUTES: ModelRoute[] = JOURNAL_CLASSIFICATION_CATALOG.flatMap')
+    && foundationNoteRouting.includes('routes.map((route) => route.key)')
+    && /routeStrategy: .*'two_stage_v1'/.test(foundationNoteRouting));
+check('internal journal flow ids never reach the model prompt or enums',
+  !/`\$\{(?:flow|entry)\.flowId\}\./.test(foundationNoteRouting)
+    && !foundationNoteRouting.includes('MANUAL_JOURNAL_FLOWS.map((flow) => flow.id)')
+    && ['went_somewhere', 'big_event'].every((internalId) => !new RegExp(`'${internalId}'`).test(foundationNoteRouting)));
 check('note atomic routing cannot author an editable field',
   !foundationNoteRouting.includes("name: 'specific'")
     && !foundationNoteRouting.includes("description: 'Specific"));

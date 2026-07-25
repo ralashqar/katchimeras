@@ -13,6 +13,7 @@ import Animated, {
 import { useEffect, useState } from 'react';
 
 import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
+import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { buildCreatureKicker } from '@/components/katchadeck/home/creature-hero';
 import { ThemedText } from '@/components/themed-text';
 import todayScene from '@/data/today-scene.json';
@@ -52,7 +53,10 @@ export function TodayTileHatchReveal({
   const reduceMotion = useReducedMotion();
   const homeTile = kingdomHomeTileForIdentity(homeArchetypeId);
   const creature = presentation.committedDay?.creature ?? null;
-  const residentTile = creature ? kingdomResidentTileForIdentity(creature) : homeTile;
+  const environmentVisualKey = presentation.committedDay?.card?.scene?.environment?.visualKey;
+  const residentTile = creature
+    ? kingdomResidentTileForIdentity({ visualKey: environmentVisualKey ?? creature.visualKey })
+    : homeTile;
   const homeAlignment = kingdomSurfaceTileAlignment(homeTile);
   const homeLayout = todayKingdomHeroLayout(windowWidth, homeAlignment);
   const residentLayout = todayKingdomHeroLayout(
@@ -270,6 +274,10 @@ export function TodayTileHatchReveal({
               },
               creatureStyle,
             ]}>
+            <CreatureGroundShadow
+              frameSize={residentLayout.creatureSize}
+              visualKey={creature.visualKey}
+            />
             <AnimatedImage
               contentFit="contain"
               source={softGlow}

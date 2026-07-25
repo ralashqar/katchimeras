@@ -189,6 +189,7 @@ const DeckItem = memo(function DeckItem({
         frameSize={cardSize}
         onPress={active && onOpenCard ? handleOpenCard : undefined}
         renderTier={renderTier}
+        sceneArt="kingdom"
       />
     );
   }

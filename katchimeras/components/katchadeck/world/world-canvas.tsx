@@ -35,7 +35,8 @@ import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { LanternEgg } from '@/components/katchadeck/home/lantern-egg';
 import { HatchCountdown } from '@/components/katchadeck/home/hatch-countdown';
 import { HatchReveal } from '@/components/katchadeck/home/hatch-reveal';
-import type { EggVisualState, LocalCreatureRecord } from '@/types/home';
+import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
+import type { EggVisualState, HomeVisualKey, LocalCreatureRecord } from '@/types/home';
 import type { MemoryNode, WorldObjectCategory, WorldPatch } from '@/types/world';
 import * as worldStructureLayout from '@/data/world-structure-layout.json';
 import type { PlacedArtefact } from '@/utils/discoveries-artefacts';
@@ -2482,6 +2483,9 @@ const SpriteView = memo(function SpriteView({
   const source = worldAssetSource(sprite.assetKey, lod);
   const theme = ARCHETYPE_THEME[sprite.archetype];
   const isCreature = sprite.kind === 'creature';
+  const creatureVisualKey = isCreature && sprite.assetKey.startsWith('creature:')
+    ? sprite.assetKey.slice('creature:'.length) as HomeVisualKey
+    : null;
   const isMood = sprite.category === 'mood';
   const w = sprite.size * SPRITE_SCALE;
   const h = w; // square frame (1:1) — object bottom-anchored at OBJECT_BOTTOM_FRAC
@@ -2507,6 +2511,12 @@ const SpriteView = memo(function SpriteView({
     // MotiView inside keeps its entrance spring. Splitting them means a drag
     // never touches Moti's animator (and vice versa).
     <Animated.View pointerEvents="none" style={[styles.sprite, { left, top, width: w, height: h }, dragStyle]}>
+      {source && creatureVisualKey ? (
+        <CreatureGroundShadow
+          frameSize={w}
+          visualKey={creatureVisualKey}
+        />
+      ) : null}
       <SpriteMotionFrame
         animateIn={animateIn}
         viewportFadeIn={viewportFadeIn}

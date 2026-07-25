@@ -13,6 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import type { KingdomHexResidentTile, KingdomTileRender } from '@/components/katchadeck/world/kingdom-hex-scene';
 import { buildKingdomHexScene } from '@/components/katchadeck/world/kingdom-hex-scene';
@@ -520,6 +521,12 @@ const ResidentCreature = memo(function ResidentCreature({
         },
       ]}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
+        {creature ? (
+          <CreatureGroundShadow
+            frameSize={CREATURE_WORLD_SIZE}
+            visualKey={creature.visualKey}
+          />
+        ) : null}
         {source ? <SeamlessWorldImage source={source} priority="normal" onReady={markReady} onFailure={markReady} /> : null}
         {statusGlyph ? <ResidentStatusGlyph status={statusGlyph} /> : null}
       </Animated.View>

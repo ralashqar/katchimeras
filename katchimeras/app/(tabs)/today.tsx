@@ -581,6 +581,7 @@ export default function HomeScreen() {
           artLod={active ? 'medium' : 'thumb'}
           compact
           creature={day.creature}
+          environmentVisualKey={day.card?.scene?.environment?.visualKey}
           hideCompactCard={!active}
           kingdomEnvironment
           kingdomHomeArchetypeId={homeArchetypeId}

@@ -160,7 +160,7 @@ export function HatchReveal({ egg, card, creature, onComplete, onSettled, hideCa
 
         {settled && card && !embedded ? (
           <Animated.View entering={FadeIn.duration(360)} style={[styles.cardWrap, creatureStyle]}>
-            <DailyCard card={card} compact />
+            <DailyCard card={card} compact sceneArt="kingdom" />
           </Animated.View>
         ) : heroSource ? (
           <Animated.View pointerEvents="none" style={[styles.creatureWrap, creatureStyle]}>

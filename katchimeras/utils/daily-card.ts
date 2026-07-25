@@ -17,6 +17,10 @@ import { resolveBondStage } from '@/utils/bond';
 import { buildReflectionContext } from '@/utils/reflection-context';
 import { dayInputSignature } from '@/game/days/shape';
 import { resolveDailyCardGlyphs } from '@/utils/daily-card-glyphs';
+import {
+  resolveDailyCardAtmosphere,
+  resolveDailyCardEnvironment,
+} from '@/utils/daily-card-scene';
 
 type CardBuildMode = 'live_hatch' | 'legacy_backfill';
 
@@ -29,7 +33,7 @@ type BuildDailyCreatureCardOptions = {
 
 type TraitCandidate = CardTrait;
 
-const CARD_ENGINE_VERSION = 'daily-card-v3' as const;
+const CARD_ENGINE_VERSION = 'daily-card-v4' as const;
 
 const CONFIDENCE_RANK: Record<CardTrait['confidence'], number> = {
   explicit: 3,
@@ -124,7 +128,7 @@ export function buildDailyCreatureCard(
     id: `card:${day.id}`,
     dayId: day.id,
     isoDate: day.isoDate,
-    schemaVersion: 3,
+    schemaVersion: 4,
     engineVersion: CARD_ENGINE_VERSION,
     provenance: options.mode,
     creatureId: creature.id,
@@ -158,7 +162,15 @@ export function upgradeDailyCreatureCard(
   day: StoredHomeDayRecord,
   creature: LocalCreatureRecord
 ): DailyCreatureCard {
-  if (card.schemaVersion === 3 && card.facets && card.dayFacts && card.dayGlyphs && card.scene && card.storyLine) {
+  if (
+    card.schemaVersion === 4
+    && card.facets
+    && card.dayFacts
+    && card.dayGlyphs
+    && card.scene?.environment
+    && card.scene.atmosphere
+    && card.storyLine
+  ) {
     const selectedPhoto = resolveDayPhoto(day);
     const mood = resolveMoodFacet(day, card.state);
     const moodChanged = card.facets.mood.value !== mood.value || card.facets.mood.iconKey !== mood.iconKey;
@@ -410,6 +422,10 @@ function resolveScene(day: StoredHomeDayRecord, treatment: CardVisualTreatment, 
     weather,
     foregroundMotifs: traits.slice(0, 3).map((trait) => trait.id),
     compositionSeed: `${day.id}:${day.creature?.id ?? 'egg'}`,
+    environment: day.creature
+      ? resolveDailyCardEnvironment(day.creature)
+      : undefined,
+    atmosphere: resolveDailyCardAtmosphere(day),
   };
 }
 

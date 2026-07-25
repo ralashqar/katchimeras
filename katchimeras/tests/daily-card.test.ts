@@ -3,7 +3,11 @@ import test from 'node:test';
 
 import type { LocalCreatureRecord, StoredHomeDayRecord } from '@/types/home';
 import { upgradeStoredHomeState } from '@/game/days/migrations';
-import { buildDailyCreatureCard, updateCardMemorySpark } from '@/utils/daily-card';
+import {
+  buildDailyCreatureCard,
+  updateCardMemorySpark,
+  upgradeDailyCreatureCard,
+} from '@/utils/daily-card';
 
 const creature: LocalCreatureRecord = {
   id: 'creature-test-mossprout',
@@ -88,8 +92,8 @@ test('daily card resolution is deterministic and keeps trait families distinct',
 
   assert.deepEqual(first, second);
   assert.equal(first.id, `card:${day.id}`);
-  assert.equal(first.schemaVersion, 3);
-  assert.equal(first.engineVersion, 'daily-card-v3');
+  assert.equal(first.schemaVersion, 4);
+  assert.equal(first.engineVersion, 'daily-card-v4');
   assert.equal(first.state.label, 'Calm & Well Rested');
   assert.equal(first.meetingNumber, 4);
   assert.equal(first.bondStage, 0);
@@ -102,7 +106,68 @@ test('daily card resolution is deterministic and keeps trait families distinct',
   assert.equal(first.dayFacts?.steps, 5316);
   assert.deepEqual(first.dayGlyphs?.map((glyph) => glyph.key), ['food', 'nature']);
   assert.equal(first.scene?.backdrop, 'rain');
+  assert.equal(first.scene?.environment?.visualKey, 'mossprout');
+  assert.equal(first.scene?.environment?.source, 'primary_fallback');
+  assert.equal(first.scene?.atmosphere?.sceneId, 'autumn_hearth');
+  assert.equal(first.scene?.atmosphere?.weatherModifier?.condition, 'rain');
+  assert.equal(first.scene?.atmosphere?.weatherModifier?.strength, 0.25);
   assert.match(first.storyLine ?? '', /rain-softened day/);
+});
+
+test('the strongest credible distinct field echo supplies the card environment', () => {
+  const creatureWithEchoes: LocalCreatureRecord = {
+    ...creature,
+    fieldEchoes: [
+      {
+        name: 'Another Mossprout',
+        probability: 0.3,
+        rarity: 'common',
+        reason: null,
+        speciesId: 'mossprout-echo',
+        visualKey: 'mossprout',
+      },
+      {
+        name: 'Pagelet',
+        probability: 0.22,
+        rarity: 'rare',
+        reason: null,
+        speciesId: 'pagelet',
+        visualKey: 'pagelet',
+      },
+    ],
+  };
+  const card = buildDailyCreatureCard(makeDay({ creature: creatureWithEchoes }), creatureWithEchoes, {
+    mode: 'live_hatch',
+    sealedAt: '2026-07-20T21:00:00.000Z',
+  });
+
+  assert.deepEqual(card.scene?.environment, {
+    candidateProfileId: 'pagelet',
+    probability: 0.22,
+    source: 'secondary_candidate',
+    visualKey: 'pagelet',
+  });
+});
+
+test('weak field echoes cannot replace the winner native environment', () => {
+  const creatureWithWeakEcho: LocalCreatureRecord = {
+    ...creature,
+    fieldEchoes: [{
+      name: 'Pagelet',
+      probability: 0.119,
+      rarity: 'common',
+      reason: null,
+      speciesId: 'pagelet',
+      visualKey: 'pagelet',
+    }],
+  };
+  const card = buildDailyCreatureCard(makeDay({ creature: creatureWithWeakEcho }), creatureWithWeakEcho, {
+    mode: 'live_hatch',
+    sealedAt: '2026-07-20T21:00:00.000Z',
+  });
+
+  assert.equal(card.scene?.environment?.source, 'primary_fallback');
+  assert.equal(card.scene?.environment?.visualKey, creature.visualKey);
 });
 
 test('sensitive solo trait is never inferred from missing social evidence', () => {
@@ -206,7 +271,7 @@ test('v12 migration backfills one stable card without rerolling creature or rari
   assert.equal(card?.provenance, 'legacy_backfill');
   assert.equal(card?.creatureId, creature.id);
   assert.equal(card?.rarity, 'rare');
-  assert.equal(card?.schemaVersion, 3);
+  assert.equal(card?.schemaVersion, 4);
   assert.deepEqual(migratedAgain.archivedDays[0].card, card);
 });
 
@@ -233,10 +298,37 @@ test('v13 migration enriches a v1 card without changing its collectible identity
   const migrated = upgradeStoredHomeState(v13State);
   const card = migrated.archivedDays[0].card;
   assert.equal(migrated.version, 16);
-  assert.equal(card?.schemaVersion, 3);
+  assert.equal(card?.schemaVersion, 4);
   assert.equal(card?.id, built.id);
   assert.equal(card?.creatureId, built.creatureId);
   assert.equal(card?.rarity, built.rarity);
   assert.deepEqual(card?.traits, built.traits);
   assert.ok(card?.facets && card.dayFacts && card.dayGlyphs && card.scene && card.storyLine);
+});
+
+test('a v3 card gains sealed scene layers without changing collectible identity', () => {
+  const day = makeDay();
+  const built = buildDailyCreatureCard(day, creature, {
+    mode: 'live_hatch',
+    sealedAt: '2026-07-20T21:00:00.000Z',
+  });
+  const legacyScene = built.scene
+    ? { ...built.scene, atmosphere: undefined, environment: undefined }
+    : undefined;
+  const v3Card = {
+    ...built,
+    engineVersion: 'daily-card-v3' as const,
+    scene: legacyScene,
+    schemaVersion: 3 as const,
+  };
+
+  const upgraded = upgradeDailyCreatureCard(v3Card, day, creature);
+
+  assert.equal(upgraded.schemaVersion, 4);
+  assert.equal(upgraded.id, v3Card.id);
+  assert.equal(upgraded.creatureId, v3Card.creatureId);
+  assert.equal(upgraded.rarity, v3Card.rarity);
+  assert.equal(upgraded.sealedAt, v3Card.sealedAt);
+  assert.ok(upgraded.scene?.environment);
+  assert.ok(upgraded.scene?.atmosphere);
 });

@@ -113,7 +113,7 @@ export function resolveDayAtmosphere(day: StoredHomeDayRecord | null | undefined
   const mood = [...day.promptAnswers]
     .reverse()
     .find((answer) => !answer.dismissed && answer.kind === 'feeling')
-    ?.choiceIds[0] ?? null;
+    ?.choiceIds[0] ?? day.hatchCheckIn?.moodId ?? null;
 
   if (mood === 'energized') add('golden_motes', 2.8, 'Radiant mood', 'mood');
   if (mood === 'good' || mood === 'calm' || mood === 'loved') add('golden_motes', 1.8, 'Light mood', 'mood');

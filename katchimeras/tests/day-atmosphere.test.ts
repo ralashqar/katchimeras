@@ -93,3 +93,27 @@ test('recorded hot weather resolves to a subtle heat shimmer', () => {
   assert.equal(plan.physical?.preset, 'heat_shimmer');
   assert.equal(plan.expressive, null);
 });
+
+test('the hatch check-in mood contributes when no prompt-chip mood exists', () => {
+  const plan = resolveDayAtmosphere(day({
+    hatchCheckIn: {
+      answeredQuestionIds: ['mood'],
+      categoryId: null,
+      categoryLabel: null,
+      completedAt: '2026-07-22T20:00:00.000Z',
+      eligibilityReason: 'regular',
+      encounterSeedBias: [],
+      flowId: null,
+      flowLabel: null,
+      moodId: 'loved',
+      moodLabel: 'Loved',
+      scoreBias: {},
+      semanticTags: ['feeling:loved'],
+      startedAt: '2026-07-22T19:59:00.000Z',
+      status: 'completed',
+      updatedAt: '2026-07-22T20:00:00.000Z',
+    },
+  }));
+
+  assert.equal(plan.expressive?.preset, 'social_ribbons');
+});

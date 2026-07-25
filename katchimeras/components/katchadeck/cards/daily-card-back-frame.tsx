@@ -24,6 +24,7 @@ export function DailyCardBackFrame({
   return (
     <View style={{ height: resolvedHeight, width }}>
       <Image
+        allowDownscaling={false}
         cachePolicy="memory-disk"
         contentFit="fill"
         pointerEvents="none"
@@ -32,6 +33,7 @@ export function DailyCardBackFrame({
         transition={0}
       />
       <Image
+        allowDownscaling={false}
         cachePolicy="memory-disk"
         contentFit="contain"
         pointerEvents="none"

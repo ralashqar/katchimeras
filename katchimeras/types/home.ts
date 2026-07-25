@@ -1010,20 +1010,41 @@ export type CardDayGlyph = {
   evidence: string[];
 };
 
+export type CardEnvironmentLayer = {
+  visualKey: HomeVisualKey;
+  source: 'secondary_candidate' | 'primary_fallback';
+  candidateProfileId: string | null;
+  probability: number | null;
+};
+
+export type CardAtmosphereLayer = {
+  sceneId: DayBackgroundSceneId;
+  mood: SkyMoodId;
+  intensity: number;
+  seed: number;
+  source: 'journal_weather_blend';
+  weatherModifier?: {
+    condition: WeatherCondition;
+    strength: number;
+  };
+};
+
 export type CardScene = {
   backdrop: CardVisualTreatment['backdrop'];
   lighting: 'day' | 'golden_hour' | 'dawn' | 'night';
   weather: 'clear' | 'rain' | 'storm' | 'snow';
   foregroundMotifs: string[];
   compositionSeed: string;
+  environment?: CardEnvironmentLayer;
+  atmosphere?: CardAtmosphereLayer;
 };
 
 export type DailyCreatureCard = {
   id: string;
   dayId: string;
   isoDate: string;
-  schemaVersion: 1 | 2 | 3;
-  engineVersion: 'daily-card-v1' | 'daily-card-v2' | 'daily-card-v3';
+  schemaVersion: 1 | 2 | 3 | 4;
+  engineVersion: 'daily-card-v1' | 'daily-card-v2' | 'daily-card-v3' | 'daily-card-v4';
   provenance: 'live_hatch' | 'legacy_backfill';
   creatureId: string;
   speciesId: string | null;
