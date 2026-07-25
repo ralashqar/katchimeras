@@ -9,9 +9,11 @@ import {
   companionInteractionReducer,
   companionQuestUsesFullBleed,
   companionReflectionIsDirty,
+  companionViewportResetKey,
   createCompanionInteractionState,
   insightForArchetype,
 } from '@/utils/companion-interaction';
+import { prepareCompanionReflection } from '@/utils/companion-reflection';
 import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
 import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import { evidenceProvider, isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
@@ -42,7 +44,58 @@ test('interaction reducer preserves reflection draft while switching threads', (
   const insight = companionInteractionReducer(withDraft, { type: 'select_thread', thread: 'insight' });
   assert.equal(insight.direction, -1);
   assert.equal(insight.reflectionDraft?.text, 'A quiet walk');
+  assert.equal(insight.reflectionReviewOpen, false);
   assert.equal(companionReflectionIsDirty(insight), true);
+});
+
+test('reflection review stays inside the companion interaction state', () => {
+  const initial = createCompanionInteractionState({
+    initialThread: 'reflection',
+    reflectionDraft: {
+      kind: 'text',
+      text: 'A quiet walk',
+      promptId: 'reflection:park',
+      promptText: 'What stayed with you?',
+    },
+  });
+  const review = companionInteractionReducer(initial, { type: 'review_reflection' });
+  const editing = companionInteractionReducer(review, { type: 'edit_reflection' });
+  assert.equal(review.reflectionReviewOpen, true);
+  assert.equal(review.reflectionDraft?.text, 'A quiet walk');
+  assert.equal(editing.reflectionReviewOpen, false);
+  assert.equal(editing.reflectionDraft?.text, 'A quiet walk');
+});
+
+test('skins is a first-class companion thread between insight and reflection', () => {
+  const insight = createCompanionInteractionState({ initialThread: 'insight' });
+  const skins = companionInteractionReducer(insight, { type: 'select_thread', thread: 'skins' });
+  const reflection = companionInteractionReducer(skins, { type: 'select_thread', thread: 'reflection' });
+  assert.equal(skins.thread, 'skins');
+  assert.equal(skins.direction, 1);
+  assert.equal(reflection.direction, 1);
+});
+
+test('discovery is a first-class companion thread between quest and insight', () => {
+  const quest = createCompanionInteractionState({ initialThread: 'quest' });
+  const discovery = companionInteractionReducer(quest, { type: 'select_thread', thread: 'discovery' });
+  const insight = companionInteractionReducer(discovery, { type: 'select_thread', thread: 'insight' });
+  assert.equal(discovery.thread, 'discovery');
+  assert.equal(discovery.direction, 1);
+  assert.equal(insight.direction, 1);
+});
+
+test('companion viewport resets across threads and content-shape transitions', () => {
+  const base = {
+    creatureId: 'companion:vesperitt',
+    thread: 'quest' as const,
+    questMode: 'offer' as const,
+  };
+  const quest = companionViewportResetKey(base);
+  assert.notEqual(companionViewportResetKey({ ...base, thread: 'discovery' }), quest);
+  assert.notEqual(companionViewportResetKey({ ...base, questMode: 'active', activeQuestTitle: 'The small hours' }), quest);
+  assert.notEqual(companionViewportResetKey({ ...base, journeyNodeId: 'understand-goal' }), quest);
+  assert.notEqual(companionViewportResetKey({ ...base, activeAttemptId: 'attempt-1' }), quest);
+  assert.equal(companionViewportResetKey({ ...base }), quest);
 });
 
 test('quest offer exposes one focused acceptance action', () => {
@@ -128,16 +181,38 @@ test('insight actions are contextual and optional', () => {
   assert.equal(insightForArchetype({ archetype: 'unknown', text: 'A quiet observation' }).action, null);
 });
 
-test('reflection origin survives journal review without entering user note text', () => {
+test('companion reflection saves directly to the canonical journal with a stable origin', () => {
   const origin = { kind: 'companion_reflection' as const, creatureId: 'mossprout', promptId: 'reflection:park', promptText: 'What pulls you back?' };
-  const command = submissionToJournalCommand({
-    sessionId: 'reflection-1', flowId: 'general', path: ['general', 'highlight'], categoryId: 'highlight', canonicalQualityIds: [],
-    fields: { specific: null, context: null }, note: 'The quiet path by the pond.',
-    journalSource: { kind: 'text_note', sourceId: 'reflection-1', origin },
-    linkedNote: { kind: 'text', text: 'The quiet path by the pond.' },
-  }, new Date('2026-07-13T12:00:00.000Z'));
+  const prepared = prepareCompanionReflection({
+    creatureId: 'mossprout',
+    dayId: '2026-07-13',
+    draft: {
+      kind: 'text',
+      text: '  The quiet path by the pond.  ',
+      promptId: origin.promptId,
+      promptText: origin.promptText,
+    },
+  });
+  assert.ok(prepared);
+  assert.equal(prepared.sourceId, 'companion-reflection:mossprout:2026-07-13');
+  assert.equal(prepared.submission.flowId, 'general');
+  assert.equal(prepared.submission.categoryId, 'other');
+  const command = submissionToJournalCommand(prepared.submission, new Date('2026-07-13T12:00:00.000Z'));
   const record = command ? commandToJournalRecord(command, new Date('2026-07-13T12:00:00.000Z')) : null;
   assert.deepEqual(record?.source.kind === 'text_note' ? record.source.origin : null, origin);
   assert.equal(record?.note, 'The quiet path by the pond.');
   assert.equal(record?.note?.includes(origin.promptText), false);
+});
+
+test('blank text without a voice recording cannot create a reflection', () => {
+  assert.equal(prepareCompanionReflection({
+    creatureId: 'mossprout',
+    dayId: '2026-07-13',
+    draft: {
+      kind: 'text',
+      text: '   ',
+      promptId: 'reflection:park',
+      promptText: 'What stayed with you?',
+    },
+  }), null);
 });

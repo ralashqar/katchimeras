@@ -46,6 +46,9 @@ const CATEGORY_PRESENTATION: Record<
   focus: { label: 'Focus', icon: 'scope', travel: { x: 82, y: 175 } },
   scheduled: { label: 'Scheduled', icon: 'calendar', travel: { x: -82, y: 250 } },
   waiting: { label: 'Waiting', icon: 'timer', travel: { x: 82, y: 250 } },
+  admin: { label: 'Admin', icon: 'calendar', travel: { x: -112, y: 205 } },
+  home: { label: 'Home', icon: 'house.fill', travel: { x: 0, y: 205 } },
+  out: { label: 'Out', icon: 'cart.fill', travel: { x: 112, y: 205 } },
 };
 
 const EMPTY_COUNTS: Record<SortingCategory, number> = {
@@ -56,6 +59,9 @@ const EMPTY_COUNTS: Record<SortingCategory, number> = {
   focus: 0,
   scheduled: 0,
   waiting: 0,
+  admin: 0,
+  home: 0,
+  out: 0,
 };
 
 const PACK_COPY: Record<SortingPackId, {
@@ -84,6 +90,15 @@ const PACK_COPY: Record<SortingPackId, {
     successTitle: 'Everything has its place',
     retryTitle: 'A few notes are still shuffling',
     finished: 'Inbox cleared',
+  },
+  'errandimp-loops': {
+    eyebrow: 'ERRANDIMP',
+    title: 'Clear the loose loops',
+    body: 'Sort each practical task into Admin, Home or Out.',
+    start: 'Start the errand sweep',
+    successTitle: 'The loose ends are lined up',
+    retryTitle: 'A few errands escaped',
+    finished: 'Loops sorted',
   },
 };
 
@@ -136,6 +151,9 @@ export function SortingQuest({
     focus: new Animated.Value(0),
     scheduled: new Animated.Value(0),
     waiting: new Animated.Value(0),
+    admin: new Animated.Value(0),
+    home: new Animated.Value(0),
+    out: new Animated.Value(0),
   }).current;
   const reduceMotion = useReducedMotion();
   const item = items[index];
@@ -355,7 +373,7 @@ export function SortingQuest({
           eyebrow={copy.eyebrow}
           title={copy.title}
           body={copy.body}
-          icon={packId === 'feastle-table' ? 'fork.knife' : 'circle.grid.2x2.fill'}
+          icon={packId === 'feastle-table' ? 'fork.knife' : packId === 'errandimp-loops' ? 'cart.fill' : 'circle.grid.2x2.fill'}
           meta={bestDurationMs != null ? `Local fastest · ${formatQuestDuration(bestDurationMs)}` : null}
           actionLabel={copy.start}
           onAction={start}

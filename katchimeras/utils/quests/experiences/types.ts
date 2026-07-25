@@ -33,7 +33,7 @@ export type QuestResult =
   | { kind: 'paced_breathing'; success: true; completedCycles: number; durationMs: number }
   | { kind: 'timing_zone'; success: boolean; hits: number; attempts: number; accuracy: number; averageOffsetMs: number; durationMs: number; personalBest?: boolean }
   | { kind: 'pattern_memory'; success: boolean; completedRounds: number; rounds: number; longestSequence: number; mistakes: number; durationMs: number; personalBest?: boolean }
-  | { kind: 'sorting'; success: boolean; correctFirstPlacements: number; totalItems: number; mistakes: number; durationMs: number; itemIds: string[]; packId?: 'feastle-table' | 'tasklet-triage'; personalBest?: boolean }
+  | { kind: 'sorting'; success: boolean; correctFirstPlacements: number; totalItems: number; mistakes: number; durationMs: number; itemIds: string[]; packId?: 'feastle-table' | 'tasklet-triage' | 'errandimp-loops'; personalBest?: boolean }
   | { kind: 'matching'; success: boolean; pairs: number; moves: number; durationMs: number; contentIds: string[]; packId?: 'relicoon-gallery' | 'mossprout-garden' | 'feastle-food'; personalBest?: boolean }
   | { kind: 'merge'; success: boolean; packId: 'feastle-kitchen'; ordersCompleted: number; ordersTotal: number; movesUsed: number; moveBudget: number; mergeCount: number; highestTier: number; orderIds: string[]; contentIds: string[]; durationMs: number; personalBest?: boolean }
   | { kind: 'block_jam'; success: boolean; rulesetId: 'tasklet-desk-jam-v2'; packId: 'tasklet-desk'; levelId: string; blocksCleared: number; totalBlocks: number; movesUsed: number; timeLimitMs: number; parMoves: number; undoCount: number; durationMs: number; personalBest?: boolean }

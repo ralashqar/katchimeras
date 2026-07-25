@@ -1,6 +1,6 @@
 import { seededShuffle } from './trivia-packs';
 
-export type SortingPackId = 'feastle-table' | 'tasklet-triage';
+export type SortingPackId = 'feastle-table' | 'tasklet-triage' | 'errandimp-loops';
 export type SortingCategory =
   | 'food'
   | 'drink'
@@ -8,7 +8,10 @@ export type SortingCategory =
   | 'quick'
   | 'focus'
   | 'scheduled'
-  | 'waiting';
+  | 'waiting'
+  | 'admin'
+  | 'home'
+  | 'out';
 export type SortingItem = { id: string; label: string; symbol: string; category: SortingCategory };
 
 export type SortingPack = {
@@ -89,6 +92,21 @@ const WAITING_TASKS = [
   'Share notes when the recording arrives',
   'Pack the gift after it is delivered',
 ];
+const ADMIN_LOOPS = [
+  'Book the dentist', 'Renew the pass', 'Reply to the landlord', 'File the receipt', 'Pay the bill',
+  'Confirm the appointment', 'Update the address', 'Cancel the trial', 'Check the bank message', 'Return the form',
+  'Save the policy number', 'Schedule the service', 'Send the meter reading', 'Review the subscription', 'Call the pharmacy',
+];
+const HOME_LOOPS = [
+  'Put the laundry away', 'Clear the kitchen counter', 'Change the bed linen', 'Water the plants', 'Take the recycling out',
+  'Restock the bathroom', 'Wipe the fridge shelf', 'Sort the post', 'Replace the light bulb', 'Tidy the entryway',
+  'Check the smoke alarm', 'Fold the clean towels', 'Empty the dishwasher', 'Organise one drawer', 'Put the tools away',
+];
+const OUT_LOOPS = [
+  'Return the parcel', 'Collect the prescription', 'Buy the missing groceries', 'Drop off the donation', 'Collect the dry cleaning',
+  'Post the letter', 'Refuel the car', 'Pick up the repaired item', 'Return the library book', 'Buy a birthday card',
+  'Collect the order', 'Take shoes for repair', 'Visit the cashpoint', 'Recycle the batteries', 'Pick up pet supplies',
+];
 
 function items(values: string[], category: SortingCategory, symbol: string): SortingItem[] {
   return values.map((label, index) => ({
@@ -112,6 +130,12 @@ export const TASKLET_SORTING_ITEMS: SortingItem[] = [
   ...items(WAITING_TASKS, 'waiting', 'timer'),
 ];
 
+export const ERRANDIMP_SORTING_ITEMS: SortingItem[] = [
+  ...items(ADMIN_LOOPS, 'admin', 'calendar'),
+  ...items(HOME_LOOPS, 'home', 'house.fill'),
+  ...items(OUT_LOOPS, 'out', 'cart.fill'),
+];
+
 export const SORTING_PACKS: Record<SortingPackId, SortingPack> = {
   'feastle-table': {
     id: 'feastle-table',
@@ -126,6 +150,11 @@ export const SORTING_PACKS: Record<SortingPackId, SortingPack> = {
       : tier === 2
         ? ['quick', 'focus', 'scheduled']
         : ['quick', 'focus', 'scheduled', 'waiting'],
+  },
+  'errandimp-loops': {
+    id: 'errandimp-loops',
+    items: ERRANDIMP_SORTING_ITEMS,
+    categoriesForTier: () => ['admin', 'home', 'out'],
   },
 };
 

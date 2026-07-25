@@ -31,6 +31,12 @@ type Config = {
 
 type Props = {
   config: Config;
+  gameId:
+    | 'gatherglow-lights'
+    | 'vesperitt-moon-signals'
+    | 'coffee-ritual-brew-sequence'
+    | 'dawnle-first-light'
+    | 'quietome-still-signals';
   seed: string;
   onAttemptStart: (config: Record<string, unknown>) => string;
   onAttemptCancel: (id: string) => void;
@@ -38,22 +44,132 @@ type Props = {
   onRunningChange: (running: boolean, id?: string | null) => void;
 };
 
-const PAD_COLORS = [
-  Lantern.ember300,
-  Lantern.auroraTeal,
-  Lantern.auroraViolet,
-  Lantern.auroraRose,
-];
-const PAD_ICONS: IconSymbolName[] = ['circle.fill', 'triangle.fill', 'square.fill', 'sparkles'];
+type PatternExperience = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  actionLabel: string;
+  icon: IconSymbolName;
+  padColors: readonly string[];
+  padIcons: readonly IconSymbolName[];
+  padAccessibilityLabel: string;
+  progressNoun: string;
+  keptNoun: string;
+  watchLabel: string;
+  replayLabel: string;
+  successTitle: string;
+  failureTitle: string;
+  resultNoun: string;
+};
+
+const GATHERGLOW_EXPERIENCE: PatternExperience = {
+  eyebrow: 'Gatherglow',
+  title: 'Follow Gatherglow’s lights',
+  body: 'Watch the four lights, then repeat their order.',
+  actionLabel: 'Begin pattern',
+  icon: 'sparkles',
+  padColors: [Lantern.ember300, Lantern.auroraTeal, Lantern.auroraViolet, Lantern.auroraRose],
+  padIcons: ['circle.fill', 'triangle.fill', 'square.fill', 'sparkles'],
+  padAccessibilityLabel: 'Pattern light',
+  progressNoun: 'ROUND',
+  keptNoun: 'KEPT',
+  watchLabel: 'Watch…',
+  replayLabel: 'Replay pattern',
+  successTitle: 'The pattern held',
+  failureTitle: 'The lights slipped away',
+  resultNoun: 'patterns remembered',
+};
+
+const VESPERITT_EXPERIENCE: PatternExperience = {
+  eyebrow: 'Vesperitt · Moon signals',
+  title: 'Trace the quiet constellations',
+  body: 'Watch each night signal wake, then echo the same path through the stars.',
+  actionLabel: 'Enter the night',
+  icon: 'moon.stars.fill',
+  padColors: ['#D6DCFF', '#8FA8FF', Lantern.auroraViolet, Lantern.auroraTeal],
+  padIcons: ['moon.stars.fill', 'star.fill', 'sparkles', 'diamond.fill'],
+  padAccessibilityLabel: 'Moon signal',
+  progressNoun: 'SIGNAL',
+  keptNoun: 'TRACED',
+  watchLabel: 'The night is signalling…',
+  replayLabel: 'Replay signals',
+  successTitle: 'The night path held',
+  failureTitle: 'The signals faded',
+  resultNoun: 'night paths traced',
+};
+
+const COFFEE_RITUAL_EXPERIENCE: PatternExperience = {
+  eyebrow: 'Baristabbit · Brew ritual',
+  title: 'Remember the little brew',
+  body: 'Watch each ritual cue, then repeat the same sequence.',
+  actionLabel: 'Begin brewing',
+  icon: 'cup.and.saucer.fill',
+  padColors: ['#F4D6A0', '#C98B54', '#8B5E3C', Lantern.ember300],
+  padIcons: ['cup.and.saucer.fill', 'circle.fill', 'sparkles', 'diamond.fill'],
+  padAccessibilityLabel: 'Brew cue',
+  progressNoun: 'POUR',
+  keptNoun: 'KEPT',
+  watchLabel: 'The ritual is unfolding…',
+  replayLabel: 'Replay brew',
+  successTitle: 'The ritual held',
+  failureTitle: 'The brew lost its rhythm',
+  resultNoun: 'brew sequences remembered',
+};
+
+const DAWNLE_EXPERIENCE: PatternExperience = {
+  eyebrow: 'Dawnle · First light',
+  title: 'Wake the morning lights',
+  body: 'Watch the first lights rise, then repeat their order.',
+  actionLabel: 'Greet the light',
+  icon: 'sun.max.fill',
+  padColors: ['#FFF1B8', '#FFD47A', '#FFAB73', '#D9C7FF'],
+  padIcons: ['sun.max.fill', 'sparkles', 'circle.fill', 'diamond.fill'],
+  padAccessibilityLabel: 'Morning light',
+  progressNoun: 'DAWN',
+  keptNoun: 'WOKEN',
+  watchLabel: 'Morning is arriving…',
+  replayLabel: 'Replay lights',
+  successTitle: 'The morning opened',
+  failureTitle: 'The first light faded',
+  resultNoun: 'morning paths remembered',
+};
+
+const QUIETOME_EXPERIENCE: PatternExperience = {
+  eyebrow: 'Quietome · Still signals',
+  title: 'Hold the quiet pattern',
+  body: 'Watch the still symbols appear, then return them without rushing.',
+  actionLabel: 'Enter the quiet',
+  icon: 'sparkles',
+  padColors: ['#D9D2C3', '#AEB7B0', '#869B92', '#C4B9D8'],
+  padIcons: ['circle.fill', 'diamond.fill', 'square.fill', 'sparkles'],
+  padAccessibilityLabel: 'Quiet signal',
+  progressNoun: 'PAUSE',
+  keptNoun: 'HELD',
+  watchLabel: 'Stay with the signals…',
+  replayLabel: 'Replay signals',
+  successTitle: 'The quiet pattern held',
+  failureTitle: 'The signals drifted',
+  resultNoun: 'quiet patterns held',
+};
+
+const PATTERN_EXPERIENCES: Record<Props['gameId'], PatternExperience> = {
+  'gatherglow-lights': GATHERGLOW_EXPERIENCE,
+  'vesperitt-moon-signals': VESPERITT_EXPERIENCE,
+  'coffee-ritual-brew-sequence': COFFEE_RITUAL_EXPERIENCE,
+  'dawnle-first-light': DAWNLE_EXPERIENCE,
+  'quietome-still-signals': QUIETOME_EXPERIENCE,
+};
 
 export function PatternMemoryQuest({
   config,
+  gameId,
   seed,
   onAttemptStart,
   onAttemptCancel,
   onComplete,
   onRunningChange,
 }: Props) {
+  const experience = PATTERN_EXPERIENCES[gameId];
   const [started, setStarted] = useState(false);
   const [round, setRound] = useState(0);
   const [won, setWon] = useState(0);
@@ -141,11 +257,11 @@ export function PatternMemoryQuest({
   if (!started) {
     return (
         <QuestExperiencePreview
-          eyebrow="Gatherglow"
-          title="Follow Gatherglow’s lights"
-          body="Watch the four lights, then repeat their order."
-          icon="sparkles"
-          actionLabel="Begin pattern"
+          eyebrow={experience.eyebrow}
+          title={experience.title}
+          body={experience.body}
+          icon={experience.icon}
+          actionLabel={experience.actionLabel}
           onAction={start}
         />
     );
@@ -155,8 +271,8 @@ export function PatternMemoryQuest({
     return (
       <ExperienceResult
         success={success}
-        title={success ? 'The pattern held' : 'The lights slipped away'}
-        body={`${won} of ${config.rounds} patterns remembered.`}
+        title={success ? experience.successTitle : experience.failureTitle}
+        body={`${won} of ${config.rounds} ${experience.resultNoun}.`}
         metric={`${won}/${config.rounds}`}
         onRetry={reset}
         onComplete={() =>
@@ -182,16 +298,16 @@ export function PatternMemoryQuest({
   return (
     <View style={experienceStyles.root}>
       <ThemedText style={styles.progress} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
-        ROUND {round + 1} OF {config.rounds} · {won} KEPT
+        {experience.progressNoun} {round + 1} OF {config.rounds} · {won} {experience.keptNoun}
       </ThemedText>
       <View accessibilityLabel="Pattern pads" style={styles.grid}>
-        {PAD_COLORS.map((color, index) => {
+        {experience.padColors.map((color, index) => {
           const selected = active === index;
           return (
             <Pressable
               key={color}
               accessibilityRole="button"
-              accessibilityLabel={`Pattern pad ${index + 1}`}
+              accessibilityLabel={`${experience.padAccessibilityLabel} ${index + 1}`}
               disabled={playing}
               onPress={() => press(index)}
               style={[
@@ -201,7 +317,7 @@ export function PatternMemoryQuest({
               ]}>
               <View pointerEvents="none" style={styles.symbolFrame}>
                 <IconSymbol
-                  name={PAD_ICONS[index]}
+                  name={experience.padIcons[index]!}
                   size={62}
                   weight="black"
                   color={selected ? Lantern.ink950 : color}
@@ -213,9 +329,9 @@ export function PatternMemoryQuest({
       </View>
       <View style={experienceStyles.center}>
         <ThemedText style={styles.status} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          {playing ? 'Watch…' : `Your turn · ${input.length}/${pattern.length}`}
+          {playing ? experience.watchLabel : `Your turn · ${input.length}/${pattern.length}`}
         </ThemedText>
-        {!playing ? <ExperienceAction label="Replay pattern" quiet onPress={play} /> : null}
+        {!playing ? <ExperienceAction label={experience.replayLabel} quiet onPress={play} /> : null}
       </View>
       <ExperienceAction label="Cancel round" quiet onPress={reset} />
     </View>

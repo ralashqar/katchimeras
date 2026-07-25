@@ -42,10 +42,15 @@ export function preserveFinalizedHatches(
   const tomorrow = incoming.tomorrow ? protect(incoming.tomorrow) : undefined;
   const archivedDays = incoming.archivedDays.map(protect);
   const encounterHistory = mergeEncounterHistory(current.encounterHistory, incoming.encounterHistory);
-  const historyChanged = encounterHistory !== incoming.encounterHistory;
+  const aspectHistory = mergeEncounterHistory(current.aspectHistory ?? {}, incoming.aspectHistory ?? {});
+  const skinHistory = mergeEncounterHistory(current.skinHistory ?? {}, incoming.skinHistory ?? {});
+  const historyChanged =
+    encounterHistory !== incoming.encounterHistory ||
+    aspectHistory !== incoming.aspectHistory ||
+    skinHistory !== incoming.skinHistory;
 
   if (!repaired && !historyChanged) return incoming;
-  return { ...incoming, today, tomorrow, archivedDays, encounterHistory };
+  return { ...incoming, today, tomorrow, archivedDays, encounterHistory, aspectHistory, skinHistory };
 }
 
 function indexDays(state: StoredHomeState): Map<string, StoredHomeDayRecord> {

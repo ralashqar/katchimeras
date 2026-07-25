@@ -1,5 +1,11 @@
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { PhotoPlaceResolution } from '@/types/photo-place';
+import type {
+  KatchimeraCompanionId,
+  KatchimeraFamilyId,
+  KatchimeraSkinId,
+  LifeAspectId,
+} from '@/types/katchimera';
 
 export type InspirationCategory = 'calm' | 'motivation' | 'reflection' | 'energy' | 'gratitude';
 export type HomeMomentType =
@@ -881,6 +887,13 @@ export type EggInteriorFieldConfig = {
 
 export type LocalCreatureRecord = {
   id: string;
+  // Stable logical identity. `id` remains the immutable per-day hatch id;
+  // companion systems use companionId so multiple visual forms share one home,
+  // bond, quest history, and insight thread.
+  aspectId?: LifeAspectId;
+  familyId?: KatchimeraFamilyId;
+  skinId?: KatchimeraSkinId;
+  companionId?: KatchimeraCompanionId;
   name: string;
   primaryTrait: HomeScoreKey;
   secondaryTrait: HomeScoreKey;
@@ -929,6 +942,9 @@ export type EncounterHistoryMap = Record<string, EncounterHistoryEntry>;
 // utils/hatch-selection.ts.
 export type KatchimeraFieldEcho = {
   speciesId: string; // the losing creature's encounterProfileId
+  aspectId?: LifeAspectId;
+  familyId?: KatchimeraFamilyId;
+  skinId?: KatchimeraSkinId;
   name: string;
   visualKey: HomeVisualKey;
   rarity: HomeRarityTier;
@@ -1277,12 +1293,21 @@ export type JournalSource =
   | { kind: 'text_note'; sourceId: string; origin?: JournalSourceOrigin | null }
   | { kind: 'voice_note'; sourceId: string; audioUri?: string | null; durationMs?: number | null; origin?: JournalSourceOrigin | null };
 
-export type JournalSourceOrigin = {
-  kind: 'companion_reflection';
-  creatureId: string;
-  promptId: string;
-  promptText: string;
-};
+export type JournalSourceOrigin =
+  | {
+      kind: 'companion_reflection';
+      creatureId: string;
+      promptId: string;
+      promptText: string;
+    }
+  | {
+      kind: 'quick_goal_completion';
+      creatureId: string;
+      familyId: KatchimeraFamilyId;
+      goalId: string;
+      completionId: string;
+      goalTitle: string;
+    };
 
 export type JournalAttachment = {
   id: string;
@@ -1491,11 +1516,16 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 16;
+  version: 17;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;
   encounterHistory: EncounterHistoryMap;
+  // Compatibility name from v17: this now stores true companion-family
+  // recurrence, while broad life aspects remain classification metadata.
+  // encounterHistory remains for immutable profile provenance/back-compat.
+  aspectHistory?: EncounterHistoryMap;
+  skinHistory?: EncounterHistoryMap;
   // User-confirmed local context only. No face embeddings or biometric data.
   personalEntities: PersonalEntity[];
   // Remote enrichment is disabled by default and must be explicitly enabled.

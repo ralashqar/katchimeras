@@ -5,6 +5,7 @@ import { encounterLiveCast, type EncounterCastEntry } from '@/constants/encounte
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import type { HomeVisualKey } from '@/types/home';
 import type { KingdomCreature } from '@/types/kingdom';
+import type { KatchimeraSkinId, LifeAspectId } from '@/types/katchimera';
 import { measureImageAlphaBounds } from '@/utils/image-alpha-bounds';
 import {
   generateAssetVariants,
@@ -19,11 +20,14 @@ import {
   type KingdomHexTileAlphaBounds,
   type KingdomHexTileVariant,
 } from '@/utils/world-visuals';
+import { identityForEncounter } from '@/utils/katchimera-identity';
 
 export type KatchimeraTileCandidate = {
   creatureId: string | null;
   name: string;
   visualKey: HomeVisualKey;
+  aspectId: LifeAspectId | null;
+  skinId: KatchimeraSkinId | null;
   themeLabel: string;
   themePrompt: string;
   source: ImageSourcePropType;
@@ -39,10 +43,13 @@ function assetKeyForTile(visualKey: HomeVisualKey, creatureId?: string | null) {
 
 export function tileCandidateFromCreature(creature: KingdomCreature): KatchimeraTileCandidate {
   const cast = CAST_BY_VISUAL_KEY.get(creature.visualKey);
+  const identity = identityForEncounter(cast?.profileId, creature.visualKey);
   return {
     creatureId: creature.creatureId,
     name: creature.name,
     visualKey: creature.visualKey,
+    aspectId: creature.aspectId ?? identity?.aspectId ?? null,
+    skinId: creature.skinId ?? identity?.skinId ?? null,
     themeLabel: cast?.categoryLabel ?? creature.name,
     themePrompt: [cast?.categoryLabel, cast?.voice, cast?.seedId].filter(Boolean).join('; '),
     source: homeCreatureVisuals[creature.visualKey].source,
@@ -52,14 +59,19 @@ export function tileCandidateFromCreature(creature: KingdomCreature): Katchimera
 export function tileCandidatesFromCast(): KatchimeraTileCandidate[] {
   return encounterLiveCast
     .filter((entry) => homeCreatureVisuals[entry.visualKey])
-    .map((entry) => ({
-      creatureId: null,
-      name: entry.visualKey,
-      visualKey: entry.visualKey,
-      themeLabel: entry.categoryLabel,
-      themePrompt: [entry.categoryLabel, entry.voice, entry.seedId].filter(Boolean).join('; '),
-      source: homeCreatureVisuals[entry.visualKey].source,
-    }));
+    .map((entry) => {
+      const identity = identityForEncounter(entry.profileId, entry.visualKey);
+      return {
+        creatureId: null,
+        name: entry.visualKey,
+        visualKey: entry.visualKey,
+        aspectId: identity?.aspectId ?? null,
+        skinId: identity?.skinId ?? null,
+        themeLabel: entry.categoryLabel,
+        themePrompt: [entry.categoryLabel, entry.voice, entry.seedId].filter(Boolean).join('; '),
+        source: homeCreatureVisuals[entry.visualKey].source,
+      };
+    });
 }
 
 export function defaultKatchimeraTilePrompt(candidate: KatchimeraTileCandidate): string {
@@ -93,6 +105,12 @@ export async function generateKatchimeraHexTile(options: {
     model: options.model ?? 'nano',
     reference,
     guide,
+    registry: {
+      assetType: 'resident_hex_tile',
+      aspectId: options.candidate.aspectId ?? undefined,
+      skinId: options.candidate.skinId ?? undefined,
+      pipelineVersion: 'katchimera-hex-tile-lab-v1',
+    },
   });
 }
 

@@ -31,6 +31,9 @@ import { DayPromptStrip } from '@/components/katchadeck/home/day-prompt-strip';
 import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
+import {
+  QuickGoalsSheet,
+} from '@/components/katchadeck/goals/companion-quick-goals';
 import { DayComicOverlay } from '@/components/katchadeck/home/day-comic-overlay';
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
 import { TodaySheetHost } from '@/components/katchadeck/home/today-sheet-host';
@@ -38,10 +41,12 @@ import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note
 import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
+import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import todayScene from '@/data/today-scene.json';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useAllDays } from '@/hooks/use-all-days';
+import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useBackfillStatus } from '@/utils/backfill-status';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
@@ -63,6 +68,7 @@ import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
 import type { ClassifiedMemory, HomeDayRecord, HomeTimelineDay } from '@/types/home';
+import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import { planContextualPrompts } from '@/utils/intelligence/prompt-planner';
@@ -75,6 +81,9 @@ import { TODAY_KINGDOM_STAGE_HEIGHT } from '@/utils/today-kingdom-hero-layout';
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
 import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
 import { todayHatchShowsResident, todayHatchShowsTomorrow } from '@/utils/today-hatch-presentation';
+import { identityForCreature } from '@/utils/katchimera-identity';
+import { companionIdForFamily } from '@/constants/katchimera-skins';
+import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -104,6 +113,11 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [homeArchetypeId, setHomeArchetypeId] = useState(() => loadWorldIdentity().selectedHomeArchetypeId);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
+  const [quickGoalsOpen, setQuickGoalsOpen] = useState(false);
+  const [quickGoalJournal, setQuickGoalJournal] = useState<{
+    completion: CompanionQuickGoalCompletion;
+    goal: CompanionQuickGoal;
+  } | null>(null);
   const [hatchCheckInOpen, setHatchCheckInOpen] = useState(false);
   const [hatchAfterCheckIn, setHatchAfterCheckIn] = useState(false);
   const [manualJournalInitialFlowId, setManualJournalInitialFlowId] = useState<string | null>(null);
@@ -156,6 +170,19 @@ export default function HomeScreen() {
     setLocationPermission,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
+  const quickGoalFamilyIds = useMemo(() => {
+    const ids = new Set<KatchimeraFamilyId>();
+    for (const day of allDays) {
+      if (!day.creature) continue;
+      const familyId = identityForCreature(day.creature)?.familyId;
+      if (familyId && hasQuickGoalTemplates(familyId)) ids.add(familyId);
+    }
+    return [...ids];
+  }, [allDays]);
+  const quickGoals = useCompanionQuickGoals({
+    dayId: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay.isoDate : null,
+    availableFamilyIds: quickGoalFamilyIds,
+  });
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const backfillStatus = useBackfillStatus();
   const { eggFeed, eggFeedKey, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
@@ -274,7 +301,7 @@ export default function HomeScreen() {
   const mapRingItems = useMemo<TodayCategoryRingItem[]>(() => {
     if (!isDay) return [];
     const pinCount = selectedDay.dayMap?.nodes.length ?? 0;
-    return [{
+    const items: TodayCategoryRingItem[] = [{
       id: 'map',
       label: 'Map',
       icon: 'map.fill',
@@ -283,7 +310,21 @@ export default function HomeScreen() {
       hasContent: pinCount > 0,
       needsAttention: false,
     }];
-  }, [isDay, selectedDay]);
+    if (selectedDay.isToday && quickGoalFamilyIds.length) {
+      const goalCount = quickGoals.goalsForToday.length;
+      const remainingCount = quickGoals.goalsForToday.filter((item) => !item.completion).length;
+      items.push({
+        id: 'goals',
+        label: 'Goals',
+        icon: 'checkmark',
+        count: goalCount,
+        countLabel: goalCount > 0 ? (remainingCount > 0 ? `${remainingCount}` : '✓') : undefined,
+        hasContent: goalCount > 0,
+        needsAttention: false,
+      });
+    }
+    return items;
+  }, [isDay, quickGoalFamilyIds.length, quickGoals.goalsForToday, selectedDay]);
 
   // --- Today-as-daily-hub: category ring, sheets, capture actions ---
   // (the same daily intelligence the World patch had, orbiting the egg instead)
@@ -727,8 +768,12 @@ export default function HomeScreen() {
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
             <TodayCategoryRing
               categories={mapRingItems}
-              onPress={() => {
-                if (isDay) handleOpenDayMap(selectedDay.id);
+              onPress={(category) => {
+                if (category.id === 'goals') {
+                  setQuickGoalsOpen(true);
+                } else if (isDay) {
+                  handleOpenDayMap(selectedDay.id);
+                }
               }}
               anchorHeight={258}
               centerOffsetY={24}
@@ -867,6 +912,54 @@ export default function HomeScreen() {
             closeManualJournal();
             pulseEgg();
             setMicrocopy('Added to today');
+          }}
+        />
+      ) : null}
+      {quickGoalsOpen && selectedDay?.kind === 'day' && selectedDay.isToday ? (
+        <QuickGoalsSheet
+          actions={{
+            onAddTemplate: quickGoals.addTemplate,
+            onAddCustom: quickGoals.addCustom,
+            onEditGoal: quickGoals.editGoal,
+            onCompleteGoal: quickGoals.completeGoal,
+            onUndoGoal: quickGoals.undoGoal,
+          }}
+          dayId={selectedDay.isoDate}
+          familyIds={quickGoalFamilyIds}
+          onClose={() => setQuickGoalsOpen(false)}
+          onRemember={(completion, goal) => {
+            setQuickGoalsOpen(false);
+            setQuickGoalJournal({ completion, goal });
+          }}
+          state={quickGoals.state}
+        />
+      ) : null}
+      {quickGoalJournal ? (
+        <ManualJournalSheet
+          allowRemoteIntelligence={cloudIntelligenceEnabled}
+          dayLocationPoints={formingDay?.locations}
+          initialNote={`I completed: ${quickGoalJournal.goal.title}`}
+          initialNoteExpanded
+          initialSpecific={quickGoalJournal.goal.title}
+          journalSource={{
+            kind: 'text_note',
+            sourceId: quickGoalJournal.completion.id,
+            origin: {
+              kind: 'quick_goal_completion',
+              creatureId: companionIdForFamily(quickGoalJournal.goal.familyId),
+              familyId: quickGoalJournal.goal.familyId,
+              goalId: quickGoalJournal.goal.id,
+              completionId: quickGoalJournal.completion.id,
+              goalTitle: quickGoalJournal.goal.title,
+            },
+          }}
+          onClose={() => setQuickGoalJournal(null)}
+          onSave={(submission) => {
+            addManualJournalEntry(submission, 'today');
+            quickGoals.markJournaled(quickGoalJournal.completion.id);
+            setQuickGoalJournal(null);
+            pulseEgg();
+            setMicrocopy('Remembered in today');
           }}
         />
       ) : null}

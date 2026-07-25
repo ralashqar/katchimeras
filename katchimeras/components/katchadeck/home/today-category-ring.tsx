@@ -61,7 +61,7 @@ export function TodayCategoryRing({
         // Even spacing top→bottom within the side's fan. A LONE chip (the
         // single action, since the other categories moved into the numbers
         // panel) sits at the egg's bottom-right instead of mid-height.
-        const t = sideCount === 1 ? (categories.length === 1 ? 1 : 0.5) : sideIndex / (sideCount - 1);
+        const t = sideCount === 1 ? 1 : sideIndex / (sideCount - 1);
         const y = (t - 0.5) * 2 * VERTICAL_SPAN;
         // The middle icon reaches furthest out; top/bottom tuck slightly in.
         const x = (radius - (Math.abs(y) / VERTICAL_SPAN) * ARC_INSET) * (onRight ? 1 : -1);

@@ -2,11 +2,22 @@ import { InteractionThreadSwitcher, type InteractionThreadOption } from '@/compo
 import type { CompanionThread } from '@/types/companion-interaction';
 
 const THREADS: InteractionThreadOption<CompanionThread>[] = [
-  { id: 'quest', label: 'Quest', icon: 'sparkles' },
+  { id: 'quest', label: 'Do', icon: 'checkmark' },
+  { id: 'discovery', label: 'You', icon: 'square.and.pencil' },
   { id: 'insight', label: 'Insight', icon: 'star.fill' },
+  { id: 'skins', label: 'Skins', icon: 'circle.grid.2x2.fill' },
   { id: 'reflection', label: 'Reflect', icon: 'leaf.fill' },
 ];
 
-export function CompanionThreadSwitcher({ value, onChange }: { value: CompanionThread; onChange: (thread: CompanionThread) => void }) {
-  return <InteractionThreadSwitcher options={THREADS} value={value} onChange={onChange} />;
+export function CompanionThreadSwitcher({
+  value,
+  onChange,
+  showSkins,
+}: {
+  value: CompanionThread;
+  onChange: (thread: CompanionThread) => void;
+  showSkins: boolean;
+}) {
+  const options = showSkins ? THREADS : THREADS.filter((thread) => thread.id !== 'skins');
+  return <InteractionThreadSwitcher options={options} value={value} onChange={onChange} />;
 }

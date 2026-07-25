@@ -99,6 +99,11 @@ Deno.serve(async (req) => {
     // (no matting needed — more reliable than BiRefNet/flood-fill for props).
     transparentBackground?: boolean;
     outputName?: string; // [a-z0-9-]+ — storage folder name
+    assetKey?: string;
+    assetType?: 'creature_cutout' | 'hatchling' | 'resident_hex_tile' | 'resident_environment' | 'expression_grid' | 'other';
+    aspectId?: string;
+    skinId?: string;
+    pipelineVersion?: string;
     // Poll action:
     requestId?: string;
     // Poll: skip server-side slicing/upload and return the raw fal image URL.
@@ -146,7 +151,7 @@ Deno.serve(async (req) => {
     if (perSide === 1) {
       // No slicing needed — upload the render untouched.
       const gridUrl = await upload(`${basePath}_grid.png`, gridBytes);
-      return { gridUrl, cells: [{ index: 0, url: gridUrl }] };
+      return { gridUrl, gridPath: `${basePath}_grid.png`, cells: [{ index: 0, url: gridUrl }] };
     }
 
     const { Image } = await import('npm:imagescript@1.3.0');
@@ -166,7 +171,34 @@ Deno.serve(async (req) => {
         cells.push({ index, url });
       }
     }
-    return { gridUrl, cells };
+    return { gridUrl, gridPath: `${basePath}_grid.png`, cells };
+  }
+
+  async function registerAsset(
+    result: { gridPath: string },
+    prompt: string | undefined
+  ): Promise<string | null> {
+    if (!body.assetKey || !/^[a-z0-9_:-]+$/.test(body.assetKey)) return null;
+    const supabaseAdmin = createClient(supabaseUrl!, serviceRoleKey!);
+    const promptHash = prompt
+      ? [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(prompt)))]
+          .map((byte) => byte.toString(16).padStart(2, '0'))
+          .join('')
+      : null;
+    const { error } = await supabaseAdmin.from('art_assets').upsert({
+      asset_key: body.assetKey,
+      asset_type: body.assetType ?? 'other',
+      aspect_id: body.aspectId ?? null,
+      skin_id: body.skinId ?? null,
+      pipeline_version: body.pipelineVersion ?? 'generate-asset-v1',
+      status: 'candidate',
+      model_id: modelEndpoint,
+      prompt_hash: promptHash,
+      storage_bucket: bucketName,
+      storage_path: result.gridPath,
+      metadata: { mode, outputName },
+    }, { onConflict: 'asset_key' });
+    return error?.message ?? null;
   }
 
   try {
@@ -199,8 +231,9 @@ Deno.serve(async (req) => {
       if (body.rawResult) {
         return jsonResponse({ status: 'completed', imageUrl: generatedUrl, model: modelEndpoint, mode });
       }
-      const { gridUrl, cells } = await finalize(generatedUrl);
-      return jsonResponse({ status: 'completed', gridUrl, cells, model: modelEndpoint, mode });
+      const result = await finalize(generatedUrl);
+      const registryWarning = await registerAsset(result, body.prompt);
+      return jsonResponse({ status: 'completed', gridUrl: result.gridUrl, cells: result.cells, model: modelEndpoint, mode, registryWarning });
     }
 
     // action 'generate'
@@ -284,8 +317,9 @@ Deno.serve(async (req) => {
     if (!generatedUrl) {
       throw new Error('fal response did not include an image URL.');
     }
-    const { gridUrl, cells } = await finalize(generatedUrl);
-    return jsonResponse({ status: 'completed', gridUrl, cells, model: modelEndpoint, mode });
+    const result = await finalize(generatedUrl);
+    const registryWarning = await registerAsset(result, prompt);
+    return jsonResponse({ status: 'completed', gridUrl: result.gridUrl, cells: result.cells, model: modelEndpoint, mode, registryWarning });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Asset generation failed.';
     return jsonResponse({ error: message }, 502);

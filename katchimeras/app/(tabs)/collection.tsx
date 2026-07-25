@@ -21,8 +21,11 @@ import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { DailyCreatureCard, HomeRarityTier, StoredHomeState } from '@/types/home';
-import { bondStageLabel } from '@/utils/bond';
 import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
+import { emptyCompanionBondState, type CompanionBondState } from '@/utils/companion-bond';
+import { loadCompanionBondState } from '@/utils/companion-bond-storage';
+import { loadCompanionQuests } from '@/utils/katchimera-quests';
+import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { requestSelectedDay } from '@/utils/selected-day-signal';
 
@@ -32,7 +35,7 @@ type CardFilters = { year: string; species: string; rarity: string; trait: strin
 const collectionViewOptions = [
   { value: 'cards', label: 'Cards' },
   { value: 'calendar', label: 'Calendar' },
-  { value: 'species', label: 'Species' },
+  { value: 'species', label: 'Companions' },
 ] as const;
 
 const EMPTY_FILTERS: CardFilters = { year: 'all', species: 'all', rarity: 'all', trait: 'all' };
@@ -49,6 +52,7 @@ const RARITY_COLOR: Record<HomeRarityTier, string> = {
 export default function CollectionScreen() {
   const router = useRouter();
   const [state, setState] = useState<StoredHomeState | null>(null);
+  const [bondState, setBondState] = useState<CompanionBondState>(emptyCompanionBondState);
   const [view, setView] = useState<CollectionView>('cards');
   const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -61,14 +65,17 @@ export default function CollectionScreen() {
       const profile = loadOnboardingProfile();
       const hydrated = hydrateHomeState(homeRepository.load(), profile, new Date());
       setState(hydrated.state);
+      const resolveCompanionId = companionIdResolverForHomeState(hydrated.state);
+      const quests = loadCompanionQuests(resolveCompanionId);
+      setBondState(loadCompanionBondState(quests, resolveCompanionId, hydrated.state));
     }, [])
   );
 
   const dex: Dex | null = useMemo(() => {
     if (!state) return null;
     const hatchedDays = [...state.archivedDays, state.today].filter((day) => day.creature !== null);
-    return buildDex(state.encounterHistory, hatchedDays);
-  }, [state]);
+    return buildDex(state.aspectHistory ?? state.encounterHistory, hatchedDays, bondState);
+  }, [bondState, state]);
 
   const cards = useMemo(
     () => days.flatMap((day) => day.card ? [{ card: day.card, dayId: day.id }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),
@@ -98,7 +105,7 @@ export default function CollectionScreen() {
       <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false}>
         <Animated.View entering={presenceEnter(20)}>
           <ThemedText type="onboardingLabel" style={styles.kicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>
-            {view === 'species' ? 'The species you have met' : 'Your life deck'}
+            {view === 'species' ? 'The life companions you have met' : 'Your life deck'}
           </ThemedText>
           <ThemedText type="display" style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
             {view === 'cards' ? 'Your life, in cards.' : view === 'calendar' ? 'Every day became something.' : 'Every kind of day.'}
@@ -223,7 +230,11 @@ function DexCell({ entry }: { entry: DexEntry }) {
         {source ? <Image contentFit="contain" source={source} style={[styles.orbImage, entry.locked ? styles.lockedImage : null]} transition={0} /> : null}
       </View>
       <ThemedText style={styles.orbName} lightColor={entry.locked ? Lantern.moon500 : Lantern.moon50} darkColor={entry.locked ? Lantern.moon500 : Lantern.moon50}>{entry.locked ? '???' : entry.name}</ThemedText>
-      <ThemedText style={[styles.orbMeta, { color: rarityColor }]}>{entry.locked ? 'Not yet met' : `${entry.highestRaritySeen ?? 'common'} · ${bondStageLabel(entry.bondStage)}`}</ThemedText>
+      <ThemedText style={[styles.orbMeta, { color: rarityColor }]}>
+        {entry.locked
+          ? 'Not yet met'
+          : `${entry.forms.filter((form) => form.unlocked).length} forms · ${entry.bondLabel}`}
+      </ThemedText>
     </View>
   );
 }

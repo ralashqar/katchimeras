@@ -34,11 +34,46 @@ import {
 import {
   COMPANION_BOND_REWARDS,
   companionBondProgress,
+  questBondEventKind,
   questBondEventId,
   recordCompanionBondEvent,
   type CompanionBondEventKind,
 } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
+import {
+  answerCompanionDiscoveryPrompt,
+  answersForCompanion,
+  removeCompanionDiscoveryAnswer,
+  setCompanionGoalStatus,
+} from '@/utils/companion-discovery';
+import {
+  loadCompanionDiscoveryState,
+  saveCompanionDiscoveryState,
+} from '@/utils/companion-discovery-storage';
+import {
+  discoveryPromptsForFamily,
+  katchimeraRoleByFamilyId,
+  type CompanionDiscoveryPromptDefinition,
+} from '@/constants/katchimera-roles';
+import { companionJourneyByFamilyId, type CompanionJourneyGoalStatus } from '@/constants/companion-journeys';
+import {
+  activeConversationForFamily,
+  answerJourneyConversation,
+  currentJourneyConversationNode,
+  goalsForJourneyFamily,
+  hasJourneyMomentForDay,
+  journeyProgressForGoal,
+  primaryGoalForFamily,
+  recordJourneyMoment,
+  recordJourneyReflection,
+  reflectionPromptForJourney,
+  setJourneyGoalStatus,
+  setPrimaryJourneyGoal,
+  startJourneyConversation,
+  syncJourneyQuestCompletions,
+} from '@/utils/companion-journey';
+import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
+import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import { requestQuestActionIntent } from '@/utils/quest-action-signal';
 import { beginQuestCapture, consumeCompletedQuestCapture, questCaptureBelongsTo } from '@/utils/quest-capture-session';
@@ -70,6 +105,17 @@ type Args = {
   todayFacts: Partial<Facts>;
 };
 
+function loadIdentityAwareCompanionQuests(): CompanionQuestState {
+  return loadCompanionQuests(companionIdResolverForHomeState(homeRepository.load()));
+}
+
+function loadIdentityAwareCompanionBondState() {
+  const homeState = homeRepository.load();
+  const resolveCompanionId = companionIdResolverForHomeState(homeState);
+  const quests = loadCompanionQuests(resolveCompanionId);
+  return loadCompanionBondState(quests, resolveCompanionId, homeState);
+}
+
 export type { QuestCaptureFeedback } from '@/types/companion-interaction';
 
 export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args) {
@@ -77,10 +123,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const [microcopy, setMicrocopy] = useState<string | null>(null);
   const [selectedResident, setSelectedResident] = useState<SelectedResident | null>(null);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
-  const [companionQuestState, setCompanionQuestState] = useState<CompanionQuestState>(() => loadCompanionQuests());
-  const [companionBondState, setCompanionBondState] = useState(() => loadCompanionBondState(loadCompanionQuests()));
+  const [companionQuestState, setCompanionQuestState] = useState<CompanionQuestState>(loadIdentityAwareCompanionQuests);
+  const [companionBondState, setCompanionBondState] = useState(loadIdentityAwareCompanionBondState);
+  const [companionDiscoveryState, setCompanionDiscoveryState] = useState(loadCompanionDiscoveryState);
+  const [companionJourneyState, setCompanionJourneyState] = useState(loadCompanionJourneyState);
   const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
   const [questCaptureFeedback, setQuestCaptureFeedback] = useState<QuestCaptureFeedback | null>(null);
+  const [quickGoalSuggestions, setQuickGoalSuggestions] = useState<{
+    familyId: string;
+    templateIds: readonly string[];
+  } | null>(null);
   const { capabilities: questCapabilities } = useQuestCapabilities(storedHomeState);
   const questDay: HomeDayRecord | null =
     today && storedHomeState?.today?.isoDate === today.isoDate
@@ -102,13 +154,37 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   );
   const residentById = useMemo(() => new Map(residents.map((resident) => [resident.creatureId, resident])), [residents]);
   const creatureById = useMemo(
-    () => new Map(kingdom.creatures.map((creature) => [creature.creatureId, creature])),
+    () => {
+      const map = new Map<string, KingdomCreature>();
+      // Kingdom creatures are newest first; retain the equipped/latest skin for
+      // each logical companion rather than letting an older hatch overwrite it.
+      for (const creature of kingdom.creatures) {
+        if (!map.has(creature.creatureId)) map.set(creature.creatureId, creature);
+      }
+      return map;
+    },
     [kingdom.creatures]
   );
 
+  // Appearance can change while the interaction sheet is open. Refresh its
+  // presentation record without changing the stable companion selection.
+  useEffect(() => {
+    setSelectedResident((current) => {
+      if (!current) return current;
+      const creature = creatureById.get(current.creature.creatureId);
+      const resident = residentById.get(current.resident.creatureId);
+      if (!creature || !resident) return null;
+      if (creature === current.creature && resident === current.resident) return current;
+      return { ...current, creature, resident };
+    });
+  }, [creatureById, residentById]);
+
   useFocusEffect(
     useCallback(() => {
-      setCompanionQuestState(loadCompanionQuests());
+      setCompanionQuestState(loadIdentityAwareCompanionQuests());
+      setCompanionBondState(loadIdentityAwareCompanionBondState());
+      setCompanionDiscoveryState(loadCompanionDiscoveryState());
+      setCompanionJourneyState(loadCompanionJourneyState());
       setStoredHomeState(homeRepository.load());
       const completedCapture = consumeCompletedQuestCapture();
       if (completedCapture?.sourceId) {
@@ -134,6 +210,15 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     return () => clearTimeout(timeout);
   }, [microcopy]);
 
+  useEffect(() => {
+    setCompanionJourneyState((current) => {
+      const next = syncJourneyQuestCompletions(current, companionQuestState.quests);
+      if (next === current) return current;
+      saveCompanionJourneyState(next);
+      return next;
+    });
+  }, [companionQuestState.quests]);
+
   const companionDataByCreatureId = useMemo(() => {
     const map = new Map<
       string,
@@ -143,6 +228,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       }
     >();
     for (const creature of kingdom.creatures) {
+      if (map.has(creature.creatureId)) continue;
       const fallback = `${creature.name} ${creature.visualKey}`;
       const archetype = archetypeForCreature(creature.creatureId, fallback);
       const subtype = subtypeForCreature(creature.creatureId, fallback);
@@ -227,12 +313,49 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const selectedCompanionData = selectedResident
     ? companionDataByCreatureId.get(selectedResident.creature.creatureId)
     : null;
+  const selectedFamilyId = selectedResident?.creature.familyId ?? null;
+  const selectedRole = selectedFamilyId ? katchimeraRoleByFamilyId.get(selectedFamilyId) ?? null : null;
+  const selectedJourneyDefinition = selectedFamilyId ? companionJourneyByFamilyId.get(selectedFamilyId) ?? null : null;
+  const selectedJourneyGoals = useMemo(
+    () => selectedFamilyId ? goalsForJourneyFamily(companionJourneyState, selectedFamilyId) : [],
+    [companionJourneyState, selectedFamilyId]
+  );
+  const selectedJourneyConversation = useMemo(
+    () => selectedFamilyId ? activeConversationForFamily(companionJourneyState, selectedFamilyId) : null,
+    [companionJourneyState, selectedFamilyId]
+  );
+  const selectedJourneyNode = useMemo(
+    () => currentJourneyConversationNode(selectedJourneyConversation),
+    [selectedJourneyConversation]
+  );
+  const selectedJourneyProgress = useMemo(() => {
+    if (!selectedFamilyId) return null;
+    const goal = primaryGoalForFamily(companionJourneyState, selectedFamilyId);
+    return goal ? journeyProgressForGoal(companionJourneyState, goal) : null;
+  }, [companionJourneyState, selectedFamilyId]);
+  const selectedJourneyMomentLoggedToday = useMemo(
+    () => Boolean(
+      today?.isoDate &&
+      selectedJourneyProgress &&
+      hasJourneyMomentForDay(companionJourneyState, selectedJourneyProgress.goal.id, today.isoDate)
+    ),
+    [companionJourneyState, selectedJourneyProgress, today?.isoDate]
+  );
+  const selectedBondProgress = useMemo(
+    () => companionBondProgress(companionBondState, selectedResident?.creature.creatureId ?? ''),
+    [companionBondState, selectedResident?.creature.creatureId]
+  );
   const selectedInsight = selectedCompanionData
-    ? insightForArchetype({
+    ? {
+        ...insightForArchetype({
         archetype: selectedCompanionData.archetype,
         text: selectedCompanionData.line,
         count: insightCount(selectedCompanionData.archetype, kingdom),
-      })
+        }),
+        evidenceLabel: selectedRole
+          ? `${selectedRole.insightThemes[Math.min(selectedBondProgress.level - 1, selectedRole.insightThemes.length - 1)]} · ${selectedBondProgress.label}`
+          : null,
+      }
     : null;
   const selectedActiveQuest = selectedResident
     ? questFor(companionQuestState, selectedResident.creature.creatureId)
@@ -298,6 +421,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         selectedResident.creature.creatureId,
         selectedResident.creature.visualKey,
         selectedResident.resident.houseLevel,
+        selectedBondProgress.level,
         today.isoDate
       ).filter((offer) => {
         const state = evaluateQuestRuntime({ questId: offer.id, facts: questFacts, capabilities: questCapabilities }).state;
@@ -305,7 +429,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       })
     : [];
   const selectedOfferOptions = selectedResident && today?.isoDate
-    ? questOffersForDay(companionQuestState, selectedResident.creature.creatureId, today.isoDate, eligibleSelectedOffers, 3)
+    ? balancedQuestOffers(
+        questOffersForDay(
+          companionQuestState,
+          selectedResident.creature.creatureId,
+          today.isoDate,
+          eligibleSelectedOffers,
+          eligibleSelectedOffers.length
+        ),
+        3
+      )
     : [];
   const selectedOffer =
     selectedResident &&
@@ -315,6 +448,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     !hasCompanionQuestForDay(companionQuestState, selectedResident.creature.creatureId, today.isoDate)
       ? selectedOfferOptions.find((offer) => offer.id === selectedOfferId) ?? selectedOfferOptions[0]
       : undefined;
+  const selectedQuestAdvancesJourneyGoal = useMemo(() => {
+    const goal = selectedJourneyProgress?.goal;
+    const currentQuestId = selectedActiveQuest?.questId ?? selectedOffer?.id;
+    const definition = currentQuestId ? questDefinition(currentQuestId) : null;
+    const contribution = definition?.goalContribution;
+    if (!goal || !contribution || definition?.familyId !== goal.familyId) return false;
+    return !contribution.goalTypeIds?.length || contribution.goalTypeIds.includes(goal.goalTypeId);
+  }, [selectedActiveQuest?.questId, selectedJourneyProgress, selectedOffer?.id]);
   const selectedInteractionState = selectedResident
     ? interactionState(
         companionQuestState,
@@ -337,8 +478,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
   }, []);
   const refreshQuestState = useCallback(() => {
-    setCompanionQuestState(loadCompanionQuests());
-    setStoredHomeState(homeRepository.load());
+    setCompanionQuestState(loadIdentityAwareCompanionQuests());
+    const nextHomeState = homeRepository.load();
+    setStoredHomeState(nextHomeState);
+    const resolveCompanionId = companionIdResolverForHomeState(nextHomeState);
+    const nextQuestState = loadCompanionQuests(resolveCompanionId);
+    setCompanionBondState(loadCompanionBondState(nextQuestState, resolveCompanionId, nextHomeState));
   }, []);
 
   // A clear quest-camera match is authoritative and auto-submits the exact
@@ -346,7 +491,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   useEffect(() => {
     if (questCaptureFeedback?.phase !== 'matched' || !questCaptureFeedback.creatureId) return;
     const timeout = setTimeout(() => {
-      const latest = loadCompanionQuests();
+      const latest = loadIdentityAwareCompanionQuests();
       const completingQuest = questFor(latest, questCaptureFeedback.creatureId!);
       const result = submitQuest(
         latest,
@@ -365,7 +510,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           ? `quest-submission:${result.state.submissions.at(-1)!.id}`
           : questBondEventId(completingQuest.creatureId, completingQuest.questId, completingQuest.acceptedAt),
         creatureId: completingQuest.creatureId,
-        kind: 'quest_completed',
+        kind: questBondEventKind(questDefinition(completingQuest.questId)),
         occurredAt: result.quest?.completedAt ?? Date.now(),
         dayId: result.quest?.completedDayId,
       });
@@ -453,23 +598,26 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   }, [commitCompanionQuestState, companionQuestState, selectedActiveQuest, selectedResident, today?.isoDate]);
 
   const cancelSelectedQuestAttempt = useCallback((attemptId: string) => {
-    const latest = loadCompanionQuests();
+    const latest = loadIdentityAwareCompanionQuests();
     commitCompanionQuestState(cancelQuestAttempt(latest, attemptId));
   }, [commitCompanionQuestState]);
 
   const completeSelectedInteractiveQuest = useCallback((attemptId: string, result: QuestResult) => {
     if (!selectedResident || !selectedActiveQuest || !today?.isoDate) return;
-    const latest = loadCompanionQuests();
+    const latest = loadIdentityAwareCompanionQuests();
     commitCompanionQuestState(completeInteractiveQuest(latest, {
       attemptId,
       creatureId: selectedResident.creature.creatureId,
       result,
       dayId: today.isoDate,
     }));
+    const bondKind = questBondEventKind(questDefinition(selectedActiveQuest.questId));
     awardBond({
-      id: `quest-attempt:${attemptId}`,
+      id: bondKind === 'mini_game_completed'
+        ? `mini-game:${selectedResident.creature.creatureId}:${today.isoDate}`
+        : `quest-attempt:${attemptId}`,
       creatureId: selectedResident.creature.creatureId,
-      kind: 'quest_completed',
+      kind: bondKind,
       occurredAt: Date.now(),
       dayId: today.isoDate,
     });
@@ -486,7 +634,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     awardBond({
       id: questBondEventId(selectedResident.creature.creatureId, selectedActiveQuest.questId, selectedActiveQuest.acceptedAt),
       creatureId: selectedResident.creature.creatureId,
-      kind: 'quest_completed',
+      kind: questBondEventKind(questDefinition(selectedActiveQuest.questId)),
       occurredAt: completedAt,
       dayId: today?.isoDate,
     });
@@ -560,7 +708,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           ? `quest-submission:${result.state.submissions.at(-1)!.id}`
           : questBondEventId(result.quest.creatureId, result.quest.questId, result.quest.acceptedAt),
         creatureId: result.quest.creatureId,
-        kind: 'quest_completed',
+        kind: questBondEventKind(questDefinition(result.quest.questId)),
         occurredAt: result.quest.completedAt ?? Date.now(),
         dayId: result.quest.completedDayId,
       });
@@ -614,7 +762,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const selectThread = useCallback((thread: CompanionThread) => {
     setSelectedResident((current) => (current ? { ...current, thread } : current));
   }, []);
-  const closeSelectedResident = useCallback(() => { setSelectedResident(null); setSelectedOfferId(null); }, []);
+  const closeSelectedResident = useCallback(() => {
+    setSelectedResident(null);
+    setSelectedOfferId(null);
+    setQuickGoalSuggestions(null);
+  }, []);
   const awardSelectedInsightBond = useCallback(() => {
     if (!selectedResident || !today?.isoDate) return;
     awardBond({
@@ -634,11 +786,140 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       occurredAt: Date.now(),
       dayId: today?.isoDate,
     });
-  }, [awardBond, selectedResident, today?.isoDate]);
-  const selectedBondProgress = useMemo(
-    () => companionBondProgress(companionBondState, selectedResident?.creature.creatureId ?? ''),
-    [companionBondState, selectedResident?.creature.creatureId]
+    if (selectedFamilyId) {
+      setCompanionJourneyState((current) => {
+        const next = recordJourneyReflection(current, selectedFamilyId, sourceId, Date.now(), today?.isoDate);
+        if (next !== current) saveCompanionJourneyState(next);
+        return next;
+      });
+    }
+  }, [awardBond, selectedFamilyId, selectedResident, today?.isoDate]);
+  const selectedReflectionPrompt = selectedFamilyId
+    ? reflectionPromptForJourney(companionJourneyState, selectedFamilyId) ?? (selectedRole
+      ? `Thinking about ${selectedRole.reflectionLenses[
+        Math.min(selectedBondProgress.level - 1, selectedRole.reflectionLenses.length - 1)
+      ]}, what would you like ${selectedRole.displayName} to remember about today?`
+      : null)
+    : null;
+  const selectedDiscoveryPrompts = useMemo(
+    () => selectedFamilyId && !selectedJourneyDefinition
+      ? discoveryPromptsForFamily(selectedFamilyId, selectedBondProgress.level)
+      : [],
+    [selectedBondProgress.level, selectedFamilyId, selectedJourneyDefinition]
   );
+  const selectedDiscoveryAnswers = useMemo(
+    () => selectedFamilyId
+      ? answersForCompanion(companionDiscoveryState, selectedFamilyId)
+      : [],
+    [companionDiscoveryState, selectedFamilyId]
+  );
+  const answerSelectedDiscoveryPrompt = useCallback((
+    prompt: CompanionDiscoveryPromptDefinition,
+    value: string
+  ) => {
+    if (!selectedResident || prompt.familyId !== selectedResident.creature.familyId) return;
+    const result = answerCompanionDiscoveryPrompt(companionDiscoveryState, prompt, value);
+    saveCompanionDiscoveryState(result.state);
+    setCompanionDiscoveryState(result.state);
+    if (result.firstAnswer) {
+      awardBond({
+        id: `discovery:${selectedResident.creature.creatureId}:${prompt.id}`,
+        creatureId: selectedResident.creature.creatureId,
+        kind: 'discovery_answered',
+        occurredAt: Date.now(),
+        dayId: today?.isoDate,
+      });
+    }
+    setMicrocopy('Answer remembered');
+  }, [awardBond, companionDiscoveryState, selectedResident, today?.isoDate]);
+  const removeSelectedDiscoveryAnswer = useCallback((promptId: string) => {
+    if (!selectedFamilyId) return;
+    setCompanionDiscoveryState((current) => {
+      const next = removeCompanionDiscoveryAnswer(current, selectedFamilyId, promptId);
+      saveCompanionDiscoveryState(next);
+      return next;
+    });
+    setMicrocopy('Answer removed');
+  }, [selectedFamilyId]);
+  const setSelectedDiscoveryGoalStatus = useCallback((
+    promptId: string,
+    status: 'active' | 'completed' | 'paused'
+  ) => {
+    if (!selectedFamilyId) return;
+    setCompanionDiscoveryState((current) => {
+      const next = setCompanionGoalStatus(current, selectedFamilyId, promptId, status);
+      saveCompanionDiscoveryState(next);
+      return next;
+    });
+    setMicrocopy(status === 'completed' ? 'Goal completed' : 'Goal updated');
+  }, [selectedFamilyId]);
+  const startSelectedJourneyConversation = useCallback(() => {
+    if (!selectedFamilyId || !selectedJourneyDefinition) return;
+    setCompanionJourneyState((current) => {
+      const next = startJourneyConversation(current, selectedFamilyId);
+      if (next !== current) saveCompanionJourneyState(next);
+      return next;
+    });
+  }, [selectedFamilyId, selectedJourneyDefinition]);
+  const answerSelectedJourneyConversation = useCallback((sessionId: string, value: string) => {
+    if (!selectedResident || !selectedFamilyId || !selectedJourneyDefinition) return;
+    const result = answerJourneyConversation(companionJourneyState, sessionId, value);
+    if (result.state === companionJourneyState) return;
+    saveCompanionJourneyState(result.state);
+    setCompanionJourneyState(result.state);
+    if (result.createdGoalId) {
+      if (result.suggestedQuickGoalIds.length) {
+        setQuickGoalSuggestions({
+          familyId: selectedFamilyId,
+          templateIds: result.suggestedQuickGoalIds,
+        });
+      }
+      awardBond({
+        id: `journey-conversation:${selectedResident.creature.creatureId}:${sessionId}`,
+        creatureId: selectedResident.creature.creatureId,
+        kind: 'discovery_answered',
+        occurredAt: Date.now(),
+        dayId: today?.isoDate,
+      });
+      setMicrocopy('Focus updated');
+    }
+  }, [awardBond, companionJourneyState, selectedFamilyId, selectedJourneyDefinition, selectedResident, today?.isoDate]);
+  const setSelectedJourneyGoalStatus = useCallback((goalId: string, status: CompanionJourneyGoalStatus) => {
+    setCompanionJourneyState((current) => {
+      const next = setJourneyGoalStatus(current, goalId, status);
+      if (next !== current) saveCompanionJourneyState(next);
+      return next;
+    });
+    setMicrocopy(status === 'completed' ? 'Focus completed' : status === 'abandoned' ? 'Focus released' : 'Focus updated');
+  }, []);
+  const setSelectedPrimaryJourneyGoal = useCallback((goalId: string) => {
+    setCompanionJourneyState((current) => {
+      const next = setPrimaryJourneyGoal(current, goalId);
+      if (next !== current) saveCompanionJourneyState(next);
+      return next;
+    });
+    setMicrocopy('Current goal changed');
+  }, []);
+  const logSelectedJourneyMoment = useCallback((kindId: string, note = '') => {
+    if (!selectedFamilyId) return;
+    const result = recordJourneyMoment(
+      companionJourneyState,
+      selectedFamilyId,
+      kindId,
+      note,
+      Date.now(),
+      today?.isoDate
+    );
+    if (!result.recorded) {
+      setMicrocopy(result.reason === 'already_recorded_today'
+        ? 'Today already has a moment'
+        : 'Choose a current goal first');
+      return;
+    }
+    saveCompanionJourneyState(result.state);
+    setCompanionJourneyState(result.state);
+    setMicrocopy('Moment remembered');
+  }, [companionJourneyState, selectedFamilyId, today?.isoDate]);
   const selectedActiveQuestDefinition = selectedActiveQuest ? questDefinition(selectedActiveQuest.questId) : null;
   const selectedInteractiveExecution = isInteractiveExecution(selectedActiveQuestDefinition?.execution)
     ? selectedActiveQuestDefinition.execution
@@ -711,11 +992,36 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedOfferId: selectedOffer?.id ?? null,
     selectedOffers: selectedOfferOptions.map((offer, index) => ({
       ...offer,
-      bondReward: COMPANION_BOND_REWARDS.quest_completed,
+      bondReward: COMPANION_BOND_REWARDS[
+        questBondEventKind(questDefinition(offer.id))
+      ],
       recommended: index === 0,
     })),
     selectedOfferCount: selectedOfferOptions.length,
     selectedBondProgress,
+    selectedRole,
+    selectedJourneyDefinition,
+    selectedJourneyGoals,
+    selectedJourneyConversation,
+    selectedJourneyNode,
+    selectedJourneyProgress,
+    selectedJourneyMomentLoggedToday,
+    selectedQuickGoalSuggestionIds: quickGoalSuggestions?.familyId === selectedFamilyId
+      ? quickGoalSuggestions.templateIds
+      : [],
+    dismissQuickGoalSuggestions: () => setQuickGoalSuggestions(null),
+    selectedQuestAdvancesJourneyGoal,
+    startSelectedJourneyConversation,
+    answerSelectedJourneyConversation,
+    logSelectedJourneyMoment,
+    setSelectedJourneyGoalStatus,
+    setSelectedPrimaryJourneyGoal,
+    selectedReflectionPrompt,
+    selectedDiscoveryPrompts,
+    selectedDiscoveryAnswers,
+    answerSelectedDiscoveryPrompt,
+    removeSelectedDiscoveryAnswer,
+    setSelectedDiscoveryGoalStatus,
     recentTriviaQuestionIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'trivia' ? attempt.result.questionIds : []).slice(-40),
     recentWordPuzzleIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'word_game' ? [attempt.result.puzzleId] : []).slice(-30),
     recentWordPathPuzzleIds: companionQuestState.attempts.flatMap((attempt) => attempt.result?.kind === 'word_connect' ? [attempt.result.puzzleId] : []).slice(-30),
@@ -746,16 +1052,18 @@ function eligibleOfferOptions<T extends { id: string }>(
   creatureId: string,
   creatureKey: string,
   houseLevel: number,
+  bondLevel: number,
   dayId: string
 ): T[] {
   return offers.filter((offer) => {
     const definition = questDefinition(offer.id);
     if (!definition) return false;
     const eligibility = definition.eligibility;
+    if ((definition.minimumBondLevel ?? 1) > bondLevel) return false;
     if (eligibility?.creatureKeys?.length && !eligibility.creatureKeys.includes(creatureKey.toLowerCase())) return false;
     if ((eligibility?.minimumHomeLevel ?? 0) > houseLevel) return false;
     if (offer.id === 'quest-step-time-trial' && completedQuestCount(state.quests, 'quest-step-sprint', creatureId, state.attempts) < 1) return false;
-    const cooldownDays = eligibility?.cooldownDays ?? 0;
+    const cooldownDays = definition.repeatPolicy?.cooldownDays ?? eligibility?.cooldownDays ?? 0;
     if (!cooldownDays) return true;
     const latest = state.quests
       .filter((quest) => quest.questId === offer.id && quest.creatureId === creatureId && quest.completedDayId)
@@ -770,6 +1078,19 @@ function dayDistance(from: string, to: string): number {
   const start = new Date(`${from}T12:00:00`).getTime();
   const end = new Date(`${to}T12:00:00`).getTime();
   return Math.floor((end - start) / 86_400_000);
+}
+
+function balancedQuestOffers<T extends { id: string }>(offers: T[], limit: number): T[] {
+  const selected: T[] = [];
+  for (const lane of ['real_life', 'mini_game'] as const) {
+    const match = offers.find((offer) => questDefinition(offer.id)?.lane === lane);
+    if (match) selected.push(match);
+  }
+  for (const offer of offers) {
+    if (selected.length >= limit) break;
+    if (!selected.some((item) => item.id === offer.id)) selected.push(offer);
+  }
+  return selected.slice(0, limit);
 }
 
 function resolveInteractiveConfig(

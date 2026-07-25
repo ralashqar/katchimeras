@@ -97,6 +97,52 @@ export function CompanionReflectionThread({
   );
 }
 
+export function CompanionReflectionReview({
+  draft,
+  promptText,
+}: {
+  draft: CompanionReflectionDraft;
+  promptText: string;
+}) {
+  return (
+    <View style={styles.reviewRoot}>
+      <View style={styles.reviewIntro}>
+        <View style={styles.reviewIcon}>
+          <IconSymbol name="sparkles" size={22} color={Meadow.goldDeep} />
+        </View>
+        <View style={styles.reviewIntroCopy}>
+          <ThemedText style={styles.reviewTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+            Ready to remember
+          </ThemedText>
+          <ThemedText selectable style={styles.reviewHelper} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+            This will be kept with today and strengthen your bond.
+          </ThemedText>
+        </View>
+      </View>
+      <CompanionSection label="Your companion asked">
+        <ThemedText selectable style={styles.reviewPrompt} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+          {promptText}
+        </ThemedText>
+      </CompanionSection>
+      <CompanionSection label="Your reflection">
+        <View style={styles.reviewAnswer}>
+          <ThemedText selectable style={styles.reviewAnswerText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+            {draft.text.trim() || 'Voice reflection'}
+          </ThemedText>
+          {draft.audioUri ? (
+            <View style={styles.voiceIncluded}>
+              <IconSymbol name="waveform" size={14} color={Meadow.goldDeep} />
+              <ThemedText style={styles.voiceIncludedText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                Voice answer included
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
+      </CompanionSection>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { gap: 22, paddingBottom: 20, paddingTop: 8 },
   prompt: { fontSize: 20, lineHeight: 29 },
@@ -111,4 +157,41 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
   audioRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   error: { fontSize: 12.5, lineHeight: 18 },
+  reviewRoot: { gap: 22, paddingBottom: 20, paddingTop: 8 },
+  reviewIntro: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(231,185,81,0.13)',
+    borderColor: 'rgba(160,113,30,0.18)',
+    borderCurve: 'continuous',
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    padding: 14,
+  },
+  reviewIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(231,185,81,0.20)',
+    borderRadius: 16,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  reviewIntroCopy: { flex: 1, gap: 3, minWidth: 0 },
+  reviewTitle: { fontSize: 17, fontWeight: '900' },
+  reviewHelper: { fontSize: 12.5, lineHeight: 18 },
+  reviewPrompt: { fontSize: 15, fontStyle: 'italic', lineHeight: 22 },
+  reviewAnswer: {
+    backgroundColor: 'rgba(255,248,232,0.42)',
+    borderColor: Meadow.cardBorder,
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 12,
+    minHeight: 126,
+    padding: 16,
+  },
+  reviewAnswerText: { fontSize: 16, lineHeight: 24 },
+  voiceIncluded: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  voiceIncludedText: { fontSize: 12, fontWeight: '800' },
 });

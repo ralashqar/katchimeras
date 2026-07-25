@@ -2,8 +2,9 @@ import type { IconSymbolName } from '@/components/ui/icon-symbol';
 import type { JournalNoteDraft } from '@/types/home';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestNextAction, QuestRuntimeState } from '@/utils/quests/runtime';
+import type { KatchimeraActivityLane, KatchimeraBondLevel } from '@/constants/katchimera-roles';
 
-export type CompanionThread = 'quest' | 'insight' | 'reflection';
+export type CompanionThread = 'quest' | 'discovery' | 'insight' | 'skins' | 'reflection';
 
 export type CompanionQuestOfferViewModel = {
   id: string;
@@ -15,6 +16,8 @@ export type CompanionQuestOfferViewModel = {
   bondReward: number;
   recommended: boolean;
   artworkKey?: string;
+  lane: Exclude<KatchimeraActivityLane, 'discovery'>;
+  minimumBondLevel: KatchimeraBondLevel;
 };
 
 export type CompanionNavigationIntent =
@@ -80,6 +83,7 @@ export type CompanionInteractionState = {
   direction: 1 | -1;
   reviewItemId: string | null;
   reflectionDraft: CompanionReflectionDraft | null;
+  reflectionReviewOpen: boolean;
   discardOpen: boolean;
 };
 
@@ -87,5 +91,7 @@ export type CompanionInteractionAction =
   | { type: 'select_thread'; thread: CompanionThread }
   | { type: 'review_item'; itemId: string | null }
   | { type: 'set_reflection_draft'; draft: CompanionReflectionDraft | null }
+  | { type: 'review_reflection' }
+  | { type: 'edit_reflection' }
   | { type: 'request_discard' }
   | { type: 'keep_editing' };

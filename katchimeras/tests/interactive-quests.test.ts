@@ -17,7 +17,7 @@ import { BOOK_TRIVIA_QUESTIONS, CITY_TRIVIA_QUESTIONS, FILM_TRIVIA_QUESTIONS, va
 import { advanceBreathing, createBreathingState } from '@/utils/quests/experiences/paced-breathing';
 import { scoreTimingTap } from '@/utils/quests/experiences/timing-zone';
 import { createPattern, patternComplete, patternMatches } from '@/utils/quests/experiences/pattern-memory';
-import { createSortingRound, FEASTLE_SORTING_ITEMS, TASKLET_SORTING_ITEMS, validateSortingItems } from '@/utils/quests/experiences/sorting';
+import { createSortingRound, ERRANDIMP_SORTING_ITEMS, FEASTLE_SORTING_ITEMS, TASKLET_SORTING_ITEMS, validateSortingItems } from '@/utils/quests/experiences/sorting';
 import { formatQuestDuration } from '@/utils/quests/experiences/duration';
 import { createMatchingDeck, createMemoryMatchState, FEASTLE_MATCHING_MOTIFS, memoryMatchPresentation, memoryMatchReducer, MOSSPROUT_MATCHING_MOTIFS, RELICOON_MATCHING_MOTIFS, shuffleMatchingDeck, validateMatchingMotifs } from '@/utils/quests/experiences/matching';
 import { attemptMatchThreeSwap, createMatchThreeState, findMatchRuns, hasLegalMove, MATCH_THREE_DIFFICULTY, resolveMatchThreeConfig, type MatchThreeState, type MatchThreeTile } from '@/utils/quests/experiences/match-three';
@@ -25,26 +25,33 @@ import { matchThreePack, validateMatchThreePack } from '@/utils/quests/experienc
 import { questDefinition } from '@/utils/quests/definitions';
 import { themedQuestOffers } from '@/utils/quests/themed';
 
-test('Steppling, Flickerbun, and Pagelet receive their interactive quest families first', () => {
-  assert.equal(themedQuestOffers('high_steps_day', 'journey', 'steppling')[0]?.id, 'quest-steppling-stride');
-  assert.equal(themedQuestOffers('cinema', 'culture', 'flickerbun')[0]?.id, 'quest-film-trivia');
-  assert.equal(themedQuestOffers('bookstore', 'culture', 'pagelet')[0]?.id, 'quest-book-trivia');
+test('Steppling, Flickerbun, and Pagelet receive their interactive quest families', () => {
+  assert.ok(themedQuestOffers('high_steps_day', 'journey', 'steppling').some((offer) => offer.id === 'quest-steppling-stride'));
+  assert.ok(themedQuestOffers('cinema', 'culture', 'flickerbun').some((offer) => offer.id === 'quest-film-trivia'));
+  assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-book-trivia'));
   assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-pagelet-lost-word'));
   assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-pagelet-word-paths'));
 });
 
-test('the new companion quest pools lead with their reusable mini-game', () => {
-  assert.equal(themedQuestOffers('good_sleep', 'night', 'bedrotte')[0]?.id, 'quest-bedrotte-breathe');
-  assert.equal(themedQuestOffers('park', 'places', 'mossprout')[0]?.id, 'quest-mossprout-memory');
-  assert.equal(themedQuestOffers('city', 'places', 'skylo')[0]?.id, 'quest-skylo-city-trivia');
-  assert.equal(themedQuestOffers('social_gathering', 'memory', 'gatherglow')[0]?.id, 'quest-gatherglow-pattern');
-  assert.equal(themedQuestOffers('feast', 'food', 'feastle')[0]?.id, 'quest-feastle-merge');
-  assert.equal(themedQuestOffers('focus_work', 'craft', 'tasklet')[0]?.id, 'quest-tasklet-desk-jam');
-  assert.equal(themedQuestOffers('celebration', 'celebrate', 'cheerlet')[0]?.id, 'quest-cheerlet-block-party');
+test('companion quest pools include their reusable mini-games', () => {
+  assert.ok(themedQuestOffers('coffee_shop', 'food', 'baristabbit').some((offer) => offer.id === 'quest-coffee-ritual-brew-sequence'));
+  assert.ok(themedQuestOffers('errand_loop', 'craft', 'errandimp').some((offer) => offer.id === 'quest-errandimp-sort'));
+  assert.ok(themedQuestOffers('dawn', 'memory', 'dawnle').some((offer) => offer.id === 'quest-dawnle-first-light'));
+  assert.ok(themedQuestOffers('tender_day', 'memory', 'mendle').some((offer) => offer.id === 'quest-mendle-breathe'));
+  assert.ok(themedQuestOffers('reflection', 'memory', 'quietome').some((offer) => offer.id === 'quest-quietome-still-signals'));
+  assert.ok(themedQuestOffers('good_sleep', 'night', 'bedrotte').some((offer) => offer.id === 'quest-bedrotte-breathe'));
+  assert.ok(themedQuestOffers('park', 'places', 'mossprout').some((offer) => offer.id === 'quest-mossprout-memory'));
+  assert.ok(themedQuestOffers('city', 'places', 'skylo').some((offer) => offer.id === 'quest-skylo-city-trivia'));
+  assert.ok(themedQuestOffers('social_gathering', 'memory', 'gatherglow').some((offer) => offer.id === 'quest-gatherglow-pattern'));
+  assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-merge'));
+  assert.ok(themedQuestOffers('focus_work', 'craft', 'tasklet').some((offer) => offer.id === 'quest-tasklet-desk-jam'));
+  assert.ok(themedQuestOffers('celebration', 'celebrate', 'cheerlet').some((offer) => offer.id === 'quest-cheerlet-block-party'));
   assert.equal(questDefinition('quest-cheerlet-block-party')?.execution?.kind, 'block_blast');
   assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-memory'));
-  assert.equal(themedQuestOffers('museum', 'culture', 'relicoon')[0]?.id, 'quest-relicoon-match');
-  assert.equal(themedQuestOffers('live_music', 'culture', 'encora')[0]?.id, 'quest-encora-rhythm');
+  assert.ok(themedQuestOffers('museum', 'culture', 'relicoon').some((offer) => offer.id === 'quest-relicoon-match'));
+  assert.ok(themedQuestOffers('live_music', 'culture', 'encora').some((offer) => offer.id === 'quest-encora-rhythm'));
+  const moonSignals = questDefinition('quest-vesperitt-moon-signals')?.execution;
+  assert.equal(moonSignals?.kind === 'pattern_memory' ? moonSignals.gameId : null, 'vesperitt-moon-signals');
 });
 
 test('Block Party V2 ships connected, role-classified shapes and deterministic fair trays', () => {
@@ -720,6 +727,16 @@ test('Tasklet triage is deterministic, valid, tiered, and records readable elaps
   assert.equal(execution?.kind === 'sorting' ? execution.packId : null, 'tasklet-triage');
 });
 
+test('Errandimp sorting separates admin, home, and out-of-home loops', () => {
+  assert.equal(ERRANDIMP_SORTING_ITEMS.length, 45);
+  assert.deepEqual(validateSortingItems(ERRANDIMP_SORTING_ITEMS), []);
+  const round = createSortingRound('errandimp:day-1', 12, [], 'errandimp-loops', 2);
+  assert.equal(round.length, 12);
+  assert.deepEqual(new Set(round.map((item) => item.category)), new Set(['admin', 'home', 'out']));
+  const execution = questDefinition('quest-errandimp-sort')?.execution;
+  assert.equal(execution?.kind === 'sorting' ? execution.packId : null, 'errandimp-loops');
+});
+
 test('Mossprout memory match uses deterministic garden assets and keeps legacy watering readable', () => {
   assert.equal(memoryMatchPresentation('mossprout-garden'), 'memory_garden');
   assert.equal(memoryMatchPresentation('relicoon-gallery'), 'standard');
@@ -735,7 +752,7 @@ test('Mossprout memory match uses deterministic garden assets and keeps legacy w
   assert.ok(deck.every((card) => deck.filter((candidate) => candidate.motif.id === card.motif.id).length === 2));
   assert.equal(questDefinition('quest-mossprout-memory')?.execution?.kind, 'matching');
   assert.equal(questDefinition('quest-mossprout-tend')?.execution?.kind, 'timing_zone');
-  assert.equal(themedQuestOffers('park', 'places', 'mossprout').some((offer) => offer.id === 'quest-mossprout-tend'), false);
+  assert.equal(themedQuestOffers('park', 'places', 'mossprout').some((offer) => offer.id === 'quest-mossprout-tend'), true);
 });
 
 test('Feastle memory match uses a varied deterministic food emoji pack', () => {

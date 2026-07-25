@@ -8,6 +8,11 @@ import {
 import type { DayScores, HomeMoment, HomeScoreKey, LocalCreatureRecord, StoredHomeDayRecord, StoredHomeState } from '@/types/home';
 import type { EncounterHistoryMap } from '@/types/home';
 import { recordEncounterHatch } from '@/utils/encounter-engine';
+import {
+  identityForCreature,
+  recordIdentityHatch,
+  withKatchimeraIdentity,
+} from '@/utils/katchimera-identity';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { selectHatch, makeSeededRng } from '@/utils/hatch-selection';
 import { buildReflectionContext } from '@/utils/reflection-context';
@@ -90,7 +95,7 @@ export function triggerHatchForDay(
       state.today,
       profile,
       now,
-      state.encounterHistory,
+      state.aspectHistory ?? state.encounterHistory,
       state.archivedDays
     );
 
@@ -98,6 +103,8 @@ export function triggerHatchForDay(
       {
         ...state,
         encounterHistory: recordHatchedEncounter(state.encounterHistory, hatchedToday),
+        aspectHistory: recordHatchedIdentity(state.aspectHistory ?? {}, hatchedToday, 'family'),
+        skinHistory: recordHatchedIdentity(state.skinHistory ?? {}, hatchedToday, 'skin'),
         today: hatchedToday,
       },
       profile,
@@ -117,13 +124,21 @@ export function triggerHatchForDay(
 
   const nextArchived = [...state.archivedDays];
   const pastDays = [state.today, ...state.archivedDays].filter((entry) => entry.id !== dayId);
-  const hatchedDay = finalizeDayHatch(target, profile, now, state.encounterHistory, pastDays);
+  const hatchedDay = finalizeDayHatch(
+    target,
+    profile,
+    now,
+    state.aspectHistory ?? state.encounterHistory,
+    pastDays
+  );
   nextArchived[archivedIndex] = hatchedDay;
 
   return normalizeStoredHomeState(
     {
       ...state,
       encounterHistory: recordHatchedEncounter(state.encounterHistory, hatchedDay),
+      aspectHistory: recordHatchedIdentity(state.aspectHistory ?? {}, hatchedDay, 'family'),
+      skinHistory: recordHatchedIdentity(state.skinHistory ?? {}, hatchedDay, 'skin'),
       archivedDays: nextArchived,
     },
     profile,
@@ -136,6 +151,21 @@ function recordHatchedEncounter(history: EncounterHistoryMap, day: StoredHomeDay
     return history;
   }
   return recordEncounterHatch(history, day.creature.encounterProfileId, day.isoDate);
+}
+
+function recordHatchedIdentity(
+  history: EncounterHistoryMap,
+  day: StoredHomeDayRecord,
+  kind: 'family' | 'skin'
+): EncounterHistoryMap {
+  if (!day.creature) return history;
+  const identity = identityForCreature(day.creature);
+  if (!identity) return history;
+  return recordIdentityHatch(
+    history,
+    kind === 'family' ? identity.familyId : identity.skinId,
+    day.isoDate
+  );
 }
 
 function finalizeFallbackHatch(
@@ -162,7 +192,7 @@ function finalizeFallbackHatch(
   const highlightMoment = pickHighlightMoment(day.moments, primaryTrait);
   const accentColor = homeCreatureVisuals[visualKey].accentColor;
 
-  const creature: LocalCreatureRecord = {
+  const creature: LocalCreatureRecord = withKatchimeraIdentity({
     id: `creature-${day.isoDate}-${hash}`,
     name,
     primaryTrait,
@@ -176,7 +206,7 @@ function finalizeFallbackHatch(
     motifTags: uniqueMomentLabels(day.moments).slice(0, 2),
     encounterProfileId: null,
     repeatDepth: 0,
-  };
+  });
   const sealedAt = day.shareReadyAt ?? now.toISOString();
   return {
     ...day,

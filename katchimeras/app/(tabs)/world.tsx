@@ -17,40 +17,50 @@ import { ZodiacTileSheet } from '@/components/katchadeck/world/zodiac-tile-sheet
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
+import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
-import type { JournalRouteProposal, JournalSource } from '@/types/home';
+import type { KatchimeraFamilyId, KatchimeraSkinId, KatchimeraWardrobeState } from '@/types/katchimera';
 import type { KingdomCreature } from '@/types/kingdom';
 import type { WorldIdentityState } from '@/types/world-identity';
 import { openingLine, reflectionLine } from '@/utils/katchimera-engagement';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
-import { noteJournalInputAdapter } from '@/utils/journal-input-adapters';
-import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
+import { prepareCompanionReflection } from '@/utils/companion-reflection';
 import { loadWorldIdentity, saveWorldIdentity } from '@/utils/world-identity';
+import {
+  applyWardrobeToKingdom,
+  equipKatchimeraSkin,
+  skinsForKingdomCompanion,
+} from '@/utils/katchimera-wardrobe';
+import {
+  loadKatchimeraWardrobe,
+  saveKatchimeraWardrobe,
+} from '@/utils/katchimera-wardrobe-storage';
+import { companionIdForFamily } from '@/constants/katchimera-skins';
+import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 
-type ReflectionReview = {
-  draft: CompanionReflectionDraft;
-  source: Extract<JournalSource, { kind: 'text_note' | 'voice_note' }>;
-  route: JournalRouteProposal | null;
-  routes: JournalRouteProposal[];
-  suggestedSpecific: string | null;
-  suggestedContext: string | null;
-  suggestedFeeling: string | null;
-};
-
-type EmbeddedJournalReview = {
-  origin: 'insight' | 'quest';
-  initialFlowId: string;
-  initialChoiceId?: string | null;
-  noteExpanded: boolean;
-};
+type EmbeddedJournalReview =
+  | {
+      origin: 'insight' | 'quest';
+      initialFlowId: string;
+      initialChoiceId?: string | null;
+      noteExpanded: boolean;
+    }
+  | {
+      origin: 'quick_goal';
+      initialFlowId: string;
+      noteExpanded: boolean;
+      completion: CompanionQuickGoalCompletion;
+      goal: CompanionQuickGoal;
+    };
 
 // The Kingdom tab is the persistent hex map: center egg, then one tile per
 // unique Katchimera in hatch order. Capture stays on Today; this is the archive.
@@ -74,17 +84,30 @@ export default function KingdomScreen() {
 
   const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
   const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
+  const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
   const [homeIdentityOpen, setHomeIdentityOpen] = useState(false);
   const [zodiacOpen, setZodiacOpen] = useState(false);
   const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
-  const [reflectionReview, setReflectionReview] = useState<ReflectionReview | null>(null);
-  const [reflectionReviewPending, setReflectionReviewPending] = useState(false);
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
   const [savedOrigin, setSavedOrigin] = useState<'reflection' | 'insight' | 'quest' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
   const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState({
     enableInteractiveServices: false,
   });
+  const presentationKingdom = useMemo(
+    () => applyWardrobeToKingdom(kingdom, wardrobe),
+    [kingdom, wardrobe]
+  );
+
+  const ownedSkinIds = useMemo(
+    () =>
+      new Set<KatchimeraSkinId>(
+        kingdom.creatures.flatMap((creature) =>
+          creature.skinId ? [creature.skinId] : []
+        )
+      ),
+    [kingdom.creatures]
+  );
 
   const hatches = useMemo<HatchRecord[]>(
     () =>
@@ -95,7 +118,10 @@ export default function KingdomScreen() {
     [kingdom.creatures]
   );
   const residents = useMemo(() => deriveResidents(hatches), [hatches]);
-  const residentTiles = useMemo(() => kingdomResidentHexTiles(residents, kingdom.creatures), [kingdom.creatures, residents]);
+  const residentTiles = useMemo(
+    () => kingdomResidentHexTiles(residents, presentationKingdom.creatures),
+    [presentationKingdom.creatures, residents]
+  );
   const eggVisual = useMemo(() => days.find((day) => day.isToday)?.egg ?? days[days.length - 1]?.egg ?? null, [days]);
   const today = useMemo(() => days.find((day) => day.isToday) ?? null, [days]);
   const kingdomBackground = useMemo(
@@ -108,7 +134,36 @@ export default function KingdomScreen() {
     return index > 0 ? days[index - 1] : null;
   }, [days, today]);
   const todayFacts = useMemo(() => resolveFactsForDay(today, yesterday), [today, yesterday]);
-  const quests = useKingdomQuests({ kingdom, residents, today, todayFacts });
+  const quests = useKingdomQuests({
+    kingdom: presentationKingdom,
+    residents,
+    today,
+    todayFacts,
+  });
+  const quickGoalFamilyIds = useMemo(() => {
+    const ids = new Set<KatchimeraFamilyId>();
+    for (const creature of kingdom.creatures) {
+      const familyId = creature.familyId;
+      if (familyId && hasQuickGoalTemplates(familyId)) {
+        ids.add(familyId);
+      }
+    }
+    return [...ids];
+  }, [kingdom.creatures]);
+  const quickGoalDayId = today?.isoDate ?? new Date().toISOString().slice(0, 10);
+  const quickGoals = useCompanionQuickGoals({
+    dayId: quickGoalDayId,
+    availableFamilyIds: quickGoalFamilyIds,
+    onBondChanged: quests.refreshQuestState,
+  });
+  const selectedFamilyId = quests.selectedResident?.creature.familyId ?? null;
+  const selectedSkinOptions = useMemo(
+    () =>
+      selectedFamilyId
+        ? skinsForKingdomCompanion(selectedFamilyId, ownedSkinIds)
+        : [],
+    [ownedSkinIds, selectedFamilyId]
+  );
 
   useEffect(() => {
     if (!identity.selectedHomeArchetypeId) {
@@ -122,6 +177,13 @@ export default function KingdomScreen() {
   const updateIdentity = (next: WorldIdentityState) => {
     setIdentity(next);
     saveWorldIdentity(next);
+  };
+  const equipSelectedSkin = (skinId: KatchimeraSkinId) => {
+    if (!selectedFamilyId) return;
+    const next = equipKatchimeraSkin(wardrobe, selectedFamilyId, skinId);
+    if (next === wardrobe) return;
+    saveKatchimeraWardrobe(next);
+    setWardrobe(next);
   };
   const closeSelectedResident = quests.closeSelectedResident;
   const refreshQuestState = quests.refreshQuestState;
@@ -163,28 +225,20 @@ export default function KingdomScreen() {
     quests.performSelectedQuestAction();
   };
 
-  const reviewReflection = async (draft: CompanionReflectionDraft) => {
-    if (!quests.selectedResident || reflectionReviewPending) return;
-    setReflectionReviewPending(true);
-    setReflectionDraft(draft);
-    const sourceId = `companion-reflection:${quests.selectedResident.creature.creatureId}:${Date.now().toString(36)}`;
-    const origin = {
-      kind: 'companion_reflection' as const,
-      creatureId: quests.selectedResident.creature.creatureId,
-      promptId: draft.promptId,
-      promptText: draft.promptText,
-    };
-    const source: ReflectionReview['source'] = draft.kind === 'voice'
-      ? { kind: 'voice_note', sourceId, audioUri: draft.audioUri ?? null, durationMs: draft.durationMs ?? null, origin }
-      : { kind: 'text_note', sourceId, origin };
-    try {
-      const analysis = await noteJournalInputAdapter.analyze({ source, text: draft.text, audioUri: draft.audioUri ?? undefined }, { allowRemote: false });
-      const route = journalNoteRouteNeedsConfirmation(analysis.routes) ? null : analysis.routes[0] ?? null;
-      setReflectionReview({ draft, source, route, routes: analysis.routes, suggestedSpecific: analysis.suggestedSpecific ?? null, suggestedContext: analysis.suggestedContext ?? null, suggestedFeeling: analysis.suggestedFeeling ?? null });
-    } catch {
-      setReflectionReview({ draft, source, route: null, routes: [], suggestedSpecific: null, suggestedContext: null, suggestedFeeling: null });
-    } finally {
-      setReflectionReviewPending(false);
+  const saveReflection = (draft: CompanionReflectionDraft) => {
+    const creatureId = quests.selectedResident?.creature.creatureId;
+    if (!creatureId) return;
+    const prepared = prepareCompanionReflection({
+      creatureId,
+      dayId: today?.isoDate ?? 'today',
+      draft,
+    });
+    if (!prepared) return;
+    addManualJournalEntry(prepared.submission, 'today');
+    quests.awardSelectedReflectionBond(prepared.sourceId);
+    setSavedOrigin('reflection');
+    if (process.env.EXPO_OS === 'ios') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
@@ -250,7 +304,7 @@ export default function KingdomScreen() {
       {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
       {zodiacOpen ? <ZodiacTileSheet identity={identity} onChange={updateIdentity} onClose={() => setZodiacOpen(false)} /> : null}
 
-      {quests.selectedResident && !reflectionReview && !embeddedJournal ? (
+      {quests.selectedResident && !embeddedJournal ? (
         <CompanionInteractionSheet
           onExperienceActiveChange={setQuestExperienceActive}
           creatureId={quests.selectedResident.creature.creatureId}
@@ -261,7 +315,10 @@ export default function KingdomScreen() {
           openingLine={openingLine(quests.selectedResident.creature.name, quests.selectedInteractionState)}
           initialThread={quests.selectedResident.thread ?? 'insight'}
           onSelectThread={quests.selectThread}
-          onClose={() => { setReflectionDraft(null); quests.closeSelectedResident(); }}
+          onClose={() => {
+            setReflectionDraft(null);
+            quests.closeSelectedResident();
+          }}
           activeQuest={quests.selectedActiveQuest ? {
             title: quests.selectedActiveQuest.title,
             hint: quests.selectedActiveQuest.hint,
@@ -297,39 +354,57 @@ export default function KingdomScreen() {
           onCompleteInteractiveQuest={quests.completeSelectedInteractiveQuest}
           insight={quests.selectedInsight ?? { text: 'This tile remembers the day we met.', action: null }}
           onInsightAction={handleInsightAction}
-          reflectionText={reflectionLine(quests.selectedCompanionData?.archetype ?? '')}
+          reflectionText={quests.selectedReflectionPrompt ?? reflectionLine(quests.selectedCompanionData?.archetype ?? '')}
           initialReflectionDraft={reflectionDraft}
           onReflectionDraftChange={setReflectionDraft}
-          onReviewReflection={(draft) => { void reviewReflection(draft); }}
-          reflectionReviewPending={reflectionReviewPending}
+          onSaveReflection={saveReflection}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
-        />
-      ) : null}
-      {reflectionReview ? (
-        <ManualJournalSheet
-          allowRemoteIntelligence={cloudIntelligenceEnabled}
-          dayLocationPoints={today?.locations}
-          key={reflectionReview.route?.id ?? 'reflection-journal-picker'}
-          initialFlowId={reflectionReview.route?.flowId}
-          initialChoiceId={reflectionReview.route?.choiceId}
-          initialSpecific={reflectionReview.route ? reflectionReview.suggestedSpecific : null}
-          initialContext={reflectionReview.route ? reflectionReview.suggestedContext : null}
-          initialFeeling={reflectionReview.route ? reflectionReview.suggestedFeeling : null}
-          initialNote={reflectionReview.draft.text}
-          initialLinkedNote={reflectionReview.draft}
-          initialConfirmedFacets={reflectionReview.route?.confirmedFacets}
-          suggestedRoutes={reflectionReview.route ? undefined : reflectionReview.routes}
-          journalSource={reflectionReview.source}
-          onBackFromInitial={() => setReflectionReview((current) => current ? { ...current, route: null, suggestedSpecific: null, suggestedContext: null, suggestedFeeling: null } : null)}
-          onClose={() => { setReflectionReview(null); setReflectionDraft(null); quests.closeSelectedResident(); }}
-          onSave={(submission) => {
-            addManualJournalEntry(submission, 'today');
-            quests.awardSelectedReflectionBond(reflectionReview.source.sourceId);
-            setReflectionReview(null);
-            setSavedOrigin('reflection');
-            if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          skins={selectedSkinOptions}
+          equippedSkinId={quests.selectedResident.creature.skinId ?? null}
+          onEquipSkin={equipSelectedSkin}
+          role={quests.selectedRole}
+          discoveryPrompts={quests.selectedDiscoveryPrompts}
+          discoveryAnswers={quests.selectedDiscoveryAnswers}
+          onAnswerDiscovery={quests.answerSelectedDiscoveryPrompt}
+          onRemoveDiscoveryAnswer={quests.removeSelectedDiscoveryAnswer}
+          onSetDiscoveryGoalStatus={quests.setSelectedDiscoveryGoalStatus}
+          journeyDefinition={quests.selectedJourneyDefinition}
+          journeyGoals={quests.selectedJourneyGoals}
+          journeyConversation={quests.selectedJourneyConversation}
+          journeyNode={quests.selectedJourneyNode}
+          journeyProgress={quests.selectedJourneyProgress}
+          journeyMomentLoggedToday={quests.selectedJourneyMomentLoggedToday}
+          questAdvancesJourneyGoal={quests.selectedQuestAdvancesJourneyGoal}
+          onStartJourneyConversation={quests.startSelectedJourneyConversation}
+          onAnswerJourneyConversation={quests.answerSelectedJourneyConversation}
+          onLogJourneyMoment={quests.logSelectedJourneyMoment}
+          onSetJourneyGoalStatus={quests.setSelectedJourneyGoalStatus}
+          onSetPrimaryJourneyGoal={quests.setSelectedPrimaryJourneyGoal}
+          familyId={quests.selectedResident.creature.familyId ?? 'vesperitt'}
+          quickGoalsEnabled={quickGoalFamilyIds.includes(quests.selectedResident.creature.familyId ?? '')}
+          quickGoalDayId={quickGoalDayId}
+          quickGoalState={quickGoals.state}
+          onAddQuickGoalTemplate={quickGoals.addTemplate}
+          onAddCustomQuickGoal={quickGoals.addCustom}
+          onCompleteQuickGoal={quickGoals.completeGoal}
+          onUndoQuickGoal={quickGoals.undoGoal}
+          onRememberQuickGoal={(completion, goal) => {
+            setEmbeddedJournal({
+              origin: 'quick_goal',
+              initialFlowId: 'general',
+              noteExpanded: true,
+              completion,
+              goal,
+            });
           }}
+          quickGoalSuggestionIds={quests.selectedQuickGoalSuggestionIds}
+          onAddQuickGoalSuggestions={(templateIds) => {
+            const added = quickGoals.addTemplates(templateIds);
+            quests.dismissQuickGoalSuggestions();
+            if (added) quests.refreshQuestState();
+          }}
+          onDismissQuickGoalSuggestions={quests.dismissQuickGoalSuggestions}
         />
       ) : null}
       {embeddedJournal ? (
@@ -337,16 +412,33 @@ export default function KingdomScreen() {
           allowRemoteIntelligence={cloudIntelligenceEnabled}
           dayLocationPoints={today?.locations}
           initialFlowId={embeddedJournal.initialFlowId}
-          initialChoiceId={embeddedJournal.initialChoiceId}
+          initialChoiceId={'initialChoiceId' in embeddedJournal ? embeddedJournal.initialChoiceId : undefined}
+          initialSpecific={embeddedJournal.origin === 'quick_goal' ? embeddedJournal.goal.title : undefined}
+          initialNote={embeddedJournal.origin === 'quick_goal' ? `I completed: ${embeddedJournal.goal.title}` : undefined}
           initialNoteExpanded={embeddedJournal.noteExpanded}
+          journalSource={embeddedJournal.origin === 'quick_goal' ? {
+            kind: 'text_note',
+            sourceId: embeddedJournal.completion.id,
+            origin: {
+              kind: 'quick_goal_completion',
+              creatureId: companionIdForFamily(embeddedJournal.goal.familyId),
+              familyId: embeddedJournal.goal.familyId,
+              goalId: embeddedJournal.goal.id,
+              completionId: embeddedJournal.completion.id,
+              goalTitle: embeddedJournal.goal.title,
+            },
+          } : undefined}
           returnToOriginOnBack
           onBackFromInitial={() => setEmbeddedJournal(null)}
           onClose={() => { setEmbeddedJournal(null); quests.closeSelectedResident(); }}
           onSave={(submission) => {
             addManualJournalEntry(submission, 'today');
             const origin = embeddedJournal.origin;
+            if (embeddedJournal.origin === 'quick_goal') {
+              quickGoals.markJournaled(embeddedJournal.completion.id);
+            }
             setEmbeddedJournal(null);
-            setSavedOrigin(origin);
+            setSavedOrigin(origin === 'quick_goal' ? null : origin);
             if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
         />

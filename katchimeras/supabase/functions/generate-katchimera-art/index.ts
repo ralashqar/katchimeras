@@ -9,6 +9,7 @@ const corsHeaders = {
 
 const bucketName = 'katchimera-art-dev';
 const defaultModelId = 'fal-ai/nano-banana-2';
+const defaultAllowedModels = [defaultModelId];
 
 function base64ToBytes(b64: string): Uint8Array {
   const binary = atob(b64);
@@ -75,8 +76,16 @@ type RenderProfilePayload = {
   caption?: string;
   motivationalQuote?: string;
   imagePrompt: string;
+  lifeAspectId?: string;
+  skinId?: string;
   [key: string]: unknown;
 };
+
+async function sha256(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -165,6 +174,10 @@ Deno.serve(async (req) => {
       typeof body?.modelId === 'string' && body.modelId.length > 0
         ? body.modelId
         : defaultModelId;
+    const allowedModels = (Deno.env.get('KATCHIMERA_ART_ALLOWED_MODELS') ?? defaultAllowedModels.join(','))
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
     const input =
       body?.input && typeof body.input === 'object' && !Array.isArray(body.input)
         ? (body.input as Record<string, unknown>)
@@ -175,6 +188,9 @@ Deno.serve(async (req) => {
         { error: 'renderProfile.id and renderProfile.imagePrompt are required.' },
         400
       );
+    }
+    if (!allowedModels.includes(modelId)) {
+      return jsonResponse({ error: `Model is not allowed: ${modelId}` }, 400);
     }
 
     // GPT Image 2 (and other edit endpoints) need fetchable URLs, not data: URIs.
@@ -280,7 +296,40 @@ Deno.serve(async (req) => {
       throw new Error(updateError?.message ?? 'Could not update generation record.');
     }
 
-    return jsonResponse({ record: updated });
+    const assetType =
+      typeof body?.assetType === 'string' &&
+      ['creature_cutout', 'hatchling', 'resident_hex_tile', 'resident_environment', 'expression_grid', 'other'].includes(body.assetType)
+        ? body.assetType
+        : 'creature_cutout';
+    const assetKey =
+      typeof body?.assetKey === 'string' && /^[a-z0-9_:-]+$/.test(body.assetKey)
+        ? body.assetKey
+        : `creature-cutout:${renderProfile.id}`;
+    const pipelineVersion =
+      typeof body?.pipelineVersion === 'string' && body.pipelineVersion.trim()
+        ? body.pipelineVersion.trim()
+        : 'generate-katchimera-art-v1';
+    const { error: registryError } = await supabaseAdmin
+      .from('art_assets')
+      .upsert({
+        asset_key: assetKey,
+        asset_type: assetType,
+        aspect_id: body?.aspectId ?? renderProfile.lifeAspectId ?? renderProfile.habitatAspectId ?? null,
+        skin_id: body?.skinId ?? renderProfile.skinId ?? null,
+        pipeline_version: pipelineVersion,
+        status: 'candidate',
+        model_id: modelId,
+        prompt_hash: await sha256(renderProfile.imagePrompt),
+        storage_bucket: bucketName,
+        storage_path: storagePath,
+        generation_record_id: recordId,
+        metadata: { renderProfileId: renderProfile.id },
+      }, { onConflict: 'asset_key' });
+
+    return jsonResponse({
+      record: updated,
+      registryWarning: registryError?.message ?? null,
+    });
   } catch (error) {
     if (recordId) {
       await supabaseAdmin

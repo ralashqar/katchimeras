@@ -13,6 +13,8 @@ import type {
   LocalCreatureRecord,
   StoredHomeDayRecord,
 } from '@/types/home';
+import type { KatchimeraFamilyId, KatchimeraSkinId, LifeAspectId } from '@/types/katchimera';
+import { identityForEncounter } from '@/utils/katchimera-identity';
 
 // Hatch Engine v2 — the probabilistic draw.
 //
@@ -78,6 +80,9 @@ export type HatchSelectionInput = {
 
 export type HatchCandidateProbability = {
   profileId: string;
+  aspectId: LifeAspectId;
+  familyId: KatchimeraFamilyId;
+  skinId: KatchimeraSkinId;
   name: string;
   probability: number;
   score: number;
@@ -161,6 +166,9 @@ export function selectHatch(input: HatchSelectionInput): HatchSelection | null {
 
   const probabilityRows: HatchCandidateProbability[] = field.map((entry, index) => ({
     profileId: entry.candidate.profile.id,
+    aspectId: entry.candidate.aspectId,
+    familyId: entry.candidate.familyId,
+    skinId: entry.candidate.skinId,
     name: entry.candidate.profile.name,
     probability: round3(probabilities[index]),
     score: round3(entry.score),
@@ -173,6 +181,9 @@ export function selectHatch(input: HatchSelectionInput): HatchSelection | null {
     .slice(0, MAX_ECHOES)
     .map(({ entry, index }) => ({
       speciesId: entry.candidate.profile.id,
+      aspectId: entry.candidate.aspectId,
+      familyId: entry.candidate.familyId,
+      skinId: entry.candidate.skinId,
       name: entry.candidate.profile.name,
       visualKey: entry.candidate.castEntry.visualKey,
       rarity: entry.rarity,
@@ -233,7 +244,13 @@ function scoreCandidate(
   }
   score += RARITY_LURE[rarityFloor] ?? 0;
   score -= recencyPenalty(daysBetween(lastSeenIsoDate, context.day.isoDate));
-  if (context.yesterdayProfileId && profile.id === context.yesterdayProfileId) {
+  const yesterdayIdentity = identityForEncounter(context.yesterdayProfileId, null);
+  if (
+    context.yesterdayProfileId &&
+    (yesterdayIdentity
+      ? candidate.familyId === yesterdayIdentity.familyId
+      : profile.id === context.yesterdayProfileId)
+  ) {
     score -= AVOID_PREV_PENALTY;
   }
 

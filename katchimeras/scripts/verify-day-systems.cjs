@@ -57,6 +57,9 @@ const classificationPolicyPath = path.join(tempDir, 'intelligence-classification
 fs.writeFileSync(classificationPolicyPath, 'exports.visionSignalIsRejected = () => false;');
 const photoSubjectProjectionPath = transpileToTemp('utils/intelligence/photo-subject-projection.ts', 'photo-subject-projection.js');
 const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 'photo-place-gameplay.js');
+const lifeAspectsPath = transpileToTemp('constants/life-aspects.ts', 'life-aspects.js');
+const katchimeraSkinsPath = transpileToTemp('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const katchimeraIdentityPath = transpileToTemp('utils/katchimera-identity.ts', 'katchimera-identity.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const dayTagsPath = transpileToTemp('utils/day-tags.ts', 'day-tags.js');
 const dexPath = transpileToTemp('utils/dex.ts', 'dex.js');
@@ -65,6 +68,8 @@ const stubs = {
   '@/constants/encounter-cast': castPath,
   '@/constants/home-mvp': { homeCreatureVisuals: homeCreatureVisualsStub, homeMomentOptions },
   '@/constants/katchimera-encounter-profiles': { katchimeraEncounterProfiles: encounterProfiles },
+  '@/constants/life-aspects': lifeAspectsPath,
+  '@/constants/katchimera-skins': katchimeraSkinsPath,
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/bond': bondPath,
   '@/utils/vision-signals': visionSignalsPath,
@@ -74,6 +79,7 @@ const stubs = {
   '@/utils/intelligence/classification-policy': classificationPolicyPath,
   '@/utils/intelligence/photo-subject-projection': photoSubjectProjectionPath,
   '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
+  '@/utils/katchimera-identity': katchimeraIdentityPath,
   '@/utils/encounter-engine': enginePath,
   '@/utils/day-tags': dayTagsPath,
   '@/utils/dex': dexPath,
@@ -138,28 +144,29 @@ check('an empty day yields no tags', buildDayTags(makeDay()).length === 0);
 
 // === Dex ===================================================================
 const history = {
-  location_coffee_shop_baristabbit: { count: 12, lastSeenIsoDate: '2026-06-11' },
-  location_museum_relicoon: { count: 1, lastSeenIsoDate: '2026-06-05' },
+  'coffee-ritual': { count: 12, lastSeenIsoDate: '2026-06-11' },
+  relicoon: { count: 1, lastSeenIsoDate: '2026-06-05' },
 };
 const hatchedDays = [
-  makeDay({ isoDate: '2026-06-05', creature: { encounterProfileId: 'location_museum_relicoon', rarity: 'epic' } }),
-  makeDay({ isoDate: '2026-06-11', creature: { encounterProfileId: 'location_coffee_shop_baristabbit', rarity: 'common' } }),
-  makeDay({ isoDate: '2026-06-09', creature: { encounterProfileId: 'location_coffee_shop_baristabbit', rarity: 'rare' } }),
+  makeDay({ isoDate: '2026-06-05', creature: { encounterProfileId: 'location_museum_relicoon', visualKey: 'relicoon', rarity: 'epic' } }),
+  makeDay({ isoDate: '2026-06-11', creature: { encounterProfileId: 'location_coffee_shop_baristabbit', visualKey: 'baristabbit', rarity: 'common' } }),
+  makeDay({ isoDate: '2026-06-09', creature: { encounterProfileId: 'location_coffee_shop_baristabbit', visualKey: 'baristabbit', rarity: 'rare' } }),
 ];
 const dex = buildDex(history, hatchedDays);
-check('dex lists the full live cast', dex.total === encounterLiveCast.length, `total=${dex.total} cast=${encounterLiveCast.length}`);
-check('collected counts only met species', dex.collected === 2, `collected=${dex.collected}`);
-const baristabbit = dex.entries.find((entry) => entry.speciesId === 'location_coffee_shop_baristabbit');
-check('met species is unlocked', baristabbit && baristabbit.locked === false, JSON.stringify(baristabbit));
+check('dex lists one companion per true family', dex.total === 56, `total=${dex.total}`);
+check('collected counts only met families', dex.collected === 2, `collected=${dex.collected}`);
+const baristabbit = dex.entries.find((entry) => entry.familyId === 'coffee-ritual');
+check('met family is unlocked', baristabbit && baristabbit.locked === false, JSON.stringify(baristabbit));
 check('bond stage reflects visit count', baristabbit && baristabbit.bondStage === 1, String(baristabbit?.bondStage));
 check('highest rarity seen is the max across days', baristabbit && baristabbit.highestRaritySeen === 'rare', String(baristabbit?.highestRaritySeen));
 check('first hatched date is the earliest', baristabbit && baristabbit.firstHatchedDate === '2026-06-09', String(baristabbit?.firstHatchedDate));
-const locked = dex.entries.find((entry) => entry.speciesId === 'subject_dog_companion_waglet');
-check('unmet species stays locked with no rarity', locked && locked.locked === true && locked.highestRaritySeen === null, JSON.stringify(locked));
-const placeCat = dex.categories.find((cat) => cat.category === 'place');
-check('category summaries report collected/total', placeCat && placeCat.collected === 2 && placeCat.total > 2, JSON.stringify(placeCat));
-const seasonCat = dex.categories.find((cat) => cat.category === 'season');
-check('seasonal species form their own category', seasonCat && seasonCat.total >= 3, JSON.stringify(seasonCat));
+check('encountered visual forms are nested under the family', baristabbit && baristabbit.forms.length === 3 && baristabbit.forms.some((form) => form.skinId === 'baristabbit' && form.unlocked), JSON.stringify(baristabbit?.forms));
+const locked = dex.entries.find((entry) => entry.familyId === 'waglet');
+check('unmet family stays locked with no rarity', locked && locked.locked === true && locked.highestRaritySeen === null, JSON.stringify(locked));
+const dailyLife = dex.categories.find((cat) => cat.category === 'daily-life');
+check('category summaries report collected/total', dailyLife && dailyLife.collected === 1 && dailyLife.total > 2, JSON.stringify(dailyLife));
+const world = dex.categories.find((cat) => cat.category === 'world');
+check('world aspects form their own category', world && world.total >= 3, JSON.stringify(world));
 
 console.log(failures === 0 ? '\nAll day-systems checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

@@ -6,6 +6,7 @@ import { CLASSIFIED_MEMORY_SCHEMA_VERSION, recalibrateClassifiedMemory, repairUr
 import { normalizeFoodEmoji } from '@/utils/food-detect';
 import { updateCardMemorySpark } from '@/utils/daily-card';
 import { reconcileDaySkySnapshot } from '@/utils/day-sky';
+import { deriveIdentityHistories } from '@/utils/katchimera-identity';
 
 import { tomorrowDateId, toLocalDateId } from './date';
 import { getDistanceMeters } from './geo';
@@ -70,13 +71,19 @@ export function normalizeStoredHomeState(
           false
         )
       : undefined;
+  const identityHistories = deriveIdentityHistories(
+    upgradedState.encounterHistory,
+    [...normalizedArchived, normalizedToday, ...(normalizedTomorrow ? [normalizedTomorrow] : [])]
+  );
 
   return {
-    version: 16,
+    version: 17,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,
     encounterHistory: upgradedState.encounterHistory,
+    aspectHistory: mergeHistory(upgradedState.aspectHistory, identityHistories.aspectHistory),
+    skinHistory: mergeHistory(upgradedState.skinHistory, identityHistories.skinHistory),
     personalEntities: upgradedState.personalEntities,
     cloudIntelligenceEnabled: upgradedState.cloudIntelligenceEnabled,
     archivedDays: normalizedArchived,
@@ -84,6 +91,24 @@ export function normalizeStoredHomeState(
     tomorrow: normalizedTomorrow,
     backfilledAt: upgradedState.backfilledAt,
   };
+}
+
+function mergeHistory(
+  current: StoredHomeState['aspectHistory'],
+  derived: NonNullable<StoredHomeState['aspectHistory']>
+): NonNullable<StoredHomeState['aspectHistory']> {
+  const merged = { ...(current ?? {}) };
+  for (const [key, entry] of Object.entries(derived)) {
+    const existing = merged[key];
+    merged[key] = {
+      count: Math.max(existing?.count ?? 0, entry.count),
+      lastSeenIsoDate:
+        existing && existing.lastSeenIsoDate > entry.lastSeenIsoDate
+          ? existing.lastSeenIsoDate
+          : entry.lastSeenIsoDate,
+    };
+  }
+  return merged;
 }
 
 function updateStoredDayDerivedFields(

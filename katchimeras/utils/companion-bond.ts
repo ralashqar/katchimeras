@@ -1,6 +1,17 @@
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
+import type { StoredHomeState } from '@/types/home';
+import { identityForCreature } from '@/utils/katchimera-identity';
+import { questDefinition, type QuestDefinition } from '@/utils/quests/definitions';
 
-export type CompanionBondEventKind = 'quest_completed' | 'reflection_saved' | 'insight_engaged';
+export type CompanionBondEventKind =
+  | 'hatch'
+  | 'real_life_quest_completed'
+  | 'mini_game_completed'
+  | 'quick_goal_completed'
+  | 'discovery_answered'
+  | 'quest_completed'
+  | 'reflection_saved'
+  | 'insight_engaged';
 
 export type CompanionBondEvent = {
   id: string;
@@ -30,10 +41,22 @@ export type CompanionBondProgress = {
 };
 
 export const COMPANION_BOND_REWARDS: Record<CompanionBondEventKind, number> = {
+  hatch: 10,
+  real_life_quest_completed: 25,
+  mini_game_completed: 10,
+  quick_goal_completed: 5,
+  discovery_answered: 15,
+  // Retained for events created before quest lanes existed.
   quest_completed: 25,
   reflection_saved: 15,
   insight_engaged: 10,
 };
+
+export function questBondEventKind(
+  definition: Pick<QuestDefinition, 'lane'> | null | undefined
+): CompanionBondEventKind {
+  return definition?.lane === 'mini_game' ? 'mini_game_completed' : 'real_life_quest_completed';
+}
 
 export const COMPANION_BOND_LEVELS = [
   { level: 1, label: 'New', threshold: 0 },
@@ -44,6 +67,19 @@ export const COMPANION_BOND_LEVELS = [
 
 export function emptyCompanionBondState(): CompanionBondState {
   return { schemaVersion: 1, events: [] };
+}
+
+export function migrateCompanionBondIdentity(
+  state: CompanionBondState,
+  resolveCompanionId: (value: string) => string
+): CompanionBondState {
+  let changed = false;
+  const events = state.events.map((event) => {
+    const creatureId = resolveCompanionId(event.creatureId);
+    if (creatureId !== event.creatureId) changed = true;
+    return creatureId === event.creatureId ? event : { ...event, creatureId };
+  });
+  return changed ? normaliseCompanionBondState({ ...state, events }) : state;
 }
 
 export function recordCompanionBondEvent(
@@ -57,6 +93,22 @@ export function recordCompanionBondEvent(
     events: [...state.events, { ...event, points }],
   });
   return { state: next, awarded: true, points };
+}
+
+export function removeCompanionBondEvent(
+  state: CompanionBondState,
+  eventId: string
+): { state: CompanionBondState; removed: boolean; points: number } {
+  const event = state.events.find((item) => item.id === eventId);
+  if (!event) return { state, removed: false, points: 0 };
+  return {
+    state: normaliseCompanionBondState({
+      ...state,
+      events: state.events.filter((item) => item.id !== eventId),
+    }),
+    removed: true,
+    points: event.points,
+  };
 }
 
 export function companionBondProgress(state: CompanionBondState, creatureId: string): CompanionBondProgress {
@@ -91,10 +143,17 @@ export function backfillQuestBondEvents(state: CompanionBondState, quests: Compa
   for (const quest of completedRows) {
     const matchingSubmission = quests.submissions.find((item) => item.creatureId === quest.creatureId && item.questId === quest.questId && item.submittedAt === quest.completedAt);
     const matchingAttempt = quests.attempts.find((item) => item.creatureId === quest.creatureId && item.questId === quest.questId && item.status === 'succeeded' && item.endedAt === quest.completedAt);
+    const kind = questBondEventKind(questDefinition(quest.questId));
     next = recordCompanionBondEvent(next, {
-      id: matchingSubmission ? `quest-submission:${matchingSubmission.id}` : matchingAttempt ? `quest-attempt:${matchingAttempt.id}` : questBondEventId(quest.creatureId, quest.questId, quest.acceptedAt),
+      id: matchingSubmission
+        ? `quest-submission:${matchingSubmission.id}`
+        : matchingAttempt && kind === 'mini_game_completed'
+          ? `mini-game:${quest.creatureId}:${matchingAttempt.dayId}`
+          : matchingAttempt
+            ? `quest-attempt:${matchingAttempt.id}`
+            : questBondEventId(quest.creatureId, quest.questId, quest.acceptedAt),
       creatureId: quest.creatureId,
-      kind: 'quest_completed',
+      kind,
       occurredAt: quest.completedAt!,
       dayId: quest.completedDayId,
     }).state;
@@ -103,18 +162,47 @@ export function backfillQuestBondEvents(state: CompanionBondState, quests: Compa
     next = recordCompanionBondEvent(next, {
       id: `quest-submission:${submission.id}`,
       creatureId: submission.creatureId,
-      kind: 'quest_completed',
+      kind: questBondEventKind(questDefinition(submission.questId)),
       occurredAt: submission.submittedAt,
       dayId: submission.dayId,
     }).state;
   }
   for (const attempt of quests.attempts.filter((item) => item.status === 'succeeded')) {
+    const kind = questBondEventKind(questDefinition(attempt.questId));
     next = recordCompanionBondEvent(next, {
-      id: `quest-attempt:${attempt.id}`,
+      id: kind === 'mini_game_completed'
+        ? `mini-game:${attempt.creatureId}:${attempt.dayId}`
+        : `quest-attempt:${attempt.id}`,
       creatureId: attempt.creatureId,
-      kind: 'quest_completed',
+      kind,
       occurredAt: attempt.endedAt ?? attempt.startedAt ?? 0,
       dayId: attempt.dayId,
+    }).state;
+  }
+  return next;
+}
+
+export function backfillHatchBondEvents(
+  state: CompanionBondState,
+  homeState: Pick<StoredHomeState, 'archivedDays' | 'today' | 'tomorrow'> | null | undefined
+): CompanionBondState {
+  if (!homeState) return state;
+  let next = state;
+  const days = [
+    ...homeState.archivedDays,
+    homeState.today,
+    ...(homeState.tomorrow ? [homeState.tomorrow] : []),
+  ];
+  for (const day of days) {
+    if (!day.creature) continue;
+    const identity = identityForCreature(day.creature);
+    if (!identity) continue;
+    next = recordCompanionBondEvent(next, {
+      id: `hatch:${day.id}:${identity.companionId}`,
+      creatureId: identity.companionId,
+      kind: 'hatch',
+      occurredAt: new Date(`${day.isoDate}T12:00:00`).getTime(),
+      dayId: day.isoDate,
     }).state;
   }
   return next;

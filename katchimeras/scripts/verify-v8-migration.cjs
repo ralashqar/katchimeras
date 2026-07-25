@@ -9,6 +9,17 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'katchimera-v8-migration-'));
 const source = fs.readFileSync(path.join(root, 'game/days/migrations.ts'), 'utf8');
 const migrationPath = path.join(temp, 'migrations.js');
 const qualityRegistryPath = path.join(temp, 'quality-registry.js');
+function transpile(relativeSourcePath, outName) {
+  const input = fs.readFileSync(path.join(root, relativeSourcePath), 'utf8');
+  const outPath = path.join(temp, outName);
+  fs.writeFileSync(outPath, ts.transpileModule(input, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
+  }).outputText);
+  return outPath;
+}
+const lifeAspectsPath = transpile('constants/life-aspects.ts', 'life-aspects.js');
+const katchimeraSkinsPath = transpile('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const katchimeraIdentityPath = transpile('utils/katchimera-identity.ts', 'katchimera-identity.js');
 fs.writeFileSync(migrationPath, ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
 }).outputText);
@@ -47,6 +58,9 @@ Module._resolveFilename = function (request, parent, ...rest) {
   if (request === '@/utils/intelligence/question-registry') return questionsPath;
   if (request === '@/utils/daily-card') return dailyCardPath;
   if (request === '@/utils/day-sky') return daySkyPath;
+  if (request === '@/constants/life-aspects') return lifeAspectsPath;
+  if (request === '@/constants/katchimera-skins') return katchimeraSkinsPath;
+  if (request === '@/utils/katchimera-identity') return katchimeraIdentityPath;
   if (request === '@/data/intelligence/memory-qualities.json') return path.join(root, 'data/intelligence/memory-qualities.json');
   if (request === './locations' && parent?.filename === migrationPath) return locationsPath;
   return originalResolve.call(this, request, parent, ...rest);
@@ -69,7 +83,7 @@ const day = {
     schemaVersion: 1, createdAt: '2026-07-09T12:00:00.000Z', updatedAt: '2026-07-09T12:00:00.000Z',
   }],
   vision: { concepts: [{ name: 'dog', peakConfidence: 0.9 }] },
-  creature: { id: 'waglet', encounterProfileId: 'subject_dog_waglet', repeatDepth: 1 },
+  creature: { id: 'waglet', visualKey: 'waglet', encounterProfileId: 'subject_dog_companion_waglet', repeatDepth: 1 },
 };
 const oldState = {
   version: 9, locationPermission: 'granted', activityPermission: 'granted', healthPermission: 'denied',
@@ -101,9 +115,13 @@ function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
   else { failures += 1; console.log(`FAIL  ${label}`); }
 }
-check('v9 upgrades to v16', upgraded.version === 16);
-check('v10 upgrades losslessly to v16', upgradedFromV10.version === 16 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
-check('v11 journals migrate to canonical records', upgradedFromV11.version === 16 && upgradedFromV11.today.journalRecords.length === 2);
+check('v9 upgrades to v17', upgraded.version === 17);
+check('v10 upgrades losslessly to v17', upgradedFromV10.version === 17 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
+check('v11 journals migrate to canonical records', upgradedFromV11.version === 17 && upgradedFromV11.today.journalRecords.length === 2);
+check('legacy creatures gain stable family identity',
+  upgraded.archivedDays[0].creature.aspectId === 'pet-companionship'
+    && upgraded.archivedDays[0].creature.familyId === 'waglet'
+    && upgraded.archivedDays[0].creature.companionId === 'companion:waglet');
 check('cloud intelligence remains opt-in', upgraded.cloudIntelligenceEnabled === false);
 check('personal entities initialize locally', Array.isArray(upgraded.personalEntities) && upgraded.personalEntities.length === 0);
 check('days are preserved', upgraded.archivedDays.length === 1 && upgraded.today.id === 'day-2026-07-10');
@@ -120,5 +138,5 @@ check('legacy hatch waits for enrichment before storing sky', upgraded.archivedD
 check('prompt answer survives', upgraded.archivedDays[0].promptAnswers[0].choiceIds[0] === 'calm');
 check('location survives', upgraded.archivedDays[0].locations[0].id === 'loc-1');
 
-console.log(failures ? `\n${failures} v16 migration check(s) FAILED.` : '\nAll v16 migration checks passed.');
+console.log(failures ? `\n${failures} v17 migration check(s) FAILED.` : '\nAll v17 migration checks passed.');
 process.exit(failures ? 1 : 0);

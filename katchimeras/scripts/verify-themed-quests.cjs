@@ -24,6 +24,7 @@ const taxonomyPath = transpile('utils/intelligence/taxonomy.ts', 'taxonomy.js');
 const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js');
 const themedPath = transpile('utils/quests/themed.ts', 'themed.js');
 const engagementPath = transpile('utils/katchimera-engagement.ts', 'katchimera-engagement.js');
+const lifeAspectsPath = transpile('constants/life-aspects.ts', 'life-aspects.js');
 const typesPath = path.join(tempDir, 'types-home.js');
 const qualityRegistryPath = path.join(tempDir, 'quality-registry.js');
 fs.writeFileSync(typesPath, '');
@@ -37,6 +38,7 @@ const stubs = {
   '@/utils/intelligence/taxonomy': taxonomyPath,
   '@/utils/quests/themed': themedPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
+  '@/constants/life-aspects': lifeAspectsPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {

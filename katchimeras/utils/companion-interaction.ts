@@ -19,6 +19,7 @@ export function createCompanionInteractionState(input: {
     direction: 1,
     reviewItemId: null,
     reflectionDraft: input.reflectionDraft ?? null,
+    reflectionReviewOpen: false,
     discardOpen: false,
   };
 }
@@ -29,18 +30,29 @@ export function companionInteractionReducer(
 ): CompanionInteractionState {
   switch (action.type) {
     case 'select_thread': {
-      const order: CompanionThread[] = ['quest', 'insight', 'reflection'];
+      const order: CompanionThread[] = ['quest', 'discovery', 'insight', 'skins', 'reflection'];
       return {
         ...state,
         thread: action.thread,
         direction: order.indexOf(action.thread) >= order.indexOf(state.thread) ? 1 : -1,
         reviewItemId: null,
+        reflectionReviewOpen: false,
       };
     }
     case 'review_item':
       return { ...state, reviewItemId: action.itemId };
     case 'set_reflection_draft':
-      return { ...state, reflectionDraft: action.draft };
+      return {
+        ...state,
+        reflectionDraft: action.draft,
+        reflectionReviewOpen: action.draft ? state.reflectionReviewOpen : false,
+      };
+    case 'review_reflection':
+      return companionReflectionIsDirty(state)
+        ? { ...state, reflectionReviewOpen: true, discardOpen: false }
+        : state;
+    case 'edit_reflection':
+      return { ...state, reflectionReviewOpen: false };
     case 'request_discard':
       return { ...state, discardOpen: true };
     case 'keep_editing':
@@ -50,6 +62,30 @@ export function companionInteractionReducer(
 
 export function companionReflectionIsDirty(state: CompanionInteractionState): boolean {
   return Boolean(state.reflectionDraft?.text.trim() || state.reflectionDraft?.audioUri);
+}
+
+export function companionViewportResetKey(input: {
+  creatureId: string;
+  thread: CompanionThread;
+  questMode: CompanionQuestViewModel['mode'];
+  activeQuestTitle?: string | null;
+  journeyNodeId?: string | null;
+  reviewItemId?: string | null;
+  reflectionReviewOpen?: boolean;
+  activeAttemptId?: string | null;
+  memorySaved?: boolean;
+}): string {
+  return [
+    input.creatureId,
+    input.thread,
+    input.questMode,
+    input.activeQuestTitle ?? '',
+    input.journeyNodeId ?? '',
+    input.reviewItemId ?? '',
+    input.reflectionReviewOpen ? 'reflection-review' : '',
+    input.activeAttemptId ? 'active-experience' : '',
+    input.memorySaved ? 'memory-saved' : '',
+  ].join('|');
 }
 
 export function companionQuestUsesFullBleed(execution: InteractiveQuestExecution | null): boolean {

@@ -79,3 +79,41 @@ export type GeneratedKatchimeraRecord = {
   created_at: string;
   updated_at: string;
 };
+
+export type LifeAspectId =
+  | 'daily-ritual'
+  | 'food-cooking'
+  | 'movement-fitness'
+  | 'rest-sleep'
+  | 'emotional-recovery'
+  | 'social-connection'
+  | 'parenting-caregiving'
+  | 'pet-companionship'
+  | 'work-focus'
+  | 'life-admin'
+  | 'learning-culture'
+  | 'hobbies-creativity'
+  | 'nature-outdoors'
+  | 'weather-atmosphere'
+  | 'travel-exploration'
+  | 'commute-routes'
+  | 'milestones-chapters'
+  | 'reflection-solitude'
+  | 'contribution-community';
+
+export type LifeAspectCategory =
+  | 'body'
+  | 'relationships'
+  | 'purpose'
+  | 'daily-life'
+  | 'world'
+  | 'inner-life';
+
+export type KatchimeraSkinId = string;
+export type KatchimeraFamilyId = string;
+export type KatchimeraCompanionId = `companion:${KatchimeraFamilyId}`;
+
+export type KatchimeraWardrobeState = {
+  version: 2;
+  equippedByFamily: Partial<Record<KatchimeraFamilyId, KatchimeraSkinId>>;
+};

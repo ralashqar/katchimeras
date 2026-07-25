@@ -63,9 +63,14 @@ const KEY = 'katchadeck.companion-quests-v1';
 // No global cap for now — a katchimera still only holds one quest at a time.
 export const MAX_ACTIVE_QUESTS = Infinity;
 
-export function loadCompanionQuests(): CompanionQuestState {
+export function loadCompanionQuests(
+  resolveCompanionId: (value: string) => string = (value) => value
+): CompanionQuestState {
   const value = getStoredJson<CompanionQuestState>(KEY, emptyCompanionQuestState());
-  return normaliseState(value, true);
+  const normalized = normaliseState(value, true);
+  const migrated = migrateCompanionQuestIdentity(normalized, resolveCompanionId);
+  if (migrated !== normalized) setStoredJson(KEY, migrated);
+  return migrated;
 }
 
 export function saveCompanionQuests(state: CompanionQuestState) {
@@ -74,6 +79,35 @@ export function saveCompanionQuests(state: CompanionQuestState) {
 
 export function emptyCompanionQuestState(): CompanionQuestState {
   return { schemaVersion: 2, quests: [], submissions: [], offerCycles: [], attempts: [] };
+}
+
+export function migrateCompanionQuestIdentity(
+  state: CompanionQuestState,
+  resolveCompanionId: (value: string) => string
+): CompanionQuestState {
+  let changed = false;
+  const resolve = (value: string) => {
+    const next = resolveCompanionId(value);
+    if (next !== value) changed = true;
+    return next;
+  };
+  const migrated: CompanionQuestState = {
+    ...state,
+    quests: state.quests.map((quest) => ({ ...quest, creatureId: resolve(quest.creatureId) })),
+    submissions: state.submissions.map((submission) => ({
+      ...submission,
+      creatureId: resolve(submission.creatureId),
+    })),
+    offerCycles: state.offerCycles.map((cycle) => ({
+      ...cycle,
+      creatureId: resolve(cycle.creatureId),
+    })),
+    attempts: state.attempts.map((attempt) => ({
+      ...attempt,
+      creatureId: resolve(attempt.creatureId),
+    })),
+  };
+  return changed ? normaliseState(migrated) : state;
 }
 
 export function questOfferForDay<T extends { id: string; weight?: number }>(

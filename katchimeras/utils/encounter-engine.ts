@@ -1,7 +1,13 @@
 import { encounterCastBySeedId, encounterLiveCast, type EncounterCastEntry } from '@/constants/encounter-cast';
 import { homeCreatureVisuals } from '@/constants/home-mvp';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
-import type { KatchimeraEncounterProfile } from '@/types/katchimera';
+import type {
+  KatchimeraCompanionId,
+  KatchimeraEncounterProfile,
+  KatchimeraFamilyId,
+  KatchimeraSkinId,
+  LifeAspectId,
+} from '@/types/katchimera';
 import type {
   EncounterHistoryMap,
   HomeRarityTier,
@@ -14,6 +20,10 @@ import { resolveBondStage, type BondStage } from '@/utils/bond';
 import { buildVisionSignals } from '@/utils/vision-signals';
 import { assignmentSignals } from '@/utils/intelligence/classification';
 import { photoPlaceEncounterSignals } from '@/utils/photo-place-gameplay';
+import {
+  historyEntryForFamily,
+  identityForEncounter,
+} from '@/utils/katchimera-identity';
 
 // Where a signal came from — drives Hatch Engine v2 weighting (explicit
 // moment/prompt input counts as "intent") and the day-tag field's grouping.
@@ -291,6 +301,10 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
 export type EncounterCandidate = {
   castEntry: EncounterCastEntry;
   profile: KatchimeraEncounterProfile;
+  aspectId: LifeAspectId;
+  familyId: KatchimeraFamilyId;
+  companionId: KatchimeraCompanionId;
+  skinId: KatchimeraSkinId;
   signal: EncounterSignal;
   repeatDepth: number;
   lastSeenIsoDate: string | null;
@@ -298,14 +312,14 @@ export type EncounterCandidate = {
   rarityFloor: HomeRarityTier;
 };
 
-// Collapse the day's signals to one candidate per species, keeping the
-// strongest signal for each (and preferring explicit moment/prompt sources on a
-// tie, so "you said so" wins the provenance). Drops signals with no live cast.
+// Collapse the day's signals to one candidate per true companion family. Broad
+// life aspects remain classification metadata and no longer collapse unrelated
+// foods, sports, places, or weather creatures into one resident.
 export function extractEncounterCandidates(
   day: StoredHomeDayRecord,
   history: EncounterHistoryMap
 ): EncounterCandidate[] {
-  const byProfile = new Map<string, EncounterCandidate>();
+  const byFamily = new Map<KatchimeraFamilyId, EncounterCandidate>();
   const intentSources: EncounterSignalSource[] = ['moment', 'prompt'];
 
   for (const signal of extractEncounterSignals(day)) {
@@ -314,11 +328,12 @@ export function extractEncounterCandidates(
       continue;
     }
     const profile = profilesById.get(castEntry.profileId);
-    if (!profile) {
+    const identity = identityForEncounter(castEntry.profileId, castEntry.visualKey);
+    if (!profile || !identity) {
       continue;
     }
 
-    const existing = byProfile.get(castEntry.profileId);
+    const existing = byFamily.get(identity.familyId);
     if (existing) {
       const strongerIntensity = signal.intensity > existing.signal.intensity;
       const sameIntensityButExplicit =
@@ -330,17 +345,22 @@ export function extractEncounterCandidates(
       }
     }
 
-    byProfile.set(castEntry.profileId, {
+    const familyHistory = historyEntryForFamily(history, identity.familyId);
+    byFamily.set(identity.familyId, {
       castEntry,
       profile,
+      aspectId: identity.aspectId,
+      familyId: identity.familyId,
+      companionId: identity.companionId,
+      skinId: identity.skinId,
       signal,
-      repeatDepth: history[castEntry.profileId]?.count ?? 0,
-      lastSeenIsoDate: history[castEntry.profileId]?.lastSeenIsoDate ?? null,
+      repeatDepth: familyHistory?.count ?? 0,
+      lastSeenIsoDate: familyHistory?.lastSeenIsoDate ?? null,
       rarityFloor: speciesRarityFloor(profile.baseRarity),
     });
   }
 
-  return [...byProfile.values()];
+  return [...byFamily.values()];
 }
 
 // Build the persisted creature record for a chosen candidate. Shared by the
@@ -358,9 +378,11 @@ export function buildCreatureFromMatch(
   const bondStage = resolveBondStage(bondVisitCount);
   const lines = pickEncounterLines(profile, castEntry, repeatDepth, rarity, signal.isRecovery, bondStage);
   const highlightMomentId = signal.sourceMomentIds[signal.sourceMomentIds.length - 1] ?? null;
+  const identity = identityForEncounter(profile.id, castEntry.visualKey);
 
   return {
     id: `creature-${day.isoDate}-${stableHash(`${day.isoDate}|${profile.id}`)}`,
+    ...(identity ?? {}),
     name: profile.name,
     primaryTrait,
     secondaryTrait,
@@ -385,22 +407,22 @@ export function matchEncounterForDay(
   history: EncounterHistoryMap,
   options: { avoidProfileId?: string } = {}
 ): EncounterMatch | null {
-  const candidates = extractEncounterSignals(day)
-    .map((signal) => {
-      const castEntry = encounterCastBySeedId.get(signal.seedId);
-      if (!castEntry) {
-        return null;
-      }
-      const profile = profilesById.get(castEntry.profileId);
-      if (!profile) {
-        return null;
-      }
-      const repeatDepth = history[castEntry.profileId]?.count ?? 0;
+  const avoidedIdentity = options.avoidProfileId
+    ? identityForEncounter(options.avoidProfileId, null)
+    : null;
+  const candidates = extractEncounterCandidates(day, history)
+    .map((candidate) => {
+      const { castEntry, profile, signal, repeatDepth } = candidate;
       // Specific scene/subject/place signals are favored over generic activity
       // fallbacks, so "what the day was about" beats "how much you moved".
       const specificityBonus = GENERIC_FALLBACK_SEEDS.has(signal.seedId) ? 0 : SPECIFICITY_BONUS;
       // Avoid repeating the day-before's creature when something else is close.
-      const avoidPenalty = options.avoidProfileId === castEntry.profileId ? AVOID_REPEAT_PENALTY : 0;
+      const avoidPenalty =
+        (avoidedIdentity
+          ? avoidedIdentity.familyId === candidate.familyId
+          : options.avoidProfileId === castEntry.profileId)
+          ? AVOID_REPEAT_PENALTY
+          : 0;
       const favored = clamp01(
         signal.intensity +
           Math.min(repeatDepth * REPEAT_FAVOR_PER_VISIT, REPEAT_FAVOR_CAP) +
@@ -409,7 +431,6 @@ export function matchEncounterForDay(
       );
       return { castEntry, profile, signal, repeatDepth, favored };
     })
-    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
     .sort((left, right) => {
       if (right.favored !== left.favored) {
         return right.favored - left.favored;
@@ -495,7 +516,7 @@ export function buildFloorEncounterCreature(
       isRecovery: seedId === 'home_evening',
       source: 'passive',
     },
-    repeatDepth: history[castEntry.profileId]?.count ?? 0,
+    repeatDepth: encounterRepeatDepth(history, castEntry),
     rarity: maxRarity(speciesRarityFloor(profile.baseRarity), livingRarity.tier),
     livingRarity,
   };
@@ -539,7 +560,7 @@ function floorCreatureFromSeed(
     castEntry,
     profile,
     signal: { seedId, intensity: 0.36, sourceMomentIds: [], isRecovery, source: 'passive' },
-    repeatDepth: history[castEntry.profileId]?.count ?? 0,
+    repeatDepth: encounterRepeatDepth(history, castEntry),
     rarity: maxRarity(speciesRarityFloor(profile.baseRarity), livingRarity.tier),
     livingRarity,
   };
@@ -573,7 +594,7 @@ export function buildDistinctEncounterCreature(
       if (!profile) {
         return null;
       }
-      const repeatDepth = history[castEntry.profileId]?.count ?? 0;
+      const repeatDepth = encounterRepeatDepth(history, castEntry);
       const specificityBonus = GENERIC_FALLBACK_SEEDS.has(signal.seedId) ? 0 : SPECIFICITY_BONUS;
       const favored = clamp01(
         signal.intensity + Math.min(repeatDepth * REPEAT_FAVOR_PER_VISIT, REPEAT_FAVOR_CAP) + specificityBonus
@@ -581,7 +602,7 @@ export function buildDistinctEncounterCreature(
       return { castEntry, profile, signal, repeatDepth, favored };
     })
     .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
-    .filter((candidate) => !excludeProfileIds.has(candidate.profile.id))
+    .filter((candidate) => !isCastExcluded(candidate.castEntry, excludeProfileIds))
     .sort((left, right) => {
       if (right.favored !== left.favored) {
         return right.favored - left.favored;
@@ -617,7 +638,7 @@ export function buildDistinctEncounterCreature(
   //     instead of a generic "you walked / stayed in" floor.
   for (const seedId of preferredFloorSeeds) {
     const castEntry = encounterCastBySeedId.get(seedId);
-    if (castEntry && !excludeProfileIds.has(castEntry.profileId)) {
+    if (castEntry && !isCastExcluded(castEntry, excludeProfileIds)) {
       const creature = floorCreatureFromSeed(day, seedId, history, primaryTrait, secondaryTrait);
       if (creature) {
         return creature;
@@ -634,7 +655,7 @@ export function buildDistinctEncounterCreature(
   const floorSeeds = day.stepsCount >= 1500 ? DISTINCT_FLOOR_SEEDS_ACTIVE : DISTINCT_FLOOR_SEEDS_QUIET;
   for (const seedId of floorSeeds) {
     const castEntry = encounterCastBySeedId.get(seedId);
-    if (castEntry && !excludeProfileIds.has(castEntry.profileId)) {
+    if (castEntry && !isCastExcluded(castEntry, excludeProfileIds)) {
       const creature = floorCreatureFromSeed(day, seedId, history, primaryTrait, secondaryTrait);
       if (creature) {
         return creature;
@@ -644,7 +665,7 @@ export function buildDistinctEncounterCreature(
 
   // 3. Last resort — any unused cast member at all.
   for (const castEntry of encounterLiveCast) {
-    if (!excludeProfileIds.has(castEntry.profileId)) {
+    if (!isCastExcluded(castEntry, excludeProfileIds)) {
       const creature = floorCreatureFromSeed(day, castEntry.seedId, history, primaryTrait, secondaryTrait);
       if (creature) {
         return creature;
@@ -679,6 +700,30 @@ export function recordEncounterHatch(
 // A creature's intrinsic rarity floor — how hard it is to meet at all,
 // independent of any one day. The day's living conditions can lift a creature
 // above its floor (see computeLivingRarity), never below it.
+function encounterRepeatDepth(
+  history: EncounterHistoryMap,
+  castEntry: EncounterCastEntry
+): number {
+  const identity = identityForEncounter(castEntry.profileId, castEntry.visualKey);
+  return identity
+    ? historyEntryForFamily(history, identity.familyId)?.count ?? 0
+    : history[castEntry.profileId]?.count ?? 0;
+}
+
+function isCastExcluded(
+  castEntry: EncounterCastEntry,
+  excludedIds: ReadonlySet<string>
+): boolean {
+  if (excludedIds.has(castEntry.profileId)) return true;
+  const identity = identityForEncounter(castEntry.profileId, castEntry.visualKey);
+  if (!identity) return false;
+  if (excludedIds.has(identity.familyId) || excludedIds.has(identity.companionId)) return true;
+  for (const excludedId of excludedIds) {
+    if (identityForEncounter(excludedId, null)?.familyId === identity.familyId) return true;
+  }
+  return false;
+}
+
 export function speciesRarityFloor(baseRarity: string): HomeRarityTier {
   if (baseRarity === 'rare') return 'epic';
   if (baseRarity === 'uncommon') return 'rare';

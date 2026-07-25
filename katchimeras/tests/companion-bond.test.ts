@@ -40,7 +40,7 @@ test('bond events are idempotent and use their configured reward', () => {
   assert.equal(duplicate.state.events.length, 1);
 });
 
-test('quest migration deduplicates completed rows and submissions', () => {
+test('quest migration deduplicates completed rows and applies the quest lane reward', () => {
   const quest = { questId: 'quest-feastle-sort', creatureId: 'feastle', title: 'Set the table', hint: 'Sort it', acceptedAt: 10, completedAt: 20, completedDayId: '2026-07-15' };
   const quests: CompanionQuestState = {
     schemaVersion: 2,
@@ -52,7 +52,7 @@ test('quest migration deduplicates completed rows and submissions', () => {
   const migrated = backfillQuestBondEvents(emptyCompanionBondState(), quests);
   assert.equal(migrated.events.length, 1);
   assert.equal(migrated.events[0]?.id, 'quest-submission:submission-1');
-  assert.equal(companionBondProgress(migrated, 'feastle').totalPoints, 25);
+  assert.equal(companionBondProgress(migrated, 'feastle').totalPoints, 10);
 });
 
 test('daily quest choices are deterministic, weighted, and capped at three', () => {

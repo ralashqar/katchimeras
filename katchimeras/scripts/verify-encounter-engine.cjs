@@ -61,6 +61,9 @@ fs.writeFileSync(deviceActivityPath, 'exports.detectDeviceContext = () => ({ dev
 const questionRegistryPath = path.join(tempDir, 'question-registry.js');
 fs.writeFileSync(questionRegistryPath, 'exports.QUESTION_PLANNER_VERSION = 3; exports.questionPlannerMode = () => "on"; exports.planNextQuestion = () => null; exports.questionIdForGraphNode = (graphId, nodeId) => graphId && nodeId ? `${graphId}.${nodeId}` : null;');
 const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 'photo-place-gameplay.js');
+const lifeAspectsPath = transpileToTemp('constants/life-aspects.ts', 'life-aspects.js');
+const katchimeraSkinsPath = transpileToTemp('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const katchimeraIdentityPath = transpileToTemp('utils/katchimera-identity.ts', 'katchimera-identity.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const hatchPastPath = transpileToTemp('utils/hatch-your-past.ts', 'hatch-your-past.js');
 
@@ -68,6 +71,8 @@ const stubs = {
   '@/constants/encounter-cast': castPath,
   '@/constants/home-mvp': { homeCreatureVisuals: homeCreatureVisualsStub },
   '@/constants/katchimera-encounter-profiles': { katchimeraEncounterProfiles: encounterProfiles },
+  '@/constants/life-aspects': lifeAspectsPath,
+  '@/constants/katchimera-skins': katchimeraSkinsPath,
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/bond': bondPath,
   '@/utils/vision-signals': visionSignalsPath,
@@ -83,6 +88,7 @@ const stubs = {
   '@/utils/intelligence/device-activity': deviceActivityPath,
   '@/utils/intelligence/question-registry': questionRegistryPath,
   '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
+  '@/utils/katchimera-identity': katchimeraIdentityPath,
   '@/utils/encounter-engine': enginePath,
   '@/types/home': {},
   '@/types/katchimera': {},

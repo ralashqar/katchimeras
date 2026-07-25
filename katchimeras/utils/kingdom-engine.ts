@@ -9,6 +9,8 @@ import type {
   KingdomState,
   KingdomTotals,
 } from '@/types/kingdom';
+import { katchimeraFamilyById } from '@/constants/katchimera-skins';
+import { identityForCreature } from '@/utils/katchimera-identity';
 
 // deriveKingdom — the pure fold from every day ever lived to the persistent
 // Kingdom. No incremental updates, no stored world state: recomputing from the
@@ -123,11 +125,18 @@ export function deriveKingdom(days: HomeDayRecord[]): KingdomState {
     }
 
     if (day.state === 'hatched' && day.creature) {
+      const identity = identityForCreature(day.creature);
+      const family = identity ? katchimeraFamilyById.get(identity.familyId) : null;
       creatures.push({
         dayId: day.id,
         isoDate: day.isoDate,
-        creatureId: day.creature.id,
-        name: day.creature.name,
+        creatureId: identity?.companionId ?? day.creature.id,
+        sourceCreatureId: day.creature.id,
+        companionId: identity?.companionId,
+        aspectId: identity?.aspectId,
+        familyId: identity?.familyId,
+        skinId: identity?.skinId,
+        name: family?.displayName ?? day.creature.name,
         visualKey: day.creature.visualKey,
         rarity: day.creature.rarity,
         accentColor: day.creature.accentColor,

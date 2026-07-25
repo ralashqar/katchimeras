@@ -47,7 +47,8 @@ export function CompanionQuestChoices({
               <View style={styles.offerCopy}>
                 <View style={styles.offerTopline}>
                   <ThemedText style={styles.offerCategory} lightColor={selected ? Meadow.goldDeep : Meadow.leafDeep} darkColor={selected ? Meadow.goldDeep : Meadow.leafDeep}>
-                    {offer.recommended ? '★ Recommended' : offer.categoryLabel}
+                    {offer.lane === 'mini_game' ? 'Mini-game' : 'Real life'}
+                    {offer.recommended ? ' · Recommended' : ` · ${offer.categoryLabel}`}
                   </ThemedText>
                   <View style={[styles.radio, selected && styles.radioSelected]}>
                     {selected ? <IconSymbol name="checkmark" size={12} color="#FFF6DA" /> : null}

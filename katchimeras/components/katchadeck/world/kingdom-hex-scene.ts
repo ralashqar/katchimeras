@@ -1,6 +1,8 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import type { KingdomCreature } from '@/types/kingdom';
+import { lifeAspectById } from '@/constants/life-aspects';
+import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import type { WorldIdentityState } from '@/types/world-identity';
 import { katchimeraHexTileForCreature } from '@/utils/katchimera-hex-tiles';
 import type { KingdomResident } from '@/utils/kingdom-residents';
@@ -117,13 +119,26 @@ function artLayerFor(
   identity: Pick<WorldIdentityState, 'selectedHomeArchetypeId' | 'zodiacSignId'> | null | undefined,
   verticalAlignmentMode: KingdomHexVerticalAlignmentMode
 ): KingdomTileArtLayer {
+  const familyAnchor =
+    tile.kind === 'resident' && tile.resident?.creature.familyId
+      ? katchimeraFamilyById.get(tile.resident.creature.familyId)?.anchorVisualKey ?? null
+      : null;
+  const aspectAnchor =
+    familyAnchor ?? (tile.kind === 'resident' && tile.resident?.creature.aspectId
+      ? lifeAspectById.get(tile.resident.creature.aspectId)?.anchorVisualKey ?? null
+      : null);
   const themedResidentTile =
     tile.kind === 'resident' && tile.resident
-      ? hexTiles.residentTiles?.[tile.resident.creature.visualKey] ?? null
+      ? hexTiles.residentTiles?.[tile.resident.creature.visualKey]
+        ?? (aspectAnchor ? hexTiles.residentTiles?.[aspectAnchor] : null)
+        ?? null
       : null;
   const customResidentTile =
     !themedResidentTile && hexTiles.useCustomResidentTiles && tile.kind === 'resident' && tile.resident
       ? katchimeraHexTileForCreature(tile.resident.creature)
+        ?? (aspectAnchor
+          ? katchimeraHexTileForCreature({ ...tile.resident.creature, visualKey: aspectAnchor })
+          : null)
       : null;
   const homeTile = identity?.selectedHomeArchetypeId
     ? hexTiles.homes[identity.selectedHomeArchetypeId]
@@ -204,7 +219,12 @@ export function kingdomResidentHexTiles(
   const coordByIndex = hexSpiral(residents.length + 1, false).filter(
     (coord) => coord.q !== ZODIAC_HEX_COORD.q || coord.r !== ZODIAC_HEX_COORD.r
   );
-  const meta = new Map(creatures.map((creature) => [creature.creatureId, creature]));
+  // deriveKingdom sorts newest first. Keep the first row for each logical
+  // companion so the resident wears its most recently encountered skin.
+  const meta = new Map<string, KingdomCreature>();
+  for (const creature of creatures) {
+    if (!meta.has(creature.creatureId)) meta.set(creature.creatureId, creature);
+  }
 
   return residents
     .map((resident, index) => {

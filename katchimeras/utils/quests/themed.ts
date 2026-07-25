@@ -9,21 +9,151 @@ export type ThemedQuestOffer = {
   categoryLabel: string;
   estimatedMinutes: number;
   artworkKey?: string;
+  lane: NonNullable<QuestDefinition['lane']>;
+  minimumBondLevel: NonNullable<QuestDefinition['minimumBondLevel']>;
 };
 
 const CREATURE_QUEST_POOL: Record<string, string[]> = {
-  bedrotte: ['quest-bedrotte-breathe', 'quest-early-night'],
-  steppling: ['quest-steppling-stride', 'quest-step-sprint', 'quest-step-time-trial', 'quest-long-walk'],
-  flickerbun: ['quest-film-trivia', 'quest-watch-film', 'quest-any-inspiration'],
-  pagelet: ['quest-book-trivia', 'quest-pagelet-word-paths', 'quest-pagelet-lost-word', 'quest-read-book', 'quest-any-inspiration'],
-  mossprout: ['quest-mossprout-memory', 'quest-new-park'],
-  skylo: ['quest-skylo-city-trivia', 'quest-photo-city'],
-  gatherglow: ['quest-gatherglow-pattern', 'quest-snap-today'],
-  feastle: ['quest-feastle-merge', 'quest-feastle-sort', 'quest-feastle-memory', 'quest-photo-food', 'quest-cuisine-any-new'],
-  tasklet: ['quest-tasklet-desk-jam', 'quest-tasklet-sort', 'quest-goal-note'],
-  cheerlet: ['quest-cheerlet-block-party', 'quest-celebrate-note'],
-  relicoon: ['quest-relicoon-match', 'quest-visit-museum'],
-  encora: ['quest-encora-rhythm', 'quest-any-inspiration'],
+  baristabbit: [
+    'quest-coffee-ritual-pause', 'quest-coffee-ritual-note', 'quest-coffee-ritual-redesign',
+    'quest-coffee-ritual-weekly-review', 'quest-coffee-ritual-brew-sequence',
+  ],
+  lattelet: [
+    'quest-coffee-ritual-pause', 'quest-coffee-ritual-note', 'quest-coffee-ritual-redesign',
+    'quest-coffee-ritual-weekly-review', 'quest-coffee-ritual-brew-sequence',
+  ],
+  hearthsip: [
+    'quest-coffee-ritual-pause', 'quest-coffee-ritual-note', 'quest-coffee-ritual-redesign',
+    'quest-coffee-ritual-weekly-review', 'quest-coffee-ritual-brew-sequence',
+  ],
+  bedrotte: [
+    'quest-bedrotte-rest-note',
+    'quest-rest-wind-down',
+    'quest-rest-boundary',
+    'quest-rest-recovery-checkin',
+    'quest-early-night',
+    'quest-rest-weekly-review',
+    'quest-bedrotte-breathe',
+  ],
+  snoozle: [
+    'quest-bedrotte-rest-note',
+    'quest-rest-wind-down',
+    'quest-rest-boundary',
+    'quest-rest-recovery-checkin',
+    'quest-early-night',
+    'quest-rest-weekly-review',
+    'quest-bedrotte-breathe',
+  ],
+  steppling: [
+    'quest-steppling-gentle-walk',
+    'quest-steppling-walk-note',
+    'quest-long-walk',
+    'quest-steppling-weekly-review',
+    'quest-steppling-stride',
+    'quest-step-sprint',
+    'quest-step-time-trial',
+  ],
+  flickerbun: [
+    'quest-flickerbun-watch',
+    'quest-flickerbun-scene-note',
+    'quest-flickerbun-new-perspective',
+    'quest-flickerbun-weekly-review',
+    'quest-film-trivia',
+  ],
+  pagelet: [
+    'quest-read-book',
+    'quest-pagelet-curiosity-note',
+    'quest-pagelet-learning-note',
+    'quest-pagelet-weekly-review',
+    'quest-book-trivia',
+    'quest-pagelet-word-paths',
+    'quest-pagelet-lost-word',
+  ],
+  mossprout: [
+    'quest-mossprout-green-photo',
+    'quest-mossprout-nature-note',
+    'quest-mossprout-return',
+    'quest-mossprout-weekly-review',
+    'quest-mossprout-tend',
+    'quest-mossprout-memory',
+  ],
+  skylo: [
+    'quest-skylo-city-photo',
+    'quest-skylo-local-stop',
+    'quest-skylo-neighbourhood-note',
+    'quest-skylo-weekly-review',
+    'quest-skylo-city-trivia',
+  ],
+  gatherglow: [
+    'quest-gatherglow-reach-out',
+    'quest-gatherglow-shared-moment',
+    'quest-gatherglow-deeper-checkin',
+    'quest-gatherglow-weekly-review',
+    'quest-gatherglow-pattern',
+  ],
+  feastle: [
+    'quest-feastle-merge',
+    'quest-feastle-meal-photo',
+    'quest-feastle-meal-note',
+    'quest-feastle-new-flavour',
+    'quest-feastle-weekly-review',
+    'quest-feastle-sort',
+    'quest-feastle-memory',
+  ],
+  tasklet: [
+    'quest-tasklet-next-action',
+    'quest-goal-note',
+    'quest-tasklet-clear-three',
+    'quest-tasklet-focus',
+    'quest-tasklet-tomorrow-first',
+    'quest-tasklet-weekly-review',
+    'quest-tasklet-sort',
+    'quest-tasklet-desk-jam',
+  ],
+  cheerlet: [
+    'quest-cheerlet-name-progress',
+    'quest-cheerlet-celebrate-note',
+    'quest-cheerlet-mark-chapter',
+    'quest-cheerlet-weekly-review',
+    'quest-cheerlet-block-party',
+  ],
+  relicoon: [
+    'quest-relicoon-object-note',
+    'quest-relicoon-museum-visit',
+    'quest-relicoon-context-note',
+    'quest-relicoon-weekly-review',
+    'quest-relicoon-match',
+  ],
+  encora: [
+    'quest-encora-listening-note',
+    'quest-encora-music-moment',
+    'quest-encora-practice-note',
+    'quest-encora-weekly-review',
+    'quest-encora-rhythm',
+  ],
+  errandimp: [
+    'quest-errandimp-close-loop', 'quest-errandimp-reset-note', 'quest-errandimp-maintenance',
+    'quest-errandimp-weekly-review', 'quest-errandimp-sort',
+  ],
+  dawnle: [
+    'quest-dawnle-first-light-photo', 'quest-dawnle-morning-note', 'quest-dawnle-prepare-start',
+    'quest-dawnle-weekly-review', 'quest-dawnle-first-light',
+  ],
+  mendle: [
+    'quest-mendle-honest-checkin', 'quest-mendle-kind-action', 'quest-mendle-repair-note',
+    'quest-mendle-weekly-review', 'quest-mendle-breathe',
+  ],
+  quietome: [
+    'quest-quietome-one-line', 'quest-quietome-solo-pause', 'quest-quietome-returning-question',
+    'quest-quietome-weekly-review', 'quest-quietome-still-signals',
+  ],
+  vesperitt: [
+    'quest-late-capture',
+    'quest-vesperitt-night-note',
+    'quest-vesperitt-next-day-note',
+    'quest-vesperitt-weekly-review',
+    'quest-vesperitt-moon-signals',
+  ],
 };
 
 const THEME_QUEST_POOL: Record<string, string[]> = {
@@ -93,6 +223,8 @@ export function themedQuestOffers(subtype: string, archetype: string, creatureKe
       hint: definition.hint,
       weight: definition.eligibility?.weight,
       family: definition.family,
+      lane: definition.lane ?? 'real_life',
+      minimumBondLevel: definition.minimumBondLevel ?? 1,
       ...questPresentation(definition),
     }));
 }

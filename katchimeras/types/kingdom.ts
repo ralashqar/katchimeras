@@ -1,4 +1,10 @@
 import type { BigMomentType, HomeRarityTier, HomeVisualKey } from '@/types/home';
+import type {
+  KatchimeraCompanionId,
+  KatchimeraFamilyId,
+  KatchimeraSkinId,
+  LifeAspectId,
+} from '@/types/katchimera';
 
 // The Kingdom — the persistent world the user's whole life builds, replacing
 // the per-day WorldPatch as the long-term unit. Derived (never authored) state:
@@ -36,7 +42,14 @@ export type KingdomBuilding = {
 export type KingdomCreature = {
   dayId: string;
   isoDate: string;
+  // Stable logical resident id. sourceCreatureId retains the immutable hatch
+  // record for archive/arrival provenance.
   creatureId: string;
+  sourceCreatureId?: string;
+  companionId?: KatchimeraCompanionId;
+  aspectId?: LifeAspectId;
+  familyId?: KatchimeraFamilyId;
+  skinId?: KatchimeraSkinId;
   name: string;
   visualKey: HomeVisualKey;
   rarity: HomeRarityTier;

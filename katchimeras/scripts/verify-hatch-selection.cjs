@@ -50,6 +50,9 @@ const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'intellig
 const classificationPath = path.join(tempDir, 'intelligence-classification.js');
 fs.writeFileSync(classificationPath, 'exports.assignmentSignals = () => [];');
 const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 'photo-place-gameplay.js');
+const lifeAspectsPath = transpileToTemp('constants/life-aspects.ts', 'life-aspects.js');
+const katchimeraSkinsPath = transpileToTemp('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const katchimeraIdentityPath = transpileToTemp('utils/katchimera-identity.ts', 'katchimera-identity.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const selectionPath = transpileToTemp('utils/hatch-selection.ts', 'hatch-selection.js');
 
@@ -57,6 +60,8 @@ const stubs = {
   '@/constants/encounter-cast': castPath,
   '@/constants/home-mvp': { homeCreatureVisuals: homeCreatureVisualsStub },
   '@/constants/katchimera-encounter-profiles': { katchimeraEncounterProfiles: encounterProfiles },
+  '@/constants/life-aspects': lifeAspectsPath,
+  '@/constants/katchimera-skins': katchimeraSkinsPath,
   '@/utils/living-rarity': livingRarityPath,
   '@/utils/bond': bondPath,
   '@/utils/vision-signals': visionSignalsPath,
@@ -64,6 +69,7 @@ const stubs = {
   '@/utils/intelligence/taxonomy': taxonomyPath,
   '@/utils/intelligence/classification': classificationPath,
   '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
+  '@/utils/katchimera-identity': katchimeraIdentityPath,
   '@/utils/encounter-engine': enginePath,
   '@/utils/hatch-selection': selectionPath,
   '@/types/home': {},
@@ -164,7 +170,7 @@ function check(label, condition, detail) {
 }
 
 const DOG = 'subject_dog_companion_waglet';
-const CAT = 'subject_cat_companion_whiskit';
+const BABY = 'subject_baby_little_one_snuglet';
 
 function probOf(result, profileId) {
   const row = result.probabilities.find((entry) => entry.profileId === profileId);
@@ -172,7 +178,7 @@ function probOf(result, profileId) {
 }
 
 // --- 1. Purity / reproducibility -------------------------------------------
-const reproDay = visionDay([visionConcept('dog', 0.9, 0.9), visionConcept('cat', 0.3, 0.6)]);
+const reproDay = visionDay([visionConcept('dog', 0.9, 0.9), visionConcept('baby', 0.3, 0.6)]);
 const reproA = selectHatch({ day: reproDay, history: {}, rng: makeSeededRng('seed-xyz') });
 const reproB = selectHatch({ day: reproDay, history: {}, rng: makeSeededRng('seed-xyz') });
 check('same (day, seed) is reproducible',
@@ -183,9 +189,9 @@ check('selection returns a creature with v2 fields',
   JSON.stringify({ p: reproA?.creature?.pickProbability, echoes: reproA?.creature?.fieldEchoes?.length }));
 
 // --- 2. Probabilistic distribution: leader wins 70-85% at tau=0.18 ---------
-// dog (cov .9 peak .9 -> 0.805 + novelty .22 = 1.025) vs cat (cov .3 peak .6 ->
+// dog (cov .9 peak .9 -> 0.805 + novelty .22 = 1.025) vs baby (cov .3 peak .6 ->
 // 0.565 + .22 = 0.785). gap 0.24 -> p_dog ~= 0.79.
-const distDay = visionDay([visionConcept('dog', 0.9, 0.9), visionConcept('cat', 0.3, 0.6)]);
+const distDay = visionDay([visionConcept('dog', 0.9, 0.9), visionConcept('baby', 0.3, 0.6)]);
 const TRIALS = 4000;
 let dogWins = 0;
 for (let i = 0; i < TRIALS; i += 1) {
@@ -197,6 +203,16 @@ check('leader wins between 70% and 85% (probabilistic, not argmax)',
   dogRate >= 0.7 && dogRate <= 0.85, `dog win rate=${dogRate.toFixed(3)}`);
 check('the underdog still wins sometimes (true sampling)',
   dogWins < TRIALS && dogWins > 0, `dogWins=${dogWins}/${TRIALS}`);
+const petForms = selectHatch({
+  day: visionDay([visionConcept('dog', 0.9, 0.9), visionConcept('cat', 0.8, 0.85)]),
+  history: {},
+  rng: makeSeededRng('pet-forms'),
+});
+check('dog and cat signals remain distinct companion families',
+  petForms?.probabilities.length === 2
+    && petForms.probabilities.some((candidate) => candidate.familyId === 'waglet')
+    && petForms.probabilities.some((candidate) => candidate.familyId === 'whiskit'),
+  JSON.stringify(petForms?.probabilities));
 
 // --- 3. Single-candidate day is consistent with the legacy builder ---------
 const coffeeDay = makeDay({ moments: [makeMoment('coffee', 0), makeMoment('coffee', 1)], stepsCount: 1600 });
@@ -215,52 +231,52 @@ check('birthSignals records the winning seed',
 check('single-candidate day has no echoes', coffeeSel?.echoes?.length === 0, String(coffeeSel?.echoes?.length));
 
 // --- 4. Variety: recency + avoid-previous suppress a just-hatched species ---
-// Two equal-base candidates (both seen, no novelty); cat was hatched yesterday
+// Two equal-base candidates (both seen, no novelty); Nestkin was hatched yesterday
 // AND is yesterday's creature, so recency + avoidPrev must drop its probability.
-const equalDay = visionDay([visionConcept('dog', 0.8, 0.85), visionConcept('cat', 0.8, 0.85)]);
+const equalDay = visionDay([visionConcept('dog', 0.8, 0.85), visionConcept('baby', 0.8, 0.85)]);
 const recencyHistory = {
   [DOG]: { count: 3, lastSeenIsoDate: '2026-06-01' }, // 11 days ago -> no recency
-  [CAT]: { count: 3, lastSeenIsoDate: '2026-06-11' }, // yesterday -> recency
+  [BABY]: { count: 3, lastSeenIsoDate: '2026-06-11' }, // yesterday -> recency
 };
 const recencyResult = selectHatch({
-  day: equalDay, history: recencyHistory, yesterdayProfileId: CAT, rng: makeSeededRng('r'),
+  day: equalDay, history: recencyHistory, yesterdayProfileId: BABY, rng: makeSeededRng('r'),
 });
 check('recency + avoidPrev lower yesterday\'s species below the alternative',
-  probOf(recencyResult, CAT) < probOf(recencyResult, DOG),
-  JSON.stringify({ dog: probOf(recencyResult, DOG), cat: probOf(recencyResult, CAT) }));
+  probOf(recencyResult, BABY) < probOf(recencyResult, DOG),
+  JSON.stringify({ dog: probOf(recencyResult, DOG), baby: probOf(recencyResult, BABY) }));
 check('the suppressed species is materially less likely',
-  probOf(recencyResult, CAT) < 0.3,
-  String(probOf(recencyResult, CAT)));
+  probOf(recencyResult, BABY) < 0.3,
+  String(probOf(recencyResult, BABY)));
 
 // Recency in isolation (both seen, equal bond, only last-seen differs).
 const recencyOnly = selectHatch({
   day: equalDay,
-  history: { [DOG]: { count: 3, lastSeenIsoDate: '2026-06-01' }, [CAT]: { count: 3, lastSeenIsoDate: '2026-06-11' } },
+  history: { [DOG]: { count: 3, lastSeenIsoDate: '2026-06-01' }, [BABY]: { count: 3, lastSeenIsoDate: '2026-06-11' } },
   rng: makeSeededRng('r2'),
 });
 check('recency alone shifts probability toward the less-recent species',
-  probOf(recencyOnly, DOG) > probOf(recencyOnly, CAT),
-  JSON.stringify({ dog: probOf(recencyOnly, DOG), cat: probOf(recencyOnly, CAT) }));
+  probOf(recencyOnly, DOG) > probOf(recencyOnly, BABY),
+  JSON.stringify({ dog: probOf(recencyOnly, DOG), baby: probOf(recencyOnly, BABY) }));
 
 // --- 5. Novelty: a never-seen species is favored over an equally-strong seen one
 const noveltyResult = selectHatch({
   day: equalDay,
-  history: { [CAT]: { count: 1, lastSeenIsoDate: '2026-05-01' } }, // dog novel, cat seen (no recency)
+  history: { [BABY]: { count: 1, lastSeenIsoDate: '2026-05-01' } }, // dog novel, baby seen (no recency)
   rng: makeSeededRng('n'),
 });
 check('novelty favors the unseen species',
-  probOf(noveltyResult, DOG) > probOf(noveltyResult, CAT),
-  JSON.stringify({ dogNovel: probOf(noveltyResult, DOG), catSeen: probOf(noveltyResult, CAT) }));
+  probOf(noveltyResult, DOG) > probOf(noveltyResult, BABY),
+  JSON.stringify({ dogNovel: probOf(noveltyResult, DOG), babySeen: probOf(noveltyResult, BABY) }));
 
 // --- 6. Bond: a deeper-history species (both seen, no recency) is favored ----
 const bondResult = selectHatch({
   day: equalDay,
-  history: { [DOG]: { count: 4, lastSeenIsoDate: '2026-05-01' }, [CAT]: { count: 1, lastSeenIsoDate: '2026-05-01' } },
+  history: { [DOG]: { count: 4, lastSeenIsoDate: '2026-05-01' }, [BABY]: { count: 1, lastSeenIsoDate: '2026-05-01' } },
   rng: makeSeededRng('b'),
 });
 check('bond reward favors the more-returned species',
-  probOf(bondResult, DOG) > probOf(bondResult, CAT),
-  JSON.stringify({ dogDeep: probOf(bondResult, DOG), catShallow: probOf(bondResult, CAT) }));
+  probOf(bondResult, DOG) > probOf(bondResult, BABY),
+  JSON.stringify({ dogDeep: probOf(bondResult, DOG), babyShallow: probOf(bondResult, BABY) }));
 
 // --- 7. Intent + specificity beat a generic high-steps day ------------------
 const familyPromptDay = makeDay({
@@ -283,7 +299,7 @@ check('a specific museum read outranks a high-steps day',
   JSON.stringify(museumResult.probabilities.map((p) => ({ n: p.name, p: p.probability }))));
 
 // --- 8. Echoes: the winner carries the candidates it beat -------------------
-const echoDay = visionDay([visionConcept('dog', 0.9, 0.9), visionConcept('cat', 0.5, 0.7)]);
+const echoDay = visionDay([visionConcept('dog', 0.9, 0.9), visionConcept('baby', 0.5, 0.7)]);
 const echoResult = selectHatch({ day: echoDay, history: {}, rng: makeSeededRng('echo-1') });
 check('winner records at least one echo', echoResult.creature.fieldEchoes.length >= 1, JSON.stringify(echoResult.creature.fieldEchoes));
 check('echoes are distinct species from the winner',

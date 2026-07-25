@@ -111,6 +111,12 @@ export async function generateAssetVariants(options: {
   // Optional second input image — a geometry template (e.g. the iso camera
   // guide) sent alongside the style reference.
   guide?: { base64: string; mime: string };
+  registry?: {
+    assetType: 'creature_cutout' | 'hatchling' | 'resident_hex_tile' | 'resident_environment' | 'expression_grid' | 'other';
+    aspectId?: string;
+    skinId?: string;
+    pipelineVersion?: string;
+  };
 }): Promise<AssetLabIteration> {
   const outputName = outputNameFor(options.assetKey);
   const invoke = async (body: Record<string, unknown>) => {
@@ -128,6 +134,11 @@ export async function generateAssetVariants(options: {
     mode: options.mode,
     model: options.model,
     outputName,
+    assetKey: options.assetKey,
+    assetType: options.registry?.assetType,
+    aspectId: options.registry?.aspectId,
+    skinId: options.registry?.skinId,
+    pipelineVersion: options.registry?.pipelineVersion ?? 'asset-lab-v1',
   });
   // Slow models (gpt) QUEUE on fal — the edge fn returns {status:'queued',
   // requestId} and we poll until the render lands (same flow as the desktop
@@ -136,7 +147,19 @@ export async function generateAssetVariants(options: {
     const requestId = data.requestId as string;
     for (let attempt = 0; attempt < 60; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 8000));
-      data = await invoke({ action: 'poll', requestId, model: options.model, mode: options.mode, outputName });
+      data = await invoke({
+        action: 'poll',
+        requestId,
+        model: options.model,
+        mode: options.mode,
+        outputName,
+        assetKey: options.assetKey,
+        assetType: options.registry?.assetType,
+        aspectId: options.registry?.aspectId,
+        skinId: options.registry?.skinId,
+        pipelineVersion: options.registry?.pipelineVersion ?? 'asset-lab-v1',
+        prompt: options.prompt,
+      });
       if (data?.status === 'completed') break;
     }
   }
