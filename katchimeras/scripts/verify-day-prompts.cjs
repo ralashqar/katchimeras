@@ -412,7 +412,13 @@ check('composer voice completion closes text overlay before journal review',
 check('manual menu is grouped into capture, context, and more', ['capture', 'context', 'more'].every((section) => todaySource.includes(`section: '${section}'`)));
 const actionRouterSource = fs.readFileSync(path.join(projectRoot, 'features/today/use-today-action-router.ts'), 'utf8');
 const dayJournalSectionsSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/day-journal-sections.tsx'), 'utf8');
-check('Today replaces the quest mote with the compact day map action', todaySource.includes("id: 'map'") && todaySource.includes('categories={mapRingItems}') && !actionRouterSource.includes('ringCategories'));
+const todayCategoryRingSource = fs.readFileSync(path.join(projectRoot, 'components/katchadeck/home/today-category-ring.tsx'), 'utf8');
+check('Today replaces the day map mote with the compact Goals status action', !todaySource.includes("id: 'map'") && todaySource.includes("id: 'goals'") && todaySource.includes('categories={goalRingItems}') && !actionRouterSource.includes('ringCategories'));
+check('Goals uses a dedicated upper-right hero anchor instead of the egg-centered orbit',
+  todayCategoryRingSource.includes('style={[styles.slot, styles.goalSlot]}')
+    && todayCategoryRingSource.includes('goalSlot:')
+    && todayCategoryRingSource.includes('right: 0')
+    && todayCategoryRingSource.includes('top: 0'));
 check('thin-day reveal opens the optional hatch check-in before finalization', todaySource.includes('hatchCheckInEligibility(selectedDay)') && todaySource.includes('<HatchCheckInSheet'));
 check('hatch check-in keeps an explicit hatch-now escape on every question', hatchCheckInSource.includes('label="Hatch now"') && hatchCheckInSource.includes('Skipping never changes whether your egg can hatch'));
 check('hatch entry and escape actions share the highlighted primary CTA',

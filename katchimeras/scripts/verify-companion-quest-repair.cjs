@@ -31,6 +31,19 @@ fs.writeFileSync(runtimePath, 'exports.evaluateQuestRuntime = () => ({ complete:
 const evaluatePath = path.join(tempDir, 'evaluate.js');
 fs.writeFileSync(evaluatePath, 'exports.questCriteriaStatus = () => [];');
 
+const definitionsPath = path.join(tempDir, 'definitions.js');
+fs.writeFileSync(definitionsPath, `
+const familyByQuestId = {
+  'quest-mossprout-green-photo': 'mossprout',
+  'quest-mossprout-memory': 'mossprout',
+  'quest-mossprout-tend': 'mossprout',
+};
+exports.questDefinition = (questId) => {
+  const familyId = familyByQuestId[questId];
+  return familyId ? { id: questId, familyId } : null;
+};
+`);
+
 const devSettingsPath = transpile('utils/dev-settings.ts', 'dev-settings.js');
 const questOfferOrderPath = transpile('utils/quest-offer-order.ts', 'quest-offer-order.js');
 const questsPath = transpile('utils/katchimera-quests.ts', 'katchimera-quests.js');
@@ -39,6 +52,7 @@ const stubs = {
   '@/utils/app-storage': storagePath,
   '@/utils/quests/runtime': runtimePath,
   '@/utils/quests/evaluate': evaluatePath,
+  '@/utils/quests/definitions': definitionsPath,
   '@/utils/dev-settings': devSettingsPath,
   '@/utils/quest-offer-order': questOfferOrderPath,
 };
@@ -50,7 +64,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
 };
 
 const { setQuestLoopAfterCompleteEnabled } = require(devSettingsPath);
-const { acceptQuest, completeQuest, evaluateCompanionQuests, hasCompanionQuestForDay, questFor, reconcileCompanionQuestOffer } = require(questsPath);
+const { acceptQuest, completeQuest, evaluateCompanionQuests, hasCompanionQuestForDay, migrateCompanionQuestIdentity, questFor, questOffersForDay, reconcileActiveQuestPool, reconcileCompanionQuestOffer } = require(questsPath);
 
 let failures = 0;
 function check(label, condition, detail) {
@@ -106,6 +120,156 @@ const unchanged = reconcileCompanionQuestOffer(repaired, {
   hint: 'Log a film, cinema trip, or movie note today.',
 }, 300);
 check('matching active quest returns same state object', unchanged === repaired);
+
+const staleNatureCycle = {
+  schemaVersion: 2,
+  quests: [],
+  submissions: [],
+  attempts: [],
+  offerCycles: [{
+    creatureId: 'companion:nature-outdoors',
+    dayId: '2026-07-21',
+    offerIds: ['quest-visit-beach', 'quest-photo-water'],
+    index: 0,
+  }],
+};
+const mossproutOffers = [
+  { id: 'quest-mossprout-green-photo', weight: 5 },
+  { id: 'quest-mossprout-memory', weight: 3 },
+];
+const refreshedNatureOffers = questOffersForDay(
+  staleNatureCycle,
+  'companion:nature-outdoors',
+  '2026-07-21',
+  mossproutOffers,
+  mossproutOffers.length
+);
+check(
+  'rebuilds a cached daily order when the companion quest pool changes',
+  refreshedNatureOffers.length === mossproutOffers.length
+    && refreshedNatureOffers.every((offer) => mossproutOffers.some((candidate) => candidate.id === offer.id)),
+  JSON.stringify(refreshedNatureOffers)
+);
+const staleActiveNatureQuest = {
+  ...staleNatureCycle,
+  quests: [{
+    questId: 'quest-visit-beach',
+    creatureId: 'companion:mossprout',
+    title: 'To the shore',
+    hint: 'Spend time by the beach.',
+    acceptedAt: 100,
+  }],
+};
+const repairedActiveNatureQuest = reconcileActiveQuestPool(
+  staleActiveNatureQuest,
+  'companion:mossprout',
+  mossproutOffers
+);
+check(
+  'removes a stale active quest that is outside the companion current pool',
+  questFor(repairedActiveNatureQuest, 'companion:mossprout') === null
+);
+const staleMossproutWateringQuest = {
+  ...staleNatureCycle,
+  quests: [{
+    questId: 'quest-mossprout-tend',
+    creatureId: 'companion:mossprout',
+    title: 'Tend Mossprout’s patch',
+    hint: 'Water the patch.',
+    acceptedAt: 100,
+  }],
+};
+const repairedMossproutWateringQuest = reconcileActiveQuestPool(
+  staleMossproutWateringQuest,
+  'companion:mossprout',
+  mossproutOffers
+);
+check(
+  'retires an already-active Mossprout watering game so the garden matcher can be chosen',
+  questFor(repairedMossproutWateringQuest, 'companion:mossprout') === null
+);
+
+const splitAspectCases = [
+  ['food-cooking', 'feastle', 'quest-feastle-merge', 'quest-cuisine-italian'],
+  ['movement-fitness', 'steppling', 'quest-steppling-stride', 'quest-flexel-training-detail'],
+  ['rest-sleep', 'sleep-rest', 'quest-bedrotte-breathe', 'quest-late-capture'],
+  ['social-connection', 'gatherglow', 'quest-gatherglow-pattern', 'quest-snap-today'],
+  ['parenting-caregiving', 'snuglet', 'quest-snuglet-care-detail', 'quest-snap-today'],
+  ['pet-companionship', 'waglet', 'quest-waglet-care-detail', 'quest-whiskit-enrichment-detail'],
+  ['life-admin', 'errandimp', 'quest-errandimp-sort', 'quest-snap-today'],
+  ['learning-culture', 'pagelet', 'quest-pagelet-word-paths', 'quest-relicoon-match'],
+  ['hobbies-creativity', 'flickerbun', 'quest-film-trivia', 'quest-encora-rhythm'],
+  ['nature-outdoors', 'mossprout', 'quest-mossprout-memory', 'quest-visit-beach'],
+  ['weather-atmosphere', 'mistle', 'quest-weather-fog', 'quest-weather-storm'],
+  ['travel-exploration', 'skylo', 'quest-skylo-city-trivia', 'quest-snap-today'],
+  ['milestones-chapters', 'cheerlet', 'quest-cheerlet-block-party', 'quest-snap-today'],
+];
+for (const [aspectId, familyId, validQuestId, staleQuestId] of splitAspectCases) {
+  const creatureId = `companion:${familyId}`;
+  const state = {
+    ...staleNatureCycle,
+    offerCycles: [],
+    quests: [{
+      questId: staleQuestId,
+      creatureId,
+      title: 'Stale merged-aspect quest',
+      hint: 'This belongs to another family.',
+      acceptedAt: 100,
+    }],
+  };
+  const repaired = reconcileActiveQuestPool(state, creatureId, [{ id: validQuestId }]);
+  check(
+    `${aspectId} split family rejects a stale sibling quest`,
+    questFor(repaired, creatureId) === null
+  );
+}
+
+const familyOwnedMigration = migrateCompanionQuestIdentity(
+  {
+    ...staleNatureCycle,
+    quests: [{
+      questId: 'quest-mossprout-memory',
+      creatureId: 'companion:nature-outdoors',
+      title: 'Mossprout’s garden pairs',
+      hint: 'Match the plants.',
+      acceptedAt: 100,
+      completedAt: 200,
+    }],
+    submissions: [{
+      id: 'submission-1',
+      questId: 'quest-mossprout-memory',
+      creatureId: 'companion:nature-outdoors',
+      dayId: '2026-07-21',
+      sourceType: 'mini_game',
+      sourceId: 'attempt-1',
+      submittedAt: 200,
+    }],
+    attempts: [{
+      id: 'attempt-1',
+      questId: 'quest-mossprout-memory',
+      creatureId: 'companion:nature-outdoors',
+      dayId: '2026-07-21',
+      status: 'succeeded',
+      startedAt: 100,
+      endedAt: 200,
+    }],
+    offerCycles: [{
+      creatureId: 'companion:nature-outdoors',
+      dayId: '2026-07-21',
+      offerIds: ['quest-mossprout-green-photo', 'quest-mossprout-memory', 'quest-snap-today'],
+      index: 0,
+    }],
+  },
+  () => 'companion:shellio'
+);
+check(
+  'family-owned quest history survives a broad-aspect split under the correct companion',
+  familyOwnedMigration.quests[0].creatureId === 'companion:mossprout'
+    && familyOwnedMigration.submissions[0].creatureId === 'companion:mossprout'
+    && familyOwnedMigration.attempts[0].creatureId === 'companion:mossprout'
+    && familyOwnedMigration.offerCycles[0].creatureId === 'companion:mossprout',
+  JSON.stringify(familyOwnedMigration)
+);
 
 const accepted = acceptQuest(
   { quests: [] },

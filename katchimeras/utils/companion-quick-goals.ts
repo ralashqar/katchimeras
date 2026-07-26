@@ -31,10 +31,20 @@ export type CompanionQuickGoalCompletion = {
   journaledAt?: number;
 };
 
+export type CompanionQuickGoalDismissal = {
+  id: string;
+  goalId: string;
+  familyId: KatchimeraFamilyId;
+  dayId: string;
+  kind: 'snoozed' | 'skipped';
+  createdAt: number;
+};
+
 export type CompanionQuickGoalState = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   goals: CompanionQuickGoal[];
   completions: CompanionQuickGoalCompletion[];
+  dismissals: CompanionQuickGoalDismissal[];
 };
 
 export type CompanionQuickGoalForDay = {
@@ -56,7 +66,7 @@ export type AddCompanionQuickGoalResult = {
 };
 
 export function emptyCompanionQuickGoalState(): CompanionQuickGoalState {
-  return { schemaVersion: 1, goals: [], completions: [] };
+  return { schemaVersion: 2, goals: [], completions: [], dismissals: [] };
 }
 
 export function normaliseCompanionQuickGoalState(value: unknown): CompanionQuickGoalState {
@@ -75,7 +85,12 @@ export function normaliseCompanionQuickGoalState(value: unknown): CompanionQuick
         isValidCompletion(completion) && goalIds.has(completion.goalId)
       ))
     : [];
-  return { schemaVersion: 1, goals, completions };
+  const dismissals = Array.isArray(candidate.dismissals)
+    ? uniqueById(candidate.dismissals.filter((dismissal) =>
+        isValidDismissal(dismissal) && goalIds.has(dismissal.goalId)
+      ))
+    : [];
+  return { schemaVersion: 2, goals, completions, dismissals };
 }
 
 export function cadenceFromTemplate(
@@ -161,17 +176,63 @@ export function quickGoalsForDay(
       .filter((completion) => completion.dayId === dayId)
       .map((completion) => [completion.goalId, completion])
   );
+  const dismissedGoalIds = new Set(
+    state.dismissals
+      .filter((dismissal) => dismissal.dayId === dayId)
+      .map((dismissal) => dismissal.goalId)
+  );
   return state.goals
     .filter((goal) =>
       goal.status === 'active' &&
       (!familyId || goal.familyId === familyId) &&
-      cadenceIncludesDay(goal.cadence, dayId)
+      cadenceIncludesDay(goal.cadence, dayId) &&
+      !dismissedGoalIds.has(goal.id)
     )
     .map((goal) => ({ goal, completion: completionByGoalId.get(goal.id) ?? null }))
     .sort((left, right) => {
       if (Boolean(left.completion) !== Boolean(right.completion)) return left.completion ? 1 : -1;
       return left.goal.createdAt - right.goal.createdAt;
     });
+}
+
+export function snoozeCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goalId: string,
+  dayId: string,
+  createdAt = Date.now()
+): { state: CompanionQuickGoalState; snoozed: boolean } {
+  const goal = state.goals.find((item) =>
+    item.id === goalId && item.status === 'active' && cadenceIncludesDay(item.cadence, dayId)
+  );
+  if (!goal || state.completions.some((item) => item.id === quickGoalCompletionId(goalId, dayId))) {
+    return { state, snoozed: false };
+  }
+  if (goal.cadence.kind === 'once') {
+    return {
+      state: updateCompanionQuickGoal(state, goalId, {
+        cadence: { kind: 'once', dayId: nextDayId(dayId) },
+      }, createdAt),
+      snoozed: true,
+    };
+  }
+  const result = dismissCompanionQuickGoal(state, goal, dayId, 'snoozed', createdAt);
+  return { state: result.state, snoozed: result.dismissed };
+}
+
+export function skipCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goalId: string,
+  dayId: string,
+  createdAt = Date.now()
+): { state: CompanionQuickGoalState; skipped: boolean } {
+  const goal = state.goals.find((item) =>
+    item.id === goalId && item.status === 'active' && cadenceIncludesDay(item.cadence, dayId)
+  );
+  if (!goal || state.completions.some((item) => item.id === quickGoalCompletionId(goalId, dayId))) {
+    return { state, skipped: false };
+  }
+  const result = dismissCompanionQuickGoal(state, goal, dayId, 'skipped', createdAt);
+  return { state: result.state, skipped: result.dismissed };
 }
 
 export function completeCompanionQuickGoal(
@@ -283,6 +344,49 @@ function isValidCompletion(value: unknown): value is CompanionQuickGoalCompletio
     typeof completion.familyId === 'string' && typeof completion.dayId === 'string' &&
     Number.isFinite(completion.completedAt) &&
     (completion.journaledAt === undefined || Number.isFinite(completion.journaledAt));
+}
+
+function isValidDismissal(value: unknown): value is CompanionQuickGoalDismissal {
+  if (!value || typeof value !== 'object') return false;
+  const dismissal = value as CompanionQuickGoalDismissal;
+  return typeof dismissal.id === 'string' && typeof dismissal.goalId === 'string' &&
+    typeof dismissal.familyId === 'string' && typeof dismissal.dayId === 'string' &&
+    ['snoozed', 'skipped'].includes(dismissal.kind) && Number.isFinite(dismissal.createdAt);
+}
+
+function dismissCompanionQuickGoal(
+  state: CompanionQuickGoalState,
+  goal: CompanionQuickGoal,
+  dayId: string,
+  kind: CompanionQuickGoalDismissal['kind'],
+  createdAt: number
+): { state: CompanionQuickGoalState; dismissed: boolean } {
+  const id = `quick-goal-dismissal:${goal.id}:${dayId}`;
+  if (state.dismissals.some((item) => item.id === id)) return { state, dismissed: false };
+  return {
+    state: {
+      ...state,
+      dismissals: [...state.dismissals, {
+        id,
+        goalId: goal.id,
+        familyId: goal.familyId,
+        dayId,
+        kind,
+        createdAt,
+      }],
+    },
+    dismissed: true,
+  };
+}
+
+function nextDayId(dayId: string): string {
+  const date = new Date(`${dayId}T12:00:00`);
+  date.setDate(date.getDate() + 1);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {

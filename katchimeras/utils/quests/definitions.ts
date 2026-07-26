@@ -91,6 +91,17 @@ export type QuestDefinition = {
     minConfidence?: number;
     allowCorroboration?: boolean;
   };
+  offerVisibility?: 'default' | 'hide_when_unavailable';
+  semanticVerification?: {
+    id: string;
+    version: number;
+    request: string;
+    matchCriteria: readonly string[];
+    exclusions?: readonly string[];
+    retryPrompt: string;
+    modalities: readonly ('text' | 'voice')[];
+    journalRouteFallbacks?: readonly string[];
+  };
 };
 
 export type QuestPresentation = {
@@ -98,6 +109,15 @@ export type QuestPresentation = {
   estimatedMinutes: number;
   artworkKey?: string;
 };
+
+export function questActivityLane(
+  definition: QuestDefinition
+): Exclude<KatchimeraActivityLane, 'discovery'> {
+  if (definition.lane) return definition.lane;
+  return definition.execution && definition.execution.kind !== 'evidence'
+    ? 'mini_game'
+    : 'real_life';
+}
 
 export function questPresentation(definition: QuestDefinition): QuestPresentation {
   const family = definition.family ?? inferQuestFamily(definition);
@@ -156,12 +176,15 @@ type ProgressiveQuestSpec = {
   cooldownDays: number;
   weight: number;
   suggestedActions?: string[];
+  requiresCapabilities?: QuestCapabilityId[];
+  offerVisibility?: QuestDefinition['offerVisibility'];
+  semanticVerification?: QuestDefinition['semanticVerification'];
 };
 
 function progressiveQuestPack(
   familyId: KatchimeraFamilyId,
   journeyId: string,
-  creatureKey: string,
+  creatureKey: string | readonly string[],
   specs: readonly ProgressiveQuestSpec[]
 ): Record<string, QuestDefinition> {
   return Object.fromEntries(specs.map((spec) => [
@@ -176,6 +199,9 @@ function progressiveQuestPack(
       hint: spec.hint,
       criteria: spec.criteria,
       suggestedActions: spec.suggestedActions,
+      requiresCapabilities: spec.requiresCapabilities,
+      offerVisibility: spec.offerVisibility,
+      semanticVerification: spec.semanticVerification,
       repeatPolicy: {
         cadence: spec.minimumBondLevel === 3 ? 'weekly' : 'anytime',
         cooldownDays: spec.cooldownDays,
@@ -186,7 +212,7 @@ function progressiveQuestPack(
       },
       goalContribution: { amount: 1 },
       eligibility: {
-        creatureKeys: [creatureKey],
+        creatureKeys: typeof creatureKey === 'string' ? [creatureKey] : [...creatureKey],
         cooldownDays: spec.cooldownDays,
         weight: spec.weight,
       },
@@ -194,7 +220,408 @@ function progressiveQuestPack(
   ]));
 }
 
+const SEMANTIC_QUEST_JOURNAL_ROUTE_FALLBACKS: Readonly<Record<string, readonly string[]>> = {
+  'quest-flexel-training-detail': ['journal.route:movement.workout'],
+  'quest-sprintail-run-detail': ['journal.route:movement.run'],
+  'quest-hooplet-skill-detail': ['journal.route:movement.sport.basketball'],
+  'quest-serveling-rally-detail': ['journal.route:movement.sport.tennis'],
+  'quest-snuglet-care-detail': [
+    'journal.route:people.my_child.care',
+    'journal.route:people.family.care',
+  ],
+  'quest-rest-restored-detail': [
+    'journal.route:general.rest',
+    'journal.route:people.solo.rest',
+  ],
+  'quest-steppling-walk-detail': ['journal.route:movement.walk'],
+  'quest-mossprout-living-detail': [
+    'journal.route:went_somewhere.park',
+    'journal.route:went_somewhere.garden',
+    'journal.route:went_somewhere.forest',
+  ],
+  'quest-skylo-city-detail': [
+    'journal.route:went_somewhere.city',
+    'journal.route:went_somewhere.street',
+  ],
+  'quest-feastle-meal-detail': [
+    'journal.route:food.meal',
+    'journal.route:food.snack',
+    'journal.route:food.cooking',
+  ],
+  'quest-tasklet-progress-detail': [
+    'journal.route:work.progress',
+    'journal.route:work.focus.progress',
+    'journal.route:work.office.progress',
+  ],
+  'quest-cheerlet-progress-detail': [
+    'journal.route:work.progress',
+    'journal.route:big_event.achievement',
+  ],
+  'quest-shellio-water-detail': ['journal.route:went_somewhere.beach'],
+};
+
+function semanticNoteQuest(input: {
+  id: string;
+  minimumBondLevel: KatchimeraBondLevel;
+  title: string;
+  hint: string;
+  request: string;
+  criteria: readonly string[];
+  exclusions?: readonly string[];
+  retryPrompt: string;
+  cooldownDays: number;
+  weight: number;
+}): ProgressiveQuestSpec {
+  const journalRouteFallbacks = SEMANTIC_QUEST_JOURNAL_ROUTE_FALLBACKS[input.id] ?? [];
+  return {
+    id: input.id,
+    minimumBondLevel: input.minimumBondLevel,
+    title: input.title,
+    hint: input.hint,
+    family: 'note',
+    criteria: [{
+      fact: 'evidence.items',
+      op: 'semanticQuestMatch',
+      value: input.id,
+      sourceTypes: ['text_note', 'voice_note'],
+      journalRouteFallbacks,
+      label: input.request,
+    }],
+    suggestedActions: ['add_note', 'record_voice'],
+    requiresCapabilities: ['appleFoundation'],
+    offerVisibility: 'hide_when_unavailable',
+    semanticVerification: {
+      id: input.id.replace(/^quest-/, ''),
+      version: 1,
+      request: input.request,
+      matchCriteria: input.criteria,
+      exclusions: input.exclusions,
+      retryPrompt: input.retryPrompt,
+      modalities: ['text', 'voice'],
+      journalRouteFallbacks,
+    },
+    cooldownDays: input.cooldownDays,
+    weight: input.weight,
+  };
+}
+
 const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
+  ...progressiveQuestPack('flexel', 'flexel-stronger-rhythm', 'flexel', [
+    {
+      id: 'quest-flexel-session-note', minimumBondLevel: 1, title: 'Show up to train',
+      hint: 'Log a gym, strength, or mobility session you completed.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Log a training session' }],
+      cooldownDays: 2, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-flexel-training-detail', minimumBondLevel: 1, title: 'Name what you trained',
+      hint: 'Write or record what you trained and one concrete effort, form, resistance, or mobility detail.',
+      request: 'Describe a real gym, strength, or mobility session and include one concrete training detail.',
+      criteria: ['A real completed training session is described', 'At least one exercise, body area, form cue, resistance, set, repetition, or mobility detail is included'],
+      exclusions: ['Plans for a future workout without completing it', 'Walking or running without strength, gym, or mobility work'],
+      retryPrompt: 'Add what you trained and one concrete exercise, effort, form, resistance, or mobility detail.',
+      cooldownDays: 2, weight: 6,
+    }),
+    {
+      id: 'quest-flexel-recovery-note', minimumBondLevel: 2, title: 'Train, then listen',
+      hint: 'Log how your body responded after training and one recovery choice.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a training recovery note' }],
+      cooldownDays: 3, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-flexel-weekly-review', minimumBondLevel: 3, title: 'Read the training week',
+      hint: 'Review what you trained, what progressed, and what you will adjust next.',
+      request: 'Review the week of gym, strength, or mobility practice with a concrete example and one next adjustment.',
+      criteria: ['At least one completed training example is named', 'A change, difficulty, or sign of progress is identified', 'One next adjustment or continuation is stated'],
+      retryPrompt: 'Add one session example, what changed, and what you want to adjust or repeat next.',
+      cooldownDays: 7, weight: 5,
+    }),
+  ]),
+  ...progressiveQuestPack('sprintail', 'sprintail-running-rhythm', 'sprintail', [
+    {
+      id: 'quest-sprintail-run-day', minimumBondLevel: 1, title: 'Make room to run',
+      hint: 'Complete a run or run-walk and let today’s movement support it.',
+      family: 'movement', criteria: [{ fact: 'steps.count', op: 'gte', value: 3000, label: 'Build a movement day around a run' }],
+      cooldownDays: 2, weight: 4,
+    },
+    semanticNoteQuest({
+      id: 'quest-sprintail-run-detail', minimumBondLevel: 1, title: 'Keep the run',
+      hint: 'Describe a real run and one pace, distance, route, endurance, or body-response detail.',
+      request: 'Describe a real completed run or run-walk and include one concrete running detail.',
+      criteria: ['A completed run or run-walk is explicit', 'At least one pace, distance, duration, route, endurance, interval, or body-response detail is included'],
+      exclusions: ['Walking only', 'A future running plan without a completed run'],
+      retryPrompt: 'Add what run you completed and one pace, distance, duration, route, or body-response detail.',
+      cooldownDays: 2, weight: 6,
+    }),
+    {
+      id: 'quest-sprintail-recovery', minimumBondLevel: 2, title: 'Notice the finish',
+      hint: 'Keep a note about recovery, energy, or what helped you finish your run.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a run recovery note' }],
+      cooldownDays: 3, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-sprintail-weekly-review', minimumBondLevel: 3, title: 'Read the running week',
+      hint: 'Review one run, what it revealed, and the next realistic running step.',
+      request: 'Review the week of running with one concrete run example, what it revealed, and one next step.',
+      criteria: ['A completed run from the week is described', 'A pace, endurance, consistency, route, or recovery pattern is noticed', 'A realistic next running step is stated'],
+      retryPrompt: 'Add one run example, what you learned from it, and the next running step.',
+      cooldownDays: 7, weight: 5,
+    }),
+  ]),
+  ...progressiveQuestPack('hooplet', 'hooplet-court-rhythm', 'hooplet', [
+    {
+      id: 'quest-hooplet-court-note', minimumBondLevel: 1, title: 'Get on court',
+      hint: 'Log a basketball practice, shoot-around, or game.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Log a basketball session' }],
+      cooldownDays: 2, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-hooplet-skill-detail', minimumBondLevel: 1, title: 'Work one court skill',
+      hint: 'Describe a basketball session and one specific skill, drill, play, or team moment.',
+      request: 'Describe a real basketball session and one specific basketball detail.',
+      criteria: ['A completed basketball practice, shoot-around, or game is explicit', 'A shot, pass, dribble, defensive play, drill, decision, or team moment is described'],
+      exclusions: ['Watching basketball without playing', 'General exercise with no basketball activity'],
+      retryPrompt: 'Add the basketball activity and one shot, pass, dribble, defensive, drill, or team detail.',
+      cooldownDays: 2, weight: 6,
+    }),
+    {
+      id: 'quest-hooplet-team-moment', minimumBondLevel: 2, title: 'Notice the team',
+      hint: 'Log one moment of communication, support, decision-making, or shared play.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a basketball team moment' }],
+      cooldownDays: 3, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-hooplet-weekly-review', minimumBondLevel: 3, title: 'Read the court week',
+      hint: 'Review one court moment, a skill pattern, and what to practise next.',
+      request: 'Review the week of basketball with one concrete court example, one skill or teamwork pattern, and a next practice focus.',
+      criteria: ['A real basketball moment from the week is named', 'A skill or teamwork pattern is identified', 'A next practice focus is stated'],
+      retryPrompt: 'Add one court example, the pattern you noticed, and what you want to practise next.',
+      cooldownDays: 7, weight: 5,
+    }),
+  ]),
+  ...progressiveQuestPack('serveling', 'serveling-rally-rhythm', 'serveling', [
+    {
+      id: 'quest-serveling-session-note', minimumBondLevel: 1, title: 'Make time to rally',
+      hint: 'Log a tennis or racket-sport practice or match.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Log a racket-sport session' }],
+      cooldownDays: 2, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-serveling-rally-detail', minimumBondLevel: 1, title: 'Keep one rally',
+      hint: 'Describe a racket-sport session and one serve, rally, stroke, match, or footwork detail.',
+      request: 'Describe a real tennis or racket-sport session and one specific play detail.',
+      criteria: ['A completed tennis or racket-sport practice or match is explicit', 'A serve, rally, stroke, return, point, match, or footwork detail is included'],
+      exclusions: ['Watching a match without playing', 'General exercise with no racket sport'],
+      retryPrompt: 'Add what you played and one serve, rally, stroke, return, match, or footwork detail.',
+      cooldownDays: 2, weight: 6,
+    }),
+    {
+      id: 'quest-serveling-reset-note', minimumBondLevel: 2, title: 'Reset between points',
+      hint: 'Keep a note about one reset, adjustment, or recovery choice during play.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a between-points note' }],
+      cooldownDays: 3, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-serveling-weekly-review', minimumBondLevel: 3, title: 'Read the rally week',
+      hint: 'Review one session, a repeatable pattern, and your next practice focus.',
+      request: 'Review the week of racket sport with one concrete session example, a play pattern, and a next practice focus.',
+      criteria: ['A real session from the week is named', 'A serve, rally, stroke, movement, match, or mindset pattern is identified', 'A next practice focus is stated'],
+      retryPrompt: 'Add one session example, the pattern you noticed, and what you want to practise next.',
+      cooldownDays: 7, weight: 5,
+    }),
+  ]),
+  ...progressiveQuestPack('snuglet', 'snuglet-everyday-care', 'snuglet', [
+    {
+      id: 'quest-snuglet-care-photo', minimumBondLevel: 1, title: 'Keep a caring moment',
+      hint: 'Capture a real caregiving or family-care moment.',
+      family: 'photo', criteria: [photoQualityCriterion('subject.baby', 'Capture a caregiving moment')],
+      cooldownDays: 2, weight: 4, suggestedActions: ['take_photo'],
+    },
+    semanticNoteQuest({
+      id: 'quest-snuglet-care-detail', minimumBondLevel: 1, title: 'Name the care you gave',
+      hint: 'Describe one concrete act of care, who it supported, and what was needed.',
+      request: 'Describe one real act of human caregiving and the need it supported.',
+      criteria: ['A concrete completed act of care is described', 'The person or relationship being supported is clear', 'The need, routine, comfort, safety, or practical support is identified'],
+      exclusions: ['A vague intention to be caring', 'Pet care'],
+      retryPrompt: 'Add what you did, who it helped, and what they needed in that moment.',
+      cooldownDays: 2, weight: 6,
+    }),
+    {
+      id: 'quest-snuglet-caregiver-pause', minimumBondLevel: 2, title: 'Care for the carer',
+      hint: 'Keep a note about one small pause, boundary, or request for support.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a caregiver support note' }],
+      cooldownDays: 3, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-snuglet-weekly-review', minimumBondLevel: 3, title: 'Read the care week',
+      hint: 'Review one care moment, what was needed repeatedly, and one adjustment for next week.',
+      request: 'Review the week of caregiving with one concrete example, a repeated need or pattern, and one next adjustment.',
+      criteria: ['A real caregiving example is named', 'A recurring need, pressure, connection, or routine is noticed', 'One next adjustment, boundary, or support choice is stated'],
+      retryPrompt: 'Add one care example, the pattern you noticed, and one adjustment or support choice for next week.',
+      cooldownDays: 7, weight: 5,
+    }),
+  ]),
+  ...progressiveQuestPack('waglet', 'waglet-shared-routine', 'waglet', [
+    {
+      id: 'quest-waglet-companion-photo', minimumBondLevel: 1, title: 'Keep a dog moment',
+      hint: 'Capture a real moment with your dog.',
+      family: 'photo', criteria: [photoQualityCriterion('subject.dog', 'Capture a dog-companionship moment')],
+      cooldownDays: 2, weight: 4, suggestedActions: ['take_photo'],
+    },
+    semanticNoteQuest({
+      id: 'quest-waglet-care-detail', minimumBondLevel: 1, title: 'Share the routine',
+      hint: 'Describe a real walk, play, training, comfort, or care moment with your dog.',
+      request: 'Describe a real dog-companionship moment and one concrete activity or care detail.',
+      criteria: ['The note is about the player’s real dog or a dog they care for', 'A completed walk, play, training, feeding, grooming, health, comfort, or shared-routine detail is included'],
+      exclusions: ['Merely seeing an unfamiliar dog', 'Planning an activity without doing it'],
+      retryPrompt: 'Add what you and the dog actually did and one walk, play, training, comfort, or care detail.',
+      cooldownDays: 2, weight: 6,
+    }),
+    {
+      id: 'quest-waglet-routine-note', minimumBondLevel: 2, title: 'Notice what they need',
+      hint: 'Keep a note about one signal, preference, or routine your dog showed you.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a dog-routine note' }],
+      cooldownDays: 3, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-waglet-weekly-review', minimumBondLevel: 3, title: 'Read the shared week',
+      hint: 'Review one dog moment, a routine pattern, and one way to support the bond next.',
+      request: 'Review the week with a dog using one concrete example, a routine or behaviour pattern, and one next care or connection choice.',
+      criteria: ['A real dog-companionship example is named', 'A routine, need, behaviour, or connection pattern is noticed', 'One next care, training, play, or connection choice is stated'],
+      retryPrompt: 'Add one dog moment, the pattern you noticed, and one care or connection choice for next week.',
+      cooldownDays: 7, weight: 5,
+    }),
+  ]),
+  ...progressiveQuestPack('whiskit', 'whiskit-gentle-attention', 'whiskit', [
+    {
+      id: 'quest-whiskit-companion-photo', minimumBondLevel: 1, title: 'Keep a cat moment',
+      hint: 'Capture a real moment with your cat.',
+      family: 'photo', criteria: [photoQualityCriterion('subject.cat', 'Capture a cat-companionship moment')],
+      cooldownDays: 2, weight: 4, suggestedActions: ['take_photo'],
+    },
+    semanticNoteQuest({
+      id: 'quest-whiskit-enrichment-detail', minimumBondLevel: 1, title: 'Follow their curiosity',
+      hint: 'Describe a real play, enrichment, comfort, behaviour, or care moment with your cat.',
+      request: 'Describe a real cat-companionship moment and one concrete play, enrichment, behaviour, comfort, or care detail.',
+      criteria: ['The note is about the player’s real cat or a cat they care for', 'A completed play, enrichment, feeding, grooming, health, comfort, observation, or care detail is included'],
+      exclusions: ['Merely seeing an unfamiliar cat', 'Planning an activity without doing it'],
+      retryPrompt: 'Add what happened with the cat and one play, enrichment, behaviour, comfort, or care detail.',
+      cooldownDays: 2, weight: 6,
+    }),
+    {
+      id: 'quest-whiskit-pattern-note', minimumBondLevel: 2, title: 'Notice their pattern',
+      hint: 'Keep a note about one preference, signal, hiding place, or repeated behaviour.',
+      family: 'note', criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a cat-pattern note' }],
+      cooldownDays: 3, weight: 4, suggestedActions: ['add_note'],
+    },
+    semanticNoteQuest({
+      id: 'quest-whiskit-weekly-review', minimumBondLevel: 3, title: 'Read the quiet week',
+      hint: 'Review one cat moment, a behaviour pattern, and one way to support comfort or connection.',
+      request: 'Review the week with a cat using one concrete example, a behaviour or routine pattern, and one next care or connection choice.',
+      criteria: ['A real cat-companionship example is named', 'A behaviour, preference, need, comfort, or routine pattern is noticed', 'One next care, enrichment, comfort, or connection choice is stated'],
+      retryPrompt: 'Add one cat moment, the pattern you noticed, and one care or connection choice for next week.',
+      cooldownDays: 7, weight: 5,
+    }),
+  ]),
+  ...progressiveQuestPack('sleep-rest', 'sleep-rest-gentle-recovery', ['bedrotte', 'snoozle'], [
+    semanticNoteQuest({
+      id: 'quest-rest-restored-detail', minimumBondLevel: 1, title: 'What restored you?',
+      hint: 'Write or record one real thing you did to rest or recover, and what changed afterward.',
+      request: 'Describe one real rest or recovery action you completed and one concrete effect it had on you.',
+      criteria: ['A completed rest, recovery, or wind-down action is described', 'A concrete effect on energy, tension, mood, attention, or readiness is included'],
+      exclusions: ['Only saying that rest is important', 'A future plan with no completed action'],
+      retryPrompt: 'Add what you actually did to rest or recover and what changed afterward.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('steppling', 'steppling-everyday-momentum', 'steppling', [
+    semanticNoteQuest({
+      id: 'quest-steppling-walk-detail', minimumBondLevel: 1, title: 'What did the walk give you?',
+      hint: 'After a real walk, share one detail from it and how you felt by the end.',
+      request: 'Describe a walk you completed, one concrete detail from it, and how your body, energy, attention, or mood felt afterward.',
+      criteria: ['A real completed walk is described', 'A route, sensory, pace, body, or surroundings detail is included', 'An afterward effect or feeling is included'],
+      exclusions: ['Planning a future walk', 'General thoughts about walking without a real walk'],
+      retryPrompt: 'Add one detail from the walk and how you felt by the end.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('mossprout', 'mossprout-nearby-nature', 'mossprout', [
+    semanticNoteQuest({
+      id: 'quest-mossprout-living-detail', minimumBondLevel: 1, title: 'Notice one living detail',
+      hint: 'Share something specific you noticed in a real green or outdoor place today.',
+      request: 'Describe a real moment in nature or a green space and one specific living, seasonal, sensory, or changing detail you noticed.',
+      criteria: ['A real outdoor, nature, garden, park, plant, or green-space moment is described', 'A specific observed detail is included'],
+      exclusions: ['A generic statement about liking nature', 'A future plan to go outside'],
+      retryPrompt: 'Add where you were and one specific thing you noticed growing, moving, sounding, smelling, or changing.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('skylo', 'skylo-local-discovery', 'skylo', [
+    semanticNoteQuest({
+      id: 'quest-skylo-city-detail', minimumBondLevel: 1, title: 'Read one city detail',
+      hint: 'Share one overlooked detail from a real local place, street, or journey.',
+      request: 'Describe a real local urban place or journey and one concrete detail you noticed about how it looked, felt, worked, or changed.',
+      criteria: ['A real street, neighbourhood, local venue, public space, or urban journey is described', 'A concrete observed detail is included'],
+      exclusions: ['A future travel wish', 'Naming a city without describing a real moment'],
+      retryPrompt: 'Add the local place or journey and one specific detail you noticed there.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('feastle', 'feastle-meaningful-meals', 'feastle', [
+    semanticNoteQuest({
+      id: 'quest-feastle-meal-detail', minimumBondLevel: 1, title: 'Why did this meal matter?',
+      hint: 'Share a real meal and one detail that made it nourishing, interesting, comforting, or connecting.',
+      request: 'Describe a real meal you ate, made, or shared and one concrete detail about its taste, care, novelty, comfort, or connection.',
+      criteria: ['A real meal, snack, cooking, or shared-food moment is described', 'A concrete taste, preparation, care, novelty, comfort, or connection detail is included'],
+      exclusions: ['Only listing food with no lived detail', 'A future meal plan'],
+      retryPrompt: 'Add what you ate or made and one detail about its taste, care, comfort, novelty, or company.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('tasklet', 'tasklet-focus-journey', 'tasklet', [
+    semanticNoteQuest({
+      id: 'quest-tasklet-progress-detail', minimumBondLevel: 1, title: 'What moved forward?',
+      hint: 'Share one task you actually moved and the concrete step that changed it.',
+      request: 'Describe a real task or project you moved forward, the concrete action you completed, and what that unlocked or made next.',
+      criteria: ['A real task or project is named', 'A completed concrete action is described', 'A result, decision, or next step is included'],
+      exclusions: ['A to-do list with no completed action', 'Only saying that work was busy'],
+      retryPrompt: 'Add the action you actually completed and what it unlocked or made possible next.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('cheerlet', 'cheerlet-visible-progress', 'cheerlet', [
+    semanticNoteQuest({
+      id: 'quest-cheerlet-progress-detail', minimumBondLevel: 1, title: 'Why does this progress matter?',
+      hint: 'Name one real bit of progress and why it is worth noticing.',
+      request: 'Describe one real piece of progress, effort, milestone, or brave step and explain why it matters to you.',
+      criteria: ['A concrete progress moment, effort, milestone, or brave step is described', 'Its personal meaning or value is included'],
+      exclusions: ['Generic positive affirmations with no real event', 'A future hope with no present progress'],
+      retryPrompt: 'Add what actually happened and why that piece of progress matters to you.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('vesperitt', 'vesperitt-intentional-nights', 'vesperitt', [
+    semanticNoteQuest({
+      id: 'quest-vesperitt-night-detail', minimumBondLevel: 1, title: 'Was the night chosen?',
+      hint: 'Share what filled a real late night and whether it felt intentional or drifted.',
+      request: 'Describe a real late-night moment, what you were doing, and whether it felt deliberately chosen or like unplanned drift.',
+      criteria: ['A real late-night moment or activity is described', 'The player reflects on whether it was intentional or drifted'],
+      exclusions: ['A general opinion about sleep with no real night', 'A future bedtime plan only'],
+      retryPrompt: 'Add what actually filled the late hours and whether you chose it or drifted into it.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
+  ...progressiveQuestPack('shellio', 'shellio-water-connection', 'shellio', [
+    semanticNoteQuest({
+      id: 'quest-shellio-water-detail', minimumBondLevel: 1, title: 'Notice the waterline',
+      hint: 'Share a real moment by water and one sensory or changing detail you noticed.',
+      request: 'Describe a real moment by the sea, a river, lake, canal, or other water and one concrete sensory, movement, weather, wildlife, or changing detail.',
+      criteria: ['A real waterside or water-related moment is described', 'A specific sensory, movement, weather, wildlife, or changing detail is included'],
+      exclusions: ['A future beach plan', 'Naming a body of water without a real observed moment'],
+      retryPrompt: 'Add where you were by water and one specific thing you saw, heard, felt, smelled, or noticed changing.',
+      cooldownDays: 2, weight: 12,
+    }),
+  ]),
   ...progressiveQuestPack('flickerbun', 'flickerbun-intentional-watching', 'flickerbun', [
     {
       id: 'quest-flickerbun-watch',

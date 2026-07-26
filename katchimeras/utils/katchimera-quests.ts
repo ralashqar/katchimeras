@@ -3,6 +3,7 @@ import type { QuestCapabilityMap } from '@/utils/capabilities/quest-capabilities
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import type { Facts } from '@/utils/signals/facts';
 import { questCriteriaStatus } from '@/utils/quests/evaluate';
+import { questDefinition } from '@/utils/quests/definitions';
 import { isQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
 import type { QuestAttempt, QuestResult } from '@/utils/quests/experiences/types';
 import { rankedQuestOfferIds } from '@/utils/quest-offer-order';
@@ -91,23 +92,47 @@ export function migrateCompanionQuestIdentity(
     if (next !== value) changed = true;
     return next;
   };
+  const resolveQuestOwner = (value: string, questId: string) => {
+    const familyId = questDefinition(questId)?.familyId;
+    const next = familyId ? `companion:${familyId}` : resolve(value);
+    if (next !== value) changed = true;
+    return next;
+  };
   const migrated: CompanionQuestState = {
     ...state,
-    quests: state.quests.map((quest) => ({ ...quest, creatureId: resolve(quest.creatureId) })),
+    quests: state.quests.map((quest) => ({
+      ...quest,
+      creatureId: resolveQuestOwner(quest.creatureId, quest.questId),
+    })),
     submissions: state.submissions.map((submission) => ({
       ...submission,
-      creatureId: resolve(submission.creatureId),
+      creatureId: resolveQuestOwner(submission.creatureId, submission.questId),
     })),
-    offerCycles: state.offerCycles.map((cycle) => ({
-      ...cycle,
-      creatureId: resolve(cycle.creatureId),
-    })),
+    offerCycles: state.offerCycles.map((cycle) => {
+      const creatureId = resolveOfferCycleOwner(cycle, resolve);
+      if (creatureId !== cycle.creatureId) changed = true;
+      return { ...cycle, creatureId };
+    }),
     attempts: state.attempts.map((attempt) => ({
       ...attempt,
-      creatureId: resolve(attempt.creatureId),
+      creatureId: resolveQuestOwner(attempt.creatureId, attempt.questId),
     })),
   };
   return changed ? normaliseState(migrated) : state;
+}
+
+function resolveOfferCycleOwner(
+  cycle: QuestOfferCycle,
+  resolveFallback: (value: string) => string
+): string {
+  const familyIds = new Set(
+    cycle.offerIds
+      .map((questId) => questDefinition(questId)?.familyId)
+      .filter((familyId): familyId is NonNullable<typeof familyId> => Boolean(familyId))
+  );
+  return familyIds.size === 1
+    ? `companion:${[...familyIds][0]}`
+    : resolveFallback(cycle.creatureId);
 }
 
 export function questOfferForDay<T extends { id: string; weight?: number }>(
@@ -118,7 +143,7 @@ export function questOfferForDay<T extends { id: string; weight?: number }>(
 ): T | undefined {
   if (!offers.length) return undefined;
   const cycle = state.offerCycles.find((item) => item.creatureId === creatureId && item.dayId === dayId);
-  const order = cycle?.offerIds?.length ? cycle.offerIds : rankedQuestOfferIds(offers, `${creatureId}:${dayId}`);
+  const order = currentQuestOfferOrder(cycle, offers, `${creatureId}:${dayId}`);
   const offerId = order[Math.max(0, cycle?.index ?? 0) % order.length];
   return offers.find((offer) => offer.id === offerId) ?? offers[0];
 }
@@ -132,11 +157,24 @@ export function questOffersForDay<T extends { id: string; weight?: number }>(
 ): T[] {
   if (!offers.length || limit <= 0) return [];
   const cycle = state.offerCycles.find((item) => item.creatureId === creatureId && item.dayId === dayId);
-  const order = cycle?.offerIds?.length ? cycle.offerIds : rankedQuestOfferIds(offers, `${creatureId}:${dayId}`);
+  const order = currentQuestOfferOrder(cycle, offers, `${creatureId}:${dayId}`);
   return order
     .map((id) => offers.find((offer) => offer.id === id))
     .filter((offer): offer is T => Boolean(offer))
     .slice(0, limit);
+}
+
+function currentQuestOfferOrder<T extends { id: string; weight?: number }>(
+  cycle: QuestOfferCycle | undefined,
+  offers: T[],
+  seed: string
+): string[] {
+  const currentIds = new Set(offers.map((offer) => offer.id));
+  const cachedIds = cycle?.offerIds ?? [];
+  const cacheMatchesCurrentPool =
+    cachedIds.length === currentIds.size &&
+    cachedIds.every((id) => currentIds.has(id));
+  return cacheMatchesCurrentPool ? cachedIds : rankedQuestOfferIds(offers, seed);
 }
 
 export function cycleQuestOffer<T extends { id: string; weight?: number }>(
@@ -313,6 +351,28 @@ export function completeQuest(
         : quest
     ),
   };
+}
+
+export function releaseActiveQuest(
+  state: CompanionQuestState,
+  creatureId: string
+): CompanionQuestState {
+  return {
+    ...state,
+    quests: state.quests.filter((quest) => quest.creatureId !== creatureId || Boolean(quest.completedAt)),
+  };
+}
+
+export function reconcileActiveQuestPool(
+  state: CompanionQuestState,
+  creatureId: string,
+  offers: readonly { id: string }[]
+): CompanionQuestState {
+  const active = questFor(state, creatureId);
+  if (!active || !offers.length || offers.some((offer) => offer.id === active.questId)) {
+    return state;
+  }
+  return releaseActiveQuest(state, creatureId);
 }
 
 export function submitQuest(

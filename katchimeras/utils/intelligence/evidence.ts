@@ -5,6 +5,7 @@ import type {
   DayVisionSummary,
   ClassifiedMemory,
   PhotoVisionResult,
+  SemanticQuestEvaluation,
 } from '@/types/home';
 import type { SceneRead } from '@/utils/scene-classify';
 
@@ -129,6 +130,9 @@ export function buildNoteEvidence(input: {
   bigMomentType?: string | null;
   semanticCategoryId?: string | null;
   semanticConfidence?: number | null;
+  journalFlowId?: string | null;
+  journalCategoryId?: string | null;
+  journalContextId?: string | null;
 }): DayEvidence {
   const provider = input.provider ?? 'deterministic';
   const signals: DayEvidenceSignal[] = textToSignals(input.text).map((signal) => ({
@@ -153,13 +157,37 @@ export function buildNoteEvidence(input: {
       source: 'note',
     });
   }
+  if (input.journalFlowId && input.journalCategoryId) {
+    const routeKey = `journal.route:${input.journalFlowId}.${input.journalCategoryId}`;
+    signals.push({
+      key: routeKey,
+      confidence: 1,
+      raw: routeKey,
+      provider: 'manual',
+      source: 'manual',
+      centrality: 'primary',
+      qualityStatus: 'confirmed',
+    });
+    if (input.journalContextId) {
+      const contextRouteKey = `${routeKey}.${input.journalContextId}`;
+      signals.push({
+        key: contextRouteKey,
+        confidence: 1,
+        raw: contextRouteKey,
+        provider: 'manual',
+        source: 'manual',
+        centrality: 'primary',
+        qualityStatus: 'confirmed',
+      });
+    }
+  }
 
   return {
     id: noteEvidenceId(input.noteId),
     sourceType: input.kind === 'voice' ? 'voice_note' : 'text_note',
     sourceId: input.noteId,
     observedAt: input.observedAt,
-    provider,
+    provider: input.journalFlowId && input.journalCategoryId ? 'manual' : provider,
     confidence: maxSignalConfidence(signals),
     signals,
     explanation: buildExplanation(signals, 'note'),
@@ -172,6 +200,24 @@ export function upsertEvidence(existing: DayEvidence[] | undefined, incoming: Da
     byId.set(item.id, item);
   }
   return [...byId.values()].sort((left, right) => Date.parse(left.observedAt) - Date.parse(right.observedAt)).slice(-80);
+}
+
+export function withSemanticQuestEvaluation(
+  evidence: DayEvidence,
+  evaluation: SemanticQuestEvaluation
+): DayEvidence {
+  const evaluations = [
+    ...(evidence.semanticQuestEvaluations ?? []).filter((item) => item.id !== evaluation.id),
+    evaluation,
+  ].slice(-12);
+  return {
+    ...evidence,
+    semanticQuestEvaluations: evaluations,
+    provider: evaluation.provider,
+    confidence: evaluation.verdict === 'match' && evaluation.confidence === 'high'
+      ? Math.max(evidence.confidence, 0.95)
+      : evidence.confidence,
+  };
 }
 
 function maxSignalConfidence(signals: DayEvidenceSignal[]): number {

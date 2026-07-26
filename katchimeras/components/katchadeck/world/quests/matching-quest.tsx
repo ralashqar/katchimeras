@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -47,6 +47,7 @@ type Props = {
   seed: string;
   recentIds: string[];
   bestDurationMs?: number | null;
+  startImmediately?: boolean;
   onAttemptStart: (config: Record<string, unknown>) => string;
   onAttemptCancel: (id: string) => void;
   onComplete: (id: string, result: QuestResult) => void;
@@ -69,6 +70,7 @@ export function MatchingQuest({
   seed,
   recentIds,
   bestDurationMs = null,
+  startImmediately = false,
   onAttemptStart,
   onAttemptCancel,
   onComplete,
@@ -98,6 +100,7 @@ export function MatchingQuest({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [finishedDurationMs, setFinishedDurationMs] = useState<number | null>(null);
   const attempt = useRef<string | null>(null);
+  const immediateStartRequested = useRef(false);
   const layoutAttempt = useRef(0);
   const startedAt = useRef(0);
   const appActive = useQuestAppActive();
@@ -152,7 +155,7 @@ export function MatchingQuest({
     if (!appActive && game.openCards.length > 0) dispatch({ type: 'hide_open' });
   }, [appActive, game.openCards.length]);
 
-  const start = () => {
+  const start = useCallback(() => {
     layoutAttempt.current += 1;
     setDeck((current) => shuffleMatchingDeck(
       current,
@@ -168,7 +171,13 @@ export function MatchingQuest({
     setFinishedDurationMs(null);
     setStarted(true);
     onRunningChange(true, attempt.current);
-  };
+  }, [config, deck, onAttemptStart, onRunningChange, packId, seed]);
+
+  useEffect(() => {
+    if (!startImmediately || started || immediateStartRequested.current) return;
+    immediateStartRequested.current = true;
+    start();
+  }, [start, startImmediately, started]);
 
   const reset = () => {
     if (attempt.current) onAttemptCancel(attempt.current);
@@ -187,6 +196,7 @@ export function MatchingQuest({
   };
 
   if (!started) {
+    if (startImmediately) return null;
     return (
         <QuestExperiencePreview
           eyebrow={pack.eyebrow}

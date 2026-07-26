@@ -1,11 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { AppState, Keyboard, KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, useReducedMotion } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
 import type { HomeVisualKey, MemoryQualityScore } from '@/types/home';
 import type {
@@ -20,7 +22,10 @@ import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import {
   buildCompanionQuestViewModel,
+  companionQuestBackAction,
+  companionQuestInlineNoteAction,
   companionInteractionReducer,
+  companionQuestSkipsPreview,
   companionQuestUsesFullBleed,
   companionReflectionIsDirty,
   companionViewportResetKey,
@@ -40,7 +45,10 @@ import { CompanionSkinsThread } from './companion-skins-thread';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
 import { CompanionDiscoveryThread } from './companion-discovery-thread';
-import { CompanionJourneyDiscoveryThread } from './companion-journey-thread';
+import {
+  CompanionJourneyDiscoveryThread,
+  CompanionJourneyQuestionnairePage,
+} from './companion-journey-thread';
 import type {
   CompanionDiscoveryPromptDefinition,
   KatchimeraRoleDefinition,
@@ -86,7 +94,7 @@ export type CompanionInteractionSheetProps = {
   initialThread: CompanionThread;
   onSelectThread?: (thread: CompanionThread) => void;
   onClose: () => void;
-  activeQuest: { title: string; hint: string; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
+  activeQuest: { title: string; hint: string; semanticInput?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
   questComplete: boolean;
   questRuntime: QuestRuntimeStatus | null;
   questCaptureFeedback: QuestCaptureFeedback | null;
@@ -97,6 +105,7 @@ export type CompanionInteractionSheetProps = {
   criteria: Criterion[];
   onAccept: (offerId?: string) => void;
   onCashIn: () => void;
+  onChooseAnotherQuest: () => void;
   onSubmitQuest: (item: QuestSubmissionItem) => void;
   onClarifyQuestMatch: (item: QuestSubmissionItem, answer: MemoryQualityScore['centrality'] | 'rejected') => void;
   onQuestAction: () => void;
@@ -139,7 +148,7 @@ export type CompanionInteractionSheetProps = {
   journeyMomentLoggedToday: boolean;
   questAdvancesJourneyGoal: boolean;
   onStartJourneyConversation: () => void;
-  onAnswerJourneyConversation: (sessionId: string, value: string) => void;
+  onAnswerJourneyConversation: (sessionId: string, value: string) => readonly string[];
   onLogJourneyMoment: (kindId: string, note?: string) => void;
   onSetJourneyGoalStatus: (goalId: string, status: CompanionJourneyGoalStatus) => void;
   onSetPrimaryJourneyGoal: (goalId: string) => void;
@@ -162,19 +171,24 @@ export type CompanionInteractionSheetProps = {
 };
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
+  const insets = useSafeAreaInsets();
   const onExperienceActiveChange = props.onExperienceActiveChange;
   const [state, dispatch] = useReducer(companionInteractionReducer, {
     initialThread: props.initialThread,
     reflectionDraft: props.initialReflectionDraft,
   }, createCompanionInteractionState);
   const [activeAttemptId, setActiveAttemptId] = useState<string | null>(null);
+  const [questExperienceOpen, setQuestExperienceOpen] = useState(false);
   const [endAttemptOpen, setEndAttemptOpen] = useState(false);
+  const [leaveQuestOpen, setLeaveQuestOpen] = useState(false);
   const [experienceInstance, setExperienceInstance] = useState(0);
   const [recentQuickGoal, setRecentQuickGoal] = useState<{
     completion: CompanionQuickGoalCompletion;
     goal: CompanionQuickGoal;
   } | null>(null);
   const [quickGoalPickerOpen, setQuickGoalPickerOpen] = useState(false);
+  const [journeyQuestionnaireOpen, setJourneyQuestionnaireOpen] = useState(false);
+  const [journeyQuestionnaireSessionId, setJourneyQuestionnaireSessionId] = useState<string | null>(null);
   const contentRef = useRef<ScrollView>(null);
   const reduceMotion = useReducedMotion();
   const visual = getCreatureVisual(props.visualKey);
@@ -200,7 +214,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     reflectionReviewOpen: state.reflectionReviewOpen,
     activeAttemptId,
     memorySaved: props.memorySaved,
-  })}:quick-goal-picker:${quickGoalPickerOpen}`;
+  })}:quick-goal-picker:${quickGoalPickerOpen}:quest-experience:${questExperienceOpen}:journey-questionnaire:${journeyQuestionnaireOpen}`;
 
   const resetViewport = useCallback(() => {
     contentRef.current?.scrollTo({ x: 0, y: 0, animated: false });
@@ -236,15 +250,42 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     };
   }, [activeAttemptId, resetViewport]);
 
+  useEffect(() => {
+    setJourneyQuestionnaireOpen(false);
+    setJourneyQuestionnaireSessionId(null);
+  }, [props.creatureId]);
+
+  useEffect(() => {
+    if (journeyQuestionnaireOpen && props.journeyConversation) {
+      setJourneyQuestionnaireSessionId(props.journeyConversation.id);
+    }
+  }, [journeyQuestionnaireOpen, props.journeyConversation]);
+
+  const returnToDo = () => {
+    setQuestExperienceOpen(false);
+    setActiveAttemptId(null);
+    setExperienceInstance((current) => current + 1);
+    resetViewport();
+  };
   const requestClose = () => {
-    if (quickGoalPickerOpen) setQuickGoalPickerOpen(false);
-    else if (activeAttemptId) setEndAttemptOpen(true);
-    else if (state.thread === 'reflection' && companionReflectionIsDirty(state)) dispatch({ type: 'request_discard' });
-    else props.onClose();
+    if (journeyQuestionnaireOpen) {
+      Keyboard.dismiss();
+      if (journeyQuestionnaireSessionId && !props.journeyConversation) props.onDismissQuickGoalSuggestions();
+      setJourneyQuestionnaireOpen(false);
+      setJourneyQuestionnaireSessionId(null);
+    } else if (quickGoalPickerOpen) setQuickGoalPickerOpen(false);
+    else {
+      const backAction = companionQuestBackAction({ activeAttemptId, experienceOpen: questExperienceOpen });
+      if (backAction === 'confirm_attempt_exit') setEndAttemptOpen(true);
+      else if (backAction === 'return_to_do') returnToDo();
+      else if (state.thread === 'reflection' && companionReflectionIsDirty(state)) dispatch({ type: 'request_discard' });
+      else props.onClose();
+    }
   };
   const selectThread = (thread: CompanionThread) => {
     Keyboard.dismiss();
     resetViewport();
+    if (thread !== 'quest') setQuestExperienceOpen(false);
     dispatch({ type: 'select_thread', thread });
     props.onSelectThread?.(thread);
   };
@@ -271,6 +312,12 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     else props.onCashIn();
   };
   const interactiveExecution = props.activeQuest?.execution ?? null;
+  useEffect(() => {
+    setActiveAttemptId(null);
+    setEndAttemptOpen(false);
+    setLeaveQuestOpen(false);
+    setQuestExperienceOpen(false);
+  }, [props.activeQuest?.title, props.creatureId]);
   const completeQuickGoal = (goalId: string) => {
     const goal = props.quickGoalState.goals.find((candidate) => candidate.id === goalId);
     const completion = props.onCompleteQuickGoal(goalId);
@@ -307,18 +354,43 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     </View>
   ) : null;
   const immersiveExperience = Boolean(activeAttemptId && companionQuestUsesFullBleed(interactiveExecution));
+  const questionnaireExperience = Boolean(journeyQuestionnaireOpen && props.journeyDefinition);
   useEffect(() => {
     onExperienceActiveChange?.(Boolean(activeAttemptId));
     return () => onExperienceActiveChange?.(false);
   }, [activeAttemptId, onExperienceActiveChange]);
+  const canReturnToQuestList = Boolean(
+    props.activeQuest &&
+    !props.questComplete &&
+    quest.mode !== 'complete' &&
+    quest.mode !== 'analysing' &&
+    !questExperienceOpen
+  );
+  const returnToQuestListAction = canReturnToQuestList
+    ? (
+        <CompanionSecondaryAction
+          label="Back to quest list"
+          icon="arrow.counterclockwise"
+          onPress={() => setLeaveQuestOpen(true)}
+        />
+      )
+    : null;
+  const inlineQuestNoteAction = companionQuestInlineNoteAction(quest);
   const actionFooter = props.memorySaved
     ? null
     : state.thread === 'quest' && interactiveExecution
-      ? null
+      ? returnToQuestListAction
     : state.thread === 'quest' && quest.mode === 'offer'
       ? null
-    : state.thread === 'quest' && quest.primaryAction
-      ? reviewItem ? null : <View style={styles.footerStack}><CompanionPrimaryAction label={quest.mode === 'offer' ? 'Accept selected quest' : quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} /></View>
+    : state.thread === 'quest' && quest.primaryAction && !inlineQuestNoteAction
+      ? reviewItem ? null : (
+          <View style={styles.footerStack}>
+            {returnToQuestListAction}
+            <CompanionPrimaryAction label={quest.mode === 'offer' ? 'Accept selected quest' : quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} />
+          </View>
+        )
+      : state.thread === 'quest'
+        ? returnToQuestListAction
       : state.thread === 'insight' && props.insight.action
         ? <CompanionPrimaryAction label={props.insight.action.label} icon={props.insight.action.icon} onPress={props.onInsightAction} />
         : state.thread === 'reflection' && state.reflectionDraft
@@ -337,16 +409,28 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       {actionFooter}
     </View>
   ) : actionFooter;
-  const visibleFooter = quickGoalPickerOpen ? null : footer;
+  const visibleFooter = quickGoalPickerOpen || questionnaireExperience ? null : footer;
   const entering = reduceMotion ? FadeIn.duration(100) : state.direction > 0 ? FadeInRight.duration(210) : FadeInLeft.duration(210);
 
   return (<>
-        <KatchaSheet fullBleed={immersiveExperience} onRequestClose={requestClose} showClose={!activeAttemptId} surface={activeAttemptId ? 'night' : 'parchment'} size={activeAttemptId ? 'full' : 'tall'}>
+        <KatchaSheet fullBleed={immersiveExperience || questionnaireExperience} onRequestClose={requestClose} showClose={!activeAttemptId && !questionnaireExperience} surface={activeAttemptId ? 'night' : 'parchment'} size={activeAttemptId || questionnaireExperience ? 'full' : 'tall'}>
       <KeyboardAvoidingView behavior={!activeAttemptId && process.env.EXPO_OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={8} style={styles.keyboard}>
-        {!activeAttemptId && !quickGoalPickerOpen ? (
+        {!activeAttemptId && !quickGoalPickerOpen && !questionnaireExperience ? (
           <CompanionHero key="companion-hero" name={props.name} image={visual.source} houseLevel={props.houseLevel} openingLine={props.openingLine}>
             <CompanionThreadSwitcher value={state.thread} onChange={selectThread} showSkins={props.skins.length > 1} />
           </CompanionHero>
+        ) : null}
+        {activeAttemptId ? (
+          <Pressable
+            accessibilityLabel="Exit game and return to Do"
+            accessibilityRole="button"
+            onPress={() => setEndAttemptOpen(true)}
+            style={({ pressed }) => [styles.gameBackButton, { top: insets.top + 10 }, pressed && styles.gameBackButtonPressed]}>
+            <IconSymbol color={Lantern.moon50} name="chevron.left" size={18} />
+            <ThemedText style={styles.gameBackLabel} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+              Do
+            </ThemedText>
+          </Pressable>
         ) : null}
         <View key="interaction-content" style={styles.contentFrame}>
           <ScrollView
@@ -355,7 +439,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             automaticallyAdjustContentInsets={false}
             automaticallyAdjustKeyboardInsets={false}
             bounces={!activeAttemptId}
-            contentContainerStyle={[styles.scrollContent, activeAttemptId && styles.activeScrollContent]}
+            contentContainerStyle={[
+              styles.scrollContent,
+              activeAttemptId && styles.activeScrollContent,
+              questionnaireExperience && [
+                styles.questionnaireScrollContent,
+                { paddingBottom: insets.bottom + 24, paddingTop: insets.top + 12 },
+              ],
+            ]}
             contentInsetAdjustmentBehavior="never"
             keyboardShouldPersistTaps="handled"
             onContentSizeChange={activeAttemptId ? resetViewport : undefined}
@@ -364,7 +455,25 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             scrollEnabled={!activeAttemptId}
             showsVerticalScrollIndicator={false}>
             <Animated.View key={state.thread} entering={entering} exiting={FadeOut.duration(100)} style={activeAttemptId ? styles.activeExperience : undefined}>
-              {quickGoalPickerOpen ? (
+              {questionnaireExperience && props.journeyDefinition ? (
+                <CompanionJourneyQuestionnairePage
+                  companionName={props.name}
+                  conversation={props.journeyConversation}
+                  definition={props.journeyDefinition}
+                  goals={props.journeyGoals}
+                  node={props.journeyNode}
+                  onAnswer={props.onAnswerJourneyConversation}
+                  onBack={requestClose}
+                  onViewTasks={() => {
+                    props.onDismissQuickGoalSuggestions();
+                    setJourneyQuestionnaireOpen(false);
+                    setJourneyQuestionnaireSessionId(null);
+                    selectThread('quest');
+                  }}
+                  quickGoalSuggestionIds={props.quickGoalSuggestionIds}
+                  resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
+                />
+              ) : quickGoalPickerOpen ? (
                 <CompanionQuickGoalPicker
                   dayId={props.quickGoalDayId}
                   familyId={props.familyId}
@@ -378,8 +487,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   <ThemedText style={styles.savedTitle} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>Memory kept</ThemedText>
                   <ThemedText style={styles.savedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{props.name} will remember that with you.</ThemedText>
                 </View>
-              ) : state.thread === 'quest' && interactiveExecution && props.onStartQuestAttempt && props.onCancelQuestAttempt && props.onCompleteInteractiveQuest ? (
+              ) : state.thread === 'quest' && interactiveExecution && questExperienceOpen && props.onStartQuestAttempt && props.onCancelQuestAttempt && props.onCompleteInteractiveQuest ? (
                 <View style={!activeAttemptId ? styles.gamePreviewFrame : styles.activeExperience}>
+                {!activeAttemptId ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={returnToDo}
+                    style={({ pressed }) => [styles.previewBackButton, pressed && styles.previewBackButtonPressed]}>
+                    <IconSymbol color={Lantern.moon300} name="chevron.left" size={16} />
+                    <ThemedText style={styles.previewBackLabel} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                      Back to Do
+                    </ThemedText>
+                  </Pressable>
+                ) : null}
                 <QuestExperienceHost
                   key={experienceInstance}
                   execution={interactiveExecution}
@@ -391,6 +511,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   recentSortingItemIds={props.recentSortingItemIds ?? []}
                   sortingBestDurationMs={props.sortingBestDurationMs ?? null}
                   matchingBestDurationMs={props.matchingBestDurationMs ?? null}
+                  startImmediately={companionQuestSkipsPreview(interactiveExecution)}
                   recentMatchingContentIds={props.recentMatchingContentIds ?? []}
                   recentMergeOrderIds={props.recentMergeOrderIds ?? []}
                   mergeBest={props.mergeBest ?? null}
@@ -400,10 +521,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   onComplete={(attemptId, result) => {
                     props.onCompleteInteractiveQuest?.(attemptId, result);
                     setActiveAttemptId(null);
+                    setQuestExperienceOpen(false);
                     selectThread('insight');
                   }}
-                  onRequestExit={() => setEndAttemptOpen(true)}
-                  onRunningChange={(running, attemptId) => setActiveAttemptId(running ? attemptId ?? null : null)}
+                  onRequestExit={() => {
+                    if (activeAttemptId) setEndAttemptOpen(true);
+                    else returnToDo();
+                  }}
+                  onRunningChange={(running, attemptId) => {
+                    if (running) setActiveAttemptId(attemptId ?? null);
+                    else returnToDo();
+                  }}
                 />
                 </View>
               ) : state.thread === 'quest' && !props.activeQuest && props.offers.length ? (
@@ -425,12 +553,28 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   <CompanionQuestThread
                     model={quest}
                     reviewItem={reviewItem}
+                    onAttemptInput={() => {
+                      if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                      props.onQuestAction();
+                    }}
                     onSelectReviewItem={(item) => dispatch({ type: 'review_item', itemId: item?.id ?? null })}
                     onClarify={(item, answer) => {
                       props.onClarifyQuestMatch(item, answer);
                       dispatch({ type: 'review_item', itemId: null });
                     }}
                   />
+                  {interactiveExecution && !props.questComplete ? (
+                    <View style={styles.openGameAction}>
+                      <CompanionPrimaryAction
+                        icon="play.fill"
+                        label="Open mini-game"
+                        onPress={() => {
+                          setQuestExperienceOpen(true);
+                          resetViewport();
+                        }}
+                      />
+                    </View>
+                  ) : null}
                 </View>
               ) : state.thread === 'discovery' ? (
                 props.journeyDefinition ? (
@@ -439,17 +583,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     conversation={props.journeyConversation}
                     definition={props.journeyDefinition}
                     goals={props.journeyGoals}
-                    momentLoggedToday={props.journeyMomentLoggedToday}
-                    node={props.journeyNode}
-                    onAnswer={props.onAnswerJourneyConversation}
-                    onLogMoment={props.onLogJourneyMoment}
                     onSetGoalStatus={props.onSetJourneyGoalStatus}
-                    onSetPrimaryGoal={props.onSetPrimaryJourneyGoal}
-                    onStart={props.onStartJourneyConversation}
-                    progress={props.journeyProgress}
-                    quickGoalSuggestionIds={props.quickGoalSuggestionIds}
-                    onAddQuickGoalSuggestions={props.onAddQuickGoalSuggestions}
-                    onDismissQuickGoalSuggestions={props.onDismissQuickGoalSuggestions}
+                    onOpenQuestionnaire={() => {
+                      if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                      setJourneyQuestionnaireOpen(true);
+                      if (props.journeyConversation) setJourneyQuestionnaireSessionId(props.journeyConversation.id);
+                      else props.onStartJourneyConversation();
+                    }}
                   />
                 ) : (
                   <CompanionDiscoveryThread
@@ -489,21 +629,35 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         </View>
         {visibleFooter ? <View style={styles.footer}>{visibleFooter}</View> : null}
         <KatchaDialog
-          body="Your current game progress will be lost. You can retry the quest from here."
+          body="This run will stop, but the quest stays active. You can reopen it from Do whenever you want."
           cancelLabel="Keep playing"
           confirmLabel="Exit game"
           onCancel={() => setEndAttemptOpen(false)}
           onConfirm={() => {
             const attemptId = activeAttemptId;
             setEndAttemptOpen(false);
-            setActiveAttemptId(null);
-            setExperienceInstance((current) => current + 1);
             if (attemptId) props.onCancelQuestAttempt?.(attemptId);
+            returnToDo();
           }}
           open={endAttemptOpen}
           portal={false}
           surface="night"
           title="Exit this game?"
+          tone="destructive"
+        />
+        <KatchaDialog
+          body="This will leave the current quest and return to the full quest list. You can choose it again later."
+          cancelLabel="Keep quest"
+          confirmLabel="Back to quest list"
+          onCancel={() => setLeaveQuestOpen(false)}
+          onConfirm={() => {
+            setLeaveQuestOpen(false);
+            returnToDo();
+            props.onChooseAnotherQuest();
+          }}
+          open={leaveQuestOpen}
+          portal={false}
+          title="Leave this quest?"
           tone="destructive"
         />
       </KeyboardAvoidingView>
@@ -517,8 +671,29 @@ const styles = StyleSheet.create({
   contentFrame: { flex: 1, minHeight: 0 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },
   activeScrollContent: { flexGrow: 1, paddingBottom: 0, paddingHorizontal: 0 },
+  questionnaireScrollContent: { flexGrow: 1, paddingHorizontal: 22 },
   activeExperience: { flex: 1 },
   gamePreviewFrame: { backgroundColor: Lantern.ink900, borderCurve: 'continuous', borderRadius: 20, minHeight: 320, padding: 14 },
+  previewBackButton: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 4, minHeight: 38, paddingHorizontal: 4, zIndex: 5 },
+  previewBackButtonPressed: { opacity: 0.68, transform: [{ scale: 0.98 }] },
+  previewBackLabel: { fontSize: 11.5, fontWeight: '900' },
+  gameBackButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(9,14,30,0.78)',
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 3,
+    left: 14,
+    minHeight: 42,
+    paddingHorizontal: 12,
+    position: 'absolute',
+    zIndex: 80,
+  },
+  gameBackButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
+  gameBackLabel: { fontSize: 12, fontWeight: '900' },
+  openGameAction: { paddingTop: 12 },
   quickGoalStack: { gap: 8, marginBottom: 12 },
   footer: { backgroundColor: 'transparent', paddingBottom: 2, paddingHorizontal: 2, paddingTop: 7 },
   footerStack: { gap: 7 },

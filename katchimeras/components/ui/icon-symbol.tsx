@@ -29,6 +29,7 @@ const MAPPING = {
   'figure.walk': 'directions-walk',
   'mappin.and.ellipse': 'location-on',
   'map.fill': 'map',
+  'list.clipboard.fill': 'assignment',
   'bolt.fill': 'bolt',
   'cup.and.saucer.fill': 'local-cafe',
   'moon.stars.fill': 'dark-mode',

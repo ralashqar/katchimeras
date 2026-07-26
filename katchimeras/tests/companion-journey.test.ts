@@ -10,6 +10,7 @@ import {
   goalsForJourneyFamily,
   hasJourneyMomentForDay,
   journeyProgressForGoal,
+  journeyQuestionnaireProgress,
   migrateLegacyDiscoveryGoals,
   normaliseCompanionJourneyState,
   primaryGoalForFamily,
@@ -58,7 +59,7 @@ function completedQuest(
 
 test('journey catalogues have valid branches, goal types, and stages', () => {
   assert.deepEqual(validateCompanionJourneyDefinitions(), []);
-  assert.equal(companionJourneyByFamilyId.size, 18);
+  assert.equal(companionJourneyByFamilyId.size, 25);
   assert.ok(companionJourneyByFamilyId.has('cheerlet'));
   assert.ok(companionJourneyByFamilyId.has('coffee-ritual'));
   assert.ok(companionJourneyByFamilyId.has('dawnle'));
@@ -77,6 +78,9 @@ test('journey catalogues have valid branches, goal types, and stages', () => {
   assert.ok(companionJourneyByFamilyId.has('steppling'));
   assert.ok(companionJourneyByFamilyId.has('tasklet'));
   assert.ok(companionJourneyByFamilyId.has('vesperitt'));
+  for (const familyId of ['flexel', 'sprintail', 'hooplet', 'serveling', 'snuglet', 'waglet', 'whiskit']) {
+    assert.ok(companionJourneyByFamilyId.has(familyId));
+  }
 });
 
 test('daily-rhythm batch creates actionable Focus goals with scoped suggestions', () => {
@@ -202,10 +206,18 @@ test('Tasklet conversation branches into a persistent goal and follow-up', () =>
   let state = startJourneyConversation(emptyCompanionJourneyState(), 'tasklet', 100);
   let conversation = activeConversationForFamily(state, 'tasklet');
   assert.equal(currentJourneyConversationNode(conversation)?.id, 'attention');
+  assert.deepEqual(
+    journeyQuestionnaireProgress(companionJourneyByFamilyId.get('tasklet')!, conversation!),
+    { current: 1, total: 3, ratio: 1 / 3 }
+  );
 
   state = answerCurrent(state, 'tasklet', 'project', 110);
   conversation = activeConversationForFamily(state, 'tasklet');
   assert.equal(currentJourneyConversationNode(conversation)?.id, 'project-goal');
+  assert.deepEqual(
+    journeyQuestionnaireProgress(companionJourneyByFamilyId.get('tasklet')!, conversation!),
+    { current: 2, total: 3, ratio: 2 / 3 }
+  );
 
   state = answerCurrent(state, 'tasklet', 'Ship the first usable prototype', 120);
   const goal = primaryGoalForFamily(state, 'tasklet');

@@ -12,20 +12,26 @@ import type { InlineVoiceNotePhase } from '@/hooks/use-inline-voice-note';
 
 type QuickNoteComposerProps = {
   onClose: () => void;
+  onCancel?: () => void;
   onSubmit: (text: string) => Promise<void>;
   onVoiceStart: () => void;
   onVoiceStop: () => void;
   voiceElapsed: number;
   voicePhase: InlineVoiceNotePhase;
+  contextTitle?: string | null;
+  contextBody?: string | null;
 };
 
 export function QuickNoteComposer({
   onClose,
+  onCancel = onClose,
   onSubmit,
   onVoiceStart,
   onVoiceStop,
   voiceElapsed,
   voicePhase,
+  contextTitle,
+  contextBody,
 }: QuickNoteComposerProps) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -39,7 +45,7 @@ export function QuickNoteComposer({
     const trimmed = text.trim();
     if (interactionLocked) return;
     if (!trimmed) {
-      onClose();
+      onCancel();
       return;
     }
     Keyboard.dismiss();
@@ -68,13 +74,20 @@ export function QuickNoteComposer({
   return (
     <View style={styles.overlay}>
       <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(160)} style={styles.backdrop}>
-        <Pressable disabled={interactionLocked} onPressIn={onClose} style={StyleSheet.absoluteFill} />
+        <Pressable disabled={interactionLocked} onPressIn={onCancel} style={StyleSheet.absoluteFill} />
       </Animated.View>
 
       <Animated.View
         entering={FadeInDown.duration(220)}
         exiting={FadeOutUp.duration(180)}
         style={[styles.card, { top: insets.top + 96 }]}>
+        {contextTitle && !voiceActive && !reading ? (
+          <View style={styles.questContext}>
+            <ThemedText style={styles.questKicker} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>QUEST NOTE</ThemedText>
+            <ThemedText style={styles.questTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{contextTitle}</ThemedText>
+            {contextBody ? <ThemedText style={styles.questBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{contextBody}</ThemedText> : null}
+          </View>
+        ) : null}
         {voiceActive ? (
           <View style={styles.voiceProgress}>
             <InlineVoiceNote elapsed={voiceElapsed} phase={voicePhase} />
@@ -99,7 +112,7 @@ export function QuickNoteComposer({
               style={styles.input}
               value={text}
             />
-            <Pressable accessibilityLabel="Cancel" accessibilityRole="button" hitSlop={10} onPress={onClose} style={styles.closeX}>
+            <Pressable accessibilityLabel="Cancel" accessibilityRole="button" hitSlop={10} onPress={onCancel} style={styles.closeX}>
               <IconSymbol name="xmark" size={12} color="rgba(251, 243, 228, 0.75)" />
             </Pressable>
           </View>
@@ -167,6 +180,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 14,
   },
+  questContext: { gap: 3, paddingBottom: 8, paddingRight: 28 },
+  questKicker: { fontSize: 9.5, fontWeight: '900', letterSpacing: 1.1 },
+  questTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 21, lineHeight: 24 },
+  questBody: { fontSize: 11.5, lineHeight: 16 },
   inputRow: {
     alignItems: 'center',
     flexDirection: 'row',

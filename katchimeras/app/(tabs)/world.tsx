@@ -46,6 +46,7 @@ import {
 } from '@/utils/katchimera-wardrobe-storage';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
+import { questDefinition } from '@/utils/quests/definitions';
 
 type EmbeddedJournalReview =
   | {
@@ -219,6 +220,13 @@ export default function KingdomScreen() {
   const handleQuestAction = () => {
     const action = quests.selectedQuestRuntime?.nextAction;
     if (action === 'add_note' || action === 'record_voice') {
+      const definition = quests.selectedQuestRuntime
+        ? questDefinition(quests.selectedQuestRuntime.questId)
+        : null;
+      if (definition?.semanticVerification) {
+        quests.performSelectedQuestAction();
+        return;
+      }
       setEmbeddedJournal({ origin: 'quest', initialFlowId: 'general', noteExpanded: true });
       return;
     }
@@ -322,6 +330,7 @@ export default function KingdomScreen() {
           activeQuest={quests.selectedActiveQuest ? {
             title: quests.selectedActiveQuest.title,
             hint: quests.selectedActiveQuest.hint,
+            semanticInput: Boolean(questDefinition(quests.selectedActiveQuest.questId)?.semanticVerification),
             execution: quests.selectedInteractiveExecution,
             resolvedConfig: quests.selectedActiveQuest.resolvedConfig,
             offerSeed: quests.selectedActiveQuest.offerSeed,
@@ -336,6 +345,7 @@ export default function KingdomScreen() {
           criteria={quests.questCriteria}
           onAccept={quests.acceptSelectedQuest}
           onCashIn={quests.cashInSelectedQuest}
+          onChooseAnotherQuest={quests.chooseAnotherSelectedQuest}
           onSubmitQuest={quests.submitSelectedQuest}
           onClarifyQuestMatch={quests.clarifySelectedQuestMatch}
           onQuestAction={handleQuestAction}
@@ -377,7 +387,14 @@ export default function KingdomScreen() {
           journeyMomentLoggedToday={quests.selectedJourneyMomentLoggedToday}
           questAdvancesJourneyGoal={quests.selectedQuestAdvancesJourneyGoal}
           onStartJourneyConversation={quests.startSelectedJourneyConversation}
-          onAnswerJourneyConversation={quests.answerSelectedJourneyConversation}
+          onAnswerJourneyConversation={(sessionId, value) => {
+            const suggestedTemplateIds = quests.answerSelectedJourneyConversation(sessionId, value);
+            if (suggestedTemplateIds.length) {
+              const added = quickGoals.addTemplates(suggestedTemplateIds);
+              if (added) quests.refreshQuestState();
+            }
+            return suggestedTemplateIds;
+          }}
           onLogJourneyMoment={quests.logSelectedJourneyMoment}
           onSetJourneyGoalStatus={quests.setSelectedJourneyGoalStatus}
           onSetPrimaryJourneyGoal={quests.setSelectedPrimaryJourneyGoal}

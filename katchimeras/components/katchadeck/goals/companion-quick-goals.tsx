@@ -1,6 +1,17 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { Image } from 'expo-image';
+import { type ComponentProps, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import Animated, {
+  Easing,
+  FadeInDown,
+  FadeInUp,
+  FadeOut,
+  LinearTransition,
+  ZoomIn,
+  ZoomOut,
+  useReducedMotion,
+} from 'react-native-reanimated';
 
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
@@ -10,6 +21,7 @@ import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import { Meadow } from '@/constants/meadow-theme';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { resolveCreatureArtSource } from '@/utils/creature-art';
 import {
   cadenceFromTemplate,
   quickGoalCadenceLabel,
@@ -39,6 +51,8 @@ type QuickGoalActions = {
   ) => void;
   onCompleteGoal: (goalId: string) => CompanionQuickGoalCompletion | null;
   onUndoGoal: (goalId: string) => boolean;
+  onSnoozeGoal: (goalId: string) => boolean;
+  onSkipGoal: (goalId: string) => boolean;
 };
 
 export function CompanionQuickGoalsPanel({
@@ -290,31 +304,49 @@ export function QuickGoalsSheet({
   onRemember?: (completion: CompanionQuickGoalCompletion, goal: CompanionQuickGoal) => void;
   state: CompanionQuickGoalState;
 }) {
+  const reduceMotion = useReducedMotion();
+  const [mode, setMode] = useState<'today' | 'add' | 'manage'>('today');
   const [familyId, setFamilyId] = useState<KatchimeraFamilyId>(
     initialFamilyId && familyIds.includes(initialFamilyId) ? initialFamilyId : familyIds[0] ?? 'vesperitt'
   );
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<CompanionQuickGoal | null>(null);
   const [title, setTitle] = useState('');
   const [cadence, setCadence] = useState<CompanionQuickGoalCadence>({ kind: 'once', dayId });
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [recentCompletion, setRecentCompletion] = useState<{
-    completion: CompanionQuickGoalCompletion;
-    goal: CompanionQuickGoal;
-  } | null>(null);
   const goals = quickGoalsForDay(state, dayId);
   const familyGoals = state.goals.filter((goal) => goal.familyId === familyId && goal.status !== 'archived');
   const templates = quickGoalTemplatesForFamily(familyId);
   const completeInSheet = (goalId: string) => {
     const goal = state.goals.find((candidate) => candidate.id === goalId);
     const completion = actions.onCompleteGoal(goalId);
-    if (goal && completion) setRecentCompletion({ completion, goal });
+    if (goal && completion) {
+      setFeedback(null);
+      if (process.env.EXPO_OS === 'ios') {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }
     return completion;
   };
   const undoInSheet = (goalId: string) => {
     const undone = actions.onUndoGoal(goalId);
-    if (undone) setRecentCompletion((current) => current?.goal.id === goalId ? null : current);
+    if (undone) {
+      setFeedback('Completion undone');
+    }
     return undone;
+  };
+  const snoozeInSheet = (goalId: string) => {
+    if (!actions.onSnoozeGoal(goalId)) return;
+    setSelectedGoalId(null);
+    setFeedback('Snoozed until the next useful day');
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+  };
+  const skipInSheet = (goalId: string) => {
+    if (!actions.onSkipGoal(goalId)) return;
+    setSelectedGoalId(null);
+    setFeedback('Skipped for today');
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
   };
 
   useEffect(() => {
@@ -364,8 +396,12 @@ export function QuickGoalsSheet({
     <KatchaSheet
       header={{
         eyebrow: 'TODAY',
-        title: 'Small goals',
-        subtitle: 'Tap to complete. Add only what feels useful.',
+        title: mode === 'today' ? 'Small goals' : mode === 'add' ? 'Add a small goal' : 'Manage goals',
+        subtitle: mode === 'today'
+          ? 'Tap a goal, then choose what feels right.'
+          : mode === 'add'
+            ? 'Choose a companion and keep it achievable.'
+            : 'Adjust what repeats or pause what you do not need.',
       }}
       keyboardAvoiding
       onRequestClose={onClose}
@@ -373,140 +409,233 @@ export function QuickGoalsSheet({
       scrollContentStyle={styles.sheetContent}
       size="tall"
       surface="parchment">
-      {goals.length ? (
-        <View style={styles.sheetSection}>
-          <ThemedText style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-            TODAY
-          </ThemedText>
-          <View style={styles.goalList}>
-            {goals.map((item) => (
-              <QuickGoalRow
-                item={item}
-                key={item.goal.id}
-                onCompleteGoal={completeInSheet}
-                onUndoGoal={undoInSheet}
-                tone="parchment"
-              />
-            ))}
-          </View>
-          <QuickGoalCompletionPrompt
-            completion={recentCompletion?.completion ?? null}
-            goal={recentCompletion?.goal ?? null}
-            onRemember={(completion, goal) => {
-              setRecentCompletion(null);
-              onRemember?.(completion, goal);
-            }}
-            onUndo={undoInSheet}
-          />
-        </View>
-      ) : null}
-
-      <View style={styles.sheetSection}>
-        <ThemedText style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-          ADD FOR
-        </ThemedText>
-        <View style={styles.familyPills}>
-          {familyIds.map((id) => {
-            const selected = id === familyId;
-            return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                key={id}
-                onPress={() => {
-                  setFamilyId(id);
-                  setCustomOpen(false);
-                  setFeedback(null);
-                }}
-                style={({ pressed }) => [styles.familyPill, selected && styles.familyPillSelected, pressed && styles.pressed]}>
-                <ThemedText style={styles.familyPillText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  {katchimeraFamilyById.get(id)?.displayName ?? id}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.presetList}>
-          {templates.map((template) => {
-            const added = familyGoals.some((goal) => goal.templateId === template.id);
-            return (
-              <Pressable
-                accessibilityRole="button"
-                disabled={added}
-                key={template.id}
-                onPress={() => {
-                  const result = actions.onAddTemplate(template.id);
-                  setFeedback(result.added ? 'Goal added' : 'That goal is already active');
-                }}
-                style={({ pressed }) => [styles.presetRow, added && styles.disabled, pressed && styles.pressed]}>
-                <View style={styles.presetCopy}>
-                  <ThemedText selectable style={styles.presetTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                    {template.title}
-                  </ThemedText>
-                  <ThemedText style={styles.presetCadence} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-                    {quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
-                  </ThemedText>
-                </View>
-                <IconSymbol color={added ? Meadow.leafDeep : Meadow.goldDeep} name={added ? 'checkmark' : 'plus'} size={17} />
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {!customOpen ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={beginCustom}
-            style={({ pressed }) => [styles.customButton, pressed && styles.pressed]}>
-            <IconSymbol color={Meadow.inkSoft} name="pencil" size={15} />
-            <ThemedText style={styles.customButtonText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              Write my own
+      {mode === 'today' ? (
+        <View style={styles.todayGoalsView}>
+          <View style={styles.todaySectionHeading}>
+            <ThemedText style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+              TODAY&apos;S GOALS
             </ThemedText>
-          </Pressable>
-        ) : (
-          <GoalEditor
-            cadence={cadence}
-            dayId={dayId}
-            editing={Boolean(editingGoal)}
-            onCadenceChange={setCadence}
-            onCancel={() => {
-              setCustomOpen(false);
-              setEditingGoal(null);
-            }}
-            onSave={save}
-            onTitleChange={setTitle}
-            title={title}
-          />
-        )}
-      </View>
-
-      {familyGoals.length ? (
-        <View style={styles.sheetSection}>
-          <ThemedText style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-            MANAGE {katchimeraFamilyById.get(familyId)?.displayName.toUpperCase() ?? 'GOALS'}
-          </ThemedText>
-          {familyGoals.map((goal) => (
-            <View key={goal.id} style={styles.manageRow}>
-              <View style={styles.presetCopy}>
-                <ThemedText selectable style={styles.presetTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  {goal.title}
+            <ThemedText style={styles.todayCount} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+              {goals.filter((item) => item.completion).length}/{goals.length}
+            </ThemedText>
+          </View>
+          {goals.length ? (
+            <View style={styles.todayGoalList}>
+              {goals.map((item, index) => {
+                const selected = item.goal.id === selectedGoalId;
+                return (
+                  <Animated.View
+                    entering={reduceMotion ? undefined : FadeInUp.delay(Math.min(index, 6) * 32).duration(180)}
+                    key={item.goal.id}
+                    layout={reduceMotion ? undefined : LinearTransition.duration(170).easing(Easing.out(Easing.cubic))}>
+                    <TodayQuickGoalCard
+                      item={item}
+                      onPress={() => {
+                        setFeedback(null);
+                        setSelectedGoalId(selected ? null : item.goal.id);
+                        if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                      }}
+                      selected={selected}
+                    />
+                    {selected ? (
+                      <GoalActionTray
+                        item={item}
+                        onComplete={() => completeInSheet(item.goal.id)}
+                        onDone={() => setSelectedGoalId(null)}
+                        onRemember={() => {
+                          if (!item.completion) return;
+                          onRemember?.(item.completion, item.goal);
+                        }}
+                        onSkip={() => skipInSheet(item.goal.id)}
+                        onSnooze={() => snoozeInSheet(item.goal.id)}
+                        onUndo={() => undoInSheet(item.goal.id)}
+                        reduceMotion={reduceMotion}
+                      />
+                    ) : null}
+                  </Animated.View>
+                );
+              })}
+            </View>
+          ) : (
+            <Animated.View entering={FadeInDown.duration(180)} style={styles.goalsEmptyState}>
+              <IconSymbol color={Meadow.goldDeep} name="sparkles" size={22} />
+              <View style={styles.goalsEmptyCopy}>
+                <ThemedText style={styles.goalsEmptyTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                  Your list is clear
                 </ThemedText>
-                <ThemedText style={styles.presetCadence} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-                  {goal.status === 'paused' ? 'Paused' : quickGoalCadenceLabel(goal.cadence)}
+                <ThemedText style={styles.goalsEmptyBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                  Add one small thing if it would help.
                 </ThemedText>
               </View>
-              <GoalManageButton icon="pencil" label="Edit" onPress={() => beginEdit(goal)} />
-              <GoalManageButton
-                icon={goal.status === 'paused' ? 'play.fill' : 'pause.fill'}
-                label={goal.status === 'paused' ? 'Resume' : 'Pause'}
-                onPress={() => actions.onEditGoal(goal.id, { status: goal.status === 'paused' ? 'active' : 'paused' })}
-              />
-              <GoalManageButton icon="trash.fill" label="Archive" onPress={() => actions.onEditGoal(goal.id, { status: 'archived' })} />
-            </View>
-          ))}
+            </Animated.View>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setMode('add');
+              setSelectedGoalId(null);
+              setFeedback(null);
+            }}
+            style={({ pressed }) => [styles.addGoalButton, pressed && styles.pressed]}>
+            <IconSymbol color={Meadow.ink} name="plus" size={18} />
+            <ThemedText style={styles.addGoalButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+              Add small goal
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setMode('manage');
+              setFeedback(null);
+            }}
+            style={({ pressed }) => [styles.manageGoalsLink, pressed && styles.pressed]}>
+            <IconSymbol color={Meadow.inkFaint} name="gearshape.fill" size={13} />
+            <ThemedText style={styles.manageGoalsLinkText} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+              Manage repeating goals
+            </ThemedText>
+          </Pressable>
         </View>
-      ) : null}
+      ) : (
+        <View style={styles.sheetSection}>
+          <SheetBack
+            label="Back to today"
+            onPress={() => {
+              setMode('today');
+              setCustomOpen(false);
+              setEditingGoal(null);
+              setFeedback(null);
+            }}
+          />
+          <ThemedText style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+            {mode === 'add' ? 'CHOOSE A COMPANION' : 'GOALS FOR'}
+          </ThemedText>
+          <View style={styles.familyPills}>
+            {familyIds.map((id) => {
+              const selected = id === familyId;
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={id}
+                  onPress={() => {
+                    setFamilyId(id);
+                    setCustomOpen(false);
+                    setFeedback(null);
+                  }}
+                  style={({ pressed }) => [styles.familyPill, selected && styles.familyPillSelected, pressed && styles.pressed]}>
+                  <CompanionThumb familyId={id} size={28} />
+                  <ThemedText style={styles.familyPillText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                    {katchimeraFamilyById.get(id)?.displayName ?? id}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {mode === 'add' ? (
+            <>
+              <View style={styles.presetList}>
+                {templates.map((template) => {
+                  const added = familyGoals.some((goal) => goal.templateId === template.id);
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={added}
+                      key={template.id}
+                      onPress={() => {
+                        const result = actions.onAddTemplate(template.id);
+                        setFeedback(result.added ? 'Goal added' : 'That goal is already active');
+                      }}
+                      style={({ pressed }) => [styles.presetRow, added && styles.disabled, pressed && styles.pressed]}>
+                      <CompanionThumb bleed familyId={template.familyId} size={48} />
+                      <View style={styles.presetCopy}>
+                        <ThemedText selectable style={styles.presetTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                          {template.title}
+                        </ThemedText>
+                        <ThemedText style={styles.presetCadence} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+                          {quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
+                        </ThemedText>
+                      </View>
+                      <View style={[styles.presetAdd, added && styles.presetAdded]}>
+                        <IconSymbol color={added ? Meadow.chipLabel : Meadow.goldDeep} name={added ? 'checkmark' : 'plus'} size={16} />
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {!customOpen ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={beginCustom}
+                  style={({ pressed }) => [styles.customButton, pressed && styles.pressed]}>
+                  <IconSymbol color={Meadow.inkSoft} name="pencil" size={15} />
+                  <ThemedText style={styles.customButtonText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                    Write my own
+                  </ThemedText>
+                </Pressable>
+              ) : (
+                <GoalEditor
+                  cadence={cadence}
+                  dayId={dayId}
+                  editing={Boolean(editingGoal)}
+                  onCadenceChange={setCadence}
+                  onCancel={() => {
+                    setCustomOpen(false);
+                    setEditingGoal(null);
+                  }}
+                  onSave={save}
+                  onTitleChange={setTitle}
+                  title={title}
+                />
+              )}
+            </>
+          ) : familyGoals.length ? (
+            <View style={styles.manageList}>
+              {familyGoals.map((goal) => (
+                <View key={goal.id} style={styles.manageRow}>
+                  <CompanionThumb bleed familyId={goal.familyId} size={42} />
+                  <View style={styles.presetCopy}>
+                    <ThemedText selectable style={styles.presetTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                      {goal.title}
+                    </ThemedText>
+                    <ThemedText style={styles.presetCadence} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+                      {goal.status === 'paused' ? 'Paused' : quickGoalCadenceLabel(goal.cadence)}
+                    </ThemedText>
+                  </View>
+                  <GoalManageButton icon="pencil" label="Edit" onPress={() => beginEdit(goal)} />
+                  <GoalManageButton
+                    icon={goal.status === 'paused' ? 'play.fill' : 'pause.fill'}
+                    label={goal.status === 'paused' ? 'Resume' : 'Pause'}
+                    onPress={() => actions.onEditGoal(goal.id, { status: goal.status === 'paused' ? 'active' : 'paused' })}
+                  />
+                  <GoalManageButton icon="trash.fill" label="Archive" onPress={() => actions.onEditGoal(goal.id, { status: 'archived' })} />
+                </View>
+              ))}
+              {customOpen ? (
+                <GoalEditor
+                  cadence={cadence}
+                  dayId={dayId}
+                  editing={Boolean(editingGoal)}
+                  onCadenceChange={setCadence}
+                  onCancel={() => {
+                    setCustomOpen(false);
+                    setEditingGoal(null);
+                  }}
+                  onSave={save}
+                  onTitleChange={setTitle}
+                  title={title}
+                />
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.goalsEmptyState}>
+              <ThemedText style={styles.goalsEmptyBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                No goals added for this companion yet.
+              </ThemedText>
+            </View>
+          )}
+        </View>
+      )}
 
       {feedback ? (
         <ThemedText accessibilityLiveRegion="polite" selectable style={styles.feedback} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
@@ -515,6 +644,220 @@ export function QuickGoalsSheet({
       ) : null}
     </KatchaSheet>
   );
+}
+
+function TodayQuickGoalCard({
+  item,
+  onPress,
+  selected,
+}: {
+  item: CompanionQuickGoalForDay;
+  onPress: () => void;
+  selected: boolean;
+}) {
+  const complete = Boolean(item.completion);
+  const familyName = katchimeraFamilyById.get(item.goal.familyId)?.displayName ?? item.goal.familyId;
+  return (
+    <Pressable
+      accessibilityHint={complete ? 'Opens completed goal actions' : 'Opens complete, snooze, and skip actions'}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.todayGoalCard,
+        selected && styles.todayGoalCardSelected,
+        complete && styles.todayGoalCardComplete,
+        pressed && styles.todayGoalCardPressed,
+      ]}>
+      <CompanionThumb bleed familyId={item.goal.familyId} size={64} />
+      <View style={styles.todayGoalCopy}>
+        <ThemedText
+          numberOfLines={2}
+          selectable
+          style={[styles.todayGoalTitle, complete && styles.todayGoalTitleComplete]}
+          lightColor={Meadow.ink}
+          darkColor={Meadow.ink}>
+          {item.goal.title}
+        </ThemedText>
+        <ThemedText style={styles.todayGoalSubtitle} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+          {goalEncouragement(item.goal.cadence)}
+        </ThemedText>
+        <View style={styles.goalTags}>
+          <GoalTag label={familyName} />
+          <GoalTag label={quickGoalCadenceLabel(item.goal.cadence)} />
+        </View>
+      </View>
+      <View style={[styles.todayGoalStatus, selected && styles.todayGoalStatusSelected, complete && styles.todayGoalStatusComplete]}>
+        {complete ? (
+          <Animated.View
+            entering={ZoomIn.duration(190).easing(Easing.out(Easing.back(1.06)))}
+            exiting={ZoomOut.duration(110).easing(Easing.in(Easing.quad))}>
+            <IconSymbol color={Meadow.chipLabel} name="checkmark" size={22} />
+          </Animated.View>
+        ) : selected ? (
+          <IconSymbol color={Meadow.chipLabel} name="chevron.down" size={18} />
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function GoalActionTray({
+  item,
+  onComplete,
+  onDone,
+  onRemember,
+  onSkip,
+  onSnooze,
+  onUndo,
+  reduceMotion,
+}: {
+  item: CompanionQuickGoalForDay;
+  onComplete: () => void;
+  onDone: () => void;
+  onRemember: () => void;
+  onSkip: () => void;
+  onSnooze: () => void;
+  onUndo: () => void;
+  reduceMotion: boolean;
+}) {
+  const complete = Boolean(item.completion);
+  return (
+    <Animated.View
+      accessibilityLiveRegion={complete ? 'polite' : undefined}
+      entering={reduceMotion ? undefined : FadeInDown.duration(165).easing(Easing.out(Easing.cubic))}
+      exiting={reduceMotion ? undefined : FadeOut.duration(100).easing(Easing.in(Easing.quad))}
+      style={[styles.goalActionTray, complete && styles.goalActionTrayComplete]}>
+      {complete ? (
+        <Animated.View
+          entering={reduceMotion ? undefined : ZoomIn.duration(210).easing(Easing.out(Easing.back(1.08)))}
+          style={styles.goalCompleteMessage}>
+          <View style={styles.goalCompleteBurst}>
+            <IconSymbol color={Meadow.chipLabel} name="checkmark" size={22} />
+          </View>
+          <View style={styles.goalCompleteCopy}>
+            <ThemedText style={styles.goalCompleteTitle} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
+              Nicely done · +5 bond
+            </ThemedText>
+            <ThemedText style={styles.goalCompleteBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+              Keep it simple, or add a line to today.
+            </ThemedText>
+          </View>
+        </Animated.View>
+      ) : (
+        <ThemedText style={styles.goalActionQuestion} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+          What would you like to do?
+        </ThemedText>
+      )}
+      <View style={styles.goalActionButtons}>
+        <GoalActionButton
+          icon={complete ? 'arrow.counterclockwise' : 'clock'}
+          label={complete ? 'Undo' : 'Snooze'}
+          onPress={complete ? onUndo : onSnooze}
+        />
+        <GoalActionButton
+          emphasized
+          icon="checkmark"
+          label={complete ? 'Done' : 'Complete'}
+          onPress={complete ? onDone : onComplete}
+        />
+        <GoalActionButton
+          icon={complete ? 'square.and.pencil' : 'arrow.right'}
+          label={complete ? 'Remember' : 'Skip'}
+          onPress={complete ? onRemember : onSkip}
+        />
+      </View>
+    </Animated.View>
+  );
+}
+
+function GoalActionButton({
+  emphasized = false,
+  icon,
+  label,
+  onPress,
+}: {
+  emphasized?: boolean;
+  icon: ComponentProps<typeof IconSymbol>['name'];
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.goalActionButton,
+        emphasized && styles.goalActionButtonEmphasized,
+        pressed && styles.goalActionButtonPressed,
+      ]}>
+      <IconSymbol color={emphasized ? Meadow.chipLabel : Meadow.inkSoft} name={icon} size={18} />
+      <ThemedText
+        style={styles.goalActionButtonLabel}
+        lightColor={emphasized ? Meadow.chipLabel : Meadow.inkSoft}
+        darkColor={emphasized ? Meadow.chipLabel : Meadow.inkSoft}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+function CompanionThumb({
+  bleed = false,
+  familyId,
+  size,
+}: {
+  bleed?: boolean;
+  familyId: KatchimeraFamilyId;
+  size: number;
+}) {
+  const family = katchimeraFamilyById.get(familyId);
+  const visualKey = family?.anchorVisualKey ?? null;
+  const artSize = bleed ? size * 1.38 : size;
+  return (
+    <View style={[styles.companionThumb, { height: size, width: size }]}>
+      {visualKey ? (
+        <Image
+          contentFit="contain"
+          source={resolveCreatureArtSource(visualKey, { lod: 'thumb', stage: 'hatchling' })}
+          style={{
+            height: artSize,
+            width: artSize,
+          }}
+          transition={120}
+        />
+      ) : (
+        <IconSymbol color={Meadow.goldDeep} name="sparkles" size={Math.round(size * 0.4)} />
+      )}
+    </View>
+  );
+}
+
+function GoalTag({ label }: { label: string }) {
+  return (
+    <View style={styles.goalTag}>
+      <ThemedText style={styles.goalTagText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
+        {label}
+      </ThemedText>
+    </View>
+  );
+}
+
+function SheetBack({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.sheetBack, pressed && styles.pressed]}>
+      <IconSymbol color={Meadow.inkSoft} name="chevron.left" size={16} />
+      <ThemedText style={styles.sheetBackText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+function goalEncouragement(cadence: CompanionQuickGoalCadence): string {
+  if (cadence.kind === 'daily') return 'Build the rhythm one small day at a time.';
+  if (cadence.kind === 'weekdays') return 'Keep the weekday rhythm gently moving.';
+  return 'One small, finishable win for today.';
 }
 
 function QuickGoalRow({
@@ -730,12 +1073,124 @@ const styles = StyleSheet.create({
   sheetContent: { gap: 18, paddingBottom: 28 },
   sheetSection: { gap: 9 },
   sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900', letterSpacing: 1.1 },
+  todayGoalsView: { gap: 12 },
+  todaySectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
+  todayCount: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  todayGoalList: { gap: 10 },
+  todayGoalCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,249,234,0.88)',
+    borderColor: 'rgba(185,145,77,0.24)',
+    borderCurve: 'continuous',
+    borderRadius: 20,
+    borderWidth: 1,
+    boxShadow: '0 5px 14px rgba(91,61,24,0.10)',
+    flexDirection: 'row',
+    gap: 11,
+    minHeight: 76,
+    paddingLeft: 7,
+    paddingRight: 11,
+    paddingVertical: 7,
+  },
+  todayGoalCardSelected: {
+    backgroundColor: '#FFF8E7',
+    borderColor: Meadow.goldDeep,
+    boxShadow: '0 8px 22px rgba(173,123,35,0.20)',
+    transform: [{ scale: 1.008 }],
+  },
+  todayGoalCardComplete: { backgroundColor: 'rgba(244,248,232,0.92)', borderColor: 'rgba(78,112,72,0.28)' },
+  todayGoalCardPressed: { opacity: 0.9, transform: [{ scale: 0.988 }] },
+  todayGoalCopy: { flex: 1, gap: 3, minWidth: 0 },
+  todayGoalTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900', letterSpacing: -0.15, lineHeight: 18 },
+  todayGoalTitleComplete: { opacity: 0.62, textDecorationLine: 'line-through' },
+  todayGoalSubtitle: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '600', lineHeight: 14 },
+  goalTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, paddingTop: 2 },
+  goalTag: { backgroundColor: 'rgba(223,181,94,0.17)', borderRadius: 999, minHeight: 21, justifyContent: 'center', paddingHorizontal: 7 },
+  goalTagText: { fontFamily: AppFontFamilies.manrope, fontSize: 8.5, fontWeight: '900' },
+  todayGoalStatus: { alignItems: 'center', borderColor: Meadow.goldDeep, borderRadius: 999, borderWidth: 1.5, height: 42, justifyContent: 'center', width: 42 },
+  todayGoalStatusSelected: { backgroundColor: Meadow.goldDeep },
+  todayGoalStatusComplete: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
+  companionThumb: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalActionTray: {
+    backgroundColor: '#F7E9C8',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderColor: 'rgba(185,145,77,0.34)',
+    borderTopWidth: 0,
+    borderWidth: 1,
+    gap: 10,
+    marginHorizontal: 6,
+    marginTop: -6,
+    padding: 11,
+    paddingTop: 15,
+  },
+  goalActionTrayComplete: { backgroundColor: '#EAF1DC', borderColor: 'rgba(78,112,72,0.30)' },
+  goalActionQuestion: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800', textAlign: 'center' },
+  goalActionButtons: { flexDirection: 'row', gap: 7 },
+  goalActionButton: {
+    alignItems: 'center',
+    borderColor: 'rgba(119,86,43,0.22)',
+    borderCurve: 'continuous',
+    borderRadius: 14,
+    borderWidth: 1,
+    flex: 1,
+    gap: 3,
+    justifyContent: 'center',
+    minHeight: 55,
+    paddingHorizontal: 5,
+  },
+  goalActionButtonEmphasized: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep, boxShadow: '0 4px 10px rgba(58,91,53,0.22)' },
+  goalActionButtonPressed: { opacity: 0.78, transform: [{ scale: 0.96 }] },
+  goalActionButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900' },
+  goalCompleteMessage: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  goalCompleteBurst: { alignItems: 'center', backgroundColor: Meadow.leafDeep, borderRadius: 999, height: 40, justifyContent: 'center', width: 40 },
+  goalCompleteCopy: { flex: 1, gap: 1 },
+  goalCompleteTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '900' },
+  goalCompleteBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '600', lineHeight: 14 },
+  addGoalButton: {
+    alignItems: 'center',
+    backgroundColor: '#F2BD43',
+    borderColor: '#D8A32E',
+    borderCurve: 'continuous',
+    borderRadius: 17,
+    borderWidth: 1,
+    boxShadow: '0 6px 16px rgba(168,113,23,0.20)',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  addGoalButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
+  manageGoalsLink: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: 5, minHeight: 38, paddingHorizontal: 10 },
+  manageGoalsLinkText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
+  goalsEmptyState: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,249,234,0.64)',
+    borderColor: Meadow.cardBorder,
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 72,
+    padding: 13,
+  },
+  goalsEmptyCopy: { flex: 1, gap: 2 },
+  goalsEmptyTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
+  goalsEmptyBody: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '600', lineHeight: 15 },
+  sheetBack: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 4, minHeight: 34, paddingRight: 10 },
+  sheetBackText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
   familyPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  familyPill: { borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, minHeight: 36, paddingHorizontal: 11, justifyContent: 'center' },
+  familyPill: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 38, paddingHorizontal: 7, paddingRight: 11, justifyContent: 'center' },
   familyPillSelected: { backgroundColor: Meadow.goldSoft, borderColor: Meadow.goldDeep },
   familyPillText: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '900' },
   presetList: { gap: 7 },
-  presetRow: { alignItems: 'center', backgroundColor: 'rgba(255,249,234,0.66)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 50, paddingHorizontal: 12, paddingVertical: 8 },
+  presetRow: { alignItems: 'center', backgroundColor: 'rgba(255,249,234,0.78)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 60, paddingHorizontal: 8, paddingVertical: 6 },
+  presetAdd: { alignItems: 'center', borderColor: Meadow.goldDeep, borderRadius: 999, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
+  presetAdded: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
   presetCopy: { flex: 1, gap: 2 },
   presetTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '800', lineHeight: 17 },
   presetCadence: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '700' },
@@ -757,7 +1212,8 @@ const styles = StyleSheet.create({
   cancelButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '900' },
   saveButton: { alignItems: 'center', backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 12, minHeight: 40, justifyContent: 'center', paddingHorizontal: 13 },
   saveButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '900' },
-  manageRow: { alignItems: 'center', borderBottomColor: Meadow.cardBorder, borderBottomWidth: 1, flexDirection: 'row', gap: 5, minHeight: 52, paddingVertical: 6 },
+  manageList: { gap: 4 },
+  manageRow: { alignItems: 'center', borderBottomColor: Meadow.cardBorder, borderBottomWidth: 1, flexDirection: 'row', gap: 6, minHeight: 58, paddingVertical: 7 },
   manageIcon: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 34, justifyContent: 'center', width: 34 },
   feedback: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900', textAlign: 'center' },
   disabled: { opacity: 0.46 },

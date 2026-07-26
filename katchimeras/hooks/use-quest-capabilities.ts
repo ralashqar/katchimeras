@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 import {
   getRecordingPermissionsAsync,
   requestRecordingPermissionsAsync,
@@ -8,9 +9,11 @@ import {
 import type { StoredHomeState } from '@/types/home';
 import {
   questCapabilitiesFromState,
+  questCapabilitiesWithFoundation,
   questCapabilitiesWithMicrophone,
   type QuestCapabilityMap,
 } from '@/utils/capabilities/quest-capabilities';
+import { isSemanticQuestVerificationAvailable } from '@/utils/quests/foundation-semantic-verification';
 
 export function useQuestCapabilities(
   state: StoredHomeState | null | undefined,
@@ -22,6 +25,7 @@ export function useQuestCapabilities(
 } {
   const baseCapabilities = useMemo(() => questCapabilitiesFromState(state), [state]);
   const [microphonePermission, setMicrophonePermission] = useState<PermissionResponse | null>(null);
+  const [foundationAvailable, setFoundationAvailable] = useState<boolean | null>(null);
 
   const refreshMicrophonePermission = useCallback(async () => {
     try {
@@ -49,10 +53,22 @@ export function useQuestCapabilities(
     }
   }, [options.refreshMicrophoneOnMount, refreshMicrophonePermission]);
 
+  useEffect(() => {
+    const refresh = () => setFoundationAvailable(isSemanticQuestVerificationAvailable());
+    refresh();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => subscription.remove();
+  }, []);
+
   return {
     capabilities: useMemo(
-      () => questCapabilitiesWithMicrophone(baseCapabilities, microphonePermission),
-      [baseCapabilities, microphonePermission]
+      () => questCapabilitiesWithMicrophone(
+        questCapabilitiesWithFoundation(baseCapabilities, foundationAvailable),
+        microphonePermission
+      ),
+      [baseCapabilities, foundationAvailable, microphonePermission]
     ),
     refreshMicrophonePermission,
     requestMicrophonePermission,

@@ -116,6 +116,19 @@ export function questCapabilitiesWithMicrophone(
   };
 }
 
+export function questCapabilitiesWithFoundation(
+  capabilities: QuestCapabilityMap,
+  available: boolean | null
+): QuestCapabilityMap {
+  return {
+    ...capabilities,
+    appleFoundation: {
+      ...capabilities.appleFoundation,
+      status: available == null ? 'unknown' : available ? 'available' : 'unavailable',
+    },
+  };
+}
+
 export function capabilityBlocksQuest(capability: QuestCapability): boolean {
   return capability.status === 'denied' || capability.status === 'unavailable';
 }

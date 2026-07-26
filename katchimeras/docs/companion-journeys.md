@@ -1,8 +1,71 @@
 # Companion Journeys
 
-Status: implemented for eighteen families, including the foundation,
+Status: implemented for twenty-five families, including the foundation,
 scaffolded-content, and daily-rhythm batches. Creamalume now shares Tasklet’s
 work/focus Journey as a skin.
+
+## 2026 semantic-quest and content expansion
+
+Journey, quick-goal, and real-life quest content now covers twenty-five
+families. The movement/sport and relationships/care families remain `partial`
+until their signature mini-games are authored.
+
+Some real-life quests ask for a specific written or voice-note reflection rather
+than accepting any new note. These definitions use `semanticVerification`,
+require `appleFoundation`, and set `offerVisibility` to
+`hide_when_unavailable`.
+
+- Offers appear only while the on-device Foundation model and structured bridge
+  are ready.
+- Typed notes remain usable without microphone permission. Voice additionally
+  requires recording and transcription.
+- The journal entry is always saved. Only a structured `match` with `high`
+  confidence completes the quest.
+- `uncertain`, `no_match`, timeout, malformed output, and model failure never
+  complete or award bond. The player is asked for one more concrete detail.
+- Evaluations are stored on the exact note evidence with deterministic identity,
+  verifier version, verdict, confidence, reason code, timestamp, and
+  `appleFoundation` provenance.
+- There is no remote-model fallback. Journal text stays on device.
+- If the model becomes unavailable after acceptance, the player can choose
+  another quest rather than becoming trapped.
+
+Broad journal routing answers "where does this note belong?" Semantic quest
+verification answers "does this exact note satisfy this exact request?" Route
+confidence must never be reused as quest proof.
+
+The first rollout adds eight quick goals, a three-question You Journey, four
+progressive real-life quests, and a Bond 3 weekly review for:
+
+- **Flexel** — gym, strength, and mobility.
+- **Sprintail** — running, pace, endurance, and recovery.
+- **Hooplet** — basketball practice, play, and teamwork.
+- **Serveling** — tennis and racket-sport practice.
+- **Snuglet** — parenting and human caregiving.
+- **Waglet** — dog companionship.
+- **Whiskit** — cat companionship.
+
+For device testing, the same Foundation-verified note pattern is also available
+at Bond 1 for companions that are already common in existing saves:
+
+- **Bedrotte / Snoozle** - a completed rest or recovery action and its effect.
+- **Steppling** - a completed walk, one concrete detail, and its after-effect.
+- **Mossprout** - a real green-space moment and one observed living detail.
+- **Skylo** - a real local urban moment and one overlooked city detail.
+- **Feastle** - a real meal and one taste, care, comfort, novelty, or connection detail.
+- **Tasklet** - a completed project action and what it unlocked next.
+- **Cheerlet** - a real piece of progress and why it matters.
+- **Vesperitt** - a real late-night moment and whether it was chosen or drifted.
+- **Shellio** - a real waterside moment and one sensory or changing detail.
+
+These test-access quests have a higher offer weight so one is easy to find when
+Apple Foundation is available. They remain hidden when the capability is not
+ready, leaving each companion's ordinary quest pool intact. Shellio now has a
+dedicated creature pool containing its semantic quest, beach visit, and water
+photo quests.
+
+Steppling remains responsible for everyday walking. Voltstep and Pulsepounce
+remain unchanged pending a later overlap audit informed by these authored roles.
 
 ## Current interaction model
 

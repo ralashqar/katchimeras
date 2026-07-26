@@ -19,6 +19,8 @@ import {
   completeCompanionQuickGoal,
   markQuickGoalCompletionJournaled,
   quickGoalsForDay,
+  skipCompanionQuickGoal,
+  snoozeCompanionQuickGoal,
   undoCompanionQuickGoal,
   updateCompanionQuickGoal,
   type CompanionQuickGoalCadence,
@@ -170,6 +172,22 @@ export function useCompanionQuickGoals({
     return true;
   }, [commit, dayId, onBondChanged, state]);
 
+  const snoozeGoal = useCallback((goalId: string) => {
+    if (!dayId) return false;
+    const result = snoozeCompanionQuickGoal(state, goalId, dayId);
+    if (!result.snoozed) return false;
+    commit(result.state);
+    return true;
+  }, [commit, dayId, state]);
+
+  const skipGoal = useCallback((goalId: string) => {
+    if (!dayId) return false;
+    const result = skipCompanionQuickGoal(state, goalId, dayId);
+    if (!result.skipped) return false;
+    commit(result.state);
+    return true;
+  }, [commit, dayId, state]);
+
   const markJournaled = useCallback((completionId: string) => {
     const next = markQuickGoalCompletionJournaled(state, completionId);
     if (next !== state) commit(next);
@@ -185,6 +203,8 @@ export function useCompanionQuickGoals({
     editGoal,
     completeGoal,
     undoGoal,
+    snoozeGoal,
+    skipGoal,
     markJournaled,
     refresh,
   };

@@ -96,8 +96,21 @@ export function companionQuestUsesFullBleed(execution: InteractiveQuestExecution
   );
 }
 
+export function companionQuestSkipsPreview(execution: InteractiveQuestExecution | null): boolean {
+  return execution?.kind === 'matching' && execution.packId === 'mossprout-garden';
+}
+
+export function companionQuestBackAction(input: {
+  activeAttemptId?: string | null;
+  experienceOpen: boolean;
+}): 'confirm_attempt_exit' | 'return_to_do' | 'close_sheet' {
+  if (input.activeAttemptId) return 'confirm_attempt_exit';
+  if (input.experienceOpen) return 'return_to_do';
+  return 'close_sheet';
+}
+
 export function buildCompanionQuestViewModel(input: {
-  activeQuest: { title: string; hint: string } | null;
+  activeQuest: { title: string; hint: string; semanticInput?: boolean } | null;
   offer?: { id: string; title: string; hint: string };
   runtime: QuestRuntimeStatus | null;
   questComplete: boolean;
@@ -172,10 +185,26 @@ export function buildCompanionQuestViewModel(input: {
     statusLabel: runtime ? questStatusLabel(runtime) : 'In progress',
     statusTone: runtime?.state === 'impossible_today' ? 'danger' : blocked ? 'warning' : 'neutral',
     criteria, evidence: items, captureFeedback,
+    semanticInput: Boolean(activeQuest.semanticInput),
     primaryAction: runtime && runtime.nextAction !== 'none'
       ? { kind: 'quest_action', label: questActionLabel(runtime.nextAction), icon: questActionIcon(runtime.nextAction), nextAction: runtime.nextAction }
       : null,
   };
+}
+
+export function companionQuestInlineNoteAction(
+  model: CompanionQuestViewModel
+): Extract<NonNullable<CompanionQuestViewModel['primaryAction']>, { kind: 'quest_action' }> | null {
+  const action = model.primaryAction;
+  if (
+    model.mode !== 'active' ||
+    !model.semanticInput ||
+    action?.kind !== 'quest_action' ||
+    (action.nextAction !== 'add_note' && action.nextAction !== 'record_voice')
+  ) {
+    return null;
+  }
+  return action;
 }
 
 export function insightForArchetype(input: { archetype: string; text: string; count?: number | null }): CompanionInsight {

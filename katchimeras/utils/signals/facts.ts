@@ -53,7 +53,8 @@ export type Op =
   | 'evidenceAll'
   | 'evidenceCorroborated'
   | 'evidenceCount'
-  | 'qualityAtLeast';
+  | 'qualityAtLeast'
+  | 'semanticQuestMatch';
 
 
 export type Criterion = {
@@ -67,6 +68,7 @@ export type Criterion = {
   qualityId?: string;
   minimumScore?: number;
   minimumCentrality?: 'primary' | 'supporting' | 'any';
+  journalRouteFallbacks?: readonly string[];
   label: string;
 };
 
@@ -108,9 +110,56 @@ export function evaluateCriterion(criterion: Criterion, facts: Partial<Facts>): 
     case 'evidenceCount':
     case 'qualityAtLeast':
       return evaluateEvidenceCriterion(criterion, actual);
+    case 'semanticQuestMatch':
+      return evaluateSemanticQuestCriterion(criterion, actual);
     default:
       return done(false);
   }
+}
+
+function evaluateSemanticQuestCriterion(criterion: Criterion, actual: FactValue): CriterionEvaluation {
+  if (!isEvidenceArray(actual)) {
+    return { done: false, evidenceIds: [], confidence: null, reason: 'No note has been checked for this quest yet.' };
+  }
+  const questId = String(criterion.value ?? '');
+  const journalRouteMatch = actual.find((evidence) =>
+    evidence.signals.some((signal) =>
+      signal.provider === 'manual' &&
+      signal.confidence === 1 &&
+      (criterion.journalRouteFallbacks ?? []).includes(signal.key)
+    )
+  );
+  if (journalRouteMatch) {
+    return {
+      done: true,
+      evidenceIds: [journalRouteMatch.id],
+      confidence: 1,
+      reason: null,
+    };
+  }
+  const matches = actual.flatMap((evidence) =>
+    (evidence.semanticQuestEvaluations ?? [])
+      .filter((evaluation) =>
+        evaluation.questId === questId &&
+        evaluation.verdict === 'match' &&
+        evaluation.confidence === 'high'
+      )
+      .map((evaluation) => ({ evidence, evaluation }))
+  );
+  const match = matches[0];
+  return match
+    ? {
+        done: true,
+        evidenceIds: [match.evidence.id],
+        confidence: 0.95,
+        reason: null,
+      }
+    : {
+        done: false,
+        evidenceIds: [],
+        confidence: null,
+        reason: 'Add a note that clearly answers this quest.',
+      };
 }
 
 export function testCriterion(criterion: Criterion, facts: Partial<Facts>): boolean {

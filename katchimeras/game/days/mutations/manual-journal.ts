@@ -73,7 +73,21 @@ function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _
     if (relationship) facets.push({ key: 'relationship', value: relationship, sensitive: true });
   }
   if (facets.length) classified = applyManualJournalFacets({ ...classified, dominantDomain: domainForAdapter(flow.adapter) }, facets, createdAt);
-  const evidence = buildNoteEvidence({ noteId: noteSource ? linkedNoteId ?? record.source.sourceId : id, kind: noteKind, observedAt: createdAt, text, provider: 'manual', mediaType, food, bigMomentType: choice.bigMomentType ?? null, semanticCategoryId: primaryQuality, semanticConfidence: 1 });
+  const evidence = buildNoteEvidence({
+    noteId: noteSource ? linkedNoteId ?? record.source.sourceId : id,
+    kind: noteKind,
+    observedAt: createdAt,
+    text,
+    provider: 'manual',
+    mediaType,
+    food,
+    bigMomentType: choice.bigMomentType ?? null,
+    semanticCategoryId: primaryQuality,
+    semanticConfidence: 1,
+    journalFlowId: record.flowId,
+    journalCategoryId: record.categoryId,
+    journalContextId: context || null,
+  });
   const linkedNote = linkedNoteId && submission.linkedNote ? {
     id: linkedNoteId, kind: submission.linkedNote.kind, text: submission.linkedNote.text.trim(), audioUri: submission.linkedNote.audioUri ?? null,
     durationMs: submission.linkedNote.durationMs ?? null, archetype: archetypeForFeeling(entry.feeling), label: specific || choice.label,

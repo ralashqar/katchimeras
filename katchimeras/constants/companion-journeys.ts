@@ -158,6 +158,165 @@ function threeQuestionJourney(config: ThreeQuestionJourneyConfig): CompanionJour
   };
 }
 
+function focusedPracticeJourney(config: {
+  id: string;
+  familyId: KatchimeraFamilyId;
+  title: string;
+  introduction: string;
+  subject: string;
+  firstPrompt: string;
+  firstOptions: readonly string[];
+  secondPrompt: string;
+  secondOptions: readonly string[];
+  directions: readonly { label: string; goalTitle: string; quickGoals: readonly string[] }[];
+}): CompanionJourneyDefinition {
+  const slug = config.familyId;
+  return threeQuestionJourney({
+    id: config.id,
+    familyId: config.familyId,
+    title: config.title,
+    introduction: config.introduction,
+    conversationTitle: `Choose your ${config.subject} direction`,
+    conversationStartLabel: `Explore ${config.subject}`,
+    first: {
+      id: `${slug}-meaning`,
+      prompt: config.firstPrompt,
+      helperText: 'Choose what feels most useful in your life now.',
+      options: config.firstOptions.map((label, index) => ({ id: `meaning-${index + 1}`, label })),
+    },
+    second: {
+      id: `${slug}-friction`,
+      prompt: config.secondPrompt,
+      helperText: 'Choose the closest pattern, not a perfect description.',
+      options: config.secondOptions.map((label, index) => ({ id: `friction-${index + 1}`, label })),
+    },
+    goal: {
+      id: `${slug}-goal`,
+      typeId: `${slug}-direction`,
+      typeLabel: `${config.title} direction`,
+      fallbackTitle: config.title,
+      prompt: `What ${config.subject} direction would you like to build?`,
+      helperText: 'Pick a low-friction direction, or write your own.',
+      options: config.directions.map((direction, index) => ({
+        id: `direction-${index + 1}`,
+        label: direction.label,
+        goalTitle: direction.goalTitle,
+        suggestedQuickGoalIds: direction.quickGoals,
+      })),
+    },
+    checkInPrompt: `What happened with ${config.subject} today?`,
+    checkInOptions: [
+      { id: 'showed-up', label: 'I showed up' },
+      { id: 'noticed', label: 'I noticed a useful detail' },
+      { id: 'adjusted', label: 'I made an adjustment' },
+      { id: 'connected', label: 'The moment felt connecting' },
+      { id: 'other', label: 'Something else' },
+    ],
+    practiceTitle: 'Build real moments',
+    practiceDescription: `Share three real ${config.subject} moments.`,
+    reflectionSubject: config.subject,
+  });
+}
+
+const flexel = focusedPracticeJourney({
+  id: 'flexel-stronger-rhythm', familyId: 'flexel', title: 'A stronger rhythm',
+  introduction: 'Build a gym, strength, or mobility practice that can survive ordinary weeks.',
+  subject: 'training', firstPrompt: 'What would you most like training to give you?',
+  firstOptions: ['More strength', 'More energy', 'More confidence', 'More mobility'],
+  secondPrompt: 'What most often interrupts training?',
+  secondOptions: ['Finding time', 'Knowing what to do', 'Gym confidence', 'Recovery and energy'],
+  directions: [
+    { label: 'Show up consistently', goalTitle: 'Build a training rhythm I can repeat', quickGoals: ['flexel:show-up', 'flexel:weekday-training'] },
+    { label: 'Build strength gradually', goalTitle: 'Make gradual strength progress', quickGoals: ['flexel:one-exercise', 'flexel:record-set'] },
+    { label: 'Move with better form', goalTitle: 'Train with more attention to form', quickGoals: ['flexel:warm-up', 'flexel:form-cue'] },
+    { label: 'Protect mobility and recovery', goalTitle: 'Make mobility and recovery part of training', quickGoals: ['flexel:mobility-five', 'flexel:recovery-choice'] },
+  ],
+});
+const sprintail = focusedPracticeJourney({
+  id: 'sprintail-running-rhythm', familyId: 'sprintail', title: 'A running rhythm',
+  introduction: 'Make running understandable through pace, endurance, routes, and recovery rather than performance pressure.',
+  subject: 'running', firstPrompt: 'What would you most like running to give you?',
+  firstOptions: ['Headspace', 'Endurance', 'Speed', 'Consistency'],
+  secondPrompt: 'What most often interrupts running?',
+  secondOptions: ['Starting', 'Pacing', 'Time', 'Recovery'],
+  directions: [
+    { label: 'Run a little more often', goalTitle: 'Build a realistic running rhythm', quickGoals: ['sprintail:shoes-on', 'sprintail:weekday-run'] },
+    { label: 'Build endurance gently', goalTitle: 'Extend my running endurance gradually', quickGoals: ['sprintail:ten-minute-run', 'sprintail:easy-pace'] },
+    { label: 'Understand my pace', goalTitle: 'Learn what a sustainable pace feels like', quickGoals: ['sprintail:easy-pace', 'sprintail:finish-feeling'] },
+    { label: 'Enjoy routes and recovery', goalTitle: 'Make running routes and recovery more supportive', quickGoals: ['sprintail:route-ready', 'sprintail:recovery'] },
+  ],
+});
+const hooplet = focusedPracticeJourney({
+  id: 'hooplet-court-rhythm', familyId: 'hooplet', title: 'Court confidence',
+  introduction: 'Turn court time into visible skill, shared play, and confidence.',
+  subject: 'basketball', firstPrompt: 'What draws you onto the court?',
+  firstOptions: ['Skill', 'Competition', 'Teamwork', 'Fun'],
+  secondPrompt: 'What most often limits your court time?',
+  secondOptions: ['Access to a court', 'Confidence', 'People to play with', 'Knowing what to practise'],
+  directions: [
+    { label: 'Touch the ball more often', goalTitle: 'Build a regular basketball rhythm', quickGoals: ['hooplet:touch-ball', 'hooplet:court-window'] },
+    { label: 'Improve one skill', goalTitle: 'Develop one basketball skill deliberately', quickGoals: ['hooplet:ten-shots', 'hooplet:one-drill'] },
+    { label: 'Play with more confidence', goalTitle: 'Build confidence through repeatable court moments', quickGoals: ['hooplet:weak-hand', 'hooplet:keep-play'] },
+    { label: 'Connect through team play', goalTitle: 'Become a more present teammate', quickGoals: ['hooplet:team-voice', 'hooplet:defence'] },
+  ],
+});
+const serveling = focusedPracticeJourney({
+  id: 'serveling-rally-rhythm', familyId: 'serveling', title: 'A steadier rally',
+  introduction: 'Build racket-sport skill through repetition, adjustment, movement, and composure.',
+  subject: 'racket practice', firstPrompt: 'What do you enjoy most in racket sport?',
+  firstOptions: ['Rallies', 'Technique', 'Competition', 'Movement'],
+  secondPrompt: 'What most often gets in the way?',
+  secondOptions: ['Court access', 'Consistency', 'Match pressure', 'Knowing what to practise'],
+  directions: [
+    { label: 'Practise more regularly', goalTitle: 'Build a repeatable racket-practice rhythm', quickGoals: ['serveling:racket-five', 'serveling:court-window'] },
+    { label: 'Build a stronger serve', goalTitle: 'Develop a more reliable serve', quickGoals: ['serveling:ten-serves', 'serveling:stroke-focus'] },
+    { label: 'Sustain better rallies', goalTitle: 'Build patience and consistency in rallies', quickGoals: ['serveling:one-rally', 'serveling:footwork'] },
+    { label: 'Reset under pressure', goalTitle: 'Use a steadier between-points reset', quickGoals: ['serveling:between-points', 'serveling:keep-point'] },
+  ],
+});
+const snuglet = focusedPracticeJourney({
+  id: 'snuglet-everyday-care', familyId: 'snuglet', title: 'Everyday care',
+  introduction: 'Make caregiving visible while including the needs and limits of the person giving care.',
+  subject: 'caregiving', firstPrompt: 'What part of caring needs more support?',
+  firstOptions: ['Daily routines', 'Connection', 'Patience', 'Asking for help'],
+  secondPrompt: 'What makes care feel hardest right now?',
+  secondOptions: ['Too much to hold', 'Unpredictable needs', 'Low energy', 'Not enough support'],
+  directions: [
+    { label: 'Make routines gentler', goalTitle: 'Create one gentler care routine', quickGoals: ['snuglet:prepare-routine', 'snuglet:tomorrow-easier'] },
+    { label: 'Protect connection', goalTitle: 'Make room for attentive care moments', quickGoals: ['snuglet:full-attention', 'snuglet:name-good'] },
+    { label: 'Share the load', goalTitle: 'Ask for and accept more practical support', quickGoals: ['snuglet:ask-need', 'snuglet:share-load'] },
+    { label: 'Protect caregiver capacity', goalTitle: 'Include my needs in the care rhythm', quickGoals: ['snuglet:small-pause', 'snuglet:gentle-boundary'] },
+  ],
+});
+const waglet = focusedPracticeJourney({
+  id: 'waglet-shared-routine', familyId: 'waglet', title: 'A shared dog rhythm',
+  introduction: 'Notice the activity, care, communication, and affection that shape life with a dog.',
+  subject: 'dog companionship', firstPrompt: 'What matters most in life with your dog?',
+  firstOptions: ['Walks', 'Play', 'Training', 'Quiet company'],
+  secondPrompt: 'What would make the shared routine better?',
+  secondOptions: ['More time', 'More variety', 'Clearer cues', 'Noticing needs sooner'],
+  directions: [
+    { label: 'Enjoy walks more', goalTitle: 'Make dog walks more present and varied', quickGoals: ['waglet:present-walk', 'waglet:fresh-route'] },
+    { label: 'Play more often', goalTitle: 'Build a small shared play rhythm', quickGoals: ['waglet:five-play', 'waglet:weekday-routine'] },
+    { label: 'Train with kindness', goalTitle: 'Practise clear, kind communication', quickGoals: ['waglet:one-cue', 'waglet:notice-signal'] },
+    { label: 'Support care and comfort', goalTitle: 'Notice and support my dog’s care needs', quickGoals: ['waglet:care-check', 'waglet:quiet-company'] },
+  ],
+});
+const whiskit = focusedPracticeJourney({
+  id: 'whiskit-gentle-attention', familyId: 'whiskit', title: 'Gentle attention',
+  introduction: 'Notice the play, preferences, behaviour, comfort, and care that shape life with a cat.',
+  subject: 'cat companionship', firstPrompt: 'What would you like to notice more with your cat?',
+  firstOptions: ['Play', 'Comfort', 'Behaviour', 'Care'],
+  secondPrompt: 'What would improve the shared routine?',
+  secondOptions: ['More play ideas', 'Better enrichment', 'Understanding signals', 'More consistent care'],
+  directions: [
+    { label: 'Play more often', goalTitle: 'Build a small cat-play rhythm', quickGoals: ['whiskit:five-play', 'whiskit:follow-curiosity'] },
+    { label: 'Offer better enrichment', goalTitle: 'Create more useful enrichment moments', quickGoals: ['whiskit:enrichment', 'whiskit:refresh-space'] },
+    { label: 'Understand behaviour', goalTitle: 'Notice my cat’s signals and preferences', quickGoals: ['whiskit:notice-preference', 'whiskit:quiet-company'] },
+    { label: 'Support care and comfort', goalTitle: 'Keep a gentle, consistent care rhythm', quickGoals: ['whiskit:care-check', 'whiskit:weekday-routine'] },
+  ],
+});
+
 const coffeeRitual = threeQuestionJourney({
   id: 'coffee-ritual-intentional-pause',
   familyId: 'coffee-ritual',
@@ -1426,9 +1585,11 @@ export const companionJourneyDefinitions: readonly CompanionJourneyDefinition[] 
   dawnle,
   encora,
   errandimp,
+  flexel,
   feastle,
   flickerbun,
   gatherglow,
+  hooplet,
   mossprout,
   mendle,
   pagelet,
@@ -1436,9 +1597,14 @@ export const companionJourneyDefinitions: readonly CompanionJourneyDefinition[] 
   relicoon,
   sleepRest,
   skylo,
+  snuglet,
+  sprintail,
   steppling,
+  serveling,
   tasklet,
   vesperitt,
+  waglet,
+  whiskit,
 ];
 
 export const companionJourneyByFamilyId = new Map(

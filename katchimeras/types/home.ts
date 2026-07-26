@@ -258,6 +258,21 @@ export type DayEvidenceSignal = {
   qualityStatus?: MemoryQualityStatus;
 };
 
+export type SemanticQuestVerdict = 'match' | 'uncertain' | 'no_match' | 'error';
+export type SemanticQuestConfidence = 'high' | 'medium' | 'low';
+
+export type SemanticQuestEvaluation = {
+  id: string;
+  questId: string;
+  verificationId: string;
+  verificationVersion: number;
+  verdict: SemanticQuestVerdict;
+  confidence: SemanticQuestConfidence;
+  reasonCode: string;
+  evaluatedAt: string;
+  provider: 'appleFoundation';
+};
+
 export type DayEvidence = {
   id: string;
   sourceType: DayEvidenceSourceType;
@@ -266,6 +281,7 @@ export type DayEvidence = {
   provider: DayEvidenceProvider;
   confidence: number;
   signals: DayEvidenceSignal[];
+  semanticQuestEvaluations?: SemanticQuestEvaluation[];
   thumbnailUri?: string | null;
   explanation?: string | null;
 };

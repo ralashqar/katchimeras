@@ -41,6 +41,16 @@ test('companion quest pools include their reusable mini-games', () => {
   assert.ok(themedQuestOffers('reflection', 'memory', 'quietome').some((offer) => offer.id === 'quest-quietome-still-signals'));
   assert.ok(themedQuestOffers('good_sleep', 'night', 'bedrotte').some((offer) => offer.id === 'quest-bedrotte-breathe'));
   assert.ok(themedQuestOffers('park', 'places', 'mossprout').some((offer) => offer.id === 'quest-mossprout-memory'));
+  assert.equal(
+    themedQuestOffers('park', 'places', 'mossprout').some((offer) => offer.id === 'quest-mossprout-tend'),
+    false,
+    'Mossprout offers only the garden card matcher, not the legacy watering game',
+  );
+  assert.equal(
+    themedQuestOffers('park', 'places', 'mossprout').find((offer) => offer.id === 'quest-mossprout-memory')?.lane,
+    'mini_game',
+    'interactive quests without legacy lane metadata are still presented in the mini-game lane',
+  );
   assert.ok(themedQuestOffers('city', 'places', 'skylo').some((offer) => offer.id === 'quest-skylo-city-trivia'));
   assert.ok(themedQuestOffers('social_gathering', 'memory', 'gatherglow').some((offer) => offer.id === 'quest-gatherglow-pattern'));
   assert.ok(themedQuestOffers('feast', 'food', 'feastle').some((offer) => offer.id === 'quest-feastle-merge'));
@@ -737,7 +747,7 @@ test('Errandimp sorting separates admin, home, and out-of-home loops', () => {
   assert.equal(execution?.kind === 'sorting' ? execution.packId : null, 'errandimp-loops');
 });
 
-test('Mossprout memory match uses deterministic garden assets and keeps legacy watering readable', () => {
+test('Mossprout uses the deterministic garden card matcher instead of the legacy watering game', () => {
   assert.equal(memoryMatchPresentation('mossprout-garden'), 'memory_garden');
   assert.equal(memoryMatchPresentation('relicoon-gallery'), 'standard');
   assert.equal(memoryMatchPresentation('feastle-food'), 'standard');
@@ -752,7 +762,7 @@ test('Mossprout memory match uses deterministic garden assets and keeps legacy w
   assert.ok(deck.every((card) => deck.filter((candidate) => candidate.motif.id === card.motif.id).length === 2));
   assert.equal(questDefinition('quest-mossprout-memory')?.execution?.kind, 'matching');
   assert.equal(questDefinition('quest-mossprout-tend')?.execution?.kind, 'timing_zone');
-  assert.equal(themedQuestOffers('park', 'places', 'mossprout').some((offer) => offer.id === 'quest-mossprout-tend'), true);
+  assert.equal(themedQuestOffers('park', 'places', 'mossprout').some((offer) => offer.id === 'quest-mossprout-tend'), false);
 });
 
 test('Feastle memory match uses a varied deterministic food emoji pack', () => {

@@ -39,6 +39,9 @@ const VERTICAL_SPAN = 76; // max |y| of a side's top/bottom chip (snug stack)
 // Chips stack in straight vertical columns (no arc) — every chip on a side
 // shares the same x, flanking the egg left and right.
 const ARC_INSET = 0;
+const STANDARD_MOTE_SIZE = 66;
+const GOAL_CARD_WIDTH = 170;
+const GOAL_CARD_HEIGHT = 84;
 
 export function TodayCategoryRing({
   categories,
@@ -129,6 +132,61 @@ function CategoryMote({
   const active = category.hasContent || category.needsAttention;
   const badge = category.countLabel ?? (category.count > 0 ? `${category.count}` : null);
 
+  if (category.id === 'goals') {
+    const remaining = Number.parseInt(category.countLabel ?? '0', 10) || 0;
+    const completed = Math.max(0, category.count - remaining);
+    const completionPercent = category.count > 0
+      ? Math.min(100, Math.round((completed / category.count) * 100))
+      : 0;
+    const status = category.count === 0
+      ? 'Add your first'
+      : remaining > 0
+        ? `${remaining} to-do`
+        : 'All done';
+
+    return (
+      <View pointerEvents="box-none" style={[styles.slot, styles.goalSlot]}>
+        <Animated.View entering={popEnter(enterDelay)} style={styles.goalCardWrap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Goals, ${status}`}
+            hitSlop={8}
+            onPress={onPress}
+            style={({ pressed }) => [styles.goalCard, pressed ? styles.goalCardPressed : null]}>
+            <View style={styles.goalClipboard} pointerEvents="none">
+              <IconSymbol name="list.clipboard.fill" size={32} color="#59472F" />
+              <View style={styles.goalStar}>
+                <IconSymbol name="star.fill" size={12} color="#FFF5D4" />
+              </View>
+            </View>
+
+            <View style={styles.goalCopy} pointerEvents="none">
+              <ThemedText
+                numberOfLines={1}
+                style={styles.goalTitle}
+                lightColor="#FFF6DE"
+                darkColor="#FFF6DE">
+                Goals
+              </ThemedText>
+              <ThemedText
+                numberOfLines={1}
+                style={styles.goalStatus}
+                lightColor="rgba(255, 246, 222, 0.78)"
+                darkColor="rgba(255, 246, 222, 0.78)">
+                {status}
+              </ThemedText>
+              <View style={styles.goalProgressTrack}>
+                <View style={[styles.goalProgressFill, { width: `${completionPercent}%` }]} />
+              </View>
+            </View>
+
+            <IconSymbol name="chevron.right" size={23} color="rgba(255, 246, 222, 0.82)" />
+          </Pressable>
+        </Animated.View>
+      </View>
+    );
+  }
+
   return (
     <View pointerEvents="box-none" style={[styles.slot, { transform: [{ translateX }, { translateY }] }]}>
       <Animated.View entering={popEnter(enterDelay)} style={styles.chipWrap} pointerEvents="box-none">
@@ -191,8 +249,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   chipWrap: {
-    height: 66,
-    width: 66,
+    height: STANDARD_MOTE_SIZE,
+    width: STANDARD_MOTE_SIZE,
   },
   pulse: {
     ...StyleSheet.absoluteFillObject,
@@ -207,11 +265,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     // Inner top-light — the glassy bevel the target panels have.
     boxShadow: '0 4px 14px rgba(13, 12, 15, 0.28), inset 0 1px 0 rgba(255, 248, 230, 0.38)',
-    height: 66,
+    height: STANDARD_MOTE_SIZE,
     justifyContent: 'center',
     overflow: 'hidden',
     paddingHorizontal: 5,
-    width: 66,
+    width: STANDARD_MOTE_SIZE,
   },
   moteAttention: {
     borderColor: GLOW,
@@ -259,5 +317,84 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 13.5,
     textAlign: 'center',
+  },
+  goalCardWrap: {
+    height: GOAL_CARD_HEIGHT,
+    width: GOAL_CARD_WIDTH,
+  },
+  goalSlot: {
+    right: 0,
+    top: 0,
+  },
+  goalCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(29, 25, 32, 0.91)',
+    borderColor: 'rgba(247, 190, 69, 0.86)',
+    borderCurve: 'continuous',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    boxShadow: '0 5px 18px rgba(8, 7, 12, 0.38), 0 0 12px rgba(247, 190, 69, 0.22), inset 0 1px 0 rgba(255, 248, 225, 0.18)',
+    flexDirection: 'row',
+    gap: 9,
+    height: GOAL_CARD_HEIGHT,
+    paddingHorizontal: 12,
+    width: GOAL_CARD_WIDTH,
+  },
+  goalCardPressed: {
+    opacity: 0.82,
+  },
+  goalClipboard: {
+    alignItems: 'center',
+    backgroundColor: '#F2DFC0',
+    borderColor: 'rgba(255, 249, 226, 0.72)',
+    borderCurve: 'continuous',
+    borderRadius: 10,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+    width: 38,
+  },
+  goalStar: {
+    alignItems: 'center',
+    backgroundColor: Meadow.gold,
+    borderRadius: 999,
+    boxShadow: '0 2px 5px rgba(61, 38, 8, 0.35)',
+    height: 20,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -7,
+    top: -7,
+    width: 20,
+  },
+  goalCopy: {
+    flex: 1,
+    gap: 1,
+    minWidth: 0,
+  },
+  goalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.15,
+    lineHeight: 21,
+  },
+  goalStatus: {
+    fontSize: 12.5,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  goalProgressTrack: {
+    backgroundColor: 'rgba(255, 246, 222, 0.19)',
+    borderRadius: 999,
+    height: 6,
+    marginTop: 4,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  goalProgressFill: {
+    backgroundColor: Meadow.gold,
+    borderRadius: 999,
+    height: '100%',
+    minWidth: 2,
   },
 });

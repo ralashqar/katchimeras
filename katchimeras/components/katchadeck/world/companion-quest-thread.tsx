@@ -8,6 +8,7 @@ import { AppFontFamilies } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
 import type { CompanionQuestOfferViewModel, CompanionQuestViewModel } from '@/types/companion-interaction';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
+import { companionQuestInlineNoteAction } from '@/utils/companion-interaction';
 import { CompanionSection, CompanionStatusBadge } from './companion-interaction-primitives';
 
 export function CompanionQuestChoices({
@@ -107,13 +108,16 @@ export function CompanionQuestThread({
   reviewItem,
   onSelectReviewItem,
   onClarify,
+  onAttemptInput,
 }: {
   model: CompanionQuestViewModel;
   reviewItem: QuestSubmissionItem | null;
   onSelectReviewItem: (item: QuestSubmissionItem | null) => void;
   onClarify: (item: QuestSubmissionItem, answer: 'primary' | 'supporting' | 'incidental' | 'rejected') => void;
+  onAttemptInput: () => void;
 }) {
   const compactActive = model.mode === 'active';
+  const inlineNoteAction = companionQuestInlineNoteAction(model);
   return (
     <Animated.View layout={LinearTransition.duration(180)} style={styles.root}>
       {compactActive ? (
@@ -140,6 +144,27 @@ export function CompanionQuestThread({
           ) : (
             <ThemedText selectable style={styles.message} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{model.message}</ThemedText>
           )}
+          {inlineNoteAction ? (
+            <Pressable
+              accessibilityHint="Opens a quest note with text and voice recording"
+              accessibilityLabel="Add a note or voice note for this quest"
+              accessibilityRole="button"
+              onPress={onAttemptInput}
+              style={({ pressed }) => [styles.noteAttempt, pressed && styles.noteAttemptPressed]}>
+              <View style={styles.noteAttemptIcon}>
+                <IconSymbol name="square.and.pencil" size={17} color={Meadow.goldDeep} />
+              </View>
+              <View style={styles.noteAttemptCopy}>
+                <ThemedText style={styles.noteAttemptTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                  Add note or voice
+                </ThemedText>
+                <ThemedText style={styles.noteAttemptHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                  Share this moment for the quest
+                </ThemedText>
+              </View>
+              <IconSymbol name="chevron.right" size={15} color={Meadow.goldDeep} />
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <View style={styles.intro}>
@@ -220,7 +245,13 @@ function CaptureFeedback({ model }: { model: CompanionQuestViewModel }) {
         : 'Analysing your new memory…';
   return (
     <View accessibilityLiveRegion="polite" style={styles.capture}>
-      {feedback.sourceId ? <Image source={feedback.sourceId} style={styles.captureThumb} contentFit="cover" transition={120} /> : <View style={styles.captureThumb} />}
+      {feedback.sourceType === 'photo' && feedback.sourceId
+        ? <Image source={feedback.sourceId} style={styles.captureThumb} contentFit="cover" transition={120} />
+        : (
+          <View style={[styles.captureThumb, styles.captureNote]}>
+            <IconSymbol name={feedback.sourceType === 'voice_note' ? 'mic.fill' : 'note.text'} size={19} color={Meadow.goldDeep} />
+          </View>
+        )}
       <View style={styles.captureCopy}>
         {analysing ? (
           <>
@@ -296,6 +327,12 @@ const styles = StyleSheet.create({
   activeGoals: { gap: 7, paddingTop: 2 },
   activeGoal: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.32)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.13), inset 0 1px 0 rgba(255,248,230,0.48)', flexDirection: 'row', gap: 11, minHeight: 58, paddingHorizontal: 11, paddingVertical: 9 },
   activeCheck: { flexShrink: 0 },
+  noteAttempt: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(231,185,81,0.18)', borderColor: 'rgba(183,132,42,0.48)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.12), inset 0 1px 0 rgba(255,248,230,0.56)', flexDirection: 'row', gap: 9, minHeight: 48, paddingHorizontal: 10, paddingVertical: 7 },
+  noteAttemptPressed: { opacity: 0.76, transform: [{ scale: 0.98 }] },
+  noteAttemptIcon: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 11, height: 32, justifyContent: 'center', width: 32 },
+  noteAttemptCopy: { gap: 1, minWidth: 0 },
+  noteAttemptTitle: { fontSize: 12.5, fontWeight: '900', lineHeight: 16 },
+  noteAttemptHint: { fontSize: 10.5, lineHeight: 14 },
   eyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
   title: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 27, lineHeight: 32 },
   message: { fontSize: 14, lineHeight: 21 },
@@ -311,6 +348,7 @@ const styles = StyleSheet.create({
   progressDone: { backgroundColor: Meadow.leaf },
   capture: { alignItems: 'center', backgroundColor: 'rgba(107,128,95,0.10)', borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 12, padding: 12 },
   captureThumb: { backgroundColor: Meadow.cardSoft, borderCurve: 'continuous', borderRadius: 13, height: 58, width: 58 },
+  captureNote: { alignItems: 'center', justifyContent: 'center' },
   captureCopy: { flex: 1, gap: 9 },
   captureBar: { backgroundColor: 'rgba(201,194,232,0.18)', borderRadius: 999, height: 9 },
   captureBarShort: { width: '52%' },

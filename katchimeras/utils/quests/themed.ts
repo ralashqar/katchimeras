@@ -1,4 +1,9 @@
-import { questDefinition, questPresentation, type QuestDefinition } from './definitions';
+import {
+  questActivityLane,
+  questDefinition,
+  questPresentation,
+  type QuestDefinition,
+} from './definitions';
 
 export type ThemedQuestOffer = {
   id: string;
@@ -27,6 +32,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-coffee-ritual-weekly-review', 'quest-coffee-ritual-brew-sequence',
   ],
   bedrotte: [
+    'quest-rest-restored-detail',
     'quest-bedrotte-rest-note',
     'quest-rest-wind-down',
     'quest-rest-boundary',
@@ -36,6 +42,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-bedrotte-breathe',
   ],
   snoozle: [
+    'quest-rest-restored-detail',
     'quest-bedrotte-rest-note',
     'quest-rest-wind-down',
     'quest-rest-boundary',
@@ -45,6 +52,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-bedrotte-breathe',
   ],
   steppling: [
+    'quest-steppling-walk-detail',
     'quest-steppling-gentle-walk',
     'quest-steppling-walk-note',
     'quest-long-walk',
@@ -70,14 +78,15 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-pagelet-lost-word',
   ],
   mossprout: [
+    'quest-mossprout-living-detail',
     'quest-mossprout-green-photo',
     'quest-mossprout-nature-note',
     'quest-mossprout-return',
     'quest-mossprout-weekly-review',
-    'quest-mossprout-tend',
     'quest-mossprout-memory',
   ],
   skylo: [
+    'quest-skylo-city-detail',
     'quest-skylo-city-photo',
     'quest-skylo-local-stop',
     'quest-skylo-neighbourhood-note',
@@ -92,6 +101,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-gatherglow-pattern',
   ],
   feastle: [
+    'quest-feastle-meal-detail',
     'quest-feastle-merge',
     'quest-feastle-meal-photo',
     'quest-feastle-meal-note',
@@ -101,6 +111,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-feastle-memory',
   ],
   tasklet: [
+    'quest-tasklet-progress-detail',
     'quest-tasklet-next-action',
     'quest-goal-note',
     'quest-tasklet-clear-three',
@@ -111,6 +122,7 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-tasklet-desk-jam',
   ],
   cheerlet: [
+    'quest-cheerlet-progress-detail',
     'quest-cheerlet-name-progress',
     'quest-cheerlet-celebrate-note',
     'quest-cheerlet-mark-chapter',
@@ -148,11 +160,45 @@ const CREATURE_QUEST_POOL: Record<string, string[]> = {
     'quest-quietome-weekly-review', 'quest-quietome-still-signals',
   ],
   vesperitt: [
+    'quest-vesperitt-night-detail',
     'quest-late-capture',
     'quest-vesperitt-night-note',
     'quest-vesperitt-next-day-note',
     'quest-vesperitt-weekly-review',
     'quest-vesperitt-moon-signals',
+  ],
+  shellio: [
+    'quest-shellio-water-detail',
+    'quest-visit-beach',
+    'quest-photo-water',
+  ],
+  flexel: [
+    'quest-flexel-session-note', 'quest-flexel-training-detail',
+    'quest-flexel-recovery-note', 'quest-flexel-weekly-review',
+  ],
+  sprintail: [
+    'quest-sprintail-run-day', 'quest-sprintail-run-detail',
+    'quest-sprintail-recovery', 'quest-sprintail-weekly-review',
+  ],
+  hooplet: [
+    'quest-hooplet-court-note', 'quest-hooplet-skill-detail',
+    'quest-hooplet-team-moment', 'quest-hooplet-weekly-review',
+  ],
+  serveling: [
+    'quest-serveling-session-note', 'quest-serveling-rally-detail',
+    'quest-serveling-reset-note', 'quest-serveling-weekly-review',
+  ],
+  snuglet: [
+    'quest-snuglet-care-photo', 'quest-snuglet-care-detail',
+    'quest-snuglet-caregiver-pause', 'quest-snuglet-weekly-review',
+  ],
+  waglet: [
+    'quest-waglet-companion-photo', 'quest-waglet-care-detail',
+    'quest-waglet-routine-note', 'quest-waglet-weekly-review',
+  ],
+  whiskit: [
+    'quest-whiskit-companion-photo', 'quest-whiskit-enrichment-detail',
+    'quest-whiskit-pattern-note', 'quest-whiskit-weekly-review',
   ],
 };
 
@@ -223,7 +269,7 @@ export function themedQuestOffers(subtype: string, archetype: string, creatureKe
       hint: definition.hint,
       weight: definition.eligibility?.weight,
       family: definition.family,
-      lane: definition.lane ?? 'real_life',
+      lane: questActivityLane(definition),
       minimumBondLevel: definition.minimumBondLevel ?? 1,
       ...questPresentation(definition),
     }));

@@ -5,7 +5,7 @@ import { encounterLiveCast } from '@/constants/encounter-cast';
 import { lifeAspects } from '@/constants/life-aspects';
 import type { HomeDayRecord, LocalCreatureRecord, StoredHomeDayRecord } from '@/types/home';
 import { buildDex } from '@/utils/dex';
-import { identityForEncounter } from '@/utils/katchimera-identity';
+import { companionIdResolverForHomeState, identityForEncounter } from '@/utils/katchimera-identity';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 
 function creature(
@@ -145,4 +145,47 @@ test('broad life categories do not merge distinct companions', () => {
     assert.notEqual(left?.familyId, right?.familyId);
     assert.notEqual(left?.companionId, right?.companionId);
   }
+});
+
+test('legacy broad-aspect companion ids are never guessed across split families', () => {
+  const familiesByAspect = new Map<string, Map<string, (typeof encounterLiveCast)[number]>>();
+  for (const entry of encounterLiveCast) {
+    const identity = identityForEncounter(entry.profileId, entry.visualKey);
+    if (!identity) continue;
+    const families = familiesByAspect.get(identity.aspectId) ?? new Map();
+    families.set(identity.familyId, entry);
+    familiesByAspect.set(identity.aspectId, families);
+  }
+
+  let checkedSplitAspects = 0;
+  for (const [aspectId, families] of familiesByAspect) {
+    if (families.size < 2) continue;
+    checkedSplitAspects += 1;
+    const entries = [...families.values()];
+    const days = entries.map((entry, index) =>
+      day(
+        `split-${aspectId}-${index}`,
+        `2026-07-${String(index + 1).padStart(2, '0')}`,
+        creature(`legacy-${entry.visualKey}`, entry.categoryLabel, entry.visualKey, entry.profileId)
+      )
+    );
+    const resolve = companionIdResolverForHomeState({
+      archivedDays: days.slice(0, -1),
+      today: days.at(-1)!,
+      tomorrow: undefined,
+    });
+
+    assert.equal(
+      resolve(`companion:${aspectId}`),
+      `companion:${aspectId}`,
+      `${aspectId} broad state stays unassigned instead of leaking into the latest family`
+    );
+    for (const entry of entries) {
+      assert.equal(
+        resolve(entry.profileId),
+        identityForEncounter(entry.profileId, entry.visualKey)?.companionId
+      );
+    }
+  }
+  assert.ok(checkedSplitAspects >= 8, 'the live cast audit covers every currently populated split aspect');
 });

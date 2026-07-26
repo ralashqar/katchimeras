@@ -262,6 +262,28 @@ export function currentJourneyConversationNode(
   return definition ? companionJourneyNode(definition, session.currentNodeId) : null;
 }
 
+export function journeyQuestionnaireProgress(
+  definition: CompanionJourneyDefinition,
+  session: CompanionJourneyConversationSession
+): { current: number; total: number; ratio: number } {
+  const remainingDepth = (nodeId: string | null, visited: ReadonlySet<string>): number => {
+    if (!nodeId || visited.has(nodeId)) return 0;
+    const node = companionJourneyNode(definition, nodeId);
+    if (!node) return 0;
+    const nextVisited = new Set(visited);
+    nextVisited.add(nodeId);
+    const nextNodeIds = node.kind === 'single_choice'
+      ? (node.options ?? []).map((option) => option.nextNodeId ?? node.nextNodeId ?? null)
+      : [node.nextNodeId ?? null];
+    const remaining = nextNodeIds.map((nextNodeId) => remainingDepth(nextNodeId, nextVisited));
+    return 1 + (remaining.length ? Math.max(...remaining) : 0);
+  };
+
+  const current = session.answers.length + 1;
+  const total = Math.max(current, session.answers.length + remainingDepth(session.currentNodeId, new Set()));
+  return { current, total, ratio: Math.min(1, current / total) };
+}
+
 export function answerJourneyConversation(
   state: CompanionJourneyState,
   sessionId: string,

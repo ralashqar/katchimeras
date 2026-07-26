@@ -6,7 +6,10 @@ import type { InteractiveQuestExecution } from '@/utils/quests/experiences/types
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import {
   buildCompanionQuestViewModel,
+  companionQuestBackAction,
+  companionQuestInlineNoteAction,
   companionInteractionReducer,
+  companionQuestSkipsPreview,
   companionQuestUsesFullBleed,
   companionReflectionIsDirty,
   companionViewportResetKey,
@@ -24,6 +27,19 @@ test('Mossprout, Feastle, and Tasklet games use the full-bleed game shell', () =
   assert.equal(companionQuestUsesFullBleed({ kind: 'block_jam', packId: 'tasklet-desk' } as InteractiveQuestExecution), true);
   assert.equal(companionQuestUsesFullBleed({ kind: 'matching', packId: 'relicoon-gallery' } as InteractiveQuestExecution), false);
   assert.equal(companionQuestUsesFullBleed(null), false);
+});
+
+test('Mossprout garden pairs launches directly without a duplicate preview screen', () => {
+  assert.equal(companionQuestSkipsPreview({ kind: 'matching', packId: 'mossprout-garden' } as InteractiveQuestExecution), true);
+  assert.equal(companionQuestSkipsPreview({ kind: 'matching', packId: 'relicoon-gallery' } as InteractiveQuestExecution), false);
+  assert.equal(companionQuestSkipsPreview({ kind: 'merge', packId: 'feastle-kitchen' } as InteractiveQuestExecution), false);
+  assert.equal(companionQuestSkipsPreview(null), false);
+});
+
+test('mini-game back navigation always returns through the Do overview', () => {
+  assert.equal(companionQuestBackAction({ activeAttemptId: 'attempt-1', experienceOpen: true }), 'confirm_attempt_exit');
+  assert.equal(companionQuestBackAction({ activeAttemptId: null, experienceOpen: true }), 'return_to_do');
+  assert.equal(companionQuestBackAction({ activeAttemptId: null, experienceOpen: false }), 'close_sheet');
 });
 
 function runtime(overrides: Partial<QuestRuntimeStatus> = {}): QuestRuntimeStatus {
@@ -117,6 +133,31 @@ test('blocked and active quests expose only the runtime recovery action', () => 
   assert.equal(model.mode, 'blocked');
   assert.equal(model.primaryAction?.kind, 'quest_action');
   assert.equal(model.primaryAction?.label, 'Enable camera');
+});
+
+test('semantic note quests expose an inline note and voice attempt action', () => {
+  const model = buildCompanionQuestViewModel({
+    activeQuest: {
+      title: 'Notice one living detail',
+      hint: 'Share something specific you noticed outside.',
+      semanticInput: true,
+    },
+    offer: undefined,
+    runtime: runtime({
+      questId: 'quest-mossprout-living-detail',
+      nextAction: 'add_note',
+      userMessage: 'Add a note about what you noticed.',
+    }),
+    questComplete: false,
+    captureFeedback: null,
+    items: [],
+    criteria: [{ label: 'Describe a real green-space moment', done: false }],
+  });
+  assert.equal(model.mode, 'active');
+  assert.equal(companionQuestInlineNoteAction(model)?.nextAction, 'add_note');
+
+  const ordinary = { ...model, semanticInput: false };
+  assert.equal(companionQuestInlineNoteAction(ordinary), null);
 });
 
 test('possible evidence requires review before submission', () => {

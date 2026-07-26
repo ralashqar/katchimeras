@@ -205,15 +205,88 @@ const quietome: readonly CompanionQuickGoalTemplate[] = [
   template('quietome', 'choose-solitude', 'Choose solitude before I am depleted', { kind: 'once' }),
 ];
 
+const flexel: readonly CompanionQuickGoalTemplate[] = [
+  template('flexel', 'show-up', 'Show up for one training session', { kind: 'once' }),
+  template('flexel', 'warm-up', 'Do a deliberate warm-up', { kind: 'once' }),
+  template('flexel', 'one-exercise', 'Complete one useful exercise', { kind: 'once' }),
+  template('flexel', 'form-cue', 'Focus on one form cue', { kind: 'once' }),
+  template('flexel', 'mobility-five', 'Do five minutes of mobility', { kind: 'daily' }),
+  template('flexel', 'record-set', 'Record one set or resistance', { kind: 'once' }),
+  template('flexel', 'recovery-choice', 'Make one recovery choice', { kind: 'once' }),
+  template('flexel', 'weekday-training', 'Protect a small training window', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+];
+const sprintail: readonly CompanionQuickGoalTemplate[] = [
+  template('sprintail', 'shoes-on', 'Put my running shoes on', { kind: 'once' }),
+  template('sprintail', 'ten-minute-run', 'Run or run-walk for ten minutes', { kind: 'once' }),
+  template('sprintail', 'easy-pace', 'Keep one run deliberately easy', { kind: 'once' }),
+  template('sprintail', 'route-ready', 'Choose my route before I start', { kind: 'once' }),
+  template('sprintail', 'warm-up', 'Warm up before the run', { kind: 'once' }),
+  template('sprintail', 'finish-feeling', 'Notice how the finish feels', { kind: 'once' }),
+  template('sprintail', 'recovery', 'Make space for run recovery', { kind: 'once' }),
+  template('sprintail', 'weekday-run', 'Protect a realistic running window', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+];
+const hooplet: readonly CompanionQuickGoalTemplate[] = [
+  template('hooplet', 'touch-ball', 'Spend five minutes with the ball', { kind: 'daily' }),
+  template('hooplet', 'ten-shots', 'Take ten deliberate shots', { kind: 'once' }),
+  template('hooplet', 'weak-hand', 'Practise with my weaker hand', { kind: 'once' }),
+  template('hooplet', 'one-drill', 'Complete one court drill', { kind: 'once' }),
+  template('hooplet', 'defence', 'Practise one defensive movement', { kind: 'once' }),
+  template('hooplet', 'team-voice', 'Communicate clearly on court', { kind: 'once' }),
+  template('hooplet', 'keep-play', 'Remember one useful play', { kind: 'once' }),
+  template('hooplet', 'court-window', 'Protect time to get on court', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+];
+const serveling: readonly CompanionQuickGoalTemplate[] = [
+  template('serveling', 'racket-five', 'Spend five minutes with the racket', { kind: 'daily' }),
+  template('serveling', 'ten-serves', 'Practise ten deliberate serves', { kind: 'once' }),
+  template('serveling', 'one-rally', 'Build one patient rally', { kind: 'once' }),
+  template('serveling', 'footwork', 'Practise one footwork pattern', { kind: 'once' }),
+  template('serveling', 'stroke-focus', 'Choose one stroke to focus on', { kind: 'once' }),
+  template('serveling', 'between-points', 'Use one between-points reset', { kind: 'once' }),
+  template('serveling', 'keep-point', 'Remember one useful point', { kind: 'once' }),
+  template('serveling', 'court-window', 'Protect time for racket practice', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+];
+const snuglet: readonly CompanionQuickGoalTemplate[] = [
+  template('snuglet', 'full-attention', 'Give one care moment my full attention', { kind: 'once' }),
+  template('snuglet', 'prepare-routine', 'Prepare one routine before it begins', { kind: 'once' }),
+  template('snuglet', 'ask-need', 'Ask what would help most', { kind: 'once' }),
+  template('snuglet', 'name-good', 'Name one thing that went well', { kind: 'daily' }),
+  template('snuglet', 'small-pause', 'Take one small caregiver pause', { kind: 'daily' }),
+  template('snuglet', 'share-load', 'Ask someone to share one task', { kind: 'once' }),
+  template('snuglet', 'gentle-boundary', 'Protect one gentle boundary', { kind: 'once' }),
+  template('snuglet', 'tomorrow-easier', 'Make one part of tomorrow easier', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+];
+const waglet: readonly CompanionQuickGoalTemplate[] = [
+  template('waglet', 'present-walk', 'Take one present, unhurried dog walk', { kind: 'daily' }),
+  template('waglet', 'five-play', 'Play together for five minutes', { kind: 'daily' }),
+  template('waglet', 'one-cue', 'Practise one cue kindly', { kind: 'once' }),
+  template('waglet', 'fresh-route', 'Take a slightly different route', { kind: 'once' }),
+  template('waglet', 'notice-signal', 'Notice one signal my dog gives me', { kind: 'once' }),
+  template('waglet', 'care-check', 'Do one food, grooming, or health check', { kind: 'once' }),
+  template('waglet', 'quiet-company', 'Share five minutes of quiet company', { kind: 'once' }),
+  template('waglet', 'weekday-routine', 'Protect our shared daily routine', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+];
+const whiskit: readonly CompanionQuickGoalTemplate[] = [
+  template('whiskit', 'five-play', 'Offer five minutes of cat play', { kind: 'daily' }),
+  template('whiskit', 'enrichment', 'Offer one small enrichment', { kind: 'once' }),
+  template('whiskit', 'notice-preference', 'Notice one preference my cat shows', { kind: 'once' }),
+  template('whiskit', 'quiet-company', 'Share five minutes of quiet company', { kind: 'daily' }),
+  template('whiskit', 'care-check', 'Do one food, grooming, or health check', { kind: 'once' }),
+  template('whiskit', 'refresh-space', 'Refresh one resting or hiding space', { kind: 'once' }),
+  template('whiskit', 'follow-curiosity', 'Follow what catches my cat’s attention', { kind: 'once' }),
+  template('whiskit', 'weekday-routine', 'Protect our shared daily routine', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+];
+
 export const companionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] = [
   ...cheerlet,
   ...coffeeRitual,
   ...dawnle,
   ...encora,
   ...errandimp,
+  ...flexel,
   ...feastle,
   ...flickerbun,
   ...gatherglow,
+  ...hooplet,
   ...mossprout,
   ...mendle,
   ...pagelet,
@@ -221,9 +294,14 @@ export const companionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] 
   ...relicoon,
   ...sleepRest,
   ...skylo,
+  ...snuglet,
+  ...sprintail,
   ...steppling,
+  ...serveling,
   ...tasklet,
   ...vesperitt,
+  ...waglet,
+  ...whiskit,
 ];
 
 export const companionQuickGoalTemplateById = new Map(

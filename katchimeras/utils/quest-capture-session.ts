@@ -6,16 +6,27 @@ export type QuestCaptureSession = {
   sourceId: string | null;
   phase: 'capturing' | 'committed';
   evaluation: PhotoQuestEvaluation | null;
+  sourceType: 'photo' | 'text_note' | 'voice_note' | null;
 };
 
 let session: QuestCaptureSession | null = null;
 
 export function beginQuestCapture(questId: string, creatureId: string): void {
-  session = { questId, creatureId, sourceId: null, phase: 'capturing', evaluation: null };
+  session = { questId, creatureId, sourceId: null, sourceType: null, phase: 'capturing', evaluation: null };
 }
 
-export function completeQuestCapture(questId: string, creatureId: string, sourceId: string, evaluation: PhotoQuestEvaluation): void {
-  session = { questId, creatureId, sourceId, phase: 'committed', evaluation };
+export function completeQuestCapture(
+  questId: string,
+  creatureId: string,
+  sourceId: string,
+  evaluation: PhotoQuestEvaluation,
+  sourceType: QuestCaptureSession['sourceType'] = 'photo'
+): void {
+  session = { questId, creatureId, sourceId, sourceType, phase: 'committed', evaluation };
+}
+
+export function activeQuestCapture(): QuestCaptureSession | null {
+  return session;
 }
 
 export function consumeCompletedQuestCapture(): QuestCaptureSession | null {

@@ -130,15 +130,26 @@ export function companionIdResolverForHomeState(
   state: Pick<StoredHomeState, 'archivedDays' | 'today' | 'tomorrow'> | null | undefined
 ): (value: string) => string {
   const byLegacyId = new Map<string, string>();
+  const companionIdsByAspect = new Map<LifeAspectId, Set<string>>();
   for (const day of state ? [...state.archivedDays, state.today, ...(state.tomorrow ? [state.tomorrow] : [])] : []) {
     if (!day.creature) continue;
     const identity = identityForCreature(day.creature);
     if (!identity) continue;
     byLegacyId.set(day.creature.id, identity.companionId);
     if (day.creature.encounterProfileId) byLegacyId.set(day.creature.encounterProfileId, identity.companionId);
-    // v17 briefly keyed companion systems by broad life aspect. The last
-    // matching hatch is the best available owner for that legacy state.
-    byLegacyId.set(`companion:${identity.aspectId}`, identity.companionId);
+    const aspectCompanions = companionIdsByAspect.get(identity.aspectId) ?? new Set<string>();
+    aspectCompanions.add(identity.companionId);
+    companionIdsByAspect.set(identity.aspectId, aspectCompanions);
+  }
+  // v17 briefly keyed companion systems by broad life aspect. Migrate that
+  // state only when the aspect still identifies exactly one family. Guessing
+  // among split families transfers quests and bond progress to the wrong
+  // Katchimera; quest-owned records are repaired separately from their
+  // declared family metadata.
+  for (const [aspectId, companionIds] of companionIdsByAspect) {
+    if (companionIds.size === 1) {
+      byLegacyId.set(`companion:${aspectId}`, [...companionIds][0]);
+    }
   }
   return (value: string) => {
     if (familyIdFromCompanionId(value)) return value;

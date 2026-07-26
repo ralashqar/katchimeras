@@ -45,6 +45,7 @@ export type QuestCaptureFeedback = {
   creatureId?: string;
   evidenceId?: string | null;
   reason?: string | null;
+  sourceType?: 'photo' | 'text_note' | 'voice_note' | null;
 };
 
 export type CompanionQuestCriterionViewModel = {
@@ -74,6 +75,7 @@ export type CompanionQuestViewModel = {
   statusTone: 'neutral' | 'warning' | 'success' | 'danger';
   criteria: CompanionQuestCriterionViewModel[];
   evidence: QuestSubmissionItem[];
+  semanticInput?: boolean;
   captureFeedback?: QuestCaptureFeedback | null;
   primaryAction?: CompanionQuestPrimaryAction | null;
 };

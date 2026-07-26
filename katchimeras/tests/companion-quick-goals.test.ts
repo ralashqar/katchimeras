@@ -20,6 +20,8 @@ import {
   markQuickGoalCompletionJournaled,
   normaliseCompanionQuickGoalState,
   quickGoalsForDay,
+  skipCompanionQuickGoal,
+  snoozeCompanionQuickGoal,
   undoCompanionQuickGoal,
 } from '@/utils/companion-quick-goals';
 
@@ -42,13 +44,17 @@ test('completed families expose authored quick-goal templates', () => {
   assert.equal(quickGoalTemplatesForFamily('vesperitt').length, 9);
   assert.equal(quickGoalTemplatesForFamily('tasklet').length, 6);
   assert.equal(quickGoalTemplatesForFamily('sleep-rest').length, 6);
+  for (const familyId of ['flexel', 'sprintail', 'hooplet', 'serveling', 'snuglet', 'waglet', 'whiskit']) {
+    assert.equal(quickGoalTemplatesForFamily(familyId).length, 8);
+  }
 });
 
 test('quick-goal UI eligibility follows authored family content', () => {
   assert.equal(hasQuickGoalTemplates('vesperitt'), true);
   assert.equal(hasQuickGoalTemplates('skylo'), true);
   assert.equal(hasQuickGoalTemplates('quietome'), true);
-  assert.equal(hasQuickGoalTemplates('flexel'), false);
+  assert.equal(hasQuickGoalTemplates('flexel'), true);
+  assert.equal(hasQuickGoalTemplates('snuglet'), true);
 });
 
 test('quick goals resolve today-only, daily, and weekday cadence', () => {
@@ -72,6 +78,43 @@ test('quick goals resolve today-only, daily, and weekday cadence', () => {
 
   assert.deepEqual(quickGoalsForDay(state, '2026-07-25').map((item) => item.goal.title), ['Tonight only', 'Daily focus']);
   assert.deepEqual(quickGoalsForDay(state, '2026-07-27').map((item) => item.goal.title), ['Daily focus', 'Weeknight rest']);
+});
+
+test('snooze postpones one-off goals and hides repeating goals for today', () => {
+  let state = addCompanionQuickGoal(emptyCompanionQuickGoalState(), {
+    familyId: 'skylo',
+    title: 'Take a local detour',
+    cadence: { kind: 'once', dayId: '2026-07-25' },
+  }, 100).state;
+  const onceId = state.goals[0]!.id;
+  const postponed = snoozeCompanionQuickGoal(state, onceId, '2026-07-25', 200);
+  assert.equal(postponed.snoozed, true);
+  assert.equal(quickGoalsForDay(postponed.state, '2026-07-25').length, 0);
+  assert.equal(quickGoalsForDay(postponed.state, '2026-07-26')[0]?.goal.id, onceId);
+
+  state = addCompanionQuickGoal(postponed.state, {
+    familyId: 'vesperitt',
+    title: 'Choose what tonight is for',
+    cadence: { kind: 'daily' },
+  }, 300).state;
+  const dailyId = state.goals.find((goal) => goal.familyId === 'vesperitt')!.id;
+  const snoozed = snoozeCompanionQuickGoal(state, dailyId, '2026-07-25', 400);
+  assert.equal(snoozed.snoozed, true);
+  assert.equal(quickGoalsForDay(snoozed.state, '2026-07-25').some((item) => item.goal.id === dailyId), false);
+  assert.equal(quickGoalsForDay(snoozed.state, '2026-07-26').some((item) => item.goal.id === dailyId), true);
+});
+
+test('skip dismisses a goal for today without completing or removing its repeat', () => {
+  const added = addCompanionQuickGoal(emptyCompanionQuickGoalState(), {
+    familyId: 'tasklet',
+    title: 'Choose one next action',
+    cadence: { kind: 'daily' },
+  }, 100);
+  const skipped = skipCompanionQuickGoal(added.state, added.goal!.id, '2026-07-25', 200);
+  assert.equal(skipped.skipped, true);
+  assert.equal(quickGoalsForDay(skipped.state, '2026-07-25').length, 0);
+  assert.equal(quickGoalsForDay(skipped.state, '2026-07-26').length, 1);
+  assert.equal(skipped.state.completions.length, 0);
 });
 
 test('preset and custom duplicates are rejected while archived goals can be re-added', () => {
@@ -163,4 +206,6 @@ test('normalization removes orphaned completions and keeps family-level ownershi
   });
   assert.equal(state.goals[0]?.familyId, 'sleep-rest');
   assert.equal(state.completions.length, 1);
+  assert.equal(state.dismissals.length, 0);
+  assert.equal(state.schemaVersion, 2);
 });

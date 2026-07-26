@@ -84,6 +84,11 @@ import { todayHatchShowsResident, todayHatchShowsTomorrow } from '@/utils/today-
 import { identityForCreature } from '@/utils/katchimera-identity';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
+import {
+  activeSemanticQuestPrompt,
+  cancelSemanticNoteQuestCapture,
+  completeSemanticNoteQuestCapture,
+} from '@/utils/quests/semantic-note-capture';
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
@@ -298,32 +303,19 @@ export default function HomeScreen() {
     () => todayAtmosphereBackgroundForDay(atmosphereDay, allDays),
     [allDays, atmosphereDay],
   );
-  const mapRingItems = useMemo<TodayCategoryRingItem[]>(() => {
-    if (!isDay) return [];
-    const pinCount = selectedDay.dayMap?.nodes.length ?? 0;
-    const items: TodayCategoryRingItem[] = [{
-      id: 'map',
-      label: 'Map',
-      icon: 'map.fill',
-      count: pinCount,
-      countLabel: pinCount > 0 ? `${pinCount}` : undefined,
-      hasContent: pinCount > 0,
-      needsAttention: false,
+  const goalRingItems = useMemo<TodayCategoryRingItem[]>(() => {
+    if (!isDay || !selectedDay.isToday || !quickGoalFamilyIds.length) return [];
+    const goalCount = quickGoals.goalsForToday.length;
+    const remainingCount = quickGoals.goalsForToday.filter((item) => !item.completion).length;
+    return [{
+      id: 'goals',
+      label: 'Goals',
+      icon: 'list.clipboard.fill',
+      count: goalCount,
+      countLabel: `${remainingCount}`,
+      hasContent: goalCount > 0,
+      needsAttention: remainingCount > 0,
     }];
-    if (selectedDay.isToday && quickGoalFamilyIds.length) {
-      const goalCount = quickGoals.goalsForToday.length;
-      const remainingCount = quickGoals.goalsForToday.filter((item) => !item.completion).length;
-      items.push({
-        id: 'goals',
-        label: 'Goals',
-        icon: 'checkmark',
-        count: goalCount,
-        countLabel: goalCount > 0 ? (remainingCount > 0 ? `${remainingCount}` : '✓') : undefined,
-        hasContent: goalCount > 0,
-        needsAttention: false,
-      });
-    }
-    return items;
   }, [isDay, quickGoalFamilyIds.length, quickGoals.goalsForToday, selectedDay]);
 
   // --- Today-as-daily-hub: category ring, sheets, capture actions ---
@@ -423,6 +415,7 @@ export default function HomeScreen() {
     closePromptSheet,
     startEggFeed,
   });
+  const semanticQuestPrompt = quickNoteOpen ? activeSemanticQuestPrompt() : null;
   const pendingNoteRoutes = useMemo(() => pendingJournalNote ? noteRoutesForSignals(pendingJournalNote) : [], [pendingJournalNote]);
   const pendingNoteRoute = journalNoteRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
   const { recentAvgSteps, memoryQuests, categories, categoriesLoading } = useTodayCategoryModel({
@@ -767,14 +760,8 @@ export default function HomeScreen() {
               a day, anchored to the shared 258px egg/creature art stage. */}
           {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
             <TodayCategoryRing
-              categories={mapRingItems}
-              onPress={(category) => {
-                if (category.id === 'goals') {
-                  setQuickGoalsOpen(true);
-                } else if (isDay) {
-                  handleOpenDayMap(selectedDay.id);
-                }
-              }}
+              categories={goalRingItems}
+              onPress={() => setQuickGoalsOpen(true)}
               anchorHeight={258}
               centerOffsetY={24}
             />
@@ -868,6 +855,10 @@ export default function HomeScreen() {
       {quickNoteOpen ? (
         <QuickNoteComposer
           onClose={() => setQuickNoteOpen(false)}
+          onCancel={() => {
+            cancelSemanticNoteQuestCapture();
+            setQuickNoteOpen(false);
+          }}
           onSubmit={handleQuickNoteSubmit}
           onVoiceStart={voiceNote.start}
           onVoiceStop={() => {
@@ -875,6 +866,8 @@ export default function HomeScreen() {
           }}
           voiceElapsed={voiceNote.elapsed}
           voicePhase={voiceNote.phase}
+          contextTitle={semanticQuestPrompt?.title}
+          contextBody={semanticQuestPrompt?.request}
         />
       ) : null}
 
@@ -923,6 +916,8 @@ export default function HomeScreen() {
             onEditGoal: quickGoals.editGoal,
             onCompleteGoal: quickGoals.completeGoal,
             onUndoGoal: quickGoals.undoGoal,
+            onSnoozeGoal: quickGoals.snoozeGoal,
+            onSkipGoal: quickGoals.skipGoal,
           }}
           dayId={selectedDay.isoDate}
           familyIds={quickGoalFamilyIds}
@@ -993,12 +988,26 @@ export default function HomeScreen() {
           journalSource={pendingJournalNote.kind === 'voice'
             ? { kind: 'voice_note', sourceId: pendingJournalNote.captureId, audioUri: pendingJournalNote.audioUri ?? null, durationMs: pendingJournalNote.durationMs ?? null }
             : { kind: 'text_note', sourceId: pendingJournalNote.captureId }}
-          onClose={clearPendingJournalNote}
-          onSave={(submission) => {
+          onClose={() => {
+            cancelSemanticNoteQuestCapture();
+            clearPendingJournalNote();
+          }}
+          onSave={async (submission) => {
             addManualJournalEntry(submission, formingTarget);
+            const result = await completeSemanticNoteQuestCapture({
+              sourceId: pendingJournalNote.captureId,
+              sourceType: pendingJournalNote.kind === 'voice' ? 'voice_note' : 'text_note',
+              text: pendingJournalNote.text,
+              target: formingTarget,
+            });
             clearPendingJournalNote();
             pulseEgg();
-            setMicrocopy('Added to today');
+            if (result.handled) {
+              refreshState();
+              setMicrocopy(result.message ?? 'Added to today');
+            } else {
+              setMicrocopy('Added to today');
+            }
           }}
         />
       ) : null}
