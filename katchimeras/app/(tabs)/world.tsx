@@ -313,8 +313,8 @@ export default function KingdomScreen() {
           questionnaireBackground={kingdomBackground}
           houseLevel={quests.selectedResident.resident.houseLevel}
           openingLine={openingLine(quests.selectedResident.creature.name, quests.selectedInteractionState)}
-          initialThread={quests.selectedResident.thread ?? 'insight'}
-          onSelectThread={quests.selectThread}
+          initialDestination={quests.selectedResident.destination}
+          onSelectDestination={quests.selectDestination}
           onClose={() => {
             quests.closeSelectedResident();
           }}

@@ -4,7 +4,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { AppFontFamilies } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
 import type { CompanionQuestOfferViewModel, CompanionQuestViewModel } from '@/types/companion-interaction';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
@@ -26,9 +26,9 @@ export function CompanionQuestChoices({
     <View style={styles.choiceRoot}>
       <View style={styles.choiceHeading}>
         <View>
-          <ThemedText style={styles.choiceTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Choose a quest</ThemedText>
+          <ThemedText style={styles.choiceTitle} lightColor="#FFF9EA" darkColor="#FFF9EA">Choose a quest</ThemedText>
         </View>
-        <ThemedText style={styles.available} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{offers.length} available</ThemedText>
+        <ThemedText style={styles.available} lightColor="#FFF5DA" darkColor="#FFF5DA">{offers.length} available</ThemedText>
       </View>
       <View style={styles.offerList}>
         {offers.map((offer) => {
@@ -306,17 +306,24 @@ function questMatchQuestion(item: QuestSubmissionItem): string {
 const styles = StyleSheet.create({
   choiceRoot: { gap: 12, paddingBottom: 8, paddingTop: 4 },
   choiceHeading: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' },
-  choiceTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 24, lineHeight: 28 },
-  available: { fontSize: 10.5, fontVariant: ['tabular-nums'], paddingBottom: 2 },
+  choiceTitle: {
+    ...KatchaUI.type.companionPageTitle,
+    fontSize: 24,
+    lineHeight: 28,
+    textShadowColor: 'rgba(20,30,24,0.72)',
+    textShadowOffset: { height: 1, width: 0 },
+    textShadowRadius: 5,
+  },
+  available: { backgroundColor: 'rgba(25,34,27,0.62)', borderRadius: 999, fontSize: 10.5, fontVariant: ['tabular-nums'], overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 5 },
   offerList: { gap: 9 },
-  offer: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.30)', borderColor: 'rgba(122,84,44,0.18)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-3px 4px 8px rgba(58,38,18,0.16), inset 0 1px 0 rgba(255,248,230,0.55)', flexDirection: 'row', gap: 11, minHeight: 108, padding: 9 },
-  offerSelected: { backgroundColor: 'rgba(255,244,204,0.58)', borderColor: Meadow.goldDeep, boxShadow: '-3px 5px 12px rgba(92,57,20,0.22), inset 0 1px 0 rgba(255,252,235,0.78), 0 0 0 1px rgba(229,190,106,0.22)' },
+  offer: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.92)', borderColor: 'rgba(255,255,255,0.64)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.20), inset 0 1px 0 rgba(255,255,255,0.78)', flexDirection: 'row', gap: 11, minHeight: 108, padding: 9 },
+  offerSelected: { backgroundColor: 'rgba(255,244,204,0.97)', borderColor: Meadow.goldDeep, boxShadow: '0 10px 25px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,235,0.9), 0 0 0 1px rgba(229,190,106,0.24)' },
   offerArt: { alignItems: 'center', backgroundColor: 'rgba(138,112,80,0.10)', borderColor: 'rgba(255,248,230,0.28)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.38)', height: 82, justifyContent: 'center', width: 72 },
   offerArtSelected: { backgroundColor: Meadow.goldSoft },
   offerCopy: { flex: 1, gap: 3, minWidth: 0 },
   offerTopline: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   offerCategory: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.7, textTransform: 'uppercase' },
-  offerTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 19, lineHeight: 21 },
+  offerTitle: { ...KatchaUI.type.companionCardTitle, fontSize: 19, lineHeight: 22 },
   offerHint: { fontSize: 10.5, lineHeight: 14 },
   offerFooter: { alignItems: 'center', flexDirection: 'row', gap: 6, justifyContent: 'space-between', paddingTop: 2 },
   offerMeta: { flexDirection: 'row', flexShrink: 1, gap: 6 },
@@ -327,7 +334,7 @@ const styles = StyleSheet.create({
   acceptPressed: { opacity: 0.78, transform: [{ scale: 0.96 }] },
   radio: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 22, justifyContent: 'center', width: 22 },
   radioSelected: { backgroundColor: Meadow.goldDeep, borderColor: Meadow.goldDeep },
-  root: { gap: 18, paddingBottom: 18, paddingTop: 8 },
+  root: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: 'rgba(255,255,255,0.64)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.20), inset 0 1px 0 rgba(255,255,255,0.78)', gap: 18, marginBottom: 12, padding: 16 },
   intro: { gap: 8 },
   activeSummary: { gap: 10 },
   activeGoals: { gap: 7, paddingTop: 2 },
@@ -340,7 +347,7 @@ const styles = StyleSheet.create({
   noteAttemptTitle: { fontSize: 12.5, fontWeight: '900', lineHeight: 16 },
   noteAttemptHint: { fontSize: 10.5, lineHeight: 14 },
   eyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
-  title: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 27, lineHeight: 32 },
+  title: { ...KatchaUI.type.companionPageTitle, fontSize: 27, lineHeight: 32 },
   message: { fontSize: 14, lineHeight: 21 },
   criteria: { gap: 2 },
   criterion: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, minHeight: 52, paddingVertical: 8 },

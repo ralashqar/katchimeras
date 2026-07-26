@@ -10,7 +10,7 @@ import { CompanionSection } from './companion-interaction-primitives';
 export function CompanionInsightThread({ insight }: { insight: CompanionInsight }) {
   const { tokens } = useKatchaSurface();
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: tokens.border }]}>
       <CompanionSection label="A pattern I noticed">
         <View style={styles.quoteRow}>
           <View style={[styles.mark, { backgroundColor: `${tokens.accent}2E` }]}><IconSymbol name="quote.opening" size={17} color={tokens.accentPressed} /></View>
@@ -28,7 +28,7 @@ export function CompanionInsightThread({ insight }: { insight: CompanionInsight 
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 24, paddingBottom: 20, paddingTop: 8 },
+  root: { borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.20), inset 0 1px 0 rgba(255,255,255,0.78)', gap: 24, marginBottom: 12, padding: 16 },
   quoteRow: { alignItems: 'flex-start', flexDirection: 'row', gap: 14 },
   mark: { alignItems: 'center', borderRadius: KatchaUI.radius.pill, height: 38, justifyContent: 'center', width: 38 },
   quote: { ...KatchaUI.type.display, flex: 1, fontSize: 24, lineHeight: 32 },

@@ -243,7 +243,7 @@ export function CompanionCheckInPage({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
-  card: { backgroundColor: 'rgba(255,248,232,0.62)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, gap: 14, padding: 16 },
+  card: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', gap: 14, padding: 16 },
   cardComplete: { backgroundColor: 'rgba(91,132,91,0.09)', borderColor: 'rgba(91,132,91,0.25)' },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
   cardIcon: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.18)', borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },

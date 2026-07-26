@@ -36,6 +36,7 @@ export function CompanionJourneyDiscoveryThread({
   goals,
   onOpenQuestionnaire,
   onSetGoalStatus,
+  showHeading = true,
 }: {
   companionName: string;
   conversation: CompanionJourneyConversationSession | null;
@@ -43,6 +44,7 @@ export function CompanionJourneyDiscoveryThread({
   goals: readonly CompanionJourneyGoal[];
   onOpenQuestionnaire: () => void;
   onSetGoalStatus: (goalId: string, status: CompanionJourneyGoalStatus) => void;
+  showHeading?: boolean;
 }) {
   const activeFocus = goals.find((goal) => goal.status === 'active' && goal.isPrimary)
     ?? goals.find((goal) => goal.status === 'active')
@@ -51,7 +53,7 @@ export function CompanionJourneyDiscoveryThread({
 
   return (
     <View style={styles.root}>
-      <View style={styles.heading}>
+      {showHeading ? <View style={styles.heading}>
         <ThemedText selectable style={styles.eyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
           YOU &amp; {companionName.toUpperCase()}
         </ThemedText>
@@ -61,7 +63,7 @@ export function CompanionJourneyDiscoveryThread({
         <ThemedText selectable style={styles.description} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
           Answer a few quick choices when you want more direction. {companionName} turns them into a focus and suggests optional actions for Do.
         </ThemedText>
-      </View>
+      </View> : null}
 
       {activeFocus ? (
         <View style={[styles.goalCard, styles.goalCardPrimary]}>
@@ -691,7 +693,7 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#FFF9EA', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 14, minHeight: 92, padding: 12, textAlignVertical: 'top' },
   primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
   primaryButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '900' },
-  startCard: { backgroundColor: 'rgba(255,248,232,0.46)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 12, padding: 15 },
+  startCard: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', gap: 12, padding: 15 },
   startIcon: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
   startButton: { alignSelf: 'stretch' },
   suggestionCard: { backgroundColor: 'rgba(255,248,232,0.62)', borderColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 12, padding: 15 },
@@ -702,7 +704,7 @@ const styles = StyleSheet.create({
   startTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 16, fontWeight: '900' },
   goalsSection: { gap: 9 },
   sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '900', letterSpacing: 1.2, paddingHorizontal: 4 },
-  goalCard: { backgroundColor: 'rgba(255,248,232,0.46)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 10, padding: 14 },
+  goalCard: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '0 7px 18px rgba(37,42,29,0.16), inset 0 1px 0 rgba(255,255,255,0.72)', gap: 10, padding: 14 },
   goalCardPrimary: { backgroundColor: Meadow.goldSoft, borderColor: Meadow.goldDeep },
   goalTopRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   goalCopy: { flex: 1, gap: 3 },

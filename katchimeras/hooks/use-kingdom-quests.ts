@@ -7,7 +7,7 @@ import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { HomeDayRecord, MemoryQualityScore } from '@/types/home';
 import type { KingdomCreature, KingdomState } from '@/types/kingdom';
-import type { CompanionNavigationIntent, CompanionThread, QuestCaptureFeedback } from '@/types/companion-interaction';
+import type { CompanionDestination, CompanionNavigationIntent, QuestCaptureFeedback } from '@/types/companion-interaction';
 import {
   archetypeForCreature,
   companionUnit,
@@ -107,7 +107,7 @@ import { buildPhotoEvidence, upsertEvidence } from '@/utils/intelligence/evidenc
 type SelectedResident = {
   creature: KingdomCreature;
   resident: KingdomResident;
-  thread: CompanionThread | null;
+  destination: CompanionDestination | null;
 };
 
 type Args = {
@@ -202,7 +202,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       if (completedCapture?.sourceId) {
         const resident = residentById.get(completedCapture.creatureId);
         const creature = creatureById.get(completedCapture.creatureId);
-        if (resident && creature) setSelectedResident({ resident, creature, thread: 'quest' });
+        if (resident && creature) setSelectedResident({ resident, creature, destination: 'quest' });
         const evaluation = completedCapture.evaluation;
         setQuestCaptureFeedback({
           phase: evaluation?.status === 'ready' ? 'matched' : evaluation?.status === 'possible' ? 'possible' : evaluation ? 'no_match' : 'analyzing',
@@ -569,14 +569,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       const resident = residentById.get(creatureId);
       const creature = creatureById.get(creatureId);
       if (resident && creature) {
-        const active = questFor(companionQuestState, creatureId);
-        const offer = companionDataByCreatureId.get(creatureId)?.quest;
-        const hasOffer = Boolean(offer && today?.isoDate && !hasCompanionQuestForDay(companionQuestState, creatureId, today.isoDate));
-        setSelectedResident({ resident, creature, thread: active || hasOffer ? 'quest' : 'insight' });
+        setSelectedResident({ resident, creature, destination: null });
         setSelectedOfferId(null);
       }
     },
-    [companionDataByCreatureId, companionQuestState, creatureById, residentById, today?.isoDate]
+    [creatureById, residentById]
   );
 
   const acceptSelectedQuest = useCallback((offerId?: string) => {
@@ -611,7 +608,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     }
     commitCompanionQuestState(next);
     setMicrocopy('Quest accepted');
-    setSelectedResident((current) => (current ? { ...current, thread: 'quest' } : current));
+    setSelectedResident((current) => (current ? { ...current, destination: 'quest' } : current));
   }, [commitCompanionQuestState, companionQuestState, selectedOffer, selectedOfferOptions, selectedResident, today?.isoDate]);
 
   const selectOffer = useCallback((offerId: string) => {
@@ -824,8 +821,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     router.push('/today');
   }, [router, selectedInsight?.action?.intent]);
 
-  const selectThread = useCallback((thread: CompanionThread) => {
-    setSelectedResident((current) => (current ? { ...current, thread } : current));
+  const selectDestination = useCallback((destination: CompanionDestination | null) => {
+    setSelectedResident((current) => (current ? { ...current, destination } : current));
   }, []);
   const closeSelectedResident = useCallback(() => {
     setSelectedResident(null);
@@ -1110,7 +1107,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     questCriteria: selectedQuestRuntime?.progress ?? (selectedActiveQuest ? questCriteria(selectedActiveQuest.questId, questFacts) : []),
     residentStatusGlyphs,
     selectResident,
-    selectThread,
+    selectDestination,
     selectedActiveQuest,
     selectedActiveQuestDefinition,
     selectedSemanticJournalFallbackActive,

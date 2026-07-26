@@ -453,17 +453,19 @@ export function QuickGoalsSheet({
               {goals.map((item, index) => {
                 return (
                   <Animated.View
-                    entering={reduceMotion ? undefined : FadeInUp.delay(Math.min(index, 6) * 32).duration(180)}
                     key={item.goal.id}
                     layout={reduceMotion ? undefined : LinearTransition.duration(170).easing(Easing.out(Easing.cubic))}>
-                    <TodayQuickGoalCard
-                      item={item}
-                      onPress={() => {
-                        setFeedback(null);
-                        setSelectedGoalId(item.goal.id);
-                        if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-                      }}
-                    />
+                    <Animated.View
+                      entering={reduceMotion ? undefined : FadeInUp.delay(Math.min(index, 6) * 32).duration(180)}>
+                      <TodayQuickGoalCard
+                        item={item}
+                        onPress={() => {
+                          setFeedback(null);
+                          setSelectedGoalId(item.goal.id);
+                          if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                        }}
+                      />
+                    </Animated.View>
                   </Animated.View>
                 );
               })}
@@ -961,7 +963,7 @@ function GoalManageButton({
 }
 
 const styles = StyleSheet.create({
-  companionPanel: { backgroundColor: 'rgba(255,248,232,0.54)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: KatchaUI.radius.card, borderWidth: 1, gap: 10, marginBottom: 12, padding: 14 },
+  companionPanel: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', gap: 10, marginBottom: 12, padding: 14 },
   scopedPicker: { gap: KatchaUI.spacing.md, paddingBottom: KatchaUI.spacing.xl, paddingHorizontal: 4, paddingTop: 6 },
   scopedBack: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 5, minHeight: 38, paddingHorizontal: 4 },
   scopedBackText: { ...KatchaUI.type.companionAction, fontSize: 11.5 },

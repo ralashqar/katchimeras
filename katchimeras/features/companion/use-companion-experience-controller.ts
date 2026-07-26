@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer } from 'react';
 
-import type { CompanionThread } from '@/types/companion-interaction';
+import type { CompanionDestination } from '@/types/companion-interaction';
 import {
   companionInteractionReducer,
   companionRouteBackAction,
@@ -9,36 +9,46 @@ import {
 
 export function useCompanionExperienceController({
   creatureId,
-  initialThread,
+  initialDestination,
   onClose,
-  onSelectThread,
+  onSelectDestination,
 }: {
   creatureId: string;
-  initialThread: CompanionThread;
+  initialDestination?: CompanionDestination | null;
   onClose: () => void;
-  onSelectThread?: (thread: CompanionThread) => void;
+  onSelectDestination?: (destination: CompanionDestination | null) => void;
 }) {
   const [state, dispatch] = useReducer(
     companionInteractionReducer,
-    { initialThread },
+    { initialDestination },
     createCompanionInteractionState
   );
 
   useEffect(() => {
-    dispatch({ type: 'reset_companion', initialThread });
-  }, [creatureId, initialThread]);
+    dispatch({ type: 'reset_companion', initialDestination });
+    // The opening destination is a launch intent. Destination changes are
+    // mirrored outside this controller only so temporary journal routes can
+    // restore the page; they must not reset the live navigation stack.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creatureId]);
 
-  const selectThread = useCallback((thread: CompanionThread) => {
-    dispatch({ type: 'select_thread', thread });
-    onSelectThread?.(thread);
-  }, [onSelectThread]);
+  const selectDestination = useCallback((destination: CompanionDestination) => {
+    dispatch({ type: 'select_destination', destination });
+    onSelectDestination?.(destination);
+  }, [onSelectDestination]);
+
+  const showHome = useCallback(() => {
+    dispatch({ type: 'show_home' });
+    onSelectDestination?.(null);
+  }, [onSelectDestination]);
 
   const requestBack = useCallback(() => {
     const action = companionRouteBackAction(state);
-    if (action === 'return_to_thread') dispatch({ type: 'return_to_thread' });
-    else if (action === 'close_sheet') onClose();
+    if (action === 'return_to_destination') dispatch({ type: 'return_to_destination' });
+    else if (action === 'return_to_home') showHome();
+    else if (action === 'close_experience') onClose();
     return action;
-  }, [onClose, state]);
+  }, [onClose, showHome, state]);
 
   const openQuickGoalPicker = useCallback(
     () => dispatch({ type: 'open_quick_goal_picker' }),
@@ -64,7 +74,10 @@ export function useCompanionExperienceController({
     (attemptId: string | null) => dispatch({ type: 'set_quest_attempt', attemptId }),
     []
   );
-  const returnToThread = useCallback(() => dispatch({ type: 'return_to_thread' }), []);
+  const returnToDestination = useCallback(
+    () => dispatch({ type: 'return_to_destination' }),
+    []
+  );
   const resetQuestExperience = useCallback(
     () => dispatch({ type: 'reset_quest_experience' }),
     []
@@ -78,7 +91,7 @@ export function useCompanionExperienceController({
     state,
     dispatch,
     route: state.route,
-    thread: state.thread,
+    destination: state.destination,
     direction: state.direction,
     reviewItemId: state.reviewItemId,
     experienceInstance: state.experienceInstance,
@@ -90,7 +103,8 @@ export function useCompanionExperienceController({
       ? state.route.sessionId
       : null,
     checkInOpen: state.route.kind === 'check_in',
-    selectThread,
+    selectDestination,
+    showHome,
     requestBack,
     openQuickGoalPicker,
     openJourneyQuestionnaire,
@@ -98,7 +112,7 @@ export function useCompanionExperienceController({
     openCheckIn,
     openQuestExperience,
     setQuestAttempt,
-    returnToThread,
+    returnToDestination,
     resetQuestExperience,
     reviewItem,
   };

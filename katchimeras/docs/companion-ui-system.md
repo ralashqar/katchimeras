@@ -1,29 +1,35 @@
 # Companion UI system
 
-The Kingdom companion experience is a feature boundary, not a collection of
-independent sheets. Its navigation, surfaces, typography, motion, and common
-states should remain predictable even when individual Katchimeras provide
-different quests or artwork.
+The Kingdom companion experience is one feature boundary, not a collection of
+independent sheets. Navigation, surfaces, typography, motion, and common states
+must remain predictable even when individual Katchimeras provide different
+quests or artwork.
 
 ## Flow
 
 The root flow is:
 
-`Kingdom resident → companion sheet → Do / You / Insight / Skins`
+`Kingdom resident → companion home → Quests / You / Goals`
 
-Focused work opens from one of those thread roots:
+Insight and Skins are secondary destinations on companion home. A normal
+resident tap always opens home. An explicit launch intent, such as returning
+from quest evidence capture, may open its owning destination directly.
 
-- Do → quick-goal picker or quest preview → active quest → result
+Focused work opens from a destination:
+
+- Quests → quest preview → active quest → result
 - You → journey questionnaire or daily check-in → result
-- Insight and Skins remain thread-root content
+- Goals → companion-specific goals → goal picker
+- Insight and Skins remain lightweight destination content
 
-Back always unwinds one level. An active mini-game asks for confirmation,
-then returns to Do. A questionnaire, check-in, goal picker, or quest preview
-returns directly to its owning thread. Only a thread root closes the sheet.
+Back always unwinds one level. An active mini-game asks for confirmation and
+then returns to Quests. A questionnaire, check-in, goal picker, or quest preview
+returns directly to its owning destination. A destination returns to companion
+home, and companion home returns to Kingdom.
 
 `CompanionRoute` in `types/companion-interaction.ts` is the source of truth.
-Do not add a new `*Open` boolean for a navigable companion subflow. Add a
-route case and reducer action instead.
+Do not add a new `*Open` boolean for a navigable companion subflow. Add a route
+case and reducer action instead.
 
 ## Ownership
 
@@ -31,25 +37,32 @@ route case and reducer action instead.
   state and exposes intent-named actions to the renderer.
 - `CompanionInteractionSheet` composes the current route. It must not own
   persistence, quest rules, bond calculations, or questionnaire definitions.
-- `companion-ui-primitives.tsx` owns shared companion shell, actions, cards,
-  sections, back controls, status and result presentation.
+- `companion-ui-primitives.tsx` owns shared companion shell, destination chrome,
+  actions, cards, sections, back controls, status, and result presentation.
 - Questionnaire scenes and quest boards own their immersive artwork and
   mechanics, but use shared chrome and tokens.
 - `KatchaUI` and `KatchaSurfacePalette` are the canonical style contract.
   Meadow and Lantern values may remain inside artwork-specific implementations,
   but new reusable UI must not introduce another token family.
 
-## Layout rules
+## Layout and type rules
 
-- Standard companion sheets keep the identity header and thread switcher above
-  one scrolling content region.
+- The whole visit is full-screen. Companion home provides navigation; do not
+  reintroduce a persistent tab or thread switcher inside destinations.
+- Standard destinations keep the identity header above one scrolling region.
+  The day atmosphere remains the page background, and a shared companion
+  speech-bubble hero introduces the destination.
+- Do not place destination content on one full-page parchment slab. Use cream
+  only for individual readable objects such as quest cards, goal rows, and
+  focus panels, with the artwork visible between them.
 - Full-screen questionnaires keep the background, creature, speech bubble, and
   top progress mounted. Only the answer region scrolls and transitions.
 - Mini-games use full bleed only when their execution explicitly requests it.
-- Use `KatchaUI.layout.phoneGutter`, semantic spacing, continuous radii, and
-  the surface provider rather than copied color or shadow literals.
-- Use `KatchaUI.type.companionName` for creature names, `screenTitle` for page
-  titles, `sectionTitle` for section headings, and `companionBody` for copy.
+- Use `KatchaUI.layout.phoneGutter`, semantic spacing, continuous radii, and the
+  surface provider rather than copied color or shadow literals.
+- Use Fredoka-backed `companionDisplay`, `companionPageTitle`,
+  `companionCardTitle`, and `companionSectionTitle` for companion headings.
+  Use Manrope-backed `companionBody` and `companionAction` for copy and controls.
 - Use transform and opacity for transitions. Respect reduced motion and avoid
   remounting stable artwork to replay entrance animations.
 
@@ -58,20 +71,18 @@ route case and reducer action instead.
 - Use `CompanionPrimaryAction` for the single main action in a view.
 - Use `CompanionSecondaryAction` for reversible or less prominent actions.
 - Use `CompanionBackAction` for focused subflow navigation.
-- Use `CompanionSection` to establish hierarchy without adding an unnecessary
-  card.
+- Use `CompanionSection` to establish hierarchy without an unnecessary card.
 - Use `CompanionCard` only when selection, elevation, or grouping is meaningful.
-- Use `CompanionResultNotice` for questionnaire/check-in task creation rather
-  than repeating the answers and generated tasks in several stacked panels.
+- Use `CompanionResultNotice` for questionnaire/check-in task creation.
 - Use `QuestExperienceHost` with grouped `session`, `history`, and `handlers`
   objects. Keep game-specific configuration inside the session.
 
-## Adding a new companion subflow
+## Adding a companion subflow
 
 1. Add a discriminated `CompanionRoute` case and reducer actions.
-2. Add pure reducer/back-navigation tests.
+2. Add pure reducer and back-navigation tests.
 3. Expose an intent-named controller action.
-4. Render the route from the interaction sheet using shared shell primitives.
+4. Render the route using the shared full-screen shell and destination chrome.
 5. Add representative default, loading, empty, error, and completion states to
    the UI gallery when they apply.
 6. Verify compact phone, standard phone, tablet, enlarged text, and reduced

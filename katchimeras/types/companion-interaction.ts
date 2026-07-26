@@ -5,6 +5,7 @@ import type { QuestNextAction, QuestRuntimeState } from '@/utils/quests/runtime'
 import type { KatchimeraActivityLane, KatchimeraBondLevel } from '@/constants/katchimera-roles';
 
 export type CompanionThread = 'quest' | 'discovery' | 'insight' | 'skins';
+export type CompanionDestination = CompanionThread | 'goals';
 
 export type CompanionQuestOfferViewModel = {
   id: string;
@@ -82,7 +83,7 @@ export type CompanionQuestViewModel = {
 };
 
 export type CompanionInteractionState = {
-  thread: CompanionThread;
+  destination: CompanionDestination | null;
   direction: 1 | -1;
   reviewItemId: string | null;
   route: CompanionRoute;
@@ -90,14 +91,16 @@ export type CompanionInteractionState = {
 };
 
 export type CompanionRoute =
-  | { kind: 'thread'; thread: CompanionThread }
-  | { kind: 'quick_goal_picker'; thread: 'quest' }
-  | { kind: 'journey_questionnaire'; thread: 'discovery'; sessionId: string | null }
-  | { kind: 'check_in'; thread: 'discovery'; checkInId: string }
-  | { kind: 'quest_experience'; thread: 'quest'; attemptId: string | null };
+  | { kind: 'home' }
+  | { kind: 'destination'; destination: CompanionDestination }
+  | { kind: 'quick_goal_picker'; destination: 'goals' }
+  | { kind: 'journey_questionnaire'; destination: 'discovery'; sessionId: string | null }
+  | { kind: 'check_in'; destination: 'discovery'; checkInId: string }
+  | { kind: 'quest_experience'; destination: 'quest'; attemptId: string | null };
 
 export type CompanionInteractionAction =
-  | { type: 'select_thread'; thread: CompanionThread }
+  | { type: 'select_destination'; destination: CompanionDestination }
+  | { type: 'show_home' }
   | { type: 'review_item'; itemId: string | null }
   | { type: 'open_quick_goal_picker' }
   | { type: 'open_journey_questionnaire'; sessionId?: string | null }
@@ -105,6 +108,6 @@ export type CompanionInteractionAction =
   | { type: 'open_check_in'; checkInId: string }
   | { type: 'open_quest_experience' }
   | { type: 'set_quest_attempt'; attemptId: string | null }
-  | { type: 'return_to_thread' }
+  | { type: 'return_to_destination' }
   | { type: 'reset_quest_experience' }
-  | { type: 'reset_companion'; initialThread: CompanionThread };
+  | { type: 'reset_companion'; initialDestination?: CompanionDestination | null };

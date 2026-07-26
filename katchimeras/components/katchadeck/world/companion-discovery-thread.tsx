@@ -20,6 +20,7 @@ export function CompanionDiscoveryThread({
   onSetGoalStatus,
   prompts,
   role,
+  showHeading = true,
 }: {
   answers: readonly CompanionDiscoveryAnswer[];
   companionName: string;
@@ -28,6 +29,7 @@ export function CompanionDiscoveryThread({
   onSetGoalStatus: (promptId: string, status: 'active' | 'completed' | 'paused') => void;
   prompts: readonly CompanionDiscoveryPromptDefinition[];
   role: KatchimeraRoleDefinition | null;
+  showHeading?: boolean;
 }) {
   const answerByPrompt = useMemo(
     () => new Map(answers.map((answer) => [answer.promptId, answer])),
@@ -46,7 +48,7 @@ export function CompanionDiscoveryThread({
 
   return (
     <View style={styles.root}>
-      <View style={styles.heading}>
+      {showHeading ? <View style={styles.heading}>
         <ThemedText selectable style={styles.eyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
           GETTING TO KNOW YOU
         </ThemedText>
@@ -56,7 +58,7 @@ export function CompanionDiscoveryThread({
         <ThemedText selectable style={styles.description} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
           {role?.role ?? 'Your answers shape future quests, goals, insights, and reflections.'}
         </ThemedText>
-      </View>
+      </View> : null}
 
       {prompts.map((prompt) => {
         const answer = answerByPrompt.get(prompt.id);
@@ -183,11 +185,12 @@ const styles = StyleSheet.create({
   title: { fontFamily: AppFontFamilies.manrope, fontSize: 23, fontWeight: '900', letterSpacing: -0.55, lineHeight: 28 },
   description: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '600', lineHeight: 19 },
   card: {
-    backgroundColor: 'rgba(255,248,232,0.46)',
+    backgroundColor: 'rgba(255,248,232,0.92)',
     borderColor: Meadow.cardBorder,
     borderCurve: 'continuous',
     borderRadius: 18,
     borderWidth: 1,
+    boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)',
     gap: 9,
     padding: 15,
   },

@@ -418,9 +418,9 @@ export function JournalComposer({
           style={styles.scroll}>
           <Animated.View
             key={stage}
-            entering={stageEntering}
             exiting={reduceMotion ? FadeOut.duration(80) : FadeOut.duration(130)}
             layout={LinearTransition.duration(180)}>
+            <Animated.View entering={stageEntering}>
             {stage === 'flow' ? (
               <View style={styles.sections}>
                 <ScrollView
@@ -595,7 +595,8 @@ export function JournalComposer({
                       <IconSymbol name="chevron.right" size={18} color={Meadow.inkSoft} />
                     </Pressable>
                   ) : (
-                    <Animated.View entering={FadeIn.duration(180)} layout={LinearTransition.duration(180)} style={styles.noteEditor}>
+                    <Animated.View layout={LinearTransition.duration(180)}>
+                      <Animated.View entering={FadeIn.duration(180)} style={styles.noteEditor}>
                       <TextInput
                         accessibilityLabel="Memory note"
                         multiline
@@ -634,7 +635,8 @@ export function JournalComposer({
                           <ThemedText style={styles.noteHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Transcribing on device…</ThemedText>
                         </View>
                       ) : null}
-                      {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
+                        {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
+                      </Animated.View>
                     </Animated.View>
                   )}
                   {!noteExpanded && voice.phase === 'recording' ? <RecordingState elapsed={voice.elapsed} /> : null}
@@ -648,6 +650,7 @@ export function JournalComposer({
                 </EditorSection>
               </View>
             ) : null}
+            </Animated.View>
           </Animated.View>
         </ScrollView>
 

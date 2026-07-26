@@ -36,7 +36,7 @@ test('Mossprout garden pairs launches directly without a duplicate preview scree
   assert.equal(companionQuestSkipsPreview(null), false);
 });
 
-test('mini-game back navigation always returns through the Do overview', () => {
+test('legacy mini-game back helper returns through the quest overview', () => {
   assert.equal(companionQuestBackAction({ activeAttemptId: 'attempt-1', experienceOpen: true }), 'confirm_attempt_exit');
   assert.equal(companionQuestBackAction({ activeAttemptId: null, experienceOpen: true }), 'return_to_do');
   assert.equal(companionQuestBackAction({ activeAttemptId: null, experienceOpen: false }), 'close_sheet');
@@ -50,42 +50,46 @@ function runtime(overrides: Partial<QuestRuntimeStatus> = {}): QuestRuntimeStatu
   };
 }
 
-test('interaction reducer moves between the merged companion threads', () => {
-  const initial = createCompanionInteractionState({ initialThread: 'quest' });
-  const you = companionInteractionReducer(initial, { type: 'select_thread', thread: 'discovery' });
-  const insight = companionInteractionReducer(you, { type: 'select_thread', thread: 'insight' });
-  const backToYou = companionInteractionReducer(insight, { type: 'select_thread', thread: 'discovery' });
-  assert.equal(you.thread, 'discovery');
+test('ordinary companion visits open on the new home route', () => {
+  const initial = createCompanionInteractionState({});
+  assert.deepEqual(initial.route, { kind: 'home' });
+  assert.equal(initial.destination, null);
+  assert.equal(companionRouteBackAction(initial), 'close_experience');
+});
+
+test('companion destinations clear focused review state and preserve direction', () => {
+  const initial = createCompanionInteractionState({ initialDestination: 'quest' });
+  const reviewing = companionInteractionReducer(initial, { type: 'review_item', itemId: 'evidence-1' });
+  const you = companionInteractionReducer(reviewing, { type: 'select_destination', destination: 'discovery' });
+  const insight = companionInteractionReducer(you, { type: 'select_destination', destination: 'insight' });
+  const backToYou = companionInteractionReducer(insight, { type: 'select_destination', destination: 'discovery' });
+  assert.equal(you.destination, 'discovery');
+  assert.equal(you.reviewItemId, null);
   assert.equal(insight.direction, 1);
   assert.equal(backToYou.direction, -1);
 });
 
-test('quest evidence review is cleared when changing companion threads', () => {
-  const initial = createCompanionInteractionState({ initialThread: 'quest' });
-  const reviewing = companionInteractionReducer(initial, { type: 'review_item', itemId: 'evidence-1' });
-  const insight = companionInteractionReducer(reviewing, { type: 'select_thread', thread: 'insight' });
-  assert.equal(insight.direction, 1);
-  assert.equal(insight.reviewItemId, null);
-});
-
-test('focused companion routes unwind to their owning thread before closing', () => {
-  const initial = createCompanionInteractionState({ initialThread: 'discovery' });
+test('focused companion routes unwind to their destination, then home, then Kingdom', () => {
+  const initial = createCompanionInteractionState({ initialDestination: 'discovery' });
   const questionnaire = companionInteractionReducer(initial, {
     type: 'open_journey_questionnaire',
     sessionId: 'journey-1',
   });
-  assert.equal(questionnaire.route.kind, 'journey_questionnaire');
-  assert.equal(companionRouteBackAction(questionnaire), 'return_to_thread');
+  assert.equal(companionRouteBackAction(questionnaire), 'return_to_destination');
 
-  const discovery = companionInteractionReducer(questionnaire, { type: 'return_to_thread' });
-  assert.deepEqual(discovery.route, { kind: 'thread', thread: 'discovery' });
-  assert.equal(companionRouteBackAction(discovery), 'close_sheet');
+  const discovery = companionInteractionReducer(questionnaire, { type: 'return_to_destination' });
+  assert.deepEqual(discovery.route, { kind: 'destination', destination: 'discovery' });
+  assert.equal(companionRouteBackAction(discovery), 'return_to_home');
+
+  const home = companionInteractionReducer(discovery, { type: 'show_home' });
+  assert.deepEqual(home.route, { kind: 'home' });
+  assert.equal(companionRouteBackAction(home), 'close_experience');
 });
 
 test('active mini-games require confirmation and reset their instance on return', () => {
-  const initial = createCompanionInteractionState({ initialThread: 'quest' });
+  const initial = createCompanionInteractionState({ initialDestination: 'quest' });
   const preview = companionInteractionReducer(initial, { type: 'open_quest_experience' });
-  assert.equal(companionRouteBackAction(preview), 'return_to_thread');
+  assert.equal(companionRouteBackAction(preview), 'return_to_destination');
 
   const active = companionInteractionReducer(preview, {
     type: 'set_quest_attempt',
@@ -93,43 +97,33 @@ test('active mini-games require confirmation and reset their instance on return'
   });
   assert.equal(companionRouteBackAction(active), 'confirm_attempt_exit');
 
-  const returned = companionInteractionReducer(active, { type: 'return_to_thread' });
-  assert.deepEqual(returned.route, { kind: 'thread', thread: 'quest' });
+  const returned = companionInteractionReducer(active, { type: 'return_to_destination' });
+  assert.deepEqual(returned.route, { kind: 'destination', destination: 'quest' });
   assert.equal(returned.experienceInstance, 1);
 });
 
-test('switching tabs closes focused companion routes', () => {
-  const initial = createCompanionInteractionState({ initialThread: 'quest' });
+test('goal picker returns to the dedicated goals destination', () => {
+  const initial = createCompanionInteractionState({ initialDestination: 'goals' });
   const picker = companionInteractionReducer(initial, { type: 'open_quick_goal_picker' });
-  const skins = companionInteractionReducer(picker, { type: 'select_thread', thread: 'skins' });
-  assert.deepEqual(skins.route, { kind: 'thread', thread: 'skins' });
-  assert.equal(skins.thread, 'skins');
+  const returned = companionInteractionReducer(picker, { type: 'return_to_destination' });
+  assert.deepEqual(returned.route, { kind: 'destination', destination: 'goals' });
 });
 
-test('skins is the final first-class companion thread after insight', () => {
-  const insight = createCompanionInteractionState({ initialThread: 'insight' });
-  const skins = companionInteractionReducer(insight, { type: 'select_thread', thread: 'skins' });
-  assert.equal(skins.thread, 'skins');
-  assert.equal(skins.direction, 1);
+test('explicit launch intents can open a destination directly', () => {
+  const quest = createCompanionInteractionState({ initialDestination: 'quest' });
+  const skins = createCompanionInteractionState({ initialDestination: 'skins' });
+  assert.deepEqual(quest.route, { kind: 'destination', destination: 'quest' });
+  assert.deepEqual(skins.route, { kind: 'destination', destination: 'skins' });
 });
 
-test('discovery is a first-class companion thread between quest and insight', () => {
-  const quest = createCompanionInteractionState({ initialThread: 'quest' });
-  const discovery = companionInteractionReducer(quest, { type: 'select_thread', thread: 'discovery' });
-  const insight = companionInteractionReducer(discovery, { type: 'select_thread', thread: 'insight' });
-  assert.equal(discovery.thread, 'discovery');
-  assert.equal(discovery.direction, 1);
-  assert.equal(insight.direction, 1);
-});
-
-test('companion viewport resets across threads and content-shape transitions', () => {
+test('companion viewport resets across destinations and content-shape transitions', () => {
   const base = {
     creatureId: 'companion:vesperitt',
-    thread: 'quest' as const,
+    destination: 'quest' as const,
     questMode: 'offer' as const,
   };
   const quest = companionViewportResetKey(base);
-  assert.notEqual(companionViewportResetKey({ ...base, thread: 'discovery' }), quest);
+  assert.notEqual(companionViewportResetKey({ ...base, destination: 'discovery' }), quest);
   assert.notEqual(companionViewportResetKey({ ...base, questMode: 'active', activeQuestTitle: 'The small hours' }), quest);
   assert.notEqual(companionViewportResetKey({ ...base, journeyNodeId: 'understand-goal' }), quest);
   assert.notEqual(companionViewportResetKey({ ...base, activeAttemptId: 'attempt-1' }), quest);

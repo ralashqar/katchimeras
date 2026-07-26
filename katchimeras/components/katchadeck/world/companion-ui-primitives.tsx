@@ -9,7 +9,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 import Animated, { FadeInUp, useReducedMotion } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
@@ -18,9 +20,11 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
 import type { KatchaSurface } from '@/constants/katcha-ui';
+import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 
 export function CompanionSheetShell({
   children,
+  background,
   fullBleed = false,
   keyboardAvoiding = true,
   onRequestClose,
@@ -28,6 +32,7 @@ export function CompanionSheetShell({
   surface = 'parchment',
 }: {
   children: ReactNode;
+  background?: TodayAtmosphereBackground;
   fullBleed?: boolean;
   keyboardAvoiding?: boolean;
   onRequestClose: () => void;
@@ -41,13 +46,60 @@ export function CompanionSheetShell({
       showClose={showClose}
       size={fullBleed ? 'full' : 'tall'}
       surface={surface}>
-      <KeyboardAvoidingView
-        behavior={keyboardAvoiding && process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={8}
-        style={styles.shell}>
-        {children}
-      </KeyboardAvoidingView>
+      <View style={styles.shellFrame}>
+        {background ? <TodaySceneBackdrop background={background} scene={null} variant="splash" /> : null}
+        <KeyboardAvoidingView
+          behavior={keyboardAvoiding && process.env.EXPO_OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={8}
+          style={styles.shell}>
+          {children}
+        </KeyboardAvoidingView>
+      </View>
     </KatchaSheet>
+  );
+}
+
+export function CompanionDestinationHeader({
+  label,
+  name,
+  onBack,
+}: {
+  label: string;
+  name: string;
+  onBack: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.destinationHeader, { paddingTop: insets.top + 10 }]}>
+      <CompanionBackAction label="Home" onPress={onBack} tone="night" />
+      <View style={styles.destinationHeading}>
+        <ThemedText style={styles.destinationEyebrow} lightColor="#F4D77D" darkColor="#F4D77D">
+          {name}
+        </ThemedText>
+        <ThemedText
+          maxFontSizeMultiplier={1.3}
+          selectable
+          style={styles.destinationTitle}
+          lightColor="#FFF9EA"
+          darkColor="#FFF9EA">
+          {label}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+export function CompanionDestinationSurface({
+  children,
+  immersive = false,
+}: {
+  children: ReactNode;
+  immersive?: boolean;
+}) {
+  return (
+    <View style={[styles.destinationSurface, immersive && styles.destinationSurfaceImmersive]}>
+      {children}
+    </View>
   );
 }
 
@@ -273,7 +325,32 @@ export function CompanionBackAction({
 }
 
 const styles = StyleSheet.create({
+  shellFrame: { flex: 1, minHeight: 0, position: 'relative' },
   shell: { flex: 1, gap: KatchaUI.spacing.xs, minHeight: 0 },
+  destinationHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: KatchaUI.spacing.sm,
+    paddingBottom: KatchaUI.spacing.sm,
+    paddingHorizontal: KatchaUI.layout.phoneGutter,
+  },
+  destinationHeading: { flex: 1, gap: 1 },
+  destinationEyebrow: { ...KatchaUI.type.label, fontSize: 9.5 },
+  destinationTitle: { ...KatchaUI.type.companionPageTitle, textShadowColor: 'rgba(23,40,49,0.65)', textShadowOffset: { height: 2, width: 0 }, textShadowRadius: 3 },
+  destinationSurface: {
+    backgroundColor: 'transparent',
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: KatchaUI.layout.phoneGutter,
+  },
+  destinationSurfaceImmersive: {
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    boxShadow: 'none',
+    paddingHorizontal: 0,
+    paddingTop: 0,
+  },
   section: { gap: KatchaUI.spacing.sm },
   sectionHeading: { gap: KatchaUI.spacing.xxs },
   sectionLabel: { ...KatchaUI.type.label },

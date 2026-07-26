@@ -14,17 +14,19 @@ export function CompanionSkinsThread({
   companionName,
   equippedSkinId,
   onEquip,
+  showHeading = true,
   skins,
 }: {
   companionName: string;
   equippedSkinId: KatchimeraSkinId | null;
   onEquip: (skinId: KatchimeraSkinId) => void;
+  showHeading?: boolean;
   skins: readonly KingdomSkinOption[];
 }) {
   const { tokens } = useKatchaSurface();
   return (
     <View style={styles.root}>
-      <View style={styles.heading}>
+      {showHeading ? <View style={styles.heading}>
         <ThemedText selectable style={styles.eyebrow} lightColor={tokens.accentPressed} darkColor={tokens.accentPressed}>
           WARDROBE
         </ThemedText>
@@ -34,7 +36,7 @@ export function CompanionSkinsThread({
         <ThemedText selectable style={styles.description} lightColor={tokens.textSecondary} darkColor={tokens.textSecondary}>
           Forms change how this companion appears in your Kingdom. Their bond, quests, and memories stay together.
         </ThemedText>
-      </View>
+      </View> : null}
 
       <View accessibilityRole="list" style={styles.grid}>
         {skins.map((skin) => {
@@ -55,8 +57,8 @@ export function CompanionSkinsThread({
               }}
               style={({ pressed }) => [
                 styles.card,
-                { backgroundColor: tokens.subtle, borderColor: tokens.border, boxShadow: tokens.cardShadow },
-                selected && [styles.selectedCard, { backgroundColor: `${tokens.accent}34`, borderColor: tokens.accentPressed }],
+                { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: tokens.border, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)' },
+                selected && [styles.selectedCard, { backgroundColor: 'rgba(255,244,204,0.97)', borderColor: tokens.accentPressed }],
                 !skin.unlocked && styles.lockedCard,
                 pressed && styles.pressedCard,
               ]}>

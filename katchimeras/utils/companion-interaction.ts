@@ -3,7 +3,7 @@ import type {
   CompanionInteractionState,
   CompanionInsight,
   CompanionQuestViewModel,
-  CompanionThread,
+  CompanionDestination,
   QuestCaptureFeedback,
 } from '@/types/companion-interaction';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
@@ -11,13 +11,14 @@ import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import type { InteractiveQuestExecution } from '@/utils/quests/experiences/types';
 
 export function createCompanionInteractionState(input: {
-  initialThread: CompanionThread;
+  initialDestination?: CompanionDestination | null;
 }): CompanionInteractionState {
+  const destination = input.initialDestination ?? null;
   return {
-    thread: input.initialThread,
+    destination,
     direction: 1,
     reviewItemId: null,
-    route: { kind: 'thread', thread: input.initialThread },
+    route: destination ? { kind: 'destination', destination } : { kind: 'home' },
     experienceInstance: 0,
   };
 }
@@ -27,28 +28,42 @@ export function companionInteractionReducer(
   action: CompanionInteractionAction
 ): CompanionInteractionState {
   switch (action.type) {
-    case 'select_thread': {
-      const order: CompanionThread[] = ['quest', 'discovery', 'insight', 'skins'];
+    case 'select_destination': {
+      const order: CompanionDestination[] = ['quest', 'discovery', 'goals', 'insight', 'skins'];
       return {
         ...state,
-        thread: action.thread,
-        direction: order.indexOf(action.thread) >= order.indexOf(state.thread) ? 1 : -1,
+        destination: action.destination,
+        direction: state.destination === null ||
+          order.indexOf(action.destination) >= order.indexOf(state.destination) ? 1 : -1,
         reviewItemId: null,
-        route: { kind: 'thread', thread: action.thread },
+        route: { kind: 'destination', destination: action.destination },
       };
     }
+    case 'show_home':
+      return {
+        ...state,
+        destination: null,
+        direction: -1,
+        reviewItemId: null,
+        route: { kind: 'home' },
+      };
     case 'review_item':
       return { ...state, reviewItemId: action.itemId };
     case 'open_quick_goal_picker':
-      return { ...state, thread: 'quest', reviewItemId: null, route: { kind: 'quick_goal_picker', thread: 'quest' } };
+      return {
+        ...state,
+        destination: 'goals',
+        reviewItemId: null,
+        route: { kind: 'quick_goal_picker', destination: 'goals' },
+      };
     case 'open_journey_questionnaire':
       return {
         ...state,
-        thread: 'discovery',
+        destination: 'discovery',
         reviewItemId: null,
         route: {
           kind: 'journey_questionnaire',
-          thread: 'discovery',
+          destination: 'discovery',
           sessionId: action.sessionId ?? null,
         },
       };
@@ -59,52 +74,63 @@ export function companionInteractionReducer(
     case 'open_check_in':
       return {
         ...state,
-        thread: 'discovery',
+        destination: 'discovery',
         reviewItemId: null,
-        route: { kind: 'check_in', thread: 'discovery', checkInId: action.checkInId },
+        route: { kind: 'check_in', destination: 'discovery', checkInId: action.checkInId },
       };
     case 'open_quest_experience':
       return {
         ...state,
-        thread: 'quest',
+        destination: 'quest',
         reviewItemId: null,
-        route: { kind: 'quest_experience', thread: 'quest', attemptId: null },
+        route: { kind: 'quest_experience', destination: 'quest', attemptId: null },
       };
     case 'set_quest_attempt':
       return state.route.kind === 'quest_experience'
         ? { ...state, route: { ...state.route, attemptId: action.attemptId } }
         : state;
-    case 'return_to_thread':
+    case 'return_to_destination': {
+      const destination: CompanionDestination =
+        state.route.kind === 'quick_goal_picker'
+          ? 'goals'
+          : state.route.kind === 'journey_questionnaire' || state.route.kind === 'check_in'
+            ? 'discovery'
+            : state.route.kind === 'quest_experience'
+              ? 'quest'
+              : state.destination ?? 'quest';
       return {
         ...state,
+        destination,
         reviewItemId: null,
-        route: { kind: 'thread', thread: state.thread },
+        route: { kind: 'destination', destination },
         experienceInstance: state.route.kind === 'quest_experience'
           ? state.experienceInstance + 1
           : state.experienceInstance,
       };
+    }
     case 'reset_quest_experience':
       return state.route.kind === 'quest_experience'
         ? {
             ...state,
-            route: { kind: 'thread', thread: 'quest' },
-            thread: 'quest',
+            route: { kind: 'destination', destination: 'quest' },
+            destination: 'quest',
             experienceInstance: state.experienceInstance + 1,
           }
         : state;
     case 'reset_companion':
-      return createCompanionInteractionState({ initialThread: action.initialThread });
+      return createCompanionInteractionState({ initialDestination: action.initialDestination });
   }
 }
 
 export type CompanionBackAction =
   | 'confirm_attempt_exit'
-  | 'return_to_thread'
-  | 'close_sheet';
+  | 'return_to_destination'
+  | 'return_to_home'
+  | 'close_experience';
 
 /**
  * One source of truth for companion back navigation. Focused experiences
- * always unwind to their owning thread before the sheet itself can close.
+ * always unwind to their owning destination before the experience can close.
  */
 export function companionRouteBackAction(
   state: CompanionInteractionState
@@ -112,13 +138,14 @@ export function companionRouteBackAction(
   if (state.route.kind === 'quest_experience' && state.route.attemptId) {
     return 'confirm_attempt_exit';
   }
-  if (state.route.kind !== 'thread') return 'return_to_thread';
-  return 'close_sheet';
+  if (state.route.kind === 'home') return 'close_experience';
+  if (state.route.kind === 'destination') return 'return_to_home';
+  return 'return_to_destination';
 }
 
 export function companionViewportResetKey(input: {
   creatureId: string;
-  thread: CompanionThread;
+  destination: CompanionDestination | null;
   questMode: CompanionQuestViewModel['mode'];
   activeQuestTitle?: string | null;
   journeyNodeId?: string | null;
@@ -128,7 +155,7 @@ export function companionViewportResetKey(input: {
 }): string {
   return [
     input.creatureId,
-    input.thread,
+    input.destination ?? 'home',
     input.questMode,
     input.activeQuestTitle ?? '',
     input.journeyNodeId ?? '',
