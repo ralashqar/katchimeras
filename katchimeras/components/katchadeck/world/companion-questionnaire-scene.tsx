@@ -29,7 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { KatchaDeckUI } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
@@ -39,6 +39,8 @@ export type CompanionQuestionnaireOption = {
   label: string;
   icon?: IconSymbolName | null;
 };
+
+export { CompanionResultNotice as QuestionnaireResultNotice } from './companion-ui-primitives';
 
 export function CompanionQuestionnaireScene({
   accentColor,
@@ -285,7 +287,7 @@ export function CompanionQuestionnaireScene({
             </View>
           ) : null}
 
-          {result ? <Animated.View entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.duration(220)} style={styles.resultContent}>{children}</Animated.View> : children}
+          {result ? <View style={styles.resultContent}>{children}</View> : children}
         </ScrollView>
       </View>
     </View>
@@ -400,13 +402,13 @@ const styles = StyleSheet.create({
   back: { alignItems: 'center', backgroundColor: 'rgba(255,249,235,0.96)', borderColor: 'rgba(117,82,44,0.26)', borderRadius: 999, borderWidth: 1, boxShadow: '0 5px 14px rgba(55,38,20,0.22), inset 0 1px 0 rgba(255,255,255,0.9)', height: 48, justifyContent: 'center', width: 48 },
   headerCopy: { flex: 1, gap: 1 },
   eyebrow: {
-    ...KatchaDeckUI.typography.screenHeader,
+    ...KatchaUI.type.sectionTitle,
     textShadowColor: 'rgba(30,70,111,0.92)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
   },
   step: {
-    ...KatchaDeckUI.typography.screenMeta,
+    ...KatchaUI.type.meta,
     fontVariant: ['tabular-nums'],
     textShadowColor: 'rgba(27,72,111,0.82)',
     textShadowOffset: { width: 0, height: 1 },
@@ -419,10 +421,10 @@ const styles = StyleSheet.create({
   bubble: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,250,239,0.98)', borderColor: 'rgba(126,92,53,0.16)', borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: '0 12px 30px rgba(70,44,18,0.22), inset 0 1px 0 rgba(255,255,255,0.94)', gap: 8, overflow: 'visible', paddingBottom: 20, paddingHorizontal: 20, paddingTop: 22, zIndex: 2 },
   bubbleCompact: { paddingBottom: 17, paddingHorizontal: 18, paddingTop: 19 },
   bubbleAccent: { borderRadius: 999, height: 10, opacity: 0.75, position: 'absolute', right: 20, top: 17, width: 10 },
-  title: { ...KatchaDeckUI.typography.screenTitle },
+  title: { ...KatchaUI.type.screenTitle },
   titleCompact: { fontSize: 23, lineHeight: 28 },
   titleLong: { fontSize: 21, lineHeight: 26 },
-  helper: { ...KatchaDeckUI.typography.uiBody },
+  helper: { ...KatchaUI.type.companionBody },
   tail: { backgroundColor: 'rgba(255,250,239,0.98)', height: 26, position: 'absolute', right: -11, top: '55%', transform: [{ rotate: '45deg' }], width: 26 },
   creatureFrame: { alignItems: 'center', height: 275, justifyContent: 'flex-start', position: 'absolute', right: -18, top: -10, width: '49%', zIndex: 4 },
   creatureFrameCompact: { height: 248, right: -16, top: -8, width: '47%' },
@@ -433,7 +435,7 @@ const styles = StyleSheet.create({
   option: { alignItems: 'center', backgroundColor: 'rgba(255,250,239,0.97)', borderColor: 'rgba(117,82,44,0.22)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, boxShadow: '0 7px 18px rgba(67,42,17,0.2), inset 0 1px 0 rgba(255,255,255,0.9)', flexDirection: 'row', gap: 12, minHeight: 62, paddingHorizontal: 15, paddingVertical: 10 },
   optionPressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
   optionIcon: { alignItems: 'center', borderRadius: 999, height: 40, justifyContent: 'center', width: 40 },
-  optionLabel: { ...KatchaDeckUI.typography.uiAction, flex: 1 },
-  resultContent: { backgroundColor: 'rgba(255,250,239,0.94)', borderCurve: 'continuous', borderRadius: 24, boxShadow: '0 10px 28px rgba(67,42,17,0.18)', gap: 14, padding: 18 },
+  optionLabel: { ...KatchaUI.type.companionAction, flex: 1 },
+  resultContent: { gap: 12 },
   pressed: { opacity: 0.76, transform: [{ scale: 0.97 }] },
 });

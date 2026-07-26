@@ -89,9 +89,9 @@ export function useCompanionQuickGoals({
   }, [availableFamilySet, commit, dayId, state]);
 
   const addTemplates = useCallback((templateIds: readonly string[]) => {
-    if (!dayId) return 0;
+    if (!dayId) return [];
     let next = state;
-    let added = 0;
+    const addedTemplateIds: string[] = [];
     const startedAt = Date.now();
     for (const [index, templateId] of templateIds.entries()) {
       const template = companionQuickGoalTemplateById.get(templateId);
@@ -104,10 +104,10 @@ export function useCompanionQuickGoals({
       }, startedAt + index);
       if (!result.goal) continue;
       next = result.state;
-      added += 1;
+      addedTemplateIds.push(template.id);
     }
     if (next !== state) commit(next);
-    return added;
+    return addedTemplateIds;
   }, [availableFamilySet, commit, dayId, state]);
 
   const addCustom = useCallback((

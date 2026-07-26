@@ -1,23 +1,24 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { type ComponentProps, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
   FadeInDown,
   FadeInUp,
-  FadeOut,
   LinearTransition,
   ZoomIn,
   ZoomOut,
   useReducedMotion,
 } from 'react-native-reanimated';
 
+import { QuickGoalActionModal } from '@/components/katchadeck/goals/quick-goal-action-modal';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
@@ -316,6 +317,21 @@ export function QuickGoalsSheet({
   const [cadence, setCadence] = useState<CompanionQuickGoalCadence>({ kind: 'once', dayId });
   const [feedback, setFeedback] = useState<string | null>(null);
   const goals = quickGoalsForDay(state, dayId);
+  const completedCount = goals.filter((item) => item.completion).length;
+  const remainingCount = goals.length - completedCount;
+  const selectedGoal = selectedGoalId
+    ? goals.find((item) => item.goal.id === selectedGoalId) ??
+      state.goals
+        .filter((goal) => goal.id === selectedGoalId)
+        .map((goal) => ({
+          goal,
+          completion:
+            state.completions.find(
+              (completion) => completion.goalId === selectedGoalId && completion.dayId === dayId
+            ) ?? null,
+        }))[0] ??
+      null
+    : null;
   const familyGoals = state.goals.filter((goal) => goal.familyId === familyId && goal.status !== 'archived');
   const templates = quickGoalTemplatesForFamily(familyId);
   const completeInSheet = (goalId: string) => {
@@ -323,9 +339,6 @@ export function QuickGoalsSheet({
     const completion = actions.onCompleteGoal(goalId);
     if (goal && completion) {
       setFeedback(null);
-      if (process.env.EXPO_OS === 'ios') {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
     }
     return completion;
   };
@@ -396,9 +409,13 @@ export function QuickGoalsSheet({
     <KatchaSheet
       header={{
         eyebrow: 'TODAY',
-        title: mode === 'today' ? 'Small goals' : mode === 'add' ? 'Add a small goal' : 'Manage goals',
+        title: mode === 'today' ? 'Today’s goals' : mode === 'add' ? 'Add a small goal' : 'Manage goals',
         subtitle: mode === 'today'
-          ? 'Tap a goal, then choose what feels right.'
+          ? goals.length
+            ? remainingCount
+              ? `${remainingCount} to-do · Tap any goal to check in.`
+              : 'Everything is complete. Take the win.'
+            : 'A short list for the life you want to live.'
           : mode === 'add'
             ? 'Choose a companion and keep it achievable.'
             : 'Adjust what repeats or pause what you do not need.',
@@ -413,16 +430,27 @@ export function QuickGoalsSheet({
         <View style={styles.todayGoalsView}>
           <View style={styles.todaySectionHeading}>
             <ThemedText style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-              TODAY&apos;S GOALS
+              YOUR LIST
             </ThemedText>
             <ThemedText style={styles.todayCount} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-              {goals.filter((item) => item.completion).length}/{goals.length}
+              {completedCount}/{goals.length}
             </ThemedText>
           </View>
           {goals.length ? (
+            <View
+              accessibilityLabel={`${completedCount} of ${goals.length} goals complete`}
+              style={styles.todayProgressTrack}>
+              <View
+                style={[
+                  styles.todayProgressFill,
+                  { width: `${Math.round((completedCount / goals.length) * 100)}%` },
+                ]}
+              />
+            </View>
+          ) : null}
+          {goals.length ? (
             <View style={styles.todayGoalList}>
               {goals.map((item, index) => {
-                const selected = item.goal.id === selectedGoalId;
                 return (
                   <Animated.View
                     entering={reduceMotion ? undefined : FadeInUp.delay(Math.min(index, 6) * 32).duration(180)}
@@ -432,26 +460,10 @@ export function QuickGoalsSheet({
                       item={item}
                       onPress={() => {
                         setFeedback(null);
-                        setSelectedGoalId(selected ? null : item.goal.id);
+                        setSelectedGoalId(item.goal.id);
                         if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
                       }}
-                      selected={selected}
                     />
-                    {selected ? (
-                      <GoalActionTray
-                        item={item}
-                        onComplete={() => completeInSheet(item.goal.id)}
-                        onDone={() => setSelectedGoalId(null)}
-                        onRemember={() => {
-                          if (!item.completion) return;
-                          onRemember?.(item.completion, item.goal);
-                        }}
-                        onSkip={() => skipInSheet(item.goal.id)}
-                        onSnooze={() => snoozeInSheet(item.goal.id)}
-                        onUndo={() => undoInSheet(item.goal.id)}
-                        reduceMotion={reduceMotion}
-                      />
-                    ) : null}
                   </Animated.View>
                 );
               })}
@@ -642,6 +654,23 @@ export function QuickGoalsSheet({
           {feedback}
         </ThemedText>
       ) : null}
+      {selectedGoal ? (
+        <QuickGoalActionModal
+          item={selectedGoal}
+          onComplete={() => completeInSheet(selectedGoal.goal.id)}
+          onDismiss={() => setSelectedGoalId(null)}
+          onRemember={() => {
+            const completion =
+              state.completions.find(
+                (candidate) => candidate.goalId === selectedGoal.goal.id && candidate.dayId === dayId
+              ) ?? selectedGoal.completion;
+            if (completion) onRemember?.(completion, selectedGoal.goal);
+          }}
+          onSkip={() => skipInSheet(selectedGoal.goal.id)}
+          onSnooze={() => snoozeInSheet(selectedGoal.goal.id)}
+          onUndo={() => undoInSheet(selectedGoal.goal.id)}
+        />
+      ) : null}
     </KatchaSheet>
   );
 }
@@ -649,11 +678,9 @@ export function QuickGoalsSheet({
 function TodayQuickGoalCard({
   item,
   onPress,
-  selected,
 }: {
   item: CompanionQuickGoalForDay;
   onPress: () => void;
-  selected: boolean;
 }) {
   const complete = Boolean(item.completion);
   const familyName = katchimeraFamilyById.get(item.goal.familyId)?.displayName ?? item.goal.familyId;
@@ -661,11 +688,9 @@ function TodayQuickGoalCard({
     <Pressable
       accessibilityHint={complete ? 'Opens completed goal actions' : 'Opens complete, snooze, and skip actions'}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [
         styles.todayGoalCard,
-        selected && styles.todayGoalCardSelected,
         complete && styles.todayGoalCardComplete,
         pressed && styles.todayGoalCardPressed,
       ]}>
@@ -687,117 +712,15 @@ function TodayQuickGoalCard({
           <GoalTag label={quickGoalCadenceLabel(item.goal.cadence)} />
         </View>
       </View>
-      <View style={[styles.todayGoalStatus, selected && styles.todayGoalStatusSelected, complete && styles.todayGoalStatusComplete]}>
+      <View style={[styles.todayGoalStatus, complete && styles.todayGoalStatusComplete]}>
         {complete ? (
           <Animated.View
             entering={ZoomIn.duration(190).easing(Easing.out(Easing.back(1.06)))}
             exiting={ZoomOut.duration(110).easing(Easing.in(Easing.quad))}>
             <IconSymbol color={Meadow.chipLabel} name="checkmark" size={22} />
           </Animated.View>
-        ) : selected ? (
-          <IconSymbol color={Meadow.chipLabel} name="chevron.down" size={18} />
         ) : null}
       </View>
-    </Pressable>
-  );
-}
-
-function GoalActionTray({
-  item,
-  onComplete,
-  onDone,
-  onRemember,
-  onSkip,
-  onSnooze,
-  onUndo,
-  reduceMotion,
-}: {
-  item: CompanionQuickGoalForDay;
-  onComplete: () => void;
-  onDone: () => void;
-  onRemember: () => void;
-  onSkip: () => void;
-  onSnooze: () => void;
-  onUndo: () => void;
-  reduceMotion: boolean;
-}) {
-  const complete = Boolean(item.completion);
-  return (
-    <Animated.View
-      accessibilityLiveRegion={complete ? 'polite' : undefined}
-      entering={reduceMotion ? undefined : FadeInDown.duration(165).easing(Easing.out(Easing.cubic))}
-      exiting={reduceMotion ? undefined : FadeOut.duration(100).easing(Easing.in(Easing.quad))}
-      style={[styles.goalActionTray, complete && styles.goalActionTrayComplete]}>
-      {complete ? (
-        <Animated.View
-          entering={reduceMotion ? undefined : ZoomIn.duration(210).easing(Easing.out(Easing.back(1.08)))}
-          style={styles.goalCompleteMessage}>
-          <View style={styles.goalCompleteBurst}>
-            <IconSymbol color={Meadow.chipLabel} name="checkmark" size={22} />
-          </View>
-          <View style={styles.goalCompleteCopy}>
-            <ThemedText style={styles.goalCompleteTitle} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-              Nicely done · +5 bond
-            </ThemedText>
-            <ThemedText style={styles.goalCompleteBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              Keep it simple, or add a line to today.
-            </ThemedText>
-          </View>
-        </Animated.View>
-      ) : (
-        <ThemedText style={styles.goalActionQuestion} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          What would you like to do?
-        </ThemedText>
-      )}
-      <View style={styles.goalActionButtons}>
-        <GoalActionButton
-          icon={complete ? 'arrow.counterclockwise' : 'clock'}
-          label={complete ? 'Undo' : 'Snooze'}
-          onPress={complete ? onUndo : onSnooze}
-        />
-        <GoalActionButton
-          emphasized
-          icon="checkmark"
-          label={complete ? 'Done' : 'Complete'}
-          onPress={complete ? onDone : onComplete}
-        />
-        <GoalActionButton
-          icon={complete ? 'square.and.pencil' : 'arrow.right'}
-          label={complete ? 'Remember' : 'Skip'}
-          onPress={complete ? onRemember : onSkip}
-        />
-      </View>
-    </Animated.View>
-  );
-}
-
-function GoalActionButton({
-  emphasized = false,
-  icon,
-  label,
-  onPress,
-}: {
-  emphasized?: boolean;
-  icon: ComponentProps<typeof IconSymbol>['name'];
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.goalActionButton,
-        emphasized && styles.goalActionButtonEmphasized,
-        pressed && styles.goalActionButtonPressed,
-      ]}>
-      <IconSymbol color={emphasized ? Meadow.chipLabel : Meadow.inkSoft} name={icon} size={18} />
-      <ThemedText
-        style={styles.goalActionButtonLabel}
-        lightColor={emphasized ? Meadow.chipLabel : Meadow.inkSoft}
-        darkColor={emphasized ? Meadow.chipLabel : Meadow.inkSoft}>
-        {label}
-      </ThemedText>
     </Pressable>
   );
 }
@@ -1038,21 +961,21 @@ function GoalManageButton({
 }
 
 const styles = StyleSheet.create({
-  companionPanel: { backgroundColor: 'rgba(255,248,232,0.54)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 10, marginBottom: 12, padding: 14 },
-  scopedPicker: { gap: 14, paddingBottom: 24, paddingHorizontal: 4, paddingTop: 6 },
+  companionPanel: { backgroundColor: 'rgba(255,248,232,0.54)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: KatchaUI.radius.card, borderWidth: 1, gap: 10, marginBottom: 12, padding: 14 },
+  scopedPicker: { gap: KatchaUI.spacing.md, paddingBottom: KatchaUI.spacing.xl, paddingHorizontal: 4, paddingTop: 6 },
   scopedBack: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 5, minHeight: 38, paddingHorizontal: 4 },
-  scopedBackText: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '900' },
+  scopedBackText: { ...KatchaUI.type.companionAction, fontSize: 11.5 },
   scopedHeading: { gap: 5, paddingBottom: 2 },
-  scopedTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 22, fontWeight: '900', letterSpacing: -0.4, lineHeight: 27 },
-  scopedDescription: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '600', lineHeight: 18 },
+  scopedTitle: { ...KatchaUI.type.screenTitle, fontSize: 22, letterSpacing: -0.4, lineHeight: 27 },
+  scopedDescription: { ...KatchaUI.type.companionBody, fontSize: 12.5, lineHeight: 18 },
   panelHeading: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   panelCopy: { flex: 1, gap: 2 },
-  panelEyebrow: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900', letterSpacing: 1 },
-  panelTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 15, fontWeight: '900' },
+  panelEyebrow: { ...KatchaUI.type.label, fontSize: 9, letterSpacing: 1 },
+  panelTitle: { ...KatchaUI.type.sectionTitle, fontSize: 15, lineHeight: 20 },
   manageButton: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 4, minHeight: 34, paddingHorizontal: 10 },
-  manageButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
+  manageButtonText: { ...KatchaUI.type.companionAction, fontSize: 10.5 },
   emptyGoals: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 8, minHeight: 44, paddingHorizontal: 12 },
-  emptyGoalsText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '800' },
+  emptyGoalsText: { ...KatchaUI.type.companionAction, fontSize: 12.5 },
   goalList: { gap: 7 },
   goalRow: { alignItems: 'center', backgroundColor: 'rgba(255,249,234,0.72)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 50, paddingHorizontal: 11, paddingVertical: 8 },
   goalRowCompact: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.12)', minHeight: 36, paddingVertical: 5 },
@@ -1061,21 +984,23 @@ const styles = StyleSheet.create({
   checkboxNight: { borderColor: Lantern.ember300 },
   checkboxComplete: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
   goalRowCopy: { flex: 1, gap: 2 },
-  goalRowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '800', lineHeight: 17 },
+  goalRowTitle: { ...KatchaUI.type.companionAction, fontSize: 12.5, lineHeight: 17 },
   goalRowTitleComplete: { opacity: 0.58, textDecorationLine: 'line-through' },
-  goalRowMeta: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '700' },
+  goalRowMeta: { ...KatchaUI.type.meta, fontSize: 9.5 },
   completionPrompt: { alignItems: 'center', backgroundColor: 'rgba(111,139,102,0.14)', borderColor: 'rgba(78,112,72,0.34)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 9, padding: 11 },
   completionCopy: { flex: 1, gap: 4 },
-  completionTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 12, fontWeight: '900' },
+  completionTitle: { ...KatchaUI.type.companionAction, fontSize: 12 },
   completionActions: { flexDirection: 'row', gap: 14 },
-  completionAction: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
-  completionActionSecondary: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
+  completionAction: { ...KatchaUI.type.companionAction, fontSize: 10.5 },
+  completionActionSecondary: { ...KatchaUI.type.companionAction, fontSize: 10.5, fontWeight: '800' },
   sheetContent: { gap: 18, paddingBottom: 28 },
   sheetSection: { gap: 9 },
-  sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900', letterSpacing: 1.1 },
+  sectionLabel: { ...KatchaUI.type.label, fontSize: 9.5, letterSpacing: 1.1 },
   todayGoalsView: { gap: 12 },
   todaySectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 },
   todayCount: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  todayProgressTrack: { backgroundColor: 'rgba(104,77,43,0.16)', borderRadius: 999, height: 5, overflow: 'hidden' },
+  todayProgressFill: { backgroundColor: Meadow.leafDeep, borderRadius: 999, height: '100%' },
   todayGoalList: { gap: 10 },
   todayGoalCard: {
     alignItems: 'center',
@@ -1092,12 +1017,6 @@ const styles = StyleSheet.create({
     paddingRight: 11,
     paddingVertical: 7,
   },
-  todayGoalCardSelected: {
-    backgroundColor: '#FFF8E7',
-    borderColor: Meadow.goldDeep,
-    boxShadow: '0 8px 22px rgba(173,123,35,0.20)',
-    transform: [{ scale: 1.008 }],
-  },
   todayGoalCardComplete: { backgroundColor: 'rgba(244,248,232,0.92)', borderColor: 'rgba(78,112,72,0.28)' },
   todayGoalCardPressed: { opacity: 0.9, transform: [{ scale: 0.988 }] },
   todayGoalCopy: { flex: 1, gap: 3, minWidth: 0 },
@@ -1108,48 +1027,11 @@ const styles = StyleSheet.create({
   goalTag: { backgroundColor: 'rgba(223,181,94,0.17)', borderRadius: 999, minHeight: 21, justifyContent: 'center', paddingHorizontal: 7 },
   goalTagText: { fontFamily: AppFontFamilies.manrope, fontSize: 8.5, fontWeight: '900' },
   todayGoalStatus: { alignItems: 'center', borderColor: Meadow.goldDeep, borderRadius: 999, borderWidth: 1.5, height: 42, justifyContent: 'center', width: 42 },
-  todayGoalStatusSelected: { backgroundColor: Meadow.goldDeep },
   todayGoalStatusComplete: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
   companionThumb: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  goalActionTray: {
-    backgroundColor: '#F7E9C8',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    borderColor: 'rgba(185,145,77,0.34)',
-    borderTopWidth: 0,
-    borderWidth: 1,
-    gap: 10,
-    marginHorizontal: 6,
-    marginTop: -6,
-    padding: 11,
-    paddingTop: 15,
-  },
-  goalActionTrayComplete: { backgroundColor: '#EAF1DC', borderColor: 'rgba(78,112,72,0.30)' },
-  goalActionQuestion: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800', textAlign: 'center' },
-  goalActionButtons: { flexDirection: 'row', gap: 7 },
-  goalActionButton: {
-    alignItems: 'center',
-    borderColor: 'rgba(119,86,43,0.22)',
-    borderCurve: 'continuous',
-    borderRadius: 14,
-    borderWidth: 1,
-    flex: 1,
-    gap: 3,
-    justifyContent: 'center',
-    minHeight: 55,
-    paddingHorizontal: 5,
-  },
-  goalActionButtonEmphasized: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep, boxShadow: '0 4px 10px rgba(58,91,53,0.22)' },
-  goalActionButtonPressed: { opacity: 0.78, transform: [{ scale: 0.96 }] },
-  goalActionButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900' },
-  goalCompleteMessage: { alignItems: 'center', flexDirection: 'row', gap: 9 },
-  goalCompleteBurst: { alignItems: 'center', backgroundColor: Meadow.leafDeep, borderRadius: 999, height: 40, justifyContent: 'center', width: 40 },
-  goalCompleteCopy: { flex: 1, gap: 1 },
-  goalCompleteTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '900' },
-  goalCompleteBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '600', lineHeight: 14 },
   addGoalButton: {
     alignItems: 'center',
     backgroundColor: '#F2BD43',

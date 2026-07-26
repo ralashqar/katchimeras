@@ -14,10 +14,14 @@ import type { MergeRoundConfig } from '@/utils/quests/experiences/merge';
 import { BlockJamQuest } from './block-jam-quest';
 import { BlockBlastQuest } from './block-blast-quest';
 
-export function QuestExperienceHost({ execution, config, seed, recentQuestionIds, recentPuzzleIds, recentWordPathPuzzleIds = [], recentSortingItemIds = [], sortingBestDurationMs = null, recentMatchingContentIds = [], matchingBestDurationMs = null, startImmediately = false, recentMergeOrderIds = [], mergeBest = null, blockJamBest = null, onAttemptStart, onAttemptCancel, onComplete, onRequestExit, onRunningChange }: {
+export type QuestExperienceSession = {
   execution: InteractiveQuestExecution;
   config: Record<string, unknown>;
   seed: string;
+  startImmediately?: boolean;
+};
+
+export type QuestExperienceHistory = {
   recentQuestionIds: string[];
   recentPuzzleIds: string[];
   recentWordPathPuzzleIds?: string[];
@@ -29,12 +33,51 @@ export function QuestExperienceHost({ execution, config, seed, recentQuestionIds
   recentMergeOrderIds?: string[];
   mergeBest?: { movesUsed: number; durationMs: number } | null;
   blockJamBest?: { movesUsed: number; durationMs: number } | null;
+};
+
+export type QuestExperienceHandlers = {
   onAttemptStart: (config: Record<string, unknown>) => string;
   onAttemptCancel: (attemptId: string) => void;
   onComplete: (attemptId: string, result: QuestResult) => void;
   onRequestExit?: () => void;
   onRunningChange: (running: boolean, attemptId?: string | null) => void;
+};
+
+export function QuestExperienceHost({
+  handlers,
+  history,
+  session,
+}: {
+  handlers: QuestExperienceHandlers;
+  history: QuestExperienceHistory;
+  session: QuestExperienceSession;
 }) {
+  const {
+    config,
+    execution,
+    seed,
+    startImmediately = false,
+  } = session;
+  const {
+    blockJamBest = null,
+    matchingBestDurationMs = null,
+    mergeBest = null,
+    recentMatchingContentIds = [],
+    recentMergeOrderIds = [],
+    recentPuzzleIds,
+    recentQuestionIds,
+    recentSortingItemIds = [],
+    recentWordPathPuzzleIds = [],
+    sortingBestDurationMs = null,
+  } = history;
+  const {
+    onAttemptCancel,
+    onAttemptStart,
+    onComplete,
+    onRequestExit,
+    onRunningChange,
+  } = handlers;
+
   if (execution.kind === 'live_steps') {
     return <LiveStepQuest config={config as { challengeId: 'step_sprint' | 'step_time_trial'; target: number; durationMs: number | null; tier: number }} onAttemptStart={onAttemptStart} onAttemptCancel={onAttemptCancel} onComplete={onComplete} onRunningChange={onRunningChange} />;
   }

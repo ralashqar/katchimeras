@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -6,8 +7,16 @@ import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaInlineNotice } from '@/components/katchadeck/ui/katcha-inline-notice';
 import { KatchaSectionHeading, KatchaSurfaceCard } from '@/components/katchadeck/ui/katcha-sheet-primitives';
 import { KatchaSurfaceProvider, useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
+import { CompanionThreadSwitcher } from '@/components/katchadeck/world/companion-thread-switcher';
+import {
+  CompanionCard,
+  CompanionResultNotice,
+  CompanionSection,
+  CompanionStatusBadge,
+} from '@/components/katchadeck/world/companion-ui-primitives';
 import { ThemedText } from '@/components/themed-text';
 import { KatchaUI, type KatchaSurface } from '@/constants/katcha-ui';
+import type { CompanionThread } from '@/types/companion-interaction';
 
 function SurfaceGallery({ surface }: { surface: KatchaSurface }) {
   const { tokens } = useKatchaSurface();
@@ -38,11 +47,44 @@ function SurfaceGallery({ surface }: { surface: KatchaSurface }) {
   );
 }
 
+function CompanionGallery() {
+  const { tokens } = useKatchaSurface();
+  const [thread, setThread] = useState<CompanionThread>('quest');
+  return (
+    <View style={[styles.surface, { backgroundColor: tokens.background, borderColor: tokens.borderStrong }]}>
+      <ThemedText style={styles.eyebrow} lightColor={tokens.textTertiary} darkColor={tokens.textTertiary}>
+        Companion system
+      </ThemedText>
+      <ThemedText style={styles.companionTitle} lightColor={tokens.text} darkColor={tokens.text}>
+        Mossprout
+      </ThemedText>
+      <CompanionThreadSwitcher onChange={setThread} showSkins value={thread} />
+      <CompanionSection
+        description="Shared spacing, typography, surface and state treatment."
+        label="Today together">
+        <CompanionCard selected>
+          <View style={styles.statusRow}>
+            <ThemedText style={styles.cardText} lightColor={tokens.text} darkColor={tokens.text}>
+              Notice one living detail
+            </ThemedText>
+            <CompanionStatusBadge label="In progress" tone="neutral" />
+          </View>
+          <ThemedText style={styles.body} lightColor={tokens.textSecondary} darkColor={tokens.textSecondary}>
+            Add one small observation from outside.
+          </ThemedText>
+        </CompanionCard>
+      </CompanionSection>
+      <CompanionResultNotice tasks={['Notice one living detail', 'Take a ten-minute outdoor pause']} />
+    </View>
+  );
+}
+
 export default function DevUiGalleryScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <ThemedText style={styles.pageTitle} lightColor="#F8F2E7" darkColor="#F8F2E7">Katcha UI gallery</ThemedText>
+        <KatchaSurfaceProvider surface="parchment"><CompanionGallery /></KatchaSurfaceProvider>
         <KatchaSurfaceProvider surface="parchment"><SurfaceGallery surface="parchment" /></KatchaSurfaceProvider>
         <KatchaSurfaceProvider surface="night"><SurfaceGallery surface="night" /></KatchaSurfaceProvider>
       </ScrollView>
@@ -57,7 +99,9 @@ const styles = StyleSheet.create({
   surface: { borderCurve: 'continuous', borderRadius: KatchaUI.radius.sheet, borderWidth: 1, gap: 14, padding: 20 },
   eyebrow: KatchaUI.type.label,
   title: KatchaUI.type.display,
+  companionTitle: KatchaUI.type.companionName,
   body: KatchaUI.type.body,
   row: { alignItems: 'stretch', flexDirection: 'row', gap: 10 },
+  statusRow: { alignItems: 'center', flexDirection: 'row', gap: 10, justifyContent: 'space-between' },
   cardText: KatchaUI.type.body,
 });

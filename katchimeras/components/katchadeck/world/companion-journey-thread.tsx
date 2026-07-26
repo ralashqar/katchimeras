@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -23,7 +23,11 @@ import {
   type QuestionnaireImageSource,
 } from '@/utils/companion-questionnaire-presentation';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
-import { CompanionQuestionnaireScene } from './companion-questionnaire-scene';
+import {
+  CompanionQuestionnaireScene,
+  QuestionnaireResultNotice,
+} from './companion-questionnaire-scene';
+import { CompanionPrimaryAction } from './companion-interaction-primitives';
 
 export function CompanionJourneyDiscoveryThread({
   companionName,
@@ -89,7 +93,7 @@ export function CompanionJourneyDiscoveryThread({
           <ThemedText style={styles.helper} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
             {conversation
               ? 'Your answers are saved. Pick up exactly where you left off.'
-              : 'A short, private multiple-choice questionnaire creates a clear focus and previews matching small tasks for you to approve.'}
+              : 'A short, private multiple-choice questionnaire creates a clear focus and adds a few matching tasks to Today.'}
           </ThemedText>
         </View>
         <Pressable
@@ -387,7 +391,7 @@ export function CompanionJourneyQuestionnairePage({
   definition: CompanionJourneyDefinition;
   goals: readonly CompanionJourneyGoal[];
   node: CompanionJourneyConversationNode | null;
-  onAddTasks: (templateIds: readonly string[]) => void;
+  onAddTasks: (templateIds: readonly string[]) => readonly string[];
   onAnswer: (sessionId: string, value: string) => readonly string[];
   onBack: () => void;
   onViewTasks: () => void;
@@ -397,59 +401,43 @@ export function CompanionJourneyQuestionnairePage({
   const activeFocus = goals.find((goal) => goal.status === 'active' && goal.isPrimary)
     ?? goals.find((goal) => goal.status === 'active')
     ?? null;
+  const autoAddedResultRef = useRef<string | null>(null);
+  const [newlyAddedTaskIds, setNewlyAddedTaskIds] = useState<readonly string[] | null>(null);
+  const resultTaskKey = quickGoalSuggestionIds.join(':');
+
+  useEffect(() => {
+    if (!resultReady || !quickGoalSuggestionIds.length || autoAddedResultRef.current === resultTaskKey) {
+      return;
+    }
+    autoAddedResultRef.current = resultTaskKey;
+    setNewlyAddedTaskIds(onAddTasks(quickGoalSuggestionIds));
+  }, [onAddTasks, quickGoalSuggestionIds, resultReady, resultTaskKey]);
+
   if (resultReady) {
-    const suggestions = quickGoalSuggestionIds
+    const displayedTaskIds = newlyAddedTaskIds ?? quickGoalSuggestionIds;
+    const addedTasks = displayedTaskIds
       .map((templateId) => companionQuickGoalTemplateById.get(templateId))
-      .filter((template) => Boolean(template));
+      .flatMap((template) => template ? [template] : [])
+      .map((template) => template.title);
     return (
       <CompanionQuestionnaireScene
         accentColor={accentColor}
         background={background}
         companionName={companionName}
         creature={creature}
-        helperText={suggestions.length
-          ? 'I found a few small actions from what you chose. Keep only what feels useful.'
+        helperText={addedTasks.length
+          ? 'I turned your answers into a few gentle steps for today.'
           : 'I’ll use your answers to shape future tasks and reflections.'}
         onBack={onBack}
         result
         stepLabel="Your direction"
         title={activeFocus?.title ?? 'Your focus is ready'}>
-        {suggestions.length ? (
-          <View style={styles.resultTasks}>
-            {suggestions.map((template) => template ? (
-              <View key={template.id} style={styles.resultTask}>
-                <View style={styles.resultTaskCheck}>
-                  <IconSymbol color={Meadow.leafDeep} name="checkmark" size={13} />
-                </View>
-                <ThemedText style={styles.resultTaskLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  {template.title}
-                </ThemedText>
-                <ThemedText style={styles.resultTaskMeta} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-                  SUGGESTED
-                </ThemedText>
-              </View>
-            ) : null)}
-          </View>
-        ) : null}
-        <View style={styles.resultActions}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              if (quickGoalSuggestionIds.length) onAddTasks(quickGoalSuggestionIds);
-              onViewTasks();
-            }}
-            style={({ pressed }) => [styles.resultPrimaryButton, pressed && styles.pressed]}>
-            <ThemedText style={styles.resultPrimaryLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-              {quickGoalSuggestionIds.length ? 'Add to Do' : 'Back to You'}
-            </ThemedText>
-            <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={18} />
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.resultSecondaryButton, pressed && styles.pressed]}>
-            <ThemedText style={styles.resultSecondaryLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              Back to You
-            </ThemedText>
-          </Pressable>
-        </View>
+        <QuestionnaireResultNotice tasks={addedTasks} />
+        <CompanionPrimaryAction
+          icon="arrow.right"
+          label={addedTasks.length ? 'View Today tasks' : 'Done'}
+          onPress={addedTasks.length ? onViewTasks : onBack}
+        />
       </CompanionQuestionnaireScene>
     );
   }

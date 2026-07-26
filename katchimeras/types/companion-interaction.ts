@@ -85,8 +85,26 @@ export type CompanionInteractionState = {
   thread: CompanionThread;
   direction: 1 | -1;
   reviewItemId: string | null;
+  route: CompanionRoute;
+  experienceInstance: number;
 };
+
+export type CompanionRoute =
+  | { kind: 'thread'; thread: CompanionThread }
+  | { kind: 'quick_goal_picker'; thread: 'quest' }
+  | { kind: 'journey_questionnaire'; thread: 'discovery'; sessionId: string | null }
+  | { kind: 'check_in'; thread: 'discovery'; checkInId: string }
+  | { kind: 'quest_experience'; thread: 'quest'; attemptId: string | null };
 
 export type CompanionInteractionAction =
   | { type: 'select_thread'; thread: CompanionThread }
-  | { type: 'review_item'; itemId: string | null };
+  | { type: 'review_item'; itemId: string | null }
+  | { type: 'open_quick_goal_picker' }
+  | { type: 'open_journey_questionnaire'; sessionId?: string | null }
+  | { type: 'sync_journey_session'; sessionId: string }
+  | { type: 'open_check_in'; checkInId: string }
+  | { type: 'open_quest_experience' }
+  | { type: 'set_quest_attempt'; attemptId: string | null }
+  | { type: 'return_to_thread' }
+  | { type: 'reset_quest_experience' }
+  | { type: 'reset_companion'; initialThread: CompanionThread };

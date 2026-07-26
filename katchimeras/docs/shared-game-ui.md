@@ -16,3 +16,9 @@ Today surfaces are routed through `TodaySurfaceState`. Open or replace one surfa
 The development gallery is available at `/dev-ui-gallery`. Check both surfaces at narrow phone, standard phone, tablet, and enlarged text sizes. Validate keyboard avoidance, scroll/shadow clearance, Android back, all dismissal paths, reduced motion, 44px targets, roles, labels, and selected/disabled states.
 
 `MeadowSheet` has been retired. Production sheets must use `KatchaSheet`; immersive reveals and ceremonies may keep feature-owned full-screen composition while consuming shared tokens, controls, notices, and dialogs.
+
+The Kingdom resident experience additionally follows
+[`companion-ui-system.md`](./companion-ui-system.md). Companion subflows use
+`CompanionRoute` and `useCompanionExperienceController`; do not add independent
+open-state booleans for questionnaires, check-ins, goal pickers, or quest
+experiences.

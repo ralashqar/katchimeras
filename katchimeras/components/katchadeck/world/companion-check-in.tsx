@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -7,7 +7,7 @@ import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goal
 import type { CompanionJourneyDefinition } from '@/constants/companion-journeys';
 import type { KatchimeraRoleDefinition } from '@/constants/katchimera-roles';
 import { Meadow } from '@/constants/meadow-theme';
-import { KatchaDeckUI } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import {
   companionCheckInProgress,
@@ -26,7 +26,14 @@ import {
   type QuestionnaireImageSource,
 } from '@/utils/companion-questionnaire-presentation';
 import { CompanionReflectionThread } from './companion-reflection-thread';
-import { CompanionQuestionnaireScene } from './companion-questionnaire-scene';
+import {
+  CompanionQuestionnaireScene,
+  QuestionnaireResultNotice,
+} from './companion-questionnaire-scene';
+import {
+  CompanionPrimaryAction,
+  CompanionSecondaryAction,
+} from './companion-interaction-primitives';
 
 export function CompanionCheckInCard({
   checkIn,
@@ -83,7 +90,6 @@ export function CompanionCheckInPage({
   onAnswer,
   onBack,
   onBackQuestion,
-  onEdit,
   onSaveNote,
   onSetTaskStatus,
   role,
@@ -95,7 +101,7 @@ export function CompanionCheckInPage({
   creature: QuestionnaireImageSource;
   definition: CompanionJourneyDefinition | null;
   goal: CompanionJourneyGoal | null;
-  onAddTasks: (templateIds: readonly string[]) => void;
+  onAddTasks: (templateIds: readonly string[]) => readonly string[];
   onAnswer: (
     checkInId: string,
     answer: Omit<CompanionJourneyCheckInAnswer, 'answeredAt'>
@@ -109,19 +115,47 @@ export function CompanionCheckInPage({
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [draft, setDraft] = useState<CompanionReflectionDraft | null>(null);
+  const [newlyAddedTaskIds, setNewlyAddedTaskIds] = useState<readonly string[] | null>(null);
+  const autoAddedCheckInRef = useRef<string | null>(null);
   const question = companionCheckInQuestion({ checkIn, definition, role, goal });
   const progress = companionCheckInProgress(checkIn);
   const suggestions = useMemo(
     () => checkIn.suggestedQuickGoalIds
       .map((id) => companionQuickGoalTemplateById.get(id))
-      .filter((template) => Boolean(template)),
+      .flatMap((template) => template ? [template] : []),
     [checkIn.suggestedQuickGoalIds]
   );
-
   useEffect(() => {
     setDetailOpen(false);
     setDraft(null);
+    setNewlyAddedTaskIds(null);
   }, [checkIn.id, checkIn.completedAt]);
+
+  useEffect(() => {
+    if (
+      !checkIn.completedAt ||
+      !checkIn.suggestedQuickGoalIds.length ||
+      checkIn.taskSuggestionStatus !== 'pending' ||
+      autoAddedCheckInRef.current === checkIn.id
+    ) {
+      return;
+    }
+    autoAddedCheckInRef.current = checkIn.id;
+    setNewlyAddedTaskIds(onAddTasks(checkIn.suggestedQuickGoalIds));
+    onSetTaskStatus(checkIn.id, 'added');
+  }, [
+    checkIn.completedAt,
+    checkIn.id,
+    checkIn.suggestedQuickGoalIds,
+    checkIn.taskSuggestionStatus,
+    onAddTasks,
+    onSetTaskStatus,
+  ]);
+  const displayedTasks = suggestions
+    .filter((template) => newlyAddedTaskIds !== null
+      ? newlyAddedTaskIds.includes(template.id)
+      : checkIn.taskSuggestionStatus === 'added')
+    .map((template) => template.title);
 
   const answer = (option: CompanionCheckInOption) => {
     if (!question) return;
@@ -141,57 +175,15 @@ export function CompanionCheckInPage({
         background={background}
         companionName={companionName}
         creature={creature}
-        helperText={companionCheckInSummary(checkIn)}
+        helperText={displayedTasks.length
+          ? 'I turned your answers into a few gentle steps for today.'
+          : 'I’ll remember what you shared for next time.'}
         onBack={onBack}
         result
         stepLabel="Today’s check-in"
-        title="Moment remembered">
+        title="All set for today">
 
-        <View style={styles.answerList}>
-          {checkIn.answers.map((item, index) => (
-            <View key={item.questionId} style={styles.answerRow}>
-              <View style={styles.answerNumber}>
-                <ThemedText style={styles.answerNumberText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>{index + 1}</ThemedText>
-              </View>
-              <ThemedText style={styles.answerLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{item.label}</ThemedText>
-            </View>
-          ))}
-        </View>
-
-        {suggestions.length && checkIn.taskSuggestionStatus === 'pending' ? (
-          <View style={styles.taskCard}>
-            <ThemedText style={styles.taskTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>Add a small next step?</ThemedText>
-            <ThemedText style={styles.body} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              These are suggestions only. Confirm to add them to Do.
-            </ThemedText>
-            {suggestions.map((template) => template ? (
-              <View key={template.id} style={styles.taskRow}>
-                <IconSymbol color={Meadow.leafDeep} name="plus" size={15} />
-                <ThemedText style={styles.taskLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>{template.title}</ThemedText>
-              </View>
-            ) : null)}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                onAddTasks(checkIn.suggestedQuickGoalIds);
-                onSetTaskStatus(checkIn.id, 'added');
-              }}
-              style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-              <ThemedText style={styles.primaryLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>Add to Do</ThemedText>
-              <IconSymbol color={Meadow.chipLabel} name="plus" size={17} />
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => onSetTaskStatus(checkIn.id, 'dismissed')} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}>
-              <ThemedText style={styles.textButtonLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Not now</ThemedText>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {checkIn.taskSuggestionStatus === 'added' ? (
-          <View style={styles.statusRow}>
-            <IconSymbol color={Meadow.leafDeep} name="checkmark" size={16} />
-            <ThemedText style={styles.statusText} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>Added to this companion&apos;s Do list</ThemedText>
-          </View>
-        ) : null}
+        <QuestionnaireResultNotice tasks={displayedTasks} />
 
         {detailOpen ? (
           <View style={styles.detail}>
@@ -201,28 +193,25 @@ export function CompanionCheckInPage({
               promptId={`companion-check-in-note:${checkIn.id}`}
               promptText="Anything else you want to remember? This is optional."
             />
-            <Pressable
-              accessibilityRole="button"
+            <CompanionPrimaryAction
               disabled={!draft?.text.trim() && !draft?.audioUri}
+              icon="checkmark"
+              label="Save detail"
               onPress={() => {
                 onSaveNote(checkIn, draft);
                 setDetailOpen(false);
               }}
-              style={({ pressed }) => [styles.primary, !draft?.text.trim() && !draft?.audioUri && styles.disabled, pressed && styles.pressed]}>
-              <ThemedText style={styles.primaryLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>Save detail</ThemedText>
-            </Pressable>
+            />
           </View>
         ) : (
-          <Pressable accessibilityRole="button" onPress={() => setDetailOpen(true)} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-            <IconSymbol color={Meadow.inkSoft} name="mic.fill" size={16} />
-            <ThemedText style={styles.secondaryLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Add an optional note or voice</ThemedText>
-          </Pressable>
+          <CompanionSecondaryAction
+            icon="mic.fill"
+            label="Add an optional note"
+            onPress={() => setDetailOpen(true)}
+          />
         )}
 
-        <Pressable accessibilityRole="button" onPress={() => onEdit(checkIn.id)} style={({ pressed }) => [styles.textButton, pressed && styles.pressed]}>
-          <IconSymbol color={Meadow.inkSoft} name="pencil" size={14} />
-          <ThemedText style={styles.textButtonLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Edit answers</ThemedText>
-        </Pressable>
+        <CompanionPrimaryAction icon="checkmark" label="Done" onPress={onBack} />
       </CompanionQuestionnaireScene>
     );
   }
@@ -259,11 +248,11 @@ const styles = StyleSheet.create({
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
   cardIcon: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.18)', borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
   cardIconComplete: { backgroundColor: Meadow.leafDeep },
-  eyebrow: { ...KatchaDeckUI.typography.screenMeta, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.2 },
-  cardTitle: { ...KatchaDeckUI.typography.screenHeader, fontSize: 18, lineHeight: 23, marginTop: 3 },
-  body: { ...KatchaDeckUI.typography.uiBody, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
+  eyebrow: { ...KatchaUI.type.meta, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.2 },
+  cardTitle: { ...KatchaUI.type.sectionTitle, fontSize: 18, lineHeight: 23, marginTop: 3 },
+  body: { ...KatchaUI.type.companionBody, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
   cardButton: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: 'rgba(231,185,81,0.18)', borderRadius: 14, flexDirection: 'row', justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
-  cardButtonLabel: { ...KatchaDeckUI.typography.uiAction, fontSize: 13, fontWeight: '900', marginRight: 7 },
+  cardButtonLabel: { ...KatchaUI.type.companionAction, fontSize: 13, fontWeight: '900', marginRight: 7 },
   page: { gap: 18, paddingBottom: 28 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   back: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.62)', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
@@ -284,20 +273,20 @@ const styles = StyleSheet.create({
   answerList: { gap: 8 },
   answerRow: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.52)', borderRadius: 15, flexDirection: 'row', gap: 11, padding: 12 },
   answerNumber: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.18)', borderRadius: 999, height: 27, justifyContent: 'center', width: 27 },
-  answerNumberText: { ...KatchaDeckUI.typography.screenMeta, fontSize: 11, fontWeight: '900' },
-  answerLabel: { ...KatchaDeckUI.typography.uiAction, flex: 1, fontSize: 13.5, lineHeight: 19 },
+  answerNumberText: { ...KatchaUI.type.meta, fontSize: 11, fontWeight: '900' },
+  answerLabel: { ...KatchaUI.type.companionAction, flex: 1, fontSize: 13.5, lineHeight: 19 },
   taskCard: { backgroundColor: 'rgba(231,185,81,0.12)', borderColor: 'rgba(160,113,30,0.20)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, gap: 10, padding: 15 },
-  taskTitle: { ...KatchaDeckUI.typography.screenHeader, fontSize: 17, lineHeight: 22 },
+  taskTitle: { ...KatchaUI.type.sectionTitle, fontSize: 17, lineHeight: 22 },
   taskRow: { alignItems: 'center', flexDirection: 'row', gap: 9, paddingVertical: 3 },
-  taskLabel: { ...KatchaDeckUI.typography.uiAction, flex: 1, fontSize: 13.5 },
+  taskLabel: { ...KatchaUI.type.companionAction, flex: 1, fontSize: 13.5 },
   primary: { alignItems: 'center', backgroundColor: Meadow.goldDeep, borderRadius: 15, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 48, paddingHorizontal: 16 },
-  primaryLabel: { ...KatchaDeckUI.typography.uiAction, fontSize: 13.5, fontWeight: '900' },
+  primaryLabel: { ...KatchaUI.type.companionAction, fontSize: 13.5, fontWeight: '900' },
   secondary: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 46, paddingHorizontal: 14 },
-  secondaryLabel: { ...KatchaDeckUI.typography.uiAction, fontSize: 12.5 },
+  secondaryLabel: { ...KatchaUI.type.companionAction, fontSize: 12.5 },
   textButton: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', gap: 6, minHeight: 38, paddingHorizontal: 10 },
-  textButtonLabel: { ...KatchaDeckUI.typography.uiAction, fontSize: 12.5 },
+  textButtonLabel: { ...KatchaUI.type.companionAction, fontSize: 12.5 },
   statusRow: { alignItems: 'center', backgroundColor: 'rgba(91,132,91,0.09)', borderRadius: 14, flexDirection: 'row', gap: 8, padding: 12 },
-  statusText: { ...KatchaDeckUI.typography.uiAction, flex: 1, fontSize: 12.5 },
+  statusText: { ...KatchaUI.type.companionAction, flex: 1, fontSize: 12.5 },
   detail: { gap: 12 },
   pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
   disabled: { opacity: 0.45 },

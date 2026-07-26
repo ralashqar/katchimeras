@@ -9,6 +9,7 @@ import {
   companionQuestBackAction,
   companionQuestInlineNoteAction,
   companionInteractionReducer,
+  companionRouteBackAction,
   companionQuestSkipsPreview,
   companionQuestUsesFullBleed,
   companionViewportResetKey,
@@ -65,6 +66,44 @@ test('quest evidence review is cleared when changing companion threads', () => {
   const insight = companionInteractionReducer(reviewing, { type: 'select_thread', thread: 'insight' });
   assert.equal(insight.direction, 1);
   assert.equal(insight.reviewItemId, null);
+});
+
+test('focused companion routes unwind to their owning thread before closing', () => {
+  const initial = createCompanionInteractionState({ initialThread: 'discovery' });
+  const questionnaire = companionInteractionReducer(initial, {
+    type: 'open_journey_questionnaire',
+    sessionId: 'journey-1',
+  });
+  assert.equal(questionnaire.route.kind, 'journey_questionnaire');
+  assert.equal(companionRouteBackAction(questionnaire), 'return_to_thread');
+
+  const discovery = companionInteractionReducer(questionnaire, { type: 'return_to_thread' });
+  assert.deepEqual(discovery.route, { kind: 'thread', thread: 'discovery' });
+  assert.equal(companionRouteBackAction(discovery), 'close_sheet');
+});
+
+test('active mini-games require confirmation and reset their instance on return', () => {
+  const initial = createCompanionInteractionState({ initialThread: 'quest' });
+  const preview = companionInteractionReducer(initial, { type: 'open_quest_experience' });
+  assert.equal(companionRouteBackAction(preview), 'return_to_thread');
+
+  const active = companionInteractionReducer(preview, {
+    type: 'set_quest_attempt',
+    attemptId: 'attempt-1',
+  });
+  assert.equal(companionRouteBackAction(active), 'confirm_attempt_exit');
+
+  const returned = companionInteractionReducer(active, { type: 'return_to_thread' });
+  assert.deepEqual(returned.route, { kind: 'thread', thread: 'quest' });
+  assert.equal(returned.experienceInstance, 1);
+});
+
+test('switching tabs closes focused companion routes', () => {
+  const initial = createCompanionInteractionState({ initialThread: 'quest' });
+  const picker = companionInteractionReducer(initial, { type: 'open_quick_goal_picker' });
+  const skins = companionInteractionReducer(picker, { type: 'select_thread', thread: 'skins' });
+  assert.deepEqual(skins.route, { kind: 'thread', thread: 'skins' });
+  assert.equal(skins.thread, 'skins');
 });
 
 test('skins is the final first-class companion thread after insight', () => {

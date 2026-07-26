@@ -405,9 +405,10 @@ export default function KingdomScreen() {
           }}
           quickGoalSuggestionIds={quests.selectedQuickGoalSuggestionIds}
           onAddQuickGoalSuggestions={(templateIds) => {
-            const added = quickGoals.addTemplates(templateIds);
+            const addedTemplateIds = quickGoals.addTemplates(templateIds);
             quests.dismissQuickGoalSuggestions();
-            if (added) quests.refreshQuestState();
+            if (addedTemplateIds.length) quests.refreshQuestState();
+            return addedTemplateIds;
           }}
           onDismissQuickGoalSuggestions={quests.dismissQuickGoalSuggestions}
         />

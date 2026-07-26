@@ -12,6 +12,9 @@ const required = [
   'components/katchadeck/ui/katcha-inline-notice.tsx',
   'components/katchadeck/ui/katcha-toast.tsx',
   'features/today/today-surface-state.ts',
+  'features/companion/use-companion-experience-controller.ts',
+  'components/katchadeck/world/companion-ui-primitives.tsx',
+  'docs/companion-ui-system.md',
   'app/dev-ui-gallery.tsx',
 ];
 const migratedSheets = [
@@ -76,6 +79,18 @@ if (existsSync(join(root, 'components/katchadeck/ui/meadow-sheet.tsx'))) failure
 
 const controller = readFileSync(join(root, 'features/today/use-today-sheet-controller.ts'), 'utf8');
 if (/useState\s*\(false\)/.test(controller)) failures.push('Today sheet controller reintroduced independent popup booleans');
+
+const companionSheet = readFileSync(join(root, 'components/katchadeck/world/companion-interaction-sheet.tsx'), 'utf8');
+if (!companionSheet.includes('useCompanionExperienceController')) failures.push('Companion sheet bypasses the shared experience controller');
+if (/set(QuickGoalPicker|JourneyQuestionnaire|CheckIn|QuestExperience)Open/.test(companionSheet)) failures.push('Companion sheet reintroduced independent navigation booleans');
+
+const companionPrimitives = readFileSync(join(root, 'components/katchadeck/world/companion-interaction-primitives.tsx'), 'utf8');
+if (companionPrimitives.includes('meadow-interaction-primitives')) failures.push('Companion primitives regressed to the parallel Meadow UI family');
+
+const questHost = readFileSync(join(root, 'components/katchadeck/world/quests/quest-experience-host.tsx'), 'utf8');
+for (const group of ['session:', 'history:', 'handlers:']) {
+  if (!questHost.includes(group)) failures.push(`Quest experience host is missing its ${group.slice(0, -1)} contract`);
+}
 
 const moments = readFileSync(join(root, 'components/katchadeck/world/sanctuary-sheet.tsx'), 'utf8');
 if (moments.includes('Give today a feeling')) failures.push('Moments reintroduced a second competing CTA');

@@ -17,6 +17,8 @@ export function createCompanionInteractionState(input: {
     thread: input.initialThread,
     direction: 1,
     reviewItemId: null,
+    route: { kind: 'thread', thread: input.initialThread },
+    experienceInstance: 0,
   };
 }
 
@@ -32,11 +34,86 @@ export function companionInteractionReducer(
         thread: action.thread,
         direction: order.indexOf(action.thread) >= order.indexOf(state.thread) ? 1 : -1,
         reviewItemId: null,
+        route: { kind: 'thread', thread: action.thread },
       };
     }
     case 'review_item':
       return { ...state, reviewItemId: action.itemId };
+    case 'open_quick_goal_picker':
+      return { ...state, thread: 'quest', reviewItemId: null, route: { kind: 'quick_goal_picker', thread: 'quest' } };
+    case 'open_journey_questionnaire':
+      return {
+        ...state,
+        thread: 'discovery',
+        reviewItemId: null,
+        route: {
+          kind: 'journey_questionnaire',
+          thread: 'discovery',
+          sessionId: action.sessionId ?? null,
+        },
+      };
+    case 'sync_journey_session':
+      return state.route.kind === 'journey_questionnaire'
+        ? { ...state, route: { ...state.route, sessionId: action.sessionId } }
+        : state;
+    case 'open_check_in':
+      return {
+        ...state,
+        thread: 'discovery',
+        reviewItemId: null,
+        route: { kind: 'check_in', thread: 'discovery', checkInId: action.checkInId },
+      };
+    case 'open_quest_experience':
+      return {
+        ...state,
+        thread: 'quest',
+        reviewItemId: null,
+        route: { kind: 'quest_experience', thread: 'quest', attemptId: null },
+      };
+    case 'set_quest_attempt':
+      return state.route.kind === 'quest_experience'
+        ? { ...state, route: { ...state.route, attemptId: action.attemptId } }
+        : state;
+    case 'return_to_thread':
+      return {
+        ...state,
+        reviewItemId: null,
+        route: { kind: 'thread', thread: state.thread },
+        experienceInstance: state.route.kind === 'quest_experience'
+          ? state.experienceInstance + 1
+          : state.experienceInstance,
+      };
+    case 'reset_quest_experience':
+      return state.route.kind === 'quest_experience'
+        ? {
+            ...state,
+            route: { kind: 'thread', thread: 'quest' },
+            thread: 'quest',
+            experienceInstance: state.experienceInstance + 1,
+          }
+        : state;
+    case 'reset_companion':
+      return createCompanionInteractionState({ initialThread: action.initialThread });
   }
+}
+
+export type CompanionBackAction =
+  | 'confirm_attempt_exit'
+  | 'return_to_thread'
+  | 'close_sheet';
+
+/**
+ * One source of truth for companion back navigation. Focused experiences
+ * always unwind to their owning thread before the sheet itself can close.
+ */
+export function companionRouteBackAction(
+  state: CompanionInteractionState
+): CompanionBackAction {
+  if (state.route.kind === 'quest_experience' && state.route.attemptId) {
+    return 'confirm_attempt_exit';
+  }
+  if (state.route.kind !== 'thread') return 'return_to_thread';
+  return 'close_sheet';
 }
 
 export function companionViewportResetKey(input: {

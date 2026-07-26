@@ -3,7 +3,8 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
-import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
+import { Lantern } from '@/constants/theme';
 
 export function ExperienceHeader({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
   return <View style={styles.header}><ThemedText style={styles.eyebrow} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>{eyebrow}</ThemedText><ThemedText selectable style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{title}</ThemedText><ThemedText selectable style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{body}</ThemedText></View>;
@@ -79,12 +80,12 @@ export const experienceStyles = StyleSheet.create({ root: { flex: 1, gap: 14, ju
 
 const styles = StyleSheet.create({
   header: { gap: 8 },
-  eyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.05 },
-  title: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 29, lineHeight: 35 },
-  body: { fontSize: 14, lineHeight: 21 },
+  eyebrow: { ...KatchaUI.type.label, fontSize: 10.5, letterSpacing: 1.05 },
+  title: { ...KatchaUI.type.screenTitle, fontSize: 29, lineHeight: 35 },
+  body: { ...KatchaUI.type.companionBody, fontSize: 14, lineHeight: 21 },
   action: { alignItems: 'center', backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 9, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
   quiet: { backgroundColor: 'transparent', borderColor: 'rgba(201,194,232,0.16)', borderWidth: 1 },
-  actionText: { fontSize: 15, fontWeight: '900' },
+  actionText: { ...KatchaUI.type.companionAction, fontSize: 15 },
   quietText: { color: Lantern.moon300 },
   disabled: { opacity: 0.45 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
@@ -94,10 +95,10 @@ const styles = StyleSheet.create({
   previewGlow: { ...StyleSheet.absoluteFillObject, opacity: 0.09 },
   previewImage: { height: '92%', width: '92%' },
   previewCopy: { flex: 1, gap: 6, minWidth: 0 },
-  previewEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.05, textTransform: 'uppercase' },
-  previewTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 23, letterSpacing: -0.25, lineHeight: 27 },
-  previewBody: { fontSize: 12.5, lineHeight: 18 },
-  previewMeta: { fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.75, textAlign: 'center', textTransform: 'uppercase' },
+  previewEyebrow: { ...KatchaUI.type.label, fontSize: 10, letterSpacing: 1.05 },
+  previewTitle: { ...KatchaUI.type.screenTitle, fontSize: 23, letterSpacing: -0.25, lineHeight: 27 },
+  previewBody: { ...KatchaUI.type.companionBody, fontSize: 12.5, lineHeight: 18 },
+  previewMeta: { ...KatchaUI.type.label, fontSize: 10.5, fontVariant: ['tabular-nums'], letterSpacing: 0.75, textAlign: 'center' },
   resultRoot: { flex: 1, gap: 16, justifyContent: 'space-between', minHeight: 0, padding: 4 },
   resultContent: { flex: 1, gap: 20, justifyContent: 'center', minHeight: 0 },
   resultCard: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.07)', borderCurve: 'continuous', borderRadius: 24, justifyContent: 'center', minHeight: 170, padding: 24 },

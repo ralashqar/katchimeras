@@ -1,4 +1,4 @@
-import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
 
 export type KatchaSurface = 'night' | 'parchment';
@@ -110,12 +110,42 @@ export const KatchaUI = {
   spacing: { xxs: 4, xs: 8, sm: 12, md: 16, lg: 20, xl: 28, xxl: 40 },
   radius: { control: 14, card: 18, sheet: 26, pill: 999 },
   touchTarget: 44,
-  motion: { press: 140, chrome: 220, sheetIn: 260, sheetOut: 200 },
+  layout: {
+    phoneGutter: 16,
+    compactGutter: 12,
+    readableWidth: 560,
+    sheetContentWidth: 680,
+    sectionGap: 18,
+  },
+  motion: {
+    press: 140,
+    chrome: 220,
+    contentIn: 240,
+    contentOut: 140,
+    progress: 320,
+    sheetIn: 260,
+    sheetOut: 200,
+  },
   type: {
     display: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 30, lineHeight: 34 },
     title: { fontFamily: AppFontFamilies.manrope, fontSize: 17, fontWeight: '800' as const, lineHeight: 22 },
     body: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '600' as const, lineHeight: 20 },
     label: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' as const, letterSpacing: 1.1, textTransform: 'uppercase' as const },
     action: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' as const, lineHeight: 19 },
+    companionName: {
+      ...KatchaDeckUI.typography.kingdomDisplay,
+      fontSize: 34,
+      lineHeight: 39,
+      letterSpacing: -0.35,
+    },
+    screenTitle: KatchaDeckUI.typography.screenTitle,
+    sectionTitle: KatchaDeckUI.typography.screenHeader,
+    meta: KatchaDeckUI.typography.screenMeta,
+    companionBody: KatchaDeckUI.typography.uiBody,
+    companionAction: KatchaDeckUI.typography.uiAction,
+    numeric: {
+      fontFamily: AppFontFamilies.manrope,
+      fontWeight: '800' as const,
+    },
   },
 } as const;
