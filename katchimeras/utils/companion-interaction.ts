@@ -12,15 +12,11 @@ import type { InteractiveQuestExecution } from '@/utils/quests/experiences/types
 
 export function createCompanionInteractionState(input: {
   initialThread: CompanionThread;
-  reflectionDraft?: CompanionInteractionState['reflectionDraft'];
 }): CompanionInteractionState {
   return {
     thread: input.initialThread,
     direction: 1,
     reviewItemId: null,
-    reflectionDraft: input.reflectionDraft ?? null,
-    reflectionReviewOpen: false,
-    discardOpen: false,
   };
 }
 
@@ -30,38 +26,17 @@ export function companionInteractionReducer(
 ): CompanionInteractionState {
   switch (action.type) {
     case 'select_thread': {
-      const order: CompanionThread[] = ['quest', 'discovery', 'insight', 'skins', 'reflection'];
+      const order: CompanionThread[] = ['quest', 'discovery', 'insight', 'skins'];
       return {
         ...state,
         thread: action.thread,
         direction: order.indexOf(action.thread) >= order.indexOf(state.thread) ? 1 : -1,
         reviewItemId: null,
-        reflectionReviewOpen: false,
       };
     }
     case 'review_item':
       return { ...state, reviewItemId: action.itemId };
-    case 'set_reflection_draft':
-      return {
-        ...state,
-        reflectionDraft: action.draft,
-        reflectionReviewOpen: action.draft ? state.reflectionReviewOpen : false,
-      };
-    case 'review_reflection':
-      return companionReflectionIsDirty(state)
-        ? { ...state, reflectionReviewOpen: true, discardOpen: false }
-        : state;
-    case 'edit_reflection':
-      return { ...state, reflectionReviewOpen: false };
-    case 'request_discard':
-      return { ...state, discardOpen: true };
-    case 'keep_editing':
-      return { ...state, discardOpen: false };
   }
-}
-
-export function companionReflectionIsDirty(state: CompanionInteractionState): boolean {
-  return Boolean(state.reflectionDraft?.text.trim() || state.reflectionDraft?.audioUri);
 }
 
 export function companionViewportResetKey(input: {
@@ -71,7 +46,6 @@ export function companionViewportResetKey(input: {
   activeQuestTitle?: string | null;
   journeyNodeId?: string | null;
   reviewItemId?: string | null;
-  reflectionReviewOpen?: boolean;
   activeAttemptId?: string | null;
   memorySaved?: boolean;
 }): string {
@@ -82,7 +56,6 @@ export function companionViewportResetKey(input: {
     input.activeQuestTitle ?? '',
     input.journeyNodeId ?? '',
     input.reviewItemId ?? '',
-    input.reflectionReviewOpen ? 'reflection-review' : '',
     input.activeAttemptId ? 'active-experience' : '',
     input.memorySaved ? 'memory-saved' : '',
   ].join('|');
@@ -110,7 +83,7 @@ export function companionQuestBackAction(input: {
 }
 
 export function buildCompanionQuestViewModel(input: {
-  activeQuest: { title: string; hint: string; semanticInput?: boolean } | null;
+  activeQuest: { title: string; hint: string; semanticInput?: boolean; journalFallback?: boolean } | null;
   offer?: { id: string; title: string; hint: string };
   runtime: QuestRuntimeStatus | null;
   questComplete: boolean;
@@ -186,6 +159,7 @@ export function buildCompanionQuestViewModel(input: {
     statusTone: runtime?.state === 'impossible_today' ? 'danger' : blocked ? 'warning' : 'neutral',
     criteria, evidence: items, captureFeedback,
     semanticInput: Boolean(activeQuest.semanticInput),
+    journalFallback: Boolean(activeQuest.journalFallback),
     primaryAction: runtime && runtime.nextAction !== 'none'
       ? { kind: 'quest_action', label: questActionLabel(runtime.nextAction), icon: questActionIcon(runtime.nextAction), nextAction: runtime.nextAction }
       : null,

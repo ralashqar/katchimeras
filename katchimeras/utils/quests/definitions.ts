@@ -177,6 +177,7 @@ type ProgressiveQuestSpec = {
   weight: number;
   suggestedActions?: string[];
   requiresCapabilities?: QuestCapabilityId[];
+  optionalCapabilities?: QuestCapabilityId[];
   offerVisibility?: QuestDefinition['offerVisibility'];
   semanticVerification?: QuestDefinition['semanticVerification'];
 };
@@ -200,6 +201,7 @@ function progressiveQuestPack(
       criteria: spec.criteria,
       suggestedActions: spec.suggestedActions,
       requiresCapabilities: spec.requiresCapabilities,
+      optionalCapabilities: spec.optionalCapabilities,
       offerVisibility: spec.offerVisibility,
       semanticVerification: spec.semanticVerification,
       repeatPolicy: {
@@ -288,8 +290,9 @@ function semanticNoteQuest(input: {
       label: input.request,
     }],
     suggestedActions: ['add_note', 'record_voice'],
-    requiresCapabilities: ['appleFoundation'],
-    offerVisibility: 'hide_when_unavailable',
+    requiresCapabilities: journalRouteFallbacks.length ? undefined : ['appleFoundation'],
+    optionalCapabilities: journalRouteFallbacks.length ? ['appleFoundation'] : undefined,
+    offerVisibility: journalRouteFallbacks.length ? 'default' : 'hide_when_unavailable',
     semanticVerification: {
       id: input.id.replace(/^quest-/, ''),
       version: 1,
@@ -1981,8 +1984,7 @@ function inferMinimumBondLevel(definition: QuestDefinition): KatchimeraBondLevel
   if (
     definition.id === 'quest-step-time-trial' ||
     definition.id === 'quest-feastle-merge' ||
-    definition.id === 'quest-tasklet-desk-jam' ||
-    definition.id === 'quest-pagelet-word-paths'
+    definition.id === 'quest-tasklet-desk-jam'
   ) return 2;
   return 1;
 }
@@ -2101,4 +2103,24 @@ function inferEvidencePolicy(definition: QuestDefinition): QuestDefinition['evid
 
 export function questDefinition(questId: string): QuestDefinition | null {
   return QUEST_DEFINITIONS[questId] ?? null;
+}
+
+export type SemanticQuestJournalRoute = {
+  flowId: string;
+  categoryId: string;
+  contextId: string | null;
+};
+
+export function semanticQuestJournalFallbackRoute(
+  questId: string
+): SemanticQuestJournalRoute | null {
+  const key = questDefinition(questId)?.semanticVerification?.journalRouteFallbacks?.[0];
+  if (!key?.startsWith('journal.route:')) return null;
+  const [flowId, categoryId, ...contextParts] = key.slice('journal.route:'.length).split('.');
+  if (!flowId || !categoryId) return null;
+  return {
+    flowId,
+    categoryId,
+    contextId: contextParts.length ? contextParts.join('.') : null,
+  };
 }

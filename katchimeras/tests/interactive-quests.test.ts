@@ -31,6 +31,8 @@ test('Steppling, Flickerbun, and Pagelet receive their interactive quest familie
   assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-book-trivia'));
   assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-pagelet-lost-word'));
   assert.ok(themedQuestOffers('bookstore', 'culture', 'pagelet').some((offer) => offer.id === 'quest-pagelet-word-paths'));
+  assert.equal(questDefinition('quest-pagelet-lost-word')?.minimumBondLevel, 1);
+  assert.equal(questDefinition('quest-pagelet-word-paths')?.minimumBondLevel, 1);
 });
 
 test('companion quest pools include their reusable mini-games', () => {

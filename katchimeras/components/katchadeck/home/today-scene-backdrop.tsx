@@ -9,10 +9,16 @@ import type { TodayFullSpreadScene } from '@/utils/today-full-spread-scenes';
 type TodaySceneBackdropProps = {
   background: TodayAtmosphereBackground;
   scene: TodayFullSpreadScene | null;
+  variant?: 'default' | 'splash';
 };
 
-export function TodaySceneBackdrop({ background, scene }: TodaySceneBackdropProps) {
+export function TodaySceneBackdrop({
+  background,
+  scene,
+  variant = 'default',
+}: TodaySceneBackdropProps) {
   const reduceMotion = useReducedMotion();
+  const splash = variant === 'splash';
   const verticalGrade = scene
     ? [
         'rgba(8, 18, 40, 0.46)',
@@ -32,6 +38,7 @@ export function TodaySceneBackdrop({ background, scene }: TodaySceneBackdropProp
       <Image
         cachePolicy="memory-disk"
         contentFit="cover"
+        contentPosition={splash ? "bottom" : "center"}
         pointerEvents="none"
         recyclingKey={background.id}
         source={background.source}
@@ -62,20 +69,24 @@ export function TodaySceneBackdrop({ background, scene }: TodaySceneBackdropProp
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
-      <LinearGradient
-        colors={['rgba(5, 12, 28, 0.16)', 'rgba(5, 12, 28, 0)']}
-        end={{ x: 1, y: 0.5 }}
-        pointerEvents="none"
-        start={{ x: 0, y: 0.5 }}
-        style={styles.leftVignette}
-      />
-      <LinearGradient
-        colors={['rgba(5, 12, 28, 0)', 'rgba(5, 12, 28, 0.16)']}
-        end={{ x: 1, y: 0.5 }}
-        pointerEvents="none"
-        start={{ x: 0, y: 0.5 }}
-        style={styles.rightVignette}
-      />
+      {!splash ? (
+        <>
+          <LinearGradient
+            colors={['rgba(5, 12, 28, 0.16)', 'rgba(5, 12, 28, 0)']}
+            end={{ x: 1, y: 0.5 }}
+            pointerEvents="none"
+            start={{ x: 0, y: 0.5 }}
+            style={styles.leftVignette}
+          />
+          <LinearGradient
+            colors={['rgba(5, 12, 28, 0)', 'rgba(5, 12, 28, 0.16)']}
+            end={{ x: 1, y: 0.5 }}
+            pointerEvents="none"
+            start={{ x: 0, y: 0.5 }}
+            style={styles.rightVignette}
+          />
+        </>
+      ) : null}
     </View>
   );
 }

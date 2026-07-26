@@ -12,6 +12,7 @@ import { noteSuggestedSpecific } from '@/utils/note-journal-specific';
 import { journalDaySearchAnchors, journalPlaceSearchQuery, mergePlaceSearchAnchors } from '@/utils/journal-place-search';
 import { classificationForResolvedRoute, foundationAtomicNeedsRetry, foundationAtomicRoutes, foundationNoteRoute, journalNoteRouteNeedsConfirmation, journalRouteForAlias, journalRouteForIds, journalRouteNeedsConfirmation, parseFoundationJournalClassification, rankJournalRoutes, registryJournalRoutes, resolveFoundationRouteEvidence } from '@/utils/journal-routing';
 import { validateJournalProjections } from '@/utils/journal-selectors';
+import { prepareCompanionCheckInReflection } from '@/utils/companion-reflection';
 
 const now = new Date('2026-07-13T12:00:00.000Z');
 function baseDay(): StoredHomeDayRecord {
@@ -52,6 +53,54 @@ test('historical Photo Library review journals without changing hatched energy',
   assert.deepEqual(result.capturedEnergy, { calm: 0.2 });
   assert.equal(result.journalRecords?.[0]?.source.kind, 'photo');
   assert.equal(result.journalRecords?.[0]?.fields.specific, 'Apple');
+});
+
+test('editing a daily companion check-in replaces its canonical journal memory', () => {
+  const baseCheckIn = {
+    id: 'journey-check-in:companion:tasklet:2026-07-13',
+    companionId: 'companion:tasklet',
+    familyId: 'tasklet' as const,
+    dayId: '2026-07-13',
+    goalId: null,
+    definitionId: null,
+    definitionVersion: 0,
+    suggestedQuickGoalIds: [],
+    taskSuggestionStatus: null,
+    startedAt: 1,
+    updatedAt: 4,
+    completedAt: 4,
+    answers: [
+      { questionId: 'moment' as const, optionId: 'progress', label: 'I made progress', answeredAt: 2 },
+      { questionId: 'effect' as const, optionId: 'supported', label: 'It supported what I want', answeredAt: 3 },
+      { questionId: 'next' as const, optionId: 'remember', label: 'Just remember it', answeredAt: 4 },
+    ],
+  };
+  const firstPrepared = prepareCompanionCheckInReflection({ checkIn: baseCheckIn });
+  assert.ok(firstPrepared);
+  const firstCommand = submissionToJournalCommand(firstPrepared.submission, now);
+  assert.ok(firstCommand);
+  const first = commitJournalRecord(baseDay(), firstCommand, now);
+
+  const editedPrepared = prepareCompanionCheckInReflection({
+    checkIn: {
+      ...baseCheckIn,
+      updatedAt: 8,
+      completedAt: 8,
+      answers: [
+        { questionId: 'moment', optionId: 'blocked', label: 'Something felt difficult', answeredAt: 6 },
+        { questionId: 'effect', optionId: 'blocked', label: 'It got in the way', answeredAt: 7 },
+        { questionId: 'next', optionId: 'smaller', label: 'Make the next step easier', answeredAt: 8 },
+      ],
+    },
+  });
+  assert.ok(editedPrepared);
+  const editedCommand = submissionToJournalCommand(editedPrepared.submission, new Date(now.getTime() + 1_000));
+  assert.ok(editedCommand);
+  const edited = commitJournalRecord(first, editedCommand, new Date(now.getTime() + 1_000));
+
+  assert.equal(edited.journalRecords?.length, 1);
+  assert.equal(edited.manualJournalEntries?.length, 1);
+  assert.match(edited.journalRecords?.[0]?.note ?? '', /Something felt difficult/);
 });
 
 test('journal session reducer handles deep links and reversible navigation', () => {

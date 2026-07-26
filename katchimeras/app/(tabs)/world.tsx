@@ -18,7 +18,7 @@ import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
-import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
@@ -28,12 +28,13 @@ import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import type { KatchimeraFamilyId, KatchimeraSkinId, KatchimeraWardrobeState } from '@/types/katchimera';
 import type { KingdomCreature } from '@/types/kingdom';
 import type { WorldIdentityState } from '@/types/world-identity';
-import { openingLine, reflectionLine } from '@/utils/katchimera-engagement';
+import { openingLine } from '@/utils/katchimera-engagement';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
 import { resolveFactsForDay } from '@/utils/signals/resolve';
 import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
-import { prepareCompanionReflection } from '@/utils/companion-reflection';
+import { prepareCompanionCheckInReflection } from '@/utils/companion-reflection';
+import type { CompanionJourneyCheckIn } from '@/utils/companion-journey';
 import { loadWorldIdentity, saveWorldIdentity } from '@/utils/world-identity';
 import {
   applyWardrobeToKingdom,
@@ -88,9 +89,8 @@ export default function KingdomScreen() {
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
   const [homeIdentityOpen, setHomeIdentityOpen] = useState(false);
   const [zodiacOpen, setZodiacOpen] = useState(false);
-  const [reflectionDraft, setReflectionDraft] = useState<CompanionReflectionDraft | null>(null);
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
-  const [savedOrigin, setSavedOrigin] = useState<'reflection' | 'insight' | 'quest' | null>(null);
+  const [savedOrigin, setSavedOrigin] = useState<'insight' | 'quest' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
   const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState({
     enableInteractiveServices: false,
@@ -186,7 +186,6 @@ export default function KingdomScreen() {
     saveKatchimeraWardrobe(next);
     setWardrobe(next);
   };
-  const closeSelectedResident = quests.closeSelectedResident;
   const refreshQuestState = quests.refreshQuestState;
 
   useEffect(() => {
@@ -194,13 +193,9 @@ export default function KingdomScreen() {
     const timeout = setTimeout(() => {
       refreshQuestState();
       setSavedOrigin(null);
-      if (savedOrigin === 'reflection') {
-        setReflectionDraft(null);
-        closeSelectedResident();
-      }
     }, 1250);
     return () => clearTimeout(timeout);
-  }, [closeSelectedResident, refreshQuestState, savedOrigin]);
+  }, [refreshQuestState, savedOrigin]);
 
   const handleInsightAction = () => {
     const action = quests.selectedInsight?.action;
@@ -233,18 +228,14 @@ export default function KingdomScreen() {
     quests.performSelectedQuestAction();
   };
 
-  const saveReflection = (draft: CompanionReflectionDraft) => {
-    const creatureId = quests.selectedResident?.creature.creatureId;
-    if (!creatureId) return;
-    const prepared = prepareCompanionReflection({
-      creatureId,
-      dayId: today?.isoDate ?? 'today',
-      draft,
-    });
+  const saveJourneyCheckIn = (
+    checkIn: CompanionJourneyCheckIn,
+    note: CompanionReflectionDraft | null
+  ) => {
+    const prepared = prepareCompanionCheckInReflection({ checkIn, note });
     if (!prepared) return;
     addManualJournalEntry(prepared.submission, 'today');
-    quests.awardSelectedReflectionBond(prepared.sourceId);
-    setSavedOrigin('reflection');
+    quests.refreshQuestState();
     if (process.env.EXPO_OS === 'ios') {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -319,18 +310,19 @@ export default function KingdomScreen() {
           name={quests.selectedResident.creature.name}
           visualKey={quests.selectedResident.creature.visualKey}
           accentColor={quests.selectedResident.creature.accentColor}
+          questionnaireBackground={kingdomBackground}
           houseLevel={quests.selectedResident.resident.houseLevel}
           openingLine={openingLine(quests.selectedResident.creature.name, quests.selectedInteractionState)}
           initialThread={quests.selectedResident.thread ?? 'insight'}
           onSelectThread={quests.selectThread}
           onClose={() => {
-            setReflectionDraft(null);
             quests.closeSelectedResident();
           }}
           activeQuest={quests.selectedActiveQuest ? {
             title: quests.selectedActiveQuest.title,
             hint: quests.selectedActiveQuest.hint,
             semanticInput: Boolean(questDefinition(quests.selectedActiveQuest.questId)?.semanticVerification),
+            journalFallback: quests.selectedSemanticJournalFallbackActive,
             execution: quests.selectedInteractiveExecution,
             resolvedConfig: quests.selectedActiveQuest.resolvedConfig,
             offerSeed: quests.selectedActiveQuest.offerSeed,
@@ -364,10 +356,6 @@ export default function KingdomScreen() {
           onCompleteInteractiveQuest={quests.completeSelectedInteractiveQuest}
           insight={quests.selectedInsight ?? { text: 'This tile remembers the day we met.', action: null }}
           onInsightAction={handleInsightAction}
-          reflectionText={quests.selectedReflectionPrompt ?? reflectionLine(quests.selectedCompanionData?.archetype ?? '')}
-          initialReflectionDraft={reflectionDraft}
-          onReflectionDraftChange={setReflectionDraft}
-          onSaveReflection={saveReflection}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
           skins={selectedSkinOptions}
@@ -387,17 +375,17 @@ export default function KingdomScreen() {
           journeyMomentLoggedToday={quests.selectedJourneyMomentLoggedToday}
           questAdvancesJourneyGoal={quests.selectedQuestAdvancesJourneyGoal}
           onStartJourneyConversation={quests.startSelectedJourneyConversation}
-          onAnswerJourneyConversation={(sessionId, value) => {
-            const suggestedTemplateIds = quests.answerSelectedJourneyConversation(sessionId, value);
-            if (suggestedTemplateIds.length) {
-              const added = quickGoals.addTemplates(suggestedTemplateIds);
-              if (added) quests.refreshQuestState();
-            }
-            return suggestedTemplateIds;
-          }}
+          onAnswerJourneyConversation={quests.answerSelectedJourneyConversation}
           onLogJourneyMoment={quests.logSelectedJourneyMoment}
           onSetJourneyGoalStatus={quests.setSelectedJourneyGoalStatus}
           onSetPrimaryJourneyGoal={quests.setSelectedPrimaryJourneyGoal}
+          journeyCheckIn={quests.selectedJourneyCheckIn}
+          onStartJourneyCheckIn={quests.startSelectedJourneyCheckIn}
+          onAnswerJourneyCheckIn={quests.answerSelectedJourneyCheckIn}
+          onBackJourneyCheckIn={quests.backSelectedJourneyCheckIn}
+          onEditJourneyCheckIn={quests.editSelectedJourneyCheckIn}
+          onSetJourneyCheckInTaskStatus={quests.setSelectedJourneyCheckInTaskStatus}
+          onSaveJourneyCheckIn={saveJourneyCheckIn}
           familyId={quests.selectedResident.creature.familyId ?? 'vesperitt'}
           quickGoalsEnabled={quickGoalFamilyIds.includes(quests.selectedResident.creature.familyId ?? '')}
           quickGoalDayId={quickGoalDayId}
@@ -474,10 +462,7 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   headerKicker: {
-    fontFamily: AppFontFamilies.fredokaBold,
-    fontSize: 28,
-    letterSpacing: 0.1,
-    lineHeight: 34,
+    ...KatchaDeckUI.typography.kingdomDisplay,
     textShadowColor: 'rgba(30,70,111,0.92)',
     textShadowOffset: { width: 0, height: 3 },
     textShadowRadius: 3,

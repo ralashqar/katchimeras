@@ -1315,6 +1315,10 @@ export type JournalSourceOrigin =
       creatureId: string;
       promptId: string;
       promptText: string;
+      familyId?: KatchimeraFamilyId;
+      goalId?: string | null;
+      checkInId?: string;
+      answerIds?: string[];
     }
   | {
       kind: 'quick_goal_completion';

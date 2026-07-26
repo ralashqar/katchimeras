@@ -20,7 +20,7 @@ type UseTodayActionRouterParams = {
   openNoteCapture: () => void;
   openQuickNote: () => void;
   openObservatory: () => void;
-  openManualJournal: (flowId?: string) => void;
+  openManualJournal: (flowId?: string, categoryId?: string, contextId?: string | null) => void;
   requestMicrophonePermission?: () => Promise<{ granted?: boolean } | null>;
 };
 
@@ -295,7 +295,15 @@ export function useTodayActionRouter({
           openNoteCapture();
           break;
         case 'add_note':
-          openQuickNote();
+          if (intent.journalRoute) {
+            openManualJournal(
+              intent.journalRoute.flowId,
+              intent.journalRoute.categoryId,
+              intent.journalRoute.contextId
+            );
+          } else {
+            openQuickNote();
+          }
           break;
         case 'open_health':
           sheets.setStepsSheetOpen(true);
@@ -308,6 +316,7 @@ export function useTodayActionRouter({
       closePromptSheet,
       openCapture,
       openMemoryVault,
+      openManualJournal,
       openNoteCapture,
       openObservatory,
       openPromptSheet,

@@ -11,7 +11,6 @@ import {
   companionInteractionReducer,
   companionQuestSkipsPreview,
   companionQuestUsesFullBleed,
-  companionReflectionIsDirty,
   companionViewportResetKey,
   createCompanionInteractionState,
   insightForArchetype,
@@ -50,45 +49,29 @@ function runtime(overrides: Partial<QuestRuntimeStatus> = {}): QuestRuntimeStatu
   };
 }
 
-test('interaction reducer preserves reflection draft while switching threads', () => {
+test('interaction reducer moves between the merged companion threads', () => {
   const initial = createCompanionInteractionState({ initialThread: 'quest' });
-  const reflection = companionInteractionReducer(initial, { type: 'select_thread', thread: 'reflection' });
-  const withDraft = companionInteractionReducer(reflection, {
-    type: 'set_reflection_draft',
-    draft: { kind: 'text', text: 'A quiet walk', promptId: 'reflection:park', promptText: 'What stayed with you?' },
-  });
-  const insight = companionInteractionReducer(withDraft, { type: 'select_thread', thread: 'insight' });
-  assert.equal(insight.direction, -1);
-  assert.equal(insight.reflectionDraft?.text, 'A quiet walk');
-  assert.equal(insight.reflectionReviewOpen, false);
-  assert.equal(companionReflectionIsDirty(insight), true);
+  const you = companionInteractionReducer(initial, { type: 'select_thread', thread: 'discovery' });
+  const insight = companionInteractionReducer(you, { type: 'select_thread', thread: 'insight' });
+  const backToYou = companionInteractionReducer(insight, { type: 'select_thread', thread: 'discovery' });
+  assert.equal(you.thread, 'discovery');
+  assert.equal(insight.direction, 1);
+  assert.equal(backToYou.direction, -1);
 });
 
-test('reflection review stays inside the companion interaction state', () => {
-  const initial = createCompanionInteractionState({
-    initialThread: 'reflection',
-    reflectionDraft: {
-      kind: 'text',
-      text: 'A quiet walk',
-      promptId: 'reflection:park',
-      promptText: 'What stayed with you?',
-    },
-  });
-  const review = companionInteractionReducer(initial, { type: 'review_reflection' });
-  const editing = companionInteractionReducer(review, { type: 'edit_reflection' });
-  assert.equal(review.reflectionReviewOpen, true);
-  assert.equal(review.reflectionDraft?.text, 'A quiet walk');
-  assert.equal(editing.reflectionReviewOpen, false);
-  assert.equal(editing.reflectionDraft?.text, 'A quiet walk');
+test('quest evidence review is cleared when changing companion threads', () => {
+  const initial = createCompanionInteractionState({ initialThread: 'quest' });
+  const reviewing = companionInteractionReducer(initial, { type: 'review_item', itemId: 'evidence-1' });
+  const insight = companionInteractionReducer(reviewing, { type: 'select_thread', thread: 'insight' });
+  assert.equal(insight.direction, 1);
+  assert.equal(insight.reviewItemId, null);
 });
 
-test('skins is a first-class companion thread between insight and reflection', () => {
+test('skins is the final first-class companion thread after insight', () => {
   const insight = createCompanionInteractionState({ initialThread: 'insight' });
   const skins = companionInteractionReducer(insight, { type: 'select_thread', thread: 'skins' });
-  const reflection = companionInteractionReducer(skins, { type: 'select_thread', thread: 'reflection' });
   assert.equal(skins.thread, 'skins');
   assert.equal(skins.direction, 1);
-  assert.equal(reflection.direction, 1);
 });
 
 test('discovery is a first-class companion thread between quest and insight', () => {
@@ -141,6 +124,7 @@ test('semantic note quests expose an inline note and voice attempt action', () =
       title: 'Notice one living detail',
       hint: 'Share something specific you noticed outside.',
       semanticInput: true,
+      journalFallback: true,
     },
     offer: undefined,
     runtime: runtime({
@@ -154,6 +138,7 @@ test('semantic note quests expose an inline note and voice attempt action', () =
     criteria: [{ label: 'Describe a real green-space moment', done: false }],
   });
   assert.equal(model.mode, 'active');
+  assert.equal(model.journalFallback, true);
   assert.equal(companionQuestInlineNoteAction(model)?.nextAction, 'add_note');
 
   const ordinary = { ...model, semanticInput: false };

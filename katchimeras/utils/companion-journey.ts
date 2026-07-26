@@ -33,6 +33,7 @@ export type CompanionJourneyGoal = {
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
+  suggestedQuickGoalIds?: readonly string[];
 };
 
 export type CompanionJourneyConversationAnswer = {
@@ -82,13 +83,38 @@ export type CompanionJourneyMomentEvent = {
   occurredAt: number;
 };
 
+export type CompanionJourneyCheckInAnswer = {
+  questionId: 'moment' | 'effect' | 'next';
+  optionId: string;
+  label: string;
+  suggestsTasks?: boolean;
+  answeredAt: number;
+};
+
+export type CompanionJourneyCheckIn = {
+  id: string;
+  companionId: string;
+  familyId: KatchimeraFamilyId;
+  dayId: string;
+  goalId: string | null;
+  definitionId: string | null;
+  definitionVersion: number;
+  answers: CompanionJourneyCheckInAnswer[];
+  suggestedQuickGoalIds: readonly string[];
+  taskSuggestionStatus: 'pending' | 'added' | 'dismissed' | null;
+  startedAt: number;
+  updatedAt: number;
+  completedAt?: number;
+};
+
 export type CompanionJourneyState = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   goals: CompanionJourneyGoal[];
   conversations: CompanionJourneyConversationSession[];
   questEvents: CompanionJourneyQuestEvent[];
   momentEvents: CompanionJourneyMomentEvent[];
   reflectionEvents: CompanionJourneyReflectionEvent[];
+  checkIns: CompanionJourneyCheckIn[];
 };
 
 export type CompanionJourneyStageProgress = {
@@ -127,7 +153,7 @@ export type AnswerJourneyConversationResult = {
 };
 
 export function emptyCompanionJourneyState(): CompanionJourneyState {
-  return { schemaVersion: 1, goals: [], conversations: [], questEvents: [], momentEvents: [], reflectionEvents: [] };
+  return { schemaVersion: 2, goals: [], conversations: [], questEvents: [], momentEvents: [], reflectionEvents: [], checkIns: [] };
 }
 
 export function normaliseCompanionJourneyState(value: unknown): CompanionJourneyState {
@@ -158,13 +184,23 @@ export function normaliseCompanionJourneyState(value: unknown): CompanionJourney
   const reflectionEvents = Array.isArray(candidate.reflectionEvents)
     ? uniqueById(candidate.reflectionEvents.filter((event) => isValidReflectionEvent(event) && goalIds.has(event.goalId)))
     : [];
+  const checkIns = Array.isArray(candidate.checkIns)
+    ? uniqueById(candidate.checkIns.filter(isValidCheckIn).map((checkIn) => ({
+        ...checkIn,
+        answers: Array.isArray(checkIn.answers) ? checkIn.answers.filter(isValidCheckInAnswer).slice(0, 3) : [],
+        suggestedQuickGoalIds: Array.isArray(checkIn.suggestedQuickGoalIds)
+          ? checkIn.suggestedQuickGoalIds.filter((id): id is string => typeof id === 'string')
+          : [],
+      })))
+    : [];
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     goals: uniqueById(goals),
     conversations: uniqueById(conversations),
     questEvents,
     momentEvents,
     reflectionEvents,
+    checkIns,
   };
 }
 
@@ -332,6 +368,7 @@ export function answerJourneyConversation(
         isPrimary: true,
         createdAt: answeredAt,
         updatedAt: answeredAt,
+        suggestedQuickGoalIds,
       },
     ];
   }
@@ -457,6 +494,164 @@ export function recordJourneyReflection(
       ...state.reflectionEvents,
       { id, familyId, goalId: goal.id, sourceId, occurredAt, dayId },
     ],
+  };
+}
+
+export function checkInForDay(
+  state: CompanionJourneyState,
+  companionId: string,
+  dayId: string
+): CompanionJourneyCheckIn | null {
+  return state.checkIns.find((checkIn) => checkIn.companionId === companionId && checkIn.dayId === dayId) ?? null;
+}
+
+export function startJourneyCheckIn(
+  state: CompanionJourneyState,
+  input: {
+    companionId: string;
+    familyId: KatchimeraFamilyId;
+    dayId: string;
+  },
+  startedAt = Date.now()
+): { state: CompanionJourneyState; checkIn: CompanionJourneyCheckIn } {
+  const existing = checkInForDay(state, input.companionId, input.dayId);
+  if (existing) return { state, checkIn: existing };
+  const definition = companionJourneyByFamilyId.get(input.familyId) ?? null;
+  const goal = primaryGoalForFamily(state, input.familyId);
+  const checkIn: CompanionJourneyCheckIn = {
+    id: `journey-check-in:${input.companionId}:${input.dayId}`,
+    companionId: input.companionId,
+    familyId: input.familyId,
+    dayId: input.dayId,
+    goalId: goal?.id ?? null,
+    definitionId: definition?.id ?? null,
+    definitionVersion: definition?.version ?? 0,
+    answers: [],
+    suggestedQuickGoalIds: [],
+    taskSuggestionStatus: null,
+    startedAt,
+    updatedAt: startedAt,
+  };
+  return { state: { ...state, checkIns: [...state.checkIns, checkIn] }, checkIn };
+}
+
+export function answerJourneyCheckIn(
+  state: CompanionJourneyState,
+  input: {
+    checkInId: string;
+    questionId: CompanionJourneyCheckInAnswer['questionId'];
+    optionId: string;
+    label: string;
+    suggestsTasks?: boolean;
+    suggestedQuickGoalIds?: readonly string[];
+  },
+  answeredAt = Date.now()
+): { state: CompanionJourneyState; checkIn: CompanionJourneyCheckIn | null; completedNow: boolean } {
+  const current = state.checkIns.find((checkIn) => checkIn.id === input.checkInId);
+  if (!current || current.completedAt) return { state, checkIn: current ?? null, completedNow: false };
+  const order: CompanionJourneyCheckInAnswer['questionId'][] = ['moment', 'effect', 'next'];
+  const answerIndex = order.indexOf(input.questionId);
+  if (answerIndex < 0 || answerIndex > current.answers.length) {
+    return { state, checkIn: current, completedNow: false };
+  }
+  const answer: CompanionJourneyCheckInAnswer = {
+    questionId: input.questionId,
+    optionId: input.optionId,
+    label: input.label,
+    ...(input.suggestsTasks ? { suggestsTasks: true } : {}),
+    answeredAt,
+  };
+  const answers = [...current.answers.slice(0, answerIndex), answer];
+  const completedNow = input.questionId === 'next';
+  const updated: CompanionJourneyCheckIn = {
+    ...current,
+    answers,
+    suggestedQuickGoalIds: completedNow ? [...(input.suggestedQuickGoalIds ?? [])].slice(0, 2) : [],
+    taskSuggestionStatus: completedNow && input.suggestedQuickGoalIds?.length ? 'pending' : null,
+    updatedAt: answeredAt,
+    ...(completedNow ? { completedAt: answeredAt } : {}),
+  };
+  let reflectionEvents = state.reflectionEvents;
+  if (completedNow && updated.goalId) {
+    const sourceId = `companion-reflection:${updated.companionId}:${updated.dayId}`;
+    const eventId = `journey-reflection:${updated.familyId}:${sourceId}`;
+    if (!reflectionEvents.some((event) => event.id === eventId)) {
+      reflectionEvents = [
+        ...reflectionEvents,
+        {
+          id: eventId,
+          familyId: updated.familyId,
+          goalId: updated.goalId,
+          sourceId,
+          dayId: updated.dayId,
+          occurredAt: answeredAt,
+        },
+      ];
+    }
+  }
+  return {
+    state: {
+      ...state,
+      checkIns: state.checkIns.map((checkIn) => checkIn.id === updated.id ? updated : checkIn),
+      reflectionEvents,
+    },
+    checkIn: updated,
+    completedNow,
+  };
+}
+
+export function backJourneyCheckIn(
+  state: CompanionJourneyState,
+  checkInId: string,
+  updatedAt = Date.now()
+): CompanionJourneyState {
+  const target = state.checkIns.find((checkIn) => checkIn.id === checkInId);
+  if (!target || target.completedAt || target.answers.length === 0) return state;
+  return {
+    ...state,
+    checkIns: state.checkIns.map((checkIn) =>
+      checkIn.id === checkInId
+        ? { ...checkIn, answers: checkIn.answers.slice(0, -1), updatedAt }
+        : checkIn
+    ),
+  };
+}
+
+export function editJourneyCheckIn(
+  state: CompanionJourneyState,
+  checkInId: string,
+  updatedAt = Date.now()
+): CompanionJourneyState {
+  const target = state.checkIns.find((checkIn) => checkIn.id === checkInId);
+  if (!target?.completedAt) return state;
+  return {
+    ...state,
+    checkIns: state.checkIns.map((checkIn) =>
+      checkIn.id === checkInId
+        ? {
+            ...checkIn,
+            answers: [],
+            suggestedQuickGoalIds: [],
+            taskSuggestionStatus: null,
+            completedAt: undefined,
+            updatedAt,
+          }
+        : checkIn
+    ),
+  };
+}
+
+export function setJourneyCheckInTaskSuggestionStatus(
+  state: CompanionJourneyState,
+  checkInId: string,
+  status: 'added' | 'dismissed',
+  updatedAt = Date.now()
+): CompanionJourneyState {
+  return {
+    ...state,
+    checkIns: state.checkIns.map((checkIn) =>
+      checkIn.id === checkInId ? { ...checkIn, taskSuggestionStatus: status, updatedAt } : checkIn
+    ),
   };
 }
 
@@ -661,6 +856,28 @@ function isValidMomentEvent(value: unknown): value is CompanionJourneyMomentEven
   return typeof event.id === 'string' && typeof event.familyId === 'string' && typeof event.goalId === 'string' &&
     typeof event.kindId === 'string' && typeof event.dayId === 'string' &&
     (event.note === undefined || typeof event.note === 'string') && Number.isFinite(event.occurredAt);
+}
+
+function isValidCheckInAnswer(value: unknown): value is CompanionJourneyCheckInAnswer {
+  if (!value || typeof value !== 'object') return false;
+  const answer = value as CompanionJourneyCheckInAnswer;
+  return ['moment', 'effect', 'next'].includes(answer.questionId) &&
+    typeof answer.optionId === 'string' && typeof answer.label === 'string' &&
+    (answer.suggestsTasks === undefined || typeof answer.suggestsTasks === 'boolean') &&
+    Number.isFinite(answer.answeredAt);
+}
+
+function isValidCheckIn(value: unknown): value is CompanionJourneyCheckIn {
+  if (!value || typeof value !== 'object') return false;
+  const checkIn = value as CompanionJourneyCheckIn;
+  return typeof checkIn.id === 'string' && typeof checkIn.companionId === 'string' &&
+    typeof checkIn.familyId === 'string' && typeof checkIn.dayId === 'string' &&
+    (typeof checkIn.goalId === 'string' || checkIn.goalId === null) &&
+    (typeof checkIn.definitionId === 'string' || checkIn.definitionId === null) &&
+    Number.isFinite(checkIn.definitionVersion) && Array.isArray(checkIn.answers) &&
+    ['pending', 'added', 'dismissed', null].includes(checkIn.taskSuggestionStatus) &&
+    Number.isFinite(checkIn.startedAt) && Number.isFinite(checkIn.updatedAt) &&
+    (checkIn.completedAt === undefined || Number.isFinite(checkIn.completedAt));
 }
 
 function localDayId(timestamp: number): string {

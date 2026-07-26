@@ -146,8 +146,12 @@ export function CompanionQuestThread({
           )}
           {inlineNoteAction ? (
             <Pressable
-              accessibilityHint="Opens a quest note with text and voice recording"
-              accessibilityLabel="Add a note or voice note for this quest"
+              accessibilityHint={model.journalFallback
+                ? 'Opens the matching journal category'
+                : 'Opens a quest note with text and voice recording'}
+              accessibilityLabel={model.journalFallback
+                ? 'Open the matching journal entry for this quest'
+                : 'Add a note or voice note for this quest'}
               accessibilityRole="button"
               onPress={onAttemptInput}
               style={({ pressed }) => [styles.noteAttempt, pressed && styles.noteAttemptPressed]}>
@@ -156,10 +160,12 @@ export function CompanionQuestThread({
               </View>
               <View style={styles.noteAttemptCopy}>
                 <ThemedText style={styles.noteAttemptTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  Add note or voice
+                  {model.journalFallback ? 'Fill journal entry' : 'Add note or voice'}
                 </ThemedText>
                 <ThemedText style={styles.noteAttemptHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-                  Share this moment for the quest
+                  {model.journalFallback
+                    ? 'The matching category is already selected'
+                    : 'Share this moment for the quest'}
                 </ThemedText>
               </View>
               <IconSymbol name="chevron.right" size={15} color={Meadow.goldDeep} />

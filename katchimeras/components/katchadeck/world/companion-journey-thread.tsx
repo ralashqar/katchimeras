@@ -18,6 +18,12 @@ import {
   journeyQuestionnaireProgress,
 } from '@/utils/companion-journey';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
+import {
+  companionQuestionnaireOptionIcon,
+  type QuestionnaireImageSource,
+} from '@/utils/companion-questionnaire-presentation';
+import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
+import { CompanionQuestionnaireScene } from './companion-questionnaire-scene';
 
 export function CompanionJourneyDiscoveryThread({
   companionName,
@@ -49,7 +55,7 @@ export function CompanionJourneyDiscoveryThread({
           Your focus
         </ThemedText>
         <ThemedText selectable style={styles.description} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          Answer a few deeper questions when you want more direction. {companionName} turns your answers into a focus and useful actions in Do.
+          Answer a few quick choices when you want more direction. {companionName} turns them into a focus and suggests optional actions for Do.
         </ThemedText>
       </View>
 
@@ -83,7 +89,7 @@ export function CompanionJourneyDiscoveryThread({
           <ThemedText style={styles.helper} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
             {conversation
               ? 'Your answers are saved. Pick up exactly where you left off.'
-              : 'A short, private questionnaire creates a clear focus and automatically adds matching small tasks to Do.'}
+              : 'A short, private multiple-choice questionnaire creates a clear focus and previews matching small tasks for you to approve.'}
           </ThemedText>
         </View>
         <Pressable
@@ -358,73 +364,56 @@ export function LegacyCompanionJourneyDiscoveryThread({
 }
 
 export function CompanionJourneyQuestionnairePage({
+  accentColor,
+  background,
   companionName,
   conversation,
+  creature,
   definition,
   goals,
   node,
+  onAddTasks,
   onAnswer,
   onBack,
   onViewTasks,
   quickGoalSuggestionIds,
   resultReady,
 }: {
+  accentColor: string;
+  background: TodayAtmosphereBackground;
   companionName: string;
   conversation: CompanionJourneyConversationSession | null;
+  creature: QuestionnaireImageSource;
   definition: CompanionJourneyDefinition;
   goals: readonly CompanionJourneyGoal[];
   node: CompanionJourneyConversationNode | null;
+  onAddTasks: (templateIds: readonly string[]) => void;
   onAnswer: (sessionId: string, value: string) => readonly string[];
   onBack: () => void;
   onViewTasks: () => void;
   quickGoalSuggestionIds: readonly string[];
   resultReady: boolean;
 }) {
-  const [draft, setDraft] = useState('');
-  const [customTextOpen, setCustomTextOpen] = useState(false);
   const activeFocus = goals.find((goal) => goal.status === 'active' && goal.isPrimary)
     ?? goals.find((goal) => goal.status === 'active')
     ?? null;
-
-  useEffect(() => {
-    setDraft('');
-    setCustomTextOpen(false);
-  }, [node?.id]);
-
-  const answer = (value: string) => {
-    if (!conversation || !value.trim()) return;
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-    onAnswer(conversation.id, value);
-    setDraft('');
-  };
-
   if (resultReady) {
     const suggestions = quickGoalSuggestionIds
       .map((templateId) => companionQuickGoalTemplateById.get(templateId))
       .filter((template) => Boolean(template));
     return (
-      <View accessibilityLiveRegion="polite" style={styles.questionnaireResult}>
-        <View style={styles.resultMark}>
-          <IconSymbol color={Meadow.chipLabel} name="checkmark" size={30} />
-        </View>
-        <View style={styles.resultCopy}>
-          <ThemedText style={styles.resultEyebrow} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-            READY WITH {companionName.toUpperCase()}
-          </ThemedText>
-          <ThemedText selectable style={styles.resultTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-            Your focus is ready
-          </ThemedText>
-          {activeFocus ? (
-            <ThemedText selectable style={styles.resultFocus} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-              {activeFocus.title}
-            </ThemedText>
-          ) : null}
-          <ThemedText style={styles.resultBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-            {suggestions.length
-              ? `Based on your answers, these small actions are ready in ${companionName}'s Do list.`
-              : `Your answers will now help ${companionName} shape future tasks and reflections.`}
-          </ThemedText>
-        </View>
+      <CompanionQuestionnaireScene
+        accentColor={accentColor}
+        background={background}
+        companionName={companionName}
+        creature={creature}
+        helperText={suggestions.length
+          ? 'I found a few small actions from what you chose. Keep only what feels useful.'
+          : 'I’ll use your answers to shape future tasks and reflections.'}
+        onBack={onBack}
+        result
+        stepLabel="Your direction"
+        title={activeFocus?.title ?? 'Your focus is ready'}>
         {suggestions.length ? (
           <View style={styles.resultTasks}>
             {suggestions.map((template) => template ? (
@@ -436,7 +425,7 @@ export function CompanionJourneyQuestionnairePage({
                   {template.title}
                 </ThemedText>
                 <ThemedText style={styles.resultTaskMeta} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-                  IN DO
+                  SUGGESTED
                 </ThemedText>
               </View>
             ) : null)}
@@ -445,10 +434,13 @@ export function CompanionJourneyQuestionnairePage({
         <View style={styles.resultActions}>
           <Pressable
             accessibilityRole="button"
-            onPress={onViewTasks}
+            onPress={() => {
+              if (quickGoalSuggestionIds.length) onAddTasks(quickGoalSuggestionIds);
+              onViewTasks();
+            }}
             style={({ pressed }) => [styles.resultPrimaryButton, pressed && styles.pressed]}>
             <ThemedText style={styles.resultPrimaryLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-              View tasks in Do
+              {quickGoalSuggestionIds.length ? 'Add to Do' : 'Back to You'}
             </ThemedText>
             <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={18} />
           </Pressable>
@@ -458,107 +450,44 @@ export function CompanionJourneyQuestionnairePage({
             </ThemedText>
           </Pressable>
         </View>
-      </View>
+      </CompanionQuestionnaireScene>
     );
   }
 
   if (!conversation || !node) {
     return (
-      <View style={styles.questionnaireLoading}>
-        <IconSymbol color={Meadow.goldDeep} name="sparkles" size={28} />
-        <ThemedText style={styles.startTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          Preparing your questions…
-        </ThemedText>
-      </View>
+      <CompanionQuestionnaireScene
+        accentColor={accentColor}
+        background={background}
+        companionName={companionName}
+        creature={creature}
+        helperText="Give me a moment to gather the right choices."
+        onBack={onBack}
+        stepLabel="Set direction"
+        title="Preparing your questions…"
+      />
     );
   }
 
   const progress = journeyQuestionnaireProgress(definition, conversation);
   return (
-    <View style={styles.questionnairePage}>
-      <View style={styles.questionnaireHeader}>
-        <Pressable accessibilityLabel="Back to You" accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.questionnaireBack, pressed && styles.pressed]}>
-          <IconSymbol color={Meadow.ink} name="chevron.left" size={20} />
-        </Pressable>
-        <View style={styles.questionnaireHeaderCopy}>
-          <ThemedText style={styles.questionnaireEyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
-            YOU &amp; {companionName.toUpperCase()}
-          </ThemedText>
-          <ThemedText style={styles.questionnaireStep} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-            Question {progress.current} of {progress.total}
-          </ThemedText>
-        </View>
-      </View>
-      <View
-        accessibilityLabel={`${Math.round(progress.ratio * 100)} percent complete`}
-        accessibilityRole="progressbar"
-        style={styles.questionnaireTrack}>
-        <View style={[styles.questionnaireTrackFill, { width: `${progress.ratio * 100}%` }]} />
-      </View>
-      <View style={styles.questionnairePrompt}>
-        <ThemedText style={styles.conversationLabelText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
-          {definition.conversationTitle}
-        </ThemedText>
-        <ThemedText selectable style={styles.questionnaireQuestion} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          {node.prompt}
-        </ThemedText>
-        <ThemedText selectable style={styles.questionnaireHelper} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          {node.helperText}
-        </ThemedText>
-      </View>
-      {node.kind === 'single_choice' ? (
-        <View style={styles.questionnaireOptions}>
-          {(node.options ?? []).map((option) => (
-            <Pressable
-              accessibilityRole="button"
-              key={option.id}
-              onPress={() => answer(option.id)}
-              style={({ pressed }) => [styles.questionnaireOption, pressed && styles.questionnaireOptionPressed]}>
-              <ThemedText style={styles.questionnaireOptionText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                {option.label}
-              </ThemedText>
-              <IconSymbol color={Meadow.goldDeep} name="chevron.right" size={18} />
-            </Pressable>
-          ))}
-          {node.allowCustomText ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: customTextOpen }}
-              onPress={() => setCustomTextOpen((current) => !current)}
-              style={({ pressed }) => [styles.questionnaireCustom, customTextOpen && styles.customOptionOpen, pressed && styles.pressed]}>
-              <IconSymbol color={Meadow.inkSoft} name="pencil" size={17} />
-              <ThemedText style={styles.customOptionText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-                Write my own
-              </ThemedText>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-      {node.kind === 'free_text' || (node.allowCustomText && customTextOpen) ? (
-        <View style={styles.questionnaireEditor}>
-          <TextInput
-            accessibilityLabel={node.prompt}
-            autoFocus={customTextOpen}
-            multiline
-            onChangeText={setDraft}
-            placeholder="Write what feels true for you…"
-            placeholderTextColor={Meadow.inkFaint}
-            style={styles.questionnaireInput}
-            value={draft}
-          />
-          <Pressable
-            accessibilityRole="button"
-            disabled={!draft.trim()}
-            onPress={() => answer(draft)}
-            style={({ pressed }) => [styles.resultPrimaryButton, !draft.trim() && styles.disabled, pressed && styles.pressed]}>
-            <ThemedText style={styles.resultPrimaryLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-              Continue
-            </ThemedText>
-            <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={18} />
-          </Pressable>
-        </View>
-      ) : null}
-    </View>
+    <CompanionQuestionnaireScene
+      accentColor={accentColor}
+      background={background}
+      companionName={companionName}
+      creature={creature}
+      helperText={node.helperText}
+      onBack={onBack}
+      onSelect={(option) => onAnswer(conversation.id, option.id)}
+      options={(node.options ?? []).map((option) => ({
+        id: option.id,
+        label: option.label,
+        icon: companionQuestionnaireOptionIcon(option.id, option.label),
+      }))}
+      progress={progress.ratio}
+      stepLabel={`Question ${progress.current} of ${progress.total}`}
+      title={node.prompt}
+    />
   );
 }
 

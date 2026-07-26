@@ -60,24 +60,31 @@ import {
 import { companionJourneyByFamilyId, type CompanionJourneyGoalStatus } from '@/constants/companion-journeys';
 import {
   activeConversationForFamily,
+  answerJourneyCheckIn,
   answerJourneyConversation,
+  backJourneyCheckIn,
+  checkInForDay,
   currentJourneyConversationNode,
+  editJourneyCheckIn,
   goalsForJourneyFamily,
   hasJourneyMomentForDay,
   journeyProgressForGoal,
   primaryGoalForFamily,
   recordJourneyMoment,
-  recordJourneyReflection,
-  reflectionPromptForJourney,
   setJourneyGoalStatus,
+  setJourneyCheckInTaskSuggestionStatus,
   setPrimaryJourneyGoal,
+  startJourneyCheckIn,
   startJourneyConversation,
   syncJourneyQuestCompletions,
+  type CompanionJourneyCheckInAnswer,
 } from '@/utils/companion-journey';
+import { companionCheckInSuggestedGoalIds } from '@/utils/companion-check-in';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import { requestQuestActionIntent } from '@/utils/quest-action-signal';
+import { selectBalancedQuestOffers } from '@/utils/quest-offer-order';
 import { beginQuestCapture, consumeCompletedQuestCapture, questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import {
   buildQuestReportBackItems,
@@ -85,7 +92,10 @@ import {
   type QuestSubmissionItem,
 } from '@/utils/quests/report-back-evidence';
 import { evaluateQuestRuntime } from '@/utils/quests/runtime';
-import { questDefinition } from '@/utils/quests/definitions';
+import {
+  questDefinition,
+  semanticQuestJournalFallbackRoute,
+} from '@/utils/quests/definitions';
 import { completedQuestCount, resolveBlockJamConfig, resolveBreathingConfig, resolveLostWordDifficulty, resolveMatchingConfig, resolveMergeConfig, resolvePatternConfig, resolveRhythmConfig, resolveSortingConfig, resolveStepChallengeConfig, resolveTimingConfig, resolveWordPathsDifficulty } from '@/utils/quests/experiences/difficulty';
 import { selectWordPathPuzzle } from '@/utils/quests/experiences/word-paths-puzzles';
 import { isInteractiveExecution, type QuestResult } from '@/utils/quests/experiences/types';
@@ -344,6 +354,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const goal = primaryGoalForFamily(companionJourneyState, selectedFamilyId);
     return goal ? journeyProgressForGoal(companionJourneyState, goal) : null;
   }, [companionJourneyState, selectedFamilyId]);
+  const selectedJourneyCheckIn = useMemo(
+    () => selectedResident && today?.isoDate
+      ? checkInForDay(companionJourneyState, selectedResident.creature.creatureId, today.isoDate)
+      : null,
+    [companionJourneyState, selectedResident, today?.isoDate]
+  );
   const selectedJourneyMomentLoggedToday = useMemo(
     () => Boolean(
       today?.isoDate &&
@@ -448,7 +464,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       })
     : [];
   const selectedOfferOptions = selectedResident && today?.isoDate
-    ? balancedQuestOffers(
+    ? selectBalancedQuestOffers(
         questOffersForDay(
           companionQuestState,
           selectedResident.creature.creatureId,
@@ -456,7 +472,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           eligibleSelectedOffers,
           eligibleSelectedOffers.length
         ),
-        3
+        3,
+        selectedFamilyId === 'pagelet'
+          ? ['quest-pagelet-word-paths', 'quest-pagelet-lost-word']
+          : []
       )
     : [];
   const selectedOffer =
@@ -770,24 +789,32 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       return;
     }
     const definition = questDefinition(selectedQuestRuntime.questId);
+    const journalFallback = semanticQuestJournalFallbackRoute(selectedQuestRuntime.questId);
+    const foundationStatus = questCapabilities.appleFoundation.status;
+    const foundationAvailable = foundationStatus === 'available' || foundationStatus === 'granted';
     if (
       selectedResident &&
       definition?.semanticVerification &&
       (selectedQuestRuntime.nextAction === 'add_note' || selectedQuestRuntime.nextAction === 'record_voice')
     ) {
-      beginQuestCapture(selectedQuestRuntime.questId, selectedResident.creature.creatureId);
-      setQuestCaptureFeedback(null);
+      if (journalFallback && !foundationAvailable) {
+        requestQuestActionIntent({
+          action: 'add_note',
+          questId: selectedQuestRuntime.questId,
+          journalRoute: journalFallback,
+        });
+        setSelectedResident(null);
+        router.push('/today');
+        return;
+      } else {
+        beginQuestCapture(selectedQuestRuntime.questId, selectedResident.creature.creatureId);
+        setQuestCaptureFeedback(null);
+      }
     }
     requestQuestActionIntent({ action: selectedQuestRuntime.nextAction, questId: selectedQuestRuntime.questId });
     setSelectedResident(null);
     router.push('/today');
-  }, [router, selectedQuestRuntime, selectedResident]);
-
-  const answerSelectedReflection = useCallback(() => {
-    requestQuestActionIntent({ action: 'add_note' });
-    setSelectedResident(null);
-    router.push('/today');
-  }, [router]);
+  }, [questCapabilities.appleFoundation.status, router, selectedQuestRuntime, selectedResident]);
 
   const performSelectedInsightAction = useCallback(() => {
     const intent: CompanionNavigationIntent | undefined = selectedInsight?.action?.intent;
@@ -815,30 +842,6 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       dayId: today.isoDate,
     });
   }, [awardBond, selectedResident, today?.isoDate]);
-  const awardSelectedReflectionBond = useCallback((sourceId: string) => {
-    if (!selectedResident) return;
-    awardBond({
-      id: `reflection:${selectedResident.creature.creatureId}:${sourceId}`,
-      creatureId: selectedResident.creature.creatureId,
-      kind: 'reflection_saved',
-      occurredAt: Date.now(),
-      dayId: today?.isoDate,
-    });
-    if (selectedFamilyId) {
-      setCompanionJourneyState((current) => {
-        const next = recordJourneyReflection(current, selectedFamilyId, sourceId, Date.now(), today?.isoDate);
-        if (next !== current) saveCompanionJourneyState(next);
-        return next;
-      });
-    }
-  }, [awardBond, selectedFamilyId, selectedResident, today?.isoDate]);
-  const selectedReflectionPrompt = selectedFamilyId
-    ? reflectionPromptForJourney(companionJourneyState, selectedFamilyId) ?? (selectedRole
-      ? `Thinking about ${selectedRole.reflectionLenses[
-        Math.min(selectedBondProgress.level - 1, selectedRole.reflectionLenses.length - 1)
-      ]}, what would you like ${selectedRole.displayName} to remember about today?`
-      : null)
-    : null;
   const selectedDiscoveryPrompts = useMemo(
     () => selectedFamilyId && !selectedJourneyDefinition
       ? discoveryPromptsForFamily(selectedFamilyId, selectedBondProgress.level)
@@ -923,6 +926,87 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     }
     return result.completed ? result.suggestedQuickGoalIds : [];
   }, [awardBond, companionJourneyState, selectedFamilyId, selectedJourneyDefinition, selectedResident, today?.isoDate]);
+  const startSelectedJourneyCheckIn = useCallback(() => {
+    if (!selectedResident || !selectedFamilyId || !today?.isoDate) return null;
+    const result = startJourneyCheckIn(companionJourneyState, {
+      companionId: selectedResident.creature.creatureId,
+      familyId: selectedFamilyId,
+      dayId: today.isoDate,
+    });
+    if (result.state !== companionJourneyState) {
+      saveCompanionJourneyState(result.state);
+      setCompanionJourneyState(result.state);
+    }
+    return result.checkIn;
+  }, [companionJourneyState, selectedFamilyId, selectedResident, today?.isoDate]);
+  const answerSelectedJourneyCheckIn = useCallback((
+    checkInId: string,
+    answer: Omit<CompanionJourneyCheckInAnswer, 'answeredAt'>
+  ) => {
+    if (!selectedResident) return null;
+    const checkIn = companionJourneyState.checkIns.find((item) => item.id === checkInId) ?? null;
+    if (!checkIn) return null;
+    const goal = checkIn.goalId
+      ? companionJourneyState.goals.find((candidate) => candidate.id === checkIn.goalId) ?? null
+      : null;
+    const proposedAnswers = [
+      ...checkIn.answers.filter((item) => item.questionId !== answer.questionId),
+      { ...answer, answeredAt: Date.now() },
+    ];
+    const suggestedQuickGoalIds = companionCheckInSuggestedGoalIds({
+      answers: proposedAnswers,
+      definition: selectedJourneyDefinition,
+      goal,
+    });
+    const result = answerJourneyCheckIn(companionJourneyState, {
+      checkInId,
+      questionId: answer.questionId,
+      optionId: answer.optionId,
+      label: answer.label,
+      suggestsTasks: answer.suggestsTasks,
+      suggestedQuickGoalIds,
+    });
+    if (result.state !== companionJourneyState) {
+      saveCompanionJourneyState(result.state);
+      setCompanionJourneyState(result.state);
+    }
+    if (result.completedNow) {
+      const sourceId = `companion-reflection:${selectedResident.creature.creatureId}:${result.checkIn?.dayId ?? today?.isoDate}`;
+      awardBond({
+        id: `reflection:${selectedResident.creature.creatureId}:${sourceId}`,
+        creatureId: selectedResident.creature.creatureId,
+        kind: 'reflection_saved',
+        occurredAt: Date.now(),
+        dayId: result.checkIn?.dayId ?? today?.isoDate,
+      });
+      setMicrocopy('Check-in remembered');
+    }
+    return result.checkIn;
+  }, [awardBond, companionJourneyState, selectedJourneyDefinition, selectedResident, today?.isoDate]);
+  const backSelectedJourneyCheckIn = useCallback((checkInId: string) => {
+    setCompanionJourneyState((current) => {
+      const next = backJourneyCheckIn(current, checkInId);
+      if (next !== current) saveCompanionJourneyState(next);
+      return next;
+    });
+  }, []);
+  const editSelectedJourneyCheckIn = useCallback((checkInId: string) => {
+    setCompanionJourneyState((current) => {
+      const next = editJourneyCheckIn(current, checkInId);
+      if (next !== current) saveCompanionJourneyState(next);
+      return next;
+    });
+  }, []);
+  const setSelectedJourneyCheckInTaskStatus = useCallback((
+    checkInId: string,
+    status: 'added' | 'dismissed'
+  ) => {
+    setCompanionJourneyState((current) => {
+      const next = setJourneyCheckInTaskSuggestionStatus(current, checkInId, status);
+      if (next !== current) saveCompanionJourneyState(next);
+      return next;
+    });
+  }, []);
   const setSelectedJourneyGoalStatus = useCallback((goalId: string, status: CompanionJourneyGoalStatus) => {
     setCompanionJourneyState((current) => {
       const next = setJourneyGoalStatus(current, goalId, status);
@@ -960,6 +1044,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setMicrocopy('Moment remembered');
   }, [companionJourneyState, selectedFamilyId, today?.isoDate]);
   const selectedActiveQuestDefinition = selectedActiveQuest ? questDefinition(selectedActiveQuest.questId) : null;
+  const selectedSemanticJournalFallbackActive = Boolean(
+    selectedActiveQuest &&
+    semanticQuestJournalFallbackRoute(selectedActiveQuest.questId) &&
+    questCapabilities.appleFoundation.status !== 'available' &&
+    questCapabilities.appleFoundation.status !== 'granted'
+  );
   const selectedInteractiveExecution = isInteractiveExecution(selectedActiveQuestDefinition?.execution)
     ? selectedActiveQuestDefinition.execution
     : null;
@@ -1009,7 +1099,6 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   return {
     acceptSelectedQuest,
     cancelSelectedQuestAttempt,
-    answerSelectedReflection,
     cashInSelectedQuest,
     chooseAnotherSelectedQuest,
     closeSelectedResident,
@@ -1024,6 +1113,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectThread,
     selectedActiveQuest,
     selectedActiveQuestDefinition,
+    selectedSemanticJournalFallbackActive,
     selectedInteractiveExecution,
     selectedCompanionData,
     selectedInsight,
@@ -1045,6 +1135,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedJourneyConversation,
     selectedJourneyNode,
     selectedJourneyProgress,
+    selectedJourneyCheckIn,
     selectedJourneyMomentLoggedToday,
     selectedQuickGoalSuggestionIds: quickGoalSuggestions?.familyId === selectedFamilyId
       ? quickGoalSuggestions.templateIds
@@ -1053,10 +1144,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedQuestAdvancesJourneyGoal,
     startSelectedJourneyConversation,
     answerSelectedJourneyConversation,
+    startSelectedJourneyCheckIn,
+    answerSelectedJourneyCheckIn,
+    backSelectedJourneyCheckIn,
+    editSelectedJourneyCheckIn,
+    setSelectedJourneyCheckInTaskStatus,
     logSelectedJourneyMoment,
     setSelectedJourneyGoalStatus,
     setSelectedPrimaryJourneyGoal,
-    selectedReflectionPrompt,
     selectedDiscoveryPrompts,
     selectedDiscoveryAnswers,
     answerSelectedDiscoveryPrompt,
@@ -1080,7 +1175,6 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     submitSelectedQuest,
     performSelectedInsightAction,
     awardSelectedInsightBond,
-    awardSelectedReflectionBond,
     refreshQuestState,
     startSelectedQuestAttempt,
   };
@@ -1118,19 +1212,6 @@ function dayDistance(from: string, to: string): number {
   const start = new Date(`${from}T12:00:00`).getTime();
   const end = new Date(`${to}T12:00:00`).getTime();
   return Math.floor((end - start) / 86_400_000);
-}
-
-function balancedQuestOffers<T extends { id: string; lane: 'real_life' | 'mini_game' }>(offers: T[], limit: number): T[] {
-  const selected: T[] = [];
-  for (const lane of ['real_life', 'mini_game'] as const) {
-    const match = offers.find((offer) => offer.lane === lane);
-    if (match) selected.push(match);
-  }
-  for (const offer of offers) {
-    if (selected.length >= limit) break;
-    if (!selected.some((item) => item.id === offer.id)) selected.push(offer);
-  }
-  return selected.slice(0, limit);
 }
 
 function resolveInteractiveConfig(

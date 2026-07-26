@@ -3,6 +3,11 @@ import type { QuestNextAction } from '@/utils/quests/runtime';
 export type PendingQuestActionIntent = {
   action: QuestNextAction;
   questId?: string | null;
+  journalRoute?: {
+    flowId: string;
+    categoryId: string;
+    contextId?: string | null;
+  } | null;
 };
 
 let pending: PendingQuestActionIntent | null = null;

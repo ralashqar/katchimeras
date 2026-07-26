@@ -6,7 +6,6 @@ const THREADS: InteractionThreadOption<CompanionThread>[] = [
   { id: 'discovery', label: 'You', icon: 'square.and.pencil' },
   { id: 'insight', label: 'Insight', icon: 'star.fill' },
   { id: 'skins', label: 'Skins', icon: 'circle.grid.2x2.fill' },
-  { id: 'reflection', label: 'Reflect', icon: 'leaf.fill' },
 ];
 
 export function CompanionThreadSwitcher({

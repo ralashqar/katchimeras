@@ -142,6 +142,43 @@ export const KatchaDeckUI = {
     premium: '0 22px 56px rgba(227, 160, 110, 0.26)',
   },
   typography: {
+    kingdomDisplay: {
+      fontFamily: AppFontFamilies.fredokaBold,
+      fontSize: 28,
+      lineHeight: 34,
+      letterSpacing: 0.1,
+    } satisfies TextStyle,
+    screenHeader: {
+      fontFamily: AppFontFamilies.fredokaBold,
+      fontSize: 20,
+      lineHeight: 25,
+      letterSpacing: 0,
+    } satisfies TextStyle,
+    screenTitle: {
+      fontFamily: AppFontFamilies.fredokaBold,
+      fontSize: 26,
+      lineHeight: 31,
+      letterSpacing: -0.25,
+    } satisfies TextStyle,
+    screenMeta: {
+      fontFamily: AppFontFamilies.manrope,
+      fontSize: 12.5,
+      lineHeight: 18,
+      fontWeight: '700',
+      letterSpacing: 0.1,
+    } satisfies TextStyle,
+    uiBody: {
+      fontFamily: AppFontFamilies.manrope,
+      fontSize: 13.5,
+      lineHeight: 20,
+      fontWeight: '600',
+    } satisfies TextStyle,
+    uiAction: {
+      fontFamily: AppFontFamilies.manrope,
+      fontSize: 14.5,
+      lineHeight: 20,
+      fontWeight: '800',
+    } satisfies TextStyle,
     display: {
       fontFamily: AppFontFamilies.instrumentSerif,
       fontSize: 42,

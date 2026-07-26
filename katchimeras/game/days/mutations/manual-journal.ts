@@ -12,10 +12,33 @@ export function withManualJournalEntry(day: StoredHomeDayRecord, submission: Man
 }
 
 export function commitJournalRecord(day: StoredHomeDayRecord, command: JournalCommitCommand, now: Date): StoredHomeDayRecord {
-  if (day.journalRecords?.some((item) => item.idempotencyKey === command.idempotencyKey)) return day;
+  const existing = day.journalRecords?.find((item) => item.idempotencyKey === command.idempotencyKey) ?? null;
+  const origin =
+    command.draft.source.kind === 'text_note' || command.draft.source.kind === 'voice_note'
+      ? command.draft.source.origin
+      : null;
+  if (existing && origin?.kind !== 'companion_reflection') return day;
   const record = commandToJournalRecord(command, now);
   if (!record) return day;
-  return projectJournalRecord(day, assignAutomaticJournalLocation(day, record, now), now);
+  const base = existing ? removeReplaceableCompanionReflection(day, existing) : day;
+  return projectJournalRecord(base, assignAutomaticJournalLocation(base, record, now), now);
+}
+
+function removeReplaceableCompanionReflection(
+  day: StoredHomeDayRecord,
+  existing: JournalRecord
+): StoredHomeDayRecord {
+  const manualEntryId = `manual-${existing.id}`;
+  const sourceId = existing.source.sourceId;
+  return {
+    ...day,
+    journalRecords: (day.journalRecords ?? []).filter((record) => record.id !== existing.id),
+    manualJournalEntries: (day.manualJournalEntries ?? []).filter((entry) => entry.id !== manualEntryId),
+    notes: (day.notes ?? []).filter((note) => note.id !== sourceId),
+    classifiedMemories: (day.classifiedMemories ?? []).filter((memory) => memory.sourceId !== sourceId),
+    evidence: (day.evidence ?? []).filter((evidence) => evidence.sourceId !== sourceId),
+    locations: (day.locations ?? []).filter((location) => location.journalRecordId !== existing.id),
+  };
 }
 
 function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _now: Date): StoredHomeDayRecord {

@@ -4,10 +4,18 @@ import test from 'node:test';
 import type { DayEvidence, ManualJournalSubmission, StoredHomeDayRecord } from '@/types/home';
 import { validateCompleteCompanionContent } from '@/constants/companion-content';
 import { withManualJournalEntry } from '@/game/days/mutations/manual-journal';
-import { questDefinition } from '@/utils/quests/definitions';
+import {
+  questDefinition,
+  semanticQuestJournalFallbackRoute,
+} from '@/utils/quests/definitions';
 import { semanticVerificationDecision } from '@/utils/quests/semantic-verification-decision';
 import { evaluateCriterion } from '@/utils/signals/facts';
 import { themedQuestOffers } from '@/utils/quests/themed';
+import {
+  defaultQuestCapabilities,
+  questCapabilitiesWithFoundation,
+} from '@/utils/capabilities/quest-capabilities';
+import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 
 const verification = questDefinition('quest-flexel-training-detail')!.semanticVerification!;
 
@@ -39,7 +47,7 @@ function journal(flowId: string, categoryId: string, context?: string): ManualJo
   };
 }
 
-test('semantic quests use Foundation-only hidden offer metadata', () => {
+test('semantic quests use Foundation when available and expose only authored journal fallbacks', () => {
   for (const questId of [
     'quest-flexel-training-detail',
     'quest-sprintail-run-detail',
@@ -59,11 +67,41 @@ test('semantic quests use Foundation-only hidden offer metadata', () => {
     'quest-shellio-water-detail',
   ]) {
     const definition = questDefinition(questId)!;
-    assert.ok(definition.requiresCapabilities?.includes('appleFoundation'));
-    assert.equal(definition.offerVisibility, 'hide_when_unavailable');
+    const journalFallback = semanticQuestJournalFallbackRoute(questId);
+    if (journalFallback) {
+      assert.equal(definition.requiresCapabilities?.includes('appleFoundation') ?? false, false);
+      assert.ok(definition.optionalCapabilities?.includes('appleFoundation'));
+      assert.equal(definition.offerVisibility, 'default');
+    } else {
+      assert.ok(definition.requiresCapabilities?.includes('appleFoundation'));
+      assert.equal(definition.offerVisibility, 'hide_when_unavailable');
+    }
     assert.deepEqual(definition.semanticVerification?.modalities, ['text', 'voice']);
   }
   assert.deepEqual(validateCompleteCompanionContent(), []);
+});
+
+test('a fallback quest remains actionable without Foundation and resolves its direct journal route', () => {
+  const capabilities = questCapabilitiesWithFoundation(defaultQuestCapabilities(), false);
+  const fallbackRuntime = evaluateQuestRuntime({
+    questId: 'quest-steppling-walk-detail',
+    facts: { 'evidence.items': [] },
+    capabilities,
+  });
+  assert.equal(fallbackRuntime.state, 'in_progress');
+  assert.equal(fallbackRuntime.nextAction, 'add_note');
+  assert.deepEqual(
+    semanticQuestJournalFallbackRoute('quest-steppling-walk-detail'),
+    { flowId: 'movement', categoryId: 'walk', contextId: null }
+  );
+
+  const modelOnlyRuntime = evaluateQuestRuntime({
+    questId: 'quest-vesperitt-night-detail',
+    facts: { 'evidence.items': [] },
+    capabilities,
+  });
+  assert.equal(modelOnlyRuntime.state, 'unavailable');
+  assert.equal(semanticQuestJournalFallbackRoute('quest-vesperitt-night-detail'), null);
 });
 
 test('owned companion pools expose a low-bond semantic quest when Foundation is available', () => {

@@ -20,7 +20,7 @@ import type { CreatureHatchlingLod } from '@/constants/creature-hatchling-source
 import { weatherIconName, weatherLabel } from '@/utils/day-weather';
 import type { DayWeather, HomeVisualKey, LocalCreatureRecord } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
-import { Lantern } from '@/constants/theme';
+import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import todayScene from '@/data/today-scene.json';
 import {
   kingdomHomeTileForIdentity,
@@ -215,10 +215,10 @@ export const CreatureHero = memo(function CreatureHero({
                   }
                 : null,
             ]}>
-            <ThemedText numberOfLines={1} type="onboardingLabel" style={styles.compactKicker} lightColor="rgba(251, 243, 228, 0.88)" darkColor="rgba(251, 243, 228, 0.88)">
+            <ThemedText numberOfLines={1} type="onboardingLabel" style={styles.compactKicker} lightColor="#F8FCFF" darkColor="#F8FCFF">
               {buildCreatureKicker(creature)}
             </ThemedText>
-            <ThemedText numberOfLines={1} type="display" style={styles.compactName} lightColor="#F2D48A" darkColor="#F2D48A">
+            <ThemedText numberOfLines={1} type="display" style={styles.compactName} lightColor="#FFD36E" darkColor="#FFD36E">
               {creature.name}
             </ThemedText>
           </View>
@@ -342,15 +342,22 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   compactKicker: {
-    fontSize: 11,
-    letterSpacing: 0.6,
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 13.5,
+    fontWeight: '800',
+    letterSpacing: 0,
+    lineHeight: 19,
     textAlign: 'center',
+    textShadowColor: 'rgba(27,72,111,0.76)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   compactName: {
-    fontSize: 27,
-    fontStyle: 'italic',
-    lineHeight: 33,
+    ...KatchaDeckUI.typography.kingdomDisplay,
     textAlign: 'center',
+    textShadowColor: 'rgba(30,70,111,0.92)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 3,
   },
   stage: {
     alignItems: 'center',

@@ -4,8 +4,11 @@ import test from 'node:test';
 import { companionJourneyByFamilyId } from '@/constants/companion-journeys';
 import {
   activeConversationForFamily,
+  answerJourneyCheckIn,
   answerJourneyConversation,
+  checkInForDay,
   currentJourneyConversationNode,
+  editJourneyCheckIn,
   emptyCompanionJourneyState,
   goalsForJourneyFamily,
   hasJourneyMomentForDay,
@@ -18,11 +21,14 @@ import {
   recordJourneyReflection,
   reflectionPromptForJourney,
   setJourneyGoalStatus,
+  setJourneyCheckInTaskSuggestionStatus,
+  startJourneyCheckIn,
   startJourneyConversation,
   syncJourneyQuestCompletions,
   validateCompanionJourneyDefinitions,
   type CompanionJourneyState,
 } from '@/utils/companion-journey';
+import { companionCheckInQuestion, companionCheckInSuggestedGoalIds } from '@/utils/companion-check-in';
 import type { CompanionQuest } from '@/utils/katchimera-quests';
 import { identityForEncounter } from '@/utils/katchimera-identity';
 import { themedQuestOffers } from '@/utils/quests/themed';
@@ -80,6 +86,16 @@ test('journey catalogues have valid branches, goal types, and stages', () => {
   assert.ok(companionJourneyByFamilyId.has('vesperitt'));
   for (const familyId of ['flexel', 'sprintail', 'hooplet', 'serveling', 'snuglet', 'waglet', 'whiskit']) {
     assert.ok(companionJourneyByFamilyId.has(familyId));
+  }
+});
+
+test('every You questionnaire is low-friction multiple choice', () => {
+  for (const definition of companionJourneyByFamilyId.values()) {
+    for (const node of definition.nodes) {
+      assert.equal(node.kind, 'single_choice', `${definition.familyId}:${node.id} requires typing`);
+      assert.ok((node.options?.length ?? 0) >= 2, `${definition.familyId}:${node.id} has too few choices`);
+      assert.notEqual(node.allowCustomText, true, `${definition.familyId}:${node.id} exposes a text answer`);
+    }
   }
 });
 
@@ -162,7 +178,7 @@ test('Bedrotte and Snoozle share one Rest Journey, goal ledger, and quest catalo
   let state = startJourneyConversation(emptyCompanionJourneyState(), bedrotte.familyId, 100);
   state = answerCurrent(state, snoozle.familyId, 'wind-down', 110);
   assert.equal(currentJourneyConversationNode(activeConversationForFamily(state, bedrotte.familyId))?.id, 'wind-down-goal');
-  state = answerCurrent(state, bedrotte.familyId, 'Read quietly before bed', 120);
+  state = answerCurrent(state, bedrotte.familyId, 'quiet-ritual', 120);
   state = answerCurrent(state, snoozle.familyId, 'switching-off', 130);
   const goal = primaryGoalForFamily(state, bedrotte.familyId);
   assert.equal(goal?.goalTypeId, 'wind-down');
@@ -190,7 +206,7 @@ test('Bedrotte and Snoozle share one Rest Journey, goal ledger, and quest catalo
 test('Rest quests contribute only when they fit the selected goal type', () => {
   let state = startJourneyConversation(emptyCompanionJourneyState(), 'sleep-rest', 100);
   state = answerCurrent(state, 'sleep-rest', 'recovery', 110);
-  state = answerCurrent(state, 'sleep-rest', 'Recover without filling the evening with chores', 120);
+  state = answerCurrent(state, 'sleep-rest', 'quiet-break', 120);
   state = answerCurrent(state, 'sleep-rest', 'responsibility', 130);
   const goal = primaryGoalForFamily(state, 'sleep-rest')!;
 
@@ -219,10 +235,10 @@ test('Tasklet conversation branches into a persistent goal and follow-up', () =>
     { current: 2, total: 3, ratio: 2 / 3 }
   );
 
-  state = answerCurrent(state, 'tasklet', 'Ship the first usable prototype', 120);
+  state = answerCurrent(state, 'tasklet', 'next-milestone', 120);
   const goal = primaryGoalForFamily(state, 'tasklet');
   assert.equal(goal?.goalTypeId, 'project');
-  assert.equal(goal?.title, 'Ship the first usable prototype');
+  assert.equal(goal?.title, 'Finish the next meaningful project milestone');
   assert.equal(currentJourneyConversationNode(activeConversationForFamily(state, 'tasklet'))?.id, 'friction');
 
   state = answerCurrent(state, 'tasklet', 'time', 130);
@@ -235,19 +251,19 @@ test('Vesperitt accidental nights branch to a gentle shift goal', () => {
   state = answerCurrent(state, 'vesperitt', 'scrolling', 110);
   state = answerCurrent(state, 'vesperitt', 'accidental', 120);
   assert.equal(currentJourneyConversationNode(activeConversationForFamily(state, 'vesperitt'))?.id, 'shift-goal');
-  state = answerCurrent(state, 'vesperitt', 'Put the phone down after one episode', 130);
+  state = answerCurrent(state, 'vesperitt', 'one-more-stop', 130);
   assert.equal(primaryGoalForFamily(state, 'vesperitt')?.goalTypeId, 'shift');
   assert.equal(activeConversationForFamily(state, 'vesperitt'), null);
 });
 
-test('Vesperitt final question offers suggested goals and optional custom text', () => {
+test('Vesperitt final question offers suggested goals without requiring custom text', () => {
   let state = startJourneyConversation(emptyCompanionJourneyState(), 'vesperitt', 100);
   state = answerCurrent(state, 'vesperitt', 'making', 110);
   state = answerCurrent(state, 'vesperitt', 'mixed', 120);
   const node = currentJourneyConversationNode(activeConversationForFamily(state, 'vesperitt'));
   assert.equal(node?.id, 'understand-goal');
   assert.equal(node?.kind, 'single_choice');
-  assert.equal(node?.allowCustomText, true);
+  assert.notEqual(node?.allowCustomText, true);
   assert.equal(node?.options?.length, 4);
   assert.deepEqual(
     node?.options?.find((option) => option.id === 'stopping-cues')?.suggestedQuickGoalIds,
@@ -292,7 +308,7 @@ test('Vesperitt stores actionable goal titles and upgrades old answer-shaped tit
 test('quest events are idempotent and move the current goal through stages', () => {
   let state = startJourneyConversation(emptyCompanionJourneyState(), 'tasklet', 100);
   state = answerCurrent(state, 'tasklet', 'project', 110);
-  state = answerCurrent(state, 'tasklet', 'Finish the portfolio', 120);
+  state = answerCurrent(state, 'tasklet', 'next-milestone', 120);
   state = answerCurrent(state, 'tasklet', 'time', 130);
   const goal = primaryGoalForFamily(state, 'tasklet')!;
 
@@ -312,7 +328,7 @@ test('quest events are idempotent and move the current goal through stages', () 
   state = recordJourneyReflection(state, 'tasklet', 'memory-1', 500, '2026-08-01');
   assert.equal(state.reflectionEvents.length, 1);
   assert.equal(journeyProgressForGoal(state, goal)?.currentStage.id, 'decide');
-  assert.match(reflectionPromptForJourney(state, 'tasklet') ?? '', /Finish the portfolio/);
+  assert.match(reflectionPromptForJourney(state, 'tasklet') ?? '', /next meaningful project milestone/);
 
   state = setJourneyGoalStatus(state, goal.id, 'completed', 600);
   assert.equal(journeyProgressForGoal(state, state.goals[0]!)?.stages.every((stage) => stage.complete), true);
@@ -342,7 +358,7 @@ test('manual moments advance the current goal once per day', () => {
 test('a quest and manual check-in on the same day count as one noticed moment', () => {
   let state = startJourneyConversation(emptyCompanionJourneyState(), 'tasklet', 100);
   state = answerCurrent(state, 'tasklet', 'project', 110);
-  state = answerCurrent(state, 'tasklet', 'Finish the portfolio', 120);
+  state = answerCurrent(state, 'tasklet', 'next-milestone', 120);
   state = answerCurrent(state, 'tasklet', 'time', 130);
   const goal = primaryGoalForFamily(state, 'tasklet')!;
 
@@ -357,18 +373,19 @@ test('a quest and manual check-in on the same day count as one noticed moment', 
 
 test('each family keeps one current focus and preserves earlier focuses as paused history', () => {
   let state = emptyCompanionJourneyState();
+  const projectDirections = ['next-milestone', 'clear-plan', 'restart'] as const;
   for (let index = 0; index < 3; index += 1) {
     state = startJourneyConversation(state, 'tasklet', 100 + index * 10);
     state = answerCurrent(state, 'tasklet', 'project', 101 + index * 10);
-    state = answerCurrent(state, 'tasklet', `Project ${index + 1}`, 102 + index * 10);
+    state = answerCurrent(state, 'tasklet', projectDirections[index]!, 102 + index * 10);
     state = answerCurrent(state, 'tasklet', 'time', 103 + index * 10);
   }
   assert.equal(goalsForJourneyFamily(state, 'tasklet').filter((goal) => goal.status === 'active').length, 1);
   assert.equal(goalsForJourneyFamily(state, 'tasklet').filter((goal) => goal.status === 'paused').length, 2);
   assert.equal(goalsForJourneyFamily(state, 'tasklet').filter((goal) => goal.isPrimary).length, 1);
-  assert.equal(primaryGoalForFamily(state, 'tasklet')?.title, 'Project 3');
+  assert.equal(primaryGoalForFamily(state, 'tasklet')?.title, 'Restart momentum on this project');
 
-  const second = goalsForJourneyFamily(state, 'tasklet').find((goal) => goal.title === 'Project 2')!;
+  const second = goalsForJourneyFamily(state, 'tasklet').find((goal) => goal.title === 'Create a clear plan for this project')!;
   state = setJourneyGoalStatus(state, second.id, 'active', 200);
   assert.equal(primaryGoalForFamily(state, 'tasklet')?.id, second.id);
   assert.equal(goalsForJourneyFamily(state, 'tasklet').filter((goal) => goal.status === 'active').length, 1);
@@ -376,10 +393,10 @@ test('each family keeps one current focus and preserves earlier focuses as pause
   state = startJourneyConversation(state, 'tasklet', 300);
   state = answerCurrent(state, 'tasklet', 'project', 301);
   const session = activeConversationForFamily(state, 'tasklet')!;
-  const replaced = answerJourneyConversation(state, session.id, 'Project 4', 302);
+  const replaced = answerJourneyConversation(state, session.id, 'smaller-scope', 302);
   assert.equal(replaced.blockedReason, null);
   assert.equal(replaced.state.goals.length, 4);
-  assert.equal(primaryGoalForFamily(replaced.state, 'tasklet')?.title, 'Project 4');
+  assert.equal(primaryGoalForFamily(replaced.state, 'tasklet')?.title, 'Reduce this project to a manageable scope');
   assert.equal(goalsForJourneyFamily(replaced.state, 'tasklet').filter((goal) => goal.status === 'active').length, 1);
 });
 
@@ -420,4 +437,96 @@ test('legacy Rest, Tasklet, and Vesperitt discovery goals migrate once', () => {
   assert.equal(primaryGoalForFamily(first, 'sleep-rest')?.goalTypeId, 'wind-down');
   assert.equal(primaryGoalForFamily(first, 'tasklet')?.title, 'Finish the launch');
   assert.equal(goalsForJourneyFamily(first, 'vesperitt')[0]?.status, 'paused');
+});
+
+test('daily check-ins branch over three taps and reward journey progress only once', () => {
+  let state = emptyCompanionJourneyState();
+  state = startJourneyConversation(state, 'tasklet', 100);
+  state = answerCurrent(state, 'tasklet', 'project', 110);
+  state = answerCurrent(state, 'tasklet', 'next-milestone', 120);
+  const completedFocus = answerJourneyConversation(
+    state,
+    activeConversationForFamily(state, 'tasklet')!.id,
+    'time',
+    130
+  );
+  state = completedFocus.state;
+  const goal = primaryGoalForFamily(state, 'tasklet')!;
+  const started = startJourneyCheckIn(state, {
+    companionId: 'companion:tasklet',
+    familyId: 'tasklet',
+    dayId: '2026-07-26',
+  }, 200);
+  state = started.state;
+  assert.equal(checkInForDay(state, 'companion:tasklet', '2026-07-26')?.id, started.checkIn.id);
+
+  const firstQuestion = companionCheckInQuestion({
+    checkIn: started.checkIn,
+    definition: companionJourneyByFamilyId.get('tasklet')!,
+    role: null,
+    goal,
+  });
+  assert.equal(firstQuestion?.id, 'moment');
+  let result = answerJourneyCheckIn(state, {
+    checkInId: started.checkIn.id,
+    questionId: 'moment',
+    optionId: 'moved-forward',
+    label: 'I moved it forward',
+  }, 210);
+  state = result.state;
+  result = answerJourneyCheckIn(state, {
+    checkInId: started.checkIn.id,
+    questionId: 'effect',
+    optionId: 'blocked',
+    label: 'It got in the way',
+  }, 220);
+  state = result.state;
+  const taskIds = companionCheckInSuggestedGoalIds({
+    answers: [
+      ...result.checkIn!.answers,
+      { questionId: 'next', optionId: 'smaller', label: 'Make the next step easier', suggestsTasks: true, answeredAt: 230 },
+    ],
+    definition: companionJourneyByFamilyId.get('tasklet')!,
+    goal,
+  });
+  assert.ok(taskIds.length > 0);
+  result = answerJourneyCheckIn(state, {
+    checkInId: started.checkIn.id,
+    questionId: 'next',
+    optionId: 'smaller',
+    label: 'Make the next step easier',
+    suggestsTasks: true,
+    suggestedQuickGoalIds: taskIds,
+  }, 230);
+  state = result.state;
+  assert.equal(result.completedNow, true);
+  assert.equal(state.reflectionEvents.length, 1);
+  assert.equal(result.checkIn?.taskSuggestionStatus, 'pending');
+
+  state = setJourneyCheckInTaskSuggestionStatus(state, started.checkIn.id, 'added', 240);
+  assert.equal(checkInForDay(state, 'companion:tasklet', '2026-07-26')?.taskSuggestionStatus, 'added');
+  state = editJourneyCheckIn(state, started.checkIn.id, 250);
+  assert.equal(checkInForDay(state, 'companion:tasklet', '2026-07-26')?.completedAt, undefined);
+  assert.equal(state.reflectionEvents.length, 1);
+});
+
+test('check-ins remain useful without a Journey focus and do not invent tasks', () => {
+  const started = startJourneyCheckIn(emptyCompanionJourneyState(), {
+    companionId: 'companion:shellio',
+    familyId: 'shellio',
+    dayId: '2026-07-26',
+  }, 100);
+  const question = companionCheckInQuestion({
+    checkIn: started.checkIn,
+    definition: null,
+    role: null,
+    goal: null,
+  });
+  assert.equal(question?.id, 'moment');
+  assert.equal(question?.options.length, 4);
+  assert.deepEqual(companionCheckInSuggestedGoalIds({
+    answers: [{ questionId: 'next', optionId: 'notice', label: 'Notice it again', suggestsTasks: true, answeredAt: 110 }],
+    definition: null,
+    goal: null,
+  }), []);
 });

@@ -9,7 +9,7 @@ import {
   recordCompanionBondEvent,
 } from '@/utils/companion-bond';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
-import { selectRankedQuestOffers } from '@/utils/quest-offer-order';
+import { selectBalancedQuestOffers, selectRankedQuestOffers } from '@/utils/quest-offer-order';
 
 test('companion bond resolves every level boundary and segment', () => {
   const state = (points: number) => ({
@@ -67,4 +67,25 @@ test('daily quest choices are deterministic, weighted, and capped at three', () 
   assert.deepEqual(first, second);
   assert.equal(first.length, 3);
   assert.equal(first[0]?.id, 'recommended');
+});
+
+test('Pagelet keeps both signature word games beside one real-life quest', () => {
+  const offers = [
+    { id: 'quest-book-trivia', lane: 'mini_game' as const },
+    { id: 'quest-pagelet-learning-note', lane: 'real_life' as const },
+    { id: 'quest-pagelet-lost-word', lane: 'mini_game' as const },
+    { id: 'quest-pagelet-word-paths', lane: 'mini_game' as const },
+    { id: 'quest-read-book', lane: 'real_life' as const },
+  ];
+  const selected = selectBalancedQuestOffers(
+    offers,
+    3,
+    ['quest-pagelet-word-paths', 'quest-pagelet-lost-word'],
+  );
+
+  assert.deepEqual(selected.map((offer) => offer.id), [
+    'quest-pagelet-learning-note',
+    'quest-pagelet-word-paths',
+    'quest-pagelet-lost-word',
+  ]);
 });

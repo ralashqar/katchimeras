@@ -126,13 +126,19 @@ export default function HomeScreen() {
   const [hatchCheckInOpen, setHatchCheckInOpen] = useState(false);
   const [hatchAfterCheckIn, setHatchAfterCheckIn] = useState(false);
   const [manualJournalInitialFlowId, setManualJournalInitialFlowId] = useState<string | null>(null);
-  const openManualJournal = useCallback((flowId?: string) => {
+  const [manualJournalInitialChoiceId, setManualJournalInitialChoiceId] = useState<string | null>(null);
+  const [manualJournalInitialContextId, setManualJournalInitialContextId] = useState<string | null>(null);
+  const openManualJournal = useCallback((flowId?: string, categoryId?: string, contextId?: string | null) => {
     setManualJournalInitialFlowId(flowId ?? null);
+    setManualJournalInitialChoiceId(categoryId ?? null);
+    setManualJournalInitialContextId(contextId ?? null);
     setManualJournalOpen(true);
   }, []);
   const closeManualJournal = useCallback(() => {
     setManualJournalOpen(false);
     setManualJournalInitialFlowId(null);
+    setManualJournalInitialChoiceId(null);
+    setManualJournalInitialContextId(null);
   }, []);
   const {
     activeDayPrompt,
@@ -899,6 +905,8 @@ export default function HomeScreen() {
           allowRemoteIntelligence={cloudIntelligenceEnabled}
           dayLocationPoints={formingDay?.locations}
           initialFlowId={manualJournalInitialFlowId}
+          initialChoiceId={manualJournalInitialChoiceId}
+          initialContext={manualJournalInitialContextId}
           onClose={closeManualJournal}
           onSave={(submission) => {
             addManualJournalEntry(submission, formingTarget);

@@ -50,11 +50,15 @@ function validateRoleQuests(role: KatchimeraRoleDefinition, issues: string[]) {
       issues.push(`${role.familyId}: ${questId} needs an explicit repeat policy`);
     }
     if (quest.semanticVerification) {
-      if (!quest.requiresCapabilities?.includes('appleFoundation')) {
-        issues.push(`${role.familyId}: ${questId} semantic verification must require appleFoundation`);
+      const hasJournalFallback = Boolean(quest.semanticVerification.journalRouteFallbacks?.length);
+      if (!hasJournalFallback && !quest.requiresCapabilities?.includes('appleFoundation')) {
+        issues.push(`${role.familyId}: ${questId} semantic verification without a journal fallback must require appleFoundation`);
       }
-      if (quest.offerVisibility !== 'hide_when_unavailable') {
-        issues.push(`${role.familyId}: ${questId} semantic verification must hide when unavailable`);
+      if (!hasJournalFallback && quest.offerVisibility !== 'hide_when_unavailable') {
+        issues.push(`${role.familyId}: ${questId} semantic verification without a journal fallback must hide when unavailable`);
+      }
+      if (hasJournalFallback && !quest.optionalCapabilities?.includes('appleFoundation')) {
+        issues.push(`${role.familyId}: ${questId} journal fallback must keep appleFoundation optional`);
       }
       if (!quest.semanticVerification.modalities.length) {
         issues.push(`${role.familyId}: ${questId} semantic verification needs an input modality`);
