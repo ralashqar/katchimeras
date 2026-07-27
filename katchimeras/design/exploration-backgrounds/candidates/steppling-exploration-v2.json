@@ -1,0 +1,41 @@
+{
+  "assetName": "steppling-exploration-v2",
+  "status": "generated-candidate",
+  "key": "steppling",
+  "displayName": "Steppling mountain trailhead",
+  "pipelineVersion": "exploration-background-v12",
+  "candidate": {
+    "index": 2,
+    "key": "steppling",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-steppling-2/1785136434586_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/steppling/candidate-2-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "c72de5c06f2c20c38222ef33b9b55963d1c2ca2c335b0ae7c707db5ef33a19bf",
+    "createdAt": "2026-07-27T07:14:13.031189+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/steppling/candidate-2-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/steppling/candidate-2-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/steppling/candidate-2-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/steppling/candidate-2-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/steppling/candidate-2-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/steppling/candidate-2-phone-right.png"
+    },
+    "masterSha256": "45234a6d51fc23247080170c861b17131999afbdf9199a50a9c434a3aaef2c06"
+  },
+  "exportedAt": "2026-07-27T07:16:00.819266+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/steppling-exploration-v2-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/steppling-exploration-v2.png",
+    "guide": "design/exploration-backgrounds/candidates/steppling-exploration-v2-platform-guide.png"
+  },
+  "sha256": {
+    "master": "45234a6d51fc23247080170c861b17131999afbdf9199a50a9c434a3aaef2c06",
+    "runtime": "317dd50ef7136c7ead807ff7639686dc3dd820f702cae75e0b7ba23cd773aee0",
+    "guide": "c8fca6e18c0bbfee368776bc88a2851ef6e0157042806ab5232277e12bc70b82"
+  }
+}

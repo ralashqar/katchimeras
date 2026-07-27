@@ -1,0 +1,41 @@
+{
+  "assetName": "flickerbun-exploration-v1",
+  "status": "generated-candidate",
+  "key": "flickerbun",
+  "displayName": "Flickerbun open-air pocket cinema",
+  "pipelineVersion": "exploration-background-v12",
+  "candidate": {
+    "index": 1,
+    "key": "flickerbun",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-flickerbun-1/1785137114801_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/flickerbun/candidate-1-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "2cb7daf644cf71b4199bd3018691b480a53c5c3ede040606ef390d8b23b5bde1",
+    "createdAt": "2026-07-27T07:25:27.214884+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/flickerbun/candidate-1-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/flickerbun/candidate-1-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/flickerbun/candidate-1-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/flickerbun/candidate-1-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/flickerbun/candidate-1-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/flickerbun/candidate-1-phone-right.png"
+    },
+    "masterSha256": "302ecb0bfe60b8b6fb9cd6cba6eb8f919e9b0f45a6690752ace9945815cd4378"
+  },
+  "exportedAt": "2026-07-27T07:28:33.005699+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/flickerbun-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/flickerbun-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/flickerbun-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "302ecb0bfe60b8b6fb9cd6cba6eb8f919e9b0f45a6690752ace9945815cd4378",
+    "runtime": "1b6c98c794df9a547bb31e55043c0866ce435b7093d5c53f6020cb235bc1a282",
+    "guide": "1acc4b1d50e01e9edf854d8d60468aa8caf78130bf1dd8ef499f08d541aa9ddd"
+  }
+}

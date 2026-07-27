@@ -1,0 +1,41 @@
+{
+  "assetName": "feastle-exploration-v5",
+  "status": "generated-candidate",
+  "key": "feastle",
+  "displayName": "Feastle harvest festival grounds",
+  "pipelineVersion": "katchimeras-exploration-background-v9",
+  "candidate": {
+    "index": 2,
+    "key": "feastle",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-feastle-2/1785134182662_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/feastle/candidate-2-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "e6417eeafcbfe1cc5d54365006f4c8733295f04a67b717eaf21a34404a8be896",
+    "createdAt": "2026-07-27T06:36:40.663260+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/feastle/candidate-2-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/feastle/candidate-2-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/feastle/candidate-2-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/feastle/candidate-2-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/feastle/candidate-2-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/feastle/candidate-2-phone-right.png"
+    },
+    "masterSha256": "e45993b37ad6b6358010009b4f4535ec53a1d25e743abd6eb6f65b5813be41e4"
+  },
+  "exportedAt": "2026-07-27T06:37:35.830110+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/feastle-exploration-v5-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/feastle-exploration-v5.png",
+    "guide": "design/exploration-backgrounds/candidates/feastle-exploration-v5-platform-guide.png"
+  },
+  "sha256": {
+    "master": "e45993b37ad6b6358010009b4f4535ec53a1d25e743abd6eb6f65b5813be41e4",
+    "runtime": "64b903fda32e916c73233234f00cff03535334eef45c375689831892245301f5",
+    "guide": "cb2d289de5526abb9b8ede7ef3980a6340ab9bb7a2a0ff6406e6c63e63ffbe10"
+  }
+}

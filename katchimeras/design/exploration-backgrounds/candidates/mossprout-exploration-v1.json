@@ -1,0 +1,41 @@
+{
+  "assetName": "mossprout-exploration-v1",
+  "status": "generated-candidate",
+  "key": "mossprout",
+  "displayName": "Mossprout rain-kissed pocket garden",
+  "pipelineVersion": "exploration-background-v12",
+  "candidate": {
+    "index": 2,
+    "key": "mossprout",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-mossprout-2/1785141375219_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/mossprout/candidate-2-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "ea9b3fa720cb566a9291672d159d5207f93005d1d9d6d3eb40b1dee76b52cdf2",
+    "createdAt": "2026-07-27T08:36:33.840400+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/mossprout/candidate-2-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/mossprout/candidate-2-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/mossprout/candidate-2-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/mossprout/candidate-2-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/mossprout/candidate-2-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/mossprout/candidate-2-phone-right.png"
+    },
+    "masterSha256": "ef6c8b482f731d8bf74fb2645f7c8445ac41b2989c74b6b9fc1926801582d1da"
+  },
+  "exportedAt": "2026-07-27T08:37:56.935658+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/mossprout-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/mossprout-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/mossprout-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "ef6c8b482f731d8bf74fb2645f7c8445ac41b2989c74b6b9fc1926801582d1da",
+    "runtime": "f304c60604c247d24eb71fb6c195710faf62de47a00b749352896ac1e6910b86",
+    "guide": "1debde3d1a83fb5dc2c5857ec14d5f948bd0309029cf657b0375c7564463190a"
+  }
+}

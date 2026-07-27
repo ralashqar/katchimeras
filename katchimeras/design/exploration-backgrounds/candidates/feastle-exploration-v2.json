@@ -1,0 +1,41 @@
+{
+  "assetName": "feastle-exploration-v2",
+  "status": "generated-candidate",
+  "key": "feastle",
+  "displayName": "Feastle harvest festival grounds",
+  "pipelineVersion": "katchimeras-exploration-background-v4",
+  "candidate": {
+    "index": 2,
+    "key": "feastle",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-feastle-2/1785130119689_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/feastle/candidate-2-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": "328bc6c97ae3a69308fc1cfd76c9b3277b6a54f41597f759d3c938fd34d54b92",
+    "promptSha256": "dcb2061e397a6e8f96e83f0074eaf496fc714df6cdf8b542dc97393d1716681b",
+    "createdAt": "2026-07-27T05:28:53.322747+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/feastle/candidate-2-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/feastle/candidate-2-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/feastle/candidate-2-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/feastle/candidate-2-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/feastle/candidate-2-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/feastle/candidate-2-phone-right.png"
+    },
+    "masterSha256": "445405e2310b52802a35be7ab5b4bf41a6f1cd3ca20dba90cdf9cc516cd070a5"
+  },
+  "exportedAt": "2026-07-27T05:29:26.095949+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/feastle-exploration-v2-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/feastle-exploration-v2.png",
+    "guide": "design/exploration-backgrounds/candidates/feastle-exploration-v2-platform-guide.png"
+  },
+  "sha256": {
+    "master": "445405e2310b52802a35be7ab5b4bf41a6f1cd3ca20dba90cdf9cc516cd070a5",
+    "runtime": "b86ee2a135d947f5f87aabe6bbb9c5baf72286bffc1bef71c27d179a22d2f166",
+    "guide": "f5b5edf6a2c54bd80a870fd4cf13e1ca4905b3f0d3b5a707045d897e10d95dcd"
+  }
+}

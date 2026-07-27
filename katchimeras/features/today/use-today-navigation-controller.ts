@@ -20,6 +20,7 @@ import {
   todayTileTransitionIndices,
   todayTileWindowIndices,
 } from '@/utils/today-tile-window';
+import type { TodayExplorationSwipeDirection } from '@/utils/today-exploration-gesture';
 
 type UseTodayNavigationControllerParams = {
   windowWidth: number;
@@ -133,7 +134,7 @@ export function useTodayNavigationController({
   }, [timelineDays.length]);
 
   const goToAdjacentDay = useCallback(
-    (direction: number) => {
+    (direction: TodayExplorationSwipeDirection) => {
       // Visual intent advances immediately even if the low-priority semantic
       // selection has not committed yet. Rapid consecutive swipes therefore
       // retarget from the in-flight destination instead of repeating a stale
@@ -189,5 +190,11 @@ export function useTodayNavigationController({
       }
     });
 
-  return { cameraProgress, navigateToDay, renderedIndices, swipeGesture };
+  return {
+    cameraProgress,
+    goToAdjacentDay,
+    navigateToDay,
+    renderedIndices,
+    swipeGesture,
+  };
 }

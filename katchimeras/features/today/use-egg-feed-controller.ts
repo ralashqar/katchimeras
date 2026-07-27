@@ -13,6 +13,7 @@ type EggFeedPayload = {
 export function useEggFeedController() {
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
   const [eggFeedKey, setEggFeedKey] = useState(0);
+  const eggTargetRef = useRef<View | null>(null);
   const heroStageRef = useRef<View | null>(null);
   const pendingFeedCommit = useRef<(() => void) | null>(null);
   const feedNonce = useRef(0);
@@ -50,8 +51,9 @@ export function useEggFeedController() {
       setEggFeed(nextFeed);
     };
 
-    if (heroStageRef.current) {
-      heroStageRef.current.measureInWindow((x, y, w, h) => launch(x + w / 2, y + h / 2));
+    const destination = eggTargetRef.current ?? heroStageRef.current;
+    if (destination) {
+      destination.measureInWindow((x, y, w, h) => launch(x + w / 2, y + h / 2));
     } else {
       commit();
     }
@@ -67,6 +69,7 @@ export function useEggFeedController() {
   return {
     eggFeed,
     eggFeedKey,
+    eggTargetRef,
     heroStageRef,
     startEggFeed,
     handleEggFeedArrive,

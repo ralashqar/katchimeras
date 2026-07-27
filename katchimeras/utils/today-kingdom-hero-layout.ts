@@ -1,5 +1,7 @@
 import kingdomWorldViewConfig from '@/constants/kingdom-world-view.json';
+import { CREATURE_HATCHLING_ALPHA_BOUNDS } from '@/constants/creature-hatchling-alpha-bounds.gen';
 import todayScene from '@/data/today-scene.json';
+import type { HomeVisualKey } from '@/types/home';
 import {
   kingdomTileArtFrame,
   type KingdomHexVerticalAlignmentMode,
@@ -9,6 +11,10 @@ import {
 import { HEX_TILE_H, HEX_TILE_LIP, HEX_TILE_W } from '@/utils/world-hex';
 
 export const TODAY_KINGDOM_STAGE_HEIGHT = 258;
+// Today's measured value replaces this after its first layout pass. Debug
+// previews use the same first-frame anchor so their full-screen composition
+// matches Today without needing to render the timeline.
+export const TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA = 8 + 85 + 26;
 // The complete close-up sits a little lower on Today than the map camera, but
 // the tile and resident now share the exact same Kingdom-space origin.
 const TODAY_KINGDOM_BASE_TILE_CENTER_Y = 138;
@@ -148,5 +154,67 @@ export function todayEggStageFrame(eggCenterY: number, eggStageScale: number) {
   return {
     height,
     top: centerY - height / 2,
+  };
+}
+
+/**
+ * Places the separately rendered egg onto the fixed platform authored into the
+ * square exploration background. `stageScreenTop` is the hero stage's y
+ * position in the full Today viewport; the returned frame is local to that
+ * stage and may extend below it because the Today composition intentionally
+ * allows visible overflow.
+ */
+export function todayExplorationEggStageFrame(
+  windowWidth: number,
+  windowHeight: number,
+  stageScreenTop: number,
+) {
+  const config = todayScene.homeExplorationBackground;
+  const eggWidth = Math.min(
+    windowWidth * config.eggWidthViewportWidthRatio,
+    windowHeight * config.eggWidthViewportHeightRatio,
+  );
+  const scale = eggWidth / EGG_STAGE_WIDTH;
+  const height = TODAY_KINGDOM_STAGE_HEIGHT * scale;
+  const contactY = windowHeight * config.eggContactYRatio;
+  const top = contactY - stageScreenTop - height;
+  return {
+    centerY: top + height / 2,
+    contactY,
+    height,
+    scale,
+    top,
+    width: eggWidth,
+  };
+}
+
+/**
+ * Places a hatchling cutout on the same authored platform as the forming egg.
+ * The frame accounts for each transparent cutout's measured bottom-most pixel,
+ * so its visible feet—not the square bitmap edge—meet the platform.
+ */
+export function todayExplorationCreatureStageFrame(
+  windowWidth: number,
+  windowHeight: number,
+  stageScreenTop: number,
+  visualKey: HomeVisualKey,
+) {
+  const config = todayScene.homeExplorationBackground;
+  const size = Math.min(
+    windowWidth * config.creatureWidthViewportWidthRatio,
+    windowHeight * config.creatureWidthViewportHeightRatio,
+  );
+  const alphaBottom = CREATURE_HATCHLING_ALPHA_BOUNDS[visualKey]?.bottom ?? 0.94;
+  const contactY = windowHeight * config.creatureContactYRatio;
+  const stageContactY = contactY - stageScreenTop;
+  const top = stageContactY - size * alphaBottom;
+  return {
+    centerY: top + size / 2,
+    contactY,
+    height: size,
+    size,
+    stageContactY,
+    top,
+    width: size,
   };
 }

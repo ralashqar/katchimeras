@@ -226,7 +226,11 @@ export function JourneyBreezeSpriteAtlas({
 
     const time = reduceMotion ? 0 : elapsed.value;
     const depth = 0.58 + particle.depth * 0.42;
-    const targetCellSize = (176 + particle.size * 34) * depth;
+    // These are ambient wind traces, not foreground characters. The authored
+    // atlas has a very readable silhouette, so the previous ~120–210 px draw
+    // size overwhelmed the Today scene on phones. Keep each gust near the
+    // scale of the carried leaves instead.
+    const targetCellSize = (54 + particle.size * 14) * depth;
     const scale = targetCellSize / cellWidth;
     const direction = wind < -0.08 ? -1 : 1;
     const travel = width + targetCellSize * 2;
@@ -253,7 +257,7 @@ export function JourneyBreezeSpriteAtlas({
   return (
     <Atlas
       image={image}
-      opacity={Math.min(0.82, 0.48 + intensity * 0.3)}
+      opacity={Math.min(0.62, 0.34 + intensity * 0.24)}
       sprites={sprites}
       transforms={transforms}
     />

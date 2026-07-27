@@ -1,0 +1,41 @@
+{
+  "assetName": "bedrotte-exploration-v1",
+  "status": "generated-candidate",
+  "key": "bedrotte",
+  "displayName": "Bedrotte moonlit rest sanctuary",
+  "pipelineVersion": "exploration-background-v12",
+  "candidate": {
+    "index": 1,
+    "key": "bedrotte",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-bedrotte-1/1785141333470_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/bedrotte/candidate-1-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "d018c9db0ed574862be2aec8fc79e7b1f7565cdf072dd2e2941a4303c51c5a3e",
+    "createdAt": "2026-07-27T08:35:58.893880+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/bedrotte/candidate-1-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/bedrotte/candidate-1-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/bedrotte/candidate-1-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/bedrotte/candidate-1-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/bedrotte/candidate-1-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/bedrotte/candidate-1-phone-right.png"
+    },
+    "masterSha256": "c18f1e47bd07f578f772a31de5ac21a61ba6b94638f17a163909f4e1a004df8b"
+  },
+  "exportedAt": "2026-07-27T08:37:55.993895+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/bedrotte-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/bedrotte-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/bedrotte-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "c18f1e47bd07f578f772a31de5ac21a61ba6b94638f17a163909f4e1a004df8b",
+    "runtime": "68afbd562c4496d4a854104c92150445c8bac17c015e652ce3b16ff8b264c656",
+    "guide": "d0e9b7c37a5341eb75d7ef2f1e09ec34849acdaa9dcea4ec39e14de4b2812104"
+  }
+}

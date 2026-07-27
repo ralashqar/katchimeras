@@ -1,0 +1,41 @@
+{
+  "assetName": "relicoon-exploration-v1",
+  "status": "generated-candidate",
+  "key": "relicoon",
+  "displayName": "Relicoon open-air discovery museum",
+  "pipelineVersion": "katchimeras-exploration-background-v4",
+  "candidate": {
+    "index": 2,
+    "key": "relicoon",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-relicoon-2/1785131172336_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/relicoon/candidate-2-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "477dd55c53e80d4c9874910a2c62cd985c368c5d74cdeb15ddc76e6204f018d6",
+    "createdAt": "2026-07-27T05:46:24.471463+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/relicoon/candidate-2-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/relicoon/candidate-2-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/relicoon/candidate-2-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/relicoon/candidate-2-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/relicoon/candidate-2-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/relicoon/candidate-2-phone-right.png"
+    },
+    "masterSha256": "2bec249d5af11ebe9035e35e478a223a84270b16770cde0c9d8052a0c15a5032"
+  },
+  "exportedAt": "2026-07-27T05:48:37.113229+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/relicoon-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/relicoon-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/relicoon-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "2bec249d5af11ebe9035e35e478a223a84270b16770cde0c9d8052a0c15a5032",
+    "runtime": "99e6f35572cd9b331ea6aed8bc1568c3e8dbf3f3606638b40fb04efc413ababe",
+    "guide": "568de78d4d204423716188336a67cd06feabfba947be148c33bae39a567c2be5"
+  }
+}

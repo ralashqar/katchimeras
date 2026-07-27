@@ -81,6 +81,7 @@ export default function RootLayout() {
           <Stack.Screen name="art-lab" options={{ title: 'Katchimera Art Lab' }} />
           <Stack.Screen name="world-base-lab" options={{ title: 'World Base Lab' }} />
           <Stack.Screen name="dev-atmosphere-lab" options={{ title: 'Atmosphere Lab', headerShown: false }} />
+          <Stack.Screen name="dev-environment-gallery" options={{ title: 'Environment Gallery', headerShown: false }} />
           <Stack.Screen name="dev-katchimera-tile-lab" options={{ title: 'Katchimera Tile Lab' }} />
           <Stack.Screen name="dev-photo-place-lab" options={{ title: 'Photo Place Lab' }} />
           <Stack.Screen name="intelligence-lab" options={{ title: 'Intelligence Lab' }} />

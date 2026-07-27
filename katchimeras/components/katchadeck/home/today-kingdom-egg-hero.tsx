@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, type RefObject, useEffect } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -18,6 +18,7 @@ import { kingdomHomeTileForIdentity, kingdomSurfaceTileAlignment } from '@/utils
 import {
   todayEggCountdownTop,
   todayEggStageFrame,
+  todayExplorationEggStageFrame,
   todayKingdomHeroLayout,
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
@@ -29,15 +30,19 @@ type TodayKingdomEggHeroProps = {
   accentColor?: string;
   coreColor?: string;
   feedbackKey?: number;
+  explorationStageTop?: number;
   homeArchetypeId?: HomeArchetypeId | null;
   hideKingdomEnvironmentArt?: boolean;
   isReady?: boolean;
   onEggPress?: () => void;
   pinchStrength?: number;
+  targetRef?: RefObject<View | null>;
 };
 
 type TodayKingdomEggOverlayProps = {
+  aboveEggClearance?: number;
   children: ReactNode;
+  explorationStageTop?: number;
   homeArchetypeId?: HomeArchetypeId | null;
 };
 
@@ -49,18 +54,25 @@ export function TodayKingdomEggHero({
   accentColor = '#F4CE7A',
   coreColor = '#FFF1B8',
   feedbackKey = 0,
+  explorationStageTop,
   homeArchetypeId,
   hideKingdomEnvironmentArt = false,
   isReady = false,
   onEggPress,
   pinchStrength = 1,
+  targetRef,
 }: TodayKingdomEggHeroProps) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const tile = kingdomHomeTileForIdentity(homeArchetypeId);
   const layout = todayKingdomHeroLayout(windowWidth, kingdomSurfaceTileAlignment(tile));
   const tileSource = kingdomHexTileSourceForLod(tile, layout.tileSize > 512 ? 'full' : 'medium');
-  const eggFrame = todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
+  const explorationEggFrame = explorationStageTop == null
+    ? null
+    : todayExplorationEggStageFrame(windowWidth, windowHeight, explorationStageTop);
+  const eggFrame = explorationEggFrame
+    ?? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
+  const eggStageScale = explorationEggFrame?.scale ?? layout.eggStageScale;
   const feedbackShake = useSharedValue(0);
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
@@ -141,8 +153,9 @@ export function TodayKingdomEggHero({
   return (
     <View pointerEvents="box-none" style={styles.stage}>
       <TodayFallbackCloudScene
-        focusY={layout.eggCenterY
-          + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio}
+        focusY={explorationEggFrame?.centerY
+          ?? layout.eggCenterY
+            + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio}
         pinchStrength={pinchStrength}
         environment={hideKingdomEnvironmentArt ? null : (
           <Image
@@ -165,6 +178,7 @@ export function TodayKingdomEggHero({
         frontTop={layout.tileFaceBottomY}>
         <View
           pointerEvents="box-none"
+          ref={targetRef}
           style={[
             styles.egg,
             {
@@ -179,8 +193,8 @@ export function TodayKingdomEggHero({
             style={[
               styles.feedRing,
               {
-                height: 270 * layout.eggStageScale,
-                width: 270 * layout.eggStageScale,
+                height: 270 * eggStageScale,
+                width: 270 * eggStageScale,
               },
               rippleStyle,
             ]}
@@ -194,8 +208,8 @@ export function TodayKingdomEggHero({
             style={[
               styles.feedRing,
               {
-                height: 270 * layout.eggStageScale,
-                width: 270 * layout.eggStageScale,
+                height: 270 * eggStageScale,
+                width: 270 * eggStageScale,
               },
               rippleEchoStyle,
             ]}
@@ -206,7 +220,7 @@ export function TodayKingdomEggHero({
             style={[
               styles.eggMotionFrame,
               eggMotionStyle,
-              { width: 200 * layout.eggStageScale },
+              { width: 200 * eggStageScale },
             ]}>
             <Pressable
               accessibilityLabel="Today egg"
@@ -234,17 +248,28 @@ export function TodayKingdomEggHero({
 }
 
 /** Camera-synchronised UI anchor rendered on the neighborhood's UI plane. */
-export function TodayKingdomEggOverlay({ children, homeArchetypeId }: TodayKingdomEggOverlayProps) {
-  const { width: windowWidth } = useWindowDimensions();
+export function TodayKingdomEggOverlay({
+  children,
+  explorationStageTop,
+  homeArchetypeId,
+}: TodayKingdomEggOverlayProps) {
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const tile = kingdomHomeTileForIdentity(homeArchetypeId);
   const layout = todayKingdomHeroLayout(windowWidth, kingdomSurfaceTileAlignment(tile));
+  const explorationEggFrame = explorationStageTop == null
+    ? null
+    : todayExplorationEggStageFrame(windowWidth, windowHeight, explorationStageTop);
 
   return (
     <View
       pointerEvents="none"
       style={[
         styles.belowEgg,
-        { top: todayEggCountdownTop(layout.eggCenterY, layout.eggStageScale) },
+        {
+          top: explorationEggFrame
+            ? explorationEggFrame.top + explorationEggFrame.height + 14
+            : todayEggCountdownTop(layout.eggCenterY, layout.eggStageScale),
+        },
       ]}>
       {children}
     </View>
@@ -252,18 +277,29 @@ export function TodayKingdomEggOverlay({ children, homeArchetypeId }: TodayKingd
 }
 
 /** Camera-synchronised UI anchor immediately above the active egg. */
-export function TodayKingdomEggAboveOverlay({ children, homeArchetypeId }: TodayKingdomEggOverlayProps) {
-  const { width: windowWidth } = useWindowDimensions();
+export function TodayKingdomEggAboveOverlay({
+  aboveEggClearance,
+  children,
+  explorationStageTop,
+  homeArchetypeId,
+}: TodayKingdomEggOverlayProps) {
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const tile = kingdomHomeTileForIdentity(homeArchetypeId);
   const layout = todayKingdomHeroLayout(windowWidth, kingdomSurfaceTileAlignment(tile));
-  const eggFrame = todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
+  const eggFrame = explorationStageTop == null
+    ? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale)
+    : todayExplorationEggStageFrame(windowWidth, windowHeight, explorationStageTop);
 
   return (
     <View
       pointerEvents="none"
       style={[
         styles.aboveEgg,
-        { top: Math.max(4, eggFrame.top - 50) },
+        explorationStageTop != null && aboveEggClearance != null
+          ? {
+              bottom: TODAY_KINGDOM_STAGE_HEIGHT - eggFrame.top + aboveEggClearance,
+            }
+          : { top: Math.max(4, eggFrame.top - 50) },
       ]}>
       {children}
     </View>

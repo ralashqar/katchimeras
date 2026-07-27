@@ -60,14 +60,16 @@ check(
     && todayReveal.includes('<CreatureGroundShadow')
     && kingdom.includes('<CreatureGroundShadow')
     && card.indexOf('<CreatureGroundShadow') < card.lastIndexOf('style={StyleSheet.absoluteFill}')
-    && today.indexOf('<CreatureGroundShadow') < today.indexOf('<Image pointerEvents="none" contentFit="contain" source={heroSource}')
+    && today.indexOf('<CreatureGroundShadow') < today.indexOf('source={heroSource}')
     && kingdom.indexOf('<CreatureGroundShadow') < kingdom.indexOf('<SeamlessWorldImage source={source}'),
 );
 check(
-  'Today scales its Katchimera and contact shadow together by 15%',
+  'Today scales each hex or exploration Katchimera and its contact shadow together',
   today.includes('TODAY_KATCHIMERA_SCALE = 1.15')
     && today.includes('const todayCreatureSize = kingdomLayout.creatureSize * TODAY_KATCHIMERA_SCALE')
-    && today.includes('frameSize={todayCreatureSize}')
+    && today.includes('frameSize={explorationFrame?.size ?? todayCreatureSize}')
+    && today.includes('height: explorationFrame.size')
+    && today.includes('width: explorationFrame.size')
     && today.includes('height: todayCreatureSize')
     && today.includes('width: todayCreatureSize'),
 );

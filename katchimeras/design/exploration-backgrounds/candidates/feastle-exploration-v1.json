@@ -1,0 +1,41 @@
+{
+  "assetName": "feastle-exploration-v1",
+  "status": "generated-candidate",
+  "key": "feastle",
+  "displayName": "Feastle hearth garden",
+  "pipelineVersion": "katchimeras-exploration-background-v2",
+  "candidate": {
+    "index": 1,
+    "key": "feastle",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-feastle-1/1785127635954_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/feastle/candidate-1-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": "328bc6c97ae3a69308fc1cfd76c9b3277b6a54f41597f759d3c938fd34d54b92",
+    "promptSha256": "1f196a04cda92f69fe4e1d9ca32bd692fbb61687b6ac60eca6d0391d007a7c29",
+    "createdAt": "2026-07-27T04:47:28.774815+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/feastle/candidate-1-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/feastle/candidate-1-preview-1k.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/feastle/candidate-1-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/feastle/candidate-1-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/feastle/candidate-1-phone-right.png"
+    },
+    "masterSha256": "a62c90b8ca9cc48661697e79102d2d24b16becb96f37ade922d2dea53663c228",
+    "platformGuidePath": ".tmp/exploration-backgrounds/feastle/candidate-1-platform-guide.png"
+  },
+  "exportedAt": "2026-07-27T04:51:26.314145+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/feastle-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/feastle-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/feastle-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "a62c90b8ca9cc48661697e79102d2d24b16becb96f37ade922d2dea53663c228",
+    "runtime": "89864be430402931c6d47eb01463523ec4a4339e2653bf4a10ee018ee9412125",
+    "guide": "cf85e9e73b5f086d6897e876694831261444a44b6aaf0de60fb55fec4b3a5616"
+  }
+}

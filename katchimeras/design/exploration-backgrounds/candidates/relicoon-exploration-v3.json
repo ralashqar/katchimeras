@@ -1,0 +1,41 @@
+{
+  "assetName": "relicoon-exploration-v3",
+  "status": "generated-candidate",
+  "key": "relicoon",
+  "displayName": "Relicoon grand discovery museum",
+  "pipelineVersion": "katchimeras-exploration-background-v6",
+  "candidate": {
+    "index": 1,
+    "key": "relicoon",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "url": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/asset-lab/exploration-background-relicoon-1/1785132070464_grid.png",
+    "rawPath": ".tmp/exploration-backgrounds/relicoon/candidate-1-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "e3065396b6271248d1b869839bb73b9b21d7b827ae5d52313320df42e86ae1db",
+    "createdAt": "2026-07-27T06:01:23.681380+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/relicoon/candidate-1-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/relicoon/candidate-1-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/relicoon/candidate-1-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/relicoon/candidate-1-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/relicoon/candidate-1-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/relicoon/candidate-1-phone-right.png"
+    },
+    "masterSha256": "613cdc1762fb7ce6eb5ad2aa758d7f588681eaa1206fd4d5f56ea689e8243f29"
+  },
+  "exportedAt": "2026-07-27T06:04:11.269957+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/relicoon-exploration-v3-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/relicoon-exploration-v3.png",
+    "guide": "design/exploration-backgrounds/candidates/relicoon-exploration-v3-platform-guide.png"
+  },
+  "sha256": {
+    "master": "613cdc1762fb7ce6eb5ad2aa758d7f588681eaa1206fd4d5f56ea689e8243f29",
+    "runtime": "0cc5d6495ecb81d94ef95cb08d2a31227185a734a0b2716b888aa377dcdeed13",
+    "guide": "3103c0a15720d972a12aa5181e0891062713413b575a97e67670cf880b2fa8f6"
+  }
+}

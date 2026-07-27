@@ -1,6 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  ActivityIndicator,
+  type LayoutChangeEvent,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -20,6 +27,11 @@ import {
   TodayKingdomEggOverlay,
 } from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
+import {
+  TodayExplorationBackground,
+  TodayExplorationSceneLayer,
+  useTodayExplorationBackgroundMotion,
+} from '@/components/katchadeck/home/today-exploration-background';
 import { TodayTileHatchReveal } from '@/components/katchadeck/home/today-tile-hatch-reveal';
 import { ResolvedAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import {
@@ -77,11 +89,20 @@ import { journalNoteRouteNeedsConfirmation } from '@/utils/journal-routing';
 import { runAfterNativeModalDismiss } from '@/utils/native-modal-navigation';
 import { hatchCheckInEligibility } from '@/utils/hatch-check-in';
 import { loadWorldIdentity } from '@/utils/world-identity';
-import { TODAY_KINGDOM_STAGE_HEIGHT } from '@/utils/today-kingdom-hero-layout';
+import {
+  todayExplorationCreatureStageFrame,
+  todayExplorationEggStageFrame,
+  TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
+  TODAY_KINGDOM_STAGE_HEIGHT,
+} from '@/utils/today-kingdom-hero-layout';
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
 import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
 import { todayHatchShowsResident, todayHatchShowsTomorrow } from '@/utils/today-hatch-presentation';
 import { identityForCreature } from '@/utils/katchimera-identity';
+import {
+  todayKatchimeraExplorationBackgroundKeyForPresentation,
+  type TodayExplorationBackgroundKey,
+} from '@/utils/today-exploration-backgrounds';
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import {
@@ -117,6 +138,7 @@ export default function HomeScreen() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [homeArchetypeId, setHomeArchetypeId] = useState(() => loadWorldIdentity().selectedHomeArchetypeId);
+  const [heroStageTop, setHeroStageTop] = useState<number | null>(null);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
   const [quickGoalsOpen, setQuickGoalsOpen] = useState(false);
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
@@ -196,7 +218,15 @@ export default function HomeScreen() {
   });
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const backfillStatus = useBackfillStatus();
-  const { eggFeed, eggFeedKey, heroStageRef, startEggFeed, handleEggFeedArrive, pulseEgg } = useEggFeedController();
+  const {
+    eggFeed,
+    eggFeedKey,
+    eggTargetRef,
+    heroStageRef,
+    startEggFeed,
+    handleEggFeedArrive,
+    pulseEgg,
+  } = useEggFeedController();
   const { promptSheetOpen, initialPrompt, openPromptSheet, closePromptSheet } = usePromptSheetController();
 
   useFocusEffect(
@@ -285,6 +315,40 @@ export default function HomeScreen() {
   const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
   const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
   const formingActivePrompt = onTomorrowForming ? tomorrowActivePrompt : activeDayPrompt;
+  const selectedKatchimeraExplorationKey =
+    isDay && selectedDay.state === 'hatched' && selectedDay.creature
+      ? todayKatchimeraExplorationBackgroundKeyForPresentation({
+          creature: selectedDay.creature,
+          environmentVisualKey: selectedDay.card?.scene?.environment?.visualKey,
+        })
+      : null;
+  const explorationBackgroundKey: TodayExplorationBackgroundKey | null = isForming
+    ? 'home'
+    : selectedKatchimeraExplorationKey;
+  const explorationBackgroundActive = explorationBackgroundKey != null && !isHatching;
+  // LanternTimeline's visual row is ~85dp tall. This estimate gives the egg a
+  // correct first frame; onLayout replaces it with the measured stage y.
+  const resolvedHeroStageTop =
+    heroStageTop
+    ?? insets.top + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
+  const explorationEggFrame = todayExplorationEggStageFrame(
+    windowWidth,
+    windowHeight,
+    resolvedHeroStageTop,
+  );
+  const explorationCreatureFrame =
+    selectedKatchimeraExplorationKey
+    && isDay
+    && selectedDay.state === 'hatched'
+    && selectedDay.creature
+      ? todayExplorationCreatureStageFrame(
+          windowWidth,
+          windowHeight,
+          resolvedHeroStageTop,
+          selectedDay.creature.visualKey,
+        )
+      : null;
+  const explorationSubjectFrame = explorationCreatureFrame ?? explorationEggFrame;
   // While a prompt is showing, the page collapses to just the egg + prompt: the
   // forming quote and the add/camera buttons hide until it's answered/dismissed.
   const hasActivePrompt = isForming && Boolean(formingActivePrompt);
@@ -616,13 +680,24 @@ export default function HomeScreen() {
     }
     const day = timelineDay.kind === 'day' ? timelineDay : tomorrowDay;
     if (day?.state === 'hatched' && day.creature) {
+      const dayExplorationKey =
+        todayKatchimeraExplorationBackgroundKeyForPresentation({
+          creature: day.creature,
+          environmentVisualKey: day.card?.scene?.environment?.visualKey,
+        });
+      const usesExplorationFraming =
+        active && explorationBackgroundActive && dayExplorationKey != null;
       return (
         <CreatureHero
           artLod={active ? 'medium' : 'thumb'}
           compact
           creature={day.creature}
           environmentVisualKey={day.card?.scene?.environment?.visualKey}
+          explorationStageTop={usesExplorationFraming
+            ? resolvedHeroStageTop
+            : undefined}
           hideCompactCard={!active}
+          hideKingdomEnvironmentArt={usesExplorationFraming}
           kingdomEnvironment
           kingdomHomeArchetypeId={homeArchetypeId}
           pinchStrength={active ? 1 : todayScene.homeEnvironment.motion.neighborPinchStrength}
@@ -634,14 +709,30 @@ export default function HomeScreen() {
       <TodayKingdomEggHero
         accentColor={day?.egg.accentColor}
         coreColor={day?.egg.coreColor}
+        explorationStageTop={active && explorationBackgroundActive
+          ? resolvedHeroStageTop
+          : undefined}
         feedbackKey={active ? eggFeedKey : 0}
+        hideKingdomEnvironmentArt={active && explorationBackgroundActive}
         homeArchetypeId={homeArchetypeId}
         isReady={active && day?.state === 'ready_to_hatch'}
         onEggPress={active && day?.canAddMoments ? () => openManualJournal() : undefined}
         pinchStrength={active ? 1 : todayScene.homeEnvironment.motion.neighborPinchStrength}
+        targetRef={active ? eggTargetRef : undefined}
       />
     );
-  }, [eggFeedKey, handleHatchAssetsReady, hatchPresentation, homeArchetypeId, isHatching, openManualJournal, tomorrowDay]);
+  }, [
+    eggFeedKey,
+    eggTargetRef,
+    explorationBackgroundActive,
+    handleHatchAssetsReady,
+    hatchPresentation,
+    homeArchetypeId,
+    isHatching,
+    openManualJournal,
+    resolvedHeroStageTop,
+    tomorrowDay,
+  ]);
 
   const renderTimelineOverlay = useCallback((timelineDay: HomeTimelineDay, active: boolean) => {
     if (
@@ -653,14 +744,28 @@ export default function HomeScreen() {
     ) {
       return null;
     }
-    return (
+    const countdown = <HatchCountdown isReady={timelineDay.state === 'ready_to_hatch'} />;
+    return explorationBackgroundActive ? (
+      <TodayKingdomEggAboveOverlay
+        aboveEggClearance={52}
+        explorationStageTop={resolvedHeroStageTop}
+        homeArchetypeId={homeArchetypeId}>
+        {countdown}
+      </TodayKingdomEggAboveOverlay>
+    ) : (
       <TodayKingdomEggOverlay homeArchetypeId={homeArchetypeId}>
-        <HatchCountdown isReady={timelineDay.state === 'ready_to_hatch'} />
+        {countdown}
       </TodayKingdomEggOverlay>
     );
-  }, [homeArchetypeId, isHatching]);
+  }, [explorationBackgroundActive, homeArchetypeId, isHatching, resolvedHeroStageTop]);
 
-  const { cameraProgress, navigateToDay, renderedIndices, swipeGesture } = useTodayNavigationController({
+  const {
+    cameraProgress,
+    goToAdjacentDay,
+    navigateToDay,
+    renderedIndices,
+    swipeGesture,
+  } = useTodayNavigationController({
     windowWidth,
     windowHeight,
     selectedDayId,
@@ -702,18 +807,38 @@ export default function HomeScreen() {
     !!studioFollowUp ||
     !!comicGen ||
     voiceNote.phase !== 'idle';
-  const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
-    enabled: !flowBusy,
+  const explorationMotion = useTodayExplorationBackgroundMotion({
+    enabled: explorationBackgroundActive && !flowBusy,
+    onQuickSwipe: goToAdjacentDay,
   });
-  const pageGesture = Gesture.Simultaneous(swipeGesture, environmentGesture);
+  const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
+    enabled: !flowBusy && !explorationBackgroundActive,
+  });
+  const pageGesture = explorationBackgroundActive
+    ? explorationMotion.gesture
+    : Gesture.Simultaneous(swipeGesture, environmentGesture);
+  const handleHeroStageLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextTop = event.nativeEvent.layout.y;
+    setHeroStageTop((current) => (
+      current == null || Math.abs(current - nextTop) > 0.5 ? nextTop : current
+    ));
+  }, []);
   return (
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
-      <TodaySceneBackdrop
-        background={dayBackground}
-        scene={null}
-      />
+      {explorationBackgroundActive ? (
+        <TodayExplorationBackground
+          backgroundKey={explorationBackgroundKey}
+          imageSize={explorationMotion.imageSize}
+          translateX={explorationMotion.translateX}
+        />
+      ) : (
+        <TodaySceneBackdrop
+          background={dayBackground}
+          scene={null}
+        />
+      )}
       {/* Today is a FIXED composition — no page scrolling; everything anchors.
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
           for layout parity but is locked. */}
@@ -736,42 +861,74 @@ export default function HomeScreen() {
         <Animated.View
           ref={heroStageRef}
           entering={presenceEnter(70)}
+          onLayout={handleHeroStageLayout}
           style={styles.heroStage}>
-          <TodayHexNeighborhood
-            allowTomorrow={
-              isTodayHatched
-              && (!isHatching || !hatchIsCurrentToday || hatchShowsTomorrow)
-            }
-            cameraProgress={cameraProgress}
-            days={selectedDay && !timelineDays.some((day) => day.id === selectedDay.id)
-              ? [selectedDay]
-              : timelineDays}
-            foreground={<ResolvedAtmosphereLayer plane="foreground" settings={dayAtmosphereSettings} target="today" />}
-            interactionLocked={isHatching}
-            onSelect={navigateToDay}
-            renderedIndices={renderedIndices}
-            selectedId={selectedDayId}
-            renderDay={renderTimelineHero}
-            renderDayOverlay={renderTimelineOverlay}
-          />
-          {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
-            <TodayKingdomEggAboveOverlay homeArchetypeId={homeArchetypeId}>
-              <InlineVoiceNote
-                elapsed={voiceNote.elapsed}
-                phase={voiceNote.phase}
+          {explorationBackgroundActive && selectedDay ? (
+            <TodayExplorationSceneLayer translateX={explorationMotion.translateX}>
+              {renderTimelineHero(selectedDay, 'active')}
+              {renderTimelineOverlay(selectedDay, true)}
+              {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
+                <TodayKingdomEggAboveOverlay
+                  explorationStageTop={resolvedHeroStageTop}
+                  homeArchetypeId={homeArchetypeId}>
+                  <InlineVoiceNote
+                    elapsed={voiceNote.elapsed}
+                    phase={voiceNote.phase}
+                  />
+                </TodayKingdomEggAboveOverlay>
+              ) : null}
+              {!hasActivePrompt ? (
+                <TodayCategoryRing
+                  categories={goalRingItems}
+                  onPress={() => setQuickGoalsOpen(true)}
+                  anchorHeight={TODAY_KINGDOM_STAGE_HEIGHT}
+                  centerOffsetY={
+                    explorationSubjectFrame.centerY
+                      - TODAY_KINGDOM_STAGE_HEIGHT / 2
+                  }
+                  singleItemLeftOfAnchorWidth={explorationSubjectFrame.width}
+                />
+              ) : null}
+            </TodayExplorationSceneLayer>
+          ) : (
+            <>
+              <TodayHexNeighborhood
+                allowTomorrow={
+                  isTodayHatched
+                  && (!isHatching || !hatchIsCurrentToday || hatchShowsTomorrow)
+                }
+                cameraProgress={cameraProgress}
+                days={selectedDay && !timelineDays.some((day) => day.id === selectedDay.id)
+                  ? [selectedDay]
+                  : timelineDays}
+                foreground={<ResolvedAtmosphereLayer plane="foreground" settings={dayAtmosphereSettings} target="today" />}
+                interactionLocked={isHatching}
+                onSelect={navigateToDay}
+                renderedIndices={renderedIndices}
+                selectedId={selectedDayId}
+                renderDay={renderTimelineHero}
+                renderDayOverlay={renderTimelineOverlay}
               />
-            </TodayKingdomEggAboveOverlay>
-          ) : null}
-          {/* The same category ring circles the hatched creature when revisiting
-              a day, anchored to the shared 258px egg/creature art stage. */}
-          {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
-            <TodayCategoryRing
-              categories={goalRingItems}
-              onPress={() => setQuickGoalsOpen(true)}
-              anchorHeight={258}
-              centerOffsetY={24}
-            />
-          ) : null}
+              {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
+                <TodayKingdomEggAboveOverlay homeArchetypeId={homeArchetypeId}>
+                  <InlineVoiceNote
+                    elapsed={voiceNote.elapsed}
+                    phase={voiceNote.phase}
+                  />
+                </TodayKingdomEggAboveOverlay>
+              ) : null}
+              {/* The same category ring circles the hatched creature when
+                  revisiting a day, anchored to the shared art stage. */}
+              {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
+                <TodayCategoryRing
+                  categories={goalRingItems}
+                  onPress={() => setQuickGoalsOpen(true)}
+                  anchorHeight={TODAY_KINGDOM_STAGE_HEIGHT}
+                  centerOffsetY={24}
+                />
+              ) : null}
+            </>
+          )}
         </Animated.View>
 
         {isHatching ? null : isHatched ? (
@@ -836,6 +993,19 @@ export default function HomeScreen() {
       ) : null}
 
       <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
+
+      {/* Cinematic egg and Katchimera scenes bypass TodayHexNeighborhood, whose
+          foreground slot normally owns rain, snow, motes, petals, and other
+          authored atmosphere. Restore that plane across the full viewport,
+          above the page composition while remaining touch-through. */}
+      {explorationBackgroundActive ? (
+        <ResolvedAtmosphereLayer
+          plane="foreground"
+          settings={dayAtmosphereSettings}
+          style={styles.explorationAtmosphere}
+          target="today"
+        />
+      ) : null}
 
       {hatchCheckInOpen && selectedDay?.kind === 'day' && selectedDay.hatchCheckIn?.status === 'in_progress' ? (
         <HatchCheckInSheet
@@ -1126,6 +1296,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 100,
     width: 290,
+  },
+  explorationAtmosphere: {
+    zIndex: 55,
   },
   heroStage: {
     alignItems: 'center',

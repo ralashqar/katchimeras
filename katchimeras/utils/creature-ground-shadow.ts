@@ -1,4 +1,4 @@
-import { CREATURE_HATCHLING_ALPHA_BOUNDS } from '@/constants/creature-hatchling-sources.gen';
+import { CREATURE_HATCHLING_ALPHA_BOUNDS } from '@/constants/creature-hatchling-alpha-bounds.gen';
 import type { HomeVisualKey } from '@/types/home';
 
 const DEFAULT_ALPHA_BOUNDS = { left: 0.2, top: 0.05, right: 0.8, bottom: 0.94 };

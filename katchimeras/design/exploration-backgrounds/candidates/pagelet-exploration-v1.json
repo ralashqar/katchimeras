@@ -1,0 +1,40 @@
+{
+  "assetName": "pagelet-exploration-v1",
+  "status": "generated-candidate",
+  "key": "pagelet",
+  "displayName": "Pagelet warm library conservatory",
+  "pipelineVersion": "exploration-background-v12",
+  "candidate": {
+    "index": 2,
+    "key": "pagelet",
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2/edit",
+    "resolution": "2K",
+    "rawPath": ".tmp/exploration-backgrounds/pagelet/candidate-2-raw.png",
+    "templateSha256": "871e36f45364e4943b38bc68a791153158cb287798d2ec288aa7094560a7301f",
+    "styleGuideSha256": null,
+    "promptSha256": "a9f5586b6b4988efd0ce0befafdc2bacb57ddaa341b3137ba6d2dc75c36b8c22",
+    "createdAt": "2026-07-27T07:53:07.5930949Z",
+    "masterPath": ".tmp/exploration-backgrounds/pagelet/candidate-2-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/pagelet/candidate-2-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/pagelet/candidate-2-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/pagelet/candidate-2-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/pagelet/candidate-2-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/pagelet/candidate-2-phone-right.png"
+    },
+    "masterSha256": "a80e349a85854f547eeacab804b01e1c67b3b04ee1472ca2b840b825d5d9286b"
+  },
+  "exportedAt": "2026-07-27T07:56:16.722612+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/pagelet-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/pagelet-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/pagelet-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "a80e349a85854f547eeacab804b01e1c67b3b04ee1472ca2b840b825d5d9286b",
+    "runtime": "0bddfcd27bb501b0f327651bc7d61ca0c45cce8702fc434aec1c6a8b6dd781ef",
+    "guide": "82926a314cda6b6b1857536c1c401b8628266859e8deebc5ff7577c11ae0270a"
+  }
+}

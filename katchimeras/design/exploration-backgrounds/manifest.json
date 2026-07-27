@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 3,
+  "pipelineVersion": "exploration-background-v12",
+  "provider": "fal",
+  "model": "fal-ai/nano-banana-2/edit",
+  "styleGuide": "assets/images/katchimeras/world/design/style-anchor.png",
+  "providerPromptContract": {
+    "referenceCount": 1,
+    "injectedField": "environmentDesign",
+    "requiredTemplateSections": [
+      "artStyle",
+      "composition",
+      "redesignFreedom",
+      "exclusions"
+    ],
+    "forbiddenTerms": [
+      "katchimera",
+      "katchimeras"
+    ],
+    "forbiddenPhrases": [
+      "project art style",
+      "approved style guide",
+      "hex environment",
+      "hex-tile style",
+      "creature-family style"
+    ]
+  },
+  "providerPromptTemplate": {
+    "artStyle": "Cozy polished stylized 3D mobile-game environment art. Match the supplied reference image's visual finish: large rounded toy-like forms, simplified geometry, broad clean surfaces, restrained tactile texture, strong readable silhouettes, soft daylight, and gentle warm accent lighting. Use medium-low detail density suitable for a clear mobile screen",
+    "composition": "Use the supplied reference image as the authority for camera angle, lens feel, perspective, horizon, foreground depth, and overall framing. Preserve the circular platform in the middle exactly: keep the same silhouette, size, thickness, position, and framing. Keep the platform empty and clearly visible. Change only its surface materials and colors to suit the target environment. Arrange the surroundings with large clear features, gentle midground layering, and broad areas of uncluttered ground and open background",
+    "redesignFreedom": "Use the ENVIRONMENT DESIGN section as the sole authority for the surrounding world. Retain or replace the reference scenery only as directed there, and build a coherent environment rather than a superficial material reskin. The result should feel complete and welcoming, but never barren or crowded; prioritize clear visual hierarchy, calm spacing, and iconic forms",
+    "exclusions": "No overly busy detail, dense visual clutter, rows of repeated objects, dozens of tiny props, intricate ornament, noisy microtexture, busy patterns, or excessive foliage. No text, letters, numbers, signs, labels, logos, watermark, UI, living creature, character, person, or egg"
+  },
+  "canvas": {
+    "aspectRatio": "1:1",
+    "generationResolution": "2K",
+    "masterSize": 2048,
+    "reviewSize": 1024,
+    "phoneViewport": {
+      "width": 390,
+      "height": 844,
+      "behavior": "cover-height-and-pan-horizontally"
+    },
+    "cameraLock": {
+      "horizonY": 0.3,
+      "description": "the same front-facing, gently elevated three-quarter camera as the Home template, at a low-to-medium world height with only enough downward pitch to read the platform top",
+      "depthStaging": "roughly the same amount of sky and foreground as the Home template: distant skyline near the upper third, open foreground continuing below the frame, the platform in the lower-middle, and themed scenery primarily in the midground and background",
+      "exclusions": "no bird's-eye view, top-down view, steep downward pitch, isometric view, map view, overhead courtyard view, centered architectural plan, or wide-angle aerial establishing shot"
+    }
+  },
+  "backgrounds": {
+    "home": {
+      "displayName": "Home meadow",
+      "template": "design/exploration-backgrounds/home-template-source.jpg",
+      "referenceMode": "template-only",
+      "theme": "the welcoming Katchimeras home meadow in the supplied template: one round grass-topped stone platform, a round-doored hillside cottage on the left, a centered stepping-stone approach, rounded trees, rolling green hills, flowers, rocks, and a clear blue sky",
+      "palette": "bright leaf green, lime meadow, honey-gold stone, warm walnut wood, cream flowers, clear sky blue, and restrained amber lantern light",
+      "environmentDesign": "Retain and polish the welcoming meadow shown in the supplied reference image: one round-doored hillside cottage on the left, a centered stepping-stone approach, rounded trees, rolling green hills, a few flowers and rocks, and a clear blue sky. Preserve the recognizable scene structure and landmark balance",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.57,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "bedrotte": {
+      "displayName": "Bedrotte moonlit rest sanctuary",
+      "internalPromptTerms": [
+        "bedrotte"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a spacious blanket-warm evening sanctuary devoted to quiet rest. Build one broad open-front sleeping pavilion in the midground with a softly curved dusty-indigo canopy, one oversized neatly tucked daybed, a few large cream and lavender cushions, and one glowing amber window. Add one chunky cushioned armchair with a single draped blanket, one low bedside table holding a blank closed book and a simple cup, one broad folded-blanket chest, two large moon-shaped lamps, and only a few rounded night plants at the outer edges. Use a calm plush dusk-blue floor made from broad clean surfaces, soft lavender architectural accents, warm cream upholstery, gentle blue evening ambient light, and several restrained pools of amber lamplight. Make the circular platform feel like a quiet central resting dais while keeping it completely empty",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "feastle": {
+      "displayName": "Feastle harvest festival grounds",
+      "internalPromptTerms": [
+        "feastle"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a welcoming harvest courtyard centered on communal cooking and abundance: one prominent glowing rounded bread oven with a broad preparation counter, one produce stall, one simple feast table with benches, one herb garden bed, a few oversized bread baskets and pumpkins, two or three rounded orchard trees, a single strand of bunting, and a few warm lanterns",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "flickerbun": {
+      "displayName": "Flickerbun open-air pocket cinema",
+      "internalPromptTerms": [
+        "flickerbun"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a cozy open-air pocket cinema at blue-hour twilight. Place one broad blank softly lit deep-blue cinema screen in the midground, framed by two simple burgundy curtains and a chunky rounded navy canopy; the screen must remain blank with no image, writing, or black rectangle. Create a clear central viewing aisle with the circular platform as a small presentation stage in front of the screen. Add two small clusters of oversized burgundy velvet seats, one simplified vintage projector with two large reel forms, one compact popcorn cart, a few large popcorn tubs, several warm amber cinema lanterns, a small number of gold film-reel ornaments, broad midnight-navy carpeted areas, rounded dark-green landscape silhouettes at the outer edges, and a calm indigo evening sky",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "mossprout": {
+      "displayName": "Mossprout rain-kissed pocket garden",
+      "internalPromptTerms": [
+        "mossprout"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a calm oversized pocket garden just after gentle rain. Create one broad leafy garden alcove in the midground from a small number of large overlapping moss and leaf forms with a clean shaded opening. Add one small smooth oval pond off to one side, three large rounded moss boulders, one chunky stump bench, two groups of oversized fern silhouettes, one simple watering-stone ornament, and two broad warm garden lanterns. Use deep forest green, moss green, pale lime, warm umber, cream stone, and a restrained touch of rainwater blue. Keep the ground open and readable with broad velvety moss surfaces and subtle damp highlights, avoiding leaf-by-leaf texture. Make the circular platform feel like a smooth moss-and-stone garden clearing while keeping it completely empty",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "pagelet": {
+      "displayName": "Pagelet warm library conservatory",
+      "internalPromptTerms": [
+        "pagelet"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a warm spacious library conservatory designed for reading and storytelling. Use cream-colored rounded architecture with one broad curved burgundy roof, a large central arched doorway, and tall arched side windows showing a soft blue sky. Build two low bookcase wings containing only a small number of oversized blank books, and place one large lectern with a single open blank book in the midground. Add one chunky cushioned reading chair with a small three-book stack on one side, one compact book cart holding three oversized books on the other side, several broad amber reading lamps, a few antique-gold closed-book ornaments, and a warm walnut floor made from broad simple planks. Make the circular platform feel like a clear storytelling podium within the open reading space",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "relicoon": {
+      "displayName": "Relicoon grand discovery museum",
+      "internalPromptTerms": [
+        "relicoon"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a grand welcoming indoor museum gallery: warm sandstone architecture, tall arched windows and columns, one large dinosaur skeleton exhibit, a small number of fossil and artifact display cases, framed landscape artwork, brass lamps, dark wood plinths, and subtle greenery",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "skylo": {
+      "displayName": "Skylo sunlit pocket-city plaza",
+      "internalPromptTerms": [
+        "skylo"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a bright welcoming pocket-city plaza made for relaxed urban wandering. Build one compact rounded art-deco pavilion in the midground with a taller central tower, two broad stepped side buildings, and only a few oversized warm amber windows. Frame it with a friendly layered skyline of large simplified blue, teal, warm-brick, and cream building silhouettes. Add two large rounded street lanterns, one broad curved city bench, one compact cafe kiosk with a blank awning, two chunky planters holding single rounded street trees, and one simple blank transit shelter. Use broad smooth blue-gray paving slabs with no road markings and keep a clear open central plaza. Make the circular platform feel like a sunlit city stage while keeping it completely empty",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "steppling": {
+      "displayName": "Steppling mountain trailhead",
+      "internalPromptTerms": [
+        "steppling"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with an unmistakable mountain hiking and running trailhead built around steps and steady forward progress. Create one prominent continuous route of oversized stylized boot-footprint-shaped stepping stones, alternating left foot and right foot: begin the footprint trail at the bottom center, lead it toward the circular platform without covering the platform, then resume it directly behind the platform and continue uphill into the distance. Combine the footprint route with a few broad stone stair sections climbing the hills toward a simple summit marker. Add one compact timber hiking lodge with a broad muted-blue roof, one blank trail-map board decorated only with a simple footprint icon, one hiking-gear rack with an oversized backpack, walking poles, rolled blanket, and boots, one chunky rest bench, one water station, two waypoint posts with simple painted trail blazes, several large rounded pine trees, and distant layered blue mountains. Make the platform feel like the obvious starting point for a hike or run",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    }
+  }
+}

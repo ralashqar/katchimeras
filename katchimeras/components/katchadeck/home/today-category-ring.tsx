@@ -29,6 +29,9 @@ type TodayCategoryRingProps = {
   // box — the hero stages (egg AND creature) are a fixed 258px art box with
   // variable text below, so anchoring keeps the ring identical on both.
   anchorHeight?: number;
+  // Exploration-scene placement: move the lone action beside an object with
+  // this rendered width instead of using the legacy bottom-right position.
+  singleItemLeftOfAnchorWidth?: number;
 };
 
 // Icons sit in two tight vertical fans beside the egg — the first half of the
@@ -42,6 +45,9 @@ const ARC_INSET = 0;
 const STANDARD_MOTE_SIZE = 66;
 const GOAL_CARD_WIDTH = 170;
 const GOAL_CARD_HEIGHT = 84;
+const COMPACT_GOAL_CARD_WIDTH = 112;
+const COMPACT_GOAL_CARD_HEIGHT = 58;
+const SINGLE_ITEM_SIDE_GAP = 12;
 
 export function TodayCategoryRing({
   categories,
@@ -49,6 +55,7 @@ export function TodayCategoryRing({
   radius = 134,
   centerOffsetY = -18,
   anchorHeight,
+  singleItemLeftOfAnchorWidth,
 }: TodayCategoryRingProps) {
   if (categories.length === 0) return null;
   const rightCount = Math.ceil(categories.length / 2);
@@ -65,13 +72,21 @@ export function TodayCategoryRing({
         // single action, since the other categories moved into the numbers
         // panel) sits at the egg's bottom-right instead of mid-height.
         const t = sideCount === 1 ? 1 : sideIndex / (sideCount - 1);
-        const y = (t - 0.5) * 2 * VERTICAL_SPAN;
+        const defaultY = (t - 0.5) * 2 * VERTICAL_SPAN;
+        const placeSingleLeft = sideCount === 1 && singleItemLeftOfAnchorWidth != null;
+        const compactGoal = placeSingleLeft && category.id === 'goals';
+        const itemWidth = compactGoal ? COMPACT_GOAL_CARD_WIDTH : STANDARD_MOTE_SIZE;
+        const y = placeSingleLeft ? 4 : defaultY;
         // The middle icon reaches furthest out; top/bottom tuck slightly in.
-        const x = (radius - (Math.abs(y) / VERTICAL_SPAN) * ARC_INSET) * (onRight ? 1 : -1);
+        const x = placeSingleLeft
+          ? -(singleItemLeftOfAnchorWidth / 2 + itemWidth / 2 + SINGLE_ITEM_SIDE_GAP)
+          : (radius - (Math.abs(y) / VERTICAL_SPAN) * ARC_INSET) * (onRight ? 1 : -1);
         return (
           <CategoryMote
             key={category.id}
             category={category}
+            centeredOnAnchor={placeSingleLeft}
+            compactGoal={compactGoal}
             onPress={() => onPress(category)}
             translateX={x}
             translateY={y}
@@ -118,12 +133,16 @@ export const CATEGORY_ART: Partial<Record<string, number>> = {
 // count badge on the top-right corner. Attention = gold ring + slow pulse.
 function CategoryMote({
   category,
+  centeredOnAnchor,
+  compactGoal,
   onPress,
   translateX,
   translateY,
   enterDelay = 0,
 }: {
   category: TodayCategoryRingItem;
+  centeredOnAnchor: boolean;
+  compactGoal: boolean;
   onPress: () => void;
   translateX: number;
   translateY: number;
@@ -144,8 +163,64 @@ function CategoryMote({
         ? `${remaining} to-do`
         : 'All done';
 
+    if (compactGoal) {
+      return (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.slot,
+            styles.compactGoalSlot,
+            { transform: [{ translateX }, { translateY }] },
+          ]}>
+          <Animated.View entering={popEnter(enterDelay)} style={styles.compactGoalCardWrap}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Goals, ${status}`}
+              hitSlop={8}
+              onPress={onPress}
+              style={({ pressed }) => [
+                styles.compactGoalCard,
+                pressed ? styles.goalCardPressed : null,
+              ]}>
+              <View style={styles.compactGoalClipboard} pointerEvents="none">
+                <IconSymbol name="list.clipboard.fill" size={22} color="#59472F" />
+                <View style={styles.compactGoalStar}>
+                  <IconSymbol name="star.fill" size={8} color="#FFF5D4" />
+                </View>
+              </View>
+              <View style={styles.compactGoalCopy} pointerEvents="none">
+                <ThemedText
+                  numberOfLines={1}
+                  style={styles.compactGoalTitle}
+                  lightColor="#FFF6DE"
+                  darkColor="#FFF6DE">
+                  Goals
+                </ThemedText>
+                <ThemedText
+                  numberOfLines={1}
+                  style={styles.compactGoalStatus}
+                  lightColor="rgba(255, 246, 222, 0.78)"
+                  darkColor="rgba(255, 246, 222, 0.78)">
+                  {status}
+                </ThemedText>
+                <View style={styles.compactGoalProgressTrack}>
+                  <View style={[styles.goalProgressFill, { width: `${completionPercent}%` }]} />
+                </View>
+              </View>
+            </Pressable>
+          </Animated.View>
+        </View>
+      );
+    }
+
     return (
-      <View pointerEvents="box-none" style={[styles.slot, styles.goalSlot]}>
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.slot,
+          centeredOnAnchor ? styles.centeredGoalSlot : styles.goalSlot,
+          centeredOnAnchor ? { transform: [{ translateX }, { translateY }] } : null,
+        ]}>
         <Animated.View entering={popEnter(enterDelay)} style={styles.goalCardWrap}>
           <Pressable
             accessibilityRole="button"
@@ -320,6 +395,87 @@ const styles = StyleSheet.create({
   },
   goalCardWrap: {
     height: GOAL_CARD_HEIGHT,
+    width: GOAL_CARD_WIDTH,
+  },
+  compactGoalCardWrap: {
+    height: COMPACT_GOAL_CARD_HEIGHT,
+    width: COMPACT_GOAL_CARD_WIDTH,
+  },
+  compactGoalSlot: {
+    height: COMPACT_GOAL_CARD_HEIGHT,
+    left: '50%',
+    marginLeft: -COMPACT_GOAL_CARD_WIDTH / 2,
+    marginTop: -COMPACT_GOAL_CARD_HEIGHT / 2,
+    top: '50%',
+    width: COMPACT_GOAL_CARD_WIDTH,
+  },
+  compactGoalCard: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(29, 25, 32, 0.91)',
+    borderColor: 'rgba(247, 190, 69, 0.82)',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1.2,
+    boxShadow: '0 4px 12px rgba(8, 7, 12, 0.34), 0 0 8px rgba(247, 190, 69, 0.18), inset 0 1px 0 rgba(255, 248, 225, 0.16)',
+    flexDirection: 'row',
+    gap: 7,
+    height: COMPACT_GOAL_CARD_HEIGHT,
+    paddingHorizontal: 9,
+    width: COMPACT_GOAL_CARD_WIDTH,
+  },
+  compactGoalClipboard: {
+    alignItems: 'center',
+    backgroundColor: '#F2DFC0',
+    borderColor: 'rgba(255, 249, 226, 0.7)',
+    borderCurve: 'continuous',
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 28,
+  },
+  compactGoalStar: {
+    alignItems: 'center',
+    backgroundColor: Meadow.gold,
+    borderRadius: 999,
+    height: 14,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -5,
+    top: -5,
+    width: 14,
+  },
+  compactGoalCopy: {
+    flex: 1,
+    gap: 0,
+    minWidth: 0,
+  },
+  compactGoalTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.1,
+    lineHeight: 17,
+  },
+  compactGoalStatus: {
+    fontSize: 9.5,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '600',
+    lineHeight: 12,
+  },
+  compactGoalProgressTrack: {
+    backgroundColor: 'rgba(255, 246, 222, 0.19)',
+    borderRadius: 999,
+    height: 4,
+    marginTop: 3,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  centeredGoalSlot: {
+    height: GOAL_CARD_HEIGHT,
+    left: '50%',
+    marginLeft: -GOAL_CARD_WIDTH / 2,
+    marginTop: -GOAL_CARD_HEIGHT / 2,
+    top: '50%',
     width: GOAL_CARD_WIDTH,
   },
   goalSlot: {
