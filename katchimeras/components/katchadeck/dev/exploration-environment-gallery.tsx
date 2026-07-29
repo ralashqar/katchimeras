@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -9,10 +9,8 @@ import {
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  cancelAnimation,
   FadeIn,
   FadeOut,
-  withSpring,
 } from 'react-native-reanimated';
 
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
@@ -25,7 +23,6 @@ import { DevAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-lay
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
-import todayScene from '@/data/today-scene.json';
 import { DEV_EXPLORATION_ENVIRONMENT_PREVIEWS } from '@/utils/dev-exploration-environments';
 import { safeGoBack } from '@/utils/safe-navigation';
 import {
@@ -50,19 +47,12 @@ export function ExplorationEnvironmentGallery() {
     });
   }, []);
   const motion = useTodayExplorationBackgroundMotion({
+    activeKey: selected?.backgroundKey,
     enabled: selected != null,
     onQuickSwipe: selectAdjacent,
   });
   const stageTop =
     insets.top + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
-
-  useEffect(() => {
-    cancelAnimation(motion.translateX);
-    motion.translateX.value = withSpring(
-      0,
-      todayScene.homeExplorationBackground.resetSpring,
-    );
-  }, [motion.translateX, selected?.backgroundKey]);
 
   if (!selected) {
     return (

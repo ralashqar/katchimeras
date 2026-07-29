@@ -27,7 +27,8 @@
     "creatureContactYRatio": 0.58,
     "creatureWidthViewportHeightRatio": 0.235,
     "creatureWidthViewportWidthRatio": 0.49,
-    "environmentDragActivationMs": 160,
+    "overscrollResistance": 0.2,
+    "pageTransitionDurationMs": 260,
     "quickSwipe": {
       "minDistance": 40,
       "minVelocity": 850
@@ -58,6 +59,8 @@
       "hoverDistance": 3,
       "hoverEnabled": true,
       "hoverHalfCycleMs": 2100,
+      "explorationMaxPinchScale": 1.6,
+      "explorationPinchSoftLimitRange": 0.2,
       "maxPinchScale": 2,
       "neighborPinchStrength": 0.08,
       "resetSpring": {

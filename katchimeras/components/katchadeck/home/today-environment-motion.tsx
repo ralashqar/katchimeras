@@ -1,6 +1,7 @@
 import { useIsFocused } from '@react-navigation/native';
 import { createContext, type ReactNode, use, useEffect, useMemo } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
+import { StyleSheet } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
@@ -24,21 +25,37 @@ type TodayEnvironmentMotion = {
 
 type MotionControllerOptions = {
   enabled: boolean;
+  hoverEnabled?: boolean;
+  maxPinchScale?: number;
+  pinchSoftLimitRange?: number;
 };
 
 const MotionContext = createContext<TodayEnvironmentMotion | null>(null);
 
-export function useTodayEnvironmentMotion({ enabled }: MotionControllerOptions) {
+export function useTodayEnvironmentMotion({
+  enabled,
+  hoverEnabled = enabled,
+  maxPinchScale,
+  pinchSoftLimitRange = 0,
+}: MotionControllerOptions) {
   const isFocused = useIsFocused();
   const reduceMotion = useReducedMotion();
   const hoverY = useSharedValue(0);
   const pinchScale = useSharedValue(1);
   const pinchStartScale = useSharedValue(1);
   const motion = todayScene.homeEnvironment.motion;
+  const resolvedMaxPinchScale = Math.max(
+    1,
+    Math.min(maxPinchScale ?? motion.maxPinchScale, motion.maxPinchScale),
+  );
+  const resolvedSoftLimitRange = Math.max(
+    0,
+    Math.min(pinchSoftLimitRange, resolvedMaxPinchScale - 1),
+  );
 
   useEffect(() => {
     cancelAnimation(hoverY);
-    if (!enabled || !isFocused || reduceMotion || !motion.hoverEnabled) {
+    if (!enabled || !hoverEnabled || !isFocused || reduceMotion || !motion.hoverEnabled) {
       hoverY.value = withTiming(0, { duration: 180 });
       return;
     }
@@ -58,7 +75,7 @@ export function useTodayEnvironmentMotion({ enabled }: MotionControllerOptions) 
       false,
     );
     return () => cancelAnimation(hoverY);
-  }, [enabled, hoverY, isFocused, motion.hoverDistance, motion.hoverEnabled, motion.hoverHalfCycleMs, reduceMotion]);
+  }, [enabled, hoverEnabled, hoverY, isFocused, motion.hoverDistance, motion.hoverEnabled, motion.hoverHalfCycleMs, reduceMotion]);
 
   useEffect(() => {
     if (enabled) return;
@@ -74,15 +91,36 @@ export function useTodayEnvironmentMotion({ enabled }: MotionControllerOptions) 
         pinchStartScale.value = pinchScale.value;
       })
       .onUpdate((event) => {
-        pinchScale.value = Math.min(
-          motion.maxPinchScale,
-          Math.max(1, pinchStartScale.value * event.scale),
-        );
+        const rawScale = Math.max(1, pinchStartScale.value * event.scale);
+        if (resolvedSoftLimitRange <= 0) {
+          pinchScale.value = Math.min(resolvedMaxPinchScale, rawScale);
+          return;
+        }
+
+        const softLimitStart = resolvedMaxPinchScale - resolvedSoftLimitRange;
+        if (rawScale <= softLimitStart) {
+          pinchScale.value = rawScale;
+          return;
+        }
+
+        // Preserve a 1:1 response through most of the zoom, then progressively
+        // resist the final portion. The asymptote prevents a perceptible stop.
+        const overshoot = rawScale - softLimitStart;
+        pinchScale.value = softLimitStart
+          + resolvedSoftLimitRange
+            * (1 - Math.exp(-overshoot / resolvedSoftLimitRange));
       })
       .onFinalize(() => {
         pinchScale.value = withSpring(1, motion.resetSpring);
       }),
-    [enabled, motion.maxPinchScale, motion.resetSpring, pinchScale, pinchStartScale],
+    [
+      enabled,
+      motion.resetSpring,
+      pinchScale,
+      pinchStartScale,
+      resolvedMaxPinchScale,
+      resolvedSoftLimitRange,
+    ],
   );
 
   return {
@@ -162,6 +200,42 @@ export function TodayEnvironmentMotionLayer({
           },
           scaleStyle,
         ]}>
+        {children}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** Applies the shared pinch to a full-screen environment plane. Its vertical
+ * pivot matches the resident's global centre while Today chrome stays fixed. */
+export function TodayEnvironmentViewportMotionLayer({
+  children,
+  focusY,
+  viewportHeight,
+}: {
+  children: ReactNode;
+  focusY: number;
+  viewportHeight: number;
+}) {
+  const motion = use(MotionContext);
+  const pivotOffsetY = focusY - viewportHeight / 2;
+  const anchorStyle = useAnimatedStyle(() => {
+    const scale = motion?.pinchScale.value ?? 1;
+    return {
+      transform: [{ translateY: (1 - scale) * pivotOffsetY }],
+    };
+  }, [pivotOffsetY]);
+  const scaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: motion?.pinchScale.value ?? 1 }],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="box-none"
+      style={[StyleSheet.absoluteFill, anchorStyle]}>
+      <Animated.View
+        pointerEvents="box-none"
+        style={[StyleSheet.absoluteFill, scaleStyle]}>
         {children}
       </Animated.View>
     </Animated.View>

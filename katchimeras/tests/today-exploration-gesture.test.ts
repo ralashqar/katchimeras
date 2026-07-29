@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveTodayExplorationSwipeDirection } from '../utils/today-exploration-gesture';
+import {
+  resolveTodayExplorationDragTranslation,
+  resolveTodayExplorationSwipeDirection,
+  resolveTodayExplorationTransitionDuration,
+  resolveTodayExplorationTransitionOpacity,
+} from '../utils/today-exploration-gesture';
 
 const thresholds = {
   minDistance: 40,
@@ -32,6 +37,14 @@ test('a slow environmental drag does not navigate even after travelling far', ()
   }), null);
 });
 
+test('a quick release at the end of a long drag still advances the day', () => {
+  assert.equal(resolveTodayExplorationSwipeDirection({
+    ...thresholds,
+    translationX: -180,
+    velocityX: -1050,
+  }), 1);
+});
+
 test('a short fast movement does not accidentally navigate', () => {
   assert.equal(resolveTodayExplorationSwipeDirection({
     ...thresholds,
@@ -46,4 +59,54 @@ test('reversing direction before release remains an environmental drag', () => {
     translationX: 96,
     velocityX: -900,
   }), null);
+});
+
+test('the environment follows the finger beyond its authored pan range with resistance', () => {
+  assert.equal(resolveTodayExplorationDragTranslation({
+    gestureStartX: 0,
+    maxPan: 200,
+    overscrollResistance: 0.2,
+    translationX: -300,
+  }), -220);
+});
+
+test('transition settling gets shorter when the drag already approached its target', () => {
+  assert.equal(resolveTodayExplorationTransitionDuration({
+    currentX: 0,
+    targetX: -400,
+  }), 280);
+  assert.equal(resolveTodayExplorationTransitionDuration({
+    currentX: -320,
+    targetX: -400,
+  }), 200);
+});
+
+test('only the selected incoming scene can fade into the foreground', () => {
+  assert.equal(resolveTodayExplorationTransitionOpacity({
+    plane: 'background',
+    progress: 0.5,
+    role: 'incoming',
+    selectedIncoming: false,
+  }), 0);
+  assert.equal(resolveTodayExplorationTransitionOpacity({
+    plane: 'subject',
+    progress: 0.5,
+    role: 'incoming',
+    selectedIncoming: true,
+  }), 0.5);
+});
+
+test('the cinematic background crossfade avoids a dark midpoint', () => {
+  assert.equal(resolveTodayExplorationTransitionOpacity({
+    plane: 'background',
+    progress: 0.5,
+    role: 'current',
+    selectedIncoming: false,
+  }), 1);
+  assert.equal(resolveTodayExplorationTransitionOpacity({
+    plane: 'background',
+    progress: 1,
+    role: 'current',
+    selectedIncoming: false,
+  }), 0);
 });

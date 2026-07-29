@@ -29,6 +29,7 @@ import {
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
 import {
   TodayExplorationBackground,
+  TodayExplorationPageLayer,
   TodayExplorationSceneLayer,
   useTodayExplorationBackgroundMotion,
 } from '@/components/katchadeck/home/today-exploration-background';
@@ -36,6 +37,7 @@ import { TodayTileHatchReveal } from '@/components/katchadeck/home/today-tile-ha
 import { ResolvedAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import {
   TodayEnvironmentMotionProvider,
+  TodayEnvironmentViewportMotionLayer,
   useTodayEnvironmentMotion,
 } from '@/components/katchadeck/home/today-environment-motion';
 import { MemoryPostcard } from '@/components/katchadeck/home/memory-postcard';
@@ -96,7 +98,10 @@ import {
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
 import { atmosphereSettingsForPlan, resolveDayAtmosphere } from '@/utils/day-atmosphere';
-import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
+import {
+  todayAtmosphereBackgroundForDay,
+  type TodayAtmosphereBackground,
+} from '@/utils/day-background-scene';
 import { todayHatchShowsResident, todayHatchShowsTomorrow } from '@/utils/today-hatch-presentation';
 import { identityForCreature } from '@/utils/katchimera-identity';
 import {
@@ -115,6 +120,18 @@ import {
 // (same pattern as the photos/timeline sections in day-journal-sections).
 const SHOW_HATCHED_ACTION_DOCK = false;
 const SHOW_HATCHED_REFLECTION_CARD = false;
+
+type TodayExplorationPageDescriptor = {
+  backgroundKey: TodayExplorationBackgroundKey | null;
+  fallbackBackground: TodayAtmosphereBackground | null;
+  timelineDay: HomeTimelineDay;
+};
+
+type TodayExplorationTransitionSnapshot = {
+  direction: -1 | 1;
+  source: TodayExplorationPageDescriptor;
+  target: TodayExplorationPageDescriptor;
+};
 
 // Mood + Sleep entries in the "+" menu — they open their own sheets instead of
 // the retired strip prompts (accents match those sheets' tiles).
@@ -373,6 +390,106 @@ export default function HomeScreen() {
     () => todayAtmosphereBackgroundForDay(atmosphereDay, allDays),
     [allDays, atmosphereDay],
   );
+  const explorationTransitionPages = useMemo(() => {
+    const selectedIndex = timelineDays.findIndex(
+      (day) => day.id === selectedDayId,
+    );
+    const pageAt = (direction: -1 | 1) => {
+      if (selectedIndex < 0) return null;
+      const target = timelineDays[selectedIndex + direction];
+      if (!target) return null;
+      if (target.kind === 'tomorrow' && !isTodayHatched) return null;
+
+      const resolvedDay = target.kind === 'day' ? target : tomorrowDay;
+      let backgroundKey: TodayExplorationBackgroundKey | null = null;
+      if (target.kind === 'tomorrow') {
+        backgroundKey = 'home';
+      } else if (
+        resolvedDay?.isToday
+        && resolvedDay.state !== 'hatched'
+      ) {
+        backgroundKey = 'home';
+      } else if (
+        resolvedDay?.state === 'hatched'
+        && resolvedDay.creature
+      ) {
+        backgroundKey =
+          todayKatchimeraExplorationBackgroundKeyForPresentation({
+            creature: resolvedDay.creature,
+            environmentVisualKey:
+              resolvedDay.card?.scene?.environment?.visualKey,
+          });
+      }
+
+      return {
+        backgroundKey,
+        fallbackBackground: backgroundKey
+          ? null
+          : todayAtmosphereBackgroundForDay(resolvedDay, allDays),
+        timelineDay: target,
+      };
+    };
+
+    return {
+      next: pageAt(1),
+      previous: pageAt(-1),
+    };
+  }, [
+    allDays,
+    isTodayHatched,
+    selectedDayId,
+    timelineDays,
+    tomorrowDay,
+  ]);
+  const currentExplorationPage = useMemo<TodayExplorationPageDescriptor | null>(
+    () => selectedDay
+      ? {
+          backgroundKey: explorationBackgroundKey,
+          fallbackBackground: explorationBackgroundKey ? null : dayBackground,
+          timelineDay: selectedDay,
+        }
+      : null,
+    [
+      dayBackground,
+      explorationBackgroundKey,
+      selectedDay,
+    ],
+  );
+  const [
+    explorationTransitionSnapshot,
+    setExplorationTransitionSnapshot,
+  ] = useState<TodayExplorationTransitionSnapshot | null>(null);
+  const explorationTransitionTargetIdRef = useRef<string | null>(null);
+  const beginExplorationTransition = useCallback((direction: -1 | 1) => {
+    const target = direction === -1
+      ? explorationTransitionPages.previous
+      : explorationTransitionPages.next;
+    if (!currentExplorationPage || !target) return;
+    explorationTransitionTargetIdRef.current = target.timelineDay.id;
+    setExplorationTransitionSnapshot({
+      direction,
+      source: currentExplorationPage,
+      target,
+    });
+  }, [currentExplorationPage, explorationTransitionPages]);
+  const displayedExplorationCurrent =
+    explorationTransitionSnapshot?.source ?? currentExplorationPage;
+  const displayedExplorationPrevious = explorationTransitionSnapshot
+    ? explorationTransitionSnapshot.direction === -1
+      ? explorationTransitionSnapshot.target
+      : null
+    : explorationTransitionPages.previous;
+  const displayedExplorationNext = explorationTransitionSnapshot
+    ? explorationTransitionSnapshot.direction === 1
+      ? explorationTransitionSnapshot.target
+      : null
+    : explorationTransitionPages.next;
+  const explorationTargetCommitted = Boolean(
+    explorationTransitionSnapshot
+    && explorationTransitionSnapshot.target.timelineDay.id === selectedDayId,
+  );
+  const explorationPresentationActive =
+    explorationBackgroundActive || explorationTransitionSnapshot != null;
   const goalRingItems = useMemo<TodayCategoryRingItem[]>(() => {
     if (!isDay || !selectedDay.isToday || !quickGoalFamilyIds.length) return [];
     const goalCount = quickGoals.goalsForToday.length;
@@ -667,8 +784,12 @@ export default function HomeScreen() {
   const renderTimelineHero = useCallback((
     timelineDay: HomeTimelineDay,
     mode: TodayTileRenderMode,
+    explorationFramingOverride?: boolean,
   ) => {
     const active = mode === 'active';
+    const pageUsesExplorationFraming =
+      explorationFramingOverride
+      ?? (active && explorationBackgroundActive);
     if (active && isHatching && hatchPresentation.dayId === timelineDay.id) {
       return (
         <TodayTileHatchReveal
@@ -686,7 +807,7 @@ export default function HomeScreen() {
           environmentVisualKey: day.card?.scene?.environment?.visualKey,
         });
       const usesExplorationFraming =
-        active && explorationBackgroundActive && dayExplorationKey != null;
+        pageUsesExplorationFraming && dayExplorationKey != null;
       return (
         <CreatureHero
           artLod={active ? 'medium' : 'thumb'}
@@ -709,11 +830,11 @@ export default function HomeScreen() {
       <TodayKingdomEggHero
         accentColor={day?.egg.accentColor}
         coreColor={day?.egg.coreColor}
-        explorationStageTop={active && explorationBackgroundActive
+        explorationStageTop={pageUsesExplorationFraming
           ? resolvedHeroStageTop
           : undefined}
         feedbackKey={active ? eggFeedKey : 0}
-        hideKingdomEnvironmentArt={active && explorationBackgroundActive}
+        hideKingdomEnvironmentArt={pageUsesExplorationFraming}
         homeArchetypeId={homeArchetypeId}
         isReady={active && day?.state === 'ready_to_hatch'}
         onEggPress={active && day?.canAddMoments ? () => openManualJournal() : undefined}
@@ -777,6 +898,14 @@ export default function HomeScreen() {
     selectTimelineDay,
     startEggFeed,
   });
+  const commitExplorationTransition = useCallback((direction: -1 | 1) => {
+    const targetId = explorationTransitionTargetIdRef.current;
+    if (targetId) {
+      navigateToDay(targetId);
+      return;
+    }
+    goToAdjacentDay(direction);
+  }, [goToAdjacentDay, navigateToDay]);
   // A discovery reveal waits until nothing else is mid-flow: no sheet, prompt,
   // follow-up, recording, or hatch on screen. It then celebrates the
   // highest-rarity pending unlock first (same order as the World page).
@@ -808,14 +937,60 @@ export default function HomeScreen() {
     !!comicGen ||
     voiceNote.phase !== 'idle';
   const explorationMotion = useTodayExplorationBackgroundMotion({
+    activeKey: selectedDayId,
+    canSwipeNext: explorationTransitionPages.next != null,
+    canSwipePrevious: explorationTransitionPages.previous != null,
     enabled: explorationBackgroundActive && !flowBusy,
-    onQuickSwipe: goToAdjacentDay,
+    onQuickSwipe: commitExplorationTransition,
+    onTransitionStart: beginExplorationTransition,
+    pageTransitionEnabled: true,
   });
+  const resetExplorationAfterCommit = explorationMotion.resetAfterCommit;
+  useEffect(() => {
+    if (!explorationTransitionSnapshot) return;
+    const sourceId = explorationTransitionSnapshot.source.timelineDay.id;
+    const targetId = explorationTransitionSnapshot.target.timelineDay.id;
+    if (selectedDayId === sourceId) return;
+    if (selectedDayId !== targetId) {
+      resetExplorationAfterCommit();
+      explorationTransitionTargetIdRef.current = null;
+      setExplorationTransitionSnapshot(null);
+      return;
+    }
+
+    // Keep the captured target centered while the live selected-day tree is
+    // rebased behind it, then let that identical live target take over.
+    resetExplorationAfterCommit();
+    let handoffFrame: number | null = null;
+    const rebaseFrame = requestAnimationFrame(() => {
+      handoffFrame = requestAnimationFrame(() => {
+        explorationTransitionTargetIdRef.current = null;
+        setExplorationTransitionSnapshot((current) => (
+          current?.target.timelineDay.id === targetId ? null : current
+        ));
+      });
+    });
+    return () => {
+      cancelAnimationFrame(rebaseFrame);
+      if (handoffFrame != null) cancelAnimationFrame(handoffFrame);
+    };
+  }, [
+    explorationTransitionSnapshot,
+    resetExplorationAfterCommit,
+    selectedDayId,
+  ]);
   const { environmentGesture, environmentMotion } = useTodayEnvironmentMotion({
-    enabled: !flowBusy && !explorationBackgroundActive,
+    enabled: !flowBusy,
+    hoverEnabled: !explorationPresentationActive,
+    maxPinchScale: explorationPresentationActive
+      ? todayScene.homeEnvironment.motion.explorationMaxPinchScale
+      : todayScene.homeEnvironment.motion.maxPinchScale,
+    pinchSoftLimitRange: explorationPresentationActive
+      ? todayScene.homeEnvironment.motion.explorationPinchSoftLimitRange
+      : 0,
   });
-  const pageGesture = explorationBackgroundActive
-    ? explorationMotion.gesture
+  const pageGesture = explorationPresentationActive
+    ? Gesture.Simultaneous(explorationMotion.gesture, environmentGesture)
     : Gesture.Simultaneous(swipeGesture, environmentGesture);
   const handleHeroStageLayout = useCallback((event: LayoutChangeEvent) => {
     const nextTop = event.nativeEvent.layout.y;
@@ -827,12 +1002,86 @@ export default function HomeScreen() {
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
-      {explorationBackgroundActive ? (
-        <TodayExplorationBackground
-          backgroundKey={explorationBackgroundKey}
-          imageSize={explorationMotion.imageSize}
-          translateX={explorationMotion.translateX}
-        />
+      {explorationPresentationActive ? (
+        <View
+          pointerEvents="none"
+          style={styles.explorationBackgroundPlane}>
+          <TodayEnvironmentViewportMotionLayer
+            focusY={resolvedHeroStageTop + explorationSubjectFrame.centerY}
+            viewportHeight={windowHeight}>
+          {displayedExplorationPrevious ? (
+            <TodayExplorationPageLayer
+              baseOffsetX={-windowWidth}
+              holdCentered={
+                explorationTargetCommitted
+                && explorationTransitionSnapshot?.direction === -1
+              }
+              pageDirection={-1}
+              key={`exploration-background-${displayedExplorationPrevious.timelineDay.id}`}
+              transitionDirection={explorationMotion.transitionDirection}
+              transitionProgress={explorationMotion.transitionProgress}
+              transitionRole="incoming"
+              translateX={explorationMotion.translateX}>
+              {displayedExplorationPrevious.backgroundKey ? (
+                <TodayExplorationBackground
+                  backgroundKey={displayedExplorationPrevious.backgroundKey}
+                  imageSize={explorationMotion.imageSize}
+                />
+              ) : displayedExplorationPrevious.fallbackBackground ? (
+                <TodaySceneBackdrop
+                  background={displayedExplorationPrevious.fallbackBackground}
+                  scene={null}
+                />
+              ) : null}
+            </TodayExplorationPageLayer>
+          ) : null}
+          {displayedExplorationCurrent ? (
+            <TodayExplorationPageLayer
+              key={`exploration-background-${displayedExplorationCurrent.timelineDay.id}`}
+              transitionProgress={explorationMotion.transitionProgress}
+              transitionRole="current"
+              translateX={explorationMotion.translateX}>
+              {displayedExplorationCurrent.backgroundKey ? (
+                <TodayExplorationBackground
+                  backgroundKey={displayedExplorationCurrent.backgroundKey}
+                  imageSize={explorationMotion.imageSize}
+                />
+              ) : displayedExplorationCurrent.fallbackBackground ? (
+                <TodaySceneBackdrop
+                  background={displayedExplorationCurrent.fallbackBackground}
+                  scene={null}
+                />
+              ) : null}
+            </TodayExplorationPageLayer>
+          ) : null}
+          {displayedExplorationNext ? (
+            <TodayExplorationPageLayer
+              baseOffsetX={windowWidth}
+              holdCentered={
+                explorationTargetCommitted
+                && explorationTransitionSnapshot?.direction === 1
+              }
+              pageDirection={1}
+              key={`exploration-background-${displayedExplorationNext.timelineDay.id}`}
+              transitionDirection={explorationMotion.transitionDirection}
+              transitionProgress={explorationMotion.transitionProgress}
+              transitionRole="incoming"
+              translateX={explorationMotion.translateX}>
+              {displayedExplorationNext.backgroundKey ? (
+                <TodayExplorationBackground
+                  backgroundKey={displayedExplorationNext.backgroundKey}
+                  imageSize={explorationMotion.imageSize}
+                />
+              ) : displayedExplorationNext.fallbackBackground ? (
+                <TodaySceneBackdrop
+                  background={displayedExplorationNext.fallbackBackground}
+                  scene={null}
+                />
+              ) : null}
+            </TodayExplorationPageLayer>
+          ) : null}
+          </TodayEnvironmentViewportMotionLayer>
+        </View>
       ) : (
         <TodaySceneBackdrop
           background={dayBackground}
@@ -845,6 +1094,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
         contentInsetAdjustmentBehavior="never"
+        style={styles.contentPlane}
         scrollEnabled={false}
         bounces={false}
         showsVerticalScrollIndicator={false}>
@@ -863,33 +1113,85 @@ export default function HomeScreen() {
           entering={presenceEnter(70)}
           onLayout={handleHeroStageLayout}
           style={styles.heroStage}>
-          {explorationBackgroundActive && selectedDay ? (
-            <TodayExplorationSceneLayer translateX={explorationMotion.translateX}>
-              {renderTimelineHero(selectedDay, 'active')}
-              {renderTimelineOverlay(selectedDay, true)}
-              {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
-                <TodayKingdomEggAboveOverlay
-                  explorationStageTop={resolvedHeroStageTop}
-                  homeArchetypeId={homeArchetypeId}>
-                  <InlineVoiceNote
-                    elapsed={voiceNote.elapsed}
-                    phase={voiceNote.phase}
-                  />
-                </TodayKingdomEggAboveOverlay>
-              ) : null}
-              {!hasActivePrompt ? (
-                <TodayCategoryRing
-                  categories={goalRingItems}
-                  onPress={() => setQuickGoalsOpen(true)}
-                  anchorHeight={TODAY_KINGDOM_STAGE_HEIGHT}
-                  centerOffsetY={
-                    explorationSubjectFrame.centerY
-                      - TODAY_KINGDOM_STAGE_HEIGHT / 2
+          {explorationPresentationActive && selectedDay ? (
+            <>
+              {displayedExplorationPrevious ? (
+                <TodayExplorationSceneLayer
+                  baseOffsetX={-windowWidth}
+                  holdCentered={
+                    explorationTargetCommitted
+                    && explorationTransitionSnapshot?.direction === -1
                   }
-                  singleItemLeftOfAnchorWidth={explorationSubjectFrame.width}
-                />
+                  pageDirection={-1}
+                  key={`exploration-subject-${displayedExplorationPrevious.timelineDay.id}`}
+                  transitionDirection={explorationMotion.transitionDirection}
+                  transitionProgress={explorationMotion.transitionProgress}
+                  transitionRole="incoming"
+                  translateX={explorationMotion.translateX}>
+                  {renderTimelineHero(
+                    displayedExplorationPrevious.timelineDay,
+                    'active',
+                    displayedExplorationPrevious.backgroundKey != null,
+                  )}
+                </TodayExplorationSceneLayer>
               ) : null}
-            </TodayExplorationSceneLayer>
+              <TodayExplorationSceneLayer
+                hidden={explorationTargetCommitted}
+                interactive={explorationTransitionSnapshot == null}
+                key={`exploration-subject-${displayedExplorationCurrent?.timelineDay.id ?? selectedDay.id}`}
+                transitionProgress={explorationMotion.transitionProgress}
+                transitionRole="current"
+                translateX={explorationMotion.translateX}>
+                {renderTimelineHero(
+                  displayedExplorationCurrent?.timelineDay ?? selectedDay,
+                  'active',
+                  displayedExplorationCurrent?.backgroundKey != null,
+                )}
+                {renderTimelineOverlay(selectedDay, true)}
+                {voiceNote.phase !== 'idle' && !quickNoteOpen ? (
+                  <TodayKingdomEggAboveOverlay
+                    explorationStageTop={resolvedHeroStageTop}
+                    homeArchetypeId={homeArchetypeId}>
+                    <InlineVoiceNote
+                      elapsed={voiceNote.elapsed}
+                      phase={voiceNote.phase}
+                    />
+                  </TodayKingdomEggAboveOverlay>
+                ) : null}
+                {!hasActivePrompt ? (
+                  <TodayCategoryRing
+                    categories={goalRingItems}
+                    onPress={() => setQuickGoalsOpen(true)}
+                    anchorHeight={TODAY_KINGDOM_STAGE_HEIGHT}
+                    centerOffsetY={
+                      explorationSubjectFrame.centerY
+                        - TODAY_KINGDOM_STAGE_HEIGHT / 2
+                    }
+                    singleItemLeftOfAnchorWidth={explorationSubjectFrame.width}
+                  />
+                ) : null}
+              </TodayExplorationSceneLayer>
+              {displayedExplorationNext ? (
+                <TodayExplorationSceneLayer
+                  baseOffsetX={windowWidth}
+                  holdCentered={
+                    explorationTargetCommitted
+                    && explorationTransitionSnapshot?.direction === 1
+                  }
+                  pageDirection={1}
+                  key={`exploration-subject-${displayedExplorationNext.timelineDay.id}`}
+                  transitionDirection={explorationMotion.transitionDirection}
+                  transitionProgress={explorationMotion.transitionProgress}
+                  transitionRole="incoming"
+                  translateX={explorationMotion.translateX}>
+                  {renderTimelineHero(
+                    displayedExplorationNext.timelineDay,
+                    'active',
+                    displayedExplorationNext.backgroundKey != null,
+                  )}
+                </TodayExplorationSceneLayer>
+              ) : null}
+            </>
           ) : (
             <>
               <TodayHexNeighborhood
@@ -998,7 +1300,7 @@ export default function HomeScreen() {
           foreground slot normally owns rain, snow, motes, petals, and other
           authored atmosphere. Restore that plane across the full viewport,
           above the page composition while remaining touch-through. */}
-      {explorationBackgroundActive ? (
+      {explorationPresentationActive ? (
         <ResolvedAtmosphereLayer
           plane="foreground"
           settings={dayAtmosphereSettings}
@@ -1281,6 +1583,16 @@ const styles = StyleSheet.create({
   screen: {
     backgroundColor: Lantern.ink950,
     flex: 1,
+  },
+  explorationBackgroundPlane: {
+    ...StyleSheet.absoluteFillObject,
+    isolation: 'isolate',
+    overflow: 'hidden',
+    zIndex: 0,
+  },
+  contentPlane: {
+    position: 'relative',
+    zIndex: 10,
   },
   content: {
     flexGrow: 1,

@@ -1,64 +1,129 @@
 import { Image } from 'expo-image';
-import { type ReactNode, useEffect, useMemo } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Gesture } from 'react-native-gesture-handler';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
+  Easing,
   runOnJS,
   type SharedValue,
   useAnimatedStyle,
+  useDerivedValue,
   useReducedMotion,
   useSharedValue,
-  withDelay,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
 import todayScene from '@/data/today-scene.json';
 import {
+  resolveTodayExplorationDragTranslation,
   resolveTodayExplorationSwipeDirection,
+  resolveTodayExplorationTransitionDuration,
+  resolveTodayExplorationTransitionOpacity,
   type TodayExplorationSwipeDirection,
+  type TodayExplorationTransitionRole,
 } from '@/utils/today-exploration-gesture';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import { TODAY_EXPLORATION_BACKGROUND_SOURCES } from '@/constants/today-exploration-background-sources.gen';
+import { useScenePerformanceProbe } from '@/hooks/use-scene-performance-probe';
 
 type TodayExplorationBackgroundMotionOptions = {
+  activeKey?: string | null;
+  canSwipeNext?: boolean;
+  canSwipePrevious?: boolean;
   enabled: boolean;
   onQuickSwipe: (direction: TodayExplorationSwipeDirection) => void;
+  onTransitionStart?: (direction: TodayExplorationSwipeDirection) => void;
+  pageTransitionEnabled?: boolean;
 };
 
 export function useTodayExplorationBackgroundMotion({
+  activeKey,
+  canSwipeNext = true,
+  canSwipePrevious = true,
   enabled,
   onQuickSwipe,
+  onTransitionStart,
+  pageTransitionEnabled = false,
 }: TodayExplorationBackgroundMotionOptions) {
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const translateX = useSharedValue(0);
   const gestureStartX = useSharedValue(0);
   const gestureEnded = useSharedValue(false);
-  const environmentDragUnlocked = useSharedValue(0);
-  const environmentDragStarted = useSharedValue(false);
-  const environmentDragOriginX = useSharedValue(0);
-  const pendingTranslationX = useSharedValue(0);
+  const gestureIgnored = useSharedValue(false);
+  const transitionActive = useSharedValue(0);
+  const transitionDirection = useSharedValue(0);
+  const transitionProgress = useSharedValue(0);
+  const transitionStartX = useSharedValue(0);
+  const previousActiveKey = useRef(activeKey);
   const imageSize = Math.max(viewportHeight, viewportWidth);
   const maxPan = Math.max(0, (imageSize - viewportWidth) / 2);
   const spring = todayScene.homeExplorationBackground.resetSpring;
+  const visualTranslateX = useDerivedValue(() => {
+    if (transitionActive.value === 0 || transitionDirection.value === 0) {
+      return translateX.value;
+    }
+    const targetX = -transitionDirection.value * viewportWidth;
+    return transitionStartX.value
+      + (targetX - transitionStartX.value) * transitionProgress.value;
+  });
+  useScenePerformanceProbe('today-exploration-page', transitionActive);
+
+  const resetAfterCommit = useCallback(() => {
+    cancelAnimation(transitionProgress);
+    transitionActive.value = 0;
+    transitionDirection.value = 0;
+    transitionProgress.value = 0;
+    transitionStartX.value = 0;
+    translateX.value = 0;
+  }, [
+    transitionActive,
+    transitionDirection,
+    transitionProgress,
+    transitionStartX,
+    translateX,
+  ]);
+
+  useEffect(() => {
+    if (previousActiveKey.current === activeKey) return;
+    previousActiveKey.current = activeKey;
+    cancelAnimation(translateX);
+    cancelAnimation(transitionProgress);
+    transitionActive.value = 0;
+    transitionDirection.value = 0;
+    transitionProgress.value = 0;
+    transitionStartX.value = 0;
+    translateX.value = 0;
+  }, [
+    activeKey,
+    transitionActive,
+    transitionDirection,
+    transitionProgress,
+    transitionStartX,
+    translateX,
+  ]);
 
   useEffect(() => {
     if (enabled) return;
-    cancelAnimation(environmentDragUnlocked);
-    environmentDragUnlocked.value = 0;
-    environmentDragStarted.value = false;
     cancelAnimation(translateX);
+    cancelAnimation(transitionProgress);
+    transitionActive.value = 0;
+    transitionDirection.value = 0;
+    transitionProgress.value = 0;
+    transitionStartX.value = 0;
     translateX.value = reduceMotion
       ? withTiming(0, { duration: 120 })
       : withSpring(0, spring);
   }, [
     enabled,
-    environmentDragStarted,
-    environmentDragUnlocked,
     reduceMotion,
     spring,
+    transitionActive,
+    transitionDirection,
+    transitionProgress,
+    transitionStartX,
     translateX,
   ]);
 
@@ -66,98 +131,139 @@ export function useTodayExplorationBackgroundMotion({
     return Gesture.Pan()
       .enabled(enabled && maxPan > 0)
       .maxPointers(1)
-      .activeOffsetX([-6, 6])
+      .activeOffsetX([-1, 1])
       .failOffsetY([-20, 20])
       .onBegin(() => {
-        cancelAnimation(translateX);
-        gestureStartX.value = translateX.value;
-        gestureEnded.value = false;
-        cancelAnimation(environmentDragUnlocked);
-        environmentDragUnlocked.value = withDelay(
-          todayScene.homeExplorationBackground.environmentDragActivationMs,
-          withTiming(1, { duration: 0 }, (finished) => {
-            if (!finished) return;
-            environmentDragStarted.value = true;
-            environmentDragOriginX.value = 0;
-            translateX.value = withTiming(
-              Math.max(
-                -maxPan,
-                Math.min(maxPan, gestureStartX.value + pendingTranslationX.value),
-              ),
-              { duration: 90 },
-            );
-          }),
-        );
-        environmentDragStarted.value = false;
-        environmentDragOriginX.value = 0;
-        pendingTranslationX.value = 0;
-      })
-      .onUpdate((event) => {
-        pendingTranslationX.value = event.translationX;
-        if (environmentDragUnlocked.value < 1) return;
-        if (!environmentDragStarted.value) {
-          environmentDragStarted.value = true;
-          environmentDragOriginX.value = event.translationX;
-          gestureStartX.value = translateX.value;
+        if (transitionActive.value > 0) {
+          gestureIgnored.value = true;
           return;
         }
-        translateX.value = Math.max(
-          -maxPan,
-          Math.min(
-            maxPan,
-            gestureStartX.value + event.translationX - environmentDragOriginX.value,
-          ),
-        );
+        gestureIgnored.value = false;
+        cancelAnimation(translateX);
+        cancelAnimation(transitionProgress);
+        gestureStartX.value = translateX.value;
+        gestureEnded.value = false;
+        transitionActive.value = 0;
+        transitionDirection.value = 0;
+        transitionProgress.value = 0;
+        transitionStartX.value = 0;
+      })
+      .onUpdate((event) => {
+        if (gestureIgnored.value || transitionActive.value > 0) return;
+        translateX.value = resolveTodayExplorationDragTranslation({
+          gestureStartX: gestureStartX.value,
+          maxPan,
+          overscrollResistance:
+            todayScene.homeExplorationBackground.overscrollResistance,
+          translationX: event.translationX,
+        });
       })
       .onEnd((event) => {
+        if (gestureIgnored.value) {
+          gestureIgnored.value = false;
+          return;
+        }
         gestureEnded.value = true;
-        const swipeDirection = environmentDragUnlocked.value >= 1
-          ? null
-          : resolveTodayExplorationSwipeDirection({
-              minDistance: todayScene.homeExplorationBackground.quickSwipe.minDistance,
-              minVelocity: todayScene.homeExplorationBackground.quickSwipe.minVelocity,
-              translationX: event.translationX,
-              velocityX: event.velocityX,
-            });
-        cancelAnimation(environmentDragUnlocked);
-        environmentDragUnlocked.value = 0;
-        environmentDragStarted.value = false;
-        pendingTranslationX.value = 0;
+        const swipeDirection = resolveTodayExplorationSwipeDirection({
+          minDistance: todayScene.homeExplorationBackground.quickSwipe.minDistance,
+          minVelocity: todayScene.homeExplorationBackground.quickSwipe.minVelocity,
+          translationX: event.translationX,
+          velocityX: event.velocityX,
+        });
+        const swipeAllowed = swipeDirection === -1
+          ? canSwipePrevious
+          : swipeDirection === 1
+          ? canSwipeNext
+          : false;
+
+        if (swipeDirection != null && swipeAllowed) {
+          if (!pageTransitionEnabled || reduceMotion) {
+            transitionActive.value = 0;
+            transitionDirection.value = 0;
+            transitionProgress.value = 0;
+            translateX.value = reduceMotion
+              ? withTiming(0, { duration: 80 })
+              : withSpring(0, spring);
+            runOnJS(onQuickSwipe)(swipeDirection);
+            return;
+          }
+          transitionActive.value = 1;
+          transitionDirection.value = swipeDirection;
+          transitionProgress.value = 0;
+          transitionStartX.value = translateX.value;
+          if (onTransitionStart) {
+            runOnJS(onTransitionStart)(swipeDirection);
+          }
+          const targetX = -swipeDirection * viewportWidth;
+          const transitionConfig = {
+            duration: resolveTodayExplorationTransitionDuration({
+              currentX: transitionStartX.value,
+              targetX,
+            }),
+            easing: Easing.out(Easing.cubic),
+          };
+          transitionProgress.value = withTiming(
+            1,
+            transitionConfig,
+            (finished) => {
+              if (finished) runOnJS(onQuickSwipe)(swipeDirection);
+            },
+          );
+          return;
+        }
+
+        transitionActive.value = 0;
+        transitionDirection.value = 0;
+        transitionProgress.value = 0;
+        transitionStartX.value = 0;
         translateX.value = reduceMotion
           ? withTiming(0, { duration: 120 })
           : withSpring(0, spring);
-        if (swipeDirection != null) runOnJS(onQuickSwipe)(swipeDirection);
       })
       .onFinalize(() => {
+        if (gestureIgnored.value) {
+          gestureIgnored.value = false;
+          return;
+        }
         if (gestureEnded.value) return;
-        cancelAnimation(environmentDragUnlocked);
-        environmentDragUnlocked.value = 0;
-        environmentDragStarted.value = false;
-        pendingTranslationX.value = 0;
+        transitionActive.value = 0;
+        transitionDirection.value = 0;
+        transitionProgress.value = 0;
+        transitionStartX.value = 0;
         translateX.value = reduceMotion
           ? withTiming(0, { duration: 120 })
           : withSpring(0, spring);
       });
   }, [
+      canSwipeNext,
+      canSwipePrevious,
       enabled,
-      environmentDragOriginX,
-      environmentDragStarted,
-      environmentDragUnlocked,
       gestureEnded,
+      gestureIgnored,
       gestureStartX,
       maxPan,
       onQuickSwipe,
-      pendingTranslationX,
+      onTransitionStart,
+      pageTransitionEnabled,
       reduceMotion,
       spring,
       translateX,
+      transitionActive,
+      transitionDirection,
+      transitionProgress,
+      transitionStartX,
+      viewportWidth,
   ]);
 
   return {
     gesture,
     imageSize,
     maxPan,
-    translateX,
+    resetAfterCommit,
+    transitionActive,
+    transitionDirection,
+    transitionProgress,
+    translateX: visualTranslateX,
   };
 }
 
@@ -168,12 +274,12 @@ export function TodayExplorationBackground({
 }: {
   backgroundKey: TodayExplorationBackgroundKey;
   imageSize: number;
-  translateX: SharedValue<number>;
+  translateX?: SharedValue<number>;
 }) {
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const background = TODAY_EXPLORATION_BACKGROUND_SOURCES[backgroundKey];
   const panStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
+    transform: [{ translateX: translateX?.value ?? 0 }],
   }));
 
   return (
@@ -205,19 +311,136 @@ export function TodayExplorationBackground({
   );
 }
 
-/** Keeps the egg and egg-anchored UI physically attached to the authored dais. */
-export function TodayExplorationSceneLayer({
+export function TodayExplorationPageLayer({
+  baseOffsetX = 0,
   children,
+  hidden = false,
+  holdCentered = false,
+  pageDirection,
+  transitionDirection,
+  transitionProgress,
+  transitionRole = 'static',
   translateX,
 }: {
+  baseOffsetX?: number;
   children: ReactNode;
+  hidden?: boolean;
+  holdCentered?: boolean;
+  pageDirection?: TodayExplorationSwipeDirection;
+  transitionDirection?: SharedValue<number>;
+  transitionProgress?: SharedValue<number>;
+  transitionRole?: TodayExplorationTransitionRole;
   translateX: SharedValue<number>;
 }) {
-  const panStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  const pageStyle = useAnimatedStyle(() => {
+    const progress = transitionProgress?.value ?? 0;
+    const isSelectedIncomingPage =
+      transitionRole === 'incoming'
+      && transitionDirection?.value === pageDirection;
+    if (hidden) {
+      return {
+        opacity: 0,
+        transform: [{ translateX: baseOffsetX + translateX.value }],
+        zIndex: 0,
+      };
+    }
+    if (holdCentered) {
+      return {
+        opacity: 1,
+        transform: [{ translateX: 0 }],
+        zIndex: 3,
+      };
+    }
+    return {
+      opacity: resolveTodayExplorationTransitionOpacity({
+        plane: 'background',
+        progress,
+        role: transitionRole,
+        selectedIncoming: isSelectedIncomingPage,
+      }),
+      transform: [{ translateX: baseOffsetX + translateX.value }],
+      zIndex: transitionRole === 'incoming'
+        ? isSelectedIncomingPage
+          ? 3
+          : 0
+        : transitionRole === 'current'
+        ? 1
+        : 0,
+    };
+  });
   return (
-    <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, panStyle]}>
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, pageStyle]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** Keeps the egg and egg-anchored UI physically attached to the authored dais. */
+export function TodayExplorationSceneLayer({
+  baseOffsetX = 0,
+  children,
+  hidden = false,
+  holdCentered = false,
+  interactive,
+  pageDirection,
+  transitionDirection,
+  transitionProgress,
+  transitionRole = 'static',
+  translateX,
+}: {
+  baseOffsetX?: number;
+  children: ReactNode;
+  hidden?: boolean;
+  holdCentered?: boolean;
+  interactive?: boolean;
+  pageDirection?: TodayExplorationSwipeDirection;
+  transitionDirection?: SharedValue<number>;
+  transitionProgress?: SharedValue<number>;
+  transitionRole?: TodayExplorationTransitionRole;
+  translateX: SharedValue<number>;
+}) {
+  const panStyle = useAnimatedStyle(() => {
+    const progress = transitionProgress?.value ?? 0;
+    const isSelectedIncomingPage =
+      transitionRole === 'incoming'
+      && transitionDirection?.value === pageDirection;
+    if (hidden) {
+      return {
+        opacity: 0,
+        transform: [{ translateX: baseOffsetX + translateX.value }],
+        zIndex: 0,
+      };
+    }
+    if (holdCentered) {
+      return {
+        opacity: 1,
+        transform: [{ translateX: 0 }],
+        zIndex: 3,
+      };
+    }
+    return {
+      opacity: resolveTodayExplorationTransitionOpacity({
+        plane: 'subject',
+        progress,
+        role: transitionRole,
+        selectedIncoming: isSelectedIncomingPage,
+      }),
+      transform: [{ translateX: baseOffsetX + translateX.value }],
+      zIndex: transitionRole === 'incoming'
+        ? isSelectedIncomingPage
+          ? 3
+          : 0
+        : transitionRole === 'current'
+        ? 1
+        : 0,
+    };
+  });
+  const receivesPointerEvents =
+    interactive ?? transitionRole !== 'incoming';
+  return (
+    <Animated.View
+      pointerEvents={receivesPointerEvents ? 'box-none' : 'none'}
+      style={[StyleSheet.absoluteFill, panStyle]}>
       {children}
     </Animated.View>
   );
