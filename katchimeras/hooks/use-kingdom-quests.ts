@@ -372,6 +372,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     () => companionBondProgress(companionBondState, selectedResident?.creature.creatureId ?? ''),
     [companionBondState, selectedResident?.creature.creatureId]
   );
+  const bondProgressForCreature = useCallback(
+    (creatureId: string) => companionBondProgress(companionBondState, creatureId),
+    [companionBondState]
+  );
   const selectedInsight = selectedCompanionData
     ? {
         ...insightForArchetype({
@@ -1095,6 +1099,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
 
   return {
     acceptSelectedQuest,
+    bondProgressForCreature,
     cancelSelectedQuestAttempt,
     cashInSelectedQuest,
     chooseAnotherSelectedQuest,

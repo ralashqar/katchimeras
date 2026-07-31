@@ -127,7 +127,7 @@ test('Kingdom entry camera places the home tile at the requested screen anchor',
 
 test('Kingdom entry discards stale camera state and bootstraps loading from home', () => {
   const worldSource = fs.readFileSync(
-    path.join(process.cwd(), 'app', '(tabs)', 'world.tsx'),
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
     'utf8',
   );
   const schedulerSource = fs.readFileSync(
@@ -144,7 +144,7 @@ test('Kingdom entry discards stale camera state and bootstraps loading from home
 
 test('Kingdom uses the resolved Today sky plate without legacy clouds or atmosphere layers', () => {
   const worldSource = fs.readFileSync(
-    path.join(process.cwd(), 'app', '(tabs)', 'world.tsx'),
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
     'utf8',
   );
   const canvasSource = fs.readFileSync(

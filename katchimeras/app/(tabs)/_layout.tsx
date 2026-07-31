@@ -8,8 +8,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 
-// Today is the app's home — the daily capture surface. The Kingdom (the
-// persistent world every day builds) sits alongside it as the long-term tab.
+// Today is the daily capture surface. The lightweight Katchimeras roster is
+// visible in navigation; the persistent world route remains registered but
+// hidden while its London/hex presentation is out of the main tab bar.
 export const unstable_settings = {
   initialRouteName: 'today',
 };
@@ -31,8 +32,8 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarHideOnKeyboard: true,
-          // Kingdom (and every other tab) mounts on FIRST visit only, and stops
-          // re-rendering while blurred — Today stays the only live screen.
+          // Companion surfaces mount on first visit and freeze while blurred;
+          // Today remains the only continuously live screen.
           lazy: true,
           freezeOnBlur: true,
         }}>
@@ -52,8 +53,14 @@ export default function TabLayout() {
         <Tabs.Screen
           name="world"
           options={{
-            title: 'Kingdom',
-            tabBarIcon: ({ color }) => <IconSymbol size={26} name="globe.americas.fill" color={color} />,
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="katchimeras"
+          options={{
+            title: 'Katchimeras',
+            tabBarIcon: ({ color }) => <IconSymbol size={26} name="pawprint.fill" color={color} />,
           }}
         />
         <Tabs.Screen

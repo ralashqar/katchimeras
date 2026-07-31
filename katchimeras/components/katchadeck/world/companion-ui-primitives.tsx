@@ -333,6 +333,8 @@ const styles = StyleSheet.create({
     gap: KatchaUI.spacing.sm,
     paddingBottom: KatchaUI.spacing.sm,
     paddingHorizontal: KatchaUI.layout.phoneGutter,
+    position: 'relative',
+    zIndex: 4,
   },
   destinationHeading: { flex: 1, gap: 1 },
   destinationEyebrow: { ...KatchaUI.type.label, fontSize: 9.5 },
@@ -342,6 +344,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     paddingHorizontal: KatchaUI.layout.phoneGutter,
+    position: 'relative',
+    zIndex: 3,
   },
   destinationSurfaceImmersive: {
     backgroundColor: 'transparent',

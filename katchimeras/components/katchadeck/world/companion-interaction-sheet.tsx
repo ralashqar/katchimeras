@@ -1,6 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Keyboard, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  AppState,
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +33,7 @@ import {
   companionViewportResetKey,
 } from '@/utils/companion-interaction';
 import { CompanionHomeScene } from './companion-home-scene';
-import { CompanionDestinationHero } from './companion-destination-hero';
+import { CompanionCinematicStage } from './companion-cinematic-stage';
 import { CompanionInsightThread } from './companion-insight-thread';
 import { CompanionPrimaryAction, CompanionSecondaryAction } from './companion-interaction-primitives';
 import {
@@ -79,6 +86,8 @@ import type {
 import { quickGoalsForDay } from '@/utils/companion-quick-goals';
 import { CompanionCheckInCard, CompanionCheckInPage } from './companion-check-in';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
+import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
+import { companionQuestListSpacer } from '@/utils/companion-home-layout';
 
 type Criterion = {
   label: string;
@@ -94,8 +103,8 @@ export type CompanionInteractionSheetProps = {
   visualKey: HomeVisualKey;
   accentColor: string;
   questionnaireBackground: TodayAtmosphereBackground;
+  homeEnvironmentKey?: TodayExplorationBackgroundKey | null;
   houseLevel?: number;
-  openingLine: string;
   initialDestination?: CompanionDestination | null;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
@@ -183,6 +192,7 @@ export type CompanionInteractionSheetProps = {
 
 export function CompanionInteractionSheet(props: CompanionInteractionSheetProps) {
   const insets = useSafeAreaInsets();
+  const { height: viewportHeight } = useWindowDimensions();
   const onExperienceActiveChange = props.onExperienceActiveChange;
   const experience = useCompanionExperienceController({
     creatureId: props.creatureId,
@@ -213,6 +223,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     goal: CompanionQuickGoal;
   } | null>(null);
   const [activeCheckIn, setActiveCheckIn] = useState<CompanionJourneyCheckIn | null>(props.journeyCheckIn);
+  const [hasShownHome, setHasShownHome] = useState(false);
   const contentRef = useRef<ScrollView>(null);
   const reduceMotion = useReducedMotion();
   const visual = getCreatureVisual(props.visualKey);
@@ -282,6 +293,16 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   }, [activeAttemptId, resetViewport]);
 
   useEffect(() => setActiveCheckIn(null), [props.creatureId]);
+
+  useEffect(() => {
+    setHasShownHome(false);
+  }, [props.creatureId]);
+
+  useEffect(() => {
+    if (route.kind === 'home' && !hasShownHome) {
+      setHasShownHome(true);
+    }
+  }, [hasShownHome, route.kind]);
 
   useEffect(() => {
     setActiveCheckIn(props.journeyCheckIn);
@@ -437,32 +458,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       : goalsToday.length
         ? 'All done today'
         : 'Choose a small step';
-  const destinationHero = destination === 'quest'
-    ? {
-        title: props.activeQuest ? 'Ready to keep going?' : 'Ready for a little adventure?',
-        body: props.activeQuest
-          ? 'Your quest is waiting. Take the next small step when it feels right.'
-          : 'Pick a quest and make a little more of today.',
-      }
+  const destinationHeroTitle = destination === 'quest'
+    ? props.activeQuest
+      ? 'Ready to keep going?'
+      : 'Ready for a little adventure?'
     : destination === 'discovery'
-      ? {
-          title: 'Let’s talk about you.',
-          body: 'A few easy choices help me understand what matters to you.',
-        }
+      ? 'Let’s talk about you.'
       : destination === 'goals'
-        ? {
-            title: 'What feels doable today?',
-            body: 'Choose one small step. You can always add another later.',
-          }
+        ? 'What feels doable today?'
         : destination === 'insight'
-          ? {
-              title: 'Here’s what I noticed.',
-              body: 'A small pattern from the moments we have shared.',
-            }
-          : {
-              title: 'Which form feels like me?',
-              body: 'Change my look without changing our bond or memories.',
-            };
+          ? 'Here’s what I noticed.'
+          : 'Which form feels like me?';
 
   return (<>
         <CompanionSheetShell
@@ -472,17 +478,29 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           onRequestClose={requestClose}
           showClose={false}
           surface={activeAttemptId ? 'night' : 'parchment'}>
+        {route.kind === 'destination' ? (
+          <CompanionCinematicStage
+            creature={visual.source}
+            environmentKey={props.homeEnvironmentKey ?? null}
+            lifted
+            name={props.name}
+            title={destinationHeroTitle}
+            visualKey={props.visualKey}
+          />
+        ) : null}
         {route.kind === 'home' ? (
           <CompanionHomeScene
+            animateEntrance={!hasShownHome}
             bondProgress={props.bondProgress}
             creature={visual.source}
+            environmentKey={props.homeEnvironmentKey ?? null}
             goalStatus={goalStatus}
             name={props.name}
             onClose={props.onClose}
             onSelectDestination={selectDestination}
-            openingLine={props.openingLine}
             questStatus={questStatus}
             showSkins={props.skins.length > 1}
+            visualKey={props.visualKey}
             youStatus={youStatus}
           />
         ) : (
@@ -527,11 +545,15 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               exiting={FadeOut.duration(100)}
               style={activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined}>
               {route.kind === 'destination' ? (
-                <CompanionDestinationHero
-                  body={destinationHero.body}
-                  creature={visual.source}
-                  name={props.name}
-                  title={destinationHero.title}
+                <View
+                  accessibilityElementsHidden
+                  pointerEvents="none"
+                  style={[
+                    styles.destinationStageSpacer,
+                    destination === 'quest' && {
+                      minHeight: companionQuestListSpacer(viewportHeight),
+                    },
+                  ]}
                 />
               ) : null}
               {checkInOpen && activeCheckIn ? (
@@ -803,6 +825,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
 
 const styles = StyleSheet.create({
   contentFrame: { flex: 1, minHeight: 0 },
+  destinationStageSpacer: { minHeight: 244 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },
   activeScrollContent: { flexGrow: 1, paddingBottom: 0, paddingHorizontal: 0 },
   questionnaireScrollContent: { flexGrow: 1, paddingHorizontal: 0 },
