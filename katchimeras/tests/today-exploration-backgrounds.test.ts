@@ -70,7 +70,13 @@ test('a Pagelet environment uses its cinematic library background', () => {
 });
 
 test('new cinematic environments resolve independently of the shown creature', () => {
-  for (const environmentVisualKey of ['skylo', 'bedrotte', 'mossprout'] as const) {
+  for (const environmentVisualKey of [
+    'skylo',
+    'bedrotte',
+    'mossprout',
+    'tasklet',
+    'cheerlet',
+  ] as const) {
     assert.equal(
       todayKatchimeraExplorationBackgroundKeyForPresentation({
         creature: {

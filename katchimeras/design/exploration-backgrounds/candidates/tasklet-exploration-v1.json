@@ -1,0 +1,38 @@
+{
+  "assetName": "tasklet-exploration-v1",
+  "status": "generated-candidate",
+  "key": "tasklet",
+  "displayName": "Tasklet focus workshop",
+  "pipelineVersion": "exploration-background-v12",
+  "candidate": {
+    "index": 1,
+    "key": "tasklet",
+    "provider": "openai-built-in",
+    "model": "gpt-image",
+    "resolution": "1254x1254",
+    "rawPath": ".tmp/exploration-backgrounds/tasklet/candidate-1-raw.png",
+    "rawSha256": "40ca2c8fcb2f1cc0526916e078ea77dac7305b1d064d83f23e91804efd10c8f1",
+    "createdAt": "2026-07-31T07:34:02.631813+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/tasklet/candidate-1-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/tasklet/candidate-1-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/tasklet/candidate-1-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/tasklet/candidate-1-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/tasklet/candidate-1-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/tasklet/candidate-1-phone-right.png"
+    },
+    "masterSha256": "26f4a67b33bf90d4b6e0fa3939cd358cc1d2a49d1f7c2fa382ff8ab20f7b3e2a"
+  },
+  "exportedAt": "2026-07-31T07:34:49.337080+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/tasklet-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/tasklet-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/tasklet-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "26f4a67b33bf90d4b6e0fa3939cd358cc1d2a49d1f7c2fa382ff8ab20f7b3e2a",
+    "runtime": "85c8525b136de640e70323fb9ffb862db203a606c4d396aa54d6dea8905d2f63",
+    "guide": "1f42875577b7094dad614ea33ba6e6362949207582d995121f3d2a761830a107"
+  }
+}

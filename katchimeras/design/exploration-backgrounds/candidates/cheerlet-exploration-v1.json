@@ -1,0 +1,38 @@
+{
+  "assetName": "cheerlet-exploration-v1",
+  "status": "generated-candidate",
+  "key": "cheerlet",
+  "displayName": "Cheerlet celebration courtyard",
+  "pipelineVersion": "exploration-background-v12",
+  "candidate": {
+    "index": 1,
+    "key": "cheerlet",
+    "provider": "openai-built-in",
+    "model": "gpt-image",
+    "resolution": "1254x1254",
+    "rawPath": ".tmp/exploration-backgrounds/cheerlet/candidate-1-raw.png",
+    "rawSha256": "3ff9e5102f52e45545d912e874d95567f75a838dd66f36dd438b311a2b79bf6d",
+    "createdAt": "2026-07-31T07:34:35.138636+00:00",
+    "masterPath": ".tmp/exploration-backgrounds/cheerlet/candidate-1-master-2k.png",
+    "reviewPath": ".tmp/exploration-backgrounds/cheerlet/candidate-1-preview-1k.png",
+    "platformGuidePath": ".tmp/exploration-backgrounds/cheerlet/candidate-1-platform-guide.png",
+    "phoneCropWidth": 473,
+    "phoneCrops": {
+      "left": ".tmp/exploration-backgrounds/cheerlet/candidate-1-phone-left.png",
+      "center": ".tmp/exploration-backgrounds/cheerlet/candidate-1-phone-center.png",
+      "right": ".tmp/exploration-backgrounds/cheerlet/candidate-1-phone-right.png"
+    },
+    "masterSha256": "c060f93497769e1206ddc58674e8b1c5b34119824dd60bed3d22ce7952afc82b"
+  },
+  "exportedAt": "2026-07-31T07:34:50.070236+00:00",
+  "outputs": {
+    "master": "design/exploration-backgrounds/candidates/cheerlet-exploration-v1-master-2k.png",
+    "runtime": "assets/images/katchimeras/world/backgrounds/cheerlet-exploration-v1.png",
+    "guide": "design/exploration-backgrounds/candidates/cheerlet-exploration-v1-platform-guide.png"
+  },
+  "sha256": {
+    "master": "c060f93497769e1206ddc58674e8b1c5b34119824dd60bed3d22ce7952afc82b",
+    "runtime": "35d069a1b5db24f8ba1f650e784f21478b5795c1e6819b32c18eee5f7ced6615",
+    "guide": "b41de8eb3b6790813ada72c7454524d9e6de6f4f132d8d372e5b0f298a0da0d6"
+  }
+}

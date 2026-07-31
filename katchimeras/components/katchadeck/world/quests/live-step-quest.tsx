@@ -255,9 +255,7 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
       {phase === 'failed' ? <ThemedText accessibilityLiveRegion="polite" style={styles.message} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Time. You reached {steps} steps — retry when you are ready.</ThemedText> : null}
       <ThemedText style={styles.safety} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Uses Motion & Fitness sensors only — no GPS. Choose a clear, safe place to move.</ThemedText>
 
-      {phase === 'running' || phase === 'starting' || phase === 'countdown' ? (
-        <Action label={phase === 'starting' ? 'Calibrating…' : 'Cancel attempt'} icon="xmark" onPress={() => cancel()} quiet />
-      ) : phase === 'success' && attemptId.current ? (
+      {phase === 'running' || phase === 'starting' || phase === 'countdown' ? null : phase === 'success' && attemptId.current ? (
         <Action label="Complete and return" icon="checkmark" onPress={() => onComplete(attemptId.current!, { kind: 'live_steps', success: true, steps, target: config.target, durationMs: elapsedMs, personalBest: false })} />
       ) : (
         <Action label="Retry challenge" icon="figure.walk" onPress={() => void start()} />

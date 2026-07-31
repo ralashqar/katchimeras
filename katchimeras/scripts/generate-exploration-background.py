@@ -865,13 +865,29 @@ def cmd_package(args: argparse.Namespace) -> None:
     work.mkdir(parents=True, exist_ok=True)
     package = package_candidate(raw, work, args.index, spec, args.key)
     records_path = work / "candidates.json"
+    records: list[dict[str, Any]] = []
     if records_path.exists():
         records = json.loads(records_path.read_text(encoding="utf-8"))
-        for record in records:
-            if record.get("index") == args.index:
-                record.update(package)
-                break
-        records_path.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
+    record = next(
+        (item for item in records if item.get("index") == args.index),
+        None,
+    )
+    if record is None:
+        with Image.open(raw) as opened:
+            source_resolution = f"{opened.width}x{opened.height}"
+        record = {
+            "index": args.index,
+            "key": args.key,
+            "provider": args.provider,
+            "model": args.model,
+            "resolution": source_resolution,
+            "rawPath": str(raw.relative_to(ROOT)).replace("\\", "/"),
+            "rawSha256": hashlib.sha256(raw.read_bytes()).hexdigest(),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+        }
+        records.append(record)
+    record.update(package)
+    records_path.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(package, indent=2))
 
 
@@ -997,6 +1013,8 @@ def build_parser() -> argparse.ArgumentParser:
     package.add_argument("key")
     package.add_argument("input")
     package.add_argument("--index", type=int, default=1)
+    package.add_argument("--provider", default="imported")
+    package.add_argument("--model", default="external")
     package.set_defaults(func=cmd_package)
     export = commands.add_parser(
         "export",

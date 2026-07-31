@@ -60,24 +60,24 @@ export function CompanionSheetShell({
 }
 
 export function CompanionDestinationHeader({
+  backLabel = 'Home',
   label,
-  name,
   onBack,
 }: {
+  backLabel?: string;
   label: string;
-  name: string;
   onBack: () => void;
 }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.destinationHeader, { paddingTop: insets.top + 10 }]}>
-      <CompanionBackAction label="Home" onPress={onBack} tone="night" />
+      <CompanionBackAction label={backLabel} onPress={onBack} tone="night" />
       <View style={styles.destinationHeading}>
-        <ThemedText style={styles.destinationEyebrow} lightColor="#F4D77D" darkColor="#F4D77D">
-          {name}
-        </ThemedText>
         <ThemedText
+          adjustsFontSizeToFit
           maxFontSizeMultiplier={1.3}
+          minimumFontScale={0.82}
+          numberOfLines={1}
           selectable
           style={styles.destinationTitle}
           lightColor="#FFF9EA"
@@ -336,9 +336,23 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 4,
   },
-  destinationHeading: { flex: 1, gap: 1 },
-  destinationEyebrow: { ...KatchaUI.type.label, fontSize: 9.5 },
-  destinationTitle: { ...KatchaUI.type.companionPageTitle, textShadowColor: 'rgba(23,40,49,0.65)', textShadowOffset: { height: 2, width: 0 }, textShadowRadius: 3 },
+  destinationHeading: {
+    alignItems: 'flex-end',
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: KatchaUI.touchTarget,
+    minWidth: 0,
+  },
+  destinationTitle: {
+    ...KatchaUI.type.companionPageTitle,
+    fontSize: 25,
+    lineHeight: 30,
+    paddingRight: 2,
+    textAlign: 'right',
+    textShadowColor: 'rgba(23,40,49,0.65)',
+    textShadowOffset: { height: 2, width: 0 },
+    textShadowRadius: 3,
+  },
   destinationSurface: {
     backgroundColor: 'transparent',
     flex: 1,

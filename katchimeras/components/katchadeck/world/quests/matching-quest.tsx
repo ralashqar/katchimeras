@@ -32,7 +32,6 @@ import type { QuestResult } from '@/utils/quests/experiences/types';
 import { worldAssetSource } from '@/utils/world-visuals';
 
 import {
-  ExperienceAction,
   ExperienceResult,
   QuestExperiencePreview,
   experienceStyles,
@@ -427,15 +426,6 @@ export function MatchingQuest({
             : 'Turn over two cards'}
       </ThemedText>
 
-      <ExperienceAction
-        label={
-          theme === 'feast'
-            ? 'Leave the table'
-            : 'Cancel gallery'
-        }
-        quiet
-        onPress={reset}
-      />
     </View>
   );
 }

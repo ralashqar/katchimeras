@@ -5,7 +5,6 @@ import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { FadeIn, FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MeadowSceneBackdrop } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
@@ -47,7 +46,6 @@ export function MossproutMemoryGardenScreen({
 
   return (
     <View style={styles.root}>
-      <MeadowSceneBackdrop />
       <View pointerEvents="none" style={styles.mossScrim} />
       <LinearGradient
         colors={['rgba(6,18,12,0.58)', 'rgba(8,22,13,0.24)', 'rgba(7,18,10,0.58)']}
@@ -57,10 +55,11 @@ export function MossproutMemoryGardenScreen({
       />
 
       <ScreenCloseButton
-        align="right"
+        align="left"
         onPress={onClose}
         style={styles.closeButton}
         tint={GARDEN_INK}
+        variant="back"
       />
 
       <View
@@ -71,7 +70,7 @@ export function MossproutMemoryGardenScreen({
             paddingBottom: Math.max(12, insets.bottom + 8),
             paddingLeft: Math.max(14, insets.left + 14),
             paddingRight: Math.max(14, insets.right + 14),
-            paddingTop: insets.top + 18,
+            paddingTop: insets.top + 62,
           },
         ]}>
         <Animated.View entering={enter} style={styles.header}>
@@ -133,7 +132,7 @@ function GardenStat({ icon, label, tone }: { icon: IconSymbolName; label: string
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: '#102417', flex: 1 },
+  root: { backgroundColor: 'transparent', flex: 1 },
   mossScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(10, 21, 13, 0.48)' },
   safeContent: { alignSelf: 'center', flex: 1, gap: 10, maxWidth: 620, width: '100%' },
   closeButton: {
@@ -141,7 +140,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(123, 86, 39, 0.72)',
     boxShadow: '0 4px 12px rgba(20, 35, 17, 0.34), inset 0 1px 0 rgba(255,255,255,0.72)',
   },
-  header: { alignItems: 'center', gap: 12, paddingHorizontal: 46 },
+  header: { alignItems: 'center', gap: 10, paddingHorizontal: 8 },
   titleRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' },
   title: { fontSize: 20, fontWeight: '900', letterSpacing: 0.7, lineHeight: 25, textTransform: 'uppercase' },
   statsRow: { flexDirection: 'row', gap: 8, justifyContent: 'center', maxWidth: 480, width: '100%' },

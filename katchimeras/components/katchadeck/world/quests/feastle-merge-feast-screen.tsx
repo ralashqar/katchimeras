@@ -4,7 +4,6 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MeadowSceneBackdrop } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -31,7 +30,6 @@ export function FeastleMergeFeastScreen({
 
   return (
     <View style={styles.root}>
-      <MeadowSceneBackdrop />
       <View pointerEvents="none" style={styles.warmScrim} />
       <LinearGradient
         colors={['rgba(47,29,12,0.46)', 'rgba(72,45,18,0.18)', 'rgba(39,22,12,0.58)']}
@@ -40,7 +38,7 @@ export function FeastleMergeFeastScreen({
         style={StyleSheet.absoluteFill}
       />
 
-      <ScreenCloseButton align="right" onPress={onClose} style={styles.closeButton} tint={FEAST_INK} />
+      <ScreenCloseButton align="left" onPress={onClose} style={styles.closeButton} tint={FEAST_INK} variant="back" />
 
       <View
         pointerEvents="box-none"
@@ -51,7 +49,7 @@ export function FeastleMergeFeastScreen({
             paddingBottom: Math.max(10, insets.bottom + 6),
             paddingLeft: Math.max(12, insets.left + 12),
             paddingRight: Math.max(12, insets.right + 12),
-            paddingTop: insets.top + (compact ? 8 : 14),
+            paddingTop: insets.top + 60,
           },
         ]}>
         <View style={[styles.header, compact && styles.headerCompact]}>
@@ -111,7 +109,7 @@ function ElapsedTimer({ finishedAt, startedAt }: { finishedAt: number | null; st
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: '#3A2918', flex: 1 },
+  root: { backgroundColor: 'transparent', flex: 1 },
   warmScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(72, 45, 17, 0.25)' },
   safeContent: { alignSelf: 'center', flex: 1, gap: 8, maxWidth: 660, width: '100%' },
   safeContentCompact: { gap: 5 },

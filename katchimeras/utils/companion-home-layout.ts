@@ -76,6 +76,13 @@ export function companionSpeechBubbleDrop(viewportHeight: number): number {
   return Math.min(84, Math.max(64, viewportHeight * 0.09));
 }
 
+export function companionDestinationSpeechBubbleTop(
+  viewportHeight: number,
+  safeAreaTop: number,
+): number {
+  return safeAreaTop + 92 + companionDestinationStageLift(viewportHeight);
+}
+
 export function companionQuestListSpacer(viewportHeight: number): number {
   return Math.min(216, Math.max(176, viewportHeight * 0.235));
 }

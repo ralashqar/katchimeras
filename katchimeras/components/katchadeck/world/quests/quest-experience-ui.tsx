@@ -1,10 +1,33 @@
 import { Image, type ImageSource } from 'expo-image';
-import { type ReactNode, useEffect, useState } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { KatchaUI } from '@/constants/katcha-ui';
 import { Lantern } from '@/constants/theme';
+
+const QuestExperienceAutoStartContext = createContext(false);
+
+export function QuestExperienceAutoStartProvider({
+  children,
+  enabled,
+}: {
+  children: ReactNode;
+  enabled: boolean;
+}) {
+  return (
+    <QuestExperienceAutoStartContext value={enabled}>
+      {children}
+    </QuestExperienceAutoStartContext>
+  );
+}
 
 export function ExperienceHeader({ eyebrow, title, body }: { eyebrow: string; title: string; body: string }) {
   return <View style={styles.header}><ThemedText style={styles.eyebrow} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>{eyebrow}</ThemedText><ThemedText selectable style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{title}</ThemedText><ThemedText selectable style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{body}</ThemedText></View>;
@@ -41,6 +64,17 @@ export function QuestExperiencePreview({
   meta?: string | null;
   children?: ReactNode;
 }) {
+  const autoStart = use(QuestExperienceAutoStartContext);
+  const didAutoStart = useRef(false);
+
+  useEffect(() => {
+    if (!autoStart || didAutoStart.current) return;
+    didAutoStart.current = true;
+    onAction();
+  }, [autoStart, onAction]);
+
+  if (autoStart) return null;
+
   return (
     <View style={styles.previewRoot}>
       <View style={styles.previewMain}>

@@ -165,16 +165,33 @@ export function companionViewportResetKey(input: {
   ].join('|');
 }
 
-export function companionQuestUsesFullBleed(execution: InteractiveQuestExecution | null): boolean {
-  return Boolean(
+export type CompanionQuestPresentation = {
+  backdrop: 'normal' | 'strong';
+  layout: 'standard' | 'fullBleed';
+  startsImmediately: boolean;
+};
+
+export function companionQuestPresentation(
+  execution: InteractiveQuestExecution | null,
+): CompanionQuestPresentation {
+  const fullBleed = Boolean(
     (execution?.kind === 'matching' && execution.packId === 'mossprout-garden') ||
     (execution?.kind === 'merge' && execution.packId === 'feastle-kitchen') ||
     (execution?.kind === 'block_jam' && execution.packId === 'tasklet-desk'),
   );
+  return {
+    backdrop: execution?.kind === 'block_blast' ? 'strong' : 'normal',
+    layout: fullBleed ? 'fullBleed' : 'standard',
+    startsImmediately: execution !== null,
+  };
+}
+
+export function companionQuestUsesFullBleed(execution: InteractiveQuestExecution | null): boolean {
+  return companionQuestPresentation(execution).layout === 'fullBleed';
 }
 
 export function companionQuestSkipsPreview(execution: InteractiveQuestExecution | null): boolean {
-  return execution?.kind === 'matching' && execution.packId === 'mossprout-garden';
+  return companionQuestPresentation(execution).startsImmediately;
 }
 
 export function companionQuestBackAction(input: {

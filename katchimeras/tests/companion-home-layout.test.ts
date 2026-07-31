@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
   companionHomeStageLayout,
   companionQuestListSpacer,
@@ -52,6 +53,15 @@ test('every companion page keeps its speech bubble lower beside the creature', (
   assert.equal(companionSpeechBubbleDrop(568), 64);
   assert.equal(companionSpeechBubbleDrop(844), 75.96);
   assert.equal(companionSpeechBubbleDrop(1194), 84);
+});
+
+test('destination speech bubble remains below top chrome after the stage lift', () => {
+  for (const height of [568, 844, 1194]) {
+    const safeTop = height === 568 ? 20 : 47;
+    const authoredTop = companionDestinationSpeechBubbleTop(height, safeTop);
+    const visibleTop = authoredTop - companionDestinationStageLift(height);
+    assert.ok(Math.abs(visibleTop - (safeTop + 92)) < 0.0001);
+  }
 });
 
 test('quest list uses a compact responsive handoff beneath the cinematic stage', () => {

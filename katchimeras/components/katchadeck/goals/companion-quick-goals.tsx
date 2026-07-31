@@ -11,6 +11,7 @@ import Animated, {
   ZoomOut,
   useReducedMotion,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuickGoalActionModal } from '@/components/katchadeck/goals/quick-goal-action-modal';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
@@ -70,7 +71,6 @@ export function CompanionQuickGoalsPanel({
   state: CompanionQuickGoalState;
 }) {
   const goals = quickGoalsForDay(state, dayId, familyId);
-  const name = katchimeraFamilyById.get(familyId)?.displayName ?? 'Companion';
   return (
     <View style={styles.companionPanel}>
       <View style={styles.panelHeading}>
@@ -79,7 +79,7 @@ export function CompanionQuickGoalsPanel({
             SMALL GOALS
           </ThemedText>
           <ThemedText selectable style={styles.panelTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-            Today with {name}
+            Today
           </ThemedText>
         </View>
         <Pressable
@@ -170,6 +170,7 @@ export function CompanionQuickGoalPicker({
   onBack: () => void;
   state: CompanionQuickGoalState;
 }) {
+  const insets = useSafeAreaInsets();
   const [customOpen, setCustomOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [cadence, setCadence] = useState<CompanionQuickGoalCadence>({ kind: 'once', dayId });
@@ -199,14 +200,14 @@ export function CompanionQuickGoalPicker({
   };
 
   return (
-    <View style={styles.scopedPicker}>
+    <View style={[styles.scopedPicker, { paddingTop: insets.top + 10 }]}>
       <Pressable
         accessibilityRole="button"
         onPress={onBack}
         style={({ pressed }) => [styles.scopedBack, pressed && styles.pressed]}>
         <IconSymbol color={Meadow.inkSoft} name="chevron.left" size={16} />
         <ThemedText style={styles.scopedBackText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          Back to Do
+          Back to Goals
         </ThemedText>
       </Pressable>
 

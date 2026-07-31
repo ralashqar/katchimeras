@@ -19,7 +19,6 @@ import {
 import type { QuestResult } from '@/utils/quests/experiences/types';
 
 import {
-  ExperienceAction,
   ExperienceResult,
   QuestExperiencePreview,
   experienceStyles,
@@ -304,7 +303,6 @@ export function TimingZoneQuest({
       ) : (
         <View style={styles.fullTapSurface}>{status}</View>
       )}
-      <ExperienceAction label="Cancel attempt" quiet onPress={reset} />
     </View>
   );
 }

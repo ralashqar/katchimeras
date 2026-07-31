@@ -13,6 +13,7 @@ import { MergeQuest } from './merge-quest';
 import type { MergeRoundConfig } from '@/utils/quests/experiences/merge';
 import { BlockJamQuest } from './block-jam-quest';
 import { BlockBlastQuest } from './block-blast-quest';
+import { QuestExperienceAutoStartProvider } from './quest-experience-ui';
 
 export type QuestExperienceSession = {
   execution: InteractiveQuestExecution;
@@ -44,6 +45,26 @@ export type QuestExperienceHandlers = {
 };
 
 export function QuestExperienceHost({
+  handlers,
+  history,
+  session,
+}: {
+  handlers: QuestExperienceHandlers;
+  history: QuestExperienceHistory;
+  session: QuestExperienceSession;
+}) {
+  return (
+    <QuestExperienceAutoStartProvider enabled={session.startImmediately ?? false}>
+      <QuestExperienceHostContent
+        handlers={handlers}
+        history={history}
+        session={session}
+      />
+    </QuestExperienceAutoStartProvider>
+  );
+}
+
+function QuestExperienceHostContent({
   handlers,
   history,
   session,

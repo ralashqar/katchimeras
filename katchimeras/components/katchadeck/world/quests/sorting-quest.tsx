@@ -16,7 +16,6 @@ import { formatQuestDuration } from '@/utils/quests/experiences/duration';
 import type { QuestResult } from '@/utils/quests/experiences/types';
 
 import {
-  ExperienceAction,
   ExperienceResult,
   QuestExperiencePreview,
   experienceStyles,
@@ -592,7 +591,6 @@ export function SortingQuest({
         })}
       </View>
 
-      <ExperienceAction label="Cancel sorting" quiet onPress={reset} />
     </View>
   );
 }

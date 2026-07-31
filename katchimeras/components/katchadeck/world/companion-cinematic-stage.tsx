@@ -16,6 +16,7 @@ import type { HomeVisualKey } from '@/types/home';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import {
+  companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
   companionSpeechBubbleDrop,
 } from '@/utils/companion-home-layout';
@@ -53,7 +54,12 @@ export function CompanionCinematicStage({
     : (width - horizontalGutter * 2) * 0.56;
   const destinationLift = companionDestinationStageLift(height);
   const speechBubbleDrop = companionSpeechBubbleDrop(height);
-  const speechBubbleTop = insets.top + 146 + speechBubbleDrop;
+  // The complete art plane lifts on destination pages. Offset the bubble
+  // before that transform so its visible position remains below navigation
+  // chrome instead of rising beneath the back button.
+  const speechBubbleTop = lifted
+    ? companionDestinationSpeechBubbleTop(height, insets.top)
+    : insets.top + 146 + speechBubbleDrop;
 
   useEffect(() => {
     liftProgress.value = reduceMotion

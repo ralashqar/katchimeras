@@ -78,6 +78,21 @@
         "projectedHeight": 0.12
       }
     },
+    "cheerlet": {
+      "displayName": "Cheerlet celebration courtyard",
+      "internalPromptTerms": [
+        "cheerlet"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a joyful open-air celebration courtyard devoted to encouragement, visible progress, and small wins. Build one rounded coral-and-cream party pavilion in the midground with a broad scalloped canopy, one simple empty display pedestal, two small clusters of oversized gift boxes with blank ribbons, one compact cake-and-refreshment table, a few large star-shaped ornaments, two warm glowing globe lanterns, one restrained arc of colorful bunting, and only a small number of rounded flowering shrubs at the outer edges. Use sunset coral, peach, warm gold, turquoise, raspberry pink, cream, and restrained mint accents. Make the circular platform feel like the main celebration stage while keeping it completely empty",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
     "feastle": {
       "displayName": "Feastle harvest festival grounds",
       "internalPromptTerms": [
@@ -176,6 +191,21 @@
       "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
       "referenceMode": "template-only",
       "environmentDesign": "Replace the original cottage and meadow with an unmistakable mountain hiking and running trailhead built around steps and steady forward progress. Create one prominent continuous route of oversized stylized boot-footprint-shaped stepping stones, alternating left foot and right foot: begin the footprint trail at the bottom center, lead it toward the circular platform without covering the platform, then resume it directly behind the platform and continue uphill into the distance. Combine the footprint route with a few broad stone stair sections climbing the hills toward a simple summit marker. Add one compact timber hiking lodge with a broad muted-blue roof, one blank trail-map board decorated only with a simple footprint icon, one hiking-gear rack with an oversized backpack, walking poles, rolled blanket, and boots, one chunky rest bench, one water station, two waypoint posts with simple painted trail blazes, several large rounded pine trees, and distant layered blue mountains. Make the platform feel like the obvious starting point for a hike or run",
+      "platform": {
+        "centerX": 0.5,
+        "centerY": 0.582,
+        "diameter": 0.26,
+        "projectedHeight": 0.12
+      }
+    },
+    "tasklet": {
+      "displayName": "Tasklet focus workshop",
+      "internalPromptTerms": [
+        "tasklet"
+      ],
+      "template": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+      "referenceMode": "template-only",
+      "environmentDesign": "Replace the original cottage and meadow with a calm welcoming open-air maker studio devoted to focus, momentum, sorting, and finishing small tasks. Build one rounded timber workshop pavilion in the midground, one broad blank pinboard holding a small number of unlabeled cards and simple check-mark icon shapes, one chunky tidy desk, three oversized stacked paper trays, one low shelf with a few large storage boxes, one softly glowing task lamp, one hourglass-shaped ornament, and only two restrained rounded plants at the outer edges. Use broad warm walnut surfaces, terracotta brown, cream paper, muted teal accents, pale mint confirmation lights, and soft golden morning light. Make the circular platform feel like a clear work-in-progress stage while keeping it completely empty",
       "platform": {
         "centerX": 0.5,
         "centerY": 0.582,

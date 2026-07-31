@@ -12,6 +12,10 @@ export const TODAY_EXPLORATION_BACKGROUND_SOURCES = {
     recyclingKey: 'today-bedrotte-exploration-v1',
     source: require('../assets/images/katchimeras/world/backgrounds/bedrotte-exploration-v1.png'),
   },
+  'cheerlet': {
+    recyclingKey: 'today-cheerlet-exploration-v1',
+    source: require('../assets/images/katchimeras/world/backgrounds/cheerlet-exploration-v1.png'),
+  },
   'feastle': {
     recyclingKey: 'today-feastle-exploration-v5',
     source: require('../assets/images/katchimeras/world/backgrounds/feastle-exploration-v5.png'),
@@ -39,6 +43,10 @@ export const TODAY_EXPLORATION_BACKGROUND_SOURCES = {
   'steppling': {
     recyclingKey: 'today-steppling-exploration-v2',
     source: require('../assets/images/katchimeras/world/backgrounds/steppling-exploration-v2.png'),
+  },
+  'tasklet': {
+    recyclingKey: 'today-tasklet-exploration-v1',
+    source: require('../assets/images/katchimeras/world/backgrounds/tasklet-exploration-v1.png'),
   },
 } as const satisfies Record<
   TodayExplorationBackgroundKey,

@@ -66,6 +66,9 @@ export function CompanionHomeScene({
   const compact = height < 735;
   const reflowPaths = width < 375 || fontScale > 1.15;
   const tablet = width >= 700;
+  const heroHeight = compact
+    ? Math.max(214, Math.min(252, height * 0.4))
+    : Math.min(336, Math.max(286, height * 0.39));
   const shouldAnimate = animateEntrance && !reduceMotion;
   const paths: HomePath[] = [
     {
@@ -120,7 +123,7 @@ export function CompanionHomeScene({
           },
         ]}
         contentInsetAdjustmentBehavior="never"
-        scrollEnabled={false}
+        scrollEnabled
         showsVerticalScrollIndicator={false}
         style={styles.scroll}>
         <View style={styles.topBar}>
@@ -145,7 +148,7 @@ export function CompanionHomeScene({
           <View accessibilityElementsHidden pointerEvents="none" style={styles.topBarBalance} />
         </View>
 
-        <View style={[styles.hero, compact && styles.heroCompact]} />
+        <View style={[styles.hero, { minHeight: heroHeight }]} />
 
         <Animated.View
           entering={
@@ -356,11 +359,7 @@ const styles = StyleSheet.create({
     width: 48,
   },
   hero: {
-    minHeight: 336,
     position: 'relative',
-  },
-  heroCompact: {
-    minHeight: 276,
   },
   paths: {
     flexDirection: 'row',

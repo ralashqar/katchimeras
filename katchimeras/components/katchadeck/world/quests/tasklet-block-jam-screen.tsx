@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 're
 import Animated, { Easing, FadeIn, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { MeadowSceneBackdrop } from '@/components/katchadeck/home/meadow-scene-backdrop';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { ScreenCloseButton } from '@/components/katchadeck/ui/screen-close-button';
@@ -52,7 +51,6 @@ export function TaskletBlockJamScreen({
 
   return (
     <View style={styles.root}>
-      <MeadowSceneBackdrop />
       <View pointerEvents="none" style={styles.sceneScrim} />
       <LinearGradient
         colors={['rgba(32,20,11,0.42)', 'rgba(37,23,13,0.18)', 'rgba(28,17,10,0.5)']}
@@ -61,7 +59,7 @@ export function TaskletBlockJamScreen({
         style={StyleSheet.absoluteFill}
       />
 
-      <ScreenCloseButton align="right" onPress={onClose} style={styles.closeButton} tint={TASKLET_INK} />
+      <ScreenCloseButton align="left" onPress={onClose} style={styles.closeButton} tint={TASKLET_INK} variant="back" />
 
       <View
         pointerEvents="box-none"
@@ -72,7 +70,7 @@ export function TaskletBlockJamScreen({
             paddingBottom: Math.max(8, insets.bottom + 6),
             paddingLeft: Math.max(10, insets.left + 10),
             paddingRight: Math.max(10, insets.right + 10),
-            paddingTop: insets.top + (compact ? 6 : 10),
+            paddingTop: insets.top + 58,
           },
         ]}>
         <Animated.View entering={enter} style={[styles.header, compact && styles.headerCompact]}>
@@ -157,7 +155,6 @@ export function TaskletBlockJamResultScreen({
 
   return (
     <View style={styles.root}>
-      <MeadowSceneBackdrop />
       <View pointerEvents="none" style={styles.sceneScrim} />
       <LinearGradient
         colors={['rgba(32,20,11,0.5)', 'rgba(37,23,13,0.2)', 'rgba(28,17,10,0.58)']}
@@ -165,7 +162,7 @@ export function TaskletBlockJamResultScreen({
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
-      <ScreenCloseButton align="right" onPress={onClose} style={styles.closeButton} tint={TASKLET_INK} />
+      <ScreenCloseButton align="left" onPress={onClose} style={styles.closeButton} tint={TASKLET_INK} variant="back" />
 
       <ScrollView
         contentContainerStyle={[
@@ -174,7 +171,7 @@ export function TaskletBlockJamResultScreen({
             paddingBottom: Math.max(12, insets.bottom + 10),
             paddingLeft: Math.max(14, insets.left + 14),
             paddingRight: Math.max(14, insets.right + 14),
-            paddingTop: insets.top + (compact ? 50 : 64),
+            paddingTop: insets.top + (compact ? 66 : 76),
           },
         ]}
         contentInsetAdjustmentBehavior="never"
@@ -326,7 +323,7 @@ function TaskletControlButton({
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: '#2F2217', flex: 1 },
+  root: { backgroundColor: 'transparent', flex: 1 },
   sceneScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(43, 27, 14, 0.22)' },
   safeContent: { alignSelf: 'center', flex: 1, gap: 8, maxWidth: 660, width: '100%' },
   safeContentCompact: { gap: 5 },

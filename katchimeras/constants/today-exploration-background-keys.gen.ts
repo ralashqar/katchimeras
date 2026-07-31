@@ -2,13 +2,15 @@
 
 export const TODAY_KATCHIMERA_EXPLORATION_BACKGROUND_KEYS = [
   'bedrotte',
+  'cheerlet',
   'feastle',
   'flickerbun',
   'mossprout',
   'pagelet',
   'relicoon',
   'skylo',
-  'steppling'
+  'steppling',
+  'tasklet'
 ] as const;
 
 export type TodayKatchimeraExplorationBackgroundKey =

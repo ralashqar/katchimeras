@@ -29,13 +29,14 @@ import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import {
   buildCompanionQuestViewModel,
   companionQuestInlineNoteAction,
-  companionQuestSkipsPreview,
+  companionQuestPresentation,
   companionViewportResetKey,
 } from '@/utils/companion-interaction';
 import { CompanionHomeScene } from './companion-home-scene';
 import { CompanionCinematicStage } from './companion-cinematic-stage';
+import { CompanionGameBackdrop } from './companion-game-backdrop';
 import { CompanionInsightThread } from './companion-insight-thread';
-import { CompanionPrimaryAction, CompanionSecondaryAction } from './companion-interaction-primitives';
+import { CompanionPrimaryAction } from './companion-interaction-primitives';
 import {
   CompanionBackAction,
   CompanionDestinationHeader,
@@ -346,6 +347,16 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     else props.onCashIn();
   };
   const interactiveExecution = props.activeQuest?.execution ?? null;
+  const questGameVisible = Boolean(
+    destination === 'quest'
+    && interactiveExecution
+    && questExperienceOpen
+    && props.onStartQuestAttempt
+    && props.onCancelQuestAttempt
+    && props.onCompleteInteractiveQuest
+  );
+  const questPresentation = companionQuestPresentation(interactiveExecution);
+  const questGameFullBleed = questPresentation.layout === 'fullBleed';
   useEffect(() => {
     setEndAttemptOpen(false);
     setLeaveQuestOpen(false);
@@ -401,31 +412,19 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     quest.mode !== 'analysing' &&
     !questExperienceOpen
   );
-  const returnToQuestListAction = canReturnToQuestList
-    ? (
-        <CompanionSecondaryAction
-          label="Back to quest list"
-          icon="arrow.counterclockwise"
-          onPress={() => setLeaveQuestOpen(true)}
-        />
-      )
-    : null;
   const inlineQuestNoteAction = companionQuestInlineNoteAction(quest);
   const actionFooter = props.memorySaved
     ? null
     : destination === 'quest' && interactiveExecution
-      ? returnToQuestListAction
+      ? null
     : destination === 'quest' && quest.mode === 'offer'
       ? null
     : destination === 'quest' && quest.primaryAction && !inlineQuestNoteAction
       ? reviewItem ? null : (
-          <View style={styles.footerStack}>
-            {returnToQuestListAction}
-            <CompanionPrimaryAction label={quest.mode === 'offer' ? 'Accept selected quest' : quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} />
-          </View>
+          <CompanionPrimaryAction label={quest.mode === 'offer' ? 'Accept selected quest' : quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} />
         )
       : destination === 'quest'
-        ? returnToQuestListAction
+        ? null
       : destination === 'insight' && props.insight.action
         ? <CompanionPrimaryAction label={props.insight.action.label} icon={props.insight.action.icon} onPress={props.onInsightAction} />
       : null;
@@ -469,16 +468,71 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         : destination === 'insight'
           ? 'Here’s what I noticed.'
           : 'Which form feels like me?';
+  const questGameContent = questGameVisible
+    && interactiveExecution
+    && props.onStartQuestAttempt
+    && props.onCancelQuestAttempt
+    && props.onCompleteInteractiveQuest
+    ? (
+        <QuestExperienceHost
+          key={experienceInstance}
+          session={{
+            execution: interactiveExecution,
+            config: props.activeQuest?.resolvedConfig ?? {},
+            seed: props.activeQuest?.offerSeed ?? `${props.creatureId}:${props.activeQuest?.title}`,
+            startImmediately: questPresentation.startsImmediately,
+          }}
+          history={{
+            recentQuestionIds: props.recentTriviaQuestionIds ?? [],
+            recentPuzzleIds: props.recentWordPuzzleIds ?? [],
+            recentWordPathPuzzleIds: props.recentWordPathPuzzleIds ?? [],
+            recentSortingItemIds: props.recentSortingItemIds ?? [],
+            sortingBestDurationMs: props.sortingBestDurationMs ?? null,
+            matchingBestDurationMs: props.matchingBestDurationMs ?? null,
+            recentMatchingContentIds: props.recentMatchingContentIds ?? [],
+            recentMergeOrderIds: props.recentMergeOrderIds ?? [],
+            mergeBest: props.mergeBest ?? null,
+            blockJamBest: props.blockJamBest ?? null,
+          }}
+          handlers={{
+            onAttemptStart: props.onStartQuestAttempt,
+            onAttemptCancel: props.onCancelQuestAttempt,
+            onComplete: (attemptId, result) => {
+              props.onCompleteInteractiveQuest?.(attemptId, result);
+              experience.setQuestAttempt(null);
+              experience.returnToDestination();
+              selectDestination('insight');
+            },
+            onRequestExit: () => {
+              if (activeAttemptId) setEndAttemptOpen(true);
+              else returnToQuest();
+            },
+            onRunningChange: (running, attemptId) => {
+              if (running) experience.setQuestAttempt(attemptId ?? null);
+              else returnToQuest();
+            },
+          }}
+        />
+      )
+    : null;
 
   return (<>
         <CompanionSheetShell
           background={props.questionnaireBackground}
           fullBleed
-          keyboardAvoiding={!activeAttemptId}
+          keyboardAvoiding={!questGameVisible}
           onRequestClose={requestClose}
           showClose={false}
-          surface={activeAttemptId ? 'night' : 'parchment'}>
-        {route.kind === 'destination' ? (
+          surface={questGameVisible ? 'night' : 'parchment'}>
+        {questGameVisible ? (
+          <CompanionGameBackdrop
+            backgroundKey={props.homeEnvironmentKey ?? null}
+            creature={visual.source}
+            name={props.name}
+            strong={questPresentation.backdrop === 'strong'}
+            visualKey={props.visualKey}
+          />
+        ) : route.kind === 'destination' && !questionnaireExperience && !quickGoalPickerOpen ? (
           <CompanionCinematicStage
             creature={visual.source}
             environmentKey={props.homeEnvironmentKey ?? null}
@@ -505,20 +559,44 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           />
         ) : (
           <>
-        {activeAttemptId ? (
+        {questGameVisible && !questGameFullBleed ? (
           <View style={[styles.gameBackPosition, { top: insets.top + 10 }]}>
-            <CompanionBackAction label="Quests" onPress={() => setEndAttemptOpen(true)} tone="night" />
+            <CompanionBackAction
+              label="Quest list"
+              onPress={() => {
+                if (activeAttemptId) setEndAttemptOpen(true);
+                else returnToQuest();
+              }}
+              tone="night"
+            />
           </View>
         ) : null}
-        {route.kind === 'destination' ? (
+        {route.kind === 'destination' && !questGameVisible && !questionnaireExperience && !quickGoalPickerOpen ? (
           <CompanionDestinationHeader
+            backLabel={destination === 'quest' && canReturnToQuestList ? 'Quest list' : 'Home'}
             label={destinationLabel}
-            name={props.name}
-            onBack={experience.showHome}
+            onBack={
+              destination === 'quest' && canReturnToQuestList
+                ? () => setLeaveQuestOpen(true)
+                : experience.showHome
+            }
           />
         ) : null}
-        <CompanionDestinationSurface immersive={Boolean(activeAttemptId || questionnaireExperience)}>
+        <CompanionDestinationSurface immersive={Boolean(questGameVisible || questionnaireExperience)}>
         <View key="interaction-content" style={styles.contentFrame}>
+          {questGameContent ? (
+            <View
+              style={[
+                styles.gameExperienceFrame,
+                !questGameFullBleed && {
+                  paddingBottom: Math.max(10, insets.bottom + 8),
+                  paddingHorizontal: 14,
+                  paddingTop: insets.top + 64,
+                },
+              ]}>
+              {questGameContent}
+            </View>
+          ) : (
           <ScrollView
             key={viewportResetKey}
             ref={contentRef}
@@ -544,7 +622,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               entering={entering}
               exiting={FadeOut.duration(100)}
               style={activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined}>
-              {route.kind === 'destination' ? (
+              {route.kind === 'destination' && !questionnaireExperience && !quickGoalPickerOpen ? (
                 <View
                   accessibilityElementsHidden
                   pointerEvents="none"
@@ -635,51 +713,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 <View accessibilityLiveRegion="polite" style={styles.saved}>
                   <ThemedText style={styles.savedTitle} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>Memory kept</ThemedText>
                   <ThemedText style={styles.savedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{props.name} will remember that with you.</ThemedText>
-                </View>
-              ) : destination === 'quest' && interactiveExecution && questExperienceOpen && props.onStartQuestAttempt && props.onCancelQuestAttempt && props.onCompleteInteractiveQuest ? (
-                <View style={!activeAttemptId ? styles.gamePreviewFrame : styles.activeExperience}>
-                {!activeAttemptId ? (
-                  <CompanionBackAction label="Back to quests" onPress={returnToQuest} tone="night" />
-                ) : null}
-                <QuestExperienceHost
-                  key={experienceInstance}
-                  session={{
-                    execution: interactiveExecution,
-                    config: props.activeQuest?.resolvedConfig ?? {},
-                    seed: props.activeQuest?.offerSeed ?? `${props.creatureId}:${props.activeQuest?.title}`,
-                    startImmediately: companionQuestSkipsPreview(interactiveExecution),
-                  }}
-                  history={{
-                    recentQuestionIds: props.recentTriviaQuestionIds ?? [],
-                    recentPuzzleIds: props.recentWordPuzzleIds ?? [],
-                    recentWordPathPuzzleIds: props.recentWordPathPuzzleIds ?? [],
-                    recentSortingItemIds: props.recentSortingItemIds ?? [],
-                    sortingBestDurationMs: props.sortingBestDurationMs ?? null,
-                    matchingBestDurationMs: props.matchingBestDurationMs ?? null,
-                    recentMatchingContentIds: props.recentMatchingContentIds ?? [],
-                    recentMergeOrderIds: props.recentMergeOrderIds ?? [],
-                    mergeBest: props.mergeBest ?? null,
-                    blockJamBest: props.blockJamBest ?? null,
-                  }}
-                  handlers={{
-                    onAttemptStart: props.onStartQuestAttempt,
-                    onAttemptCancel: props.onCancelQuestAttempt,
-                    onComplete: (attemptId, result) => {
-                      props.onCompleteInteractiveQuest?.(attemptId, result);
-                      experience.setQuestAttempt(null);
-                      experience.returnToDestination();
-                      selectDestination('insight');
-                    },
-                    onRequestExit: () => {
-                      if (activeAttemptId) setEndAttemptOpen(true);
-                      else returnToQuest();
-                    },
-                    onRunningChange: (running, attemptId) => {
-                      if (running) experience.setQuestAttempt(attemptId ?? null);
-                      else returnToQuest();
-                    },
-                  }}
-                />
                 </View>
               ) : destination === 'quest' && !props.activeQuest && props.offers.length ? (
                 <View>
@@ -782,6 +815,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ) : null}
             </Animated.View>
           </ScrollView>
+          )}
         </View>
         {visibleFooter ? <View style={styles.footer}>{visibleFooter}</View> : null}
         </CompanionDestinationSurface>
@@ -830,7 +864,7 @@ const styles = StyleSheet.create({
   activeScrollContent: { flexGrow: 1, paddingBottom: 0, paddingHorizontal: 0 },
   questionnaireScrollContent: { flexGrow: 1, paddingHorizontal: 0 },
   activeExperience: { flex: 1 },
-  gamePreviewFrame: { backgroundColor: Lantern.ink900, borderCurve: 'continuous', borderRadius: 20, minHeight: 320, padding: 14 },
+  gameExperienceFrame: { flex: 1, minHeight: 0, position: 'relative', zIndex: 3 },
   gameBackPosition: {
     left: 14,
     position: 'absolute',
@@ -840,7 +874,6 @@ const styles = StyleSheet.create({
   quickGoalStack: { gap: 8, marginBottom: 12 },
   youStack: { gap: 14 },
   footer: { backgroundColor: 'transparent', paddingBottom: 2, paddingHorizontal: 2, paddingTop: 7 },
-  footerStack: { gap: 7 },
   saved: { alignItems: 'center', gap: 8, justifyContent: 'center', minHeight: 220, paddingHorizontal: 24 },
   savedTitle: { fontSize: 24, fontWeight: '900' },
   savedBody: { fontSize: 14, lineHeight: 21, textAlign: 'center' },

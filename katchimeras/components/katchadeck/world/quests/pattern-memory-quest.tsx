@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
@@ -169,6 +169,7 @@ export function PatternMemoryQuest({
   onComplete,
   onRunningChange,
 }: Props) {
+  const { height, width } = useWindowDimensions();
   const experience = PATTERN_EXPERIENCES[gameId];
   const [started, setStarted] = useState(false);
   const [round, setRound] = useState(0);
@@ -184,6 +185,7 @@ export function PatternMemoryQuest({
   const pattern = useMemo(() => createPattern(`${seed}:${round}`, length), [length, round, seed]);
   const complete = round >= config.rounds;
   const appActive = useQuestAppActive();
+  const padSize = Math.max(104, Math.min(136, (Math.min(width, 360) - 40) / 2, (height - 260) / 2));
 
   const play = useCallback(() => {
     timers.current.forEach(clearTimeout);
@@ -300,7 +302,7 @@ export function PatternMemoryQuest({
       <ThemedText style={styles.progress} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>
         {experience.progressNoun} {round + 1} OF {config.rounds} · {won} {experience.keptNoun}
       </ThemedText>
-      <View accessibilityLabel="Pattern pads" style={styles.grid}>
+      <View accessibilityLabel="Pattern pads" style={[styles.grid, { maxWidth: padSize * 2 + 12 }]}>
         {experience.padColors.map((color, index) => {
           const selected = active === index;
           return (
@@ -312,7 +314,12 @@ export function PatternMemoryQuest({
               onPress={() => press(index)}
               style={[
                 styles.pad,
-                { backgroundColor: selected ? color : `${color}33`, borderColor: color },
+                {
+                  backgroundColor: selected ? color : `${color}33`,
+                  borderColor: color,
+                  height: padSize,
+                  width: padSize,
+                },
                 selected && styles.padActive,
               ]}>
               <View pointerEvents="none" style={styles.symbolFrame}>
@@ -333,7 +340,6 @@ export function PatternMemoryQuest({
         </ThemedText>
         {!playing ? <ExperienceAction label={experience.replayLabel} quiet onPress={play} /> : null}
       </View>
-      <ExperienceAction label="Cancel round" quiet onPress={reset} />
     </View>
   );
 }
@@ -350,16 +356,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    maxWidth: 284,
   },
   pad: {
     alignItems: 'center',
     borderCurve: 'continuous',
     borderRadius: 26,
     borderWidth: 2,
-    height: 136,
     justifyContent: 'center',
-    width: 136,
   },
   padActive: {
     transform: [{ scale: 1.04 }],

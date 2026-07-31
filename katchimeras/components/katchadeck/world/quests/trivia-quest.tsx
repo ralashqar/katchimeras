@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -56,19 +56,27 @@ export function TriviaQuest({ config, seed, recentQuestionIds, onAttemptStart, o
   );
 
   if (finished && attemptId.current) return (
-    <View accessibilityLiveRegion="polite" style={[styles.root, styles.resultRoot]}>
+    <ScrollView
+      accessibilityLiveRegion="polite"
+      contentContainerStyle={[styles.root, styles.resultRoot]}
+      contentInsetAdjustmentBehavior="never"
+      showsVerticalScrollIndicator={false}>
       <View style={styles.resultContent}>
         <Header title="Round complete" body={`You scored ${score} out of ${round.questions.length}.`} />
         <View style={styles.score}><ThemedText style={styles.scoreNumber} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>{score}/{round.questions.length}</ThemedText><ThemedText style={styles.scoreCaption} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Finished in {Math.max(1, Math.round(elapsed / 1000))} seconds</ThemedText></View>
       </View>
       <Action label="Complete and return" onPress={() => onComplete(attemptId.current!, { kind: 'trivia', success: true, score, questionCount: round.questions.length, durationMs: elapsed, questionIds: round.questions.map((question) => question.id) })} />
-    </View>
+    </ScrollView>
   );
 
   if (!current) return null;
   const correct = selected === current.correctChoiceId;
   return (
-    <View style={styles.root}>
+    <ScrollView
+      contentContainerStyle={[styles.root, styles.scrollRoot]}
+      contentInsetAdjustmentBehavior="never"
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}>
       <View style={styles.progressRow}><ThemedText style={styles.progressText} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>QUESTION {round.index + 1} OF {round.questions.length}</ThemedText><ThemedText style={styles.progressText} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>SCORE {score}</ThemedText></View>
       <ThemedText selectable style={styles.question} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{current.prompt}</ThemedText>
       <View style={styles.choices}>{current.choices.map((choice, index) => {
@@ -78,7 +86,7 @@ export function TriviaQuest({ config, seed, recentQuestionIds, onAttemptStart, o
       })}</View>
       {selected ? <View accessibilityLiveRegion="polite" style={styles.feedback}><ThemedText style={styles.feedbackTitle} lightColor={correct ? Lantern.auroraTeal : Lantern.ember300} darkColor={correct ? Lantern.auroraTeal : Lantern.ember300}>{correct ? 'Correct' : 'Not this time'}</ThemedText><ThemedText selectable style={styles.feedbackBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{current.explanation}</ThemedText></View> : null}
       {selected ? <Action label={triviaRoundComplete(round) ? 'See result' : 'Next question'} onPress={advance} /> : <Pressable accessibilityRole="button" onPress={() => { if (attemptId.current) onAttemptCancel(attemptId.current); onRunningChange(false); setRound(null); }} style={styles.cancel}><ThemedText style={styles.cancelText} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Cancel round</ThemedText></Pressable>}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -86,7 +94,7 @@ function Header({ title, body }: { title: string; body: string }) { return <View
 function Action({ label, onPress }: { label: string; onPress: () => void }) { return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, pressed && styles.pressed]}><ThemedText style={styles.actionText} lightColor={Lantern.emberInk} darkColor={Lantern.emberInk}>{label}</ThemedText><IconSymbol name="arrow.right" size={17} color={Lantern.emberInk} /></Pressable>; }
 
 const styles = StyleSheet.create({
-  root: { gap: 18, paddingBottom: 20, paddingTop: 8 }, header: { gap: 8 }, eyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.05 },
+  root: { gap: 18, paddingBottom: 20, paddingTop: 8 }, scrollRoot: { flexGrow: 1 }, header: { gap: 8 }, eyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.05 },
   title: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 29, lineHeight: 34 }, body: { fontSize: 14, lineHeight: 21 },
   info: { alignItems: 'center', backgroundColor: 'rgba(255,195,107,0.07)', borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 10, padding: 14 }, infoText: { flex: 1, fontSize: 12.5, lineHeight: 18 },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between' }, progressText: { fontSize: 10.5, fontWeight: '900', letterSpacing: 0.8 },

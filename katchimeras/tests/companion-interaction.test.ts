@@ -8,6 +8,7 @@ import {
   buildCompanionQuestViewModel,
   companionQuestBackAction,
   companionQuestInlineNoteAction,
+  companionQuestPresentation,
   companionInteractionReducer,
   companionRouteBackAction,
   companionQuestSkipsPreview,
@@ -29,10 +30,25 @@ test('Mossprout, Feastle, and Tasklet games use the full-bleed game shell', () =
   assert.equal(companionQuestUsesFullBleed(null), false);
 });
 
-test('Mossprout garden pairs launches directly without a duplicate preview screen', () => {
+test('quest presentation keeps shell ownership and backdrop treatment together', () => {
+  assert.deepEqual(
+    companionQuestPresentation({ kind: 'matching', packId: 'mossprout-garden' } as InteractiveQuestExecution),
+    { backdrop: 'normal', layout: 'fullBleed', startsImmediately: true },
+  );
+  assert.deepEqual(
+    companionQuestPresentation({ kind: 'block_blast', packId: 'cheerlet-party' } as InteractiveQuestExecution),
+    { backdrop: 'strong', layout: 'standard', startsImmediately: true },
+  );
+  assert.deepEqual(
+    companionQuestPresentation(null),
+    { backdrop: 'normal', layout: 'standard', startsImmediately: false },
+  );
+});
+
+test('interactive mini-games launch directly without duplicate preview screens', () => {
   assert.equal(companionQuestSkipsPreview({ kind: 'matching', packId: 'mossprout-garden' } as InteractiveQuestExecution), true);
-  assert.equal(companionQuestSkipsPreview({ kind: 'matching', packId: 'relicoon-gallery' } as InteractiveQuestExecution), false);
-  assert.equal(companionQuestSkipsPreview({ kind: 'merge', packId: 'feastle-kitchen' } as InteractiveQuestExecution), false);
+  assert.equal(companionQuestSkipsPreview({ kind: 'matching', packId: 'relicoon-gallery' } as InteractiveQuestExecution), true);
+  assert.equal(companionQuestSkipsPreview({ kind: 'merge', packId: 'feastle-kitchen' } as InteractiveQuestExecution), true);
   assert.equal(companionQuestSkipsPreview(null), false);
 });
 
