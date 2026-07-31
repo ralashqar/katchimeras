@@ -13,7 +13,7 @@ import { Meadow } from '@/constants/meadow-theme';
 // camera. (The carved-wood variant was retired — design/today-mockup-v2.jpeg.)
 
 // Routes that never render as tab items (expo-router registers them anyway).
-const HIDDEN_ROUTES = new Set(['index']);
+const HIDDEN_ROUTES = new Set(['index', 'world']);
 
 const INACTIVE = 'rgba(226, 221, 238, 0.72)';
 
