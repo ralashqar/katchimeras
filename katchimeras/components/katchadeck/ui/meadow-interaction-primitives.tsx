@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { StatusBadge, type StatusTone } from '@/components/katchadeck/ui/status-badge';
+import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Meadow } from '@/constants/meadow-theme';
@@ -49,12 +50,7 @@ export function MeadowSecondaryAction({
 }
 
 export function MeadowBackAction({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-      <IconSymbol name="chevron.left" size={15} color={Meadow.inkSoft} />
-      <ThemedText style={styles.backText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{label}</ThemedText>
-    </Pressable>
-  );
+  return <KatchimeraBackButton accessibilityLabel={label} onPress={onPress} />;
 }
 
 export function MeadowSection({ label, children }: { label?: string; children: ReactNode }) {
@@ -125,11 +121,6 @@ const styles = StyleSheet.create({
     boxShadow: '-2px 3px 7px rgba(58,38,18,0.15), inset 0 1px 0 rgba(255,248,230,0.54)', flexDirection: 'row', gap: 7, minHeight: 44, paddingHorizontal: 14,
   },
   secondaryText: { fontSize: 13.5, fontWeight: '800' },
-  back: {
-    alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(255,248,232,0.34)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1,
-    boxShadow: '-2px 3px 7px rgba(58,38,18,0.13), inset 0 1px 0 rgba(255,248,230,0.50)', flexDirection: 'row', gap: 5, minHeight: 42, paddingHorizontal: 12,
-  },
-  backText: { fontSize: 12.5, fontWeight: '800' },
   pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
   disabled: { opacity: 0.45 },
   section: { gap: 10 },

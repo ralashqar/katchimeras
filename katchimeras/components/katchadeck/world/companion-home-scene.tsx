@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { KatchaUI } from '@/constants/katcha-ui';
 import type { CompanionDestination } from '@/types/companion-interaction';
 import type { HomeVisualKey } from '@/types/home';
@@ -127,14 +128,10 @@ export function CompanionHomeScene({
         showsVerticalScrollIndicator={false}
         style={styles.scroll}>
         <View style={styles.topBar}>
-          <Pressable
+          <KatchimeraBackButton
             accessibilityLabel="Back to Katchimeras"
-            accessibilityRole="button"
-            hitSlop={8}
             onPress={onClose}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <IconSymbol color="#3D2A1D" name="chevron.left" size={23} />
-          </Pressable>
+          />
           <ThemedText
             adjustsFontSizeToFit
             minimumFontScale={0.72}
@@ -333,18 +330,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 4,
   },
-  backButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,249,235,0.94)',
-    borderColor: 'rgba(91,61,30,0.24)',
-    borderRadius: 999,
-    borderWidth: 1,
-    boxShadow:
-      '0 5px 15px rgba(42,29,17,0.24), inset 0 1px 0 rgba(255,255,255,0.92)',
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
   topBarTitle: {
     ...KatchaUI.type.companionName,
     flex: 1,
@@ -355,8 +340,8 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   topBarBalance: {
-    height: 48,
-    width: 48,
+    height: 44,
+    width: 44,
   },
   hero: {
     position: 'relative',

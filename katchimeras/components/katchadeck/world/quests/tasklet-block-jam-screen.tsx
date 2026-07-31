@@ -59,7 +59,7 @@ export function TaskletBlockJamScreen({
         style={StyleSheet.absoluteFill}
       />
 
-      <ScreenCloseButton align="left" onPress={onClose} style={styles.closeButton} tint={TASKLET_INK} variant="back" />
+      <ScreenCloseButton align="left" onPress={onClose} variant="back" />
 
       <View
         pointerEvents="box-none"
@@ -162,7 +162,7 @@ export function TaskletBlockJamResultScreen({
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
-      <ScreenCloseButton align="left" onPress={onClose} style={styles.closeButton} tint={TASKLET_INK} variant="back" />
+      <ScreenCloseButton align="left" onPress={onClose} variant="back" />
 
       <ScrollView
         contentContainerStyle={[
@@ -327,11 +327,6 @@ const styles = StyleSheet.create({
   sceneScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(43, 27, 14, 0.22)' },
   safeContent: { alignSelf: 'center', flex: 1, gap: 8, maxWidth: 660, width: '100%' },
   safeContentCompact: { gap: 5 },
-  closeButton: {
-    backgroundColor: 'rgba(255, 239, 203, 0.98)',
-    borderColor: 'rgba(148, 92, 36, 0.76)',
-    boxShadow: '0 4px 12px rgba(63,35,15,0.34), inset 0 1px 0 rgba(255,255,255,0.86)',
-  },
   header: {
     backgroundColor: 'rgba(255, 235, 191, 0.97)',
     borderColor: 'rgba(158, 101, 43, 0.72)',

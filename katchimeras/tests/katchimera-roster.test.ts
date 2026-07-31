@@ -165,7 +165,27 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.match(rosterScreen, /FlashList/);
   assert.doesNotMatch(rosterScreen, /SectionList/);
   assert.match(gameRoute, /BlockBlastQuest/);
+  assert.match(gameRoute, /cheerlet-exploration-v1\.png/);
+  assert.match(gameRoute, /AmbientEnvironmentDrift/);
   assert.doesNotMatch(gameRoute, /CompanionInteractionSheet|TodaySceneBackdrop|CompanionGameBackdrop/);
+});
+
+test('large mini-game environment art shares the ambient drift animation', () => {
+  const backdrop = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-game-backdrop.tsx'),
+    'utf8',
+  );
+  const motion = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'ui', 'ambient-environment-drift.tsx'),
+    'utf8',
+  );
+
+  assert.match(backdrop, /AmbientEnvironmentDrift/);
+  assert.match(motion, /DEFAULT_LEG_DURATION = 22_000/);
+  assert.match(motion, /SAFE_DRIFT_FRACTION = 0\.85/);
+  assert.match(motion, /width \* \(\(BACKGROUND_SCALE - 1\) \/ 2\) \* SAFE_DRIFT_FRACTION/);
+  assert.match(motion, /withRepeat/);
+  assert.match(motion, /useReducedMotion/);
 });
 
 test('Block Blast keeps gesture callbacks on JavaScript where live game state is owned', () => {
@@ -176,4 +196,39 @@ test('Block Blast keeps gesture callbacks on JavaScript where live game state is
 
   assert.match(board, /Gesture\.Pan\(\)[\s\S]*?\.runOnJS\(true\)/);
   assert.doesNotMatch(board, /runOnJS\(onPick\)|runOnJS\(onPlace\)/);
+});
+
+test('Block Blast completes its occupied-cell loss cascade before showing minimal results', () => {
+  const board = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-board.tsx'),
+    'utf8',
+  );
+  const quest = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-quest.tsx'),
+    'utf8',
+  );
+
+  assert.match(board, /BLOCK_BLAST_LOSS_OUTRO_MS = 1_240/);
+  assert.match(board, /state\.status === 'lost' \? <LossCollapse/);
+  assert.match(board, /board\.flatMap\(\(colorId, index\) => colorId/);
+  assert.match(board, /state\.status === 'playing' && arrivalCells\.length \? <PlacementArrival/);
+  assert.match(board, /horizontalImpulse[\s\S]*?upwardImpulse[\s\S]*?fallDistance[\s\S]*?rotation/);
+  assert.match(board, /lossBurstRing/);
+  assert.match(quest, /setResultReady\(true\)[\s\S]*?BLOCK_BLAST_LOSS_OUTRO_MS/);
+  assert.match(quest, /FINAL SCORE/);
+  assert.doesNotMatch(quest, /Counting the celebration|No moves left|resultBody|ResultStat/);
+});
+
+test('Katchimera navigation surfaces share one back-button treatment', () => {
+  const files = [
+    path.join('components', 'katchadeck', 'world', 'companion-home-scene.tsx'),
+    path.join('components', 'katchadeck', 'world', 'companion-ui-primitives.tsx'),
+    path.join('components', 'katchadeck', 'ui', 'meadow-interaction-primitives.tsx'),
+    path.join('components', 'katchadeck', 'ui', 'screen-close-button.tsx'),
+    path.join('components', 'katchadeck', 'world', 'quests', 'block-blast-quest.tsx'),
+  ];
+
+  for (const file of files) {
+    assert.match(fs.readFileSync(path.join(process.cwd(), file), 'utf8'), /KatchimeraBackButton/);
+  }
 });

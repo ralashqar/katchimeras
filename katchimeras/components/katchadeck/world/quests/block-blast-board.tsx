@@ -46,6 +46,8 @@ export type BoardMetrics = {
 
 export type WindowFrame = { x: number; y: number; width: number; height: number };
 
+export const BLOCK_BLAST_LOSS_OUTRO_MS = 1_240;
+
 const CONTROLLED_EASE = Easing.bezier(0.22, 1, 0.36, 1);
 const DRAG_DELTA_GAIN = 1.42;
 
@@ -106,7 +108,8 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
       entering={reduceMotion ? ZoomIn.duration(80) : ZoomIn.duration(280).easing(CONTROLLED_EASE)}
       style={[styles.board, { height: size, width: size }]}
     >
-      <StaticBlockBlastBoard board={state.board} metrics={metrics} size={size} />
+      <StaticBlockBlastBoard board={state.status === 'lost' ? EMPTY_BOARD : state.board} metrics={metrics} size={size} />
+      {state.status === 'lost' ? <LossCollapse board={state.board} metrics={metrics} reduceMotion={reduceMotion} /> : null}
       {validHover && selectedPiece && hover && previewPalette ? (
         <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
           {selectedPiece.cells.map((part, index) => {
@@ -126,7 +129,7 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
           })}
         </Canvas>
       ) : null}
-      {arrivalCells.length ? <PlacementArrival key={`arrival-${state.lastResolution?.id}`} cells={arrivalCells} metrics={metrics} reduceMotion={reduceMotion} /> : null}
+      {state.status === 'playing' && arrivalCells.length ? <PlacementArrival key={`arrival-${state.lastResolution?.id}`} cells={arrivalCells} metrics={metrics} reduceMotion={reduceMotion} /> : null}
       {linePreview.length ? <LineClearPreview cells={linePreview} metrics={metrics} reduceMotion={reduceMotion} /> : null}
       <BoardHitTargets metrics={metrics} onCellPress={onCellPress} validOrigins={validOrigins} />
       {state.lastResolution?.clearedCells.length ? (
@@ -137,6 +140,7 @@ export const BlockBlastBoard = memo(function BlockBlastBoard({
 });
 
 const EMPTY_ORIGIN_MASK = new Array<number>(BLOCK_BLAST_BOARD_SIZE * BLOCK_BLAST_BOARD_SIZE).fill(0);
+const EMPTY_BOARD = new Array<BlockBlastColorId | null>(BLOCK_BLAST_BOARD_SIZE * BLOCK_BLAST_BOARD_SIZE).fill(null);
 
 const StaticBlockBlastBoard = memo(function StaticBlockBlastBoard({
   board,
@@ -274,6 +278,129 @@ function PlacementArrivalCell({ colorId, index, metrics, order }: { colorId: Blo
       </Animated.View>
     </View>
   );
+}
+
+function LossCollapse({
+  board,
+  metrics,
+  reduceMotion,
+}: {
+  board: BlockBlastState['board'];
+  metrics: BoardMetrics;
+  reduceMotion: boolean;
+}) {
+  if (reduceMotion) return null;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {board.flatMap((colorId, index) => colorId
+        ? [<LossCollapseCell colorId={colorId} index={index} key={`loss-${index}`} metrics={metrics} />]
+        : [])}
+    </View>
+  );
+}
+
+function LossCollapseCell({
+  colorId,
+  index,
+  metrics,
+}: {
+  colorId: BlockBlastColorId;
+  index: number;
+  metrics: BoardMetrics;
+}) {
+  const progress = useSharedValue(0);
+  const row = Math.floor(index / BLOCK_BLAST_BOARD_SIZE);
+  const column = index % BLOCK_BLAST_BOARD_SIZE;
+  const palette = BLOCK_PARTY_COLORS[colorId];
+  const radius = Math.max(5, metrics.cell * 0.17);
+  const horizontalNoise = lossCellNoise(index, 1);
+  const verticalNoise = lossCellNoise(index, 2);
+  const timingNoise = lossCellNoise(index, 3);
+  const rotationNoise = lossCellNoise(index, 4);
+  const centerDistance = Math.hypot(column - 3.5, row - 3.5);
+  const outwardDirection = column < 3.5 ? -1 : 1;
+  const horizontalImpulse = outwardDirection * metrics.cell * (1.1 + horizontalNoise * 2.2);
+  const upwardImpulse = -metrics.cell * (1.15 + verticalNoise * 1.45);
+  const fallDistance = metrics.size * (0.72 + verticalNoise * 0.2);
+  const rotation = outwardDirection * (125 + rotationNoise * 250);
+  const delay = Math.round(centerDistance * 42 + timingNoise * 115);
+
+  useEffect(() => {
+    progress.value = withDelay(
+      delay,
+      withTiming(1, { duration: 790, easing: Easing.in(Easing.quad) }),
+    );
+    return () => cancelAnimation(progress);
+  }, [delay, progress]);
+
+  const flightStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.78, 0.94, 1], [1, 1, 0.72, 0]),
+    transform: [
+      { translateX: interpolate(progress.value, [0, 0.16, 0.42, 1], [0, horizontalImpulse * -0.08, horizontalImpulse * 0.58, horizontalImpulse]) },
+      { translateY: interpolate(progress.value, [0, 0.13, 0.42, 1], [0, 3, upwardImpulse, fallDistance]) },
+      { rotate: `${interpolate(progress.value, [0, 0.13, 1], [0, outwardDirection * -5, rotation])}deg` },
+      { scale: interpolate(progress.value, [0, 0.13, 0.28, 0.82, 1], [1, 0.93, 1.1, 0.94, 0.82]) },
+    ],
+  }));
+  const burstStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.08, 0.25, 0.4], [0, 1, 0.64, 0]),
+    transform: [
+      { rotate: `${interpolate(progress.value, [0, 0.4], [0, outwardDirection * 32])}deg` },
+      { scale: interpolate(progress.value, [0, 0.08, 0.4], [0.28, 0.72, 1.7]) },
+    ],
+  }));
+
+  return (
+    <View
+      style={[
+        styles.lossCellOrigin,
+        {
+          height: metrics.cell,
+          left: metrics.outer + column * metrics.pitch,
+          top: metrics.outer + row * metrics.pitch,
+          width: metrics.cell,
+        },
+      ]}
+    >
+      <Animated.View style={[styles.lossBurst, burstStyle]}>
+        <View style={[styles.lossBurstRing, { borderRadius: metrics.cell, height: metrics.cell * 1.28, left: -metrics.cell * 0.14, top: -metrics.cell * 0.14, width: metrics.cell * 1.28 }]} />
+        {LOSS_SHARD_VECTORS.map((vector, shardIndex) => (
+          <View
+            key={`loss-shard-${shardIndex}`}
+            style={[
+              styles.lossShard,
+              {
+                backgroundColor: shardIndex % 2 === 0 ? palette.bright : '#FFF3C9',
+                left: metrics.cell * (0.45 + vector.x * 0.32),
+                top: metrics.cell * (0.45 + vector.y * 0.32),
+                transform: [{ rotate: `${vector.rotation}deg` }],
+              },
+            ]}
+          />
+        ))}
+      </Animated.View>
+      <Animated.View style={[styles.lossCell, { borderRadius: radius }, flightStyle]}>
+        <LinearGradient
+          colors={[palette.bright, palette.mid, palette.deep]}
+          locations={[0, 0.52, 1]}
+          style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
+        />
+        <View style={[styles.lossCellShine, { borderRadius: radius }]} />
+      </Animated.View>
+    </View>
+  );
+}
+
+const LOSS_SHARD_VECTORS = [
+  { rotation: -28, x: -1, y: -0.7 },
+  { rotation: 24, x: 0.9, y: -1 },
+  { rotation: 61, x: 1, y: 0.72 },
+  { rotation: -67, x: -0.82, y: 1 },
+] as const;
+
+function lossCellNoise(index: number, channel: number): number {
+  const value = Math.sin((index + 1) * (12.9898 + channel * 17.137)) * 43_758.5453;
+  return value - Math.floor(value);
 }
 
 function LineClearPreview({
@@ -632,6 +759,12 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 9px rgba(255, 230, 142, 0.72)',
     position: 'absolute',
   },
+  lossCellOrigin: { position: 'absolute' },
+  lossBurst: { height: '100%', left: 0, position: 'absolute', top: 0, width: '100%' },
+  lossBurstRing: { borderColor: 'rgba(255,244,196,0.88)', borderWidth: 1.5, position: 'absolute' },
+  lossShard: { borderRadius: 2, height: 5, position: 'absolute', width: 7 },
+  lossCell: { borderColor: 'rgba(255,255,255,0.24)', borderWidth: 0.75, height: '100%', overflow: 'hidden', width: '100%' },
+  lossCellShine: { backgroundColor: 'rgba(255,255,255,0.18)', height: '28%', left: '14%', position: 'absolute', top: '12%', width: '72%' },
   pieceHitbox: { alignItems: 'center', height: '100%', justifyContent: 'center', overflow: 'visible', width: '100%' },
   pieceHitboxPressed: { opacity: 0.9 },
   clearCell: { borderColor: '#FFF8DE', borderWidth: 1, boxShadow: '0 0 10px rgba(255,238,176,0.48)', overflow: 'hidden', position: 'absolute' },

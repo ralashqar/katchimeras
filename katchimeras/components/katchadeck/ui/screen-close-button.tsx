@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 
 // One close/back control for every full-screen takeover (maps, journal, camera).
 // Floats just below the status bar via the top safe-area inset, so it never
@@ -21,10 +22,24 @@ export function ScreenCloseButton({
 }) {
   const insets = useSafeAreaInsets();
 
+  if (variant === 'back') {
+    return (
+      <KatchimeraBackButton
+        accessibilityLabel="Go back"
+        onPress={onPress}
+        style={[
+          styles.backButton,
+          align === 'right' ? styles.alignRight : styles.alignLeft,
+          { top: insets.top + 10 },
+        ]}
+      />
+    );
+  }
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={variant === 'back' ? 'Go back' : 'Close'}
+      accessibilityLabel="Close"
       hitSlop={10}
       onPress={onPress}
       style={({ pressed }) => [
@@ -34,7 +49,7 @@ export function ScreenCloseButton({
         pressed ? styles.pressed : null,
         style,
       ]}>
-      <IconSymbol color={tint} name={variant === 'back' ? 'chevron.left' : 'xmark'} size={18} />
+      <IconSymbol color={tint} name="xmark" size={18} />
     </Pressable>
   );
 }
@@ -53,6 +68,7 @@ const styles = StyleSheet.create({
     width: 40,
     zIndex: 30,
   },
+  backButton: { position: 'absolute', zIndex: 30 },
   alignLeft: {
     left: 16,
   },

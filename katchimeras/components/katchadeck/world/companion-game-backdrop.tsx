@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, View } from 'react-native';
 
+import { AmbientEnvironmentDrift } from '@/components/katchadeck/ui/ambient-environment-drift';
 import type { HomeVisualKey } from '@/types/home';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
@@ -22,13 +23,15 @@ export function CompanionGameBackdrop({
 }) {
   return (
     <View pointerEvents="none" style={styles.root}>
-      <CompanionHomeEnvironmentStage
-        backgroundKey={backgroundKey}
-        creature={creature}
-        layer="background"
-        name={name}
-        visualKey={visualKey}
-      />
+      <AmbientEnvironmentDrift>
+        <CompanionHomeEnvironmentStage
+          backgroundKey={backgroundKey}
+          creature={creature}
+          layer="background"
+          name={name}
+          visualKey={visualKey}
+        />
+      </AmbientEnvironmentDrift>
       <View style={[styles.scrim, strong && styles.scrimStrong]} />
       <LinearGradient
         colors={

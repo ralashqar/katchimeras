@@ -2,7 +2,6 @@ import * as Haptics from 'expo-haptics';
 import { type ReactNode, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
-  Pressable,
   type StyleProp,
   StyleSheet,
   View,
@@ -13,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TodaySceneBackdrop } from '@/components/katchadeck/home/today-scene-backdrop';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
+import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { useKatchaSurface } from '@/components/katchadeck/ui/katcha-surface';
 import { StatusBadge, type StatusTone } from '@/components/katchadeck/ui/status-badge';
@@ -296,35 +296,12 @@ export function CompanionResultNotice({
 export function CompanionBackAction({
   label,
   onPress,
-  tone = 'parchment',
 }: {
   label: string;
   onPress: () => void;
   tone?: 'night' | 'parchment';
 }) {
-  const { tokens } = useKatchaSurface();
-  const foreground = tone === 'night' ? '#FFF9EE' : tokens.textSecondary;
-  return (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      hitSlop={8}
-      onPress={() => {
-        if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-        onPress();
-      }}
-      style={({ pressed }) => [
-        styles.back,
-        {
-          backgroundColor: tone === 'night' ? 'rgba(9,14,30,0.78)' : tokens.subtle,
-          borderColor: tone === 'night' ? 'rgba(255,255,255,0.18)' : tokens.border,
-        },
-        pressed && styles.pressed,
-      ]}>
-      <IconSymbol color={foreground} name="chevron.left" size={16} />
-      <ThemedText style={styles.backLabel} lightColor={foreground} darkColor={foreground}>{label}</ThemedText>
-    </Pressable>
-  );
+  return <KatchimeraBackButton accessibilityLabel={label} onPress={onPress} />;
 }
 
 const styles = StyleSheet.create({
@@ -429,17 +406,5 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     lineHeight: 17,
   },
-  back: {
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderCurve: 'continuous',
-    borderRadius: KatchaUI.radius.pill,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 4,
-    minHeight: KatchaUI.touchTarget,
-    paddingHorizontal: 13,
-  },
-  backLabel: { ...KatchaUI.type.companionAction, fontSize: 12.5 },
   pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
 });

@@ -38,7 +38,7 @@ export function FeastleMergeFeastScreen({
         style={StyleSheet.absoluteFill}
       />
 
-      <ScreenCloseButton align="left" onPress={onClose} style={styles.closeButton} tint={FEAST_INK} variant="back" />
+      <ScreenCloseButton align="left" onPress={onClose} variant="back" />
 
       <View
         pointerEvents="box-none"
@@ -113,11 +113,6 @@ const styles = StyleSheet.create({
   warmScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(72, 45, 17, 0.25)' },
   safeContent: { alignSelf: 'center', flex: 1, gap: 8, maxWidth: 660, width: '100%' },
   safeContentCompact: { gap: 5 },
-  closeButton: {
-    backgroundColor: 'rgba(255, 240, 206, 0.97)',
-    borderColor: 'rgba(149, 91, 33, 0.78)',
-    boxShadow: '0 5px 14px rgba(63,33,12,0.38), inset 0 1px 0 rgba(255,255,255,0.82)',
-  },
   header: { minHeight: 132, paddingRight: 116, position: 'relative' },
   headerCompact: { minHeight: 106 },
   headerCopy: { flex: 1, gap: 5, justifyContent: 'center', maxWidth: 390, paddingLeft: 4 },

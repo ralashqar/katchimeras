@@ -2,10 +2,11 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, AppState, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInUp, FadeOutUp, Keyframe, ZoomIn, useReducedMotion } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeInUp, FadeOutUp, Keyframe, useReducedMotion } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import {
   BLOCK_BLAST_PACK,
@@ -25,12 +26,12 @@ import {
   loadBlockBlastProfile,
   recordBlockBlastRun,
   saveBlockBlastActiveRun,
-  setBlockBlastSoundEnabled,
   type BlockBlastProfile,
 } from '@/utils/quests/experiences/block-blast-storage';
 import type { QuestResult } from '@/utils/quests/experiences/types';
 import {
   BlockBlastBoard,
+  BLOCK_BLAST_LOSS_OUTRO_MS,
   DraggableBlockBlastPiece,
   blockBlastBoardMetrics,
   type WindowFrame,
@@ -41,7 +42,7 @@ import {
   playBlockBlastSound,
   type BlockBlastSound,
 } from './block-blast-sounds';
-import { ExperienceAction, QuestExperiencePreview } from './quest-experience-ui';
+import { QuestExperiencePreview } from './quest-experience-ui';
 
 type Config = {
   packId: typeof BLOCK_BLAST_PACK;
@@ -126,7 +127,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
       setResultReady(false);
       return;
     }
-    const timeout = setTimeout(() => setResultReady(true), reduceMotion ? 90 : 650);
+    const timeout = setTimeout(() => setResultReady(true), reduceMotion ? 90 : BLOCK_BLAST_LOSS_OUTRO_MS);
     return () => clearTimeout(timeout);
   }, [game?.status, game?.seed, reduceMotion]);
 
@@ -302,11 +303,6 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     onComplete(id, result);
   };
 
-  const toggleSound = () => {
-    setProfile((current) => setBlockBlastSoundEnabled(current, !current.soundEnabled));
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-  };
-
   if (!started) {
     return (
       <QuestExperiencePreview
@@ -318,14 +314,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
         meta={game ? `Saved run · ${formatScore(game.score)} points` : profile.highScore ? `Personal best · ${formatScore(profile.highScore)}` : 'Endless · three pieces at a time'}
         actionLabel={game ? 'Resume run' : 'Start the party'}
         onAction={start}
-      >
-        <View style={styles.previewControls}>
-          <Pressable accessibilityRole="button" accessibilityLabel={profile.soundEnabled ? 'Mute game sounds' : 'Turn on game sounds'} onPress={toggleSound} style={styles.soundChoice}>
-            <IconSymbol name={profile.soundEnabled ? 'speaker.wave.2.fill' : 'speaker.slash.fill'} size={17} color={Lantern.moon300} />
-            <ThemedText style={styles.soundChoiceText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{profile.soundEnabled ? 'Sound on' : 'Sound off'}</ThemedText>
-          </Pressable>
-        </View>
-      </QuestExperiencePreview>
+      />
     );
   }
 
@@ -334,29 +323,23 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   if (game.status === 'lost' && resultReady) {
     const displayBest = Math.max(profile.highScore, game.score);
     return (
-      <Animated.View entering={FadeIn.duration(180)} accessibilityLiveRegion="polite" style={styles.resultRoot}>
-        <View style={styles.resultHero}>
-          <Animated.View entering={reduceMotion ? FadeIn.duration(80) : ZoomIn.duration(280).easing(CONTROLLED_EASE)} style={styles.resultCreatureWrap}>
-            <Image source={CHEERLET} contentFit="contain" style={styles.resultCreature} />
-          </Animated.View>
+      <Animated.View entering={FadeInUp.duration(reduceMotion ? 100 : 260).easing(CONTROLLED_EASE)} accessibilityLiveRegion="polite" style={styles.resultRoot}>
+        <View style={styles.resultCard}>
           <View style={styles.resultCopy}>
-            <ThemedText style={styles.resultEyebrow} lightColor={Lantern.auroraRose} darkColor={Lantern.auroraRose}>{lastPersonalBest || currentRunIsPersonalBest ? 'NEW PERSONAL BEST' : 'PARTY COMPLETE'}</ThemedText>
-            <ThemedText selectable style={styles.resultTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{lastPersonalBest || currentRunIsPersonalBest ? 'A new reason to celebrate' : 'The board is full'}</ThemedText>
-            <ThemedText selectable style={styles.resultBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Every placed piece added to the party. Start a fresh board or take your best score back to Cheerlet.</ThemedText>
+            <View style={styles.resultEyebrowPill}>
+              <IconSymbol name="sparkles" size={12} color="#C94F79" />
+              <ThemedText style={styles.resultEyebrow} lightColor="#C94F79" darkColor="#C94F79">{lastPersonalBest || currentRunIsPersonalBest ? 'NEW PERSONAL BEST' : 'BOARD FULL'}</ThemedText>
+            </View>
           </View>
-        </View>
-        <View style={styles.scoreStage}>
-          <ThemedText style={styles.finalScore} lightColor={lastPersonalBest || currentRunIsPersonalBest ? Lantern.auroraRose : Lantern.ember300} darkColor={lastPersonalBest || currentRunIsPersonalBest ? Lantern.auroraRose : Lantern.ember300}>{formatScore(game.score)}</ThemedText>
-          <ThemedText style={styles.finalLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>FINAL SCORE · BEST {formatScore(displayBest)}</ThemedText>
-          <View style={styles.statRow}>
-            <ResultStat label="LINES" value={game.linesCleared} />
-            <ResultStat label="PIECES" value={game.piecesPlaced} />
-            <ResultStat label="BEST COMBO" value={game.maxCombo} />
+          <View style={styles.scoreStage}>
+            <ThemedText style={styles.scoreStageLabel} lightColor="#9A6A48" darkColor="#9A6A48">FINAL SCORE</ThemedText>
+            <ThemedText style={styles.finalScore} lightColor={lastPersonalBest || currentRunIsPersonalBest ? '#C94F79' : '#5D351F'} darkColor={lastPersonalBest || currentRunIsPersonalBest ? '#C94F79' : '#5D351F'}>{formatScore(game.score)}</ThemedText>
+            <ThemedText style={styles.finalLabel} lightColor="#8A5A3A" darkColor="#8A5A3A">BEST · {formatScore(displayBest)}</ThemedText>
           </View>
         </View>
         <View style={styles.resultActions}>
-          <ExperienceAction label="New run" onPress={createRun} />
-          <ExperienceAction label="Finish with Cheerlet" quiet onPress={finish} />
+          <ResultAction label="New run" onPress={createRun} primary />
+          <ResultAction label="Finish with Cheerlet" onPress={finish} />
         </View>
       </Animated.View>
     );
@@ -364,19 +347,19 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
 
   return (
     <View style={styles.root}>
-      <View style={styles.topLine}>
-        <View style={styles.brandCorner}>
-          <ThemedText style={styles.kicker} lightColor={Lantern.auroraRose} darkColor={Lantern.auroraRose}>CHEERLET · BLOCK PARTY</ThemedText>
+      <View style={styles.topBar}>
+        <KatchimeraBackButton
+          accessibilityHint="Saves this run and returns to Cheerlet"
+          accessibilityLabel="Back"
+          onPress={saveAndLeave}
+        />
+        <View style={styles.topLine}>
+          <View style={styles.scoreCenter}>
+            <ThemedText style={styles.scoreLabel} lightColor="#8A5A3A" darkColor="#8A5A3A">SCORE</ThemedText>
+            <AnimatedScore reduceMotion={reduceMotion} value={game.score} />
+          </View>
         </View>
-        <View style={styles.scoreCenter}>
-          <ThemedText style={styles.scoreLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>SCORE</ThemedText>
-          <AnimatedScore reduceMotion={reduceMotion} value={game.score} />
-        </View>
-        <View style={styles.topActions}>
-          <Pressable accessibilityRole="button" accessibilityLabel={profile.soundEnabled ? 'Mute game sounds' : 'Turn on game sounds'} onPress={toggleSound} style={styles.iconButton}>
-            <IconSymbol name={profile.soundEnabled ? 'speaker.wave.2.fill' : 'speaker.slash.fill'} size={17} color={Lantern.moon300} />
-          </Pressable>
-        </View>
+        <View pointerEvents="none" style={styles.topBarBalance} />
       </View>
 
       {streakCallout ? (
@@ -392,7 +375,8 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
       ) : null}
 
       <View style={styles.boardFrame}>
-        <View ref={boardRef} onLayout={measureBoard}>
+        <View ref={boardRef} onLayout={measureBoard} style={styles.boardShell}>
+          <View pointerEvents="none" style={[styles.boardRim, { height: boardSize + 14, width: boardSize + 14 }]} />
           <BlockBlastBoard
             state={game}
             size={boardSize}
@@ -402,17 +386,6 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
             onCellPress={pressBoardCell}
           />
         </View>
-        {game.lastResolution?.scoreDelta ? (
-          <Animated.View key={game.lastResolution.id} entering={FadeInUp.duration(150).easing(CONTROLLED_EASE)} style={styles.scoreDelta}>
-            <ThemedText style={styles.scoreDeltaText} lightColor={game.lastResolution.perfectClear ? Lantern.ember300 : Lantern.auroraTeal} darkColor={game.lastResolution.perfectClear ? Lantern.ember300 : Lantern.auroraTeal}>+{game.lastResolution.scoreDelta}</ThemedText>
-          </Animated.View>
-        ) : null}
-        {game.status === 'lost' ? (
-          <Animated.View entering={FadeIn.duration(reduceMotion ? 60 : 180)} pointerEvents="none" style={[styles.noMovesOverlay, { height: boardSize, width: boardSize }]}>
-            <ThemedText style={styles.noMovesTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>No moves left</ThemedText>
-            <ThemedText style={styles.noMovesBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Counting the celebration…</ThemedText>
-          </Animated.View>
-        ) : null}
       </View>
 
       <View key={game.trayGeneration} style={styles.tray}>
@@ -438,9 +411,6 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
         ))}
       </View>
 
-      <Pressable accessibilityRole="button" onPress={saveAndLeave} style={({ pressed }) => [styles.leaveButton, pressed && styles.pressed]}>
-        <ThemedText style={styles.leaveText} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Save and leave</ThemedText>
-      </Pressable>
     </View>
   );
 }
@@ -484,7 +454,7 @@ function AnimatedScore({ value, reduceMotion }: { value: number; reduceMotion: b
     return () => cancelAnimationFrame(frame);
   }, [reduceMotion, value]);
 
-  return <ThemedText selectable style={styles.score} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{formatScore(displayValue)}</ThemedText>;
+  return <ThemedText selectable style={styles.score} lightColor="#5D351F" darkColor="#5D351F">{formatScore(displayValue)}</ThemedText>;
 }
 
 function streakColor(combo: number): string {
@@ -537,8 +507,13 @@ function StreakWordmark({ combo }: { combo: number }) {
   );
 }
 
-function ResultStat({ label, value }: { label: string; value: number }) {
-  return <View style={styles.stat}><ThemedText style={styles.statValue} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{formatScore(value)}</ThemedText><ThemedText style={styles.statLabel} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>{label}</ThemedText></View>;
+function ResultAction({ label, onPress, primary = false }: { label: string; onPress: () => void; primary?: boolean }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.resultAction, primary && styles.resultActionPrimary, pressed && styles.pressed]}>
+      <ThemedText style={styles.resultActionLabel} lightColor="#5D351F" darkColor="#5D351F">{label}</ThemedText>
+      <IconSymbol name={primary ? 'arrow.right' : 'heart.fill'} size={17} color={primary ? '#5D351F' : '#C94F79'} />
+    </Pressable>
+  );
 }
 
 function formatScore(value: number): string {
@@ -547,14 +522,12 @@ function formatScore(value: number): string {
 
 const styles = StyleSheet.create({
   root: { flex: 1, gap: 8, justifyContent: 'space-between', minHeight: 0, padding: 4 },
-  topLine: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', minHeight: 66, position: 'relative' },
-  brandCorner: { left: 2, maxWidth: 82, position: 'absolute' },
-  kicker: { fontSize: 8.5, fontWeight: '900', letterSpacing: 0.8, lineHeight: 11 },
+  topBar: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 58 },
+  topBarBalance: { height: 44, width: 44 },
+  topLine: { alignItems: 'center', backgroundColor: 'rgba(255,244,214,0.97)', borderColor: 'rgba(151,96,49,0.28)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, boxShadow: '0 6px 16px rgba(81,46,28,0.22), inset 0 2px 0 rgba(255,255,255,0.72)', justifyContent: 'center', minHeight: 56, minWidth: 158, paddingHorizontal: 24 },
   scoreCenter: { alignItems: 'center', justifyContent: 'center' },
-  scoreLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.4, lineHeight: 10 },
-  score: { fontSize: 42, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -1.25, lineHeight: 46, textAlign: 'center' },
-  topActions: { alignItems: 'center', flexDirection: 'row', position: 'absolute', right: 2 },
-  iconButton: { alignItems: 'center', borderColor: 'rgba(201,194,232,0.16)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 39, justifyContent: 'center', width: 42 },
+  scoreLabel: { fontSize: 8, fontWeight: '900', letterSpacing: 1.7, lineHeight: 9 },
+  score: { fontSize: 34, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -1, lineHeight: 38, textAlign: 'center' },
   streakOverlay: { alignItems: 'center', left: 0, position: 'absolute', right: 0, top: '36%', zIndex: 200 },
   streakWordmark: { alignItems: 'center', justifyContent: 'center', maxWidth: '94%' },
   streakDisplayText: { fontFamily: AppFontFamilies.fredokaBold, fontVariant: ['tabular-nums'], letterSpacing: 0.1, textAlign: 'center' },
@@ -563,42 +536,31 @@ const styles = StyleSheet.create({
   streakKeyline: { position: 'absolute', transform: [{ scaleX: 1.035 }, { scaleY: 1.075 }] },
   streakFace: { textShadowColor: 'rgba(255,255,255,0.72)', textShadowOffset: { width: 0, height: -2 }, textShadowRadius: 1.5 },
   boardFrame: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 0, position: 'relative' },
-  scoreDelta: { position: 'absolute', right: 14, top: 4 },
-  scoreDeltaText: { fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900' },
-  noMovesOverlay: { alignItems: 'center', backgroundColor: 'rgba(12,10,20,0.72)', borderCurve: 'continuous', borderRadius: 24, justifyContent: 'center', position: 'absolute' },
-  noMovesTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 29, lineHeight: 34 },
-  noMovesBody: { fontSize: 11.5, marginTop: 4 },
-  tray: { alignItems: 'center', backgroundColor: 'rgba(20,18,39,0.82)', borderColor: 'rgba(201,194,232,0.16)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 10px 24px rgba(6,5,17,0.26), inset 0 1px 0 rgba(255,255,255,0.035)', flexDirection: 'row', height: 90, justifyContent: 'space-between', overflow: 'visible', paddingHorizontal: 6, position: 'relative' },
-  traySheen: { backgroundColor: 'rgba(255,255,255,0.055)', borderRadius: 99, height: 1, left: 18, position: 'absolute', right: 18, top: 1 },
+  boardShell: { position: 'relative' },
+  boardRim: { backgroundColor: 'rgba(255,240,201,0.97)', borderColor: 'rgba(142,84,41,0.34)', borderCurve: 'continuous', borderRadius: 30, borderWidth: 1, boxShadow: '0 10px 24px rgba(74,41,24,0.28), inset 0 2px 0 rgba(255,255,255,0.75)', left: -7, position: 'absolute', top: -7 },
+  tray: { alignItems: 'center', backgroundColor: 'rgba(255,244,214,0.96)', borderColor: 'rgba(151,96,49,0.30)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 10px 24px rgba(74,41,24,0.24), inset 0 2px 0 rgba(255,255,255,0.74)', flexDirection: 'row', height: 90, justifyContent: 'space-between', marginBottom: 14, overflow: 'visible', paddingHorizontal: 6, position: 'relative' },
+  traySheen: { backgroundColor: 'rgba(255,255,255,0.7)', borderRadius: 99, height: 1, left: 18, position: 'absolute', right: 18, top: 1 },
   traySlot: { alignItems: 'center', flex: 1, height: 84, justifyContent: 'center', overflow: 'visible' },
   traySlotActive: { zIndex: 50 },
   traySlotUsed: { opacity: 0.48 },
-  usedDot: { backgroundColor: 'rgba(201,194,232,0.18)', borderRadius: 99, height: 5, width: 5 },
-  leaveButton: { alignItems: 'center', alignSelf: 'center', minHeight: 34, justifyContent: 'center', paddingHorizontal: 18 },
-  leaveText: { fontSize: 11.5, fontWeight: '800' },
+  usedDot: { backgroundColor: 'rgba(124,76,43,0.22)', borderRadius: 99, height: 5, width: 5 },
   pressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
-  previewControls: { alignItems: 'center' },
-  soundChoice: { alignItems: 'center', borderColor: 'rgba(201,194,232,0.15)', borderCurve: 'continuous', borderRadius: 13, borderWidth: 1, flexDirection: 'row', gap: 7, minHeight: 38, paddingHorizontal: 12 },
-  soundChoiceText: { fontSize: 11.5, fontWeight: '800' },
   previewMedia: { height: 128, position: 'relative', width: 144 },
   previewBoard: { backgroundColor: '#111326', borderColor: '#3B3B61', borderCurve: 'continuous', borderRadius: 15, borderWidth: 4, flexDirection: 'row', flexWrap: 'wrap', gap: 2, height: 94, left: 0, padding: 7, position: 'absolute', top: 15, transform: [{ rotate: '-5deg' }], width: 94 },
   previewCell: { backgroundColor: '#252846', borderRadius: 3, height: 13, width: 13 },
   previewCellFilled: { backgroundColor: '#F18AB7', borderColor: '#FFC2DA', borderWidth: 0.5 },
   previewCheerlet: { bottom: -4, height: 114, position: 'absolute', right: -18, width: 94 },
-  resultRoot: { flex: 1, gap: 18, justifyContent: 'space-between', minHeight: 0, padding: 4 },
-  resultHero: { alignItems: 'center', flexDirection: 'row', gap: 8, minHeight: 154 },
-  resultCreatureWrap: { height: 142, width: 122 },
-  resultCreature: { height: '100%', width: '100%' },
-  resultCopy: { flex: 1, gap: 7 },
+  resultRoot: { flex: 1, gap: 12, justifyContent: 'center', minHeight: 0, padding: 4 },
+  resultCard: { backgroundColor: 'rgba(255,244,214,0.97)', borderColor: 'rgba(151,96,49,0.30)', borderCurve: 'continuous', borderRadius: 28, borderWidth: 1, boxShadow: '0 14px 32px rgba(73,40,23,0.28), inset 0 2px 0 rgba(255,255,255,0.76)', gap: 16, padding: 18 },
+  resultCopy: { alignItems: 'center', paddingHorizontal: 8 },
+  resultEyebrowPill: { alignItems: 'center', backgroundColor: 'rgba(244,154,193,0.14)', borderRadius: 999, flexDirection: 'row', gap: 5, paddingHorizontal: 10, paddingVertical: 5 },
   resultEyebrow: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.95 },
-  resultTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 27, letterSpacing: -0.2, lineHeight: 31 },
-  resultBody: { fontSize: 12, lineHeight: 17 },
-  scoreStage: { alignItems: 'center', backgroundColor: 'rgba(244,154,193,0.055)', borderColor: 'rgba(244,154,193,0.15)', borderCurve: 'continuous', borderRadius: 25, borderWidth: 1, gap: 5, justifyContent: 'center', minHeight: 210, padding: 20 },
-  finalScore: { fontSize: 48, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: -1.4, lineHeight: 54 },
-  finalLabel: { fontSize: 9, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.7 },
-  statRow: { borderColor: 'rgba(201,194,232,0.11)', borderTopWidth: 1, flexDirection: 'row', marginTop: 14, paddingTop: 14, width: '100%' },
-  stat: { alignItems: 'center', flex: 1, gap: 2 },
-  statValue: { fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900' },
-  statLabel: { fontSize: 7.5, fontWeight: '900', letterSpacing: 0.65 },
+  scoreStage: { alignItems: 'center', backgroundColor: '#FFE9B9', borderColor: 'rgba(151,96,49,0.26)', borderCurve: 'continuous', borderRadius: 23, borderWidth: 1, boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.62)', gap: 3, justifyContent: 'center', padding: 14 },
+  scoreStageLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.25 },
+  finalScore: { fontFamily: AppFontFamilies.fredokaBold, fontSize: 52, fontVariant: ['tabular-nums'], letterSpacing: -1.4, lineHeight: 57 },
+  finalLabel: { fontSize: 9, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.65 },
   resultActions: { gap: 8 },
+  resultAction: { alignItems: 'center', backgroundColor: 'rgba(255,244,214,0.94)', borderColor: 'rgba(151,96,49,0.28)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 10, justifyContent: 'center', minHeight: 54, paddingHorizontal: 18 },
+  resultActionPrimary: { backgroundColor: '#FFC875', borderColor: 'rgba(142,84,41,0.32)', boxShadow: '0 8px 18px rgba(74,41,24,0.20), inset 0 2px 0 rgba(255,255,255,0.45)' },
+  resultActionLabel: { fontSize: 15, fontWeight: '900' },
 });

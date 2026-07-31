@@ -57,8 +57,6 @@ export function MossproutMemoryGardenScreen({
       <ScreenCloseButton
         align="left"
         onPress={onClose}
-        style={styles.closeButton}
-        tint={GARDEN_INK}
         variant="back"
       />
 
@@ -135,11 +133,6 @@ const styles = StyleSheet.create({
   root: { backgroundColor: 'transparent', flex: 1 },
   mossScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(10, 21, 13, 0.48)' },
   safeContent: { alignSelf: 'center', flex: 1, gap: 10, maxWidth: 620, width: '100%' },
-  closeButton: {
-    backgroundColor: 'rgba(255, 241, 206, 0.96)',
-    borderColor: 'rgba(123, 86, 39, 0.72)',
-    boxShadow: '0 4px 12px rgba(20, 35, 17, 0.34), inset 0 1px 0 rgba(255,255,255,0.72)',
-  },
   header: { alignItems: 'center', gap: 10, paddingHorizontal: 8 },
   titleRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'center' },
   title: { fontSize: 20, fontWeight: '900', letterSpacing: 0.7, lineHeight: 25, textTransform: 'uppercase' },
