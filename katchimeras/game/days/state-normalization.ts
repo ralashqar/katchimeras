@@ -4,6 +4,7 @@ import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { pruneRejectedDerivedMoments } from '@/utils/intelligence/classification-policy';
 import { CLASSIFIED_MEMORY_SCHEMA_VERSION, recalibrateClassifiedMemory, repairUrbanPhotoCentrality } from '@/utils/intelligence/classification';
 import { normalizeFoodEmoji } from '@/utils/food-detect';
+import { repairGeneratedHatchCheckInAnchor } from '@/utils/hatch-check-in';
 import { updateCardMemorySpark } from '@/utils/daily-card';
 import { reconcileDaySkySnapshot } from '@/utils/day-sky';
 import { deriveIdentityHistories } from '@/utils/katchimera-identity';
@@ -130,9 +131,10 @@ function updateStoredDayDerivedFields(
     (current, memory) => pruneRejectedDerivedMoments(current, memory),
     emojiNormalizedDay
   );
-  const dayWithCard = prunedDay.card && prunedDay.creature
-    ? { ...prunedDay, card: updateCardMemorySpark(prunedDay.card, prunedDay, prunedDay.creature) }
-    : prunedDay;
+  const repairedDay = repairGeneratedHatchCheckInAnchor(prunedDay);
+  const dayWithCard = repairedDay.card && repairedDay.creature
+    ? { ...repairedDay, card: updateCardMemorySpark(repairedDay.card, repairedDay, repairedDay.creature) }
+    : repairedDay;
   const day = reconcileDaySkySnapshot(dayWithCard);
   const signature = dayInputSignature(day);
 

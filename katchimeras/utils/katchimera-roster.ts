@@ -144,3 +144,55 @@ export function featuredKatchimera(
       || left.name.localeCompare(right.name)
     ))[0] ?? null;
 }
+
+export function katchimeraRosterItemId(item: KatchimeraRosterItem): string {
+  return item.kind === 'owned' ? item.creatureId : `locked-${item.familyId}`;
+}
+
+/** Retains item and array identities when a focus refresh did not change their UI. */
+export function reconcileKatchimeraRoster(
+  previous: readonly KatchimeraRosterItem[],
+  next: readonly KatchimeraRosterItem[],
+): KatchimeraRosterItem[] {
+  if (previous.length === 0) return [...next];
+  const previousById = new Map(previous.map((item) => [katchimeraRosterItemId(item), item]));
+  let changed = previous.length !== next.length;
+  const reconciled = next.map((item, index) => {
+    const prior = previousById.get(katchimeraRosterItemId(item));
+    const stableItem = prior && rosterItemsEqual(prior, item) ? prior : item;
+    if (stableItem !== previous[index]) changed = true;
+    return stableItem;
+  });
+  return changed ? reconciled : previous as KatchimeraRosterItem[];
+}
+
+function rosterItemsEqual(left: KatchimeraRosterItem, right: KatchimeraRosterItem): boolean {
+  if (left.kind !== right.kind) return false;
+  if (left.kind === 'locked' && right.kind === 'locked') {
+    return left.familyId === right.familyId
+      && left.aspectId === right.aspectId
+      && left.silhouetteVisualKey === right.silhouetteVisualKey;
+  }
+  if (left.kind !== 'owned' || right.kind !== 'owned') return false;
+  return left.creatureId === right.creatureId
+    && left.familyId === right.familyId
+    && left.name === right.name
+    && left.visualKey === right.visualKey
+    && left.aspectId === right.aspectId
+    && left.rarity === right.rarity
+    && left.accentColor === right.accentColor
+    && left.houseLevel === right.houseLevel
+    && left.hatchCount === right.hatchCount
+    && left.arrivedAt === right.arrivedAt
+    && left.status === right.status
+    && left.bond.level === right.bond.level
+    && left.bond.label === right.bond.label
+    && left.bond.totalPoints === right.bond.totalPoints
+    && left.bond.segmentPoints === right.bond.segmentPoints
+    && left.bond.segmentTarget === right.bond.segmentTarget
+    && left.bond.ratio === right.bond.ratio
+    && left.bond.nextLevel === right.bond.nextLevel
+    && left.bond.nextLabel === right.bond.nextLabel
+    && left.bond.pointsRemaining === right.bond.pointsRemaining
+    && left.bond.isMax === right.bond.isMax;
+}

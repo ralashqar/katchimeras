@@ -1,7 +1,6 @@
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { KatchimeraRosterScreen } from '@/components/katchadeck/roster/katchimera-roster-screen';
 import { useAllDays } from '@/hooks/use-all-days';
@@ -12,7 +11,11 @@ import { loadCompanionBondState } from '@/utils/companion-bond-storage';
 import { todayAtmosphereBackgroundForDay } from '@/utils/day-background-scene';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests, questFor } from '@/utils/katchimera-quests';
-import { buildKatchimeraRoster } from '@/utils/katchimera-roster';
+import {
+  buildKatchimeraRoster,
+  reconcileKatchimeraRoster,
+  type KatchimeraRosterItem,
+} from '@/utils/katchimera-roster';
 import { markFlowStart } from '@/utils/flow-performance';
 import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
 import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
@@ -35,6 +38,23 @@ function loadRosterPersistentState() {
   };
 }
 
+type RosterPersistentState = ReturnType<typeof loadRosterPersistentState>;
+
+function rosterPersistentFingerprint(state: RosterPersistentState): string {
+  const activeQuestOwners = state.quests.quests
+    .filter((quest) => !quest.completedAt)
+    .map((quest) => quest.creatureId)
+    .sort();
+  const equippedSkins = Object.entries(state.wardrobe.equippedByFamily)
+    .sort(([left], [right]) => left.localeCompare(right));
+  return JSON.stringify([state.bond.events, activeQuestOwners, equippedSkins]);
+}
+
+function loadRosterPersistentSnapshot() {
+  const state = loadRosterPersistentState();
+  return { fingerprint: rosterPersistentFingerprint(state), state };
+}
+
 /**
  * The tab owns only the collection read model. Companion, journey, discovery,
  * journal, and mini-game controllers mount on their dedicated routes.
@@ -42,17 +62,30 @@ function loadRosterPersistentState() {
 export function KatchimeraRosterRouteScreen() {
   const isFocused = useIsFocused();
 
-  return isFocused ? <FocusedKatchimeraRoster /> : <View style={{ flex: 1, backgroundColor: '#171A12' }} />;
+  // Release the FlashList cell pool and its animated/image views while a
+  // companion or mini-game owns the screen. A fresh mount gives every return
+  // one clean entrance animation without keeping the roster alive underneath.
+  return isFocused ? <FocusedKatchimeraRoster /> : null;
 }
 
 function FocusedKatchimeraRoster() {
   const router = useRouter();
   const { days } = useAllDays();
-  const [persistent, setPersistent] = useState(loadRosterPersistentState);
+  const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
+  const hasCompletedInitialFocus = useRef(false);
+  const previousItems = useRef<readonly KatchimeraRosterItem[]>([]);
+  const persistent = persistentSnapshot.state;
 
   useFocusEffect(
     useCallback(() => {
-      setPersistent(loadRosterPersistentState());
+      if (!hasCompletedInitialFocus.current) {
+        hasCompletedInitialFocus.current = true;
+        return;
+      }
+      const next = loadRosterPersistentSnapshot();
+      setPersistentSnapshot((current) => (
+        current.fingerprint === next.fingerprint ? current : next
+      ));
     }, []),
   );
 
@@ -84,15 +117,17 @@ function FocusedKatchimeraRoster() {
     (creatureId: string) => companionBondProgress(persistent.bond, creatureId),
     [persistent.bond],
   );
-  const items = useMemo(
-    () => buildKatchimeraRoster({
+  const items = useMemo(() => {
+    const next = buildKatchimeraRoster({
       creatures: kingdom.creatures,
       residents,
       bondForCreature,
       statusByCreatureId,
-    }),
-    [bondForCreature, kingdom.creatures, residents, statusByCreatureId],
-  );
+    });
+    const reconciled = reconcileKatchimeraRoster(previousItems.current, next);
+    previousItems.current = reconciled;
+    return reconciled;
+  }, [bondForCreature, kingdom.creatures, residents, statusByCreatureId]);
   const openCreature = useCallback((creatureId: string) => {
     markFlowStart('katchimera-companion');
     router.push({ pathname: '/katchimera/[creatureId]', params: { creatureId } });

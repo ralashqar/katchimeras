@@ -1,8 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
-import { useCallback, useMemo, useState } from 'react';
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -25,6 +25,7 @@ import { resolveCreatureArtSource } from '@/utils/creature-art';
 import {
   featuredKatchimera,
   filterAndSortKatchimeraRoster,
+  katchimeraRosterItemId,
   type KatchimeraRosterItem,
   type KatchimeraRosterSort,
 } from '@/utils/katchimera-roster';
@@ -32,9 +33,21 @@ import {
 type RosterListItem =
   | { type: 'hero'; id: 'hero' }
   | { type: 'filters'; id: 'filters' }
-  | { type: 'card'; id: string; item: KatchimeraRosterItem; index: number };
+  | { type: 'card'; id: string; item: KatchimeraRosterItem };
 
-export function KatchimeraRosterScreen({
+const ROSTER_STICKY_HEADER_INDICES = [1];
+const ROSTER_MAINTAIN_VISIBLE_POSITION = { disabled: true } as const;
+
+function rosterListKey(item: RosterListItem): string {
+  return item.id;
+}
+
+function rosterListItemType(item: RosterListItem): string {
+  if (item.type !== 'card') return item.type;
+  return item.item.kind === 'owned' ? 'card-owned' : 'card-locked';
+}
+
+function KatchimeraRosterScreenComponent({
   background,
   items,
   onGoToday,
@@ -46,14 +59,18 @@ export function KatchimeraRosterScreen({
   onSelectCreature: (creatureId: string) => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+  const listRef = useRef<FlashListRef<RosterListItem>>(null);
   const [selectedAspect, setSelectedAspect] = useState<LifeAspectId | 'all'>('all');
   const [sort, setSort] = useState<KatchimeraRosterSort>('bond');
   const [sortOpen, setSortOpen] = useState(false);
+  const [introActive, setIntroActive] = useState(() => !reduceMotion);
   const columnCount = width >= 390 ? 3 : 2;
+  const introCardLimit = columnCount * 2;
   const horizontalPadding = 14;
   const gap = 9;
+  const drawDistance = Math.min(360, Math.max(240, height * 0.4));
   const cardWidth = (
     width
     - horizontalPadding * 2
@@ -73,13 +90,29 @@ export function KatchimeraRosterScreen({
   const listItems = useMemo<RosterListItem[]>(() => [
     { type: 'hero', id: 'hero' },
     { type: 'filters', id: 'filters' },
-    ...visibleItems.map((item, index) => ({
+    ...visibleItems.map((item) => ({
       type: 'card' as const,
-      id: item.kind === 'owned' ? item.creatureId : `locked-${item.familyId}`,
+      id: katchimeraRosterItemId(item),
       item,
-      index,
     })),
   ], [visibleItems]);
+
+  const contentContainerStyle = useMemo(() => ({
+    paddingBottom: insets.bottom + 112,
+    paddingHorizontal: horizontalPadding,
+  }), [insets.bottom]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setIntroActive(false);
+      return;
+    }
+    if (!introActive) return;
+    const timeout = setTimeout(() => {
+      setIntroActive(false);
+    }, 480);
+    return () => clearTimeout(timeout);
+  }, [introActive, reduceMotion]);
 
   const selectCreature = useCallback((creatureId: string) => {
     if (process.env.EXPO_OS === 'ios') {
@@ -87,14 +120,38 @@ export function KatchimeraRosterScreen({
     }
     onSelectCreature(creatureId);
   }, [onSelectCreature]);
-  const renderItem = useCallback(({ item }: ListRenderItemInfo<RosterListItem>) => {
+  const scrollToGridStart = useCallback(() => {
+    requestAnimationFrame(() => {
+      void listRef.current?.scrollToIndex({ animated: false, index: 1 }).catch(() => undefined);
+    });
+  }, []);
+  const changeAspect = useCallback((aspect: LifeAspectId | 'all') => {
+    setSelectedAspect(aspect);
+    setSortOpen(false);
+    scrollToGridStart();
+  }, [scrollToGridStart]);
+  const changeSort = useCallback((nextSort: KatchimeraRosterSort) => {
+    setSort(nextSort);
+    setSortOpen(false);
+    scrollToGridStart();
+  }, [scrollToGridStart]);
+  const toggleSort = useCallback(() => setSortOpen((current) => !current), []);
+  const handleLoad = useCallback(({ elapsedTimeInMs }: { elapsedTimeInMs: number }) => {
+    if (__DEV__ && process.env.EXPO_PUBLIC_SCENE_PERF === '1') {
+      console.info('[roster-perf] initial-grid', { readyMs: Math.round(elapsedTimeInMs * 10) / 10 });
+    }
+  }, []);
+  const renderItem = useCallback(({ index, item, target }: ListRenderItemInfo<RosterListItem>) => {
+    const renderArtwork = target === 'Cell';
     if (item.type === 'hero') {
       return (
         <View style={styles.fullBleedItem}>
           <RosterHero
+            animateEntrance={introActive && renderArtwork}
             featured={featured}
             onGoToday={onGoToday}
             reduceMotion={reduceMotion}
+            renderArtwork={renderArtwork}
             safeTop={insets.top}
           />
         </View>
@@ -106,15 +163,9 @@ export function KatchimeraRosterScreen({
           <KatchimeraRosterFilters
             aspectIds={availableAspects}
             count={visibleItems.length}
-            onAspectChange={(aspect) => {
-              setSelectedAspect(aspect);
-              setSortOpen(false);
-            }}
-            onSortChange={(nextSort) => {
-              setSort(nextSort);
-              setSortOpen(false);
-            }}
-            onToggleSort={() => setSortOpen((current) => !current)}
+            onAspectChange={changeAspect}
+            onSortChange={changeSort}
+            onToggleSort={toggleSort}
             selectedAspect={selectedAspect}
             sort={sort}
             sortOpen={sortOpen}
@@ -125,10 +176,13 @@ export function KatchimeraRosterScreen({
     return (
       <View style={styles.cardCell}>
         <KatchimeraRosterCard
+          animateEntrance={introActive && renderArtwork && index - 2 < introCardLimit}
+          entranceIndex={Math.max(0, index - 2)}
           featured={item.item.kind === 'owned' && item.item.creatureId === featured?.creatureId}
-          index={item.index}
           item={item.item}
           onPress={selectCreature}
+          reduceMotion={reduceMotion}
+          renderArtwork={renderArtwork}
           width={cardWidth}
         />
       </View>
@@ -136,14 +190,19 @@ export function KatchimeraRosterScreen({
   }, [
     availableAspects,
     cardWidth,
+    changeAspect,
+    changeSort,
     featured,
     insets.top,
+    introActive,
+    introCardLimit,
     onGoToday,
     reduceMotion,
     selectCreature,
     selectedAspect,
     sort,
     sortOpen,
+    toggleSort,
     visibleItems.length,
   ]);
   const overrideItemLayout = useCallback((layout: { span?: number }, item: RosterListItem) => {
@@ -164,38 +223,47 @@ export function KatchimeraRosterScreen({
         style={StyleSheet.absoluteFill}
       />
       <FlashList<RosterListItem>
-        contentContainerStyle={{ paddingBottom: insets.bottom + 112, paddingHorizontal: horizontalPadding }}
-        key={`roster-${columnCount}`}
-        keyExtractor={(item) => item.id}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={contentContainerStyle}
         data={listItems}
-        drawDistance={640}
-        getItemType={(item) => item.type}
+        drawDistance={drawDistance}
+        getItemType={rosterListItemType}
+        key={`roster-${columnCount}`}
+        keyExtractor={rosterListKey}
+        keyboardShouldPersistTaps="handled"
+        maintainVisibleContentPosition={ROSTER_MAINTAIN_VISIBLE_POSITION}
         numColumns={columnCount}
+        onLoad={handleLoad}
         overrideItemLayout={overrideItemLayout}
+        ref={listRef}
         renderItem={renderItem}
         style={styles.list}
-        stickyHeaderIndices={[1]}
+        stickyHeaderIndices={ROSTER_STICKY_HEADER_INDICES}
         showsVerticalScrollIndicator={false}
       />
     </View>
   );
 }
 
+export const KatchimeraRosterScreen = memo(KatchimeraRosterScreenComponent);
+
 function RosterHero({
+  animateEntrance,
   featured,
   onGoToday,
   reduceMotion,
+  renderArtwork,
   safeTop,
 }: {
+  animateEntrance: boolean;
   featured: ReturnType<typeof featuredKatchimera>;
   onGoToday: () => void;
   reduceMotion: boolean;
+  renderArtwork: boolean;
   safeTop: number;
 }) {
   return (
     <View style={[styles.hero, { paddingTop: safeTop + 20 }]}>
-      <Animated.View entering={reduceMotion ? undefined : FadeIn.duration(300)} style={styles.heroCopy}>
+      <Animated.View entering={reduceMotion || !animateEntrance ? undefined : FadeIn.duration(300)} style={styles.heroCopy}>
         <ThemedText selectable style={styles.heroEyebrow} lightColor="#F0D67A" darkColor="#F0D67A">
           YOUR
         </ThemedText>
@@ -228,21 +296,22 @@ function RosterHero({
           </Pressable>
         )}
       </Animated.View>
-      {featured ? (
-        <Animated.View
-          entering={reduceMotion ? undefined : FadeInRight.duration(360)}
-          pointerEvents="none"
-          style={styles.heroArt}>
-          <Image
-            accessibilityLabel={`${featured.name}, your closest companion`}
-            cachePolicy="memory-disk"
-            contentFit="contain"
-            source={resolveCreatureArtSource(featured.visualKey, { lod: 'medium' })}
-            style={StyleSheet.absoluteFill}
-            transition={reduceMotion ? 0 : 180}
-          />
-        </Animated.View>
-      ) : (
+      {featured ? renderArtwork ? (
+          <Animated.View
+            entering={reduceMotion || !animateEntrance ? undefined : FadeInRight.duration(360)}
+            pointerEvents="none"
+            style={styles.heroArt}>
+            <Image
+              accessibilityLabel={`${featured.name}, your closest companion`}
+              cachePolicy="memory-disk"
+              contentFit="contain"
+              recyclingKey={`roster-hero:${featured.creatureId}:${featured.visualKey}`}
+              source={resolveCreatureArtSource(featured.visualKey, { lod: 'medium' })}
+              style={StyleSheet.absoluteFill}
+              transition={0}
+            />
+          </Animated.View>
+        ) : null : (
         <View pointerEvents="none" style={styles.emptyArt}>
           <IconSymbol name="sparkles" size={66} color="rgba(240,214,122,0.72)" />
         </View>

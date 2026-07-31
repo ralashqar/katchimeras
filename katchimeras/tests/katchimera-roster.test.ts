@@ -10,6 +10,7 @@ import {
   buildKatchimeraRoster,
   featuredKatchimera,
   filterAndSortKatchimeraRoster,
+  reconcileKatchimeraRoster,
   type KatchimeraOwnedRosterItem,
 } from '@/utils/katchimera-roster';
 
@@ -132,6 +133,30 @@ test('the highest-bond owned companion is featured', () => {
   assert.equal(featuredKatchimera(roster)?.familyId, 'steppling');
 });
 
+test('roster reconciliation preserves unchanged card identities and replaces only changed cards', () => {
+  const rebuilt = roster.map((item) => item.kind === 'owned'
+    ? { ...item, bond: { ...item.bond } }
+    : { ...item });
+  const unchanged = reconcileKatchimeraRoster(roster, rebuilt);
+  assert.equal(unchanged, roster);
+  assert.equal(unchanged.every((item, index) => item === roster[index]), true);
+
+  const changedCreatureId = roster.find((item) => item.kind === 'owned')?.creatureId;
+  const changedInput = rebuilt.map((item) => item.kind === 'owned' && item.creatureId === changedCreatureId
+    ? { ...item, bond: { ...item.bond, totalPoints: item.bond.totalPoints + 10 } }
+    : item);
+  const changed = reconcileKatchimeraRoster(roster, changedInput);
+  assert.notEqual(changed, roster);
+  for (let index = 0; index < changed.length; index += 1) {
+    const item = changed[index];
+    if (item.kind === 'owned' && item.creatureId === changedCreatureId) {
+      assert.notEqual(item, roster[index]);
+    } else {
+      assert.equal(item, roster[index]);
+    }
+  }
+});
+
 test('the bottom bar exposes Katchimeras while retaining the hidden world route', () => {
   const layout = fs.readFileSync(
     path.join(process.cwd(), 'app', '(tabs)', '_layout.tsx'),
@@ -155,6 +180,14 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
     path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-screen.tsx'),
     'utf8',
   );
+  const rosterRoute = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx'),
+    'utf8',
+  );
+  const rosterCard = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-card.tsx'),
+    'utf8',
+  );
   const gameRoute = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-route-screen.tsx'),
     'utf8',
@@ -164,6 +197,16 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.doesNotMatch(tabRoute, /KingdomCompanionScreen/);
   assert.match(rosterScreen, /FlashList/);
   assert.doesNotMatch(rosterScreen, /SectionList/);
+  assert.match(rosterScreen, /target === 'Cell'/);
+  assert.match(rosterScreen, /Math\.min\(360, Math\.max\(240, height \* 0\.4\)\)/);
+  assert.doesNotMatch(rosterScreen, /rosterIntroCompleted/);
+  assert.match(rosterScreen, /useState\(\(\) => !reduceMotion\)/);
+  assert.match(rosterCard, /recyclingKey=\{artworkKey\}/);
+  assert.match(rosterCard, /transition=\{0\}/);
+  assert.doesNotMatch(rosterCard, /useReducedMotion/);
+  assert.match(rosterRoute, /hasCompletedInitialFocus/);
+  assert.match(rosterRoute, /useIsFocused/);
+  assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRoster \/> : null/);
   assert.match(gameRoute, /BlockBlastQuest/);
   assert.match(gameRoute, /cheerlet-exploration-v1\.png/);
   assert.match(gameRoute, /AmbientEnvironmentDrift/);

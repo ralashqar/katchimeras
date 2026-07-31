@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   FadeInUp,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -38,26 +37,36 @@ const STATUS_ICONS: Record<NonNullable<KatchimeraOwnedRosterItem['status']>, Ico
 };
 
 function KatchimeraRosterCardComponent({
+  animateEntrance,
+  entranceIndex,
   featured,
-  index,
   item,
   onPress,
+  reduceMotion,
+  renderArtwork,
   width,
 }: {
+  animateEntrance: boolean;
+  entranceIndex: number;
   featured: boolean;
-  index: number;
   item: KatchimeraRosterItem;
   onPress: (creatureId: string) => void;
+  reduceMotion: boolean;
+  renderArtwork: boolean;
   width: number;
 }) {
-  const reduceMotion = useReducedMotion();
   const pressScale = useSharedValue(1);
   const cardHeight = Math.min(214, Math.max(166, width * 1.46));
   const aspect = lifeAspectById.get(item.aspectId);
   const icon = CATEGORY_ICONS[aspect?.category ?? ''] ?? 'sparkles';
-  const artwork = item.kind === 'owned'
-    ? resolveCreatureArtSource(item.visualKey, { lod: 'thumb' })
-    : resolveCreatureArtSource(item.silhouetteVisualKey, { lod: 'thumb' });
+  const artwork = renderArtwork
+    ? item.kind === 'owned'
+      ? resolveCreatureArtSource(item.visualKey, { lod: 'thumb' })
+      : resolveCreatureArtSource(item.silhouetteVisualKey, { lod: 'thumb' })
+    : null;
+  const artworkKey = item.kind === 'owned'
+    ? `${item.creatureId}:${item.visualKey}`
+    : `locked:${item.familyId}:${item.silhouetteVisualKey}`;
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pressScale.value }],
   }));
@@ -69,9 +78,12 @@ function KatchimeraRosterCardComponent({
         : 'Undiscovered Katchimera. Hatch more days to meet this companion.'}
       accessibilityRole="button"
       disabled={item.kind === 'locked'}
-      entering={reduceMotion || index >= 12
+      entering={reduceMotion || !animateEntrance
         ? undefined
-        : FadeInUp.duration(280).delay(Math.min(index * 34, 238))}
+        : FadeInUp
+            .duration(220)
+            .delay(Math.min(entranceIndex * 24, 120))
+            .withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] })}
       onPress={() => {
         if (item.kind === 'owned') onPress(item.creatureId);
       }}
@@ -115,15 +127,18 @@ function KatchimeraRosterCardComponent({
       </View>
 
       <View pointerEvents="none" style={styles.artStage}>
-        <Image
-          accessibilityLabel=""
-          cachePolicy="memory-disk"
-          contentFit="contain"
-          source={artwork}
-          style={styles.art}
-          tintColor={item.kind === 'locked' ? '#191815' : undefined}
-          transition={reduceMotion ? 0 : 140}
-        />
+        {artwork ? (
+          <Image
+            accessibilityLabel=""
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            recyclingKey={artworkKey}
+            source={artwork}
+            style={styles.art}
+            tintColor={item.kind === 'locked' ? '#191815' : undefined}
+            transition={0}
+          />
+        ) : null}
         {item.kind === 'locked' ? (
           <View style={styles.questionBadge}>
             <ThemedText style={styles.question} lightColor="#EEDFB9" darkColor="#EEDFB9">?</ThemedText>

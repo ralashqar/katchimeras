@@ -237,9 +237,14 @@ export function hatchCheckInEvidenceLine(day: StoredHomeDayRecord): string | nul
 
 export function hatchReflectionMoments(day: StoredHomeDayRecord): HatchReflectionMoment[] {
   const canonical = day.journalRecords ?? [];
-  const manual = canonical.length === 0 ? (day.manualJournalEntries ?? []) : [];
-  const records = canonical.map(momentFromJournalRecord).concat(manual.map(momentFromManualEntry));
-  if (records.length > 0) return uniqueMoments(records).slice(0, 6);
+  if (canonical.length > 0) {
+    const records = canonical
+      .filter(isHatchReflectionJournalRecord)
+      .map(momentFromJournalRecord);
+    return uniqueMoments(records).slice(0, 6);
+  }
+  const manual = day.manualJournalEntries ?? [];
+  if (manual.length > 0) return uniqueMoments(manual.map(momentFromManualEntry)).slice(0, 6);
   const legacy: HatchReflectionMoment[] = [];
   for (const item of day.bigMoments ?? []) legacy.push(momentChoice(`big:${item.id}`, item.label, 'big_event', item.type, 'sparkles'));
   for (const item of day.confirmedPlaces ?? []) legacy.push(momentChoice(`place:${item.id}`, item.label, 'went_somewhere', null, 'mappin.and.ellipse'));
@@ -248,6 +253,52 @@ export function hatchReflectionMoments(day: StoredHomeDayRecord): HatchReflectio
   for (const item of day.notes ?? []) legacy.push(momentChoice(`note:${item.id}`, item.label || 'A note', 'general', null, 'note.text'));
   if (day.stepsInterpretation) legacy.push(momentChoice('movement:steps', day.stepsInterpretation.label, 'movement', day.stepsInterpretation.movement, 'figure.walk'));
   return uniqueMoments(legacy).slice(0, 6);
+}
+
+export function repairGeneratedHatchCheckInAnchor(day: StoredHomeDayRecord): StoredHomeDayRecord {
+  const checkIn = day.hatchCheckIn;
+  if (!checkIn || checkIn.status !== 'in_progress' || checkIn.mode !== 'reflect' || !checkIn.anchorId) return day;
+  if (hatchReflectionMoments(day).some((moment) => moment.id === checkIn.anchorId)) return day;
+
+  const dayWithoutCheckIn = { ...day, hatchCheckIn: undefined };
+  const eligibilityReason = hatchCheckInEligibility(dayWithoutCheckIn) ?? 'empty';
+  const plan = buildHatchCheckInPlan(dayWithoutCheckIn, eligibilityReason);
+  const anchor = plan.anchor;
+  return {
+    ...day,
+    hatchCheckIn: {
+      ...checkIn,
+      planVersion: 2,
+      mode: plan.mode,
+      questionPlan: plan.questionPlan,
+      answeredQuestionIds: [],
+      eligibilityReason,
+      moodId: null,
+      moodLabel: null,
+      flowId: anchor?.flowId ?? null,
+      flowLabel: anchor ? HATCH_CHECK_IN_FLOWS.find((item) => item.id === anchor.flowId)?.label ?? null : null,
+      categoryId: anchor?.categoryId ?? null,
+      categoryLabel: anchor?.categoryId
+        ? hatchCheckInDetailChoices(anchor.flowId).find((item) => item.id === anchor.categoryId)?.label ?? null
+        : null,
+      anchorId: anchor?.id ?? null,
+      anchorLabel: anchor?.label ?? null,
+      meaningId: null,
+      meaningLabel: null,
+      semanticTags: [],
+      scoreBias: {},
+      encounterSeedBias: [],
+    },
+  };
+}
+
+function isHatchReflectionJournalRecord(record: JournalRecord): boolean {
+  const source = record.source;
+  if (source?.kind !== 'text_note' && source?.kind !== 'voice_note') return true;
+  const origin = source.origin;
+  if (origin?.kind === 'quick_goal_completion') return false;
+  if (origin?.kind === 'companion_reflection' && origin.checkInId) return false;
+  return true;
 }
 
 export function resolveHatchCheckInSignals(input: Pick<HatchCheckIn, 'flowId' | 'categoryId' | 'meaningId'>) {
@@ -316,7 +367,7 @@ function uniqueMoments(items: HatchReflectionMoment[]): HatchReflectionMoment[] 
   });
 }
 
-function meaningChoices(accent: string, items: Array<[string, string, IconSymbolName]>): HatchCheckInChoice[] {
+function meaningChoices(accent: string, items: [string, string, IconSymbolName][]): HatchCheckInChoice[] {
   return items.map(([id, label, icon]) => ({ id, label, icon, accent }));
 }
 

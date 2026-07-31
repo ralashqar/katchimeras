@@ -11,6 +11,7 @@ import {
   currentHatchCheckInQuestion,
   hatchCheckInEligibility,
   rankedHatchCheckInFlows,
+  repairGeneratedHatchCheckInAnchor,
 } from '@/utils/hatch-check-in';
 import { buildMomentTimeline } from '@/utils/moment-timeline';
 
@@ -25,7 +26,52 @@ function day(): StoredHomeDayRecord {
 }
 
 function journal(id: string, flowId: string, categoryId: string, specific: string): JournalRecord {
-  return { id, flowId, categoryId, fields: { specific }, createdAt: now.toISOString() } as unknown as JournalRecord;
+  return {
+    id,
+    source: { kind: 'manual', sourceId: id },
+    flowId,
+    categoryId,
+    fields: { specific },
+    createdAt: now.toISOString(),
+  } as unknown as JournalRecord;
+}
+
+function companionCheckInJournal(id: string): JournalRecord {
+  return {
+    ...journal(id, 'general', 'other', 'I spent time reading or learning. It supported what I want. Next: Build on it with one small step.'),
+    source: {
+      kind: 'text_note',
+      sourceId: `companion-reflection:tasklet:${day().isoDate}`,
+      origin: {
+        kind: 'companion_reflection',
+        creatureId: 'companion:tasklet',
+        familyId: 'tasklet',
+        goalId: 'goal:study',
+        checkInId: 'journey-check-in:companion:tasklet:2026-07-20',
+        answerIds: ['moment:read', 'effect:supported', 'next:build'],
+        promptId: 'companion-check-in:tasklet',
+        promptText: 'Three-question companion check-in',
+      },
+    },
+  } as JournalRecord;
+}
+
+function quickGoalJournal(id: string): JournalRecord {
+  return {
+    ...journal(id, 'work', 'learning', 'Study for an exam'),
+    source: {
+      kind: 'text_note',
+      sourceId: `quick-goal-completion:goal:study:${day().isoDate}`,
+      origin: {
+        kind: 'quick_goal_completion',
+        creatureId: 'tasklet',
+        familyId: 'tasklet',
+        goalId: 'goal:study',
+        completionId: 'completion:study',
+        goalTitle: 'Study for an exam',
+      },
+    },
+  } as JournalRecord;
 }
 
 test('passive signals suggest context without replacing the empty-day hierarchy', () => {
@@ -51,6 +97,81 @@ test('planner distinguishes thin, regular, and rich days', () => {
     ...day(),
     journalRecords: [journal('book', 'studio', 'book', 'Harry Potter'), journal('walk', 'movement', 'walk', 'Evening walk')],
   }), 'rich');
+});
+
+test('companion goals never become pre-hatch meaning anchors', () => {
+  for (const generated of [companionCheckInJournal('check-in'), quickGoalJournal('quick-goal')]) {
+    const goalOnlyDay = {
+      ...day(),
+      journalRecords: [generated],
+      manualJournalEntries: [{
+        id: `manual-${generated.id}`,
+        flowId: generated.flowId,
+        categoryId: generated.categoryId,
+        fields: generated.fields,
+        createdAt: generated.createdAt,
+      }],
+      notes: [{ id: generated.source.sourceId, label: generated.fields.specific }],
+    } as unknown as StoredHomeDayRecord;
+
+    assert.equal(hatchCheckInEligibility(goalOnlyDay), 'empty');
+    const started = withStartedHatchCheckIn(goalOnlyDay, 'empty', now);
+    const question = currentHatchCheckInQuestion(started);
+    assert.equal(question?.kind, 'flow');
+    assert.match(question?.title ?? '', /What was the highlight/);
+    assert.doesNotMatch(question?.title ?? '', /reading|exam|goal/i);
+  }
+});
+
+test('real journal entries still drive reflection when companion goals are also present', () => {
+  const mixedDay = {
+    ...day(),
+    journalRecords: [companionCheckInJournal('check-in'), journal('walk', 'movement', 'walk', 'Evening walk')],
+  } as StoredHomeDayRecord;
+
+  assert.equal(hatchCheckInEligibility(mixedDay), 'regular');
+  const started = withStartedHatchCheckIn(mixedDay, 'regular', now);
+  assert.equal(currentHatchCheckInQuestion(started)?.kind, 'meaning');
+  assert.match(currentHatchCheckInQuestion(started)?.title ?? '', /Evening walk/);
+  assert.doesNotMatch(currentHatchCheckInQuestion(started)?.title ?? '', /reading or learning/i);
+});
+
+test('a user-authored companion reflection remains a real journal entry', () => {
+  const reflection = {
+    ...journal('reflection', 'general', 'other', 'The quiet path by the pond'),
+    source: {
+      kind: 'text_note',
+      sourceId: 'companion-reflection:mossprout:2026-07-20',
+      origin: {
+        kind: 'companion_reflection',
+        creatureId: 'mossprout',
+        promptId: 'reflection:park',
+        promptText: 'What pulls you back?',
+      },
+    },
+  } as JournalRecord;
+  const reflectionDay = { ...day(), journalRecords: [reflection] } as StoredHomeDayRecord;
+
+  assert.equal(hatchCheckInEligibility(reflectionDay), 'regular');
+  const started = withStartedHatchCheckIn(reflectionDay, 'regular', now);
+  assert.match(currentHatchCheckInQuestion(started)?.title ?? '', /quiet path by the pond/i);
+});
+
+test('an already-open generated-goal meaning prompt is repaired to the no-journal route', () => {
+  const originalJournal = journal('check-in', 'general', 'other', 'I spent time reading or learning');
+  const originallyStarted = withStartedHatchCheckIn({ ...day(), journalRecords: [originalJournal] }, 'regular', now);
+  assert.equal(currentHatchCheckInQuestion(originallyStarted)?.kind, 'meaning');
+
+  const stale = {
+    ...originallyStarted,
+    journalRecords: [companionCheckInJournal('check-in')],
+  } as StoredHomeDayRecord;
+  const repaired = repairGeneratedHatchCheckInAnchor(stale);
+
+  assert.equal(repaired.hatchCheckIn?.eligibilityReason, 'empty');
+  assert.deepEqual(repaired.hatchCheckIn?.questionPlan, ['reconstruct.focus', 'reconstruct.category', 'reflection.meaning']);
+  assert.equal(currentHatchCheckInQuestion(repaired)?.kind, 'flow');
+  assert.match(currentHatchCheckInQuestion(repaired)?.title ?? '', /What was the highlight/);
 });
 
 test('low-signal day drills from highlight to detail and meaning in three taps', () => {
