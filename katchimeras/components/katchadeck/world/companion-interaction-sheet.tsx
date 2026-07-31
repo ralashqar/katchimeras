@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   Keyboard,
@@ -45,7 +45,6 @@ import {
   CompanionSheetShell,
 } from './companion-ui-primitives';
 import { CompanionQuestChoices, CompanionQuestThread } from './companion-quest-thread';
-import { QuestExperienceHost } from './quests/quest-experience-host';
 import type { InteractiveQuestExecution, QuestResult } from '@/utils/quests/experiences/types';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import { CompanionSkinsThread } from './companion-skins-thread';
@@ -90,6 +89,11 @@ import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import { companionQuestListSpacer } from '@/utils/companion-home-layout';
 
+const LazyQuestExperienceHost = lazy(async () => {
+  const module = await import('./quests/quest-experience-host');
+  return { default: module.QuestExperienceHost };
+});
+
 type Criterion = {
   label: string;
   done: boolean;
@@ -109,7 +113,8 @@ export type CompanionInteractionSheetProps = {
   initialDestination?: CompanionDestination | null;
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
-  activeQuest: { title: string; hint: string; semanticInput?: boolean; journalFallback?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
+  embedded?: boolean;
+  activeQuest: { questId: string; title: string; hint: string; semanticInput?: boolean; journalFallback?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
   questComplete: boolean;
   questRuntime: QuestRuntimeStatus | null;
   questCaptureFeedback: QuestCaptureFeedback | null;
@@ -137,6 +142,7 @@ export type CompanionInteractionSheetProps = {
   onStartQuestAttempt?: (config: Record<string, unknown>) => string;
   onCancelQuestAttempt?: (attemptId: string) => void;
   onCompleteInteractiveQuest?: (attemptId: string, result: QuestResult) => void;
+  onOpenQuestGame?: (questId: string) => void;
   insight: CompanionInsight;
   onInsightAction: () => void;
   memorySaved?: boolean;
@@ -474,7 +480,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     && props.onCancelQuestAttempt
     && props.onCompleteInteractiveQuest
     ? (
-        <QuestExperienceHost
+        <Suspense fallback={<View style={styles.gameLoading} />}>
+        <LazyQuestExperienceHost
           key={experienceInstance}
           session={{
             execution: interactiveExecution,
@@ -513,6 +520,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             },
           }}
         />
+        </Suspense>
       )
     : null;
 
@@ -522,6 +530,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           fullBleed
           keyboardAvoiding={!questGameVisible}
           onRequestClose={requestClose}
+          portal={!props.embedded}
           showClose={false}
           surface={questGameVisible ? 'night' : 'parchment'}>
         {questGameVisible ? (
@@ -747,6 +756,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                         icon="play.fill"
                         label="Open mini-game"
                         onPress={() => {
+                          if (
+                            props.onOpenQuestGame
+                            && props.activeQuest?.questId
+                            && interactiveExecution?.kind === 'block_blast'
+                          ) {
+                            props.onOpenQuestGame(props.activeQuest.questId);
+                            return;
+                          }
                           experience.openQuestExperience();
                           resetViewport();
                         }}
@@ -865,6 +882,7 @@ const styles = StyleSheet.create({
   questionnaireScrollContent: { flexGrow: 1, paddingHorizontal: 0 },
   activeExperience: { flex: 1 },
   gameExperienceFrame: { flex: 1, minHeight: 0, position: 'relative', zIndex: 3 },
+  gameLoading: { flex: 1, backgroundColor: '#11131B' },
   gameBackPosition: {
     left: 14,
     position: 'absolute',

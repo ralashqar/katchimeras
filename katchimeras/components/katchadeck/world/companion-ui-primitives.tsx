@@ -28,6 +28,7 @@ export function CompanionSheetShell({
   fullBleed = false,
   keyboardAvoiding = true,
   onRequestClose,
+  portal = true,
   showClose = true,
   surface = 'parchment',
 }: {
@@ -36,6 +37,7 @@ export function CompanionSheetShell({
   fullBleed?: boolean;
   keyboardAvoiding?: boolean;
   onRequestClose: () => void;
+  portal?: boolean;
   showClose?: boolean;
   surface?: KatchaSurface;
 }) {
@@ -43,6 +45,7 @@ export function CompanionSheetShell({
     <KatchaSheet
       fullBleed={fullBleed}
       onRequestClose={onRequestClose}
+      portal={portal}
       showClose={showClose}
       size={fullBleed ? 'full' : 'tall'}
       surface={surface}>

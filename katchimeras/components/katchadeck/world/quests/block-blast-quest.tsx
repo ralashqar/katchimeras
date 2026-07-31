@@ -189,13 +189,10 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   const scheduleClearCascadeHaptics = (resolution: BlockBlastResolution, combo: boolean) => {
     if (process.env.EXPO_OS !== 'ios') return;
     const startedAt = Date.now();
-    const cells = [...resolution.clearedCells].sort((left, right) => (
-      blockBlastClearCascadePhase(left.index, resolution.clearedRows, resolution.clearedColumns)
-      - blockBlastClearCascadePhase(right.index, resolution.clearedRows, resolution.clearedColumns)
-      || left.index - right.index
-    ));
-    cells.forEach((cell) => {
-      const phase = blockBlastClearCascadePhase(cell.index, resolution.clearedRows, resolution.clearedColumns);
+    const phases = [...new Set(resolution.clearedCells.map((cell) => (
+      blockBlastClearCascadePhase(cell.index, resolution.clearedRows, resolution.clearedColumns)
+    )))].sort((left, right) => left - right);
+    phases.forEach((phase) => {
       const visualTime = startedAt + CLEAR_HAPTIC_VISUAL_OFFSET_MS + Math.min(phase * 24, 220);
       const fireAt = Math.max(visualTime, nextClearHapticAt.current);
       nextClearHapticAt.current = fireAt + CLEAR_HAPTIC_INTERVAL_MS;
@@ -257,6 +254,14 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     }, 0);
     return true;
   };
+  const placeRef = useRef(place);
+  const selectedPieceRef = useRef(selectedPiece);
+  placeRef.current = place;
+  selectedPieceRef.current = selectedPiece;
+  const pressBoardCell = useCallback((row: number, column: number) => {
+    const piece = selectedPieceRef.current;
+    if (piece) placeRef.current(piece.id, row, column);
+  }, []);
 
   const saveAndLeave = () => {
     if (game) {
@@ -394,7 +399,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
             selectedPiece={selectedPiece}
             hover={hover}
             reduceMotion={reduceMotion}
-            onCellPress={(row, column) => selectedPiece && place(selectedPiece.id, row, column)}
+            onCellPress={pressBoardCell}
           />
         </View>
         {game.lastResolution?.scoreDelta ? (

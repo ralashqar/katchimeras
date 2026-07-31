@@ -3,7 +3,6 @@ import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   FadeInUp,
-  LinearTransition,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -48,7 +47,7 @@ function KatchimeraRosterCardComponent({
   featured: boolean;
   index: number;
   item: KatchimeraRosterItem;
-  onPress: () => void;
+  onPress: (creatureId: string) => void;
   width: number;
 }) {
   const reduceMotion = useReducedMotion();
@@ -70,11 +69,12 @@ function KatchimeraRosterCardComponent({
         : 'Undiscovered Katchimera. Hatch more days to meet this companion.'}
       accessibilityRole="button"
       disabled={item.kind === 'locked'}
-      entering={reduceMotion
+      entering={reduceMotion || index >= 12
         ? undefined
         : FadeInUp.duration(280).delay(Math.min(index * 34, 238))}
-      layout={reduceMotion ? undefined : LinearTransition.duration(220)}
-      onPress={onPress}
+      onPress={() => {
+        if (item.kind === 'owned') onPress(item.creatureId);
+      }}
       onPressIn={() => {
         pressScale.value = withTiming(0.98, { duration: 90 });
       }}

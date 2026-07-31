@@ -1,10 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMemo, useState } from 'react';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Pressable,
-  SectionList,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -29,7 +29,10 @@ import {
   type KatchimeraRosterSort,
 } from '@/utils/katchimera-roster';
 
-type RosterRow = KatchimeraRosterItem[];
+type RosterListItem =
+  | { type: 'hero'; id: 'hero' }
+  | { type: 'filters'; id: 'filters' }
+  | { type: 'card'; id: string; item: KatchimeraRosterItem; index: number };
 
 export function KatchimeraRosterScreen({
   background,
@@ -67,48 +70,39 @@ export function KatchimeraRosterScreen({
     () => filterAndSortKatchimeraRoster(items, selectedAspect, sort),
     [items, selectedAspect, sort],
   );
-  const rows = useMemo(() => {
-    const next: RosterRow[] = [];
-    for (let index = 0; index < visibleItems.length; index += columnCount) {
-      next.push(visibleItems.slice(index, index + columnCount));
-    }
-    return next;
-  }, [columnCount, visibleItems]);
+  const listItems = useMemo<RosterListItem[]>(() => [
+    { type: 'hero', id: 'hero' },
+    { type: 'filters', id: 'filters' },
+    ...visibleItems.map((item, index) => ({
+      type: 'card' as const,
+      id: item.kind === 'owned' ? item.creatureId : `locked-${item.familyId}`,
+      item,
+      index,
+    })),
+  ], [visibleItems]);
 
-  const selectCreature = (creatureId: string) => {
+  const selectCreature = useCallback((creatureId: string) => {
     if (process.env.EXPO_OS === 'ios') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     onSelectCreature(creatureId);
-  };
-
-  return (
-    <View style={styles.screen}>
-      <TodaySceneBackdrop background={background} scene={null} variant="splash" />
-      <LinearGradient
-        colors={[
-          'rgba(14,20,11,0.38)',
-          'rgba(17,20,13,0.62)',
-          'rgba(14,15,12,0.94)',
-        ]}
-        locations={[0, 0.36, 1]}
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
-      <SectionList<RosterRow>
-        contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
-        contentInsetAdjustmentBehavior="never"
-        key={`roster-${columnCount}`}
-        keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={(
+  }, [onSelectCreature]);
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<RosterListItem>) => {
+    if (item.type === 'hero') {
+      return (
+        <View style={styles.fullBleedItem}>
           <RosterHero
             featured={featured}
             onGoToday={onGoToday}
             reduceMotion={reduceMotion}
             safeTop={insets.top}
           />
-        )}
-        renderSectionHeader={() => (
+        </View>
+      );
+    }
+    if (item.type === 'filters') {
+      return (
+        <View style={styles.stickyFilters}>
           <KatchimeraRosterFilters
             aspectIds={availableAspects}
             count={visibleItems.length}
@@ -125,26 +119,63 @@ export function KatchimeraRosterScreen({
             sort={sort}
             sortOpen={sortOpen}
           />
-        )}
-        renderItem={({ item: row, index: rowIndex }) => (
-          <View style={[styles.gridRow, { gap, paddingHorizontal: horizontalPadding }]}>
-            {row.map((item, columnIndex) => (
-              <KatchimeraRosterCard
-                featured={item.kind === 'owned' && item.creatureId === featured?.creatureId}
-                index={rowIndex * columnCount + columnIndex}
-                item={item}
-                key={item.kind === 'owned' ? item.creatureId : `locked-${item.familyId}`}
-                onPress={() => {
-                  if (item.kind === 'owned') selectCreature(item.creatureId);
-                }}
-                width={cardWidth}
-              />
-            ))}
-          </View>
-        )}
-        sections={[{ data: rows }]}
-        stickySectionHeadersEnabled
+        </View>
+      );
+    }
+    return (
+      <View style={styles.cardCell}>
+        <KatchimeraRosterCard
+          featured={item.item.kind === 'owned' && item.item.creatureId === featured?.creatureId}
+          index={item.index}
+          item={item.item}
+          onPress={selectCreature}
+          width={cardWidth}
+        />
+      </View>
+    );
+  }, [
+    availableAspects,
+    cardWidth,
+    featured,
+    insets.top,
+    onGoToday,
+    reduceMotion,
+    selectCreature,
+    selectedAspect,
+    sort,
+    sortOpen,
+    visibleItems.length,
+  ]);
+  const overrideItemLayout = useCallback((layout: { span?: number }, item: RosterListItem) => {
+    layout.span = item.type === 'card' ? 1 : columnCount;
+  }, [columnCount]);
+
+  return (
+    <View style={styles.screen}>
+      <TodaySceneBackdrop background={background} scene={null} variant="splash" />
+      <LinearGradient
+        colors={[
+          'rgba(14,20,11,0.38)',
+          'rgba(17,20,13,0.62)',
+          'rgba(14,15,12,0.94)',
+        ]}
+        locations={[0, 0.36, 1]}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
+      <FlashList<RosterListItem>
+        contentContainerStyle={{ paddingBottom: insets.bottom + 112, paddingHorizontal: horizontalPadding }}
+        key={`roster-${columnCount}`}
+        keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
+        data={listItems}
+        drawDistance={640}
+        getItemType={(item) => item.type}
+        numColumns={columnCount}
+        overrideItemLayout={overrideItemLayout}
+        renderItem={renderItem}
         style={styles.list}
+        stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -309,8 +340,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
   },
-  gridRow: {
-    flexDirection: 'row',
-    paddingTop: 9,
-  },
+  cardCell: { alignItems: 'center', paddingTop: 9 },
+  fullBleedItem: { marginHorizontal: -14 },
+  stickyFilters: { backgroundColor: '#171A12', marginHorizontal: -14, zIndex: 4 },
 });

@@ -78,12 +78,18 @@ function hatchTimestamp(creature: KingdomCreature, index: number): number {
   return Number.isFinite(time) ? time + index : index;
 }
 
-export type KingdomCompanionPresentation = 'world' | 'roster';
+export type KingdomCompanionPresentation = 'world' | 'roster' | 'companion';
 
 export function KingdomCompanionScreen({
   presentation = 'world',
+  initialCreatureId,
+  onCloseCompanion,
+  onOpenQuestGame,
 }: {
   presentation?: KingdomCompanionPresentation;
+  initialCreatureId?: string;
+  onCloseCompanion?: () => void;
+  onOpenQuestGame?: (creatureId: string, questId: string) => void;
 }) {
   const isFocused = useIsFocused();
   const router = useRouter();
@@ -203,6 +209,14 @@ export function KingdomCompanionScreen({
       residents,
     ],
   );
+  const selectInitialResident = quests.selectResident;
+  const selectedCreatureId = quests.selectedResident?.creature.creatureId;
+
+  useEffect(() => {
+    if (presentation !== 'companion' || !initialCreatureId) return;
+    if (selectedCreatureId === initialCreatureId) return;
+    selectInitialResident(initialCreatureId);
+  }, [initialCreatureId, presentation, selectInitialResident, selectedCreatureId]);
 
   useEffect(() => {
     if (presentation !== 'world') return;
@@ -295,7 +309,7 @@ export function KingdomCompanionScreen({
           onGoToday={() => router.navigate('/today')}
           onSelectCreature={quests.selectResident}
         />
-      ) : (
+      ) : presentation === 'world' ? (
       <View style={styles.stage}>
         {isFocused && !questExperienceActive ? (
           <KingdomHexCanvas
@@ -338,7 +352,7 @@ export function KingdomCompanionScreen({
           </Animated.View>
         ) : null}
       </View>
-      )}
+      ) : <View style={styles.companionRouteStage} />}
 
       {discoveriesOpen ? (
         <DiscoveriesHallSheet
@@ -354,6 +368,7 @@ export function KingdomCompanionScreen({
       {quests.selectedResident && !embeddedJournal ? (
         <CompanionInteractionSheet
           onExperienceActiveChange={setQuestExperienceActive}
+          embedded={presentation === 'companion'}
           creatureId={quests.selectedResident.creature.creatureId}
           name={quests.selectedResident.creature.name}
           visualKey={quests.selectedResident.creature.visualKey}
@@ -365,8 +380,10 @@ export function KingdomCompanionScreen({
           onSelectDestination={quests.selectDestination}
           onClose={() => {
             quests.closeSelectedResident();
+            if (presentation === 'companion') onCloseCompanion?.();
           }}
           activeQuest={quests.selectedActiveQuest ? {
+            questId: quests.selectedActiveQuest.questId,
             title: quests.selectedActiveQuest.title,
             hint: quests.selectedActiveQuest.hint,
             semanticInput: Boolean(questDefinition(quests.selectedActiveQuest.questId)?.semanticVerification),
@@ -402,6 +419,9 @@ export function KingdomCompanionScreen({
           onStartQuestAttempt={quests.startSelectedQuestAttempt}
           onCancelQuestAttempt={quests.cancelSelectedQuestAttempt}
           onCompleteInteractiveQuest={quests.completeSelectedInteractiveQuest}
+          onOpenQuestGame={onOpenQuestGame
+            ? (questId) => onOpenQuestGame(quests.selectedResident!.creature.creatureId, questId)
+            : undefined}
           insight={quests.selectedInsight ?? { text: 'This tile remembers the day we met.', action: null }}
           onInsightAction={handleInsightAction}
           memorySaved={Boolean(savedOrigin)}
@@ -504,6 +524,7 @@ export function KingdomCompanionScreen({
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#55A9E2', flex: 1 },
   stage: { flex: 1 },
+  companionRouteStage: { flex: 1, backgroundColor: '#11131B' },
   header: {
     left: 20,
     position: 'absolute',

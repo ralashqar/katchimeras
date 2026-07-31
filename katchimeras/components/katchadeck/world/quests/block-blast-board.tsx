@@ -1,7 +1,7 @@
 import { Canvas, Group, LinearGradient as SkiaGradient, RoundedRect, vec } from '@shopify/react-native-skia';
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -187,6 +187,38 @@ const BoardHitTargets = memo(function BoardHitTargets({
   onCellPress: (row: number, column: number) => void;
   validOrigins: readonly number[];
 }) {
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState(false);
+  useEffect(() => {
+    void AccessibilityInfo.isScreenReaderEnabled().then(setScreenReaderEnabled);
+    const subscription = AccessibilityInfo.addEventListener('screenReaderChanged', setScreenReaderEnabled);
+    return () => subscription.remove();
+  }, []);
+
+  if (!screenReaderEnabled) {
+    return (
+      <Pressable
+        accessible={false}
+        onPress={(event) => {
+          const x = event.nativeEvent.locationX - metrics.outer;
+          const y = event.nativeEvent.locationY - metrics.outer;
+          const column = Math.floor(x / metrics.pitch);
+          const row = Math.floor(y / metrics.pitch);
+          const insideCell = x >= 0 && y >= 0
+            && x % metrics.pitch <= metrics.cell
+            && y % metrics.pitch <= metrics.cell;
+          const index = row * BLOCK_BLAST_BOARD_SIZE + column;
+          if (
+            insideCell
+            && row >= 0 && row < BLOCK_BLAST_BOARD_SIZE
+            && column >= 0 && column < BLOCK_BLAST_BOARD_SIZE
+            && validOrigins[index] === 1
+          ) onCellPress(row, column);
+        }}
+        style={StyleSheet.absoluteFill}
+      />
+    );
+  }
+
   return <>
       {Array.from({ length: 64 }, (_, index) => {
         const row = Math.floor(index / 8);

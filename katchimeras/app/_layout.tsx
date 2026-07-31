@@ -93,6 +93,8 @@ export default function RootLayout() {
           <Stack.Screen name="life-map" options={{ headerShown: false, title: 'Life Map' }} />
           <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
+          <Stack.Screen name="katchimera/[creatureId]" options={{ headerShown: false }} />
+          <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />
         </Stack>
         <StatusBar style={colorScheme === 'light' ? 'dark' : 'light'} />

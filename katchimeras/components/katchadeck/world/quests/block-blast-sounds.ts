@@ -1,6 +1,7 @@
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 
 export type BlockBlastSound = 'place' | 'clear' | 'combo' | 'game_over';
+export type BlockBlastSoundPlayers = Partial<Record<BlockBlastSound, AudioPlayer>>;
 
 const TONES: Record<BlockBlastSound, string> = {
   place: 'data:audio/wav;base64,UklGRhQBAABXQVZFZm10IBAAAAABAAEAoA8AAEAfAAACABAAZGF0YfAAAAAAAFsPcxp3Hnkapg/vADvyYOcg43rmavA8/kIM1RZCG4EYbA+AAi317+pg5pTo1fDe/HgJWBP6F0cW0Q6rA8/3WO6u6e7qoPHn+wAHBRCoFNAT2Q1uBBv6k/EC7X/txfJW++EE5AxVEScRiAzMBAz8l/RS8D7wQPQs+x4D/QkLDlMO5ArDBKH9XveT8yTzC/Zm+7kBWAfUCl4L9AhYBNT+4fm+9ib2HvgC/LcA+gS4B1EIvwaMA6X/GPzJ+Tz5c/r9/BgA6wLABDUFTARjAhIA/v2r/Fv8Av1T/t3/LwH1ARQCowHhABoAjv9c/3v/w/8=',
@@ -9,20 +10,15 @@ const TONES: Record<BlockBlastSound, string> = {
   game_over: 'data:audio/wav;base64,UklGRhQBAABXQVZFZm10IBAAAAABAAEAoA8AAEAfAAACABAAZGF0YfAAAAAAALIYlx0sC0zwNeK/6wQF5xkZGs8FVO3x473wRQkSGhwW4gBg63TmqPWrDEoZ1RGO/GrqkelP+igPrxd6DfH4ZOoV7Yb+uBBoFTwJIPY069DwKQJjEaISSAUn9LvskPQeBTkRiw/GAQTz0e4m+FQHVRBTDNb+r/JM8Wr7wwjWDicJjPwU8wD0OP5vCeQMMwb3+hj0v/Z2AGUJqAqcAxn6m/Ve+RECughNCH8B6/l197f7AgOJB/0F9P9f+n75p/1IA/YF4gMJ/1z7jPsU/+8CKAQeAsH+xPx2/ez/CAJGAtEAGP9z/hb/JgCvAHoADwA=',
 };
 
-export function createBlockBlastSoundPlayers(): Record<BlockBlastSound, AudioPlayer> {
-  return {
-    place: createAudioPlayer(TONES.place),
-    clear: createAudioPlayer(TONES.clear),
-    combo: createAudioPlayer(TONES.combo),
-    game_over: createAudioPlayer(TONES.game_over),
-  };
+export function createBlockBlastSoundPlayers(): BlockBlastSoundPlayers {
+  return {};
 }
 
-export function disposeBlockBlastSoundPlayers(players: Record<BlockBlastSound, AudioPlayer>) {
-  Object.values(players).forEach((player) => player.remove());
+export function disposeBlockBlastSoundPlayers(players: BlockBlastSoundPlayers) {
+  Object.values(players).forEach((player) => player?.remove());
 }
 
-export function playBlockBlastSound(players: Record<BlockBlastSound, AudioPlayer>, sound: BlockBlastSound) {
-  const player = players[sound];
+export function playBlockBlastSound(players: BlockBlastSoundPlayers, sound: BlockBlastSound) {
+  const player = players[sound] ?? (players[sound] = createAudioPlayer(TONES[sound]));
   void player.seekTo(0).then(() => player.play()).catch(() => undefined);
 }

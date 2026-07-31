@@ -145,3 +145,35 @@ test('the bottom bar exposes Katchimeras while retaining the hidden world route'
   assert.match(layout, /name="katchimeras"[\s\S]*?title: 'Katchimeras'/);
   assert.match(worldRoute, /KingdomCompanionScreen/);
 });
+
+test('the roster, companion, and Block Blast use isolated route boundaries', () => {
+  const tabRoute = fs.readFileSync(
+    path.join(process.cwd(), 'app', '(tabs)', 'katchimeras.tsx'),
+    'utf8',
+  );
+  const rosterScreen = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'roster', 'katchimera-roster-screen.tsx'),
+    'utf8',
+  );
+  const gameRoute = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-route-screen.tsx'),
+    'utf8',
+  );
+
+  assert.match(tabRoute, /KatchimeraRosterRouteScreen/);
+  assert.doesNotMatch(tabRoute, /KingdomCompanionScreen/);
+  assert.match(rosterScreen, /FlashList/);
+  assert.doesNotMatch(rosterScreen, /SectionList/);
+  assert.match(gameRoute, /BlockBlastQuest/);
+  assert.doesNotMatch(gameRoute, /CompanionInteractionSheet|TodaySceneBackdrop|CompanionGameBackdrop/);
+});
+
+test('Block Blast keeps gesture callbacks on JavaScript where live game state is owned', () => {
+  const board = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-board.tsx'),
+    'utf8',
+  );
+
+  assert.match(board, /Gesture\.Pan\(\)[\s\S]*?\.runOnJS\(true\)/);
+  assert.doesNotMatch(board, /runOnJS\(onPick\)|runOnJS\(onPlace\)/);
+});

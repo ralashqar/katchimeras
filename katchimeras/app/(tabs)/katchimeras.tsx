@@ -1,5 +1,5 @@
-import { KingdomCompanionScreen } from '@/components/katchadeck/world/kingdom-companion-screen';
+import { KatchimeraRosterRouteScreen } from '@/components/katchadeck/roster/katchimera-roster-route-screen';
 
 export default function KatchimerasScreen() {
-  return <KingdomCompanionScreen presentation="roster" />;
+  return <KatchimeraRosterRouteScreen />;
 }
