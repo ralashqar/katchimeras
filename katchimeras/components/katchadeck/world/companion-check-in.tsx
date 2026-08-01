@@ -219,19 +219,17 @@ export function CompanionCheckInPage({
         {!taskPreview && detailOpen ? (
           <View style={styles.detail}>
             <CompanionReflectionThread
+              autoOpen
+              composerTitle="Add an optional note"
               initialDraft={draft}
+              onCancel={() => setDetailOpen(false)}
               onDraftChange={setDraft}
-              promptId={`companion-check-in-note:${checkIn.id}`}
-              promptText="Anything else you want to remember? This is optional."
-            />
-            <CompanionPrimaryAction
-              disabled={!draft?.text.trim() && !draft?.audioUri}
-              icon="checkmark"
-              label="Save detail"
-              onPress={() => {
-                onSaveNote(checkIn, draft);
+              onSave={(nextDraft) => {
+                onSaveNote(checkIn, nextDraft);
                 setDetailOpen(false);
               }}
+              promptId={`companion-check-in-note:${checkIn.id}`}
+              promptText="Anything else you want to remember? This is optional."
             />
           </View>
         ) : !taskPreview ? (

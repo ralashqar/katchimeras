@@ -75,7 +75,6 @@ import type {
 import {
   CompanionQuickGoalPicker,
   CompanionQuickGoalsPanel,
-  QuickGoalCompletionPrompt,
 } from '@/components/katchadeck/goals/companion-quick-goals';
 import type {
   CompanionQuickGoal,
@@ -190,6 +189,8 @@ export type CompanionInteractionSheetProps = {
     cadence: CompanionQuickGoalCadence
   ) => { added: boolean; reason: string | null };
   onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletion | null;
+  onSkipQuickGoal: (goalId: string) => boolean;
+  onSnoozeQuickGoal: (goalId: string) => boolean;
   onUndoQuickGoal: (goalId: string) => boolean;
   onRememberQuickGoal: (completion: CompanionQuickGoalCompletion, goal: CompanionQuickGoal) => void;
   quickGoalSuggestionIds: readonly string[];
@@ -225,10 +226,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   } = experience;
   const [endAttemptOpen, setEndAttemptOpen] = useState(false);
   const [leaveQuestOpen, setLeaveQuestOpen] = useState(false);
-  const [recentQuickGoal, setRecentQuickGoal] = useState<{
-    completion: CompanionQuickGoalCompletion;
-    goal: CompanionQuickGoal;
-  } | null>(null);
   const [activeCheckIn, setActiveCheckIn] = useState<CompanionJourneyCheckIn | null>(props.journeyCheckIn);
   const [hasShownHome, setHasShownHome] = useState(false);
   const contentRef = useRef<ScrollView>(null);
@@ -371,38 +368,21 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     setLeaveQuestOpen(false);
     resetQuestExperience();
   }, [props.activeQuest?.title, props.creatureId, resetQuestExperience]);
-  const completeQuickGoal = (goalId: string) => {
-    const goal = props.quickGoalState.goals.find((candidate) => candidate.id === goalId);
-    const completion = props.onCompleteQuickGoal(goalId);
-    if (goal && completion) setRecentQuickGoal({ goal, completion });
-    return completion;
-  };
-  const undoQuickGoal = (goalId: string) => {
-    const undone = props.onUndoQuickGoal(goalId);
-    if (undone) setRecentQuickGoal((current) => current?.goal.id === goalId ? null : current);
-    return undone;
-  };
   const quickGoalPanel = props.quickGoalsEnabled ? (
     <View style={styles.quickGoalStack}>
       <CompanionQuickGoalsPanel
         dayId={props.quickGoalDayId}
         familyId={props.familyId}
-        onCompleteGoal={completeQuickGoal}
+        onCompleteGoal={props.onCompleteQuickGoal}
         onOpen={() => {
           if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
           experience.openQuickGoalPicker();
         }}
-        onUndoGoal={undoQuickGoal}
+        onRemember={props.onRememberQuickGoal}
+        onSkipGoal={props.onSkipQuickGoal}
+        onSnoozeGoal={props.onSnoozeQuickGoal}
+        onUndoGoal={props.onUndoQuickGoal}
         state={props.quickGoalState}
-      />
-      <QuickGoalCompletionPrompt
-        completion={recentQuickGoal?.completion ?? null}
-        goal={recentQuickGoal?.goal ?? null}
-        onRemember={(completion, goal) => {
-          setRecentQuickGoal(null);
-          props.onRememberQuickGoal(completion, goal);
-        }}
-        onUndo={undoQuickGoal}
       />
     </View>
   ) : null;

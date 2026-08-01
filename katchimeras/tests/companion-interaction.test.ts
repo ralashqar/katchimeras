@@ -41,6 +41,18 @@ test('You questionnaires require answer confirmation and task consent', () => {
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-check-in.tsx'),
     'utf8',
   );
+  const reflectionThread = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-reflection-thread.tsx'),
+    'utf8',
+  );
+  const reflectionComposer = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-reflection-composer-modal.tsx'),
+    'utf8',
+  );
+  const zodiac = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'zodiac-tile-sheet.tsx'),
+    'utf8',
+  );
   const interaction = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
     'utf8',
@@ -68,6 +80,18 @@ test('You questionnaires require answer confirmation and task consent', () => {
   assert.match(journey, /onDismissTasks/);
   assert.match(journey, /Add \$\{suggestedTasks\.length\} to Today/);
   assert.match(checkIn, /effectiveTaskStatus === 'pending'/);
+  assert.match(checkIn, /<CompanionReflectionThread\s+autoOpen/);
+  assert.match(checkIn, /onSaveNote\(checkIn, nextDraft\)/);
+  assert.doesNotMatch(checkIn, /label="Save detail"/);
+  assert.match(reflectionThread, /Type it or use your voice/);
+  assert.match(reflectionThread, /<CompanionReflectionComposerModal/);
+  assert.match(reflectionComposer, /<Modal/);
+  assert.match(reflectionComposer, /useJournalVoiceDraft/);
+  assert.match(reflectionComposer, /Tap the microphone to record/);
+  assert.match(reflectionComposer, /keyboardVisible && styles\.keyboardFrameOpen/);
+  assert.match(reflectionComposer, /!text\.trim\(\) && !voiceDraft\?\.audioUri/);
+  assert.match(zodiac, /onSave=\{saveReflection\}/);
+  assert.doesNotMatch(zodiac, /label="Save reflection"/);
   assert.match(interaction, /How did today feel\?/);
   assert.match(interaction, /emphasized=\{Boolean\(activeJourneyFocus/);
   assert.match(interaction, /bubbleBody=\{quickGoalPickerOpen \?.*destinationHeroBody\}/);
@@ -189,6 +213,14 @@ test('goal picker returns to the dedicated goals destination', () => {
     path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'quick-goal-composer-modal.tsx'),
     'utf8',
   );
+  const goalActions = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'quick-goal-action-modal.tsx'),
+    'utf8',
+  );
+  const kingdomCompanion = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
+    'utf8',
+  );
   const initial = createCompanionInteractionState({ initialDestination: 'goals' });
   const picker = companionInteractionReducer(initial, { type: 'open_quick_goal_picker' });
   const returned = companionInteractionReducer(picker, { type: 'return_to_destination' });
@@ -201,8 +233,21 @@ test('goal picker returns to the dedicated goals destination', () => {
   assert.match(quickGoals, /backgroundColor: '#211A13'/);
   assert.match(quickGoals, /styles\.scopedPresetRow/);
   assert.match(quickGoals, /<QuickGoalComposerModal/);
+  assert.match(quickGoals, /<QuickGoalActionModal/);
+  assert.match(quickGoals, /Skipped for today/);
+  assert.match(quickGoals, /Marked incomplete/);
   assert.match(quickGoals, /Type it or use your voice/);
   assert.doesNotMatch(quickGoals, /Back to Goals/);
+  assert.doesNotMatch(quickGoals, /QuickGoalCompletionPrompt|completionPrompt/);
+  assert.doesNotMatch(interaction, /QuickGoalCompletionPrompt/);
+  assert.match(interaction, /onSkipGoal=\{props\.onSkipQuickGoal\}/);
+  assert.match(interaction, /onSnoozeGoal=\{props\.onSnoozeQuickGoal\}/);
+  assert.match(kingdomCompanion, /onSkipQuickGoal=\{quickGoals\.skipGoal\}/);
+  assert.match(kingdomCompanion, /onSnoozeQuickGoal=\{quickGoals\.snoozeGoal\}/);
+  assert.match(goalActions, /onSkip/);
+  assert.match(goalActions, /onSnooze/);
+  assert.match(goalActions, /justCompleted/);
+  assert.match(goalActions, /goalCardComplete/);
   assert.match(goalComposer, /<Modal/);
   assert.match(goalComposer, /useJournalVoiceDraft/);
   assert.match(goalComposer, /Tap the microphone to record/);

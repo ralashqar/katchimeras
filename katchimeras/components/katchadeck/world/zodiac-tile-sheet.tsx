@@ -69,8 +69,8 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
     setTimeout(() => setMode('prompt'), 280);
   }
 
-  function saveReflection() {
-    if (!prompt || !reflectionDraft?.text.trim()) return;
+  function saveReflection(draft: CompanionReflectionDraft | null = reflectionDraft) {
+    if (!prompt || (!draft?.text.trim() && !draft?.audioUri)) return;
     onChange({
       ...identity,
       recentZodiacPromptIds: [prompt.id, ...identity.recentZodiacPromptIds.filter((id) => id !== prompt.id)].slice(0, 6),
@@ -81,9 +81,9 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
           dayId,
           promptId: prompt.id,
           prompt: prompt.text,
-          text: reflectionDraft.text.trim(),
-          audioUri: reflectionDraft.audioUri,
-          durationMs: reflectionDraft.durationMs,
+          text: draft.text.trim(),
+          audioUri: draft.audioUri,
+          durationMs: draft.durationMs,
           createdAt: new Date().toISOString(),
           origin: 'zodiac_prompt',
         },
@@ -115,9 +115,7 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
 
   const footer = mode === 'profile'
     ? <MeadowPrimaryAction label={completedToday ? 'Replay elemental ritual' : 'Begin elemental ritual'} icon="sparkles" onPress={() => setMode('game')} />
-    : mode === 'prompt'
-      ? <MeadowPrimaryAction label="Save reflection" icon="arrow.right" disabled={!reflectionDraft?.text.trim()} onPress={saveReflection} />
-      : mode === 'birthday'
+    : mode === 'birthday'
         ? <MeadowPrimaryAction label="Update star companion" icon="calendar" disabled={!proposedSign} onPress={updateBirthday} />
         : null;
 
@@ -175,10 +173,12 @@ export function ZodiacTileSheet({ identity, onChange, onClose }: { identity: Wor
 
                   {mode === 'prompt' && prompt ? (
                     <CompanionReflectionThread
+                      composerTitle="Add a reflection"
                       promptId={`zodiac:${prompt.id}`}
                       promptText={prompt.text}
                       initialDraft={reflectionDraft}
                       onDraftChange={setReflectionDraft}
+                      onSave={saveReflection}
                     />
                   ) : null}
 

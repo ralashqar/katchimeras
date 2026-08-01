@@ -461,6 +461,8 @@ export function KingdomCompanionScreen({
           onAddQuickGoalTemplate={quickGoals.addTemplate}
           onAddCustomQuickGoal={quickGoals.addCustom}
           onCompleteQuickGoal={quickGoals.completeGoal}
+          onSkipQuickGoal={quickGoals.skipGoal}
+          onSnoozeQuickGoal={quickGoals.snoozeGoal}
           onUndoQuickGoal={quickGoals.undoGoal}
           onRememberQuickGoal={(completion, goal) => {
             setEmbeddedJournal({

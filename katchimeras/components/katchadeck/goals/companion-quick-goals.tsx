@@ -62,15 +62,24 @@ export function CompanionQuickGoalsPanel({
   familyId,
   onCompleteGoal,
   onOpen,
+  onRemember,
+  onSkipGoal,
+  onSnoozeGoal,
   onUndoGoal,
   state,
-}: Pick<QuickGoalActions, 'onCompleteGoal' | 'onUndoGoal'> & {
+}: Pick<QuickGoalActions, 'onCompleteGoal' | 'onSkipGoal' | 'onSnoozeGoal' | 'onUndoGoal'> & {
   dayId: string;
   familyId: KatchimeraFamilyId;
   onOpen: () => void;
+  onRemember: (completion: CompanionQuickGoalCompletion, goal: CompanionQuickGoal) => void;
   state: CompanionQuickGoalState;
 }) {
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const goals = quickGoalsForDay(state, dayId, familyId);
+  const selectedGoal = selectedGoalId
+    ? goals.find((item) => item.goal.id === selectedGoalId) ?? null
+    : null;
   return (
     <View style={styles.companionPanel}>
       <View style={styles.panelHeading}>
@@ -98,8 +107,11 @@ export function CompanionQuickGoalsPanel({
             <QuickGoalRow
               item={item}
               key={item.goal.id}
-              onCompleteGoal={onCompleteGoal}
-              onUndoGoal={onUndoGoal}
+              onPress={() => {
+                setActionFeedback(null);
+                setSelectedGoalId(item.goal.id);
+                if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+              }}
               tone="parchment"
             />
           ))}
@@ -115,42 +127,39 @@ export function CompanionQuickGoalsPanel({
           </ThemedText>
         </Pressable>
       )}
-    </View>
-  );
-}
-
-export function QuickGoalCompletionPrompt({
-  completion,
-  goal,
-  onRemember,
-  onUndo,
-}: {
-  completion: CompanionQuickGoalCompletion | null;
-  goal: CompanionQuickGoal | null;
-  onRemember: (completion: CompanionQuickGoalCompletion, goal: CompanionQuickGoal) => void;
-  onUndo: (goalId: string) => void;
-}) {
-  if (!completion || !goal) return null;
-  return (
-    <View accessibilityLiveRegion="polite" style={styles.completionPrompt}>
-      <IconSymbol color={Meadow.leafDeep} name="checkmark" size={17} />
-      <View style={styles.completionCopy}>
-        <ThemedText numberOfLines={1} style={styles.completionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          Goal complete · +5 bond
-        </ThemedText>
-        <View style={styles.completionActions}>
-          <Pressable accessibilityRole="button" onPress={() => onRemember(completion, goal)}>
-            <ThemedText style={styles.completionAction} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
-              Remember this
-            </ThemedText>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => onUndo(goal.id)}>
-            <ThemedText style={styles.completionActionSecondary} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              Undo
-            </ThemedText>
-          </Pressable>
+      {actionFeedback ? (
+        <View accessibilityLiveRegion="polite" style={styles.goalActionFeedback}>
+          <IconSymbol color={Meadow.leafDeep} name="checkmark" size={14} />
+          <ThemedText selectable style={styles.goalActionFeedbackText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+            {actionFeedback}
+          </ThemedText>
         </View>
-      </View>
+      ) : null}
+      {selectedGoal ? (
+        <QuickGoalActionModal
+          item={selectedGoal}
+          onComplete={() => onCompleteGoal(selectedGoal.goal.id)}
+          onDismiss={() => setSelectedGoalId(null)}
+          onRemember={() => {
+            const completion =
+              state.completions.find(
+                (candidate) => candidate.goalId === selectedGoal.goal.id && candidate.dayId === dayId
+              ) ?? selectedGoal.completion;
+            if (completion) onRemember(completion, selectedGoal.goal);
+          }}
+          onSkip={() => {
+            if (onSkipGoal(selectedGoal.goal.id)) setActionFeedback('Skipped for today');
+          }}
+          onSnooze={() => {
+            if (onSnoozeGoal(selectedGoal.goal.id)) setActionFeedback('Snoozed until the next useful day');
+          }}
+          onUndo={() => {
+            const undone = onUndoGoal(selectedGoal.goal.id);
+            if (undone) setActionFeedback('Marked incomplete');
+            return undone;
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -775,12 +784,12 @@ function goalEncouragement(cadence: CompanionQuickGoalCadence): string {
 function QuickGoalRow({
   compact = false,
   item,
-  onCompleteGoal,
-  onUndoGoal,
+  onPress,
   tone,
-}: Pick<QuickGoalActions, 'onCompleteGoal' | 'onUndoGoal'> & {
+}: {
   compact?: boolean;
   item: CompanionQuickGoalForDay;
+  onPress: () => void;
   tone: 'night' | 'parchment';
 }) {
   const complete = Boolean(item.completion);
@@ -788,15 +797,10 @@ function QuickGoalRow({
   const secondary = tone === 'night' ? Lantern.moon300 : Meadow.inkFaint;
   return (
     <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: complete }}
-      onPress={() => {
-        if (process.env.EXPO_OS === 'ios') {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
-        if (complete) onUndoGoal(item.goal.id);
-        else onCompleteGoal(item.goal.id);
-      }}
+      accessibilityHint={complete ? 'Opens completed goal actions' : 'Opens complete, snooze, and skip actions'}
+      accessibilityRole="button"
+      accessibilityState={{ selected: complete }}
+      onPress={onPress}
       style={({ pressed }) => [
         styles.goalRow,
         compact && styles.goalRowCompact,
@@ -1036,12 +1040,8 @@ const styles = StyleSheet.create({
   goalRowTitle: { ...KatchaUI.type.companionAction, fontSize: 12.5, lineHeight: 17 },
   goalRowTitleComplete: { opacity: 0.58, textDecorationLine: 'line-through' },
   goalRowMeta: { ...KatchaUI.type.meta, fontSize: 9.5 },
-  completionPrompt: { alignItems: 'center', backgroundColor: 'rgba(111,139,102,0.14)', borderColor: 'rgba(78,112,72,0.34)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, flexDirection: 'row', gap: 9, padding: 11 },
-  completionCopy: { flex: 1, gap: 4 },
-  completionTitle: { ...KatchaUI.type.companionAction, fontSize: 12 },
-  completionActions: { flexDirection: 'row', gap: 14 },
-  completionAction: { ...KatchaUI.type.companionAction, fontSize: 10.5 },
-  completionActionSecondary: { ...KatchaUI.type.companionAction, fontSize: 10.5, fontWeight: '800' },
+  goalActionFeedback: { alignItems: 'center', backgroundColor: 'rgba(238,242,223,0.86)', borderColor: 'rgba(78,112,72,0.26)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 7, minHeight: 38, paddingHorizontal: 11 },
+  goalActionFeedbackText: { ...KatchaUI.type.companionAction, flex: 1, fontSize: 10.5, lineHeight: 14 },
   sheetContent: { gap: 18, paddingBottom: 28 },
   sheetSection: { gap: 9 },
   sectionLabel: { ...KatchaUI.type.label, fontSize: 9.5, letterSpacing: 1.1 },
