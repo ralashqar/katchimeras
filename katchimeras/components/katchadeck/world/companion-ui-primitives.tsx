@@ -216,22 +216,26 @@ export function CompanionStatusBadge({ label, tone }: { label: string; tone: Sta
 
 export function CompanionResultNotice({
   body,
+  mode = 'saved',
   tasks,
   title,
 }: {
   body?: string;
+  mode?: 'preview' | 'added' | 'saved';
   tasks: readonly string[];
   title?: string;
 }) {
   const reduceMotion = useReducedMotion();
   const { tokens } = useKatchaSurface();
-  const hasTasks = tasks.length > 0;
+  const added = mode === 'added';
+  const preview = mode === 'preview';
+  const statusColor = added ? tokens.success : preview ? tokens.accentPressed : tokens.textTertiary;
 
   useEffect(() => {
-    if (hasTasks && process.env.EXPO_OS === 'ios') {
+    if (added && process.env.EXPO_OS === 'ios') {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [hasTasks]);
+  }, [added]);
 
   return (
     <Animated.View
@@ -245,26 +249,30 @@ export function CompanionResultNotice({
           boxShadow: tokens.cardShadow,
         },
       ]}>
-      <View style={[styles.resultMark, { backgroundColor: hasTasks ? tokens.success : tokens.subtle }]}>
+      <View style={[styles.resultMark, { backgroundColor: added ? tokens.success : tokens.subtle }]}>
         <IconSymbol
-          color={hasTasks ? tokens.accentText : tokens.textSecondary}
-          name="checkmark"
+          color={added ? tokens.accentText : statusColor}
+          name={added ? 'checkmark' : preview ? 'plus' : 'sparkles'}
           size={18}
         />
       </View>
       <View style={styles.resultCopy}>
-        <ThemedText style={styles.resultEyebrow} lightColor={hasTasks ? tokens.success : tokens.textTertiary} darkColor={hasTasks ? tokens.success : tokens.textTertiary}>
-          {hasTasks ? 'Added to Today' : 'Check-in saved'}
+        <ThemedText style={styles.resultEyebrow} lightColor={statusColor} darkColor={statusColor}>
+          {added ? 'Added to Today' : preview ? 'Suggested for Today' : 'Saved'}
         </ThemedText>
         <ThemedText selectable style={styles.resultTitle} lightColor={tokens.text} darkColor={tokens.text}>
-          {title ?? (hasTasks
+          {title ?? (added
             ? `${tasks.length} small ${tasks.length === 1 ? 'task' : 'tasks'} added`
-            : 'Your answers are saved')}
+            : preview
+              ? `${tasks.length} small ${tasks.length === 1 ? 'step' : 'steps'}, if they help`
+              : 'Your answers are saved')}
         </ThemedText>
         <ThemedText selectable style={styles.resultBody} lightColor={tokens.textSecondary} darkColor={tokens.textSecondary}>
-          {body ?? (hasTasks
-            ? 'Chosen from your answers. Keep what helps today.'
-            : 'They will shape future questions and reflections.')}
+          {body ?? (added
+            ? 'They are ready with your other Today tasks.'
+            : preview
+              ? 'Nothing is added until you choose to add it.'
+              : 'They will shape future questions and reflections.')}
         </ThemedText>
         {tasks.length ? (
           <View style={[styles.resultTaskList, { borderTopColor: tokens.border }]}>
@@ -278,8 +286,8 @@ export function CompanionResultNotice({
                     borderTopWidth: StyleSheet.hairlineWidth,
                   },
                 ]}>
-                <View style={[styles.resultTaskMark, { backgroundColor: `${tokens.success}18` }]}>
-                  <IconSymbol color={tokens.success} name="checkmark" size={12} />
+                <View style={[styles.resultTaskMark, { backgroundColor: `${statusColor}18` }]}>
+                  <IconSymbol color={statusColor} name={added ? 'checkmark' : 'arrow.right'} size={12} />
                 </View>
                 <ThemedText selectable style={styles.resultTaskLabel} lightColor={tokens.text} darkColor={tokens.text}>
                   {task}

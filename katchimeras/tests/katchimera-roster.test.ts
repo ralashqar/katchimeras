@@ -199,11 +199,14 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.doesNotMatch(rosterScreen, /SectionList/);
   assert.match(rosterScreen, /target === 'Cell'/);
   assert.match(rosterScreen, /Math\.min\(360, Math\.max\(240, height \* 0\.4\)\)/);
-  assert.doesNotMatch(rosterScreen, /rosterIntroCompleted/);
-  assert.match(rosterScreen, /useState\(\(\) => !reduceMotion\)/);
+  assert.doesNotMatch(rosterScreen, /introActive|setTimeout/);
+  assert.match(rosterScreen, /hasCompletedInitialLoad/);
+  assert.match(rosterScreen, /FadeIn\.duration\(240\)/);
+  assert.match(rosterRoute, /useAllDays\(\{ refreshOnFocus: false \}\)/);
   assert.match(rosterCard, /recyclingKey=\{artworkKey\}/);
   assert.match(rosterCard, /transition=\{0\}/);
   assert.doesNotMatch(rosterCard, /useReducedMotion/);
+  assert.doesNotMatch(rosterCard, /FadeInUp|entering=|translateY/);
   assert.match(rosterRoute, /hasCompletedInitialFocus/);
   assert.match(rosterRoute, /useIsFocused/);
   assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRoster \/> : null/);

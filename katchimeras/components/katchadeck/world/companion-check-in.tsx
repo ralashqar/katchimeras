@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -9,6 +9,7 @@ import type { KatchimeraRoleDefinition } from '@/constants/katchimera-roles';
 import { Meadow } from '@/constants/meadow-theme';
 import { KatchaUI } from '@/constants/katcha-ui';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
+import type { HomeVisualKey } from '@/types/home';
 import {
   companionCheckInProgress,
   companionCheckInQuestion,
@@ -21,6 +22,7 @@ import type {
   CompanionJourneyGoal,
 } from '@/utils/companion-journey';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
+import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import {
   companionQuestionnaireOptionIcon,
   type QuestionnaireImageSource,
@@ -38,16 +40,18 @@ import {
 export function CompanionCheckInCard({
   checkIn,
   companionName,
+  emphasized = false,
   onOpen,
 }: {
   checkIn: CompanionJourneyCheckIn | null;
   companionName: string;
+  emphasized?: boolean;
   onOpen: () => void;
 }) {
   const complete = Boolean(checkIn?.completedAt);
   const inProgress = Boolean(checkIn && !complete && checkIn.answers.length);
   return (
-    <View style={[styles.card, complete && styles.cardComplete]}>
+    <View style={[styles.card, emphasized && styles.cardEmphasized, complete && styles.cardComplete]}>
       <View style={styles.cardTop}>
         <View style={[styles.cardIcon, complete && styles.cardIconComplete]}>
           <IconSymbol color={complete ? Meadow.chipLabel : Meadow.goldDeep} name={complete ? 'checkmark' : 'sparkles'} size={20} />
@@ -57,14 +61,14 @@ export function CompanionCheckInCard({
             {complete ? 'CHECKED IN TODAY' : 'TODAY'}
           </ThemedText>
           <ThemedText style={styles.cardTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-            {complete ? 'A moment remembered' : `Check in with ${companionName}`}
+            {complete ? 'Today is remembered' : inProgress ? 'Finish today’s check-in' : `A moment with ${companionName}`}
           </ThemedText>
           <ThemedText numberOfLines={complete ? 3 : 2} style={styles.body} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
             {complete
               ? companionCheckInSummary(checkIn!)
               : inProgress
                 ? `Question ${checkIn!.answers.length + 1} of 3. Your answers are saved.`
-                : 'Three quick choices about this part of life. No writing required.'}
+                : 'Three quick choices. No writing required.'}
           </ThemedText>
         </View>
       </View>
@@ -85,6 +89,7 @@ export function CompanionCheckInPage({
   companionName,
   creature,
   definition,
+  environmentKey,
   goal,
   onAddTasks,
   onAnswer,
@@ -93,6 +98,7 @@ export function CompanionCheckInPage({
   onSaveNote,
   onSetTaskStatus,
   role,
+  visualKey,
 }: {
   checkIn: CompanionJourneyCheckIn;
   accentColor: string;
@@ -100,6 +106,7 @@ export function CompanionCheckInPage({
   companionName: string;
   creature: QuestionnaireImageSource;
   definition: CompanionJourneyDefinition | null;
+  environmentKey: TodayExplorationBackgroundKey | null;
   goal: CompanionJourneyGoal | null;
   onAddTasks: (templateIds: readonly string[]) => readonly string[];
   onAnswer: (
@@ -112,11 +119,12 @@ export function CompanionCheckInPage({
   onSaveNote: (checkIn: CompanionJourneyCheckIn, draft: CompanionReflectionDraft | null) => void;
   onSetTaskStatus: (checkInId: string, status: 'added' | 'dismissed') => void;
   role: KatchimeraRoleDefinition | null;
+  visualKey: HomeVisualKey;
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [draft, setDraft] = useState<CompanionReflectionDraft | null>(null);
   const [newlyAddedTaskIds, setNewlyAddedTaskIds] = useState<readonly string[] | null>(null);
-  const autoAddedCheckInRef = useRef<string | null>(null);
+  const [taskDecision, setTaskDecision] = useState<'added' | 'dismissed' | null>(null);
   const question = companionCheckInQuestion({ checkIn, definition, role, goal });
   const progress = companionCheckInProgress(checkIn);
   const suggestions = useMemo(
@@ -129,28 +137,9 @@ export function CompanionCheckInPage({
     setDetailOpen(false);
     setDraft(null);
     setNewlyAddedTaskIds(null);
+    setTaskDecision(null);
   }, [checkIn.id, checkIn.completedAt]);
 
-  useEffect(() => {
-    if (
-      !checkIn.completedAt ||
-      !checkIn.suggestedQuickGoalIds.length ||
-      checkIn.taskSuggestionStatus !== 'pending' ||
-      autoAddedCheckInRef.current === checkIn.id
-    ) {
-      return;
-    }
-    autoAddedCheckInRef.current = checkIn.id;
-    setNewlyAddedTaskIds(onAddTasks(checkIn.suggestedQuickGoalIds));
-    onSetTaskStatus(checkIn.id, 'added');
-  }, [
-    checkIn.completedAt,
-    checkIn.id,
-    checkIn.suggestedQuickGoalIds,
-    checkIn.taskSuggestionStatus,
-    onAddTasks,
-    onSetTaskStatus,
-  ]);
   const displayedTasks = suggestions
     .filter((template) => newlyAddedTaskIds !== null
       ? newlyAddedTaskIds.includes(template.id)
@@ -169,23 +158,65 @@ export function CompanionCheckInPage({
   };
 
   if (checkIn.completedAt) {
+    const suggestionTitles = suggestions.map((template) => template.title);
+    const effectiveTaskStatus = taskDecision ?? checkIn.taskSuggestionStatus;
+    const taskPreview = effectiveTaskStatus === 'pending' && suggestionTitles.length > 0;
+    const tasksAdded = effectiveTaskStatus === 'added';
+    const alreadyAdded = tasksAdded && newlyAddedTaskIds?.length === 0;
+    const showingCurrentAddResult = tasksAdded && newlyAddedTaskIds !== null;
     return (
       <CompanionQuestionnaireScene
         accentColor={accentColor}
         background={background}
         companionName={companionName}
         creature={creature}
-        helperText={displayedTasks.length
-          ? 'I turned your answers into a few gentle steps for today.'
-          : 'I’ll remember what you shared for next time.'}
+        environmentKey={environmentKey}
+        helperText="Your answers are saved. You choose whether any suggested steps join Today."
         onBack={onBack}
         result
         stepLabel="Today’s check-in"
-        title="All set for today">
+        title="All set for today"
+        visualKey={visualKey}>
 
-        <QuestionnaireResultNotice tasks={displayedTasks} />
+        <QuestionnaireResultNotice
+          body={alreadyAdded
+            ? 'Those steps were already waiting for you.'
+            : tasksAdded && !showingCurrentAddResult
+              ? 'You can find any added steps with your Today tasks.'
+              : undefined}
+          mode={taskPreview ? 'preview' : showingCurrentAddResult ? 'added' : 'saved'}
+          tasks={taskPreview ? suggestionTitles : showingCurrentAddResult ? displayedTasks : []}
+          title={alreadyAdded
+            ? 'Already in Today'
+            : tasksAdded && !showingCurrentAddResult
+              ? 'Your task choice is saved'
+              : undefined}
+        />
 
-        {detailOpen ? (
+        {taskPreview ? (
+          <View style={styles.resultActions}>
+            <CompanionPrimaryAction
+              icon="plus"
+              label={`Add ${suggestionTitles.length} to Today`}
+              onPress={() => {
+                const addedIds = onAddTasks(checkIn.suggestedQuickGoalIds);
+                setNewlyAddedTaskIds(addedIds);
+                setTaskDecision('added');
+                onSetTaskStatus(checkIn.id, 'added');
+              }}
+            />
+            <CompanionSecondaryAction
+              label="Not now"
+              onPress={() => {
+                setTaskDecision('dismissed');
+                onSetTaskStatus(checkIn.id, 'dismissed');
+                onBack();
+              }}
+            />
+          </View>
+        ) : null}
+
+        {!taskPreview && detailOpen ? (
           <View style={styles.detail}>
             <CompanionReflectionThread
               initialDraft={draft}
@@ -203,55 +234,58 @@ export function CompanionCheckInPage({
               }}
             />
           </View>
-        ) : (
+        ) : !taskPreview ? (
           <CompanionSecondaryAction
             icon="mic.fill"
             label="Add an optional note"
             onPress={() => setDetailOpen(true)}
           />
-        )}
+        ) : null}
 
-        <CompanionPrimaryAction icon="checkmark" label="Done" onPress={onBack} />
+        {!taskPreview ? <CompanionPrimaryAction icon="checkmark" label="Done" onPress={onBack} /> : null}
       </CompanionQuestionnaireScene>
     );
   }
 
   if (!question) return null;
   return (
-    <CompanionQuestionnaireScene
-      accentColor={accentColor}
-      background={background}
-      companionName={companionName}
-      creature={creature}
-      helperText={question.helperText}
-      onBack={checkIn.answers.length ? () => onBackQuestion(checkIn.id) : onBack}
-      onSelect={(option) => {
-        const source = question.options.find((candidate) => candidate.id === option.id);
-        if (source) answer(source);
-      }}
-      options={question.options.map((option) => ({
-        id: option.id,
-        label: option.label,
-        icon: companionQuestionnaireOptionIcon(option.id, option.label),
-      }))}
-      progress={progress.ratio}
-      stepLabel={`Question ${progress.current} of ${progress.total}`}
-      title={question.prompt}
+      <CompanionQuestionnaireScene
+        accentColor={accentColor}
+        background={background}
+        companionName={companionName}
+        creature={creature}
+        environmentKey={environmentKey}
+        helperText={question.helperText}
+        onBack={checkIn.answers.length ? () => onBackQuestion(checkIn.id) : onBack}
+        onSelect={(option) => {
+          const source = question.options.find((candidate) => candidate.id === option.id);
+          if (source) answer(source);
+        }}
+        options={question.options.map((option) => ({
+          id: option.id,
+          label: option.label,
+          icon: companionQuestionnaireOptionIcon(option.id, option.label),
+        }))}
+        progress={progress.ratio}
+        stepLabel={`Question ${progress.current} of ${progress.total}`}
+        title={question.prompt}
+        visualKey={visualKey}
     />
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
-  card: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', gap: 14, padding: 16 },
-  cardComplete: { backgroundColor: 'rgba(91,132,91,0.09)', borderColor: 'rgba(91,132,91,0.25)' },
+  card: { backgroundColor: '#FFF3D7', borderColor: '#D8B974', borderCurve: 'continuous', borderRadius: 21, borderWidth: 1, boxShadow: '0 9px 22px rgba(10,7,4,0.25), inset 0 1px 0 rgba(255,255,255,0.9)', gap: 14, padding: 16 },
+  cardEmphasized: { borderColor: '#E4B852', borderWidth: 2, boxShadow: '0 12px 28px rgba(10,7,4,0.3), inset 0 1px 0 rgba(255,255,255,0.94)' },
+  cardComplete: { backgroundColor: '#EEF0D9', borderColor: '#9EAC79' },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
-  cardIcon: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.18)', borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
+  cardIcon: { alignItems: 'center', backgroundColor: '#F3DFA7', borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
   cardIconComplete: { backgroundColor: Meadow.leafDeep },
   eyebrow: { ...KatchaUI.type.meta, fontSize: 10.5, fontWeight: '900', letterSpacing: 1.2 },
   cardTitle: { ...KatchaUI.type.sectionTitle, fontSize: 18, lineHeight: 23, marginTop: 3 },
   body: { ...KatchaUI.type.companionBody, fontSize: 12.5, lineHeight: 18, marginTop: 4 },
-  cardButton: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: 'rgba(231,185,81,0.18)', borderRadius: 14, flexDirection: 'row', justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
+  cardButton: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: '#E9C66F', borderColor: '#D3A94C', borderRadius: 14, borderWidth: 1, flexDirection: 'row', justifyContent: 'center', minHeight: 46, paddingHorizontal: 14 },
   cardButtonLabel: { ...KatchaUI.type.companionAction, fontSize: 13, fontWeight: '900', marginRight: 7 },
   page: { gap: 18, paddingBottom: 28 },
   header: { alignItems: 'center', flexDirection: 'row', gap: 12 },
@@ -288,6 +322,7 @@ const styles = StyleSheet.create({
   statusRow: { alignItems: 'center', backgroundColor: 'rgba(91,132,91,0.09)', borderRadius: 14, flexDirection: 'row', gap: 8, padding: 12 },
   statusText: { ...KatchaUI.type.companionAction, flex: 1, fontSize: 12.5 },
   detail: { gap: 12 },
+  resultActions: { gap: 8 },
   pressed: { opacity: 0.74, transform: [{ scale: 0.985 }] },
   disabled: { opacity: 0.45 },
 });

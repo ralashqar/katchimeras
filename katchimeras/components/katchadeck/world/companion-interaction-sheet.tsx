@@ -240,6 +240,9 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     props.familyId
   );
   const goalsRemaining = goalsToday.filter((item) => !item.completion).length;
+  const activeJourneyFocus = props.journeyGoals.find((goal) => goal.status === 'active' && goal.isPrimary)
+    ?? props.journeyGoals.find((goal) => goal.status === 'active')
+    ?? null;
   const selectedOffer = props.offers.find((offer) => offer.id === props.selectedOfferId) ?? props.offers[0];
   const quest = useMemo(() => buildCompanionQuestViewModel({
     activeQuest: props.activeQuest,
@@ -468,12 +471,23 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       ? 'Ready to keep going?'
       : 'Ready for a little adventure?'
     : destination === 'discovery'
-      ? 'Let’s talk about you.'
+      ? props.journeyConversation
+        ? 'Let’s pick up where we left off.'
+        : !activeJourneyFocus
+          ? 'What would you like to shape?'
+          : props.journeyCheckIn?.completedAt
+            ? 'I’ll keep today in mind.'
+            : 'How did today feel?'
       : destination === 'goals'
         ? 'What feels doable today?'
         : destination === 'insight'
           ? 'Here’s what I noticed.'
           : 'Which form feels like me?';
+  const destinationHeroBody = destination === 'discovery'
+    ? activeJourneyFocus
+      ? 'Check in for today, or adjust the focus you are working on together.'
+      : `A few quick choices help ${props.name} understand what would be useful right now.`
+    : undefined;
   const questGameContent = questGameVisible
     && interactiveExecution
     && props.onStartQuestAttempt
@@ -541,13 +555,16 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             strong={questPresentation.backdrop === 'strong'}
             visualKey={props.visualKey}
           />
-        ) : route.kind === 'destination' && !questionnaireExperience && !quickGoalPickerOpen ? (
+        ) : (route.kind === 'destination' || quickGoalPickerOpen) && !questionnaireExperience ? (
           <CompanionCinematicStage
+            bubbleBody={quickGoalPickerOpen ? 'Choose one for today, or make a small goal of your own.' : destinationHeroBody}
+            bubbleVariant={destination === 'discovery' || quickGoalPickerOpen ? 'questionnaire' : 'default'}
             creature={visual.source}
             environmentKey={props.homeEnvironmentKey ?? null}
             lifted
             name={props.name}
-            title={destinationHeroTitle}
+            showSpeechBubble
+            title={quickGoalPickerOpen ? 'Which small step feels right?' : destinationHeroTitle}
             visualKey={props.visualKey}
           />
         ) : null}
@@ -580,12 +597,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             />
           </View>
         ) : null}
-        {route.kind === 'destination' && !questGameVisible && !questionnaireExperience && !quickGoalPickerOpen ? (
+        {(route.kind === 'destination' || quickGoalPickerOpen) && !questGameVisible && !questionnaireExperience ? (
           <CompanionDestinationHeader
-            backLabel={destination === 'quest' && canReturnToQuestList ? 'Quest list' : 'Home'}
+            backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && canReturnToQuestList ? 'Quest list' : 'Home'}
             label={destinationLabel}
             onBack={
-              destination === 'quest' && canReturnToQuestList
+              quickGoalPickerOpen
+                ? experience.returnToDestination
+                : destination === 'quest' && canReturnToQuestList
                 ? () => setLeaveQuestOpen(true)
                 : experience.showHome
             }
@@ -631,12 +650,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               entering={entering}
               exiting={FadeOut.duration(100)}
               style={activeAttemptId || questionnaireExperience ? styles.activeExperience : undefined}>
-              {route.kind === 'destination' && !questionnaireExperience && !quickGoalPickerOpen ? (
+              {(route.kind === 'destination' || quickGoalPickerOpen) && !questionnaireExperience ? (
                 <View
                   accessibilityElementsHidden
                   pointerEvents="none"
                   style={[
                     styles.destinationStageSpacer,
+                    destination === 'discovery' && styles.youStageSpacer,
                     destination === 'quest' && {
                       minHeight: companionQuestListSpacer(viewportHeight),
                     },
@@ -651,6 +671,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   companionName={props.name}
                   creature={visual.source}
                   definition={props.journeyDefinition}
+                  environmentKey={props.homeEnvironmentKey ?? null}
                   goal={activeCheckIn.goalId
                     ? props.journeyGoals.find((goal) => goal.id === activeCheckIn.goalId) ?? null
                     : null}
@@ -687,6 +708,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                       : current);
                   }}
                   role={props.role}
+                  visualKey={props.visualKey}
                 />
               ) : questionnaireExperience && props.journeyDefinition ? (
                 <CompanionJourneyQuestionnairePage
@@ -696,11 +718,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   conversation={props.journeyConversation}
                   creature={visual.source}
                   definition={props.journeyDefinition}
+                  environmentKey={props.homeEnvironmentKey ?? null}
                   goals={props.journeyGoals}
                   node={props.journeyNode}
                   onAddTasks={props.onAddQuickGoalSuggestions}
                   onAnswer={props.onAnswerJourneyConversation}
                   onBack={requestClose}
+                  onDismissTasks={props.onDismissQuickGoalSuggestions}
                   onViewTasks={() => {
                     props.onDismissQuickGoalSuggestions();
                     experience.returnToDestination();
@@ -708,6 +732,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   }}
                   quickGoalSuggestionIds={props.quickGoalSuggestionIds}
                   resultReady={Boolean(journeyQuestionnaireSessionId && !props.journeyConversation)}
+                  visualKey={props.visualKey}
                 />
               ) : quickGoalPickerOpen ? (
                 <CompanionQuickGoalPicker
@@ -715,7 +740,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   familyId={props.familyId}
                   onAddCustom={props.onAddCustomQuickGoal}
                   onAddTemplate={props.onAddQuickGoalTemplate}
-                  onBack={experience.returnToDestination}
                   state={props.quickGoalState}
                 />
               ) : props.memorySaved ? (
@@ -773,18 +797,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 </View>
               ) : destination === 'discovery' ? (
                 <View style={styles.youStack}>
-                  <CompanionCheckInCard
-                    checkIn={props.journeyCheckIn}
-                    companionName={props.name}
-                    onOpen={() => {
-                      if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-                      const checkIn = props.journeyCheckIn ?? props.onStartJourneyCheckIn();
-                      if (!checkIn) return;
-                      setActiveCheckIn(checkIn);
-                      experience.openCheckIn(checkIn.id);
-                    }}
-                  />
-                {props.journeyDefinition ? (
+                {props.journeyDefinition && (!activeJourneyFocus || props.journeyConversation) ? (
                   <CompanionJourneyDiscoveryThread
                     companionName={props.name}
                     conversation={props.journeyConversation}
@@ -798,7 +811,34 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     }}
                     showHeading={false}
                   />
-                ) : (
+                ) : null}
+                  <CompanionCheckInCard
+                    checkIn={props.journeyCheckIn}
+                    companionName={props.name}
+                    emphasized={Boolean(activeJourneyFocus && !props.journeyConversation)}
+                    onOpen={() => {
+                      if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                      const checkIn = props.journeyCheckIn ?? props.onStartJourneyCheckIn();
+                      if (!checkIn) return;
+                      setActiveCheckIn(checkIn);
+                      experience.openCheckIn(checkIn.id);
+                    }}
+                  />
+                {props.journeyDefinition && activeJourneyFocus && !props.journeyConversation ? (
+                  <CompanionJourneyDiscoveryThread
+                    companionName={props.name}
+                    conversation={props.journeyConversation}
+                    definition={props.journeyDefinition}
+                    goals={props.journeyGoals}
+                    onSetGoalStatus={props.onSetJourneyGoalStatus}
+                    onOpenQuestionnaire={() => {
+                      if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                      experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+                      if (!props.journeyConversation) props.onStartJourneyConversation();
+                    }}
+                    showHeading={false}
+                  />
+                ) : !props.journeyDefinition ? (
                   <CompanionDiscoveryThread
                     answers={props.discoveryAnswers}
                     companionName={props.name}
@@ -809,7 +849,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     role={props.role}
                     showHeading={false}
                   />
-                )}
+                ) : null}
                 </View>
               ) : destination === 'goals' ? (
                 quickGoalPanel ?? (
@@ -877,6 +917,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
 const styles = StyleSheet.create({
   contentFrame: { flex: 1, minHeight: 0 },
   destinationStageSpacer: { minHeight: 244 },
+  youStageSpacer: { minHeight: 188 },
   scrollContent: { paddingBottom: 12, paddingHorizontal: 4 },
   activeScrollContent: { flexGrow: 1, paddingBottom: 0, paddingHorizontal: 0 },
   questionnaireScrollContent: { flexGrow: 1, paddingHorizontal: 0 },
@@ -890,7 +931,17 @@ const styles = StyleSheet.create({
   },
   openGameAction: { paddingTop: 12 },
   quickGoalStack: { gap: 8, marginBottom: 12 },
-  youStack: { gap: 14 },
+  youStack: {
+    backgroundColor: '#211A13',
+    borderColor: 'rgba(248,220,165,0.2)',
+    borderCurve: 'continuous',
+    borderRadius: 30,
+    borderWidth: 1,
+    boxShadow: '0 18px 42px rgba(31,20,10,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
+    gap: 14,
+    padding: 18,
+    paddingBottom: 20,
+  },
   footer: { backgroundColor: 'transparent', paddingBottom: 2, paddingHorizontal: 2, paddingTop: 7 },
   saved: { alignItems: 'center', gap: 8, justifyContent: 'center', minHeight: 220, paddingHorizontal: 24 },
   savedTitle: { fontSize: 24, fontWeight: '900' },

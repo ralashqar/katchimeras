@@ -70,7 +70,10 @@ export function KatchimeraRosterRouteScreen() {
 
 function FocusedKatchimeraRoster() {
   const router = useRouter();
-  const { days } = useAllDays();
+  // This component is created fresh for every focus session, so its lazy
+  // initializer already reads the latest persisted days. Refreshing on that
+  // same initial focus would rebuild the just-mounted grid a second time.
+  const { days } = useAllDays({ refreshOnFocus: false });
   const [persistentSnapshot, setPersistentSnapshot] = useState(loadRosterPersistentSnapshot);
   const hasCompletedInitialFocus = useRef(false);
   const previousItems = useRef<readonly KatchimeraRosterItem[]>([]);

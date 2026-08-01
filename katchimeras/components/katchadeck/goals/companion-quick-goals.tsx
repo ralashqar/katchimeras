@@ -11,9 +11,9 @@ import Animated, {
   ZoomOut,
   useReducedMotion,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { QuickGoalActionModal } from '@/components/katchadeck/goals/quick-goal-action-modal';
+import { QuickGoalComposerModal } from '@/components/katchadeck/goals/quick-goal-composer-modal';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -160,132 +160,118 @@ export function CompanionQuickGoalPicker({
   familyId,
   onAddCustom,
   onAddTemplate,
-  onBack,
   state,
 }: {
   dayId: string;
   familyId: KatchimeraFamilyId;
   onAddCustom: QuickGoalActions['onAddCustom'];
   onAddTemplate: QuickGoalActions['onAddTemplate'];
-  onBack: () => void;
   state: CompanionQuickGoalState;
 }) {
-  const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const [customOpen, setCustomOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [cadence, setCadence] = useState<CompanionQuickGoalCadence>({ kind: 'once', dayId });
   const [feedback, setFeedback] = useState<string | null>(null);
   const family = katchimeraFamilyById.get(familyId);
   const familyGoals = state.goals.filter((goal) => goal.familyId === familyId && goal.status !== 'archived');
   const templates = quickGoalTemplatesForFamily(familyId);
 
-  const saveCustom = () => {
-    if (!title.trim()) {
-      setFeedback('Write a short goal first');
-      return;
-    }
-    if (cadence.kind === 'weekdays' && !cadence.weekdays.length) {
-      setFeedback('Choose at least one day');
-      return;
-    }
-    const result = onAddCustom(familyId, title, cadence);
-    if (!result.added) {
-      setFeedback(result.reason === 'duplicate' ? 'That goal is already active' : 'Could not add that goal');
-      return;
-    }
-    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setFeedback('Added to today');
-    setCustomOpen(false);
-    setTitle('');
-  };
-
   return (
-    <View style={[styles.scopedPicker, { paddingTop: insets.top + 10 }]}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onBack}
-        style={({ pressed }) => [styles.scopedBack, pressed && styles.pressed]}>
-        <IconSymbol color={Meadow.inkSoft} name="chevron.left" size={16} />
-        <ThemedText style={styles.scopedBackText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          Back to Goals
-        </ThemedText>
-      </Pressable>
-
+    <>
+    <View style={styles.scopedPicker}>
       <View style={styles.scopedHeading}>
-        <ThemedText style={styles.sectionLabel} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
-          {family?.displayName.toUpperCase() ?? 'COMPANION'} GOALS
+        <ThemedText style={styles.scopedEyebrow} lightColor="#E9BE61" darkColor="#E9BE61">
+          {templates.length} IDEAS FOR TODAY
         </ThemedText>
-        <ThemedText selectable style={styles.scopedTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-          Choose something small
+        <ThemedText selectable style={styles.scopedTitle} lightColor="#FFF8E7" darkColor="#FFF8E7">
+          Pick a small step
         </ThemedText>
-        <ThemedText selectable style={styles.scopedDescription} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          Only goals connected to {family?.displayName ?? 'this companion'} and its part of your life.
+        <ThemedText selectable style={styles.scopedDescription} lightColor="#D8C5AD" darkColor="#D8C5AD">
+          Made for you and {family?.displayName ?? 'your companion'}. You can change it later.
         </ThemedText>
       </View>
 
       <View style={styles.presetList}>
-        {templates.map((template) => {
+        {templates.map((template, index) => {
           const added = familyGoals.some((goal) => goal.templateId === template.id);
           return (
-            <Pressable
-              accessibilityRole="button"
-              disabled={added}
-              key={template.id}
-              onPress={() => {
-                const result = onAddTemplate(template.id);
-                if (result.added && process.env.EXPO_OS === 'ios') {
-                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                }
-                setFeedback(result.added ? 'Added to today' : 'That goal is already active');
-              }}
-              style={({ pressed }) => [styles.presetRow, added && styles.disabled, pressed && styles.pressed]}>
-              <View style={styles.presetCopy}>
-                <ThemedText selectable style={styles.presetTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  {template.title}
-                </ThemedText>
-                <ThemedText style={styles.presetCadence} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-                  {quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
-                </ThemedText>
-              </View>
-              <IconSymbol color={added ? Meadow.leafDeep : Meadow.goldDeep} name={added ? 'checkmark' : 'plus'} size={17} />
-            </Pressable>
+            <Animated.View
+              entering={reduceMotion ? undefined : FadeInUp.delay(Math.min(index, 7) * 34).duration(210)}
+              key={template.id}>
+              <Pressable
+                accessibilityLabel={`${template.title}. ${added ? 'Already added' : 'Add goal'}`}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: added }}
+                disabled={added}
+                onPress={() => {
+                  const result = onAddTemplate(template.id);
+                  if (result.added && process.env.EXPO_OS === 'ios') {
+                    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                  setFeedback(result.added ? 'Added to today' : 'That goal is already active');
+                }}
+                style={({ pressed }) => [
+                  styles.scopedPresetRow,
+                  added && styles.scopedPresetRowAdded,
+                  pressed && styles.pressed,
+                ]}>
+                <View style={styles.presetCopy}>
+                  <ThemedText selectable style={styles.presetTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+                    {template.title}
+                  </ThemedText>
+                  <ThemedText style={styles.presetCadence} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                    {added ? 'Added' : quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
+                  </ThemedText>
+                </View>
+                <View style={[styles.presetAdd, added && styles.presetAdded]}>
+                  <IconSymbol color={added ? '#FFF8E7' : Meadow.goldDeep} name={added ? 'checkmark' : 'plus'} size={16} />
+                </View>
+              </Pressable>
+            </Animated.View>
           );
         })}
       </View>
 
-      {!customOpen ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            setCadence({ kind: 'once', dayId });
-            setFeedback(null);
-            setCustomOpen(true);
-          }}
-          style={({ pressed }) => [styles.customButton, pressed && styles.pressed]}>
-          <IconSymbol color={Meadow.inkSoft} name="pencil" size={15} />
-          <ThemedText style={styles.customButtonText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-            Write my own {family?.displayName ?? 'companion'} goal
+      <Pressable
+        accessibilityHint="Opens a popup where you can type or record a goal"
+        accessibilityRole="button"
+        onPress={() => {
+          setFeedback(null);
+          setCustomOpen(true);
+        }}
+        style={({ pressed }) => [styles.scopedCustomButton, pressed && styles.pressed]}>
+        <View style={styles.scopedCustomIcon}>
+          <IconSymbol color={Meadow.ink} name="square.and.pencil" size={16} />
+        </View>
+        <View style={styles.scopedCustomCopy}>
+          <ThemedText style={styles.scopedCustomButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+            Write my own goal
           </ThemedText>
-        </Pressable>
-      ) : (
-        <GoalEditor
-          cadence={cadence}
-          dayId={dayId}
-          editing={false}
-          onCadenceChange={setCadence}
-          onCancel={() => setCustomOpen(false)}
-          onSave={saveCustom}
-          onTitleChange={setTitle}
-          title={title}
-        />
-      )}
+          <ThemedText style={styles.scopedCustomButtonHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+            Type it or use your voice
+          </ThemedText>
+        </View>
+        <IconSymbol color={Meadow.ink} name="arrow.right" size={17} />
+      </Pressable>
 
       {feedback ? (
-        <ThemedText accessibilityLiveRegion="polite" selectable style={styles.feedback} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
+        <ThemedText accessibilityLiveRegion="polite" selectable style={styles.scopedFeedback} lightColor="#F4D690" darkColor="#F4D690">
           {feedback}
         </ThemedText>
       ) : null}
     </View>
+    {customOpen ? (
+      <QuickGoalComposerModal
+        dayId={dayId}
+        familyName={family?.displayName ?? 'your companion'}
+        onRequestClose={() => setCustomOpen(false)}
+        onSave={(nextTitle, nextCadence) => {
+          const result = onAddCustom(familyId, nextTitle, nextCadence);
+          if (result.added) setFeedback('Added to today');
+          return result;
+        }}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -965,12 +951,72 @@ function GoalManageButton({
 
 const styles = StyleSheet.create({
   companionPanel: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', gap: 10, marginBottom: 12, padding: 14 },
-  scopedPicker: { gap: KatchaUI.spacing.md, paddingBottom: KatchaUI.spacing.xl, paddingHorizontal: 4, paddingTop: 6 },
-  scopedBack: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', gap: 5, minHeight: 38, paddingHorizontal: 4 },
-  scopedBackText: { ...KatchaUI.type.companionAction, fontSize: 11.5 },
-  scopedHeading: { gap: 5, paddingBottom: 2 },
+  scopedPicker: {
+    backgroundColor: '#211A13',
+    borderColor: 'rgba(248,220,165,0.2)',
+    borderCurve: 'continuous',
+    borderRadius: 30,
+    borderWidth: 1,
+    boxShadow: '0 18px 42px rgba(31,20,10,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
+    gap: 14,
+    marginBottom: 12,
+    padding: 18,
+    paddingBottom: 20,
+  },
+  scopedHeading: { gap: 5, paddingBottom: 3 },
+  scopedEyebrow: { ...KatchaUI.type.label, fontSize: 9.5, letterSpacing: 1.15 },
   scopedTitle: { ...KatchaUI.type.screenTitle, fontSize: 22, letterSpacing: -0.4, lineHeight: 27 },
   scopedDescription: { ...KatchaUI.type.companionBody, fontSize: 12.5, lineHeight: 18 },
+  scopedPresetRow: {
+    alignItems: 'center',
+    backgroundColor: '#FFF8E7',
+    borderColor: 'rgba(236,204,140,0.62)',
+    borderCurve: 'continuous',
+    borderRadius: 18,
+    borderWidth: 1,
+    boxShadow: '0 4px 12px rgba(16,10,6,0.18), inset 0 1px 0 rgba(255,255,255,0.9)',
+    flexDirection: 'row',
+    gap: 10,
+    minHeight: 68,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  scopedPresetRowAdded: {
+    backgroundColor: '#EEF2DF',
+    borderColor: 'rgba(101,132,83,0.38)',
+  },
+  scopedCustomButton: {
+    alignItems: 'center',
+    backgroundColor: '#F2C967',
+    borderColor: '#D7A93C',
+    borderCurve: 'continuous',
+    borderRadius: 17,
+    borderWidth: 1,
+    boxShadow: '0 7px 18px rgba(5,3,2,0.26), inset 0 1px 0 rgba(255,255,255,0.42)',
+    flexDirection: 'row',
+    gap: 9,
+    justifyContent: 'center',
+    minHeight: 54,
+    paddingHorizontal: 14,
+  },
+  scopedCustomIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,248,231,0.42)',
+    borderRadius: 999,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  scopedCustomCopy: { flex: 1, gap: 1 },
+  scopedCustomButtonText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
+  scopedCustomButtonHint: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700' },
+  scopedFeedback: {
+    fontFamily: AppFontFamilies.manrope,
+    fontSize: 11.5,
+    fontWeight: '900',
+    lineHeight: 16,
+    textAlign: 'center',
+  },
   panelHeading: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   panelCopy: { flex: 1, gap: 2 },
   panelEyebrow: { ...KatchaUI.type.label, fontSize: 9, letterSpacing: 1 },

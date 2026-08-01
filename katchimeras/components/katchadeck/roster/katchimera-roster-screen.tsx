@@ -2,14 +2,14 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
-import Animated, { FadeIn, FadeInRight, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KatchimeraRosterCard } from '@/components/katchadeck/roster/katchimera-roster-card';
@@ -62,12 +62,11 @@ function KatchimeraRosterScreenComponent({
   const { height, width } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const listRef = useRef<FlashListRef<RosterListItem>>(null);
+  const hasCompletedInitialLoad = useRef(false);
   const [selectedAspect, setSelectedAspect] = useState<LifeAspectId | 'all'>('all');
   const [sort, setSort] = useState<KatchimeraRosterSort>('bond');
   const [sortOpen, setSortOpen] = useState(false);
-  const [introActive, setIntroActive] = useState(() => !reduceMotion);
   const columnCount = width >= 390 ? 3 : 2;
-  const introCardLimit = columnCount * 2;
   const horizontalPadding = 14;
   const gap = 9;
   const drawDistance = Math.min(360, Math.max(240, height * 0.4));
@@ -102,18 +101,6 @@ function KatchimeraRosterScreenComponent({
     paddingHorizontal: horizontalPadding,
   }), [insets.bottom]);
 
-  useEffect(() => {
-    if (reduceMotion) {
-      setIntroActive(false);
-      return;
-    }
-    if (!introActive) return;
-    const timeout = setTimeout(() => {
-      setIntroActive(false);
-    }, 480);
-    return () => clearTimeout(timeout);
-  }, [introActive, reduceMotion]);
-
   const selectCreature = useCallback((creatureId: string) => {
     if (process.env.EXPO_OS === 'ios') {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -137,20 +124,20 @@ function KatchimeraRosterScreenComponent({
   }, [scrollToGridStart]);
   const toggleSort = useCallback(() => setSortOpen((current) => !current), []);
   const handleLoad = useCallback(({ elapsedTimeInMs }: { elapsedTimeInMs: number }) => {
+    if (hasCompletedInitialLoad.current) return;
+    hasCompletedInitialLoad.current = true;
     if (__DEV__ && process.env.EXPO_PUBLIC_SCENE_PERF === '1') {
       console.info('[roster-perf] initial-grid', { readyMs: Math.round(elapsedTimeInMs * 10) / 10 });
     }
   }, []);
-  const renderItem = useCallback(({ index, item, target }: ListRenderItemInfo<RosterListItem>) => {
+  const renderItem = useCallback(({ item, target }: ListRenderItemInfo<RosterListItem>) => {
     const renderArtwork = target === 'Cell';
     if (item.type === 'hero') {
       return (
         <View style={styles.fullBleedItem}>
           <RosterHero
-            animateEntrance={introActive && renderArtwork}
             featured={featured}
             onGoToday={onGoToday}
-            reduceMotion={reduceMotion}
             renderArtwork={renderArtwork}
             safeTop={insets.top}
           />
@@ -176,12 +163,9 @@ function KatchimeraRosterScreenComponent({
     return (
       <View style={styles.cardCell}>
         <KatchimeraRosterCard
-          animateEntrance={introActive && renderArtwork && index - 2 < introCardLimit}
-          entranceIndex={Math.max(0, index - 2)}
           featured={item.item.kind === 'owned' && item.item.creatureId === featured?.creatureId}
           item={item.item}
           onPress={selectCreature}
-          reduceMotion={reduceMotion}
           renderArtwork={renderArtwork}
           width={cardWidth}
         />
@@ -194,10 +178,7 @@ function KatchimeraRosterScreenComponent({
     changeSort,
     featured,
     insets.top,
-    introActive,
-    introCardLimit,
     onGoToday,
-    reduceMotion,
     selectCreature,
     selectedAspect,
     sort,
@@ -222,24 +203,28 @@ function KatchimeraRosterScreenComponent({
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
       />
-      <FlashList<RosterListItem>
-        contentContainerStyle={contentContainerStyle}
-        data={listItems}
-        drawDistance={drawDistance}
-        getItemType={rosterListItemType}
-        key={`roster-${columnCount}`}
-        keyExtractor={rosterListKey}
-        keyboardShouldPersistTaps="handled"
-        maintainVisibleContentPosition={ROSTER_MAINTAIN_VISIBLE_POSITION}
-        numColumns={columnCount}
-        onLoad={handleLoad}
-        overrideItemLayout={overrideItemLayout}
-        ref={listRef}
-        renderItem={renderItem}
-        style={styles.list}
-        stickyHeaderIndices={ROSTER_STICKY_HEADER_INDICES}
-        showsVerticalScrollIndicator={false}
-      />
+      <Animated.View
+        entering={reduceMotion ? undefined : FadeIn.duration(240)}
+        style={styles.listFrame}>
+        <FlashList<RosterListItem>
+          contentContainerStyle={contentContainerStyle}
+          data={listItems}
+          drawDistance={drawDistance}
+          getItemType={rosterListItemType}
+          key={`roster-${columnCount}`}
+          keyExtractor={rosterListKey}
+          keyboardShouldPersistTaps="handled"
+          maintainVisibleContentPosition={ROSTER_MAINTAIN_VISIBLE_POSITION}
+          numColumns={columnCount}
+          onLoad={handleLoad}
+          overrideItemLayout={overrideItemLayout}
+          ref={listRef}
+          renderItem={renderItem}
+          style={styles.list}
+          stickyHeaderIndices={ROSTER_STICKY_HEADER_INDICES}
+          showsVerticalScrollIndicator={false}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -247,23 +232,19 @@ function KatchimeraRosterScreenComponent({
 export const KatchimeraRosterScreen = memo(KatchimeraRosterScreenComponent);
 
 function RosterHero({
-  animateEntrance,
   featured,
   onGoToday,
-  reduceMotion,
   renderArtwork,
   safeTop,
 }: {
-  animateEntrance: boolean;
   featured: ReturnType<typeof featuredKatchimera>;
   onGoToday: () => void;
-  reduceMotion: boolean;
   renderArtwork: boolean;
   safeTop: number;
 }) {
   return (
     <View style={[styles.hero, { paddingTop: safeTop + 20 }]}>
-      <Animated.View entering={reduceMotion || !animateEntrance ? undefined : FadeIn.duration(300)} style={styles.heroCopy}>
+      <View style={styles.heroCopy}>
         <ThemedText selectable style={styles.heroEyebrow} lightColor="#F0D67A" darkColor="#F0D67A">
           YOUR
         </ThemedText>
@@ -295,10 +276,9 @@ function RosterHero({
             </ThemedText>
           </Pressable>
         )}
-      </Animated.View>
+      </View>
       {featured ? renderArtwork ? (
-          <Animated.View
-            entering={reduceMotion || !animateEntrance ? undefined : FadeInRight.duration(360)}
+          <View
             pointerEvents="none"
             style={styles.heroArt}>
             <Image
@@ -310,7 +290,7 @@ function RosterHero({
               style={StyleSheet.absoluteFill}
               transition={0}
             />
-          </Animated.View>
+          </View>
         ) : null : (
         <View pointerEvents="none" style={styles.emptyArt}>
           <IconSymbol name="sparkles" size={66} color="rgba(240,214,122,0.72)" />
@@ -322,6 +302,7 @@ function RosterHero({
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: '#171A12', flex: 1 },
+  listFrame: { flex: 1 },
   list: { flex: 1 },
   hero: {
     minHeight: 296,

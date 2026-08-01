@@ -17,13 +17,18 @@ let hydrationCache: { state: ReturnType<typeof homeRepository.load>; dayKey: str
 // calendar and the per-day journal, which (unlike the Home timeline) must be able
 // to resolve any day in the archive. Re-reads on focus so a freshly hatched day
 // shows up without a manual refresh.
-export function useAllDays() {
+export function useAllDays({
+  refreshOnFocus = true,
+}: {
+  refreshOnFocus?: boolean;
+} = {}) {
   const [version, setVersion] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
+      if (!refreshOnFocus) return;
       setVersion((current) => current + 1);
-    }, [])
+    }, [refreshOnFocus])
   );
 
   // Manual re-read for consumers that mutate the day WITHOUT leaving the screen

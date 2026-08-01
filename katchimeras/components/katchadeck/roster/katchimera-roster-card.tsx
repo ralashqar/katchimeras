@@ -2,7 +2,6 @@ import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
-  FadeInUp,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -37,21 +36,15 @@ const STATUS_ICONS: Record<NonNullable<KatchimeraOwnedRosterItem['status']>, Ico
 };
 
 function KatchimeraRosterCardComponent({
-  animateEntrance,
-  entranceIndex,
   featured,
   item,
   onPress,
-  reduceMotion,
   renderArtwork,
   width,
 }: {
-  animateEntrance: boolean;
-  entranceIndex: number;
   featured: boolean;
   item: KatchimeraRosterItem;
   onPress: (creatureId: string) => void;
-  reduceMotion: boolean;
   renderArtwork: boolean;
   width: number;
 }) {
@@ -78,12 +71,6 @@ function KatchimeraRosterCardComponent({
         : 'Undiscovered Katchimera. Hatch more days to meet this companion.'}
       accessibilityRole="button"
       disabled={item.kind === 'locked'}
-      entering={reduceMotion || !animateEntrance
-        ? undefined
-        : FadeInUp
-            .duration(220)
-            .delay(Math.min(entranceIndex * 24, 120))
-            .withInitialValues({ opacity: 0, transform: [{ translateY: 6 }] })}
       onPress={() => {
         if (item.kind === 'owned') onPress(item.creatureId);
       }}

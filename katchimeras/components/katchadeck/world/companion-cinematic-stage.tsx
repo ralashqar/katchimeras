@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
+  FadeIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -27,18 +28,24 @@ const parchment = KatchaSurfacePalette.parchment;
 
 export function CompanionCinematicStage({
   creature,
+  bubbleBody,
+  bubbleVariant = 'default',
   enterFromLifted = false,
   environmentKey,
   lifted,
   name,
+  showSpeechBubble = true,
   title,
   visualKey,
 }: {
+  bubbleBody?: string;
+  bubbleVariant?: 'default' | 'questionnaire';
   creature: QuestionnaireImageSource;
   enterFromLifted?: boolean;
   environmentKey: TodayExplorationBackgroundKey | null;
   lifted: boolean;
   name: string;
+  showSpeechBubble?: boolean;
   title: string;
   visualKey: HomeVisualKey;
 }) {
@@ -46,12 +53,17 @@ export function CompanionCinematicStage({
   const reduceMotion = useReducedMotion();
   const { height, width } = useWindowDimensions();
   const compact = height < 735;
+  const questionnaireBubble = bubbleVariant === 'questionnaire';
   const liftProgress = useSharedValue(enterFromLifted ? 1 : 0);
   const tabletGutter = Math.max(28, (width - 720) / 2);
   const horizontalGutter = width >= 700 ? tabletGutter : 20;
-  const bubbleWidth = width >= 700
-    ? Math.min(330, width * 0.4)
-    : (width - horizontalGutter * 2) * 0.56;
+  const bubbleWidth = questionnaireBubble
+    ? width >= 700
+      ? Math.min(390, width * 0.48)
+      : (width - horizontalGutter * 2) * 0.62
+    : width >= 700
+      ? Math.min(330, width * 0.4)
+      : (width - horizontalGutter * 2) * 0.56;
   const destinationLift = companionDestinationStageLift(height);
   const speechBubbleDrop = companionSpeechBubbleDrop(height);
   // The complete art plane lifts on destination pages. Offset the bubble
@@ -100,26 +112,49 @@ export function CompanionCinematicStage({
       />
 
       <Animated.View pointerEvents="none" style={[styles.foregroundPlane, liftStyle]}>
-        <Animated.View
-          accessibilityLabel={`${name} says: ${title}`}
-          style={[
-            styles.speechBubble,
-            {
-              left: horizontalGutter,
-              top: speechBubbleTop,
-              width: bubbleWidth,
-            },
-          ]}>
-          <View style={styles.speechTail} />
-          <ThemedText
-            maxFontSizeMultiplier={1.3}
-            selectable
-            style={[styles.title, compact && styles.titleCompact]}
-            lightColor="#342317"
-            darkColor="#342317">
-            {title}
-          </ThemedText>
-        </Animated.View>
+        {showSpeechBubble ? (
+          <Animated.View
+            accessibilityLabel={`${name} says: ${title}`}
+            entering={questionnaireBubble && !reduceMotion ? FadeIn.duration(180) : undefined}
+            key={questionnaireBubble ? `question:${title}` : 'destination-speech'}
+            style={[
+              styles.speechBubble,
+              questionnaireBubble && styles.speechBubbleQuestionnaire,
+              {
+                left: horizontalGutter,
+                top: speechBubbleTop,
+                width: bubbleWidth,
+              },
+            ]}>
+            <View style={styles.speechTail} />
+            <TypewriterText
+              durationMs={560}
+              key={`speech-title:${title}`}
+              reduceMotion={reduceMotion}
+              style={[
+                styles.title,
+                compact && styles.titleCompact,
+                questionnaireBubble && styles.questionTitle,
+                questionnaireBubble && title.length > 58 && styles.questionTitleLong,
+              ]}
+              text={title}
+              lightColor="#342317"
+              darkColor="#342317"
+            />
+            {questionnaireBubble && bubbleBody ? (
+              <TypewriterText
+                delayMs={170}
+                durationMs={640}
+                key={`speech-body:${bubbleBody}`}
+                reduceMotion={reduceMotion}
+                style={styles.questionBody}
+                text={bubbleBody}
+                lightColor="#6B5544"
+                darkColor="#6B5544"
+              />
+            ) : null}
+          </Animated.View>
+        ) : null}
 
         <CompanionHomeEnvironmentStage
           backgroundKey={environmentKey}
@@ -129,6 +164,76 @@ export function CompanionCinematicStage({
           visualKey={visualKey}
         />
       </Animated.View>
+    </View>
+  );
+}
+
+function TypewriterText({
+  darkColor,
+  delayMs = 0,
+  durationMs,
+  lightColor,
+  reduceMotion,
+  style,
+  text,
+}: {
+  darkColor: string;
+  delayMs?: number;
+  durationMs: number;
+  lightColor: string;
+  reduceMotion: boolean;
+  style: StyleProp<TextStyle>;
+  text: string;
+}) {
+  const characters = useMemo(() => Array.from(text), [text]);
+  const [visibleCount, setVisibleCount] = useState(() => reduceMotion ? characters.length : 0);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setVisibleCount(characters.length);
+      return;
+    }
+
+    setVisibleCount(0);
+    let frame: number | null = null;
+    const startAt = performance.now() + delayMs;
+    const reveal = (timestamp: number) => {
+      if (timestamp < startAt) {
+        frame = requestAnimationFrame(reveal);
+        return;
+      }
+      const ratio = Math.min(1, (timestamp - startAt) / durationMs);
+      const nextCount = Math.min(characters.length, Math.ceil(characters.length * ratio));
+      setVisibleCount((current) => current === nextCount ? current : nextCount);
+      if (ratio < 1) frame = requestAnimationFrame(reveal);
+    };
+    frame = requestAnimationFrame(reveal);
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [characters, delayMs, durationMs, reduceMotion]);
+
+  const complete = visibleCount >= characters.length;
+  return (
+    <View style={styles.typewriterFrame}>
+      <ThemedText
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        maxFontSizeMultiplier={1.3}
+        style={[style, styles.typewriterMeasure]}
+        lightColor={lightColor}
+        darkColor={darkColor}>
+        {text}
+      </ThemedText>
+      <ThemedText
+        accessibilityLabel={text}
+        maxFontSizeMultiplier={1.3}
+        selectable={complete}
+        style={[StyleSheet.absoluteFill, style]}
+        lightColor={lightColor}
+        darkColor={darkColor}>
+        {characters.slice(0, visibleCount).join('')}
+      </ThemedText>
     </View>
   );
 }
@@ -149,6 +254,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 2,
   },
+  typewriterFrame: {
+    alignSelf: 'stretch',
+    position: 'relative',
+  },
+  typewriterMeasure: {
+    opacity: 0,
+  },
   speechBubble: {
     backgroundColor: 'rgba(255,248,231,0.96)',
     borderColor: 'rgba(103,72,39,0.22)',
@@ -162,6 +274,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     position: 'absolute',
     zIndex: 1,
+  },
+  speechBubbleQuestionnaire: {
+    minHeight: 146,
+    paddingBottom: 20,
+    paddingHorizontal: 18,
+    paddingTop: 20,
   },
   speechTail: {
     backgroundColor: '#FFF8E7',
@@ -184,5 +302,18 @@ const styles = StyleSheet.create({
   titleCompact: {
     fontSize: 28,
     lineHeight: 30,
+  },
+  questionTitle: {
+    fontSize: 22,
+    lineHeight: 27,
+  },
+  questionTitleLong: {
+    fontSize: 19,
+    lineHeight: 24,
+  },
+  questionBody: {
+    ...KatchaUI.type.companionBody,
+    fontSize: 12,
+    lineHeight: 17,
   },
 });

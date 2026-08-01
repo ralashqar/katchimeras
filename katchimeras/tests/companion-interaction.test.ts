@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 import type { HomeDayRecord } from '@/types/home';
@@ -21,6 +23,62 @@ import { prepareCompanionReflection } from '@/utils/companion-reflection';
 import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
 import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import { evidenceProvider, isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
+
+test('You questionnaires require answer confirmation and task consent', () => {
+  const questionnaireScene = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-questionnaire-scene.tsx'),
+    'utf8',
+  );
+  const cinematicStage = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-cinematic-stage.tsx'),
+    'utf8',
+  );
+  const journey = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-journey-thread.tsx'),
+    'utf8',
+  );
+  const checkIn = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-check-in.tsx'),
+    'utf8',
+  );
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+
+  assert.match(questionnaireScene, /options\?\.length && selectedId/);
+  assert.doesNotMatch(questionnaireScene, /disabled=\{!selectedId\}/);
+  assert.match(questionnaireScene, /onPress=\{confirmSelection\}/);
+  assert.doesNotMatch(questionnaireScene, /setTimeout/);
+  assert.match(questionnaireScene, /<CompanionCinematicStage/);
+  assert.match(questionnaireScene, /bubbleVariant="questionnaire"/);
+  assert.match(questionnaireScene, /environmentKey=\{environmentKey\}/);
+  assert.match(questionnaireScene, /styles\.progressBlock/);
+  assert.match(questionnaireScene, /height: compact \? 210 : 238/);
+  assert.doesNotMatch(questionnaireScene, /styles\.creatureFrame|styles\.bubble,/);
+  assert.match(cinematicStage, /speechBubbleQuestionnaire/);
+  assert.match(cinematicStage, /minHeight: 146/);
+  assert.match(cinematicStage, /questionTitleLong/);
+  assert.match(cinematicStage, /function TypewriterText/);
+  assert.match(cinematicStage, /requestAnimationFrame\(reveal\)/);
+  assert.match(cinematicStage, /styles\.typewriterMeasure/);
+  assert.match(cinematicStage, /reduceMotion \? characters\.length : 0/);
+  assert.doesNotMatch(journey, /autoAddedResultRef/);
+  assert.doesNotMatch(checkIn, /autoAddedCheckInRef/);
+  assert.match(journey, /onDismissTasks/);
+  assert.match(journey, /Add \$\{suggestedTasks\.length\} to Today/);
+  assert.match(checkIn, /effectiveTaskStatus === 'pending'/);
+  assert.match(interaction, /How did today feel\?/);
+  assert.match(interaction, /emphasized=\{Boolean\(activeJourneyFocus/);
+  assert.match(interaction, /bubbleBody=\{quickGoalPickerOpen \?.*destinationHeroBody\}/);
+  assert.match(interaction, /bubbleVariant=\{destination === 'discovery' \|\| quickGoalPickerOpen \? 'questionnaire' : 'default'\}/);
+  assert.match(interaction, /showSpeechBubble/);
+  assert.doesNotMatch(interaction, /styles\.youHeading|styles\.youIntro/);
+  assert.match(interaction, /backgroundColor: '#211A13'/);
+  assert.doesNotMatch(interaction, /talk about you/i);
+  assert.doesNotMatch(journey, /Find a new focus/);
+  assert.doesNotMatch(journey, /previous focus kept in history/);
+});
 
 test('Mossprout, Feastle, and Tasklet games use the full-bleed game shell', () => {
   assert.equal(companionQuestUsesFullBleed({ kind: 'matching', packId: 'mossprout-garden' } as InteractiveQuestExecution), true);
@@ -119,10 +177,40 @@ test('active mini-games require confirmation and reset their instance on return'
 });
 
 test('goal picker returns to the dedicated goals destination', () => {
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  const quickGoals = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'companion-quick-goals.tsx'),
+    'utf8',
+  );
+  const goalComposer = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'quick-goal-composer-modal.tsx'),
+    'utf8',
+  );
   const initial = createCompanionInteractionState({ initialDestination: 'goals' });
   const picker = companionInteractionReducer(initial, { type: 'open_quick_goal_picker' });
   const returned = companionInteractionReducer(picker, { type: 'return_to_destination' });
+
   assert.deepEqual(returned.route, { kind: 'destination', destination: 'goals' });
+  assert.match(interaction, /quickGoalPickerOpen \? 'Which small step feels right\?' : destinationHeroTitle/);
+  assert.match(interaction, /backLabel=\{quickGoalPickerOpen \? 'Goals'/);
+  assert.match(interaction, /\(route\.kind === 'destination' \|\| quickGoalPickerOpen\) && !questionnaireExperience/);
+  assert.match(interaction, /\(route\.kind === 'destination' \|\| quickGoalPickerOpen\) && !questGameVisible && !questionnaireExperience/);
+  assert.match(quickGoals, /backgroundColor: '#211A13'/);
+  assert.match(quickGoals, /styles\.scopedPresetRow/);
+  assert.match(quickGoals, /<QuickGoalComposerModal/);
+  assert.match(quickGoals, /Type it or use your voice/);
+  assert.doesNotMatch(quickGoals, /Back to Goals/);
+  assert.match(goalComposer, /<Modal/);
+  assert.match(goalComposer, /useJournalVoiceDraft/);
+  assert.match(goalComposer, /Tap the microphone to record/);
+  assert.match(goalComposer, /paddingTop: insets\.top \+ \(keyboardVisible \? 6 : 16\)/);
+  assert.match(goalComposer, /keyboardWillShow/);
+  assert.match(goalComposer, /keyboardVisible && styles\.keyboardFrameOpen/);
+  assert.match(goalComposer, /keyboardVisible && styles\.contentKeyboard/);
+  assert.match(goalComposer, /onSave\(trimmed, cadence\)/);
 });
 
 test('explicit launch intents can open a destination directly', () => {

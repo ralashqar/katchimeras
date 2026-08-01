@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,6 +11,7 @@ import {
 } from '@/constants/companion-journeys';
 import { AppFontFamilies } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
+import type { HomeVisualKey } from '@/types/home';
 import {
   type CompanionGoalJourneyProgress,
   type CompanionJourneyConversationSession,
@@ -23,6 +24,7 @@ import {
   type QuestionnaireImageSource,
 } from '@/utils/companion-questionnaire-presentation';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
+import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import {
   CompanionQuestionnaireScene,
   QuestionnaireResultNotice,
@@ -49,7 +51,54 @@ export function CompanionJourneyDiscoveryThread({
   const activeFocus = goals.find((goal) => goal.status === 'active' && goal.isPrimary)
     ?? goals.find((goal) => goal.status === 'active')
     ?? null;
-  const previousCount = goals.filter((goal) => goal.id !== activeFocus?.id).length;
+  const focusCard = activeFocus ? (
+    <View style={[styles.goalCard, styles.youGoalCard]}>
+      <View style={styles.goalTopRow}>
+        <View style={styles.goalCopy}>
+          <ThemedText style={styles.goalMeta} lightColor="#E7BE68" darkColor="#E7BE68">
+            YOUR CURRENT FOCUS
+          </ThemedText>
+          <ThemedText selectable style={styles.goalTitle} lightColor="#FFF4DA" darkColor="#FFF4DA">
+            {activeFocus.title}
+          </ThemedText>
+        </View>
+      </View>
+      <View style={styles.goalActions}>
+        <GoalAction icon="pause.fill" label="Pause" night onPress={() => onSetGoalStatus(activeFocus.id, 'paused')} />
+        <GoalAction icon="checkmark" label="Complete" night onPress={() => onSetGoalStatus(activeFocus.id, 'completed')} />
+      </View>
+    </View>
+  ) : null;
+  const startCard = (
+    <View style={[styles.startCard, styles.youStartCard, !activeFocus && styles.startCardPrimary]}>
+      <View style={styles.startHeading}>
+        <View style={[styles.startIcon, styles.youStartIcon]}>
+          <IconSymbol color="#E7BE68" name="bubble.left.and.bubble.right.fill" size={22} />
+        </View>
+        <View style={styles.startCopy}>
+          <ThemedText style={styles.startTitle} lightColor="#FFF4DA" darkColor="#FFF4DA">
+            {conversation ? 'Continue where you left off' : activeFocus ? 'Choose a different focus' : 'Choose your first focus'}
+          </ThemedText>
+          <ThemedText style={styles.helper} lightColor="#D8C6A4" darkColor="#D8C6A4">
+            {conversation
+              ? 'Your completed answers are saved.'
+              : activeFocus
+                ? 'Three quick choices can shape a new direction. Your current focus stays until you finish.'
+                : `Three quick choices help ${companionName} find a direction that fits you.`}
+          </ThemedText>
+        </View>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpenQuestionnaire}
+        style={({ pressed }) => [styles.primaryButton, styles.startButton, pressed && styles.pressed]}>
+        <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
+          {conversation ? 'Continue' : definition.conversationStartLabel}
+        </ThemedText>
+        <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={17} />
+      </Pressable>
+    </View>
+  );
 
   return (
     <View style={styles.root}>
@@ -65,55 +114,8 @@ export function CompanionJourneyDiscoveryThread({
         </ThemedText>
       </View> : null}
 
-      {activeFocus ? (
-        <View style={[styles.goalCard, styles.goalCardPrimary]}>
-          <View style={styles.goalTopRow}>
-            <View style={styles.goalCopy}>
-              <ThemedText style={styles.goalMeta} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-                CURRENT FOCUS
-              </ThemedText>
-              <ThemedText selectable style={styles.goalTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                {activeFocus.title}
-              </ThemedText>
-            </View>
-          </View>
-          <View style={styles.goalActions}>
-            <GoalAction icon="pause.fill" label="Pause" onPress={() => onSetGoalStatus(activeFocus.id, 'paused')} />
-            <GoalAction icon="checkmark" label="Complete" onPress={() => onSetGoalStatus(activeFocus.id, 'completed')} />
-          </View>
-        </View>
-      ) : null}
-
-      <View style={styles.startCard}>
-        <View style={styles.startIcon}>
-          <IconSymbol color={Meadow.goldDeep} name="bubble.left.and.bubble.right.fill" size={22} />
-        </View>
-        <View style={styles.startCopy}>
-          <ThemedText style={styles.startTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-            {conversation ? 'Continue your questionnaire' : activeFocus ? 'Find a new focus' : 'Find your focus'}
-          </ThemedText>
-          <ThemedText style={styles.helper} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-            {conversation
-              ? 'Your answers are saved. Pick up exactly where you left off.'
-              : 'A short, private multiple-choice questionnaire creates a clear focus and adds a few matching tasks to Today.'}
-          </ThemedText>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenQuestionnaire}
-          style={({ pressed }) => [styles.primaryButton, styles.startButton, pressed && styles.pressed]}>
-          <ThemedText style={styles.primaryButtonLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
-            {conversation ? 'Continue questionnaire' : definition.conversationStartLabel}
-          </ThemedText>
-          <IconSymbol color={Meadow.chipLabel} name="arrow.right" size={17} />
-        </Pressable>
-      </View>
-
-      {previousCount ? (
-        <ThemedText style={styles.historyNote} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-          {previousCount} previous {previousCount === 1 ? 'focus' : 'focuses'} kept in history
-        </ThemedText>
-      ) : null}
+      {conversation ? startCard : focusCard}
+      {conversation ? focusCard : startCard}
     </View>
   );
 }
@@ -159,7 +161,6 @@ export function LegacyCompanionJourneyDiscoveryThread({
   const activeFocus = goals.find((goal) => goal.status === 'active' && goal.isPrimary)
     ?? goals.find((goal) => goal.status === 'active')
     ?? null;
-  const previousCount = goals.filter((goal) => goal.id !== activeFocus?.id).length;
 
   useEffect(() => {
     setDraft('');
@@ -360,11 +361,6 @@ export function LegacyCompanionJourneyDiscoveryThread({
         </View>
       ) : null}
 
-      {previousCount ? (
-        <ThemedText style={styles.historyNote} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-          {previousCount} previous {previousCount === 1 ? 'focus' : 'focuses'} kept in history
-        </ThemedText>
-      ) : null}
     </View>
   );
 }
@@ -376,14 +372,17 @@ export function CompanionJourneyQuestionnairePage({
   conversation,
   creature,
   definition,
+  environmentKey,
   goals,
   node,
   onAddTasks,
   onAnswer,
   onBack,
+  onDismissTasks,
   onViewTasks,
   quickGoalSuggestionIds,
   resultReady,
+  visualKey,
 }: {
   accentColor: string;
   background: TodayAtmosphereBackground;
@@ -391,55 +390,86 @@ export function CompanionJourneyQuestionnairePage({
   conversation: CompanionJourneyConversationSession | null;
   creature: QuestionnaireImageSource;
   definition: CompanionJourneyDefinition;
+  environmentKey: TodayExplorationBackgroundKey | null;
   goals: readonly CompanionJourneyGoal[];
   node: CompanionJourneyConversationNode | null;
   onAddTasks: (templateIds: readonly string[]) => readonly string[];
   onAnswer: (sessionId: string, value: string) => readonly string[];
   onBack: () => void;
+  onDismissTasks: () => void;
   onViewTasks: () => void;
   quickGoalSuggestionIds: readonly string[];
   resultReady: boolean;
+  visualKey: HomeVisualKey;
 }) {
   const activeFocus = goals.find((goal) => goal.status === 'active' && goal.isPrimary)
     ?? goals.find((goal) => goal.status === 'active')
     ?? null;
-  const autoAddedResultRef = useRef<string | null>(null);
   const [newlyAddedTaskIds, setNewlyAddedTaskIds] = useState<readonly string[] | null>(null);
-  const resultTaskKey = quickGoalSuggestionIds.join(':');
-
-  useEffect(() => {
-    if (!resultReady || !quickGoalSuggestionIds.length || autoAddedResultRef.current === resultTaskKey) {
-      return;
-    }
-    autoAddedResultRef.current = resultTaskKey;
-    setNewlyAddedTaskIds(onAddTasks(quickGoalSuggestionIds));
-  }, [onAddTasks, quickGoalSuggestionIds, resultReady, resultTaskKey]);
+  const [taskDecision, setTaskDecision] = useState<'preview' | 'added' | 'already-added' | 'none'>('preview');
 
   if (resultReady) {
-    const displayedTaskIds = newlyAddedTaskIds ?? quickGoalSuggestionIds;
-    const addedTasks = displayedTaskIds
+    const suggestedTasks = quickGoalSuggestionIds
       .map((templateId) => companionQuickGoalTemplateById.get(templateId))
       .flatMap((template) => template ? [template] : [])
       .map((template) => template.title);
+    const addedTasks = (newlyAddedTaskIds ?? [])
+      .map((templateId) => companionQuickGoalTemplateById.get(templateId))
+      .flatMap((template) => template ? [template] : [])
+      .map((template) => template.title);
+    const previewing = taskDecision === 'preview' && suggestedTasks.length > 0;
+    const added = taskDecision === 'added';
+    const alreadyAdded = taskDecision === 'already-added';
     return (
       <CompanionQuestionnaireScene
         accentColor={accentColor}
         background={background}
         companionName={companionName}
         creature={creature}
-        helperText={addedTasks.length
-          ? 'I turned your answers into a few gentle steps for today.'
-          : 'I’ll use your answers to shape future tasks and reflections.'}
+        environmentKey={environmentKey}
+        helperText="This direction can shape future questions, quests, and reflections."
         onBack={onBack}
         result
         stepLabel="Your direction"
-        title={activeFocus?.title ?? 'Your focus is ready'}>
-        <QuestionnaireResultNotice tasks={addedTasks} />
-        <CompanionPrimaryAction
-          icon="arrow.right"
-          label={addedTasks.length ? 'View Today tasks' : 'Done'}
-          onPress={addedTasks.length ? onViewTasks : onBack}
+        title={activeFocus?.title ?? 'Your focus is ready'}
+        visualKey={visualKey}>
+        <QuestionnaireResultNotice
+          body={alreadyAdded ? 'Those steps were already waiting for you.' : undefined}
+          mode={previewing ? 'preview' : added || alreadyAdded ? 'added' : 'saved'}
+          tasks={previewing ? suggestedTasks : added ? addedTasks : []}
+          title={alreadyAdded ? 'Already in Today' : undefined}
         />
+        {previewing ? (
+          <>
+            <CompanionPrimaryAction
+              icon="plus"
+              label={`Add ${suggestedTasks.length} to Today`}
+              onPress={() => {
+                const addedIds = onAddTasks(quickGoalSuggestionIds);
+                setNewlyAddedTaskIds(addedIds);
+                setTaskDecision(addedIds.length ? 'added' : 'already-added');
+              }}
+            />
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                onDismissTasks();
+                setTaskDecision('none');
+                onBack();
+              }}
+              style={({ pressed }) => [styles.resultTextAction, pressed && styles.pressed]}>
+              <ThemedText style={styles.resultTextActionLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                Not now
+              </ThemedText>
+            </Pressable>
+          </>
+        ) : (
+          <CompanionPrimaryAction
+            icon={added || alreadyAdded ? 'arrow.right' : 'checkmark'}
+            label={added || alreadyAdded ? 'View tasks' : 'Done'}
+            onPress={added || alreadyAdded ? onViewTasks : onBack}
+          />
+        )}
       </CompanionQuestionnaireScene>
     );
   }
@@ -451,9 +481,11 @@ export function CompanionJourneyQuestionnairePage({
         background={background}
         companionName={companionName}
         creature={creature}
+        environmentKey={environmentKey}
         helperText="Give me a moment to gather the right choices."
         onBack={onBack}
         stepLabel="Set direction"
+        visualKey={visualKey}
         title="Preparing your questions…"
       />
     );
@@ -466,6 +498,7 @@ export function CompanionJourneyQuestionnairePage({
       background={background}
       companionName={companionName}
       creature={creature}
+      environmentKey={environmentKey}
       helperText={node.helperText}
       onBack={onBack}
       onSelect={(option) => onAnswer(conversation.id, option.id)}
@@ -477,6 +510,7 @@ export function CompanionJourneyQuestionnairePage({
       progress={progress.ratio}
       stepLabel={`Question ${progress.current} of ${progress.total}`}
       title={node.prompt}
+      visualKey={visualKey}
     />
   );
 }
@@ -484,16 +518,19 @@ export function CompanionJourneyQuestionnairePage({
 function GoalAction({
   icon,
   label,
+  night = false,
   onPress,
 }: {
   icon: 'pause.fill' | 'checkmark' | 'xmark' | 'play.fill';
   label: string;
+  night?: boolean;
   onPress: () => void;
 }) {
+  const color = night ? '#E7D7B8' : Meadow.inkSoft;
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.goalAction, pressed && styles.pressed]}>
-      <IconSymbol color={Meadow.inkSoft} name={icon} size={14} />
-      <ThemedText style={styles.goalActionLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.goalAction, night && styles.youGoalAction, pressed && styles.pressed]}>
+      <IconSymbol color={color} name={icon} size={14} />
+      <ThemedText style={styles.goalActionLabel} lightColor={color} darkColor={color}>
         {label}
       </ThemedText>
     </Pressable>
@@ -693,19 +730,25 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#FFF9EA', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 14, minHeight: 92, padding: 12, textAlignVertical: 'top' },
   primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
   primaryButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '900' },
-  startCard: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', gap: 12, padding: 15 },
+  startCard: { backgroundColor: 'rgba(255,248,232,0.92)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 10px 28px rgba(37,42,29,0.2), inset 0 1px 0 rgba(255,255,255,0.8)', gap: 14, padding: 16 },
+  youStartCard: { backgroundColor: '#30271E', borderColor: '#584934', boxShadow: 'none' },
+  startCardPrimary: { borderColor: Meadow.goldDeep, borderWidth: 1.5 },
+  startHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
   startIcon: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
+  youStartIcon: { backgroundColor: '#493A25', borderColor: '#6B5430', borderWidth: 1 },
   startButton: { alignSelf: 'stretch' },
   suggestionCard: { backgroundColor: 'rgba(255,248,232,0.62)', borderColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 12, padding: 15 },
   suggestionList: { gap: 7 },
   suggestionRow: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 13, flexDirection: 'row', gap: 8, minHeight: 40, paddingHorizontal: 11 },
-  historyNote: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '700', paddingHorizontal: 4 },
   startCopy: { gap: 4 },
   startTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 16, fontWeight: '900' },
+  resultTextAction: { alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
+  resultTextActionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
   goalsSection: { gap: 9 },
   sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '900', letterSpacing: 1.2, paddingHorizontal: 4 },
   goalCard: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '0 7px 18px rgba(37,42,29,0.16), inset 0 1px 0 rgba(255,255,255,0.72)', gap: 10, padding: 14 },
   goalCardPrimary: { backgroundColor: Meadow.goldSoft, borderColor: Meadow.goldDeep },
+  youGoalCard: { backgroundColor: '#3A2D20', borderColor: '#695333', boxShadow: 'none' },
   goalTopRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   goalCopy: { flex: 1, gap: 3 },
   goalMeta: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900', letterSpacing: 0.9 },
@@ -714,6 +757,7 @@ const styles = StyleSheet.create({
   smallButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '900' },
   goalActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   goalAction: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 4, minHeight: 32, paddingHorizontal: 9 },
+  youGoalAction: { backgroundColor: '#2A2119', borderColor: '#665237' },
   goalActionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
   progressCard: { backgroundColor: 'rgba(255,248,232,0.54)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 11, padding: 14 },
   progressHeading: { alignItems: 'center', flexDirection: 'row', gap: 9 },
