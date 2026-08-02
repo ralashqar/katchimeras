@@ -32,6 +32,7 @@ import {
   submitQuest,
   startQuestAttempt,
   type CompanionQuestState,
+  type CompanionQuest,
 } from '@/utils/katchimera-quests';
 import {
   COMPANION_BOND_REWARDS,
@@ -117,6 +118,15 @@ type Args = {
   todayFacts: Partial<Facts>;
 };
 
+export type QuestResultNotice = {
+  kind: 'success' | 'possible' | 'no_match';
+  title: string;
+  message: string;
+  thumbnailUri: string | null;
+  questId: string;
+  creatureId: string;
+};
+
 function loadIdentityAwareCompanionQuests(): CompanionQuestState {
   return loadCompanionQuests(companionIdResolverForHomeState(homeRepository.load()));
 }
@@ -141,6 +151,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const [companionJourneyState, setCompanionJourneyState] = useState(loadCompanionJourneyState);
   const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
   const [questCaptureFeedback, setQuestCaptureFeedback] = useState<QuestCaptureFeedback | null>(null);
+  const [completedQuestPreview, setCompletedQuestPreview] = useState<{
+    quest: CompanionQuest;
+    item: QuestSubmissionItem;
+  } | null>(null);
+  const [questResultNotice, setQuestResultNotice] = useState<QuestResultNotice | null>(null);
   const [quickGoalSuggestions, setQuickGoalSuggestions] = useState<{
     familyId: string;
     templateIds: readonly string[];
@@ -213,6 +228,19 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           reason: evaluation?.reason ?? null,
           sourceType: completedCapture.sourceType,
         });
+        if (evaluation?.status === 'possible' || evaluation?.status === 'no_match') {
+          const requested = evaluation.requestedLabel?.toLowerCase() ?? 'the detail this quest needs';
+          setQuestResultNotice({
+            kind: evaluation.status,
+            title: evaluation.status === 'possible' ? 'This might count' : 'Not a clear match yet',
+            message: evaluation.status === 'possible'
+              ? `Your photo may show ${requested}. Review it in the quest before submitting.`
+              : `Your photo was saved, but it does not clearly show ${requested}. You can try another photo.`,
+            thumbnailUri: completedCapture.sourceId,
+            questId: completedCapture.questId,
+            creatureId: completedCapture.creatureId,
+          });
+        }
       }
     }, [creatureById, residentById])
   );
@@ -388,14 +416,21 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           : null,
       }
     : null;
-  const selectedActiveQuest = selectedResident
+  const selectedLiveQuest = selectedResident
     ? questFor(companionQuestState, selectedResident.creature.creatureId)
     : null;
+  const selectedCompletedQuestPreview = selectedResident
+    && completedQuestPreview?.quest.creatureId === selectedResident.creature.creatureId
+      ? completedQuestPreview
+      : null;
+  const selectedActiveQuest = selectedLiveQuest ?? selectedCompletedQuestPreview?.quest ?? null;
+  const selectedQuestPersistedComplete = Boolean(!selectedLiveQuest && selectedCompletedQuestPreview);
   const selectedQuestRuntime = useMemo(
     () =>
       selectedActiveQuest
         ? evaluateQuestRuntime({
             questId: selectedActiveQuest.questId,
+            questRunId: selectedActiveQuest.questRunId,
             day: questDay,
             facts: questFacts,
             capabilities: questCapabilities,
@@ -412,6 +447,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     [questCaptureFeedback, selectedActiveQuest?.questId, selectedResident?.creature.creatureId]
   );
   const selectedQuestItems = useMemo(() => {
+    if (selectedCompletedQuestPreview) return [selectedCompletedQuestPreview.item];
     if (!selectedActiveQuest || !selectedQuestRuntime) return [];
     if (selectedQuestRuntime.readyToSubmit || selectedQuestRuntime.possibleEvidenceIds.length > 0) {
       return buildQuestSubmissionItems(
@@ -425,10 +461,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     }
     if (selectedQuestRuntime.complete) return buildQuestReportBackItems(questDay, selectedQuestRuntime);
     return [];
-  }, [companionQuestState.submissions, questDay, selectedActiveQuest, selectedQuestCaptureFeedback?.sourceId, selectedQuestRuntime]);
+  }, [companionQuestState.submissions, questDay, selectedActiveQuest, selectedCompletedQuestPreview, selectedQuestCaptureFeedback?.sourceId, selectedQuestRuntime]);
 
   useEffect(() => {
-    if (selectedQuestCaptureFeedback?.phase !== 'analyzing' || !selectedQuestRuntime) return;
+    if (
+      selectedQuestCaptureFeedback?.phase !== 'analyzing'
+      || selectedQuestCaptureFeedback.reason === 'direct_semantic_pending'
+      || !selectedQuestRuntime
+    ) return;
     const timeout = setTimeout(() => {
       const capturedItem = selectedQuestItems.find((item) => item.sourceId === selectedQuestCaptureFeedback.sourceId);
       const phase: QuestCaptureFeedback['phase'] = capturedItem?.matchStatus === 'ready'
@@ -463,7 +503,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
             return status !== 'available' && status !== 'granted';
           })
         ) return false;
-        const state = evaluateQuestRuntime({ questId: offer.id, facts: questFacts, capabilities: questCapabilities }).state;
+        const state = evaluateQuestRuntime({ questId: offer.id, day: questDay, facts: questFacts, capabilities: questCapabilities }).state;
         return state !== 'unavailable' && state !== 'impossible_today';
       })
     : [];
@@ -529,50 +569,62 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   }, []);
 
   // A clear quest-camera match is authoritative and auto-submits the exact
-  // captured source. Keep the matched state visible briefly, then complete.
+  // captured source. Keep the companion sheet open and surface the result so
+  // completion is never a silent navigation change.
   useEffect(() => {
     if (questCaptureFeedback?.phase !== 'matched' || !questCaptureFeedback.creatureId) return;
-    const timeout = setTimeout(() => {
-      const latest = loadIdentityAwareCompanionQuests();
-      const completingQuest = questFor(latest, questCaptureFeedback.creatureId!);
-      const result = submitQuest(
-        latest,
-        questCaptureFeedback.creatureId!,
-        {
-          sourceType: questCaptureFeedback.sourceType ?? 'photo',
-          sourceId: questCaptureFeedback.sourceId,
-          evidenceId: questCaptureFeedback.evidenceId ?? null,
-        },
-        Date.now(),
-        today?.isoDate ?? null
-      );
-      commitCompanionQuestState(result.state);
-      if (result.submitted && completingQuest) awardBond({
-        id: result.state.submissions.at(-1)?.id
-          ? `quest-submission:${result.state.submissions.at(-1)!.id}`
-          : questBondEventId(completingQuest.creatureId, completingQuest.questId, completingQuest.acceptedAt),
-        creatureId: completingQuest.creatureId,
-        kind: questBondEventKind(questDefinition(completingQuest.questId)),
-        occurredAt: result.quest?.completedAt ?? Date.now(),
-        dayId: result.quest?.completedDayId,
+    const capturedItem = selectedQuestItems.find(
+      (item) => item.sourceId === questCaptureFeedback.sourceId && item.matchStatus === 'ready'
+    );
+    if (!capturedItem) return;
+    const latest = loadIdentityAwareCompanionQuests();
+    const completingQuest = questFor(latest, questCaptureFeedback.creatureId);
+    const result = submitQuest(
+      latest,
+      questCaptureFeedback.creatureId,
+      {
+        sourceType: questCaptureFeedback.sourceType ?? 'photo',
+        sourceId: questCaptureFeedback.sourceId,
+        evidenceId: questCaptureFeedback.evidenceId ?? capturedItem.evidenceId ?? null,
+        verificationSource: 'vision',
+      },
+      Date.now(),
+      today?.isoDate ?? null
+    );
+    commitCompanionQuestState(result.state);
+    if (result.submitted && completingQuest) awardBond({
+      id: result.state.submissions.at(-1)?.id
+        ? `quest-submission:${result.state.submissions.at(-1)!.id}`
+        : questBondEventId(completingQuest.creatureId, completingQuest.questId, completingQuest.acceptedAt),
+      creatureId: completingQuest.creatureId,
+      kind: questBondEventKind(questDefinition(completingQuest.questId)),
+      occurredAt: result.quest?.completedAt ?? Date.now(),
+      dayId: result.quest?.completedDayId,
+    });
+    if (result.submitted && result.quest) {
+      setCompletedQuestPreview({ quest: result.quest, item: capturedItem });
+      setQuestResultNotice({
+        kind: 'success',
+        title: 'Quest complete',
+        message: `Your photo matched “${result.quest.title}” and has been submitted.`,
+        thumbnailUri: capturedItem.thumbnailUri ?? questCaptureFeedback.sourceId,
+        questId: result.quest.questId,
+        creatureId: result.quest.creatureId,
       });
-      setMicrocopy(result.submitted ? 'Photo matched - quest complete' : 'Quest already submitted');
-      if (result.submitted && process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setQuestCaptureFeedback(null);
-      if (result.submitted) {
-        setSelectedResident((current) =>
-          current?.creature.creatureId === questCaptureFeedback.creatureId ? null : current
-        );
-      }
-    }, 1200);
-    return () => clearTimeout(timeout);
-  }, [awardBond, commitCompanionQuestState, questCaptureFeedback, today?.isoDate]);
+      setMicrocopy('Photo matched - quest complete');
+      if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      setMicrocopy('Quest already submitted');
+    }
+    setQuestCaptureFeedback(null);
+  }, [awardBond, commitCompanionQuestState, questCaptureFeedback, selectedQuestItems, today?.isoDate]);
 
   const selectResident = useCallback(
     (creatureId: string) => {
       const resident = residentById.get(creatureId);
       const creature = creatureById.get(creatureId);
       if (resident && creature) {
+        setCompletedQuestPreview(null);
         setSelectedResident({ resident, creature, destination: null });
         setSelectedOfferId(null);
       }
@@ -585,6 +637,16 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     const offer = selectedOfferOptions.find((item) => item.id === offerId) ?? selectedOffer;
     if (!offer) return;
     const definition = questDefinition(offer.id);
+    const offerRuntime = evaluateQuestRuntime({
+      questId: offer.id,
+      day: questDay,
+      facts: questFacts,
+      capabilities: questCapabilities,
+    });
+    if (offerRuntime.state === 'unavailable' || offerRuntime.state === 'impossible_today') {
+      setMicrocopy(offerRuntime.userMessage);
+      return;
+    }
     const seed = `${selectedResident.creature.creatureId}:${today?.isoDate ?? 'today'}:${offer.id}`;
     const resolvedConfig = resolveInteractiveConfig(
       definition,
@@ -613,7 +675,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     commitCompanionQuestState(next);
     setMicrocopy('Quest accepted');
     setSelectedResident((current) => (current ? { ...current, destination: 'quest' } : current));
-  }, [commitCompanionQuestState, companionQuestState, selectedOffer, selectedOfferOptions, selectedResident, today?.isoDate]);
+  }, [commitCompanionQuestState, companionQuestState, questCapabilities, questDay, questFacts, selectedOffer, selectedOfferOptions, selectedResident, today?.isoDate]);
 
   const selectOffer = useCallback((offerId: string) => {
     setSelectedOfferId(offerId);
@@ -687,6 +749,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       releaseActiveQuest(companionQuestState, selectedResident.creature.creatureId)
     );
     setQuestCaptureFeedback(null);
+    setCompletedQuestPreview(null);
     setSelectedOfferId(null);
     setMicrocopy('Choose another quest');
   }, [commitCompanionQuestState, companionQuestState, selectedActiveQuest, selectedResident]);
@@ -747,7 +810,21 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       const result = submitQuest(
         companionQuestState,
         selectedResident.creature.creatureId,
-        { sourceType: item.sourceType, sourceId: item.sourceId, evidenceId: item.evidenceId },
+        {
+          sourceType: item.sourceType,
+          sourceId: item.sourceId,
+          evidenceId: item.evidenceId,
+          journalRecordId: item.sourceType === 'manual_log' && item.sourceId.startsWith('manual-')
+            ? item.sourceId.slice('manual-'.length)
+            : null,
+          verificationSource: item.sourceType === 'manual_log'
+            ? 'journal'
+            : item.sourceType === 'photo'
+              ? 'vision'
+              : item.sourceType === 'text_note' || item.sourceType === 'voice_note'
+                ? 'foundation'
+                : 'legacy',
+        },
         Date.now(),
         today?.isoDate ?? null
       );
@@ -762,10 +839,47 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         dayId: result.quest.completedDayId,
       });
       setMicrocopy(result.submitted ? 'Quest submitted' : 'Already submitted');
-      if (result.submitted) setSelectedResident(null);
+      if (result.submitted && result.quest) {
+        setCompletedQuestPreview({ quest: result.quest, item });
+        setQuestCaptureFeedback(null);
+        setQuestResultNotice({
+          kind: 'success',
+          title: 'Quest complete',
+          message: `${item.title} was submitted for “${result.quest.title}”.`,
+          thumbnailUri: item.thumbnailUri ?? null,
+          questId: result.quest.questId,
+          creatureId: result.quest.creatureId,
+        });
+      }
     },
     [awardBond, commitCompanionQuestState, companionQuestState, selectedResident, today?.isoDate]
   );
+
+  const reportSelectedQuestJournalOutcome = useCallback((input: {
+    phase: 'analyzing' | 'possible' | 'no_match';
+    sourceId: string;
+    sourceType: 'text_note' | 'voice_note';
+    evidenceId?: string | null;
+    reason?: string | null;
+  }) => {
+    if (!selectedResident || !selectedActiveQuest) return;
+    setQuestCaptureFeedback({
+      phase: input.phase,
+      sourceId: input.sourceId,
+      questId: selectedActiveQuest.questId,
+      creatureId: selectedResident.creature.creatureId,
+      evidenceId: input.evidenceId ?? null,
+      reason: input.reason ?? null,
+      sourceType: input.sourceType,
+    });
+    setMicrocopy(
+      input.phase === 'analyzing'
+        ? 'Checking your entry'
+        : input.phase === 'possible'
+          ? 'This may fit - review it first'
+          : 'Saved to your journal, but it did not match this quest'
+    );
+  }, [selectedActiveQuest, selectedResident]);
 
   const performSelectedQuestAction = useCallback(() => {
     if (!selectedQuestRuntime || selectedQuestRuntime.nextAction === 'none') return;
@@ -773,7 +887,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       selectedResident &&
       (selectedQuestRuntime.nextAction === 'take_photo' || selectedQuestRuntime.nextAction === 'enable_camera')
     ) {
-      beginQuestCapture(selectedQuestRuntime.questId, selectedResident.creature.creatureId);
+      beginQuestCapture(selectedQuestRuntime.questId, selectedResident.creature.creatureId, selectedActiveQuest?.questRunId);
       setQuestCaptureFeedback(null);
       // Do not retain a native companion Modal underneath the pushed camera
       // route. It can keep gesture ownership when iOS restores the Kingdom
@@ -785,6 +899,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           target: 'today',
           questId: selectedQuestRuntime.questId,
           questCreatureId: selectedResident.creature.creatureId,
+          questRunId: selectedActiveQuest?.questRunId,
         },
       });
       return;
@@ -808,14 +923,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         router.push('/today');
         return;
       } else {
-        beginQuestCapture(selectedQuestRuntime.questId, selectedResident.creature.creatureId);
+        beginQuestCapture(selectedQuestRuntime.questId, selectedResident.creature.creatureId, selectedActiveQuest?.questRunId);
         setQuestCaptureFeedback(null);
       }
     }
     requestQuestActionIntent({ action: selectedQuestRuntime.nextAction, questId: selectedQuestRuntime.questId });
     setSelectedResident(null);
     router.push('/today');
-  }, [questCapabilities.appleFoundation.status, router, selectedQuestRuntime, selectedResident]);
+  }, [questCapabilities.appleFoundation.status, router, selectedActiveQuest?.questRunId, selectedQuestRuntime, selectedResident]);
 
   const performSelectedInsightAction = useCallback(() => {
     const intent: CompanionNavigationIntent | undefined = selectedInsight?.action?.intent;
@@ -832,6 +947,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setSelectedResident(null);
     setSelectedOfferId(null);
     setQuickGoalSuggestions(null);
+    setCompletedQuestPreview(null);
+    setQuestResultNotice(null);
   }, []);
   const awardSelectedInsightBond = useCallback(() => {
     if (!selectedResident || !today?.isoDate) return;
@@ -1045,6 +1162,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setMicrocopy('Moment remembered');
   }, [companionJourneyState, selectedFamilyId, today?.isoDate]);
   const selectedActiveQuestDefinition = selectedActiveQuest ? questDefinition(selectedActiveQuest.questId) : null;
+  const selectedFoundationAvailable = questCapabilities.appleFoundation.status === 'available' || questCapabilities.appleFoundation.status === 'granted';
   const selectedSemanticJournalFallbackActive = Boolean(
     selectedActiveQuest &&
     semanticQuestJournalFallbackRoute(selectedActiveQuest.questId) &&
@@ -1109,12 +1227,18 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     completeSelectedInteractiveQuest,
     selectOffer,
     questCaptureFeedback: selectedQuestCaptureFeedback,
+    questResultNotice: selectedResident && questResultNotice?.creatureId === selectedResident.creature.creatureId
+      ? questResultNotice
+      : null,
+    dismissQuestResultNotice: () => setQuestResultNotice(null),
     questCriteria: selectedQuestRuntime?.progress ?? (selectedActiveQuest ? questCriteria(selectedActiveQuest.questId, questFacts) : []),
     residentStatusGlyphs,
     selectResident,
     selectDestination,
     selectedActiveQuest,
+    selectedQuestPersistedComplete,
     selectedActiveQuestDefinition,
+    selectedFoundationAvailable,
     selectedSemanticJournalFallbackActive,
     selectedInteractiveExecution,
     selectedCompanionData,
@@ -1174,6 +1298,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedQuestRuntime,
     selectedResident,
     clarifySelectedQuestMatch,
+    reportSelectedQuestJournalOutcome,
     submitSelectedQuest,
     performSelectedInsightAction,
     awardSelectedInsightBond,

@@ -21,6 +21,7 @@ const factsPath = transpile('utils/signals/facts.ts', 'facts.js');
 const capsPath = transpile('utils/capabilities/quest-capabilities.ts', 'quest-capabilities.js');
 const scoringPath = transpile('utils/quests/evidence-scoring.ts', 'evidence-scoring.js');
 const taxonomyPath = transpile('utils/intelligence/taxonomy.ts', 'taxonomy.js');
+const journalTemplatesPath = transpile('utils/quests/journal-templates.ts', 'journal-templates.js');
 const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js');
 const themedPath = transpile('utils/quests/themed.ts', 'themed.js');
 const engagementPath = transpile('utils/katchimera-engagement.ts', 'katchimera-engagement.js');
@@ -38,6 +39,7 @@ const stubs = {
   '@/utils/intelligence/taxonomy': taxonomyPath,
   '@/utils/quests/themed': themedPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
+  '@/utils/quests/journal-templates': journalTemplatesPath,
   '@/constants/life-aspects': lifeAspectsPath,
 };
 const originalResolve = Module._resolveFilename;
@@ -78,9 +80,9 @@ check('photo quest metadata suggests camera action', dogQuest.suggestedActions.i
 check('Mossprout park quest is explicitly camera-first', parkQuest.family === 'photo' && parkQuest.suggestedActions.includes('take_photo'));
 check('Mossprout park quest requires camera, not location', parkQuest.requiresCapabilities.includes('camera.capture') && !parkQuest.requiresCapabilities.includes('location.foreground'), JSON.stringify(parkQuest.requiresCapabilities));
 check('Mossprout park quest uses only the canonical park photo quality', parkQuest.criteria.length === 1 && parkQuest.criteria[0].qualityId === 'place.park', JSON.stringify(parkQuest.criteria));
-check('celebration voice quest requires microphone', voiceQuest.requiresCapabilities.includes('microphone'), JSON.stringify(voiceQuest.requiresCapabilities));
-check('celebration voice quest lists speech transcription as optional', voiceQuest.optionalCapabilities.includes('speech.transcription'));
-check('celebration voice quest uses voice-note fact', voiceQuest.criteria.some((criterion) => criterion.fact === 'notes.voiceAdded'));
+check('celebration journal quest does not require microphone', !voiceQuest.requiresCapabilities.includes('microphone'), JSON.stringify(voiceQuest.requiresCapabilities));
+check('celebration journal quest keeps speech transcription optional', voiceQuest.optionalCapabilities.includes('speech.transcription'));
+check('celebration journal quest uses exact linked journal evidence', voiceQuest.criteria.some((criterion) => criterion.fact === 'evidence.items' && criterion.op === 'questJournalMatch'));
 
 const kingdom = {
   totals: { foodMoments: 0, steps: 0, places: 0, bigMoments: 0, notes: 0, studioMoments: 0, photos: 0, daysHatched: 0 },

@@ -20,6 +20,7 @@ import {
 import { withManualJournalEntry } from './manual-journal';
 
 export type CapturedMomentInput = {
+  captureMode?: 'full' | 'evidence_only';
   energy: Partial<DayScores>;
   vision: DayVisionSummary | null;
   sourceId?: string | null;

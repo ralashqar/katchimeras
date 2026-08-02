@@ -3,6 +3,7 @@ import type { ClassifiedMemory, DayEvidence, HomeDayRecord } from '@/types/home'
 import type { CompanionQuest, QuestSubmissionRecord } from '@/utils/katchimera-quests';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
 import { resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
+import { manualJournalFlow } from '@/utils/manual-journal-registry';
 
 import { questDefinition } from './definitions';
 
@@ -98,6 +99,25 @@ function itemForEvidenceId(day: HomeDayRecord, evidenceId: string): QuestReportB
 
   if (evidence.sourceType === 'voice_note' || evidence.sourceType === 'text_note') {
     return noteEvidenceItem(day, evidence);
+  }
+
+  if (evidence.sourceType === 'manual_log') {
+    const entry = (day.manualJournalEntries ?? []).find((item) => item.id === evidence.sourceId);
+    const flow = entry ? manualJournalFlow(entry.flowId) : null;
+    const choice = flow?.choices.find((item) => item.id === entry?.categoryId);
+    return {
+      id: evidence.id,
+      kind: 'note',
+      sourceType: evidence.sourceType,
+      sourceId: evidence.sourceId,
+      evidenceId: evidence.id,
+      createdAt: evidence.observedAt,
+      title: choice?.label ?? 'Journal entry',
+      subtitle: flow ? `${flow.shortTitle ?? flow.title} · Ready for this quest` : 'Journal entry · Ready for this quest',
+      body: entry?.note ?? null,
+      icon: 'book.closed.fill',
+      accentColor: '#D2AE59',
+    };
   }
 
   return {
@@ -224,10 +244,11 @@ function fallbackItemsForQuest(day: HomeDayRecord, questId: string): QuestReport
   if (facts.has('studio.media')) {
     items.push(...latestStudioItems(day, def?.criteria.find((criterion) => criterion.fact === 'studio.media')?.value));
   }
-  if (facts.has('notes.added')) {
-    items.push(...latestNoteItems(day, questId));
-  }
-  if (facts.has('notes.voiceAdded')) {
+  if (
+    facts.has('notes.added') ||
+    facts.has('notes.voiceAdded') ||
+    def?.evidenceInput?.kind === 'journal'
+  ) {
     items.push(...latestNoteItems(day, questId));
   }
   if (facts.has('places.categories') || facts.has('places.confirmed') || facts.has('places.confirmedNew')) {

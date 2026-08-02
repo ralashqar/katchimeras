@@ -204,7 +204,7 @@ export function companionQuestBackAction(input: {
 }
 
 export function buildCompanionQuestViewModel(input: {
-  activeQuest: { title: string; hint: string; semanticInput?: boolean; journalFallback?: boolean } | null;
+  activeQuest: { title: string; hint: string; semanticInput?: boolean; journalInput?: boolean; journalFallback?: boolean; assistedJournalInput?: boolean } | null;
   offer?: { id: string; title: string; hint: string };
   runtime: QuestRuntimeStatus | null;
   questComplete: boolean;
@@ -245,6 +245,17 @@ export function buildCompanionQuestViewModel(input: {
       criteria, evidence: items, captureFeedback,
     };
   }
+  if (questComplete || runtime?.complete) {
+    return {
+      mode: 'complete', runtimeState: runtime?.state, eyebrow: 'Quest complete', title: activeQuest.title,
+      message: questComplete
+        ? 'Your entry matched and has been submitted.'
+        : 'You found what this quest was looking for.',
+      rewardLabel: 'Bond strengthened', statusLabel: 'Complete', statusTone: 'success',
+      criteria, evidence: items,
+      primaryAction: questComplete ? null : { kind: 'report', label: 'Report back', icon: 'sparkles' },
+    };
+  }
   const possible = items.find((item) => item.matchStatus === 'possible');
   if (possible) {
     return {
@@ -263,14 +274,6 @@ export function buildCompanionQuestViewModel(input: {
       primaryAction: { kind: 'submit', label: 'Submit quest', icon: 'paperplane.fill', item: ready },
     };
   }
-  if (questComplete || runtime?.complete) {
-    return {
-      mode: 'complete', runtimeState: runtime?.state, eyebrow: 'Quest complete', title: activeQuest.title,
-      message: 'You found what this quest was looking for.', rewardLabel: 'Bond strengthened', statusLabel: 'Complete', statusTone: 'success',
-      criteria, evidence: items,
-      primaryAction: { kind: 'report', label: 'Report back', icon: 'sparkles' },
-    };
-  }
   const blocked = runtime?.state === 'blocked_permission' || runtime?.state === 'unavailable' || runtime?.state === 'impossible_today';
   return {
     mode: blocked ? 'blocked' : 'active', runtimeState: runtime?.state,
@@ -280,7 +283,9 @@ export function buildCompanionQuestViewModel(input: {
     statusTone: runtime?.state === 'impossible_today' ? 'danger' : blocked ? 'warning' : 'neutral',
     criteria, evidence: items, captureFeedback,
     semanticInput: Boolean(activeQuest.semanticInput),
+    journalInput: Boolean(activeQuest.journalInput ?? activeQuest.semanticInput),
     journalFallback: Boolean(activeQuest.journalFallback),
+    assistedJournalInput: Boolean(activeQuest.assistedJournalInput),
     primaryAction: runtime && runtime.nextAction !== 'none'
       ? { kind: 'quest_action', label: questActionLabel(runtime.nextAction), icon: questActionIcon(runtime.nextAction), nextAction: runtime.nextAction }
       : null,
@@ -292,10 +297,24 @@ export function companionQuestInlineNoteAction(
 ): Extract<NonNullable<CompanionQuestViewModel['primaryAction']>, { kind: 'quest_action' }> | null {
   const action = model.primaryAction;
   if (
-    model.mode !== 'active' ||
-    !model.semanticInput ||
+    (model.mode !== 'active' && model.mode !== 'blocked') ||
+    !model.journalInput ||
     action?.kind !== 'quest_action' ||
     (action.nextAction !== 'add_note' && action.nextAction !== 'record_voice')
+  ) {
+    return null;
+  }
+  return action;
+}
+
+export function companionQuestInlinePhotoAction(
+  model: CompanionQuestViewModel
+): Extract<NonNullable<CompanionQuestViewModel['primaryAction']>, { kind: 'quest_action' }> | null {
+  const action = model.primaryAction;
+  if (
+    (model.mode !== 'active' && model.mode !== 'blocked') ||
+    action?.kind !== 'quest_action' ||
+    (action.nextAction !== 'take_photo' && action.nextAction !== 'enable_camera' && action.nextAction !== 'enable_photos')
   ) {
     return null;
   }

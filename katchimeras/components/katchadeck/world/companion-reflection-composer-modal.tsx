@@ -1,6 +1,6 @@
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -30,6 +30,10 @@ export function CompanionReflectionComposerModal({
   onSave,
   promptId,
   promptText,
+  eyebrow = 'OPTIONAL NOTE',
+  hapticOnSave = true,
+  initialVoiceRecording = false,
+  saveLabel = 'Save note',
   title = 'Add a note',
 }: {
   initialDraft?: CompanionReflectionDraft | null;
@@ -37,6 +41,10 @@ export function CompanionReflectionComposerModal({
   onSave: (draft: CompanionReflectionDraft) => void;
   promptId: string;
   promptText: string;
+  eyebrow?: string;
+  hapticOnSave?: boolean;
+  initialVoiceRecording?: boolean;
+  saveLabel?: string;
   title?: string;
 }) {
   const insets = useSafeAreaInsets();
@@ -51,6 +59,8 @@ export function CompanionReflectionComposerModal({
     setVoiceDraft({ ...draft, promptId, promptText });
     if (draft.text.trim()) setText(draft.text);
   });
+  const voiceStartRef = useRef(voice.start);
+  const initialVoiceStarted = useRef(false);
   const busy = voice.phase === 'recording' || voice.phase === 'transcribing';
   const compact = height < 720;
 
@@ -64,6 +74,20 @@ export function CompanionReflectionComposerModal({
       hideSubscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    voiceStartRef.current = voice.start;
+  }, [voice.start]);
+
+  useEffect(() => {
+    if (!initialVoiceRecording || initialVoiceStarted.current) return;
+    initialVoiceStarted.current = true;
+    const timeout = setTimeout(() => {
+      Keyboard.dismiss();
+      void voiceStartRef.current();
+    }, 260);
+    return () => clearTimeout(timeout);
+  }, [initialVoiceRecording]);
 
   const close = () => {
     if (voice.phase === 'recording') {
@@ -102,7 +126,7 @@ export function CompanionReflectionComposerModal({
       promptText,
       text: text.trim(),
     };
-    if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (hapticOnSave && process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Keyboard.dismiss();
     onSave(draft);
   };
@@ -146,7 +170,7 @@ export function CompanionReflectionComposerModal({
               <View style={styles.header}>
                 <View style={styles.headerCopy}>
                   <ThemedText style={styles.eyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>
-                    OPTIONAL NOTE
+                    {eyebrow}
                   </ThemedText>
                   <ThemedText selectable style={[styles.heading, keyboardVisible && styles.headingKeyboard]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
                     {title}
@@ -172,7 +196,7 @@ export function CompanionReflectionComposerModal({
 
               <TextInput
                 accessibilityLabel="Reflection note"
-                autoFocus
+                autoFocus={!initialVoiceRecording}
                 editable={!busy}
                 maxLength={600}
                 multiline
@@ -262,7 +286,7 @@ export function CompanionReflectionComposerModal({
                   pressed && !busy && styles.pressed,
                 ]}>
                 <ThemedText style={styles.saveButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  Save note
+                  {saveLabel}
                 </ThemedText>
                 <IconSymbol color={Meadow.ink} name="arrow.right" size={17} />
               </Pressable>

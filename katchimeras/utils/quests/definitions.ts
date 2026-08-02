@@ -6,6 +6,11 @@ import type {
   KatchimeraBondLevel,
 } from '@/constants/katchimera-roles';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import {
+  questJournalTemplate,
+  questUsesJournalEntrySystem,
+  type QuestJournalTemplate,
+} from '@/utils/quests/journal-templates';
 
 // Declarative companion-quest catalogue (docs/katchimera-engagement-v1.md
 // refactor). A quest is DATA: id + copy + a list of criteria against facts.
@@ -102,6 +107,9 @@ export type QuestDefinition = {
     modalities: readonly ('text' | 'voice')[];
     journalRouteFallbacks?: readonly string[];
   };
+  evidenceInput?:
+    | { kind: 'journal'; template: QuestJournalTemplate }
+    | { kind: 'photo' };
 };
 
 export type QuestPresentation = {
@@ -630,9 +638,9 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       id: 'quest-flickerbun-watch',
       minimumBondLevel: 1,
       title: 'Choose a story on purpose',
-      hint: 'Log a film or show you deliberately chose to spend time with.',
+      hint: 'Watch a film you deliberately chose, then keep its title and one detail that made the time feel worthwhile.',
       family: 'studio',
-      criteria: [{ fact: 'studio.media', op: 'includes', value: 'film', label: 'Log a film or show' }],
+      criteria: [{ fact: 'studio.media', op: 'includes', value: 'film', label: 'Log a film you deliberately watched' }],
       cooldownDays: 2,
       weight: 5,
     },
@@ -640,7 +648,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       id: 'quest-flickerbun-scene-note',
       minimumBondLevel: 1,
       title: 'Keep one scene',
-      hint: 'Keep a short note about one scene, feeling, or idea that stayed after the credits.',
+      hint: 'Keep a short note about one scene, feeling, or idea from a film that stayed after the credits.',
       family: 'note',
       criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Keep a screen-story note' }],
       cooldownDays: 2,
@@ -651,7 +659,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       id: 'quest-flickerbun-new-perspective',
       minimumBondLevel: 2,
       title: 'Watch beyond the familiar',
-      hint: 'Try a story outside your usual genre or viewpoint, then note what felt different.',
+      hint: 'Try a film outside your usual genre or viewpoint, then note what felt different.',
       family: 'note',
       criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Record a new screen-story perspective' }],
       cooldownDays: 3,
@@ -662,7 +670,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       id: 'quest-flickerbun-weekly-review',
       minimumBondLevel: 3,
       title: 'Read the week’s watchlist',
-      hint: 'Review what you watched, what stayed with you, and which choices felt genuinely worthwhile.',
+      hint: 'Review the films you watched, what stayed with you, and which choice felt genuinely worthwhile.',
       family: 'note',
       criteria: [{ fact: 'notes.added', op: 'gte', value: 1, label: 'Write a short watching review' }],
       cooldownDays: 7,
@@ -686,7 +694,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       id: 'quest-relicoon-museum-visit',
       minimumBondLevel: 1,
       title: 'Wander the halls',
-      hint: 'Visit a museum or gallery and confirm it on your map.',
+      hint: 'Visit a museum or gallery, then keep its name and one thing that caught your attention.',
       family: 'place',
       criteria: [{ fact: 'places.categories', op: 'includes', value: 'museum', label: 'Confirm a museum or gallery' }],
       cooldownDays: 3,
@@ -869,7 +877,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       id: 'quest-skylo-local-stop',
       minimumBondLevel: 1,
       title: 'Stop instead of passing',
-      hint: 'Visit or confirm one local place you would usually pass without entering.',
+      hint: 'Visit one local place you would usually pass, then keep its name and one detail you noticed inside.',
       family: 'place',
       criteria: [{ fact: 'places.confirmed', op: 'gte', value: 1, label: 'Confirm a local place' }],
       cooldownDays: 2,
@@ -1463,7 +1471,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     minimumBondLevel: 2,
     family: 'note',
     title: 'Protect one focus block',
-    hint: 'Capture a note or photo that records a period of focused work or study.',
+    hint: 'After a real period of focused work or study, keep a short note about what received your attention.',
     criteria: [{
       fact: 'memory.qualities',
       op: 'qualityAtLeast',
@@ -1474,7 +1482,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
       minimumCentrality: 'supporting',
       label: 'Record focused work or study',
     }],
-    suggestedActions: ['add_note', 'take_photo'],
+    suggestedActions: ['add_note', 'record_voice'],
     repeatPolicy: { cadence: 'anytime', cooldownDays: 2 },
     progression: { journeyId: 'tasklet-focus-journey', stageId: 'momentum' },
     goalContribution: { amount: 1 },
@@ -1710,7 +1718,7 @@ const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
     lane: 'real_life',
     minimumBondLevel: 1,
     title: 'Between the pages',
-    hint: 'Log a book in your Studio.',
+    hint: 'Read from a book, then keep its title and one idea, detail, or feeling that stayed with you.',
     criteria: [{ fact: 'studio.media', op: 'includes', value: 'book', label: 'Log a book' }],
     repeatPolicy: { cadence: 'anytime', cooldownDays: 2 },
     progression: { journeyId: 'pagelet-living-curiosity', stageId: 'learn' },
@@ -1951,13 +1959,101 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
             }
           : criterion;
       });
-      const normalizedDefinition = { ...definition, criteria };
-      const family = definition.family ?? inferFamily(normalizedDefinition);
+      const preliminaryDefinition = { ...definition, criteria };
+      const family = definition.family ?? inferFamily(preliminaryDefinition);
       const familyId = definition.familyId;
+      const journalEnabled = family === 'note' || family === 'voice' || questUsesJournalEntrySystem(definition.id);
+      const journalInput = journalEnabled
+        ? {
+            kind: 'journal' as const,
+            template: questJournalTemplate({
+              id: definition.id,
+              title: definition.title,
+              hint: definition.hint,
+              familyId,
+              journalRouteFallbacks: definition.semanticVerification?.journalRouteFallbacks,
+            }),
+          }
+        : null;
+      const synthesizedJournalRoutes = journalInput?.template.initialChoiceId
+        ? [
+            journalInput.template.initialChoiceId,
+            ...(journalInput.template.allowedChoiceIds ?? []).filter(
+              (choiceId) => choiceId !== journalInput.template.initialChoiceId
+            ),
+          ].map((choiceId) => `journal.route:${journalInput.template.flowId}.${choiceId}`)
+        : [];
+      const semanticVerification = journalInput
+        ? definition.semanticVerification
+          ? {
+              ...definition.semanticVerification,
+              journalRouteFallbacks: definition.semanticVerification.journalRouteFallbacks?.length
+                ? definition.semanticVerification.journalRouteFallbacks
+                : synthesizedJournalRoutes,
+            }
+          : {
+              id: definition.id.replace(/^quest-/, ''),
+              version: 1,
+              request: definition.hint,
+              matchCriteria: criteria.length
+                ? criteria.map((criterion) => criterion.label)
+                : [`The note meaningfully answers “${definition.hint}”`],
+              retryPrompt: `Add a little more that directly answers: ${definition.hint}`,
+              modalities: ['text', 'voice'] as const,
+              journalRouteFallbacks: synthesizedJournalRoutes,
+            }
+        : definition.semanticVerification;
+      const linkedCriteria = journalInput
+        ? criteria.map((criterion) => {
+            if (questUsesJournalEntrySystem(definition.id)) {
+              return {
+                ...criterion,
+                fact: 'evidence.items' as const,
+                op: 'semanticQuestMatch' as const,
+                value: definition.id,
+                sourceTypes: ['text_note', 'voice_note'] as Criterion['sourceTypes'],
+                journalRouteFallbacks: semanticVerification?.journalRouteFallbacks ?? [],
+              };
+            }
+            if (criterion.fact === 'notes.added' || criterion.fact === 'notes.voiceAdded') {
+              return {
+                ...criterion,
+                fact: 'evidence.items' as const,
+                op: 'questJournalMatch' as const,
+                value: definition.id,
+                sourceTypes: undefined,
+              };
+            }
+            if (criterion.op === 'semanticQuestMatch' && !criterion.journalRouteFallbacks?.length) {
+              return {
+                ...criterion,
+                journalRouteFallbacks: semanticVerification?.journalRouteFallbacks ?? [],
+              };
+            }
+            return criterion;
+          })
+        : criteria;
+      const normalizedDefinition = {
+        ...definition,
+        criteria: linkedCriteria,
+        semanticVerification,
+        evidenceInput: definition.evidenceInput ?? journalInput ?? (
+          family === 'photo' || family === 'moment' ? { kind: 'photo' as const } : undefined
+        ),
+      };
       const lane = definition.lane ?? (definition.execution && definition.execution.kind !== 'evidence' ? 'mini_game' : 'real_life');
-      const requiresCapabilities = definition.requiresCapabilities ?? inferRequiredCapabilities(definition, family);
-      const optionalCapabilities = definition.optionalCapabilities ?? inferOptionalCapabilities(definition, family);
-      const suggestedActions = definition.suggestedActions ?? inferSuggestedActions(family);
+      const inferredRequired = definition.requiresCapabilities ?? inferRequiredCapabilities(definition, family);
+      const requiresCapabilities = journalInput
+        ? []
+        : inferredRequired;
+      const inferredOptional = definition.optionalCapabilities ?? inferOptionalCapabilities(definition, family);
+      const optionalCapabilities = journalInput && semanticVerification
+        ? Array.from(new Set([
+            ...inferredOptional.filter((capability) => capability !== 'photos.read' && capability !== 'appleVision'),
+            'appleFoundation' as const,
+          ]))
+        : inferredOptional;
+      const suggestedActions = journalInput ? ['add_note', 'record_voice'] : definition.suggestedActions ?? inferSuggestedActions(family);
       const themes = Array.from(new Set([...(definition.themes ?? []), ...inferThemes(definition, family)]));
       const evidencePolicy = definition.evidencePolicy ?? inferEvidencePolicy(normalizedDefinition);
       return [
@@ -1972,6 +2068,7 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
           themes,
           requiresCapabilities,
           optionalCapabilities,
+          offerVisibility: journalInput ? 'default' : definition.offerVisibility,
           suggestedActions,
           evidencePolicy,
         },

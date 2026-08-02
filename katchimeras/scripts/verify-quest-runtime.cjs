@@ -21,6 +21,7 @@ const taxonomyPath = transpile('utils/intelligence/taxonomy.ts', 'taxonomy.js');
 const scoringPath = transpile('utils/quests/evidence-scoring.ts', 'evidence-scoring.js');
 const capsPath = transpile('utils/capabilities/quest-capabilities.ts', 'quest-capabilities.js');
 const factsPath = transpile('utils/signals/facts.ts', 'facts.js');
+const journalTemplatesPath = transpile('utils/quests/journal-templates.ts', 'journal-templates.js');
 const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js');
 const runtimePath = transpile('utils/quests/runtime.ts', 'runtime.js');
 const typesPath = path.join(tempDir, 'types-home.js');
@@ -35,6 +36,7 @@ const stubs = {
   '@/utils/capabilities/quest-capabilities': capsPath,
   '@/utils/signals/facts': factsPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
+  '@/utils/quests/journal-templates': journalTemplatesPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {
@@ -64,6 +66,22 @@ function photoEvidence(id, key, confidence) {
     provider: 'appleVision',
     confidence,
     signals: [{ key, confidence, provider: 'appleVision', source: 'vision' }],
+  };
+}
+
+function journalEvidence(id, questId, questRunId) {
+  return {
+    id,
+    sourceType: 'manual_log',
+    sourceId: id,
+    observedAt: '2026-07-07T12:00:00.000Z',
+    provider: 'manual',
+    confidence: 1,
+    signals: [
+      { key: `quest.run:${questRunId}`, confidence: 1, provider: 'manual', source: 'manual' },
+      { key: `quest.id:${questId}`, confidence: 1, provider: 'manual', source: 'manual' },
+      { key: 'journal.route:milestone', confidence: 1, provider: 'manual', source: 'manual' },
+    ],
   };
 }
 
@@ -136,27 +154,30 @@ check('meeting step target completes even when capability status is stale unknow
 
 const cheerletIncomplete = runtime.evaluateQuestRuntime({
   questId: 'quest-celebrate-note',
-  facts: { 'notes.voiceAdded': 0 },
+  questRunId: 'cheerlet-run-1',
+  facts: { 'evidence.items': [] },
   capabilities: caps.defaultQuestCapabilities(),
 });
-check('celebration voice quest blocks when microphone is unknown', cheerletIncomplete.state === 'blocked_permission', cheerletIncomplete.state);
-check('celebration voice quest missing microphone points to recording permission', cheerletIncomplete.nextAction === 'record_voice', cheerletIncomplete.nextAction);
+check('celebration journal quest stays available when microphone is unknown', cheerletIncomplete.state === 'in_progress', cheerletIncomplete.state);
+check('celebration journal quest opens the structured journal fallback', cheerletIncomplete.nextAction === 'add_note', cheerletIncomplete.nextAction);
 
 const grantedMicCaps = caps.questCapabilitiesWithMicrophone(caps.defaultQuestCapabilities(), { granted: true, status: 'granted' });
 const cheerletGrantedIncomplete = runtime.evaluateQuestRuntime({
   questId: 'quest-celebrate-note',
-  facts: { 'notes.voiceAdded': 0 },
+  questRunId: 'cheerlet-run-1',
+  facts: { 'evidence.items': [] },
   capabilities: grantedMicCaps,
 });
 check('celebration voice quest is in progress when microphone is granted', cheerletGrantedIncomplete.state === 'in_progress', cheerletGrantedIncomplete.state);
 
 const cheerletComplete = runtime.evaluateQuestRuntime({
   questId: 'quest-celebrate-note',
-  facts: { 'notes.voiceAdded': 1 },
+  questRunId: 'cheerlet-run-1',
+  facts: { 'evidence.items': [journalEvidence('journal-1', 'quest-celebrate-note', 'cheerlet-run-1')] },
   capabilities: grantedMicCaps,
 });
-check('celebration voice note is ready for explicit submission', cheerletComplete.state === 'ready_to_submit', cheerletComplete.state);
-check('celebration voice note does not auto-complete before submission', cheerletComplete.complete === false, String(cheerletComplete.complete));
+check('celebration journal entry is ready for explicit submission', cheerletComplete.state === 'ready_to_submit', cheerletComplete.state);
+check('celebration journal entry does not auto-complete before submission', cheerletComplete.complete === false, String(cheerletComplete.complete));
 
 const noteComplete = runtime.evaluateQuestRuntime({
   questId: 'quest-goal-note',

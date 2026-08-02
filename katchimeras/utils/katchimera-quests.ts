@@ -26,6 +26,7 @@ export type CompanionQuest = {
   repairedFromQuestId?: string;
   offerSeed?: string;
   resolvedConfig?: Record<string, unknown>;
+  questRunId?: string;
 };
 
 export type QuestSubmissionRecord = {
@@ -37,12 +38,17 @@ export type QuestSubmissionRecord = {
   sourceId: string;
   evidenceId?: string | null;
   submittedAt: number;
+  questRunId?: string;
+  journalRecordId?: string | null;
+  verificationSource?: 'journal' | 'foundation' | 'vision' | 'manual_review' | 'legacy';
 };
 
 export type QuestSubmissionInput = {
   sourceType: string;
   sourceId: string;
   evidenceId?: string | null;
+  journalRecordId?: string | null;
+  verificationSource?: QuestSubmissionRecord['verificationSource'];
 };
 
 export type QuestOfferCycle = {
@@ -53,7 +59,7 @@ export type QuestOfferCycle = {
 };
 
 export type CompanionQuestState = {
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   quests: CompanionQuest[];
   submissions: QuestSubmissionRecord[];
   offerCycles: QuestOfferCycle[];
@@ -68,9 +74,10 @@ export function loadCompanionQuests(
   resolveCompanionId: (value: string) => string = (value) => value
 ): CompanionQuestState {
   const value = getStoredJson<CompanionQuestState>(KEY, emptyCompanionQuestState());
+  const needsRunMigration = value.schemaVersion !== 3 || value.quests.some((quest) => !quest.questRunId);
   const normalized = normaliseState(value, true);
   const migrated = migrateCompanionQuestIdentity(normalized, resolveCompanionId);
-  if (migrated !== normalized) setStoredJson(KEY, migrated);
+  if (needsRunMigration || migrated !== normalized) setStoredJson(KEY, migrated);
   return migrated;
 }
 
@@ -79,7 +86,7 @@ export function saveCompanionQuests(state: CompanionQuestState) {
 }
 
 export function emptyCompanionQuestState(): CompanionQuestState {
-  return { schemaVersion: 2, quests: [], submissions: [], offerCycles: [], attempts: [] };
+  return { schemaVersion: 3, quests: [], submissions: [], offerCycles: [], attempts: [] };
 }
 
 export function migrateCompanionQuestIdentity(
@@ -235,7 +242,7 @@ export function interactionState(
 ): InteractionState {
   const active = questFor(state, creatureId);
   if (active) {
-    const runtime = evaluateQuestRuntime({ questId: active.questId, facts, capabilities });
+    const runtime = evaluateQuestRuntime({ questId: active.questId, questRunId: active.questRunId, facts, capabilities });
     return runtime.complete || runtime.readyToSubmit || runtime.possibleEvidenceIds.length > 0 ? 'ready' : 'active';
   }
   return hasOffer ? 'offer' : 'idle';
@@ -250,6 +257,7 @@ export function acceptQuest(
   if (questFor(state, offer.creatureId)) return null;
   if (offer.dayId && hasCompanionQuestForDay(state, offer.creatureId, offer.dayId)) return null;
   if (activeQuests(state).length >= MAX_ACTIVE_QUESTS) return null;
+  const questRunId = createQuestRunId(offer.questId, offer.creatureId, acceptedAt);
   return {
     ...state,
     quests: [
@@ -263,6 +271,7 @@ export function acceptQuest(
         acceptedDayId: offer.dayId ?? localDayId(acceptedAt),
         offerSeed: offer.offerSeed,
         resolvedConfig: offer.resolvedConfig,
+        questRunId,
       },
     ],
   };
@@ -399,6 +408,9 @@ export function submitQuest(
     sourceId: submission.sourceId,
     evidenceId: submission.evidenceId ?? null,
     submittedAt,
+    questRunId: active.questRunId ?? createQuestRunId(active.questId, active.creatureId, active.acceptedAt),
+    journalRecordId: submission.journalRecordId ?? null,
+    verificationSource: submission.verificationSource ?? 'legacy',
   };
   const done = { ...active, completedAt: submittedAt, completedDayId: resolvedDayId };
   const quests = isQuestLoopAfterCompleteEnabled()
@@ -429,8 +441,11 @@ export function isSubmittedForQuest(
 
 function normaliseState(value: CompanionQuestState | null | undefined, cancelInterrupted = false): CompanionQuestState {
   return {
-    schemaVersion: 2,
-    quests: value && Array.isArray(value.quests) ? value.quests : [],
+    schemaVersion: 3,
+    quests: value && Array.isArray(value.quests) ? value.quests.map((quest) => ({
+      ...quest,
+      questRunId: quest.questRunId ?? createQuestRunId(quest.questId, quest.creatureId, quest.acceptedAt),
+    })) : [],
     submissions: value && Array.isArray(value.submissions) ? value.submissions : [],
     offerCycles: value && Array.isArray(value.offerCycles) ? value.offerCycles : [],
     attempts: value && Array.isArray(value.attempts)
@@ -439,6 +454,10 @@ function normaliseState(value: CompanionQuestState | null | undefined, cancelInt
         : attempt)
       : [],
   };
+}
+
+export function createQuestRunId(questId: string, creatureId: string, acceptedAt: number): string {
+  return `quest-run:${creatureId}:${questId}:${acceptedAt.toString(36)}`;
 }
 
 export function startQuestAttempt(

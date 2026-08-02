@@ -10,6 +10,7 @@ import {
   buildCompanionQuestViewModel,
   companionQuestBackAction,
   companionQuestInlineNoteAction,
+  companionQuestInlinePhotoAction,
   companionQuestPresentation,
   companionInteractionReducer,
   companionRouteBackAction,
@@ -300,12 +301,13 @@ test('blocked and active quests expose only the runtime recovery action', () => 
   assert.equal(model.primaryAction?.label, 'Enable camera');
 });
 
-test('semantic note quests expose an inline note and voice attempt action', () => {
+test('journal quests expose one inline structured journal action', () => {
   const model = buildCompanionQuestViewModel({
     activeQuest: {
       title: 'Notice one living detail',
       hint: 'Share something specific you noticed outside.',
       semanticInput: true,
+      assistedJournalInput: true,
       journalFallback: true,
     },
     offer: undefined,
@@ -321,10 +323,60 @@ test('semantic note quests expose an inline note and voice attempt action', () =
   });
   assert.equal(model.mode, 'active');
   assert.equal(model.journalFallback, true);
+  assert.equal(model.assistedJournalInput, true);
   assert.equal(companionQuestInlineNoteAction(model)?.nextAction, 'add_note');
 
-  const ordinary = { ...model, semanticInput: false };
+  const ordinary = { ...model, semanticInput: false, journalInput: false };
   assert.equal(companionQuestInlineNoteAction(ordinary), null);
+
+  const legacyBlockedJournal = {
+    ...model,
+    mode: 'blocked' as const,
+    runtimeState: 'impossible_today' as const,
+  };
+  assert.equal(companionQuestInlineNoteAction(legacyBlockedJournal)?.nextAction, 'add_note');
+});
+
+test('photo quests keep their camera action inside the quest card', () => {
+  const model = buildCompanionQuestViewModel({
+    activeQuest: { title: 'Catch one city detail', hint: 'Photograph something you noticed in the city.' },
+    offer: undefined,
+    runtime: runtime({
+      questId: 'quest-skylo-city-photo',
+      nextAction: 'take_photo',
+      userMessage: 'Take a photo that clearly shows the city detail.',
+    }),
+    questComplete: false,
+    captureFeedback: null,
+    items: [],
+    criteria: [{ label: 'Photograph the city', done: false }],
+  });
+  assert.equal(model.mode, 'active');
+  assert.equal(companionQuestInlinePhotoAction(model)?.nextAction, 'take_photo');
+
+  const blocked = buildCompanionQuestViewModel({
+    activeQuest: { title: 'Catch one city detail', hint: 'Photograph something you noticed in the city.' },
+    offer: undefined,
+    runtime: runtime({ state: 'blocked_permission', nextAction: 'enable_camera' }),
+    questComplete: false,
+    captureFeedback: null,
+    items: [],
+    criteria: [{ label: 'Photograph the city', done: false }],
+  });
+  assert.equal(companionQuestInlinePhotoAction(blocked)?.nextAction, 'enable_camera');
+
+  const sheet = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  const thread = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-quest-thread.tsx'),
+    'utf8',
+  );
+  assert.match(sheet, /!inlineQuestPhotoAction/);
+  assert.match(thread, /<PhotoCaptureAction/);
+  assert.match(thread, /Photo needed/);
+  assert.match(thread, /It will stay attached here while the quest checks the match/);
 });
 
 test('possible evidence requires review before submission', () => {
@@ -338,6 +390,48 @@ test('possible evidence requires review before submission', () => {
   });
   assert.equal(model.mode, 'possible');
   assert.equal(model.primaryAction?.kind, 'review_match');
+});
+
+test('a submitted quest stays in its completed state even when its evidence is still runtime-ready', () => {
+  const item = {
+    id: 'note-1', kind: 'note' as const, sourceType: 'text_note', sourceId: 'note-1',
+    title: 'Notice one living detail', subtitle: 'Checked on device · Added to this quest',
+    icon: 'square.and.pencil' as const, accentColor: '#D2AE59', matchStatus: 'ready' as const,
+  };
+  const model = buildCompanionQuestViewModel({
+    activeQuest: { title: 'Notice one living detail', hint: 'Share what you noticed.' }, offer: undefined,
+    runtime: runtime({ readyToSubmit: true, matchedEvidenceIds: ['note-1'] }),
+    questComplete: true, captureFeedback: null, items: [item], criteria: [],
+  });
+  assert.equal(model.mode, 'complete');
+  assert.equal(model.message, 'Your entry matched and has been submitted.');
+  assert.equal(model.primaryAction, null);
+  assert.deepEqual(model.evidence, [item]);
+});
+
+test('quest notes use the shared composer while guided entries retain the journal picker', () => {
+  const screen = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
+    'utf8',
+  );
+  const journal = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'manual-journal-sheet.tsx'),
+    'utf8',
+  );
+  assert.match(screen, /inputMode === 'guided'[\s\S]*setEmbeddedJournal/);
+  assert.match(screen, /setQuestNoteCapture\(\{[\s\S]*\.\.\.review,[\s\S]*inputMode,[\s\S]*captureSourceId:/);
+  assert.match(screen, /<CompanionReflectionComposerModal/);
+  assert.match(screen, /initialVoiceRecording=\{questNoteCapture\.inputMode === 'voice'\}/);
+  assert.match(screen, /requestedInputMode \?\? \(quests\.selectedFoundationAvailable \? 'note' : 'guided'\)/);
+  assert.match(screen, /title="That doesn’t answer the quest yet"/);
+  assert.match(screen, /captureSourceId: `\$\{review\.questRunId\}:\$\{inputMode\}:/);
+  assert.match(screen, /entryVariant=\{embeddedJournal\.origin === 'quest' \? 'quest_focused' : 'standard'\}/);
+  assert.match(journal, /questFocused \|\| initialNoteExpanded/);
+  assert.match(journal, /autoFocus=\{questFocused\}/);
+  assert.ok(
+    journal.indexOf('{questFocused ? (') < journal.indexOf("{(contextOptionsOverride ?? choice.detailChoices"),
+    'the focused quest note belongs above secondary journal details',
+  );
 });
 
 test('quest capture feedback is visible only to the quest and creature that started it', () => {

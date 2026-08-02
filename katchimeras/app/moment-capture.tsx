@@ -1,8 +1,9 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -21,7 +22,7 @@ import { aggregatePhotoVision, CAPTURE_PHOTO_CONFIDENCE_FLOOR } from '@/utils/vi
 import { confirmationsRejectDomain } from '@/utils/intelligence/classification-policy';
 import type { SceneRead } from '@/utils/scene-classify';
 import type { DayInputTarget, DayVisionSummary, ManualJournalSubmission, PhotoVisionResult, UserConfirmation } from '@/types/home';
-import { cancelQuestCapture, completeQuestCapture } from '@/utils/quest-capture-session';
+import { beginQuestCapture, cancelQuestCapture, completeQuestCapture } from '@/utils/quest-capture-session';
 import { saveDevLastPhotoAnalysis } from '@/utils/dev-photo-analysis';
 import { buildPhotoIntelligence } from '@/utils/intelligence/photo-intelligence';
 import type { PhotoAnalysisInput, ReviewedPhotoAnalysis } from '@/utils/intelligence/photo-analysis';
@@ -33,11 +34,11 @@ import type { PhotoPlaceResolution } from '@/types/photo-place';
 // live → capturing (shutter + flash, no particles) → captured (the shared
 // EssenceReview reads the photo, shows its essence, asks what it meant, then
 // streams the tags into the day and exits).
-type CaptureState = 'live' | 'capturing' | 'captured';
+type CaptureState = 'live' | 'capturing' | 'captured' | 'evaluating';
 
 export default function MomentCaptureScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ target?: string; questId?: string; questCreatureId?: string }>();
+  const params = useLocalSearchParams<{ target?: string; questId?: string; questCreatureId?: string; questRunId?: string }>();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const { selectedDay, applyCapturedMoment, isTodayHatched, tomorrowDay } = useHomeScreenState();
@@ -50,11 +51,17 @@ export default function MomentCaptureScreen() {
   const cameraRef = useRef<CameraView | null>(null);
   const rawVisionRef = useRef<PhotoVisionResult | null>(null);
   const placeResolutionRef = useRef<PhotoPlaceResolution | null>(null);
+  const directQuestCaptureRef = useRef(false);
   const closingRef = useRef(false);
   const [state, setState] = useState<CaptureState>('live');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const questId = typeof params.questId === 'string' ? params.questId : null;
   const questCreatureId = typeof params.questCreatureId === 'string' ? params.questCreatureId : null;
+  const questRunId = typeof params.questRunId === 'string' ? params.questRunId : null;
+
+  useEffect(() => {
+    if (questId && questCreatureId && questRunId) beginQuestCapture(questId, questCreatureId, questRunId);
+  }, [questCreatureId, questId, questRunId]);
 
   const closeCapture = useCallback(() => {
     if (closingRef.current) return;
@@ -209,6 +216,73 @@ export default function MomentCaptureScreen() {
     [applyCapturedMoment, captureTarget, dayScores, photoUri, questCreatureId, questId, router]
   );
 
+  // Quest camera captures only need the on-device photo intelligence. Persist
+  // that evidence directly, evaluate it, and return to the quest without
+  // routing through the generic photo journal / Essence Review flow.
+  useEffect(() => {
+    if (
+      state !== 'captured'
+      || !photoUri
+      || !questId
+      || !questCreatureId
+      || directQuestCaptureRef.current
+    ) return;
+    directQuestCaptureRef.current = true;
+    setState('evaluating');
+
+    void (async () => {
+      const observedAt = new Date().toISOString();
+      let analysis: PhotoAnalysisInput = { rawVision: null, summary: null, placeResolution: null };
+      try {
+        analysis = await analyzeCaptured();
+      } catch {
+        // A failed Vision read still returns an explicit no-match result rather
+        // than dropping the user back into the quest with no explanation.
+      }
+      const intelligence = buildPhotoIntelligence({
+        sourceId: photoUri,
+        observedAt,
+        thumbnailUri: photoUri,
+        rawVision: analysis.rawVision,
+        vision: analysis.summary,
+      });
+      const placeResolution = analysis.placeResolution ?? placeResolutionRef.current;
+      applyCapturedMoment(
+        {
+          captureMode: 'evidence_only',
+          energy: {},
+          vision: analysis.summary,
+          sourceId: photoUri,
+          classifiedMemory: intelligence.memory,
+          evidence: intelligence.evidence,
+          placeResolution,
+        },
+        captureTarget
+      );
+      saveDevLastPhotoAnalysis({
+        sourceId: photoUri,
+        thumbnailUri: photoUri,
+        rawVision: analysis.rawVision,
+        visionSummary: analysis.summary,
+        scene: null,
+        confirmations: [],
+        journalClassification: null,
+        journalEnrichment: null,
+        questId,
+        creatureId: questCreatureId,
+      });
+      completeQuestCapture(
+        questId,
+        questCreatureId,
+        photoUri,
+        evaluatePhotoForQuest(intelligence.memory, questId, placeResolution)
+      );
+      if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      closingRef.current = true;
+      safeDismissModal(router);
+    })();
+  }, [analyzeCaptured, applyCapturedMoment, captureTarget, photoUri, questCreatureId, questId, router, state]);
+
   if (permission && !permission.granted) {
     return (
       <View style={[styles.screen, styles.permission, { paddingTop: insets.top + 40 }]}>
@@ -225,6 +299,26 @@ export default function MomentCaptureScreen() {
           ) : null}
           <KatchaButton label="Not now" onPress={closeCapture} variant="secondary" />
         </View>
+      </View>
+    );
+  }
+
+  if ((state === 'captured' || state === 'evaluating') && photoUri && questId && questCreatureId) {
+    return (
+      <View style={styles.screen}>
+        <Image contentFit="cover" source={{ uri: photoUri }} style={StyleSheet.absoluteFill} transition={80} />
+        <View style={styles.questCheckScrim} />
+        <Animated.View entering={FadeIn.duration(180)} style={styles.questCheckCard}>
+          <View style={styles.questCheckIcon}>
+            <ActivityIndicator color={Lantern.ember300} size="small" />
+          </View>
+          <ThemedText type="display" style={styles.questCheckTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
+            Checking your photo
+          </ThemedText>
+          <ThemedText style={styles.questCheckBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+            Looking for the detail this quest needs…
+          </ThemedText>
+        </Animated.View>
       </View>
     );
   }
@@ -301,4 +395,31 @@ const styles = StyleSheet.create({
     width: 78,
   },
   shutterInner: { backgroundColor: Lantern.moon50, borderRadius: 999, height: 60, width: 60 },
+  questCheckScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(20,12,8,0.56)' },
+  questCheckCard: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(31,24,19,0.92)',
+    borderColor: 'rgba(255,239,197,0.22)',
+    borderCurve: 'continuous',
+    borderRadius: 28,
+    borderWidth: 1,
+    gap: 8,
+    marginHorizontal: 28,
+    marginTop: 'auto',
+    marginBottom: 'auto',
+    paddingHorizontal: 28,
+    paddingVertical: 26,
+  },
+  questCheckIcon: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,241,205,0.1)',
+    borderRadius: 16,
+    height: 48,
+    justifyContent: 'center',
+    marginBottom: 4,
+    width: 48,
+  },
+  questCheckTitle: { fontSize: 27, lineHeight: 31, textAlign: 'center' },
+  questCheckBody: { fontSize: 15, lineHeight: 21, textAlign: 'center' },
 });

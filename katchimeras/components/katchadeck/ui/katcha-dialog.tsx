@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { Modal, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn, useReducedMotion } from 'react-native-reanimated';
@@ -15,6 +16,7 @@ type KatchaDialogProps = {
   cancelLabel?: string;
   confirmLabel?: string;
   icon?: IconSymbolName;
+  imageUri?: string | null;
   onCancel: () => void;
   onConfirm?: () => void;
   open: boolean;
@@ -29,6 +31,7 @@ export function KatchaDialog({
   cancelLabel = 'Cancel',
   confirmLabel = 'Continue',
   icon,
+  imageUri,
   onCancel,
   onConfirm,
   open,
@@ -53,6 +56,11 @@ export function KatchaDialog({
           <View style={[styles.icon, { backgroundColor: tokens.subtle, borderColor: tokens.border }]}>
             <IconSymbol name={resolvedIcon} size={21} color={iconColor} />
           </View>
+          {imageUri ? (
+            <View style={[styles.imageFrame, { backgroundColor: tokens.subtle, borderColor: tokens.border }]}>
+              <Image contentFit="cover" source={{ uri: imageUri }} style={styles.image} transition={100} />
+            </View>
+          ) : null}
           <ThemedText style={styles.eyebrow} lightColor={tone === 'destructive' ? tokens.destructive : tokens.textTertiary} darkColor={tone === 'destructive' ? tokens.destructive : tokens.textTertiary}>
             {tone === 'destructive' ? 'Please confirm' : tone === 'warning' ? 'Before you continue' : 'Good to know'}
           </ThemedText>
@@ -88,6 +96,8 @@ const styles = StyleSheet.create({
   scrim: { alignItems: 'center', flex: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40 },
   card: { alignItems: 'flex-start', borderCurve: 'continuous', borderRadius: 26, borderWidth: 1, gap: 8, maxWidth: 360, padding: 22, width: '100%' },
   icon: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, height: 44, justifyContent: 'center', marginBottom: 2, width: 44 },
+  imageFrame: { alignSelf: 'stretch', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, height: 164, marginBottom: 6, overflow: 'hidden' },
+  image: { height: '100%', width: '100%' },
   eyebrow: KatchaUI.type.label,
   title: { ...KatchaUI.type.display, fontSize: 29, lineHeight: 33 },
   body: { ...KatchaUI.type.body, paddingBottom: 5 },

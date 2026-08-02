@@ -16,6 +16,8 @@ import { CompanionInteractionSheet } from '@/components/katchadeck/world/compani
 import { HomeIdentitySheet } from '@/components/katchadeck/world/home-identity-sheet';
 import { ZodiacTileSheet } from '@/components/katchadeck/world/zodiac-tile-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
+import { CompanionReflectionComposerModal } from '@/components/katchadeck/world/companion-reflection-composer-modal';
+import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { KatchimeraRosterScreen } from '@/components/katchadeck/roster/katchimera-roster-screen';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -27,6 +29,7 @@ import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
+import type { JournalSource, ManualJournalSubmission } from '@/types/home';
 import type { KatchimeraFamilyId, KatchimeraSkinId, KatchimeraWardrobeState } from '@/types/katchimera';
 import type { KingdomCreature } from '@/types/kingdom';
 import type { WorldIdentityState } from '@/types/world-identity';
@@ -53,15 +56,48 @@ import {
 import { companionIdForFamily } from '@/constants/katchimera-skins';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import { questDefinition } from '@/utils/quests/definitions';
+import type { QuestJournalCaptureMode, QuestJournalTemplate } from '@/utils/quests/journal-templates';
+import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
+import { journalIdempotencyKey, journalRecordId } from '@/utils/journal-domain';
+import { noteEvidenceId } from '@/utils/intelligence/evidence';
 import { buildKatchimeraRoster } from '@/utils/katchimera-roster';
+import { beginQuestCapture, cancelQuestCapture } from '@/utils/quest-capture-session';
+import { completeSemanticNoteQuestCapture } from '@/utils/quests/semantic-note-capture';
+import { manualJournalFlow } from '@/utils/manual-journal-registry';
+
+type QuestJournalReviewContext = {
+  initialFlowId: string;
+  initialChoiceId?: string | null;
+  noteExpanded: boolean;
+  template: QuestJournalTemplate;
+  questRunId: string;
+  questId: string;
+  creatureId: string;
+  acceptedDayId: string;
+  inputMode: QuestJournalCaptureMode;
+  captureSourceId?: string;
+};
+
+type QuestNoteCapture = QuestJournalReviewContext & {
+  inputMode: 'note' | 'voice';
+  captureSourceId: string;
+};
+
+type QuestNoteMismatch = {
+  message: string;
+  review: QuestNoteCapture;
+};
 
 type EmbeddedJournalReview =
   | {
-      origin: 'insight' | 'quest';
+      origin: 'insight';
       initialFlowId: string;
       initialChoiceId?: string | null;
       noteExpanded: boolean;
     }
+  | ({
+      origin: 'quest';
+    } & QuestJournalReviewContext)
   | {
       origin: 'quick_goal';
       initialFlowId: string;
@@ -76,6 +112,78 @@ type EmbeddedJournalReview =
 function hatchTimestamp(creature: KingdomCreature, index: number): number {
   const time = Date.parse(`${creature.isoDate}T00:00:00`);
   return Number.isFinite(time) ? time + index : index;
+}
+
+function questJournalSubmissionItem(
+  submission: ManualJournalSubmission,
+  review: QuestJournalReviewContext
+): QuestSubmissionItem {
+  const source = submission.journalSource ?? {
+    kind: 'manual' as const,
+    sourceId: review.questRunId,
+  };
+  const noteSource = source.kind === 'text_note' || source.kind === 'voice_note';
+  const journalId = journalRecordId(journalIdempotencyKey(source, submission.sessionId ?? review.questRunId));
+  const sourceId = noteSource ? source.sourceId : `manual-${journalId}`;
+  const evidenceId = noteSource ? noteEvidenceId(source.sourceId) : `evidence:manual:${sourceId}`;
+  return {
+    id: evidenceId,
+    kind: source.kind === 'voice_note' ? 'voice' : source.kind === 'text_note' ? 'note' : 'note',
+    sourceType: noteSource ? source.kind : 'manual_log',
+    sourceId,
+    evidenceId,
+    title: review.template.reviewLabel,
+    subtitle: review.inputMode === 'guided' ? 'Guided journal · Added to this quest' : 'Checked on device · Added to this quest',
+    body: submission.linkedNote?.text?.trim() || submission.note?.trim() || null,
+    icon: source.kind === 'voice_note' ? 'mic.fill' : source.kind === 'text_note' ? 'square.and.pencil' : 'book.closed.fill',
+    accentColor: '#D2AE59',
+    matchStatus: 'ready',
+  };
+}
+
+function questJournalSource(review: QuestJournalReviewContext): JournalSource {
+  const origin = {
+    kind: 'companion_quest' as const,
+    questRunId: review.questRunId,
+    questId: review.questId,
+    creatureId: review.creatureId,
+    acceptedDayId: review.acceptedDayId,
+    journalTemplateId: review.template.id,
+    inputMode: review.inputMode,
+  };
+  if (review.inputMode === 'note') return { kind: 'text_note', sourceId: review.captureSourceId ?? review.questRunId, origin };
+  if (review.inputMode === 'voice') return { kind: 'voice_note', sourceId: review.captureSourceId ?? review.questRunId, origin };
+  return { kind: 'manual', sourceId: review.questRunId, origin };
+}
+
+function questNoteSubmission(
+  draft: CompanionReflectionDraft,
+  review: QuestNoteCapture
+): ManualJournalSubmission | null {
+  const flow = manualJournalFlow(review.template.flowId);
+  const categoryId = review.template.initialChoiceId
+    ?? review.template.allowedChoiceIds?.[0]
+    ?? flow?.choices[0]?.id
+    ?? null;
+  const choice = flow?.choices.find((item) => item.id === categoryId);
+  if (!flow || !choice || !categoryId) return null;
+  return {
+    flowId: flow.id,
+    path: [categoryId],
+    categoryId,
+    canonicalQualityIds: choice.qualityIds ?? [],
+    fields: { specific: draft.text.trim() || review.template.reviewLabel },
+    feeling: null,
+    note: draft.text.trim() || null,
+    linkedNote: {
+      kind: draft.kind,
+      text: draft.text.trim(),
+      audioUri: draft.audioUri ?? null,
+      durationMs: draft.durationMs ?? null,
+    },
+    sessionId: review.captureSourceId,
+    journalSource: questJournalSource(review),
+  };
 }
 
 export type KingdomCompanionPresentation = 'world' | 'roster' | 'companion';
@@ -109,6 +217,8 @@ export function KingdomCompanionScreen({
   const [homeIdentityOpen, setHomeIdentityOpen] = useState(false);
   const [zodiacOpen, setZodiacOpen] = useState(false);
   const [embeddedJournal, setEmbeddedJournal] = useState<EmbeddedJournalReview | null>(null);
+  const [questNoteCapture, setQuestNoteCapture] = useState<QuestNoteCapture | null>(null);
+  const [questNoteMismatch, setQuestNoteMismatch] = useState<QuestNoteMismatch | null>(null);
   const [savedOrigin, setSavedOrigin] = useState<'insight' | 'quest' | null>(null);
   const [questExperienceActive, setQuestExperienceActive] = useState(false);
   const { addManualJournalEntry, cloudIntelligenceEnabled } = useHomeScreenState({
@@ -265,17 +375,47 @@ export function KingdomCompanionScreen({
     quests.performSelectedInsightAction();
   };
 
-  const handleQuestAction = () => {
+  const handleQuestAction = (requestedInputMode?: QuestJournalCaptureMode) => {
+    const inputMode = requestedInputMode ?? (quests.selectedFoundationAvailable ? 'note' : 'guided');
     const action = quests.selectedQuestRuntime?.nextAction;
     if (action === 'add_note' || action === 'record_voice') {
       const definition = quests.selectedQuestRuntime
         ? questDefinition(quests.selectedQuestRuntime.questId)
         : null;
-      if (definition?.semanticVerification) {
-        quests.performSelectedQuestAction();
+      const activeQuest = quests.selectedActiveQuest;
+      const template = definition?.evidenceInput?.kind === 'journal'
+        ? definition.evidenceInput.template
+        : null;
+      if (activeQuest && template && quests.selectedResident) {
+        const review: QuestJournalReviewContext = {
+          initialFlowId: template.flowId,
+          initialChoiceId: inputMode === 'guided'
+            ? template.initialChoiceId
+            : template.initialChoiceId ?? template.allowedChoiceIds?.[0] ?? null,
+          noteExpanded: inputMode !== 'guided',
+          template,
+          questRunId: activeQuest.questRunId ?? `quest-run:${quests.selectedResident.creature.creatureId}:${activeQuest.questId}:${activeQuest.acceptedAt.toString(36)}`,
+          questId: activeQuest.questId,
+          creatureId: quests.selectedResident.creature.creatureId,
+          acceptedDayId: activeQuest.acceptedDayId ?? today?.isoDate ?? 'today',
+          inputMode,
+        };
+        if (inputMode === 'guided') {
+          setEmbeddedJournal({ origin: 'quest', ...review });
+        } else {
+          if (definition?.semanticVerification && quests.selectedFoundationAvailable) {
+            beginQuestCapture(activeQuest.questId, quests.selectedResident.creature.creatureId, activeQuest.questRunId);
+          }
+          setQuestNoteMismatch(null);
+          setQuestNoteCapture({
+            ...review,
+            inputMode,
+            captureSourceId: `${review.questRunId}:${inputMode}:${Date.now().toString(36)}`,
+          });
+        }
         return;
       }
-      setEmbeddedJournal({ origin: 'quest', initialFlowId: 'general', noteExpanded: true });
+      setEmbeddedJournal({ origin: 'insight', initialFlowId: 'general', noteExpanded: true });
       return;
     }
     quests.performSelectedQuestAction();
@@ -365,7 +505,7 @@ export function KingdomCompanionScreen({
       {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
       {zodiacOpen ? <ZodiacTileSheet identity={identity} onChange={updateIdentity} onClose={() => setZodiacOpen(false)} /> : null}
 
-      {quests.selectedResident && !embeddedJournal ? (
+      {quests.selectedResident && !embeddedJournal && !questNoteCapture ? (
         <CompanionInteractionSheet
           onExperienceActiveChange={setQuestExperienceActive}
           embedded={presentation === 'companion'}
@@ -387,12 +527,16 @@ export function KingdomCompanionScreen({
             title: quests.selectedActiveQuest.title,
             hint: quests.selectedActiveQuest.hint,
             semanticInput: Boolean(questDefinition(quests.selectedActiveQuest.questId)?.semanticVerification),
-            journalFallback: quests.selectedSemanticJournalFallbackActive,
+            journalInput: questDefinition(quests.selectedActiveQuest.questId)?.evidenceInput?.kind === 'journal',
+            journalFallback: questDefinition(quests.selectedActiveQuest.questId)?.evidenceInput?.kind === 'journal',
+            assistedJournalInput: Boolean(
+              questDefinition(quests.selectedActiveQuest.questId)?.semanticVerification && quests.selectedFoundationAvailable
+            ),
             execution: quests.selectedInteractiveExecution,
             resolvedConfig: quests.selectedActiveQuest.resolvedConfig,
             offerSeed: quests.selectedActiveQuest.offerSeed,
           } : null}
-          questComplete={Boolean(quests.selectedQuestRuntime?.complete)}
+          questComplete={Boolean(quests.selectedQuestPersistedComplete || quests.selectedQuestRuntime?.complete)}
           questRuntime={quests.selectedQuestRuntime}
           questCaptureFeedback={quests.questCaptureFeedback}
           submissionItems={quests.selectedQuestItems}
@@ -485,14 +629,24 @@ export function KingdomCompanionScreen({
       ) : null}
       {embeddedJournal ? (
         <ManualJournalSheet
-          allowRemoteIntelligence={cloudIntelligenceEnabled}
+          allowRemoteIntelligence={embeddedJournal.origin === 'quest' ? false : cloudIntelligenceEnabled}
+          entryVariant={embeddedJournal.origin === 'quest' ? 'quest_focused' : 'standard'}
           dayLocationPoints={today?.locations}
           initialFlowId={embeddedJournal.initialFlowId}
           initialChoiceId={'initialChoiceId' in embeddedJournal ? embeddedJournal.initialChoiceId : undefined}
+          allowedChoiceIds={embeddedJournal.origin === 'quest' ? embeddedJournal.template.allowedChoiceIds : undefined}
+          contextOptionsOverride={embeddedJournal.origin === 'quest' && embeddedJournal.inputMode === 'guided' ? embeddedJournal.template.contextOptions : undefined}
+          contextTitleOverride={embeddedJournal.origin === 'quest' && embeddedJournal.inputMode === 'guided' ? embeddedJournal.template.contextTitle : undefined}
+          promptBody={embeddedJournal.origin === 'quest' ? embeddedJournal.template.promptBody : undefined}
+          promptTitle={embeddedJournal.origin === 'quest' ? embeddedJournal.template.promptTitle : undefined}
+          saveLabel={embeddedJournal.origin === 'quest'
+            ? embeddedJournal.inputMode === 'guided' ? 'Save and complete quest' : 'Check and submit'
+            : undefined}
+          initialInputMode={embeddedJournal.origin === 'quest' ? embeddedJournal.inputMode : undefined}
           initialSpecific={embeddedJournal.origin === 'quick_goal' ? embeddedJournal.goal.title : undefined}
           initialNote={embeddedJournal.origin === 'quick_goal' ? `I completed: ${embeddedJournal.goal.title}` : undefined}
           initialNoteExpanded={embeddedJournal.noteExpanded}
-          journalSource={embeddedJournal.origin === 'quick_goal' ? {
+          journalSource={embeddedJournal.origin === 'quest' ? questJournalSource(embeddedJournal) : embeddedJournal.origin === 'quick_goal' ? {
             kind: 'text_note',
             sourceId: embeddedJournal.completion.id,
             origin: {
@@ -505,20 +659,216 @@ export function KingdomCompanionScreen({
             },
           } : undefined}
           returnToOriginOnBack
-          onBackFromInitial={() => setEmbeddedJournal(null)}
-          onClose={() => { setEmbeddedJournal(null); quests.closeSelectedResident(); }}
+          onBackFromInitial={() => {
+            if (embeddedJournal.origin === 'quest') cancelQuestCapture(embeddedJournal.questId);
+            setEmbeddedJournal(null);
+          }}
+          onClose={() => {
+            if (embeddedJournal.origin === 'quest') cancelQuestCapture(embeddedJournal.questId);
+            setEmbeddedJournal(null);
+            quests.closeSelectedResident();
+          }}
           onSave={(submission) => {
             addManualJournalEntry(submission, 'today');
             const origin = embeddedJournal.origin;
             if (embeddedJournal.origin === 'quick_goal') {
               quickGoals.markJournaled(embeddedJournal.completion.id);
             }
+            if (embeddedJournal.origin === 'quest') {
+              const review = embeddedJournal;
+              const submissionItem = questJournalSubmissionItem(submission, review);
+              const noteText = submission.linkedNote?.text.trim() || submission.note?.trim() || '';
+              const semantic = questDefinition(review.questId)?.semanticVerification;
+              if (review.inputMode === 'guided') {
+                cancelQuestCapture(review.questId);
+                quests.submitSelectedQuest(submissionItem);
+              } else if (semantic && quests.selectedFoundationAvailable && noteText) {
+                void completeSemanticNoteQuestCapture({
+                  sourceId: review.questRunId,
+                  sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                  text: noteText,
+                  target: 'today',
+                }).then((outcome) => {
+                  if (outcome.matched) {
+                    quests.submitSelectedQuest(submissionItem);
+                    return;
+                  }
+                  quests.reportSelectedQuestJournalOutcome({
+                    phase: 'no_match',
+                    sourceId: review.questRunId,
+                    sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                    evidenceId: outcome.evidenceId,
+                    reason: outcome.message,
+                  });
+                }).finally(quests.refreshQuestState);
+              } else {
+                cancelQuestCapture(review.questId);
+                quests.reportSelectedQuestJournalOutcome({
+                  phase: 'no_match',
+                  sourceId: review.questRunId,
+                  sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                  reason: noteText
+                    ? 'This device could not check the entry. Use the guided journal to complete the quest.'
+                    : 'Add a transcript or use the guided journal so the quest can check this entry.',
+                });
+              }
+            }
             setEmbeddedJournal(null);
             setSavedOrigin(origin === 'quick_goal' ? null : origin);
+            if (origin === 'quest' && embeddedJournal.origin === 'quest' && embeddedJournal.inputMode !== 'guided') quests.refreshQuestState();
             if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }}
         />
       ) : null}
+      {questNoteCapture ? (
+        <CompanionReflectionComposerModal
+          eyebrow="QUEST ENTRY"
+          hapticOnSave={false}
+          initialDraft={null}
+          initialVoiceRecording={questNoteCapture.inputMode === 'voice'}
+          promptId={questNoteCapture.questId}
+          promptText={questNoteCapture.template.promptBody}
+          saveLabel="Check and submit"
+          title={questNoteCapture.template.promptTitle}
+          onCancel={() => {
+            cancelQuestCapture(questNoteCapture.questId);
+            setQuestNoteCapture(null);
+          }}
+          onSave={(draft) => {
+            const review = questNoteCapture;
+            const captureSourceId = review.captureSourceId;
+            const submission = questNoteSubmission(draft, review);
+            if (!submission) {
+              cancelQuestCapture(review.questId);
+              quests.reportSelectedQuestJournalOutcome({
+                phase: 'no_match',
+                sourceId: captureSourceId,
+                sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                reason: 'This entry could not be filed. Try the guided journal instead.',
+              });
+              setQuestNoteCapture(null);
+              return;
+            }
+            addManualJournalEntry(submission, 'today');
+            const submissionItem = questJournalSubmissionItem(submission, review);
+            const noteText = draft.text.trim();
+            const semantic = questDefinition(review.questId)?.semanticVerification;
+            setQuestNoteCapture(null);
+            if (semantic && quests.selectedFoundationAvailable && noteText) {
+              quests.reportSelectedQuestJournalOutcome({
+                phase: 'analyzing',
+                sourceId: captureSourceId,
+                sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                reason: 'direct_semantic_pending',
+              });
+              void completeSemanticNoteQuestCapture({
+                sourceId: captureSourceId,
+                sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                text: noteText,
+                target: 'today',
+              }).then((outcome) => {
+                if (outcome.matched) {
+                  if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  quests.submitSelectedQuest(submissionItem);
+                  return;
+                }
+                if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                setQuestNoteMismatch({
+                  message: outcome.message ?? 'This note does not clearly answer the quest question yet.',
+                  review,
+                });
+                quests.reportSelectedQuestJournalOutcome({
+                  phase: 'no_match',
+                  sourceId: captureSourceId,
+                  sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                  evidenceId: outcome.evidenceId,
+                  reason: outcome.message,
+                });
+              }).catch(() => {
+                cancelQuestCapture(review.questId);
+                if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                const message = 'Your note was saved, but it could not be checked just now.';
+                setQuestNoteMismatch({ message, review });
+                quests.reportSelectedQuestJournalOutcome({
+                  phase: 'no_match',
+                  sourceId: captureSourceId,
+                  sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                  reason: message,
+                });
+              }).finally(quests.refreshQuestState);
+            } else {
+              cancelQuestCapture(review.questId);
+              if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              quests.reportSelectedQuestJournalOutcome({
+                phase: 'no_match',
+                sourceId: captureSourceId,
+                sourceType: review.inputMode === 'voice' ? 'voice_note' : 'text_note',
+                reason: noteText
+                  ? 'This device could not check the entry. Use the guided journal to complete the quest.'
+                  : 'Add a transcript or use the guided journal so the quest can check this entry.',
+              });
+            }
+          }}
+        />
+      ) : null}
+      <KatchaDialog
+        body={quests.questResultNotice?.message ?? ''}
+        cancelLabel={quests.questResultNotice?.kind === 'success'
+          ? 'Done'
+          : quests.questResultNotice?.kind === 'possible'
+            ? 'Review photo'
+            : 'Keep quest open'}
+        confirmLabel="Try another photo"
+        icon={quests.questResultNotice?.kind === 'success' ? 'checkmark' : 'camera.fill'}
+        imageUri={quests.questResultNotice?.thumbnailUri}
+        onCancel={quests.dismissQuestResultNotice}
+        onConfirm={quests.questResultNotice?.kind === 'no_match'
+          ? () => {
+              quests.dismissQuestResultNotice();
+              quests.performSelectedQuestAction();
+            }
+          : undefined}
+        open={Boolean(quests.questResultNotice)}
+        title={quests.questResultNotice?.title ?? ''}
+        tone={quests.questResultNotice?.kind === 'success' ? 'info' : 'warning'}
+      />
+      <KatchaDialog
+        body={questNoteMismatch
+          ? `${questNoteMismatch.message} Try another answer, or use the guided journal to complete it without on-device checking.`
+          : ''}
+        cancelLabel="Try another answer"
+        confirmLabel="Use guided journal"
+        icon="text.bubble.fill"
+        onCancel={() => {
+          if (!questNoteMismatch) return;
+          const review = questNoteMismatch.review;
+          cancelQuestCapture(review.questId);
+          beginQuestCapture(review.questId, review.creatureId, review.questRunId);
+          setQuestNoteMismatch(null);
+          setQuestNoteCapture({
+            ...review,
+            captureSourceId: `${review.questRunId}:${review.inputMode}:${Date.now().toString(36)}`,
+          });
+        }}
+        onConfirm={() => {
+          if (!questNoteMismatch) return;
+          const review = questNoteMismatch.review;
+          cancelQuestCapture(review.questId);
+          setQuestNoteMismatch(null);
+          setEmbeddedJournal({
+            origin: 'quest',
+            ...review,
+            captureSourceId: undefined,
+            inputMode: 'guided',
+            initialChoiceId: review.template.initialChoiceId,
+            noteExpanded: true,
+          });
+        }}
+        open={Boolean(questNoteMismatch)}
+        surface="parchment"
+        title="That doesn’t answer the quest yet"
+        tone="warning"
+      />
     </GestureHandlerRootView>
   );
 }

@@ -22,6 +22,7 @@ const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'taxonomy
 const intelligenceEvidencePath = transpileToTemp('utils/intelligence/evidence.ts', 'intelligence-evidence.js');
 const scoringPath = transpileToTemp('utils/quests/evidence-scoring.ts', 'evidence-scoring.js');
 const factsPath = transpileToTemp('utils/signals/facts.ts', 'facts.js');
+const journalTemplatesPath = transpileToTemp('utils/quests/journal-templates.ts', 'journal-templates.js');
 const definitionsPath = transpileToTemp('utils/quests/definitions.ts', 'definitions.js');
 const evaluatePath = transpileToTemp('utils/quests/evaluate.ts', 'evaluate.js');
 const typesPath = path.join(tempDir, 'types-home.js');
@@ -35,6 +36,7 @@ const stubs = {
   '@/utils/quests/evidence-scoring': scoringPath,
   '@/utils/signals/facts': factsPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
+  '@/utils/quests/journal-templates': journalTemplatesPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {

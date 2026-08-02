@@ -20,14 +20,14 @@ export function semanticVerificationDecision(
     ? response.confidence as SemanticQuestConfidence
     : 'low';
   const reasonCode = typeof response.reasonCode === 'string' ? response.reasonCode : 'invalid_response';
-  const verdict = readVerdict === 'match' && confidence !== 'high' ? 'uncertain' : readVerdict;
+  const verdict = readVerdict;
   return {
     verdict,
     confidence,
     reasonCode,
-    passed: verdict === 'match' && confidence === 'high',
+    passed: verdict === 'match' && confidence !== 'low',
     playerMessage: verdict === 'match'
-      ? 'This note clearly answers the quest.'
+      ? 'This note answers the quest.'
       : verdict === 'uncertain'
         ? retryPrompt
         : verdict === 'no_match'

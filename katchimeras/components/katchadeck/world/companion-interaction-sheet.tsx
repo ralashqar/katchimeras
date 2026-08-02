@@ -26,9 +26,11 @@ import type {
 import { getCreatureVisual } from '@/game/days';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
 import type { QuestRuntimeStatus } from '@/utils/quests/runtime';
+import type { QuestJournalCaptureMode } from '@/utils/quests/journal-templates';
 import {
   buildCompanionQuestViewModel,
   companionQuestInlineNoteAction,
+  companionQuestInlinePhotoAction,
   companionQuestPresentation,
   companionViewportResetKey,
 } from '@/utils/companion-interaction';
@@ -113,7 +115,7 @@ export type CompanionInteractionSheetProps = {
   onSelectDestination?: (destination: CompanionDestination | null) => void;
   onClose: () => void;
   embedded?: boolean;
-  activeQuest: { questId: string; title: string; hint: string; semanticInput?: boolean; journalFallback?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
+  activeQuest: { questId: string; title: string; hint: string; semanticInput?: boolean; journalInput?: boolean; journalFallback?: boolean; assistedJournalInput?: boolean; execution?: InteractiveQuestExecution | null; resolvedConfig?: Record<string, unknown>; offerSeed?: string } | null;
   questComplete: boolean;
   questRuntime: QuestRuntimeStatus | null;
   questCaptureFeedback: QuestCaptureFeedback | null;
@@ -127,7 +129,7 @@ export type CompanionInteractionSheetProps = {
   onChooseAnotherQuest: () => void;
   onSubmitQuest: (item: QuestSubmissionItem) => void;
   onClarifyQuestMatch: (item: QuestSubmissionItem, answer: MemoryQualityScore['centrality'] | 'rejected') => void;
-  onQuestAction: () => void;
+  onQuestAction: (mode?: QuestJournalCaptureMode) => void;
   recentTriviaQuestionIds?: string[];
   recentWordPuzzleIds?: string[];
   recentWordPathPuzzleIds?: string[];
@@ -402,13 +404,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     !questExperienceOpen
   );
   const inlineQuestNoteAction = companionQuestInlineNoteAction(quest);
+  const inlineQuestPhotoAction = companionQuestInlinePhotoAction(quest);
   const actionFooter = props.memorySaved
     ? null
     : destination === 'quest' && interactiveExecution
       ? null
     : destination === 'quest' && quest.mode === 'offer'
       ? null
-    : destination === 'quest' && quest.primaryAction && !inlineQuestNoteAction
+    : destination === 'quest' && quest.primaryAction && !inlineQuestNoteAction && !inlineQuestPhotoAction
       ? reviewItem ? null : (
           <CompanionPrimaryAction label={quest.mode === 'offer' ? 'Accept selected quest' : quest.primaryAction.label} icon={quest.primaryAction.icon} onPress={runPrimary} disabled={quest.mode === 'analysing'} />
         )
@@ -744,10 +747,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   <CompanionQuestThread
                     model={quest}
                     reviewItem={reviewItem}
-                    onAttemptInput={() => {
+                    onAttemptInput={(mode) => {
                       if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-                      props.onQuestAction();
+                      props.onQuestAction(mode);
                     }}
+                    onAttemptPhoto={runPrimary}
                     onSelectReviewItem={(item) => setReviewItem(item?.id ?? null)}
                     onClarify={(item, answer) => {
                       props.onClarifyQuestMatch(item, answer);

@@ -13,10 +13,7 @@ export function withManualJournalEntry(day: StoredHomeDayRecord, submission: Man
 
 export function commitJournalRecord(day: StoredHomeDayRecord, command: JournalCommitCommand, now: Date): StoredHomeDayRecord {
   const existing = day.journalRecords?.find((item) => item.idempotencyKey === command.idempotencyKey) ?? null;
-  const origin =
-    command.draft.source.kind === 'text_note' || command.draft.source.kind === 'voice_note'
-      ? command.draft.source.origin
-      : null;
+  const origin = command.draft.source.origin ?? null;
   if (existing && origin?.kind !== 'companion_reflection') return day;
   const record = commandToJournalRecord(command, now);
   if (!record) return day;
@@ -110,6 +107,12 @@ function projectJournalRecord(day: StoredHomeDayRecord, record: JournalRecord, _
     journalFlowId: record.flowId,
     journalCategoryId: record.categoryId,
     journalContextId: context || null,
+    questLink: record.source.origin?.kind === 'companion_quest' ? {
+      questRunId: record.source.origin.questRunId,
+      questId: record.source.origin.questId,
+      journalTemplateId: record.source.origin.journalTemplateId,
+      inputMode: record.source.origin.inputMode,
+    } : null,
   });
   const linkedNote = linkedNoteId && submission.linkedNote ? {
     id: linkedNoteId, kind: submission.linkedNote.kind, text: submission.linkedNote.text.trim(), audioUri: submission.linkedNote.audioUri ?? null,

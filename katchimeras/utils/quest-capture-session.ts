@@ -7,12 +7,14 @@ export type QuestCaptureSession = {
   phase: 'capturing' | 'committed';
   evaluation: PhotoQuestEvaluation | null;
   sourceType: 'photo' | 'text_note' | 'voice_note' | null;
+  questRunId?: string | null;
 };
 
-let session: QuestCaptureSession | null = null;
+const STORAGE_KEY = 'katchadeck.quest-capture-session-v2';
+let memorySession: QuestCaptureSession | null = null;
 
-export function beginQuestCapture(questId: string, creatureId: string): void {
-  session = { questId, creatureId, sourceId: null, sourceType: null, phase: 'capturing', evaluation: null };
+export function beginQuestCapture(questId: string, creatureId: string, questRunId?: string | null): void {
+  saveSession({ questId, creatureId, questRunId: questRunId ?? null, sourceId: null, sourceType: null, phase: 'capturing', evaluation: null });
 }
 
 export function completeQuestCapture(
@@ -22,22 +24,50 @@ export function completeQuestCapture(
   evaluation: PhotoQuestEvaluation,
   sourceType: QuestCaptureSession['sourceType'] = 'photo'
 ): void {
-  session = { questId, creatureId, sourceId, sourceType, phase: 'committed', evaluation };
+  const current = activeQuestCapture();
+  saveSession({ questId, creatureId, questRunId: current?.questRunId ?? null, sourceId, sourceType, phase: 'committed', evaluation });
 }
 
 export function activeQuestCapture(): QuestCaptureSession | null {
-  return session;
+  const storage = globalThis.localStorage;
+  if (!storage) return memorySession;
+  try {
+    const value = storage.getItem(STORAGE_KEY);
+    return value ? JSON.parse(value) as QuestCaptureSession : memorySession;
+  } catch {
+    return memorySession;
+  }
 }
 
 export function consumeCompletedQuestCapture(): QuestCaptureSession | null {
+  const session = activeQuestCapture();
   if (session?.phase !== 'committed') return null;
   const completed = session;
-  session = null;
+  clearSession();
   return completed;
 }
 
 export function cancelQuestCapture(questId?: string | null): void {
-  if (!questId || session?.questId === questId) session = null;
+  const session = activeQuestCapture();
+  if (!questId || session?.questId === questId) clearSession();
+}
+
+function saveSession(value: QuestCaptureSession): void {
+  memorySession = value;
+  try {
+    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // The in-memory copy keeps the active navigation flow usable.
+  }
+}
+
+function clearSession(): void {
+  memorySession = null;
+  try {
+    globalThis.localStorage?.removeItem(STORAGE_KEY);
+  } catch {
+    // Best effort; the in-memory state is already cleared.
+  }
 }
 
 export function questCaptureBelongsTo(

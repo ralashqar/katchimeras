@@ -77,7 +77,9 @@ export type CompanionQuestViewModel = {
   criteria: CompanionQuestCriterionViewModel[];
   evidence: QuestSubmissionItem[];
   semanticInput?: boolean;
+  journalInput?: boolean;
   journalFallback?: boolean;
+  assistedJournalInput?: boolean;
   captureFeedback?: QuestCaptureFeedback | null;
   primaryAction?: CompanionQuestPrimaryAction | null;
 };

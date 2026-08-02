@@ -133,6 +133,12 @@ export function buildNoteEvidence(input: {
   journalFlowId?: string | null;
   journalCategoryId?: string | null;
   journalContextId?: string | null;
+  questLink?: {
+    questRunId: string;
+    questId: string;
+    journalTemplateId: string;
+    inputMode?: 'guided' | 'note' | 'voice';
+  } | null;
 }): DayEvidence {
   const provider = input.provider ?? 'deterministic';
   const signals: DayEvidenceSignal[] = textToSignals(input.text).map((signal) => ({
@@ -174,6 +180,26 @@ export function buildNoteEvidence(input: {
         key: contextRouteKey,
         confidence: 1,
         raw: contextRouteKey,
+        provider: 'manual',
+        source: 'manual',
+        centrality: 'primary',
+        qualityStatus: 'confirmed',
+      });
+    }
+  }
+  if (input.questLink) {
+    for (const [key, raw] of [
+      [`quest.run:${input.questLink.questRunId}`, input.questLink.questRunId],
+      [`quest.id:${input.questLink.questId}`, input.questLink.questId],
+      [`quest.template:${input.questLink.journalTemplateId}`, input.questLink.journalTemplateId],
+      ...(input.questLink.inputMode
+        ? [[`quest.input:${input.questLink.inputMode}`, input.questLink.inputMode] as const]
+        : []),
+    ] as const) {
+      signals.push({
+        key,
+        confidence: 1,
+        raw,
         provider: 'manual',
         source: 'manual',
         centrality: 'primary',

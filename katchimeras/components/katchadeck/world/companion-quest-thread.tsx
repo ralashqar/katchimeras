@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,7 +8,11 @@ import { KatchaUI } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
 import type { CompanionQuestOfferViewModel, CompanionQuestViewModel } from '@/types/companion-interaction';
 import type { QuestSubmissionItem } from '@/utils/quests/report-back-evidence';
-import { companionQuestInlineNoteAction } from '@/utils/companion-interaction';
+import type { QuestJournalCaptureMode } from '@/utils/quests/journal-templates';
+import {
+  companionQuestInlineNoteAction,
+  companionQuestInlinePhotoAction,
+} from '@/utils/companion-interaction';
 import { CompanionSection, CompanionStatusBadge } from './companion-interaction-primitives';
 
 export function CompanionQuestChoices({
@@ -109,15 +113,23 @@ export function CompanionQuestThread({
   onSelectReviewItem,
   onClarify,
   onAttemptInput,
+  onAttemptPhoto,
 }: {
   model: CompanionQuestViewModel;
   reviewItem: QuestSubmissionItem | null;
   onSelectReviewItem: (item: QuestSubmissionItem | null) => void;
   onClarify: (item: QuestSubmissionItem, answer: 'primary' | 'supporting' | 'incidental' | 'rejected') => void;
-  onAttemptInput: () => void;
+  onAttemptInput: (mode: QuestJournalCaptureMode) => void;
+  onAttemptPhoto: () => void;
 }) {
-  const compactActive = model.mode === 'active';
   const inlineNoteAction = companionQuestInlineNoteAction(model);
+  const inlinePhotoAction = companionQuestInlinePhotoAction(model);
+  const singlePhotoCriterion = inlinePhotoAction && model.criteria.length === 1 ? model.criteria[0] : null;
+  const compactActive = model.mode === 'active' || Boolean(inlineNoteAction || inlinePhotoAction);
+  const completedCriteria = model.criteria.filter((criterion) => criterion.done).length;
+  const progressUnit = inlinePhotoAction
+    ? model.criteria.length === 1 ? 'photo' : 'photos'
+    : model.criteria.length === 1 ? 'entry' : 'entries';
   return (
     <Animated.View layout={LinearTransition.duration(180)} style={styles.root}>
       {compactActive ? (
@@ -126,7 +138,21 @@ export function CompanionQuestThread({
           style={styles.activeSummary}>
           <ThemedText style={styles.eyebrow} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>{model.eyebrow}</ThemedText>
           <ThemedText selectable style={styles.title} lightColor={Meadow.ink} darkColor={Meadow.ink}>{model.title}</ThemedText>
+          {model.mode === 'blocked' ? (
+            <View style={styles.inlineStatus}>
+              <IconSymbol name="info.circle.fill" size={14} color={model.statusTone === 'danger' ? '#A84F43' : Meadow.goldDeep} />
+              <ThemedText selectable style={styles.inlineStatusText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{model.message}</ThemedText>
+            </View>
+          ) : null}
           {model.criteria.length ? (
+            <View style={styles.questProgressSummary}>
+              <IconSymbol name={inlinePhotoAction ? 'photo.fill' : 'book.closed.fill'} size={14} color={Meadow.goldDeep} />
+              <ThemedText style={styles.questProgressSummaryText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                {completedCriteria} of {model.criteria.length} {progressUnit} attached
+              </ThemedText>
+            </View>
+          ) : null}
+          {model.criteria.length && !singlePhotoCriterion ? (
             <View style={styles.activeGoals}>
               {model.criteria.map((criterion) => (
                 <View key={criterion.id} style={styles.activeGoal}>
@@ -144,32 +170,47 @@ export function CompanionQuestThread({
           ) : (
             <ThemedText selectable style={styles.message} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{model.message}</ThemedText>
           )}
+          {inlinePhotoAction ? (
+            <PhotoCaptureAction
+              action={inlinePhotoAction}
+              requirement={singlePhotoCriterion?.label ?? 'Capture a photo that matches this quest'}
+              onPress={onAttemptPhoto}
+            />
+          ) : null}
           {inlineNoteAction ? (
-            <Pressable
-              accessibilityHint={model.journalFallback
-                ? 'Opens the matching journal category'
-                : 'Opens a quest note with text and voice recording'}
-              accessibilityLabel={model.journalFallback
-                ? 'Open the matching journal entry for this quest'
-                : 'Add a note or voice note for this quest'}
-              accessibilityRole="button"
-              onPress={onAttemptInput}
-              style={({ pressed }) => [styles.noteAttempt, pressed && styles.noteAttemptPressed]}>
-              <View style={styles.noteAttemptIcon}>
-                <IconSymbol name="square.and.pencil" size={17} color={Meadow.goldDeep} />
-              </View>
-              <View style={styles.noteAttemptCopy}>
-                <ThemedText style={styles.noteAttemptTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
-                  {model.journalFallback ? 'Fill journal entry' : 'Add note or voice'}
-                </ThemedText>
-                <ThemedText style={styles.noteAttemptHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-                  {model.journalFallback
-                    ? 'The matching category is already selected'
-                    : 'Share this moment for the quest'}
-                </ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={15} color={Meadow.goldDeep} />
-            </Pressable>
+            <View style={styles.captureMethods}>
+              <ThemedText style={styles.captureMethodsLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                Add what happened
+              </ThemedText>
+              {model.assistedJournalInput ? (
+                <>
+                  <QuestCaptureChoice
+                    icon="square.and.pencil"
+                    label="Answer with a note"
+                    detail="Checked privately on this device"
+                    onPress={() => onAttemptInput('note')}
+                    prominent
+                  />
+                  <View style={styles.assistedMethods}>
+                    <QuestCaptureChoice icon="mic.fill" label="Use voice" detail="Checked on device" onPress={() => onAttemptInput('voice')} />
+                    <QuestCaptureChoice icon="book.closed.fill" label="Guided journal" detail="Complete without a model check" onPress={() => onAttemptInput('guided')} />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <QuestCaptureChoice
+                    icon="book.closed.fill"
+                    label="Use guided journal"
+                    detail="Complete with a matching journal section"
+                    onPress={() => onAttemptInput('guided')}
+                    prominent
+                  />
+                  <ThemedText style={styles.captureMethodsHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+                    Add text or voice inside the guided journal.
+                  </ThemedText>
+                </>
+              )}
+            </View>
           ) : null}
         </View>
       ) : (
@@ -239,6 +280,81 @@ export function CompanionQuestThread({
   );
 }
 
+function PhotoCaptureAction({
+  action,
+  requirement,
+  onPress,
+}: {
+  action: NonNullable<ReturnType<typeof companionQuestInlinePhotoAction>>;
+  requirement: string;
+  onPress: () => void;
+}) {
+  const buttonLabel = action.nextAction === 'take_photo' ? 'Take photo' : action.label;
+  const detail = action.nextAction === 'take_photo'
+    ? 'Open the camera and attach a new photo to this quest'
+    : action.nextAction === 'enable_camera'
+      ? 'Allow camera access, then take the quest photo'
+      : 'Choose a photo and attach it to this quest';
+  return (
+    <View style={styles.photoCapture}>
+      <View style={styles.photoCaptureHeading}>
+        <View style={styles.photoCaptureIcon}>
+          <IconSymbol name="camera.fill" size={19} color={Meadow.goldDeep} />
+        </View>
+        <View style={styles.photoCaptureCopy}>
+          <ThemedText style={styles.photoCaptureKicker} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>Photo needed</ThemedText>
+          <ThemedText selectable style={styles.photoCaptureRequirement} lightColor={Meadow.ink} darkColor={Meadow.ink}>{requirement}</ThemedText>
+        </View>
+      </View>
+      <Pressable
+        accessibilityHint={detail}
+        accessibilityLabel={buttonLabel}
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.photoCaptureButton, pressed && styles.photoCaptureButtonPressed]}>
+        <IconSymbol name={action.icon} size={18} color={Meadow.ink} />
+        <ThemedText style={styles.photoCaptureButtonText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{buttonLabel}</ThemedText>
+        <IconSymbol name="arrow.right" size={16} color={Meadow.ink} />
+      </Pressable>
+      <ThemedText selectable style={styles.photoCaptureHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+        It will stay attached here while the quest checks the match.
+      </ThemedText>
+    </View>
+  );
+}
+
+function QuestCaptureChoice({
+  detail,
+  icon,
+  label,
+  onPress,
+  prominent = false,
+}: {
+  detail: string;
+  icon: IconSymbolName;
+  label: string;
+  onPress: () => void;
+  prominent?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityHint={detail}
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.captureMethod, prominent && styles.captureMethodProminent, pressed && styles.noteAttemptPressed]}>
+      <View style={[styles.noteAttemptIcon, prominent && styles.captureMethodIconProminent]}>
+        <IconSymbol name={icon} size={17} color={Meadow.goldDeep} />
+      </View>
+      <View style={styles.noteAttemptCopy}>
+        <ThemedText style={styles.noteAttemptTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
+        <ThemedText numberOfLines={1} style={styles.noteAttemptHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{detail}</ThemedText>
+      </View>
+      {prominent ? <IconSymbol name="chevron.right" size={15} color={Meadow.goldDeep} /> : null}
+    </Pressable>
+  );
+}
+
 function CaptureFeedback({ model }: { model: CompanionQuestViewModel }) {
   const feedback = model.captureFeedback!;
   const analysing = feedback.phase === 'analyzing';
@@ -260,10 +376,12 @@ function CaptureFeedback({ model }: { model: CompanionQuestViewModel }) {
         )}
       <View style={styles.captureCopy}>
         {analysing ? (
-          <>
-            <View style={[styles.captureBar, { width: '84%' }]} />
-            <View style={[styles.captureBar, styles.captureBarShort]} />
-          </>
+          <View style={styles.captureAnalysing}>
+            <ActivityIndicator color={Meadow.goldDeep} size="small" />
+            <ThemedText style={styles.captureAnalysingText} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+              Checking whether this answers the quest…
+            </ThemedText>
+          </View>
         ) : (
           <ThemedText style={styles.captureLabel} lightColor={feedback.phase === 'matched' ? Meadow.leafDeep : feedback.phase === 'no_match' ? '#A84F43' : Meadow.goldDeep} darkColor={feedback.phase === 'matched' ? Meadow.leafDeep : feedback.phase === 'no_match' ? '#A84F43' : Meadow.goldDeep}>{label}</ThemedText>
         )}
@@ -340,12 +458,30 @@ const styles = StyleSheet.create({
   activeGoals: { gap: 7, paddingTop: 2 },
   activeGoal: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.32)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.13), inset 0 1px 0 rgba(255,248,230,0.48)', flexDirection: 'row', gap: 11, minHeight: 58, paddingHorizontal: 11, paddingVertical: 9 },
   activeCheck: { flexShrink: 0 },
-  noteAttempt: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(231,185,81,0.18)', borderColor: 'rgba(183,132,42,0.48)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.12), inset 0 1px 0 rgba(255,248,230,0.56)', flexDirection: 'row', gap: 9, minHeight: 48, paddingHorizontal: 10, paddingVertical: 7 },
+  photoCapture: { backgroundColor: 'rgba(255,247,222,0.72)', borderColor: 'rgba(183,132,42,0.34)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, boxShadow: '-2px 4px 10px rgba(58,38,18,0.14), inset 0 1px 0 rgba(255,255,255,0.72)', gap: 10, padding: 11 },
+  photoCaptureHeading: { alignItems: 'center', flexDirection: 'row', gap: 10 },
+  photoCaptureIcon: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.20)', borderCurve: 'continuous', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
+  photoCaptureCopy: { flex: 1, gap: 1, minWidth: 0 },
+  photoCaptureKicker: { fontSize: 9.5, fontWeight: '900', letterSpacing: 0.75, textTransform: 'uppercase' },
+  photoCaptureRequirement: { fontSize: 13.5, fontWeight: '900', lineHeight: 18 },
+  photoCaptureButton: { alignItems: 'center', backgroundColor: '#E8BA50', borderColor: 'rgba(255,246,216,0.78)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, boxShadow: '0 5px 12px rgba(115,78,24,0.20), inset 0 1px 0 rgba(255,255,255,0.54)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 50, paddingHorizontal: 14 },
+  photoCaptureButtonPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
+  photoCaptureButtonText: { flex: 1, fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  photoCaptureHint: { fontSize: 10.5, lineHeight: 14, paddingHorizontal: 2 },
+  inlineStatus: { alignItems: 'flex-start', backgroundColor: 'rgba(255,248,232,0.38)', borderCurve: 'continuous', borderRadius: 13, flexDirection: 'row', gap: 7, paddingHorizontal: 9, paddingVertical: 8 },
+  inlineStatusText: { flex: 1, fontSize: 11, lineHeight: 15 },
+  captureMethods: { backgroundColor: 'rgba(255,248,232,0.28)', borderColor: 'rgba(122,84,44,0.15)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, gap: 8, padding: 9 },
+  captureMethodsLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.65, paddingHorizontal: 2, textTransform: 'uppercase' },
+  captureMethod: { alignItems: 'center', backgroundColor: 'rgba(255,250,239,0.52)', borderColor: 'rgba(122,84,44,0.15)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, minHeight: 50, paddingHorizontal: 9, paddingVertical: 7 },
+  captureMethodProminent: { backgroundColor: 'rgba(231,185,81,0.22)', borderColor: 'rgba(183,132,42,0.48)', boxShadow: '-2px 3px 7px rgba(58,38,18,0.12), inset 0 1px 0 rgba(255,248,230,0.56)' },
+  captureMethodIconProminent: { backgroundColor: 'rgba(255,246,208,0.9)' },
+  assistedMethods: { flexDirection: 'row', gap: 7 },
+  captureMethodsHint: { fontSize: 10.5, lineHeight: 14, paddingHorizontal: 3, paddingBottom: 1 },
   noteAttemptPressed: { opacity: 0.76, transform: [{ scale: 0.98 }] },
   noteAttemptIcon: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 11, height: 32, justifyContent: 'center', width: 32 },
-  noteAttemptCopy: { gap: 1, minWidth: 0 },
-  noteAttemptTitle: { fontSize: 12.5, fontWeight: '900', lineHeight: 16 },
-  noteAttemptHint: { fontSize: 10.5, lineHeight: 14 },
+  noteAttemptCopy: { flex: 1, gap: 1, minWidth: 0 },
+  noteAttemptTitle: { fontSize: 11.5, fontWeight: '900', lineHeight: 15 },
+  noteAttemptHint: { fontSize: 9.5, lineHeight: 12 },
   eyebrow: { fontSize: 10.5, fontWeight: '900', letterSpacing: 1.1, textTransform: 'uppercase' },
   title: { ...KatchaUI.type.companionPageTitle, fontSize: 27, lineHeight: 32 },
   message: { fontSize: 14, lineHeight: 21 },
@@ -359,10 +495,14 @@ const styles = StyleSheet.create({
   progressTrack: { backgroundColor: Meadow.trackOnCard, borderRadius: 999, height: 7, overflow: 'hidden' },
   progressFill: { backgroundColor: Meadow.goldDeep, borderRadius: 999, height: '100%' },
   progressDone: { backgroundColor: Meadow.leaf },
+  questProgressSummary: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  questProgressSummaryText: { fontSize: 12, fontWeight: '800', lineHeight: 16 },
   capture: { alignItems: 'center', backgroundColor: 'rgba(107,128,95,0.10)', borderCurve: 'continuous', borderRadius: 18, flexDirection: 'row', gap: 12, padding: 12 },
   captureThumb: { backgroundColor: Meadow.cardSoft, borderCurve: 'continuous', borderRadius: 13, height: 58, width: 58 },
   captureNote: { alignItems: 'center', justifyContent: 'center' },
   captureCopy: { flex: 1, gap: 9 },
+  captureAnalysing: { alignItems: 'center', flexDirection: 'row', gap: 9, minHeight: 34 },
+  captureAnalysingText: { flex: 1, fontSize: 11.5, fontWeight: '700', lineHeight: 16 },
   captureBar: { backgroundColor: 'rgba(201,194,232,0.18)', borderRadius: 999, height: 9 },
   captureBarShort: { width: '52%' },
   captureLabel: { fontSize: 12.5, fontWeight: '800', lineHeight: 18 },

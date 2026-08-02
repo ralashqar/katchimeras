@@ -54,7 +54,8 @@ export type Op =
   | 'evidenceCorroborated'
   | 'evidenceCount'
   | 'qualityAtLeast'
-  | 'semanticQuestMatch';
+  | 'semanticQuestMatch'
+  | 'questJournalMatch';
 
 
 export type Criterion = {
@@ -81,7 +82,11 @@ export type CriterionEvaluation = {
   centrality?: 'primary' | 'supporting' | 'incidental' | null;
 };
 
-export function evaluateCriterion(criterion: Criterion, facts: Partial<Facts>): CriterionEvaluation {
+export function evaluateCriterion(
+  criterion: Criterion,
+  facts: Partial<Facts>,
+  context?: { questRunId?: string | null }
+): CriterionEvaluation {
   const actual = criterion.op === 'qualityAtLeast'
     ? facts[criterion.fact] ?? facts['evidence.items']
     : facts[criterion.fact];
@@ -111,18 +116,27 @@ export function evaluateCriterion(criterion: Criterion, facts: Partial<Facts>): 
     case 'qualityAtLeast':
       return evaluateEvidenceCriterion(criterion, actual);
     case 'semanticQuestMatch':
-      return evaluateSemanticQuestCriterion(criterion, actual);
+      return evaluateSemanticQuestCriterion(criterion, actual, context?.questRunId);
+    case 'questJournalMatch':
+      return evaluateQuestJournalCriterion(criterion, actual, context?.questRunId);
     default:
       return done(false);
   }
 }
 
-function evaluateSemanticQuestCriterion(criterion: Criterion, actual: FactValue): CriterionEvaluation {
+function evaluateSemanticQuestCriterion(criterion: Criterion, actual: FactValue, questRunId?: string | null): CriterionEvaluation {
   if (!isEvidenceArray(actual)) {
     return { done: false, evidenceIds: [], confidence: null, reason: 'No note has been checked for this quest yet.' };
   }
   const questId = String(criterion.value ?? '');
+  const linkedEntry = findQuestLinkedEvidence(actual, questId, questRunId, true);
+  const linkedInputMode = linkedEntry?.signals.find((signal) => signal.key.startsWith('quest.input:'))?.key;
+  if (linkedEntry && (!linkedInputMode || linkedInputMode === 'quest.input:guided')) {
+    return { done: true, evidenceIds: [linkedEntry.id], confidence: 1, reason: null };
+  }
   const journalRouteMatch = actual.find((evidence) =>
+    !evidence.signals.some((signal) => signal.key === 'quest.input:note' || signal.key === 'quest.input:voice') &&
+    (!questRunId || evidence.signals.some((signal) => signal.key === `quest.run:${questRunId}`)) &&
     evidence.signals.some((signal) =>
       signal.provider === 'manual' &&
       signal.confidence === 1 &&
@@ -142,7 +156,8 @@ function evaluateSemanticQuestCriterion(criterion: Criterion, actual: FactValue)
       .filter((evaluation) =>
         evaluation.questId === questId &&
         evaluation.verdict === 'match' &&
-        evaluation.confidence === 'high'
+        evaluation.confidence === 'high' &&
+        (!questRunId || evidence.signals.some((signal) => signal.key === `quest.run:${questRunId}`))
       )
       .map((evaluation) => ({ evidence, evaluation }))
   );
@@ -160,6 +175,33 @@ function evaluateSemanticQuestCriterion(criterion: Criterion, actual: FactValue)
         confidence: null,
         reason: 'Add a note that clearly answers this quest.',
       };
+}
+
+function evaluateQuestJournalCriterion(
+  criterion: Criterion,
+  actual: FactValue,
+  questRunId?: string | null
+): CriterionEvaluation {
+  if (!isEvidenceArray(actual)) {
+    return { done: false, evidenceIds: [], confidence: null, reason: 'No journal entry is attached to this quest yet.' };
+  }
+  const match = findQuestLinkedEvidence(actual, String(criterion.value ?? ''), questRunId);
+  return match
+    ? { done: true, evidenceIds: [match.id], confidence: 1, reason: null }
+    : { done: false, evidenceIds: [], confidence: null, reason: 'Add the matching journal entry for this quest.' };
+}
+
+function findQuestLinkedEvidence(
+  actual: DayEvidence[],
+  questId: string,
+  questRunId?: string | null,
+  requireJournalRoute = false
+): DayEvidence | null {
+  const requiredKey = questRunId ? `quest.run:${questRunId}` : `quest.id:${questId}`;
+  return actual.find((evidence) =>
+    evidence.signals.some((signal) => signal.provider === 'manual' && signal.confidence === 1 && signal.key === requiredKey) &&
+    (!requireJournalRoute || evidence.signals.some((signal) => signal.provider === 'manual' && signal.key.startsWith('journal.route:')))
+  ) ?? null;
 }
 
 export function testCriterion(criterion: Criterion, facts: Partial<Facts>): boolean {

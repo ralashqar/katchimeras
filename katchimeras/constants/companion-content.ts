@@ -10,7 +10,9 @@ import {
   katchimeraRoles,
   type KatchimeraRoleDefinition,
 } from '@/constants/katchimera-roles';
+import { manualJournalFlow } from '@/utils/manual-journal-registry';
 import { questDefinition } from '@/utils/quests/definitions';
+import { questUsesJournalEntrySystem } from '@/utils/quests/journal-templates';
 
 /**
  * The minimum playable vertical slice for a family marked `complete`.
@@ -24,6 +26,69 @@ export function validateCompleteCompanionContent(): string[] {
     validateRoleQuests(role, issues);
     validateQuickGoals(role, issues);
     validateJourney(role, companionJourneyByFamilyId.get(role.familyId), issues);
+  }
+
+  issues.push(...validateKatchimeraQuestEvidenceSystem());
+
+  return issues;
+}
+
+/**
+ * Catalogue-wide contract for quest capture. This intentionally includes
+ * partial families: they still ship quests and must not fall through to the
+ * legacy generic note screen while their remaining content is being authored.
+ */
+export function validateKatchimeraQuestEvidenceSystem(): string[] {
+  const issues: string[] = [];
+  const visited = new Set<string>();
+
+  for (const role of katchimeraRoles) {
+    for (const questId of role.realLifeQuestIds) {
+      if (visited.has(questId)) continue;
+      visited.add(questId);
+      const quest = questDefinition(questId);
+      if (!quest) continue;
+
+      const mustUseJournal = quest.family === 'note' || quest.family === 'voice' || questUsesJournalEntrySystem(questId);
+      if (mustUseJournal && quest.evidenceInput?.kind !== 'journal') {
+        issues.push(`${role.familyId}: ${questId} must use the focused quest journal`);
+        continue;
+      }
+      if (quest.family === 'photo' && quest.evidenceInput?.kind === 'journal') {
+        issues.push(`${role.familyId}: ${questId} must remain a photo quest`);
+      }
+      if (quest.evidenceInput?.kind !== 'journal') continue;
+
+      const template = quest.evidenceInput.template;
+      const flow = manualJournalFlow(template.flowId);
+      const choiceIds = new Set(flow?.choices.map((choice) => choice.id) ?? []);
+      if (!flow) issues.push(`${role.familyId}: ${questId} uses missing journal flow ${template.flowId}`);
+      if (!template.initialChoiceId || !choiceIds.has(template.initialChoiceId)) {
+        issues.push(`${role.familyId}: ${questId} needs a valid focused journal category`);
+      }
+      if (!template.allowedChoiceIds?.length || !template.allowedChoiceIds.includes(template.initialChoiceId ?? '')) {
+        issues.push(`${role.familyId}: ${questId} must allow its initial journal category`);
+      }
+      for (const choiceId of template.allowedChoiceIds ?? []) {
+        if (!choiceIds.has(choiceId)) issues.push(`${role.familyId}: ${questId} allows missing journal category ${choiceId}`);
+      }
+      if (!quest.semanticVerification) {
+        issues.push(`${role.familyId}: ${questId} needs optional on-device answer evaluation`);
+      } else {
+        if (!quest.semanticVerification.modalities.includes('text') || !quest.semanticVerification.modalities.includes('voice')) {
+          issues.push(`${role.familyId}: ${questId} must support both note and voice input`);
+        }
+        if (!quest.semanticVerification.journalRouteFallbacks?.length) {
+          issues.push(`${role.familyId}: ${questId} needs a deterministic manual journal fallback`);
+        }
+      }
+      if (quest.requiresCapabilities?.length) {
+        issues.push(`${role.familyId}: ${questId} must keep its text fallback free of required capabilities`);
+      }
+      if (!quest.optionalCapabilities?.includes('appleFoundation')) {
+        issues.push(`${role.familyId}: ${questId} must keep appleFoundation optional`);
+      }
+    }
   }
 
   return issues;
@@ -49,16 +114,21 @@ function validateRoleQuests(role: KatchimeraRoleDefinition, issues: string[]) {
     if (!quest.repeatPolicy) {
       issues.push(`${role.familyId}: ${questId} needs an explicit repeat policy`);
     }
+    if ((quest.family === 'note' || quest.family === 'voice') && quest.evidenceInput?.kind !== 'journal') {
+      issues.push(`${role.familyId}: ${questId} needs a structured journal template`);
+    }
+    if (quest.criteria.some((criterion) => criterion.fact === 'notes.added' || criterion.fact === 'notes.voiceAdded')) {
+      issues.push(`${role.familyId}: ${questId} must not use an unrelated note counter`);
+    }
     if (quest.semanticVerification) {
-      const hasJournalFallback = Boolean(quest.semanticVerification.journalRouteFallbacks?.length);
-      if (!hasJournalFallback && !quest.requiresCapabilities?.includes('appleFoundation')) {
-        issues.push(`${role.familyId}: ${questId} semantic verification without a journal fallback must require appleFoundation`);
+      if (quest.requiresCapabilities?.includes('appleFoundation')) {
+        issues.push(`${role.familyId}: ${questId} must remain usable without appleFoundation`);
       }
-      if (!hasJournalFallback && quest.offerVisibility !== 'hide_when_unavailable') {
-        issues.push(`${role.familyId}: ${questId} semantic verification without a journal fallback must hide when unavailable`);
+      if (!quest.optionalCapabilities?.includes('appleFoundation')) {
+        issues.push(`${role.familyId}: ${questId} must keep appleFoundation optional`);
       }
-      if (hasJournalFallback && !quest.optionalCapabilities?.includes('appleFoundation')) {
-        issues.push(`${role.familyId}: ${questId} journal fallback must keep appleFoundation optional`);
+      if (quest.evidenceInput?.kind !== 'journal') {
+        issues.push(`${role.familyId}: ${questId} semantic verification needs a manual journal path`);
       }
       if (!quest.semanticVerification.modalities.length) {
         issues.push(`${role.familyId}: ${questId} semantic verification needs an input modality`);

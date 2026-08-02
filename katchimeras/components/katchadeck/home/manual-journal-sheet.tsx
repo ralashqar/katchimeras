@@ -34,11 +34,13 @@ import { extractNoteSpecificOnDevice } from '@/utils/foundation-note';
 import { voiceJournalInputAdapter } from '@/utils/journal-input-adapters';
 import { shouldAutoRouteVoice } from '@/utils/manual-journal-voice-routing';
 import { journalPlaceSearchQuery } from '@/utils/journal-place-search';
+import type { QuestJournalCaptureMode } from '@/utils/quests/journal-templates';
 import {
   MANUAL_JOURNAL_FLOWS,
   manualJournalFlow,
   type ManualJournalChoice,
   type ManualJournalFlowDefinition,
+  type ManualJournalOption,
   type ManualJournalSection,
 } from '@/utils/manual-journal-registry';
 
@@ -54,6 +56,7 @@ const SECTION_LABELS: Record<ManualJournalSection, string> = {
 const FLOW_ORDER = ['people', 'food', 'went_somewhere', 'movement', 'studio', 'work', 'big_event', 'general'];
 
 export type JournalComposerProps = {
+  entryVariant?: 'standard' | 'quest_focused';
   initialFlowId?: string | null;
   initialChoiceId?: string | null;
   initialSpecific?: string | null;
@@ -75,6 +78,13 @@ export type JournalComposerProps = {
   thumbnailUri?: string | null;
   journalSource?: JournalSource;
   allowRemoteIntelligence?: boolean;
+  allowedChoiceIds?: readonly string[];
+  contextOptionsOverride?: readonly ManualJournalOption[];
+  contextTitleOverride?: string;
+  promptBody?: string;
+  promptTitle?: string;
+  saveLabel?: string;
+  initialInputMode?: QuestJournalCaptureMode;
   onBackFromInitial?: () => void;
   returnToOriginOnBack?: boolean;
   onRouteResolved?: (flowId: string, categoryId: string) => void;
@@ -83,6 +93,7 @@ export type JournalComposerProps = {
 };
 
 export function JournalComposer({
+  entryVariant = 'standard',
   initialFlowId,
   initialChoiceId,
   initialSpecific,
@@ -104,12 +115,20 @@ export function JournalComposer({
   thumbnailUri,
   journalSource,
   allowRemoteIntelligence = false,
+  allowedChoiceIds,
+  contextOptionsOverride,
+  contextTitleOverride,
+  promptBody,
+  promptTitle,
+  saveLabel = 'Save memory',
+  initialInputMode = 'guided',
   onBackFromInitial,
   returnToOriginOnBack = false,
   onRouteResolved,
   onClose,
   onSave,
 }: JournalComposerProps) {
+  const questFocused = entryVariant === 'quest_focused';
   const initialFlow = useMemo(() => initialFlowId ? manualJournalFlow(initialFlowId) : null, [initialFlowId]);
   const sessionId = useRef(journalSource?.sourceId ?? sourceId ?? `journal-${Date.now().toString(36)}`).current;
   const initialChoice = useMemo(
@@ -124,7 +143,7 @@ export function JournalComposer({
   const [feeling, setFeeling] = useState<string | null>(initialFeeling ?? null);
   const [context, setContext] = useState<string | null>(initialContext ?? null);
   const [note, setNote] = useState(initialNote ?? '');
-  const [noteExpanded, setNoteExpanded] = useState(initialNoteExpanded || !!initialNote || !!initialLinkedNote);
+  const [noteExpanded, setNoteExpanded] = useState(questFocused || initialNoteExpanded || initialInputMode !== 'guided' || !!initialNote || !!initialLinkedNote);
   const [linkedNote, setLinkedNote] = useState<JournalNoteDraft | null>(initialLinkedNote ?? null);
   const [resolvedJournalSource, setResolvedJournalSource] = useState<JournalSource | undefined>(journalSource);
   const [confirmedFacets, setConfirmedFacets] = useState(initialConfirmedFacets);
@@ -138,6 +157,7 @@ export function JournalComposer({
   const longPressRef = useRef(false);
   const redoLongPressRef = useRef(false);
   const quickVoiceRef = useRef(false);
+  const initialVoiceStartedRef = useRef(false);
   const noteSpecificRequestRef = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Partial<Record<ManualJournalSection, number>>>({});
@@ -157,6 +177,7 @@ export function JournalComposer({
       sourceId: sessionId,
       audioUri: draft.audioUri ?? null,
       durationMs: draft.durationMs ?? null,
+      origin: journalSource?.origin ?? null,
     };
     setResolvedJournalSource(source);
     try {
@@ -188,8 +209,17 @@ export function JournalComposer({
     } finally {
       setVoiceRouting(false);
     }
-  }, [allowRemoteIntelligence, sessionId]);
+  }, [allowRemoteIntelligence, journalSource?.origin, sessionId]);
   const voice = useJournalVoiceDraft(handleVoiceReady, { allowRemote: allowRemoteIntelligence });
+  useEffect(() => {
+    if (initialInputMode !== 'voice' || initialVoiceStartedRef.current) return;
+    initialVoiceStartedRef.current = true;
+    const timeout = setTimeout(() => {
+      quickVoiceRef.current = false;
+      void voice.start();
+    }, 180);
+    return () => clearTimeout(timeout);
+  }, [initialInputMode, voice]);
   const quickVoiceAvailable = sourceType === 'manual'
     && (!resolvedJournalSource || resolvedJournalSource.kind === 'manual');
   const noteSource = resolvedJournalSource ?? journalSource;
@@ -234,16 +264,17 @@ export function JournalComposer({
 
   const step = stage === 'flow' ? 0 : stage === 'category' ? 1 : 2;
   const dirty = !!choice || !!specific.trim() || !!context || !!feeling || !!note.trim() || !!linkedNote || !!location;
+  const requiredContextMissing = Boolean(contextOptionsOverride?.length && !context);
   const title = stage === 'flow'
     ? 'What would you like to keep?'
     : stage === 'category'
-      ? flow?.shortTitle ?? flow?.title ?? 'Choose a moment'
-      : 'Make it yours';
+      ? promptTitle ?? flow?.shortTitle ?? flow?.title ?? 'Choose a moment'
+      : promptTitle ?? 'Make it yours';
   const subtitle = stage === 'flow'
     ? 'Choose a part of your day.'
     : stage === 'category'
-      ? 'What kind of moment was it?'
-      : 'Add as much as you’d like.';
+      ? promptBody ?? 'What kind of moment was it?'
+      : promptBody ?? 'Add as much as you’d like.';
   const locationSearchQuery = flow?.id === 'went_somewhere' && choice
     ? journalPlaceSearchQuery(specific, noteSpecificLoading ? '' : choice.id)
     : '';
@@ -336,6 +367,9 @@ export function JournalComposer({
   const save = () => {
     if (!flow || !choice || voice.phase === 'transcribing') return;
     const trimmedNote = note.trim();
+    const savedJournalSource = trimmedNote && resolvedJournalSource?.kind === 'manual' && resolvedJournalSource.origin?.kind === 'companion_quest'
+      ? { kind: 'text_note' as const, sourceId: resolvedJournalSource.sourceId, origin: resolvedJournalSource.origin }
+      : resolvedJournalSource;
     successHaptic();
     onSave({
       sessionId,
@@ -354,7 +388,7 @@ export function JournalComposer({
         : trimmedNote
           ? { kind: 'text', text: trimmedNote }
           : null,
-      journalSource: resolvedJournalSource,
+      journalSource: savedJournalSource,
       confirmedFacets,
       location: flow.id === 'went_somewhere' ? location : null,
     });
@@ -369,6 +403,16 @@ export function JournalComposer({
   };
   const startVoice = () => {
     longPressRef.current = true;
+    quickVoiceRef.current = false;
+    impactHaptic();
+    void voice.start();
+  };
+  const toggleNoteVoice = () => {
+    if (voice.phase === 'recording') {
+      void voice.stop();
+      return;
+    }
+    if (voice.phase === 'transcribing') return;
     quickVoiceRef.current = false;
     impactHaptic();
     void voice.start();
@@ -392,6 +436,81 @@ export function JournalComposer({
     : direction > 0
       ? FadeInRight.duration(210)
       : FadeInLeft.duration(210);
+  const expandedNoteEditor = (
+    <Animated.View entering={FadeIn.duration(180)} style={[styles.noteEditor, questFocused && styles.noteEditorFocused]}>
+      <TextInput
+        accessibilityLabel="Memory note"
+        autoFocus={questFocused}
+        multiline
+        onChangeText={setNote}
+        onFocus={() => setTimeout(() => {
+          if (questFocused) scrollRef.current?.scrollTo({ y: 82, animated: true });
+          else scrollRef.current?.scrollToEnd({ animated: true });
+        }, 80)}
+        placeholder={questFocused ? 'Write what happened, or record it with your voice…' : 'A detail, thought, or memory…'}
+        placeholderTextColor={Meadow.inkSoft}
+        selectionColor={Meadow.goldDeep}
+        style={[styles.input, styles.noteInput, questFocused && styles.noteInputFocused]}
+        textAlignVertical="top"
+        value={note}
+      />
+      {questFocused && !linkedNote?.audioUri ? (
+        <Pressable
+          accessibilityHint="Tap once to begin and again to finish"
+          accessibilityLabel={voice.phase === 'recording' ? 'Finish voice recording' : 'Record this entry with voice'}
+          accessibilityRole="button"
+          disabled={voice.phase === 'transcribing'}
+          onPress={toggleNoteVoice}
+          style={({ pressed }) => [
+            styles.focusedVoiceButton,
+            voice.phase === 'recording' && styles.focusedVoiceButtonRecording,
+            voice.phase === 'transcribing' && styles.disabled,
+            pressed && styles.pressed,
+          ]}>
+          {voice.phase === 'transcribing' ? (
+            <ActivityIndicator color={Meadow.ink} size="small" />
+          ) : (
+            <IconSymbol name={voice.phase === 'recording' ? 'stop.fill' : 'mic.fill'} size={17} color={Meadow.ink} />
+          )}
+          <ThemedText style={styles.focusedVoiceText} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+            {voice.phase === 'recording' ? 'Finish recording' : voice.phase === 'transcribing' ? 'Transcribing…' : 'Record with voice'}
+          </ThemedText>
+          {voice.phase === 'recording' ? (
+            <ThemedText style={styles.focusedVoiceTime} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+              0:{String(voice.elapsed).padStart(2, '0')}
+            </ThemedText>
+          ) : null}
+        </Pressable>
+      ) : null}
+      <VoiceControls
+        linkedNote={linkedNote}
+        onPlay={toggleAudio}
+        onRedoLongPress={() => {
+          redoLongPressRef.current = true;
+          quickVoiceRef.current = false;
+          impactHaptic();
+          void voice.start();
+        }}
+        onRedoPressOut={() => {
+          if (redoLongPressRef.current) void voice.stop();
+          redoLongPressRef.current = false;
+        }}
+        onRemove={() => {
+          setLinkedNote(null);
+          voice.reset();
+        }}
+        playing={playerStatus.playing}
+      />
+      {!questFocused && voice.phase === 'recording' ? <RecordingState elapsed={voice.elapsed} /> : null}
+      {!questFocused && voice.phase === 'transcribing' ? (
+        <View accessibilityRole="progressbar" style={styles.reading}>
+          <ActivityIndicator color={Meadow.goldDeep} />
+          <ThemedText style={styles.noteHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Transcribing on device…</ThemedText>
+        </View>
+      ) : null}
+      {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
+    </Animated.View>
+  );
 
   return (
     <KatchaSheet onRequestClose={() => requestClose()} surface="parchment" size="tall">
@@ -402,7 +521,7 @@ export function JournalComposer({
         <JournalHeader
           canGoBack={stage !== 'flow' || !!onBackFromInitial}
           compact={stage === 'flow'}
-          kicker={sourceType === 'photo' ? 'Review photo memory' : 'Log something'}
+          kicker={sourceType === 'photo' ? 'Review photo memory' : questFocused ? 'Quest journal' : 'Log something'}
           onBack={back}
           step={step}
           subtitle={stage === 'flow' ? undefined : subtitle}
@@ -477,7 +596,7 @@ export function JournalComposer({
 
             {stage === 'category' && flow ? (
               <View style={styles.categoryGrid}>
-                {flow.choices.map((item, index) => (
+                {flow.choices.filter((item) => !allowedChoiceIds?.length || allowedChoiceIds.includes(item.id)).map((item, index) => (
                   <Animated.View
                     key={item.id}
                     entering={reduceMotion ? undefined : FadeInRight.delay(Math.min(index * 24, 180)).duration(190)}
@@ -530,16 +649,22 @@ export function JournalComposer({
                   </View>
                 </EditorSection>
 
+                {questFocused ? (
+                  <EditorSection label="Your note or voice">
+                    {expandedNoteEditor}
+                  </EditorSection>
+                ) : null}
+
                 {flow.id === 'went_somewhere' ? sourceType === 'photo' ? (
                   <PhotoLocationNotice />
                 ) : (
                   <JournalLocationField dayLocationPoints={dayLocationPoints} onChange={setLocation} query={locationSearchQuery} value={location} />
                 ) : null}
 
-                {(choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices)?.length ? (
-                  <EditorSection label={choice.contextTitle ?? 'A little more'}>
+                {(contextOptionsOverride ?? choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices)?.length ? (
+                  <EditorSection label={contextTitleOverride ?? choice.contextTitle ?? 'A little more'}>
                     <View style={styles.optionWrap}>
-                      {(choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices ?? []).map((item) => (
+                      {(contextOptionsOverride ?? choice.detailChoices ?? choice.contextChoices ?? flow.contextChoices ?? []).map((item) => (
                         <OptionChip
                           key={item.id}
                           label={item.label}
@@ -571,7 +696,7 @@ export function JournalComposer({
                   </View>
                 </EditorSection>
 
-                <EditorSection label="A note to keep">
+                {!questFocused ? <EditorSection label="A note to keep">
                   {!noteExpanded ? (
                     <Pressable
                       accessibilityActions={[{ name: 'activate', label: 'Write note' }, { name: 'longpress', label: 'Record voice note' }]}
@@ -596,47 +721,7 @@ export function JournalComposer({
                     </Pressable>
                   ) : (
                     <Animated.View layout={LinearTransition.duration(180)}>
-                      <Animated.View entering={FadeIn.duration(180)} style={styles.noteEditor}>
-                      <TextInput
-                        accessibilityLabel="Memory note"
-                        multiline
-                        onChangeText={setNote}
-                        onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80)}
-                        placeholder="A detail, thought, or memory…"
-                        placeholderTextColor={Meadow.inkSoft}
-                        selectionColor={Meadow.goldDeep}
-                        style={[styles.input, styles.noteInput]}
-                        textAlignVertical="top"
-                        value={note}
-                      />
-                      <VoiceControls
-                        linkedNote={linkedNote}
-                        onPlay={toggleAudio}
-                        onRedoLongPress={() => {
-                          redoLongPressRef.current = true;
-                          quickVoiceRef.current = false;
-                          impactHaptic();
-                          void voice.start();
-                        }}
-                        onRedoPressOut={() => {
-                          if (redoLongPressRef.current) void voice.stop();
-                          redoLongPressRef.current = false;
-                        }}
-                        onRemove={() => {
-                          setLinkedNote(null);
-                          voice.reset();
-                        }}
-                        playing={playerStatus.playing}
-                      />
-                      {voice.phase === 'recording' ? <RecordingState elapsed={voice.elapsed} /> : null}
-                      {voice.phase === 'transcribing' ? (
-                        <View accessibilityRole="progressbar" style={styles.reading}>
-                          <ActivityIndicator color={Meadow.goldDeep} />
-                          <ThemedText style={styles.noteHint} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Transcribing on device…</ThemedText>
-                        </View>
-                      ) : null}
-                        {voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
-                      </Animated.View>
+                      {expandedNoteEditor}
                     </Animated.View>
                   )}
                   {!noteExpanded && voice.phase === 'recording' ? <RecordingState elapsed={voice.elapsed} /> : null}
@@ -647,7 +732,7 @@ export function JournalComposer({
                     </View>
                   ) : null}
                   {!noteExpanded && voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
-                </EditorSection>
+                </EditorSection> : null}
               </View>
             ) : null}
             </Animated.View>
@@ -657,14 +742,14 @@ export function JournalComposer({
         {stage === 'details' && choice ? (
           <View style={styles.footer}>
             <Pressable
-              accessibilityHint="Adds this memory to today"
-              accessibilityLabel="Save memory"
+              accessibilityHint={requiredContextMissing ? `Choose an option under ${contextTitleOverride ?? 'A little more'} first` : 'Adds this memory to today'}
+              accessibilityLabel={saveLabel}
               accessibilityRole="button"
-              disabled={voice.phase === 'transcribing'}
+              disabled={voice.phase === 'transcribing' || requiredContextMissing}
               onPress={save}
-              style={({ pressed }) => [styles.save, pressed && styles.savePressed, voice.phase === 'transcribing' && styles.disabled]}>
+              style={({ pressed }) => [styles.save, pressed && styles.savePressed, (voice.phase === 'transcribing' || requiredContextMissing) && styles.disabled]}>
               <IconSymbol name="checkmark" size={18} color={Meadow.ink} />
-              <ThemedText style={styles.saveText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Save memory</ThemedText>
+              <ThemedText style={styles.saveText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{saveLabel}</ThemedText>
             </Pressable>
           </View>
         ) : null}
@@ -979,7 +1064,13 @@ const styles = StyleSheet.create({
   noteDoorTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '700' },
   noteHint: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '500', lineHeight: 16 },
   noteEditor: { gap: 10 },
+  noteEditorFocused: { gap: 9 },
   noteInput: { minHeight: 126, paddingTop: 14 },
+  noteInputFocused: { backgroundColor: 'rgba(255,251,239,0.72)', borderColor: 'rgba(184,137,54,0.48)', minHeight: 112 },
+  focusedVoiceButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: 'rgba(229,190,106,0.24)', borderColor: 'rgba(169,129,54,0.32)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 8, minHeight: 46, paddingHorizontal: 13 },
+  focusedVoiceButtonRecording: { backgroundColor: '#EBC76F', borderColor: Meadow.goldDeep },
+  focusedVoiceText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '800' },
+  focusedVoiceTime: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontVariant: ['tabular-nums'], fontWeight: '700' },
   voiceRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   voiceAction: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.36)', borderColor: Meadow.cardBorder, borderRadius: 12, borderWidth: 1, flexDirection: 'row', gap: 6, minHeight: 44, paddingHorizontal: 11 },
   voiceActionText: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '700' },

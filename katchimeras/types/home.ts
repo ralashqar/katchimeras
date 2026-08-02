@@ -1304,8 +1304,8 @@ export type ManualJournalEntry = {
 export type JournalInputKind = 'manual' | 'photo' | 'text_note' | 'voice_note';
 
 export type JournalSource =
-  | { kind: 'manual'; sourceId: string }
-  | { kind: 'photo'; sourceId: string; thumbnailUri?: string | null; classifiedMemoryId?: string | null; evidenceId?: string | null }
+  | { kind: 'manual'; sourceId: string; origin?: JournalSourceOrigin | null }
+  | { kind: 'photo'; sourceId: string; thumbnailUri?: string | null; classifiedMemoryId?: string | null; evidenceId?: string | null; origin?: JournalSourceOrigin | null }
   | { kind: 'text_note'; sourceId: string; origin?: JournalSourceOrigin | null }
   | { kind: 'voice_note'; sourceId: string; audioUri?: string | null; durationMs?: number | null; origin?: JournalSourceOrigin | null };
 
@@ -1327,6 +1327,15 @@ export type JournalSourceOrigin =
       goalId: string;
       completionId: string;
       goalTitle: string;
+    }
+  | {
+      kind: 'companion_quest';
+      questRunId: string;
+      questId: string;
+      creatureId: string;
+      acceptedDayId: string;
+      journalTemplateId: string;
+      inputMode?: 'guided' | 'note' | 'voice';
     };
 
 export type JournalAttachment = {

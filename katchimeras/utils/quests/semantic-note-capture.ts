@@ -11,12 +11,12 @@ export async function completeSemanticNoteQuestCapture(input: {
   sourceType: Extract<DayEvidenceSourceType, 'text_note' | 'voice_note'>;
   text: string;
   target?: DayInputTarget;
-}): Promise<{ handled: boolean; matched: boolean; message: string | null }> {
+}): Promise<{ handled: boolean; matched: boolean; status: PhotoQuestEvaluation['status'] | null; evidenceId: string | null; message: string | null }> {
   const capture = activeQuestCapture();
-  if (!capture || capture.phase !== 'capturing') return { handled: false, matched: false, message: null };
+  if (!capture || capture.phase !== 'capturing') return { handled: false, matched: false, status: null, evidenceId: null, message: null };
   const definition = questDefinition(capture.questId);
   const verification = definition?.semanticVerification;
-  if (!verification) return { handled: false, matched: false, message: null };
+  if (!verification) return { handled: false, matched: false, status: null, evidenceId: null, message: null };
 
   const outcome = await verifyNoteForQuest({
     questId: capture.questId,
@@ -31,12 +31,26 @@ export async function completeSemanticNoteQuestCapture(input: {
     const targetDay = stored[targetKey]!;
     const evidence = (targetDay.evidence ?? []).find((item) => item.id === evidenceId);
     if (evidence) {
+      const templateId = definition.evidenceInput?.kind === 'journal'
+        ? definition.evidenceInput.template.id
+        : `${capture.questId}.journal`;
+      const questSignals = capture.questRunId ? [
+        { key: `quest.run:${capture.questRunId}`, confidence: 1, raw: capture.questRunId, provider: 'manual' as const, source: 'manual' as const, centrality: 'primary' as const, qualityStatus: 'confirmed' as const },
+        { key: `quest.id:${capture.questId}`, confidence: 1, raw: capture.questId, provider: 'manual' as const, source: 'manual' as const, centrality: 'primary' as const, qualityStatus: 'confirmed' as const },
+        { key: `quest.template:${templateId}`, confidence: 1, raw: templateId, provider: 'manual' as const, source: 'manual' as const, centrality: 'primary' as const, qualityStatus: 'confirmed' as const },
+      ] : [];
       homeRepository.save({
         ...stored,
         [targetKey]: {
           ...targetDay,
           evidence: (targetDay.evidence ?? []).map((item) =>
-            item.id === evidenceId ? withSemanticQuestEvaluation(item, outcome) : item
+            item.id === evidenceId ? withSemanticQuestEvaluation({
+              ...item,
+              signals: [
+                ...item.signals.filter((signal) => !questSignals.some((candidate) => candidate.key === signal.key)),
+                ...questSignals,
+              ],
+            }, outcome) : item
           ),
         },
       });
@@ -61,7 +75,7 @@ export async function completeSemanticNoteQuestCapture(input: {
     evaluation,
     input.sourceType
   );
-  return { handled: true, matched: outcome.passed, message: outcome.playerMessage };
+  return { handled: true, matched: outcome.passed, status: evaluation.status, evidenceId, message: outcome.playerMessage };
 }
 
 export function cancelSemanticNoteQuestCapture(): void {

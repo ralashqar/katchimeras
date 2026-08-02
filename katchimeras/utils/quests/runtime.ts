@@ -70,6 +70,7 @@ type EvaluateQuestRuntimeInput = {
   day?: HomeDayRecord | null;
   facts: Partial<Facts>;
   capabilities?: QuestCapabilityMap | null;
+  questRunId?: string | null;
 };
 
 export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRuntimeStatus {
@@ -116,7 +117,7 @@ export function evaluateQuestRuntime(input: EvaluateQuestRuntimeInput): QuestRun
   }
 
   const progress = def.criteria.map<QuestRuntimeCriterion>((criterion) => {
-    const result = evaluateCriterion(criterion, input.facts);
+    const result = evaluateCriterion(criterion, input.facts, { questRunId: input.questRunId });
     const progress = progressForCriterion(criterion, input.facts);
     return {
       label: criterion.label,
@@ -243,6 +244,7 @@ function requiredCapabilitiesForQuest(def: QuestDefinition): QuestCapabilityId[]
 
 function nextActionForQuest(def: QuestDefinition, input: EvaluateQuestRuntimeInput): QuestNextAction {
   const family = familyForQuest(def);
+  if (def.evidenceInput?.kind === 'journal') return 'add_note';
   if (def.suggestedActions?.includes('take_photo') || family === 'photo' || family === 'moment') return 'take_photo';
   if (family === 'place') return 'confirm_place';
   if (family === 'voice') return 'record_voice';
@@ -349,7 +351,10 @@ function capabilityAction(action: string): QuestNextAction {
 
 function impossibleToday(def: QuestDefinition, day?: HomeDayRecord | null): boolean {
   if (!day) return false;
-  if (day.state === 'hatched') return true;
+  // A finalized day is still a valid journal destination. Journal records are
+  // additive and preserve the hatch, so blocking them here strands a quest in
+  // the generic legacy "finished for today" state after it has been accepted.
+  if (day.state === 'hatched' && def.evidenceInput?.kind !== 'journal') return true;
   if (def.criteria.some((criterion) => criterion.fact === 'capture.earliestHour' && criterion.op === 'lt')) {
     return new Date().getHours() >= Number(def.criteria.find((criterion) => criterion.fact === 'capture.earliestHour')?.value ?? 8);
   }
