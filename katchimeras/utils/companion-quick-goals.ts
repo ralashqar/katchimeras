@@ -52,6 +52,14 @@ export type CompanionQuickGoalForDay = {
   completion: CompanionQuickGoalCompletion | null;
 };
 
+export type CompanionQuickGoalTemplateDayStatus =
+  | 'active'
+  | 'completed'
+  | 'paused'
+  | 'scheduled'
+  | 'skipped'
+  | 'snoozed';
+
 export type AddCompanionQuickGoalInput = {
   familyId: KatchimeraFamilyId;
   title: string;
@@ -193,6 +201,60 @@ export function quickGoalsForDay(
       if (Boolean(left.completion) !== Boolean(right.completion)) return left.completion ? 1 : -1;
       return left.goal.createdAt - right.goal.createdAt;
     });
+}
+
+/**
+ * One-off goals only belong to the day they were created for. Once that day
+ * has passed, archive the instance so it remains available to completion
+ * history without permanently blocking the same preset or custom goal.
+ * Repeating goals intentionally remain active and get a fresh daily state
+ * from their day-scoped completion/dismissal records.
+ */
+export function rollCompanionQuickGoalsToDay(
+  state: CompanionQuickGoalState,
+  dayId: string,
+  updatedAt = Date.now()
+): CompanionQuickGoalState {
+  let changed = false;
+  const goals = state.goals.map((goal) => {
+    if (
+      goal.status !== 'archived' &&
+      goal.cadence.kind === 'once' &&
+      goal.cadence.dayId < dayId
+    ) {
+      changed = true;
+      return { ...goal, status: 'archived' as const, updatedAt };
+    }
+    return goal;
+  });
+  return changed ? { ...state, goals } : state;
+}
+
+/**
+ * Drives the Add-screen tick from the same day-scoped rules as the Goals
+ * screen. A stale one-off returns null; repeating goals stay added and reset
+ * their completion automatically on the next eligible day.
+ */
+export function quickGoalTemplateStatusForDay(
+  state: CompanionQuickGoalState,
+  templateId: string,
+  dayId: string
+): CompanionQuickGoalTemplateDayStatus | null {
+  const goal = state.goals.find((candidate) =>
+    candidate.templateId === templateId &&
+    candidate.status !== 'archived' &&
+    !(candidate.cadence.kind === 'once' && candidate.cadence.dayId < dayId)
+  );
+  if (!goal) return null;
+  if (goal.status === 'paused') return 'paused';
+  if (state.completions.some((completion) =>
+    completion.goalId === goal.id && completion.dayId === dayId
+  )) return 'completed';
+  const dismissal = state.dismissals.find((candidate) =>
+    candidate.goalId === goal.id && candidate.dayId === dayId
+  );
+  if (dismissal) return dismissal.kind;
+  return cadenceIncludesDay(goal.cadence, dayId) ? 'active' : 'scheduled';
 }
 
 export function snoozeCompanionQuickGoal(

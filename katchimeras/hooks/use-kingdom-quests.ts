@@ -17,11 +17,13 @@ import { insightForArchetype } from '@/utils/companion-interaction';
 import { requestCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
 import {
   acceptQuest,
+  canAcceptQuestForDay,
   cancelQuestAttempt,
   completeInteractiveQuest,
   completeQuest,
-  hasCompanionQuestForDay,
+  hasCompletedRealLifeQuestForDay,
   interactionState,
+  isQuestCompletedForDay,
   loadCompanionQuests,
   questCriteria,
   questFor,
@@ -85,7 +87,7 @@ import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/co
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import { requestQuestActionIntent } from '@/utils/quest-action-signal';
-import { selectBalancedQuestOffers } from '@/utils/quest-offer-order';
+import { selectBalancedQuestOffers, sortQuestOffersByAvailability } from '@/utils/quest-offer-order';
 import { beginQuestCapture, consumeCompletedQuestCapture, questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import {
   buildQuestReportBackItems,
@@ -151,6 +153,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const [companionJourneyState, setCompanionJourneyState] = useState(loadCompanionJourneyState);
   const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
   const [questCaptureFeedback, setQuestCaptureFeedback] = useState<QuestCaptureFeedback | null>(null);
+  const [questCaptureRestoreKey, setQuestCaptureRestoreKey] = useState<string | null>(null);
   const [completedQuestPreview, setCompletedQuestPreview] = useState<{
     quest: CompanionQuest;
     item: QuestSubmissionItem;
@@ -215,6 +218,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       setStoredHomeState(homeRepository.load());
       const completedCapture = consumeCompletedQuestCapture();
       if (completedCapture?.sourceId) {
+        setQuestCaptureRestoreKey(`${completedCapture.questId}:${completedCapture.sourceId}`);
         const resident = residentById.get(completedCapture.creatureId);
         const creature = creatureById.get(completedCapture.creatureId);
         if (resident && creature) setSelectedResident({ resident, creature, destination: 'quest' });
@@ -349,9 +353,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const residentStatusGlyphs = useMemo(() => {
     const glyphs: Partial<Record<string, 'offer' | 'active' | 'ready'>> = {};
     for (const creature of kingdom.creatures) {
-      const offer = companionDataByCreatureId.get(creature.creatureId)?.quest;
+      const offers = companionDataByCreatureId.get(creature.creatureId)?.questOptions ?? [];
       const hasOffer = Boolean(
-        offer && today?.isoDate && !hasCompanionQuestForDay(companionQuestState, creature.creatureId, today.isoDate)
+        today?.isoDate && offers.some((offer) => canAcceptQuestForDay(
+          companionQuestState,
+          creature.creatureId,
+          offer.id,
+          today.isoDate
+        ))
       );
       const state = interactionState(companionQuestState, creature.creatureId, questFacts, hasOffer, questCapabilities);
       if (state !== 'idle') glyphs[creature.creatureId] = state;
@@ -522,13 +531,36 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
           : []
       )
     : [];
+  const selectedRealLifeQuestCompletedToday = Boolean(
+    selectedResident
+    && today?.isoDate
+    && hasCompletedRealLifeQuestForDay(
+      companionQuestState,
+      selectedResident.creature.creatureId,
+      today.isoDate
+    )
+  );
   const selectedOffer =
     selectedResident &&
     selectedOfferOptions.length > 0 &&
     today?.isoDate &&
-    !selectedActiveQuest &&
-    !hasCompanionQuestForDay(companionQuestState, selectedResident.creature.creatureId, today.isoDate)
-      ? selectedOfferOptions.find((offer) => offer.id === selectedOfferId) ?? selectedOfferOptions[0]
+    !selectedActiveQuest
+      ? selectedOfferOptions.find((offer) =>
+          offer.id === selectedOfferId
+          && canAcceptQuestForDay(
+            companionQuestState,
+            selectedResident.creature.creatureId,
+            offer.id,
+            today.isoDate
+          )
+        )
+        ?? selectedOfferOptions.find((offer) => canAcceptQuestForDay(
+          companionQuestState,
+          selectedResident.creature.creatureId,
+          offer.id,
+          today.isoDate
+        ))
+        ?? selectedOfferOptions[0]
       : undefined;
   const selectedQuestAdvancesJourneyGoal = useMemo(() => {
     const goal = selectedJourneyProgress?.goal;
@@ -575,8 +607,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (questCaptureFeedback?.phase !== 'matched' || !questCaptureFeedback.creatureId) return;
     const capturedItem = selectedQuestItems.find(
       (item) => item.sourceId === questCaptureFeedback.sourceId && item.matchStatus === 'ready'
-    );
-    if (!capturedItem) return;
+    ) ?? captureSubmissionItem(questCaptureFeedback);
     const latest = loadIdentityAwareCompanionQuests();
     const completingQuest = questFor(latest, questCaptureFeedback.creatureId);
     const result = submitQuest(
@@ -601,20 +632,35 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       occurredAt: result.quest?.completedAt ?? Date.now(),
       dayId: result.quest?.completedDayId,
     });
-    if (result.submitted && result.quest) {
-      setCompletedQuestPreview({ quest: result.quest, item: capturedItem });
+    const completedQuest = result.quest?.completedAt
+      ? result.quest
+      : latest.quests.find((quest) =>
+          quest.creatureId === questCaptureFeedback.creatureId
+          && quest.questId === questCaptureFeedback.questId
+          && Boolean(quest.completedAt)
+        ) ?? null;
+    if (completedQuest) {
+      setCompletedQuestPreview({ quest: completedQuest, item: capturedItem });
       setQuestResultNotice({
         kind: 'success',
         title: 'Quest complete',
-        message: `Your photo matched “${result.quest.title}” and has been submitted.`,
+        message: `Your photo matched “${completedQuest.title}” and has been submitted.`,
         thumbnailUri: capturedItem.thumbnailUri ?? questCaptureFeedback.sourceId,
-        questId: result.quest.questId,
-        creatureId: result.quest.creatureId,
+        questId: completedQuest.questId,
+        creatureId: completedQuest.creatureId,
       });
       setMicrocopy('Photo matched - quest complete');
-      if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (result.submitted && process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
-      setMicrocopy('Quest already submitted');
+      setQuestResultNotice({
+        kind: 'no_match',
+        title: 'Photo matched, but was not submitted',
+        message: 'The photo is still attached to this quest. Return to the quest and tap Submit quest to finish.',
+        thumbnailUri: capturedItem.thumbnailUri ?? questCaptureFeedback.sourceId,
+        questId: questCaptureFeedback.questId ?? '',
+        creatureId: questCaptureFeedback.creatureId,
+      });
+      setMicrocopy('Photo ready to submit');
     }
     setQuestCaptureFeedback(null);
   }, [awardBond, commitCompanionQuestState, questCaptureFeedback, selectedQuestItems, today?.isoDate]);
@@ -625,7 +671,14 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       const creature = creatureById.get(creatureId);
       if (resident && creature) {
         setCompletedQuestPreview(null);
-        setSelectedResident({ resident, creature, destination: null });
+        // The dedicated companion route may race this initial selection with a
+        // just-completed camera return. Never replace the restored quest
+        // destination with the same creature's generic home destination.
+        setSelectedResident((current) =>
+          current?.creature.creatureId === creatureId
+            ? current
+            : { resident, creature, destination: null }
+        );
         setSelectedOfferId(null);
       }
     },
@@ -636,6 +689,20 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (!selectedResident) return;
     const offer = selectedOfferOptions.find((item) => item.id === offerId) ?? selectedOffer;
     if (!offer) return;
+    if (
+      today?.isoDate
+      && !canAcceptQuestForDay(
+        companionQuestState,
+        selectedResident.creature.creatureId,
+        offer.id,
+        today.isoDate
+      )
+    ) {
+      setMicrocopy(questDefinition(offer.id)?.lane === 'mini_game'
+        ? 'Finish the active quest first'
+        : 'Today’s real-life quest is already complete');
+      return;
+    }
     const definition = questDefinition(offer.id);
     const offerRuntime = evaluateQuestRuntime({
       questId: offer.id,
@@ -949,6 +1016,13 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     setQuickGoalSuggestions(null);
     setCompletedQuestPreview(null);
     setQuestResultNotice(null);
+    setQuestCaptureRestoreKey(null);
+  }, []);
+  const finishQuestResultNotice = useCallback(() => {
+    setQuestResultNotice(null);
+    setQuestCaptureFeedback(null);
+    setCompletedQuestPreview(null);
+    setSelectedOfferId(null);
   }, []);
   const awardSelectedInsightBond = useCallback(() => {
     if (!selectedResident || !today?.isoDate) return;
@@ -1227,10 +1301,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     completeSelectedInteractiveQuest,
     selectOffer,
     questCaptureFeedback: selectedQuestCaptureFeedback,
+    questCaptureRestoreKey,
     questResultNotice: selectedResident && questResultNotice?.creatureId === selectedResident.creature.creatureId
       ? questResultNotice
       : null,
     dismissQuestResultNotice: () => setQuestResultNotice(null),
+    finishQuestResultNotice,
     questCriteria: selectedQuestRuntime?.progress ?? (selectedActiveQuest ? questCriteria(selectedActiveQuest.questId, questFacts) : []),
     residentStatusGlyphs,
     selectResident,
@@ -1246,12 +1322,27 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedInteractionState,
     selectedOffer,
     selectedOfferId: selectedOffer?.id ?? null,
-    selectedOffers: selectedOfferOptions.map((offer, index) => ({
-      ...offer,
-      bondReward: COMPANION_BOND_REWARDS[
-        questBondEventKind(questDefinition(offer.id))
-      ],
-      recommended: index === 0,
+    selectedOffers: sortQuestOffersByAvailability(selectedOfferOptions.map((offer, index) => {
+      const definition = questDefinition(offer.id);
+      const repeatable = definition?.lane === 'mini_game';
+      const completedToday = Boolean(
+        selectedResident
+        && today?.isoDate
+        && isQuestCompletedForDay(
+          companionQuestState,
+          selectedResident.creature.creatureId,
+          offer.id,
+          today.isoDate
+        )
+      );
+      return {
+        ...offer,
+        bondReward: COMPANION_BOND_REWARDS[questBondEventKind(definition)],
+        recommended: index === 0,
+        completedToday,
+        repeatable,
+        availableToday: repeatable || !selectedRealLifeQuestCompletedToday,
+      };
     })),
     selectedOfferCount: selectedOfferOptions.length,
     selectedBondProgress,
@@ -1307,6 +1398,22 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   };
 }
 
+function captureSubmissionItem(feedback: QuestCaptureFeedback): QuestSubmissionItem {
+  return {
+    id: feedback.evidenceId ?? `photo:${feedback.sourceId}`,
+    kind: 'photo',
+    sourceType: feedback.sourceType ?? 'photo',
+    sourceId: feedback.sourceId,
+    evidenceId: feedback.evidenceId ?? `photo:${feedback.sourceId}`,
+    title: 'Quest photo',
+    subtitle: 'Matched privately on this device',
+    thumbnailUri: feedback.sourceId,
+    icon: 'photo.fill',
+    accentColor: '#6B805F',
+    matchStatus: 'ready',
+  };
+}
+
 function eligibleOfferOptions<T extends { id: string }>(
   offers: T[],
   state: CompanionQuestState,
@@ -1324,6 +1431,9 @@ function eligibleOfferOptions<T extends { id: string }>(
     if (eligibility?.creatureKeys?.length && !eligibility.creatureKeys.includes(creatureKey.toLowerCase())) return false;
     if ((eligibility?.minimumHomeLevel ?? 0) > houseLevel) return false;
     if (offer.id === 'quest-step-time-trial' && completedQuestCount(state.quests, 'quest-step-sprint', creatureId, state.attempts) < 1) return false;
+    // Keep today's completed card in the daily list so it can render as a
+    // visible green-tick state instead of disappearing after success.
+    if (isQuestCompletedForDay(state, creatureId, offer.id, dayId)) return true;
     const cooldownDays = definition.repeatPolicy?.cooldownDays ?? eligibility?.cooldownDays ?? 0;
     if (!cooldownDays) return true;
     const latest = state.quests

@@ -507,6 +507,7 @@ export function KingdomCompanionScreen({
 
       {quests.selectedResident && !embeddedJournal && !questNoteCapture ? (
         <CompanionInteractionSheet
+          key={`${quests.selectedResident.creature.creatureId}:${quests.questCaptureRestoreKey ?? 'standard'}`}
           onExperienceActiveChange={setQuestExperienceActive}
           embedded={presentation === 'companion'}
           creatureId={quests.selectedResident.creature.creatureId}
@@ -814,14 +815,16 @@ export function KingdomCompanionScreen({
       <KatchaDialog
         body={quests.questResultNotice?.message ?? ''}
         cancelLabel={quests.questResultNotice?.kind === 'success'
-          ? 'Done'
+          ? 'Back to quests'
           : quests.questResultNotice?.kind === 'possible'
             ? 'Review photo'
             : 'Keep quest open'}
         confirmLabel="Try another photo"
         icon={quests.questResultNotice?.kind === 'success' ? 'checkmark' : 'camera.fill'}
         imageUri={quests.questResultNotice?.thumbnailUri}
-        onCancel={quests.dismissQuestResultNotice}
+        onCancel={quests.questResultNotice?.kind === 'success'
+          ? quests.finishQuestResultNotice
+          : quests.dismissQuestResultNotice}
         onConfirm={quests.questResultNotice?.kind === 'no_match'
           ? () => {
               quests.dismissQuestResultNotice();

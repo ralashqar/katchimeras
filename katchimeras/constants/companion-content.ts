@@ -22,8 +22,9 @@ import { questUsesJournalEntrySystem } from '@/utils/quests/journal-templates';
 export function validateCompleteCompanionContent(): string[] {
   const issues: string[] = [];
 
-  for (const role of katchimeraRoles.filter((item) => item.status === 'complete')) {
+  for (const role of katchimeraRoles.filter((item) => item.status !== 'planned')) {
     validateRoleQuests(role, issues);
+    if (role.status !== 'complete') continue;
     validateQuickGoals(role, issues);
     validateJourney(role, companionJourneyByFamilyId.get(role.familyId), issues);
   }

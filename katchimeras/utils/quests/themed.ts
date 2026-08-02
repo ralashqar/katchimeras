@@ -4,6 +4,10 @@ import {
   questPresentation,
   type QuestDefinition,
 } from './definitions';
+import { bespokeFamilyQuestPackByFamilyId } from '@/constants/katchimera-bespoke-quests';
+import { katchimeraRoleByFamilyId } from '@/constants/katchimera-roles';
+import { katchimeraSkinByVisualKey } from '@/constants/katchimera-skins';
+import type { HomeVisualKey } from '@/types/home';
 
 export type ThemedQuestOffer = {
   id: string;
@@ -249,11 +253,24 @@ const ARCHETYPE_QUEST_POOL: Record<string, string[]> = {
 };
 
 export function themedQuestOffers(subtype: string, archetype: string, creatureKey = ''): ThemedQuestOffer[] {
+  const normalizedCreatureKey = creatureKey.toLowerCase();
+  const skin = katchimeraSkinByVisualKey.get(normalizedCreatureKey as HomeVisualKey);
+  const familyId = skin?.familyId;
+  const role = familyId ? katchimeraRoleByFamilyId.get(familyId) : null;
+  const familyOwnedPool = role
+    ? [...role.realLifeQuestIds, ...role.miniGameQuestIds]
+    : [];
+  const manuallyCuratedPool = CREATURE_QUEST_POOL[normalizedCreatureKey] ?? [];
+  const dedicatedPool = familyId && bespokeFamilyQuestPackByFamilyId.has(familyId)
+    ? familyOwnedPool
+    : manuallyCuratedPool.length
+      ? manuallyCuratedPool
+      : familyOwnedPool;
   const ids = [
-    ...(CREATURE_QUEST_POOL[creatureKey.toLowerCase()] ?? []),
-    ...(THEME_QUEST_POOL[subtype] ?? []),
-    ...(ARCHETYPE_QUEST_POOL[archetype] ?? []),
-    'quest-snap-today',
+    ...dedicatedPool,
+    ...(dedicatedPool.length ? [] : THEME_QUEST_POOL[subtype] ?? []),
+    ...(dedicatedPool.length ? [] : ARCHETYPE_QUEST_POOL[archetype] ?? []),
+    ...(dedicatedPool.length ? [] : ['quest-snap-today']),
   ];
   return ids
     .filter((id, index) => ids.indexOf(id) === index)
@@ -261,7 +278,7 @@ export function themedQuestOffers(subtype: string, archetype: string, creatureKe
     .filter((definition): definition is NonNullable<typeof definition> => Boolean(definition))
     .filter((definition) => {
       const keys = definition.eligibility?.creatureKeys;
-      return !keys?.length || keys.includes(creatureKey.toLowerCase());
+      return !keys?.length || keys.includes(normalizedCreatureKey);
     })
     .map((definition) => ({
       id: definition.id,

@@ -11,6 +11,7 @@ import {
   questUsesJournalEntrySystem,
   type QuestJournalTemplate,
 } from '@/utils/quests/journal-templates';
+import { BESPOKE_FAMILY_QUEST_DEFINITIONS } from '@/utils/quests/bespoke-family-packs';
 
 // Declarative companion-quest catalogue (docs/katchimera-engagement-v1.md
 // refactor). A quest is DATA: id + copy + a list of criteria against facts.
@@ -317,6 +318,7 @@ function semanticNoteQuest(input: {
 }
 
 const RAW_QUEST_DEFINITIONS: Record<string, QuestDefinition> = {
+  ...BESPOKE_FAMILY_QUEST_DEFINITIONS,
   ...progressiveQuestPack('flexel', 'flexel-stronger-rhythm', 'flexel', [
     {
       id: 'quest-flexel-session-note', minimumBondLevel: 1, title: 'Show up to train',

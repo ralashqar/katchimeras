@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   companionQuickGoalTemplateById,
@@ -19,6 +19,7 @@ import {
   completeCompanionQuickGoal,
   markQuickGoalCompletionJournaled,
   quickGoalsForDay,
+  rollCompanionQuickGoalsToDay,
   skipCompanionQuickGoal,
   snoozeCompanionQuickGoal,
   undoCompanionQuickGoal,
@@ -45,15 +46,38 @@ export function useCompanionQuickGoals({
   availableFamilyIds,
   onBondChanged,
 }: UseCompanionQuickGoalsArgs) {
-  const [state, setState] = useState(loadCompanionQuickGoalState);
+  const [state, setState] = useState(() => {
+    const loaded = loadCompanionQuickGoalState();
+    if (!dayId) return loaded;
+    const rolled = rollCompanionQuickGoalsToDay(loaded, dayId);
+    if (rolled !== loaded) saveCompanionQuickGoalState(rolled);
+    return rolled;
+  });
 
   const refresh = useCallback(() => {
-    setState(loadCompanionQuickGoalState());
-  }, []);
+    const loaded = loadCompanionQuickGoalState();
+    if (!dayId) {
+      setState(loaded);
+      return;
+    }
+    const rolled = rollCompanionQuickGoalsToDay(loaded, dayId);
+    if (rolled !== loaded) saveCompanionQuickGoalState(rolled);
+    setState(rolled);
+  }, [dayId]);
 
   useFocusEffect(useCallback(() => {
     refresh();
   }, [refresh]));
+
+  useEffect(() => {
+    if (!dayId) return;
+    setState((current) => {
+      const rolled = rollCompanionQuickGoalsToDay(current, dayId);
+      if (rolled === current) return current;
+      saveCompanionQuickGoalState(rolled);
+      return rolled;
+    });
+  }, [dayId]);
 
   const availableFamilySet = useMemo(
     () => new Set(availableFamilyIds),
@@ -77,7 +101,8 @@ export function useCompanionQuickGoals({
     if (!template || !availableFamilySet.has(template.familyId)) {
       return { added: false, reason: 'invalid_template' as const };
     }
-    const result = addCompanionQuickGoal(state, {
+    const current = rollCompanionQuickGoalsToDay(state, dayId);
+    const result = addCompanionQuickGoal(current, {
       familyId: template.familyId,
       templateId: template.id,
       title: template.title,
@@ -90,7 +115,7 @@ export function useCompanionQuickGoals({
 
   const addTemplates = useCallback((templateIds: readonly string[]) => {
     if (!dayId) return [];
-    let next = state;
+    let next = rollCompanionQuickGoalsToDay(state, dayId);
     const addedTemplateIds: string[] = [];
     const startedAt = Date.now();
     for (const [index, templateId] of templateIds.entries()) {
@@ -115,12 +140,14 @@ export function useCompanionQuickGoals({
     title: string,
     cadence: CompanionQuickGoalCadence
   ) => {
+    if (!dayId) return { added: false, reason: 'missing_day' as const };
     if (!availableFamilySet.has(familyId)) return { added: false, reason: 'invalid_family' as const };
-    const result = addCompanionQuickGoal(state, { familyId, title, cadence });
+    const current = rollCompanionQuickGoalsToDay(state, dayId);
+    const result = addCompanionQuickGoal(current, { familyId, title, cadence });
     if (!result.goal) return { added: false, reason: result.reason };
     commit(result.state);
     return { added: true, reason: null };
-  }, [availableFamilySet, commit, state]);
+  }, [availableFamilySet, commit, dayId, state]);
 
   const editGoal = useCallback((
     goalId: string,

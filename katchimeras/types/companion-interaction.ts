@@ -16,6 +16,9 @@ export type CompanionQuestOfferViewModel = {
   estimatedMinutes: number;
   bondReward: number;
   recommended: boolean;
+  completedToday?: boolean;
+  repeatable?: boolean;
+  availableToday?: boolean;
   artworkKey?: string;
   lane: Exclude<KatchimeraActivityLane, 'discovery'>;
   minimumBondLevel: KatchimeraBondLevel;

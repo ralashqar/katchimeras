@@ -40,6 +40,18 @@ export function selectBalancedQuestOffers<
   return selected;
 }
 
+export function sortQuestOffersByAvailability<T extends { availableToday?: boolean }>(offers: T[]): T[] {
+  // Modern JavaScript sort is stable, so authored/daily ranking is preserved
+  // within the available and unavailable groups.
+  return offers
+    .map((offer, index) => ({ offer, index }))
+    .sort((left, right) =>
+      Number(right.offer.availableToday !== false) - Number(left.offer.availableToday !== false)
+      || left.index - right.index
+    )
+    .map(({ offer }) => offer);
+}
+
 function weightedOfferScore(offer: { id: string; weight?: number }, seed: string): number {
   const unit = (stableHash(`${seed}:${offer.id}`) + 1) / 4_294_967_297;
   const weight = Math.max(0.1, offer.weight ?? 1);

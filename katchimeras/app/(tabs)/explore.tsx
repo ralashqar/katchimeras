@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
@@ -35,7 +35,6 @@ import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-pr
 import { getCreatureVisual, prepareTodayForDevRehatch, resetTodayInState, type DevRehatchMode } from '@/game/days';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
-import { isQuestLoopAfterCompleteEnabled, setQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 
@@ -55,13 +54,11 @@ export default function ExploreScreen() {
   } | null>(null);
   const [backfilling, setBackfilling] = useState(false);
   const [promptPhotoLoading, setPromptPhotoLoading] = useState(false);
-  const [questLoopEnabled, setQuestLoopEnabled] = useState(isQuestLoopAfterCompleteEnabled());
 
   useFocusEffect(
     useCallback(() => {
       setProfile(loadOnboardingProfile());
       setStoredState(homeRepository.load());
-      setQuestLoopEnabled(isQuestLoopAfterCompleteEnabled());
     }, [])
   );
 
@@ -333,11 +330,6 @@ export default function ExploreScreen() {
     router.replace('/(tabs)');
   }
 
-  function handleQuestLoopToggle(enabled: boolean) {
-    setQuestLoopEnabled(enabled);
-    setQuestLoopAfterCompleteEnabled(enabled);
-  }
-
   return (
     <View style={styles.screen}>
       <AmbientBackground
@@ -367,17 +359,6 @@ export default function ExploreScreen() {
           <Animated.View entering={presenceEnter(60)}>
             <GlassPanel contentStyle={styles.panelBody}>
               <SectionHeader label="Fast actions" title="Reset and debug" />
-              <View style={styles.debugToggleRow}>
-                <View style={styles.debugToggleText}>
-                  <ThemedText style={styles.debugToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
-                    Loop companion quests
-                  </ThemedText>
-                  <ThemedText style={styles.debugToggleBody} lightColor="#D9E4FF" darkColor="#D9E4FF">
-                    Completed companion quests are not locked for the day, so the offer returns immediately.
-                  </ThemedText>
-                </View>
-                <Switch value={questLoopEnabled} onValueChange={handleQuestLoopToggle} />
-              </View>
               <View style={styles.devActions}>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
@@ -803,30 +784,6 @@ const styles = StyleSheet.create({
   },
   devActions: {
     gap: 10,
-  },
-  debugToggleRow: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    gap: 14,
-    justifyContent: 'space-between',
-    padding: 12,
-  },
-  debugToggleText: {
-    flex: 1,
-    gap: 3,
-  },
-  debugToggleTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  debugToggleBody: {
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 16,
   },
   collectionGrid: {
     flexDirection: 'row',

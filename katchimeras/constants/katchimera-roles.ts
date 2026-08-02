@@ -1,4 +1,8 @@
 import { katchimeraFamilies, katchimeraSkinById } from '@/constants/katchimera-skins';
+import {
+  bespokeFamilyQuestPackByFamilyId,
+  bespokeQuestIdsForFamily,
+} from '@/constants/katchimera-bespoke-quests';
 import { lifeAspectById } from '@/constants/life-aspects';
 import type { KatchimeraFamilyId, LifeAspectId } from '@/types/katchimera';
 
@@ -546,6 +550,44 @@ export const katchimeraRoles: readonly KatchimeraRoleDefinition[] = katchimeraFa
   const authored = FOUNDATION_ROLES[family.id];
   if (authored) return { familyId: family.id, aspectId: family.aspectId, displayName: family.displayName, ...authored };
 
+  const bespokeQuestPack = bespokeFamilyQuestPackByFamilyId.get(family.id);
+  if (bespokeQuestPack) {
+    return {
+      familyId: family.id,
+      aspectId: family.aspectId,
+      displayName: family.displayName,
+      role: bespokeQuestPack.role,
+      boundary: bespokeQuestPack.boundary,
+      hatchSignals: bespokeQuestPack.hatchSignals,
+      realLifeQuestIds: bespokeQuestIdsForFamily(family.id),
+      discoveryPrompts: [
+        prompt(
+          family.id,
+          'quest-direction',
+          1,
+          'single_choice',
+          `What would you most like to explore with ${family.displayName}?`,
+          'This keeps the quests relevant to the part of this companion that matters to you.',
+          bespokeQuestPack.goalTypes.map(sentenceCase)
+        ),
+        prompt(
+          family.id,
+          'quest-goal',
+          2,
+          'goal',
+          `What small direction would feel worth building with ${family.displayName}?`,
+          'Choose something concrete enough to notice in an ordinary week.'
+        ),
+      ],
+      miniGameQuestIds: [],
+      plannedMiniGame: `A future signature activity for ${family.displayName}'s role.`,
+      insightThemes: bespokeQuestPack.insightThemes,
+      reflectionLenses: bespokeQuestPack.reflectionLenses,
+      goalTypes: bespokeQuestPack.goalTypes,
+      status: 'partial',
+    };
+  }
+
   const aspect = lifeAspectById.get(family.aspectId);
   const anchor = katchimeraSkinById.get(family.anchorSkinId);
   const planned = !anchor || anchor.status === 'planned';
@@ -589,6 +631,10 @@ export function validateKatchimeraRoleCatalogue(): string[] {
     }
     if (!role.role.trim() || !role.boundary.trim()) issues.push(`${family.id}: role or boundary is empty`);
     if (!role.discoveryPrompts.length) issues.push(`${family.id}: discovery lane is empty`);
+    if (role.status === 'fallback') issues.push(`${family.id}: playable content must not use a broad fallback role`);
+    if (role.status !== 'planned' && role.realLifeQuestIds.length < 4) {
+      issues.push(`${family.id}: authored role needs four progressive real-life quests`);
+    }
     if (role.status === 'complete') {
       if (role.realLifeQuestIds.length < 2) issues.push(`${family.id}: complete role needs two real-life quests`);
       if (role.discoveryPrompts.length < 2) issues.push(`${family.id}: complete role needs two discovery prompts`);
@@ -628,4 +674,8 @@ function prompt(
     helperText,
     options,
   };
+}
+
+function sentenceCase(value: string): string {
+  return value ? `${value[0]?.toLocaleUpperCase()}${value.slice(1)}` : value;
 }

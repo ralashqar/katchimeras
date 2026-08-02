@@ -26,7 +26,9 @@ import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import {
   cadenceFromTemplate,
+  cadenceIncludesDay,
   quickGoalCadenceLabel,
+  quickGoalTemplateStatusForDay,
   quickGoalsForDay,
   type CompanionQuickGoal,
   type CompanionQuickGoalCadence,
@@ -34,6 +36,7 @@ import {
   type CompanionQuickGoalForDay,
   type CompanionQuickGoalState,
   type CompanionQuickGoalStatus,
+  type CompanionQuickGoalTemplateDayStatus,
 } from '@/utils/companion-quick-goals';
 
 type QuickGoalActions = {
@@ -77,6 +80,9 @@ export function CompanionQuickGoalsPanel({
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const goals = quickGoalsForDay(state, dayId, familyId);
+  const activeGoals = goals.filter((item) => !item.completion);
+  const completedGoals = goals.filter((item) => item.completion);
+  const otherAddedGoals = otherQuickGoalsForDay(state, dayId, [familyId]);
   const selectedGoal = selectedGoalId
     ? goals.find((item) => item.goal.id === selectedGoalId) ?? null
     : null;
@@ -101,9 +107,9 @@ export function CompanionQuickGoalsPanel({
           </ThemedText>
         </Pressable>
       </View>
-      {goals.length ? (
+      {activeGoals.length ? (
         <View style={styles.goalList}>
-          {goals.map((item) => (
+          {activeGoals.map((item) => (
             <QuickGoalRow
               item={item}
               key={item.goal.id}
@@ -116,7 +122,39 @@ export function CompanionQuickGoalsPanel({
             />
           ))}
         </View>
-      ) : (
+      ) : null}
+      {completedGoals.length ? (
+        <View style={styles.completedGoalSection}>
+          <ThemedText style={styles.completedGoalLabel} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
+            COMPLETED TODAY
+          </ThemedText>
+          <View style={styles.goalList}>
+            {completedGoals.map((item) => (
+              <QuickGoalRow
+                item={item}
+                key={item.goal.id}
+                onPress={() => {
+                  setActionFeedback(null);
+                  setSelectedGoalId(item.goal.id);
+                  if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                }}
+                tone="parchment"
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+      {otherAddedGoals.length ? (
+        <View style={styles.otherGoalSection}>
+          <ThemedText style={styles.otherGoalLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+            OTHER ADDED GOALS
+          </ThemedText>
+          <View style={styles.goalList}>
+            {otherAddedGoals.map((item) => <OtherAddedGoalRow item={item} key={item.goal.id} />)}
+          </View>
+        </View>
+      ) : null}
+      {!goals.length && !otherAddedGoals.length ? (
         <Pressable
           accessibilityRole="button"
           onPress={onOpen}
@@ -126,7 +164,7 @@ export function CompanionQuickGoalsPanel({
             Choose one small thing to do
           </ThemedText>
         </Pressable>
-      )}
+      ) : null}
       {actionFeedback ? (
         <View accessibilityLiveRegion="polite" style={styles.goalActionFeedback}>
           <IconSymbol color={Meadow.leafDeep} name="checkmark" size={14} />
@@ -181,7 +219,6 @@ export function CompanionQuickGoalPicker({
   const [customOpen, setCustomOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const family = katchimeraFamilyById.get(familyId);
-  const familyGoals = state.goals.filter((goal) => goal.familyId === familyId && goal.status !== 'archived');
   const templates = quickGoalTemplatesForFamily(familyId);
 
   return (
@@ -201,7 +238,8 @@ export function CompanionQuickGoalPicker({
 
       <View style={styles.presetList}>
         {templates.map((template, index) => {
-          const added = familyGoals.some((goal) => goal.templateId === template.id);
+          const templateStatus = quickGoalTemplateStatusForDay(state, template.id, dayId);
+          const added = templateStatus !== null;
           return (
             <Animated.View
               entering={reduceMotion ? undefined : FadeInUp.delay(Math.min(index, 7) * 34).duration(210)}
@@ -228,7 +266,9 @@ export function CompanionQuickGoalPicker({
                     {template.title}
                   </ThemedText>
                   <ThemedText style={styles.presetCadence} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-                    {added ? 'Added' : quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
+                    {templateStatus
+                      ? quickGoalTemplateDayStatusLabel(templateStatus, template.defaultCadence.kind)
+                      : quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
                   </ThemedText>
                 </View>
                 <View style={[styles.presetAdd, added && styles.presetAdded]}>
@@ -313,8 +353,11 @@ export function QuickGoalsSheet({
   const [cadence, setCadence] = useState<CompanionQuickGoalCadence>({ kind: 'once', dayId });
   const [feedback, setFeedback] = useState<string | null>(null);
   const goals = quickGoalsForDay(state, dayId);
-  const completedCount = goals.filter((item) => item.completion).length;
-  const remainingCount = goals.length - completedCount;
+  const activeGoals = goals.filter((item) => !item.completion);
+  const completedGoals = goals.filter((item) => item.completion);
+  const completedCount = completedGoals.length;
+  const remainingCount = activeGoals.length;
+  const otherAddedGoals = otherQuickGoalsForDay(state, dayId, familyIds);
   const selectedGoal = selectedGoalId
     ? goals.find((item) => item.goal.id === selectedGoalId) ??
       state.goals
@@ -426,7 +469,7 @@ export function QuickGoalsSheet({
         <View style={styles.todayGoalsView}>
           <View style={styles.todaySectionHeading}>
             <ThemedText style={styles.sectionLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-              YOUR LIST
+              {activeGoals.length ? 'TO DO' : completedGoals.length ? 'TODAY' : 'YOUR LIST'}
             </ThemedText>
             <ThemedText style={styles.todayCount} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
               {completedCount}/{goals.length}
@@ -444,9 +487,9 @@ export function QuickGoalsSheet({
               />
             </View>
           ) : null}
-          {goals.length ? (
+          {activeGoals.length ? (
             <View style={styles.todayGoalList}>
-              {goals.map((item, index) => {
+              {activeGoals.map((item, index) => {
                 return (
                   <Animated.View
                     key={item.goal.id}
@@ -466,7 +509,54 @@ export function QuickGoalsSheet({
                 );
               })}
             </View>
-          ) : (
+          ) : null}
+          {completedGoals.length ? (
+            <View style={styles.completedGoalSection}>
+              <View style={styles.todaySectionHeading}>
+                <ThemedText style={styles.completedGoalLabel} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
+                  COMPLETED TODAY
+                </ThemedText>
+                <ThemedText style={styles.todayCount} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
+                  {completedGoals.length}
+                </ThemedText>
+              </View>
+              <View style={styles.todayGoalList}>
+                {completedGoals.map((item, index) => (
+                  <Animated.View
+                    key={item.goal.id}
+                    layout={reduceMotion ? undefined : LinearTransition.duration(170).easing(Easing.out(Easing.cubic))}>
+                    <Animated.View
+                      entering={reduceMotion ? undefined : FadeInUp.delay(Math.min(index, 6) * 32).duration(180)}>
+                      <TodayQuickGoalCard
+                        item={item}
+                        onPress={() => {
+                          setFeedback(null);
+                          setSelectedGoalId(item.goal.id);
+                          if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+                        }}
+                      />
+                    </Animated.View>
+                  </Animated.View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+          {otherAddedGoals.length ? (
+            <View style={styles.otherGoalSection}>
+              <View style={styles.todaySectionHeading}>
+                <ThemedText style={styles.otherGoalLabel} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+                  OTHER ADDED GOALS
+                </ThemedText>
+                <ThemedText style={styles.todayCount} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
+                  {otherAddedGoals.length}
+                </ThemedText>
+              </View>
+              <View style={styles.todayGoalList}>
+                {otherAddedGoals.map((item) => <OtherAddedGoalRow item={item} key={item.goal.id} />)}
+              </View>
+            </View>
+          ) : null}
+          {!goals.length && !otherAddedGoals.length ? (
             <Animated.View entering={FadeInDown.duration(180)} style={styles.goalsEmptyState}>
               <IconSymbol color={Meadow.goldDeep} name="sparkles" size={22} />
               <View style={styles.goalsEmptyCopy}>
@@ -478,7 +568,7 @@ export function QuickGoalsSheet({
                 </ThemedText>
               </View>
             </Animated.View>
-          )}
+          ) : null}
           <Pressable
             accessibilityRole="button"
             onPress={() => {
@@ -546,7 +636,8 @@ export function QuickGoalsSheet({
             <>
               <View style={styles.presetList}>
                 {templates.map((template) => {
-                  const added = familyGoals.some((goal) => goal.templateId === template.id);
+                  const templateStatus = quickGoalTemplateStatusForDay(state, template.id, dayId);
+                  const added = templateStatus !== null;
                   return (
                     <Pressable
                       accessibilityRole="button"
@@ -563,7 +654,9 @@ export function QuickGoalsSheet({
                           {template.title}
                         </ThemedText>
                         <ThemedText style={styles.presetCadence} lightColor={Meadow.inkFaint} darkColor={Meadow.inkFaint}>
-                          {quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
+                          {templateStatus
+                            ? quickGoalTemplateDayStatusLabel(templateStatus, template.defaultCadence.kind)
+                            : quickGoalCadenceLabel(cadenceFromTemplate(template, dayId))}
                         </ThemedText>
                       </View>
                       <View style={[styles.presetAdd, added && styles.presetAdded]}>
@@ -673,6 +766,71 @@ export function QuickGoalsSheet({
   );
 }
 
+type OtherQuickGoalForDay = {
+  goal: CompanionQuickGoal;
+  statusLabel: string;
+};
+
+function otherQuickGoalsForDay(
+  state: CompanionQuickGoalState,
+  dayId: string,
+  familyIds: readonly KatchimeraFamilyId[]
+): OtherQuickGoalForDay[] {
+  const familySet = new Set(familyIds);
+  const todayGoalIds = new Set(
+    quickGoalsForDay(state, dayId)
+      .filter((item) => familySet.has(item.goal.familyId))
+      .map((item) => item.goal.id)
+  );
+  return state.goals
+    .filter((goal) =>
+      familySet.has(goal.familyId) &&
+      goal.status !== 'archived' &&
+      !todayGoalIds.has(goal.id) &&
+      !(goal.cadence.kind === 'once' && goal.cadence.dayId < dayId)
+    )
+    .map((goal) => {
+      if (goal.status === 'paused') return { goal, statusLabel: 'Paused' };
+      const dismissal = state.dismissals.find((candidate) =>
+        candidate.goalId === goal.id && candidate.dayId === dayId
+      );
+      if (dismissal?.kind === 'skipped') return { goal, statusLabel: 'Skipped today' };
+      if (dismissal?.kind === 'snoozed') return { goal, statusLabel: 'Snoozed for today' };
+      if (!cadenceIncludesDay(goal.cadence, dayId)) {
+        return {
+          goal,
+          statusLabel: goal.cadence.kind === 'once'
+            ? 'Scheduled for a later day'
+            : `Next on ${quickGoalCadenceLabel(goal.cadence)}`,
+        };
+      }
+      return { goal, statusLabel: 'Added' };
+    })
+    .sort((left, right) => left.goal.createdAt - right.goal.createdAt);
+}
+
+function OtherAddedGoalRow({ item }: { item: OtherQuickGoalForDay }) {
+  const familyName = katchimeraFamilyById.get(item.goal.familyId)?.displayName ?? item.goal.familyId;
+  return (
+    <View
+      accessibilityLabel={`${item.goal.title}. ${item.statusLabel}`}
+      style={styles.otherGoalRow}>
+      <CompanionThumb bleed familyId={item.goal.familyId} size={46} />
+      <View style={styles.todayGoalCopy}>
+        <ThemedText numberOfLines={2} selectable style={styles.otherGoalTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+          {item.goal.title}
+        </ThemedText>
+        <ThemedText style={styles.otherGoalMeta} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
+          {familyName} · {item.statusLabel}
+        </ThemedText>
+      </View>
+      <View style={styles.otherGoalStatus}>
+        <IconSymbol color={Meadow.inkFaint} name="clock.fill" size={14} />
+      </View>
+    </View>
+  );
+}
+
 function TodayQuickGoalCard({
   item,
   onPress,
@@ -779,6 +937,18 @@ function goalEncouragement(cadence: CompanionQuickGoalCadence): string {
   if (cadence.kind === 'daily') return 'Build the rhythm one small day at a time.';
   if (cadence.kind === 'weekdays') return 'Keep the weekday rhythm gently moving.';
   return 'One small, finishable win for today.';
+}
+
+function quickGoalTemplateDayStatusLabel(
+  status: CompanionQuickGoalTemplateDayStatus,
+  cadenceKind: 'once' | 'daily' | 'weekdays'
+): string {
+  if (status === 'completed') return 'Completed today';
+  if (status === 'paused') return 'Paused';
+  if (status === 'skipped') return 'Skipped today';
+  if (status === 'snoozed') return 'Snoozed for today';
+  if (status === 'scheduled') return cadenceKind === 'weekdays' ? 'Added · Next weekday' : 'Added · Scheduled';
+  return cadenceKind === 'once' ? 'Added today' : 'Repeats automatically';
 }
 
 function QuickGoalRow({
@@ -1030,6 +1200,46 @@ const styles = StyleSheet.create({
   emptyGoals: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 8, minHeight: 44, paddingHorizontal: 12 },
   emptyGoalsText: { ...KatchaUI.type.companionAction, fontSize: 12.5 },
   goalList: { gap: 7 },
+  completedGoalSection: {
+    borderTopColor: 'rgba(78,112,72,0.18)',
+    borderTopWidth: 1,
+    gap: 8,
+    marginTop: 2,
+    paddingTop: 10,
+  },
+  completedGoalLabel: { ...KatchaUI.type.label, fontSize: 8.5, letterSpacing: 1 },
+  otherGoalSection: {
+    borderTopColor: 'rgba(104,77,43,0.14)',
+    borderTopWidth: 1,
+    gap: 8,
+    marginTop: 2,
+    paddingTop: 10,
+  },
+  otherGoalLabel: { ...KatchaUI.type.label, fontSize: 8.5, letterSpacing: 1 },
+  otherGoalRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,249,234,0.48)',
+    borderColor: 'rgba(119,86,43,0.16)',
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 9,
+    minHeight: 60,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  otherGoalTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '800', lineHeight: 16, opacity: 0.78 },
+  otherGoalMeta: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '700', lineHeight: 13 },
+  otherGoalStatus: {
+    alignItems: 'center',
+    borderColor: 'rgba(119,86,43,0.2)',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
   goalRow: { alignItems: 'center', backgroundColor: 'rgba(255,249,234,0.72)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flexDirection: 'row', gap: 10, minHeight: 50, paddingHorizontal: 11, paddingVertical: 8 },
   goalRowCompact: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.12)', minHeight: 36, paddingVertical: 5 },
   goalRowNight: { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.12)' },

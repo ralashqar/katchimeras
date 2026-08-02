@@ -9,7 +9,20 @@ import {
   recordCompanionBondEvent,
 } from '@/utils/companion-bond';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
-import { selectBalancedQuestOffers, selectRankedQuestOffers } from '@/utils/quest-offer-order';
+import { selectBalancedQuestOffers, selectRankedQuestOffers, sortQuestOffersByAvailability } from '@/utils/quest-offer-order';
+
+test('available quests sort above completed or tomorrow-only cards without losing authored order', () => {
+  const offers = [
+    { id: 'completed-real-life', availableToday: false },
+    { id: 'first-available', availableToday: true },
+    { id: 'tomorrow-only', availableToday: false },
+    { id: 'replayable-mini-game', availableToday: true },
+  ];
+  assert.deepEqual(
+    sortQuestOffersByAvailability(offers).map((offer) => offer.id),
+    ['first-available', 'replayable-mini-game', 'completed-real-life', 'tomorrow-only'],
+  );
+});
 
 test('companion bond resolves every level boundary and segment', () => {
   const state = (points: number) => ({

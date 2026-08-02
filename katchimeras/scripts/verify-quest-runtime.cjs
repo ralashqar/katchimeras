@@ -22,6 +22,14 @@ const scoringPath = transpile('utils/quests/evidence-scoring.ts', 'evidence-scor
 const capsPath = transpile('utils/capabilities/quest-capabilities.ts', 'quest-capabilities.js');
 const factsPath = transpile('utils/signals/facts.ts', 'facts.js');
 const journalTemplatesPath = transpile('utils/quests/journal-templates.ts', 'journal-templates.js');
+const bespokeQuestCataloguePath = transpile(
+  'constants/katchimera-bespoke-quests.ts',
+  'katchimera-bespoke-quests.js'
+);
+const bespokeQuestDefinitionsPath = transpile(
+  'utils/quests/bespoke-family-packs.ts',
+  'bespoke-family-packs.js'
+);
 const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js');
 const runtimePath = transpile('utils/quests/runtime.ts', 'runtime.js');
 const typesPath = path.join(tempDir, 'types-home.js');
@@ -37,6 +45,8 @@ const stubs = {
   '@/utils/signals/facts': factsPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
   '@/utils/quests/journal-templates': journalTemplatesPath,
+  '@/constants/katchimera-bespoke-quests': bespokeQuestCataloguePath,
+  '@/utils/quests/bespoke-family-packs': bespokeQuestDefinitionsPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {

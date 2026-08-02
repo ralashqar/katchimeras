@@ -26,37 +26,52 @@ export function CompanionQuestChoices({
   onSelect: (id: string) => void;
   onAccept: (id: string) => void;
 }) {
+  const availableCount = offers.filter((offer) => offer.availableToday !== false).length;
   return (
     <View style={styles.choiceRoot}>
       <View style={styles.choiceHeading}>
         <View>
           <ThemedText style={styles.choiceTitle} lightColor="#FFF9EA" darkColor="#FFF9EA">Choose a quest</ThemedText>
         </View>
-        <ThemedText style={styles.available} lightColor="#FFF5DA" darkColor="#FFF5DA">{offers.length} available</ThemedText>
+        <ThemedText style={styles.available} lightColor="#FFF5DA" darkColor="#FFF5DA">{availableCount} available</ThemedText>
       </View>
       <View style={styles.offerList}>
         {offers.map((offer) => {
-          const selected = selectedId === offer.id;
+          const completed = Boolean(offer.completedToday);
+          const repeatable = Boolean(offer.repeatable);
+          const unavailable = offer.availableToday === false;
+          const selected = selectedId === offer.id && !unavailable;
           const icon = questFamilyIcon(offer.family);
           return (
             <Pressable
               key={offer.id}
               accessibilityRole="radio"
-              accessibilityState={{ selected }}
-              accessibilityLabel={`${offer.title}. ${offer.hint}. ${offer.bondReward} bond. About ${offer.estimatedMinutes} minutes.`}
-              onPress={() => onSelect(offer.id)}
-              style={({ pressed }) => [styles.offer, selected && styles.offerSelected, pressed && styles.pressed]}>
-              <View style={[styles.offerArt, selected && styles.offerArtSelected]}>
-                <IconSymbol name={icon} size={31} color={selected ? Meadow.goldDeep : Meadow.iconOnCard} />
+              accessibilityState={{ disabled: unavailable, selected }}
+              accessibilityLabel={`${offer.title}. ${completed ? repeatable ? 'Played today and available to play again.' : 'Completed today.' : unavailable ? 'Available tomorrow.' : `${offer.bondReward} bond. About ${offer.estimatedMinutes} minutes.`}`}
+              onPress={() => {
+                if (!unavailable) onSelect(offer.id);
+              }}
+              style={({ pressed }) => [
+                styles.offer,
+                completed && styles.offerCompleted,
+                unavailable && styles.offerUnavailable,
+                selected && styles.offerSelected,
+                pressed && !unavailable && styles.pressed,
+              ]}>
+              <View style={[styles.offerArt, completed && styles.offerArtCompleted, selected && styles.offerArtSelected]}>
+                <IconSymbol name={completed && !repeatable ? 'checkmark' : icon} size={31} color={completed ? Meadow.leafDeep : selected ? Meadow.goldDeep : Meadow.iconOnCard} />
               </View>
               <View style={styles.offerCopy}>
                 <View style={styles.offerTopline}>
-                  <ThemedText style={styles.offerCategory} lightColor={selected ? Meadow.goldDeep : Meadow.leafDeep} darkColor={selected ? Meadow.goldDeep : Meadow.leafDeep}>
-                    {offer.lane === 'mini_game' ? 'Mini-game' : 'Real life'}
-                    {offer.recommended ? ' · Recommended' : ` · ${offer.categoryLabel}`}
+                  <ThemedText style={styles.offerCategory} lightColor={completed ? Meadow.leafDeep : selected ? Meadow.goldDeep : Meadow.leafDeep} darkColor={completed ? Meadow.leafDeep : selected ? Meadow.goldDeep : Meadow.leafDeep}>
+                    {completed
+                      ? repeatable ? 'Played today · Replayable' : 'Completed today'
+                      : unavailable
+                        ? 'Real life · Available tomorrow'
+                        : `${offer.lane === 'mini_game' ? 'Mini-game' : 'Real life'}${offer.recommended ? ' · Recommended' : ` · ${offer.categoryLabel}`}`}
                   </ThemedText>
-                  <View style={[styles.radio, selected && styles.radioSelected]}>
-                    {selected ? <IconSymbol name="checkmark" size={12} color="#FFF6DA" /> : null}
+                  <View style={[styles.radio, selected && styles.radioSelected, completed && styles.radioCompleted]}>
+                    {completed || selected ? <IconSymbol name="checkmark" size={12} color="#FFF6DA" /> : null}
                   </View>
                 </View>
                 <ThemedText numberOfLines={2} style={styles.offerTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{offer.title}</ThemedText>
@@ -66,7 +81,7 @@ export function CompanionQuestChoices({
                     <Meta icon="heart.fill" label={`+${offer.bondReward} bond`} />
                     <Meta icon="timer" label={`${offer.estimatedMinutes} min`} />
                   </View>
-                  {selected ? (
+                  {selected && !unavailable ? (
                     <Animated.View entering={FadeIn.duration(140)}>
                       <Pressable
                         accessibilityRole="button"
@@ -77,7 +92,7 @@ export function CompanionQuestChoices({
                           onAccept(offer.id);
                         }}
                         style={({ pressed }) => [styles.accept, pressed && styles.acceptPressed]}>
-                        <ThemedText style={styles.acceptText} lightColor={Meadow.ink} darkColor={Meadow.ink}>Accept</ThemedText>
+                        <ThemedText style={styles.acceptText} lightColor={Meadow.ink} darkColor={Meadow.ink}>{completed && repeatable ? 'Play again' : 'Accept'}</ThemedText>
                         <IconSymbol name="arrow.right" size={12} color={Meadow.ink} />
                       </Pressable>
                     </Animated.View>
@@ -435,8 +450,11 @@ const styles = StyleSheet.create({
   available: { backgroundColor: 'rgba(25,34,27,0.62)', borderRadius: 999, fontSize: 10.5, fontVariant: ['tabular-nums'], overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 5 },
   offerList: { gap: 9 },
   offer: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.92)', borderColor: 'rgba(255,255,255,0.64)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.20), inset 0 1px 0 rgba(255,255,255,0.78)', flexDirection: 'row', gap: 11, minHeight: 108, padding: 9 },
+  offerCompleted: { backgroundColor: 'rgba(239,247,226,0.96)', borderColor: 'rgba(85,104,75,0.48)' },
+  offerUnavailable: { opacity: 0.72 },
   offerSelected: { backgroundColor: 'rgba(255,244,204,0.97)', borderColor: Meadow.goldDeep, boxShadow: '0 10px 25px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,235,0.9), 0 0 0 1px rgba(229,190,106,0.24)' },
   offerArt: { alignItems: 'center', backgroundColor: 'rgba(138,112,80,0.10)', borderColor: 'rgba(255,248,230,0.28)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.38)', height: 82, justifyContent: 'center', width: 72 },
+  offerArtCompleted: { backgroundColor: 'rgba(107,128,95,0.15)', borderColor: 'rgba(85,104,75,0.28)' },
   offerArtSelected: { backgroundColor: Meadow.goldSoft },
   offerCopy: { flex: 1, gap: 3, minWidth: 0 },
   offerTopline: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
@@ -452,6 +470,7 @@ const styles = StyleSheet.create({
   acceptPressed: { opacity: 0.78, transform: [{ scale: 0.96 }] },
   radio: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 22, justifyContent: 'center', width: 22 },
   radioSelected: { backgroundColor: Meadow.goldDeep, borderColor: Meadow.goldDeep },
+  radioCompleted: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
   root: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: 'rgba(255,255,255,0.64)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.20), inset 0 1px 0 rgba(255,255,255,0.78)', gap: 18, marginBottom: 12, padding: 16 },
   intro: { gap: 8 },
   activeSummary: { gap: 10 },

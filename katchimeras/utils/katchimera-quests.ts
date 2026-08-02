@@ -4,7 +4,6 @@ import { evaluateQuestRuntime } from '@/utils/quests/runtime';
 import type { Facts } from '@/utils/signals/facts';
 import { questCriteriaStatus } from '@/utils/quests/evaluate';
 import { questDefinition } from '@/utils/quests/definitions';
-import { isQuestLoopAfterCompleteEnabled } from '@/utils/dev-settings';
 import type { QuestAttempt, QuestResult } from '@/utils/quests/experiences/types';
 import { rankedQuestOfferIds } from '@/utils/quest-offer-order';
 
@@ -219,12 +218,63 @@ export function hasCompanionQuestForDay(
   creatureId: string,
   dayId: string
 ): boolean {
-  const ignoreCompletedHistory = isQuestLoopAfterCompleteEnabled();
   return state.quests.some((quest) => {
     if (quest.creatureId !== creatureId) return false;
-    if (ignoreCompletedHistory && quest.completedAt) return false;
     return questDayId(quest.acceptedAt, quest.acceptedDayId) === dayId || questDayId(quest.completedAt, quest.completedDayId) === dayId;
-  });
+  }) || (state.submissions ?? []).some((submission) =>
+    submission.creatureId === creatureId && submission.dayId === dayId
+  );
+}
+
+export function isQuestCompletedForDay(
+  state: CompanionQuestState,
+  creatureId: string,
+  questId: string,
+  dayId: string
+): boolean {
+  return state.quests.some((quest) =>
+    quest.creatureId === creatureId
+    && quest.questId === questId
+    && Boolean(quest.completedAt)
+    && questDayId(quest.completedAt, quest.completedDayId) === dayId
+  ) || (state.submissions ?? []).some((submission) =>
+    submission.creatureId === creatureId
+    && submission.questId === questId
+    && submission.dayId === dayId
+  ) || (state.attempts ?? []).some((attempt) =>
+    attempt.creatureId === creatureId
+    && attempt.questId === questId
+    && attempt.dayId === dayId
+    && attempt.status === 'succeeded'
+  );
+}
+
+export function hasCompletedRealLifeQuestForDay(
+  state: CompanionQuestState,
+  creatureId: string,
+  dayId: string
+): boolean {
+  return state.quests.some((quest) =>
+    quest.creatureId === creatureId
+    && Boolean(quest.completedAt)
+    && questDayId(quest.completedAt, quest.completedDayId) === dayId
+    && questDefinition(quest.questId)?.lane !== 'mini_game'
+  ) || (state.submissions ?? []).some((submission) =>
+    submission.creatureId === creatureId
+    && submission.dayId === dayId
+    && questDefinition(submission.questId)?.lane !== 'mini_game'
+  );
+}
+
+export function canAcceptQuestForDay(
+  state: CompanionQuestState,
+  creatureId: string,
+  questId: string,
+  dayId: string
+): boolean {
+  if (questFor(state, creatureId)) return false;
+  if (questDefinition(questId)?.lane === 'mini_game') return true;
+  return !hasCompletedRealLifeQuestForDay(state, creatureId, dayId);
 }
 
 // The village status glyph for a resident (docs/katchimera-engagement-v1.md):
@@ -255,7 +305,7 @@ export function acceptQuest(
   acceptedAt: number
 ): CompanionQuestState | null {
   if (questFor(state, offer.creatureId)) return null;
-  if (offer.dayId && hasCompanionQuestForDay(state, offer.creatureId, offer.dayId)) return null;
+  if (offer.dayId && !canAcceptQuestForDay(state, offer.creatureId, offer.questId, offer.dayId)) return null;
   if (activeQuests(state).length >= MAX_ACTIVE_QUESTS) return null;
   const questRunId = createQuestRunId(offer.questId, offer.creatureId, acceptedAt);
   return {
@@ -326,16 +376,15 @@ export function evaluateCompanionQuests(
   capabilities?: QuestCapabilityMap | null,
   dayId?: string | null
 ): { state: CompanionQuestState; completed: CompanionQuest[] } {
-  const loopAfterComplete = isQuestLoopAfterCompleteEnabled();
   const completed: CompanionQuest[] = [];
-  const quests = state.quests.flatMap((quest) => {
+  const quests = state.quests.map((quest) => {
     const runtime = evaluateQuestRuntime({ questId: quest.questId, facts, capabilities });
     if (quest.completedAt || !runtime.complete) {
-      return [quest];
+      return quest;
     }
     const done = { ...quest, completedAt: now, completedDayId: dayId ?? localDayId(now) };
     completed.push(done);
-    return loopAfterComplete ? [] : [done];
+    return done;
   });
   return { state: { ...state, quests }, completed };
 }
@@ -346,12 +395,6 @@ export function completeQuest(
   completedAt: number,
   dayId?: string | null
 ): CompanionQuestState {
-  if (isQuestLoopAfterCompleteEnabled()) {
-    return {
-      ...state,
-      quests: state.quests.filter((quest) => quest.creatureId !== creatureId || quest.completedAt),
-    };
-  }
   return {
     ...state,
     quests: state.quests.map((quest) =>
@@ -413,9 +456,7 @@ export function submitQuest(
     verificationSource: submission.verificationSource ?? 'legacy',
   };
   const done = { ...active, completedAt: submittedAt, completedDayId: resolvedDayId };
-  const quests = isQuestLoopAfterCompleteEnabled()
-    ? state.quests.filter((quest) => quest !== active)
-    : state.quests.map((quest) => (quest === active ? done : quest));
+  const quests = state.quests.map((quest) => (quest === active ? done : quest));
   return {
     state: { ...state, quests, submissions: [...submissions, record] },
     quest: done,

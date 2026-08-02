@@ -22,6 +22,14 @@ const memoryDisplayPath = transpile('utils/memory-display.ts', 'memory-display.j
 const qualityRegistryPath = transpile('utils/intelligence/quality-registry.ts', 'quality-registry.js');
 const journalTemplatesPath = transpile('utils/quests/journal-templates.ts', 'journal-templates.js');
 const manualJournalRegistryPath = transpile('utils/manual-journal-registry.ts', 'manual-journal-registry.js');
+const bespokeQuestCataloguePath = transpile(
+  'constants/katchimera-bespoke-quests.ts',
+  'katchimera-bespoke-quests.js'
+);
+const bespokeQuestDefinitionsPath = transpile(
+  'utils/quests/bespoke-family-packs.ts',
+  'bespoke-family-packs.js'
+);
 const qualityDataPath = path.join(projectRoot, 'data/intelligence/memory-qualities.json');
 require('module')._resolveFilename = function resolveVerificationModule(request, parent, isMain, options) {
   if (request === '@/utils/studio-detect') return studioDetectPath;
@@ -29,6 +37,8 @@ require('module')._resolveFilename = function resolveVerificationModule(request,
   if (request === '@/utils/intelligence/quality-registry') return qualityRegistryPath;
   if (request === '@/utils/quests/journal-templates') return journalTemplatesPath;
   if (request === '@/utils/manual-journal-registry') return manualJournalRegistryPath;
+  if (request === '@/constants/katchimera-bespoke-quests') return bespokeQuestCataloguePath;
+  if (request === '@/utils/quests/bespoke-family-packs') return bespokeQuestDefinitionsPath;
   if (request === '@/data/intelligence/memory-qualities.json') return qualityDataPath;
   return originalResolveFilename.call(this, request, parent, isMain, options);
 };

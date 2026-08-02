@@ -379,6 +379,27 @@ test('photo quests keep their camera action inside the quest card', () => {
   assert.match(thread, /It will stay attached here while the quest checks the match/);
 });
 
+test('quest completion returns to a list with completed real-life and replayable mini-game states', () => {
+  const questThread = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-quest-thread.tsx'),
+    'utf8',
+  );
+  const companionScreen = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
+    'utf8',
+  );
+  const questHook = fs.readFileSync(
+    path.join(process.cwd(), 'hooks', 'use-kingdom-quests.ts'),
+    'utf8',
+  );
+  assert.match(questThread, /Completed today/);
+  assert.match(questThread, /Played today · Replayable/);
+  assert.match(questThread, /Play again/);
+  assert.match(companionScreen, /Back to quests/);
+  assert.match(companionScreen, /finishQuestResultNotice/);
+  assert.match(questHook, /selectedQuestItems\.find[\s\S]*\?\? captureSubmissionItem/);
+});
+
 test('possible evidence requires review before submission', () => {
   const item = {
     id: 'photo-1', kind: 'photo' as const, sourceType: 'photo', sourceId: 'photo-1', title: 'Park photo', subtitle: 'Today',

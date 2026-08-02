@@ -22,6 +22,16 @@ const capsPath = transpile('utils/capabilities/quest-capabilities.ts', 'quest-ca
 const scoringPath = transpile('utils/quests/evidence-scoring.ts', 'evidence-scoring.js');
 const taxonomyPath = transpile('utils/intelligence/taxonomy.ts', 'taxonomy.js');
 const journalTemplatesPath = transpile('utils/quests/journal-templates.ts', 'journal-templates.js');
+const bespokeQuestCataloguePath = transpile(
+  'constants/katchimera-bespoke-quests.ts',
+  'katchimera-bespoke-quests.js'
+);
+const bespokeQuestDefinitionsPath = transpile(
+  'utils/quests/bespoke-family-packs.ts',
+  'bespoke-family-packs.js'
+);
+const katchimeraSkinsPath = transpile('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const katchimeraRolesPath = transpile('constants/katchimera-roles.ts', 'katchimera-roles.js');
 const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js');
 const themedPath = transpile('utils/quests/themed.ts', 'themed.js');
 const engagementPath = transpile('utils/katchimera-engagement.ts', 'katchimera-engagement.js');
@@ -41,6 +51,10 @@ const stubs = {
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
   '@/utils/quests/journal-templates': journalTemplatesPath,
   '@/constants/life-aspects': lifeAspectsPath,
+  '@/constants/katchimera-bespoke-quests': bespokeQuestCataloguePath,
+  '@/utils/quests/bespoke-family-packs': bespokeQuestDefinitionsPath,
+  '@/constants/katchimera-skins': katchimeraSkinsPath,
+  '@/constants/katchimera-roles': katchimeraRolesPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {

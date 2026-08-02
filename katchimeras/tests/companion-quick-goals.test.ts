@@ -19,7 +19,9 @@ import {
   emptyCompanionQuickGoalState,
   markQuickGoalCompletionJournaled,
   normaliseCompanionQuickGoalState,
+  quickGoalTemplateStatusForDay,
   quickGoalsForDay,
+  rollCompanionQuickGoalsToDay,
   skipCompanionQuickGoal,
   snoozeCompanionQuickGoal,
   undoCompanionQuickGoal,
@@ -145,6 +147,57 @@ test('preset and custom duplicates are rejected while archived goals can be re-a
     cadence: { kind: 'daily' },
   }, 130);
   assert.equal(duplicateCustom.reason, 'duplicate');
+});
+
+test('today-only presets archive after their day and can be added again', () => {
+  const template = companionQuickGoalTemplateById.get('vesperitt:one-more-stop')!;
+  const first = addCompanionQuickGoal(emptyCompanionQuickGoalState(), {
+    familyId: template.familyId,
+    templateId: template.id,
+    title: template.title,
+    cadence: cadenceFromTemplate(template, '2026-07-25'),
+  }, 100);
+  const completed = completeCompanionQuickGoal(first.state, first.goal!.id, '2026-07-25', 200);
+
+  assert.equal(quickGoalTemplateStatusForDay(completed.state, template.id, '2026-07-25'), 'completed');
+
+  const rolled = rollCompanionQuickGoalsToDay(completed.state, '2026-07-26', 300);
+  assert.equal(rolled.goals[0]?.status, 'archived');
+  assert.equal(rolled.completions.length, 1, 'completion history remains available');
+  assert.equal(quickGoalTemplateStatusForDay(rolled, template.id, '2026-07-26'), null);
+
+  const second = addCompanionQuickGoal(rolled, {
+    familyId: template.familyId,
+    templateId: template.id,
+    title: template.title,
+    cadence: cadenceFromTemplate(template, '2026-07-26'),
+  }, 400);
+  assert.equal(second.reason, null);
+  assert.equal(second.goal?.cadence.kind, 'once');
+  assert.equal(quickGoalsForDay(second.state, '2026-07-26').length, 1);
+});
+
+test('repeating goals reset completion each day without needing to be re-added', () => {
+  const template = companionQuickGoalTemplateById.get('vesperitt:choose-tonight')!;
+  const added = addCompanionQuickGoal(emptyCompanionQuickGoalState(), {
+    familyId: template.familyId,
+    templateId: template.id,
+    title: template.title,
+    cadence: { kind: 'daily' },
+  }, 100);
+  const completed = completeCompanionQuickGoal(added.state, added.goal!.id, '2026-07-25', 200);
+
+  assert.equal(quickGoalTemplateStatusForDay(completed.state, template.id, '2026-07-25'), 'completed');
+  assert.equal(quickGoalTemplateStatusForDay(completed.state, template.id, '2026-07-26'), 'active');
+  assert.equal(quickGoalsForDay(completed.state, '2026-07-26')[0]?.completion, null);
+
+  const duplicate = addCompanionQuickGoal(completed.state, {
+    familyId: template.familyId,
+    templateId: template.id,
+    title: template.title,
+    cadence: { kind: 'daily' },
+  }, 300);
+  assert.equal(duplicate.reason, 'duplicate', 'recurring goals remain one persistent definition');
 });
 
 test('completion, journal linkage, undo, and bond rewards are idempotent', () => {

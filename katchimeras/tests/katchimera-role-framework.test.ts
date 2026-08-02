@@ -7,6 +7,8 @@ import {
   katchimeraRoles,
   validateKatchimeraRoleCatalogue,
 } from '@/constants/katchimera-roles';
+import { BESPOKE_FAMILY_QUEST_PACKS } from '@/constants/katchimera-bespoke-quests';
+import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import { validateCompleteCompanionContent } from '@/constants/companion-content';
 import type { StoredHomeState } from '@/types/home';
 import {
@@ -33,6 +35,9 @@ test('every family has a role and authored families are complete', () => {
   assert.equal(coverage.total, 60);
   assert.equal(coverage.playable, 56);
   assert.equal(coverage.complete, 18);
+  assert.equal(coverage.partial, 36);
+  assert.equal(coverage.fallback, 0);
+  assert.equal(coverage.planned, 6);
   assert.deepEqual(
     katchimeraRoles.filter((role) => role.status === 'complete').map((role) => role.familyId).sort(),
     [
@@ -56,6 +61,45 @@ test('every family has a role and authored families are complete', () => {
       'vesperitt',
     ]
   );
+});
+
+test('every formerly fallback family owns a progressive bespoke quest ladder', () => {
+  assert.equal(BESPOKE_FAMILY_QUEST_PACKS.length, 29);
+  for (const pack of BESPOKE_FAMILY_QUEST_PACKS) {
+    const family = katchimeraFamilyById.get(pack.familyId);
+    const role = katchimeraRoles.find((candidate) => candidate.familyId === pack.familyId);
+    assert.ok(family?.anchorVisualKey, `${pack.familyId} must have playable art`);
+    assert.equal(role?.status, 'partial', `${pack.familyId} must no longer use fallback content`);
+    assert.equal(role?.realLifeQuestIds.length, 4, `${pack.familyId} needs a four-quest ladder`);
+
+    const levels = role?.realLifeQuestIds.map((questId) => {
+      const definition = questDefinition(questId);
+      assert.ok(definition, `${pack.familyId} is missing ${questId}`);
+      assert.equal(definition?.familyId, pack.familyId, `${questId} must remain family-owned`);
+      assert.equal(definition?.lane, 'real_life');
+      if (definition?.family === 'photo') {
+        assert.equal(definition.evidenceInput?.kind, 'photo');
+        assert.ok(definition.requiresCapabilities?.includes('camera.capture'));
+        assert.ok(definition.optionalCapabilities?.includes('appleVision'));
+      } else {
+        assert.equal(definition?.evidenceInput?.kind, 'journal');
+        assert.deepEqual(definition?.semanticVerification?.modalities, ['text', 'voice']);
+        assert.ok(definition?.semanticVerification?.journalRouteFallbacks?.length, `${questId} needs a manual route`);
+        assert.equal(definition?.requiresCapabilities?.length, 0, `${questId} must work without Foundation`);
+        assert.ok(definition?.optionalCapabilities?.includes('appleFoundation'));
+      }
+      return definition?.minimumBondLevel;
+    });
+    assert.deepEqual(levels, [1, 1, 2, 3], `${pack.familyId} needs progressive bond levels`);
+
+    const offers = themedQuestOffers('', '', family!.anchorVisualKey!);
+    assert.deepEqual(
+      offers.map((offer) => offer.id),
+      role?.realLifeQuestIds,
+      `${pack.familyId} must offer only its family-owned pool`
+    );
+    assert.equal(offers.some((offer) => offer.id === 'quest-snap-today'), false);
+  }
 });
 
 test('every completed role references valid lane-specific quests', () => {
