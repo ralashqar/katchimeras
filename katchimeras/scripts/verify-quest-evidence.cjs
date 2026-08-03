@@ -23,6 +23,8 @@ const intelligenceEvidencePath = transpileToTemp('utils/intelligence/evidence.ts
 const scoringPath = transpileToTemp('utils/quests/evidence-scoring.ts', 'evidence-scoring.js');
 const factsPath = transpileToTemp('utils/signals/facts.ts', 'facts.js');
 const journalTemplatesPath = transpileToTemp('utils/quests/journal-templates.ts', 'journal-templates.js');
+const katchimeraSkinsPath = transpileToTemp('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const familyJourneysPath = transpileToTemp('constants/katchimera-family-journeys.ts', 'katchimera-family-journeys.js');
 const bespokeQuestCataloguePath = transpileToTemp(
   'constants/katchimera-bespoke-quests.ts',
   'katchimera-bespoke-quests.js'
@@ -69,6 +71,8 @@ const stubs = {
   '@/utils/signals/facts': factsPath,
   '@/utils/intelligence/quality-registry': qualityRegistryPath,
   '@/utils/quests/journal-templates': journalTemplatesPath,
+  '@/constants/katchimera-skins': katchimeraSkinsPath,
+  '@/constants/katchimera-family-journeys': familyJourneysPath,
   '@/constants/katchimera-bespoke-quests': bespokeQuestCataloguePath,
   '@/utils/quests/bespoke-family-packs': bespokeQuestDefinitionsPath,
   '@/constants/batch-one-quest-variants': batchOneQuestVariantsPath,

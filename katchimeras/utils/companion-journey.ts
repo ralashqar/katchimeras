@@ -10,6 +10,7 @@ import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { CompanionDiscoveryState } from '@/utils/companion-discovery';
 import type { CompanionQuest } from '@/utils/katchimera-quests';
 import { questDefinition } from '@/utils/quests/definitions';
+import { canonicalFamilyId, companionIdForFamily } from '@/constants/katchimera-skins';
 
 export const MAX_ACTIVE_COMPANION_GOALS = 1;
 
@@ -117,7 +118,7 @@ export type CompanionJourneyCheckIn = {
 };
 
 export type CompanionJourneyState = {
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   goals: CompanionJourneyGoal[];
   conversations: CompanionJourneyConversationSession[];
   questEvents: CompanionJourneyQuestEvent[];
@@ -162,7 +163,7 @@ export type AnswerJourneyConversationResult = {
 };
 
 export function emptyCompanionJourneyState(): CompanionJourneyState {
-  return { schemaVersion: 2, goals: [], conversations: [], questEvents: [], momentEvents: [], reflectionEvents: [], checkIns: [] };
+  return { schemaVersion: 3, goals: [], conversations: [], questEvents: [], momentEvents: [], reflectionEvents: [], checkIns: [] };
 }
 
 export function normaliseCompanionJourneyState(value: unknown): CompanionJourneyState {
@@ -171,8 +172,10 @@ export function normaliseCompanionJourneyState(value: unknown): CompanionJourney
   const goals = normaliseSingleFocus(Array.isArray(candidate.goals)
     ? candidate.goals.filter(isValidGoal).map((goal) => {
         const title = goal.title.trim();
+        const familyId = canonicalFamilyId(goal.familyId) ?? goal.familyId;
         return {
           ...goal,
+          familyId,
           title: LEGACY_GOAL_TITLE_REPLACEMENTS[`${goal.familyId}:${title}`] ?? title,
         };
       })
@@ -181,29 +184,34 @@ export function normaliseCompanionJourneyState(value: unknown): CompanionJourney
   const conversations = Array.isArray(candidate.conversations)
     ? candidate.conversations.filter(isValidConversation).map((session) => ({
         ...session,
+        familyId: canonicalFamilyId(session.familyId) ?? session.familyId,
         answers: Array.isArray(session.answers) ? session.answers.filter(isValidConversationAnswer) : [],
       }))
     : [];
   const questEvents = Array.isArray(candidate.questEvents)
-    ? uniqueById(candidate.questEvents.filter((event) => isValidQuestEvent(event) && goalIds.has(event.goalId)))
+    ? uniqueById(candidate.questEvents.filter((event) => isValidQuestEvent(event) && goalIds.has(event.goalId)).map((event) => ({ ...event, familyId: canonicalFamilyId(event.familyId) ?? event.familyId })))
     : [];
   const momentEvents = Array.isArray(candidate.momentEvents)
-    ? uniqueById(candidate.momentEvents.filter((event) => isValidMomentEvent(event) && goalIds.has(event.goalId)))
+    ? uniqueById(candidate.momentEvents.filter((event) => isValidMomentEvent(event) && goalIds.has(event.goalId)).map((event) => ({ ...event, familyId: canonicalFamilyId(event.familyId) ?? event.familyId })))
     : [];
   const reflectionEvents = Array.isArray(candidate.reflectionEvents)
-    ? uniqueById(candidate.reflectionEvents.filter((event) => isValidReflectionEvent(event) && goalIds.has(event.goalId)))
+    ? uniqueById(candidate.reflectionEvents.filter((event) => isValidReflectionEvent(event) && goalIds.has(event.goalId)).map((event) => ({ ...event, familyId: canonicalFamilyId(event.familyId) ?? event.familyId })))
     : [];
   const checkIns = Array.isArray(candidate.checkIns)
-    ? uniqueById(candidate.checkIns.filter(isValidCheckIn).map((checkIn) => ({
+    ? uniqueById(candidate.checkIns.filter(isValidCheckIn).map((checkIn) => {
+        const familyId = canonicalFamilyId(checkIn.familyId) ?? checkIn.familyId;
+        return ({
         ...checkIn,
+        familyId,
+        companionId: companionIdForFamily(familyId),
         answers: Array.isArray(checkIn.answers) ? checkIn.answers.filter(isValidCheckInAnswer).slice(0, 3) : [],
         suggestedQuickGoalIds: Array.isArray(checkIn.suggestedQuickGoalIds)
           ? checkIn.suggestedQuickGoalIds.filter((id): id is string => typeof id === 'string')
           : [],
-      })))
+      }); }))
     : [];
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     goals: uniqueById(goals),
     conversations: uniqueById(conversations),
     questEvents,
@@ -219,16 +227,19 @@ export function migrateLegacyDiscoveryGoals(
   migratedAt = Date.now()
 ): CompanionJourneyState {
   const mapping: Record<string, { familyId: KatchimeraFamilyId; goalTypeId: string }> = {
-    'sleep-rest:wind-down-goal': { familyId: 'sleep-rest', goalTypeId: 'wind-down' },
+    'sleep-rest:wind-down-goal': { familyId: 'bedrotte', goalTypeId: 'wind-down' },
     'tasklet:focus-goal': { familyId: 'tasklet', goalTypeId: 'project' },
-    'vesperitt:night-intention': { familyId: 'vesperitt', goalTypeId: 'understand' },
+    'vesperitt:night-intention': { familyId: 'bedrotte', goalTypeId: 'understand' },
   };
   let next = state;
   for (const answer of discovery.answers) {
     const mapped = mapping[answer.promptId]
       ?? (answer.promptId === `${answer.familyId}:quest-goal`
-        && companionJourneyByFamilyId.has(answer.familyId)
-        ? { familyId: answer.familyId, goalTypeId: `${answer.familyId}-direction` }
+        && companionJourneyByFamilyId.has(canonicalFamilyId(answer.familyId) ?? answer.familyId)
+        ? {
+            familyId: canonicalFamilyId(answer.familyId) ?? answer.familyId,
+            goalTypeId: `${answer.familyId}-direction`,
+          }
         : undefined);
     if (!mapped || !answer.value.trim()) continue;
     const id = `legacy-goal:${answer.familyId}:${answer.promptId}`;
@@ -261,9 +272,10 @@ export function goalsForJourneyFamily(
   state: CompanionJourneyState,
   familyId: KatchimeraFamilyId
 ): CompanionJourneyGoal[] {
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
   const order: Record<CompanionJourneyGoalStatus, number> = { active: 0, paused: 1, completed: 2, abandoned: 3 };
   return state.goals
-    .filter((goal) => goal.familyId === familyId)
+    .filter((goal) => goal.familyId === ownerFamilyId)
     .sort((left, right) => order[left.status] - order[right.status] || Number(right.isPrimary) - Number(left.isPrimary) || right.updatedAt - left.updatedAt);
 }
 
@@ -271,7 +283,8 @@ export function primaryGoalForFamily(
   state: CompanionJourneyState,
   familyId: KatchimeraFamilyId
 ): CompanionJourneyGoal | null {
-  const active = state.goals.filter((goal) => goal.familyId === familyId && goal.status === 'active');
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  const active = state.goals.filter((goal) => goal.familyId === ownerFamilyId && goal.status === 'active');
   return active.find((goal) => goal.isPrimary) ?? active.sort((left, right) => right.updatedAt - left.updatedAt)[0] ?? null;
 }
 
@@ -279,10 +292,11 @@ export function activeConversationForFamily(
   state: CompanionJourneyState,
   familyId: KatchimeraFamilyId
 ): CompanionJourneyConversationSession | null {
-  const definition = companionJourneyByFamilyId.get(familyId);
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  const definition = companionJourneyByFamilyId.get(ownerFamilyId);
   if (!definition) return null;
   return state.conversations
-    .filter((session) => session.familyId === familyId
+    .filter((session) => session.familyId === ownerFamilyId
       && session.definitionId === definition.id
       && session.definitionVersion === definition.version
       && !session.completedAt
@@ -295,11 +309,12 @@ export function startJourneyConversation(
   familyId: KatchimeraFamilyId,
   startedAt = Date.now()
 ): CompanionJourneyState {
-  const definition = companionJourneyByFamilyId.get(familyId);
-  if (!definition || activeConversationForFamily(state, familyId)) return state;
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  const definition = companionJourneyByFamilyId.get(ownerFamilyId);
+  if (!definition || activeConversationForFamily(state, ownerFamilyId)) return state;
   const session: CompanionJourneyConversationSession = {
-    id: `journey-conversation:${familyId}:${startedAt}`,
-    familyId,
+    id: `journey-conversation:${ownerFamilyId}:${startedAt}`,
+    familyId: ownerFamilyId,
     definitionId: definition.id,
     definitionVersion: definition.version,
     currentNodeId: definition.startNodeId,
@@ -735,7 +750,8 @@ export function recordJourneyMoment(
   occurredAt = Date.now(),
   dayId = localDayId(occurredAt)
 ): RecordJourneyMomentResult {
-  const definition = companionJourneyByFamilyId.get(familyId);
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  const definition = companionJourneyByFamilyId.get(ownerFamilyId);
   const goal = primaryGoalForFamily(state, familyId);
   if (!goal) return { state, recorded: false, reason: 'no_active_goal' };
   if (!definition?.checkIn.options.some((option) => option.id === kindId)) {
@@ -752,7 +768,7 @@ export function recordJourneyMoment(
         ...state.momentEvents,
         {
           id: `journey-moment:${goal.id}:${dayId}`,
-          familyId,
+          familyId: ownerFamilyId,
           goalId: goal.id,
           kindId,
           ...(trimmedNote ? { note: trimmedNote } : {}),

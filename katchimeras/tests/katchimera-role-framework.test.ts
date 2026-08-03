@@ -8,7 +8,12 @@ import {
   validateKatchimeraRoleCatalogue,
 } from '@/constants/katchimera-roles';
 import { BESPOKE_FAMILY_QUEST_PACKS } from '@/constants/katchimera-bespoke-quests';
-import { katchimeraFamilyById } from '@/constants/katchimera-skins';
+import {
+  canonicalFamilyId,
+  katchimeraFamilies,
+  katchimeraFamilyById,
+  katchimeraSkins,
+} from '@/constants/katchimera-skins';
 import { validateCompleteCompanionContent } from '@/constants/companion-content';
 import type { StoredHomeState } from '@/types/home';
 import {
@@ -28,54 +33,42 @@ import {
 import { questDefinition } from '@/utils/quests/definitions';
 import { themedQuestOffers } from '@/utils/quests/themed';
 
-test('every family has a role and authored families are complete', () => {
+test('all 25 life-area families have complete playable systems', () => {
   assert.deepEqual(validateKatchimeraRoleCatalogue(), []);
   assert.deepEqual(validateCompleteCompanionContent(), []);
   const coverage = katchimeraRoleCoverage();
-  assert.equal(coverage.total, 60);
-  assert.equal(coverage.playable, 56);
-  assert.equal(coverage.complete, 18);
-  assert.equal(coverage.partial, 36);
+  assert.equal(coverage.total, 25);
+  assert.equal(coverage.playable, 25);
+  assert.equal(coverage.complete, 16);
+  assert.equal(coverage.partial, 9);
   assert.equal(coverage.fallback, 0);
-  assert.equal(coverage.planned, 6);
-  assert.deepEqual(
-    katchimeraRoles.filter((role) => role.status === 'complete').map((role) => role.familyId).sort(),
-    [
-      'cheerlet',
-      'coffee-ritual',
-      'dawnle',
-      'encora',
-      'errandimp',
-      'feastle',
-      'flickerbun',
-      'gatherglow',
-      'mendle',
-      'mossprout',
-      'pagelet',
-      'quietome',
-      'relicoon',
-      'skylo',
-      'sleep-rest',
-      'steppling',
-      'tasklet',
-      'vesperitt',
-    ]
+  assert.equal(coverage.planned, 0);
+  assert.equal(katchimeraFamilies.length, 25);
+  assert.equal(new Set(katchimeraSkins.map((skin) => skin.id)).size, katchimeraSkins.length);
+  assert.equal(
+    new Set(katchimeraFamilies.flatMap((family) => family.skinIds)).size,
+    katchimeraSkins.length
   );
+  assert.equal(katchimeraFamilies.every((family) => family.focusLanes.length >= 2), true);
+  assert.equal(canonicalFamilyId('quietome'), 'pagelet');
+  assert.equal(canonicalFamilyId('vesperitt'), 'bedrotte');
+  assert.equal(canonicalFamilyId('sprintail'), 'steppling');
 });
 
-test('every formerly fallback family owns a progressive bespoke quest ladder', () => {
-  assert.equal(BESPOKE_FAMILY_QUEST_PACKS.length, 29);
+test('legacy specialist quest ladders remain playable inside canonical parents', () => {
+  assert.equal(BESPOKE_FAMILY_QUEST_PACKS.length, 31);
   for (const pack of BESPOKE_FAMILY_QUEST_PACKS) {
-    const family = katchimeraFamilyById.get(pack.familyId);
-    const role = katchimeraRoles.find((candidate) => candidate.familyId === pack.familyId);
-    assert.ok(family?.anchorVisualKey, `${pack.familyId} must have playable art`);
-    assert.equal(role?.status, 'partial', `${pack.familyId} must no longer use fallback content`);
-    assert.equal(role?.realLifeQuestIds.length, 4, `${pack.familyId} needs a four-quest ladder`);
+    const ownerId = canonicalFamilyId(pack.familyId)!;
+    const family = katchimeraFamilyById.get(ownerId);
+    const role = katchimeraRoles.find((candidate) => candidate.familyId === ownerId);
+    assert.ok(family?.anchorVisualKey, `${ownerId} must have playable art`);
+    assert.ok(role, `${ownerId} must own ${pack.familyId}'s content`);
 
-    const levels = role?.realLifeQuestIds.map((questId) => {
+    const levels = pack.quests.map((quest) => {
+      const questId = `quest-${pack.familyId}-${quest.suffix}`;
       const definition = questDefinition(questId);
       assert.ok(definition, `${pack.familyId} is missing ${questId}`);
-      assert.equal(definition?.familyId, pack.familyId, `${questId} must remain family-owned`);
+      assert.equal(definition?.familyId, ownerId, `${questId} must join its canonical parent`);
       assert.equal(definition?.lane, 'real_life');
       if (definition?.family === 'photo') {
         assert.equal(definition.evidenceInput?.kind, 'photo');
@@ -92,13 +85,7 @@ test('every formerly fallback family owns a progressive bespoke quest ladder', (
     });
     assert.deepEqual(levels, [1, 1, 2, 3], `${pack.familyId} needs progressive bond levels`);
 
-    const offers = themedQuestOffers('', '', family!.anchorVisualKey!);
-    assert.deepEqual(
-      offers.map((offer) => offer.id),
-      role?.realLifeQuestIds,
-      `${pack.familyId} must offer only its family-owned pool`
-    );
-    assert.equal(offers.some((offer) => offer.id === 'quest-snap-today'), false);
+    assert.equal(pack.quests.every((quest) => role!.realLifeQuestIds.includes(`quest-${pack.familyId}-${quest.suffix}`)), true);
   }
 });
 
@@ -147,23 +134,21 @@ test('every completed role references valid lane-specific quests', () => {
 });
 
 test('bond tiers progressively unlock discovery prompts', () => {
-  assert.equal(discoveryPromptsForFamily('steppling', 1).length, 1);
-  assert.equal(discoveryPromptsForFamily('steppling', 2).length, 2);
+  assert.equal(discoveryPromptsForFamily('steppling', 1).length, 2);
+  assert.equal(discoveryPromptsForFamily('steppling', 2).length, 3);
+  assert.equal(discoveryPromptsForFamily('steppling', 3).length, 4);
 });
 
-test('Vesperitt owns late-night life without overlapping the rest family', () => {
-  const role = katchimeraRoles.find((item) => item.familyId === 'vesperitt');
+test('Vesperitt is a Bedrotte form and keeps its late-night activities', () => {
+  const role = katchimeraRoles.find((item) => item.familyId === 'bedrotte');
   assert.equal(role?.status, 'complete');
-  assert.match(role?.boundary ?? '', /not sleep/i);
-  assert.equal(discoveryPromptsForFamily('vesperitt', 1).length, 1);
-  assert.equal(discoveryPromptsForFamily('vesperitt', 2).length, 2);
-  assert.equal(discoveryPromptsForFamily('vesperitt', 3).length, 3);
+  assert.equal(discoveryPromptsForFamily('vesperitt', 1).length, 2);
+  assert.equal(discoveryPromptsForFamily('vesperitt', 3).length, 4);
 
   const offers = themedQuestOffers('small_hours', 'night', 'vesperitt');
   assert.ok(offers.some((offer) => offer.id === 'quest-late-capture' && offer.lane === 'real_life'));
   assert.ok(offers.some((offer) => offer.id === 'quest-vesperitt-night-note' && offer.minimumBondLevel === 2));
   assert.ok(offers.some((offer) => offer.id === 'quest-vesperitt-moon-signals' && offer.lane === 'mini_game'));
-  assert.equal(offers.some((offer) => offer.id === 'quest-early-night'), false);
 });
 
 test('discovery answers are editable, removable, and rewarded only on first answer', () => {
@@ -176,11 +161,10 @@ test('discovery answers are editable, removable, and rewarded only on first answ
   assert.equal(removeCompanionDiscoveryAnswer(edit.state, 'steppling', prompt.id).answers.length, 0);
 });
 
-test('goal answers retain editable progress state', () => {
-  const prompt = discoveryPromptsForFamily('steppling', 2).find((item) => item.kind === 'goal')!;
+test('discovery answers remain editable preferences; goals are created by Focus', () => {
+  const prompt = discoveryPromptsForFamily('steppling', 3).at(-1)!;
   const answered = answerCompanionDiscoveryPrompt(emptyCompanionDiscoveryState(), prompt, 'Walk at lunch', 10);
-  const completed = setCompanionGoalStatus(answered.state, 'steppling', prompt.id, 'completed', 20);
-  assert.equal(completed.answers[0]?.goalStatus, 'completed');
+  assert.equal(answered.state.answers[0]?.goalStatus, undefined);
 });
 
 test('skin variants receive the same family mini-game', () => {
@@ -197,9 +181,9 @@ test('historical hatches backfill into one family-level bond ledger', () => {
     visualKey,
     encounterProfileId: profile,
     aspectId: 'rest-sleep',
-    familyId: 'sleep-rest',
+    familyId: 'bedrotte',
     skinId: visualKey,
-    companionId: 'companion:sleep-rest',
+    companionId: 'companion:bedrotte',
   });
   const day = (id: string, isoDate: string, resident: ReturnType<typeof creature>) => ({
     id,

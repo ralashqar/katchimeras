@@ -518,6 +518,38 @@ export const BESPOKE_FAMILY_QUEST_PACKS: readonly BespokeFamilyQuestPack[] = [
       q('weekly-review', 3, 'Read the horizon line', 'Review one viewpoint, what perspective it gave you, and where you want to look from next.', ['A real viewpoint example is named', 'A scale, orientation, or perspective pattern is identified', 'One next viewpoint intention is stated']),
     ],
   },
+  {
+    familyId: 'heartmote',
+    role: 'Supports appreciation, attentive time, and respectful communication in a close relationship.',
+    boundary: 'Everyday relationship care, not therapy, diagnosis, surveillance, pressure to disclose, or instructions to remain in an unsafe relationship.',
+    hatchSignals: ['quality time with someone close', 'anniversary or date', 'appreciation', 'relationship reflection'],
+    journalRoutes: [],
+    insightThemes: ['appreciation expressed', 'attention protected', 'needs communicated', 'time shared'],
+    reflectionLenses: ['what helped closeness', 'what felt mutual', 'what needs a respectful conversation', 'what can stay private'],
+    goalTypes: ['show appreciation', 'protect quality time', 'communicate clearly', 'make a small caring gesture'],
+    quests: [
+      q('specific-appreciation', 1, 'Make appreciation specific', 'If it feels welcome, share one particular thing you value about someone close and privately note why it mattered.', ['A specific appreciation was expressed or prepared', 'The note focuses on the user’s own action and does not expose another person’s private information']),
+      q('present-moment', 1, 'Protect one present moment', 'Choose a short shared moment and give it your attention. Record what helped you be present without including private details.', ['A real shared moment is identified', 'A concrete choice that protected attention is described']),
+      q('gentle-communication', 2, 'Say one thing clearly', 'In a conversation that feels safe, express one appreciation, preference, boundary, or need respectfully. You may skip this quest.', ['A respectful communication attempt is described', 'The reflection centres consent, safety, and the user’s own words or choices'], ['Pressure, monitoring, retaliation, or instructions to confront someone unsafely']),
+      q('weekly-review', 3, 'Notice the relationship rhythm', 'Review one moment of closeness, one condition that supported it, and one small direction you freely want to continue.', ['A real relationship moment is named without unnecessary private detail', 'A supportive condition or pattern is identified', 'One optional next direction is stated']),
+    ],
+  },
+  {
+    familyId: 'kindling',
+    role: 'Helps people contribute through sustainable, freely chosen acts of help, participation, volunteering, or mentoring.',
+    boundary: 'Community contribution, not moral scoring, compulsory service, rescuing others, or giving beyond the user’s capacity.',
+    hatchSignals: ['volunteering', 'helping a neighbour', 'community event', 'mentoring or sharing knowledge'],
+    journalRoutes: [],
+    insightThemes: ['help that was useful', 'community participation', 'knowledge shared', 'capacity protected'],
+    reflectionLenses: ['what was actually needed', 'what felt mutual', 'where contribution was sustainable', 'when saying no protected future capacity'],
+    goalTypes: ['offer practical help', 'join a community activity', 'share knowledge', 'support a cause sustainably'],
+    quests: [
+      q('useful-help', 1, 'Offer help that is useful', 'Ask or notice what would genuinely help, then take one manageable action if it is welcome.', ['A real act of help or offer is described', 'The recipient’s needs, consent, or context informed the action']),
+      q('notice-contribution', 1, 'Notice who keeps things going', 'Thank or acknowledge one contribution that is easy to miss, without turning it into a public performance.', ['A specific contribution is identified', 'A genuine acknowledgement or private reflection is included']),
+      q('participate', 2, 'Take part within your capacity', 'Join, support, or learn about one community activity or cause in a way that fits your available time and energy.', ['A real community, volunteering, mentoring, or cause-related action is described', 'The action is bounded to the user’s current capacity']),
+      q('weekly-review', 3, 'Read the contribution pattern', 'Review what felt useful, what felt sustainable, and one contribution you might freely choose next.', ['A real example of contribution is named', 'Usefulness and capacity are both considered', 'One optional next direction is stated']),
+    ],
+  },
 ];
 
 /**
@@ -555,6 +587,8 @@ export const SPECIALIST_JOURNEY_ID_BY_FAMILY_ID = new Map<KatchimeraFamilyId, st
   ['ironette', 'ironette-landmark-context'],
   ['neonpoko', 'neonpoko-city-energy'],
   ['skysette', 'skysette-high-perspective'],
+  ['heartmote', 'heartmote-life-area-focus'],
+  ['kindling', 'kindling-life-area-focus'],
 ]);
 
 export const bespokeFamilyQuestPackByFamilyId = new Map(

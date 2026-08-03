@@ -114,6 +114,6 @@ export type KatchimeraFamilyId = string;
 export type KatchimeraCompanionId = `companion:${KatchimeraFamilyId}`;
 
 export type KatchimeraWardrobeState = {
-  version: 2;
+  version: 2 | 3;
   equippedByFamily: Partial<Record<KatchimeraFamilyId, KatchimeraSkinId>>;
 };

@@ -1,5 +1,6 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { SPECIALIST_COMPANION_SYSTEMS } from '@/constants/specialist-companion-catalogue';
+import { canonicalFamilyId, katchimeraFamilies } from '@/constants/katchimera-skins';
 
 export type CompanionJourneyGoalStatus = 'active' | 'paused' | 'completed' | 'abandoned';
 
@@ -1118,25 +1119,52 @@ const steppling: CompanionJourneyDefinition = {
 
 const feastle: CompanionJourneyDefinition = {
   id: 'feastle-meaningful-meals',
-  version: 3,
+  version: 4,
   familyId: 'feastle',
-  title: 'Meaningful meals',
-  introduction: 'Notice what makes food feel manageable, enjoyable, caring, or connecting without turning meals into a test.',
-  conversationTitle: 'Choose what food should bring',
+  title: 'Food that fits',
+  introduction: 'Make food more manageable, enjoyable, caring, or connecting without turning eating into a test.',
+  conversationTitle: 'Choose what would help around food',
   conversationStartLabel: 'Explore a food direction',
   startNodeId: 'meal-meaning',
   nodes: [
     {
       id: 'meal-meaning',
       kind: 'single_choice',
-      prompt: 'What would you like more of around food?',
+      prompt: 'What would you like food to feel more like?',
       helperText: 'This is about lived meals, not perfect nutrition or “good” and “bad” food.',
       options: [
-        { id: 'ease', label: 'Meals that feel easier', nextNodeId: 'meal-friction' },
-        { id: 'care', label: 'Food that feels caring', nextNodeId: 'meal-friction' },
+        { id: 'ease', label: 'Dependable and manageable', nextNodeId: 'nourishment-friction' },
+        { id: 'care', label: 'Supportive of my needs', nextNodeId: 'nourishment-friction' },
         { id: 'connection', label: 'More shared meals', nextNodeId: 'meal-friction' },
         { id: 'curiosity', label: 'More variety and curiosity', nextNodeId: 'meal-friction' },
       ],
+    },
+    {
+      id: 'nourishment-friction',
+      kind: 'single_choice',
+      prompt: 'What most gets in the way?',
+      helperText: 'Choose the practical condition Feastle should work around—not something to blame yourself for.',
+      options: [
+        { id: 'decisions', label: 'Time or too many decisions', nextNodeId: 'nourishment-goal' },
+        { id: 'energy', label: 'Energy to prepare food', nextNodeId: 'nourishment-goal' },
+        { id: 'availability', label: 'Cost or food availability', nextNodeId: 'nourishment-goal' },
+        { id: 'needs', label: 'Appetite, dietary, or sensory needs', nextNodeId: 'nourishment-goal' },
+        { id: 'shared-needs', label: 'Other people’s needs', nextNodeId: 'nourishment-goal' },
+      ],
+    },
+    {
+      id: 'nourishment-goal',
+      kind: 'single_choice',
+      createsGoalTypeId: 'everyday-nourishment',
+      prompt: 'What small support would make the biggest difference?',
+      helperText: 'Choose a practical experiment. This is not a nutrition score or a rule for every day.',
+      options: [
+        { id: 'dependable-food', label: 'Keep one dependable option available', goalTitle: 'Keep one dependable food option available', suggestedQuickGoalIds: ['feastle:dependable-option', 'feastle:easy-option-visible'], nextNodeId: null },
+        { id: 'fewer-decisions', label: 'Make fewer food decisions in the moment', goalTitle: 'Make everyday food decisions easier', suggestedQuickGoalIds: ['feastle:two-meal-list', 'feastle:reduce-one-decision', 'feastle:plan-meal'], nextNodeId: null },
+        { id: 'fit-needs', label: 'Make food fit my needs more comfortably', goalTitle: 'Make food work better with my needs', suggestedQuickGoalIds: ['feastle:adapt-a-need', 'feastle:notice-satisfaction'], nextNodeId: null },
+        { id: 'simple-cooking', label: 'Make simple preparation easier', goalTitle: 'Make simple cooking easier to return to', suggestedQuickGoalIds: ['feastle:make-one-thing', 'feastle:weekday-cook', 'feastle:plan-meal'], nextNodeId: null },
+      ],
+      nextNodeId: null,
     },
     {
       id: 'meal-friction',
@@ -1167,11 +1195,13 @@ const feastle: CompanionJourneyDefinition = {
     },
   ],
   goalTypes: {
+    'everyday-nourishment': { label: 'Everyday nourishment', fallbackTitle: 'Make everyday food more manageable' },
     'meal-rhythm': { label: 'Meal rhythm', fallbackTitle: 'Create more meaningful meals' },
   },
   checkIn: {
     prompt: 'What mattered about food today?',
     options: [
+      { id: 'supported', label: 'An easy or dependable option helped' },
       { id: 'made', label: 'I made or prepared something' },
       { id: 'shared', label: 'I shared food with someone' },
       { id: 'noticed', label: 'I slowed down enough to notice the meal' },
@@ -1752,7 +1782,7 @@ const vesperitt: CompanionJourneyDefinition = {
   },
 };
 
-export const companionJourneyDefinitions: readonly CompanionJourneyDefinition[] = [
+const legacyCompanionJourneyDefinitions: readonly CompanionJourneyDefinition[] = [
   cheerlet,
   coffeeRitual,
   dawnle,
@@ -1780,6 +1810,53 @@ export const companionJourneyDefinitions: readonly CompanionJourneyDefinition[] 
   whiskit,
   ...SPECIALIST_COMPANION_SYSTEMS.map((system) => system.journey),
 ];
+
+const PRIMARY_JOURNEY_SOURCE: Readonly<Record<string, string>> = {
+  baristabbit: 'coffee-ritual',
+  bedrotte: 'sleep-rest',
+};
+
+const NEW_FAMILY_QUICK_GOALS: Readonly<Record<string, readonly string[]>> = {
+  heartmote: ['heartmote:specific-thanks', 'heartmote:ten-present-minutes', 'heartmote:gentle-question', 'heartmote:small-kindness', 'heartmote:plan-time', 'heartmote:name-a-need'],
+  kindling: ['kindling:small-help', 'kindling:thank-contributor', 'kindling:community-check', 'kindling:share-knowledge', 'kindling:support-cause', 'kindling:protect-capacity'],
+};
+
+function newFamilyJourney(family: (typeof katchimeraFamilies)[number]): CompanionJourneyDefinition {
+  const quickGoals = NEW_FAMILY_QUICK_GOALS[family.id] ?? [];
+  return focusedPracticeJourney({
+    id: `${family.id}-life-area-focus`,
+    version: 1,
+    familyId: family.id,
+    title: `${family.displayName} Focus`,
+    introduction: family.description,
+    subject: family.lifeAreaLabel.toLowerCase(),
+    firstPrompt: `What would you most like ${family.displayName} to support?`,
+    firstHelperText: 'Choose the direction that matters now. You can change it later.',
+    firstOptions: family.focusLanes.map((focusLane) => focusLane.label),
+    secondPrompt: 'What most affects whether this fits your life?',
+    secondHelperText: 'Capacity, access and other people matter. Choose the nearest answer.',
+    secondOptions: ['Finding time or energy', 'Knowing where to begin', 'Access, cost, or location', 'Other people or responsibilities', 'I mainly need a gentle prompt'],
+    goalPrompt: 'Which small direction would feel useful now?',
+    goalHelperText: 'Choose one experiment. You can adapt, pause, or skip any suggestion.',
+    directions: family.focusLanes.slice(0, 4).map((focusLane, index) => ({
+      label: focusLane.label,
+      goalTitle: `Build a gentle ${focusLane.label.toLowerCase()} rhythm`,
+      quickGoals: quickGoals.length
+        ? [quickGoals[index % quickGoals.length], quickGoals[(index + 1) % quickGoals.length]]
+        : [],
+    })),
+  });
+}
+
+export const companionJourneyDefinitions: readonly CompanionJourneyDefinition[] = katchimeraFamilies.map((family) => {
+  const sourceId = PRIMARY_JOURNEY_SOURCE[family.id] ?? family.id;
+  const existing = legacyCompanionJourneyDefinitions.find((definition) => definition.familyId === sourceId);
+  if (!existing) return newFamilyJourney(family);
+  const canonical = canonicalFamilyId(existing.familyId) ?? family.id;
+  return existing.familyId === canonical
+    ? existing
+    : { ...existing, familyId: canonical, version: existing.version + 1 };
+});
 
 export const companionJourneyByFamilyId = new Map(
   companionJourneyDefinitions.map((definition) => [definition.familyId, definition])

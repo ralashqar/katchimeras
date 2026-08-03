@@ -2,6 +2,10 @@ import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import type { StoredHomeState } from '@/types/home';
 import { identityForCreature } from '@/utils/katchimera-identity';
 import { questDefinition, type QuestDefinition } from '@/utils/quests/definitions';
+import {
+  companionIdForFamily,
+  familyIdFromCompanionId,
+} from '@/constants/katchimera-skins';
 
 export type CompanionBondEventKind =
   | 'hatch'
@@ -112,8 +116,13 @@ export function removeCompanionBondEvent(
 }
 
 export function companionBondProgress(state: CompanionBondState, creatureId: string): CompanionBondProgress {
+  const familyId = familyIdFromCompanionId(creatureId);
+  const canonicalCreatureId = familyId ? companionIdForFamily(familyId) : creatureId;
   const totalPoints = state.events
-    .filter((event) => event.creatureId === creatureId)
+    .filter((event) => {
+      const eventFamilyId = familyIdFromCompanionId(event.creatureId);
+      return (eventFamilyId ? companionIdForFamily(eventFamilyId) : event.creatureId) === canonicalCreatureId;
+    })
     .reduce((sum, event) => sum + event.points, 0);
   const current = [...COMPANION_BOND_LEVELS].reverse().find((item) => totalPoints >= item.threshold) ?? COMPANION_BOND_LEVELS[0];
   const next = COMPANION_BOND_LEVELS.find((item) => item.level === current.level + 1) ?? null;

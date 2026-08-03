@@ -15,7 +15,7 @@ export type LifeAspectDefinition = {
 
 export const lifeAspects: readonly LifeAspectDefinition[] = [
   { id: 'daily-ritual', label: 'Daily ritual', companionName: 'Baristabbit', description: 'Small rituals that give a day rhythm.', category: 'daily-life', anchorVisualKey: 'baristabbit', engagementArchetype: 'food', engagementSubtype: 'coffee_shop', status: 'live' },
-  { id: 'food-cooking', label: 'Food & cooking', companionName: 'Feastle', description: 'Meals, cooking, treats, and shared tables.', category: 'daily-life', anchorVisualKey: 'feastle', engagementArchetype: 'food', engagementSubtype: 'food', status: 'live' },
+  { id: 'food-cooking', label: 'Food & cooking', companionName: 'Feastle', description: 'Everyday nourishment, cooking, enjoyment, and shared tables.', category: 'daily-life', anchorVisualKey: 'feastle', engagementArchetype: 'food', engagementSubtype: 'food', status: 'live' },
   { id: 'movement-fitness', label: 'Movement & fitness', companionName: 'Flexel', description: 'Exercise, sport, walking, and physical momentum.', category: 'body', anchorVisualKey: 'flexel', engagementArchetype: 'journey', engagementSubtype: 'gym', status: 'live' },
   { id: 'rest-sleep', label: 'Rest & sleep', companionName: 'Bedrotte', description: 'Sleep, recovery, evenings, and body-clock rhythms.', category: 'body', anchorVisualKey: 'bedrotte', engagementArchetype: 'night', engagementSubtype: 'good_sleep', status: 'live' },
   { id: 'emotional-recovery', label: 'Emotional recovery', companionName: 'Mendle', description: 'Tender days, repair, resilience, and self-kindness.', category: 'inner-life', anchorVisualKey: 'mendle', engagementArchetype: 'memory', engagementSubtype: 'tender_day', status: 'live' },
@@ -32,7 +32,7 @@ export const lifeAspects: readonly LifeAspectDefinition[] = [
   { id: 'commute-routes', label: 'Commute & daily routes', companionName: 'Signalhop', description: 'Regular routes, transit, and the spaces between destinations.', category: 'daily-life', anchorVisualKey: 'neonpoko', engagementArchetype: 'journey', engagementSubtype: 'commute', status: 'live' },
   { id: 'milestones-chapters', label: 'Milestones & chapters', companionName: 'Cheerlet', description: 'Celebrations, achievements, beginnings, and endings.', category: 'inner-life', anchorVisualKey: 'cheerlet', engagementArchetype: 'celebrate', engagementSubtype: 'celebration', status: 'live' },
   { id: 'reflection-solitude', label: 'Reflection & solitude', companionName: 'Quietome', description: 'Stillness, perspective, contemplation, and time alone.', category: 'inner-life', anchorVisualKey: 'quietome', engagementArchetype: 'memory', engagementSubtype: 'reflection', status: 'live' },
-  { id: 'contribution-community', label: 'Contribution & community', companionName: 'Kindling', description: 'Helping, volunteering, mentoring, and giving something back.', category: 'relationships', anchorVisualKey: null, engagementArchetype: 'memory', engagementSubtype: 'community', status: 'planned' },
+  { id: 'contribution-community', label: 'Contribution & community', companionName: 'Kindling', description: 'Helping, volunteering, mentoring, and giving something back.', category: 'relationships', anchorVisualKey: 'kindling', engagementArchetype: 'memory', engagementSubtype: 'community', status: 'live' },
 ] as const;
 
 export const lifeAspectById = new Map(lifeAspects.map((aspect) => [aspect.id, aspect]));

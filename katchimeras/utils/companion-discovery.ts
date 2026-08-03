@@ -1,5 +1,6 @@
 import type { CompanionDiscoveryPromptDefinition } from '@/constants/katchimera-roles';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { canonicalFamilyId } from '@/constants/katchimera-skins';
 
 export type CompanionDiscoveryAnswer = {
   id: string;
@@ -11,12 +12,12 @@ export type CompanionDiscoveryAnswer = {
 };
 
 export type CompanionDiscoveryState = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   answers: CompanionDiscoveryAnswer[];
 };
 
 export function emptyCompanionDiscoveryState(): CompanionDiscoveryState {
-  return { schemaVersion: 1, answers: [] };
+  return { schemaVersion: 2, answers: [] };
 }
 
 export function normaliseCompanionDiscoveryState(value: unknown): CompanionDiscoveryState {
@@ -35,11 +36,12 @@ export function normaliseCompanionDiscoveryState(value: unknown): CompanionDisco
       !row.value.trim() ||
       !Number.isFinite(row.answeredAt)
     ) continue;
-    const key = `${row.familyId}:${row.promptId}`;
+    const familyId = canonicalFamilyId(row.familyId) ?? row.familyId;
+    const key = `${familyId}:${row.promptId}`;
     const current = byPrompt.get(key);
-    if (!current || row.answeredAt >= current.answeredAt) byPrompt.set(key, { ...row, value: row.value.trim() });
+    if (!current || row.answeredAt >= current.answeredAt) byPrompt.set(key, { ...row, familyId, value: row.value.trim() });
   }
-  return { schemaVersion: 1, answers: [...byPrompt.values()] };
+  return { schemaVersion: 2, answers: [...byPrompt.values()] };
 }
 
 export function answerCompanionDiscoveryPrompt(
@@ -64,7 +66,7 @@ export function answerCompanionDiscoveryPrompt(
   return {
     firstAnswer: !existing,
     state: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       answers: [
         ...state.answers.filter(
           (item) => item.familyId !== prompt.familyId || item.promptId !== prompt.id
@@ -81,7 +83,7 @@ export function removeCompanionDiscoveryAnswer(
   promptId: string
 ): CompanionDiscoveryState {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     answers: state.answers.filter(
       (answer) => answer.familyId !== familyId || answer.promptId !== promptId
     ),
@@ -96,7 +98,7 @@ export function setCompanionGoalStatus(
   updatedAt = Date.now()
 ): CompanionDiscoveryState {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     answers: state.answers.map((answer) =>
       answer.familyId === familyId && answer.promptId === promptId && answer.goalStatus
         ? { ...answer, goalStatus, answeredAt: updatedAt }
@@ -109,7 +111,8 @@ export function answersForCompanion(
   state: CompanionDiscoveryState,
   familyId: KatchimeraFamilyId
 ): readonly CompanionDiscoveryAnswer[] {
+  const canonical = canonicalFamilyId(familyId) ?? familyId;
   return state.answers
-    .filter((answer) => answer.familyId === familyId)
+    .filter((answer) => answer.familyId === canonical)
     .sort((left, right) => left.answeredAt - right.answeredAt);
 }

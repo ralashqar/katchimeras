@@ -19,6 +19,11 @@ import { BATCH_THREE_QUEST_VARIANTS } from '@/constants/batch-three-quest-varian
 import { BATCH_FOUR_QUEST_VARIANTS } from '@/constants/batch-four-quest-variants';
 import { BATCH_FIVE_QUEST_VARIANTS } from '@/constants/batch-five-quest-variants';
 import { BATCH_SIX_QUEST_VARIANTS } from '@/constants/batch-six-quest-variants';
+import { canonicalFamilyId } from '@/constants/katchimera-skins';
+import {
+  CANONICAL_JOURNEY_ID_BY_FAMILY,
+  CANONICAL_PRACTICE_STAGE_BY_FAMILY,
+} from '@/constants/katchimera-family-journeys';
 
 // Declarative companion-quest catalogue (docs/katchimera-engagement-v1.md
 // refactor). A quest is DATA: id + copy + a list of criteria against facts.
@@ -2033,9 +2038,28 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
             }
           : criterion;
       });
-      const preliminaryDefinition = { ...definition, criteria };
+      const familyId = canonicalFamilyId(definition.familyId) ?? definition.familyId;
+      const ownerChanged = Boolean(definition.familyId && familyId !== definition.familyId);
+      const preliminaryDefinition = {
+        ...definition,
+        criteria,
+        familyId,
+        ...(definition.progression && familyId && CANONICAL_JOURNEY_ID_BY_FAMILY[familyId]
+          ? {
+              progression: {
+                ...definition.progression,
+                journeyId: CANONICAL_JOURNEY_ID_BY_FAMILY[familyId],
+                stageId: definition.progression.stageId === 'review'
+                  ? 'review'
+                  : CANONICAL_PRACTICE_STAGE_BY_FAMILY[familyId],
+              },
+            }
+          : {}),
+        ...(ownerChanged && definition.goalContribution
+          ? { goalContribution: { amount: definition.goalContribution.amount } }
+          : {}),
+      };
       const family = definition.family ?? inferFamily(preliminaryDefinition);
-      const familyId = definition.familyId;
       const journalEnabled = family === 'note' || family === 'voice' || questUsesJournalEntrySystem(definition.id);
       const journalInput = journalEnabled
         ? {
@@ -2044,7 +2068,9 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
               id: definition.id,
               title: definition.title,
               hint: definition.hint,
-              familyId,
+              // Keep the authored form's journal route (for example café or
+              // museum) even when progression ownership moves to its parent.
+              familyId: definition.familyId,
               journalRouteFallbacks: definition.semanticVerification?.journalRouteFallbacks,
             }),
           }
@@ -2108,7 +2134,7 @@ function withQuestMetadata(definitions: Record<string, QuestDefinition>): Record
           })
         : criteria;
       const normalizedDefinition = {
-        ...definition,
+        ...preliminaryDefinition,
         criteria: linkedCriteria,
         semanticVerification,
         evidenceInput: definition.evidenceInput ?? journalInput ?? (

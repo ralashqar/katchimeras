@@ -13,11 +13,11 @@ import {
 const restCreature: KingdomCreature = {
   dayId: 'day-1',
   isoDate: '2026-07-25',
-  creatureId: 'companion:sleep-rest',
+  creatureId: 'companion:bedrotte',
   sourceCreatureId: 'hatch-1',
-  companionId: 'companion:sleep-rest',
+  companionId: 'companion:bedrotte',
   aspectId: 'rest-sleep',
-  familyId: 'sleep-rest',
+  familyId: 'bedrotte',
   skinId: 'bedrotte',
   name: 'Bedrotte',
   visualKey: 'bedrotte',
@@ -25,24 +25,37 @@ const restCreature: KingdomCreature = {
   accentColor: '#F0C9A0',
 };
 
-test('testing wardrobe unlocks only the approved Rest family', () => {
-  const skins = skinsForKingdomCompanion('sleep-rest', new Set());
+test('testing wardrobe exposes every approved Rest form', () => {
+  const skins = skinsForKingdomCompanion('bedrotte', new Set());
   assert.deepEqual(
     skins.map((skin) => skin.id),
-    ['bedrotte', 'snoozle']
+    ['bedrotte', 'snoozle', 'vesperitt', 'duskle', 'twinklet']
   );
   assert.equal(skins.every((skin) => skin.unlocked), true);
 });
 
-test('playable placeholder forms appear while artless planned forms stay hidden', () => {
-  const commute = skinsForKingdomCompanion('signalhop', new Set());
+test('placeholder forms and newly illustrated parent forms are selectable', () => {
+  const commute = skinsForKingdomCompanion('skylo', new Set());
   assert.deepEqual(
     commute.map((skin) => [skin.id, skin.visualKey]),
-    [['signalhop', 'neonpoko']]
+    [['skylo', 'skylo'], ['neonpoko', 'neonpoko'], ['signalhop', 'neonpoko']]
   );
-  assert.equal(
-    skinsForKingdomCompanion('kindling', new Set()).length,
-    0
+  assert.deepEqual(
+    skinsForKingdomCompanion('kindling', new Set()).map((skin) => skin.id),
+    ['kindling']
+  );
+  assert.deepEqual(
+    skinsForKingdomCompanion('feastle', new Set()).map((skin) => [skin.id, skin.visualKey]),
+    [
+      ['feastle', 'feastle'],
+      ['cartle', 'feastle'],
+      ['crumbun', 'crumbun'],
+      ['hayhorn', 'hayhorn'],
+      ['crustling', 'crustling'],
+      ['nigirimp', 'nigirimp'],
+      ['noodloo', 'noodloo'],
+      ['sundael', 'sundael'],
+    ]
   );
 });
 
@@ -57,15 +70,15 @@ test('wardrobe normalization drops cross-aspect and missing-art selections', () 
     },
   });
   assert.deepEqual(normalized, {
-    version: 2,
-    equippedByFamily: { 'sleep-rest': 'snoozle' },
+    version: 3,
+    equippedByFamily: { bedrotte: 'snoozle', kindling: 'kindling' },
   });
 });
 
 test('equipping a skin changes presentation but preserves companion provenance', () => {
   const wardrobe = equipKatchimeraSkin(
     EMPTY_KATCHIMERA_WARDROBE,
-    'sleep-rest',
+    'bedrotte',
     'snoozle'
   );
   const presented = applyWardrobeToCreature(restCreature, wardrobe);
@@ -80,7 +93,7 @@ test('equipping a skin changes presentation but preserves companion provenance',
 test('invalid equipment cannot cross companion boundaries', () => {
   const unchanged = equipKatchimeraSkin(
     EMPTY_KATCHIMERA_WARDROBE,
-    'sleep-rest',
+    'bedrotte',
     'flexel'
   );
   assert.equal(unchanged, EMPTY_KATCHIMERA_WARDROBE);

@@ -183,6 +183,14 @@ export const homeCreatureVisuals: Record<
     accentColor: string;
   }
 > = {
+  heartmote: {
+    source: require('../assets/images/katchimeras/cutouts/heartmote.png'),
+    accentColor: '#F28D9C',
+  },
+  kindling: {
+    source: require('../assets/images/katchimeras/cutouts/kindling.png'),
+    accentColor: '#E89A4D',
+  },
   voltstep: {
     source: require('../assets/images/katchimeras/cutouts/voltstep.png'),
     accentColor: '#93C7FF',
@@ -281,7 +289,11 @@ export const homeCreatureVisuals: Record<
   },
   snuglet: {
     source: require('../assets/images/katchimeras/cutouts/snuglet.png'),
-    accentColor: '#F2C9B4',
+    accentColor: '#EFB58D',
+  },
+  nestkin: {
+    source: require('../assets/images/katchimeras/cutouts/nestkin.png'),
+    accentColor: '#9CBCC5',
   },
   driftkin: {
     source: require('../assets/images/katchimeras/cutouts/driftkin.png'),

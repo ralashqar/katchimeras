@@ -3,6 +3,7 @@ import {
   type CompanionQuickGoalTemplate,
 } from '@/constants/companion-quick-goals';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { canonicalFamilyId } from '@/constants/katchimera-skins';
 
 export type CompanionQuickGoalCadence =
   | { kind: 'once'; dayId: string }
@@ -41,7 +42,7 @@ export type CompanionQuickGoalDismissal = {
 };
 
 export type CompanionQuickGoalState = {
-  schemaVersion: 2;
+  schemaVersion: 2 | 3;
   goals: CompanionQuickGoal[];
   completions: CompanionQuickGoalCompletion[];
   dismissals: CompanionQuickGoalDismissal[];
@@ -74,7 +75,7 @@ export type AddCompanionQuickGoalResult = {
 };
 
 export function emptyCompanionQuickGoalState(): CompanionQuickGoalState {
-  return { schemaVersion: 2, goals: [], completions: [], dismissals: [] };
+  return { schemaVersion: 3, goals: [], completions: [], dismissals: [] };
 }
 
 export function normaliseCompanionQuickGoalState(value: unknown): CompanionQuickGoalState {
@@ -83,6 +84,7 @@ export function normaliseCompanionQuickGoalState(value: unknown): CompanionQuick
   const goals = Array.isArray(candidate.goals)
     ? uniqueById(candidate.goals.filter(isValidGoal).map((goal) => ({
         ...goal,
+        familyId: canonicalFamilyId(goal.familyId) ?? goal.familyId,
         title: goal.title.trim(),
         cadence: normaliseCadence(goal.cadence),
       })))
@@ -91,14 +93,14 @@ export function normaliseCompanionQuickGoalState(value: unknown): CompanionQuick
   const completions = Array.isArray(candidate.completions)
     ? uniqueById(candidate.completions.filter((completion) =>
         isValidCompletion(completion) && goalIds.has(completion.goalId)
-      ))
+      ).map((completion) => ({ ...completion, familyId: canonicalFamilyId(completion.familyId) ?? completion.familyId })))
     : [];
   const dismissals = Array.isArray(candidate.dismissals)
     ? uniqueById(candidate.dismissals.filter((dismissal) =>
         isValidDismissal(dismissal) && goalIds.has(dismissal.goalId)
-      ))
+      ).map((dismissal) => ({ ...dismissal, familyId: canonicalFamilyId(dismissal.familyId) ?? dismissal.familyId })))
     : [];
-  return { schemaVersion: 2, goals, completions, dismissals };
+  return { schemaVersion: 3, goals, completions, dismissals };
 }
 
 export function cadenceFromTemplate(
@@ -115,16 +117,17 @@ export function addCompanionQuickGoal(
   input: AddCompanionQuickGoalInput,
   createdAt = Date.now()
 ): AddCompanionQuickGoalResult {
+  const familyId = canonicalFamilyId(input.familyId) ?? input.familyId;
   const title = input.title.trim();
   if (!title) return { state, goal: null, reason: 'blank_title' };
   if (input.templateId) {
     const template = companionQuickGoalTemplateById.get(input.templateId);
-    if (!template || template.familyId !== input.familyId) {
+    if (!template || template.familyId !== familyId) {
       return { state, goal: null, reason: 'invalid_template' };
     }
   }
   const duplicate = state.goals.some((goal) =>
-    goal.familyId === input.familyId &&
+    goal.familyId === familyId &&
     goal.status !== 'archived' &&
     (
       input.templateId
@@ -134,8 +137,8 @@ export function addCompanionQuickGoal(
   );
   if (duplicate) return { state, goal: null, reason: 'duplicate' };
   const goal: CompanionQuickGoal = {
-    id: `quick-goal:${input.familyId}:${createdAt}:${slug(title)}`,
-    familyId: input.familyId,
+    id: `quick-goal:${familyId}:${createdAt}:${slug(title)}`,
+    familyId,
     ...(input.templateId ? { templateId: input.templateId } : {}),
     title,
     cadence: normaliseCadence(input.cadence),
@@ -179,6 +182,7 @@ export function quickGoalsForDay(
   dayId: string,
   familyId?: KatchimeraFamilyId | null
 ): CompanionQuickGoalForDay[] {
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
   const completionByGoalId = new Map(
     state.completions
       .filter((completion) => completion.dayId === dayId)
@@ -192,7 +196,7 @@ export function quickGoalsForDay(
   return state.goals
     .filter((goal) =>
       goal.status === 'active' &&
-      (!familyId || goal.familyId === familyId) &&
+      (!ownerFamilyId || goal.familyId === ownerFamilyId) &&
       cadenceIncludesDay(goal.cadence, dayId) &&
       !dismissedGoalIds.has(goal.id)
     )

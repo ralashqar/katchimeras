@@ -208,10 +208,16 @@ const petForms = selectHatch({
   history: {},
   rng: makeSeededRng('pet-forms'),
 });
-check('dog and cat signals remain distinct companion families',
-  petForms?.probabilities.length === 2
-    && petForms.probabilities.some((candidate) => candidate.familyId === 'waglet')
-    && petForms.probabilities.some((candidate) => candidate.familyId === 'whiskit'),
+const catForm = selectHatch({
+  day: visionDay([visionConcept('cat', 0.9, 0.9)]),
+  history: {},
+  rng: makeSeededRng('cat-form'),
+});
+check('dog and cat signals share one pet family but retain distinct forms',
+  petForms?.probabilities.length === 1
+    && petForms.probabilities[0]?.familyId === 'waglet'
+    && catForm?.creature?.familyId === 'waglet'
+    && catForm?.creature?.skinId === 'whiskit',
   JSON.stringify(petForms?.probabilities));
 
 // --- 3. Single-candidate day is consistent with the legacy builder ---------

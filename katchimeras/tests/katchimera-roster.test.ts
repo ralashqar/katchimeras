@@ -36,10 +36,10 @@ const creatures: KingdomCreature[] = [
   {
     dayId: 'day-new',
     isoDate: '2026-07-28',
-    creatureId: 'companion:sleep-rest',
-    companionId: 'companion:sleep-rest',
+    creatureId: 'companion:bedrotte',
+    companionId: 'companion:bedrotte',
     aspectId: 'rest-sleep',
-    familyId: 'sleep-rest',
+    familyId: 'bedrotte',
     skinId: 'snoozle',
     name: 'Snoozle',
     visualKey: 'snoozle',
@@ -49,10 +49,10 @@ const creatures: KingdomCreature[] = [
   {
     dayId: 'day-old-skin',
     isoDate: '2026-07-20',
-    creatureId: 'companion:sleep-rest',
-    companionId: 'companion:sleep-rest',
+    creatureId: 'companion:bedrotte',
+    companionId: 'companion:bedrotte',
     aspectId: 'rest-sleep',
-    familyId: 'sleep-rest',
+    familyId: 'bedrotte',
     skinId: 'bedrotte',
     name: 'Bedrotte',
     visualKey: 'bedrotte',
@@ -76,7 +76,7 @@ const creatures: KingdomCreature[] = [
 
 const residents: KingdomResident[] = [
   {
-    creatureId: 'companion:sleep-rest',
+    creatureId: 'companion:bedrotte',
     arrivalIndex: 0,
     tileIndex: 0,
     quad: 0,
@@ -98,7 +98,7 @@ const residents: KingdomResident[] = [
 const roster = buildKatchimeraRoster({
   creatures,
   residents,
-  bondForCreature: (creatureId) => bond(creatureId.includes('sleep-rest') ? 140 : 280),
+  bondForCreature: (creatureId) => bond(creatureId.includes('bedrotte') ? 140 : 280),
   statusByCreatureId: { 'companion:steppling': 'ready' },
 });
 
@@ -121,19 +121,19 @@ test('the roster contains one owned card per logical companion and uses its late
     (item): item is KatchimeraOwnedRosterItem => item.kind === 'owned',
   );
   assert.equal(owned.length, 2);
-  const rest = owned.find((item) => item.familyId === 'sleep-rest');
+  const rest = owned.find((item) => item.familyId === 'bedrotte');
   assert.equal(rest?.visualKey, 'snoozle');
   assert.equal(rest?.hatchCount, 2);
   assert.equal(rest?.houseLevel, 2);
 });
 
-test('owned families are removed from locked silhouettes and artless planned families stay hidden', () => {
+test('owned families are removed from locked silhouettes and illustrated new families are discoverable', () => {
   const lockedFamilies = roster
     .filter((item) => item.kind === 'locked')
     .map((item) => item.familyId);
-  assert.equal(lockedFamilies.includes('sleep-rest'), false);
+  assert.equal(lockedFamilies.includes('bedrotte'), false);
   assert.equal(lockedFamilies.includes('steppling'), false);
-  assert.equal(lockedFamilies.includes('kindling'), false);
+  assert.equal(lockedFamilies.includes('kindling'), true);
 });
 
 test('filters use life aspect and keep locked entries after sorted owned entries', () => {

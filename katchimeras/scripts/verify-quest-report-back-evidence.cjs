@@ -21,6 +21,8 @@ const studioDetectPath = transpile('utils/studio-detect.ts', 'studio-detect.js')
 const memoryDisplayPath = transpile('utils/memory-display.ts', 'memory-display.js');
 const qualityRegistryPath = transpile('utils/intelligence/quality-registry.ts', 'quality-registry.js');
 const journalTemplatesPath = transpile('utils/quests/journal-templates.ts', 'journal-templates.js');
+const katchimeraSkinsPath = transpile('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const familyJourneysPath = transpile('constants/katchimera-family-journeys.ts', 'katchimera-family-journeys.js');
 const manualJournalRegistryPath = transpile('utils/manual-journal-registry.ts', 'manual-journal-registry.js');
 const bespokeQuestCataloguePath = transpile(
   'constants/katchimera-bespoke-quests.ts',
@@ -60,6 +62,8 @@ require('module')._resolveFilename = function resolveVerificationModule(request,
   if (request === '@/utils/memory-display') return memoryDisplayPath;
   if (request === '@/utils/intelligence/quality-registry') return qualityRegistryPath;
   if (request === '@/utils/quests/journal-templates') return journalTemplatesPath;
+  if (request === '@/constants/katchimera-skins') return katchimeraSkinsPath;
+  if (request === '@/constants/katchimera-family-journeys') return familyJourneysPath;
   if (request === '@/utils/manual-journal-registry') return manualJournalRegistryPath;
   if (request === '@/constants/katchimera-bespoke-quests') return bespokeQuestCataloguePath;
   if (request === '@/utils/quests/bespoke-family-packs') return bespokeQuestDefinitionsPath;

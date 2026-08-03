@@ -1,5 +1,6 @@
 import {
   companionIdForFamily,
+  canonicalFamilyId,
   familyIdFromCompanionId,
   katchimeraFamilyById,
   katchimeraSkinById,
@@ -22,6 +23,7 @@ import type {
 
 const PROFILE_SKIN_OVERRIDES: Readonly<Record<string, KatchimeraSkinId>> = {
   activity_transit_commute_signalhop: 'signalhop',
+  location_grocery_cartle: 'cartle',
   subject_parenting_care_nestkin: 'nestkin',
 };
 
@@ -54,10 +56,8 @@ export function identityForCreature(
   if (skin) return identityForSkin(skin);
   const encounterIdentity = identityForEncounter(creature.encounterProfileId, creature.visualKey);
   if (encounterIdentity) return encounterIdentity;
-  const familyId =
-    creature.familyId && katchimeraFamilyById.has(creature.familyId)
-      ? creature.familyId
-      : familyIdFromCompanionId(creature.companionId);
+  const familyId = canonicalFamilyId(creature.familyId)
+    ?? familyIdFromCompanionId(creature.companionId);
   const family = familyId ? katchimeraFamilyById.get(familyId) : null;
   const anchorSkin = family ? katchimeraSkinById.get(family.anchorSkinId) : null;
   return anchorSkin ? identityForSkin(anchorSkin) : null;
@@ -72,13 +72,15 @@ export function historyEntryForFamily(
   history: EncounterHistoryMap,
   familyId: KatchimeraFamilyId
 ): EncounterHistoryEntry | undefined {
-  const direct = history[familyId] ?? history[companionIdForFamily(familyId)];
+  const canonical = canonicalFamilyId(familyId) ?? familyId;
+  const direct = history[canonical] ?? history[companionIdForFamily(canonical)];
   if (direct) return direct;
   let count = 0;
   let lastSeenIsoDate = '';
   for (const [key, entry] of Object.entries(history)) {
     const identity = identityForEncounter(key, null);
-    if (identity?.familyId !== familyId) continue;
+    const legacyFamily = canonicalFamilyId(key);
+    if (identity?.familyId !== canonical && legacyFamily !== canonical) continue;
     count += entry.count;
     if (entry.lastSeenIsoDate > lastSeenIsoDate) lastSeenIsoDate = entry.lastSeenIsoDate;
   }
@@ -152,7 +154,8 @@ export function companionIdResolverForHomeState(
     }
   }
   return (value: string) => {
-    if (familyIdFromCompanionId(value)) return value;
+    const familyId = familyIdFromCompanionId(value);
+    if (familyId) return companionIdForFamily(familyId);
     const mapped = byLegacyId.get(value);
     if (mapped) return mapped;
     const identity = identityForEncounter(value, null);

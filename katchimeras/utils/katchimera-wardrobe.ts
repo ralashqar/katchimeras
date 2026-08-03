@@ -1,5 +1,6 @@
 import {
   ALL_KATCHIMERA_SKINS_UNLOCKED,
+  canonicalFamilyId,
   familyIdFromCompanionId,
   katchimeraFamilyById,
   katchimeraSkinById,
@@ -22,7 +23,7 @@ export type KingdomSkinOption = Omit<KatchimeraSkinDefinition, 'visualKey'> & {
 };
 
 export const EMPTY_KATCHIMERA_WARDROBE: KatchimeraWardrobeState = {
-  version: 2,
+  version: 3,
   equippedByFamily: {},
 };
 
@@ -32,7 +33,7 @@ export function normalizeKatchimeraWardrobe(value: unknown): KatchimeraWardrobeS
   }
 
   const source =
-    value.version === 2 && isRecord(value.equippedByFamily)
+    (value.version === 2 || value.version === 3) && isRecord(value.equippedByFamily)
       ? value.equippedByFamily
       : value.version === 1 && isRecord(value.equippedByAspect)
         ? value.equippedByAspect
@@ -46,7 +47,7 @@ export function normalizeKatchimeraWardrobe(value: unknown): KatchimeraWardrobeS
     const familyId =
       value.version === 1
         ? skin?.familyId
-        : rawOwnerId as KatchimeraFamilyId;
+        : canonicalFamilyId(rawOwnerId);
     if (
       familyId &&
       katchimeraFamilyById.has(familyId) &&
@@ -57,16 +58,17 @@ export function normalizeKatchimeraWardrobe(value: unknown): KatchimeraWardrobeS
     }
   }
 
-  return { version: 2, equippedByFamily };
+  return { version: 3, equippedByFamily };
 }
 
 export function skinsForKingdomCompanion(
   familyId: KatchimeraFamilyId,
   ownedSkinIds: ReadonlySet<KatchimeraSkinId>
 ): KingdomSkinOption[] {
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
   return katchimeraSkins.flatMap((skin) => {
     const visualKey = selectableVisualKey(skin);
-    if (skin.familyId !== familyId || !visualKey) return [];
+    if (skin.familyId !== ownerFamilyId || !visualKey) return [];
     return [{
       ...skin,
       visualKey,
@@ -80,20 +82,21 @@ export function equipKatchimeraSkin(
   familyId: KatchimeraFamilyId,
   skinId: KatchimeraSkinId
 ): KatchimeraWardrobeState {
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
   const skin = katchimeraSkinById.get(skinId);
   if (
     !skin ||
-    skin.familyId !== familyId ||
+    skin.familyId !== ownerFamilyId ||
     selectableVisualKey(skin) === null
   ) {
     return state;
   }
 
   return {
-    version: 2,
+    version: 3,
     equippedByFamily: {
       ...state.equippedByFamily,
-      [familyId]: skin.id,
+      [ownerFamilyId]: skin.id,
     },
   };
 }
@@ -115,9 +118,8 @@ export function applyWardrobeToCreature(
   creature: KingdomCreature,
   wardrobe: KatchimeraWardrobeState
 ): KingdomCreature {
-  const familyId =
-    creature.familyId ??
-    familyIdFromCompanionId(creature.companionId ?? creature.creatureId);
+  const familyId = canonicalFamilyId(creature.familyId)
+    ?? familyIdFromCompanionId(creature.companionId ?? creature.creatureId);
   if (!familyId) return creature;
 
   const equippedSkinId = wardrobe.equippedByFamily[familyId];

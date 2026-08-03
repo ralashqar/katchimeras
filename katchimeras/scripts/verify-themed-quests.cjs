@@ -55,6 +55,7 @@ const batchSixQuestVariantsPath = transpile(
   'batch-six-quest-variants.js'
 );
 const katchimeraSkinsPath = transpile('constants/katchimera-skins.ts', 'katchimera-skins.js');
+const familyJourneysPath = transpile('constants/katchimera-family-journeys.ts', 'katchimera-family-journeys.js');
 const katchimeraRolesPath = transpile('constants/katchimera-roles.ts', 'katchimera-roles.js');
 const definitionsPath = transpile('utils/quests/definitions.ts', 'definitions.js');
 const themedPath = transpile('utils/quests/themed.ts', 'themed.js');
@@ -84,6 +85,7 @@ const stubs = {
   '@/constants/batch-five-quest-variants': batchFiveQuestVariantsPath,
   '@/constants/batch-six-quest-variants': batchSixQuestVariantsPath,
   '@/constants/katchimera-skins': katchimeraSkinsPath,
+  '@/constants/katchimera-family-journeys': familyJourneysPath,
   '@/constants/katchimera-roles': katchimeraRolesPath,
 };
 const originalResolve = Module._resolveFilename;

@@ -1,5 +1,6 @@
 import type { CompanionContentItem } from '@/constants/companion-content';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { canonicalFamilyId, companionIdForFamily } from '@/constants/katchimera-skins';
 
 export type CompanionMemoryFact = {
   id: string;
@@ -49,7 +50,7 @@ export type CompanionContentEvent = {
 };
 
 export type CompanionContentState = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   invitations: CompanionDailyInvitation[];
   memoryFacts: CompanionMemoryFact[];
   events: CompanionContentEvent[];
@@ -74,17 +75,21 @@ export type SelectCompanionInvitationInput = {
 };
 
 export function emptyCompanionContentState(): CompanionContentState {
-  return { schemaVersion: 1, invitations: [], memoryFacts: [], events: [] };
+  return { schemaVersion: 2, invitations: [], memoryFacts: [], events: [] };
 }
 
 export function normaliseCompanionContentState(value: unknown): CompanionContentState {
   if (!value || typeof value !== 'object') return emptyCompanionContentState();
   const candidate = value as Partial<CompanionContentState>;
+  const canonicalizeOwner = <T extends { familyId: KatchimeraFamilyId; companionId: string }>(item: T): T => {
+    const familyId = canonicalFamilyId(item.familyId) ?? item.familyId;
+    return { ...item, familyId, companionId: companionIdForFamily(familyId) };
+  };
   return {
-    schemaVersion: 1,
-    invitations: uniqueById(Array.isArray(candidate.invitations) ? candidate.invitations.filter(isInvitation) : []).slice(-2000),
-    memoryFacts: uniqueById(Array.isArray(candidate.memoryFacts) ? candidate.memoryFacts.filter(isMemoryFact) : []).slice(-2000),
-    events: uniqueById(Array.isArray(candidate.events) ? candidate.events.filter(isContentEvent) : []).slice(-4000),
+    schemaVersion: 2,
+    invitations: uniqueById((Array.isArray(candidate.invitations) ? candidate.invitations.filter(isInvitation) : []).map(canonicalizeOwner)).slice(-2000),
+    memoryFacts: uniqueById((Array.isArray(candidate.memoryFacts) ? candidate.memoryFacts.filter(isMemoryFact) : []).map(canonicalizeOwner)).slice(-2000),
+    events: uniqueById((Array.isArray(candidate.events) ? candidate.events.filter(isContentEvent) : []).map(canonicalizeOwner)).slice(-4000),
   };
 }
 

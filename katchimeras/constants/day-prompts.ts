@@ -162,7 +162,7 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
         icon: 'heart.fill',
         semanticTags: ['people:partner', 'feeling:loved'],
         scoreBias: { social: 0.24, calm: 0.1 },
-        encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.4 }],
+        encounterSeedBias: [{ seedId: 'close_relationship', intensity: 0.46 }],
       },
       {
         id: 'friends',
@@ -173,7 +173,15 @@ export const dayPromptRegistry: Record<DayPromptKind, DayPromptDefinition> = {
         scoreBias: { social: 0.28 },
         encounterSeedBias: [{ seedId: 'social_gathering', intensity: 0.42 }],
       },
-      { id: 'someone_new', label: 'Someone new', emoji: 'New', icon: 'sparkles', semanticTags: ['people:someone_new', 'novelty'], scoreBias: { social: 0.22, exploration: 0.1 } },
+      {
+        id: 'community',
+        label: 'Helping out',
+        emoji: 'Helping',
+        icon: 'hands.sparkles.fill',
+        semanticTags: ['people:community', 'meaning:support'],
+        scoreBias: { social: 0.2, focus: 0.08 },
+        encounterSeedBias: [{ seedId: 'community_contribution', intensity: 0.46 }],
+      },
     ],
   },
   meaning: {

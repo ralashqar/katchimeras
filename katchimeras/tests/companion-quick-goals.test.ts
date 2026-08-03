@@ -6,6 +6,7 @@ import {
   hasQuickGoalTemplates,
   quickGoalTemplatesForFamily,
 } from '@/constants/companion-quick-goals';
+import { katchimeraFamilies } from '@/constants/katchimera-skins';
 import {
   COMPANION_BOND_REWARDS,
   emptyCompanionBondState,
@@ -28,27 +29,10 @@ import {
 } from '@/utils/companion-quick-goals';
 
 test('completed families expose authored quick-goal templates', () => {
-  assert.equal(quickGoalTemplatesForFamily('coffee-ritual').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('errandimp').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('dawnle').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('mendle').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('quietome').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('flickerbun').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('relicoon').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('encora').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('gatherglow').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('cheerlet').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('skylo').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('steppling').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('feastle').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('pagelet').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('mossprout').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('vesperitt').length, 9);
-  assert.equal(quickGoalTemplatesForFamily('tasklet').length, 8);
-  assert.equal(quickGoalTemplatesForFamily('sleep-rest').length, 8);
-  for (const familyId of ['flexel', 'sprintail', 'hooplet', 'serveling', 'snuglet', 'waglet', 'whiskit']) {
-    assert.equal(quickGoalTemplatesForFamily(familyId).length, 8);
+  for (const family of katchimeraFamilies) {
+    assert.ok(quickGoalTemplatesForFamily(family.id).length >= 8, `${family.id} needs at least eight small goals`);
   }
+  assert.deepEqual(quickGoalTemplatesForFamily('vesperitt'), quickGoalTemplatesForFamily('bedrotte'));
 });
 
 test('quick-goal UI eligibility follows authored family content', () => {
@@ -57,6 +41,21 @@ test('quick-goal UI eligibility follows authored family content', () => {
   assert.equal(hasQuickGoalTemplates('quietome'), true);
   assert.equal(hasQuickGoalTemplates('flexel'), true);
   assert.equal(hasQuickGoalTemplates('snuglet'), true);
+});
+
+test('Feastle offers practical nourishment goals without diet scoring', () => {
+  const templates = quickGoalTemplatesForFamily('feastle');
+  for (const id of [
+    'feastle:dependable-option',
+    'feastle:easy-option-visible',
+    'feastle:two-meal-list',
+    'feastle:reduce-one-decision',
+    'feastle:adapt-a-need',
+    'feastle:notice-satisfaction',
+  ]) {
+    assert.equal(templates.some((template) => template.id === id), true, `${id} should be available`);
+  }
+  assert.equal(templates.some((template) => /calorie|weight|clean eating|cheat meal/i.test(template.title)), false);
 });
 
 test('quick goals resolve today-only, daily, and weekday cadence', () => {
@@ -99,7 +98,7 @@ test('snooze postpones one-off goals and hides repeating goals for today', () =>
     title: 'Choose what tonight is for',
     cadence: { kind: 'daily' },
   }, 300).state;
-  const dailyId = state.goals.find((goal) => goal.familyId === 'vesperitt')!.id;
+  const dailyId = state.goals.find((goal) => goal.familyId === 'bedrotte')!.id;
   const snoozed = snoozeCompanionQuickGoal(state, dailyId, '2026-07-25', 400);
   assert.equal(snoozed.snoozed, true);
   assert.equal(quickGoalsForDay(snoozed.state, '2026-07-25').some((item) => item.goal.id === dailyId), false);
@@ -257,8 +256,8 @@ test('normalization removes orphaned completions and keeps family-level ownershi
       { id: 'orphan', goalId: 'missing', familyId: 'sleep-rest', dayId: '2026-07-25', completedAt: 2 },
     ],
   });
-  assert.equal(state.goals[0]?.familyId, 'sleep-rest');
+  assert.equal(state.goals[0]?.familyId, 'bedrotte');
   assert.equal(state.completions.length, 1);
   assert.equal(state.dismissals.length, 0);
-  assert.equal(state.schemaVersion, 2);
+  assert.equal(state.schemaVersion, 3);
 });

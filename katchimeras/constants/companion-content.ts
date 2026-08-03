@@ -13,6 +13,7 @@ import {
   katchimeraRoles,
   type KatchimeraRoleDefinition,
 } from '@/constants/katchimera-roles';
+import { canonicalFamilyId } from '@/constants/katchimera-skins';
 import {
   STEPPLING_BOND_MOMENTS,
   STEPPLING_DAILY_PULSES,
@@ -58,6 +59,10 @@ const PULSE_OPTIONS: readonly CompanionContentOption[] = [
   { id: 'difficult', label: 'It felt difficult' },
   { id: 'noticed', label: 'I noticed something new' },
 ];
+
+function pulseChoices(labels: readonly string[]): readonly CompanionContentOption[] {
+  return labels.map((label, index) => ({ id: `choice-${index + 1}`, label }));
+}
 
 const REVIEW_OPTIONS: readonly CompanionContentOption[] = [
   { id: 'working', label: 'Something is working' },
@@ -135,7 +140,11 @@ function sentence(value: string | undefined, fallback: string): string {
 function buildFamilyContent(familyId: KatchimeraFamilyId): CompanionContentItem[] {
   const role = katchimeraRoleByFamilyId.get(familyId);
   const familyName = role?.displayName ?? familyId;
-  const themes = role?.insightThemes.length ? role.insightThemes : ['what stood out', 'what helped', 'what changed', 'what to continue'];
+  const authoredFamilyId = familyId === 'bedrotte'
+    ? 'sleep-rest'
+    : familyId === 'baristabbit'
+      ? 'coffee-ritual'
+      : familyId;
   const lenses = role?.reflectionLenses.length ? role.reflectionLenses : ['what this part of life meant'];
   const authoredPack = familyId === 'steppling'
     ? {
@@ -144,30 +153,80 @@ function buildFamilyContent(familyId: KatchimeraFamilyId): CompanionContentItem[
         returns: STEPPLING_RETURN_CONVERSATIONS,
         bonds: STEPPLING_BOND_MOMENTS,
       }
-    : BATCH_ONE_COMPANION_CONTENT[familyId]
-      ?? BATCH_TWO_COMPANION_CONTENT[familyId]
-    ?? BATCH_THREE_COMPANION_CONTENT[familyId]
-    ?? BATCH_FOUR_COMPANION_CONTENT[familyId]
-    ?? BATCH_FIVE_COMPANION_CONTENT[familyId]
-    ?? BATCH_SIX_COMPANION_CONTENT[familyId]
-    ?? SPECIALIST_COMPANION_CONTENT[familyId];
-  const pilot = authoredPack?.pulses ?? PILOT_PULSES[familyId] ?? [];
+    : BATCH_ONE_COMPANION_CONTENT[authoredFamilyId]
+      ?? BATCH_TWO_COMPANION_CONTENT[authoredFamilyId]
+    ?? BATCH_THREE_COMPANION_CONTENT[authoredFamilyId]
+    ?? BATCH_FOUR_COMPANION_CONTENT[authoredFamilyId]
+    ?? BATCH_FIVE_COMPANION_CONTENT[authoredFamilyId]
+    ?? BATCH_SIX_COMPANION_CONTENT[authoredFamilyId]
+    ?? SPECIALIST_COMPANION_CONTENT[authoredFamilyId];
+  const pilot = authoredPack?.pulses ?? PILOT_PULSES[authoredFamilyId] ?? [];
+  const genericPulses: readonly CompanionPulseSeed[] = [
+    {
+      prompt: `What did ${familyName} help you notice today?`,
+      helperText: 'Choose the closest kind of detail. Nothing has to be dramatic.',
+      options: pulseChoices(['A feeling', 'A small detail', 'A pattern', 'A change', 'Nothing yet']),
+    },
+    {
+      prompt: 'How did this part of today feel?',
+      helperText: 'A mixed or uncertain answer is still useful.',
+      options: pulseChoices(['Supportive', 'Mostly easy', 'Mixed', 'Difficult', 'It did not come up']),
+    },
+    {
+      prompt: `Is there a ${familyName} moment worth remembering?`,
+      helperText: 'A brief or ordinary moment can be worth keeping.',
+      options: pulseChoices(['Yes, clearly', 'A small one', 'It felt mixed', 'Not really', 'I am not sure']),
+    },
+    {
+      prompt: 'What would you like to understand better here?',
+      helperText: 'Pick the question that feels most useful now.',
+      options: pulseChoices(['What helps', 'What gets in the way', 'How I feel', 'What I want', 'Nothing yet']),
+    },
+    {
+      prompt: 'What felt most natural in this part of today?',
+      helperText: 'Think about what needed the least forcing.',
+      options: pulseChoices(['The whole moment', 'One small part', 'My pace', 'My choice', 'Nothing felt natural']),
+    },
+    {
+      prompt: 'How much effort did this ask from you?',
+      helperText: 'Effort can be physical, practical, social, or emotional.',
+      options: pulseChoices(['Very little', 'A little', 'Quite a bit', 'Too much', 'I am not sure']),
+    },
+    {
+      prompt: 'What supported you in this part of life today?',
+      helperText: 'Choose the closest source of support.',
+      options: pulseChoices(['Time or energy', 'Another person', 'A place or tool', 'My own choice', 'Nothing helped yet']),
+    },
+    {
+      prompt: 'What got in the way, even a little?',
+      helperText: 'This is for understanding, not blame.',
+      options: pulseChoices(['Time', 'Energy or health', 'Access or cost', 'Other demands', 'Nothing in particular']),
+    },
+    {
+      prompt: 'What would you gladly make room for again?',
+      helperText: 'Repeating only one helpful part still counts.',
+      options: pulseChoices(['The whole moment', 'One small part', 'A gentler version', 'Something different', 'Nothing right now']),
+    },
+    {
+      prompt: 'What might help if this comes up tomorrow?',
+      helperText: 'Choose a light adjustment, not a promise.',
+      options: pulseChoices(['Make it smaller', 'Plan a time', 'Ask for support', 'Keep it flexible', 'Leave it for now']),
+    },
+    {
+      prompt: 'What surprised you about this moment?',
+      helperText: 'Surprise can be pleasant, difficult, or simply different.',
+      options: pulseChoices(['It was easier', 'It was harder', 'It felt different', 'I noticed something new', 'Nothing surprised me']),
+    },
+    {
+      prompt: 'What mattered most in this part of today?',
+      helperText: `Think about ${sentence(lenses[0], 'what it meant')}.`,
+      options: pulseChoices(['How it felt', 'Who was involved', 'The setting', 'The choice I made', 'I am not sure']),
+    },
+  ];
   const pulseSeeds = Array.from({ length: 12 }, (_, index) => {
     const authored = pilot[index % pilot.length];
     if (authored && index < pilot.length) return authored;
-    const theme = sentence(themes[index % themes.length], 'this part of today');
-    const lens = sentence(lenses[index % lenses.length], 'what it meant');
-    const prompts = [
-      `What did you notice about ${theme} today?`,
-      `What made ${theme} easier or harder today?`,
-      `Was there a moment of ${theme} worth remembering?`,
-      `What would you like to understand better about ${theme}?`,
-    ];
-    return {
-      prompt: prompts[index % prompts.length],
-      helperText: `Think about ${lens}. Choose the closest answer, not a perfect one.`,
-      options: PULSE_OPTIONS,
-    };
+    return genericPulses[index]!;
   });
   const pulses: CompanionContentItem[] = pulseSeeds.map((seed, index) => ({
     id: `${familyId}:pulse:${index + 1}`,
@@ -231,7 +290,7 @@ function buildFamilyContent(familyId: KatchimeraFamilyId): CompanionContentItem[
     kind: 'bond_moment',
     title: authored?.title ?? (level === 2 ? 'You feel familiar now' : level === 3 ? 'A pattern between you' : 'A shared history'),
     prompt: authored?.prompt ?? (level === 2
-      ? `What would you like ${familyName} to understand about you as you get to know each other?`
+      ? `What would you like ${familyName} to understand about you?`
       : level === 3
         ? `What has ${familyName} helped you notice that you might otherwise have missed?`
         : `What part of your history with ${familyName} feels most worth carrying forward?`),
@@ -251,7 +310,8 @@ export const companionContentItems: readonly CompanionContentItem[] = companionJ
 export const companionContentById = new Map(companionContentItems.map((item) => [item.id, item]));
 
 export function companionContentForFamily(familyId: KatchimeraFamilyId): readonly CompanionContentItem[] {
-  return companionContentItems.filter((item) => item.familyId === familyId);
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  return companionContentItems.filter((item) => item.familyId === ownerFamilyId);
 }
 
 /** Cross-catalogue authoring contract for every playable companion family. */

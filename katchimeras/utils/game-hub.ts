@@ -1,4 +1,4 @@
-import { katchimeraFamilies } from '@/constants/katchimera-skins';
+import { canonicalFamilyId, katchimeraFamilies } from '@/constants/katchimera-skins';
 import { katchimeraRoles } from '@/constants/katchimera-roles';
 import type { KatchimeraBondLevel } from '@/constants/katchimera-roles';
 import type { HomeVisualKey } from '@/types/home';
@@ -89,7 +89,10 @@ export function buildGameHubItems(input: {
   questState: CompanionQuestState;
   dayId: string;
 }): GameHubItem[] {
-  const companionByFamily = new Map(input.companions.map((companion) => [companion.familyId, companion]));
+  const companionByFamily = new Map(input.companions.map((companion) => [
+    canonicalFamilyId(companion.familyId) ?? companion.familyId,
+    companion,
+  ]));
   return gameCatalog.map((entry) => {
     const companion = companionByFamily.get(entry.familyId) ?? null;
     const prerequisiteMissing = entry.questId === 'quest-step-time-trial' && companion

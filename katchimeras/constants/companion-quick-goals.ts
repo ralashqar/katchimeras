@@ -1,5 +1,6 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { SPECIALIST_COMPANION_SYSTEMS } from '@/constants/specialist-companion-catalogue';
+import { canonicalFamilyId } from '@/constants/katchimera-skins';
 
 export type CompanionQuickGoalTemplate = {
   id: string;
@@ -65,6 +66,12 @@ const feastle: readonly CompanionQuickGoalTemplate[] = [
   template('feastle', 'plan-meal', 'Choose tomorrow’s meal in advance', { kind: 'daily' }),
   template('feastle', 'sit-for-meal', 'Sit down for one intentional meal', { kind: 'daily' }),
   template('feastle', 'weekday-cook', 'Cook something simple', { kind: 'weekdays', weekdays: [1, 2, 3, 4, 5] }),
+  template('feastle', 'dependable-option', 'Choose one dependable food option for a demanding day', { kind: 'once' }),
+  template('feastle', 'easy-option-visible', 'Put one easy food option somewhere accessible', { kind: 'once' }),
+  template('feastle', 'two-meal-list', 'Write a short list for two realistic meals', { kind: 'once' }),
+  template('feastle', 'reduce-one-decision', 'Make one food decision for tomorrow in advance', { kind: 'once' }),
+  template('feastle', 'adapt-a-need', 'Adapt one food choice around a dietary or sensory need', { kind: 'once' }),
+  template('feastle', 'notice-satisfaction', 'Notice what made one meal or snack feel enough for now', { kind: 'once' }),
 ];
 
 const pagelet: readonly CompanionQuickGoalTemplate[] = [
@@ -281,7 +288,29 @@ const whiskit: readonly CompanionQuickGoalTemplate[] = [
   template('whiskit', 'weekday-routine', 'Adapt one shared routine to today’s needs', { kind: 'once' }),
 ];
 
-export const companionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] = [
+const heartmote: readonly CompanionQuickGoalTemplate[] = [
+  template('heartmote', 'specific-thanks', 'Share one specific thing you appreciate', { kind: 'once' }),
+  template('heartmote', 'ten-present-minutes', 'Spend ten present minutes together', { kind: 'once' }),
+  template('heartmote', 'gentle-question', 'Ask one genuine question and listen', { kind: 'once' }),
+  template('heartmote', 'small-kindness', 'Offer one freely chosen act of care', { kind: 'once' }),
+  template('heartmote', 'plan-time', 'Suggest one simple time to connect', { kind: 'once' }),
+  template('heartmote', 'name-a-need', 'Name one need clearly and respectfully', { kind: 'once' }),
+  template('heartmote', 'shared-memory', 'Revisit one good shared memory', { kind: 'once' }),
+  template('heartmote', 'protect-attention', 'Put one distraction aside while connecting', { kind: 'once' }),
+];
+
+const kindling: readonly CompanionQuickGoalTemplate[] = [
+  template('kindling', 'small-help', 'Offer one small piece of practical help', { kind: 'once' }),
+  template('kindling', 'thank-contributor', 'Thank someone whose contribution is easy to miss', { kind: 'once' }),
+  template('kindling', 'community-check', 'Check one local community notice or event', { kind: 'once' }),
+  template('kindling', 'share-knowledge', 'Share one useful piece of knowledge', { kind: 'once' }),
+  template('kindling', 'support-cause', 'Take one manageable step for a cause you value', { kind: 'once' }),
+  template('kindling', 'ask-needed', 'Ask what help would actually be useful', { kind: 'once' }),
+  template('kindling', 'make-introduction', 'Make one helpful introduction with permission', { kind: 'once' }),
+  template('kindling', 'protect-capacity', 'Choose a contribution that fits your capacity', { kind: 'once' }),
+];
+
+const legacyCompanionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] = [
   ...cheerlet,
   ...coffeeRitual,
   ...dawnle,
@@ -307,8 +336,15 @@ export const companionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] 
   ...vesperitt,
   ...waglet,
   ...whiskit,
+  ...heartmote,
+  ...kindling,
   ...SPECIALIST_COMPANION_SYSTEMS.flatMap((system) => system.quickGoals),
 ];
+
+export const companionQuickGoalTemplates: readonly CompanionQuickGoalTemplate[] = legacyCompanionQuickGoalTemplates.map((item) => ({
+  ...item,
+  familyId: canonicalFamilyId(item.familyId) ?? item.familyId,
+}));
 
 export const companionQuickGoalTemplateById = new Map(
   companionQuickGoalTemplates.map((item) => [item.id, item])
@@ -319,13 +355,14 @@ const companionQuickGoalFamilyIds = new Set(
 );
 
 export function hasQuickGoalTemplates(familyId: KatchimeraFamilyId): boolean {
-  return companionQuickGoalFamilyIds.has(familyId);
+  return companionQuickGoalFamilyIds.has(canonicalFamilyId(familyId) ?? familyId);
 }
 
 export function quickGoalTemplatesForFamily(
   familyId: KatchimeraFamilyId
 ): readonly CompanionQuickGoalTemplate[] {
-  return companionQuickGoalTemplates.filter((item) => item.familyId === familyId);
+  const canonical = canonicalFamilyId(familyId) ?? familyId;
+  return companionQuickGoalTemplates.filter((item) => item.familyId === canonical);
 }
 
 function template(

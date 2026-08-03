@@ -144,7 +144,7 @@ check('an empty day yields no tags', buildDayTags(makeDay()).length === 0);
 
 // === Dex ===================================================================
 const history = {
-  'coffee-ritual': { count: 12, lastSeenIsoDate: '2026-06-11' },
+  baristabbit: { count: 12, lastSeenIsoDate: '2026-06-11' },
   relicoon: { count: 1, lastSeenIsoDate: '2026-06-05' },
 };
 const hatchedDays = [
@@ -153,14 +153,14 @@ const hatchedDays = [
   makeDay({ isoDate: '2026-06-09', creature: { encounterProfileId: 'location_coffee_shop_baristabbit', visualKey: 'baristabbit', rarity: 'rare' } }),
 ];
 const dex = buildDex(history, hatchedDays);
-check('dex lists one companion per true family', dex.total === 56, `total=${dex.total}`);
+check('dex lists one companion per life-area family', dex.total === 25, `total=${dex.total}`);
 check('collected counts only met families', dex.collected === 2, `collected=${dex.collected}`);
-const baristabbit = dex.entries.find((entry) => entry.familyId === 'coffee-ritual');
+const baristabbit = dex.entries.find((entry) => entry.familyId === 'baristabbit');
 check('met family is unlocked', baristabbit && baristabbit.locked === false, JSON.stringify(baristabbit));
 check('bond stage reflects visit count', baristabbit && baristabbit.bondStage === 1, String(baristabbit?.bondStage));
 check('highest rarity seen is the max across days', baristabbit && baristabbit.highestRaritySeen === 'rare', String(baristabbit?.highestRaritySeen));
 check('first hatched date is the earliest', baristabbit && baristabbit.firstHatchedDate === '2026-06-09', String(baristabbit?.firstHatchedDate));
-check('encountered visual forms are nested under the family', baristabbit && baristabbit.forms.length === 3 && baristabbit.forms.some((form) => form.skinId === 'baristabbit' && form.unlocked), JSON.stringify(baristabbit?.forms));
+check('encountered visual forms are nested under the family', baristabbit && baristabbit.forms.length === 4 && baristabbit.forms.some((form) => form.skinId === 'baristabbit' && form.unlocked), JSON.stringify(baristabbit?.forms));
 const locked = dex.entries.find((entry) => entry.familyId === 'waglet');
 check('unmet family stays locked with no rarity', locked && locked.locked === true && locked.highestRaritySeen === null, JSON.stringify(locked));
 const dailyLife = dex.categories.find((cat) => cat.category === 'daily-life');

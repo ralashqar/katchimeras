@@ -47,6 +47,14 @@ export const encounterLiveCast: readonly EncounterCastEntry[] = [
     visualKey: 'hayhorn',
   },
   {
+    profileId: 'location_grocery_cartle',
+    voice: 'practical, flexible, and pleased by any food plan that makes an ordinary day easier',
+    seedId: 'grocery',
+    categoryLabel: 'Grocery',
+    visualKey: 'feastle',
+    placeholderArt: true,
+  },
+  {
     profileId: 'activity_run_session_sprintail',
     voice: 'bright and encouraging, in love with momentum',
     seedId: 'run_session',
@@ -399,8 +407,21 @@ export const encounterLiveCast: readonly EncounterCastEntry[] = [
     voice: 'a warm protective nest spirit who honours ordinary acts of care',
     seedId: 'parenting_care',
     categoryLabel: 'Parenting',
-    visualKey: 'snuglet',
-    placeholderArt: true,
+    visualKey: 'nestkin',
+  },
+  {
+    profileId: 'activity_close_relationship_heartmote',
+    voice: 'warm, attentive, and gentle about closeness, boundaries, and what stays private',
+    seedId: 'close_relationship',
+    categoryLabel: 'Close relationship',
+    visualKey: 'heartmote',
+  },
+  {
+    profileId: 'activity_community_contribution_kindling',
+    voice: 'quietly capable and encouraging, always protecting choice and capacity',
+    seedId: 'community_contribution',
+    categoryLabel: 'Community',
+    visualKey: 'kindling',
   },
 ];
 

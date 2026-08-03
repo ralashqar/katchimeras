@@ -29,6 +29,8 @@ export type ActivityPermissionState = 'unknown' | 'granted' | 'denied' | 'unavai
 export type HealthPermissionState = 'unknown' | 'granted' | 'denied' | 'unavailable';
 export type HealthRouteImportStatus = 'idle' | 'success' | 'no_data' | 'denied' | 'unavailable' | 'error';
 export type HomeVisualKey =
+  | 'heartmote'
+  | 'kindling'
   | 'voltstep'
   | 'hearthsip'
   | 'glimmuse'
@@ -54,6 +56,7 @@ export type HomeVisualKey =
   | 'waglet'
   | 'whiskit'
   | 'snuglet'
+  | 'nestkin'
   | 'driftkin'
   | 'duskle'
   | 'crustling'

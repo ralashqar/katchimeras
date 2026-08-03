@@ -22,6 +22,9 @@ function q(title: string, prompt: string, helperText: string, options: string): 
 const feastle: Pack = {
   pulses: [
     q('Notice the meal', 'What kind of food moment fitted today?', 'A meal, snack, drink, shared table, or very limited option can all count.', 'cooked:I made something|assembled:I put something simple together|bought:I bought or collected food|shared:I ate with someone|limited:My options were limited'),
+    q('Find the useful support', 'What made food more manageable today?', 'Look for a practical condition, not a measure of willpower.', 'available:An easy option was available|decided:I decided ahead of time|help:Someone helped|adapted:I adapted to my needs|nothing:Nothing made it easier'),
+    q('Reduce the decisions', 'Which food decision would be useful to make ahead of time?', 'One decision is enough. You do not need to plan every meal.', 'first:My first food or drink|main:One main meal|snack:An easy snack|shopping:A short grocery list|none:I do not want to plan one'),
+    q('Respect your needs', 'Did food need adapting today?', 'Dietary, allergy, cultural, appetite, access, and sensory needs are valid conditions.', 'dietary:A dietary or allergy need|sensory:A sensory preference|appetite:My appetite or energy|access:What was available or affordable|no:No adaptation was needed'),
     q('Name what mattered', 'What mattered most about one food moment today?', 'This is about your experience, not whether the food was “good” or “bad”.', 'ease:It was easy|comfort:It was comforting|taste:I enjoyed the taste|company:The company mattered|fuel:It met a practical need'),
     q('Read the conditions', 'What made eating or preparing food easier?', 'Notice practical support rather than judging effort.', 'time:I had enough time|ingredients:Food was available|simple:I kept it simple|help:Someone helped|nothing:Nothing made it easier'),
     q('Respect the limits', 'What made food more difficult today?', 'Cost, access, appetite, time, culture, and energy can all shape a meal.', 'time:Not enough time|cost:Cost or availability|energy:Limited energy|appetite:Appetite or sensory needs|other-needs:Other people’s needs'),
@@ -35,6 +38,8 @@ const feastle: Pack = {
     q('Make it kinder', 'What would make this Food Focus kinder to live with?', 'You can reduce, adapt, or pause it without treating food as a test.', 'smaller:Make it smaller|cheaper:Make it lower-cost|easier:Use easier options|flexible:Make it more flexible|pause:Pause it for now'),
   ],
   reviews: [
+    q('Keep practical support', 'Which everyday food support deserves to stay?', 'Keep what reduces friction without turning it into a fixed rule.', 'dependable:A dependable option|decisions:Fewer decisions|shopping:A short shopping plan|adaptation:Adapting to my needs|help:Accepting help'),
+    q('Check the nourishment direction', 'What have you learned about food that fits your life?', 'The useful pattern may be about access, satisfaction, timing, or flexibility.', 'available:Availability matters|enough:I know more about what feels enough|timing:Timing matters|flexible:Flexibility matters|unclear:Nothing is clear yet'),
     q('See what supports meals', 'Across recent food moments, what has helped most?', 'Review access, ease, enjoyment, and company—not dietary perfection.', 'simple:Simple options|prepared:A little preparation|available:Having food available|company:Company|unclear:Nothing is clear yet'),
     q('Notice what changed', 'What has changed since you chose this Food Focus?', 'A clearer need or easier option counts as change.', 'easier:Food feels easier to manage|more-care:I notice care more|more-interest:I feel more curious|know-limits:I understand the limits|no-change:Nothing has clearly changed'),
     q('Make the Focus fit', 'What would make your Food Focus more realistic now?', 'Choose an adjustment that respects access and capacity.', 'simpler:Simpler actions|less-often:Less often|lower-cost:Lower-cost options|support:More help|pause:A pause for now'),
@@ -47,7 +52,7 @@ const feastle: Pack = {
     q('Choose what happens next', 'What would you like to do with this Food Focus?', 'Continuing, adapting, pausing, and finishing are all valid.', 'continue:Continue as it is|reshape:Reshape it|simplify:Make it simpler|pause:Pause it|complete:Mark it complete'),
   ],
   bonds: {
-    2: q('You know each other better', 'How would you like Feastle to support food moments?', 'Choose support that avoids pressure and respects access.', 'simple:Keep ideas simple|curious:Offer gentle curiosity|practical:Notice practical supports|flexible:Let me adapt freely'),
+    2: q('You know each other better', 'How would you like Feastle to support food moments?', 'Choose support that avoids pressure and respects access.', 'simple:Keep ideas simple|curious:Offer gentle curiosity|practical:Notice practical supports|decisions:Help reduce decisions|flexible:Let me adapt freely'),
     3: q('A pattern between you', 'What have you learned about food moments that suit you?', 'Choose the clearest pattern so far.', 'ease:Ease matters|comfort:Comfort matters|interest:Curiosity matters|company:Company matters|varies:My needs vary'),
     4: q('A shared history', 'What should Feastle carry forward?', 'Choose what future invitations should remember.', 'favourites:Familiar favourites|discoveries:New discoveries|people:Shared food moments|access:What is accessible|kindness:A non-judgemental approach'),
   },

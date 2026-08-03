@@ -1,4 +1,4 @@
-import { katchimeraFamilies, katchimeraSkinById } from '@/constants/katchimera-skins';
+import { canonicalFamilyId, katchimeraFamilies, katchimeraSkinById } from '@/constants/katchimera-skins';
 import {
   bespokeFamilyQuestPackByFamilyId,
   bespokeQuestIdsForFamily,
@@ -86,9 +86,9 @@ const FOUNDATION_ROLES: Record<string, AuthoredRole> = {
     status: 'complete',
   },
   feastle: {
-    role: 'Celebrates eating, cooking, and the meaning carried by shared food.',
-    boundary: 'Meals and cooking as lived experiences, not one cuisine, venue, or treat type.',
-    hatchSignals: ['food moment', 'cooking', 'meal photo', 'shared table'],
+    role: 'Supports everyday nourishment, cooking, food discovery, and the meaning carried by shared meals.',
+    boundary: 'Lived food experiences and practical support—not calorie targets, weight change, medical nutrition, or judging food as good or bad.',
+    hatchSignals: ['food moment', 'cooking', 'meal photo', 'shared table', 'grocery preparation'],
     realLifeQuestIds: [
       'quest-feastle-meal-photo',
       'quest-feastle-meal-note',
@@ -96,14 +96,14 @@ const FOUNDATION_ROLES: Record<string, AuthoredRole> = {
       'quest-feastle-weekly-review',
     ],
     discoveryPrompts: [
-      prompt('feastle', 'food-meaning', 1, 'single_choice', 'What matters most to you about food?', 'Feastle will use this when reflecting on meals.', ['Comfort', 'Connection', 'Trying things', 'Making something']),
-      prompt('feastle', 'food-goal', 2, 'goal', 'Is there a food or cooking goal you would enjoy?', 'It can be a dish, habit, place, or person to share with.'),
+      prompt('feastle', 'food-meaning', 1, 'single_choice', 'What would you like food to feel more like?', 'Choose the experience you want, not a rule for what you should eat.', ['Dependable and manageable', 'Comforting', 'Connecting', 'Interesting', 'Enjoyable to make']),
+      prompt('feastle', 'food-goal', 2, 'goal', 'What would make food easier or more meaningful right now?', 'It can be one dependable option, less planning, something to make, or a meal to share.'),
     ],
     miniGameQuestIds: ['quest-feastle-merge', 'quest-feastle-sort', 'quest-feastle-memory'],
     plannedMiniGame: null,
-    insightThemes: ['meal variety', 'cooking versus eating out', 'shared meals', 'comfort foods'],
-    reflectionLenses: ['what a meal meant', 'who shared the table', 'new tastes', 'care expressed through food'],
-    goalTypes: ['cook a dish', 'shared meal', 'try a cuisine', 'meal rhythm'],
+    insightThemes: ['dependable food options', 'meal ease and access', 'cooking versus eating out', 'shared meals', 'comfort foods'],
+    reflectionLenses: ['what made food manageable', 'what a meal meant', 'who shared the table', 'new tastes', 'care expressed through food'],
+    goalTypes: ['everyday nourishment', 'grocery preparation', 'cook a dish', 'shared meal', 'try a cuisine', 'meal rhythm'],
     status: 'complete',
   },
   tasklet: {
@@ -546,45 +546,68 @@ const FOUNDATION_ROLES: Record<string, AuthoredRole> = {
   },
 };
 
-export const katchimeraRoles: readonly KatchimeraRoleDefinition[] = katchimeraFamilies.map((family) => {
-  const authored = FOUNDATION_ROLES[family.id];
-  if (authored) return { familyId: family.id, aspectId: family.aspectId, displayName: family.displayName, ...authored };
+const PRIMARY_ROLE_SOURCE: Readonly<Record<string, string>> = {
+  baristabbit: 'coffee-ritual',
+  bedrotte: 'sleep-rest',
+};
 
-  const bespokeQuestPack = bespokeFamilyQuestPackByFamilyId.get(family.id);
-  if (bespokeQuestPack) {
+function authoredRoleForSource(sourceId: string): AuthoredRole | null {
+  const foundation = FOUNDATION_ROLES[sourceId];
+  if (foundation) return foundation;
+  const bespoke = bespokeFamilyQuestPackByFamilyId.get(sourceId);
+  if (!bespoke) return null;
+  return {
+    role: bespoke.role,
+    boundary: bespoke.boundary,
+    hatchSignals: bespoke.hatchSignals,
+    realLifeQuestIds: bespokeQuestIdsForFamily(sourceId),
+    discoveryPrompts: [],
+    miniGameQuestIds: [],
+    plannedMiniGame: `A future signature activity for ${sentenceCase(sourceId)}.`,
+    insightThemes: bespoke.insightThemes,
+    reflectionLenses: bespoke.reflectionLenses,
+    goalTypes: bespoke.goalTypes,
+    status: 'partial',
+  };
+}
+
+export const katchimeraRoles: readonly KatchimeraRoleDefinition[] = katchimeraFamilies.map((family) => {
+  const sourceIds = [...new Set([
+    PRIMARY_ROLE_SOURCE[family.id] ?? family.id,
+    family.id,
+    ...family.skinIds,
+  ])];
+  const sources = sourceIds.flatMap((sourceId) => {
+    const role = authoredRoleForSource(sourceId);
+    return role ? [{ sourceId, role }] : [];
+  });
+  const primary = sources[0]?.role;
+
+  if (primary) {
+    const realLifeQuestIds = [...new Set(sources.flatMap(({ role }) => role.realLifeQuestIds))];
+    const miniGameQuestIds = [...new Set(sources.flatMap(({ role }) => role.miniGameQuestIds))];
+    const focusLabels = family.focusLanes.map((focusLane) => focusLane.label);
+    const discoveryPrompts: CompanionDiscoveryPromptDefinition[] = [
+      prompt(family.id, 'focus-direction', 1, 'single_choice', `What would you most like ${family.displayName} to support?`, 'Choose the direction that feels useful now. You can change it later.', focusLabels),
+      prompt(family.id, 'focus-fit', 1, 'single_choice', 'What would help this fit your life?', 'Choose the nearest answer, not a perfect description.', ['A smaller first step', 'A regular time or cue', 'More choice and flexibility', 'Someone or somewhere supportive']),
+      prompt(family.id, 'focus-start', 2, 'single_choice', 'What kind of next step feels realistic?', 'Future invitations can use this to stay manageable.', ['Something under five minutes', 'One planned moment this week', 'A repeatable routine', 'Notice first, then decide']),
+      prompt(family.id, 'focus-protect', 3, 'single_choice', 'What should future invitations protect?', 'Your wellbeing matters more than completing a task.', ['My energy', 'My time', 'My privacy', 'My ability to adapt or skip']),
+    ];
     return {
       familyId: family.id,
       aspectId: family.aspectId,
       displayName: family.displayName,
-      role: bespokeQuestPack.role,
-      boundary: bespokeQuestPack.boundary,
-      hatchSignals: bespokeQuestPack.hatchSignals,
-      realLifeQuestIds: bespokeQuestIdsForFamily(family.id),
-      discoveryPrompts: [
-        prompt(
-          family.id,
-          'quest-direction',
-          1,
-          'single_choice',
-          `What would you most like to explore with ${family.displayName}?`,
-          'This keeps the quests relevant to the part of this companion that matters to you.',
-          bespokeQuestPack.goalTypes.map(sentenceCase)
-        ),
-        prompt(
-          family.id,
-          'quest-goal',
-          2,
-          'goal',
-          `What small direction would feel worth building with ${family.displayName}?`,
-          'Choose something concrete enough to notice in an ordinary week.'
-        ),
-      ],
-      miniGameQuestIds: [],
-      plannedMiniGame: `A future signature activity for ${family.displayName}'s role.`,
-      insightThemes: bespokeQuestPack.insightThemes,
-      reflectionLenses: bespokeQuestPack.reflectionLenses,
-      goalTypes: bespokeQuestPack.goalTypes,
-      status: 'partial',
+      role: primary.role,
+      boundary: primary.boundary,
+      hatchSignals: [...new Set([...family.focusLanes.map((item) => item.label.toLowerCase()), ...sources.flatMap(({ role }) => role.hatchSignals)])],
+      realLifeQuestIds,
+      discoveryPrompts,
+      miniGameQuestIds,
+      plannedMiniGame: miniGameQuestIds.length ? null : primary.plannedMiniGame,
+      insightThemes: [...new Set(sources.flatMap(({ role }) => role.insightThemes))],
+      reflectionLenses: [...new Set(sources.flatMap(({ role }) => role.reflectionLenses))],
+      goalTypes: [...new Set([...focusLabels, ...sources.flatMap(({ role }) => role.goalTypes)])],
+      status: realLifeQuestIds.length >= 4 && miniGameQuestIds.length ? 'complete' : 'partial',
     };
   }
 
@@ -617,7 +640,8 @@ export function discoveryPromptsForFamily(
   familyId: KatchimeraFamilyId,
   bondLevel: KatchimeraBondLevel
 ): readonly CompanionDiscoveryPromptDefinition[] {
-  return (katchimeraRoleByFamilyId.get(familyId)?.discoveryPrompts ?? [])
+  const canonical = canonicalFamilyId(familyId) ?? familyId;
+  return (katchimeraRoleByFamilyId.get(canonical)?.discoveryPrompts ?? [])
     .filter((promptDefinition) => promptDefinition.minimumBondLevel <= bondLevel);
 }
 

@@ -79,7 +79,7 @@ test('Bedrotte and Snoozle are skins of one rest companion', () => {
   assert.equal(bedrotte?.aspectId, 'rest-sleep');
   assert.equal(snoozle?.aspectId, 'rest-sleep');
   assert.equal(bedrotte?.companionId, snoozle?.companionId);
-  assert.equal(bedrotte?.familyId, 'sleep-rest');
+  assert.equal(bedrotte?.familyId, 'bedrotte');
   assert.notEqual(bedrotte?.skinId, snoozle?.skinId);
 });
 
@@ -99,8 +99,8 @@ test('Kingdom keeps both hatch records under one logical resident id', () => {
   ];
   const kingdom = deriveKingdom(days as HomeDayRecord[]);
   assert.equal(kingdom.creatures.length, 2, 'day provenance remains intact');
-  assert.equal(kingdom.creatures[0]?.creatureId, 'companion:sleep-rest');
-  assert.equal(kingdom.creatures[1]?.creatureId, 'companion:sleep-rest');
+  assert.equal(kingdom.creatures[0]?.creatureId, 'companion:bedrotte');
+  assert.equal(kingdom.creatures[1]?.creatureId, 'companion:bedrotte');
   assert.equal(new Set(kingdom.creatures.map((entry) => entry.creatureId)).size, 1);
 });
 
@@ -113,8 +113,8 @@ test('Dex is family-first and exposes Bedrotte and Snoozle as unlocked forms', (
     { 'sleep-rest': { count: 2, lastSeenIsoDate: '2026-07-21' } },
     days
   );
-  const rest = dex.entries.find((entry) => entry.familyId === 'sleep-rest');
-  assert.equal(dex.total, 56);
+  const rest = dex.entries.find((entry) => entry.familyId === 'bedrotte');
+  assert.equal(dex.total, 25);
   assert.equal(rest?.totalHatches, 2);
   assert.deepEqual(
     rest?.forms.filter((form) => form.unlocked).map((form) => form.skinId).sort(),
@@ -122,15 +122,15 @@ test('Dex is family-first and exposes Bedrotte and Snoozle as unlocked forms', (
   );
 });
 
-test('broad life categories do not merge distinct companions', () => {
-  const pairs = [
+test('approved forms merge while distinct life areas keep separate companions', () => {
+  const mergedPairs = [
     [
       identityForEncounter('subject_feast_feastle', 'feastle'),
       identityForEncounter('location_bakery_crumbun', 'crumbun'),
     ],
     [
-      identityForEncounter('subject_gym_day_flexel', 'flexel'),
-      identityForEncounter('activity_run_session_sprintail', 'sprintail'),
+      identityForEncounter('subject_feast_feastle', 'feastle'),
+      identityForEncounter('location_grocery_cartle', 'feastle'),
     ],
     [
       identityForEncounter('subject_dog_companion_waglet', 'waglet'),
@@ -138,10 +138,25 @@ test('broad life categories do not merge distinct companions', () => {
     ],
     [
       identityForEncounter('state_night_owl_vesperitt', 'vesperitt'),
+      identityForEncounter('location_home_evening_bedrotte', 'bedrotte'),
+    ],
+  ];
+  for (const [left, right] of mergedPairs) {
+    assert.equal(left?.familyId, right?.familyId);
+    assert.equal(left?.companionId, right?.companionId);
+  }
+
+  const distinctPairs = [
+    [
+      identityForEncounter('subject_gym_day_flexel', 'flexel'),
+      identityForEncounter('activity_run_session_sprintail', 'sprintail'),
+    ],
+    [
+      identityForEncounter('state_night_owl_vesperitt', 'vesperitt'),
       identityForEncounter('state_first_light_dawnle', 'dawnle'),
     ],
   ];
-  for (const [left, right] of pairs) {
+  for (const [left, right] of distinctPairs) {
     assert.notEqual(left?.familyId, right?.familyId);
     assert.notEqual(left?.companionId, right?.companionId);
   }
