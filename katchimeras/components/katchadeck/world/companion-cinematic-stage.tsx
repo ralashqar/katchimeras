@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useState } from 'react';
-import { type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View } from 'react-native';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { type LayoutChangeEvent, type StyleProp, StyleSheet, type TextStyle, useWindowDimensions, View, type View as ViewType } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -28,12 +28,14 @@ const parchment = KatchaSurfacePalette.parchment;
 
 export function CompanionCinematicStage({
   creature,
+  creatureTargetRef,
   bubbleBody,
   bubbleVariant = 'default',
   enterFromLifted = false,
   environmentKey,
   lifted,
   name,
+  onSpeechBubbleHeightChange,
   showSpeechBubble = true,
   title,
   visualKey,
@@ -41,10 +43,12 @@ export function CompanionCinematicStage({
   bubbleBody?: string;
   bubbleVariant?: 'default' | 'questionnaire';
   creature: QuestionnaireImageSource;
+  creatureTargetRef?: RefObject<ViewType | null>;
   enterFromLifted?: boolean;
   environmentKey: TodayExplorationBackgroundKey | null;
   lifted: boolean;
   name: string;
+  onSpeechBubbleHeightChange?: (height: number) => void;
   showSpeechBubble?: boolean;
   title: string;
   visualKey: HomeVisualKey;
@@ -117,6 +121,7 @@ export function CompanionCinematicStage({
             accessibilityLabel={`${name} says: ${title}`}
             entering={questionnaireBubble && !reduceMotion ? FadeIn.duration(180) : undefined}
             key={questionnaireBubble ? `question:${title}` : 'destination-speech'}
+            onLayout={(event: LayoutChangeEvent) => onSpeechBubbleHeightChange?.(event.nativeEvent.layout.height)}
             style={[
               styles.speechBubble,
               questionnaireBubble && styles.speechBubbleQuestionnaire,
@@ -159,6 +164,7 @@ export function CompanionCinematicStage({
         <CompanionHomeEnvironmentStage
           backgroundKey={environmentKey}
           creature={creature}
+          creatureTargetRef={creatureTargetRef}
           layer="creature"
           name={name}
           visualKey={visualKey}

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   View,
+  type View as ViewType,
 } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight, FadeOut, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -90,6 +91,9 @@ import { CompanionCheckInCard, CompanionCheckInPage } from './companion-check-in
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import { companionQuestListSpacer } from '@/utils/companion-home-layout';
+import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
+import type { GoalTaskSourceRect } from '@/components/katchadeck/goals/goal-task-row';
+import { BondRewardFlightOverlay } from '@/components/katchadeck/goals/bond-reward-overlay';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -194,7 +198,7 @@ export type CompanionInteractionSheetProps = {
     title: string,
     cadence: CompanionQuickGoalCadence
   ) => { added: boolean; reason: string | null };
-  onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletion | null;
+  onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
   onSkipQuickGoal: (goalId: string) => boolean;
   onSnoozeQuickGoal: (goalId: string) => boolean;
   onUndoQuickGoal: (goalId: string) => boolean;
@@ -208,6 +212,22 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const insets = useSafeAreaInsets();
   const { height: viewportHeight } = useWindowDimensions();
   const onExperienceActiveChange = props.onExperienceActiveChange;
+  const creatureRewardTargetRef = useRef<ViewType | null>(null);
+  const [bondReward, setBondReward] = useState<{
+    from: GoalTaskSourceRect;
+    points: number;
+    to: GoalTaskSourceRect;
+  } | null>(null);
+  const showQuickGoalReward = useCallback((
+    receipt: CompanionQuickGoalCompletionReceipt,
+    source: GoalTaskSourceRect | null
+  ) => {
+    if (!receipt.bondAward) return;
+    creatureRewardTargetRef.current?.measureInWindow((x, y, width, height) => {
+      const target = { height, width, x, y };
+      setBondReward({ from: source ?? target, points: receipt.bondAward!.points, to: target });
+    });
+  }, []);
   const experience = useCompanionExperienceController({
     creatureId: props.creatureId,
     initialDestination: props.initialDestination,
@@ -401,6 +421,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         dayId={props.quickGoalDayId}
         familyId={props.familyId}
         onCompleteGoal={props.onCompleteQuickGoal}
+        onCompletionReward={showQuickGoalReward}
         onOpen={() => {
           if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
           experience.openQuickGoalPicker();
@@ -568,6 +589,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             bubbleBody={quickGoalPickerOpen ? 'Choose one for today, or make a small goal of your own.' : destinationHeroBody}
             bubbleVariant={destination === 'discovery' || quickGoalPickerOpen ? 'questionnaire' : 'default'}
             creature={visual.source}
+            creatureTargetRef={creatureRewardTargetRef}
             environmentKey={props.homeEnvironmentKey ?? null}
             lifted
             name={props.name}
@@ -924,6 +946,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           title="Leave this quest?"
           tone="destructive"
         />
+        {bondReward ? (
+          <BondRewardFlightOverlay
+            from={bondReward.from}
+            onFinish={() => setBondReward(null)}
+            points={bondReward.points}
+            to={bondReward.to}
+          />
+        ) : null}
         </CompanionSheetShell>
   </>);
 }

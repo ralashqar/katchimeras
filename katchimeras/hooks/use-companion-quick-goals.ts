@@ -41,6 +41,16 @@ type UseCompanionQuickGoalsArgs = {
   onBondChanged?: () => void;
 };
 
+export type CompanionQuickGoalCompletionReceipt = {
+  bondAward: {
+    creatureId: string;
+    familyId: KatchimeraFamilyId;
+    points: number;
+  } | null;
+  completion: CompanionQuickGoalCompletion | null;
+  newlyCompleted: boolean;
+};
+
 export function useCompanionQuickGoals({
   dayId,
   availableFamilyIds,
@@ -161,10 +171,12 @@ export function useCompanionQuickGoals({
     if (next !== state) commit(next);
   }, [commit, state]);
 
-  const completeGoal = useCallback((goalId: string): CompanionQuickGoalCompletion | null => {
-    if (!dayId) return null;
+  const completeGoal = useCallback((goalId: string): CompanionQuickGoalCompletionReceipt => {
+    if (!dayId) return { bondAward: null, completion: null, newlyCompleted: false };
     const result = completeCompanionQuickGoal(state, goalId, dayId);
-    if (!result.completed || !result.completion) return result.completion;
+    if (!result.completed || !result.completion) {
+      return { bondAward: null, completion: result.completion, newlyCompleted: false };
+    }
     commit(result.state);
 
     const homeState = homeRepository.load();
@@ -180,7 +192,17 @@ export function useCompanionQuickGoals({
     });
     if (awarded.awarded) saveCompanionBondState(awarded.state);
     onBondChanged?.();
-    return result.completion;
+    return {
+      bondAward: awarded.awarded
+        ? {
+            creatureId: companionIdForFamily(result.completion.familyId),
+            familyId: result.completion.familyId,
+            points: awarded.points,
+          }
+        : null,
+      completion: result.completion,
+      newlyCompleted: true,
+    };
   }, [commit, dayId, onBondChanged, state]);
 
   const undoGoal = useCallback((goalId: string) => {

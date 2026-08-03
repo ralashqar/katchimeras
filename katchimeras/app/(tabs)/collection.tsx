@@ -19,6 +19,7 @@ import { KatchaDeckUI, Lantern } from '@/constants/theme';
 import { getCreatureVisual, hydrateHomeState } from '@/game/days';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDiscoveries } from '@/hooks/use-discoveries';
+import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { DailyCreatureCard, HomeRarityTier, StoredHomeState } from '@/types/home';
 import { buildDex, dexCategoryLabel, type Dex, type DexEntry } from '@/utils/dex';
@@ -51,6 +52,7 @@ const RARITY_COLOR: Record<HomeRarityTier, string> = {
 
 export default function CollectionScreen() {
   const router = useRouter();
+  const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const [state, setState] = useState<StoredHomeState | null>(null);
   const [bondState, setBondState] = useState<CompanionBondState>(emptyCompanionBondState);
   const [view, setView] = useState<CollectionView>('cards');
@@ -74,8 +76,13 @@ export default function CollectionScreen() {
   const dex: Dex | null = useMemo(() => {
     if (!state) return null;
     const hatchedDays = [...state.archivedDays, state.today].filter((day) => day.creature !== null);
-    return buildDex(state.aspectHistory ?? state.encounterHistory, hatchedDays, bondState);
-  }, [bondState, state]);
+    return buildDex(
+      state.aspectHistory ?? state.encounterHistory,
+      hatchedDays,
+      bondState,
+      { unlockAll: allKatchimerasAvailable },
+    );
+  }, [allKatchimerasAvailable, bondState, state]);
 
   const cards = useMemo(
     () => days.flatMap((day) => day.card ? [{ card: day.card, dayId: day.id }] : []).sort((left, right) => right.card.isoDate.localeCompare(left.card.isoDate)),

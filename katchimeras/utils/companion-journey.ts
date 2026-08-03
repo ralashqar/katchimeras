@@ -5,6 +5,7 @@ import {
   type CompanionJourneyDefinition,
   type CompanionJourneyGoalStatus,
 } from '@/constants/companion-journeys';
+import { companionSpeechCopyIssues } from '@/constants/companion-speech-copy';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import type { CompanionDiscoveryState } from '@/utils/companion-discovery';
 import type { CompanionQuest } from '@/utils/katchimera-quests';
@@ -838,6 +839,7 @@ export function validateCompanionJourneyDefinitions(): string[] {
     if (!nodeIds.has(definition.startNodeId)) issues.push(`${definition.familyId}: missing start node`);
     if (!definition.stages.length) issues.push(`${definition.familyId}: missing stages`);
     for (const node of definition.nodes) {
+      issues.push(...companionSpeechCopyIssues(`${definition.familyId}:${node.id}`, node.prompt, node.helperText));
       if (node.createsGoalTypeId && !definition.goalTypes[node.createsGoalTypeId]) {
         issues.push(`${definition.familyId}:${node.id}: unknown goal type`);
       }

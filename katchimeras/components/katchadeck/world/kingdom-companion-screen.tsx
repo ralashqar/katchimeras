@@ -24,6 +24,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
+import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
@@ -64,6 +65,7 @@ import { buildKatchimeraRoster } from '@/utils/katchimera-roster';
 import { beginQuestCapture, cancelQuestCapture } from '@/utils/quest-capture-session';
 import { completeSemanticNoteQuestCapture } from '@/utils/quests/semantic-note-capture';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
+import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
 
 type QuestJournalReviewContext = {
   initialFlowId: string;
@@ -204,7 +206,11 @@ export function KingdomCompanionScreen({
   const insets = useSafeAreaInsets();
   const archive = useAllDays();
   const { days } = archive;
-  const kingdom = useMemo(() => deriveKingdom(days), [days]);
+  const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
+  const kingdom = useMemo(
+    () => withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable),
+    [allKatchimerasAvailable, days],
+  );
   const {
     entries: discoveryEntries,
     unlockedCount: discoveriesUnlocked,

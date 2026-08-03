@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
-import { memo } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { memo, type RefObject } from 'react';
+import { StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
 
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
@@ -13,12 +13,14 @@ export const CompanionHomeEnvironmentStage = memo(
   function CompanionHomeEnvironmentStage({
     backgroundKey,
     creature,
+    creatureTargetRef,
     layer = 'both',
     name,
     visualKey,
   }: {
     backgroundKey: TodayExplorationBackgroundKey | null;
     creature: QuestionnaireImageSource;
+    creatureTargetRef?: RefObject<ViewType | null>;
     layer?: 'background' | 'creature' | 'both';
     name: string;
     visualKey: HomeVisualKey;
@@ -52,6 +54,8 @@ export const CompanionHomeEnvironmentStage = memo(
 
         {showCreature ? <View style={[styles.creaturePlane, stageTransform]}>
           <View
+            collapsable={false}
+            ref={creatureTargetRef}
             style={[
               styles.creatureFrame,
               {

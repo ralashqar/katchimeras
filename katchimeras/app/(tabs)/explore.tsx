@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { AmbientBackground } from '@/components/katchadeck/ambient-background';
@@ -16,6 +16,7 @@ import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
 import { createStarterReveal } from '@/constants/katchadeck';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
+import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { KatchaDeckUI } from '@/constants/theme';
 import { enrichBackfillReflections, runBackfillFoundation, runBackfillPhotosOnly } from '@/utils/day-backfill';
 import {
@@ -36,10 +37,12 @@ import { getCreatureVisual, prepareTodayForDevRehatch, resetTodayInState, type D
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
+import { setAllKatchimerasAvailableEnabled } from '@/utils/dev-settings';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
 
 export default function ExploreScreen() {
   const router = useRouter();
+  const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const [profile, setProfile] = useState(loadOnboardingProfile());
   const [storedState, setStoredState] = useState(homeRepository.load());
   const [pickedVision, setPickedVision] = useState<{
@@ -360,6 +363,22 @@ export default function ExploreScreen() {
             <GlassPanel contentStyle={styles.panelBody}>
               <SectionHeader label="Fast actions" title="Reset and debug" />
               <View style={styles.devActions}>
+                <View style={styles.devToggleRow}>
+                  <View style={styles.devToggleCopy}>
+                    <ThemedText selectable style={styles.devToggleTitle} lightColor="#F8FBFF" darkColor="#F8FBFF">
+                      Make all Katchimeras available
+                    </ThemedText>
+                    <ThemedText selectable style={styles.devToggleBody} lightColor="#C4D8FF" darkColor="#C4D8FF">
+                      Adds temporary testing residents without changing hatch or bond history.
+                    </ThemedText>
+                  </View>
+                  <Switch
+                    accessibilityLabel="Make all Katchimeras available for testing"
+                    onValueChange={setAllKatchimerasAvailableEnabled}
+                    trackColor={{ false: 'rgba(200,216,255,0.2)', true: '#5FA87B' }}
+                    value={allKatchimerasAvailable}
+                  />
+                </View>
                 <KatchaButton label="🔄 Reset to fresh profile (full first-run)" onPress={handleFreshProfile} variant="primary" />
                 <KatchaButton label="Reset today only" onPress={handleResetToday} variant="secondary" />
                 <KatchaButton
@@ -785,6 +804,22 @@ const styles = StyleSheet.create({
   devActions: {
     gap: 10,
   },
+  devToggleRow: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(200,216,255,0.08)',
+    borderColor: 'rgba(200,216,255,0.16)',
+    borderCurve: 'continuous',
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 76,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  devToggleCopy: { flex: 1, gap: 3 },
+  devToggleTitle: { fontSize: 14, fontWeight: '800', lineHeight: 18 },
+  devToggleBody: { fontSize: 11, lineHeight: 15 },
   collectionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

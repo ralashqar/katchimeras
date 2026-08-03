@@ -50,6 +50,7 @@ export type QuestAttempt = {
   seed: string;
   executionKind: InteractiveQuestExecution['kind'];
   configSnapshot: Record<string, unknown>;
+  questRunId?: string;
   status: QuestAttemptStatus;
   startedAt?: number;
   endedAt?: number;

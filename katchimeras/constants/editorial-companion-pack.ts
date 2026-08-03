@@ -42,7 +42,7 @@ export function createEditorialCompanionPack(profile: EditorialCompanionProfile)
       q('Check the fit', `How well did ${focusName} fit your capacity today?`, 'This is about fit, not performance.', profile.fit),
       q('Choose what suits you', `What kind of ${momentName} would suit the next few days?`, 'Choose what feels realistic now. You do not need to stretch.', profile.next),
       q('Read the conditions', `Which condition most shaped ${focusName} today?`, 'The surrounding conditions often matter more than intention.', profile.conditions),
-      q('Notice a limit', `Where did a limit or boundary matter around ${focusName}?`, 'Stopping, adapting, or choosing something else can be the right response.', profile.limits),
+      q('Notice a limit', `Where did a limit matter for ${focusName}?`, 'Stopping, adapting, or choosing something else can be the right response.', profile.limits),
       q('Learn from the pattern', `What are you learning about ${focusName}?`, 'Choose the clearest pattern so far, including that it varies.', profile.learning),
       q('Keep what works', `What is most worth keeping from recent ${momentName}s?`, 'Keep one useful part rather than turning it into a rule.', profile.keep),
       q('Make it kinder', `What would make this ${companionName} Focus kinder to live with?`, 'Changing, reducing, or pausing the Focus is always valid.', profile.adapt),

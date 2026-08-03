@@ -25,6 +25,50 @@ import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/jour
 import { questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import { evidenceProvider, isLateNightHour, withCaptureTimeSignals } from '@/utils/signals/providers/evidence';
 
+test('Today and companion goals share deliberate task-row interactions', () => {
+  const row = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'goal-task-row.tsx'),
+    'utf8',
+  );
+  const todayGoals = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'today-goals-experience.tsx'),
+    'utf8',
+  );
+  const companionGoals = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'companion-quick-goals.tsx'),
+    'utf8',
+  );
+  const todayScreen = fs.readFileSync(
+    path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'),
+    'utf8',
+  );
+  const goalModal = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'quick-goal-action-modal.tsx'),
+    'utf8',
+  );
+  const quickGoalHook = fs.readFileSync(
+    path.join(process.cwd(), 'hooks', 'use-companion-quick-goals.ts'),
+    'utf8',
+  );
+
+  assert.match(row, /ReanimatedSwipeable/);
+  assert.match(row, /renderLeftActions/);
+  assert.match(row, /onPress=\{handleComplete\}/);
+  assert.match(row, /height: 48/);
+  assert.match(row, /accessibilityActions/);
+  assert.match(todayGoals, /<GoalTaskRow/);
+  assert.match(todayGoals, /<CompanionBackAction/);
+  assert.match(todayGoals, /KatchaDeckUI\.typography\.kingdomDisplay/);
+  assert.match(companionGoals, /<GoalTaskRow/);
+  assert.match(todayScreen, /<TodayGoalsExperience/);
+  assert.match(todayScreen, /initialMode=\{quickGoalSheetMode\}/);
+  assert.match(todayScreen, /!quickGoalsOpen/);
+  assert.match(todayScreen, /isHatching \|\|[\s\S]*?quickGoalsOpen \|\|[\s\S]*?timelineDay\.kind/);
+  assert.match(quickGoalHook, /CompanionQuickGoalCompletionReceipt/);
+  assert.match(quickGoalHook, /bondAward: awarded\.awarded/);
+  assert.doesNotMatch(goalModal, /Nicely done · \+5 bond/);
+});
+
 test('You questionnaires require answer confirmation and task consent', () => {
   const questionnaireScene = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-questionnaire-scene.tsx'),
@@ -67,11 +111,13 @@ test('You questionnaires require answer confirmation and task consent', () => {
   assert.match(questionnaireScene, /bubbleVariant="questionnaire"/);
   assert.match(questionnaireScene, /environmentKey=\{environmentKey\}/);
   assert.match(questionnaireScene, /styles\.progressBlock/);
-  assert.match(questionnaireScene, /height: compact \? 210 : 238/);
+  assert.match(questionnaireScene, /companionQuestionnaireHeroSpacer\(height, speechBubbleHeight\)/);
+  assert.match(questionnaireScene, /onSpeechBubbleHeightChange=\{setSpeechBubbleHeight\}/);
   assert.doesNotMatch(questionnaireScene, /styles\.creatureFrame|styles\.bubble,/);
   assert.match(cinematicStage, /speechBubbleQuestionnaire/);
   assert.match(cinematicStage, /minHeight: 146/);
   assert.match(cinematicStage, /questionTitleLong/);
+  assert.match(cinematicStage, /onLayout=.*onSpeechBubbleHeightChange/);
   assert.match(cinematicStage, /function TypewriterText/);
   assert.match(cinematicStage, /requestAnimationFrame\(reveal\)/);
   assert.match(cinematicStage, /styles\.typewriterMeasure/);
@@ -218,6 +264,10 @@ test('goal picker returns to the dedicated goals destination', () => {
     path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'quick-goal-action-modal.tsx'),
     'utf8',
   );
+  const goalCelebration = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'goals', 'goal-completion-celebration.tsx'),
+    'utf8',
+  );
   const kingdomCompanion = fs.readFileSync(
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
     'utf8',
@@ -249,6 +299,10 @@ test('goal picker returns to the dedicated goals destination', () => {
   assert.match(goalActions, /onSnooze/);
   assert.match(goalActions, /justCompleted/);
   assert.match(goalActions, /goalCardComplete/);
+  assert.match(goalActions, /celebrateCreature\(\)/);
+  assert.match(goalActions, /<GoalCompletionCelebration[\s\S]*embedded/);
+  assert.match(goalActions, /creatureRotation\.value = withSequence/);
+  assert.match(goalCelebration, /if \(embedded\) return celebration/);
   assert.match(goalComposer, /<Modal/);
   assert.match(goalComposer, /useJournalVoiceDraft/);
   assert.match(goalComposer, /Tap the microphone to record/);

@@ -3,6 +3,7 @@ import {
   companionJourneyDefinitions,
   type CompanionJourneyDefinition,
 } from '@/constants/companion-journeys';
+import { companionSpeechCopyIssues } from '@/constants/companion-speech-copy';
 import {
   companionQuickGoalTemplateById,
   quickGoalTemplatesForFamily,
@@ -283,6 +284,7 @@ export function validateEvolvingCompanionContent(): string[] {
       if (seen.has(item.id)) issues.push(`${definition.familyId}: duplicate evolving content id ${item.id}`);
       seen.add(item.id);
       if (!item.prompt.trim() || item.options.length < 3) issues.push(`${item.id}: incomplete prompt or answer set`);
+      issues.push(...companionSpeechCopyIssues(item.id, item.prompt, item.helperText));
       if (item.cooldownDays < 1) issues.push(`${item.id}: cooldown must be positive`);
     }
   }

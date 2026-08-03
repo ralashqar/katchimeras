@@ -86,3 +86,17 @@ export function companionDestinationSpeechBubbleTop(
 export function companionQuestListSpacer(viewportHeight: number): number {
   return Math.min(216, Math.max(176, viewportHeight * 0.235));
 }
+
+/**
+ * The questionnaire panel used to begin after a fixed spacer even when a
+ * translated speech bubble grew beyond its normal 160px footprint. Reserve
+ * the measured overflow so large text and longer questions cannot sit on top
+ * of the progress panel. The options remain scrollable in the space below.
+ */
+export function companionQuestionnaireHeroSpacer(
+  viewportHeight: number,
+  speechBubbleHeight: number,
+): number {
+  const base = viewportHeight < 720 ? 210 : 238;
+  return base + Math.max(0, speechBubbleHeight - 160);
+}

@@ -11,6 +11,7 @@ import { companionJourneyByFamilyId } from '@/constants/companion-journeys';
 import { quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
 import { BESPOKE_FAMILY_QUEST_PACKS } from '@/constants/katchimera-bespoke-quests';
 import { SPECIALIST_COMPANION_SYSTEMS } from '@/constants/specialist-companion-catalogue';
+import { COMPANION_SPEECH_COPY_LIMITS } from '@/constants/companion-speech-copy';
 import {
   emptyCompanionContentState,
   ensureCompanionInvitation,
@@ -50,6 +51,21 @@ test('all 54 playable Journey families have the evolving authored content contra
     const bondMoment = mossContent.find((item) => item.id === `mossprout:bond:${level}`);
     assert.notDeepEqual(bondMoment?.options, BOND_MOMENT_OPTIONS[level]);
     assert.equal(bondMoment?.options.some((option) => option.id === 'supported'), false);
+  }
+});
+
+test('speech-bubble copy stays within the mobile authoring budget', () => {
+  for (const definition of companionJourneyByFamilyId.values()) {
+    for (const node of definition.nodes) {
+      assert.ok(node.prompt.length <= COMPANION_SPEECH_COPY_LIMITS.prompt, `${definition.familyId}:${node.id} prompt is too long`);
+      assert.ok(node.helperText.length <= COMPANION_SPEECH_COPY_LIMITS.helperText, `${definition.familyId}:${node.id} helper is too long`);
+      assert.ok(node.prompt.length + node.helperText.length <= COMPANION_SPEECH_COPY_LIMITS.combined, `${definition.familyId}:${node.id} combined copy is too long`);
+    }
+  }
+  for (const item of companionContentItems) {
+    assert.ok(item.prompt.length <= COMPANION_SPEECH_COPY_LIMITS.prompt, `${item.id} prompt is too long`);
+    assert.ok(item.helperText.length <= COMPANION_SPEECH_COPY_LIMITS.helperText, `${item.id} helper is too long`);
+    assert.ok(item.prompt.length + item.helperText.length <= COMPANION_SPEECH_COPY_LIMITS.combined, `${item.id} combined copy is too long`);
   }
 });
 

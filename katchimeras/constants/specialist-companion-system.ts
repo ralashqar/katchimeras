@@ -156,7 +156,7 @@ export function createSpecialistCompanionSystem(
         id: goalNodeId,
         kind: 'single_choice',
         createsGoalTypeId: goalTypeId,
-        prompt: `What ${config.subject} direction would feel useful now?`,
+        prompt: 'Which direction would feel useful now?',
         helperText: 'Choose a direction that can fit an ordinary week. You can make it smaller, change it, or pause it later.',
         options: config.directions.map((direction) => ({
           id: direction.id,

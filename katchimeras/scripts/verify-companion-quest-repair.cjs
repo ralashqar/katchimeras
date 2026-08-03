@@ -65,7 +65,7 @@ Module._resolveFilename = function (request, parent, ...rest) {
 };
 
 const { setQuestLoopAfterCompleteEnabled } = require(devSettingsPath);
-const { acceptQuest, completeQuest, evaluateCompanionQuests, hasCompanionQuestForDay, isQuestCompletedForDay, migrateCompanionQuestIdentity, questFor, questOffersForDay, reconcileActiveQuestPool, reconcileCompanionQuestOffer } = require(questsPath);
+const { acceptGameHubQuest, acceptQuest, completeInteractiveQuest, completeQuest, evaluateCompanionQuests, gameHubQuestFor, hasCompanionQuestForDay, isQuestCompletedForDay, migrateCompanionQuestIdentity, questFor, questOffersForDay, reconcileActiveQuestPool, reconcileCompanionQuestOffer, startQuestAttempt } = require(questsPath);
 
 let failures = 0;
 function check(label, condition, detail) {
@@ -435,6 +435,27 @@ const nextDayLoopAccepted = acceptQuest(
 const loopAuto = evaluateCompanionQuests(nextDayLoopAccepted, {}, new Date('2026-07-08T22:30:00').getTime(), null, '2026-07-08');
 check('automatic completion still reports the newly completed quest', loopAuto.completed.length === 1, String(loopAuto.completed.length));
 check('automatic real-life completion remains in history', loopAuto.state.quests.length === 2 && loopAuto.state.quests.every((quest) => Boolean(quest.completedAt)), JSON.stringify(loopAuto.state.quests));
+
+const concurrentCompanion = acceptQuest(
+  { schemaVersion: 4, quests: [], submissions: [], offerCycles: [], attempts: [] },
+  { questId: 'quest-rest-note', creatureId: 'companion:sleep-rest', title: 'Keep a rest note', hint: 'Keep one detail.', dayId: '2026-08-03' },
+  100
+);
+const concurrentHub = acceptGameHubQuest(concurrentCompanion, {
+  questId: 'quest-bedrotte-breathe', creatureId: 'companion:sleep-rest', title: 'Breathe together', hint: 'Take a slow breath.',
+  dayId: '2026-08-03', offerSeed: 'sleep-rest:round', resolvedConfig: { cycles: 4 },
+}, 200);
+check('hub acceptance preserves the companion quest', questFor(concurrentHub.state, 'companion:sleep-rest')?.questId === 'quest-rest-note');
+check('hub acceptance creates a separately addressable run', gameHubQuestFor(concurrentHub.state, 'companion:sleep-rest')?.questId === 'quest-bedrotte-breathe');
+const hubAttempt = startQuestAttempt(concurrentHub.state, {
+  questId: 'quest-bedrotte-breathe', creatureId: 'companion:sleep-rest', dayId: '2026-08-03', seed: 'sleep-rest:round',
+  executionKind: 'paced_breathing', configSnapshot: { cycles: 4 }, questRunId: concurrentHub.quest.questRunId,
+}, 300);
+const hubCompleted = completeInteractiveQuest(hubAttempt.state, {
+  attemptId: hubAttempt.attempt.id, creatureId: 'companion:sleep-rest', dayId: '2026-08-03',
+  result: { kind: 'paced_breathing', success: true, completedCycles: 4, durationMs: 40000 },
+}, 400);
+check('hub completion targets only its quest run', !questFor(hubCompleted, 'companion:sleep-rest')?.completedAt && hubCompleted.quests.find((quest) => quest.questRunId === concurrentHub.quest.questRunId)?.completedAt === 400);
 
 console.log(failures === 0 ? '\nAll companion quest repair checks passed.' : `\n${failures} check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

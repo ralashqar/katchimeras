@@ -6,6 +6,9 @@ import test from 'node:test';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
 import type { KingdomCreature } from '@/types/kingdom';
 import type { KingdomResident } from '@/utils/kingdom-residents';
+import { katchimeraFamilies } from '@/constants/katchimera-skins';
+import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { deriveKingdom } from '@/utils/kingdom-engine';
 import {
   buildKatchimeraRoster,
   featuredKatchimera,
@@ -99,6 +102,20 @@ const roster = buildKatchimeraRoster({
   statusByCreatureId: { 'companion:steppling': 'ready' },
 });
 
+test('the dev availability layer adds every renderable family without changing real progression', () => {
+  const emptyKingdom = deriveKingdom([]);
+  const disabled = withDevAvailableKatchimeras(emptyKingdom, false);
+  const enabled = withDevAvailableKatchimeras(emptyKingdom, true);
+  const renderableFamilies = katchimeraFamilies.filter((family) => family.anchorVisualKey);
+
+  assert.equal(disabled, emptyKingdom);
+  assert.equal(enabled.creatures.length, renderableFamilies.length);
+  assert.equal(new Set(enabled.creatures.map((creature) => creature.familyId)).size, renderableFamilies.length);
+  assert.equal(enabled.totals.daysHatched, 0);
+  assert.equal(enabled.builtFromDayCount, 0);
+  assert.equal(enabled.creatures.every((creature) => creature.creatureId === `companion:${creature.familyId}`), true);
+});
+
 test('the roster contains one owned card per logical companion and uses its latest skin', () => {
   const owned = roster.filter(
     (item): item is KatchimeraOwnedRosterItem => item.kind === 'owned',
@@ -171,6 +188,24 @@ test('the bottom bar exposes Katchimeras while retaining the hidden world route'
   assert.match(worldRoute, /KingdomCompanionScreen/);
 });
 
+test('the dev toggle exposes virtual companions across roster, companion, games, goals, and Dex surfaces', () => {
+  const read = (...segments: string[]) => fs.readFileSync(path.join(process.cwd(), ...segments), 'utf8');
+  const devTab = read('app', '(tabs)', 'explore.tsx');
+  const rosterRoute = read('components', 'katchadeck', 'roster', 'katchimera-roster-route-screen.tsx');
+  const companionRoute = read('components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx');
+  const gamesRoute = read('components', 'katchadeck', 'games', 'game-hub-route-screen.tsx');
+  const today = read('app', '(tabs)', 'today.tsx');
+  const collection = read('app', '(tabs)', 'collection.tsx');
+
+  assert.match(devTab, /Make all Katchimeras available/);
+  assert.match(devTab, /setAllKatchimerasAvailableEnabled/);
+  assert.match(rosterRoute, /withDevAvailableKatchimeras/);
+  assert.match(companionRoute, /withDevAvailableKatchimeras/);
+  assert.match(gamesRoute, /withDevAvailableKatchimeras/);
+  assert.match(today, /allKatchimerasAvailable[\s\S]*katchimeraFamilies/);
+  assert.match(collection, /unlockAll: allKatchimerasAvailable/);
+});
+
 test('the roster, companion, and Block Blast use isolated route boundaries', () => {
   const tabRoute = fs.readFileSync(
     path.join(process.cwd(), 'app', '(tabs)', 'katchimeras.tsx'),
@@ -192,6 +227,10 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
     path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-route-screen.tsx'),
     'utf8',
   );
+  const gameShell = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'quests', 'block-blast-game-shell.tsx'),
+    'utf8',
+  );
 
   assert.match(tabRoute, /KatchimeraRosterRouteScreen/);
   assert.doesNotMatch(tabRoute, /KingdomCompanionScreen/);
@@ -211,8 +250,9 @@ test('the roster, companion, and Block Blast use isolated route boundaries', () 
   assert.match(rosterRoute, /useIsFocused/);
   assert.match(rosterRoute, /isFocused \? <FocusedKatchimeraRoster \/> : null/);
   assert.match(gameRoute, /BlockBlastQuest/);
-  assert.match(gameRoute, /cheerlet-exploration-v1\.png/);
-  assert.match(gameRoute, /AmbientEnvironmentDrift/);
+  assert.match(gameRoute, /BlockBlastGameShell/);
+  assert.match(gameShell, /cheerlet-exploration-v1\.png/);
+  assert.match(gameShell, /AmbientEnvironmentDrift/);
   assert.doesNotMatch(gameRoute, /CompanionInteractionSheet|TodaySceneBackdrop|CompanionGameBackdrop/);
 });
 

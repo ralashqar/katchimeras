@@ -1,5 +1,3 @@
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -7,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AmbientEnvironmentDrift } from '@/components/katchadeck/ui/ambient-environment-drift';
+import { BlockBlastGameShell } from '@/components/katchadeck/world/quests/block-blast-game-shell';
 import { BlockBlastQuest } from '@/components/katchadeck/world/quests/block-blast-quest';
 import { QuestExperienceAutoStartProvider } from '@/components/katchadeck/world/quests/quest-experience-ui';
 import { homeRepository } from '@/storage/repositories/home-repository';
@@ -34,8 +32,6 @@ type BlockBlastConfig = {
   boardSize?: 8;
   mode?: 'endless';
 };
-
-const CHEERLET_PARTY_BACKGROUND = require('../../../../assets/images/katchimeras/world/backgrounds/cheerlet-exploration-v1.png');
 
 function loadQuestState() {
   const homeState = homeRepository.load();
@@ -142,26 +138,7 @@ export function BlockBlastRouteScreen({
   }
 
   return (
-    <View style={styles.screen}>
-      <AmbientEnvironmentDrift>
-        <Image
-          allowDownscaling
-          cachePolicy="memory-disk"
-          contentFit="cover"
-          pointerEvents="none"
-          priority="high"
-          recyclingKey="block-blast-cheerlet-party-background"
-          source={CHEERLET_PARTY_BACKGROUND}
-          style={StyleSheet.absoluteFill}
-          transition={0}
-        />
-      </AmbientEnvironmentDrift>
-      <LinearGradient
-        colors={['rgba(255,246,220,0.12)', 'rgba(255,239,205,0.04)', 'rgba(33,18,43,0.24)']}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={{ flex: 1, paddingTop: insets.top + 8, paddingBottom: Math.max(10, insets.bottom + 8), paddingHorizontal: 14 }}>
+    <BlockBlastGameShell>
         <QuestExperienceAutoStartProvider enabled>
           <BlockBlastQuest
             config={config}
@@ -172,13 +149,11 @@ export function BlockBlastRouteScreen({
             onRunningChange={() => undefined}
           />
         </QuestExperienceAutoStartProvider>
-      </View>
-    </View>
+    </BlockBlastGameShell>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#9DCB6A' },
   invalid: { alignItems: 'center', backgroundColor: '#11131B', flex: 1, gap: 18, justifyContent: 'center', paddingHorizontal: 28 },
   invalidTitle: { fontFamily: AppFontFamilies.instrumentSerif, fontSize: 28, lineHeight: 34, textAlign: 'center' },
   backButton: { backgroundColor: Lantern.ember300, borderCurve: 'continuous', borderRadius: 999, minHeight: 44, justifyContent: 'center', paddingHorizontal: 18 },

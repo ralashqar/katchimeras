@@ -235,7 +235,7 @@ const flexel = focusedPracticeJourney({
   secondPrompt: 'What most affects whether training fits?',
   secondHelperText: 'Pain, symptoms, access, uncertainty, and recovery needs are real constraints—not failures of motivation.',
   secondOptions: ['Finding time or access', 'Knowing what suits my body', 'Confidence or belonging', 'Pain, fatigue, or recovery', 'Equipment or support needs'],
-  goalHelperText: 'Choose one adaptable direction. Reducing, changing, resting, or getting appropriate guidance can all be part of the Focus.',
+  goalHelperText: 'Choose an adaptable direction. Reducing, changing, resting, or getting appropriate guidance can all belong in the Focus.',
   directions: [
     { label: 'Find a repeatable, flexible rhythm', goalTitle: 'Build a flexible training rhythm that suits my capacity', quickGoals: ['flexel:show-up', 'flexel:weekday-training'] },
     { label: 'Build useful strength gradually', goalTitle: 'Explore gradual strength progress without comparison', quickGoals: ['flexel:one-exercise', 'flexel:record-set'] },
@@ -331,7 +331,7 @@ const snuglet = focusedPracticeJourney({
   secondPrompt: 'What makes care feel hardest right now?',
   secondHelperText: 'Name the constraint without blaming yourself or the person receiving care.',
   secondOptions: ['Too much to hold', 'Unpredictable or changing needs', 'My health, energy, or limits', 'Not enough practical support', 'Systems, cost, or service barriers'],
-  goalHelperText: 'Choose one direction within your control. Asking, delegating, setting limits, and leaving non-urgent tasks undone are valid.',
+  goalHelperText: 'Choose what is within your control. Asking, delegating, setting limits, and leaving non-urgent tasks undone are valid.',
   directions: [
     { label: 'Make routines gentler', goalTitle: 'Create one gentler care routine', quickGoals: ['snuglet:prepare-routine', 'snuglet:tomorrow-easier'] },
     { label: 'Protect connection without forcing it', goalTitle: 'Make room for care that respects both people’s needs', quickGoals: ['snuglet:full-attention', 'snuglet:name-good'] },
@@ -355,7 +355,7 @@ const waglet = focusedPracticeJourney({
   secondPrompt: 'What most affects the shared routine?',
   secondHelperText: 'Health, stress, environment, access, and human capacity can matter more than consistency.',
   secondOptions: ['Time or human capacity', 'Weather, routes, or access', 'The dog’s health, age, or energy', 'Stress, fear, or overstimulation', 'Knowing when to get qualified help'],
-  goalHelperText: 'Choose a kind, observable direction. Respect opting out and seek qualified veterinary or behaviour support for concerning changes.',
+  goalHelperText: 'Choose a kind, observable direction. Respect opting out and seek qualified support for concerning changes.',
   directions: [
     { label: 'Make walks or outdoor time suit us', goalTitle: 'Adapt dog walks or outdoor time to our shared needs', quickGoals: ['waglet:present-walk', 'waglet:fresh-route'] },
     { label: 'Offer choice in play and enrichment', goalTitle: 'Build a small dog-play rhythm led by choice', quickGoals: ['waglet:five-play', 'waglet:weekday-routine'] },
@@ -379,7 +379,7 @@ const whiskit = focusedPracticeJourney({
   secondPrompt: 'What most affects the shared routine?',
   secondHelperText: 'Health, stress, environment, resources, and human capacity can matter more than consistency.',
   secondOptions: ['Time or human capacity', 'Space, noise, or household change', 'The cat’s health, age, or energy', 'Stress, fear, or overstimulation', 'Knowing when to get qualified help'],
-  goalHelperText: 'Choose a kind, observable direction. Respect disengagement and seek qualified veterinary or behaviour support for concerning changes.',
+  goalHelperText: 'Choose a kind, observable direction. Respect disengagement and seek qualified support for concerning changes.',
   directions: [
     { label: 'Offer choice in play', goalTitle: 'Build a small cat-play rhythm led by choice', quickGoals: ['whiskit:five-play', 'whiskit:follow-curiosity'] },
     { label: 'Support enrichment and safe space', goalTitle: 'Offer enrichment and spaces that suit my cat', quickGoals: ['whiskit:enrichment', 'whiskit:refresh-space'] },
@@ -591,7 +591,7 @@ const mendle = threeQuestionJourney({
   second: {
     id: 'repair-friction',
     prompt: 'What tends to make recovery harder?',
-    helperText: 'Name the pressure without blaming yourself. If everyday tools are not enough, human or professional support belongs in the answer.',
+    helperText: 'Name the pressure without blame. If everyday tools are not enough, human or professional support belongs in the answer.',
     options: [
       { id: 'push', label: 'I keep pushing through' },
       { id: 'judge', label: 'I judge the feeling' },

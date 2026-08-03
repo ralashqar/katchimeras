@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { KatchimeraRosterScreen } from '@/components/katchadeck/roster/katchimera-roster-screen';
 import { useAllDays } from '@/hooks/use-all-days';
+import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { homeRepository } from '@/storage/repositories/home-repository';
 import type { KingdomCreature } from '@/types/kingdom';
 import { companionBondProgress } from '@/utils/companion-bond';
@@ -21,6 +22,7 @@ import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
 import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
 import { deriveKingdom } from '@/utils/kingdom-engine';
 import { deriveResidents, type HatchRecord } from '@/utils/kingdom-residents';
+import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
 
 function hatchTimestamp(creature: KingdomCreature, index: number): number {
   const time = Date.parse(`${creature.isoDate}T00:00:00`);
@@ -70,6 +72,7 @@ export function KatchimeraRosterRouteScreen() {
 
 function FocusedKatchimeraRoster() {
   const router = useRouter();
+  const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   // This component is created fresh for every focus session, so its lazy
   // initializer already reads the latest persisted days. Refreshing on that
   // same initial focus would rebuild the just-mounted grid a second time.
@@ -93,8 +96,11 @@ function FocusedKatchimeraRoster() {
   );
 
   const kingdom = useMemo(
-    () => applyWardrobeToKingdom(deriveKingdom(days), persistent.wardrobe),
-    [days, persistent.wardrobe],
+    () => applyWardrobeToKingdom(
+      withDevAvailableKatchimeras(deriveKingdom(days), allKatchimerasAvailable),
+      persistent.wardrobe,
+    ),
+    [allKatchimerasAvailable, days, persistent.wardrobe],
   );
   const hatches = useMemo<HatchRecord[]>(
     () => kingdom.creatures.map((creature, index) => ({

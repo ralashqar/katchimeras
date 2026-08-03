@@ -6,6 +6,19 @@ remaining companion from modular fallback copy to a fully authored content set.
 Batch status and family-specific risk briefs are tracked in
 [`companion-editorial-rollout.md`](./companion-editorial-rollout.md).
 
+## Speech-bubble copy budget
+
+Questionnaire prompts and daily-invitation questions share a compact speech
+bubble above the answer panel. Keep the prompt at or below 80 characters, its
+helper text at or below 120 characters, and both together at or below 170
+characters. Put nuance into answer choices, later questions, or quest guidance
+instead of building one dense bubble. Repository validation rejects content
+that exceeds these limits.
+
+The UI also measures the rendered bubble. If wrapping, screen size, or Dynamic
+Type makes it taller than its normal footprint, the scrollable answer panel is
+pushed down by the exact overflow rather than being covered.
+
 ## Product and audience
 
 Katchimeras is a local-first consumer wellbeing and life-reflection product. It

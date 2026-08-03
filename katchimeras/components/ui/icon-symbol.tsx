@@ -90,6 +90,7 @@ const MAPPING = {
   'gearshape.fill': 'settings',
   'pencil': 'edit',
   'trash.fill': 'delete',
+  'lock.fill': 'lock',
   'diamond.fill': 'diamond',
   'flame.fill': 'local-fire-department',
   'chevron.down': 'keyboard-arrow-down',

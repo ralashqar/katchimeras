@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator,
+  BackHandler,
   type LayoutChangeEvent,
   ScrollView,
   StyleSheet,
@@ -10,7 +11,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
@@ -48,6 +57,7 @@ import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock'
 import {
   QuickGoalsSheet,
 } from '@/components/katchadeck/goals/companion-quick-goals';
+import { TodayGoalsExperience } from '@/components/katchadeck/goals/today-goals-experience';
 import { DayComicOverlay } from '@/components/katchadeck/home/day-comic-overlay';
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
 import { TodaySheetHost } from '@/components/katchadeck/home/today-sheet-host';
@@ -61,6 +71,7 @@ import todayScene from '@/data/today-scene.json';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
+import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { useBackfillStatus } from '@/utils/backfill-status';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
@@ -108,7 +119,8 @@ import {
   todayKatchimeraExplorationBackgroundKeyForPresentation,
   type TodayExplorationBackgroundKey,
 } from '@/utils/today-exploration-backgrounds';
-import { companionIdForFamily } from '@/constants/katchimera-skins';
+import { companionIdForFamily, katchimeraFamilies } from '@/constants/katchimera-skins';
+import { companionDestinationStageLift } from '@/utils/companion-home-layout';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import {
   activeSemanticQuestPrompt,
@@ -152,12 +164,14 @@ const QUICK_PROMPT_CATEGORIES: {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [homeArchetypeId, setHomeArchetypeId] = useState(() => loadWorldIdentity().selectedHomeArchetypeId);
   const [heroStageTop, setHeroStageTop] = useState<number | null>(null);
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
   const [quickGoalsOpen, setQuickGoalsOpen] = useState(false);
+  const [quickGoalSheetMode, setQuickGoalSheetMode] = useState<'add' | 'manage' | null>(null);
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
     completion: CompanionQuickGoalCompletion;
     goal: CompanionQuickGoal;
@@ -221,6 +235,11 @@ export default function HomeScreen() {
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
   const quickGoalFamilyIds = useMemo(() => {
+    if (allKatchimerasAvailable) {
+      return katchimeraFamilies
+        .filter((family) => family.anchorVisualKey && hasQuickGoalTemplates(family.id))
+        .map((family) => family.id);
+    }
     const ids = new Set<KatchimeraFamilyId>();
     for (const day of allDays) {
       if (!day.creature) continue;
@@ -228,12 +247,14 @@ export default function HomeScreen() {
       if (familyId && hasQuickGoalTemplates(familyId)) ids.add(familyId);
     }
     return [...ids];
-  }, [allDays]);
+  }, [allDays, allKatchimerasAvailable]);
   const quickGoals = useCompanionQuickGoals({
     dayId: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay.isoDate : null,
     availableFamilyIds: quickGoalFamilyIds,
   });
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
+  const reduceMotion = useReducedMotion();
+  const goalsFocusProgress = useSharedValue(0);
   const backfillStatus = useBackfillStatus();
   const {
     eggFeed,
@@ -862,6 +883,7 @@ export default function HomeScreen() {
     if (
       !active ||
       isHatching ||
+      quickGoalsOpen ||
       timelineDay.kind !== 'day' ||
       !timelineDay.isToday ||
       timelineDay.state === 'hatched'
@@ -881,7 +903,7 @@ export default function HomeScreen() {
         {countdown}
       </TodayKingdomEggOverlay>
     );
-  }, [explorationBackgroundActive, homeArchetypeId, isHatching, resolvedHeroStageTop]);
+  }, [explorationBackgroundActive, homeArchetypeId, isHatching, quickGoalsOpen, resolvedHeroStageTop]);
 
   const {
     cameraProgress,
@@ -896,7 +918,7 @@ export default function HomeScreen() {
     timelineDays,
     isTodayHatched,
     isHatching,
-    promptSheetOpen: promptSheetOpen || hatchCheckInOpen,
+    promptSheetOpen: promptSheetOpen || hatchCheckInOpen || quickGoalsOpen,
     comicOpen: Boolean(comicGen),
     selectTimelineDay,
     startEggFeed,
@@ -914,6 +936,7 @@ export default function HomeScreen() {
   // highest-rarity pending unlock first (same order as the World page).
   const flowBusy =
     isHatching ||
+    quickGoalsOpen ||
     hatchCheckInOpen ||
     hasActivePrompt ||
     promptSheetOpen ||
@@ -1001,10 +1024,42 @@ export default function HomeScreen() {
       current == null || Math.abs(current - nextTop) > 0.5 ? nextTop : current
     ));
   }, []);
+  useEffect(() => {
+    goalsFocusProgress.value = reduceMotion
+      ? quickGoalsOpen ? 1 : 0
+      : withTiming(quickGoalsOpen ? 1 : 0, {
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+        });
+  }, [goalsFocusProgress, quickGoalsOpen, reduceMotion]);
+  useEffect(() => {
+    if (!quickGoalsOpen) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (quickGoalSheetMode) {
+        setQuickGoalSheetMode(null);
+      } else {
+        setQuickGoalsOpen(false);
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [quickGoalSheetMode, quickGoalsOpen]);
+  const goalsLift = companionDestinationStageLift(windowHeight);
+  const goalsSceneLiftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -goalsLift * goalsFocusProgress.value }],
+  }));
+  const goalsChromeStyle = useAnimatedStyle(() => ({
+    opacity: 1 - goalsFocusProgress.value,
+  }));
+  const goalsListTop = Math.max(
+    insets.top + 248,
+    Math.min(390, windowHeight * (windowHeight < 735 ? 0.4 : 0.43)),
+  );
   return (
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>
       {explorationPresentationActive ? (
         <View
           pointerEvents="none"
@@ -1091,6 +1146,7 @@ export default function HomeScreen() {
           scene={null}
         />
       )}
+      </Animated.View>
       {/* Today is a FIXED composition — no page scrolling; everything anchors.
           (Readers/sheets keep their own scrolling.) The ScrollView shell stays
           for layout parity but is locked. */}
@@ -1101,7 +1157,10 @@ export default function HomeScreen() {
         scrollEnabled={false}
         bounces={false}
         showsVerticalScrollIndicator={false}>
-        <Animated.View entering={presenceEnter(20)} style={styles.timelineLayer}>
+        <Animated.View
+          entering={presenceEnter(20)}
+          pointerEvents={quickGoalsOpen ? 'none' : 'auto'}
+          style={[styles.timelineLayer, goalsChromeStyle]}>
           <LanternTimeline
             days={timelineDays}
             hatchPresentation={hatchPresentation}
@@ -1115,7 +1174,7 @@ export default function HomeScreen() {
           ref={heroStageRef}
           entering={presenceEnter(70)}
           onLayout={handleHeroStageLayout}
-          style={styles.heroStage}>
+          style={[styles.heroStage, goalsSceneLiftStyle]}>
           {explorationPresentationActive && selectedDay ? (
             <>
               {displayedExplorationPrevious ? (
@@ -1161,7 +1220,7 @@ export default function HomeScreen() {
                     />
                   </TodayKingdomEggAboveOverlay>
                 ) : null}
-                {!hasActivePrompt ? (
+                {!hasActivePrompt && !quickGoalsOpen ? (
                   <TodayCategoryRing
                     categories={goalRingItems}
                     onPress={() => setQuickGoalsOpen(true)}
@@ -1224,7 +1283,7 @@ export default function HomeScreen() {
               ) : null}
               {/* The same category ring circles the hatched creature when
                   revisiting a day, anchored to the shared art stage. */}
-              {(isForming || isHatched) && !isHatching && !hasActivePrompt ? (
+              {(isForming || isHatched) && !isHatching && !hasActivePrompt && !quickGoalsOpen ? (
                 <TodayCategoryRing
                   categories={goalRingItems}
                   onPress={() => setQuickGoalsOpen(true)}
@@ -1261,7 +1320,29 @@ export default function HomeScreen() {
           page collapsed and during the hatch reveal. The panel also shows on
           the TOMORROW view once today has hatched (viewedDay resolves it);
           before the hatch, tomorrow stays a locked egg with no panel. */}
-      {!isHatching && !hasActivePrompt ? (
+      {quickGoalsOpen && selectedDay?.kind === 'day' && selectedDay.isToday ? (
+        <TodayGoalsExperience
+          actions={{
+            onCompleteGoal: quickGoals.completeGoal,
+            onUndoGoal: quickGoals.undoGoal,
+            onSnoozeGoal: quickGoals.snoozeGoal,
+            onSkipGoal: quickGoals.skipGoal,
+          }}
+          dayId={selectedDay.isoDate}
+          familyIds={quickGoalFamilyIds}
+          headerTop={insets.top + 10}
+          listTop={goalsListTop}
+          onAdd={() => setQuickGoalSheetMode('add')}
+          onBack={() => setQuickGoalsOpen(false)}
+          onManage={() => setQuickGoalSheetMode('manage')}
+          onRemember={(completion, goal) => {
+            setQuickGoalsOpen(false);
+            setQuickGoalJournal({ completion, goal });
+          }}
+          state={quickGoals.state}
+        />
+      ) : null}
+      {!isHatching && !hasActivePrompt && !quickGoalsOpen ? (
         <TodayBottomDock
           canHatch={isDay ? selectedDay.canHatch : false}
           isForming={isForming}
@@ -1399,7 +1480,7 @@ export default function HomeScreen() {
           }}
         />
       ) : null}
-      {quickGoalsOpen && selectedDay?.kind === 'day' && selectedDay.isToday ? (
+      {quickGoalSheetMode && selectedDay?.kind === 'day' && selectedDay.isToday ? (
         <QuickGoalsSheet
           actions={{
             onAddTemplate: quickGoals.addTemplate,
@@ -1412,8 +1493,10 @@ export default function HomeScreen() {
           }}
           dayId={selectedDay.isoDate}
           familyIds={quickGoalFamilyIds}
-          onClose={() => setQuickGoalsOpen(false)}
+          initialMode={quickGoalSheetMode}
+          onClose={() => setQuickGoalSheetMode(null)}
           onRemember={(completion, goal) => {
+            setQuickGoalSheetMode(null);
             setQuickGoalsOpen(false);
             setQuickGoalJournal({ completion, goal });
           }}

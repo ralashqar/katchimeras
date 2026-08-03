@@ -27,6 +27,7 @@ import { Meadow } from '@/constants/meadow-theme';
 import type { HomeVisualKey } from '@/types/home';
 import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
+import { companionQuestionnaireHeroSpacer } from '@/utils/companion-home-layout';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
 import { CompanionCinematicStage } from './companion-cinematic-stage';
 
@@ -76,7 +77,7 @@ export function CompanionQuestionnaireScene({
   const reduceMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
-  const compact = height < 720;
+  const [speechBubbleHeight, setSpeechBubbleHeight] = useState(0);
   const [selection, setSelection] = useState<{ question: string; optionId: string | null }>({
     optionId: null,
     question: title,
@@ -121,6 +122,7 @@ export function CompanionQuestionnaireScene({
         environmentKey={environmentKey}
         lifted
         name={companionName}
+        onSpeechBubbleHeightChange={setSpeechBubbleHeight}
         title={title}
         visualKey={visualKey}
       />
@@ -139,7 +141,10 @@ export function CompanionQuestionnaireScene({
           </View>
         </View>
 
-        <View pointerEvents="none" style={{ height: compact ? 210 : 238 }} />
+        <View
+          pointerEvents="none"
+          style={{ height: companionQuestionnaireHeroSpacer(height, speechBubbleHeight) }}
+        />
 
         <View style={styles.interactionPanel}>
           <View style={styles.progressBlock}>

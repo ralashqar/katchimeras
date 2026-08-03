@@ -27,6 +27,7 @@ export type CompanionQuest = {
   resolvedConfig?: Record<string, unknown>;
   questRunId?: string;
   presentationVariantId?: string;
+  source?: 'companion' | 'game_hub';
 };
 
 export type QuestSubmissionRecord = {
@@ -59,7 +60,7 @@ export type QuestOfferCycle = {
 };
 
 export type CompanionQuestState = {
-  schemaVersion: 2 | 3;
+  schemaVersion: 2 | 3 | 4;
   quests: CompanionQuest[];
   submissions: QuestSubmissionRecord[];
   offerCycles: QuestOfferCycle[];
@@ -74,7 +75,7 @@ export function loadCompanionQuests(
   resolveCompanionId: (value: string) => string = (value) => value
 ): CompanionQuestState {
   const value = getStoredJson<CompanionQuestState>(KEY, emptyCompanionQuestState());
-  const needsRunMigration = value.schemaVersion !== 3 || value.quests.some((quest) => !quest.questRunId);
+  const needsRunMigration = value.schemaVersion !== 4 || value.quests.some((quest) => !quest.questRunId || !quest.source);
   const normalized = normaliseState(value, true);
   const migrated = migrateCompanionQuestIdentity(normalized, resolveCompanionId);
   if (needsRunMigration || migrated !== normalized) setStoredJson(KEY, migrated);
@@ -86,7 +87,7 @@ export function saveCompanionQuests(state: CompanionQuestState) {
 }
 
 export function emptyCompanionQuestState(): CompanionQuestState {
-  return { schemaVersion: 3, quests: [], submissions: [], offerCycles: [], attempts: [] };
+  return { schemaVersion: 4, quests: [], submissions: [], offerCycles: [], attempts: [] };
 }
 
 export function migrateCompanionQuestIdentity(
@@ -211,7 +212,19 @@ export function activeQuests(state: CompanionQuestState): CompanionQuest[] {
 }
 
 export function questFor(state: CompanionQuestState, creatureId: string): CompanionQuest | null {
-  return activeQuests(state).find((quest) => quest.creatureId === creatureId) ?? null;
+  return activeQuests(state).find((quest) => quest.creatureId === creatureId && quest.source !== 'game_hub') ?? null;
+}
+
+export function gameHubQuestFor(
+  state: CompanionQuestState,
+  creatureId: string,
+  questId?: string
+): CompanionQuest | null {
+  return activeQuests(state).find((quest) =>
+    quest.source === 'game_hub'
+    && quest.creatureId === creatureId
+    && (!questId || quest.questId === questId)
+  ) ?? null;
 }
 
 export function hasCompanionQuestForDay(
@@ -324,8 +337,49 @@ export function acceptQuest(
         resolvedConfig: offer.resolvedConfig,
         questRunId,
         presentationVariantId: offer.presentationVariantId,
+        source: 'companion',
       },
     ],
+  };
+}
+
+/**
+ * Start a foreground game-hub quest without displacing the companion's
+ * accepted quest. Only one hub run is kept active because the app can present
+ * only one foreground game at a time.
+ */
+export function acceptGameHubQuest(
+  state: CompanionQuestState,
+  offer: {
+    questId: string;
+    creatureId: string;
+    title: string;
+    hint: string;
+    dayId: string;
+    offerSeed: string;
+    resolvedConfig: Record<string, unknown>;
+  },
+  acceptedAt: number
+): { state: CompanionQuestState; quest: CompanionQuest } {
+  const matching = gameHubQuestFor(state, offer.creatureId, offer.questId);
+  if (matching) return { state, quest: matching };
+  const questRunId = createQuestRunId(offer.questId, offer.creatureId, acceptedAt);
+  const quest: CompanionQuest = {
+    ...offer,
+    acceptedAt,
+    acceptedDayId: offer.dayId,
+    questRunId,
+    source: 'game_hub',
+  };
+  return {
+    state: {
+      ...state,
+      quests: [
+        ...state.quests.filter((item) => item.completedAt || item.source !== 'game_hub'),
+        quest,
+      ],
+    },
+    quest,
   };
 }
 
@@ -348,7 +402,7 @@ export function reconcileCompanionQuestOffer(
   return {
     ...state,
     quests: state.quests.map((quest) =>
-      quest.creatureId === offer.creatureId && !quest.completedAt
+      quest.creatureId === offer.creatureId && quest.source !== 'game_hub' && !quest.completedAt
         ? {
             ...quest,
             ...offer,
@@ -380,6 +434,7 @@ export function evaluateCompanionQuests(
 ): { state: CompanionQuestState; completed: CompanionQuest[] } {
   const completed: CompanionQuest[] = [];
   const quests = state.quests.map((quest) => {
+    if (quest.source === 'game_hub') return quest;
     const runtime = evaluateQuestRuntime({ questId: quest.questId, facts, capabilities });
     if (quest.completedAt || !runtime.complete) {
       return quest;
@@ -400,10 +455,33 @@ export function completeQuest(
   return {
     ...state,
     quests: state.quests.map((quest) =>
-      quest.creatureId === creatureId && !quest.completedAt
+      quest.creatureId === creatureId && quest.source !== 'game_hub' && !quest.completedAt
         ? { ...quest, completedAt, completedDayId: dayId ?? localDayId(completedAt) }
         : quest
     ),
+  };
+}
+
+export function completeQuestRun(
+  state: CompanionQuestState,
+  questRunId: string,
+  completedAt: number,
+  dayId?: string | null
+): CompanionQuestState {
+  return {
+    ...state,
+    quests: state.quests.map((quest) =>
+      quest.questRunId === questRunId && !quest.completedAt
+        ? { ...quest, completedAt, completedDayId: dayId ?? localDayId(completedAt) }
+        : quest
+    ),
+  };
+}
+
+export function releaseGameHubQuest(state: CompanionQuestState, questRunId: string): CompanionQuestState {
+  return {
+    ...state,
+    quests: state.quests.filter((quest) => quest.questRunId !== questRunId || Boolean(quest.completedAt)),
   };
 }
 
@@ -413,7 +491,9 @@ export function releaseActiveQuest(
 ): CompanionQuestState {
   return {
     ...state,
-    quests: state.quests.filter((quest) => quest.creatureId !== creatureId || Boolean(quest.completedAt)),
+    quests: state.quests.filter((quest) =>
+      quest.creatureId !== creatureId || quest.source === 'game_hub' || Boolean(quest.completedAt)
+    ),
   };
 }
 
@@ -484,10 +564,11 @@ export function isSubmittedForQuest(
 
 function normaliseState(value: CompanionQuestState | null | undefined, cancelInterrupted = false): CompanionQuestState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     quests: value && Array.isArray(value.quests) ? value.quests.map((quest) => ({
       ...quest,
       questRunId: quest.questRunId ?? createQuestRunId(quest.questId, quest.creatureId, quest.acceptedAt),
+      source: quest.source ?? 'companion',
     })) : [],
     submissions: value && Array.isArray(value.submissions) ? value.submissions : [],
     offerCycles: value && Array.isArray(value.offerCycles) ? value.offerCycles : [],
@@ -512,6 +593,7 @@ export function startQuestAttempt(
     attempt.questId === input.questId &&
     attempt.creatureId === input.creatureId &&
     attempt.dayId === input.dayId &&
+    (attempt.questRunId ?? null) === (input.questRunId ?? null) &&
     attempt.status === 'running'
   );
   if (running) return { state, attempt: running };
@@ -551,7 +633,9 @@ export function completeInteractiveQuest(
         : attempt
     ),
   };
-  return completeQuest(withResult, input.creatureId, completedAt, input.dayId);
+  return existing.questRunId
+    ? completeQuestRun(withResult, existing.questRunId, completedAt, input.dayId)
+    : completeQuest(withResult, input.creatureId, completedAt, input.dayId);
 }
 
 function withPersonalBest(state: CompanionQuestState, questId: string, result: QuestResult): QuestResult {

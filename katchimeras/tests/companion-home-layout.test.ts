@@ -5,6 +5,7 @@ import {
   companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
   companionHomeStageLayout,
+  companionQuestionnaireHeroSpacer,
   companionQuestListSpacer,
   companionSpeechBubbleDrop,
 } from '../utils/companion-home-layout';
@@ -68,4 +69,12 @@ test('quest list uses a compact responsive handoff beneath the cinematic stage',
   assert.equal(companionQuestListSpacer(568), 176);
   assert.ok(Math.abs(companionQuestListSpacer(844) - 198.34) < 0.0001);
   assert.equal(companionQuestListSpacer(1194), 216);
+});
+
+test('questionnaire spacer grows with measured speech copy instead of allowing overlap', () => {
+  assert.equal(companionQuestionnaireHeroSpacer(700, 0), 210);
+  assert.equal(companionQuestionnaireHeroSpacer(700, 160), 210);
+  assert.equal(companionQuestionnaireHeroSpacer(700, 228), 278);
+  assert.equal(companionQuestionnaireHeroSpacer(844, 160), 238);
+  assert.equal(companionQuestionnaireHeroSpacer(844, 250), 328);
 });

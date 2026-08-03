@@ -57,6 +57,7 @@ type Props = {
   onAttemptStart: (config: Record<string, unknown>) => string;
   onAttemptCancel: (id: string) => void;
   onComplete: (id: string, result: QuestResult) => void;
+  onRequestExit?: () => void;
   onRunningChange: (running: boolean, id?: string | null) => void;
 };
 
@@ -75,7 +76,7 @@ const STREAK_BOUNCE_IN = new Keyframe({
 
 type StreakCallout = { id: number; combo: number };
 
-export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel, onComplete, onRunningChange }: Props) {
+export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel, onComplete, onRequestExit, onRunningChange }: Props) {
   const loadedProfile = useMemo(loadBlockBlastProfile, []);
   const [profile, setProfile] = useState<BlockBlastProfile>(loadedProfile);
   const profileRef = useRef<BlockBlastProfile>(loadedProfile);
@@ -349,9 +350,9 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     <View style={styles.root}>
       <View style={styles.topBar}>
         <KatchimeraBackButton
-          accessibilityHint="Saves this run and returns to Cheerlet"
+          accessibilityHint={onRequestExit ? 'Asks before leaving this round' : 'Saves this run and returns to Cheerlet'}
           accessibilityLabel="Back"
-          onPress={saveAndLeave}
+          onPress={onRequestExit ?? saveAndLeave}
         />
         <View style={styles.topLine}>
           <View style={styles.scoreCenter}>
