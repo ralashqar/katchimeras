@@ -65,7 +65,7 @@ function completedQuest(
 
 test('journey catalogues have valid branches, goal types, and stages', () => {
   assert.deepEqual(validateCompanionJourneyDefinitions(), []);
-  assert.equal(companionJourneyByFamilyId.size, 25);
+  assert.equal(companionJourneyByFamilyId.size, 54);
   assert.ok(companionJourneyByFamilyId.has('cheerlet'));
   assert.ok(companionJourneyByFamilyId.has('coffee-ritual'));
   assert.ok(companionJourneyByFamilyId.has('dawnle'));
@@ -99,11 +99,34 @@ test('every You questionnaire is low-friction multiple choice', () => {
   }
 });
 
+test('an outdated questionnaire session is replaced instead of mixing definition versions', () => {
+  const definition = companionJourneyByFamilyId.get('shellio');
+  assert.equal(definition?.version, 4);
+  const outdated: CompanionJourneyState = {
+    ...emptyCompanionJourneyState(),
+    conversations: [{
+      id: 'shellio-old-water-questionnaire',
+      familyId: 'shellio',
+      definitionId: 'shellio-water-connection',
+      definitionVersion: 3,
+      currentNodeId: 'shellio-conditions',
+      startedAt: 50,
+      answers: [{ nodeId: 'shellio-meaning', value: 'Connection to a place', answeredAt: 60 }],
+    }],
+  };
+
+  assert.equal(activeConversationForFamily(outdated, 'shellio'), null);
+  const restarted = startJourneyConversation(outdated, 'shellio', 100);
+  const active = activeConversationForFamily(restarted, 'shellio');
+  assert.equal(active?.definitionVersion, 4);
+  assert.equal(active?.currentNodeId, 'shellio-meaning');
+});
+
 test('daily-rhythm batch creates actionable Focus goals with scoped suggestions', () => {
   const cases = [
     ['coffee-ritual', ['break', 'skip', 'break'], 'Protect one small drink break in the day'],
     ['errandimp', ['forms', 'batch', 'admin'], 'Handle life admin before it becomes urgent'],
-    ['dawnle', ['quiet', 'phone', 'phone'], 'Keep the first few minutes of the day phone-free'],
+    ['dawnle', ['quiet', 'phone', 'phone'], 'Choose what gets my attention at the start of the day'],
     ['mendle', ['kindness', 'judge', 'kind'], 'Replace harsh self-talk with something fairer'],
     ['quietome', ['question', 'solve', 'question'], 'Stay with one important question without forcing an answer'],
   ] as const;
@@ -145,7 +168,7 @@ test('scaffolded batch journeys create distinct Focus goals and scoped suggestio
 
 test('foundation journeys create plain-language Focus goals with scoped suggestions', () => {
   const cases = [
-    ['steppling', ['energy', 'breaks', 'daily-ten'], 'Make room for a ten-minute walk'],
+    ['steppling', ['energy', 'breaks', 'daily-ten'], 'Make room for short walks'],
     ['feastle', ['connection', 'time', 'shared-food'], 'Create more moments around shared food'],
     ['pagelet', ['subject', 'attention', 'understand-topic'], 'Follow one question until I understand it better'],
     ['mossprout', ['attention', 'street', 'notice-season'], 'Pay attention to small seasonal changes'],
@@ -179,7 +202,11 @@ test('Bedrotte and Snoozle share one Rest Journey, goal ledger, and quest catalo
   state = answerCurrent(state, snoozle.familyId, 'wind-down', 110);
   assert.equal(currentJourneyConversationNode(activeConversationForFamily(state, bedrotte.familyId))?.id, 'wind-down-goal');
   state = answerCurrent(state, bedrotte.familyId, 'quiet-ritual', 120);
-  state = answerCurrent(state, snoozle.familyId, 'switching-off', 130);
+  const restSession = activeConversationForFamily(state, snoozle.familyId)!;
+  const restCompleted = answerJourneyConversation(state, restSession.id, 'switching-off', 130);
+  state = restCompleted.state;
+  assert.equal(restCompleted.completed, true);
+  assert.deepEqual(restCompleted.suggestedQuickGoalIds, ['sleep-rest:phone-away', 'sleep-rest:gentler-night']);
   const goal = primaryGoalForFamily(state, bedrotte.familyId);
   assert.equal(goal?.goalTypeId, 'wind-down');
   assert.equal(goalsForJourneyFamily(state, snoozle.familyId)[0]?.id, goal?.id);
@@ -241,7 +268,11 @@ test('Tasklet conversation branches into a persistent goal and follow-up', () =>
   assert.equal(goal?.title, 'Finish the next meaningful project milestone');
   assert.equal(currentJourneyConversationNode(activeConversationForFamily(state, 'tasklet'))?.id, 'friction');
 
-  state = answerCurrent(state, 'tasklet', 'time', 130);
+  const finalSession = activeConversationForFamily(state, 'tasklet')!;
+  const completed = answerJourneyConversation(state, finalSession.id, 'time', 130);
+  state = completed.state;
+  assert.equal(completed.completed, true);
+  assert.deepEqual(completed.suggestedQuickGoalIds, ['tasklet:next-action', 'tasklet:ten-minutes', 'tasklet:focus-block']);
   assert.equal(activeConversationForFamily(state, 'tasklet'), null);
   assert.equal(goalsForJourneyFamily(state, 'tasklet').length, 1);
 });
@@ -264,7 +295,8 @@ test('Vesperitt final question offers suggested goals without requiring custom t
   assert.equal(node?.id, 'understand-goal');
   assert.equal(node?.kind, 'single_choice');
   assert.notEqual(node?.allowCustomText, true);
-  assert.equal(node?.options?.length, 4);
+  assert.ok((node?.options?.length ?? 0) >= 4);
+  assert.equal(node?.options?.some((option) => option.id === 'unavoidable-support'), true);
   assert.deepEqual(
     node?.options?.find((option) => option.id === 'stopping-cues')?.suggestedQuickGoalIds,
     ['vesperitt:end-planned', 'vesperitt:next-morning']
@@ -400,7 +432,7 @@ test('each family keeps one current focus and preserves earlier focuses as pause
   assert.equal(goalsForJourneyFamily(replaced.state, 'tasklet').filter((goal) => goal.status === 'active').length, 1);
 });
 
-test('legacy Rest, Tasklet, and Vesperitt discovery goals migrate once', () => {
+test('legacy foundation and specialist discovery goals migrate once', () => {
   const discovery = {
     schemaVersion: 1 as const,
     answers: [
@@ -428,15 +460,25 @@ test('legacy Rest, Tasklet, and Vesperitt discovery goals migrate once', () => {
         answeredAt: 110,
         goalStatus: 'paused' as const,
       },
+      {
+        id: 'legacy-shellio',
+        familyId: 'shellio',
+        promptId: 'shellio:quest-goal',
+        value: 'Return to the canal safely',
+        answeredAt: 120,
+        goalStatus: 'active' as const,
+      },
     ],
   };
   const first = migrateLegacyDiscoveryGoals(emptyCompanionJourneyState(), discovery, 200);
   const repeated = migrateLegacyDiscoveryGoals(first, discovery, 300);
-  assert.equal(first.goals.length, 3);
-  assert.equal(repeated.goals.length, 3);
+  assert.equal(first.goals.length, 4);
+  assert.equal(repeated.goals.length, 4);
   assert.equal(primaryGoalForFamily(first, 'sleep-rest')?.goalTypeId, 'wind-down');
   assert.equal(primaryGoalForFamily(first, 'tasklet')?.title, 'Finish the launch');
   assert.equal(goalsForJourneyFamily(first, 'vesperitt')[0]?.status, 'paused');
+  assert.equal(primaryGoalForFamily(first, 'shellio')?.goalTypeId, 'shellio-direction');
+  assert.equal(primaryGoalForFamily(first, 'shellio')?.title, 'Return to the canal safely');
 });
 
 test('daily check-ins branch over three taps and reward journey progress only once', () => {
@@ -512,8 +554,8 @@ test('daily check-ins branch over three taps and reward journey progress only on
 
 test('check-ins remain useful without a Journey focus and do not invent tasks', () => {
   const started = startJourneyCheckIn(emptyCompanionJourneyState(), {
-    companionId: 'companion:shellio',
-    familyId: 'shellio',
+    companionId: 'companion:signalhop',
+    familyId: 'signalhop',
     dayId: '2026-07-26',
   }, 100);
   const question = companionCheckInQuestion({
@@ -529,4 +571,80 @@ test('check-ins remain useful without a Journey focus and do not invent tasks', 
     definition: null,
     goal: null,
   }), []);
+});
+
+test('bond invitations use a coherent three-question conversation and repair stale options', () => {
+  const legacyOptions = [
+    { id: 'supported', label: 'It supported me' },
+    { id: 'mixed', label: 'It felt mixed' },
+    { id: 'difficult', label: 'It felt difficult' },
+    { id: 'noticed', label: 'I noticed something new' },
+  ];
+  const correctedOptions = [
+    { id: 'gentle-encouragement', label: 'Encourage me gently' },
+    { id: 'notice-patterns', label: 'Help me notice patterns' },
+    { id: 'small-suggestions', label: 'Keep suggestions small' },
+    { id: 'set-my-pace', label: 'Let me set the pace' },
+  ];
+  let started = startJourneyCheckIn(emptyCompanionJourneyState(), {
+    companionId: 'companion:steppling',
+    familyId: 'steppling',
+    dayId: '2026-08-02',
+    contentItemId: 'steppling:bond:2',
+    contentPrompt: 'What would you like Steppling to understand about you?',
+    contentOptions: legacyOptions,
+  }, 100);
+  let answered = answerJourneyCheckIn(started.state, {
+    checkInId: started.checkIn.id,
+    questionId: 'moment',
+    optionId: 'supported',
+    label: 'It supported me',
+  }, 110);
+  started = startJourneyCheckIn(answered.state, {
+    companionId: 'companion:steppling',
+    familyId: 'steppling',
+    dayId: '2026-08-02',
+    contentItemId: 'steppling:bond:2',
+    contentPrompt: 'What would you like Steppling to understand about you?',
+    contentOptions: correctedOptions,
+  }, 120);
+  assert.deepEqual(started.checkIn.answers, []);
+  assert.deepEqual(started.checkIn.contentOptions, correctedOptions);
+
+  const first = companionCheckInQuestion({
+    checkIn: started.checkIn,
+    definition: companionJourneyByFamilyId.get('steppling')!,
+    role: null,
+    goal: null,
+  });
+  assert.deepEqual(first?.options.map((option) => option.label), correctedOptions.map((option) => option.label));
+
+  answered = answerJourneyCheckIn(started.state, {
+    checkInId: started.checkIn.id,
+    questionId: 'moment',
+    optionId: correctedOptions[0].id,
+    label: correctedOptions[0].label,
+  }, 130);
+  const second = companionCheckInQuestion({
+    checkIn: answered.checkIn!,
+    definition: companionJourneyByFamilyId.get('steppling')!,
+    role: null,
+    goal: null,
+  });
+  assert.equal(second?.prompt, 'Why would that be useful to you?');
+
+  answered = answerJourneyCheckIn(answered.state, {
+    checkInId: started.checkIn.id,
+    questionId: 'effect',
+    optionId: 'feel-supported',
+    label: 'It would help me feel supported',
+  }, 140);
+  const third = companionCheckInQuestion({
+    checkIn: answered.checkIn!,
+    definition: companionJourneyByFamilyId.get('steppling')!,
+    role: null,
+    goal: null,
+  });
+  assert.match(third?.prompt ?? '', /use what you shared/i);
+  assert.equal(third?.options[0]?.label, 'Bring it into future invitations');
 });

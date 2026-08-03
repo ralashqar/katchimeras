@@ -26,6 +26,7 @@ export type CompanionQuest = {
   offerSeed?: string;
   resolvedConfig?: Record<string, unknown>;
   questRunId?: string;
+  presentationVariantId?: string;
 };
 
 export type QuestSubmissionRecord = {
@@ -301,7 +302,7 @@ export function interactionState(
 /** Accept a quest offer; returns null (unchanged) if caps are hit. */
 export function acceptQuest(
   state: CompanionQuestState,
-  offer: { questId: string; creatureId: string; title: string; hint: string; dayId?: string | null; offerSeed?: string; resolvedConfig?: Record<string, unknown> },
+  offer: { questId: string; creatureId: string; title: string; hint: string; dayId?: string | null; offerSeed?: string; resolvedConfig?: Record<string, unknown>; presentationVariantId?: string },
   acceptedAt: number
 ): CompanionQuestState | null {
   if (questFor(state, offer.creatureId)) return null;
@@ -322,6 +323,7 @@ export function acceptQuest(
         offerSeed: offer.offerSeed,
         resolvedConfig: offer.resolvedConfig,
         questRunId,
+        presentationVariantId: offer.presentationVariantId,
       },
     ],
   };

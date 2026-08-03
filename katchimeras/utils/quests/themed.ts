@@ -20,6 +20,7 @@ export type ThemedQuestOffer = {
   artworkKey?: string;
   lane: NonNullable<QuestDefinition['lane']>;
   minimumBondLevel: NonNullable<QuestDefinition['minimumBondLevel']>;
+  presentationVariantId?: string;
 };
 
 const CREATURE_QUEST_POOL: Record<string, string[]> = {

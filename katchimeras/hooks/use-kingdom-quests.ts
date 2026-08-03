@@ -61,6 +61,7 @@ import {
   type CompanionDiscoveryPromptDefinition,
 } from '@/constants/katchimera-roles';
 import { companionJourneyByFamilyId, type CompanionJourneyGoalStatus } from '@/constants/companion-journeys';
+import { companionContentById, companionContentForFamily } from '@/constants/companion-content';
 import {
   activeConversationForFamily,
   answerJourneyCheckIn,
@@ -83,11 +84,20 @@ import {
   type CompanionJourneyCheckInAnswer,
 } from '@/utils/companion-journey';
 import { companionCheckInSuggestedGoalIds } from '@/utils/companion-check-in';
+import {
+  ensureCompanionInvitation,
+  rememberCompanionAnswer,
+  selectCompanionDailyInvitation,
+  updateCompanionInvitation,
+  type CompanionContentState,
+} from '@/utils/companion-content';
+import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import type { KingdomResident } from '@/utils/kingdom-residents';
 import { requestQuestActionIntent } from '@/utils/quest-action-signal';
 import { selectBalancedQuestOffers, sortQuestOffersByAvailability } from '@/utils/quest-offer-order';
+import { withDailyQuestPresentationVariant } from '@/utils/quests/presentation-variants';
 import { beginQuestCapture, consumeCompletedQuestCapture, questCaptureBelongsTo } from '@/utils/quest-capture-session';
 import {
   buildQuestReportBackItems,
@@ -151,6 +161,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const [companionBondState, setCompanionBondState] = useState(loadIdentityAwareCompanionBondState);
   const [companionDiscoveryState, setCompanionDiscoveryState] = useState(loadCompanionDiscoveryState);
   const [companionJourneyState, setCompanionJourneyState] = useState(loadCompanionJourneyState);
+  const [companionContentState, setCompanionContentState] = useState<CompanionContentState>(loadCompanionContentState);
   const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
   const [questCaptureFeedback, setQuestCaptureFeedback] = useState<QuestCaptureFeedback | null>(null);
   const [questCaptureRestoreKey, setQuestCaptureRestoreKey] = useState<string | null>(null);
@@ -215,6 +226,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       setCompanionBondState(loadIdentityAwareCompanionBondState());
       setCompanionDiscoveryState(loadCompanionDiscoveryState());
       setCompanionJourneyState(loadCompanionJourneyState());
+      setCompanionContentState(loadCompanionContentState());
       setStoredHomeState(homeRepository.load());
       const completedCapture = consumeCompletedQuestCapture();
       if (completedCapture?.sourceId) {
@@ -514,7 +526,11 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         ) return false;
         const state = evaluateQuestRuntime({ questId: offer.id, day: questDay, facts: questFacts, capabilities: questCapabilities }).state;
         return state !== 'unavailable' && state !== 'impossible_today';
-      })
+      }).map((offer) => withDailyQuestPresentationVariant(offer, {
+        companionId: selectedResident.creature.creatureId,
+        dayId: today.isoDate,
+        questState: companionQuestState,
+      }))
     : [];
   const selectedOfferOptions = selectedResident && today?.isoDate
     ? selectBalancedQuestOffers(
@@ -562,6 +578,71 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         ))
         ?? selectedOfferOptions[0]
       : undefined;
+  const selectedDailyInvitation = useMemo(() => {
+    if (!selectedResident || !selectedFamilyId || !today?.isoDate) return null;
+    const titles = Object.fromEntries(selectedOfferOptions.map((offer) => [offer.id, offer.title]));
+    return selectCompanionDailyInvitation({
+      state: companionContentState,
+      companionId: selectedResident.creature.creatureId,
+      familyId: selectedFamilyId,
+      dayId: today.isoDate,
+      bondLevel: selectedBondProgress.level,
+      content: companionContentForFamily(selectedFamilyId),
+      activeQuestId: selectedLiveQuest?.questId,
+      activeConversationId: selectedJourneyConversation?.id,
+      hasActiveGoal: Boolean(selectedJourneyProgress?.goal),
+      hasFocusHistory: selectedJourneyGoals.some((goal) => goal.status !== 'active'),
+      questCompletions: selectedJourneyProgress?.questCompletions ?? 0,
+      reflections: selectedJourneyProgress?.reflections ?? 0,
+      eligibleQuestIds: selectedOfferOptions
+        .filter((offer) => canAcceptQuestForDay(
+          companionQuestState,
+          selectedResident.creature.creatureId,
+          offer.id,
+          today.isoDate
+        ))
+        .map((offer) => offer.id),
+      questTitles: titles,
+    });
+  }, [
+    companionContentState,
+    companionQuestState,
+    selectedBondProgress.level,
+    selectedFamilyId,
+    selectedJourneyConversation?.id,
+    selectedJourneyProgress,
+    selectedJourneyGoals,
+    selectedLiveQuest?.questId,
+    selectedOfferOptions,
+    selectedResident,
+    today?.isoDate,
+  ]);
+  useEffect(() => {
+    if (!selectedDailyInvitation) return;
+    setCompanionContentState((current) => {
+      const next = ensureCompanionInvitation(current, selectedDailyInvitation);
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedDailyInvitation]);
+  useEffect(() => {
+    if (!selectedDailyInvitation || !selectedResident || !today?.isoDate) return;
+    const questDone = selectedDailyInvitation.questId
+      ? isQuestCompletedForDay(
+          companionQuestState,
+          selectedResident.creature.creatureId,
+          selectedDailyInvitation.questId,
+          today.isoDate
+        )
+      : false;
+    const focusDone = selectedDailyInvitation.kind === 'resume_focus' && !selectedJourneyConversation;
+    if (!questDone && !focusDone) return;
+    setCompanionContentState((current) => {
+      const next = updateCompanionInvitation(current, selectedDailyInvitation.id, 'completed');
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+  }, [companionQuestState, selectedDailyInvitation, selectedJourneyConversation, selectedResident, today?.isoDate]);
   const selectedQuestAdvancesJourneyGoal = useMemo(() => {
     const goal = selectedJourneyProgress?.goal;
     const currentQuestId = selectedActiveQuest?.questId ?? selectedOffer?.id;
@@ -732,6 +813,7 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         dayId: today?.isoDate ?? null,
         offerSeed: seed,
         resolvedConfig,
+        presentationVariantId: offer.presentationVariantId,
       },
       Date.now()
     );
@@ -1100,6 +1182,25 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     if (result.state === companionJourneyState) return [];
     saveCompanionJourneyState(result.state);
     setCompanionJourneyState(result.state);
+    const session = result.state.conversations.find((item) => item.id === sessionId);
+    const latestAnswer = session?.answers.at(-1);
+    if (latestAnswer) {
+      setCompanionContentState((current) => {
+        let next = rememberCompanionAnswer(current, {
+          companionId: selectedResident.creature.creatureId,
+          familyId: selectedFamilyId,
+          key: `focus:${latestAnswer.nodeId}`,
+          value: latestAnswer.value,
+          sourceId: sessionId,
+          occurredAt: latestAnswer.answeredAt,
+        });
+        if (result.completed && selectedDailyInvitation) {
+          next = updateCompanionInvitation(next, selectedDailyInvitation.id, 'completed', latestAnswer.answeredAt);
+        }
+        saveCompanionContentState(next);
+        return next;
+      });
+    }
     if (result.completed && result.suggestedQuickGoalIds.length) {
       setQuickGoalSuggestions({
         familyId: selectedFamilyId,
@@ -1117,20 +1218,31 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
       setMicrocopy('Focus updated');
     }
     return result.completed ? result.suggestedQuickGoalIds : [];
-  }, [awardBond, companionJourneyState, selectedFamilyId, selectedJourneyDefinition, selectedResident, today?.isoDate]);
+  }, [awardBond, companionJourneyState, selectedDailyInvitation, selectedFamilyId, selectedJourneyDefinition, selectedResident, today?.isoDate]);
   const startSelectedJourneyCheckIn = useCallback(() => {
     if (!selectedResident || !selectedFamilyId || !today?.isoDate) return null;
     const result = startJourneyCheckIn(companionJourneyState, {
       companionId: selectedResident.creature.creatureId,
       familyId: selectedFamilyId,
       dayId: today.isoDate,
+      ...(selectedDailyInvitation?.contentItemId
+        ? (() => {
+            const content = companionContentById.get(selectedDailyInvitation.contentItemId);
+            return content ? {
+              contentItemId: content.id,
+              contentPrompt: content.prompt,
+              contentHelperText: content.helperText,
+              contentOptions: content.options,
+            } : {};
+          })()
+        : {}),
     });
     if (result.state !== companionJourneyState) {
       saveCompanionJourneyState(result.state);
       setCompanionJourneyState(result.state);
     }
     return result.checkIn;
-  }, [companionJourneyState, selectedFamilyId, selectedResident, today?.isoDate]);
+  }, [companionJourneyState, selectedDailyInvitation, selectedFamilyId, selectedResident, today?.isoDate]);
   const answerSelectedJourneyCheckIn = useCallback((
     checkInId: string,
     answer: Omit<CompanionJourneyCheckInAnswer, 'answeredAt'>
@@ -1172,9 +1284,47 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
         dayId: result.checkIn?.dayId ?? today?.isoDate,
       });
       setMicrocopy('Check-in remembered');
+      const firstAnswer = result.checkIn?.answers[0];
+      setCompanionContentState((current) => {
+        let next = current;
+        if (firstAnswer && result.checkIn) {
+          next = rememberCompanionAnswer(next, {
+            companionId: selectedResident.creature.creatureId,
+            familyId: result.checkIn.familyId,
+            key: result.checkIn.contentItemId ?? `daily-pulse:${result.checkIn.dayId}`,
+            value: firstAnswer.label,
+            sourceId: result.checkIn.id,
+            occurredAt: firstAnswer.answeredAt,
+          });
+        }
+        if (selectedDailyInvitation) {
+          next = updateCompanionInvitation(next, selectedDailyInvitation.id, 'completed');
+        }
+        if (next !== current) saveCompanionContentState(next);
+        return next;
+      });
     }
     return result.checkIn;
-  }, [awardBond, companionJourneyState, selectedJourneyDefinition, selectedResident, today?.isoDate]);
+  }, [awardBond, companionJourneyState, selectedDailyInvitation, selectedJourneyDefinition, selectedResident, today?.isoDate]);
+
+  const openSelectedDailyInvitation = useCallback(() => {
+    if (!selectedDailyInvitation) return;
+    setCompanionContentState((current) => {
+      const next = updateCompanionInvitation(current, selectedDailyInvitation.id, 'opened');
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+    if (selectedDailyInvitation.questId) setSelectedOfferId(selectedDailyInvitation.questId);
+  }, [selectedDailyInvitation]);
+  const skipSelectedDailyInvitation = useCallback(() => {
+    if (!selectedDailyInvitation) return;
+    setCompanionContentState((current) => {
+      const next = updateCompanionInvitation(current, selectedDailyInvitation.id, 'skipped');
+      if (next !== current) saveCompanionContentState(next);
+      return next;
+    });
+    setMicrocopy('Invitation left for today');
+  }, [selectedDailyInvitation]);
   const backSelectedJourneyCheckIn = useCallback((checkInId: string) => {
     setCompanionJourneyState((current) => {
       const next = backJourneyCheckIn(current, checkInId);
@@ -1320,6 +1470,9 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedCompanionData,
     selectedInsight,
     selectedInteractionState,
+    selectedDailyInvitation,
+    openSelectedDailyInvitation,
+    skipSelectedDailyInvitation,
     selectedOffer,
     selectedOfferId: selectedOffer?.id ?? null,
     selectedOffers: sortQuestOffersByAvailability(selectedOfferOptions.map((offer, index) => {

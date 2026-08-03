@@ -42,7 +42,7 @@ type AuthoredRole = Omit<KatchimeraRoleDefinition, 'familyId' | 'aspectId' | 'di
 
 const FOUNDATION_ROLES: Record<string, AuthoredRole> = {
   steppling: {
-    role: 'Turns everyday walking into visible momentum.',
+    role: 'Helps people notice where everyday walking fits and what it gives them.',
     boundary: 'Walking and accumulated daily movement, not training, running, or competitive sport.',
     hatchSignals: ['high step count', 'a deliberately logged walk', 'sustained everyday movement'],
     realLifeQuestIds: [
@@ -52,14 +52,14 @@ const FOUNDATION_ROLES: Record<string, AuthoredRole> = {
       'quest-steppling-weekly-review',
     ],
     discoveryPrompts: [
-      prompt('steppling', 'walking-place', 1, 'single_choice', 'Where does walking fit most naturally into your life?', 'This helps Steppling suggest walks that feel realistic.', ['Daily journeys', 'Clearing my head', 'Exploring', 'Fitness']),
-      prompt('steppling', 'walking-goal', 2, 'goal', 'What walking goal would feel worth building toward?', 'Keep it small enough to repeat.'),
+      prompt('steppling', 'walking-place', 1, 'single_choice', 'Where could a walk fit most easily?', 'Choose what seems realistic in your life now.', ['An everyday journey', 'A short break', 'Before or after something else', 'Time set aside to wander']),
+      prompt('steppling', 'walking-goal', 2, 'goal', 'What would you like to try with walking?', 'Choose a small experiment you can adjust later.'),
     ],
     miniGameQuestIds: ['quest-steppling-stride', 'quest-step-sprint', 'quest-step-time-trial'],
     plannedMiniGame: null,
-    insightThemes: ['walking consistency', 'active days', 'routes and step trends', 'momentum without perfection'],
-    reflectionLenses: ['what made movement easy', 'how walking changed the day', 'routes worth repeating', 'progress over time'],
-    goalTypes: ['daily steps', 'walk frequency', 'route exploration', 'walking streak'],
+    insightThemes: ['where walking fits', 'what makes starting easier', 'how a walk feels afterwards', 'routes and surroundings'],
+    reflectionLenses: ['what supported the walk', 'what changed afterwards', 'what made walking difficult', 'what feels worth repeating'],
+    goalTypes: ['short walks', 'everyday journeys', 'headspace', 'nearby exploration'],
     status: 'complete',
   },
   'sleep-rest': {

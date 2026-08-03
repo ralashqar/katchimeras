@@ -49,6 +49,7 @@ import {
 import { CompanionQuestChoices, CompanionQuestThread } from './companion-quest-thread';
 import type { InteractiveQuestExecution, QuestResult } from '@/utils/quests/experiences/types';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
+import type { CompanionDailyInvitation } from '@/utils/companion-content';
 import { CompanionSkinsThread } from './companion-skins-thread';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
@@ -148,6 +149,9 @@ export type CompanionInteractionSheetProps = {
   onInsightAction: () => void;
   memorySaved?: boolean;
   bondProgress: CompanionBondProgress;
+  dailyInvitation: CompanionDailyInvitation | null;
+  onOpenDailyInvitation: () => void;
+  onSkipDailyInvitation: () => void;
   onExperienceActiveChange?: (active: boolean) => void;
   skins: readonly KingdomSkinOption[];
   equippedSkinId: KatchimeraSkinId | null;
@@ -340,6 +344,27 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     Keyboard.dismiss();
     resetViewport();
     experience.selectDestination(nextDestination);
+  };
+  const openDailyInvitation = () => {
+    const invitation = props.dailyInvitation;
+    if (!invitation) return;
+    props.onOpenDailyInvitation();
+    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (invitation.destination === 'quest') {
+      if (invitation.questId) props.onSelectOffer(invitation.questId);
+      selectDestination('quest');
+      return;
+    }
+    selectDestination('discovery');
+    if (invitation.kind === 'focus_setup' || invitation.kind === 'resume_focus') {
+      experience.openJourneyQuestionnaire(props.journeyConversation?.id);
+      if (!props.journeyConversation) props.onStartJourneyConversation();
+      return;
+    }
+    const checkIn = props.journeyCheckIn ?? props.onStartJourneyCheckIn();
+    if (!checkIn) return;
+    setActiveCheckIn(checkIn);
+    experience.openCheckIn(checkIn.id);
   };
   const runPrimary = () => {
     const action = quest.primaryAction;
@@ -556,10 +581,15 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             animateEntrance={!hasShownHome}
             bondProgress={props.bondProgress}
             creature={visual.source}
+            dailyInvitation={props.dailyInvitation?.status === 'offered' || props.dailyInvitation?.status === 'opened'
+              ? props.dailyInvitation
+              : null}
             environmentKey={props.homeEnvironmentKey ?? null}
             goalStatus={goalStatus}
             name={props.name}
             onClose={props.onClose}
+            onOpenDailyInvitation={openDailyInvitation}
+            onSkipDailyInvitation={props.onSkipDailyInvitation}
             onSelectDestination={selectDestination}
             questStatus={questStatus}
             showSkins={props.skins.length > 1}

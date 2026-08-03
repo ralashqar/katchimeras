@@ -211,9 +211,9 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
   if (phase === 'intro') return (
     <QuestExperiencePreview
       eyebrow={`Steppling · Tier ${config.tier}`}
-      title={config.challengeId === 'step_sprint' ? 'Quick feet' : 'Beat the trail clock'}
-      body={config.challengeId === 'step_sprint' ? `Reach ${config.target} live steps in one minute.` : `Reach ${config.target} live steps and set a time.`}
-      icon="figure.run"
+      title={config.challengeId === 'step_sprint' ? 'One-minute step challenge' : 'Step target challenge'}
+      body={config.challengeId === 'step_sprint' ? `Move at a pace that feels safe. Reach ${config.target} steps in one minute.` : `Reach ${config.target} steps at a pace that feels safe and set a time.`}
+      icon="figure.walk"
       meta="Motion sensors only · no GPS"
       actionLabel="Start challenge"
       onAction={() => void start()}
@@ -224,9 +224,9 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
     <View style={styles.root}>
       <View style={styles.heading}>
         <ThemedText style={styles.eyebrow} lightColor={Lantern.ember300} darkColor={Lantern.ember300}>STEPPLING CHALLENGE · TIER {config.tier}</ThemedText>
-        <ThemedText selectable style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{config.challengeId === 'step_sprint' ? 'Quick feet' : 'Beat the trail clock'}</ThemedText>
+        <ThemedText selectable style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>{config.challengeId === 'step_sprint' ? 'One-minute step challenge' : 'Step target challenge'}</ThemedText>
         <ThemedText selectable style={styles.body} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-          {config.challengeId === 'step_sprint' ? `Reach ${config.target} live steps in one minute.` : `Reach ${config.target} live steps and set a time.`}
+          {config.challengeId === 'step_sprint' ? `Move at a pace that feels safe. Reach ${config.target} steps in one minute.` : `Reach ${config.target} steps at a pace that feels safe and set a time.`}
         </ThemedText>
       </View>
 
@@ -252,13 +252,13 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
       </View>
 
       {message ? <ThemedText accessibilityLiveRegion="polite" selectable style={styles.message} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{message}</ThemedText> : null}
-      {phase === 'failed' ? <ThemedText accessibilityLiveRegion="polite" style={styles.message} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Time. You reached {steps} steps — retry when you are ready.</ThemedText> : null}
+      {phase === 'failed' ? <ThemedText accessibilityLiveRegion="polite" style={styles.message} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>That round is complete. You reached {steps} steps. Try again only if you want to.</ThemedText> : null}
       <ThemedText style={styles.safety} lightColor={Lantern.moon500} darkColor={Lantern.moon500}>Uses Motion & Fitness sensors only — no GPS. Choose a clear, safe place to move.</ThemedText>
 
       {phase === 'running' || phase === 'starting' || phase === 'countdown' ? null : phase === 'success' && attemptId.current ? (
         <Action label="Complete and return" icon="checkmark" onPress={() => onComplete(attemptId.current!, { kind: 'live_steps', success: true, steps, target: config.target, durationMs: elapsedMs, personalBest: false })} />
       ) : (
-        <Action label="Retry challenge" icon="figure.walk" onPress={() => void start()} />
+        <Action label="Try again" icon="figure.walk" onPress={() => void start()} />
       )}
     </View>
   );

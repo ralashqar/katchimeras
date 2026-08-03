@@ -571,6 +571,9 @@ export function KingdomCompanionScreen({
           onInsightAction={handleInsightAction}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
+          dailyInvitation={quests.selectedDailyInvitation}
+          onOpenDailyInvitation={quests.openSelectedDailyInvitation}
+          onSkipDailyInvitation={quests.skipSelectedDailyInvitation}
           skins={selectedSkinOptions}
           equippedSkinId={quests.selectedResident.creature.skinId ?? null}
           onEquipSkin={equipSelectedSkin}

@@ -21,6 +21,9 @@ type TodayBottomDockProps = {
   viewedDay: HomeDayRecord | null;
   showHatchedActionDock: boolean;
   showHatchedReflectionCard: boolean;
+  showCompanionInvitation?: boolean;
+  companionName?: string;
+  onOpenCompanion?: () => void;
   showFormingActions?: boolean;
   recording: boolean;
   cameraBadge?: number;
@@ -58,6 +61,9 @@ export function TodayBottomDock({
   viewedDay,
   showHatchedActionDock,
   showHatchedReflectionCard,
+  showCompanionInvitation = false,
+  companionName,
+  onOpenCompanion,
   showFormingActions = true,
   recording,
   cameraBadge,
@@ -179,6 +185,14 @@ export function TodayBottomDock({
               cameraBadge={cameraBadge}
             />
           </View>
+        ) : isHatched && showCompanionInvitation && onOpenCompanion ? (
+          <KatchaButton
+            fullWidth
+            icon="heart.fill"
+            label={`Spend a moment with ${companionName ?? 'your Katchimera'}`}
+            onPress={onOpenCompanion}
+            variant="secondary"
+          />
         ) : null}
       </Animated.View>
 

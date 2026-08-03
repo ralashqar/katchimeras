@@ -30,6 +30,30 @@ const bespokeQuestDefinitionsPath = transpile(
   'utils/quests/bespoke-family-packs.ts',
   'bespoke-family-packs.js'
 );
+const batchOneQuestVariantsPath = transpile(
+  'constants/batch-one-quest-variants.ts',
+  'batch-one-quest-variants.js'
+);
+const batchTwoQuestVariantsPath = transpile(
+  'constants/batch-two-quest-variants.ts',
+  'batch-two-quest-variants.js'
+);
+const batchThreeQuestVariantsPath = transpile(
+  'constants/batch-three-quest-variants.ts',
+  'batch-three-quest-variants.js'
+);
+const batchFourQuestVariantsPath = transpile(
+  'constants/batch-four-quest-variants.ts',
+  'batch-four-quest-variants.js'
+);
+const batchFiveQuestVariantsPath = transpile(
+  'constants/batch-five-quest-variants.ts',
+  'batch-five-quest-variants.js'
+);
+const batchSixQuestVariantsPath = transpile(
+  'constants/batch-six-quest-variants.ts',
+  'batch-six-quest-variants.js'
+);
 const qualityDataPath = path.join(projectRoot, 'data/intelligence/memory-qualities.json');
 require('module')._resolveFilename = function resolveVerificationModule(request, parent, isMain, options) {
   if (request === '@/utils/studio-detect') return studioDetectPath;
@@ -39,6 +63,12 @@ require('module')._resolveFilename = function resolveVerificationModule(request,
   if (request === '@/utils/manual-journal-registry') return manualJournalRegistryPath;
   if (request === '@/constants/katchimera-bespoke-quests') return bespokeQuestCataloguePath;
   if (request === '@/utils/quests/bespoke-family-packs') return bespokeQuestDefinitionsPath;
+  if (request === '@/constants/batch-one-quest-variants') return batchOneQuestVariantsPath;
+  if (request === '@/constants/batch-two-quest-variants') return batchTwoQuestVariantsPath;
+  if (request === '@/constants/batch-three-quest-variants') return batchThreeQuestVariantsPath;
+  if (request === '@/constants/batch-four-quest-variants') return batchFourQuestVariantsPath;
+  if (request === '@/constants/batch-five-quest-variants') return batchFiveQuestVariantsPath;
+  if (request === '@/constants/batch-six-quest-variants') return batchSixQuestVariantsPath;
   if (request === '@/data/intelligence/memory-qualities.json') return qualityDataPath;
   return originalResolveFilename.call(this, request, parent, isMain, options);
 };

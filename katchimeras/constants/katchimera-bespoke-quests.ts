@@ -248,18 +248,18 @@ export const BESPOKE_FAMILY_QUEST_PACKS: readonly BespokeFamilyQuestPack[] = [
   },
   {
     familyId: 'shellio',
-    role: 'Deepens calm, attentive time beside coasts, rivers, lakes, and moving water.',
-    boundary: 'Being beside natural water—not swimming performance, weather, or generic outdoor time.',
-    hatchSignals: ['beach or coast', 'river or lake', 'water-side pause'],
+    role: 'Builds a safe, personal relationship with swimming, beaches, shores, and time near water.',
+    boundary: 'Swimming and water-place connection—not competitive performance, unsafe water entry, weather collecting, or generic outdoor time.',
+    hatchSignals: ['swimming or pool', 'beach or coast', 'river, lake, or water-side pause'],
     journalRoutes: ['journal.route:went_somewhere.beach'],
-    insightThemes: ['water places', 'tides and movement', 'calm returns'],
-    reflectionLenses: ['what the water was doing', 'how the pace changed', 'a shore worth returning to'],
-    goalTypes: ['visit the water', 'take a shoreline pause', 'notice a tide or current'],
+    insightThemes: ['swimming experiences', 'water confidence and fit', 'beaches and water places'],
+    reflectionLenses: ['how the swim or shore time felt', 'what supported safety and confidence', 'a water experience worth returning to'],
+    goalTypes: ['build a swimming rhythm', 'grow water confidence', 'spend time at a beach or shore', 'connect with water without entering'],
     quests: [
-      p('water-detail', 'Notice the waterline', 'Capture the real coast, river, lake, or canal where you paused.', 'nature.water', 'Photograph a real body of water'),
-      q('shore-pause', 1, 'Let the shore set the pace', 'Take a deliberate pause beside water and record what changed in you.', ['A real pause beside water is described', 'A concrete effect on pace, mood, tension, or attention is included']),
-      q('return-to-water', 2, 'Return to a water place', 'Revisit a coast, river, lake, or canal and notice what was different this time.', ['A water place was revisited', 'A specific difference in conditions, attention, or experience is included']),
-      q('weekly-review', 3, 'Read the tide of the week', 'Review one water-side moment, what it gave you, and where you want to return.', ['A real water-side example is named', 'A place, mood, or sensory pattern is identified', 'One next water-place intention is stated']),
+      p('water-detail', 'Keep one real water moment', 'Capture a pool, beach, shore, or real body of water connected to your experience.', 'nature.water', 'Photograph a real swimming or water place'),
+      q('shore-pause', 1, 'Choose your water moment', 'Swim in a suitable setting, spend time at a beach or shore, or connect with water without entering; record what you chose and how it felt.', ['A real swim, beach, shore, or non-entry water moment is described', 'The choice and its effect on comfort, confidence, energy, mood, or attention are included']),
+      q('return-to-water', 2, 'Make a safe return to water', 'Return to a suitable swim or water place and notice what made it fit—or told you to adapt, stay out, or stop.', ['A real return to swimming or a water place is described', 'A specific safety, access, confidence, body, environmental, or sensory condition is included']),
+      q('weekly-review', 3, 'Read your water week', 'Review one swim or water-place moment, what supported it, and the next water experience that would genuinely suit you.', ['A real swimming, beach, shore, or water-place example is named', 'A support, barrier, preference, or safety pattern is identified', 'One suitable next swim, shore visit, non-entry connection, adaptation, or pause is stated']),
     ],
   },
   {
@@ -519,6 +519,43 @@ export const BESPOKE_FAMILY_QUEST_PACKS: readonly BespokeFamilyQuestPack[] = [
     ],
   },
 ];
+
+/**
+ * Stable Journey identities for the playable specialist families. This lives
+ * beside their quest catalogue so Node-only quest verification can consume it
+ * without loading UI or rotating-content modules.
+ */
+export const SPECIALIST_JOURNEY_ID_BY_FAMILY_ID = new Map<KatchimeraFamilyId, string>([
+  ['crumbun', 'crumbun-baking-ritual'],
+  ['hayhorn', 'hayhorn-ingredient-origins'],
+  ['crustling', 'crustling-pizza-ritual'],
+  ['nigirimp', 'nigirimp-japanese-food-discovery'],
+  ['noodloo', 'noodloo-noodle-trail'],
+  ['sundael', 'sundael-dessert-occasions'],
+  ['bobaloo', 'bobaloo-playful-drinks'],
+  ['voltstep', 'voltstep-cardio-rhythm'],
+  ['pulsepounce', 'pulsepounce-playful-agility'],
+  ['museling', 'museling-creative-practice'],
+  ['pixooka', 'pixooka-intentional-play'],
+  ['glimmuse', 'glimmuse-art-encounters'],
+  ['shellio', 'shellio-water-connection'],
+  ['petalimp', 'petalimp-garden-care'],
+  ['fernip', 'fernip-woodland-connection'],
+  ['amberleaf', 'amberleaf-autumn-turning'],
+  ['blossle', 'blossle-spring-return'],
+  ['peakle', 'peakle-hiking-confidence'],
+  ['stillo', 'stillo-still-water'],
+  ['drizzlet', 'drizzlet-rainy-days'],
+  ['driftkin', 'driftkin-snow-days'],
+  ['duskle', 'duskle-evening-light'],
+  ['twinklet', 'twinklet-night-sky'],
+  ['tempesto', 'tempesto-storm-awareness'],
+  ['mistle', 'mistle-fog-awareness'],
+  ['voyagle', 'voyagle-travel-stories'],
+  ['ironette', 'ironette-landmark-context'],
+  ['neonpoko', 'neonpoko-city-energy'],
+  ['skysette', 'skysette-high-perspective'],
+]);
 
 export const bespokeFamilyQuestPackByFamilyId = new Map(
   BESPOKE_FAMILY_QUEST_PACKS.map((pack) => [pack.familyId, pack])

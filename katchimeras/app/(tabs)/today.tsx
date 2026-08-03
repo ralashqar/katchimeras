@@ -321,6 +321,9 @@ export default function HomeScreen() {
 
   const isDay = selectedDay?.kind === 'day';
   const isHatched = isDay && selectedDay.state === 'hatched' && selectedDay.creature;
+  const selectedHatchedCompanionId = isDay && selectedDay.state === 'hatched' && selectedDay.creature
+    ? identityForCreature(selectedDay.creature)?.companionId ?? null
+    : null;
   const isFormingToday = isDay && selectedDay.isToday && selectedDay.state !== 'hatched';
 
   // Once today has hatched, the Tomorrow page becomes a forming egg the user can
@@ -1266,6 +1269,14 @@ export default function HomeScreen() {
           viewedDay={viewedDay}
           showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK}
           showHatchedReflectionCard={SHOW_HATCHED_REFLECTION_CARD}
+          showCompanionInvitation={Boolean(isDay && selectedDay.isToday && selectedHatchedCompanionId)}
+          companionName={isHatched ? selectedDay.creature?.name : undefined}
+          onOpenCompanion={selectedHatchedCompanionId ? () => {
+            router.push({
+              pathname: '/katchimera/[creatureId]',
+              params: { creatureId: selectedHatchedCompanionId },
+            });
+          } : undefined}
           recording={voiceNote.isRecording}
           cameraBadge={categoryById.get('photos')?.needsAttention ? Math.max(1, photoPrompt?.photoCandidates.length ?? 1) : undefined}
           momentCount={categoryById.get('reflection')?.count}

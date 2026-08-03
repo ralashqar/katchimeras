@@ -1,4 +1,7 @@
-import { BESPOKE_FAMILY_QUEST_PACKS } from '@/constants/katchimera-bespoke-quests';
+import {
+  BESPOKE_FAMILY_QUEST_PACKS,
+  SPECIALIST_JOURNEY_ID_BY_FAMILY_ID,
+} from '@/constants/katchimera-bespoke-quests';
 import type { Criterion } from '@/utils/signals/facts';
 import type { QuestDefinition } from '@/utils/quests/definitions';
 import { qualityThresholds } from '@/utils/intelligence/quality-registry';
@@ -8,6 +11,7 @@ export const BESPOKE_FAMILY_QUEST_DEFINITIONS: Record<string, QuestDefinition> =
     const id = `quest-${pack.familyId}-${quest.suffix}`;
     const cooldownDays = quest.minimumBondLevel === 3 ? 7 : quest.minimumBondLevel === 2 ? 3 : 2;
     const isPhoto = Boolean(quest.photoQualityId);
+    const journeyId = SPECIALIST_JOURNEY_ID_BY_FAMILY_ID.get(pack.familyId);
     const criteria: Criterion[] = isPhoto
       ? [{
           fact: 'memory.qualities',
@@ -37,7 +41,11 @@ export const BESPOKE_FAMILY_QUEST_DEFINITIONS: Record<string, QuestDefinition> =
         cadence: quest.minimumBondLevel === 3 ? 'weekly' : 'anytime',
         cooldownDays,
       },
-      goalContribution: { goalTypeIds: pack.goalTypes, amount: 1 },
+      goalContribution: { goalTypeIds: journeyId ? [`${pack.familyId}-direction`] : pack.goalTypes, amount: 1 },
+      ...(journeyId ? { progression: {
+        journeyId,
+        stageId: quest.minimumBondLevel === 3 ? 'review' : 'practice',
+      } } : {}),
       family: isPhoto ? 'photo' : 'note',
       presentation: {
         categoryLabel: quest.minimumBondLevel === 3 ? 'Weekly reflection' : index < 2 ? 'Notice' : 'Try',

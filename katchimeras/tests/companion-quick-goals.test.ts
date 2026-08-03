@@ -44,8 +44,8 @@ test('completed families expose authored quick-goal templates', () => {
   assert.equal(quickGoalTemplatesForFamily('pagelet').length, 8);
   assert.equal(quickGoalTemplatesForFamily('mossprout').length, 8);
   assert.equal(quickGoalTemplatesForFamily('vesperitt').length, 9);
-  assert.equal(quickGoalTemplatesForFamily('tasklet').length, 6);
-  assert.equal(quickGoalTemplatesForFamily('sleep-rest').length, 6);
+  assert.equal(quickGoalTemplatesForFamily('tasklet').length, 8);
+  assert.equal(quickGoalTemplatesForFamily('sleep-rest').length, 8);
   for (const familyId of ['flexel', 'sprintail', 'hooplet', 'serveling', 'snuglet', 'waglet', 'whiskit']) {
     assert.equal(quickGoalTemplatesForFamily(familyId).length, 8);
   }

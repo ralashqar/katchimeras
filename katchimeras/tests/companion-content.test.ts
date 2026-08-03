@@ -1,0 +1,505 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  BOND_MOMENT_OPTIONS,
+  companionContentForFamily,
+  companionContentItems,
+  validateEvolvingCompanionContent,
+} from '@/constants/companion-content';
+import { companionJourneyByFamilyId } from '@/constants/companion-journeys';
+import { quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
+import { BESPOKE_FAMILY_QUEST_PACKS } from '@/constants/katchimera-bespoke-quests';
+import { SPECIALIST_COMPANION_SYSTEMS } from '@/constants/specialist-companion-catalogue';
+import {
+  emptyCompanionContentState,
+  ensureCompanionInvitation,
+  invitationForDay,
+  rememberCompanionAnswer,
+  selectCompanionDailyInvitation,
+  updateCompanionInvitation,
+} from '@/utils/companion-content';
+import { companionCheckInQuestion } from '@/utils/companion-check-in';
+import {
+  activeConversationForFamily,
+  answerJourneyConversation,
+  emptyCompanionJourneyState,
+  startJourneyCheckIn,
+  startJourneyConversation,
+} from '@/utils/companion-journey';
+import type { CompanionQuestState } from '@/utils/katchimera-quests';
+import { QUEST_DEFINITIONS } from '@/utils/quests/definitions';
+import { withDailyQuestPresentationVariant } from '@/utils/quests/presentation-variants';
+
+const mossContent = companionContentForFamily('mossprout');
+const stepplingContent = companionContentForFamily('steppling');
+const emptyQuestState = (): CompanionQuestState => ({
+  schemaVersion: 3,
+  quests: [],
+  submissions: [],
+  offerCycles: [],
+  attempts: [],
+});
+
+test('all 54 playable Journey families have the evolving authored content contract', () => {
+  assert.deepEqual(validateEvolvingCompanionContent(), []);
+  assert.equal(companionContentItems.length, 54 * 23);
+  assert.equal(mossContent.filter((item) => item.kind === 'daily_pulse').length, 12);
+  assert.match(mossContent[0].prompt, /nature moment/i);
+  for (const level of [2, 3, 4] as const) {
+    const bondMoment = mossContent.find((item) => item.id === `mossprout:bond:${level}`);
+    assert.notDeepEqual(bondMoment?.options, BOND_MOMENT_OPTIONS[level]);
+    assert.equal(bondMoment?.options.some((option) => option.id === 'supported'), false);
+  }
+});
+
+test('all 29 formerly quest-led specialists now have complete Focus systems', () => {
+  assert.equal(SPECIALIST_COMPANION_SYSTEMS.length, 29);
+  assert.deepEqual(
+    SPECIALIST_COMPANION_SYSTEMS.map((system) => system.familyId).sort(),
+    BESPOKE_FAMILY_QUEST_PACKS.map((pack) => pack.familyId).sort()
+  );
+
+  for (const system of SPECIALIST_COMPANION_SYSTEMS) {
+    assert.equal(system.journey.version >= 3, true, `${system.familyId} needs the current Journey version`);
+    assert.equal(system.journey.nodes.length, 3, `${system.familyId} needs a three-question Focus`);
+    assert.equal(system.quickGoals.length >= 8, true, `${system.familyId} needs at least eight small goals`);
+    assert.equal(new Set(system.quickGoals.map((goal) => goal.title)).size, system.quickGoals.length, `${system.familyId} small goals must be distinct`);
+    const familyContent = companionContentForFamily(system.familyId);
+    assert.equal(familyContent.length, 23, `${system.familyId} needs complete rotating content`);
+    assert.equal(new Set(familyContent.map((item) => item.prompt)).size, 23, `${system.familyId} prompts must be distinct`);
+    assert.equal(familyContent.every((item) => item.options.length >= 4), true, `${system.familyId} prompts need accessible answer choices`);
+
+    const goalNode = system.journey.nodes.find((node) => node.createsGoalTypeId);
+    assert.ok(goalNode, `${system.familyId} needs a goal-producing result question`);
+    for (const choice of goalNode?.options ?? []) {
+      assert.ok(choice.goalTitle?.trim(), `${system.familyId}:${choice.id} needs an actionable goal title`);
+      assert.equal((choice.suggestedQuickGoalIds?.length ?? 0) >= 2, true, `${system.familyId}:${choice.id} needs at least two task suggestions`);
+    }
+
+    let journeyState = startJourneyConversation(emptyCompanionJourneyState(), system.familyId, 100);
+    let completedResult: ReturnType<typeof answerJourneyConversation> | null = null;
+    for (const node of system.journey.nodes) {
+      const conversation = activeConversationForFamily(journeyState, system.familyId);
+      assert.ok(conversation, `${system.familyId} questionnaire ended before ${node.id}`);
+      const choice = node.options?.[0];
+      assert.ok(choice, `${system.familyId}:${node.id} needs an answer option`);
+      completedResult = answerJourneyConversation(journeyState, conversation.id, choice.id, 110);
+      journeyState = completedResult.state;
+    }
+    assert.equal(completedResult?.completed, true, `${system.familyId} questionnaire must complete`);
+    assert.ok(completedResult?.createdGoalId, `${system.familyId} questionnaire must create a Focus`);
+    assert.equal((completedResult?.suggestedQuickGoalIds.length ?? 0) >= 2, true, `${system.familyId} questionnaire must return small tasks`);
+
+    const pack = BESPOKE_FAMILY_QUEST_PACKS.find((candidate) => candidate.familyId === system.familyId)!;
+    for (const quest of pack.quests) {
+      const definition = QUEST_DEFINITIONS[`quest-${system.familyId}-${quest.suffix}`];
+      assert.equal(definition?.progression?.journeyId, system.journeyId);
+      assert.equal(definition?.progression?.stageId, quest.minimumBondLevel === 3 ? 'review' : 'practice');
+      assert.deepEqual(definition?.goalContribution?.goalTypeIds, [`${system.familyId}-direction`]);
+    }
+  }
+});
+
+test('Shellio owns swimming, beach, and non-entry water connection as distinct safe directions', () => {
+  const shellio = SPECIALIST_COMPANION_SYSTEMS.find((system) => system.familyId === 'shellio');
+  assert.ok(shellio);
+  assert.equal(shellio.journey.version, 4);
+  assert.match(shellio.journey.introduction, /swimming/i);
+  assert.match(shellio.journey.introduction, /beach/i);
+  assert.match(shellio.journey.introduction, /never asks you to swim beyond your ability/i);
+
+  const desiredRelationship = shellio.journey.nodes[0];
+  assert.match(desiredRelationship.prompt, /bring into your life/i);
+  assert.equal(desiredRelationship.options?.some((option) => /swimming rhythm/i.test(option.label)), true);
+  assert.equal(desiredRelationship.options?.some((option) => /shoreline time/i.test(option.label)), true);
+  assert.equal(desiredRelationship.options?.some((option) => /without needing to swim/i.test(option.label)), true);
+
+  const conditions = shellio.journey.nodes[1];
+  assert.match(conditions.helperText ?? '', /ability.*health.*access.*cost.*supervision.*weather.*water quality/i);
+
+  const direction = shellio.journey.nodes[2];
+  assert.deepEqual(direction.options?.map((option) => option.id), ['swim-rhythm', 'confidence', 'movement', 'shore', 'connection']);
+  assert.equal(shellio.quickGoals.length, 10);
+  assert.equal(shellio.quickGoals.some((goal) => /qualified lesson/i.test(goal.title)), true);
+  assert.equal(shellio.quickGoals.some((goal) => /does not require entering/i.test(goal.title)), true);
+
+  const questPack = BESPOKE_FAMILY_QUEST_PACKS.find((pack) => pack.familyId === 'shellio');
+  assert.ok(questPack);
+  assert.match(questPack.role, /swimming, beaches, shores/i);
+  assert.match(questPack.boundary, /unsafe water entry/i);
+  assert.equal(questPack.quests.every((quest) => /swim|water|beach|shore/i.test(`${quest.title} ${quest.hint}`)), true);
+
+  const semanticQuest = QUEST_DEFINITIONS['quest-shellio-water-detail'];
+  assert.match(semanticQuest.semanticVerification?.request ?? '', /swimming, beach, shore, or water-place moment/i);
+  assert.match((semanticQuest.semanticVerification?.exclusions ?? []).join(' '), /unsafe water entry/i);
+});
+
+test('Batch 1 families use complete, coherent, pressure-aware authored packs', () => {
+  for (const familyId of ['sleep-rest', 'tasklet', 'mossprout', 'gatherglow'] as const) {
+    const content = companionContentForFamily(familyId);
+    assert.equal(content.length, 23);
+    const pulses = content.filter((item) => item.kind === 'daily_pulse');
+    assert.equal(new Set(pulses.map((item) => item.prompt)).size, 12);
+    assert.equal(content.every((item) => item.options.length >= 4), true);
+    assert.equal(content.some((item) => item.options.some((option) => option.id === 'supported')), false);
+    assert.equal(companionJourneyByFamilyId.get(familyId)?.version, 3);
+  }
+
+  assert.equal(companionContentForFamily('sleep-rest').some((item) => item.options.some((option) => option.id === 'not-possible')), false);
+  assert.equal(companionContentForFamily('tasklet').some((item) => item.options.some((option) => option.id === 'no-movement')), true);
+  assert.equal(companionContentForFamily('mossprout').some((item) => item.options.some((option) => option.id === 'window')), true);
+  assert.equal(companionContentForFamily('gatherglow').some((item) => item.options.some((option) => option.id === 'solitude')), true);
+});
+
+test('Batch 2 families use complete authored packs and accessible Focus journeys', () => {
+  for (const familyId of ['feastle', 'coffee-ritual', 'errandimp', 'skylo'] as const) {
+    const content = companionContentForFamily(familyId);
+    assert.equal(content.length, 23);
+    assert.equal(new Set(content.filter((item) => item.kind === 'daily_pulse').map((item) => item.prompt)).size, 12);
+    assert.equal(content.every((item) => item.options.length >= 4), true);
+    assert.equal(content.some((item) => item.options.some((option) => option.id === 'supported')), false);
+    assert.equal(companionJourneyByFamilyId.get(familyId)?.version, 3);
+    assert.equal(quickGoalTemplatesForFamily(familyId).length >= 8, true);
+  }
+  assert.equal(companionContentForFamily('feastle').some((item) => item.options.some((option) => option.id === 'limited')), true);
+  assert.equal(companionContentForFamily('coffee-ritual').some((item) => item.options.some((option) => option.id === 'none')), true);
+  assert.equal(companionContentForFamily('errandimp').some((item) => item.options.some((option) => option.id === 'wait')), true);
+  assert.equal(companionContentForFamily('skylo').some((item) => item.options.some((option) => option.id === 'safety')), true);
+});
+
+test('Steppling uses a fully authored, pressure-aware content set', () => {
+  const pulses = stepplingContent.filter((item) => item.kind === 'daily_pulse');
+  assert.equal(pulses.length, 12);
+  assert.equal(new Set(pulses.map((item) => item.prompt)).size, 12);
+  assert.equal(pulses.every((item) => item.options.length >= 4), true);
+  assert.equal(pulses.some((item) => item.options.some((option) => option.id === 'supported')), false);
+  assert.equal(pulses.some((item) => item.options.some((option) => option.id === 'no-walk' || option.id === 'none-now' || option.id === 'pause')), true);
+
+  const obstacleReturn = stepplingContent.find((item) => item.id === 'steppling:return:3');
+  assert.match(obstacleReturn?.prompt ?? '', /making walking difficult/i);
+  assert.equal(obstacleReturn?.options.some((option) => option.id === 'different-barrier'), true);
+
+  const journey = companionJourneyByFamilyId.get('steppling');
+  assert.equal(journey?.version, 3);
+  assert.match(journey?.introduction ?? '', /leave room for days/i);
+  assert.equal(journey?.checkIn.options.some((option) => option.id === 'no-walk'), true);
+
+  const quickGoals = quickGoalTemplatesForFamily('steppling');
+  assert.equal(quickGoals.some((goal) => /usually skip|call while walking|unfamiliar turn/i.test(goal.title)), false);
+
+  const familiar = stepplingContent.find((item) => item.id === 'steppling:bond:2')!;
+  const started = startJourneyCheckIn(emptyCompanionJourneyState(), {
+    companionId: 'companion:steppling', familyId: 'steppling', dayId: '2026-08-03',
+    contentItemId: familiar.id, contentPrompt: familiar.prompt,
+    contentHelperText: familiar.helperText, contentOptions: familiar.options,
+  });
+  const bondQuestion = companionCheckInQuestion({
+    checkIn: started.checkIn, definition: journey!, role: null, goal: null,
+  });
+  assert.deepEqual(bondQuestion?.options, familiar.options);
+});
+
+test('Steppling quest copy states thresholds honestly and uses activity-specific variants', () => {
+  const everyday = QUEST_DEFINITIONS['quest-steppling-gentle-walk'];
+  const longer = QUEST_DEFINITIONS['quest-long-walk'];
+  assert.equal(everyday.title, 'An everyday walking day');
+  assert.match(everyday.hint, /4,000 steps/i);
+  assert.match(longer.hint, /8,000 steps/i);
+  assert.equal(longer.hint.includes('recent daily average'), false);
+  for (const quest of [everyday, longer]) {
+    const variantCopy = quest.presentationVariants?.map((variant) => variant.hint).join(' ') ?? '';
+    assert.equal(/detail you have not used|changed since last time/i.test(variantCopy), false);
+  }
+  const reflectionQuest = QUEST_DEFINITIONS['quest-steppling-walk-detail'];
+  assert.equal(reflectionQuest.presentationVariants?.length, 3);
+  assert.match(reflectionQuest.presentationVariants?.[1]?.hint ?? '', /sight, sound, or physical feeling/i);
+});
+
+test('Batch 1 repeatable quests use evidence-matched authored variants', () => {
+  const ids = [
+    'quest-rest-restored-detail',
+    'quest-tasklet-progress-detail',
+    'quest-mossprout-living-detail',
+    'quest-gatherglow-reach-out',
+  ];
+  for (const id of ids) {
+    const quest = QUEST_DEFINITIONS[id];
+    assert.equal(quest.presentationVariants?.length, 3);
+    const copy = quest.presentationVariants?.map((variant) => variant.hint).join(' ') ?? '';
+    assert.equal(/detail you have not used|changed since last time/i.test(copy), false);
+  }
+  assert.match(QUEST_DEFINITIONS['quest-mossprout-living-detail'].semanticVerification?.matchCriteria.join(' ') ?? '', /window view/i);
+  assert.equal(QUEST_DEFINITIONS['quest-early-night'].criteria[0]?.fact, 'evidence.items');
+  assert.equal(QUEST_DEFINITIONS['quest-early-night'].criteria[0]?.op, 'questJournalMatch');
+});
+
+test('Batch 2 repeatable quests use family-specific authored variants', () => {
+  const ids = [
+    'quest-feastle-meal-photo',
+    'quest-coffee-ritual-note',
+    'quest-errandimp-maintenance',
+    'quest-skylo-neighbourhood-note',
+  ];
+  for (const id of ids) {
+    const quest = QUEST_DEFINITIONS[id];
+    assert.equal(quest.presentationVariants?.length, 3);
+    const copy = quest.presentationVariants?.map((variant) => variant.hint).join(' ') ?? '';
+    assert.equal(/detail you have not used|changed since last time/i.test(copy), false);
+  }
+  assert.match(QUEST_DEFINITIONS['quest-coffee-ritual-pause'].hint, /coffee, tea, water/i);
+  assert.match(QUEST_DEFINITIONS['quest-errandimp-maintenance'].hint, /concrete result/i);
+  assert.match(QUEST_DEFINITIONS['quest-skylo-city-photo'].hint, /accessible local detail/i);
+});
+
+test('Batch 3 families use complete authored packs and accessible Focus journeys', () => {
+  for (const familyId of ['pagelet', 'flickerbun', 'relicoon', 'encora'] as const) {
+    const content = companionContentForFamily(familyId);
+    assert.equal(content.length, 23);
+    assert.equal(new Set(content.filter((item) => item.kind === 'daily_pulse').map((item) => item.prompt)).size, 12);
+    assert.equal(content.every((item) => item.options.length >= 4), true);
+    assert.equal(content.some((item) => item.options.some((option) => option.id === 'supported')), false);
+    assert.equal(companionJourneyByFamilyId.get(familyId)?.version, 3);
+    assert.equal(quickGoalTemplatesForFamily(familyId).length >= 8, true);
+  }
+  assert.equal(companionContentForFamily('pagelet').some((item) => item.options.some((option) => option.id === 'audio' || option.id === 'format')), true);
+  assert.equal(companionContentForFamily('flickerbun').some((item) => item.options.some((option) => option.id === 'stopped')), true);
+  assert.equal(companionContentForFamily('relicoon').some((item) => item.options.some((option) => option.id === 'absence' || option.id === 'uncertainty')), true);
+  assert.equal(companionContentForFamily('encora').some((item) => item.options.some((option) => option.id === 'quiet')), true);
+});
+
+test('Batch 3 repeatable quests change the lens while preserving family meaning', () => {
+  const ids = [
+    'quest-read-book',
+    'quest-pagelet-learning-note',
+    'quest-pagelet-curiosity-note',
+    'quest-pagelet-weekly-review',
+    'quest-flickerbun-watch',
+    'quest-flickerbun-scene-note',
+    'quest-flickerbun-new-perspective',
+    'quest-flickerbun-weekly-review',
+    'quest-relicoon-object-note',
+    'quest-relicoon-museum-visit',
+    'quest-relicoon-context-note',
+    'quest-relicoon-weekly-review',
+    'quest-encora-listening-note',
+    'quest-encora-music-moment',
+    'quest-encora-practice-note',
+    'quest-encora-weekly-review',
+  ];
+  for (const id of ids) {
+    const quest = QUEST_DEFINITIONS[id];
+    assert.equal(quest.presentationVariants?.length, 3, id);
+    const copy = quest.presentationVariants?.map((variant) => `${variant.title} ${variant.hint}`).join(' ') ?? '';
+    assert.equal(/detail you have not used|changed since last time/i.test(copy), false, id);
+    assert.equal(new Set(quest.presentationVariants?.map((variant) => variant.title)).size, 3, id);
+  }
+  assert.match(QUEST_DEFINITIONS['quest-read-book'].hint, /read, listen to, or read along/i);
+  assert.match(QUEST_DEFINITIONS['quest-flickerbun-watch'].hint, /stopping partway is allowed/i);
+  assert.match(QUEST_DEFINITIONS['quest-relicoon-museum-visit'].hint, /online collection/i);
+  assert.match(QUEST_DEFINITIONS['quest-encora-listening-note'].hint, /volume, format, and breaks/i);
+});
+
+test('Batch 4 families keep time, reflection, and progress pressure-aware', () => {
+  for (const familyId of ['dawnle', 'quietome', 'vesperitt', 'cheerlet'] as const) {
+    const content = companionContentForFamily(familyId);
+    assert.equal(content.length, 23);
+    assert.equal(new Set(content.filter((item) => item.kind === 'daily_pulse').map((item) => item.prompt)).size, 12);
+    assert.equal(content.every((item) => item.options.length >= 4), true);
+    assert.equal(content.some((item) => item.options.some((option) => option.id === 'supported')), false);
+    assert.equal(companionJourneyByFamilyId.get(familyId)?.version, 3);
+    assert.equal(quickGoalTemplatesForFamily(familyId).length >= 8, true);
+  }
+  assert.equal(companionContentForFamily('dawnle').some((item) => item.options.some((option) => option.id === 'different-time')), true);
+  assert.equal(companionContentForFamily('quietome').some((item) => item.options.some((option) => option.id === 'company' || option.id === 'unsafe')), true);
+  assert.equal(companionContentForFamily('vesperitt').some((item) => item.options.some((option) => option.id === 'unavoidable' || option.id === 'awake')), true);
+  assert.equal(companionContentForFamily('cheerlet').some((item) => item.options.some((option) => option.id === 'mixed' || option.id === 'declined')), true);
+});
+
+test('Batch 4 quests repeat safely without rewarding early or late wakefulness', () => {
+  const ids = [
+    'quest-cheerlet-progress-detail',
+    'quest-vesperitt-night-detail',
+    'quest-dawnle-first-light-photo',
+    'quest-dawnle-morning-note',
+    'quest-dawnle-prepare-start',
+    'quest-dawnle-weekly-review',
+    'quest-quietome-one-line',
+    'quest-quietome-solo-pause',
+    'quest-quietome-returning-question',
+    'quest-quietome-weekly-review',
+    'quest-late-capture',
+    'quest-vesperitt-night-note',
+    'quest-vesperitt-next-day-note',
+    'quest-vesperitt-weekly-review',
+    'quest-cheerlet-name-progress',
+    'quest-cheerlet-celebrate-note',
+    'quest-cheerlet-mark-chapter',
+    'quest-cheerlet-weekly-review',
+  ];
+  for (const id of ids) {
+    const quest = QUEST_DEFINITIONS[id];
+    assert.equal(quest.presentationVariants?.length, 3, id);
+    assert.equal(new Set(quest.presentationVariants?.map((variant) => variant.title)).size, 3, id);
+  }
+  assert.match(QUEST_DEFINITIONS['quest-dawnle-first-light-photo'].hint, /do not wake early/i);
+  assert.match(QUEST_DEFINITIONS['quest-late-capture'].hint, /do not stay awake or go out/i);
+  assert.match(QUEST_DEFINITIONS['quest-quietome-solo-pause'].hint, /stop or seek company/i);
+  assert.match(QUEST_DEFINITIONS['quest-cheerlet-celebrate-note'].hint, /celebration is optional/i);
+});
+
+test('Batch 5 families support adaptation, recovery, and non-competitive play', () => {
+  for (const familyId of ['flexel', 'sprintail', 'hooplet', 'serveling'] as const) {
+    const content = companionContentForFamily(familyId);
+    assert.equal(content.length, 23);
+    assert.equal(new Set(content.filter((item) => item.kind === 'daily_pulse').map((item) => item.prompt)).size, 12);
+    assert.equal(content.every((item) => item.options.length >= 4), true);
+    assert.equal(content.some((item) => item.options.some((option) => option.id === 'supported')), false);
+    assert.equal(companionJourneyByFamilyId.get(familyId)?.version, 3);
+    assert.equal(quickGoalTemplatesForFamily(familyId).length >= 8, true);
+    assert.equal(content.some((item) => item.options.some((option) => ['adapted', 'slower', 'run-walk', 'cooperative'].includes(option.id))), true);
+    assert.equal(content.some((item) => item.options.some((option) => option.id === 'stopped' || option.id === 'rest')), true);
+  }
+  assert.match(companionJourneyByFamilyId.get('sprintail')?.introduction ?? '', /running itself are always optional/i);
+  assert.match(companionJourneyByFamilyId.get('hooplet')?.introduction ?? '', /competition.*optional/i);
+  assert.match(companionJourneyByFamilyId.get('serveling')?.introduction ?? '', /standing play.*optional/i);
+});
+
+test('Batch 5 quests match evidence and do not disguise performance demands', () => {
+  const ids = [
+    'quest-flexel-session-note', 'quest-flexel-training-detail', 'quest-flexel-recovery-note', 'quest-flexel-weekly-review',
+    'quest-sprintail-run-day', 'quest-sprintail-run-detail', 'quest-sprintail-recovery', 'quest-sprintail-weekly-review',
+    'quest-hooplet-court-note', 'quest-hooplet-skill-detail', 'quest-hooplet-team-moment', 'quest-hooplet-weekly-review',
+    'quest-serveling-session-note', 'quest-serveling-rally-detail', 'quest-serveling-reset-note', 'quest-serveling-weekly-review',
+  ];
+  for (const id of ids) {
+    const quest = QUEST_DEFINITIONS[id];
+    assert.equal(quest.presentationVariants?.length, 3, id);
+    assert.equal(new Set(quest.presentationVariants?.map((variant) => variant.title)).size, 3, id);
+  }
+  assert.match(QUEST_DEFINITIONS['quest-sprintail-run-day'].hint, /threshold does not prove a run/i);
+  assert.equal(QUEST_DEFINITIONS['quest-sprintail-run-day'].criteria[0]?.value, 3000);
+  assert.match(QUEST_DEFINITIONS['quest-flexel-training-detail'].hint, /seated, or adapted/i);
+  assert.match(QUEST_DEFINITIONS['quest-hooplet-court-note'].hint, /wheelchair or adapted/i);
+  assert.match(QUEST_DEFINITIONS['quest-serveling-session-note'].hint, /seated or adapted/i);
+});
+
+test('Batch 6 families protect dignity, consent, animal choice, and routes to support', () => {
+  for (const familyId of ['snuglet', 'waglet', 'whiskit', 'mendle'] as const) {
+    const content = companionContentForFamily(familyId);
+    assert.equal(content.length, 23);
+    assert.equal(new Set(content.filter((item) => item.kind === 'daily_pulse').map((item) => item.prompt)).size, 12);
+    assert.equal(content.every((item) => item.options.length >= 4), true);
+    assert.equal(content.some((item) => item.options.some((option) => option.id === 'supported')), false);
+    assert.equal(companionJourneyByFamilyId.get(familyId)?.version, 3);
+    assert.equal(quickGoalTemplatesForFamily(familyId).length >= 8, true);
+  }
+  assert.equal(companionContentForFamily('snuglet').some((item) => item.options.some((option) => option.id === 'boundary' || option.id === 'delegated')), true);
+  assert.equal(companionContentForFamily('waglet').some((item) => item.options.some((option) => option.id === 'dog-stopped')), true);
+  assert.equal(companionContentForFamily('whiskit').some((item) => item.options.some((option) => option.id === 'cat-stopped')), true);
+  assert.equal(companionContentForFamily('mendle').some((item) => item.options.some((option) => option.id === 'urgent' || option.id === 'professional')), true);
+  assert.match(companionJourneyByFamilyId.get('waglet')?.introduction ?? '', /cannot diagnose/i);
+  assert.match(companionJourneyByFamilyId.get('whiskit')?.introduction ?? '', /cannot diagnose/i);
+  assert.match(companionJourneyByFamilyId.get('mendle')?.introduction ?? '', /does not diagnose, provide crisis care/i);
+});
+
+test('Batch 6 quests use private, honest evidence and three safe return lenses', () => {
+  const ids = [
+    'quest-snuglet-care-photo', 'quest-snuglet-care-detail', 'quest-snuglet-caregiver-pause', 'quest-snuglet-weekly-review',
+    'quest-waglet-companion-photo', 'quest-waglet-care-detail', 'quest-waglet-routine-note', 'quest-waglet-weekly-review',
+    'quest-whiskit-companion-photo', 'quest-whiskit-enrichment-detail', 'quest-whiskit-pattern-note', 'quest-whiskit-weekly-review',
+    'quest-mendle-honest-checkin', 'quest-mendle-kind-action', 'quest-mendle-repair-note', 'quest-mendle-weekly-review',
+  ];
+  for (const id of ids) {
+    const quest = QUEST_DEFINITIONS[id];
+    assert.equal(quest.presentationVariants?.length, 3, id);
+    assert.equal(new Set(quest.presentationVariants?.map((variant) => variant.title)).size, 3, id);
+  }
+  const privateCare = QUEST_DEFINITIONS['quest-snuglet-care-photo'];
+  assert.equal(privateCare.family, 'note');
+  assert.equal(privateCare.criteria[0]?.fact, 'evidence.items');
+  assert.equal(privateCare.criteria[0]?.op, 'questJournalMatch');
+  assert.match(privateCare.hint, /without including another person’s private details/i);
+  assert.match(QUEST_DEFINITIONS['quest-waglet-routine-note'].hint, /leave room for uncertainty/i);
+  assert.match(QUEST_DEFINITIONS['quest-whiskit-pattern-note'].hint, /leave room for uncertainty/i);
+  assert.match(QUEST_DEFINITIONS['quest-mendle-weekly-review'].hint, /human or professional help/i);
+});
+
+test('one deterministic invitation is persisted for a companion and local day', () => {
+  const input = {
+    state: emptyCompanionContentState(),
+    companionId: 'companion:mossprout',
+    familyId: 'mossprout',
+    dayId: '2026-08-02',
+    bondLevel: 1 as const,
+    content: mossContent,
+    hasActiveGoal: true,
+    questCompletions: 1,
+    reflections: 0,
+    eligibleQuestIds: [],
+    createdAt: 100,
+  };
+  const first = selectCompanionDailyInvitation(input);
+  const repeated = selectCompanionDailyInvitation(input);
+  assert.deepEqual(first, repeated);
+  const stored = ensureCompanionInvitation(input.state, first);
+  assert.equal(invitationForDay(stored, input.companionId, input.dayId)?.id, first.id);
+  assert.equal(stored.invitations.length, 1);
+  assert.equal(stored.events.filter((event) => event.kind === 'shown').length, 1);
+  assert.equal(ensureCompanionInvitation(stored, first), stored);
+});
+
+test('resume work and Focus setup take priority over rotating content', () => {
+  const base = {
+    state: emptyCompanionContentState(), companionId: 'companion:mossprout', familyId: 'mossprout',
+    dayId: '2026-08-02', bondLevel: 3 as const, content: mossContent,
+    hasActiveGoal: true, questCompletions: 3, reflections: 0, eligibleQuestIds: [], createdAt: 1,
+  };
+  assert.equal(selectCompanionDailyInvitation({ ...base, activeQuestId: 'quest-mossprout-return' }).kind, 'resume_quest');
+  assert.equal(selectCompanionDailyInvitation({ ...base, activeConversationId: 'conversation-1' }).kind, 'resume_focus');
+  assert.equal(selectCompanionDailyInvitation({ ...base, hasActiveGoal: false }).kind, 'focus_setup');
+});
+
+test('invitation lifecycle and remembered answers are idempotent and contain no journal text', () => {
+  const invitation = selectCompanionDailyInvitation({
+    state: emptyCompanionContentState(), companionId: 'companion:mossprout', familyId: 'mossprout',
+    dayId: '2026-08-02', bondLevel: 1, content: mossContent, hasActiveGoal: true,
+    questCompletions: 0, reflections: 0, eligibleQuestIds: [], createdAt: 1,
+  });
+  let state = ensureCompanionInvitation(emptyCompanionContentState(), invitation);
+  state = updateCompanionInvitation(state, invitation.id, 'opened', 2);
+  state = updateCompanionInvitation(state, invitation.id, 'completed', 3);
+  state = updateCompanionInvitation(state, invitation.id, 'completed', 4);
+  state = rememberCompanionAnswer(state, {
+    companionId: invitation.companionId, familyId: invitation.familyId,
+    key: invitation.contentItemId ?? 'pulse', value: 'I noticed something new', sourceId: invitation.id, occurredAt: 3,
+  });
+  assert.equal(state.invitations[0].status, 'completed');
+  assert.equal(state.events.filter((event) => event.kind === 'completed').length, 1);
+  assert.equal(state.memoryFacts[0].value, 'I noticed something new');
+  assert.equal(JSON.stringify(state.events).includes('I noticed something new'), false);
+});
+
+test('repeatable real-life quests rotate presentation variants and retain evidence identity', () => {
+  const definition = QUEST_DEFINITIONS['quest-mossprout-green-photo'];
+  assert.equal(definition.presentationVariants?.length, 3);
+  const offer = {
+    id: definition.id, title: definition.title, hint: definition.hint,
+    categoryLabel: 'Photo', estimatedMinutes: 5, lane: 'real_life' as const, minimumBondLevel: 1 as const,
+  };
+  const first = withDailyQuestPresentationVariant(offer, {
+    companionId: 'companion:mossprout', dayId: '2026-08-02', questState: emptyQuestState(),
+  });
+  const state = {
+    ...emptyQuestState(),
+    quests: [{
+      questId: definition.id, creatureId: 'companion:mossprout', title: first.title, hint: first.hint,
+      acceptedAt: 1, acceptedDayId: '2026-08-02', questRunId: 'run-1', presentationVariantId: first.presentationVariantId,
+    }],
+  };
+  const second = withDailyQuestPresentationVariant(offer, {
+    companionId: 'companion:mossprout', dayId: '2026-08-04', questState: state,
+  });
+  assert.equal(second.id, first.id);
+  assert.notEqual(second.presentationVariantId, first.presentationVariantId);
+});

@@ -1,4 +1,5 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { SPECIALIST_COMPANION_SYSTEMS } from '@/constants/specialist-companion-catalogue';
 
 export type CompanionJourneyGoalStatus = 'active' | 'paused' | 'completed' | 'abandoned';
 
@@ -59,6 +60,7 @@ export type CompanionJourneyDefinition = {
 
 type ThreeQuestionJourneyConfig = {
   id: string;
+  version?: number;
   familyId: KatchimeraFamilyId;
   title: string;
   introduction: string;
@@ -100,7 +102,7 @@ type ThreeQuestionJourneyConfig = {
 function threeQuestionJourney(config: ThreeQuestionJourneyConfig): CompanionJourneyDefinition {
   return {
     id: config.id,
-    version: 2,
+    version: config.version ?? 2,
     familyId: config.familyId,
     title: config.title,
     introduction: config.introduction,
@@ -159,19 +161,26 @@ function threeQuestionJourney(config: ThreeQuestionJourneyConfig): CompanionJour
 
 function focusedPracticeJourney(config: {
   id: string;
+  version?: number;
   familyId: KatchimeraFamilyId;
   title: string;
   introduction: string;
   subject: string;
   firstPrompt: string;
+  firstHelperText?: string;
   firstOptions: readonly string[];
   secondPrompt: string;
+  secondHelperText?: string;
   secondOptions: readonly string[];
+  goalPrompt?: string;
+  goalHelperText?: string;
+  checkInOptions?: readonly CompanionJourneyCheckInOption[];
   directions: readonly { label: string; goalTitle: string; quickGoals: readonly string[] }[];
 }): CompanionJourneyDefinition {
   const slug = config.familyId;
   return threeQuestionJourney({
     id: config.id,
+    version: config.version,
     familyId: config.familyId,
     title: config.title,
     introduction: config.introduction,
@@ -180,13 +189,13 @@ function focusedPracticeJourney(config: {
     first: {
       id: `${slug}-meaning`,
       prompt: config.firstPrompt,
-      helperText: 'Choose what feels most useful in your life now.',
+      helperText: config.firstHelperText ?? 'Choose what feels most useful in your life now.',
       options: config.firstOptions.map((label, index) => ({ id: `meaning-${index + 1}`, label })),
     },
     second: {
       id: `${slug}-friction`,
       prompt: config.secondPrompt,
-      helperText: 'Choose the closest pattern, not a perfect description.',
+      helperText: config.secondHelperText ?? 'Choose the closest pattern, not a perfect description.',
       options: config.secondOptions.map((label, index) => ({ id: `friction-${index + 1}`, label })),
     },
     goal: {
@@ -194,8 +203,8 @@ function focusedPracticeJourney(config: {
       typeId: `${slug}-direction`,
       typeLabel: `${config.title} direction`,
       fallbackTitle: config.title,
-      prompt: `What ${config.subject} direction would you like to build?`,
-      helperText: 'Pick the closest low-friction direction.',
+      prompt: config.goalPrompt ?? `What ${config.subject} direction would you like to build?`,
+      helperText: config.goalHelperText ?? 'Pick the closest low-friction direction.',
       options: config.directions.map((direction, index) => ({
         id: `direction-${index + 1}`,
         label: direction.label,
@@ -204,7 +213,7 @@ function focusedPracticeJourney(config: {
       })),
     },
     checkInPrompt: `What happened with ${config.subject} today?`,
-    checkInOptions: [
+    checkInOptions: config.checkInOptions ?? [
       { id: 'showed-up', label: 'I showed up' },
       { id: 'noticed', label: 'I noticed a useful detail' },
       { id: 'adjusted', label: 'I made an adjustment' },
@@ -218,106 +227,177 @@ function focusedPracticeJourney(config: {
 }
 
 const flexel = focusedPracticeJourney({
-  id: 'flexel-stronger-rhythm', familyId: 'flexel', title: 'A stronger rhythm',
-  introduction: 'Build a gym, strength, or mobility practice that can survive ordinary weeks.',
+  id: 'flexel-stronger-rhythm', version: 3, familyId: 'flexel', title: 'A stronger rhythm',
+  introduction: 'Build an adaptable strength, gym, or mobility practice around your body, access, recovery, and ordinary life—not comparison or pushing through symptoms.',
   subject: 'training', firstPrompt: 'What would you most like training to give you?',
-  firstOptions: ['More strength', 'More energy', 'More confidence', 'More mobility'],
-  secondPrompt: 'What most often interrupts training?',
-  secondOptions: ['Finding time', 'Knowing what to do', 'Gym confidence', 'Recovery and energy'],
+  firstHelperText: 'Choose what matters to you. Appearance, heavier loads, and harder sessions are not assumed goals.',
+  firstOptions: ['Useful strength', 'Enjoyable movement or energy', 'Confidence in my own practice', 'Mobility or everyday function', 'A supported way to begin'],
+  secondPrompt: 'What most affects whether training fits?',
+  secondHelperText: 'Pain, symptoms, access, uncertainty, and recovery needs are real constraints—not failures of motivation.',
+  secondOptions: ['Finding time or access', 'Knowing what suits my body', 'Confidence or belonging', 'Pain, fatigue, or recovery', 'Equipment or support needs'],
+  goalHelperText: 'Choose one adaptable direction. Reducing, changing, resting, or getting appropriate guidance can all be part of the Focus.',
   directions: [
-    { label: 'Show up consistently', goalTitle: 'Build a training rhythm I can repeat', quickGoals: ['flexel:show-up', 'flexel:weekday-training'] },
-    { label: 'Build strength gradually', goalTitle: 'Make gradual strength progress', quickGoals: ['flexel:one-exercise', 'flexel:record-set'] },
-    { label: 'Move with better form', goalTitle: 'Train with more attention to form', quickGoals: ['flexel:warm-up', 'flexel:form-cue'] },
+    { label: 'Find a repeatable, flexible rhythm', goalTitle: 'Build a flexible training rhythm that suits my capacity', quickGoals: ['flexel:show-up', 'flexel:weekday-training'] },
+    { label: 'Build useful strength gradually', goalTitle: 'Explore gradual strength progress without comparison', quickGoals: ['flexel:one-exercise', 'flexel:record-set'] },
+    { label: 'Learn a safe-feeling adaptation or technique', goalTitle: 'Learn adaptations and technique that suit my body', quickGoals: ['flexel:warm-up', 'flexel:form-cue'] },
     { label: 'Protect mobility and recovery', goalTitle: 'Make mobility and recovery part of training', quickGoals: ['flexel:mobility-five', 'flexel:recovery-choice'] },
+  ],
+  checkInOptions: [
+    { id: 'trained', label: 'I trained in a way that suited me' },
+    { id: 'adapted', label: 'I adapted or reduced something' },
+    { id: 'recovered', label: 'I chose recovery or rest' },
+    { id: 'stopped', label: 'I stopped when needed' },
+    { id: 'none', label: 'Training did not fit today' },
   ],
 });
 const sprintail = focusedPracticeJourney({
-  id: 'sprintail-running-rhythm', familyId: 'sprintail', title: 'A running rhythm',
-  introduction: 'Make running understandable through pace, endurance, routes, and recovery rather than performance pressure.',
+  id: 'sprintail-running-rhythm', version: 3, familyId: 'sprintail', title: 'A running rhythm',
+  introduction: 'Explore running or run-walk practice through enjoyment, sustainable effort, routes, and recovery. Pace, distance, frequency, and running itself are always optional.',
   subject: 'running', firstPrompt: 'What would you most like running to give you?',
-  firstOptions: ['Headspace', 'Endurance', 'Speed', 'Consistency'],
-  secondPrompt: 'What most often interrupts running?',
-  secondOptions: ['Starting', 'Pacing', 'Time', 'Recovery'],
+  firstHelperText: 'Choose your reason rather than an outside performance standard.',
+  firstOptions: ['Headspace or enjoyment', 'Sustainable endurance', 'Learning about pace', 'A flexible rhythm', 'Connection to a route or people'],
+  secondPrompt: 'What most affects whether running fits?',
+  secondHelperText: 'Pain, symptoms, route safety, weather, access, and recovery are valid reasons to adapt or not run.',
+  secondOptions: ['Starting or finding time', 'Pacing or expectations', 'Route, weather, or access', 'Pain, fatigue, or recovery', 'Running does not fit right now'],
+  goalHelperText: 'Choose a low-pressure experiment. Walking intervals, stopping, recovery, and pausing the Focus are valid.',
   directions: [
-    { label: 'Run a little more often', goalTitle: 'Build a realistic running rhythm', quickGoals: ['sprintail:shoes-on', 'sprintail:weekday-run'] },
-    { label: 'Build endurance gently', goalTitle: 'Extend my running endurance gradually', quickGoals: ['sprintail:ten-minute-run', 'sprintail:easy-pace'] },
+    { label: 'Find a realistic running rhythm', goalTitle: 'Build a flexible running or run-walk rhythm', quickGoals: ['sprintail:shoes-on', 'sprintail:weekday-run'] },
+    { label: 'Explore endurance gently', goalTitle: 'Explore sustainable endurance with permission to slow or stop', quickGoals: ['sprintail:ten-minute-run', 'sprintail:easy-pace'] },
     { label: 'Understand my pace', goalTitle: 'Learn what a sustainable pace feels like', quickGoals: ['sprintail:easy-pace', 'sprintail:finish-feeling'] },
     { label: 'Enjoy routes and recovery', goalTitle: 'Make running routes and recovery more supportive', quickGoals: ['sprintail:route-ready', 'sprintail:recovery'] },
   ],
+  checkInOptions: [
+    { id: 'ran', label: 'I ran or used run-walk intervals' },
+    { id: 'adapted', label: 'I slowed, shortened, or changed it' },
+    { id: 'enjoyed', label: 'Something felt enjoyable or connecting' },
+    { id: 'recovered', label: 'I chose recovery or no run' },
+    { id: 'stopped', label: 'I stopped when needed' },
+  ],
 });
 const hooplet = focusedPracticeJourney({
-  id: 'hooplet-court-rhythm', familyId: 'hooplet', title: 'Court confidence',
-  introduction: 'Turn court time into visible skill, shared play, and confidence.',
+  id: 'hooplet-court-rhythm', version: 3, familyId: 'hooplet', title: 'Court confidence',
+  introduction: 'Explore basketball through skill, fun, accessible practice, and shared play. Competition, full-court movement, and public court time are optional.',
   subject: 'basketball', firstPrompt: 'What draws you onto the court?',
-  firstOptions: ['Skill', 'Competition', 'Teamwork', 'Fun'],
-  secondPrompt: 'What most often limits your court time?',
-  secondOptions: ['Access to a court', 'Confidence', 'People to play with', 'Knowing what to practise'],
+  firstHelperText: 'This can include solo, cooperative, wheelchair, adapted, recreational, or competitive basketball.',
+  firstOptions: ['Learning a skill', 'Competition', 'Teamwork or belonging', 'Fun or expression', 'Adapted or solo play'],
+  secondPrompt: 'What most affects whether basketball fits?',
+  secondHelperText: 'Court access, body needs, equipment, people, and belonging all shape the opportunity to play.',
+  secondOptions: ['Court, cost, or transport access', 'Pain, injury, fatigue, or mobility', 'People or a welcoming session', 'Confidence or performance pressure', 'Equipment or adaptation needs'],
+  goalHelperText: 'Choose a direction you can adapt. Watching, learning, solo skill work, recovery, and no competition can all count.',
   directions: [
-    { label: 'Touch the ball more often', goalTitle: 'Build a regular basketball rhythm', quickGoals: ['hooplet:touch-ball', 'hooplet:court-window'] },
+    { label: 'Build a flexible basketball rhythm', goalTitle: 'Build a basketball rhythm that fits my access and capacity', quickGoals: ['hooplet:touch-ball', 'hooplet:court-window'] },
     { label: 'Improve one skill', goalTitle: 'Develop one basketball skill deliberately', quickGoals: ['hooplet:ten-shots', 'hooplet:one-drill'] },
-    { label: 'Play with more confidence', goalTitle: 'Build confidence through repeatable court moments', quickGoals: ['hooplet:weak-hand', 'hooplet:keep-play'] },
-    { label: 'Connect through team play', goalTitle: 'Become a more present teammate', quickGoals: ['hooplet:team-voice', 'hooplet:defence'] },
+    { label: 'Adapt practice to suit me', goalTitle: 'Find basketball adaptations and practice forms that suit me', quickGoals: ['hooplet:weak-hand', 'hooplet:keep-play'] },
+    { label: 'Connect through supportive team play', goalTitle: 'Explore supportive communication and shared basketball play', quickGoals: ['hooplet:team-voice', 'hooplet:defence'] },
+  ],
+  checkInOptions: [
+    { id: 'played', label: 'I played or practised' },
+    { id: 'learned', label: 'I watched or learned one detail' },
+    { id: 'adapted', label: 'I adapted the setup or movement' },
+    { id: 'connected', label: 'Shared play felt supportive' },
+    { id: 'none', label: 'Basketball did not fit today' },
   ],
 });
 const serveling = focusedPracticeJourney({
-  id: 'serveling-rally-rhythm', familyId: 'serveling', title: 'A steadier rally',
-  introduction: 'Build racket-sport skill through repetition, adjustment, movement, and composure.',
+  id: 'serveling-rally-rhythm', version: 3, familyId: 'serveling', title: 'A steadier rally',
+  introduction: 'Explore tennis or racket sport through cooperative rallies, skill, adaptation, and composure. Scoring, competition, standing play, and conventional courts are optional.',
   subject: 'racket practice', firstPrompt: 'What do you enjoy most in racket sport?',
-  firstOptions: ['Rallies', 'Technique', 'Competition', 'Movement'],
-  secondPrompt: 'What most often gets in the way?',
-  secondOptions: ['Court access', 'Consistency', 'Match pressure', 'Knowing what to practise'],
+  firstHelperText: 'This can include solo, cooperative, seated, adapted, recreational, or competitive play.',
+  firstOptions: ['Cooperative rallies', 'Technique or problem-solving', 'Competition', 'Movement or focus', 'Adapted or solo practice'],
+  secondPrompt: 'What most affects whether racket sport fits?',
+  secondHelperText: 'Access, body needs, equipment, partners, and performance pressure are all part of the practice context.',
+  secondOptions: ['Court, cost, or transport access', 'Pain, injury, fatigue, or mobility', 'A suitable partner or group', 'Match or performance pressure', 'Equipment or adaptation needs'],
+  goalHelperText: 'Choose a direction you can adapt. Cooperative hitting, solo practice, slower play, and no scoring are valid.',
   directions: [
-    { label: 'Practise more regularly', goalTitle: 'Build a repeatable racket-practice rhythm', quickGoals: ['serveling:racket-five', 'serveling:court-window'] },
+    { label: 'Find a flexible practice rhythm', goalTitle: 'Build a racket-practice rhythm that fits my access and capacity', quickGoals: ['serveling:racket-five', 'serveling:court-window'] },
     { label: 'Build a stronger serve', goalTitle: 'Develop a more reliable serve', quickGoals: ['serveling:ten-serves', 'serveling:stroke-focus'] },
-    { label: 'Sustain better rallies', goalTitle: 'Build patience and consistency in rallies', quickGoals: ['serveling:one-rally', 'serveling:footwork'] },
-    { label: 'Reset under pressure', goalTitle: 'Use a steadier between-points reset', quickGoals: ['serveling:between-points', 'serveling:keep-point'] },
+    { label: 'Explore cooperative or adapted rallies', goalTitle: 'Build satisfying rallies through adaptation and cooperation', quickGoals: ['serveling:one-rally', 'serveling:footwork'] },
+    { label: 'Reset without judging the point', goalTitle: 'Use a steadier reset between points or attempts', quickGoals: ['serveling:between-points', 'serveling:keep-point'] },
+  ],
+  checkInOptions: [
+    { id: 'played', label: 'I played or practised' },
+    { id: 'learned', label: 'I noticed one useful detail' },
+    { id: 'adapted', label: 'I adapted the setup or movement' },
+    { id: 'connected', label: 'Cooperative play felt good' },
+    { id: 'none', label: 'Racket sport did not fit today' },
   ],
 });
 const snuglet = focusedPracticeJourney({
-  id: 'snuglet-everyday-care', familyId: 'snuglet', title: 'Everyday care',
-  introduction: 'Make caregiving visible while including the needs and limits of the person giving care.',
+  id: 'snuglet-everyday-care', version: 3, familyId: 'snuglet', title: 'Everyday care',
+  introduction: 'Make human caregiving visible while respecting the cared-for person’s dignity and choices and the caregiver’s needs, limits, safety, and right to support.',
   subject: 'caregiving', firstPrompt: 'What part of caring needs more support?',
-  firstOptions: ['Daily routines', 'Connection', 'Patience', 'Asking for help'],
+  firstHelperText: 'Choose the area that feels most pressing. This does not assume all care needs can be solved by you.',
+  firstOptions: ['Daily routines', 'Connection or communication', 'Practical or service support', 'Sharing the load', 'My own capacity or safety'],
   secondPrompt: 'What makes care feel hardest right now?',
-  secondOptions: ['Too much to hold', 'Unpredictable needs', 'Low energy', 'Not enough support'],
+  secondHelperText: 'Name the constraint without blaming yourself or the person receiving care.',
+  secondOptions: ['Too much to hold', 'Unpredictable or changing needs', 'My health, energy, or limits', 'Not enough practical support', 'Systems, cost, or service barriers'],
+  goalHelperText: 'Choose one direction within your control. Asking, delegating, setting limits, and leaving non-urgent tasks undone are valid.',
   directions: [
     { label: 'Make routines gentler', goalTitle: 'Create one gentler care routine', quickGoals: ['snuglet:prepare-routine', 'snuglet:tomorrow-easier'] },
-    { label: 'Protect connection', goalTitle: 'Make room for attentive care moments', quickGoals: ['snuglet:full-attention', 'snuglet:name-good'] },
+    { label: 'Protect connection without forcing it', goalTitle: 'Make room for care that respects both people’s needs', quickGoals: ['snuglet:full-attention', 'snuglet:name-good'] },
     { label: 'Share the load', goalTitle: 'Ask for and accept more practical support', quickGoals: ['snuglet:ask-need', 'snuglet:share-load'] },
     { label: 'Protect caregiver capacity', goalTitle: 'Include my needs in the care rhythm', quickGoals: ['snuglet:small-pause', 'snuglet:gentle-boundary'] },
   ],
+  checkInOptions: [
+    { id: 'care', label: 'A care need was met' },
+    { id: 'connected', label: 'There was a connecting moment' },
+    { id: 'shared', label: 'I shared or asked for support' },
+    { id: 'boundary', label: 'I held or noticed a limit' },
+    { id: 'hard', label: 'Care felt hard or unsupported' },
+  ],
 });
 const waglet = focusedPracticeJourney({
-  id: 'waglet-shared-routine', familyId: 'waglet', title: 'A shared dog rhythm',
-  introduction: 'Notice the activity, care, communication, and affection that shape life with a dog.',
+  id: 'waglet-shared-routine', version: 3, familyId: 'waglet', title: 'A shared dog rhythm',
+  introduction: 'Notice the choice, activity, care, communication, and affection that shape life with a dog. The app can help you observe routines, but it cannot diagnose health or behaviour changes.',
   subject: 'dog companionship', firstPrompt: 'What matters most in life with your dog?',
-  firstOptions: ['Walks', 'Play', 'Training', 'Quiet company'],
-  secondPrompt: 'What would make the shared routine better?',
-  secondOptions: ['More time', 'More variety', 'Clearer cues', 'Noticing needs sooner'],
+  firstHelperText: 'Choose what matters in your shared life, including rest and the dog’s ability to opt out.',
+  firstOptions: ['Walks or outdoor time', 'Play or enrichment', 'Communication or training', 'Quiet company', 'Care, comfort, or ageing needs'],
+  secondPrompt: 'What most affects the shared routine?',
+  secondHelperText: 'Health, stress, environment, access, and human capacity can matter more than consistency.',
+  secondOptions: ['Time or human capacity', 'Weather, routes, or access', 'The dog’s health, age, or energy', 'Stress, fear, or overstimulation', 'Knowing when to get qualified help'],
+  goalHelperText: 'Choose a kind, observable direction. Respect opting out and seek qualified veterinary or behaviour support for concerning changes.',
   directions: [
-    { label: 'Enjoy walks more', goalTitle: 'Make dog walks more present and varied', quickGoals: ['waglet:present-walk', 'waglet:fresh-route'] },
-    { label: 'Play more often', goalTitle: 'Build a small shared play rhythm', quickGoals: ['waglet:five-play', 'waglet:weekday-routine'] },
-    { label: 'Train with kindness', goalTitle: 'Practise clear, kind communication', quickGoals: ['waglet:one-cue', 'waglet:notice-signal'] },
-    { label: 'Support care and comfort', goalTitle: 'Notice and support my dog’s care needs', quickGoals: ['waglet:care-check', 'waglet:quiet-company'] },
+    { label: 'Make walks or outdoor time suit us', goalTitle: 'Adapt dog walks or outdoor time to our shared needs', quickGoals: ['waglet:present-walk', 'waglet:fresh-route'] },
+    { label: 'Offer choice in play and enrichment', goalTitle: 'Build a small dog-play rhythm led by choice', quickGoals: ['waglet:five-play', 'waglet:weekday-routine'] },
+    { label: 'Communicate without force', goalTitle: 'Practise clear, reward-based communication', quickGoals: ['waglet:one-cue', 'waglet:notice-signal'] },
+    { label: 'Support care and comfort', goalTitle: 'Notice routines and seek appropriate help when needed', quickGoals: ['waglet:care-check', 'waglet:quiet-company'] },
+  ],
+  checkInOptions: [
+    { id: 'shared', label: 'We shared a suitable moment' },
+    { id: 'choice', label: 'I followed the dog’s choice' },
+    { id: 'adapted', label: 'I adapted the routine' },
+    { id: 'space', label: 'The dog needed space or rest' },
+    { id: 'help', label: 'A change may need qualified help' },
   ],
 });
 const whiskit = focusedPracticeJourney({
-  id: 'whiskit-gentle-attention', familyId: 'whiskit', title: 'Gentle attention',
-  introduction: 'Notice the play, preferences, behaviour, comfort, and care that shape life with a cat.',
+  id: 'whiskit-gentle-attention', version: 3, familyId: 'whiskit', title: 'Gentle attention',
+  introduction: 'Notice the choice, play, preferences, behaviour, comfort, and care that shape life with a cat. The app can help you observe routines, but it cannot diagnose health or behaviour changes.',
   subject: 'cat companionship', firstPrompt: 'What would you like to notice more with your cat?',
-  firstOptions: ['Play', 'Comfort', 'Behaviour', 'Care'],
-  secondPrompt: 'What would improve the shared routine?',
-  secondOptions: ['More play ideas', 'Better enrichment', 'Understanding signals', 'More consistent care'],
+  firstHelperText: 'Choose what matters in your shared life, including rest, hiding, and the cat’s ability to opt out.',
+  firstOptions: ['Play or enrichment', 'Comfort or safe space', 'Preferences and communication', 'Quiet company', 'Care, health, or ageing needs'],
+  secondPrompt: 'What most affects the shared routine?',
+  secondHelperText: 'Health, stress, environment, resources, and human capacity can matter more than consistency.',
+  secondOptions: ['Time or human capacity', 'Space, noise, or household change', 'The cat’s health, age, or energy', 'Stress, fear, or overstimulation', 'Knowing when to get qualified help'],
+  goalHelperText: 'Choose a kind, observable direction. Respect disengagement and seek qualified veterinary or behaviour support for concerning changes.',
   directions: [
-    { label: 'Play more often', goalTitle: 'Build a small cat-play rhythm', quickGoals: ['whiskit:five-play', 'whiskit:follow-curiosity'] },
-    { label: 'Offer better enrichment', goalTitle: 'Create more useful enrichment moments', quickGoals: ['whiskit:enrichment', 'whiskit:refresh-space'] },
-    { label: 'Understand behaviour', goalTitle: 'Notice my cat’s signals and preferences', quickGoals: ['whiskit:notice-preference', 'whiskit:quiet-company'] },
-    { label: 'Support care and comfort', goalTitle: 'Keep a gentle, consistent care rhythm', quickGoals: ['whiskit:care-check', 'whiskit:weekday-routine'] },
+    { label: 'Offer choice in play', goalTitle: 'Build a small cat-play rhythm led by choice', quickGoals: ['whiskit:five-play', 'whiskit:follow-curiosity'] },
+    { label: 'Support enrichment and safe space', goalTitle: 'Offer enrichment and spaces that suit my cat', quickGoals: ['whiskit:enrichment', 'whiskit:refresh-space'] },
+    { label: 'Observe without assuming', goalTitle: 'Notice my cat’s signals while leaving uncertainty open', quickGoals: ['whiskit:notice-preference', 'whiskit:quiet-company'] },
+    { label: 'Support care and comfort', goalTitle: 'Keep a gentle routine and seek appropriate help when needed', quickGoals: ['whiskit:care-check', 'whiskit:weekday-routine'] },
+  ],
+  checkInOptions: [
+    { id: 'shared', label: 'We shared a suitable moment' },
+    { id: 'choice', label: 'I followed the cat’s choice' },
+    { id: 'adapted', label: 'I adapted the routine or space' },
+    { id: 'space', label: 'The cat needed space or rest' },
+    { id: 'help', label: 'A change may need qualified help' },
   ],
 });
 
 const coffeeRitual = threeQuestionJourney({
   id: 'coffee-ritual-intentional-pause',
+  version: 3,
   familyId: 'coffee-ritual',
   title: 'An intentional pause',
   introduction: 'Use a familiar drink to mark a beginning, break, comfort, or shared moment without turning the ritual into another task.',
@@ -326,7 +406,7 @@ const coffeeRitual = threeQuestionJourney({
   first: {
     id: 'pause-gift',
     prompt: 'What do you most want this small ritual to give you?',
-    helperText: 'The drink is only the cue. Choose the experience around it.',
+    helperText: 'Coffee, tea, water, or another drink can be the cue. Choose the experience around it.',
     options: [
       { id: 'start', label: 'A clearer start' },
       { id: 'break', label: 'A real break' },
@@ -337,7 +417,7 @@ const coffeeRitual = threeQuestionJourney({
   second: {
     id: 'pause-friction',
     prompt: 'What usually makes the ritual disappear?',
-    helperText: 'Baristabbit will keep the Focus small enough to survive busy days.',
+    helperText: 'Choose the condition around the pause. Skipping a drink or changing the ritual is always allowed.',
     options: [
       { id: 'rush', label: 'I rush straight through it' },
       { id: 'screen', label: 'Another screen takes over' },
@@ -365,7 +445,7 @@ const coffeeRitual = threeQuestionJourney({
     { id: 'paused', label: 'It became a real pause' },
     { id: 'comforted', label: 'The familiarity felt comforting' },
     { id: 'shared', label: 'I shared it with someone' },
-    { id: 'other', label: 'Something else' },
+    { id: 'no-pause', label: 'There was no drink pause today' },
   ],
   practiceTitle: 'Pause on purpose',
   practiceDescription: 'Share three real ritual moments.',
@@ -374,9 +454,10 @@ const coffeeRitual = threeQuestionJourney({
 
 const errandimp = threeQuestionJourney({
   id: 'errandimp-lighter-loops',
+  version: 3,
   familyId: 'errandimp',
   title: 'Lighter loose ends',
-  introduction: 'Close practical loops in small passes so ordinary maintenance stops occupying more attention than it deserves.',
+  introduction: 'Choose one practical area to make lighter, while respecting the time, money, access, and energy available to you.',
   conversationTitle: 'Lighten practical life',
   conversationStartLabel: 'Choose an admin direction',
   first: {
@@ -393,12 +474,13 @@ const errandimp = threeQuestionJourney({
   second: {
     id: 'admin-friction',
     prompt: 'Why do those loops tend to stay open?',
-    helperText: 'Errandimp is looking for the smallest useful intervention.',
+    helperText: 'The constraint may be practical or outside your control. Choose what comes closest.',
     options: [
       { id: 'unclear', label: 'I forget the next practical step' },
       { id: 'batch', label: 'There are too many little things' },
       { id: 'energy', label: 'They feel dull or draining' },
       { id: 'timing', label: 'They depend on the right time or place' },
+      { id: 'resources', label: 'Cost, access, or support' },
     ],
   },
   goal: {
@@ -421,7 +503,7 @@ const errandimp = threeQuestionJourney({
     { id: 'reset', label: 'I reset a useful space' },
     { id: 'prepared', label: 'I prepared something early' },
     { id: 'deferred', label: 'I decided what can wait' },
-    { id: 'other', label: 'Something else' },
+    { id: 'no-capacity', label: 'I had no capacity for practical tasks' },
   ],
   practiceTitle: 'Close small loops',
   practiceDescription: 'Share three real admin or maintenance moments.',
@@ -430,31 +512,32 @@ const errandimp = threeQuestionJourney({
 
 const dawnle = threeQuestionJourney({
   id: 'dawnle-kinder-beginnings',
+  version: 3,
   familyId: 'dawnle',
   title: 'Kinder beginnings',
-  introduction: 'Shape the first few minutes of the day with a repeatable cue that reduces rushing and supports the morning you actually live.',
+  introduction: 'Explore what helps the beginning of your day feel kinder and clearer, whatever time your day starts and whatever responsibilities arrive first.',
   conversationTitle: 'Choose a morning beginning',
   conversationStartLabel: 'Shape the first part of the day',
   first: {
     id: 'morning-need',
-    prompt: 'What would improve the beginning of your day most?',
-    helperText: 'This is about the start, not waking at an impressive hour.',
+    prompt: 'What would you most like from the beginning of your day?',
+    helperText: 'This is about the start you actually live, not waking early or performing a perfect routine.',
     options: [
-      { id: 'calm', label: 'Less rushing' },
-      { id: 'light', label: 'More light and movement' },
+      { id: 'calm', label: 'A less rushed pace' },
+      { id: 'light', label: 'Comfortable light or movement' },
       { id: 'clarity', label: 'A clearer first step' },
-      { id: 'quiet', label: 'A calmer first few minutes' },
+      { id: 'quiet', label: 'A moment of care or orientation' },
     ],
   },
   second: {
     id: 'morning-friction',
-    prompt: 'What tends to take over first?',
-    helperText: 'Dawnle will help change one cue rather than rebuild the whole morning.',
+    prompt: 'What most often shapes the start before you can choose it?',
+    helperText: 'Choose the closest condition. Some mornings cannot and do not need to be redesigned.',
     options: [
-      { id: 'phone', label: 'My phone' },
-      { id: 'rushing', label: 'Immediate rushing' },
-      { id: 'fog', label: 'I do not know where to begin' },
-      { id: 'night', label: 'Nothing was prepared the night before' },
+      { id: 'phone', label: 'Messages or my phone' },
+      { id: 'rushing', label: 'Work, care, or immediate demands' },
+      { id: 'fog', label: 'Fatigue, pain, or not knowing where to begin' },
+      { id: 'timing', label: 'My day starts at a different or changing time' },
     ],
   },
   goal: {
@@ -463,11 +546,11 @@ const dawnle = threeQuestionJourney({
     typeLabel: 'Morning start',
     fallbackTitle: 'Build a kinder morning beginning',
     prompt: 'What beginning would you like to practise?',
-    helperText: 'Choose one cue that can work on ordinary mornings.',
+    helperText: 'Choose one flexible cue. It can happen whenever your day begins, and you can skip it when capacity is low.',
     options: [
-      { id: 'light', label: 'Begin with light and water', goalTitle: 'Begin the day with light and water', suggestedQuickGoalIds: ['dawnle:open-curtains', 'dawnle:morning-water', 'dawnle:outside-light'] },
-      { id: 'phone', label: 'Protect the first minutes from my phone', goalTitle: 'Keep the first few minutes of the day phone-free', suggestedQuickGoalIds: ['dawnle:no-phone-five', 'dawnle:choose-first'] },
-      { id: 'simple', label: 'Follow a simple first sequence', goalTitle: 'Build a simple weekday starting sequence', suggestedQuickGoalIds: ['dawnle:weekday-start', 'dawnle:notice-energy'] },
+      { id: 'light', label: 'Begin with comfortable light or a drink', goalTitle: 'Begin my day with a comfortable orienting cue', suggestedQuickGoalIds: ['dawnle:open-curtains', 'dawnle:morning-water', 'dawnle:outside-light'] },
+      { id: 'phone', label: 'Choose what gets my attention first', goalTitle: 'Choose what gets my attention at the start of the day', suggestedQuickGoalIds: ['dawnle:no-phone-five', 'dawnle:choose-first'] },
+      { id: 'simple', label: 'Use one simple first step', goalTitle: 'Use one flexible first step when my day begins', suggestedQuickGoalIds: ['dawnle:weekday-start', 'dawnle:notice-energy'] },
       { id: 'prepare', label: 'Prepare the start the night before', goalTitle: 'Make tomorrow morning easier the night before', suggestedQuickGoalIds: ['dawnle:prepare-night', 'dawnle:choose-first'] },
     ],
   },
@@ -476,7 +559,8 @@ const dawnle = threeQuestionJourney({
     { id: 'light', label: 'Light or movement helped' },
     { id: 'calm', label: 'The start felt calmer' },
     { id: 'clear', label: 'I knew the first step' },
-    { id: 'rushed', label: 'I noticed what created the rush' },
+    { id: 'adapted', label: 'I adapted the start to my capacity' },
+    { id: 'rushed', label: 'Demands shaped the start' },
     { id: 'other', label: 'Something else' },
   ],
   practiceTitle: 'Practise the beginning',
@@ -486,31 +570,34 @@ const dawnle = threeQuestionJourney({
 
 const mendle = threeQuestionJourney({
   id: 'mendle-gentle-repair',
+  version: 3,
   familyId: 'mendle',
   title: 'Gentle repair',
-  introduction: 'Meet tender days honestly, lower unnecessary pressure, and discover which small acts help emotional recovery begin.',
+  introduction: 'Meet tender days honestly, lower unnecessary pressure, and notice which everyday supports fit. Mendle does not diagnose, provide crisis care, or replace trusted human or professional support.',
   conversationTitle: 'Choose what support looks like',
   conversationStartLabel: 'Find a gentle recovery direction',
   first: {
     id: 'tender-need',
     prompt: 'What is hardest on a tender day?',
-    helperText: 'Choose what needs kindness, not what you think should be fixed.',
+    helperText: 'Choose what needs support, not what you think should be fixed or improved quickly.',
     options: [
       { id: 'name', label: 'Naming what I feel' },
       { id: 'pressure', label: 'Lowering expectations' },
       { id: 'kindness', label: 'Being fair to myself' },
       { id: 'support', label: 'Letting someone know' },
+      { id: 'safe', label: 'Feeling safe or getting enough support' },
     ],
   },
   second: {
     id: 'repair-friction',
     prompt: 'What tends to make recovery harder?',
-    helperText: 'Mendle will never turn the answer into a performance target.',
+    helperText: 'Name the pressure without blaming yourself. If everyday tools are not enough, human or professional support belongs in the answer.',
     options: [
       { id: 'push', label: 'I keep pushing through' },
       { id: 'judge', label: 'I judge the feeling' },
       { id: 'isolate', label: 'I withdraw without asking for support' },
       { id: 'solve', label: 'I try to solve everything at once' },
+      { id: 'access', label: 'Support is unavailable or hard to reach' },
     ],
   },
   goal: {
@@ -519,21 +606,23 @@ const mendle = threeQuestionJourney({
     typeLabel: 'Recovery',
     fallbackTitle: 'Practise gentler emotional recovery',
     prompt: 'What supportive direction feels possible?',
-    helperText: 'Choose the closest small act of repair.',
+    helperText: 'Choose the closest supportive direction. No option promises to remove a feeling, and pausing self-guided work is valid.',
     options: [
       { id: 'notice', label: 'Notice feelings without fixing them', goalTitle: 'Make room for honest emotional check-ins', suggestedQuickGoalIds: ['mendle:name-feeling', 'mendle:weekday-checkin'] },
       { id: 'lower', label: 'Lower pressure on tender days', goalTitle: 'Lower unnecessary pressure on tender days', suggestedQuickGoalIds: ['mendle:soften-expectation', 'mendle:ask-need'] },
       { id: 'kind', label: 'Practise fairer self-talk', goalTitle: 'Replace harsh self-talk with something fairer', suggestedQuickGoalIds: ['mendle:release-blame', 'mendle:comfort-action'] },
-      { id: 'support', label: 'Reach for support earlier', goalTitle: 'Let trusted people know when a day is tender', suggestedQuickGoalIds: ['mendle:reach-support', 'mendle:gentle-breath'] },
+      { id: 'support', label: 'Reach for trusted support earlier', goalTitle: 'Let a trusted person know when I need support', suggestedQuickGoalIds: ['mendle:reach-support', 'mendle:ask-need'] },
+      { id: 'care', label: 'Keep a route to appropriate care', goalTitle: 'Keep a clear route to human or professional support', suggestedQuickGoalIds: ['mendle:reach-support', 'mendle:weekday-checkin'] },
     ],
   },
-  checkInPrompt: 'What helped repair begin today?',
+  checkInPrompt: 'What happened when you tried to support yourself today?',
   checkInOptions: [
     { id: 'named', label: 'I named the feeling honestly' },
     { id: 'softened', label: 'I softened an expectation' },
     { id: 'kind', label: 'I treated myself more fairly' },
-    { id: 'supported', label: 'I reached for support' },
-    { id: 'other', label: 'Something else' },
+    { id: 'supported', label: 'I reached for human support' },
+    { id: 'unchanged', label: 'Nothing clearly shifted' },
+    { id: 'more-support', label: 'I needed more or different support' },
   ],
   practiceTitle: 'Practise gentle repair',
   practiceDescription: 'Share three real emotional-recovery moments.',
@@ -542,31 +631,33 @@ const mendle = threeQuestionJourney({
 
 const quietome = threeQuestionJourney({
   id: 'quietome-chosen-solitude',
+  version: 3,
   familyId: 'quietome',
   title: 'Chosen solitude',
-  introduction: 'Protect small spaces with less input so reflection can become perspective rather than another demand for answers.',
+  introduction: 'Explore small spaces for reflection, with quiet, grounding input, or trusted company as needed. The aim is perspective—not isolation or forced answers.',
   conversationTitle: 'Choose a quiet direction',
   conversationStartLabel: 'Explore what solitude can give',
   first: {
     id: 'quiet-gift',
-    prompt: 'What do you most need from time alone?',
-    helperText: 'Choose the quality of solitude you want, not simply less contact.',
+    prompt: 'What would you most like a reflective pause to offer?',
+    helperText: 'Reflection can be alone or supported. Choose the quality you want, not a rule about solitude.',
     options: [
       { id: 'perspective', label: 'Perspective' },
       { id: 'input', label: 'Less input' },
-      { id: 'writing', label: 'Space to write' },
+      { id: 'expression', label: 'Space to write, speak, or make sense' },
       { id: 'question', label: 'Time with an unanswered question' },
+      { id: 'support', label: 'A clearer sense of when I need support' },
     ],
   },
   second: {
     id: 'quiet-friction',
-    prompt: 'What tends to interrupt that space?',
-    helperText: 'Quietome will keep the practice light and chosen.',
+    prompt: 'What can make reflection less helpful?',
+    helperText: 'Quiet is not always the right support. Circling thoughts or feeling worse are reasons to stop or reach out.',
     options: [
-      { id: 'phone', label: 'My phone fills every gap' },
+      { id: 'input', label: 'There is too much input or interruption' },
       { id: 'late', label: 'I wait until I am depleted' },
-      { id: 'solve', label: 'I pressure myself to find answers' },
-      { id: 'avoid', label: 'Solitude turns into avoidance' },
+      { id: 'solve', label: 'Thoughts circle or I force an answer' },
+      { id: 'unsafe', label: 'Being alone does not feel supportive' },
     ],
   },
   goal: {
@@ -575,20 +666,22 @@ const quietome = threeQuestionJourney({
     typeLabel: 'Solitude',
     fallbackTitle: 'Protect a small reflective pause',
     prompt: 'What kind of quiet would help you hear yourself?',
-    helperText: 'Choose the closest small recurring practice.',
+    helperText: 'Choose a small, optional practice. If quiet is unhelpful, supported reflection is a valid direction.',
     options: [
-      { id: 'pause', label: 'Take a small quiet pause', goalTitle: 'Protect a small daily quiet pause', suggestedQuickGoalIds: ['quietome:two-quiet-minutes', 'quietome:phone-outside'] },
+      { id: 'pause', label: 'Take a brief low-input pause', goalTitle: 'Protect a brief low-input pause when it helps', suggestedQuickGoalIds: ['quietome:two-quiet-minutes', 'quietome:phone-outside'] },
       { id: 'write', label: 'Write one honest line', goalTitle: 'Use one honest line to notice what is here', suggestedQuickGoalIds: ['quietome:write-one-line', 'quietome:notice-thought'] },
-      { id: 'walk', label: 'Walk without more input', goalTitle: 'Make room for quiet walks without added input', suggestedQuickGoalIds: ['quietome:silent-walk', 'quietome:choose-solitude'] },
+      { id: 'walk', label: 'Move or travel with less input', goalTitle: 'Make room for movement or travel with less input', suggestedQuickGoalIds: ['quietome:silent-walk', 'quietome:choose-solitude'] },
       { id: 'question', label: 'Return to one question slowly', goalTitle: 'Stay with one important question without forcing an answer', suggestedQuickGoalIds: ['quietome:sit-with-question', 'quietome:weekday-reflect'] },
+      { id: 'supported', label: 'Reflect with someone or a grounding prompt', goalTitle: 'Use supported reflection when quiet is not enough', suggestedQuickGoalIds: ['quietome:write-one-line', 'quietome:notice-thought'] },
     ],
   },
   checkInPrompt: 'What did quiet make visible today?',
   checkInOptions: [
     { id: 'clearer', label: 'Something became clearer' },
     { id: 'returned', label: 'A thought or question returned' },
-    { id: 'rested', label: 'Less input felt restorative' },
+    { id: 'rested', label: 'Less input felt restful' },
     { id: 'chosen', label: 'Solitude felt chosen, not isolating' },
+    { id: 'support', label: 'I noticed I needed support or input' },
     { id: 'other', label: 'Something else' },
   ],
   practiceTitle: 'Protect the quiet',
@@ -598,15 +691,16 @@ const quietome = threeQuestionJourney({
 
 const flickerbun = threeQuestionJourney({
   id: 'flickerbun-intentional-watching',
+  version: 3,
   familyId: 'flickerbun',
   title: 'Intentional watching',
-  introduction: 'Choose stories on purpose, notice what stays with you, and make watching feel more like an experience than a default.',
+  introduction: 'Choose screen stories with intention, without treating watching as a bad habit or finishing as an obligation.',
   conversationTitle: 'Shape your watching life',
   conversationStartLabel: 'Choose a screen-story direction',
   first: {
     id: 'story-gift',
     prompt: 'What do you most want a film or show to give you?',
-    helperText: 'There is no superior kind of watching; choose what feels alive now.',
+    helperText: 'There is no superior kind of watching. Subtitles, audio description, breaks, and stopping all count.',
     options: [
       { id: 'escape', label: 'Rest and escape' },
       { id: 'feeling', label: 'A strong feeling' },
@@ -654,15 +748,16 @@ const flickerbun = threeQuestionJourney({
 
 const relicoon = threeQuestionJourney({
   id: 'relicoon-cultural-trail',
+  version: 3,
   familyId: 'relicoon',
   title: 'A cultural trail',
-  introduction: 'Follow objects, places, and stories into the past, then keep the human details that make history feel present.',
+  introduction: 'Follow objects, places, sources, and people into the past while noticing context, uncertainty, and missing perspectives.',
   conversationTitle: 'Follow a thread through time',
   conversationStartLabel: 'Choose a cultural direction',
   first: {
     id: 'past-entry',
     prompt: 'What most often draws you into history or culture?',
-    helperText: 'Choose the doorway that makes you want to look closer.',
+    helperText: 'Choose the doorway that draws you in. No single source or institution holds the whole story.',
     options: [
       { id: 'people', label: 'People and ordinary life' },
       { id: 'objects', label: 'Objects and design' },
@@ -710,15 +805,16 @@ const relicoon = threeQuestionJourney({
 
 const encora = threeQuestionJourney({
   id: 'encora-active-music',
+  version: 3,
   familyId: 'encora',
   title: 'Active music',
-  introduction: 'Bring music into the foreground through listening, discovery, practice, and sharing.',
+  introduction: 'Bring music forward through listening, making, sharing, or choosing quiet in ways that suit your senses and interests.',
   conversationTitle: 'Choose a musical direction',
   conversationStartLabel: 'Explore your music life',
   first: {
     id: 'music-role',
     prompt: 'What do you most want music to do in your life?',
-    helperText: 'Choose the role you want to make more deliberate.',
+    helperText: 'Choose the role you want to make more deliberate. There is no better genre, skill level, or way to listen.',
     options: [
       { id: 'feel', label: 'Help me feel or shift mood' },
       { id: 'discover', label: 'Open new sounds and artists' },
@@ -766,31 +862,34 @@ const encora = threeQuestionJourney({
 
 const gatherglow = threeQuestionJourney({
   id: 'gatherglow-tended-connection',
+  version: 3,
   familyId: 'gatherglow',
   title: 'Tended connection',
-  introduction: 'Choose a relationship rhythm worth participating in, then notice what makes connection feel mutual and real.',
+  introduction: 'Choose a kind of connection that fits your life, then notice what makes it feel mutual, safe, and real.',
   conversationTitle: 'Tend a social rhythm',
   conversationStartLabel: 'Choose a connection direction',
   first: {
     id: 'connection-shape',
-    prompt: 'What kind of connection feels most missing?',
-    helperText: 'Choose the shape, not a person, for now.',
+    prompt: 'What kind of connection would support you right now?',
+    helperText: 'Choose the shape, not a person. Wanting space is also a valid direction.',
     options: [
       { id: 'regular', label: 'More regular contact' },
       { id: 'deeper', label: 'Deeper conversation' },
       { id: 'shared', label: 'More things done together' },
       { id: 'belonging', label: 'A stronger sense of belonging' },
+      { id: 'space', label: 'More space and clearer boundaries' },
     ],
   },
   second: {
     id: 'connection-friction',
-    prompt: 'What most often gets in the way?',
-    helperText: 'This is about your part of the pattern, not grading anyone else.',
+    prompt: 'What most affects whether connection feels possible?',
+    helperText: 'This can be about timing, energy, safety, or the other person’s response. It is not all yours to fix.',
     options: [
       { id: 'waiting', label: 'I wait for others to reach out' },
       { id: 'time', label: 'Plans never quite happen' },
       { id: 'surface', label: 'Conversation stays on the surface' },
       { id: 'energy', label: 'Social energy is limited' },
+      { id: 'safety', label: 'The connection does not feel right or safe' },
     ],
   },
   goal: {
@@ -798,13 +897,14 @@ const gatherglow = threeQuestionJourney({
     typeId: 'connection',
     typeLabel: 'Connection',
     fallbackTitle: 'Tend a meaningful connection',
-    prompt: 'What connection direction would feel nourishing?',
-    helperText: 'Choose the closest action you control.',
+    prompt: 'What connection direction feels kind and realistic?',
+    helperText: 'Choose an action or boundary you control. Another person’s response is not part of the goal.',
     options: [
       { id: 'reach', label: 'Reach out more regularly', goalTitle: 'Reach out instead of always waiting', suggestedQuickGoalIds: ['gatherglow:send-message', 'gatherglow:weekday-reach-out'] },
-      { id: 'plan', label: 'Make simple plans happen', goalTitle: 'Make room for simple shared plans', suggestedQuickGoalIds: ['gatherglow:make-plan', 'gatherglow:shared-moment'] },
+      { id: 'plan', label: 'Make simple plans happen', goalTitle: 'Make room for simple shared plans', suggestedQuickGoalIds: ['gatherglow:make-plan', 'gatherglow:give-attention'] },
       { id: 'deepen', label: 'Make conversation more genuine', goalTitle: 'Create space for more genuine conversation', suggestedQuickGoalIds: ['gatherglow:check-in', 'gatherglow:give-attention'] },
       { id: 'appreciate', label: 'Show people they matter', goalTitle: 'Express appreciation more openly', suggestedQuickGoalIds: ['gatherglow:say-thanks', 'gatherglow:reply-today'] },
+      { id: 'protect-space', label: 'Protect my social energy', goalTitle: 'Use clearer boundaries around social energy', suggestedQuickGoalIds: ['gatherglow:protect-space', 'gatherglow:reply-today'] },
     ],
   },
   checkInPrompt: 'What happened in connection today?',
@@ -813,7 +913,8 @@ const gatherglow = threeQuestionJourney({
     { id: 'shared', label: 'We shared real time or attention' },
     { id: 'deeper', label: 'A conversation went deeper' },
     { id: 'belonged', label: 'I felt part of something' },
-    { id: 'other', label: 'Something else' },
+    { id: 'space', label: 'I protected needed space' },
+    { id: 'no-contact', label: 'There was no contact today' },
   ],
   practiceTitle: 'Show up and notice',
   practiceDescription: 'Share three real moments of connection.',
@@ -822,31 +923,34 @@ const gatherglow = threeQuestionJourney({
 
 const cheerlet = threeQuestionJourney({
   id: 'cheerlet-visible-progress',
+  version: 3,
   familyId: 'cheerlet',
   title: 'Visible progress',
-  introduction: 'Make progress and chapter changes visible enough to acknowledge, remember, and celebrate.',
+  introduction: 'Make effort, progress, survival, and chapter changes visible enough to acknowledge—without requiring a win, public celebration, or uncomplicated happiness.',
   conversationTitle: 'Choose what deserves credit',
   conversationStartLabel: 'Mark a meaningful chapter',
   first: {
     id: 'overlooked-progress',
-    prompt: 'What do you most often forget to acknowledge?',
+    prompt: 'What do you most often leave without fair acknowledgement?',
     helperText: 'It does not need to be finished or impressive to count.',
     options: [
       { id: 'small', label: 'Small wins' },
       { id: 'distance', label: 'How far I have come' },
       { id: 'support', label: 'The people who helped' },
       { id: 'chapter', label: 'A beginning or ending' },
+      { id: 'survival', label: 'Getting through something hard' },
     ],
   },
   second: {
     id: 'celebration-friction',
     prompt: 'Why does acknowledgement tend to get skipped?',
-    helperText: 'Cheerlet will keep celebration proportionate and genuine.',
+    helperText: 'Acknowledgement can be private, small, and mixed. It does not have to look celebratory.',
     options: [
       { id: 'next', label: 'I move straight to the next thing' },
       { id: 'not-enough', label: 'Progress never feels big enough' },
       { id: 'awkward', label: 'Celebrating myself feels awkward' },
       { id: 'memory', label: 'The moment passes before I save it' },
+      { id: 'mixed', label: 'The change brings mixed feelings' },
     ],
   },
   goal: {
@@ -855,20 +959,22 @@ const cheerlet = threeQuestionJourney({
     typeLabel: 'Milestone',
     fallbackTitle: 'Make meaningful progress visible',
     prompt: 'What would you like to acknowledge more deliberately?',
-    helperText: 'Choose a direction, or write the chapter in your own words.',
+    helperText: 'Choose a direction that feels genuine. Private credit and mixed feelings both count.',
     options: [
-      { id: 'small-wins', label: 'Notice small wins', goalTitle: 'Give small wins the credit they deserve', suggestedQuickGoalIds: ['cheerlet:name-win', 'cheerlet:weekday-credit'] },
+      { id: 'small-wins', label: 'Give effort fair credit', goalTitle: 'Give effort and small progress fair credit', suggestedQuickGoalIds: ['cheerlet:name-win', 'cheerlet:weekday-credit'] },
       { id: 'progress', label: 'Mark progress before the finish', goalTitle: 'Mark progress while it is still unfolding', suggestedQuickGoalIds: ['cheerlet:mark-progress', 'cheerlet:small-celebration'] },
       { id: 'chapter', label: 'Remember a chapter change', goalTitle: 'Remember this chapter as it changes', suggestedQuickGoalIds: ['cheerlet:save-memory', 'cheerlet:share-good-news'] },
-      { id: 'support', label: 'Acknowledge other people', goalTitle: 'Acknowledge the people who helped me get here', suggestedQuickGoalIds: ['cheerlet:thank-helper', 'cheerlet:congratulate'] },
+      { id: 'support', label: 'Acknowledge support without creating debt', goalTitle: 'Recognise support that mattered to me', suggestedQuickGoalIds: ['cheerlet:thank-helper', 'cheerlet:congratulate'] },
+      { id: 'survival', label: 'Recognise what it took to get through', goalTitle: 'Recognise the effort of getting through a hard chapter', suggestedQuickGoalIds: ['cheerlet:name-win', 'cheerlet:save-memory'] },
     ],
   },
   checkInPrompt: 'What deserved acknowledgement today?',
   checkInOptions: [
-    { id: 'win', label: 'A small win' },
+    { id: 'win', label: 'Effort or a small win' },
     { id: 'progress', label: 'Progress before the finish' },
     { id: 'chapter', label: 'A beginning or ending' },
-    { id: 'support', label: 'Someone’s help or success' },
+    { id: 'support', label: 'Support that mattered' },
+    { id: 'mixed', label: 'A change with mixed feelings' },
     { id: 'other', label: 'Something else' },
   ],
   practiceTitle: 'Mark what matters',
@@ -878,9 +984,10 @@ const cheerlet = threeQuestionJourney({
 
 const skylo = threeQuestionJourney({
   id: 'skylo-local-discovery',
+  version: 3,
   familyId: 'skylo',
   title: 'Local discovery',
-  introduction: 'Turn the city around you into somewhere you actively notice, explore, and gradually know.',
+  introduction: 'Notice and gradually know the local world around you through safe, accessible, ordinary places and views.',
   conversationTitle: 'Know your city differently',
   conversationStartLabel: 'Choose a local exploration',
   first: {
@@ -896,13 +1003,14 @@ const skylo = threeQuestionJourney({
   },
   second: {
     id: 'city-friction',
-    prompt: 'What keeps your surroundings feeling too familiar?',
-    helperText: 'Exploration can begin with a five-minute detour.',
+    prompt: 'What most affects local exploration for you?',
+    helperText: 'Routine is only one factor. Safety, mobility, cost, and time matter too.',
     options: [
       { id: 'routine', label: 'I repeat the same routes' },
       { id: 'passing', label: 'I pass places without stopping' },
       { id: 'planning', label: 'Ideas stay on a saved list' },
       { id: 'far', label: 'I assume exploration must be far away' },
+      { id: 'access', label: 'Safety, access, cost, or energy' },
     ],
   },
   goal: {
@@ -911,7 +1019,7 @@ const skylo = threeQuestionJourney({
     typeLabel: 'Local exploration',
     fallbackTitle: 'Explore my city with fresh attention',
     prompt: 'What local direction would make the city feel new?',
-    helperText: 'Choose the closest practical experiment.',
+    helperText: 'Choose a safe, accessible experiment. A view, detail, or short stop can be enough.',
     options: [
       { id: 'detours', label: 'Take more small detours', goalTitle: 'Use small detours to see familiar streets differently', suggestedQuickGoalIds: ['skylo:new-street', 'skylo:weekday-detour'] },
       { id: 'stops', label: 'Actually visit saved places', goalTitle: 'Turn saved local places into real visits', suggestedQuickGoalIds: ['skylo:save-place', 'skylo:local-stop'] },
@@ -925,7 +1033,7 @@ const skylo = threeQuestionJourney({
     { id: 'stopped', label: 'I stopped somewhere I usually pass' },
     { id: 'detail', label: 'I noticed a city detail' },
     { id: 'familiar', label: 'A familiar area felt different' },
-    { id: 'other', label: 'Something else' },
+    { id: 'no-exploration', label: 'Exploration was not possible today' },
   ],
   practiceTitle: 'Explore and notice',
   practiceDescription: 'Share three real moments of local discovery.',
@@ -934,86 +1042,86 @@ const skylo = threeQuestionJourney({
 
 const steppling: CompanionJourneyDefinition = {
   id: 'steppling-everyday-momentum',
-  version: 2,
+  version: 3,
   familyId: 'steppling',
-  title: 'Everyday momentum',
-  introduction: 'Find where walking fits naturally, then build movement into ordinary days without turning it into a performance.',
-  conversationTitle: 'Find your walking rhythm',
-  conversationStartLabel: 'Choose a walking direction',
+  title: 'Walking that fits',
+  introduction: 'Find a kind of walking that fits your life. Start small, adjust as you go, and leave room for days when walking is not right for you.',
+  conversationTitle: 'Find what works for you',
+  conversationStartLabel: 'Choose a starting point',
   startNodeId: 'walking-purpose',
   nodes: [
     {
       id: 'walking-purpose',
       kind: 'single_choice',
-      prompt: 'What would you most like walking to give you?',
-      helperText: 'Choose the benefit that would make walking worth returning to.',
+      prompt: 'What would you most like from walking?',
+      helperText: 'Choose what would make a walk feel worthwhile to you.',
       options: [
-        { id: 'energy', label: 'More everyday energy', nextNodeId: 'walking-fit' },
+        { id: 'energy', label: 'A little more everyday energy', nextNodeId: 'walking-fit' },
         { id: 'headspace', label: 'Space to clear my head', nextNodeId: 'walking-fit' },
         { id: 'exploration', label: 'A way to explore', nextNodeId: 'walking-fit' },
-        { id: 'consistency', label: 'A steadier movement habit', nextNodeId: 'walking-fit' },
+        { id: 'consistency', label: 'A walking habit I can sustain', nextNodeId: 'walking-fit' },
       ],
     },
     {
       id: 'walking-fit',
       kind: 'single_choice',
-      prompt: 'Where could walking fit most easily?',
-      helperText: 'Start with the shape your real days already make possible.',
+      prompt: 'Where could a walk fit most easily?',
+      helperText: 'Choose what seems realistic, not what you think you should do.',
       options: [
-        { id: 'journeys', label: 'Journeys I already make', nextNodeId: 'walking-goal' },
-        { id: 'breaks', label: 'Short breaks', nextNodeId: 'walking-goal' },
-        { id: 'meals', label: 'Before or after meals', nextNodeId: 'walking-goal' },
-        { id: 'weekends', label: 'Longer weekend wanders', nextNodeId: 'walking-goal' },
+        { id: 'journeys', label: 'An everyday journey', nextNodeId: 'walking-goal' },
+        { id: 'breaks', label: 'A short break', nextNodeId: 'walking-goal' },
+        { id: 'meals', label: 'Before or after something I already do', nextNodeId: 'walking-goal' },
+        { id: 'weekends', label: 'Time set aside to wander', nextNodeId: 'walking-goal' },
       ],
     },
     {
       id: 'walking-goal',
       kind: 'single_choice',
       createsGoalTypeId: 'walking-rhythm',
-      prompt: 'What walking direction feels useful now?',
-      helperText: 'Pick the closest simple experiment.',
+      prompt: 'What would you like to try first?',
+      helperText: 'Pick one small experiment. You can change it later.',
       options: [
-        { id: 'daily-ten', label: 'Walk for ten minutes most days', goalTitle: 'Make room for a ten-minute walk', suggestedQuickGoalIds: ['steppling:ten-minute-walk', 'steppling:fresh-air-break'], nextNodeId: null },
-        { id: 'walk-journey', label: 'Walk more everyday journeys', goalTitle: 'Turn one everyday journey into a walk', suggestedQuickGoalIds: ['steppling:walk-one-journey', 'steppling:weekday-steps'], nextNodeId: null },
-        { id: 'clear-head', label: 'Use walking to clear my head', goalTitle: 'Use a short walk to make headspace', suggestedQuickGoalIds: ['steppling:fresh-air-break', 'steppling:notice-route'], nextNodeId: null },
-        { id: 'explore', label: 'Explore beyond my usual route', goalTitle: 'Explore one unfamiliar route at a time', suggestedQuickGoalIds: ['steppling:explore-turn', 'steppling:notice-route'], nextNodeId: null },
+        { id: 'daily-ten', label: 'Take a short walk when it fits', goalTitle: 'Make room for short walks', suggestedQuickGoalIds: ['steppling:ten-minute-walk', 'steppling:fresh-air-break'], nextNodeId: null },
+        { id: 'walk-journey', label: 'Walk part of an everyday journey', goalTitle: 'Use walking for more everyday journeys', suggestedQuickGoalIds: ['steppling:walk-one-journey', 'steppling:weekday-steps'], nextNodeId: null },
+        { id: 'clear-head', label: 'Use a walk to make headspace', goalTitle: 'Use short walks to make headspace', suggestedQuickGoalIds: ['steppling:fresh-air-break', 'steppling:notice-route'], nextNodeId: null },
+        { id: 'explore', label: 'Notice more along familiar routes', goalTitle: 'Use walks to notice and explore nearby', suggestedQuickGoalIds: ['steppling:explore-turn', 'steppling:notice-route'], nextNodeId: null },
       ],
       nextNodeId: null,
     },
   ],
   goalTypes: {
-    'walking-rhythm': { label: 'Walking rhythm', fallbackTitle: 'Build everyday walking momentum' },
+    'walking-rhythm': { label: 'Walking Focus', fallbackTitle: 'Find a kind of walking that fits' },
   },
   checkIn: {
-    prompt: 'What did walking give you today?',
+    prompt: 'What was walking like for you today?',
     options: [
-      { id: 'moved', label: 'I made room to move' },
-      { id: 'headspace', label: 'The walk gave me headspace' },
+      { id: 'moved', label: 'I fitted in some walking' },
+      { id: 'headspace', label: 'It gave me some headspace' },
       { id: 'noticed', label: 'I noticed something along the way' },
-      { id: 'friction', label: 'I noticed what made walking difficult' },
-      { id: 'other', label: 'Something else' },
+      { id: 'friction', label: 'It felt difficult or uncomfortable' },
+      { id: 'no-walk', label: 'I did not walk today' },
     ],
   },
   stages: [
-    { id: 'choose', title: 'Choose a rhythm', description: 'Decide what walking should add to your days.', requirement: { kind: 'goal_created', target: 1 } },
-    { id: 'walk', title: 'Build momentum', description: 'Share three real walking moments.', requirement: { kind: 'quest_completions', target: 3 } },
-    { id: 'review', title: 'Notice what works', description: 'Reflect on when walking fits naturally.', requirement: { kind: 'reflections', target: 1 } },
-    { id: 'decide', title: 'Choose what continues', description: 'Keep, reshape, pause, or complete this walking goal.', requirement: { kind: 'goal_resolved', target: 1 } },
+    { id: 'choose', title: 'Choose a starting point', description: 'Decide what you would like from walking now.', requirement: { kind: 'goal_created', target: 1 } },
+    { id: 'walk', title: 'Try it in real life', description: 'Share three walking moments from different days.', requirement: { kind: 'quest_completions', target: 3 } },
+    { id: 'review', title: 'Notice what fits', description: 'Look at what helped, what did not, and what you want to change.', requirement: { kind: 'reflections', target: 1 } },
+    { id: 'decide', title: 'Choose what happens next', description: 'Continue, change, pause, or complete this walking Focus.', requirement: { kind: 'goal_resolved', target: 1 } },
   ],
   reflectionPrompts: {
-    choose: 'What would walking add to your life if it felt easy to repeat?',
-    walk: 'What helped “{goal}” fit into today, and what did the walk give you?',
+    choose: 'What would make “{goal}” feel worthwhile and realistic?',
+    walk: 'What helped “{goal}” fit today? What, if anything, did you notice afterwards?',
     review: 'Across your recent walks, which times, places, or reasons made “{goal}” easiest to return to?',
-    decide: 'What should happen next with “{goal}”: keep it, reshape it, pause it, or call it complete?',
+    decide: 'What would fit best now: continue “{goal}”, change it, pause it, or mark it complete?',
   },
 };
 
 const feastle: CompanionJourneyDefinition = {
   id: 'feastle-meaningful-meals',
-  version: 2,
+  version: 3,
   familyId: 'feastle',
   title: 'Meaningful meals',
-  introduction: 'Notice what makes food feel nourishing, enjoyable, or connecting, then create more of those meals.',
+  introduction: 'Notice what makes food feel manageable, enjoyable, caring, or connecting without turning meals into a test.',
   conversationTitle: 'Choose what food should bring',
   conversationStartLabel: 'Explore a food direction',
   startNodeId: 'meal-meaning',
@@ -1022,7 +1130,7 @@ const feastle: CompanionJourneyDefinition = {
       id: 'meal-meaning',
       kind: 'single_choice',
       prompt: 'What would you like more of around food?',
-      helperText: 'This is about lived meals, not perfect nutrition.',
+      helperText: 'This is about lived meals, not perfect nutrition or “good” and “bad” food.',
       options: [
         { id: 'ease', label: 'Meals that feel easier', nextNodeId: 'meal-friction' },
         { id: 'care', label: 'Food that feels caring', nextNodeId: 'meal-friction' },
@@ -1033,13 +1141,14 @@ const feastle: CompanionJourneyDefinition = {
     {
       id: 'meal-friction',
       kind: 'single_choice',
-      prompt: 'What most often gets in the way?',
-      helperText: 'Choose the closest pattern; Feastle will keep the next step small.',
+      prompt: 'What most affects whether that is possible?',
+      helperText: 'Time, energy, cost, access, appetite, and other people’s needs can all shape food.',
       options: [
         { id: 'time', label: 'Time or planning', nextNodeId: 'meal-goal' },
         { id: 'energy', label: 'Energy to prepare food', nextNodeId: 'meal-goal' },
         { id: 'routine', label: 'I fall into the same routine', nextNodeId: 'meal-goal' },
         { id: 'rushing', label: 'Meals feel rushed or distracted', nextNodeId: 'meal-goal' },
+        { id: 'access', label: 'Cost, access, appetite, or sensory needs', nextNodeId: 'meal-goal' },
       ],
     },
     {
@@ -1047,7 +1156,7 @@ const feastle: CompanionJourneyDefinition = {
       kind: 'single_choice',
       createsGoalTypeId: 'meal-rhythm',
       prompt: 'What food direction would feel good to practise?',
-      helperText: 'Pick the closest small direction.',
+      helperText: 'Choose a small direction that fits your time, budget, access, and energy.',
       options: [
         { id: 'simple-cooking', label: 'Cook something simple more often', goalTitle: 'Make simple cooking easier to return to', suggestedQuickGoalIds: ['feastle:make-one-thing', 'feastle:weekday-cook', 'feastle:plan-meal'], nextNodeId: null },
         { id: 'intentional-meal', label: 'Give one meal my full attention', goalTitle: 'Make one daily meal feel intentional', suggestedQuickGoalIds: ['feastle:eat-without-rushing', 'feastle:sit-for-meal'], nextNodeId: null },
@@ -1067,7 +1176,7 @@ const feastle: CompanionJourneyDefinition = {
       { id: 'shared', label: 'I shared food with someone' },
       { id: 'noticed', label: 'I slowed down enough to notice the meal' },
       { id: 'new', label: 'I tried something different' },
-      { id: 'other', label: 'Something else' },
+      { id: 'limited', label: 'My options were limited today' },
     ],
   },
   stages: [
@@ -1086,10 +1195,10 @@ const feastle: CompanionJourneyDefinition = {
 
 const pagelet: CompanionJourneyDefinition = {
   id: 'pagelet-living-curiosity',
-  version: 2,
+  version: 3,
   familyId: 'pagelet',
   title: 'Living curiosity',
-  introduction: 'Choose a curiosity worth returning to, then turn reading and learning into ideas you can keep.',
+  introduction: 'Follow a curiosity in a format and pace that suit you, without making speed or finishing the measure of learning.',
   conversationTitle: 'Follow a useful curiosity',
   conversationStartLabel: 'Choose a learning direction',
   startNodeId: 'learning-shape',
@@ -1098,7 +1207,7 @@ const pagelet: CompanionJourneyDefinition = {
       id: 'learning-shape',
       kind: 'single_choice',
       prompt: 'What kind of learning do you want more of?',
-      helperText: 'Choose the shape that sounds inviting now.',
+      helperText: 'Books, articles, audio, read-aloud tools, courses, and practical learning all count.',
       options: [
         { id: 'book', label: 'Finishing or enjoying a book', nextNodeId: 'learning-friction' },
         { id: 'subject', label: 'Understanding a subject', nextNodeId: 'learning-friction' },
@@ -1116,6 +1225,7 @@ const pagelet: CompanionJourneyDefinition = {
         { id: 'attention', label: 'My attention gets pulled elsewhere', nextNodeId: 'learning-goal' },
         { id: 'choice', label: 'I do not know where to start', nextNodeId: 'learning-goal' },
         { id: 'retention', label: 'Ideas disappear after I read them', nextNodeId: 'learning-goal' },
+        { id: 'format', label: 'The format is not accessible or comfortable', nextNodeId: 'learning-goal' },
       ],
     },
     {
@@ -1125,7 +1235,7 @@ const pagelet: CompanionJourneyDefinition = {
       prompt: 'What direction would you like Pagelet to remember?',
       helperText: 'Pick the closest low-friction experiment.',
       options: [
-        { id: 'reading-rhythm', label: 'Read a little most days', goalTitle: 'Build a small, steady reading rhythm', suggestedQuickGoalIds: ['pagelet:read-five-pages', 'pagelet:read-ten-minutes'], nextNodeId: null },
+        { id: 'reading-rhythm', label: 'Make room for small reading moments', goalTitle: 'Build a small, flexible reading rhythm', suggestedQuickGoalIds: ['pagelet:read-five-pages', 'pagelet:read-ten-minutes'], nextNodeId: null },
         { id: 'finish-book', label: 'Return to and finish a book', goalTitle: 'Return to the book I want to finish', suggestedQuickGoalIds: ['pagelet:return-to-book', 'pagelet:phone-for-book'], nextNodeId: null },
         { id: 'understand-topic', label: 'Understand one topic better', goalTitle: 'Follow one question until I understand it better', suggestedQuickGoalIds: ['pagelet:look-up-question', 'pagelet:weekday-learning'], nextNodeId: null },
         { id: 'keep-ideas', label: 'Keep and use what I learn', goalTitle: 'Keep the ideas that matter to me', suggestedQuickGoalIds: ['pagelet:keep-one-idea', 'pagelet:share-one-idea'], nextNodeId: null },
@@ -1162,23 +1272,23 @@ const pagelet: CompanionJourneyDefinition = {
 
 const mossprout: CompanionJourneyDefinition = {
   id: 'mossprout-nearby-nature',
-  version: 2,
+  version: 3,
   familyId: 'mossprout',
   title: 'Nearby nature',
-  introduction: 'Build a relationship with ordinary green places and notice how returning outside changes the shape of a day.',
-  conversationTitle: 'Grow an outdoor rhythm',
+  introduction: 'Build a relationship with nearby nature through ordinary places, window views, weather, or something growing.',
+  conversationTitle: 'Grow a nearby-nature rhythm',
   conversationStartLabel: 'Choose a nature direction',
   startNodeId: 'nature-need',
   nodes: [
     {
       id: 'nature-need',
       kind: 'single_choice',
-      prompt: 'What would you like nearby nature to give you?',
-      helperText: 'A park, garden, tree-lined street, balcony, or patch of grass all count.',
+      prompt: 'What would you like to notice or experience through nearby nature?',
+      helperText: 'A window view, houseplant, street tree, garden, or outdoor place can all count.',
       options: [
         { id: 'pause', label: 'A restorative pause', nextNodeId: 'nature-place' },
         { id: 'attention', label: 'More attention to the living world', nextNodeId: 'nature-place' },
-        { id: 'routine', label: 'A reason to get outside', nextNodeId: 'nature-place' },
+        { id: 'routine', label: 'A small reason to pause and look', nextNodeId: 'nature-place' },
         { id: 'care', label: 'Something living to care for', nextNodeId: 'nature-place' },
       ],
     },
@@ -1192,16 +1302,17 @@ const mossprout: CompanionJourneyDefinition = {
         { id: 'street', label: 'My street or daily route', nextNodeId: 'nature-goal' },
         { id: 'garden', label: 'A garden, balcony, or windowsill', nextNodeId: 'nature-goal' },
         { id: 'varied', label: 'Different outdoor places', nextNodeId: 'nature-goal' },
+        { id: 'window', label: 'A view from indoors', nextNodeId: 'nature-goal' },
       ],
     },
     {
       id: 'nature-goal',
       kind: 'single_choice',
       createsGoalTypeId: 'outdoor-rhythm',
-      prompt: 'What outdoor direction feels realistic now?',
-      helperText: 'Pick the closest option that can survive an ordinary week.',
+      prompt: 'What nearby-nature direction feels realistic now?',
+      helperText: 'Choose something accessible in an ordinary week. It does not need to happen every day.',
       options: [
-        { id: 'daily-outside', label: 'Step outside every day', goalTitle: 'Build a small daily outdoor pause', suggestedQuickGoalIds: ['mossprout:step-outside', 'mossprout:notice-living-thing'], nextNodeId: null },
+        { id: 'daily-outside', label: 'Make room for brief nature moments', goalTitle: 'Build a small nearby-nature pause', suggestedQuickGoalIds: ['mossprout:step-outside', 'mossprout:window-view'], nextNodeId: null },
         { id: 'green-place', label: 'Return to a nearby green place', goalTitle: 'Build a relationship with one nearby green place', suggestedQuickGoalIds: ['mossprout:visit-green', 'mossprout:same-place'], nextNodeId: null },
         { id: 'notice-season', label: 'Notice the season changing', goalTitle: 'Pay attention to small seasonal changes', suggestedQuickGoalIds: ['mossprout:season-change', 'mossprout:notice-living-thing'], nextNodeId: null },
         { id: 'care-plant', label: 'Care for something growing', goalTitle: 'Create a gentle plant-care rhythm', suggestedQuickGoalIds: ['mossprout:care-for-plant', 'mossprout:sit-outside'], nextNodeId: null },
@@ -1213,13 +1324,14 @@ const mossprout: CompanionJourneyDefinition = {
     'outdoor-rhythm': { label: 'Outdoor rhythm', fallbackTitle: 'Grow a nearby nature rhythm' },
   },
   checkIn: {
-    prompt: 'What did you notice outside today?',
+    prompt: 'What happened in nearby nature today?',
     options: [
       { id: 'paused', label: 'Being outside changed my pace' },
       { id: 'living', label: 'I noticed something living' },
       { id: 'returned', label: 'I returned to a familiar place' },
       { id: 'cared', label: 'I cared for something growing' },
-      { id: 'other', label: 'Something else' },
+      { id: 'indoors', label: 'I noticed nature from indoors' },
+      { id: 'none', label: 'There was no nature moment today' },
     ],
   },
   stages: [
@@ -1238,7 +1350,7 @@ const mossprout: CompanionJourneyDefinition = {
 
 const sleepRest: CompanionJourneyDefinition = {
   id: 'sleep-rest-gentle-recovery',
-  version: 2,
+  version: 3,
   familyId: 'sleep-rest',
   title: 'Gentle recovery',
   introduction: 'Learn what genuinely restores you, then build a kinder rhythm for stopping, sleeping, and recovering.',
@@ -1250,7 +1362,7 @@ const sleepRest: CompanionJourneyDefinition = {
       id: 'rest-need',
       kind: 'single_choice',
       prompt: 'What kind of rest feels most missing right now?',
-      helperText: 'Rest is broader than sleep. Pick the kind that would make ordinary life feel more sustainable.',
+      helperText: 'Rest is broader than sleep. Choose the need that feels clearest, without turning it into a promise.',
       options: [
         { id: 'sleep', label: 'A steadier sleep rhythm', nextNodeId: 'sleep-goal' },
         { id: 'wind-down', label: 'A gentler wind-down', nextNodeId: 'wind-down-goal' },
@@ -1337,14 +1449,15 @@ const sleepRest: CompanionJourneyDefinition = {
     {
       id: 'rest-friction',
       kind: 'single_choice',
-      prompt: 'What most often makes that difficult?',
-      helperText: 'This helps shape the questions your rest companion asks later.',
+      prompt: 'What most affects whether that rest is possible?',
+      helperText: 'The answer can be practical, emotional, or simply unclear. It is not a test of discipline.',
       options: [
         { id: 'time', label: 'There never seems to be time', nextNodeId: null },
         { id: 'switching-off', label: 'I struggle to switch off', nextNodeId: null },
         { id: 'responsibility', label: 'Other people or responsibilities need me', nextNodeId: null },
         { id: 'screens', label: 'Screens keep pulling me back', nextNodeId: null },
         { id: 'guilt', label: 'Rest can feel undeserved', nextNodeId: null },
+        { id: 'unclear', label: 'It changes or is not clear yet', nextNodeId: null },
       ],
     },
   ],
@@ -1362,7 +1475,8 @@ const sleepRest: CompanionJourneyDefinition = {
       { id: 'stopped', label: 'I stopped when I needed to' },
       { id: 'pushed-through', label: 'I pushed past my need for rest' },
       { id: 'boundary', label: 'A boundary helped or got tested' },
-      { id: 'other', label: 'Something else' },
+      { id: 'not-possible', label: 'Rest was not really possible today' },
+      { id: 'unclear', label: 'I am not sure what helped' },
     ],
   },
   stages: [
@@ -1381,10 +1495,10 @@ const sleepRest: CompanionJourneyDefinition = {
 
 const tasklet: CompanionJourneyDefinition = {
   id: 'tasklet-focus-journey',
-  version: 2,
+  version: 3,
   familyId: 'tasklet',
   title: 'Meaningful momentum',
-  introduction: 'Turn something that matters into a direction you can revisit, move, and reshape over time.',
+  introduction: 'Choose one useful outcome, then learn what helps it move—or when changing, sharing, or stopping is wiser.',
   conversationTitle: 'Choose what deserves attention',
   conversationStartLabel: 'Plan something with Tasklet',
   startNodeId: 'attention',
@@ -1392,8 +1506,8 @@ const tasklet: CompanionJourneyDefinition = {
     {
       id: 'attention',
       kind: 'single_choice',
-      prompt: 'What deserves your attention right now?',
-      helperText: 'Pick the closest shape. Tasklet will ask a more useful follow-up.',
+      prompt: 'What would be useful to clarify or move right now?',
+      helperText: 'Choose the closest shape. This is about useful attention, not proving productivity.',
       options: [
         { id: 'project', label: 'A project', nextNodeId: 'project-goal' },
         { id: 'routine', label: 'A recurring responsibility', nextNodeId: 'routine-goal' },
@@ -1480,14 +1594,15 @@ const tasklet: CompanionJourneyDefinition = {
     {
       id: 'friction',
       kind: 'single_choice',
-      prompt: 'What is most likely to get in the way?',
-      helperText: 'This answer can shape later reflections and quest recommendations.',
+      prompt: 'What condition is most likely to affect this work?',
+      helperText: 'A limit or changed priority is useful information, not resistance to overcome.',
       options: [
         { id: 'unclear', label: 'The next step is unclear', nextNodeId: null },
         { id: 'time', label: 'Protecting time', nextNodeId: null },
         { id: 'energy', label: 'Energy or motivation', nextNodeId: null },
         { id: 'too-much', label: 'It feels too large', nextNodeId: null },
         { id: 'distraction', label: 'Distractions', nextNodeId: null },
+        { id: 'changed-priority', label: 'The priority may change', nextNodeId: null },
       ],
     },
   ],
@@ -1505,7 +1620,8 @@ const tasklet: CompanionJourneyDefinition = {
       { id: 'next-step', label: 'I found the next step' },
       { id: 'blocked', label: 'I noticed what blocked me' },
       { id: 'changed-course', label: 'I changed the plan deliberately' },
-      { id: 'other', label: 'Something else' },
+      { id: 'stopped', label: 'I stopped or let something go' },
+      { id: 'no-movement', label: 'Nothing moved today' },
     ],
   },
   stages: [
@@ -1524,10 +1640,10 @@ const tasklet: CompanionJourneyDefinition = {
 
 const vesperitt: CompanionJourneyDefinition = {
   id: 'vesperitt-intentional-nights',
-  version: 2,
+  version: 3,
   familyId: 'vesperitt',
   title: 'Intentional small hours',
-  introduction: 'Understand what your late nights contain, then protect what matters or gently change what does not.',
+  introduction: 'Understand what your life after dark contains, including chosen time, shift work, caring, stress, or wakefulness you did not choose. Protect what matters and change only what is yours to change.',
   conversationTitle: 'Understand your nights',
   conversationStartLabel: 'Explore a night pattern',
   startNodeId: 'night-content',
@@ -1544,17 +1660,20 @@ const vesperitt: CompanionJourneyDefinition = {
         { id: 'entertainment', label: 'Entertainment', nextNodeId: 'intention' },
         { id: 'scrolling', label: 'Accidental scrolling', nextNodeId: 'intention' },
         { id: 'quiet', label: 'Quiet time alone', nextNodeId: 'intention' },
+        { id: 'care', label: 'Caring, health, or practical needs', nextNodeId: 'intention' },
+        { id: 'awake', label: 'I was awake without choosing it', nextNodeId: 'intention' },
       ],
     },
     {
       id: 'intention',
       kind: 'single_choice',
       prompt: 'How intentional do those nights usually feel?',
-      helperText: 'Vesperitt is interested in choice, not in judging the hour.',
+      helperText: 'Vesperitt is interested in choice and constraints, not in judging the hour or assuming everyone keeps the same schedule.',
       options: [
         { id: 'chosen', label: 'Mostly chosen', nextNodeId: 'protect-goal' },
         { id: 'mixed', label: 'A mixture', nextNodeId: 'understand-goal' },
         { id: 'accidental', label: 'Mostly accidental', nextNodeId: 'shift-goal' },
+        { id: 'unavoidable', label: 'Mostly outside my control', nextNodeId: 'understand-goal' },
       ],
     },
     {
@@ -1575,13 +1694,14 @@ const vesperitt: CompanionJourneyDefinition = {
       id: 'understand-goal',
       kind: 'single_choice',
       createsGoalTypeId: 'understand',
-      prompt: 'What pattern would you like to understand or make more deliberate?',
-      helperText: 'Pick the closest question. This can be an experiment rather than a promise.',
+      prompt: 'What pattern would you like to understand or support more kindly?',
+      helperText: 'Pick the closest question. Understanding a constraint is useful even when you cannot change it.',
       options: [
         { id: 'chosen-to-drift', label: 'When a chosen night turns into drift', goalTitle: 'Notice when and why a chosen night turns into drift', suggestedQuickGoalIds: ['vesperitt:choose-tonight', 'vesperitt:end-planned', 'vesperitt:next-morning'], nextNodeId: null },
         { id: 'late-work-effect', label: 'How late work affects the next day', goalTitle: 'Notice how late work affects the next day', suggestedQuickGoalIds: ['vesperitt:finish-late-work', 'vesperitt:next-morning'], nextNodeId: null },
         { id: 'stopping-cues', label: 'What helps me stop when I mean to', goalTitle: 'Learn what helps me stop when I mean to', suggestedQuickGoalIds: ['vesperitt:end-planned', 'vesperitt:next-morning'], nextNodeId: null },
         { id: 'worthwhile-nights', label: 'Which late nights are actually worth it', goalTitle: 'Notice which late nights feel worth it', suggestedQuickGoalIds: ['vesperitt:choose-tonight', 'vesperitt:chosen-activity', 'vesperitt:next-morning'], nextNodeId: null },
+        { id: 'unavoidable-support', label: 'What helps after an unavoidable late night', goalTitle: 'Notice what supports me after unavoidable late nights', suggestedQuickGoalIds: ['vesperitt:next-morning', 'vesperitt:choose-tonight'], nextNodeId: null },
       ],
       nextNodeId: null,
     },
@@ -1590,12 +1710,12 @@ const vesperitt: CompanionJourneyDefinition = {
       kind: 'single_choice',
       createsGoalTypeId: 'shift',
       prompt: 'What would you like to change gently about those nights?',
-      helperText: 'Choose the closest small boundary or replacement.',
+      helperText: 'Choose a small experiment that is within your control. A late schedule is not automatically a problem.',
       options: [
         { id: 'one-more-stop', label: 'Stop after one episode or game', suggestedQuickGoalIds: ['vesperitt:one-more-stop', 'vesperitt:choose-tonight'], nextNodeId: null },
         { id: 'phone-away', label: 'Put my phone away at a set time', suggestedQuickGoalIds: ['vesperitt:phone-away', 'vesperitt:choose-tonight'], nextNodeId: null },
         { id: 'work-earlier', label: 'Move late work a little earlier', suggestedQuickGoalIds: ['vesperitt:finish-late-work', 'vesperitt:next-morning'], nextNodeId: null },
-        { id: 'calmer-replacement', label: 'Replace scrolling with something calming', suggestedQuickGoalIds: ['vesperitt:calmer-replacement', 'vesperitt:phone-away'], nextNodeId: null },
+        { id: 'calmer-replacement', label: 'Try another activity when scrolling stops feeling chosen', goalTitle: 'Try a different activity when late scrolling stops feeling chosen', suggestedQuickGoalIds: ['vesperitt:calmer-replacement', 'vesperitt:phone-away'], nextNodeId: null },
       ],
       nextNodeId: null,
     },
@@ -1614,6 +1734,7 @@ const vesperitt: CompanionJourneyDefinition = {
       { id: 'drifted', label: 'I drifted later than intended' },
       { id: 'stopped', label: 'I stopped when I meant to' },
       { id: 'next-day-effect', label: 'I noticed the next-day effect' },
+      { id: 'unavoidable', label: 'The late night was not really optional' },
       { id: 'other', label: 'Something else' },
     ],
   },
@@ -1657,6 +1778,7 @@ export const companionJourneyDefinitions: readonly CompanionJourneyDefinition[] 
   vesperitt,
   waglet,
   whiskit,
+  ...SPECIALIST_COMPANION_SYSTEMS.map((system) => system.journey),
 ];
 
 export const companionJourneyByFamilyId = new Map(

@@ -102,6 +102,35 @@ test('every formerly fallback family owns a progressive bespoke quest ladder', (
   }
 });
 
+test('every playable real-life quest has coherent repeat-day presentation variants', () => {
+  const genericFallback = /choose one detail you have not used before|notice what changed since last time/i;
+
+  for (const role of katchimeraRoles.filter((item) => item.status !== 'planned')) {
+    for (const questId of role.realLifeQuestIds) {
+      const definition = questDefinition(questId);
+      assert.ok(definition, `${role.familyId} is missing ${questId}`);
+      assert.equal(definition?.lane, 'real_life', `${questId} must be a real-life quest`);
+      assert.equal(definition?.presentationVariants?.length, 3, `${questId} needs three repeat-day lenses`);
+
+      const variants = definition?.presentationVariants ?? [];
+      assert.equal(new Set(variants.map((variant) => variant.id)).size, 3, `${questId} needs unique variant IDs`);
+      assert.doesNotMatch(
+        variants.map((variant) => `${variant.title} ${variant.hint}`).join(' '),
+        genericFallback,
+        `${questId} must not use the old generic repeat prompt`
+      );
+
+      if (role.status === 'partial') {
+        assert.equal(
+          new Set(variants.map((variant) => variant.title)).size,
+          3,
+          `${questId} needs distinguishable repeat-day titles`
+        );
+      }
+    }
+  }
+});
+
 test('every completed role references valid lane-specific quests', () => {
   for (const role of katchimeraRoles.filter((item) => item.status === 'complete')) {
     for (const questId of role.realLifeQuestIds) {

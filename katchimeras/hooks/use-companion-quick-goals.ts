@@ -172,7 +172,7 @@ export function useCompanionQuickGoals({
     const questState = loadCompanionQuests(resolveCompanionId);
     const bondState = loadCompanionBondState(questState, resolveCompanionId, homeState);
     const awarded = recordCompanionBondEvent(bondState, {
-      id: `quick-goal:${result.completion.id}`,
+      id: `quick-goal-daily:${companionIdForFamily(result.completion.familyId)}:${result.completion.dayId}`,
       creatureId: companionIdForFamily(result.completion.familyId),
       kind: 'quick_goal_completed',
       occurredAt: result.completion.completedAt,
@@ -193,7 +193,16 @@ export function useCompanionQuickGoals({
     const resolveCompanionId = companionIdResolverForHomeState(homeState);
     const questState = loadCompanionQuests(resolveCompanionId);
     const bondState = loadCompanionBondState(questState, resolveCompanionId, homeState);
-    const removed = removeCompanionBondEvent(bondState, `quick-goal:${result.completion.id}`);
+    const anotherCompletionRemains = result.state.completions.some((completion) =>
+      completion.familyId === result.completion!.familyId
+      && completion.dayId === result.completion!.dayId
+    );
+    const removed = anotherCompletionRemains
+      ? { state: bondState, removed: false, points: 0 }
+      : removeCompanionBondEvent(
+          bondState,
+          `quick-goal-daily:${companionIdForFamily(result.completion.familyId)}:${result.completion.dayId}`
+        );
     if (removed.removed) saveCompanionBondState(removed.state);
     onBondChanged?.();
     return true;

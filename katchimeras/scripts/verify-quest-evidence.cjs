@@ -31,6 +31,30 @@ const bespokeQuestDefinitionsPath = transpileToTemp(
   'utils/quests/bespoke-family-packs.ts',
   'bespoke-family-packs.js'
 );
+const batchOneQuestVariantsPath = transpileToTemp(
+  'constants/batch-one-quest-variants.ts',
+  'batch-one-quest-variants.js'
+);
+const batchTwoQuestVariantsPath = transpileToTemp(
+  'constants/batch-two-quest-variants.ts',
+  'batch-two-quest-variants.js'
+);
+const batchThreeQuestVariantsPath = transpileToTemp(
+  'constants/batch-three-quest-variants.ts',
+  'batch-three-quest-variants.js'
+);
+const batchFourQuestVariantsPath = transpileToTemp(
+  'constants/batch-four-quest-variants.ts',
+  'batch-four-quest-variants.js'
+);
+const batchFiveQuestVariantsPath = transpileToTemp(
+  'constants/batch-five-quest-variants.ts',
+  'batch-five-quest-variants.js'
+);
+const batchSixQuestVariantsPath = transpileToTemp(
+  'constants/batch-six-quest-variants.ts',
+  'batch-six-quest-variants.js'
+);
 const definitionsPath = transpileToTemp('utils/quests/definitions.ts', 'definitions.js');
 const evaluatePath = transpileToTemp('utils/quests/evaluate.ts', 'evaluate.js');
 const typesPath = path.join(tempDir, 'types-home.js');
@@ -47,6 +71,12 @@ const stubs = {
   '@/utils/quests/journal-templates': journalTemplatesPath,
   '@/constants/katchimera-bespoke-quests': bespokeQuestCataloguePath,
   '@/utils/quests/bespoke-family-packs': bespokeQuestDefinitionsPath,
+  '@/constants/batch-one-quest-variants': batchOneQuestVariantsPath,
+  '@/constants/batch-two-quest-variants': batchTwoQuestVariantsPath,
+  '@/constants/batch-three-quest-variants': batchThreeQuestVariantsPath,
+  '@/constants/batch-four-quest-variants': batchFourQuestVariantsPath,
+  '@/constants/batch-five-quest-variants': batchFiveQuestVariantsPath,
+  '@/constants/batch-six-quest-variants': batchSixQuestVariantsPath,
 };
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, parent, ...rest) {

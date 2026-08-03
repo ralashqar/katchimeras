@@ -13,6 +13,10 @@ import { questDefinition } from '@/utils/quests/definitions';
 export const MAX_ACTIVE_COMPANION_GOALS = 1;
 
 const LEGACY_GOAL_TITLE_REPLACEMENTS: Readonly<Record<string, string>> = {
+  'steppling:Make room for a ten-minute walk': 'Make room for short walks',
+  'steppling:Turn one everyday journey into a walk': 'Use walking for more everyday journeys',
+  'steppling:Use a short walk to make headspace': 'Use short walks to make headspace',
+  'steppling:Explore one unfamiliar route at a time': 'Use walks to notice and explore nearby',
   'vesperitt:Creative or learning time': 'Protect creative or learning time after dark',
   'vesperitt:Quiet time alone': 'Make room for quiet time after dark',
   'vesperitt:Time with people I care about': 'Protect time with people I care about',
@@ -99,6 +103,10 @@ export type CompanionJourneyCheckIn = {
   goalId: string | null;
   definitionId: string | null;
   definitionVersion: number;
+  contentItemId?: string;
+  contentPrompt?: string;
+  contentHelperText?: string;
+  contentOptions?: readonly { id: string; label: string }[];
   answers: CompanionJourneyCheckInAnswer[];
   suggestedQuickGoalIds: readonly string[];
   taskSuggestionStatus: 'pending' | 'added' | 'dismissed' | null;
@@ -216,7 +224,11 @@ export function migrateLegacyDiscoveryGoals(
   };
   let next = state;
   for (const answer of discovery.answers) {
-    const mapped = mapping[answer.promptId];
+    const mapped = mapping[answer.promptId]
+      ?? (answer.promptId === `${answer.familyId}:quest-goal`
+        && companionJourneyByFamilyId.has(answer.familyId)
+        ? { familyId: answer.familyId, goalTypeId: `${answer.familyId}-direction` }
+        : undefined);
     if (!mapped || !answer.value.trim()) continue;
     const id = `legacy-goal:${answer.familyId}:${answer.promptId}`;
     if (next.goals.some((goal) => goal.id === id)) continue;
@@ -266,8 +278,14 @@ export function activeConversationForFamily(
   state: CompanionJourneyState,
   familyId: KatchimeraFamilyId
 ): CompanionJourneyConversationSession | null {
+  const definition = companionJourneyByFamilyId.get(familyId);
+  if (!definition) return null;
   return state.conversations
-    .filter((session) => session.familyId === familyId && !session.completedAt && session.currentNodeId)
+    .filter((session) => session.familyId === familyId
+      && session.definitionId === definition.id
+      && session.definitionVersion === definition.version
+      && !session.completedAt
+      && session.currentNodeId)
     .sort((left, right) => right.startedAt - left.startedAt)[0] ?? null;
 }
 
@@ -375,6 +393,15 @@ export function answerJourneyConversation(
 
   const answer: CompanionJourneyConversationAnswer = { nodeId: node.id, value: answerValue, answeredAt };
   const completed = nextNodeId === null;
+  if (completed && !suggestedQuickGoalIds.length && !node.createsGoalTypeId) {
+    const conversationGoal = goals.find((goal) =>
+      goal.familyId === session.familyId
+      && goal.status === 'active'
+      && goal.isPrimary
+      && goal.createdAt >= session.startedAt
+    );
+    suggestedQuickGoalIds = conversationGoal?.suggestedQuickGoalIds ?? suggestedQuickGoalIds;
+  }
   const conversations = state.conversations.map((item) =>
     item.id === session.id
       ? {
@@ -511,11 +538,42 @@ export function startJourneyCheckIn(
     companionId: string;
     familyId: KatchimeraFamilyId;
     dayId: string;
+    contentItemId?: string;
+    contentPrompt?: string;
+    contentHelperText?: string;
+    contentOptions?: readonly { id: string; label: string }[];
   },
   startedAt = Date.now()
 ): { state: CompanionJourneyState; checkIn: CompanionJourneyCheckIn } {
   const existing = checkInForDay(state, input.companionId, input.dayId);
-  if (existing) return { state, checkIn: existing };
+  if (existing) {
+    const repairsUnfinishedAuthoredContent = !existing.completedAt
+      && Boolean(input.contentItemId)
+      && existing.contentItemId === input.contentItemId
+      && (
+        existing.contentPrompt !== input.contentPrompt
+        || existing.contentHelperText !== input.contentHelperText
+        || JSON.stringify(existing.contentOptions ?? []) !== JSON.stringify(input.contentOptions ?? [])
+      );
+    if (!repairsUnfinishedAuthoredContent) return { state, checkIn: existing };
+    const repaired: CompanionJourneyCheckIn = {
+      ...existing,
+      ...(input.contentPrompt ? { contentPrompt: input.contentPrompt } : {}),
+      ...(input.contentHelperText ? { contentHelperText: input.contentHelperText } : {}),
+      ...(input.contentOptions?.length ? { contentOptions: input.contentOptions } : {}),
+      answers: [],
+      suggestedQuickGoalIds: [],
+      taskSuggestionStatus: null,
+      updatedAt: startedAt,
+    };
+    return {
+      state: {
+        ...state,
+        checkIns: state.checkIns.map((checkIn) => checkIn.id === repaired.id ? repaired : checkIn),
+      },
+      checkIn: repaired,
+    };
+  }
   const definition = companionJourneyByFamilyId.get(input.familyId) ?? null;
   const goal = primaryGoalForFamily(state, input.familyId);
   const checkIn: CompanionJourneyCheckIn = {
@@ -526,6 +584,10 @@ export function startJourneyCheckIn(
     goalId: goal?.id ?? null,
     definitionId: definition?.id ?? null,
     definitionVersion: definition?.version ?? 0,
+    ...(input.contentItemId ? { contentItemId: input.contentItemId } : {}),
+    ...(input.contentPrompt ? { contentPrompt: input.contentPrompt } : {}),
+    ...(input.contentHelperText ? { contentHelperText: input.contentHelperText } : {}),
+    ...(input.contentOptions?.length ? { contentOptions: input.contentOptions } : {}),
     answers: [],
     suggestedQuickGoalIds: [],
     taskSuggestionStatus: null,

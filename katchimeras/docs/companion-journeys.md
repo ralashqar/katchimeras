@@ -1,14 +1,24 @@
 # Companion Journeys
 
-Status: implemented for twenty-five families, including the foundation,
-scaffolded-content, and daily-rhythm batches. Creamalume now shares Tasklet’s
+## Editorial content rollout
+
+Steppling and Batch 1 (Sleep/Rest, Tasklet, Mossprout, and Gatherglow) use fully
+authored rotating content packs. Each pack contains 12 daily pulses, four
+progress reviews, four return conversations, and bond moments for levels 2–4.
+Every question owns its answer set; generic sentiment answers are not reused for
+these families. See `companion-content-authoring-guide.md` and
+`companion-editorial-rollout.md` for the authoring and rollout contracts.
+
+Status: implemented for all fifty-four playable families, including the
+foundation, daily-rhythm, and specialist batches. Creamalume shares Tasklet’s
 work/focus Journey as a skin.
 
 ## 2026 semantic-quest and content expansion
 
-Journey, quick-goal, and real-life quest content now covers twenty-five
-families. The movement/sport and relationships/care families remain `partial`
-until their signature mini-games are authored.
+Journey, quick-goal, rotating prompt, bond-dialogue, and real-life quest content
+now covers all fifty-four playable families. A `partial` role status can still
+mean that a separately planned signature mini-game has not been authored; it no
+longer means that Focus, task suggestions, prompts, or progression are absent.
 
 Some real-life quests ask for a specific written or voice-note reflection rather
 than accepting any new note. These definitions use `semanticVerification`,
@@ -56,7 +66,10 @@ at Bond 1 for companions that are already common in existing saves:
 - **Tasklet** - a completed project action and what it unlocked next.
 - **Cheerlet** - a real piece of progress and why it matters.
 - **Vesperitt** - a real late-night moment and whether it was chosen or drifted.
-- **Shellio** - a real waterside moment and one sensory or changing detail.
+- **Shellio** - a real swimming, beach, shore, or non-entry water moment and one
+  body, confidence, safety, sensory, movement, or changing detail. Shellio owns
+  swimming as well as wider water connection; Stillo remains focused on quiet
+  still-water places rather than swimming.
 
 These test-access quests have a higher offer weight so one is easy to find when
 Apple Foundation is available. They remain hidden when the capability is not
@@ -68,6 +81,32 @@ Steppling remains responsible for everyday walking. Voltstep and Pulsepounce
 remain unchanged pending a later overlap audit informed by these authored roles.
 
 ## Current interaction model
+
+### Evolving daily invitations
+
+The fifty-four playable Journey families also share one authored daily-invitation
+system. A companion receives at most one new invitation per local day. The
+selection is persisted, deterministic, and ordered by: unfinished quest,
+unfinished Focus conversation, missing Focus, newly reached bond moment,
+progress review, contextual quest, then a rotating daily pulse.
+
+- `constants/companion-content.ts` owns the modular catalogue: twelve pulses,
+  four reviews, four return conversations, and Familiar/Devoted/Kindred moments
+  per Journey family. Mossprout, Tasklet, Rest, and Gatherglow carry an
+  additional hand-authored pilot voice layer.
+- `utils/companion-content.ts` owns deterministic selection, fourteen-day exact
+  prompt exclusion, lifecycle events, and small reusable memory facts.
+- `utils/companion-content-storage.ts` persists under
+  `katchadeck.companion-content-v1`.
+- The companion Home page leads with the invitation and offers a non-destructive
+  **Not today** action. Today promotes only the companion hatched that day.
+- Repeatable real-life quests rotate three presentation variants while keeping
+  the same quest ID, evidence contract, cooldown, and Journey contribution.
+- Quick goals remain independently completable, but only the first quick-goal
+  completion for a family/day awards relationship bond.
+
+Invitation analytics are local, metadata-only lifecycle records. They never
+contain journal text or free-text answer content.
 
 The player-facing model is intentionally simpler than the original staged Journey UI:
 
@@ -104,6 +143,11 @@ only that companion family's presets and custom-goal option.
 Questionnaire endpoints can provide `suggestedQuickGoalIds`. The UI offers these as an optional group; accepting them uses the same duplicate-safe add path as the goal sheet.
 
 This document is the source of truth for extending multi-day quests, branching “You” conversations, goals, and reflections to the remaining Katchimera families.
+
+The editorial, wellness, accessibility, questionnaire, and quest-copy standard
+for completing those families is in
+[`companion-content-authoring-guide.md`](./companion-content-authoring-guide.md).
+Steppling is the first fully authored reference pack under that standard.
 
 ## Product model
 
