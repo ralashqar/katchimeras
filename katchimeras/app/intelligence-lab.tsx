@@ -21,6 +21,8 @@ import {
 export default function IntelligenceLabScreen() {
   const { selectedDay, personalEntities, cloudIntelligenceEnabled } = useHomeScreenState();
   const memories = selectedDay?.kind === 'day' ? selectedDay.classifiedMemories ?? [] : [];
+  const hatchDecision = selectedDay?.kind === 'day' ? selectedDay.creature?.hatchDecision ?? null : null;
+  const hatchDecisionJson = useMemo(() => hatchDecision ? JSON.stringify(hatchDecision, null, 2) : '', [hatchDecision]);
   const [lastPhoto, setLastPhoto] = useState<DevLastPhotoAnalysis | null>(() => loadDevLastPhotoAnalysis());
   const [lastNote, setLastNote] = useState<DevLastNoteAnalysis | null>(() => loadDevLastNoteAnalysis());
   const foundationAvailability = foundationSceneAvailability();
@@ -79,6 +81,23 @@ export default function IntelligenceLabScreen() {
     <>
       <Stack.Screen options={{ title: 'Intelligence Lab' }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+        {hatchDecision ? (
+          <View style={[styles.card, styles.hatchDecisionCard]}>
+            <View style={styles.headingRow}>
+              <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50} selectable>Hatch decision</ThemedText>
+              <ThemedText style={styles.provider} lightColor="#A8E2C6" darkColor="#A8E2C6" selectable>{hatchDecision.engineVersion}</ThemedText>
+            </View>
+            <ThemedText style={styles.line} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>
+              Leader: {hatchDecision.leaderFamilyId} Â· winner: {hatchDecision.winnerFamilyId} Â· {hatchDecision.leaderFamilyId === hatchDecision.winnerFamilyId ? 'leader won' : 'weighted-draw upset'}
+            </ThemedText>
+            {hatchDecision.candidates.map((candidate) => (
+              <ThemedText key={candidate.profileId} style={styles.line} lightColor={candidate.selected ? '#A8E2C6' : Lantern.moon300} darkColor={candidate.selected ? '#A8E2C6' : Lantern.moon300} selectable>
+                {candidate.selected ? 'WINNER' : 'FIELD'} {candidate.familyId}/{candidate.skinId} Â· {Math.round(candidate.probability * 100)}% Â· score {candidate.score.toFixed(3)} Â· journal {candidate.contributions.map((item) => `${item.routeKey} ${item.weight}${item.keyMoment ? ' key' : ''}`).join(', ') || 'none'}
+              </ThemedText>
+            ))}
+            <ThemedText style={styles.json} lightColor={Lantern.moon300} darkColor={Lantern.moon300} selectable>{hatchDecisionJson}</ThemedText>
+          </View>
+        ) : null}
         <View style={[styles.card, foundationAvailability.available ? styles.foundationReady : styles.foundationWarning]}>
           <View style={styles.headingRow}>
             <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50} selectable>
@@ -421,6 +440,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   lastPhotoCard: { borderColor: 'rgba(146,215,255,0.4)' },
+  hatchDecisionCard: { borderColor: 'rgba(168,226,198,0.4)' },
   foundationReady: { borderColor: 'rgba(168,226,198,0.4)' },
   foundationWarning: { borderColor: 'rgba(243,179,106,0.55)' },
   photo: { width: '100%', aspectRatio: 1.4, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },

@@ -1,0 +1,11 @@
+Create a production sprite sheet of twelve isolated Katchimeras achievement keepsakes in an EXACT 4 columns by 3 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Dawnle palette: coral pink, peach, apricot, butter yellow, warm cream, dewdrop glass, pale honey wood, matte ceramic, and restrained gold edging. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #ff00ff background. Repeat: EXACT 4-by-3 grid, twelve cells. Exactly one compact connected keepsake per cell, centered, at most 68% cell occupancy, with at least 10% uninterrupted pure-magenta gutter on every side and clearly visible gutters between cells. Complete bases. Nothing touches a boundary. No cast/contact shadows, floor, reflections, scenery, text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges.
+
+Row 1, left to right — MORNING MOMENTS progression tiers I–IV. Use the same sunrise tea-tray keepsake: tier I is a tiny round cream tray with coral cup and small sun-disc ornament; tier II adds a dew-glass bud vase; tier III adds a pale honey-wood rounded window and folded napkin; tier IV is a richly arranged compact dawn tray with window, cup, dew vase, tiny bell, and golden sunrise inlay. All parts connected on one base.
+
+Row 2, left to right — MORNING RHYTHM progression tiers I–IV. Use the same dawn-bell timepiece: tier I is a simple coral bell on a cream base with one raised sun ray; tier II adds a small circular clock-like face with no numbers or marks; tier III adds paired sunrise arcs and dewdrop ornaments; tier IV becomes an ornate but compact morning rhythm clock-bell with layered sun rays, dew crystals, and gold rim. No readable clock numerals.
+
+Row 3, left to right — GOALS progression tiers I–IV. Use the same sunrise crest token: tier I is a round peach token with a raised sun-disc; tier II adds two coral rays and cream rim; tier III becomes a standing dawn crest with dew drops and warm glow; tier IV is an ornate mastery crest with layered rays, glass dew accents, and gold edging. Tier IV is generation-only.
+
+Keep silhouettes rounded, luminous but not glossy, readable at 80 pixels, similar in mass, and fully isolated.

@@ -1,0 +1,11 @@
+Create a production sprite sheet of twelve isolated Katchimeras achievement keepsakes in an EXACT 4 columns by 3 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Encora palette: deep teal, luminous cyan, violet, soft pink, indigo, warm walnut, brushed brass, frosted glass, felt, and matte ceramic. Translate the futuristic glow into handcrafted Katchimeras objects rather than glossy sci-fi UI. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #00ff00 background. Repeat: EXACT 4-by-3 grid, twelve cells. Exactly one compact connected keepsake per cell, centered, at most 68% occupancy, with at least 10% uninterrupted pure-green gutter on every side and clearly visible gutters between cells. Complete bases. Nothing touches a boundary. No shadows, floor, reflections, scenery, text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges. No chroma green in subjects.
+
+Row 1 — MUSIC MOMENTS progression tiers I–IV. Use the same rounded listening station: tier I is a small walnut speaker with cyan glass sound inset; tier II adds attached violet headphones; tier III adds a compact turntable-like disc with no label and two speakers; tier IV is a richly equipped but compact music console with paired speakers, headphones, brass controls, and softly glowing cyan-violet sound ribbons carved into the base.
+
+Row 2 — MUSIC DISCOVERED progression tiers I–IV. Use the same music archive: tier I is one blank indigo record sleeve with brass disc edge; tier II is two distinct sleeves in a walnut rack; tier III is a compact listening shelf with three sleeves and small chime; tier IV is an ornate music cabinet with multiple blank sleeves, frosted-glass sound crystal, chimes, and warm lights. No album art or writing.
+
+Row 3 — GOALS progression tiers I–IV. Use the same soundwave crest: tier I is a rounded teal token with a simple raised cyan wave line; tier II adds violet echo rings and brass rim; tier III becomes a standing frosted-glass sound crest with cyan and pink inlays; tier IV is an ornate mastery crest with layered sound arcs, brass frame, and gentle glow. Tier IV is generation-only.
+
+Keep silhouettes musical, tactile, readable at 80 pixels, similar in mass, and fully isolated.

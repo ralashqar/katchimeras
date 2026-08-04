@@ -11,7 +11,7 @@ import type {
   StepsInterpretation,
   StoredHomeDayRecord,
 } from '@/types/home';
-import { buildMovementClassifiedMemory, buildPlaceClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
+import { buildPlaceClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import {
   buildHatchCheckInPlan,
   currentHatchCheckInQuestion,
@@ -22,6 +22,7 @@ import {
   hatchReflectionMoments,
   resolveHatchCheckInSignals,
 } from '@/utils/hatch-check-in';
+import { withManualJournalEntry } from './manual-journal';
 
 const MANUAL_BIG_MOMENT_LABEL: Record<BigMomentType, string> = {
   birthday: 'Birthday',
@@ -73,6 +74,7 @@ export function withStartedHatchCheckIn(
         : null,
       anchorId: plan.anchor?.id ?? null,
       anchorLabel: plan.anchor?.label ?? null,
+      anchorSeedId: plan.anchor?.seedId ?? null,
       meaningId: null,
       meaningLabel: null,
       semanticTags: [],
@@ -102,11 +104,11 @@ export function withHatchCheckInAnswer(
   if (input.kind === 'flow') {
     const choice = HATCH_CHECK_IN_FLOWS.find((item) => item.id === input.id);
     if (!choice) return day;
-    next = { ...next, flowId: choice.id, flowLabel: choice.label, categoryId: null, categoryLabel: null };
+    next = { ...next, flowId: choice.id, flowLabel: choice.label, categoryId: null, categoryLabel: null, anchorSeedId: null };
   } else if (input.kind === 'category') {
     const choice = hatchCheckInDetailChoices(current.flowId).find((item) => item.id === input.id);
     if (!choice) return day;
-    next = { ...next, categoryId: choice.id, categoryLabel: choice.label, anchorId: `reconstructed:${current.flowId}:${choice.id}`, anchorLabel: choice.label };
+    next = { ...next, categoryId: choice.id, categoryLabel: choice.label, anchorId: `reconstructed:${current.flowId}:${choice.id}`, anchorLabel: choice.label, anchorSeedId: null };
   } else if (input.kind === 'moment') {
     const choice = hatchReflectionMoments(day).find((item) => item.id === input.id);
     if (!choice) return day;
@@ -114,10 +116,14 @@ export function withHatchCheckInAnswer(
       ...next,
       anchorId: choice.id,
       anchorLabel: choice.label,
+      anchorSeedId: choice.seedId ?? null,
       flowId: choice.flowId,
       flowLabel: HATCH_CHECK_IN_FLOWS.find((item) => item.id === choice.flowId)?.label ?? null,
       categoryId: choice.categoryId,
       categoryLabel: choice.categoryId ? hatchCheckInDetailChoices(choice.flowId).find((item) => item.id === choice.categoryId)?.label ?? null : null,
+      answeredQuestionIds: choice.categoryId
+        ? [...new Set([...(next.answeredQuestionIds ?? []), 'evidence.category'])]
+        : next.answeredQuestionIds,
     };
   } else {
     const choice = hatchCheckInMeaningChoices(current.flowId).find((item) => item.id === input.id);
@@ -125,7 +131,16 @@ export function withHatchCheckInAnswer(
     next = { ...next, meaningId: choice.id, meaningLabel: choice.label };
   }
   const signals = resolveHatchCheckInSignals(next);
-  return { ...day, hatchCheckIn: { ...next, ...signals } };
+  const selectedJournalId = input.kind === 'moment' && input.id.startsWith('journal:')
+    ? input.id.slice('journal:'.length)
+    : null;
+  return {
+    ...day,
+    ...(selectedJournalId && (day.journalRecords ?? []).some((record) => record.id === selectedJournalId)
+      ? { keyJournalRecordId: selectedJournalId }
+      : {}),
+    hatchCheckIn: { ...next, ...signals },
+  };
 }
 
 export function withFinishedHatchCheckIn(
@@ -357,24 +372,34 @@ export function withStepsInterpretation(
   input: { movement: StepsInterpretation['movement']; label: string; emoji: string; subtype?: string | null },
   now: Date
 ): StoredHomeDayRecord {
-  return {
-    ...day,
-    stepsInterpretation: {
-      movement: input.movement,
-      label: input.label,
-      emoji: input.emoji,
-      subtype: input.subtype ?? null,
-      createdAt: now.toISOString(),
+  const categoryId = movementJournalCategory(input.movement);
+  const context = input.subtype ?? movementJournalContext(input.movement);
+  return withManualJournalEntry(day, {
+    flowId: 'movement',
+    path: ['movement', categoryId],
+    categoryId,
+    canonicalQualityIds: [],
+    fields: { specific: input.label, context },
+    sourceType: 'manual',
+    sourceId: `movement:${day.isoDate}`,
+    sessionId: `steps-interpretation:${day.isoDate}`,
+    journalSource: {
+      kind: 'manual',
+      sourceId: `movement:${day.isoDate}`,
+      origin: { kind: 'steps_interpretation' },
     },
-    classifiedMemories: upsertClassifiedMemory(day.classifiedMemories, [
-      buildMovementClassifiedMemory({
-        sourceId: `movement:${day.isoDate}`,
-        observedAt: now.toISOString(),
-        movement: input.movement,
-        subtype: input.subtype,
-      }),
-    ]),
-  };
+  }, now);
+}
+
+function movementJournalCategory(movement: StepsInterpretation['movement']): string {
+  if (movement === 'transit' || movement === 'drive') return 'commute';
+  return movement;
+}
+
+function movementJournalContext(movement: StepsInterpretation['movement']): string | null {
+  if (movement === 'transit') return 'mostly_transit';
+  if (movement === 'drive') return 'mostly_driving';
+  return null;
 }
 
 export function withFeaturedMemory(

@@ -130,7 +130,7 @@ test('legacy reconstruction delays its stored sky until generated enrichment fin
     version: 14,
   });
 
-  assert.equal(migrated.version, 16);
+  assert.equal(migrated.version, 18);
   assert.equal(migrated.archivedDays[0].skyPolicy, 'historical_adaptive');
   assert.equal(migrated.archivedDays[0].sky, undefined);
   assert.equal(migrated.today.sky, undefined);
@@ -200,7 +200,7 @@ test('v15 migration repairs enriched historical skies and preserves live hatch s
     version: 15,
   });
 
-  assert.equal(migrated.version, 16);
+  assert.equal(migrated.version, 18);
   assert.equal(migrated.archivedDays[0].skyPolicy, 'live_frozen');
   assert.deepEqual(migrated.archivedDays[0].sky, liveFrozenSky);
   assert.equal(migrated.archivedDays[1].skyPolicy, 'historical_adaptive');

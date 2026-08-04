@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { prepareTodayForDevRehatch } from '@/game/days/dev';
+import { withStartedHatchCheckIn } from '@/game/days/mutations/day-fields';
 import { preserveVisibleHatchForMap } from '@/game/days/map-hatch-invariant';
 import { preserveFinalizedHatches } from '@/game/days/state-integrity';
 import type { HomeDayRecord, StoredHomeState } from '@/types/home';
-import { buildHatchCheckInPlan, hatchCheckInEligibility } from '@/utils/hatch-check-in';
+import { buildHatchCheckInPlan, currentHatchCheckInQuestion, hatchCheckInEligibility, hatchReflectionMoments } from '@/utils/hatch-check-in';
+import { dayForDevHatchSelection } from '@/utils/forced-low-signal-hatch';
 
 function state(): StoredHomeState {
   return {
@@ -39,6 +41,9 @@ test('adaptive replay unhatches while preserving the day evidence', () => {
   assert.equal(next.today.journalRecords?.[0]?.fields.specific, 'A Brief History of Time');
   assert.equal(next.today.devHatchReflectionMode, undefined);
   assert.equal(hatchCheckInEligibility(next.today), 'regular');
+  const started = withStartedHatchCheckIn(next.today, 'regular', new Date('2026-07-20T21:01:00.000Z'));
+  assert.equal(currentHatchCheckInQuestion(started)?.kind, 'meaning');
+  assert.match(currentHatchCheckInQuestion(started)?.title ?? '', /Brief History of Time/);
 });
 
 test('forced low-signal replay bypasses the clock and chooses the hierarchy', () => {
@@ -51,6 +56,40 @@ test('forced low-signal replay bypasses the clock and chooses the hierarchy', ()
     'reconstruct.category',
     'reflection.meaning',
   ]);
+  assert.deepEqual(hatchReflectionMoments(next.today), []);
+  const started = withStartedHatchCheckIn(next.today, 'empty', new Date('2026-07-20T21:01:00.000Z'));
+  const question = currentHatchCheckInQuestion(started);
+  assert.equal(question?.kind, 'flow');
+  assert.equal(question?.suggestedId, null);
+  assert.equal(question?.subtitle, undefined);
+  assert.equal(question?.choices[0]?.id, 'people');
+  assert.doesNotMatch(question?.title ?? '', /Brief History|8,200|steps/i);
+});
+
+test('forced low-signal hatch input retains only its questionnaire evidence', () => {
+  const forced = prepareTodayForDevRehatch(state(), 'force_low_signal').today;
+  forced.promptAnswers = [{ id: 'old-prompt' }] as never;
+  forced.placeCategorySeeds = ['museum'];
+  forced.weather = { condition: 'storm', source: 'vision' };
+  forced.hatchCheckIn = {
+    status: 'completed', eligibilityReason: 'empty', flowId: 'food', flowLabel: 'Food & drink',
+    categoryId: 'meal', categoryLabel: 'A meal', moodId: null, moodLabel: null,
+    anchorId: 'reconstructed:food:meal', anchorLabel: 'A meal', meaningId: 'comfort', meaningLabel: 'Comfort',
+    answeredQuestionIds: ['reconstruct.focus', 'reconstruct.category', 'reflection.meaning'],
+    semanticTags: ['activity:food'], scoreBias: { calm: 0.32 },
+    encounterSeedBias: [{ seedId: 'feast', intensity: 0.58 }],
+    startedAt: '2026-07-20T21:00:00.000Z', updatedAt: '2026-07-20T21:01:00.000Z', completedAt: '2026-07-20T21:01:00.000Z',
+  };
+
+  const input = dayForDevHatchSelection(forced);
+  assert.equal(input.stepsCount, 0);
+  assert.deepEqual(input.journalRecords, []);
+  assert.deepEqual(input.promptAnswers, []);
+  assert.deepEqual(input.placeCategorySeeds, []);
+  assert.equal(input.weather, undefined);
+  assert.deepEqual(input.hatchCheckIn?.encounterSeedBias, [{ seedId: 'feast', intensity: 0.58 }]);
+  assert.equal(forced.stepsCount, 8200);
+  assert.equal(forced.journalRecords?.[0]?.categoryId, 'book');
 });
 
 test('map refresh repairs a stale egg snapshot but respects an intentional dev unhatch', () => {

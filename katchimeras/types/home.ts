@@ -153,6 +153,8 @@ export type HatchCheckIn = {
   categoryLabel: string | null;
   anchorId?: string | null;
   anchorLabel?: string | null;
+  /** Exact canonical encounter seed carried by a detected/selected moment. */
+  anchorSeedId?: string | null;
   meaningId?: string | null;
   meaningLabel?: string | null;
   semanticTags: string[];
@@ -946,6 +948,53 @@ export type LocalCreatureRecord = {
   pickProbability?: number;
   fieldEchoes?: KatchimeraFieldEcho[];
   birthSignals?: string[];
+  /** Explainable, privacy-safe record of the field that produced this hatch. */
+  hatchDecision?: HatchDecisionSnapshot;
+};
+
+export type HatchDecisionContribution = {
+  journalRecordId: string;
+  routeKey: string;
+  sourceKind: JournalSource['kind'];
+  weight: number;
+  keyMoment: boolean;
+  explanation: string;
+};
+
+export type HatchDecisionModifiers = {
+  novelty: number;
+  intent: number;
+  /** Bounded lift from an unusually large measured step count. */
+  measuredMovement?: number;
+  /** Bounded lift when independent sources agree on the same movement family. */
+  corroboration?: number;
+  /** Demotion that keeps a generic movement total below a specific day context. */
+  contextualPriority?: number;
+  bond: number;
+  seasonal: number;
+  rarity: number;
+  recency: number;
+  previousDay: number;
+};
+
+export type HatchDecisionCandidate = {
+  profileId: string;
+  familyId: KatchimeraFamilyId;
+  skinId: KatchimeraSkinId;
+  seedId: string;
+  score: number;
+  probability: number;
+  selected: boolean;
+  modifiers: HatchDecisionModifiers;
+  contributions: HatchDecisionContribution[];
+};
+
+export type HatchDecisionSnapshot = {
+  version: 1;
+  engineVersion: 'journal-field-v1' | 'journal-field-v2';
+  leaderFamilyId: KatchimeraFamilyId;
+  winnerFamilyId: KatchimeraFamilyId;
+  candidates: HatchDecisionCandidate[];
 };
 
 export type EncounterHistoryEntry = {
@@ -1199,8 +1248,8 @@ export type DaySleep = {
 
 // How a notably active day MOVED — the steps tell us "a lot happened", the user
 // tells us what it WAS (a hike, a long walk, a run...). Read-only interpretation
-// that colours the day's story; never a goal or a score. One-tap, from the "!" on
-// the Steps structure when the day's steps spike.
+// that colours the day's story. The answer is also committed as one canonical
+// movement journal memory, so it can corroborate measured hatch evidence.
 export type DayMovementKind =
   | 'hike'
   | 'walk'
@@ -1318,6 +1367,10 @@ export type JournalSource =
   | { kind: 'voice_note'; sourceId: string; audioUri?: string | null; durationMs?: number | null; origin?: JournalSourceOrigin | null };
 
 export type JournalSourceOrigin =
+  | {
+      /** A Today steps clarification promoted into the canonical journal. */
+      kind: 'steps_interpretation';
+    }
   | {
       kind: 'companion_reflection';
       creatureId: string;
@@ -1455,6 +1508,8 @@ export type ManualJournalSubmission = {
   confirmedFacets?: JournalConfirmedFacet[];
   journalSource?: JournalSource;
   location?: JournalLocationSelection | null;
+  /** Composer-only intent; persisted as StoredHomeDayRecord.keyJournalRecordId. */
+  makeKeyMoment?: boolean;
 };
 
 export type StoredHomeDayRecord = {
@@ -1502,6 +1557,8 @@ export type StoredHomeDayRecord = {
   // Canonical, reviewed journal inputs. Older arrays below remain materialized
   // compatibility projections while their readers migrate to journal selectors.
   journalRecords?: JournalRecord[];
+  /** At most one pre-hatch journal record can be given extra salience. */
+  keyJournalRecordId?: string | null;
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
   // Live hatches freeze their sky. Reconstructed historical days keep an
@@ -1558,7 +1615,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 17;
+  version: 18;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

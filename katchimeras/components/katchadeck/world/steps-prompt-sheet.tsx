@@ -8,8 +8,8 @@ import { KatchaSurfacePalette } from '@/constants/katcha-ui';
 import type { DayMovementKind } from '@/types/home';
 
 // Interpret a notably active day — the steps say "a lot moved today", the user says
-// what it WAS. One tap, multiple choice. Read-only colour for the day's story; never
-// a goal or a score. Shown from the "!" on the Steps structure.
+// what it WAS. One tap, multiple choice. The answer becomes one canonical
+// movement memory and can corroborate—but never replace—the measured steps.
 
 type MovementOption = { movement: DayMovementKind; label: string; emoji: string; tint: string };
 const MOVEMENTS: MovementOption[] = [
@@ -50,26 +50,37 @@ const SUBTYPES: Partial<Record<DayMovementKind, { id: string; label: string; emo
 
 export function StepsPromptSheet({
   stepsCount,
+  detectedActivityTypes = [],
   onConfirm,
   onClose,
 }: {
   stepsCount?: number | null;
+  detectedActivityTypes?: string[];
   onConfirm: (input: { movement: DayMovementKind; label: string; emoji: string; subtype?: string | null }) => void;
   onClose: () => void;
 }) {
   const [selected, setSelected] = useState<MovementOption | null>(null);
   const stepsLine = stepsCount && stepsCount > 0 ? `${stepsCount.toLocaleString()} steps today` : 'A big day of movement';
   const subtypes = selected ? SUBTYPES[selected.movement] : null;
+  const orderedMovements = orderMovementOptions(MOVEMENTS, detectedActivityTypes);
+  const routeDetected = detectedActivityTypes.length > 0;
   const chooseMovement = (option: MovementOption) => {
     if (SUBTYPES[option.movement]) setSelected(option);
     else onConfirm({ movement: option.movement, label: option.label, emoji: option.emoji });
   };
 
   return (
-    <KatchaSheet header={{ eyebrow: stepsLine, title: selected ? 'What kind of route?' : 'How did you get around?' }} onRequestClose={() => onClose()} surface="parchment">
+    <KatchaSheet header={{ eyebrow: stepsLine, title: selected ? 'What kind of route?' : 'What kind of movement was it?' }} onRequestClose={() => onClose()} surface="parchment">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {!selected ? (
+          <ThemedText style={styles.helper} lightColor={PARCHMENT.textSecondary} darkColor={PARCHMENT.textSecondary}>
+            {routeDetected
+              ? 'Health detected a route. Choose what it was to keep one movement memory for today.'
+              : 'Your steps stood out. Choose what they came from to keep one movement memory for today.'}
+          </ThemedText>
+        ) : null}
         <Animated.View entering={FadeInDown.duration(220)} style={styles.grid}>
-          {(subtypes ?? MOVEMENTS).map((option) => (
+          {(subtypes ?? orderedMovements).map((option) => (
             <Pressable
               key={'movement' in option ? option.movement : option.id}
               onPress={() => {
@@ -108,6 +119,7 @@ export function StepsPromptSheet({
 
 const styles = StyleSheet.create({
   scroll: { gap: 8, paddingBottom: 4 },
+  helper: { fontSize: 13, lineHeight: 18, paddingHorizontal: 2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 6 },
   chip: {
     flexDirection: 'row',
@@ -125,3 +137,15 @@ const styles = StyleSheet.create({
   backRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4, paddingTop: 6 },
   backLabel: { fontSize: 12.5, fontWeight: '700' },
 });
+
+function orderMovementOptions(options: MovementOption[], detectedActivityTypes: string[]): MovementOption[] {
+  const preferred = new Set<DayMovementKind>();
+  for (const raw of detectedActivityTypes) {
+    const activity = raw.toLowerCase();
+    if (/hike|hiking/.test(activity)) preferred.add('hike');
+    else if (/run|running|jog/.test(activity)) preferred.add('run');
+    else if (/walk|walking/.test(activity)) preferred.add('walk');
+    else if (/cycle|cycling|bike/.test(activity)) preferred.add('cycle');
+  }
+  return [...options].sort((left, right) => Number(preferred.has(right.movement)) - Number(preferred.has(left.movement)));
+}

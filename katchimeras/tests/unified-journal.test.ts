@@ -351,6 +351,10 @@ test('confirmed place locations persist once while non-place routes discard coor
     name: 'Natural History Museum',
     address: 'Cromwell Road, London',
     placeId: 'apple:natural-history-museum',
+    venueKey: 'provider:apple:natural-history-museum',
+    locality: null,
+    region: null,
+    countryCode: null,
     source: 'apple_maps' as const,
     accuracyMeters: null,
   };

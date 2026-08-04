@@ -1,4 +1,5 @@
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { canonicalFamilyId } from '@/constants/katchimera-skins';
 
 export type QuestJournalContextOption = {
   id: string;
@@ -85,22 +86,28 @@ const FAMILY_DEFAULTS: Partial<Record<KatchimeraFamilyId, QuestJournalRoute>> = 
   relicoon: { flowId: 'went_somewhere', initialChoiceId: 'museum', allowedChoiceIds: ['museum'] },
   encora: { flowId: 'studio', initialChoiceId: 'music', allowedChoiceIds: ['music'] },
   gatherglow: { flowId: 'people', initialChoiceId: 'someone_else', allowedChoiceIds: PEOPLE_CHOICES },
-  cheerlet: { flowId: 'work', initialChoiceId: 'progress', allowedChoiceIds: ['progress'] },
+  cheerlet: { flowId: 'big_event', initialChoiceId: 'achievement', allowedChoiceIds: ['achievement', 'milestone', 'firstTime'] },
   skylo: { flowId: 'went_somewhere', initialChoiceId: 'street', allowedChoiceIds: ['street', 'city', 'cafe', 'other_place'] },
   'coffee-ritual': { flowId: 'food', initialChoiceId: 'coffee', allowedChoiceIds: ['coffee', 'tea', 'drink'] },
+  baristabbit: { flowId: 'food', initialChoiceId: 'coffee', allowedChoiceIds: ['coffee', 'tea', 'drink'] },
   tasklet: { flowId: 'work', initialChoiceId: 'planning', allowedChoiceIds: ['focus', 'planning', 'admin', 'progress'] },
-  errandimp: { flowId: 'work', initialChoiceId: 'admin', allowedChoiceIds: ['admin'] },
-  dawnle: { flowId: 'general', initialChoiceId: 'ordinary', allowedChoiceIds: ['ordinary'] },
+  errandimp: { flowId: 'work', initialChoiceId: 'admin', allowedChoiceIds: ['admin', 'home_tasks'] },
+  dawnle: { flowId: 'general', initialChoiceId: 'morning', allowedChoiceIds: ['morning'] },
   mendle: { flowId: 'general', initialChoiceId: 'difficult', allowedChoiceIds: ['difficult'] },
   quietome: { flowId: 'people', initialChoiceId: 'solo', allowedChoiceIds: ['solo'] },
   bedrotte: { flowId: 'general', initialChoiceId: 'rest', allowedChoiceIds: ['rest'] },
   'sleep-rest': { flowId: 'general', initialChoiceId: 'rest', allowedChoiceIds: ['rest'] },
   steppling: { flowId: 'movement', initialChoiceId: 'walk', allowedChoiceIds: ['walk'] },
-  mossprout: { flowId: 'went_somewhere', initialChoiceId: 'park', allowedChoiceIds: ['park', 'garden', 'forest', 'beach', 'other_place'] },
+  mossprout: { flowId: 'went_somewhere', initialChoiceId: 'park', allowedChoiceIds: ['park', 'garden', 'forest'] },
   feastle: { flowId: 'food', initialChoiceId: 'meal', allowedChoiceIds: ['meal', 'snack', 'dessert', 'cooking', 'other_food'] },
   pagelet: { flowId: 'studio', initialChoiceId: 'book', allowedChoiceIds: ['book'] },
   vesperitt: { flowId: 'general', initialChoiceId: 'rest', allowedChoiceIds: ['rest'] },
   shellio: { flowId: 'went_somewhere', initialChoiceId: 'beach', allowedChoiceIds: ['beach'] },
+  heartmote: { flowId: 'people', initialChoiceId: 'partner', allowedChoiceIds: ['partner', 'family'] },
+  kindling: { flowId: 'people', initialChoiceId: 'group', allowedChoiceIds: ['group'] },
+  museling: { flowId: 'work', initialChoiceId: 'creative', allowedChoiceIds: ['creative'] },
+  pixooka: { flowId: 'studio', initialChoiceId: 'game', allowedChoiceIds: ['game'] },
+  voyagle: { flowId: 'went_somewhere', initialChoiceId: 'travel', allowedChoiceIds: ['travel', 'city', 'other_place'] },
 };
 
 /**
@@ -163,7 +170,10 @@ function familyRoute(input: QuestJournalTemplateInput): QuestJournalRoute | null
   if (id.includes('walk')) return { flowId: 'movement', initialChoiceId: 'walk', allowedChoiceIds: ['walk'] };
   if (id.includes('rest') || id.includes('recovery') || id.includes('night')) return { flowId: 'general', initialChoiceId: 'rest', allowedChoiceIds: ['rest'] };
   if (id.includes('progress') || id.includes('finish')) return { flowId: 'work', initialChoiceId: 'progress', allowedChoiceIds: ['progress'] };
-  return input.familyId ? FAMILY_DEFAULTS[input.familyId] ?? null : null;
+  const canonical = canonicalFamilyId(input.familyId);
+  return input.familyId
+    ? FAMILY_DEFAULTS[input.familyId] ?? (canonical ? FAMILY_DEFAULTS[canonical] ?? null : null)
+    : null;
 }
 
 function parseJournalRoutes(values?: readonly string[]): QuestJournalRoute | null {

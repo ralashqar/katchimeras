@@ -1,0 +1,227 @@
+{
+  "family": "heartmote",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/heartmote.png",
+    "../../assets/images/katchimeras/world/objects/photo/forest_heart.webp",
+    "../../assets/images/katchimeras/manual-journal/people.webp"
+  ],
+  "sheets": [
+    {
+      "input": "heartmote-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/heartmote-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "close-moments-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            310,
+            462
+          ]
+        },
+        {
+          "name": "close-moments-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            310,
+            0,
+            635,
+            462
+          ]
+        },
+        {
+          "name": "close-moments-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            635,
+            0,
+            923,
+            462
+          ]
+        },
+        {
+          "name": "close-moments-4",
+          "row": 0,
+          "column": 3,
+          "bounds": [
+            923,
+            0,
+            1254,
+            462
+          ]
+        },
+        {
+          "name": "appreciation-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            462,
+            312,
+            834
+          ]
+        },
+        {
+          "name": "appreciation-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            312,
+            462,
+            602,
+            834
+          ]
+        },
+        {
+          "name": "appreciation-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            602,
+            462,
+            915,
+            834
+          ]
+        },
+        {
+          "name": "appreciation-4",
+          "row": 1,
+          "column": 3,
+          "bounds": [
+            915,
+            462,
+            1254,
+            834
+          ]
+        },
+        {
+          "name": "family-goals-1",
+          "row": 2,
+          "column": 0,
+          "bounds": [
+            0,
+            834,
+            299,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-2",
+          "row": 2,
+          "column": 1,
+          "bounds": [
+            299,
+            834,
+            609,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-3",
+          "row": 2,
+          "column": 2,
+          "bounds": [
+            609,
+            834,
+            914,
+            1254
+          ]
+        }
+      ]
+    },
+    {
+      "input": "heartmote-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/heartmote-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "companion-quests-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            408,
+            602
+          ]
+        },
+        {
+          "name": "companion-quests-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            408,
+            0,
+            818,
+            602
+          ]
+        },
+        {
+          "name": "companion-quests-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            818,
+            0,
+            1254,
+            602
+          ]
+        },
+        {
+          "name": "journey-goals-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            602,
+            374,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            374,
+            602,
+            777,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            777,
+            602,
+            1254,
+            1254
+          ]
+        }
+      ]
+    }
+  ]
+}

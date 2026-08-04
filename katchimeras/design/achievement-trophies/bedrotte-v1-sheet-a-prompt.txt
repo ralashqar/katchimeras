@@ -1,0 +1,11 @@
+Create a production sprite sheet of twelve isolated Katchimeras achievement keepsakes in an EXACT 4 columns by 3 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Bedrotte palette: oatmeal, biscuit beige, peach, dusty rose-brown, quilted fabric, pillowy felt, pale wood, matte ceramic, and small warm-gold details. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #ff00ff background. Repeat: EXACT 4-by-3 grid, twelve cells. Exactly one compact connected keepsake per cell, centered, no more than 68% occupancy, with at least 10% uninterrupted pure-magenta gutter on every side and clear gutters between cells. Complete bases fully visible. Nothing touches a boundary. No cast or contact shadows, floor, reflections, scenery, text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges.
+
+Row 1, left to right — REST DAYS progression tiers I–IV. Use the same cozy nest-bed keepsake: tier I is a small round quilted cushion with one folded blanket; tier II adds a tasselled pillow; tier III becomes a compact layered nest with two pillows and a warm nightlight; tier IV is a richly quilted but compact rest nook with canopy-like folded blanket, three pillows, tiny lantern, and warm gold stitching. Keep later tiers inside the same visual footprint.
+
+Row 2, left to right — RESTED MORNINGS progression tiers I–IV. Use the same sunlit bedside keepsake: tier I is a low pale-wood bedside tray with a peach cup and tiny dawn disc; tier II adds a folded eye mask and one soft sun ray ornament; tier III adds a small rounded window frame with warm dawn glow and a neatly folded blanket; tier IV is a compact complete morning-rest vignette with rounded dawn window, cup, eye mask, folded blanket, and gold sunrise inlay, all on one connected base.
+
+Row 3, left to right — GOALS progression tiers I–IV. Use the same moon-and-blanket token: tier I is a small round quilted token with one crescent-shaped stitched inset; tier II adds a tassel and pale wooden rim; tier III becomes a standing padded crest with crescent, pillow fold, and warm glow; tier IV is an ornate mastery crest with layered quilt, tassels, and gold trim. Tier IV is generation-only.
+
+Keep silhouettes chunky, calm, readable at 80 pixels, similar in mass, and fully isolated.

@@ -64,6 +64,8 @@ const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 
 const lifeAspectsPath = transpileToTemp('constants/life-aspects.ts', 'life-aspects.js');
 const katchimeraSkinsPath = transpileToTemp('constants/katchimera-skins.ts', 'katchimera-skins.js');
 const katchimeraIdentityPath = transpileToTemp('utils/katchimera-identity.ts', 'katchimera-identity.js');
+const journalAffinitiesPath = transpileToTemp('constants/katchimera-journal-affinities.ts', 'katchimera-journal-affinities.js');
+const journalContributionsPath = transpileToTemp('utils/journal-hatch-contributions.ts', 'journal-hatch-contributions.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const hatchPastPath = transpileToTemp('utils/hatch-your-past.ts', 'hatch-your-past.js');
 
@@ -89,6 +91,8 @@ const stubs = {
   '@/utils/intelligence/question-registry': questionRegistryPath,
   '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
   '@/utils/katchimera-identity': katchimeraIdentityPath,
+  '@/constants/katchimera-journal-affinities': journalAffinitiesPath,
+  '@/utils/journal-hatch-contributions': journalContributionsPath,
   '@/utils/encounter-engine': enginePath,
   '@/types/home': {},
   '@/types/katchimera': {},

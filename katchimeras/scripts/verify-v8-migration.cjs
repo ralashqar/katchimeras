@@ -104,7 +104,7 @@ const upgradedFromV11 = upgradeStoredHomeState({
 });
 const currentState = upgradeStoredHomeState({
   ...oldState,
-  version: 12,
+  version: 17,
   archivedDays: [{
     ...day,
     classifiedMemories: day.classifiedMemories.map((memory) => ({ ...memory, schemaVersion: 6 })),
@@ -115,9 +115,10 @@ function check(label, condition) {
   if (condition) console.log(`  ok  ${label}`);
   else { failures += 1; console.log(`FAIL  ${label}`); }
 }
-check('v9 upgrades to v17', upgraded.version === 17);
-check('v10 upgrades losslessly to v17', upgradedFromV10.version === 17 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
-check('v11 journals migrate to canonical records', upgradedFromV11.version === 17 && upgradedFromV11.today.journalRecords.length === 2);
+check('v9 upgrades to v18', upgraded.version === 18);
+check('v10 upgrades losslessly to v18', upgradedFromV10.version === 18 && upgradedFromV10.today.id === oldState.today.id && upgradedFromV10.archivedDays.length === oldState.archivedDays.length);
+check('v11 journals migrate to canonical records', upgradedFromV11.version === 18 && upgradedFromV11.today.journalRecords.length === 2);
+check('v17 upgrades losslessly and does not invent a key moment', currentState.version === 18 && currentState.archivedDays[0].keyJournalRecordId == null);
 check('legacy creatures gain stable family identity',
   upgraded.archivedDays[0].creature.aspectId === 'pet-companionship'
     && upgraded.archivedDays[0].creature.familyId === 'waglet'
@@ -138,5 +139,5 @@ check('legacy hatch waits for enrichment before storing sky', upgraded.archivedD
 check('prompt answer survives', upgraded.archivedDays[0].promptAnswers[0].choiceIds[0] === 'calm');
 check('location survives', upgraded.archivedDays[0].locations[0].id === 'loc-1');
 
-console.log(failures ? `\n${failures} v17 migration check(s) FAILED.` : '\nAll v17 migration checks passed.');
+console.log(failures ? `\n${failures} v18 migration check(s) FAILED.` : '\nAll v18 migration checks passed.');
 process.exit(failures ? 1 : 0);

@@ -1,0 +1,227 @@
+{
+  "family": "gatherglow",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/gatherglow.png",
+    "../../assets/images/katchimeras/world/objects/photo/gathering_table.webp",
+    "../../assets/images/katchimeras/manual-journal/people.webp"
+  ],
+  "sheets": [
+    {
+      "input": "gatherglow-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/gatherglow-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "friend-moments-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            305,
+            412
+          ]
+        },
+        {
+          "name": "friend-moments-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            305,
+            0,
+            612,
+            412
+          ]
+        },
+        {
+          "name": "friend-moments-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            612,
+            0,
+            920,
+            412
+          ]
+        },
+        {
+          "name": "friend-moments-4",
+          "row": 0,
+          "column": 3,
+          "bounds": [
+            920,
+            0,
+            1254,
+            412
+          ]
+        },
+        {
+          "name": "gatherings-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            412,
+            298,
+            839
+          ]
+        },
+        {
+          "name": "gatherings-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            298,
+            412,
+            600,
+            839
+          ]
+        },
+        {
+          "name": "gatherings-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            600,
+            412,
+            918,
+            839
+          ]
+        },
+        {
+          "name": "gatherings-4",
+          "row": 1,
+          "column": 3,
+          "bounds": [
+            918,
+            412,
+            1254,
+            839
+          ]
+        },
+        {
+          "name": "family-goals-1",
+          "row": 2,
+          "column": 0,
+          "bounds": [
+            0,
+            839,
+            285,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-2",
+          "row": 2,
+          "column": 1,
+          "bounds": [
+            285,
+            839,
+            584,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-3",
+          "row": 2,
+          "column": 2,
+          "bounds": [
+            584,
+            839,
+            913,
+            1254
+          ]
+        }
+      ]
+    },
+    {
+      "input": "gatherglow-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/gatherglow-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "companion-quests-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            378,
+            634
+          ]
+        },
+        {
+          "name": "companion-quests-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            378,
+            0,
+            806,
+            634
+          ]
+        },
+        {
+          "name": "companion-quests-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            806,
+            0,
+            1254,
+            634
+          ]
+        },
+        {
+          "name": "journey-goals-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            634,
+            363,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            363,
+            634,
+            762,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            762,
+            634,
+            1254,
+            1254
+          ]
+        }
+      ]
+    }
+  ]
+}

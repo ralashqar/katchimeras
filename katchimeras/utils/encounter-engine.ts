@@ -24,10 +24,11 @@ import {
   historyEntryForFamily,
   identityForEncounter,
 } from '@/utils/katchimera-identity';
+import { aggregateJournalHatchSignals, type JournalHatchEvidenceRef } from '@/utils/journal-hatch-contributions';
 
 // Where a signal came from — drives Hatch Engine v2 weighting (explicit
 // moment/prompt input counts as "intent") and the day-tag field's grouping.
-export type EncounterSignalSource = 'place' | 'vision' | 'prompt' | 'moment' | 'passive';
+export type EncounterSignalSource = 'place' | 'vision' | 'prompt' | 'moment' | 'journal' | 'passive';
 
 export type EncounterSignal = {
   seedId: string;
@@ -35,6 +36,7 @@ export type EncounterSignal = {
   sourceMomentIds: string[];
   isRecovery: boolean;
   source: EncounterSignalSource;
+  journalEvidence?: JournalHatchEvidenceRef[];
 };
 
 export type EncounterMatch = {
@@ -107,6 +109,21 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
       sourceMomentIds: [],
       isRecovery: false,
       source: assignment.confirmed ? 'prompt' : 'vision',
+    });
+  });
+
+  // Canonical manual-journal routes are stronger and more precise than the
+  // compatibility classification projection. Aggregate them with diminishing
+  // returns so several honest memories can reinforce a theme without making
+  // repeated taps an unlimited hatch multiplier.
+  aggregateJournalHatchSignals(day).forEach((journalSignal) => {
+    signals.push({
+      seedId: journalSignal.seedId,
+      intensity: journalSignal.intensity,
+      sourceMomentIds: [],
+      isRecovery: journalSignal.familyId === 'bedrotte' || journalSignal.familyId === 'mendle',
+      source: 'journal',
+      journalEvidence: journalSignal.evidence,
     });
   });
 
@@ -201,7 +218,9 @@ export function extractEncounterSignals(day: StoredHomeDayRecord): EncounterSign
   } else if (day.stepsCount >= HIGH_STEPS_THRESHOLD) {
     signals.push({
       seedId: 'high_steps_day',
-      intensity: clamp01(0.5 + Math.min((day.stepsCount - HIGH_STEPS_THRESHOLD) / 9000, 0.3)),
+      // Keep distinguishing a solid walking day from an exceptional one. The
+      // previous curve saturated around 9.2k, making 20k steps no stronger.
+      intensity: highStepsSignalIntensity(day.stepsCount),
       sourceMomentIds: [],
       isRecovery: false,
       source: 'passive',
@@ -320,7 +339,7 @@ export function extractEncounterCandidates(
   history: EncounterHistoryMap
 ): EncounterCandidate[] {
   const byFamily = new Map<KatchimeraFamilyId, EncounterCandidate>();
-  const intentSources: EncounterSignalSource[] = ['moment', 'prompt'];
+  const intentSources: EncounterSignalSource[] = ['moment', 'prompt', 'journal'];
 
   for (const signal of extractEncounterSignals(day)) {
     const castEntry = encounterCastBySeedId.get(signal.seedId);
@@ -335,6 +354,29 @@ export function extractEncounterCandidates(
 
     const existing = byFamily.get(identity.familyId);
     if (existing) {
+      if (signal.source === 'journal' || existing.signal.source === 'journal') {
+        const journalSignal = signal.source === 'journal' ? signal : existing.signal;
+        byFamily.set(identity.familyId, {
+          ...(signal.intensity > existing.signal.intensity ? {
+            castEntry,
+            profile,
+            aspectId: identity.aspectId,
+            familyId: identity.familyId,
+            companionId: identity.companionId,
+            skinId: identity.skinId,
+            repeatDepth: existing.repeatDepth,
+            lastSeenIsoDate: existing.lastSeenIsoDate,
+            rarityFloor: speciesRarityFloor(profile.baseRarity),
+          } : existing),
+          signal: {
+            ...journalSignal,
+            intensity: Math.max(signal.intensity, existing.signal.intensity),
+            isRecovery: signal.isRecovery || existing.signal.isRecovery,
+            sourceMomentIds: [...new Set([...existing.signal.sourceMomentIds, ...signal.sourceMomentIds])],
+          },
+        });
+        continue;
+      }
       const strongerIntensity = signal.intensity > existing.signal.intensity;
       const sameIntensityButExplicit =
         signal.intensity === existing.signal.intensity &&
@@ -811,6 +853,19 @@ function groupMomentIdsByType(day: StoredHomeDayRecord) {
 
 function clamp01(value: number) {
   return Math.min(Math.max(value, 0), 1);
+}
+
+function highStepsSignalIntensity(steps: number): number {
+  if (steps <= HIGH_STEPS_THRESHOLD) return 0.5;
+  if (steps <= 10_000) return lerp(0.5, 0.62, (steps - HIGH_STEPS_THRESHOLD) / (10_000 - HIGH_STEPS_THRESHOLD));
+  if (steps <= 15_000) return lerp(0.62, 0.72, (steps - 10_000) / 5_000);
+  if (steps <= 20_000) return lerp(0.72, 0.82, (steps - 15_000) / 5_000);
+  if (steps <= 25_000) return lerp(0.82, 0.9, (steps - 20_000) / 5_000);
+  return Math.min(0.98, 0.9 + ((steps - 25_000) / 10_000) * 0.08);
+}
+
+function lerp(from: number, to: number, progress: number): number {
+  return from + (to - from) * Math.min(Math.max(progress, 0), 1);
 }
 
 function stableHash(input: string) {

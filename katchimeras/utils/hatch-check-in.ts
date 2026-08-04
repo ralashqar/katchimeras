@@ -9,6 +9,7 @@ import type {
   ManualJournalEntry,
   StoredHomeDayRecord,
 } from '@/types/home';
+import { KATCHIMERA_JOURNAL_AFFINITIES, journalAffinitiesFor } from '@/constants/katchimera-journal-affinities';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
 
 export type HatchCheckInAnswerKind = 'flow' | 'category' | 'moment' | 'meaning';
@@ -23,6 +24,8 @@ export type HatchCheckInChoice = {
 export type HatchReflectionMoment = HatchCheckInChoice & {
   flowId: string;
   categoryId: string | null;
+  seedId?: string | null;
+  source?: 'journal' | 'confirmed_place' | 'detected_place' | 'photo' | 'health' | 'steps' | 'legacy';
 };
 
 export type HatchCheckInQuestion = {
@@ -50,10 +53,10 @@ export const HATCH_CHECK_IN_FLOWS: HatchCheckInChoice[] = [
 const DETAIL_IDS: Record<string, string[]> = {
   people: ['partner', 'my_child', 'family', 'friends', 'solo', 'pet'],
   food: ['meal', 'snack', 'dessert', 'coffee', 'drink', 'cooking'],
-  went_somewhere: ['home', 'park', 'cafe', 'restaurant', 'museum', 'travel'],
-  movement: ['walk', 'run', 'workout', 'sport', 'commute', 'travel'],
-  studio: ['book', 'film', 'show', 'game', 'music', 'other_media'],
-  work: ['focus', 'office', 'learning', 'creative', 'admin', 'progress'],
+  went_somewhere: ['park', 'city', 'beach', 'forest', 'garden', 'museum', 'cafe', 'restaurant', 'cinema', 'home', 'travel'],
+  movement: ['walk', 'run', 'hike', 'cycle', 'workout', 'sport', 'errands', 'commute', 'travel', 'mixed'],
+  studio: ['book', 'film', 'show', 'game', 'music', 'podcast', 'art', 'other_media'],
+  work: ['focus', 'office', 'learning', 'planning', 'creative', 'admin', 'home_tasks', 'progress'],
   big_event: ['birthday', 'trip', 'achievement', 'wedding', 'newJob', 'milestone'],
   general: ['highlight', 'difficult', 'gratitude', 'new', 'rest', 'ordinary'],
 };
@@ -125,25 +128,39 @@ const MEANING_BIAS: Record<string, { scores: Partial<DayScores>; tags: string[] 
   difficult: { scores: { calm: 0.04 }, tags: ['meaning:difficult', 'tender_day'] },
 };
 
-const CATEGORY_SEED: Record<string, string> = {
-  'movement.workout': 'gym_day', 'movement.sport': 'gym_day', 'movement.run': 'high_steps_day', 'movement.travel': 'high_steps_day',
-  'studio.book': 'bookstore', 'studio.game': 'gaming_session', 'studio.music': 'live_music', 'work.creative': 'creative_day',
-  'went_somewhere.cafe': 'coffee_shop', 'went_somewhere.restaurant': 'feast', 'went_somewhere.home': 'home_evening',
-};
-
 export function hatchCheckInEligibility(day: StoredHomeDayRecord): HatchCheckInEligibilityReason | null {
   if (day.hatchCheckIn) return day.hatchCheckIn.status === 'in_progress' ? day.hatchCheckIn.eligibilityReason : null;
   if (day.devHatchReflectionMode === 'force_low_signal') return 'empty';
-  const moments = hatchReflectionMoments(day);
-  if (moments.length >= 3 || new Set(moments.map((item) => item.flowId)).size >= 2) return 'rich';
-  if (moments.length > 0) return 'regular';
+  const authored = journalReflectionMoments(day);
+  if (authored.length >= 3 || new Set(authored.map((item) => item.flowId)).size >= 2) return 'rich';
+  if (authored.length > 0) return 'regular';
+  if (hatchReflectionMoments(day).length > 0) return 'thin';
   const lightweightCount = day.promptAnswers.filter((answer) => !answer.dismissed).length +
     day.moments.filter((moment) => moment.type !== 'photo' && moment.type !== 'inspiration').length + (day.sleep ? 1 : 0);
   return lightweightCount === 0 ? 'empty' : 'thin';
 }
 
 export function buildHatchCheckInPlan(day: StoredHomeDayRecord, reason: HatchCheckInEligibilityReason) {
+  if (day.devHatchReflectionMode === 'force_low_signal') {
+    return { mode: 'reconstruct' as const, questionPlan: ['reconstruct.focus', 'reconstruct.category', 'reflection.meaning'], anchor: null };
+  }
   const moments = hatchReflectionMoments(day);
+  const authored = journalReflectionMoments(day);
+  if (authored.length > 0) {
+    const anchor = authored.length === 1 ? authored[0] : null;
+    return {
+      mode: 'reflect' as const,
+      questionPlan: authored.length > 1 ? ['reflection.moment', 'reflection.meaning'] : ['reflection.meaning'],
+      anchor,
+    };
+  }
+  if (moments.length > 0) {
+    return {
+      mode: 'reflect' as const,
+      questionPlan: ['reflection.moment', 'evidence.category', 'reflection.meaning'],
+      anchor: null,
+    };
+  }
   if (reason === 'empty' || reason === 'thin') {
     return { mode: 'reconstruct' as const, questionPlan: ['reconstruct.focus', 'reconstruct.category', 'reflection.meaning'], anchor: null };
   }
@@ -175,15 +192,17 @@ export function currentHatchCheckInQuestion(day: StoredHomeDayRecord): HatchChec
       suggestedId: suggested,
     };
   }
-  if (questionId === 'reconstruct.category') {
+  if (questionId === 'reconstruct.category' || questionId === 'evidence.category') {
     return { ...common, kind: 'category', title: detailTitle(checkIn.flowId), choices: hatchCheckInDetailChoices(checkIn.flowId), suggestedId: null };
   }
   if (questionId === 'reflection.moment') {
     return {
       ...common,
       kind: 'moment',
-      title: 'What stayed with you most?',
-      subtitle: 'Choose the moment that best holds the day.',
+      title: journalReflectionMoments(day).length > 0 ? 'What shaped this day most?' : 'What best holds this day?',
+      subtitle: journalReflectionMoments(day).length > 0
+        ? 'Choose one moment. We will not add another journal entry.'
+        : 'These are private, on-device clues. You decide what mattered.',
       choices: hatchReflectionMoments(day),
       suggestedId: null,
     };
@@ -214,13 +233,15 @@ export function hatchCheckInMeaningChoices(flowId: string | null): HatchCheckInC
 }
 
 export function rankedHatchCheckInFlows(day: StoredHomeDayRecord): HatchCheckInChoice[] {
+  if (day.devHatchReflectionMode === 'force_low_signal') return HATCH_CHECK_IN_FLOWS;
   const suggested = suggestedHatchCheckInFlow(day);
   return suggested ? [...HATCH_CHECK_IN_FLOWS].sort((a, b) => Number(b.id === suggested) - Number(a.id === suggested)) : HATCH_CHECK_IN_FLOWS;
 }
 
 export function suggestedHatchCheckInFlow(day: StoredHomeDayRecord): string | null {
-  if (day.stepsCount >= 6000) return 'movement';
-  if (day.newPlaceCount > 0 || day.visitedPlaceCount > 1 || day.locations.length > 1) return 'went_somewhere';
+  if (day.devHatchReflectionMode === 'force_low_signal') return null;
+  const candidate = hatchReflectionMoments(day)[0];
+  if (candidate) return candidate.flowId;
   const concepts = new Set((day.vision?.concepts ?? []).map((item) => item.name.replaceAll('_', ' ').toLowerCase()));
   if (['food', 'meal', 'dish', 'coffee'].some((item) => concepts.has(item))) return 'food';
   if (['book', 'television', 'film', 'music', 'computer monitor'].some((item) => concepts.has(item))) return 'studio';
@@ -228,6 +249,7 @@ export function suggestedHatchCheckInFlow(day: StoredHomeDayRecord): string | nu
 }
 
 export function hatchCheckInEvidenceLine(day: StoredHomeDayRecord): string | null {
+  if (day.devHatchReflectionMode === 'force_low_signal') return null;
   const parts: string[] = [];
   if (day.stepsCount >= 1000) parts.push(`${day.stepsCount.toLocaleString()} steps`);
   const places = Math.max(day.visitedPlaceCount, day.newPlaceCount);
@@ -236,23 +258,62 @@ export function hatchCheckInEvidenceLine(day: StoredHomeDayRecord): string | nul
 }
 
 export function hatchReflectionMoments(day: StoredHomeDayRecord): HatchReflectionMoment[] {
-  const canonical = day.journalRecords ?? [];
-  if (canonical.length > 0) {
-    const records = canonical
-      .filter(isHatchReflectionJournalRecord)
-      .map(momentFromJournalRecord);
-    return uniqueMoments(records).slice(0, 6);
+  // Developer replay mode deliberately exercises the zero-evidence branch.
+  // Preserve the real day in storage, but do not let journal, place, photo,
+  // Health, or steps evidence leak into its questionnaire choices.
+  if (day.devHatchReflectionMode === 'force_low_signal') return [];
+  const authored = journalReflectionMoments(day);
+  const sensor: HatchReflectionMoment[] = [];
+
+  for (const item of day.confirmedPlaces ?? []) {
+    const categoryId = placeCategory(item.category, item.label);
+    if (categoryId) sensor.push(candidateChoice(`place:${item.id}`, item.name || item.label, 'went_somewhere', categoryId, 'mappin.and.ellipse', 'confirmed_place'));
   }
-  const manual = day.manualJournalEntries ?? [];
-  if (manual.length > 0) return uniqueMoments(manual.map(momentFromManualEntry)).slice(0, 6);
+  for (const seedId of day.placeCategorySeeds ?? []) {
+    const route = canonicalRouteForSeed(seedId);
+    if (route) sensor.push(candidateChoice(`detected:${seedId}`, routeLabel(route.flowId, route.categoryId), route.flowId, route.categoryId, 'mappin.and.ellipse', 'detected_place', seedId));
+  }
+  for (const concept of day.vision?.concepts ?? []) {
+    const route = routeForVisionConcept(concept.name);
+    if (route) sensor.push(candidateChoice(`photo:${route.flowId}:${route.categoryId}`, routeLabel(route.flowId, route.categoryId), route.flowId, route.categoryId, 'camera.fill', 'photo'));
+  }
+  for (const segment of day.exactRouteSegments ?? []) {
+    const movement = routeMovementCategory(segment.activityType);
+    if (movement) sensor.push(candidateChoice(`health:${segment.id}`, routeLabel('movement', movement.categoryId), 'movement', movement.categoryId, 'figure.walk', 'health', movement.seedId));
+  }
+  if ((day.stepsCount ?? 0) >= 6_500) {
+    sensor.push(candidateChoice('steps:significant', `${day.stepsCount.toLocaleString()} steps`, 'movement', null, 'figure.walk', 'steps', 'high_steps_day'));
+  }
+
   const legacy: HatchReflectionMoment[] = [];
-  for (const item of day.bigMoments ?? []) legacy.push(momentChoice(`big:${item.id}`, item.label, 'big_event', item.type, 'sparkles'));
-  for (const item of day.confirmedPlaces ?? []) legacy.push(momentChoice(`place:${item.id}`, item.label, 'went_somewhere', null, 'mappin.and.ellipse'));
-  for (const item of day.foodMoments ?? []) if (item.source === 'manual') legacy.push(momentChoice(`food:${item.id}`, item.label, 'food', null, 'fork.knife'));
-  for (const item of day.studioMoments ?? []) if (item.source === 'manual') legacy.push(momentChoice(`studio:${item.id}`, item.label, 'studio', item.mediaType, 'book.fill'));
-  for (const item of day.notes ?? []) legacy.push(momentChoice(`note:${item.id}`, item.label || 'A note', 'general', null, 'note.text'));
-  if (day.stepsInterpretation) legacy.push(momentChoice('movement:steps', day.stepsInterpretation.label, 'movement', day.stepsInterpretation.movement, 'figure.walk'));
-  return uniqueMoments(legacy).slice(0, 6);
+  const canUseLegacy = (day.journalRecords ?? []).length === 0 && (day.manualJournalEntries ?? []).length === 0;
+  if (canUseLegacy) {
+    for (const item of day.bigMoments ?? []) legacy.push(momentChoice(`big:${item.id}`, item.label, 'big_event', item.type, 'sparkles'));
+    for (const item of day.foodMoments ?? []) if (item.source === 'manual') legacy.push(momentChoice(`food:${item.id}`, item.label, 'food', null, 'fork.knife'));
+    for (const item of day.studioMoments ?? []) if (item.source === 'manual') legacy.push(momentChoice(`studio:${item.id}`, item.label, 'studio', item.mediaType, 'book.fill'));
+    for (const item of day.notes ?? []) legacy.push(momentChoice(`note:${item.id}`, item.label || 'A note', 'general', null, 'note.text'));
+    if (day.stepsInterpretation && !authored.some((item) => item.flowId === 'movement')) legacy.push(momentChoice('movement:steps', day.stepsInterpretation.label, 'movement', day.stepsInterpretation.movement, 'figure.walk'));
+  }
+
+  const seenRoutes = new Set(authored.map(routeKey));
+  const dedupedSensor = [...sensor, ...legacy].filter((item) => {
+    const key = routeKey(item);
+    if (seenRoutes.has(key)) return false;
+    seenRoutes.add(key);
+    return true;
+  });
+  return [...authored, ...dedupedSensor].slice(0, 6);
+}
+
+function journalReflectionMoments(day: StoredHomeDayRecord): HatchReflectionMoment[] {
+  const canonical = (day.journalRecords ?? []).filter(isHatchReflectionJournalRecord).map(momentFromJournalRecord);
+  const manual = (day.journalRecords ?? []).length === 0 ? (day.manualJournalEntries ?? []).map(momentFromManualEntry) : [];
+  return uniqueMoments([...canonical, ...manual]).map((item) => {
+    if (item.flowId === 'movement' && (day.stepsCount ?? 0) >= 6_500 && !item.label.includes('steps')) {
+      return { ...item, label: `${item.label} · ${day.stepsCount.toLocaleString()} steps` };
+    }
+    return item;
+  }).slice(0, 6);
 }
 
 export function repairGeneratedHatchCheckInAnchor(day: StoredHomeDayRecord): StoredHomeDayRecord {
@@ -283,6 +344,7 @@ export function repairGeneratedHatchCheckInAnchor(day: StoredHomeDayRecord): Sto
         : null,
       anchorId: anchor?.id ?? null,
       anchorLabel: anchor?.label ?? null,
+      anchorSeedId: anchor?.seedId ?? null,
       meaningId: null,
       meaningLabel: null,
       semanticTags: [],
@@ -301,7 +363,7 @@ function isHatchReflectionJournalRecord(record: JournalRecord): boolean {
   return true;
 }
 
-export function resolveHatchCheckInSignals(input: Pick<HatchCheckIn, 'flowId' | 'categoryId' | 'meaningId'>) {
+export function resolveHatchCheckInSignals(input: Pick<HatchCheckIn, 'flowId' | 'categoryId' | 'meaningId' | 'anchorSeedId'>) {
   const scoreBias: Partial<DayScores> = {};
   const semanticTags: string[] = [];
   const encounterSeedBias: DayPromptEncounterBias[] = [];
@@ -320,10 +382,13 @@ export function resolveHatchCheckInSignals(input: Pick<HatchCheckIn, 'flowId' | 
     addScores(meaning.scores);
     semanticTags.push(...meaning.tags);
   }
-  const categorySeed = input.flowId && input.categoryId ? CATEGORY_SEED[`${input.flowId}.${input.categoryId}`] : null;
-  if (categorySeed && focus) {
-    const existing = encounterSeedBias.find((bias) => bias.seedId === focus.seed.seedId);
-    if (existing) existing.seedId = categorySeed;
+  const affinity = input.flowId && input.categoryId
+    ? journalAffinitiesFor(input.flowId, input.categoryId).find((item) => item.role === 'primary')
+      ?? journalAffinitiesFor(input.flowId, input.categoryId)[0]
+    : null;
+  const categorySeed = input.anchorSeedId ?? affinity?.seedId ?? null;
+  if (categorySeed) {
+    encounterSeedBias.splice(0, encounterSeedBias.length, { seedId: categorySeed, intensity: 0.58 });
   }
   return { scoreBias, semanticTags: [...new Set(semanticTags)], encounterSeedBias: mergeEncounterBias(encounterSeedBias) };
 }
@@ -337,11 +402,11 @@ export function hatchCheckInIsComplete(day: StoredHomeDayRecord): boolean {
 }
 
 function momentFromJournalRecord(record: JournalRecord): HatchReflectionMoment {
-  return momentFromEntry(record, record.id);
+  return { ...momentFromEntry(record, record.id), source: 'journal' };
 }
 
 function momentFromManualEntry(entry: ManualJournalEntry): HatchReflectionMoment {
-  return momentFromEntry(entry, entry.id);
+  return { ...momentFromEntry(entry, entry.id), source: 'journal' };
 }
 
 function momentFromEntry(entry: Pick<JournalRecord, 'flowId' | 'categoryId' | 'fields'>, id: string): HatchReflectionMoment {
@@ -355,6 +420,73 @@ function momentFromEntry(entry: Pick<JournalRecord, 'flowId' | 'categoryId' | 'f
 
 function momentChoice(id: string, label: string, flowId: string, categoryId: string | null, icon: IconSymbolName): HatchReflectionMoment {
   return { id, label, flowId, categoryId, icon, accent: flowAccent(flowId) };
+}
+
+function candidateChoice(
+  id: string,
+  label: string,
+  flowId: string,
+  categoryId: string | null,
+  icon: IconSymbolName,
+  source: NonNullable<HatchReflectionMoment['source']>,
+  seedId?: string | null
+): HatchReflectionMoment {
+  return { ...momentChoice(id, label, flowId, categoryId, icon), source, seedId: seedId ?? canonicalSeed(flowId, categoryId) };
+}
+
+function canonicalSeed(flowId: string, categoryId: string | null): string | null {
+  if (!categoryId) return null;
+  return journalAffinitiesFor(flowId, categoryId).find((item) => item.role === 'primary')?.seedId
+    ?? journalAffinitiesFor(flowId, categoryId)[0]?.seedId
+    ?? null;
+}
+
+function canonicalRouteForSeed(seedId: string): { flowId: string; categoryId: string } | null {
+  const affinity = KATCHIMERA_JOURNAL_AFFINITIES.find((item) => item.seedId === seedId && item.role === 'primary');
+  return affinity ? { flowId: affinity.flowId, categoryId: affinity.categoryId } : null;
+}
+
+function routeForVisionConcept(raw: string): { flowId: string; categoryId: string } | null {
+  const value = raw.replaceAll('_', ' ').toLowerCase();
+  const routes: Array<[RegExp, string, string]> = [
+    [/museum|gallery|exhibition|sculpture|artifact|artwork/, 'went_somewhere', 'museum'],
+    [/beach|coast|ocean|seaside|shore/, 'went_somewhere', 'beach'],
+    [/forest|woodland|trail/, 'went_somewhere', 'forest'],
+    [/park|green space/, 'went_somewhere', 'park'],
+    [/city|town|street|urban/, 'went_somewhere', 'city'],
+    [/cafe|coffee shop/, 'went_somewhere', 'cafe'],
+    [/restaurant/, 'went_somewhere', 'restaurant'],
+    [/cinema|movie theater/, 'went_somewhere', 'cinema'],
+    [/meal|food|dish/, 'food', 'meal'],
+    [/book/, 'studio', 'book'],
+    [/film|movie|television/, 'studio', 'film'],
+  ];
+  const match = routes.find(([pattern]) => pattern.test(value));
+  return match ? { flowId: match[1], categoryId: match[2] } : null;
+}
+
+function routeMovementCategory(activityType: string): { categoryId: string; seedId: string } | null {
+  if (/swim/i.test(activityType)) return { categoryId: 'sport', seedId: 'beach' };
+  if (/hike/i.test(activityType)) return { categoryId: 'hike', seedId: 'high_steps_day' };
+  if (/run|jog/i.test(activityType)) return { categoryId: 'run', seedId: 'run_session' };
+  if (/cycl|bike/i.test(activityType)) return { categoryId: 'cycle', seedId: 'gym_day' };
+  if (/walk/i.test(activityType)) return { categoryId: 'walk', seedId: 'high_steps_day' };
+  return null;
+}
+
+function placeCategory(category: string, label: string): string | null {
+  const value = `${category} ${label}`.replaceAll('_', ' ').toLowerCase();
+  return routeForVisionConcept(value)?.flowId === 'went_somewhere'
+    ? routeForVisionConcept(value)?.categoryId ?? null
+    : manualJournalFlow('went_somewhere')?.choices.some((item) => item.id === category) ? category : null;
+}
+
+function routeLabel(flowId: string, categoryId: string): string {
+  return manualJournalFlow(flowId)?.choices.find((item) => item.id === categoryId)?.label ?? 'A moment from your day';
+}
+
+function routeKey(item: HatchReflectionMoment): string {
+  return `${item.flowId}:${item.categoryId ?? item.seedId ?? item.id}`;
 }
 
 function uniqueMoments(items: HatchReflectionMoment[]): HatchReflectionMoment[] {

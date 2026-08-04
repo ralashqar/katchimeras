@@ -1,0 +1,149 @@
+{
+  "family": "errandimp",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/errandimp.png",
+    "../../assets/images/katchimeras/manual-journal/went_somewhere.webp",
+    "../../assets/images/katchimeras/world/objects/notes_stack/notes_stack_04.png"
+  ],
+  "sheets": [
+    {
+      "input": "errandimp-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/errandimp-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "columnCuts": [
+          0,
+        389,
+        762,
+        1114,
+          1536
+        ],
+        "rowCuts": [
+          0,
+        510,
+        959,
+          1536
+        ]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "admin-1",
+          "row": 0,
+          "column": 0
+        },
+        {
+          "name": "admin-2",
+          "row": 0,
+          "column": 1
+        },
+        {
+          "name": "admin-3",
+          "row": 0,
+          "column": 2
+        },
+        {
+          "name": "admin-4",
+          "row": 0,
+          "column": 3
+        },
+        {
+          "name": "errands-1",
+          "row": 1,
+          "column": 0
+        },
+        {
+          "name": "errands-2",
+          "row": 1,
+          "column": 1
+        },
+        {
+          "name": "errands-3",
+          "row": 1,
+          "column": 2
+        },
+        {
+          "name": "errands-4",
+          "row": 1,
+          "column": 3
+        },
+        {
+          "name": "family-goals-1",
+          "row": 2,
+          "column": 0
+        },
+        {
+          "name": "family-goals-2",
+          "row": 2,
+          "column": 1
+        },
+        {
+          "name": "family-goals-3",
+          "row": 2,
+          "column": 2
+        }
+      ]
+    },
+    {
+      "input": "errandimp-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/errandimp-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2,
+        "columnCuts": [
+          0,
+        460,
+        966,
+          1536
+        ],
+        "rowCuts": [
+          0,
+        750,
+          1536
+        ]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "companion-quests-1",
+          "row": 0,
+          "column": 0
+        },
+        {
+          "name": "companion-quests-2",
+          "row": 0,
+          "column": 1
+        },
+        {
+          "name": "companion-quests-3",
+          "row": 0,
+          "column": 2
+        },
+        {
+          "name": "journey-goals-1",
+          "row": 1,
+          "column": 0
+        },
+        {
+          "name": "journey-goals-2",
+          "row": 1,
+          "column": 1
+        },
+        {
+          "name": "journey-goals-3",
+          "row": 1,
+          "column": 2
+        }
+      ]
+    }
+  ]
+}

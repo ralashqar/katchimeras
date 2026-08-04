@@ -56,6 +56,7 @@ const SECTION_LABELS: Record<ManualJournalSection, string> = {
 const FLOW_ORDER = ['people', 'food', 'went_somewhere', 'movement', 'studio', 'work', 'big_event', 'general'];
 
 export type JournalComposerProps = {
+  allowKeyMoment?: boolean;
   entryVariant?: 'standard' | 'quest_focused';
   initialFlowId?: string | null;
   initialChoiceId?: string | null;
@@ -93,6 +94,7 @@ export type JournalComposerProps = {
 };
 
 export function JournalComposer({
+  allowKeyMoment = true,
   entryVariant = 'standard',
   initialFlowId,
   initialChoiceId,
@@ -153,6 +155,7 @@ export function JournalComposer({
   const [noteSpecificLoading, setNoteSpecificLoading] = useState(false);
   const [activeSection, setActiveSection] = useState<ManualJournalSection>('everyday');
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [makeKeyMoment, setMakeKeyMoment] = useState(false);
   const specificEditedRef = useRef(false);
   const longPressRef = useRef(false);
   const redoLongPressRef = useRef(false);
@@ -391,6 +394,7 @@ export function JournalComposer({
       journalSource: savedJournalSource,
       confirmedFacets,
       location: flow.id === 'went_somewhere' ? location : null,
+      makeKeyMoment: allowKeyMoment && makeKeyMoment,
     });
   };
   const toggleAudio = () => {
@@ -733,6 +737,28 @@ export function JournalComposer({
                   ) : null}
                   {!noteExpanded && voice.error ? <ThemedText accessibilityRole="alert" selectable style={styles.error} lightColor="#8C3F36" darkColor="#8C3F36">{voice.error}</ThemedText> : null}
                 </EditorSection> : null}
+
+                {allowKeyMoment ? (
+                  <Pressable
+                    accessibilityHint="Gives this memory a stronger, but not guaranteed, influence on today's hatch"
+                    accessibilityLabel="This mattered most today"
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: makeKeyMoment }}
+                    onPress={() => {
+                      selectionHaptic();
+                      setMakeKeyMoment((value) => !value);
+                    }}
+                    style={({ pressed }) => [styles.keyMoment, makeKeyMoment && styles.keyMomentSelected, pressed && styles.pressed]}>
+                    <View style={[styles.keyMomentIcon, makeKeyMoment && styles.keyMomentIconSelected]}>
+                      <IconSymbol name={makeKeyMoment ? 'star.fill' : 'star'} size={19} color={makeKeyMoment ? Meadow.ink : Meadow.goldDeep} />
+                    </View>
+                    <View style={styles.keyMomentCopy}>
+                      <ThemedText style={styles.keyMomentTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>This mattered most today</ThemedText>
+                      <ThemedText style={styles.keyMomentBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Give this memory a little more pull on the hatch.</ThemedText>
+                    </View>
+                    {makeKeyMoment ? <IconSymbol name="checkmark.circle.fill" size={21} color={Meadow.goldDeep} /> : null}
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
             </Animated.View>
@@ -1040,6 +1066,13 @@ const styles = StyleSheet.create({
   change: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 8 },
   changeText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '700' },
   editorSection: { gap: 10 },
+  keyMoment: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.34)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 70, padding: 11 },
+  keyMomentSelected: { backgroundColor: 'rgba(229,190,106,0.22)', borderColor: Meadow.goldDeep },
+  keyMomentIcon: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.16)', borderRadius: 12, height: 42, justifyContent: 'center', width: 42 },
+  keyMomentIconSelected: { backgroundColor: '#E7B951' },
+  keyMomentCopy: { flex: 1, gap: 2 },
+  keyMomentTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 13.5, fontWeight: '800', lineHeight: 18 },
+  keyMomentBody: { fontFamily: AppFontFamilies.manrope, fontSize: 11.5, fontWeight: '600', lineHeight: 16 },
   inputFrame: { position: 'relative' },
   input: { backgroundColor: 'rgba(255,248,232,0.42)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.52)', color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 16, minHeight: 56, paddingHorizontal: 15, paddingVertical: 13 },
   inputWithActivity: { paddingRight: 48 },

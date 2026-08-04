@@ -1,0 +1,60 @@
+{
+  "family": "feastle",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/feastle.png",
+    "../../assets/images/katchimeras/world/today/feastle-full-spread.webp",
+    "../../assets/images/katchimeras/world/objects/food/hearth_pot.webp"
+  ],
+  "sheets": [
+    {
+      "input": "feastle-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/feastle-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "rowCuts": [0, 434, 824, 1254]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        { "name": "food-memories-1", "row": 0, "column": 0, "bounds": [0, 0, 293, 434] },
+        { "name": "food-memories-2", "row": 0, "column": 1, "bounds": [293, 0, 628, 434] },
+        { "name": "food-memories-3", "row": 0, "column": 2, "bounds": [628, 0, 914, 434] },
+        { "name": "food-memories-4", "row": 0, "column": 3, "bounds": [914, 0, 1254, 434] },
+        { "name": "cuisines-1", "row": 1, "column": 0, "bounds": [0, 434, 252, 824] },
+        { "name": "cuisines-2", "row": 1, "column": 1, "bounds": [252, 434, 600, 824] },
+        { "name": "cuisines-3", "row": 1, "column": 2, "bounds": [600, 434, 931, 824] },
+        { "name": "cuisines-4", "row": 1, "column": 3, "bounds": [931, 434, 1254, 824] },
+        { "name": "family-goals-1", "row": 2, "column": 0, "bounds": [0, 824, 261, 1254] },
+        { "name": "family-goals-2", "row": 2, "column": 1, "bounds": [261, 824, 576, 1254] },
+        { "name": "family-goals-3", "row": 2, "column": 2, "bounds": [576, 824, 906, 1254] }
+      ]
+    },
+    {
+      "input": "feastle-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/feastle-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2,
+        "columnCuts": [0, 392, 782, 1254],
+        "rowCuts": [0, 580, 1254]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        { "name": "companion-quests-1", "row": 0, "column": 0 },
+        { "name": "companion-quests-2", "row": 0, "column": 1 },
+        { "name": "companion-quests-3", "row": 0, "column": 2 },
+        { "name": "journey-goals-1", "row": 1, "column": 0 },
+        { "name": "journey-goals-2", "row": 1, "column": 1 },
+        { "name": "journey-goals-3", "row": 1, "column": 2 }
+      ]
+    }
+  ]
+}

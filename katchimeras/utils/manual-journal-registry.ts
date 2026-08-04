@@ -140,7 +140,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     choices: [
       {
         ...choice('partner', 'Partner', 'heart.fill', ['subject.person']), contextTitle: 'What kind of time was it?', detailTitle: 'How did being together feel?', feelings: CLOSE_REACTIONS,
-        contextChoices: [{ id: 'date', label: 'A date' }, { id: 'meal', label: 'A meal' }, { id: 'conversation', label: 'A conversation' }, { id: 'relaxing', label: 'Relaxing' }, { id: 'celebration', label: 'Celebrating' }, { id: 'support', label: 'Supporting each other' }],
+        contextChoices: [{ id: 'date', label: 'A date' }, { id: 'meal', label: 'A meal' }, { id: 'conversation', label: 'A conversation' }, { id: 'relaxing', label: 'Relaxing' }, { id: 'celebration', label: 'Celebrating' }, { id: 'support', label: 'Supporting each other' }, { id: 'care', label: 'Providing care' }],
       },
       {
         ...choice('my_child', 'My child', 'figure.and.child.holdinghands', ['subject.child']), contextTitle: 'What was happening?', detailTitle: 'What did this moment feel like?', feelings: CHILD_REACTIONS,
@@ -157,7 +157,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
       },
       {
         ...choice('group', 'A group or gathering', 'person.3.sequence.fill', ['subject.group']), contextTitle: 'What kind of gathering?', detailTitle: 'What was the atmosphere like?', feelings: REACTIONS,
-        contextChoices: [{ id: 'party', label: 'A party' }, { id: 'event', label: 'An event' }, { id: 'meal', label: 'A meal' }, { id: 'work', label: 'Work' }, { id: 'community', label: 'Community' }, { id: 'casual', label: 'Casual time' }],
+        contextChoices: [{ id: 'party', label: 'A party' }, { id: 'event', label: 'An event' }, { id: 'meal', label: 'A meal' }, { id: 'work', label: 'Work' }, { id: 'community', label: 'Community' }, { id: 'volunteering', label: 'Volunteering' }, { id: 'helping', label: 'Helping' }, { id: 'mentoring', label: 'Mentoring' }, { id: 'organising', label: 'Organising' }, { id: 'advocacy', label: 'Advocacy' }, { id: 'casual', label: 'Casual time' }],
       },
       {
         ...choice('someone_new', 'Someone new', 'sparkles', ['subject.person']), contextTitle: 'How did you meet?', detailTitle: 'What was the connection like?', feelings: REACTIONS,
@@ -172,7 +172,10 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
         ...choice('solo', 'Me / time by myself', 'person.fill'), specificFieldLabel: 'Memory label', specificFieldPlaceholder: 'What were you doing? (optional)', contextTitle: 'What kind of time was it?', detailTitle: 'How did the time feel?', feelings: SOLO_REACTIONS,
         contextChoices: [{ id: 'rest', label: 'Resting' }, { id: 'reset', label: 'Resetting' }, { id: 'hobby', label: 'A hobby' }, { id: 'walk', label: 'A walk' }, { id: 'errands', label: 'Getting things done' }, { id: 'thinking', label: 'Thinking time' }],
       },
-      choice('someone_else', 'Someone else', 'person.fill', ['subject.person']),
+      {
+        ...choice('someone_else', 'Someone else', 'person.fill', ['subject.person']), contextTitle: 'What kind of time was it?',
+        contextChoices: [{ id: 'conversation', label: 'A conversation' }, { id: 'activity', label: 'An activity' }, { id: 'adult_elder_care', label: 'Adult or elder care' }, { id: 'practical_care', label: 'Practical care' }, { id: 'emotional_support', label: 'Emotional support' }],
+      },
     ],
     contextChoices: [{ id: 'meal', label: 'A meal' }, { id: 'celebration', label: 'Celebration' }, { id: 'visit', label: 'A visit' }, { id: 'activity', label: 'An activity' }, { id: 'conversation', label: 'Conversation' }, { id: 'care', label: 'Care' }],
     detailTitle: 'How did it feel?', specificFieldLabel: 'Name', specificFieldPlaceholder: 'Who was it? (optional)', feelings: REACTIONS,
@@ -183,6 +186,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
       choice('focus', 'Focused work', 'bolt.fill', ['work.focus']), choice('office', 'Office or workday', 'briefcase.fill', ['work.focus']),
       choice('learning', 'Studying or learning', 'graduationcap.fill', ['work.focus']), choice('planning', 'Planning', 'list.bullet.clipboard.fill', ['work.focus']),
       choice('creative', 'Creative project', 'paintbrush.fill', ['media.art']), choice('admin', 'Personal admin', 'checklist', ['work.focus']),
+      choice('home_tasks', 'Home tasks or chores', 'house.fill'),
       choice('progress', 'Achievement or progress', 'trophy.fill', ['life.celebration']), choice('other_work', 'Something else', 'hammer.fill'),
     ],
     contextChoices: [{ id: 'finished', label: 'Finished it' }, { id: 'progress', label: 'Made progress' }, { id: 'started', label: 'Started something' }, { id: 'stuck', label: 'Got stuck' }, { id: 'routine', label: 'Routine work' }],
@@ -206,7 +210,9 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
     id: 'general', version: 1, title: 'Something else', shortTitle: 'Something else', description: 'Highlights, hard moments or anything else', section: 'other', icon: 'ellipsis.circle.fill', adapter: 'general', projectionKind: 'general',
     choices: [
       choice('highlight', 'A highlight', 'star.fill'), choice('difficult', 'A difficult moment', 'cloud.rain.fill'), choice('gratitude', 'Something I’m grateful for', 'heart.fill'),
-      choice('new', 'Something new', 'sparkles'), choice('rest', 'Rest or recovery', 'moon.stars.fill'), choice('ordinary', 'An ordinary moment', 'circle.fill'), choice('other', 'Other', 'ellipsis.circle.fill'),
+      choice('new', 'Something new', 'sparkles'), choice('rest', 'Rest or recovery', 'moon.stars.fill'),
+      choice('morning', 'A morning moment', 'sunrise.fill'), choice('nature', 'Nature or weather I noticed', 'leaf.fill'),
+      choice('ordinary', 'An ordinary moment', 'circle.fill'), choice('other', 'Other', 'ellipsis.circle.fill'),
     ],
     detailTitle: 'How did it feel?', specificFieldLabel: 'Short name', specificFieldPlaceholder: 'What happened?', feelings: REACTIONS,
   },

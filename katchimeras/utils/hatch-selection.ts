@@ -7,6 +7,7 @@ import {
 import { computeLivingRarity, maxRarity, type LivingRarity } from '@/utils/living-rarity';
 import type {
   EncounterHistoryMap,
+  HatchDecisionModifiers,
   HomeRarityTier,
   HomeScoreKey,
   KatchimeraFieldEcho,
@@ -15,6 +16,7 @@ import type {
 } from '@/types/home';
 import type { KatchimeraFamilyId, KatchimeraSkinId, LifeAspectId } from '@/types/katchimera';
 import { identityForEncounter } from '@/utils/katchimera-identity';
+import { dayForDevHatchSelection } from '@/utils/forced-low-signal-hatch';
 
 // Hatch Engine v2 — the probabilistic draw.
 //
@@ -41,6 +43,7 @@ const AVOID_PREV_PENALTY = 0.15; // same species as yesterday's hatch
 const SPECIFICITY_GENERIC = 0.7; // generic activity reads (how much you moved)
 const SCORE_FLOOR = 0.02;
 const SCORE_CEIL = 1.5;
+const CONTEXT_LEADER_MARGIN = 0.06;
 
 // Generic "activity" fallbacks describe HOW MUCH you moved, not what the day was
 // about — they get a specificity haircut so a real scene/place/subject wins.
@@ -87,6 +90,8 @@ export type HatchCandidateProbability = {
   probability: number;
   score: number;
   rarity: HomeRarityTier;
+  seedId: string;
+  modifiers: HatchDecisionModifiers;
 };
 
 export type HatchSelection = {
@@ -101,38 +106,71 @@ type ScoredCandidate = {
   candidate: EncounterCandidate;
   score: number;
   rarity: HomeRarityTier;
+  modifiers: HatchDecisionModifiers;
 };
 
 // Score and rank the day's candidate field — shared by the draw and the
 // pre-hatch preview. Pure and rng-free; sorting is stable.
-function scoreField(
+export function scoreField(
   day: StoredHomeDayRecord,
   history: EncounterHistoryMap,
-  yesterdayProfileId: string | null | undefined
+  yesterdayProfileId: string | null | undefined = null
 ): ScoredCandidate[] {
-  const candidates = extractEncounterCandidates(day, history);
+  const hatchInputDay = dayForDevHatchSelection(day);
+  const candidates = extractEncounterCandidates(hatchInputDay, history);
   if (candidates.length === 0) {
     return [];
   }
   // Rarity is a property of how the day was lived — computed once, shared by
   // every candidate (each then takes the higher of this and its own floor).
-  const livingRarity = computeLivingRarity(day);
-  const month = isoMonth(day.isoDate);
+  const livingRarity = computeLivingRarity(hatchInputDay);
+  const month = isoMonth(hatchInputDay.isoDate);
 
-  return candidates
-    .map((candidate) => ({
-      candidate,
-      score: scoreCandidate(candidate, { day, livingRarity, month, yesterdayProfileId }),
-      rarity: maxRarity(candidate.rarityFloor, livingRarity.tier),
-    }))
-    .sort((left, right) => {
+  const scored = candidates
+    .map((candidate) => {
+      const scored = scoreCandidate(candidate, { day: hatchInputDay, livingRarity, month, yesterdayProfileId });
+      return {
+        candidate,
+        score: scored.score,
+        modifiers: scored.modifiers,
+        rarity: maxRarity(candidate.rarityFloor, livingRarity.tier),
+      };
+    });
+
+  // A large step total is meaningful evidence, but it describes how much the
+  // user moved rather than what the day was about. Keep it as a strong echo
+  // beneath a credible museum/beach/city/photo/journal context unless the user
+  // explicitly chose movement in the pre-hatch reflection.
+  const explicitMovementChoice = hatchInputDay.hatchCheckIn?.status !== 'skipped'
+    && hatchInputDay.hatchCheckIn?.flowId === 'movement'
+    && (hatchInputDay.hatchCheckIn.answeredQuestionIds?.length ?? 0) > 0;
+  if (!explicitMovementChoice) {
+    const contextualLeader = scored
+      .filter((entry) =>
+        entry.candidate.familyId !== 'steppling'
+        && !GENERIC_FALLBACK_SEEDS.has(entry.candidate.signal.seedId)
+        && ['place', 'vision', 'prompt', 'moment', 'journal'].includes(entry.candidate.signal.source)
+      )
+      .sort((left, right) => right.score - left.score)[0];
+    const movement = scored.find((entry) =>
+      entry.candidate.familyId === 'steppling'
+      && entry.candidate.signal.seedId === 'high_steps_day'
+    );
+    if (contextualLeader && movement && movement.score >= contextualLeader.score - CONTEXT_LEADER_MARGIN) {
+      const adjusted = Math.max(SCORE_FLOOR, contextualLeader.score - CONTEXT_LEADER_MARGIN);
+      movement.modifiers.contextualPriority = round3(adjusted - movement.score);
+      movement.score = adjusted;
+    }
+  }
+
+  return scored.sort((left, right) => {
       if (right.score !== left.score) {
         return right.score - left.score;
       }
       // Stable tiebreak so ordering (and therefore the seeded draw) is fixed.
       return (
-        stableHash(`${day.isoDate}|${left.candidate.castEntry.seedId}`) -
-        stableHash(`${day.isoDate}|${right.candidate.castEntry.seedId}`)
+        stableHash(`${hatchInputDay.isoDate}|${left.candidate.castEntry.seedId}`) -
+        stableHash(`${hatchInputDay.isoDate}|${right.candidate.castEntry.seedId}`)
       );
     });
 }
@@ -152,7 +190,8 @@ export function previewLeadingCandidate(
 }
 
 export function selectHatch(input: HatchSelectionInput): HatchSelection | null {
-  const { day, history, yesterdayProfileId, rng } = input;
+  const { history, yesterdayProfileId, rng } = input;
+  const day = dayForDevHatchSelection(input.day);
   const scored = scoreField(day, history, yesterdayProfileId);
   if (scored.length === 0) {
     return null;
@@ -173,6 +212,8 @@ export function selectHatch(input: HatchSelectionInput): HatchSelection | null {
     probability: round3(probabilities[index]),
     score: round3(entry.score),
     rarity: entry.rarity,
+    seedId: entry.candidate.signal.seedId,
+    modifiers: entry.modifiers,
   }));
 
   const echoes: KatchimeraFieldEcho[] = field
@@ -211,7 +252,34 @@ export function selectHatch(input: HatchSelectionInput): HatchSelection | null {
       ...base,
       pickProbability: round3(probabilities[winnerIndex]),
       fieldEchoes: echoes,
-      birthSignals: [winner.candidate.signal.seedId],
+      birthSignals: [...new Set([
+        winner.candidate.signal.seedId,
+        ...(winner.candidate.signal.journalEvidence ?? []).map((row) => row.seedId),
+      ])],
+      hatchDecision: {
+        version: 1,
+        engineVersion: 'journal-field-v2',
+        leaderFamilyId: field[0].candidate.familyId,
+        winnerFamilyId: winner.candidate.familyId,
+        candidates: field.map((entry, index) => ({
+          profileId: entry.candidate.profile.id,
+          familyId: entry.candidate.familyId,
+          skinId: entry.candidate.skinId,
+          seedId: entry.candidate.signal.seedId,
+          score: round3(entry.score),
+          probability: round3(probabilities[index]),
+          selected: index === winnerIndex,
+          modifiers: entry.modifiers,
+          contributions: (entry.candidate.signal.journalEvidence ?? []).map((row) => ({
+            journalRecordId: row.journalRecordId,
+            routeKey: row.routeKey,
+            sourceKind: row.sourceKind,
+            weight: row.weight,
+            keyMoment: row.keyMoment,
+            explanation: row.explanation,
+          })),
+        })),
+      },
     },
     echoes,
     probabilities: probabilityRows,
@@ -226,24 +294,40 @@ function scoreCandidate(
     month: number;
     yesterdayProfileId?: string | null;
   }
-): number {
+): { score: number; modifiers: HatchDecisionModifiers } {
   const { signal, repeatDepth, rarityFloor, lastSeenIsoDate, profile, castEntry } = candidate;
 
   const specificity = GENERIC_FALLBACK_SEEDS.has(castEntry.seedId) ? SPECIFICITY_GENERIC : 1;
   let score = signal.intensity * specificity;
+  const modifiers: HatchDecisionModifiers = {
+    novelty: 0,
+    intent: 0,
+    measuredMovement: 0,
+    corroboration: 0,
+    contextualPriority: 0,
+    bond: 0,
+    seasonal: 0,
+    rarity: 0,
+    recency: 0,
+    previousDay: 0,
+  };
 
   if (repeatDepth === 0) {
-    score += NOVELTY_BONUS;
+    modifiers.novelty = NOVELTY_BONUS;
   }
-  if (signal.source === 'moment' || signal.source === 'prompt') {
-    score += INTENT_BONUS;
+  if (signal.source === 'moment' || signal.source === 'prompt' || signal.source === 'journal') {
+    modifiers.intent = INTENT_BONUS;
   }
-  score += Math.min(repeatDepth * BOND_PER_VISIT, BOND_CAP);
+  if (candidate.familyId === 'steppling') {
+    modifiers.measuredMovement = measuredMovementBonus(context.day.stepsCount ?? 0);
+    modifiers.corroboration = movementCorroborationBonus(context.day, signal);
+  }
+  modifiers.bond = Math.min(repeatDepth * BOND_PER_VISIT, BOND_CAP);
   if (SEASONAL_WINDOWS[castEntry.seedId]?.includes(context.month)) {
-    score += SEASONAL_BONUS;
+    modifiers.seasonal = SEASONAL_BONUS;
   }
-  score += RARITY_LURE[rarityFloor] ?? 0;
-  score -= recencyPenalty(daysBetween(lastSeenIsoDate, context.day.isoDate));
+  modifiers.rarity = RARITY_LURE[rarityFloor] ?? 0;
+  modifiers.recency = -recencyPenalty(daysBetween(lastSeenIsoDate, context.day.isoDate));
   const yesterdayIdentity = identityForEncounter(context.yesterdayProfileId, null);
   if (
     context.yesterdayProfileId &&
@@ -251,10 +335,40 @@ function scoreCandidate(
       ? candidate.familyId === yesterdayIdentity.familyId
       : profile.id === context.yesterdayProfileId)
   ) {
-    score -= AVOID_PREV_PENALTY;
+    modifiers.previousDay = -AVOID_PREV_PENALTY;
   }
 
-  return clamp(score, SCORE_FLOOR, SCORE_CEIL);
+  score += Object.values(modifiers).reduce((sum, value) => sum + value, 0);
+  return {
+    score: clamp(score, SCORE_FLOOR, SCORE_CEIL),
+    modifiers: Object.fromEntries(Object.entries(modifiers).map(([key, value]) => [key, round3(value)])) as HatchDecisionModifiers,
+  };
+}
+
+function measuredMovementBonus(steps: number): number {
+  if (steps < 6_500) return 0;
+  if (steps < 10_000) return interpolate(0, 0.05, (steps - 6_500) / 3_500);
+  if (steps < 15_000) return interpolate(0.05, 0.11, (steps - 10_000) / 5_000);
+  if (steps < 20_000) return interpolate(0.11, 0.18, (steps - 15_000) / 5_000);
+  if (steps < 25_000) return interpolate(0.18, 0.24, (steps - 20_000) / 5_000);
+  return Math.min(0.28, 0.24 + ((steps - 25_000) / 10_000) * 0.04);
+}
+
+function movementCorroborationBonus(day: StoredHomeDayRecord, signal: EncounterCandidate['signal']): number {
+  const measuredSteps = (day.stepsCount ?? 0) >= 6_500;
+  const journalMovement = (signal.journalEvidence ?? []).some((row) =>
+    /^journal\.route:movement\.(walk|hike|run)(?:\.|$)/.test(row.routeKey)
+  );
+  const measuredRoute = (day.exactRouteSegments ?? []).some((segment) =>
+    /walk|hike|run|jog/i.test(segment.activityType)
+  );
+  const sourceCount = [measuredSteps, journalMovement, measuredRoute].filter(Boolean).length;
+  if (sourceCount < 2) return 0;
+  return sourceCount === 2 ? 0.1 : 0.14;
+}
+
+function interpolate(from: number, to: number, progress: number): number {
+  return from + (to - from) * Math.min(Math.max(progress, 0), 1);
 }
 
 // Anti-dupe: a species hatched very recently is suppressed, decaying to nothing

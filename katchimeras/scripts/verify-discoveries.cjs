@@ -23,7 +23,38 @@ function transpileToTemp(relativeSourcePath, outName) {
 // engine imports @/utils/discoveries-catalog at runtime; alias it to the transpiled
 // catalog. (context + catalog have only type imports → erased → no other stubs.)
 const catalogPath = transpileToTemp('utils/discoveries-catalog.ts', 'discoveries-catalog.js');
-const stubs = { '@/utils/discoveries-catalog': catalogPath };
+const photoAchievementsPath = path.join(tempDir, 'photo-achievements.js');
+fs.writeFileSync(photoAchievementsPath, `
+exports.buildPhotoAchievementSnapshot = function buildPhotoAchievementSnapshot(days) {
+  const keptPhotoIds = new Set();
+  const photoDays = new Set();
+  for (const day of days) {
+    const dayPhotoIds = new Set();
+    for (const record of day.journalRecords || []) {
+      if (record.source && record.source.kind === 'photo') dayPhotoIds.add(record.source.sourceId);
+    }
+    for (const entry of day.manualJournalEntries || []) {
+      if (entry.sourceType === 'photo' && entry.sourceId) dayPhotoIds.add(entry.sourceId);
+    }
+    for (const meaning of day.capturedMeanings || []) {
+      if (meaning.sourceId) dayPhotoIds.add(meaning.sourceId);
+    }
+    if (dayPhotoIds.size) photoDays.add(day.isoDate);
+    dayPhotoIds.forEach((id) => keptPhotoIds.add(id));
+  }
+  return {
+    values: {},
+    sourceDayBySignal: {},
+    keptPhotoCount: keptPhotoIds.size,
+    photoDayCount: photoDays.size,
+    distinctPhysicalQualityCount: 0,
+  };
+};
+`);
+const stubs = {
+  '@/utils/discoveries-catalog': catalogPath,
+  '@/utils/photo-achievements': photoAchievementsPath,
+};
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
   if (request in stubs) return stubs[request];
@@ -75,6 +106,8 @@ const passes = (days, id) => passingDiscoveryIds(ctx(days)).includes(id);
 
 // helpers
 const place = (category) => ({ id: `n-${Math.round(Math.random() * 1e9)}`, category, archetype: 'calm', label: category, confirmedAt: '' });
+const sourceLinkedPhotos = (count) =>
+  Array.from({ length: count }, (_, index) => ({ sourceId: `photo-${index + 1}` }));
 const consecutive = (n, overrides) =>
   Array.from({ length: n }, (_, i) => day({ isoDate: `2026-06-${String(i + 1).padStart(2, '0')}`, ...overrides }));
 
@@ -88,7 +121,17 @@ const mc = ctx(twoMuseums);
 check('place category counted', mc.placeCategoryCounts.museum === 2, JSON.stringify(mc.placeCategoryCounts));
 check('uniquePlaceCount sums confirmed places', mc.uniquePlaceCount === 2, String(mc.uniquePlaceCount));
 
-check('photoCount = capturedMeanings + heroPhoto', ctx([day({ capturedMeanings: [{}, {}], heroPhoto: { assetId: 'a' } })]).photoCount === 3);
+check(
+  'photoCount de-duplicates source-linked kept photos',
+  ctx([day({
+    journalRecords: [
+      { source: { kind: 'photo', sourceId: 'photo-1' } },
+      { source: { kind: 'photo', sourceId: 'photo-2' } },
+    ],
+    capturedMeanings: [{ sourceId: 'photo-2' }, { sourceId: 'photo-3' }],
+    heroPhoto: { assetId: 'legacy-display-only' },
+  })]).photoCount === 3
+);
 check('voiceMemoryCount counts only voice notes', ctx([day({ notes: [{ kind: 'voice' }, { kind: 'text' }, { kind: 'voice' }] })]).voiceMemoryCount === 2);
 check('foodMemoryCount sums food moments', ctx([day({ foodMoments: [{}, {}] })]).foodMemoryCount === 2);
 check('studioMemoryCount sums studio moments', ctx([day({ studioMoments: [{}, {}, {}] })]).studioMemoryCount === 3);
@@ -124,9 +167,9 @@ check('parks_3 fires at 3 park visits', passes([day({ confirmedPlaces: Array.fro
 check('places_10 fires at 10 marked places', passes([day({ confirmedPlaces: Array.from({ length: 10 }, () => place('cafe')) })], 'places_10'));
 check('first_voice_memory fires', passes([day({ notes: [{ kind: 'voice' }] })], 'first_voice_memory'));
 check('voice_5 fires at 5 voice memories', passes([day({ notes: Array.from({ length: 5 }, () => ({ kind: 'voice' })) })], 'voice_5'));
-check('photos_10 and photos_50 fire at the right thresholds', passes([day({ capturedMeanings: Array.from({ length: 10 }, () => ({})) })], 'photos_10') && !passes([day({ capturedMeanings: Array.from({ length: 10 }, () => ({})) })], 'photos_50'));
-check('photos_50 fires at 50', passes([day({ capturedMeanings: Array.from({ length: 50 }, () => ({})) })], 'photos_50'));
-check('photos_100 fires at 100', passes([day({ capturedMeanings: Array.from({ length: 100 }, () => ({})) })], 'photos_100'));
+check('photos_10 and photos_50 fire at the right thresholds', passes([day({ capturedMeanings: sourceLinkedPhotos(10) })], 'photos_10') && !passes([day({ capturedMeanings: sourceLinkedPhotos(10) })], 'photos_50'));
+check('photos_50 fires at 50', passes([day({ capturedMeanings: sourceLinkedPhotos(50) })], 'photos_50'));
+check('photos_100 fires at 100', passes([day({ capturedMeanings: sourceLinkedPhotos(100) })], 'photos_100'));
 check('food_10 fires at 10 food memories', passes([day({ foodMoments: Array.from({ length: 10 }, () => ({})) })], 'food_10'));
 check('studio_10 fires at 10 studio memories', passes([day({ studioMoments: Array.from({ length: 10 }, () => ({})) })], 'studio_10'));
 check('steps_15k fires at 16k', passes([day({ stepsCount: 16000 })], 'steps_15k'));

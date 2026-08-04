@@ -4,6 +4,8 @@
 Inputs must already have alpha. Legacy manifests can describe a 4x4 sheet with
 named rows. New manifests can describe any regular grid with an explicit list
 of named cells, which lets a batch pack differently sized tier ladders tightly.
+Individual cells may override their grid crop with measured pixel bounds when
+the generator's transparent gutters shift between rows or columns.
 """
 
 from __future__ import annotations
@@ -159,7 +161,7 @@ def process_sheet(input_path: Path, out_dir: Path, sheet: dict[str, object], siz
             column = int(item["column"])
             if not 0 <= row < rows_count or not 0 <= column < columns:
                 raise ValueError(f"{input_path}: cell ({row}, {column}) is outside the grid")
-            jobs.append((str(item["name"]), row, column))
+            jobs.append((str(item["name"]), row, column, item.get("bounds")))
     else:
         rows = sheet.get("rows")
         if not isinstance(rows, list) or len(rows) != 4:
@@ -175,19 +177,28 @@ def process_sheet(input_path: Path, out_dir: Path, sheet: dict[str, object], siz
             tiers = int(row_item.get("tiers", 4))
             if not 1 <= tiers <= 4:
                 raise ValueError(f"{section}: tiers must be between one and four")
-            jobs.extend((f"{section}-{column + 1}", row_index, column) for column in range(tiers))
+            jobs.extend((f"{section}-{column + 1}", row_index, column, None) for column in range(tiers))
 
     seen_names: set[str] = set()
     seen_cells: set[tuple[int, int]] = set()
-    for name, row, column in jobs:
+    for name, row, column, explicit_bounds in jobs:
         if name in seen_names:
             raise ValueError(f"{input_path}: duplicate output name {name}")
         if (row, column) in seen_cells:
             raise ValueError(f"{input_path}: grid cell ({row}, {column}) is assigned twice")
         seen_names.add(name)
         seen_cells.add((row, column))
-        left, right = manifest_grid_bounds(column, columns, image.width, column_cuts, "column")
-        top, bottom = manifest_grid_bounds(row, rows_count, image.height, row_cuts, "row")
+        if explicit_bounds is not None:
+            if not isinstance(explicit_bounds, list) or len(explicit_bounds) != 4:
+                raise ValueError(f"{input_path}: {name} bounds must be [left, top, right, bottom]")
+            left, top, right, bottom = (int(value) for value in explicit_bounds)
+            if not (0 <= left < right <= image.width and 0 <= top < bottom <= image.height):
+                raise ValueError(
+                    f"{input_path}: {name} bounds {explicit_bounds} fall outside image size {image.size}"
+                )
+        else:
+            left, right = manifest_grid_bounds(column, columns, image.width, column_cuts, "column")
+            top, bottom = manifest_grid_bounds(row, rows_count, image.height, row_cuts, "row")
         cell = image.crop((left, top, right, bottom))
         if clean_components:
             cell = remove_stray_components(cell, drop_edge_fragments)

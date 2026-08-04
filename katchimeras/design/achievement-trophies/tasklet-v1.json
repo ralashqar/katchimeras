@@ -1,0 +1,149 @@
+{
+  "family": "tasklet",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/tasklet.png",
+    "../../assets/images/katchimeras/game-hub/tasklet-desk-jam.webp",
+    "../../assets/images/katchimeras/manual-journal/work.webp"
+  ],
+  "sheets": [
+    {
+      "input": "tasklet-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/tasklet-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "columnCuts": [
+          0,
+        353,
+        741,
+        1122,
+          1536
+        ],
+        "rowCuts": [
+          0,
+        549,
+        1012,
+          1536
+        ]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "focused-work-1",
+          "row": 0,
+          "column": 0
+        },
+        {
+          "name": "focused-work-2",
+          "row": 0,
+          "column": 1
+        },
+        {
+          "name": "focused-work-3",
+          "row": 0,
+          "column": 2
+        },
+        {
+          "name": "focused-work-4",
+          "row": 0,
+          "column": 3
+        },
+        {
+          "name": "finished-work-1",
+          "row": 1,
+          "column": 0
+        },
+        {
+          "name": "finished-work-2",
+          "row": 1,
+          "column": 1
+        },
+        {
+          "name": "finished-work-3",
+          "row": 1,
+          "column": 2
+        },
+        {
+          "name": "finished-work-4",
+          "row": 1,
+          "column": 3
+        },
+        {
+          "name": "family-goals-1",
+          "row": 2,
+          "column": 0
+        },
+        {
+          "name": "family-goals-2",
+          "row": 2,
+          "column": 1
+        },
+        {
+          "name": "family-goals-3",
+          "row": 2,
+          "column": 2
+        }
+      ]
+    },
+    {
+      "input": "tasklet-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/tasklet-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2,
+        "columnCuts": [
+          0,
+        502,
+        1012,
+          1536
+        ],
+        "rowCuts": [
+          0,
+          768,
+          1536
+        ]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "companion-quests-1",
+          "row": 0,
+          "column": 0
+        },
+        {
+          "name": "companion-quests-2",
+          "row": 0,
+          "column": 1
+        },
+        {
+          "name": "companion-quests-3",
+          "row": 0,
+          "column": 2
+        },
+        {
+          "name": "journey-goals-1",
+          "row": 1,
+          "column": 0
+        },
+        {
+          "name": "journey-goals-2",
+          "row": 1,
+          "column": 1
+        },
+        {
+          "name": "journey-goals-3",
+          "row": 1,
+          "column": 2
+        }
+      ]
+    }
+  ]
+}

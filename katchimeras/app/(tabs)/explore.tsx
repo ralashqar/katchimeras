@@ -152,7 +152,7 @@ export default function ExploreScreen() {
     Alert.alert(
       forceLowSignal ? 'Force the low-signal hatch flow?' : 'Replay today’s adaptive hatch flow?',
       forceLowSignal
-        ? 'Keeps today’s journal and passive data, but unhatches the egg and forces the three-step highlight → detail → meaning flow.'
+        ? 'Keeps today’s data intact, but temporarily hides it from the questionnaire so you can test the true zero-evidence highlight → detail → meaning flow.'
         : 'Keeps today’s journal and passive data, unhatches the egg, and lets the adaptive planner choose the questions again.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -387,7 +387,7 @@ export default function ExploreScreen() {
                   variant="secondary"
                 />
                 <KatchaButton
-                  label="Unhatch egg · force low-signal flow"
+                  label="Unhatch egg · test true low-signal flow"
                   onPress={() => handlePrepareTodayRehatch('force_low_signal')}
                   variant="secondary"
                 />

@@ -303,6 +303,7 @@ export function TodaySheetHost({
       {stepsSheetOpen ? (
         <StepsPromptSheet
           stepsCount={viewedDay.stepsCount ?? null}
+          detectedActivityTypes={(viewedDay.exactRouteSegments ?? []).map((segment) => segment.activityType)}
           onConfirm={handleConfirmSteps}
           onClose={() => setStepsSheetOpen(false)}
         />

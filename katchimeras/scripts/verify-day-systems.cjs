@@ -53,6 +53,8 @@ const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-realit
 const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'intelligence-taxonomy.js');
 const classificationPath = path.join(tempDir, 'intelligence-classification.js');
 fs.writeFileSync(classificationPath, 'exports.assignmentSignals = () => [];');
+const journalContributionsPath = path.join(tempDir, 'journal-hatch-contributions.js');
+fs.writeFileSync(journalContributionsPath, 'exports.aggregateJournalHatchSignals = () => [];');
 const classificationPolicyPath = path.join(tempDir, 'intelligence-classification-policy.js');
 fs.writeFileSync(classificationPolicyPath, 'exports.visionSignalIsRejected = () => false;');
 const photoSubjectProjectionPath = transpileToTemp('utils/intelligence/photo-subject-projection.ts', 'photo-subject-projection.js');
@@ -76,6 +78,7 @@ const stubs = {
   '@/utils/photo-reality': photoRealityPath,
   '@/utils/intelligence/taxonomy': taxonomyPath,
   '@/utils/intelligence/classification': classificationPath,
+  '@/utils/journal-hatch-contributions': journalContributionsPath,
   '@/utils/intelligence/classification-policy': classificationPolicyPath,
   '@/utils/intelligence/photo-subject-projection': photoSubjectProjectionPath,
   '@/utils/photo-place-gameplay': photoPlaceGameplayPath,

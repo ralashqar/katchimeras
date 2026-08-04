@@ -2,26 +2,31 @@ import type { JournalCommitCommand, JournalLocationSelection, JournalRecord, Man
 import { buildNoteEvidence, upsertEvidence } from '@/utils/intelligence/evidence';
 import { applyManualJournalFacets, buildManualJournalClassifiedMemory, buildNoteClassifiedMemory, upsertClassifiedMemory } from '@/utils/intelligence/classification';
 import { manualJournalFlow } from '@/utils/manual-journal-registry';
-import { commandToJournalRecord, submissionToJournalCommand } from '@/utils/journal-domain';
+import { commandToJournalRecord, journalRecordId, submissionToJournalCommand } from '@/utils/journal-domain';
 import { isPlausibleGeographicCoordinate } from '@/utils/photo-location';
 import { applyJournalCompatibilityProjection } from './journal-projections';
 
 export function withManualJournalEntry(day: StoredHomeDayRecord, submission: ManualJournalSubmission, now: Date): StoredHomeDayRecord {
   const command = submissionToJournalCommand(submission, now);
-  return command ? commitJournalRecord(day, command, now) : day;
+  if (!command) return day;
+  const committed = commitJournalRecord(day, command, now);
+  return submission.makeKeyMoment && committed.state !== 'hatched'
+    ? { ...committed, keyJournalRecordId: journalRecordId(command.idempotencyKey) }
+    : committed;
 }
 
 export function commitJournalRecord(day: StoredHomeDayRecord, command: JournalCommitCommand, now: Date): StoredHomeDayRecord {
   const existing = day.journalRecords?.find((item) => item.idempotencyKey === command.idempotencyKey) ?? null;
   const origin = command.draft.source.origin ?? null;
-  if (existing && origin?.kind !== 'companion_reflection') return day;
+  const replaceable = origin?.kind === 'companion_reflection' || origin?.kind === 'steps_interpretation';
+  if (existing && !replaceable) return day;
   const record = commandToJournalRecord(command, now);
   if (!record) return day;
-  const base = existing ? removeReplaceableCompanionReflection(day, existing) : day;
+  const base = existing ? removeReplaceableJournalRecord(day, existing) : day;
   return projectJournalRecord(base, assignAutomaticJournalLocation(base, record, now), now);
 }
 
-function removeReplaceableCompanionReflection(
+function removeReplaceableJournalRecord(
   day: StoredHomeDayRecord,
   existing: JournalRecord
 ): StoredHomeDayRecord {

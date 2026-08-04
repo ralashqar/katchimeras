@@ -1,0 +1,7 @@
+Create six isolated Katchimeras achievement keepsakes in an EXACT 3 columns by 2 rows production sprite sheet. Match the style board's cozy rounded miniature 3D look and Flickerbun palette: midnight navy, burgundy, plum velvet, amber light, brass, dark walnut, cream film stock, and starry blue enamel. References are style-only; no characters or scenes.
+
+Perfectly flat uniform #ff00ff background. Repeat: EXACT 3-by-2 grid. One compact connected subject per cell, centered, no more than 68% occupancy, at least 10% uninterrupted pure-magenta gutter on every side, and clear gutters between cells. Nothing touches boundaries. No shadows, floor, reflections, text, numbers, characters, panels, cups, medals, ribbons, or generic awards.
+
+Row 1 — COMPANION QUESTS tiers I–III: the same cinema satchel progressing from a small navy-and-burgundy bag with secured film canister, to a velvet-trimmed satchel with reel and amber lantern, to a compact equipped story backpack with secured reels, cream film roll, projector lens, lantern, curtain pocket, and brass fittings.
+
+Row 2 — JOURNEY GOALS tiers I–III: the same cinema portal progressing from a simple dark-walnut arch with one amber step light, to a burgundy-curtained arch with reel lantern and two steps, to an ornate compact movie-palace doorway with curved blank marquee, velvet curtains, brass reels, starry lights, and three illuminated steps on one connected base.

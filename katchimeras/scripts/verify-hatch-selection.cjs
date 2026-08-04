@@ -49,10 +49,13 @@ const photoRealityPath = transpileToTemp('utils/photo-reality.ts', 'photo-realit
 const taxonomyPath = transpileToTemp('utils/intelligence/taxonomy.ts', 'intelligence-taxonomy.js');
 const classificationPath = path.join(tempDir, 'intelligence-classification.js');
 fs.writeFileSync(classificationPath, 'exports.assignmentSignals = () => [];');
+const journalContributionsPath = path.join(tempDir, 'journal-hatch-contributions.js');
+fs.writeFileSync(journalContributionsPath, 'exports.aggregateJournalHatchSignals = (day) => day.__journalSignals || [];');
 const photoPlaceGameplayPath = transpileToTemp('utils/photo-place-gameplay.ts', 'photo-place-gameplay.js');
 const lifeAspectsPath = transpileToTemp('constants/life-aspects.ts', 'life-aspects.js');
 const katchimeraSkinsPath = transpileToTemp('constants/katchimera-skins.ts', 'katchimera-skins.js');
 const katchimeraIdentityPath = transpileToTemp('utils/katchimera-identity.ts', 'katchimera-identity.js');
+const forcedLowSignalPath = transpileToTemp('utils/forced-low-signal-hatch.ts', 'forced-low-signal-hatch.js');
 const enginePath = transpileToTemp('utils/encounter-engine.ts', 'encounter-engine.js');
 const selectionPath = transpileToTemp('utils/hatch-selection.ts', 'hatch-selection.js');
 
@@ -68,8 +71,10 @@ const stubs = {
   '@/utils/photo-reality': photoRealityPath,
   '@/utils/intelligence/taxonomy': taxonomyPath,
   '@/utils/intelligence/classification': classificationPath,
+  '@/utils/journal-hatch-contributions': journalContributionsPath,
   '@/utils/photo-place-gameplay': photoPlaceGameplayPath,
   '@/utils/katchimera-identity': katchimeraIdentityPath,
+  '@/utils/forced-low-signal-hatch': forcedLowSignalPath,
   '@/utils/encounter-engine': enginePath,
   '@/utils/hatch-selection': selectionPath,
   '@/types/home': {},
@@ -94,7 +99,7 @@ Module._resolveFilename = function (request, ...rest) {
 
 const engine = require(enginePath);
 const selection = require(selectionPath);
-const { selectHatch, makeSeededRng } = selection;
+const { selectHatch, scoreField, makeSeededRng } = selection;
 
 function makeDay(overrides = {}) {
   return {
@@ -326,13 +331,95 @@ const farResult = selectHatch({ day: farDay, history: {}, rng: makeSeededRng('fa
 check('living conditions lift rarity at hatch', farResult.creature.rarity !== 'common', String(farResult.creature.rarity));
 check('rarity carries its living reason', /far|never|moved|distance|small hours|first light|stops/.test(farResult.creature.rarityReason ?? ''), farResult.creature.rarityReason);
 
-// --- 10. Seeded RNG is deterministic and seed-sensitive ---------------------
+// --- 10. Canonical journal evidence leads and persists safe provenance -------
+const swimEvidence = [{
+  journalRecordId: 'journal:swim', routeKey: 'journal.route:movement.sport.swimming', sourceKind: 'manual',
+  familyId: 'shellio', skinId: 'shellio', seedId: 'beach', role: 'primary', weight: 0.95,
+  keyMoment: false, explanation: 'your swim',
+}];
+const journalOnly = selectHatch({
+  day: makeDay({ __journalSignals: [{ familyId: 'shellio', skinId: 'shellio', seedId: 'beach', intensity: 0.95, evidence: swimEvidence }] }),
+  history: {}, rng: makeSeededRng('journal-only'),
+});
+check('journal-only day hatches its canonical family', journalOnly.creature.familyId === 'shellio', journalOnly.creature.familyId);
+check('hatch decision persists route provenance without journal prose',
+  journalOnly.creature.hatchDecision.candidates[0].contributions[0].routeKey === 'journal.route:movement.sport.swimming' &&
+  !JSON.stringify(journalOnly.creature.hatchDecision).includes('private prose'),
+  JSON.stringify(journalOnly.creature.hatchDecision));
+const journalVsSteps = selectHatch({
+  day: makeDay({ stepsCount: 9000, __journalSignals: [{ familyId: 'shellio', skinId: 'shellio', seedId: 'beach', intensity: 0.95, evidence: swimEvidence }] }),
+  history: {}, rng: makeSeededRng('journal-vs-steps'),
+});
+check('specific journal route leads over incidental high steps', journalVsSteps.probabilities[0].familyId === 'shellio', JSON.stringify(journalVsSteps.probabilities));
+
+const walkEvidence = [{
+  journalRecordId: 'journal:walk', routeKey: 'journal.route:movement.walk', sourceKind: 'manual',
+  familyId: 'steppling', skinId: 'steppling', seedId: 'high_steps_day', role: 'primary', weight: 0.78,
+  keyMoment: false, explanation: 'your walk',
+}];
+const ordinarySteppling = scoreField(makeDay({ stepsCount: 9500 }), {})
+  .find((entry) => entry.candidate.familyId === 'steppling');
+const exceptionalSteppling = scoreField(makeDay({ stepsCount: 20000 }), {})
+  .find((entry) => entry.candidate.familyId === 'steppling');
+const corroboratedSteppling = scoreField(makeDay({
+  stepsCount: 20000,
+  __journalSignals: [{ familyId: 'steppling', skinId: 'steppling', seedId: 'high_steps_day', intensity: 0.78, evidence: walkEvidence }],
+}), {}).find((entry) => entry.candidate.familyId === 'steppling');
+check('20k steps score materially above an ordinary active day',
+  exceptionalSteppling.score >= ordinarySteppling.score + 0.15,
+  JSON.stringify({ ordinary: ordinarySteppling.score, exceptional: exceptionalSteppling.score }));
+check('20k steps retain an auditable measured-movement modifier',
+  exceptionalSteppling.modifiers.measuredMovement === 0.18,
+  JSON.stringify(exceptionalSteppling.modifiers));
+check('matching Walk journal evidence adds bounded corroboration',
+  corroboratedSteppling.modifiers.corroboration === 0.1 && corroboratedSteppling.score > exceptionalSteppling.score,
+  JSON.stringify({ measured: exceptionalSteppling, corroborated: corroboratedSteppling }));
+check('new hatch decisions identify the recalibrated field engine',
+  selectHatch({ day: makeDay({ stepsCount: 20000 }), history: {}, rng: makeSeededRng('20k') }).creature.hatchDecision.engineVersion === 'journal-field-v2');
+
+const museum20k = makeDay({ stepsCount: 20000, placeCategorySeeds: ['museum'] });
+const museum20kField = scoreField(museum20k, {});
+const museum20kRelicoon = museum20kField.find((entry) => entry.candidate.familyId === 'relicoon');
+const museum20kSteppling = museum20kField.find((entry) => entry.candidate.familyId === 'steppling');
+check('specific museum context leads raw 20k movement evidence',
+  museum20kRelicoon.score > museum20kSteppling.score && museum20kSteppling.modifiers.contextualPriority < 0,
+  JSON.stringify({ museum: museum20kRelicoon, steps: museum20kSteppling }));
+
+const explicitMovement20k = scoreField(makeDay({
+  stepsCount: 20000,
+  placeCategorySeeds: ['museum'],
+  hatchCheckIn: {
+    status: 'completed', flowId: 'movement', categoryId: 'walk', meaningId: 'journey',
+    answeredQuestionIds: ['reflection.moment', 'evidence.category', 'reflection.meaning'],
+    encounterSeedBias: [{ seedId: 'high_steps_day', intensity: 0.58 }], semanticTags: [], scoreBias: {},
+  },
+}), {});
+check('explicitly choosing movement lets 20k steps lead the same museum day',
+  explicitMovement20k[0].candidate.familyId === 'steppling',
+  JSON.stringify(explicitMovement20k.map((entry) => ({ family: entry.candidate.familyId, score: entry.score }))));
+
+const forcedQuestionnaireOnly = scoreField(makeDay({
+  devHatchReflectionMode: 'force_low_signal',
+  stepsCount: 20000,
+  placeCategorySeeds: ['museum'],
+  promptAnswers: [makePromptAnswer('media', ['book'], ['A book'], [], {}, [{ seedId: 'bookstore', intensity: 0.95 }])],
+  hatchCheckIn: {
+    status: 'completed', flowId: 'food', categoryId: 'meal', meaningId: 'comfort',
+    answeredQuestionIds: ['reconstruct.focus', 'reconstruct.category', 'reflection.meaning'],
+    encounterSeedBias: [{ seedId: 'feast', intensity: 0.58 }], semanticTags: ['activity:food'], scoreBias: { calm: 0.2 },
+  },
+}), {});
+check('forced low-signal field contains only the active questionnaire family',
+  forcedQuestionnaireOnly.length === 1 && forcedQuestionnaireOnly[0].candidate.familyId === 'feastle',
+  JSON.stringify(forcedQuestionnaireOnly.map((entry) => ({ family: entry.candidate.familyId, seed: entry.candidate.signal.seedId }))));
+
+// --- 11. Seeded RNG is deterministic and seed-sensitive ---------------------
 const rngA = makeSeededRng('alpha');
 const rngB = makeSeededRng('alpha');
 check('same seed yields the same RNG sequence', rngA() === rngB() && rngA() === rngB(), 'mismatch');
 check('different seeds diverge', makeSeededRng('alpha')() !== makeSeededRng('beta')(), 'collision');
 
-// --- 11. No candidates -> null (trait fallback path) ------------------------
+// --- 12. No candidates -> null (trait fallback path) ------------------------
 const emptyDay = makeDay({ moments: [makeMoment('focus', 0)], stepsCount: 3000 });
 check('uncovered day returns null', selectHatch({ day: emptyDay, history: {}, rng: makeSeededRng('e') }) === null);
 

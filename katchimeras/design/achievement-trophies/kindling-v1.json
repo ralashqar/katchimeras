@@ -1,0 +1,227 @@
+{
+  "family": "kindling",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/kindling.png",
+    "../../assets/images/katchimeras/world/objects/decor_plants/grove/stone_lantern.webp",
+    "../../assets/images/katchimeras/manual-journal/people.webp"
+  ],
+  "sheets": [
+    {
+      "input": "kindling-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/kindling-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "community-moments-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            290,
+            470
+          ]
+        },
+        {
+          "name": "community-moments-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            290,
+            0,
+            615,
+            470
+          ]
+        },
+        {
+          "name": "community-moments-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            615,
+            0,
+            925,
+            470
+          ]
+        },
+        {
+          "name": "community-moments-4",
+          "row": 0,
+          "column": 3,
+          "bounds": [
+            925,
+            0,
+            1254,
+            470
+          ]
+        },
+        {
+          "name": "helping-moments-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            470,
+            309,
+            844
+          ]
+        },
+        {
+          "name": "helping-moments-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            309,
+            470,
+            594,
+            844
+          ]
+        },
+        {
+          "name": "helping-moments-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            594,
+            470,
+            911,
+            844
+          ]
+        },
+        {
+          "name": "helping-moments-4",
+          "row": 1,
+          "column": 3,
+          "bounds": [
+            911,
+            470,
+            1254,
+            844
+          ]
+        },
+        {
+          "name": "family-goals-1",
+          "row": 2,
+          "column": 0,
+          "bounds": [
+            0,
+            844,
+            297,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-2",
+          "row": 2,
+          "column": 1,
+          "bounds": [
+            297,
+            844,
+            602,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-3",
+          "row": 2,
+          "column": 2,
+          "bounds": [
+            602,
+            844,
+            907,
+            1254
+          ]
+        }
+      ]
+    },
+    {
+      "input": "kindling-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/kindling-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "companion-quests-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            396,
+            598
+          ]
+        },
+        {
+          "name": "companion-quests-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            396,
+            0,
+            788,
+            598
+          ]
+        },
+        {
+          "name": "companion-quests-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            788,
+            0,
+            1254,
+            598
+          ]
+        },
+        {
+          "name": "journey-goals-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            598,
+            400,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            400,
+            598,
+            777,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            777,
+            598,
+            1254,
+            1254
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -55,6 +55,11 @@ export function CreatureProvenance({ creature }: { creature: LocalCreatureRecord
   const showReason = Boolean(creature.rarityReason) && creature.rarity !== 'common';
   const echoes = (creature.fieldEchoes ?? []).slice(0, 3);
   const accent = creature.accentColor;
+  const journalReasons = creature.hatchDecision?.candidates
+    .find((candidate) => candidate.selected)
+    ?.contributions
+    .filter((item, index, rows) => rows.findIndex((row) => row.explanation === item.explanation) === index)
+    .slice(0, 2) ?? [];
 
   if (!seedLabel && echoes.length === 0) {
     return null;
@@ -81,6 +86,19 @@ export function CreatureProvenance({ creature }: { creature: LocalCreatureRecord
               </ThemedText>
             ) : null}
           </View>
+        </View>
+      ) : null}
+
+      {journalReasons.length > 0 ? (
+        <View style={styles.reasonList}>
+          {journalReasons.map((reason) => (
+            <View key={`${reason.journalRecordId}:${reason.routeKey}`} style={styles.reasonRow}>
+              <IconSymbol color={reason.keyMoment ? Lantern.ember300 : Lantern.moon300} name={reason.keyMoment ? 'star.fill' : 'book.closed.fill'} size={14} />
+              <ThemedText style={styles.journalReason} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
+                {reason.keyMoment ? `Your key moment: ${reason.explanation}` : `Your journal: ${reason.explanation}`}
+              </ThemedText>
+            </View>
+          ))}
         </View>
       ) : null}
 
@@ -160,6 +178,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  reasonList: { gap: 7 },
+  reasonRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  journalReason: { flex: 1, fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
   echoBlock: {
     borderTopColor: 'rgba(215, 228, 255, 0.1)',
     borderTopWidth: 1,

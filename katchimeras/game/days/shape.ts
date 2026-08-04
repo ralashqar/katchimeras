@@ -1,7 +1,11 @@
 import type { StoredHomeDayRecord } from '@/types/home';
 
 export function dayInputSignature(day: StoredHomeDayRecord): string {
-  return `${day.locations.length}|${day.moments.length}|${day.selectedPathId ?? ''}|${day.hatchCheckIn?.moodId ?? ''}|${day.hatchCheckIn?.flowId ?? ''}|${day.hatchCheckIn?.categoryId ?? ''}|${day.creature ? 1 : 0}`;
+  const journalSignature = (day.journalRecords ?? [])
+    .map((record) => `${record.id}:${record.flowId}.${record.categoryId}.${typeof record.fields.context === 'string' ? record.fields.context : ''}`)
+    .sort()
+    .join(',');
+  return `${day.locations.length}|${day.moments.length}|${day.selectedPathId ?? ''}|${day.hatchCheckIn?.moodId ?? ''}|${day.hatchCheckIn?.flowId ?? ''}|${day.hatchCheckIn?.categoryId ?? ''}|${journalSignature}|${day.keyJournalRecordId ?? ''}|${day.creature ? 1 : 0}`;
 }
 
 export function dayHasShape(day: StoredHomeDayRecord) {

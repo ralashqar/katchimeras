@@ -1,0 +1,227 @@
+{
+  "family": "waglet",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/waglet.png",
+    "../../assets/images/katchimeras/world/objects/photo/pet_pedestal.webp",
+    "../../assets/images/katchimeras/world/objects/food/picnic_hamper.webp"
+  ],
+  "sheets": [
+    {
+      "input": "waglet-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/waglet-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "pet-moments-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            310,
+            469
+          ]
+        },
+        {
+          "name": "pet-moments-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            310,
+            0,
+            610,
+            469
+          ]
+        },
+        {
+          "name": "pet-moments-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            610,
+            0,
+            922,
+            469
+          ]
+        },
+        {
+          "name": "pet-moments-4",
+          "row": 0,
+          "column": 3,
+          "bounds": [
+            922,
+            0,
+            1254,
+            469
+          ]
+        },
+        {
+          "name": "play-and-care-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            469,
+            304,
+            824
+          ]
+        },
+        {
+          "name": "play-and-care-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            304,
+            469,
+            614,
+            824
+          ]
+        },
+        {
+          "name": "play-and-care-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            614,
+            469,
+            908,
+            824
+          ]
+        },
+        {
+          "name": "play-and-care-4",
+          "row": 1,
+          "column": 3,
+          "bounds": [
+            908,
+            469,
+            1254,
+            824
+          ]
+        },
+        {
+          "name": "family-goals-1",
+          "row": 2,
+          "column": 0,
+          "bounds": [
+            0,
+            824,
+            289,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-2",
+          "row": 2,
+          "column": 1,
+          "bounds": [
+            289,
+            824,
+            588,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-3",
+          "row": 2,
+          "column": 2,
+          "bounds": [
+            588,
+            824,
+            888,
+            1254
+          ]
+        }
+      ]
+    },
+    {
+      "input": "waglet-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/waglet-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "companion-quests-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            376,
+            628
+          ]
+        },
+        {
+          "name": "companion-quests-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            376,
+            0,
+            790,
+            628
+          ]
+        },
+        {
+          "name": "companion-quests-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            790,
+            0,
+            1254,
+            628
+          ]
+        },
+        {
+          "name": "journey-goals-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            628,
+            364,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            364,
+            628,
+            756,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            756,
+            628,
+            1254,
+            1254
+          ]
+        }
+      ]
+    }
+  ]
+}

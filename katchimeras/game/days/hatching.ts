@@ -19,6 +19,7 @@ import { buildReflectionContext } from '@/utils/reflection-context';
 import { resolveVariantCellId } from '@/utils/creature-variant';
 import { buildDailyCreatureCard } from '@/utils/daily-card';
 import { deriveDaySkySnapshot } from '@/utils/day-sky';
+import { dayForDevHatchSelection } from '@/utils/forced-low-signal-hatch';
 import { stableHash } from './hash';
 import { resolveDayState, resolveHatchHour } from './lifecycle';
 import { computeDayScores, parsePathId, resolveRarity } from './scoring';
@@ -33,15 +34,16 @@ export function finalizeDayHatch(
   encounterHistory: EncounterHistoryMap,
   pastDays: readonly StoredHomeDayRecord[] = []
 ): StoredHomeDayRecord {
-  const scores = computeDayScores(day);
+  const hatchInputDay = dayForDevHatchSelection(day);
+  const scores = computeDayScores(hatchInputDay);
   const sortedTraits = [...scoreOrder].sort((left, right) => scores[right] - scores[left]);
   const primaryTrait = sortedTraits[0] ?? 'calm';
   const secondaryTrait = sortedTraits[1] ?? 'focus';
 
   const yesterdayProfileId = resolveYesterdayProfileId(day, pastDays);
-  const seed = `${day.isoDate}|${dayInputSignature(day)}|${day.storedNonce ?? ''}`;
+  const seed = `${day.isoDate}|${dayInputSignature(hatchInputDay)}|${day.storedNonce ?? ''}`;
   const selection = selectHatch({
-    day,
+    day: hatchInputDay,
     history: encounterHistory,
     yesterdayProfileId,
     rng: makeSeededRng(seed),
@@ -76,7 +78,7 @@ export function finalizeDayHatch(
     };
   }
 
-  return finalizeFallbackHatch(day, profile, now, scores, primaryTrait, secondaryTrait, pastDays);
+  return finalizeFallbackHatch(day, profile, now, scores, primaryTrait, secondaryTrait, pastDays, hatchInputDay);
 }
 
 export function triggerHatchForDay(
@@ -175,21 +177,22 @@ function finalizeFallbackHatch(
   scores: DayScores,
   primaryTrait: HomeScoreKey,
   secondaryTrait: HomeScoreKey,
-  pastDays: readonly StoredHomeDayRecord[]
+  pastDays: readonly StoredHomeDayRecord[],
+  hatchInputDay: StoredHomeDayRecord = day
 ): StoredHomeDayRecord {
   const signature = [
-    day.isoDate,
-    ...day.moments.map((moment) => moment.type),
-    day.selectedPathId ?? 'none',
+    hatchInputDay.isoDate,
+    ...hatchInputDay.moments.map((moment) => moment.type),
+    hatchInputDay.selectedPathId ?? 'none',
   ].join('|');
   const hash = stableHash(signature);
-  const rarity = resolveRarity(scores, day.moments);
+  const rarity = resolveRarity(scores, hatchInputDay.moments);
   const visualPool = homeVisualPools[primaryTrait];
   const visualKey = visualPool[hash % visualPool.length] ?? visualPool[0];
   const roots = homeNameRoots[primaryTrait];
   const suffixes = homeNameSuffixes[secondaryTrait];
   const name = `${roots[hash % roots.length]}${suffixes[(hash >> 3) % suffixes.length]}`;
-  const highlightMoment = pickHighlightMoment(day.moments, primaryTrait);
+  const highlightMoment = pickHighlightMoment(hatchInputDay.moments, primaryTrait);
   const accentColor = homeCreatureVisuals[visualKey].accentColor;
 
   const creature: LocalCreatureRecord = withKatchimeraIdentity({

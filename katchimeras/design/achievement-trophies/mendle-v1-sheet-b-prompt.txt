@@ -1,0 +1,7 @@
+Create six isolated Katchimeras achievement keepsakes in an EXACT 3 columns by 2 rows production sprite sheet. Match the style board's cozy rounded miniature 3D look and Mendle palette: muted sage, blue-grey, ivory cloth, amber candlelight, pale stone, weathered wood, matte ceramic, and restrained gold repair seams. References are style-only; no characters or scenes.
+
+Perfectly flat uniform #ff00ff background. Repeat: EXACT 3-by-2 grid. One compact connected subject per cell, centered, no more than 68% occupancy, at least 10% uninterrupted pure-magenta gutter on every side, and clear gutters between cells. Nothing touches boundaries. No shadows, floor, reflections, text, numbers, characters, faces, panels, cups, medals, ribbons, or generic awards.
+
+Row 1 — COMPANION QUESTS tiers I–III: the same reflection satchel progression, from a small sage cloth bag with blank journal, to a wrapped blue-grey satchel with attached candle lantern and repaired ceramic token, to a compact richly equipped healing backpack with secured journal, ivory wraps, candle lantern, still-water vial, and gold fittings. Every accessory is attached or contained.
+
+Row 2 — JOURNEY GOALS tiers I–III: the same miniature quiet-garden doorway, from a simple weathered-wood arch with one pale stone, to a sage-draped arch with repaired bowl and candle, to a serene compact sanctuary arch with still-water dish, layered stones, ivory cloth, candles, and gold-repaired ceramic details on one connected base.

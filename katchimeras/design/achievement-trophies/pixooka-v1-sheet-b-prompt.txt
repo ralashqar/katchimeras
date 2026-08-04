@@ -1,0 +1,7 @@
+Create six isolated Katchimeras achievement keepsakes in an EXACT 3 columns by 2 rows production sprite sheet. Match the style board's cozy rounded miniature 3D look and Pixooka palette: cobalt, cyan, magenta, violet, mint-turquoise, warm white, frosted plastic, rubber, enamel, walnut, and restrained warm metal. References are style-only; no characters or scenes.
+
+Perfectly flat uniform #00ff00 background. Repeat: EXACT 3-by-2 grid. One compact connected subject per cell, centered, no more than 68% occupancy, at least 10% uninterrupted pure-green gutter on every side, and clear gutters between cells. Nothing touches boundaries. No shadows, floor, reflections, text, numbers, characters, panels, cups, medals, ribbons, or generic awards. No chroma green in subjects.
+
+Row 1 — COMPANION QUESTS tiers I–III: the same player gear bag progressing from a small cobalt-and-white controller case, to a cyan-and-violet satchel with secured controller and two blank cartridges, to a compact equipped gaming backpack with controller, cartridge rack, headphones, charging cable, frosted light panel, and pink-cyan accents.
+
+Row 2 — JOURNEY GOALS tiers I–III: the same playful arcade portal progressing from a simple rounded walnut-and-cobalt arch with one tiled step, to a cyan-lit arch with controller ornament and two violet steps, to a vibrant compact game-room doorway with blank frosted display, cartridge shelves, controller, tiled heart crest, and three cyan-magenta illuminated steps on one connected base.

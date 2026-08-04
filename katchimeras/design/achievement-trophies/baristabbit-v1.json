@@ -1,0 +1,61 @@
+{
+  "family": "baristabbit",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/baristabbit.png",
+    "../../assets/images/katchimeras/environments/coffee_cafe/base.jpg",
+    "../../assets/images/katchimeras/world/objects/body_studio/tea_service.webp"
+  ],
+  "sheets": [
+    {
+      "input": "baristabbit-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/baristabbit-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "columnCuts": [0, 294, 584, 902, 1254],
+        "rowCuts": [0, 456, 808, 1254]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        { "name": "cafe-visits-1", "row": 0, "column": 0 },
+        { "name": "cafe-visits-2", "row": 0, "column": 1 },
+        { "name": "cafe-visits-3", "row": 0, "column": 2 },
+        { "name": "cafe-visits-4", "row": 0, "column": 3 },
+        { "name": "drink-moments-1", "row": 1, "column": 0 },
+        { "name": "drink-moments-2", "row": 1, "column": 1 },
+        { "name": "drink-moments-3", "row": 1, "column": 2 },
+        { "name": "drink-moments-4", "row": 1, "column": 3 },
+        { "name": "family-goals-1", "row": 2, "column": 0 },
+        { "name": "family-goals-2", "row": 2, "column": 1 },
+        { "name": "family-goals-3", "row": 2, "column": 2 }
+      ]
+    },
+    {
+      "input": "baristabbit-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/baristabbit-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2,
+        "columnCuts": [0, 391, 800, 1254],
+        "rowCuts": [0, 613, 1254]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        { "name": "companion-quests-1", "row": 0, "column": 0 },
+        { "name": "companion-quests-2", "row": 0, "column": 1 },
+        { "name": "companion-quests-3", "row": 0, "column": 2 },
+        { "name": "journey-goals-1", "row": 1, "column": 0 },
+        { "name": "journey-goals-2", "row": 1, "column": 1 },
+        { "name": "journey-goals-3", "row": 1, "column": 2 }
+      ]
+    }
+  ]
+}

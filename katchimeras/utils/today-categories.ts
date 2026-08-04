@@ -70,11 +70,17 @@ export function findUnconfirmedPlace(day: HomeDayRecord): DayMapNode | null {
 
 // Steps spike: an unmistakably active day (7k+) or well above the recent norm,
 // not yet interpreted (same read as the World Journey "!").
-export function stepsNeedInterpreting(day: HomeDayRecord, recentAvgSteps?: number | null): boolean {
+export function stepsNeedInterpreting(
+  day: Pick<HomeDayRecord, 'stepsInterpretation' | 'stepsCount' | 'exactRouteSegments'>,
+  recentAvgSteps?: number | null
+): boolean {
   if (day.stepsInterpretation) return false;
   const steps = day.stepsCount ?? 0;
   const spike = recentAvgSteps ? steps >= Math.max(4500, recentAvgSteps * 1.6) : false;
-  return steps >= 7000 || spike;
+  const meaningfulRoute = (day.exactRouteSegments ?? []).some((segment) =>
+    /walk|hike|run|jog|cycle|bike/i.test(segment.activityType)
+  );
+  return steps >= 7000 || spike || meaningfulRoute;
 }
 
 function hasFeelingAnswer(day: HomeDayRecord): boolean {

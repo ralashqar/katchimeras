@@ -10,6 +10,7 @@ import type { JournalRecord, StoredHomeDayRecord } from '@/types/home';
 import {
   currentHatchCheckInQuestion,
   hatchCheckInEligibility,
+  hatchReflectionMoments,
   rankedHatchCheckInFlows,
   repairGeneratedHatchCheckInAnchor,
 } from '@/utils/hatch-check-in';
@@ -74,16 +75,16 @@ function quickGoalJournal(id: string): JournalRecord {
   } as JournalRecord;
 }
 
-test('passive signals suggest context without replacing the empty-day hierarchy', () => {
+test('passive signals become selectable evidence without pretending they are journal entries', () => {
   const passive = {
     ...day(), stepsCount: 8400, visitedPlaceCount: 2, newPlaceCount: 1, locationSampleCount: 8,
     locations: [{ id: 'point', lat: 51.5, lng: -0.1, capturedAt: now.toISOString(), type: 'unknown', hasPhoto: false, source: 'foreground' }],
   } as StoredHomeDayRecord;
-  assert.equal(hatchCheckInEligibility(passive), 'empty');
+  assert.equal(hatchCheckInEligibility(passive), 'thin');
   assert.equal(rankedHatchCheckInFlows(passive)[0]?.id, 'movement');
-  const started = withStartedHatchCheckIn(passive, 'empty', now);
-  assert.deepEqual(started.hatchCheckIn?.questionPlan, ['reconstruct.focus', 'reconstruct.category', 'reflection.meaning']);
-  assert.equal(currentHatchCheckInQuestion(started)?.kind, 'flow');
+  const started = withStartedHatchCheckIn(passive, 'thin', now);
+  assert.deepEqual(started.hatchCheckIn?.questionPlan, ['reflection.moment', 'evidence.category', 'reflection.meaning']);
+  assert.equal(currentHatchCheckInQuestion(started)?.kind, 'moment');
 });
 
 test('planner distinguishes thin, regular, and rich days', () => {
@@ -222,4 +223,52 @@ test('hatch now records skipped or partial and never creates empty recap noise',
   const partial = withFinishedHatchCheckIn(focus, 'partial', new Date(now.getTime() + 2));
   assert.equal(partial.hatchCheckIn?.status, 'partial');
   assert.equal(buildMomentTimeline(partial as never).filter((item) => item.category === 'Daily reflection').length, 1);
+});
+
+test('a museum day with 20k steps offers both concrete interpretations', () => {
+  const museumDay = {
+    ...day(),
+    stepsCount: 20_000,
+    placeCategorySeeds: ['museum'],
+    visitedPlaceCount: 1,
+  } as StoredHomeDayRecord;
+
+  const choices = hatchReflectionMoments(museumDay);
+  assert.deepEqual(choices.map((choice) => choice.label), ['Museum or gallery', '20,000 steps']);
+  const started = withStartedHatchCheckIn(museumDay, 'thin', now);
+  assert.equal(currentHatchCheckInQuestion(started)?.title, 'What best holds this day?');
+
+  const museum = withHatchCheckInAnswer(started, { kind: 'moment', id: 'detected:museum' }, new Date(now.getTime() + 1));
+  assert.equal(currentHatchCheckInQuestion(museum)?.kind, 'meaning');
+  assert.equal(museum.hatchCheckIn?.categoryId, 'museum');
+  assert.equal(museum.hatchCheckIn?.encounterSeedBias[0]?.seedId, 'museum');
+});
+
+test('choosing raw steps asks what kind of movement before asking its meaning', () => {
+  const activeDay = { ...day(), stepsCount: 20_000, placeCategorySeeds: ['museum'] } as StoredHomeDayRecord;
+  const started = withStartedHatchCheckIn(activeDay, 'thin', now);
+  const steps = withHatchCheckInAnswer(started, { kind: 'moment', id: 'steps:significant' }, new Date(now.getTime() + 1));
+  assert.equal(currentHatchCheckInQuestion(steps)?.kind, 'category');
+  assert.match(currentHatchCheckInQuestion(steps)?.title ?? '', /movement/i);
+  const hike = withHatchCheckInAnswer(steps, { kind: 'category', id: 'hike' }, new Date(now.getTime() + 2));
+  assert.equal(currentHatchCheckInQuestion(hike)?.kind, 'meaning');
+  assert.equal(hike.hatchCheckIn?.encounterSeedBias[0]?.seedId, 'high_steps_day');
+});
+
+test('canonical journal affinities resolve museum rather than the old generic park fallback', () => {
+  const started = withStartedHatchCheckIn(day(), 'empty', now);
+  const somewhere = withHatchCheckInAnswer(started, { kind: 'flow', id: 'went_somewhere' }, new Date(now.getTime() + 1));
+  const museum = withHatchCheckInAnswer(somewhere, { kind: 'category', id: 'museum' }, new Date(now.getTime() + 2));
+  assert.equal(museum.hatchCheckIn?.encounterSeedBias[0]?.seedId, 'museum');
+});
+
+test('selecting an existing journal moment marks it key without creating another record', () => {
+  const journalDay = {
+    ...day(),
+    journalRecords: [journal('book', 'studio', 'book', 'A novel'), journal('walk', 'movement', 'walk', 'Riverside walk')],
+  } as StoredHomeDayRecord;
+  const started = withStartedHatchCheckIn(journalDay, 'rich', now);
+  const selected = withHatchCheckInAnswer(started, { kind: 'moment', id: 'journal:walk' }, new Date(now.getTime() + 1));
+  assert.equal(selected.keyJournalRecordId, 'walk');
+  assert.equal(selected.journalRecords?.length, 2);
 });

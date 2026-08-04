@@ -1,0 +1,11 @@
+Create a production sprite sheet of twelve isolated Katchimeras achievement keepsakes in an EXACT 4 columns by 3 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Museling palette: peach clay, warm cream, cobalt blue, violet, turquoise, coral pink, sunny yellow, walnut, canvas, and matte ceramic. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #00ff00 background. Repeat: EXACT 4-by-3 grid, twelve cells. Exactly one compact connected keepsake per cell, centered, at most 68% occupancy, with at least 10% uninterrupted pure-green gutter on every side and clearly visible gutters between cells. Complete bases. Nothing touches a boundary. No shadows, floor, reflections, scenery, text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges. Do not use bright chroma green inside the artwork.
+
+Row 1 — MAKING SESSIONS progression tiers I–IV. Use the same tiny artist worktable: tier I has one blank cream canvas tile, brush, and peach palette; tier II adds paint pots in cobalt and violet; tier III adds a small walnut easel and drying rack; tier IV is a richly equipped compact creative station with easel, palette, brushes, paint pots, clay tool, and warm lamp. No painted letters or pictures.
+
+Row 2 — CREATIVE PROJECTS progression tiers I–IV. Use the same project folio box: tier I is one coral-and-cream tied folio; tier II adds a second cobalt folio and thread spool; tier III is a compact compartment box with canvas roll, clay piece, and paint swatches; tier IV is an ornate but compact project archive chest filled with distinct connected creative materials and colourful blank folios.
+
+Row 3 — GOALS progression tiers I–IV. Use the same palette crest: tier I is a rounded peach palette token with three raised colour wells; tier II adds a tiny attached brush and walnut rim; tier III becomes a standing palette crest with cobalt, violet, coral, and yellow inlays; tier IV is an ornate mastery palette with layered brushes, gold-toned ferrules, and warm glow. Tier IV is generation-only.
+
+Keep silhouettes playful but handcrafted, readable at 80 pixels, similar in mass, and fully isolated.

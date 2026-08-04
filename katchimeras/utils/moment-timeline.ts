@@ -21,6 +21,7 @@ export type MomentTimelineEntry = {
   noteText?: string | null;
   thumbnailUri?: string | null;
   audioUri?: string | null;
+  keyMoment?: boolean;
 };
 
 const MEANING_META: Record<string, { icon: IconSymbolName; accent: string }> = {
@@ -174,15 +175,17 @@ export function buildMomentTimeline(day: HomeDayRecord): MomentTimelineEntry[] {
     const choice = flow?.choices.find((item) => item.id === entry.categoryId);
     const specific = typeof entry.fields.specific === 'string' ? entry.fields.specific.trim() : '';
     const linkedNote = entry.linkedNoteId ? (day.notes ?? []).find((note) => note.id === entry.linkedNoteId) : null;
+    const keyMoment = entry.id === `manual-${day.keyJournalRecordId}`;
     push({
       id: `manual:${entry.id}`,
       createdAt: entry.createdAt,
-      icon: choice?.icon ?? flow?.icon ?? 'plus.circle.fill',
+      icon: keyMoment ? 'star.fill' : choice?.icon ?? flow?.icon ?? 'plus.circle.fill',
       accent: '#FFC36B',
       label: specific || choice?.label || flow?.title || 'Journal entry',
-      category: choice?.label ?? flow?.title ?? 'Journal',
+      category: keyMoment ? `Key moment Â· ${choice?.label ?? flow?.title ?? 'Journal'}` : choice?.label ?? flow?.title ?? 'Journal',
       noteText: linkedNote?.text ?? entry.note,
       audioUri: linkedNote?.kind === 'voice' ? linkedNote.audioUri : null,
+      keyMoment,
     });
   }
 

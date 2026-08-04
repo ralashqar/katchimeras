@@ -1,0 +1,13 @@
+Create a production sprite sheet of fifteen isolated Katchimeras achievement keepsakes in an EXACT 5 columns by 3 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Mendle palette: muted sage, blue-grey, warm ivory bandage cloth, honey amber candlelight, pale stone, weathered wood, matte ceramic, and restrained gold repair seams. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #ff00ff background. Repeat: EXACT 5-by-3 grid, fifteen cells total. Exactly one compact connected keepsake per cell, centered, no more than 68% occupancy, with at least 10% uninterrupted pure-magenta gutter on every side and clearly visible gutters between cells. Include complete bases. Nothing touches any boundary. No cast/contact shadows, floor, reflections, scenery, text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges.
+
+Row 1, left to right — REFLECTIONS progression tiers I–V. Use the same quiet reflection-journal keepsake: tier I is a small closed sage journal with amber candle pebble; tier II is an open blank journal on a pale stone base; tier III adds a rounded still-water mirror and one candle; tier IV adds layered blank pages, two candles, and a gold-edged mirror; tier V is a richly crafted but compact reflection shrine with blank journal, still-water mirror, warm candles, sage cloth, and restrained gold details. No writing.
+
+Row 2, left to right — REPAIR MOMENTS progression tiers I–V. Use the same repaired ceramic bowl: tier I is a small cracked ivory bowl with one subtle gold repair seam; tier II adds a sage cloth wrap; tier III has several elegant gold seams and a tiny amber candle; tier IV becomes a complete repaired tea set with bowl, cup, cloth, and gold seams on one connected tray; tier V is a more ornate generation-only mastery repair set with additional repaired vessel and warm candle, still compact. The gold seams must look handcrafted, not lightning.
+
+Row 3 cells 1–2 — CALM DAYS tiers I–II. Cell 1 is a small smooth-stone cairn beside one amber candle on a connected sage mat. Cell 2 is a richer calm altar with three rounded stones, still-water dish, folded ivory cloth, and two warm candles on one connected base.
+
+Row 3 cells 3–5 — GOALS tiers I–III. Use the same mended-heart crest token: first is a simple rounded sage crest with an amber heart-shaped inset and one ivory wrap; second adds a subtle gold repair seam and pale stone rim; third becomes a standing mastery crest with layered wrap, warm candle glow, gold seam, and carved wood base.
+
+Keep all silhouettes chunky, contemplative, readable at 80 pixels, similar in visual mass, and fully isolated.

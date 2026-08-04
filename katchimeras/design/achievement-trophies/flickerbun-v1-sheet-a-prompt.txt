@@ -1,0 +1,13 @@
+Create a production sprite sheet of sixteen isolated Katchimeras achievement keepsakes in an EXACT 4 columns by 4 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Flickerbun palette: midnight navy, deep burgundy, plum velvet, warm amber light, brass, dark walnut, cream film stock, and subtle starry blue enamel. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #ff00ff background. Repeat: EXACT 4-by-4 grid, sixteen cells. Exactly one compact connected keepsake per cell, centered, at most 66% occupancy, with at least 10% uninterrupted pure-magenta gutter on every side and clearly visible gutters between all cells. Complete bases. Nothing touches a boundary. No shadows, floor, reflections, scenery, readable text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges.
+
+Row 1 — SCREEN STORIES progression tiers I–IV. Use the same reel-lantern projector: tier I is a small brass-edged film reel lamp; tier II adds a walnut projector body and cream reel strip secured inside; tier III adds paired reels and burgundy viewing hood; tier IV is a richly detailed compact story projector with paired reels, amber lens, navy body, velvet curtain detail, and starry enamel base.
+
+Row 2 — TITLES DISCOVERED progression tiers I–IV. Use the same film archive: tier I is one round navy film canister with blank brass center; tier II is two distinct canisters in a walnut tray; tier III is a compact shelf with three canisters and a tiny amber lamp; tier IV is an ornate story archive cabinet with multiple blank canisters, cream film rolls, warm lamps, and brass corners. No labels.
+
+Row 3 — CINEMA VISITS progression tiers I–IV. Use the same miniature cinema entrance: tier I is a burgundy doorway with one amber footlight; tier II adds navy velvet curtains and two lights; tier III adds a brass marquee canopy with blank cream panels and three lights; tier IV is a generation-only ornate cinema facade with curved marquee, curtains, lanterns, and starry enamel steps. No signage.
+
+Row 4 — GOALS progression tiers I–IV. Use the same framed-screen token: tier I is a small rounded navy frame with blank amber inset; tier II adds burgundy curtain corners; tier III becomes a standing story-screen crest with brass reel ornament and starry base; tier IV is an ornate generation-only mastery screen with layered curtains, reel, amber glow, and brass edging.
+
+Keep all sixteen silhouettes readable at 80 pixels, similar in visual mass, and fully isolated.

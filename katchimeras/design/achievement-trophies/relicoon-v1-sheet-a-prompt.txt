@@ -1,0 +1,11 @@
+Create a production sprite sheet of twelve isolated Katchimeras achievement keepsakes in an EXACT 4 columns by 3 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Relicoon palette: terracotta orange, deep teal, warm cream stone, weathered walnut, aged bronze, museum burgundy, and small moss accents. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #ff00ff background. Repeat: EXACT 4-by-3 grid, twelve cells. Exactly one compact connected keepsake per cell, centered, at most 68% occupancy, with at least 10% uninterrupted pure-magenta gutter on every side and clearly visible gutters between cells. Complete bases. Nothing touches a boundary. No shadows, floor, reflections, scenery, readable text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges.
+
+Row 1 — MUSEUM VISITS progression tiers I–IV. Use the same miniature museum entrance: tier I is a simple cream-stone arch and one terracotta step; tier II adds paired teal columns and a tiny blank banner; tier III adds a bronze lamp and display plinth; tier IV is a richly detailed compact museum facade with columns, burgundy canopy, bronze lamps, and three stone steps. No signage.
+
+Row 2 — CULTURE KEPT progression tiers I–IV. Use the same curator display case: tier I is one small artefact shard on a teal velvet plinth; tier II adds a rounded glass-like dome and bronze label plate with no writing; tier III becomes a two-shelf cabinet with pottery shard and carved token; tier IV is a compact ornate museum cabinet with several distinct connected artefacts, warm lights, stone base, and bronze corners.
+
+Row 3 — GOALS progression tiers I–IV. Use the same curator catalogue token: tier I is a rounded terracotta-and-teal tablet with a raised blank cream tile; tier II adds a small bronze artefact peg; tier III becomes a standing museum catalogue board with three blank tiles and stone base; tier IV is an ornate mastery catalogue with columns, bronze trim, and warm light. Tier IV is generation-only. No writing.
+
+Keep silhouettes sturdy, historical but friendly, readable at 80 pixels, similar in mass, and fully isolated.

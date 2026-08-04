@@ -1,0 +1,227 @@
+{
+  "family": "snuglet",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/snuglet.png",
+    "../../assets/images/katchimeras/world/objects/food/picnic_hamper.webp",
+    "../../assets/images/katchimeras/manual-journal/people.webp"
+  ],
+  "sheets": [
+    {
+      "input": "snuglet-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/snuglet-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "caregiving-moments-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            298,
+            446
+          ]
+        },
+        {
+          "name": "caregiving-moments-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            298,
+            0,
+            604,
+            446
+          ]
+        },
+        {
+          "name": "caregiving-moments-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            604,
+            0,
+            902,
+            446
+          ]
+        },
+        {
+          "name": "caregiving-moments-4",
+          "row": 0,
+          "column": 3,
+          "bounds": [
+            902,
+            0,
+            1254,
+            446
+          ]
+        },
+        {
+          "name": "care-moments-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            446,
+            292,
+            818
+          ]
+        },
+        {
+          "name": "care-moments-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            292,
+            446,
+            598,
+            818
+          ]
+        },
+        {
+          "name": "care-moments-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            598,
+            446,
+            903,
+            818
+          ]
+        },
+        {
+          "name": "care-moments-4",
+          "row": 1,
+          "column": 3,
+          "bounds": [
+            903,
+            446,
+            1254,
+            818
+          ]
+        },
+        {
+          "name": "family-goals-1",
+          "row": 2,
+          "column": 0,
+          "bounds": [
+            0,
+            818,
+            293,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-2",
+          "row": 2,
+          "column": 1,
+          "bounds": [
+            293,
+            818,
+            584,
+            1254
+          ]
+        },
+        {
+          "name": "family-goals-3",
+          "row": 2,
+          "column": 2,
+          "bounds": [
+            584,
+            818,
+            912,
+            1254
+          ]
+        }
+      ]
+    },
+    {
+      "input": "snuglet-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/snuglet-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        {
+          "name": "companion-quests-1",
+          "row": 0,
+          "column": 0,
+          "bounds": [
+            0,
+            0,
+            386,
+            628
+          ]
+        },
+        {
+          "name": "companion-quests-2",
+          "row": 0,
+          "column": 1,
+          "bounds": [
+            386,
+            0,
+            818,
+            628
+          ]
+        },
+        {
+          "name": "companion-quests-3",
+          "row": 0,
+          "column": 2,
+          "bounds": [
+            818,
+            0,
+            1254,
+            628
+          ]
+        },
+        {
+          "name": "journey-goals-1",
+          "row": 1,
+          "column": 0,
+          "bounds": [
+            0,
+            628,
+            374,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-2",
+          "row": 1,
+          "column": 1,
+          "bounds": [
+            374,
+            628,
+            762,
+            1254
+          ]
+        },
+        {
+          "name": "journey-goals-3",
+          "row": 1,
+          "column": 2,
+          "bounds": [
+            762,
+            628,
+            1254,
+            1254
+          ]
+        }
+      ]
+    }
+  ]
+}

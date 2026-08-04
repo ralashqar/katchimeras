@@ -1,0 +1,11 @@
+Create a production sprite sheet of twelve isolated Katchimeras achievement keepsakes in an EXACT 4 columns by 3 rows grid. Match the style board's cozy premium rounded miniature 3D rendering and Pagelet palette: warm ivory cloth, parchment cream, burgundy, plum, pale sage, walnut, soft leather, and restrained antique gold. References are style-only; do not reproduce characters, rooms, or collage framing.
+
+Use a perfectly flat uniform #ff00ff background. Repeat: EXACT 4-by-3 grid, twelve cells. Exactly one compact connected keepsake per cell, centered, at most 68% occupancy, with at least 10% uninterrupted pure-magenta gutter on every side and clearly visible gutters between cells. Complete bases fully visible. Nothing touches a boundary. No shadows, floor, reflections, scenery, text, letters, numbers, characters, faces, generic trophy cups, medals, ribbons, or badges.
+
+Row 1 — READING progression tiers I–IV. Use the same open-book reading nook: tier I is one open blank parchment book on a burgundy cloth; tier II adds a small sage bookmark and warm reading candle; tier III adds a curved walnut bookrest and tiny spectacles; tier IV is a richly crafted compact reading desk with open book, lamp, spectacles, bookmark, and plum leather inlay. No writing.
+
+Row 2 — BOOKS progression tiers I–IV. Use the same collected-book stack: tier I is one closed ivory-and-sage volume; tier II is two coordinated books with a plum bookmark; tier III is a compact three-volume bookcase with brass corners; tier IV is a miniature rounded library cabinet filled with distinct blank-spined volumes and a warm lamp. No spine labels.
+
+Row 3 — GOALS progression tiers I–IV. Use the same bookmark-and-book token: tier I is a small walnut-backed closed book with burgundy bookmark; tier II adds a pale gold corner and second page layer; tier III becomes a standing open-book crest with sage and plum inlays; tier IV is an ornate mastery book crest with layered pages, warm glow, and antique-gold edging. Tier IV is generation-only.
+
+Keep silhouettes chunky, readable at 80 pixels, similar in mass, and fully isolated.

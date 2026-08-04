@@ -1,0 +1,61 @@
+{
+  "family": "flexel",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/flexel.png",
+    "../../assets/images/katchimeras/cutouts/hooplet.png",
+    "../../assets/images/katchimeras/manual-journal/movement.webp"
+  ],
+  "sheets": [
+    {
+      "input": "flexel-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/flexel-v1",
+      "grid": {
+        "columns": 4,
+        "rows": 3,
+        "columnCuts": [0, 386, 739, 1109, 1536],
+        "rowCuts": [0, 384, 684, 1024]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        { "name": "exercise-sessions-1", "row": 0, "column": 0 },
+        { "name": "exercise-sessions-2", "row": 0, "column": 1 },
+        { "name": "exercise-sessions-3", "row": 0, "column": 2 },
+        { "name": "exercise-sessions-4", "row": 0, "column": 3 },
+        { "name": "sports-tried-1", "row": 1, "column": 0 },
+        { "name": "sports-tried-2", "row": 1, "column": 1 },
+        { "name": "sports-tried-3", "row": 1, "column": 2 },
+        { "name": "sports-tried-4", "row": 1, "column": 3 },
+        { "name": "family-goals-1", "row": 2, "column": 0 },
+        { "name": "family-goals-2", "row": 2, "column": 1 },
+        { "name": "family-goals-3", "row": 2, "column": 2 }
+      ]
+    },
+    {
+      "input": "flexel-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/flexel-v1",
+      "grid": {
+        "columns": 3,
+        "rows": 2,
+        "columnCuts": [0, 452, 975, 1536],
+        "rowCuts": [0, 508, 1024]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        { "name": "companion-quests-1", "row": 0, "column": 0 },
+        { "name": "companion-quests-2", "row": 0, "column": 1 },
+        { "name": "companion-quests-3", "row": 0, "column": 2 },
+        { "name": "journey-goals-1", "row": 1, "column": 0 },
+        { "name": "journey-goals-2", "row": 1, "column": 1 },
+        { "name": "journey-goals-3", "row": 1, "column": 2 }
+      ]
+    }
+  ]
+}
