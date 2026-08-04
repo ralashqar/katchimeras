@@ -431,6 +431,17 @@ function normalizeSemanticChildRoute(
       reason: !routeKey ? 'semantic_child_route_empty' : 'semantic_child_confidence_missing',
     };
   }
+  if (routeKey === 'undetermined') {
+    return {
+      kind: 'flow_only', stage: 'enum_route', flowId, categoryId: null,
+      candidates: [flowCandidate(flowId, modelConfidenceScore(topLevelConfidence))],
+      selected: null, selectedFlowId: flowId,
+      visualSubject: frame.primarySubject, provider: 'appleFoundation', rawResponse: raw,
+      enumResponse: raw, evidence, attempts: [], decisionBasis: null,
+      semanticFrame: frame, reason: 'foundation_child_not_visually_distinguishable',
+      navigationAction: 'open_flow', topLevelConfidence, subcategoryConfidence,
+    };
+  }
   const confidenceScore = modelConfidenceScore(subcategoryConfidence);
   const baseRoute = journalRouteForKey(routeKey, confidenceScore, 'Apple Foundation selected a child of the evidence-locked journal flow');
   if (!baseRoute || baseRoute.flowId !== flowId) {
@@ -444,17 +455,28 @@ function normalizeSemanticChildRoute(
   const verificationVerdict = cleanString(raw.verificationVerdict);
   const verificationEvidenceKey = cleanString(raw.verificationEvidenceKey);
   const verificationConfidence = cleanModelConfidence(raw.verificationConfidence);
+  const visibleRouteSupport = rankPhotoJournalRouteSupport(evidence ?? frame.evidence);
+  const proposedVisibleSupport = visibleRouteSupport.find((support) => support.routeKey === routeKey)?.support ?? 0;
+  const strongestVisibleSibling = visibleRouteSupport
+    .filter((support) => support.routeKey !== routeKey && support.routeKey.startsWith(`${flowId}.`))
+    .sort((left, right) => right.support - left.support)[0] ?? null;
+  const contradictedByVisibleSibling = !!strongestVisibleSibling
+    && strongestVisibleSibling.support >= ROUTE_CANDIDATE_MIN_EVIDENCE_SUPPORT
+    && strongestVisibleSibling.support >= proposedVisibleSupport + ROUTE_COMPETITOR_MARGIN;
   const independentlyGrounded = verificationVerdict === 'supported'
     && verificationConfidence === 'high'
     && verificationEvidenceKey !== null
     && verificationEvidenceKey !== 'none'
-    && frame.classificationEvidenceKeys.includes(verificationEvidenceKey);
+    && frame.classificationEvidenceKeys.includes(verificationEvidenceKey)
+    && !contradictedByVisibleSibling;
   if (subcategoryConfidence !== 'high' || !independentlyGrounded) {
     const reason = subcategoryConfidence !== 'high'
       ? `foundation_child_${subcategoryConfidence}_confidence`
-      : verificationVerdict === 'not_distinguishable'
-        ? 'foundation_child_not_visually_distinguishable'
-        : `foundation_child_verification_${cleanString(raw.verificationStatus) ?? 'missing'}`;
+      : contradictedByVisibleSibling
+        ? 'foundation_child_contradicted_by_visible_sibling'
+        : verificationVerdict === 'not_distinguishable'
+          ? 'foundation_child_not_visually_distinguishable'
+          : `foundation_child_verification_${cleanString(raw.verificationStatus) ?? 'missing'}`;
     return {
       kind: 'flow_only', stage: 'enum_route', flowId, categoryId: null,
       candidates: [flowCandidate(flowId, modelConfidenceScore(topLevelConfidence))],

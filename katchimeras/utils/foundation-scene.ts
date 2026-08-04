@@ -126,7 +126,7 @@ type FoundationSceneModule = {
 
 export const FOUNDATION_MEMORY_PROMPT_VERSION = 2;
 export const FOUNDATION_NOTE_SCHEMA_VERSION = 6;
-export const FOUNDATION_PHOTO_SCHEMA_VERSION = 16;
+export const FOUNDATION_PHOTO_SCHEMA_VERSION = 17;
 // Photo schema 13 introduced the dynamic structured bridge used by the live
 // classifier. Later app schema versions change the app-authored prompt
 // contract, not the native bridge shape, so an installed v13 development
@@ -388,9 +388,10 @@ async function runPhotoSemanticFrameTask(
         return modelFlowId ? [`${modelFlowId}: ${flow.title}${flow.description ? `. ${flow.description}` : ''}`] : [];
       })
       .join('\n');
-    const taskId = mode === 'primary' ? 'photo.top-level.v4' : mode === 'retry' ? 'photo.top-level.retry.v4' : 'photo.top-level.repair.v4';
+    const allowedTopLevelValues = [...allowedFlowIds, 'undetermined'];
+    const taskId = mode === 'primary' ? 'photo.top-level.v5' : mode === 'retry' ? 'photo.top-level.retry.v5' : 'photo.top-level.repair.v5';
     const instructions = [
-      'Map the mechanically locked principal visual evidence cluster to exactly one supplied broad journal flow.',
+      'Map the mechanically locked principal visual evidence cluster to one supplied broad journal flow, or return undetermined when the visual evidence cannot safely establish any one flow.',
       'The app has already selected the principal cluster from detector confidence, observation-source reliability, independent corroboration, and available spatial evidence.',
       'The supplied observations are the top filtered Essence tags from the same relevance pipeline used by the review UI. No unfiltered raw-label background is available.',
       'Do not re-rank the observations or replace the locked principal with another Essence tag.',
@@ -399,15 +400,16 @@ async function runPhotoSemanticFrameTask(
       'Representation describes the outer captured image and is not by itself proof that every detected subject is physically present.',
       'OCR is intentionally absent. Use only the supplied visual evidence and the supplied flow titles and descriptions.',
       'Choose the flow that best represents the locked principal subject in the photo.',
+      'Use undetermined when the locked principal and its context conflict, or when choosing a broad flow would depend on replacing the locked principal.',
       'Report high confidence only when the visual evidence clearly identifies one flow over the alternatives. Use medium when plausible but review is advisable, and low when the user should choose.',
     ].join(' ');
     const prompt = [
       photoTopLevelEvidenceText(frame),
-      `Broad journal flows:\n${flowDescriptions}`,
+      `Broad journal flows:\n${flowDescriptions}\nundetermined: The visual evidence does not safely identify one broad journal flow; the user must choose.`,
       'Select the best broad flow for the locked principal evidence. Judge this stage independently.',
     ].join('\n\n');
     const fields: StructuredBridgeField[] = [
-      { name: 'flowId', description: 'Best broad journal flow for the locked principal visual evidence', kind: 'enum', values: allowedFlowIds },
+      { name: 'flowId', description: 'Best broad journal flow for the locked principal visual evidence, or undetermined when no one flow is grounded', kind: 'enum', values: allowedTopLevelValues },
       { name: 'confidence', description: 'Confidence in this broad-flow decision only', kind: 'enum', values: ['high', 'medium', 'low'] },
     ];
     const modelRequest = { taskId, instructions, prompt, fields, sampling: 'greedy' };
@@ -422,9 +424,9 @@ async function runPhotoSemanticFrameTask(
       return topLevelFailure('technical', { ...(bridge.rawResponse ?? {}), modelRequest }, bridge.durationMs, bridge.reason ?? 'Foundation structured bridge returned no result');
     }
     const raw: Record<string, unknown> = { ...bridge.response, modelRequest };
-    const flowId = cleanEnum(raw.flowId, allowedFlowIds);
+    const flowId = cleanEnum(raw.flowId, allowedTopLevelValues);
     if (!flowId) return topLevelFailure('invalid_output', raw, bridge.durationMs, 'Foundation omitted a valid broad journal flow');
-    const topLevel = photoTopLevelForSemanticFlow(flowId);
+    const topLevel = flowId === 'undetermined' ? 'ambiguous' : photoTopLevelForSemanticFlow(flowId);
     if (!topLevel) return topLevelFailure('invalid_output', raw, bridge.durationMs, 'Foundation returned an unmapped broad journal flow');
     const confidence = cleanEnum(raw.confidence, ['high', 'medium', 'low']) as PhotoModelConfidence | null;
     if (!confidence) return topLevelFailure('invalid_output', raw, bridge.durationMs, 'Foundation omitted top-level confidence');
@@ -521,14 +523,19 @@ export async function classifyPhotoJournalEnumOnDevice(
     `${entry.label}. ${entry.definition}`,
     entry.exclusions.length ? `Exclude: ${entry.exclusions.slice(0, 2).join(' / ')}.` : '',
   ].filter(Boolean).join(' '));
+  const allowedChildRouteKeys = [...candidateRouteKeys, 'undetermined'];
+  const allowedChildDescriptions = [
+    ...candidateDescriptions,
+    'The visual evidence does not distinguish one child route from its siblings; the user must choose inside the selected broad flow.',
+  ];
   const modelRequest = {
     requestedAt: new Date().toISOString(),
     stage: 'enum_route',
     outputSchema: 'PhotoRouteDecision.routeKey+confidence+independentGrounding',
     evidence,
     lockedFlowId: semanticFrame.flowKey,
-    candidateRouteKeys,
-    candidateDescriptions,
+    candidateRouteKeys: allowedChildRouteKeys,
+    candidateDescriptions: allowedChildDescriptions,
     sampling: 'greedy',
   } as Record<string, unknown>;
   const routeInstructions = [
@@ -538,22 +545,22 @@ export async function classifyPhotoJournalEnumOnDevice(
     'Treat the locked principal cluster as the subject and the remaining clusters only as context.',
     'Broad or contextual evidence that fits several sibling routes is insufficient for high confidence.',
     'Use high confidence only when the visual evidence distinguishes one supplied child route from its siblings.',
-    'When the evidence does not distinguish a child route, still choose the best candidate but report medium or low confidence so the app can ask the user inside the selected broad flow.',
+    'When the evidence does not distinguish a child route, return undetermined so the app can ask the user inside the selected broad flow.',
     'High means the subcategory is visually clear; medium means plausible but review is advisable; low means the user should choose.',
     'Do not extract names, OCR values, or editable fields in this classification pass.',
   ].join(' ');
   const routePrompt = [
     `Original visual evidence (OCR excluded):\n${evidence}`,
     `Selected broad flow: ${semanticFrame.flowKey}`,
-    `Allowed child routes:\n${candidateRouteKeys.map((key, index) => `${key}: ${candidateDescriptions[index]}`).join('\n')}`,
+    `Allowed child routes:\n${allowedChildRouteKeys.map((key, index) => `${key}: ${allowedChildDescriptions[index]}`).join('\n')}`,
     'From scratch, select the best child route and report confidence in this child decision.',
   ].join('\n\n');
   const routeFields: StructuredBridgeField[] = [
-    { name: 'routeKey', description: 'Best child route inside the selected broad flow', kind: 'enum', values: candidateRouteKeys },
+    { name: 'routeKey', description: 'Best child route inside the selected broad flow, or undetermined when siblings are not visually distinguishable', kind: 'enum', values: allowedChildRouteKeys },
     { name: 'confidence', description: 'Confidence in this child-route decision only', kind: 'enum', values: ['high', 'medium', 'low'] },
   ];
   Object.assign(modelRequest, {
-    taskId: 'photo.child-route.v4',
+    taskId: 'photo.child-route.v5',
     instructions: routeInstructions,
     prompt: routePrompt,
     fields: routeFields,
@@ -578,6 +585,14 @@ export async function classifyPhotoJournalEnumOnDevice(
       };
     }
     const proposedRouteKey = typeof response.routeKey === 'string' ? response.routeKey : '';
+    if (proposedRouteKey === 'undetermined') {
+      return {
+        verificationStatus: 'skipped',
+        verificationVerdict: 'not_distinguishable',
+        verificationEvidenceKey: 'none',
+        verificationConfidence: 'high',
+      };
+    }
     const proposedIndex = candidateRouteKeys.indexOf(proposedRouteKey);
     if (proposedIndex < 0) {
       return {
@@ -674,7 +689,7 @@ export async function classifyPhotoJournalEnumOnDevice(
   const startedAt = Date.now();
   try {
     const primaryStartedAt = Date.now();
-    const response = await runGenericRouteTask('photo.child-route.v4') ?? {};
+    const response = await runGenericRouteTask('photo.child-route.v5') ?? {};
     const primaryDurationMs = Date.now() - primaryStartedAt;
     const attempts: Record<string, unknown>[] = [];
     if (hasRouteDecision(response)) {
@@ -685,7 +700,7 @@ export async function classifyPhotoJournalEnumOnDevice(
 
     attempts.push(emptyEnumAttempt('primary', response, primaryDurationMs));
     const retryStartedAt = Date.now();
-    const retry = await runGenericRouteTask('photo.child-route.retry.v4') ?? {};
+    const retry = await runGenericRouteTask('photo.child-route.retry.v5') ?? {};
     const retryDurationMs = Date.now() - retryStartedAt;
     if (hasRouteDecision(retry)) {
       attempts.push(successfulEnumAttempt('simplified_retry', retry, retryDurationMs));

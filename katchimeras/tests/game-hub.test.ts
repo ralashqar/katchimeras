@@ -42,3 +42,10 @@ test('hub and quick-launch games retain the authored world environments', () => 
   assert.match(route, /router\.dismissTo\('\/games'\)/);
   assert.doesNotMatch(route, /LinearGradient/);
 });
+
+test('hub cards do not cover their artwork with a played-today badge', () => {
+  const hub = readFileSync('components/katchadeck/games/game-hub-screen.tsx', 'utf8');
+
+  assert.doesNotMatch(hub, /styles\.playedBadge/);
+  assert.doesNotMatch(hub, />TODAY<\/ThemedText>/);
+});

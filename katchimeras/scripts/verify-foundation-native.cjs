@@ -226,10 +226,10 @@ check('older note builds receive route-locked Foundation field enrichment',
   foundationNote.includes("taskId: 'note.specific.v1'")
     && foundationNote.includes('The supplied journal route is already selected and immutable')
     && foundationNote.includes('never the whole note'));
-check('availability diagnostics expose native bridge schema v14 and app prompt contract v16',
+check('availability diagnostics expose native bridge schema v14 and app prompt contract v17',
   swift.includes('"photoSchemaVersion": JournalNoteRouteCatalog.photoSchemaVersion')
     && generatedNote.includes('photoSchemaVersion = "14"')
-    && foundationScene.includes('FOUNDATION_PHOTO_SCHEMA_VERSION = 16')
+    && foundationScene.includes('FOUNDATION_PHOTO_SCHEMA_VERSION = 17')
     && swift.includes('"structuredBridgeVersion": "1"'));
 check('installed photo schema v13 remains compatible with the dynamic bridge',
   foundationScene.includes('FOUNDATION_PHOTO_MIN_COMPATIBLE_SCHEMA_VERSION = 13')
@@ -241,12 +241,12 @@ check('generic native bridge accepts bounded runtime string and enum schemas',
     && swift.includes('field.kind == "enum"')
     && swift.includes('requestJson.utf8.count <= 64_000'));
 check('active photo passes use fresh greedy generic bridge tasks',
-  foundationScene.includes("mode === 'primary' ? 'photo.top-level.v4' : mode === 'retry' ? 'photo.top-level.retry.v4' : 'photo.top-level.repair.v4'")
+  foundationScene.includes("mode === 'primary' ? 'photo.top-level.v5' : mode === 'retry' ? 'photo.top-level.retry.v5' : 'photo.top-level.repair.v5'")
     && foundationScene.includes("name: 'flowId'")
     && foundationScene.includes("name: 'confidence'")
     && foundationScene.includes("sampling: 'greedy'")
     && foundationScene.includes('lockedPrincipalEvidenceKey = frame.primaryEvidenceKeys[0]')
-    && foundationScene.includes("runGenericRouteTask('photo.child-route.v4')")
+    && foundationScene.includes("runGenericRouteTask('photo.child-route.v5')")
     && foundationScene.includes("taskId: 'photo.child-route-verifier.v1'")
     && foundationScene.includes("'photo.book-ocr.v1'")
     && foundationScene.includes('generateStructuredTask('));

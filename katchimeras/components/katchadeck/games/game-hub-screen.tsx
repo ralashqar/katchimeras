@@ -298,12 +298,6 @@ function GameCard({ item, onPress, width }: { item: GameHubItem; onPress: () => 
               {item.displayCompanionName}
             </ThemedText>
           </View>
-          {item.playedToday && !item.locked ? (
-            <View style={styles.playedBadge}>
-              <IconSymbol name="checkmark" size={12} color="#1F2A1D" />
-              <ThemedText style={styles.playedText} lightColor="#1F2A1D" darkColor="#1F2A1D">TODAY</ThemedText>
-            </View>
-          ) : null}
           {item.locked ? (
             <View style={styles.lockVeil}>
               <View style={styles.lockBadge}>
@@ -384,8 +378,6 @@ const styles = StyleSheet.create({
   art: { overflow: 'hidden', position: 'relative', width: '100%' },
   artGlyph: { left: 13, opacity: 0.66, position: 'absolute', top: 13 },
   creatureArt: { bottom: -5, height: '89%', position: 'absolute', right: -12, width: '94%' },
-  playedBadge: { alignItems: 'center', backgroundColor: '#DCC873', borderRadius: 8, flexDirection: 'row', gap: 3, left: 9, minHeight: 25, paddingHorizontal: 7, position: 'absolute', top: 9 },
-  playedText: { fontFamily: AppFontFamilies.manrope, fontSize: 8.5, fontWeight: '900', letterSpacing: 0.7 },
   companionBadge: { backgroundColor: 'rgba(17,16,22,0.72)', borderColor: 'rgba(255,245,218,0.18)', borderRadius: 9, borderWidth: 1, bottom: 8, justifyContent: 'center', left: 8, maxWidth: '68%', minHeight: 25, paddingHorizontal: 7, position: 'absolute' },
   companionBadgeText: { fontFamily: AppFontFamilies.manrope, fontSize: 9, fontWeight: '900' },
   playBadge: { alignItems: 'center', backgroundColor: 'rgba(22,21,28,0.86)', borderRadius: 999, borderWidth: 1, bottom: 8, height: 32, justifyContent: 'center', position: 'absolute', right: 8, width: 32 },

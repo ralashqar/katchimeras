@@ -43,7 +43,7 @@ exports.refinePhotoSemanticFrameOnDevice = async (frame) => {
 };
 exports.retryPhotoTopLevelOnDevice = exports.refinePhotoSemanticFrameOnDevice;
 exports.enrichPhotoJournalOnDevice = async () => null;
-exports.FOUNDATION_PHOTO_SCHEMA_VERSION = 16;
+exports.FOUNDATION_PHOTO_SCHEMA_VERSION = 17;
 exports.foundationSceneAvailability = () => ({ available: true, reason: 'available', photoSchemaVersion: 14, structuredBridgeVersion: 1 });
 exports.supportsFoundationPhotoJournalSchema = () => true;
 `);
@@ -175,6 +175,29 @@ function resolvedFrame(packet, topLevel = 'food', confidence = 'high') {
     JSON.stringify(ungrounded)
   );
 
+  const explicitlyUndetermined = analysis.normalizePhotoJournalEnumRoute(
+    {
+      stage: 'enum_route',
+      routeKey: 'undetermined',
+      confidence: 'high',
+      photoSchemaVersion: 16,
+      verificationStatus: 'skipped',
+      verificationVerdict: 'not_distinguishable',
+      verificationEvidenceKey: 'none',
+      verificationConfidence: 'high',
+    },
+    packet,
+    locked
+  );
+  check(
+    'an explicitly undetermined child opens the locked broad flow',
+    explicitlyUndetermined.kind === 'flow_only'
+      && explicitlyUndetermined.selected === null
+      && explicitlyUndetermined.selectedFlowId === 'food'
+      && explicitlyUndetermined.navigationAction === 'open_flow',
+    JSON.stringify(explicitlyUndetermined)
+  );
+
   const escaped = analysis.normalizePhotoJournalEnumRoute(
     { stage: 'enum_route', routeKey: 'studio.book', confidence: 'high', photoSchemaVersion: 16 },
     packet,
@@ -235,6 +258,41 @@ function resolvedFrame(packet, topLevel = 'food', confidence = 'high') {
       && unsupportedMediaChild.selectedFlowId === 'studio'
       && unsupportedMediaChild.categoryId === null,
     JSON.stringify(unsupportedMediaChild)
+  );
+
+  const televisionPhoto = photo([
+    ['toy', 0.716],
+    ['stuffed animals', 0.716],
+    ['cabinet', 0.574],
+    ['television', 0.561],
+    ['computer', 0.265],
+    ['device monitor', 0.265],
+    ['computer monitor', 0.265],
+    ['person', 0.320],
+  ]);
+  const televisionPacket = evidence.buildPhotoJournalEvidence(televisionPhoto.vision, televisionPhoto.raw);
+  const televisionFrame = resolvedFrame(televisionPacket, 'media');
+  const contradictedBook = analysis.normalizePhotoJournalEnumRoute(
+    {
+      stage: 'enum_route',
+      routeKey: 'studio.book',
+      confidence: 'high',
+      photoSchemaVersion: 16,
+      verificationStatus: 'completed',
+      verificationVerdict: 'supported',
+      verificationEvidenceKey: 'vision:toy',
+      verificationConfidence: 'high',
+    },
+    televisionPacket,
+    televisionFrame
+  );
+  check(
+    'television evidence prevents a contradictory Book auto-route even when the verifier supports it',
+    contradictedBook.kind === 'flow_only'
+      && contradictedBook.selected === null
+      && contradictedBook.selectedFlowId === 'studio'
+      && contradictedBook.reason === 'foundation_child_contradicted_by_visible_sibling',
+    JSON.stringify(contradictedBook)
   );
 
   const tracedDisplayVision = {
@@ -500,6 +558,20 @@ function resolvedFrame(packet, topLevel = 'food', confidence = 'high') {
     JSON.stringify(mediumResult)
   );
 
+  global.__enumCalls = 0;
+  global.__topConfidence = 'high';
+  global.__topLevel = 'ambiguous';
+  const undeterminedTopProgressive = analysis.preparePhotoJournalAnalysis(apple.vision, apple.raw);
+  const undeterminedTopResult = await undeterminedTopProgressive.refinement;
+  check(
+    'an undetermined top-level result requests the full journal picker without running a child pass',
+    global.__enumCalls === 0
+      && undeterminedTopResult?.selected === null
+      && undeterminedTopResult?.selectedFlowId === null
+      && undeterminedTopResult?.navigationAction === 'manual',
+    JSON.stringify(undeterminedTopResult)
+  );
+
   const foundationSource = fs.readFileSync(path.join(root, 'utils/foundation-scene.ts'), 'utf8');
   check(
     'top and child structured tasks use greedy sampling',
@@ -512,8 +584,9 @@ function resolvedFrame(packet, topLevel = 'food', confidence = 'high') {
         foundationSource.indexOf('export async function classifyPhotoJournalEnumOnDevice'),
         foundationSource.indexOf('function hasRouteDecision')
       );
-      return childSource.includes("runGenericRouteTask('photo.child-route.v4')")
+      return childSource.includes("runGenericRouteTask('photo.child-route.v5')")
         && childSource.includes("taskId: 'photo.child-route-verifier.v1'")
+        && childSource.includes("'undetermined'")
         && childSource.includes("name: 'confidence'")
         && childSource.includes("name: 'evidenceKey'")
         && childSource.includes("values: ['none', ...semanticFrame.classificationEvidenceKeys]")
@@ -531,6 +604,7 @@ function resolvedFrame(packet, topLevel = 'food', confidence = 'high') {
       const fieldSource = topSource.slice(topSource.indexOf('const fields:'), topSource.indexOf('const modelRequest'));
       return fieldSource.includes("name: 'flowId'")
         && fieldSource.includes("name: 'confidence'")
+        && topSource.includes("'undetermined'")
         && !fieldSource.includes("name: 'primaryEvidenceKey'")
         && !fieldSource.includes("name: 'topLevel'")
         && topSource.includes('lockedPrincipalEvidenceKey = frame.primaryEvidenceKeys[0]')
@@ -570,6 +644,13 @@ function resolvedFrame(packet, topLevel = 'food', confidence = 'high') {
       && refinementCacheIndex >= 0
       && refinementUiGuardIndex > refinementCacheIndex
       && essenceReviewSource.includes('saveDevLastPhotoAnalysis({')
+  );
+  check(
+    'photo ambiguity opens the picker at the narrowest grounded level',
+    essenceReviewSource.includes("analysis.navigationAction === 'manual'")
+      && essenceReviewSource.includes('setJournalFlowId(null)')
+      && essenceReviewSource.includes("analysis.kind === 'flow_only' && analysis.selectedFlowId")
+      && essenceReviewSource.includes('setJournalFlowId(analysis.selectedFlowId)')
   );
 
   if (failures) {

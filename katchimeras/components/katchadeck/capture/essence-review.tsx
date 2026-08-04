@@ -243,7 +243,8 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
     setJournalAnalysisState(analysis.kind === 'unrouted' ? 'failed' : 'ready');
     if (analysis.selected) {
       openJournalRoute(analysis.selected, analysis);
-    } else if (analysis.reason?.startsWith('foundation_top_level_')) {
+    } else if (analysis.navigationAction === 'manual'
+      && analysis.semanticFrame?.stage === 'foundation_reconciled') {
       setJournalFlowId(null);
       setJournalPickerOpen(true);
     } else if (analysis.kind === 'flow_only' && analysis.selectedFlowId) {
