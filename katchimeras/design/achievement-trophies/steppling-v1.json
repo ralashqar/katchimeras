@@ -1,0 +1,47 @@
+{
+  "family": "steppling",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts/steppling.png",
+    "../../assets/images/katchimeras/world/backgrounds/steppling-exploration-v2.png",
+    "../../assets/images/katchimeras/world/objects/steps_path/steps_path_01.webp"
+  ],
+  "sheets": [
+    {
+      "input": "steppling-v1-sheet-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/steppling-v1",
+      "grid": {
+        "columns": 5,
+        "rows": 4,
+        "columnCuts": [0, 274, 563, 828, 1116, 1402],
+        "rowCuts": [0, 325, 586, 849, 1122]
+      },
+      "cleanComponents": true,
+      "tightFit": true,
+      "subjectCoverage": 0.78,
+      "dropEdgeFragments": true,
+      "strictCellBounds": true,
+      "cells": [
+        { "name": "step-days-1", "row": 0, "column": 0 },
+        { "name": "step-days-2", "row": 0, "column": 1 },
+        { "name": "step-days-3", "row": 0, "column": 2 },
+        { "name": "step-days-4", "row": 0, "column": 3 },
+        { "name": "step-days-5", "row": 0, "column": 4 },
+        { "name": "walking-streak-1", "row": 1, "column": 0 },
+        { "name": "walking-streak-2", "row": 1, "column": 1 },
+        { "name": "walking-streak-3", "row": 1, "column": 2 },
+        { "name": "walking-streak-4", "row": 1, "column": 3 },
+        { "name": "walks-shared-1", "row": 1, "column": 4 },
+        { "name": "family-goals-1", "row": 2, "column": 0 },
+        { "name": "family-goals-2", "row": 2, "column": 1 },
+        { "name": "family-goals-3", "row": 2, "column": 2 },
+        { "name": "walks-shared-2", "row": 2, "column": 3 },
+        { "name": "companion-quests-1", "row": 2, "column": 4 },
+        { "name": "companion-quests-2", "row": 3, "column": 0 },
+        { "name": "companion-quests-3", "row": 3, "column": 1 },
+        { "name": "journey-goals-1", "row": 3, "column": 2 },
+        { "name": "journey-goals-2", "row": 3, "column": 3 },
+        { "name": "journey-goals-3", "row": 3, "column": 4 }
+      ]
+    }
+  ]
+}

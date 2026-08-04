@@ -66,12 +66,15 @@ export function CompanionDestinationHeader({
   backLabel = 'Home',
   label,
   onBack,
+  titleTone = 'default',
 }: {
   backLabel?: string;
   label: string;
   onBack: () => void;
+  titleTone?: 'default' | 'gold';
 }) {
   const insets = useSafeAreaInsets();
+  const goldTitle = titleTone === 'gold';
   return (
     <View style={[styles.destinationHeader, { paddingTop: insets.top + 10 }]}>
       <CompanionBackAction label={backLabel} onPress={onBack} tone="night" />
@@ -82,9 +85,9 @@ export function CompanionDestinationHeader({
           minimumFontScale={0.82}
           numberOfLines={1}
           selectable
-          style={styles.destinationTitle}
-          lightColor="#FFF9EA"
-          darkColor="#FFF9EA">
+          style={[styles.destinationTitle, goldTitle && styles.destinationTitleGold]}
+          lightColor={goldTitle ? '#FFD36E' : '#FFF9EA'}
+          darkColor={goldTitle ? '#FFD36E' : '#FFF9EA'}>
           {label}
         </ThemedText>
       </View>
@@ -340,6 +343,15 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(23,40,49,0.65)',
     textShadowOffset: { height: 2, width: 0 },
     textShadowRadius: 3,
+  },
+  destinationTitleGold: {
+    ...KatchaUI.type.companionName,
+    fontSize: 29,
+    letterSpacing: -0.2,
+    lineHeight: 33,
+    textShadowColor: 'rgba(30,48,53,0.88)',
+    textShadowOffset: { height: 3, width: 0 },
+    textShadowRadius: 4,
   },
   destinationSurface: {
     backgroundColor: 'transparent',

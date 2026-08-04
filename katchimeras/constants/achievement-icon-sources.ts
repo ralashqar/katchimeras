@@ -104,6 +104,41 @@ const MOSS = {
   ],
 } satisfies Record<string, readonly ImageSource[]>;
 
+const STEPPLING = {
+  'step-days': [
+    require('../assets/images/katchimeras/achievements/steppling-v1/step-days-1.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/step-days-2.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/step-days-3.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/step-days-4.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/step-days-5.webp'),
+  ],
+  'walking-streak': [
+    require('../assets/images/katchimeras/achievements/steppling-v1/walking-streak-1.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/walking-streak-2.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/walking-streak-3.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/walking-streak-4.webp'),
+  ],
+  'walks-shared': [
+    require('../assets/images/katchimeras/achievements/steppling-v1/walks-shared-1.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/walks-shared-2.webp'),
+  ],
+  'family-goals': [
+    require('../assets/images/katchimeras/achievements/steppling-v1/family-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/family-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/family-goals-3.webp'),
+  ],
+  'companion-quests': [
+    require('../assets/images/katchimeras/achievements/steppling-v1/companion-quests-1.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/companion-quests-2.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/companion-quests-3.webp'),
+  ],
+  'journey-goals': [
+    require('../assets/images/katchimeras/achievements/steppling-v1/journey-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/journey-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/steppling-v1/journey-goals-3.webp'),
+  ],
+} satisfies Record<string, readonly ImageSource[]>;
+
 const FAMILY_ART_KIND: Record<KatchimeraFamilyId, keyof typeof JOURNAL_ART> = {
   baristabbit: 'food', feastle: 'food', steppling: 'movement', flexel: 'movement', bedrotte: 'general',
   dawnle: 'general', mendle: 'general', gatherglow: 'people', heartmote: 'people', kindling: 'people',
@@ -115,6 +150,10 @@ const FAMILY_ART_KIND: Record<KatchimeraFamilyId, keyof typeof JOURNAL_ART> = {
 export function companionAchievementIconSource(definition: CompanionAchievementDef): ImageSource {
   if (definition.familyId === 'mossprout' && definition.sectionId in MOSS) {
     const progression = MOSS[definition.sectionId as keyof typeof MOSS];
+    return progression[Math.min(progression.length - 1, definition.tier - 1)];
+  }
+  if (definition.familyId === 'steppling' && definition.sectionId in STEPPLING) {
+    const progression = STEPPLING[definition.sectionId as keyof typeof STEPPLING];
     return progression[Math.min(progression.length - 1, definition.tier - 1)];
   }
   const index = Math.max(0, Math.min(3, definition.tier - 1));

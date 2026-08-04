@@ -41,7 +41,7 @@ const PILLAR_ICON: Record<CompanionAchievementPillar, IconSymbolName> = {
 };
 
 const TROPHY_WIDTH = 144;
-const TROPHY_ART_SIZE = 132;
+const TROPHY_ART_SIZE = 120;
 const TIER_PRESENTATION = [
   { label: 'Common', color: '#756B59' },
   { label: 'Uncommon', color: '#66834F' },
@@ -104,7 +104,14 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
       <View style={[styles.topBar, { paddingTop: insets.top + 10, width: maxWidth }]}>
         <KatchimeraBackButton accessibilityLabel={`Back to ${family.displayName}`} onPress={() => router.back()} />
         <View style={styles.topTitleWrap}>
-          <ThemedText selectable style={styles.topTitle} lightColor="#FFF9EA" darkColor="#FFF9EA">
+          <ThemedText
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            numberOfLines={1}
+            selectable
+            style={styles.topTitle}
+            lightColor="#FFD36E"
+            darkColor="#FFD36E">
             Trophy room
           </ThemedText>
           <ThemedText selectable style={styles.topCount} lightColor="#F3DFC0" darkColor="#F3DFC0">
@@ -299,10 +306,7 @@ function CarouselTrophy({
           contentFit="contain"
           priority={isSelected ? 'high' : 'normal'}
           source={companionAchievementIconSource(entry.def)}
-          style={[
-            styles.carouselArt,
-            { transform: [{ scale: trophyArtScale(entry) }] },
-          ]}
+          style={styles.carouselArt}
           transition={0}
         />
         {earned ? (
@@ -326,18 +330,6 @@ function tierPresentation(entry: CompanionAchievementEntry) {
   return TIER_PRESENTATION[Math.max(0, Math.min(TIER_PRESENTATION.length - 1, entry.def.tier - 1))];
 }
 
-/**
- * Trophy sources share square canvases, but their visible alpha bounds vary
- * considerably. Zoom only the padded sets inside the clipped presentation
- * frame so the row and shelf dimensions remain unchanged.
- */
-function trophyArtScale(entry: CompanionAchievementEntry): number {
-  if (entry.def.familyId === 'mossprout') return 1.9;
-  if (entry.def.pillar === 'quests') return 1.4;
-  if (entry.def.pillar === 'journey') return 1.25;
-  return 1;
-}
-
 function AchievementCard({ entry }: { entry: CompanionAchievementEntry }) {
   const earned = Boolean(entry.record);
   const tint = PILLAR_TINT[entry.def.pillar];
@@ -355,7 +347,6 @@ function AchievementCard({ entry }: { entry: CompanionAchievementEntry }) {
           source={companionAchievementIconSource(entry.def)}
           style={[
             styles.cardArt,
-            { transform: [{ scale: trophyArtScale(entry) }] },
             !earned && styles.artLocked,
           ]}
           transition={0}
@@ -398,7 +389,7 @@ const styles = StyleSheet.create({
   content: { alignSelf: 'center', flexGrow: 1, paddingHorizontal: 14, zIndex: 3 },
   topBar: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', minHeight: 58, paddingBottom: 8, paddingHorizontal: 18, position: 'relative', zIndex: 4 },
   topTitleWrap: { alignItems: 'center', flex: 1 },
-  topTitle: { ...KatchaUI.type.companionPageTitle, fontSize: 22, lineHeight: 27, textShadowColor: 'rgba(23,40,49,0.58)', textShadowOffset: { height: 2, width: 0 }, textShadowRadius: 3 },
+  topTitle: { ...KatchaUI.type.companionName, fontSize: 29, letterSpacing: -0.2, lineHeight: 33, textShadowColor: 'rgba(30,48,53,0.88)', textShadowOffset: { height: 3, width: 0 }, textShadowRadius: 4 },
   topCount: { ...KatchaUI.type.meta, fontSize: 10, fontVariant: ['tabular-nums'], textShadowColor: 'rgba(23,40,49,0.58)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
   topBalance: { height: 44, width: 44 },
   archive: { backgroundColor: '#DFC8A4', borderColor: 'rgba(104,72,38,0.24)', borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: '0 18px 38px rgba(46,29,13,0.34), inset 0 1px 0 rgba(255,248,230,0.72)', gap: 12, overflow: 'hidden', paddingBottom: 18, paddingHorizontal: 13, paddingTop: 15, position: 'relative', zIndex: 4 },

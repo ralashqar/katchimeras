@@ -659,6 +659,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           <CompanionDestinationHeader
             backLabel={quickGoalPickerOpen ? 'Goals' : destination === 'quest' && canReturnToQuestList ? 'Quest list' : 'Home'}
             label={destinationLabel}
+            titleTone={destination === 'achievements' ? 'gold' : 'default'}
             onBack={
               quickGoalPickerOpen
                 ? experience.returnToDestination
