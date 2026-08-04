@@ -19,6 +19,7 @@ import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-ba
 import {
   companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
+  companionSpeechTitleTier,
   companionSpeechBubbleDrop,
 } from '@/utils/companion-home-layout';
 
@@ -58,6 +59,7 @@ export function CompanionCinematicStage({
   const { height, width } = useWindowDimensions();
   const compact = height < 735;
   const questionnaireBubble = bubbleVariant === 'questionnaire';
+  const defaultTitleTier = companionSpeechTitleTier(title);
   const liftProgress = useSharedValue(enterFromLifted ? 1 : 0);
   const tabletGutter = Math.max(28, (width - 720) / 2);
   const horizontalGutter = width >= 700 ? tabletGutter : 20;
@@ -139,6 +141,8 @@ export function CompanionCinematicStage({
               style={[
                 styles.title,
                 compact && styles.titleCompact,
+                !questionnaireBubble && defaultTitleTier === 'medium' && styles.titleMedium,
+                !questionnaireBubble && defaultTitleTier === 'long' && styles.titleLong,
                 questionnaireBubble && styles.questionTitle,
                 questionnaireBubble && title.length > 58 && styles.questionTitleLong,
               ]}
@@ -308,6 +312,14 @@ const styles = StyleSheet.create({
   titleCompact: {
     fontSize: 28,
     lineHeight: 30,
+  },
+  titleMedium: {
+    fontSize: 25,
+    lineHeight: 29,
+  },
+  titleLong: {
+    fontSize: 21,
+    lineHeight: 25,
   },
   questionTitle: {
     fontSize: 22,

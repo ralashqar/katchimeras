@@ -29,6 +29,7 @@ import type { TodayAtmosphereBackground } from '@/utils/day-background-scene';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import { companionQuestionnaireHeroSpacer } from '@/utils/companion-home-layout';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
+import { companionFirstPersonText } from '@/utils/companion-dialogue';
 import { CompanionCinematicStage } from './companion-cinematic-stage';
 
 export type CompanionQuestionnaireOption = {
@@ -85,6 +86,10 @@ export function CompanionQuestionnaireScene({
   const selectedId = selection.question === title ? selection.optionId : null;
   const lowerScrollRef = useRef<ScrollView>(null);
   const progressValue = useSharedValue(progress ?? 0);
+  const spokenTitle = companionFirstPersonText(title, companionName);
+  const spokenHelperText = helperText
+    ? companionFirstPersonText(helperText, companionName)
+    : undefined;
   const progressStyle = useAnimatedStyle(() => ({
     transform: [{ scaleX: progressValue.value }],
   }));
@@ -115,7 +120,7 @@ export function CompanionQuestionnaireScene({
     <View style={[styles.root, { height, width }]}>
       <TodaySceneBackdrop background={background} scene={null} variant="splash" />
       <CompanionCinematicStage
-        bubbleBody={helperText}
+        bubbleBody={spokenHelperText}
         bubbleVariant="questionnaire"
         creature={creature}
         enterFromLifted
@@ -123,7 +128,7 @@ export function CompanionQuestionnaireScene({
         lifted
         name={companionName}
         onSpeechBubbleHeightChange={setSpeechBubbleHeight}
-        title={title}
+        title={spokenTitle}
         visualKey={visualKey}
       />
 

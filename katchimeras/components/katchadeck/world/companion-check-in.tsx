@@ -5,6 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { companionQuickGoalTemplateById } from '@/constants/companion-quick-goals';
 import type { CompanionJourneyDefinition } from '@/constants/companion-journeys';
+import type { CompanionSupportStyle } from '@/constants/companion-introductions';
 import type { KatchimeraRoleDefinition } from '@/constants/katchimera-roles';
 import { Meadow } from '@/constants/meadow-theme';
 import { KatchaUI } from '@/constants/katcha-ui';
@@ -42,11 +43,13 @@ export function CompanionCheckInCard({
   companionName,
   emphasized = false,
   onOpen,
+  supportStyle,
 }: {
   checkIn: CompanionJourneyCheckIn | null;
   companionName: string;
   emphasized?: boolean;
   onOpen: () => void;
+  supportStyle?: CompanionSupportStyle;
 }) {
   const complete = Boolean(checkIn?.completedAt);
   const inProgress = Boolean(checkIn && !complete && checkIn.answers.length);
@@ -68,7 +71,11 @@ export function CompanionCheckInCard({
               ? companionCheckInSummary(checkIn!)
               : inProgress
                 ? `Question ${checkIn!.answers.length + 1} of 3. Your answers are saved.`
-                : 'Three quick choices. No writing required.'}
+                : supportStyle === 'on_demand'
+                  ? 'I’ll wait here until you choose to check in.'
+                  : supportStyle === 'patterns'
+                    ? 'Three quick choices to help us notice a pattern.'
+                    : 'Three quick choices. No writing required.'}
           </ThemedText>
         </View>
       </View>
@@ -98,6 +105,7 @@ export function CompanionCheckInPage({
   onSaveNote,
   onSetTaskStatus,
   role,
+  supportStyle,
   visualKey,
 }: {
   checkIn: CompanionJourneyCheckIn;
@@ -119,6 +127,7 @@ export function CompanionCheckInPage({
   onSaveNote: (checkIn: CompanionJourneyCheckIn, draft: CompanionReflectionDraft | null) => void;
   onSetTaskStatus: (checkInId: string, status: 'added' | 'dismissed') => void;
   role: KatchimeraRoleDefinition | null;
+  supportStyle?: CompanionSupportStyle;
   visualKey: HomeVisualKey;
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
@@ -130,8 +139,9 @@ export function CompanionCheckInPage({
   const suggestions = useMemo(
     () => checkIn.suggestedQuickGoalIds
       .map((id) => companionQuickGoalTemplateById.get(id))
-      .flatMap((template) => template ? [template] : []),
-    [checkIn.suggestedQuickGoalIds]
+      .flatMap((template) => template ? [template] : [])
+      .slice(0, supportStyle === 'gentle' ? 1 : 2),
+    [checkIn.suggestedQuickGoalIds, supportStyle]
   );
   useEffect(() => {
     setDetailOpen(false);
@@ -199,7 +209,7 @@ export function CompanionCheckInPage({
               icon="plus"
               label={`Add ${suggestionTitles.length} to Today`}
               onPress={() => {
-                const addedIds = onAddTasks(checkIn.suggestedQuickGoalIds);
+                const addedIds = onAddTasks(suggestions.map((template) => template.id));
                 setNewlyAddedTaskIds(addedIds);
                 setTaskDecision('added');
                 onSetTaskStatus(checkIn.id, 'added');

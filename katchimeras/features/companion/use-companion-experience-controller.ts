@@ -54,6 +54,10 @@ export function useCompanionExperienceController({
     () => dispatch({ type: 'open_quick_goal_picker' }),
     []
   );
+  const openIntroduction = useCallback(
+    () => dispatch({ type: 'open_introduction' }),
+    []
+  );
   const openJourneyQuestionnaire = useCallback(
     (sessionId?: string | null) => dispatch({ type: 'open_journey_questionnaire', sessionId }),
     []
@@ -103,10 +107,12 @@ export function useCompanionExperienceController({
       ? state.route.sessionId
       : null,
     checkInOpen: state.route.kind === 'check_in',
+    introductionOpen: state.route.kind === 'introduction',
     selectDestination,
     showHome,
     requestBack,
     openQuickGoalPicker,
+    openIntroduction,
     openJourneyQuestionnaire,
     syncJourneySession,
     openCheckIn,

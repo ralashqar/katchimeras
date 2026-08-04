@@ -6,7 +6,13 @@ import * as Location from 'expo-location';
 // every time a sheet re-opened. We fix it by caching the FIRST resolved label per
 // coordinate and reusing it forever — the name a place gets is the name it keeps.
 
-export type ResolvedPlaceName = { primary: string; locality: string | null };
+export type ResolvedPlaceName = {
+  primary: string;
+  locality: string | null;
+  city?: string | null;
+  region?: string | null;
+  countryCode?: string | null;
+};
 
 const CACHE_KEY = 'katcha:place-names:v1';
 // ~110 m grid — close to the day-map cluster radius (150 m), so a cluster's drifting
@@ -58,7 +64,13 @@ function labelFromGeocode(result: Location.LocationGeocodedAddress, coords: stri
       .filter((value): value is string => Boolean(value) && value !== primary)
       .slice(0, 2)
       .join(', ') || null;
-  return { primary, locality };
+  return {
+    primary,
+    locality,
+    city: result.city?.trim() || null,
+    region: result.region?.trim() || null,
+    countryCode: result.isoCountryCode?.trim().toUpperCase() || null,
+  };
 }
 
 // Resolve a coordinate to a stable, persisted place label. First resolution wins.

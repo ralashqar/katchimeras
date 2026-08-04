@@ -4,9 +4,11 @@ import test from 'node:test';
 import {
   companionDestinationSpeechBubbleTop,
   companionDestinationStageLift,
+  companionHomeHeroSpacer,
   companionHomeStageLayout,
   companionQuestionnaireHeroSpacer,
   companionQuestListSpacer,
+  companionSpeechTitleTier,
   companionSpeechBubbleDrop,
 } from '../utils/companion-home-layout';
 
@@ -48,6 +50,21 @@ test('destination pose lifts the complete cinematic stage toward the top', () =>
   assert.equal(companionDestinationStageLift(568), 118);
   assert.equal(companionDestinationStageLift(844), 135.04);
   assert.equal(companionDestinationStageLift(1194), 150);
+});
+
+test('top-level companion home hands content off closer to the lifted art', () => {
+  assert.ok(Math.abs(companionHomeHeroSpacer(568) - 193.12) < 0.0001);
+  assert.ok(Math.abs(companionHomeHeroSpacer(844) - 244.76) < 0.0001);
+  assert.equal(companionHomeHeroSpacer(1194), 270);
+});
+
+test('long home greetings step down before they overgrow the speech bubble', () => {
+  assert.equal(companionSpeechTitleTier('Where shall we begin today?'), 'standard');
+  assert.equal(companionSpeechTitleTier('I’m ready to take the next step with you.'), 'medium');
+  assert.equal(
+    companionSpeechTitleTier('I’m here for both the person you care for and the caregiver in you.'),
+    'long',
+  );
 });
 
 test('every companion page keeps its speech bubble lower beside the creature', () => {

@@ -1,4 +1,5 @@
 import type { CompanionContentItem } from '@/constants/companion-content';
+import type { CompanionSupportStyle } from '@/constants/companion-introductions';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { canonicalFamilyId, companionIdForFamily } from '@/constants/katchimera-skins';
 
@@ -49,11 +50,41 @@ export type CompanionContentEvent = {
   occurredAt: number;
 };
 
+export type CompanionIntroductionAnswer = {
+  nodeId: string;
+  optionId: string;
+  label: string;
+};
+
+export type CompanionIntroductionRecord = {
+  id: string;
+  companionId: string;
+  familyId: KatchimeraFamilyId;
+  status: 'deferred' | 'completed';
+  preference?: CompanionIntroductionAnswer;
+  supportStyle?: CompanionSupportStyle;
+  firstSeenAt: number;
+  deferredAt?: number;
+  completedAt?: number;
+  migrated?: boolean;
+};
+
+export type CompanionVisitRecord = {
+  id: string;
+  companionId: string;
+  familyId: KatchimeraFamilyId;
+  lastVisitedDayId: string;
+  lastVisitedAt: number;
+  seenSkinIds: string[];
+};
+
 export type CompanionContentState = {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   invitations: CompanionDailyInvitation[];
   memoryFacts: CompanionMemoryFact[];
   events: CompanionContentEvent[];
+  introductions: CompanionIntroductionRecord[];
+  visits: CompanionVisitRecord[];
 };
 
 export type SelectCompanionInvitationInput = {
@@ -75,7 +106,7 @@ export type SelectCompanionInvitationInput = {
 };
 
 export function emptyCompanionContentState(): CompanionContentState {
-  return { schemaVersion: 2, invitations: [], memoryFacts: [], events: [] };
+  return { schemaVersion: 3, invitations: [], memoryFacts: [], events: [], introductions: [], visits: [] };
 }
 
 export function normaliseCompanionContentState(value: unknown): CompanionContentState {
@@ -86,10 +117,148 @@ export function normaliseCompanionContentState(value: unknown): CompanionContent
     return { ...item, familyId, companionId: companionIdForFamily(familyId) };
   };
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     invitations: uniqueById((Array.isArray(candidate.invitations) ? candidate.invitations.filter(isInvitation) : []).map(canonicalizeOwner)).slice(-2000),
     memoryFacts: uniqueById((Array.isArray(candidate.memoryFacts) ? candidate.memoryFacts.filter(isMemoryFact) : []).map(canonicalizeOwner)).slice(-2000),
     events: uniqueById((Array.isArray(candidate.events) ? candidate.events.filter(isContentEvent) : []).map(canonicalizeOwner)).slice(-4000),
+    introductions: uniqueById((Array.isArray(candidate.introductions) ? candidate.introductions.filter(isIntroduction) : []).map(canonicalizeOwner)).slice(-200),
+    visits: uniqueById((Array.isArray(candidate.visits) ? candidate.visits.filter(isVisit) : []).map(canonicalizeOwner)).slice(-200),
+  };
+}
+
+export function introductionForFamily(
+  state: CompanionContentState,
+  familyId: KatchimeraFamilyId
+): CompanionIntroductionRecord | null {
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  return state.introductions.find((item) => item.familyId === ownerFamilyId) ?? null;
+}
+
+export function visitForFamily(
+  state: CompanionContentState,
+  familyId: KatchimeraFamilyId
+): CompanionVisitRecord | null {
+  const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
+  return state.visits.find((item) => item.familyId === ownerFamilyId) ?? null;
+}
+
+export function migrateCompanionIntroduction(
+  state: CompanionContentState,
+  input: {
+    companionId: string;
+    familyId: KatchimeraFamilyId;
+    hasExistingRelationship: boolean;
+    occurredAt?: number;
+  }
+): CompanionContentState {
+  const familyId = canonicalFamilyId(input.familyId) ?? input.familyId;
+  if (!input.hasExistingRelationship || introductionForFamily(state, familyId)) return state;
+  const occurredAt = input.occurredAt ?? Date.now();
+  const record: CompanionIntroductionRecord = {
+    id: `companion-introduction:${familyId}`,
+    companionId: companionIdForFamily(familyId),
+    familyId,
+    status: 'completed',
+    firstSeenAt: occurredAt,
+    completedAt: occurredAt,
+    migrated: true,
+  };
+  return { ...state, introductions: [...state.introductions, record] };
+}
+
+export function deferCompanionIntroduction(
+  state: CompanionContentState,
+  input: {
+    companionId: string;
+    familyId: KatchimeraFamilyId;
+    preference?: CompanionIntroductionAnswer;
+    occurredAt?: number;
+  }
+): CompanionContentState {
+  const familyId = canonicalFamilyId(input.familyId) ?? input.familyId;
+  const existing = introductionForFamily(state, familyId);
+  if (existing?.status === 'completed') return state;
+  const occurredAt = input.occurredAt ?? Date.now();
+  const record: CompanionIntroductionRecord = {
+    id: `companion-introduction:${familyId}`,
+    companionId: companionIdForFamily(familyId),
+    familyId,
+    status: 'deferred',
+    ...(input.preference ? { preference: input.preference } : {}),
+    firstSeenAt: existing?.firstSeenAt ?? occurredAt,
+    deferredAt: occurredAt,
+  };
+  return {
+    ...state,
+    introductions: [...state.introductions.filter((item) => item.familyId !== familyId), record],
+  };
+}
+
+export function completeCompanionIntroduction(
+  state: CompanionContentState,
+  input: {
+    companionId: string;
+    familyId: KatchimeraFamilyId;
+    preference: CompanionIntroductionAnswer;
+    supportStyle: CompanionSupportStyle;
+    occurredAt?: number;
+  }
+): CompanionContentState {
+  const familyId = canonicalFamilyId(input.familyId) ?? input.familyId;
+  const existing = introductionForFamily(state, familyId);
+  const occurredAt = input.occurredAt ?? Date.now();
+  const record: CompanionIntroductionRecord = {
+    id: `companion-introduction:${familyId}`,
+    companionId: companionIdForFamily(familyId),
+    familyId,
+    status: 'completed',
+    preference: input.preference,
+    supportStyle: input.supportStyle,
+    firstSeenAt: existing?.firstSeenAt ?? occurredAt,
+    completedAt: occurredAt,
+  };
+  return {
+    ...state,
+    introductions: [...state.introductions.filter((item) => item.familyId !== familyId), record],
+  };
+}
+
+export type CompanionVisitGreeting = 'regular' | 'returning' | 'new_skin';
+
+export function recordCompanionVisit(
+  state: CompanionContentState,
+  input: {
+    companionId: string;
+    familyId: KatchimeraFamilyId;
+    skinId: string;
+    dayId: string;
+    visitedAt?: number;
+    returnAfterDays?: number;
+  }
+): { state: CompanionContentState; greeting: CompanionVisitGreeting } {
+  const familyId = canonicalFamilyId(input.familyId) ?? input.familyId;
+  const existing = visitForFamily(state, familyId);
+  const visitedAt = input.visitedAt ?? Date.now();
+  const firstSkinVisit = Boolean(existing && !existing.seenSkinIds.includes(input.skinId));
+  const returning = Boolean(
+    existing
+      && existing.lastVisitedDayId !== input.dayId
+      && dayDistance(existing.lastVisitedDayId, input.dayId) >= (input.returnAfterDays ?? 14)
+  );
+  const visit: CompanionVisitRecord = {
+    id: `companion-visit:${familyId}`,
+    companionId: companionIdForFamily(familyId),
+    familyId,
+    lastVisitedDayId: input.dayId,
+    lastVisitedAt: visitedAt,
+    seenSkinIds: [...new Set([...(existing?.seenSkinIds ?? []), input.skinId])],
+  };
+  return {
+    greeting: firstSkinVisit ? 'new_skin' : returning ? 'returning' : 'regular',
+    state: {
+      ...state,
+      visits: [...state.visits.filter((item) => item.familyId !== familyId), visit],
+    },
   };
 }
 
@@ -337,4 +506,25 @@ function isMemoryFact(value: unknown): value is CompanionMemoryFact {
 function isContentEvent(value: unknown): value is CompanionContentEvent {
   const item = value as CompanionContentEvent;
   return Boolean(item && typeof item.id === 'string' && typeof item.invitationId === 'string');
+}
+
+function isIntroduction(value: unknown): value is CompanionIntroductionRecord {
+  const item = value as CompanionIntroductionRecord;
+  return Boolean(
+    item
+      && typeof item.id === 'string'
+      && typeof item.familyId === 'string'
+      && (item.status === 'deferred' || item.status === 'completed')
+  );
+}
+
+function isVisit(value: unknown): value is CompanionVisitRecord {
+  const item = value as CompanionVisitRecord;
+  return Boolean(
+    item
+      && typeof item.id === 'string'
+      && typeof item.familyId === 'string'
+      && typeof item.lastVisitedDayId === 'string'
+      && Array.isArray(item.seenSkinIds)
+  );
 }

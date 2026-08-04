@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import {
   KingdomHexCanvas,
   kingdomResidentHexTiles,
 } from '@/components/katchadeck/world/kingdom-hex-canvas';
-import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
+import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { CompanionInteractionSheet } from '@/components/katchadeck/world/companion-interaction-sheet';
 import { HomeIdentitySheet } from '@/components/katchadeck/world/home-identity-sheet';
 import { ZodiacTileSheet } from '@/components/katchadeck/world/zodiac-tile-sheet';
@@ -20,7 +20,6 @@ import { CompanionReflectionComposerModal } from '@/components/katchadeck/world/
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { KatchimeraRosterScreen } from '@/components/katchadeck/roster/katchimera-roster-screen';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, KatchaDeckUI, Lantern } from '@/constants/theme';
 import { useAllDays } from '@/hooks/use-all-days';
@@ -28,6 +27,7 @@ import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-a
 import { useDiscoveriesFromArchive } from '@/hooks/use-discoveries';
 import { useKingdomQuests } from '@/hooks/use-kingdom-quests';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
+import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import type { CompanionReflectionDraft } from '@/types/companion-interaction';
 import type { JournalSource, ManualJournalSubmission } from '@/types/home';
@@ -212,12 +212,10 @@ export function KingdomCompanionScreen({
     [allKatchimerasAvailable, days],
   );
   const {
-    entries: discoveryEntries,
     unlockedCount: discoveriesUnlocked,
     totalCount: discoveriesTotal,
   } = useDiscoveriesFromArchive(archive);
 
-  const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
   const [identity, setIdentity] = useState<WorldIdentityState>(loadWorldIdentity);
   const [wardrobe, setWardrobe] = useState<KatchimeraWardrobeState>(loadKatchimeraWardrobe);
   const [homeIdentityOpen, setHomeIdentityOpen] = useState(false);
@@ -293,6 +291,28 @@ export function KingdomCompanionScreen({
     onBondChanged: quests.refreshQuestState,
   });
   const selectedFamilyId = quests.selectedResident?.creature.familyId ?? null;
+  const companionAchievements = useCompanionAchievements();
+  const refreshCompanionAchievements = companionAchievements.refresh;
+  const selectedAchievementEntries = selectedFamilyId
+    ? companionAchievements.entriesForFamily(selectedFamilyId)
+    : [];
+  const selectedAchievementProgress = {
+    earned: selectedAchievementEntries.filter((entry) => entry.record).length,
+    total: selectedAchievementEntries.length,
+    unseen: selectedAchievementEntries.filter((entry) => entry.record && !entry.record.seenCelebration).length,
+  };
+  const achievementRefreshSignature = [
+    quests.selectedBondProgress.totalPoints,
+    quickGoals.state.completions.length,
+    quests.selectedQuestPersistedComplete ? 1 : 0,
+    quests.selectedJourneyProgress?.completedStageCount ?? 0,
+    quests.selectedJourneyProgress?.moments ?? 0,
+    quests.selectedJourneyProgress?.reflections ?? 0,
+  ].join('|');
+
+  useEffect(() => {
+    refreshCompanionAchievements();
+  }, [achievementRefreshSignature, refreshCompanionAchievements]);
   const selectedHomeEnvironmentKey = useMemo(() => {
     const creature = quests.selectedResident?.creature;
     if (!creature) return null;
@@ -479,12 +499,6 @@ export function KingdomCompanionScreen({
           </ThemedText>
         </View>
 
-        <View pointerEvents="box-none" style={[styles.actionRail, { top: insets.top + 14 }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Hall of Discoveries" onPress={() => setDiscoveriesOpen(true)} style={styles.headerButton}>
-            <IconSymbol name="star.fill" size={18} color={Lantern.moon50} />
-          </Pressable>
-        </View>
-
         {quests.microcopy ? (
           <Animated.View
             key={quests.microcopy}
@@ -500,14 +514,6 @@ export function KingdomCompanionScreen({
       </View>
       ) : <View style={styles.companionRouteStage} />}
 
-      {discoveriesOpen ? (
-        <DiscoveriesHallSheet
-          entries={discoveryEntries}
-          unlockedCount={discoveriesUnlocked}
-          totalCount={discoveriesTotal}
-          onClose={() => setDiscoveriesOpen(false)}
-        />
-      ) : null}
       {homeIdentityOpen ? <HomeIdentitySheet identity={identity} onChange={updateIdentity} onClose={() => setHomeIdentityOpen(false)} /> : null}
       {zodiacOpen ? <ZodiacTileSheet identity={identity} onChange={updateIdentity} onClose={() => setZodiacOpen(false)} /> : null}
 
@@ -577,9 +583,18 @@ export function KingdomCompanionScreen({
           onInsightAction={handleInsightAction}
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
-          dailyInvitation={quests.selectedDailyInvitation}
-          onOpenDailyInvitation={quests.openSelectedDailyInvitation}
-          onSkipDailyInvitation={quests.skipSelectedDailyInvitation}
+          achievementProgress={selectedAchievementProgress}
+          onOpenAchievements={() => {
+            const creatureId = quests.selectedResident?.creature.creatureId;
+            if (!creatureId) return;
+            router.push({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } });
+          }}
+          introductionDefinition={quests.selectedIntroductionDefinition}
+          introductionRecord={quests.selectedIntroduction}
+          introductionShouldAutoOpen={quests.selectedIntroductionShouldAutoOpen}
+          visitGreeting={quests.selectedVisitGreeting}
+          onDeferIntroduction={quests.deferSelectedIntroduction}
+          onCompleteIntroduction={quests.completeSelectedIntroduction}
           skins={selectedSkinOptions}
           equippedSkinId={quests.selectedResident.creature.skinId ?? null}
           onEquipSkin={equipSelectedSkin}
@@ -819,6 +834,12 @@ export function KingdomCompanionScreen({
               });
             }
           }}
+        />
+      ) : null}
+      {companionAchievements.pending.length > 0 && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
+        <CompanionAchievementCelebration
+          achievements={companionAchievements.pending}
+          onDismiss={() => companionAchievements.markSeen(companionAchievements.pending.map((def) => def.id))}
         />
       ) : null}
       <KatchaDialog

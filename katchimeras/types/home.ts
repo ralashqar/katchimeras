@@ -1239,6 +1239,11 @@ export type ConfirmedPlace = {
   longitude?: number;
   address?: string | null;
   placeId?: string | null;
+  /** Confirmed local-only identity used for distinct-place achievements. */
+  venueKey?: string | null;
+  locality?: string | null;
+  region?: string | null;
+  countryCode?: string | null;
   locationSource?: JournalLocationSelection['source'] | 'detected';
   locationPointId?: string;
   detectedNodeId?: string;
@@ -1357,6 +1362,11 @@ export type JournalLocationSelection = {
   name: string;
   address?: string | null;
   placeId?: string | null;
+  /** Confirmed local-only identity used for distinct-place achievements. */
+  venueKey?: string | null;
+  locality?: string | null;
+  region?: string | null;
+  countryCode?: string | null;
   source: 'apple_maps' | 'current_location' | 'manual_pin' | 'photo_metadata' | 'day_location';
   accuracyMeters?: number | null;
 };

@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Share, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { captureRef } from 'react-native-view-shot';
+import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -9,6 +11,8 @@ import type { DiscoveryDef, DiscoveryRarity } from '@/types/discoveries';
 import { artefactForReward } from '@/utils/discoveries-artefacts';
 import { discoveryEssence } from '@/utils/essence-engine';
 import { Meadow } from '@/constants/meadow-theme';
+import { discoveryIconSource } from '@/constants/achievement-icon-sources';
+import { CelebrationParticles } from '@/components/katchadeck/world/companion-achievement-celebration';
 
 // "Discovery Recorded" — the celebration when a NEW discovery unlocks (post-baseline).
 // Tasteful, rarity-scaled, queue-safe (the host shows one at a time). Carries a
@@ -42,6 +46,13 @@ export function DiscoveryReveal({ discovery, onDismiss }: DiscoveryRevealProps) 
   const kicker = discovery.hidden ? '✨ New Discovery Found' : 'Discovery Recorded';
   const artefact = artefactForReward(discovery.worldRewardId);
   const essence = discoveryEssence(discovery);
+  const celebrationTier = ({ common: 1, rare: 2, epic: 3, legendary: 4 } as const)[discovery.rarity];
+
+  useEffect(() => {
+    if (process.env.EXPO_OS !== 'ios') return;
+    if (celebrationTier >= 3) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    else void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [celebrationTier]);
 
   async function handleShare() {
     if (sharing) return;
@@ -78,6 +89,8 @@ export function DiscoveryReveal({ discovery, onDismiss }: DiscoveryRevealProps) 
         <Pressable onPress={onDismiss} style={StyleSheet.absoluteFill} />
       </Animated.View>
 
+      <CelebrationParticles tier={celebrationTier} tint={tint} />
+
       <Animated.View entering={ZoomIn.springify().damping(13).mass(0.9)} exiting={FadeOut.duration(180)} style={styles.center}>
         {/* The shareable card (captured for sharing). */}
         <View ref={cardRef} collapsable={false} style={[styles.card, { borderColor: `${tint}66` }]}>
@@ -85,7 +98,13 @@ export function DiscoveryReveal({ discovery, onDismiss }: DiscoveryRevealProps) 
           <ThemedText style={styles.kicker} lightColor={tint} darkColor={tint}>
             {kicker}
           </ThemedText>
-          <ThemedText style={[styles.icon, isLegendary && styles.iconLegendary]}>{discovery.icon}</ThemedText>
+          <Image
+            accessibilityLabel={discovery.name}
+            contentFit="contain"
+            source={discoveryIconSource(discovery.category, discovery.rarity)}
+            style={[styles.iconArt, isLegendary && styles.iconArtLegendary]}
+            transition={0}
+          />
           <ThemedText type="display" style={styles.name} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
             {discovery.name}
           </ThemedText>
@@ -143,8 +162,8 @@ const styles = StyleSheet.create({
   },
   glow: { position: 'absolute', top: -60, width: 220, height: 220, borderRadius: 999 },
   kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
-  icon: { fontSize: 64, lineHeight: 72 },
-  iconLegendary: { fontSize: 80, lineHeight: 88 },
+  iconArt: { height: 86, width: 86 },
+  iconArtLegendary: { height: 104, width: 104 },
   name: { fontSize: 30, fontStyle: 'italic', lineHeight: 36, textAlign: 'center' },
   description: { fontSize: 14.5, fontWeight: '500', lineHeight: 20, textAlign: 'center' },
   rarityChip: {

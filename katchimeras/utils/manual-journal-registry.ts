@@ -89,6 +89,7 @@ export const MANUAL_JOURNAL_FLOWS: ManualJournalFlowDefinition[] = [
       choice('beach', 'Beach or coast', 'water.waves', ['place.beach']), choice('forest', 'Forest or trail', 'tree.fill', ['place.forest']),
       choice('garden', 'Garden', 'camera.macro', ['place.garden']), choice('museum', 'Museum or gallery', 'building.columns.fill', ['place.museum']),
       choice('cafe', 'Cafe', 'cup.and.saucer.fill', ['place.cafe']), choice('restaurant', 'Restaurant', 'fork.knife', ['place.restaurant']),
+      choice('cinema', 'Cinema', 'film.fill', ['place.cinema']),
       choice('street', 'Street or neighbourhood', 'map.fill', ['place.street']), { ...choice('home', 'Home', 'house.fill', ['place.home']), photoEnrichmentMode: 'none' },
       choice('travel', 'Day trip or travel', 'airplane'), choice('other_place', 'Somewhere else', 'mappin'),
     ],

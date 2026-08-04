@@ -83,8 +83,8 @@ export function CompanionJourneyDiscoveryThread({
             {conversation
               ? 'Your completed answers are saved.'
               : activeFocus
-                ? 'Three quick choices can shape a new direction. Your current focus stays until you finish.'
-                : `Three quick choices help ${companionName} find a direction that fits you.`}
+                ? 'I’ll ask three quick questions about a new direction. Your current focus stays until you finish.'
+                : 'I’ll ask three quick questions, then help you choose a direction that fits.'}
           </ThemedText>
         </View>
       </View>
@@ -110,7 +110,7 @@ export function CompanionJourneyDiscoveryThread({
           Your focus
         </ThemedText>
         <ThemedText selectable style={styles.description} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          Answer a few quick choices when you want more direction. {companionName} turns them into a focus and suggests optional actions for Do.
+          Answer a few quick questions when you want more direction. I’ll turn them into a focus and suggest optional small steps.
         </ThemedText>
       </View> : null}
 
@@ -184,7 +184,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
           Your focus
         </ThemedText>
         <ThemedText selectable style={styles.description} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-          A few deeper questions help {companionName} understand what matters. Your focus can then shape suggested goals, quests, and reflections.
+          I’ll ask a few deeper questions about what matters. Your focus can then shape optional goals, quests, and reflections.
         </ThemedText>
       </View>
 
@@ -305,7 +305,7 @@ export function LegacyCompanionJourneyDiscoveryThread({
               {activeFocus ? 'Change your focus' : 'Choose a focus'}
             </ThemedText>
             <ThemedText style={styles.helper} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>
-              A short branching questionnaire will find a direction and suggest a few small goals. Choosing a new focus pauses the old one.
+              I’ll ask a short set of questions, then suggest a direction and a few small goals. Choosing a new focus pauses the old one.
             </ThemedText>
           </View>
           <Pressable

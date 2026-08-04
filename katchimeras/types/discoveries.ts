@@ -77,6 +77,7 @@ export type DiscoveryRecord = {
 
 export type DiscoveryState = {
   version: 1;
+  catalogVersion?: number;
   unlocked: Record<string, DiscoveryRecord>; // id → record
   // True once the FIRST evaluation has run on this install. That first pass
   // silently backfills everything already earned (seenAnimation:true, one quiet

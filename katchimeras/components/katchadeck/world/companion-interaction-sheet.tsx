@@ -50,7 +50,16 @@ import {
 import { CompanionQuestChoices, CompanionQuestThread } from './companion-quest-thread';
 import type { InteractiveQuestExecution, QuestResult } from '@/utils/quests/experiences/types';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
-import type { CompanionDailyInvitation } from '@/utils/companion-content';
+import type {
+  CompanionIntroductionAnswer,
+  CompanionIntroductionRecord,
+  CompanionVisitGreeting,
+} from '@/utils/companion-content';
+import type {
+  CompanionIntroductionDefinition,
+  CompanionSupportStyle,
+} from '@/constants/companion-introductions';
+import { companionFormGreeting } from '@/utils/companion-dialogue';
 import { CompanionSkinsThread } from './companion-skins-thread';
 import type { KatchimeraFamilyId, KatchimeraSkinId } from '@/types/katchimera';
 import type { KingdomSkinOption } from '@/utils/katchimera-wardrobe';
@@ -94,6 +103,7 @@ import { companionQuestListSpacer } from '@/utils/companion-home-layout';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
 import type { GoalTaskSourceRect } from '@/components/katchadeck/goals/goal-task-row';
 import { BondRewardFlightOverlay } from '@/components/katchadeck/goals/bond-reward-overlay';
+import { CompanionIntroduction } from './companion-introduction';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -153,10 +163,18 @@ export type CompanionInteractionSheetProps = {
   onInsightAction: () => void;
   memorySaved?: boolean;
   bondProgress: CompanionBondProgress;
-  dailyInvitation: CompanionDailyInvitation | null;
-  onOpenDailyInvitation: () => void;
-  onSkipDailyInvitation: () => void;
+  introductionDefinition: CompanionIntroductionDefinition | null;
+  introductionRecord: CompanionIntroductionRecord | null;
+  introductionShouldAutoOpen: boolean;
+  visitGreeting: CompanionVisitGreeting;
+  onDeferIntroduction: (preference?: CompanionIntroductionAnswer) => void;
+  onCompleteIntroduction: (
+    preference: CompanionIntroductionAnswer,
+    supportStyle: CompanionSupportStyle
+  ) => void;
   onExperienceActiveChange?: (active: boolean) => void;
+  onOpenAchievements: () => void;
+  achievementProgress: { earned: number; total: number; unseen: number };
   skins: readonly KingdomSkinOption[];
   equippedSkinId: KatchimeraSkinId | null;
   onEquipSkin: (skinId: KatchimeraSkinId) => void;
@@ -173,7 +191,7 @@ export type CompanionInteractionSheetProps = {
   journeyProgress: CompanionGoalJourneyProgress | null;
   journeyMomentLoggedToday: boolean;
   questAdvancesJourneyGoal: boolean;
-  onStartJourneyConversation: () => void;
+  onStartJourneyConversation: (preference?: CompanionIntroductionAnswer) => void;
   onAnswerJourneyConversation: (sessionId: string, value: string) => readonly string[];
   onLogJourneyMoment: (kindId: string, note?: string) => void;
   onSetJourneyGoalStatus: (goalId: string, status: CompanionJourneyGoalStatus) => void;
@@ -240,8 +258,10 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     destination,
     direction,
     experienceInstance,
+    introductionOpen,
     journeyQuestionnaireOpen,
     journeyQuestionnaireSessionId,
+    openIntroduction,
     resetQuestExperience,
     questExperienceOpen,
     quickGoalPickerOpen,
@@ -254,6 +274,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
   const [leaveQuestOpen, setLeaveQuestOpen] = useState(false);
   const [activeCheckIn, setActiveCheckIn] = useState<CompanionJourneyCheckIn | null>(props.journeyCheckIn);
   const [hasShownHome, setHasShownHome] = useState(false);
+  const autoIntroductionCreatureRef = useRef<string | null>(null);
   const contentRef = useRef<ScrollView>(null);
   const reduceMotion = useReducedMotion();
   const visual = getCreatureVisual(props.visualKey);
@@ -329,7 +350,18 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
 
   useEffect(() => {
     setHasShownHome(false);
+    autoIntroductionCreatureRef.current = null;
   }, [props.creatureId]);
+
+  useEffect(() => {
+    if (
+      !props.introductionShouldAutoOpen
+      || props.initialDestination
+      || autoIntroductionCreatureRef.current === props.creatureId
+    ) return;
+    autoIntroductionCreatureRef.current = props.creatureId;
+    openIntroduction();
+  }, [openIntroduction, props.creatureId, props.initialDestination, props.introductionShouldAutoOpen]);
 
   useEffect(() => {
     if (route.kind === 'home' && !hasShownHome) {
@@ -364,27 +396,6 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     Keyboard.dismiss();
     resetViewport();
     experience.selectDestination(nextDestination);
-  };
-  const openDailyInvitation = () => {
-    const invitation = props.dailyInvitation;
-    if (!invitation) return;
-    props.onOpenDailyInvitation();
-    if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (invitation.destination === 'quest') {
-      if (invitation.questId) props.onSelectOffer(invitation.questId);
-      selectDestination('quest');
-      return;
-    }
-    selectDestination('discovery');
-    if (invitation.kind === 'focus_setup' || invitation.kind === 'resume_focus') {
-      experience.openJourneyQuestionnaire(props.journeyConversation?.id);
-      if (!props.journeyConversation) props.onStartJourneyConversation();
-      return;
-    }
-    const checkIn = props.journeyCheckIn ?? props.onStartJourneyCheckIn();
-    if (!checkIn) return;
-    setActiveCheckIn(checkIn);
-    experience.openCheckIn(checkIn.id);
   };
   const runPrimary = () => {
     const action = quest.primaryAction;
@@ -435,6 +446,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
     </View>
   ) : null;
   const questionnaireExperience = Boolean(
+    introductionOpen ||
     (journeyQuestionnaireOpen && props.journeyDefinition) ||
     (checkInOpen && activeCheckIn)
   );
@@ -495,6 +507,13 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       : goalsToday.length
         ? 'All done today'
         : 'Choose a small step';
+  const homeGreeting = props.introductionDefinition
+    ? props.visitGreeting === 'returning'
+      ? props.introductionDefinition.returnGreeting
+      : props.visitGreeting === 'new_skin'
+        ? companionFormGreeting(props.name)
+        : props.introductionDefinition.homeGreeting
+    : 'Where shall we begin today?';
   const destinationHeroTitle = destination === 'quest'
     ? props.activeQuest
       ? 'Ready to keep going?'
@@ -514,8 +533,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
           : 'Which form feels like me?';
   const destinationHeroBody = destination === 'discovery'
     ? activeJourneyFocus
-      ? 'Check in for today, or adjust the focus you are working on together.'
-      : `A few quick choices help ${props.name} understand what would be useful right now.`
+      ? 'Check in with me today, or adjust the focus we are working on together.'
+      : 'I can ask a few quick questions to learn what would be useful right now.'
     : undefined;
   const questGameContent = questGameVisible
     && interactiveExecution
@@ -603,16 +622,14 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             animateEntrance={!hasShownHome}
             bondProgress={props.bondProgress}
             creature={visual.source}
-            dailyInvitation={props.dailyInvitation?.status === 'offered' || props.dailyInvitation?.status === 'opened'
-              ? props.dailyInvitation
-              : null}
             environmentKey={props.homeEnvironmentKey ?? null}
             goalStatus={goalStatus}
+            homeGreeting={homeGreeting}
             name={props.name}
             onClose={props.onClose}
-            onOpenDailyInvitation={openDailyInvitation}
-            onSkipDailyInvitation={props.onSkipDailyInvitation}
+            onOpenAchievements={props.onOpenAchievements}
             onSelectDestination={selectDestination}
+            achievementProgress={props.achievementProgress}
             questStatus={questStatus}
             showSkins={props.skins.length > 1}
             visualKey={props.visualKey}
@@ -698,7 +715,31 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   ]}
                 />
               ) : null}
-              {checkInOpen && activeCheckIn ? (
+              {introductionOpen && props.introductionDefinition && props.journeyDefinition ? (
+                <CompanionIntroduction
+                  accentColor={props.accentColor}
+                  background={props.questionnaireBackground}
+                  companionName={props.name}
+                  creature={visual.source}
+                  definition={props.journeyDefinition}
+                  environmentKey={props.homeEnvironmentKey ?? null}
+                  introduction={props.introductionDefinition}
+                  onComplete={(preference, supportStyle) => {
+                    props.onCompleteIntroduction(preference, supportStyle);
+                    experience.showHome();
+                  }}
+                  onDefer={(preference) => {
+                    props.onDeferIntroduction(preference);
+                    experience.showHome();
+                  }}
+                  onStartFocus={(preference, supportStyle) => {
+                    props.onCompleteIntroduction(preference, supportStyle);
+                    props.onStartJourneyConversation(preference);
+                    experience.openJourneyQuestionnaire(null);
+                  }}
+                  visualKey={props.visualKey}
+                />
+              ) : checkInOpen && activeCheckIn ? (
                 <CompanionCheckInPage
                   accentColor={props.accentColor}
                   background={props.questionnaireBackground}
@@ -743,6 +784,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                       : current);
                   }}
                   role={props.role}
+                  supportStyle={props.introductionRecord?.supportStyle}
                   visualKey={props.visualKey}
                 />
               ) : questionnaireExperience && props.journeyDefinition ? (
@@ -780,7 +822,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
               ) : props.memorySaved ? (
                 <View accessibilityLiveRegion="polite" style={styles.saved}>
                   <ThemedText style={styles.savedTitle} lightColor={Lantern.auroraTeal} darkColor={Lantern.auroraTeal}>Memory kept</ThemedText>
-                  <ThemedText style={styles.savedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>{props.name} will remember that with you.</ThemedText>
+                  <ThemedText style={styles.savedBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>I’ll remember that with you.</ThemedText>
                 </View>
               ) : destination === 'quest' && !props.activeQuest && props.offers.length ? (
                 <View>
@@ -833,6 +875,17 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                 </View>
               ) : destination === 'discovery' ? (
                 <View style={styles.youStack}>
+                {props.introductionRecord?.status === 'deferred' && props.introductionDefinition ? (
+                  <CompanionSection
+                    description="I can ask two short questions now, or wait until another day."
+                    label={`Meet ${props.name}`}>
+                    <CompanionPrimaryAction
+                      icon="heart.fill"
+                      label={`Meet ${props.name}`}
+                      onPress={openIntroduction}
+                    />
+                  </CompanionSection>
+                ) : null}
                 {props.journeyDefinition && (!activeJourneyFocus || props.journeyConversation) ? (
                   <CompanionJourneyDiscoveryThread
                     companionName={props.name}
@@ -851,7 +904,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                   <CompanionCheckInCard
                     checkIn={props.journeyCheckIn}
                     companionName={props.name}
-                    emphasized={Boolean(activeJourneyFocus && !props.journeyConversation)}
+                    emphasized={Boolean(activeJourneyFocus && !props.journeyConversation)
+                      && props.introductionRecord?.supportStyle !== 'on_demand'}
                     onOpen={() => {
                       if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
                       const checkIn = props.journeyCheckIn ?? props.onStartJourneyCheckIn();
@@ -859,6 +913,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                       setActiveCheckIn(checkIn);
                       experience.openCheckIn(checkIn.id);
                     }}
+                    supportStyle={props.introductionRecord?.supportStyle}
                   />
                 {props.journeyDefinition && activeJourneyFocus && !props.journeyConversation ? (
                   <CompanionJourneyDiscoveryThread

@@ -9,6 +9,8 @@ import type { DiscoveryDef } from '@/types/discoveries';
 
 const cat = (count: Record<string, number>, key: string) => count[key] ?? 0;
 
+export const DISCOVERY_CATALOG_VERSION = 3;
+
 export const DISCOVERY_CATALOG: DiscoveryDef[] = [
   // ───────────────────────── 🌍 Exploration ─────────────────────────
   {
@@ -494,4 +496,92 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
     icon: '🌟',
     test: (c) => c.legendaryPatchCount >= 1,
   },
+  {
+    id: 'parks_10', category: 'exploration', name: 'Green Familiar', description: 'Ten park visits.',
+    rarity: 'rare', hidden: false, icon: '🌿', test: (c) => cat(c.placeCategoryCounts, 'park') >= 10,
+  },
+  {
+    id: 'parks_25', category: 'exploration', name: 'Keeper of Green Places', description: 'Twenty-five park visits.',
+    rarity: 'epic', hidden: false, icon: '🌳', test: (c) => cat(c.placeCategoryCounts, 'park') >= 25,
+  },
+  {
+    id: 'cafes_25', category: 'exploration', name: 'A Table Waiting', description: 'Twenty-five café visits.',
+    rarity: 'epic', hidden: false, icon: '☕', test: (c) => cat(c.placeCategoryCounts, 'cafe') >= 25,
+  },
+  {
+    id: 'cinemas_5', category: 'exploration', name: 'Five Evenings in Frame', description: 'Five cinema visits.',
+    rarity: 'rare', hidden: false, icon: '🎞️', test: (c) => cat(c.placeCategoryCounts, 'cinema') >= 5,
+  },
+  {
+    id: 'cinemas_20', category: 'exploration', name: 'House Lights Down', description: 'Twenty cinema visits.',
+    rarity: 'epic', hidden: true, icon: '🎬', test: (c) => cat(c.placeCategoryCounts, 'cinema') >= 20,
+  },
+  {
+    id: 'voice_25', category: 'memory', name: 'A Voice Kept', description: 'Twenty-five voice memories.',
+    rarity: 'epic', hidden: false, icon: '🎙️', test: (c) => c.voiceMemoryCount >= 25,
+  },
+  {
+    id: 'food_25', category: 'memory', name: 'Table of Twenty-Five', description: 'Twenty-five food memories.',
+    rarity: 'epic', hidden: false, icon: '🍽️', test: (c) => c.foodMemoryCount >= 25,
+  },
+  {
+    id: 'food_50', category: 'memory', name: 'A Life at the Table', description: 'Fifty food memories.',
+    rarity: 'legendary', hidden: false, icon: '🥘', test: (c) => c.foodMemoryCount >= 50,
+  },
+  {
+    id: 'studio_25', category: 'memory', name: 'Shelf of Influences', description: 'Twenty-five inspirations saved.',
+    rarity: 'epic', hidden: false, icon: '📚', test: (c) => c.studioMemoryCount >= 25,
+  },
+  {
+    id: 'studio_50', category: 'memory', name: 'A Personal Canon', description: 'Fifty inspirations saved.',
+    rarity: 'legendary', hidden: true, icon: '✨', test: (c) => c.studioMemoryCount >= 50,
+  },
+  {
+    id: 'big_moments_3', category: 'life', name: 'Three Turning Points', description: 'Three big moments marked.',
+    rarity: 'rare', hidden: false, icon: '⭐', test: (c) => c.bigMomentCount >= 3,
+  },
+  {
+    id: 'big_moments_10', category: 'life', name: 'A Life in Chapters', description: 'Ten big moments marked.',
+    rarity: 'epic', hidden: false, icon: '📖', test: (c) => c.bigMomentCount >= 10,
+  },
+  {
+    id: 'big_moments_25', category: 'life', name: 'Many Chapters', description: 'Twenty-five big moments marked.',
+    rarity: 'legendary', hidden: true, icon: '🌟', test: (c) => c.bigMomentCount >= 25,
+  },
+  {
+    id: 'walk_streak_14', category: 'journey', name: 'Two Weeks On', description: 'Fourteen consecutive walking days.',
+    rarity: 'epic', hidden: false, icon: '🥾', test: (c) => c.walkingStreak >= 14,
+  },
+  {
+    id: 'walk_streak_30', category: 'journey', name: 'A Month in Motion', description: 'Thirty consecutive walking days.',
+    rarity: 'legendary', hidden: true, icon: '🛤️', test: (c) => c.walkingStreak >= 30,
+  },
+  {
+    id: 'reflections_25', category: 'reflection', name: 'A Habit of Returning', description: 'Twenty-five reflections.',
+    rarity: 'epic', hidden: false, icon: '🍃', test: (c) => c.reflectionCount >= 25,
+  },
+  {
+    id: 'reflections_50', category: 'reflection', name: 'Inner Archive', description: 'Fifty reflections.',
+    rarity: 'legendary', hidden: true, icon: '🕯️', test: (c) => c.reflectionCount >= 50,
+  },
+  {
+    id: 'legendary_3', category: 'world', name: 'Constellation of Rarities', description: 'Three legendary Katchimeras hatched.',
+    rarity: 'legendary', hidden: true, icon: '🌌', test: (c) => c.legendaryPatchCount >= 3,
+  },
 ];
+
+/** Discoveries without a natural companion owner remain in the app-wide hall. */
+export const COMPANION_OWNED_DISCOVERY_IDS = new Set([
+  'big_birthday', 'big_milestone', 'big_moments_10', 'big_moments_25', 'big_moments_3', 'big_trip',
+  'cafes_10', 'cafes_25', 'cafes_3', 'calm_30', 'calm_7', 'cinemas_20', 'cinemas_5',
+  'first_big_moment', 'first_cinema', 'first_food', 'first_museum', 'first_park', 'first_reflection',
+  'food_10', 'food_25', 'food_50', 'goal_achieved', 'museums_3', 'museums_5', 'museums_50',
+  'parks_10', 'parks_25', 'parks_3', 'places_10', 'places_25', 'places_100',
+  'reflections_3', 'reflections_10', 'reflections_25', 'reflections_50',
+  'steps_10k', 'steps_15k', 'steps_20k', 'steps_30k',
+  'walk_streak_3', 'walk_streak_7', 'walk_streak_14', 'walk_streak_30',
+]);
+
+export const GLOBAL_DISCOVERY_CATALOG: DiscoveryDef[] = DISCOVERY_CATALOG.filter(
+  (definition) => !COMPANION_OWNED_DISCOVERY_IDS.has(definition.id)
+);

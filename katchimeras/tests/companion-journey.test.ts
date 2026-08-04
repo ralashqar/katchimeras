@@ -33,6 +33,20 @@ import type { CompanionQuest } from '@/utils/katchimera-quests';
 import { identityForEncounter } from '@/utils/katchimera-identity';
 import { themedQuestOffers } from '@/utils/quests/themed';
 
+test('an introduction preference can seed Focus without asking it twice', () => {
+  const definition = companionJourneyByFamilyId.get('steppling')!;
+  const firstNode = definition.nodes.find((node) => node.id === definition.startNodeId)!;
+  const choice = firstNode.options![0];
+  const state = startJourneyConversation(emptyCompanionJourneyState(), 'steppling', 100, {
+    nodeId: firstNode.id,
+    value: choice.id,
+  });
+  const session = activeConversationForFamily(state, 'steppling')!;
+  assert.equal(session.answers.length, 1);
+  assert.equal(session.answers[0].value, choice.id);
+  assert.equal(session.currentNodeId, choice.nextNodeId ?? firstNode.nextNodeId);
+});
+
 function answerCurrent(
   state: CompanionJourneyState,
   familyId: string,
@@ -615,5 +629,5 @@ test('bond invitations use a coherent three-question conversation and repair sta
     goal: null,
   });
   assert.match(third?.prompt ?? '', /use what you shared/i);
-  assert.equal(third?.options[0]?.label, 'Bring it into future invitations');
+  assert.equal(third?.options[0]?.label, 'Use it in future conversations');
 });

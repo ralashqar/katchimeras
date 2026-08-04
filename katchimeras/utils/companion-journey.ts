@@ -307,19 +307,28 @@ export function activeConversationForFamily(
 export function startJourneyConversation(
   state: CompanionJourneyState,
   familyId: KatchimeraFamilyId,
-  startedAt = Date.now()
+  startedAt = Date.now(),
+  seedAnswer?: { nodeId: string; value: string }
 ): CompanionJourneyState {
   const ownerFamilyId = canonicalFamilyId(familyId) ?? familyId;
   const definition = companionJourneyByFamilyId.get(ownerFamilyId);
   if (!definition || activeConversationForFamily(state, ownerFamilyId)) return state;
+  const startNode = companionJourneyNode(definition, definition.startNodeId);
+  const seedChoice = seedAnswer?.nodeId === definition.startNodeId && startNode?.kind === 'single_choice'
+    ? startNode.options?.find((option) => option.id === seedAnswer.value || option.label === seedAnswer.value)
+    : null;
+  const seededNextNodeId = seedChoice?.nextNodeId ?? startNode?.nextNodeId ?? null;
+  const canSeed = Boolean(seedChoice && seededNextNodeId);
   const session: CompanionJourneyConversationSession = {
     id: `journey-conversation:${ownerFamilyId}:${startedAt}`,
     familyId: ownerFamilyId,
     definitionId: definition.id,
     definitionVersion: definition.version,
-    currentNodeId: definition.startNodeId,
+    currentNodeId: canSeed ? seededNextNodeId : definition.startNodeId,
     startedAt,
-    answers: [],
+    answers: canSeed && startNode
+      ? [{ nodeId: startNode.id, value: seedChoice!.id, answeredAt: startedAt }]
+      : [],
   };
   return { ...state, conversations: [...state.conversations, session] };
 }

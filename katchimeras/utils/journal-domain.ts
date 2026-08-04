@@ -113,8 +113,13 @@ function sanitizeJournalLocation(value?: JournalLocationSelection | null): Journ
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || !name) return null;
   const address = value.address?.trim().slice(0, 320) || null;
   const placeId = value.placeId?.trim().slice(0, 500) || null;
+  const venueKey = value.venueKey?.trim().slice(0, 500)
+    || (placeId ? `provider:${placeId}` : `geo:${latitude.toFixed(3)}:${longitude.toFixed(3)}`);
+  const locality = value.locality?.trim().slice(0, 160) || null;
+  const region = value.region?.trim().slice(0, 160) || null;
+  const countryCode = value.countryCode?.trim().toUpperCase().slice(0, 3) || null;
   const accuracyMeters = value.accuracyMeters != null && Number.isFinite(value.accuracyMeters) && value.accuracyMeters >= 0
     ? Math.min(value.accuracyMeters, 100_000)
     : null;
-  return { latitude, longitude, name, address, placeId, source: value.source, accuracyMeters };
+  return { latitude, longitude, name, address, placeId, venueKey, locality, region, countryCode, source: value.source, accuracyMeters };
 }

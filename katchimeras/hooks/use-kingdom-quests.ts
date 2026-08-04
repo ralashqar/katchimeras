@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQuestCapabilities } from '@/hooks/use-quest-capabilities';
 import { homeRepository } from '@/storage/repositories/home-repository';
@@ -61,6 +61,10 @@ import {
   type CompanionDiscoveryPromptDefinition,
 } from '@/constants/katchimera-roles';
 import { companionJourneyByFamilyId, type CompanionJourneyGoalStatus } from '@/constants/companion-journeys';
+import {
+  companionIntroductionByFamilyId,
+  type CompanionSupportStyle,
+} from '@/constants/companion-introductions';
 import { companionContentById, companionContentForFamily } from '@/constants/companion-content';
 import {
   activeConversationForFamily,
@@ -86,10 +90,17 @@ import {
 import { companionCheckInSuggestedGoalIds } from '@/utils/companion-check-in';
 import {
   ensureCompanionInvitation,
+  completeCompanionIntroduction,
+  deferCompanionIntroduction,
+  introductionForFamily,
+  migrateCompanionIntroduction,
+  recordCompanionVisit,
   rememberCompanionAnswer,
   selectCompanionDailyInvitation,
   updateCompanionInvitation,
   type CompanionContentState,
+  type CompanionIntroductionAnswer,
+  type CompanionVisitGreeting,
 } from '@/utils/companion-content';
 import { loadCompanionContentState, saveCompanionContentState } from '@/utils/companion-content-storage';
 import { loadCompanionJourneyState, saveCompanionJourneyState } from '@/utils/companion-journey-storage';
@@ -162,6 +173,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const [companionDiscoveryState, setCompanionDiscoveryState] = useState(loadCompanionDiscoveryState);
   const [companionJourneyState, setCompanionJourneyState] = useState(loadCompanionJourneyState);
   const [companionContentState, setCompanionContentState] = useState<CompanionContentState>(loadCompanionContentState);
+  const [selectedVisitGreeting, setSelectedVisitGreeting] = useState<CompanionVisitGreeting>('regular');
+  const recordedVisitKeyRef = useRef<string | null>(null);
   const [storedHomeState, setStoredHomeState] = useState(() => homeRepository.load());
   const [questCaptureFeedback, setQuestCaptureFeedback] = useState<QuestCaptureFeedback | null>(null);
   const [questCaptureRestoreKey, setQuestCaptureRestoreKey] = useState<string | null>(null);
@@ -386,6 +399,12 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
   const selectedFamilyId = selectedResident?.creature.familyId ?? null;
   const selectedRole = selectedFamilyId ? katchimeraRoleByFamilyId.get(selectedFamilyId) ?? null : null;
   const selectedJourneyDefinition = selectedFamilyId ? companionJourneyByFamilyId.get(selectedFamilyId) ?? null : null;
+  const selectedIntroductionDefinition = selectedFamilyId
+    ? companionIntroductionByFamilyId.get(selectedFamilyId) ?? null
+    : null;
+  const selectedIntroduction = selectedFamilyId
+    ? introductionForFamily(companionContentState, selectedFamilyId)
+    : null;
   const selectedJourneyGoals = useMemo(
     () => selectedFamilyId ? goalsForJourneyFamily(companionJourneyState, selectedFamilyId) : [],
     [companionJourneyState, selectedFamilyId]
@@ -421,6 +440,45 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     () => companionBondProgress(companionBondState, selectedResident?.creature.creatureId ?? ''),
     [companionBondState, selectedResident?.creature.creatureId]
   );
+  const selectedHasRelationshipHistory = Boolean(
+    selectedBondProgress.totalPoints > COMPANION_BOND_REWARDS.hatch
+    || selectedJourneyGoals.length > 0
+    || selectedJourneyConversation
+    || (selectedFamilyId && answersForCompanion(companionDiscoveryState, selectedFamilyId).length > 0)
+    || (selectedFamilyId && companionContentState.memoryFacts.some((fact) => fact.familyId === selectedFamilyId))
+    || (selectedFamilyId && companionContentState.events.some((event) =>
+      event.familyId === selectedFamilyId && event.kind !== 'shown'))
+  );
+  const selectedIntroductionShouldAutoOpen = Boolean(
+    selectedResident
+    && selectedJourneyDefinition
+    && selectedIntroductionDefinition
+    && !selectedIntroduction
+    && !selectedHasRelationshipHistory
+    && !selectedResident.destination
+  );
+  useEffect(() => {
+    if (!selectedResident || !selectedFamilyId || !today?.isoDate) return;
+    const skinId = selectedResident.creature.skinId ?? selectedResident.creature.visualKey;
+    const visitKey = `${selectedResident.creature.creatureId}:${skinId}:${today.isoDate}`;
+    if (recordedVisitKeyRef.current === visitKey) return;
+    recordedVisitKeyRef.current = visitKey;
+    const migrated = migrateCompanionIntroduction(companionContentState, {
+      companionId: selectedResident.creature.creatureId,
+      familyId: selectedFamilyId,
+      hasExistingRelationship: selectedHasRelationshipHistory,
+    });
+    const visit = recordCompanionVisit(migrated, {
+      companionId: selectedResident.creature.creatureId,
+      familyId: selectedFamilyId,
+      skinId,
+      dayId: today.isoDate,
+      returnAfterDays: 14,
+    });
+    setSelectedVisitGreeting(visit.greeting);
+    saveCompanionContentState(visit.state);
+    setCompanionContentState(visit.state);
+  }, [companionContentState, selectedFamilyId, selectedHasRelationshipHistory, selectedResident, today?.isoDate]);
   const bondProgressForCreature = useCallback(
     (creatureId: string) => companionBondProgress(companionBondState, creatureId),
     [companionBondState]
@@ -1168,14 +1226,47 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     });
     setMicrocopy(status === 'completed' ? 'Goal completed' : 'Goal updated');
   }, [selectedFamilyId]);
-  const startSelectedJourneyConversation = useCallback(() => {
+  const startSelectedJourneyConversation = useCallback((preference?: CompanionIntroductionAnswer) => {
     if (!selectedFamilyId || !selectedJourneyDefinition) return;
     setCompanionJourneyState((current) => {
-      const next = startJourneyConversation(current, selectedFamilyId);
+      const next = startJourneyConversation(
+        current,
+        selectedFamilyId,
+        Date.now(),
+        preference ? { nodeId: preference.nodeId, value: preference.optionId } : undefined
+      );
       if (next !== current) saveCompanionJourneyState(next);
       return next;
     });
   }, [selectedFamilyId, selectedJourneyDefinition]);
+  const deferSelectedIntroduction = useCallback((preference?: CompanionIntroductionAnswer) => {
+    if (!selectedResident || !selectedFamilyId) return;
+    setCompanionContentState((current) => {
+      const next = deferCompanionIntroduction(current, {
+        companionId: selectedResident.creature.creatureId,
+        familyId: selectedFamilyId,
+        preference,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedFamilyId, selectedResident]);
+  const completeSelectedIntroduction = useCallback((
+    preference: CompanionIntroductionAnswer,
+    supportStyle: CompanionSupportStyle
+  ) => {
+    if (!selectedResident || !selectedFamilyId) return;
+    setCompanionContentState((current) => {
+      const next = completeCompanionIntroduction(current, {
+        companionId: selectedResident.creature.creatureId,
+        familyId: selectedFamilyId,
+        preference,
+        supportStyle,
+      });
+      saveCompanionContentState(next);
+      return next;
+    });
+  }, [selectedFamilyId, selectedResident]);
   const answerSelectedJourneyConversation = useCallback((sessionId: string, value: string) => {
     if (!selectedResident || !selectedFamilyId || !selectedJourneyDefinition) return [];
     const result = answerJourneyConversation(companionJourneyState, sessionId, value);
@@ -1501,6 +1592,10 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     selectedBondProgress,
     selectedRole,
     selectedJourneyDefinition,
+    selectedIntroductionDefinition,
+    selectedIntroduction,
+    selectedIntroductionShouldAutoOpen,
+    selectedVisitGreeting,
     selectedJourneyGoals,
     selectedJourneyConversation,
     selectedJourneyNode,
@@ -1513,6 +1608,8 @@ export function useKingdomQuests({ kingdom, residents, today, todayFacts }: Args
     dismissQuickGoalSuggestions: () => setQuickGoalSuggestions(null),
     selectedQuestAdvancesJourneyGoal,
     startSelectedJourneyConversation,
+    deferSelectedIntroduction,
+    completeSelectedIntroduction,
     answerSelectedJourneyConversation,
     startSelectedJourneyCheckIn,
     answerSelectedJourneyCheckIn,

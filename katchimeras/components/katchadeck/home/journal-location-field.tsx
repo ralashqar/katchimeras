@@ -85,13 +85,18 @@ export function JournalLocationField({
     return () => clearTimeout(timer);
   }, [cleanQuery, searchAnchors]);
 
-  const chooseResult = (result: ApplePlaceSearchResult) => {
+  const chooseResult = async (result: ApplePlaceSearchResult) => {
+    const resolved = await resolvePlaceName(result.latitude, result.longitude);
     onChange({
       latitude: result.latitude,
       longitude: result.longitude,
       name: result.name,
       address: result.address ?? null,
       placeId: result.id,
+      venueKey: `provider:${result.id}`,
+      locality: resolved.city ?? null,
+      region: resolved.region ?? null,
+      countryCode: resolved.countryCode ?? null,
       source: 'apple_maps',
       accuracyMeters: null,
     });
@@ -134,6 +139,10 @@ export function JournalLocationField({
         ...nextAnchor,
         name: name.primary,
         address: name.locality,
+        venueKey: venueKeyFor(nextAnchor.latitude, nextAnchor.longitude),
+        locality: name.city ?? null,
+        region: name.region ?? null,
+        countryCode: name.countryCode ?? null,
         source: 'current_location',
         accuracyMeters: location.coords.accuracy,
       });
@@ -187,7 +196,7 @@ export function JournalLocationField({
                     accessibilityLabel={`${result.name}${result.address ? `, ${result.address}` : ''}`}
                     accessibilityRole="button"
                     key={result.id}
-                    onPress={() => chooseResult(result)}
+                    onPress={() => void chooseResult(result)}
                     style={({ pressed }) => [styles.result, pressed && styles.pressed]}>
                     <View style={styles.resultPin}><IconSymbol name="mappin.and.ellipse" size={16} color={Meadow.goldDeep} /></View>
                     <View style={styles.resultCopy}>
@@ -313,6 +322,10 @@ function ManualMapPicker({ initialCoordinate, nativeMaps, onCancel, onConfirm, o
         ...coordinate,
         name: place.primary || query || 'Pinned location',
         address: place.locality,
+        venueKey: venueKeyFor(coordinate.latitude, coordinate.longitude),
+        locality: place.city ?? null,
+        region: place.region ?? null,
+        countryCode: place.countryCode ?? null,
         source: 'manual_pin',
         accuracyMeters: null,
       });
@@ -355,6 +368,10 @@ function ManualMapPicker({ initialCoordinate, nativeMaps, onCancel, onConfirm, o
       </View>
     </KatchaSheet>
   );
+}
+
+function venueKeyFor(latitude: number, longitude: number): string {
+  return `geo:${latitude.toFixed(3)}:${longitude.toFixed(3)}`;
 }
 
 function LocationAction({ disabled = false, icon, label, onPress }: {

@@ -97,6 +97,7 @@ export type CompanionInteractionState = {
 
 export type CompanionRoute =
   | { kind: 'home' }
+  | { kind: 'introduction' }
   | { kind: 'destination'; destination: CompanionDestination }
   | { kind: 'quick_goal_picker'; destination: 'goals' }
   | { kind: 'journey_questionnaire'; destination: 'discovery'; sessionId: string | null }
@@ -105,6 +106,7 @@ export type CompanionRoute =
 
 export type CompanionInteractionAction =
   | { type: 'select_destination'; destination: CompanionDestination }
+  | { type: 'open_introduction' }
   | { type: 'show_home' }
   | { type: 'review_item'; itemId: string | null }
   | { type: 'open_quick_goal_picker' }

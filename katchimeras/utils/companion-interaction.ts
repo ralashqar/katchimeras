@@ -47,6 +47,13 @@ export function companionInteractionReducer(
         reviewItemId: null,
         route: { kind: 'home' },
       };
+    case 'open_introduction':
+      return {
+        ...state,
+        destination: null,
+        reviewItemId: null,
+        route: { kind: 'introduction' },
+      };
     case 'review_item':
       return { ...state, reviewItemId: action.itemId };
     case 'open_quick_goal_picker':
@@ -90,6 +97,14 @@ export function companionInteractionReducer(
         ? { ...state, route: { ...state.route, attemptId: action.attemptId } }
         : state;
     case 'return_to_destination': {
+      if (state.route.kind === 'introduction') {
+        return {
+          ...state,
+          destination: null,
+          reviewItemId: null,
+          route: { kind: 'home' },
+        };
+      }
       const destination: CompanionDestination =
         state.route.kind === 'quick_goal_picker'
           ? 'goals'
@@ -139,6 +154,7 @@ export function companionRouteBackAction(
     return 'confirm_attempt_exit';
   }
   if (state.route.kind === 'home') return 'close_experience';
+  if (state.route.kind === 'introduction') return 'return_to_destination';
   if (state.route.kind === 'destination') return 'return_to_home';
   return 'return_to_destination';
 }

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   BackHandler,
   type LayoutChangeEvent,
+  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
@@ -62,7 +63,7 @@ import { DayComicOverlay } from '@/components/katchadeck/home/day-comic-overlay'
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
 import { TodaySheetHost } from '@/components/katchadeck/home/today-sheet-host';
 import { InlineVoiceNote } from '@/components/katchadeck/world/inline-voice-note';
-import type { IconSymbolName } from '@/components/ui/icon-symbol';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
@@ -74,6 +75,8 @@ import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { useBackfillStatus } from '@/utils/backfill-status';
 import { DiscoveryReveal } from '@/components/katchadeck/world/discovery-reveal';
+import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
+import { ProgressBackfillNotice } from '@/components/katchadeck/world/progress-backfill-notice';
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
 import { usePromptSheetController } from '@/features/today/use-prompt-sheet-controller';
 import { useMicrocopy } from '@/features/today/use-microcopy';
@@ -83,6 +86,7 @@ import { useTodayActionRouter } from '@/features/today/use-today-action-router';
 import { useMorningPromptController } from '@/features/today/use-morning-prompt-controller';
 import { useObservatoryController } from '@/features/today/use-observatory-controller';
 import { useDiscoveryRevealController } from '@/features/today/use-discovery-reveal-controller';
+import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
 import { useNoteCaptureController } from '@/features/today/use-note-capture-controller';
 import { useTodayMemoryWriters } from '@/features/today/use-today-memory-writers';
 import { useTodayPromptAnswerController } from '@/features/today/use-today-prompt-answer-controller';
@@ -662,7 +666,14 @@ export default function HomeScreen() {
   // Discoveries (life milestones): whatever is added on Today re-evaluates the
   // catalog right away, and a fresh unlock plays its reveal here too — but only
   // once the current flow is done, never on top of an open prompt/sheet.
-  const { celebrateDiscovery, markDiscoverySeen } = useDiscoveryRevealController(formingDay);
+  const {
+    celebrateDiscovery,
+    markDiscoverySeen,
+    discoveryProgress,
+    discoveryBackfillCount,
+    dismissDiscoveryBackfill,
+  } = useDiscoveryRevealController(formingDay);
+  const companionAchievements = useCompanionAchievements();
 
   const anyManualSheetOpen =
     memoryVaultOpen ||
@@ -1320,6 +1331,18 @@ export default function HomeScreen() {
           page collapsed and during the hatch reveal. The panel also shows on
           the TOMORROW view once today has hatched (viewedDay resolves it);
           before the hatch, tomorrow stays a locked egg with no panel. */}
+      {!isHatching && !quickGoalsOpen && !hasActivePrompt ? (
+        <Pressable
+          accessibilityLabel={`Discoveries. ${discoveryProgress.unlocked} of ${discoveryProgress.total} found`}
+          accessibilityRole="button"
+          onPress={() => router.push('/discoveries')}
+          style={({ pressed }) => [styles.discoveriesShortcut, { top: insets.top + 70 }, pressed && styles.discoveriesShortcutPressed]}>
+          <IconSymbol color="#FFF3D0" name="star.fill" size={15} />
+          <ThemedText style={styles.discoveriesShortcutLabel} lightColor="#FFF3D0" darkColor="#FFF3D0">
+            {discoveryProgress.unlocked}/{discoveryProgress.total}
+          </ThemedText>
+        </Pressable>
+      ) : null}
       {quickGoalsOpen && selectedDay?.kind === 'day' && selectedDay.isToday ? (
         <TodayGoalsExperience
           actions={{
@@ -1642,6 +1665,22 @@ export default function HomeScreen() {
       {celebrateDiscovery && !flowBusy ? (
         <DiscoveryReveal discovery={celebrateDiscovery} onDismiss={() => markDiscoverySeen(celebrateDiscovery.id)} />
       ) : null}
+      {!celebrateDiscovery && companionAchievements.pending.length > 0 && !flowBusy ? (
+        <CompanionAchievementCelebration
+          achievements={companionAchievements.pending}
+          onDismiss={() => companionAchievements.markSeen(companionAchievements.pending.map((def) => def.id))}
+        />
+      ) : null}
+      {!celebrateDiscovery && companionAchievements.pending.length === 0 && !flowBusy && (companionAchievements.backfillCount > 0 || discoveryBackfillCount > 0) ? (
+        <ProgressBackfillNotice
+          achievementCount={companionAchievements.backfillCount}
+          discoveryCount={discoveryBackfillCount}
+          onDismiss={() => {
+            companionAchievements.dismissBackfill();
+            dismissDiscoveryBackfill();
+          }}
+        />
+      ) : null}
       {backfillStatus.active ? (
         <Animated.View entering={FadeIn.duration(220)} exiting={FadeOut.duration(220)} pointerEvents="none" style={styles.backfillTag}>
           <ActivityIndicator color={Lantern.ember300} size="small" />
@@ -1723,6 +1762,23 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 20,
   },
+  discoveriesShortcut: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(31,28,23,0.78)',
+    borderColor: 'rgba(255,226,145,0.24)',
+    borderRadius: 14,
+    borderWidth: 1,
+    boxShadow: '0 5px 14px rgba(22,16,10,0.22)',
+    flexDirection: 'row',
+    gap: 6,
+    minHeight: 38,
+    paddingHorizontal: 10,
+    position: 'absolute',
+    right: 14,
+    zIndex: 54,
+  },
+  discoveriesShortcutPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
+  discoveriesShortcutLabel: { fontSize: 10.5, fontWeight: '900', fontVariant: ['tabular-nums'] },
   sectionGap: {
     gap: 16,
     // 'auto' absorbs free space above, pinning the card just over the tab bar

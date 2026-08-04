@@ -8,18 +8,28 @@ import {
   validateEvolvingCompanionContent,
 } from '@/constants/companion-content';
 import { companionJourneyByFamilyId } from '@/constants/companion-journeys';
+import {
+  companionIntroductionDefinitions,
+  validateCompanionIntroductionDefinitions,
+} from '@/constants/companion-introductions';
 import { quickGoalTemplatesForFamily } from '@/constants/companion-quick-goals';
 import { BESPOKE_FAMILY_QUEST_PACKS } from '@/constants/katchimera-bespoke-quests';
 import { SPECIALIST_COMPANION_SYSTEMS } from '@/constants/specialist-companion-catalogue';
 import { COMPANION_SPEECH_COPY_LIMITS } from '@/constants/companion-speech-copy';
 import {
   emptyCompanionContentState,
+  completeCompanionIntroduction,
+  deferCompanionIntroduction,
   ensureCompanionInvitation,
   invitationForDay,
+  introductionForFamily,
+  migrateCompanionIntroduction,
+  recordCompanionVisit,
   rememberCompanionAnswer,
   selectCompanionDailyInvitation,
   updateCompanionInvitation,
 } from '@/utils/companion-content';
+import { companionFirstPersonText } from '@/utils/companion-dialogue';
 import { companionCheckInQuestion } from '@/utils/companion-check-in';
 import {
   activeConversationForFamily,
@@ -52,6 +62,54 @@ test('all 25 life-area families have the evolving authored content contract', ()
     assert.notDeepEqual(bondMoment?.options, BOND_MOMENT_OPTIONS[level]);
     assert.equal(bondMoment?.options.some((option) => option.id === 'supported'), false);
   }
+});
+
+test('each family has concise first-person introduction and return copy', () => {
+  assert.deepEqual(validateCompanionIntroductionDefinitions(), []);
+  assert.equal(companionFirstPersonText('How should Steppling use this?', 'Steppling'), 'How should I use this?');
+  assert.equal(companionFirstPersonText('Steppling will remember it.', 'Steppling'), 'I’ll remember it.');
+  for (const introduction of companionIntroductionDefinitions) {
+    const name = introduction.greeting.match(/^I[’']m ([^.]+)\./)?.[1] ?? introduction.familyId;
+    const presented = companionFirstPersonText(introduction.greeting, name);
+    assert.equal(presented, introduction.greeting, `${name}'s first-person greeting must remain unchanged`);
+    assert.doesNotMatch(presented, /\bI[’']m I\b/i);
+  }
+});
+
+test('introduction choices persist per family and defer without nagging', () => {
+  const preference = { nodeId: 'first', optionId: 'walk', label: 'Walk more often' };
+  const deferred = deferCompanionIntroduction(emptyCompanionContentState(), {
+    companionId: 'companion:steppling', familyId: 'steppling', preference, occurredAt: 10,
+  });
+  assert.equal(introductionForFamily(deferred, 'steppling')?.status, 'deferred');
+  assert.deepEqual(introductionForFamily(deferred, 'steppling')?.preference, preference);
+
+  const completed = completeCompanionIntroduction(deferred, {
+    companionId: 'companion:steppling', familyId: 'steppling', preference,
+    supportStyle: 'gentle', occurredAt: 20,
+  });
+  assert.equal(introductionForFamily(completed, 'steppling')?.status, 'completed');
+  assert.equal(introductionForFamily(completed, 'steppling')?.supportStyle, 'gentle');
+
+  const migrated = migrateCompanionIntroduction(emptyCompanionContentState(), {
+    companionId: 'companion:steppling', familyId: 'steppling', hasExistingRelationship: true, occurredAt: 30,
+  });
+  assert.equal(introductionForFamily(migrated, 'steppling')?.migrated, true);
+});
+
+test('visits distinguish returning companions and newly equipped skins', () => {
+  const first = recordCompanionVisit(emptyCompanionContentState(), {
+    companionId: 'companion:shellio', familyId: 'shellio', skinId: 'shellio', dayId: '2026-07-01', visitedAt: 1,
+  });
+  assert.equal(first.greeting, 'regular');
+  const returning = recordCompanionVisit(first.state, {
+    companionId: 'companion:shellio', familyId: 'shellio', skinId: 'shellio', dayId: '2026-07-15', visitedAt: 2,
+  });
+  assert.equal(returning.greeting, 'returning');
+  const newSkin = recordCompanionVisit(returning.state, {
+    companionId: 'companion:shellio', familyId: 'shellio', skinId: 'shellio-pool', dayId: '2026-07-15', visitedAt: 3,
+  });
+  assert.equal(newSkin.greeting, 'new_skin');
 });
 
 test('speech-bubble copy stays within the mobile authoring budget', () => {

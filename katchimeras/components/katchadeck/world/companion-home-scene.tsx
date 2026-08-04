@@ -21,9 +21,9 @@ import { KatchaUI } from '@/constants/katcha-ui';
 import type { CompanionDestination } from '@/types/companion-interaction';
 import type { HomeVisualKey } from '@/types/home';
 import type { CompanionBondProgress } from '@/utils/companion-bond';
-import type { CompanionDailyInvitation } from '@/utils/companion-content';
 import type { QuestionnaireImageSource } from '@/utils/companion-questionnaire-presentation';
 import type { TodayExplorationBackgroundKey } from '@/utils/today-exploration-backgrounds';
+import { companionHomeHeroSpacer } from '@/utils/companion-home-layout';
 
 import { CompanionCinematicStage } from './companion-cinematic-stage';
 
@@ -39,14 +39,14 @@ export function CompanionHomeScene({
   animateEntrance = true,
   bondProgress,
   creature,
-  dailyInvitation,
   environmentKey,
   goalStatus,
+  homeGreeting,
   name,
   onClose,
-  onOpenDailyInvitation,
-  onSkipDailyInvitation,
+  onOpenAchievements,
   onSelectDestination,
+  achievementProgress,
   questStatus,
   showSkins,
   visualKey,
@@ -55,14 +55,14 @@ export function CompanionHomeScene({
   animateEntrance?: boolean;
   bondProgress: CompanionBondProgress;
   creature: QuestionnaireImageSource;
-  dailyInvitation: CompanionDailyInvitation | null;
   environmentKey: TodayExplorationBackgroundKey | null;
   goalStatus: string;
+  homeGreeting: string;
   name: string;
   onClose: () => void;
-  onOpenDailyInvitation: () => void;
-  onSkipDailyInvitation: () => void;
+  onOpenAchievements: () => void;
   onSelectDestination: (destination: CompanionDestination) => void;
+  achievementProgress: { earned: number; total: number; unseen: number };
   questStatus: string;
   showSkins: boolean;
   visualKey: HomeVisualKey;
@@ -71,12 +71,9 @@ export function CompanionHomeScene({
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { fontScale, height, width } = useWindowDimensions();
-  const compact = height < 735;
   const reflowPaths = width < 375 || fontScale > 1.15;
   const tablet = width >= 700;
-  const heroHeight = compact
-    ? Math.max(214, Math.min(252, height * 0.4))
-    : Math.min(336, Math.max(286, height * 0.39));
+  const heroHeight = companionHomeHeroSpacer(height);
   const shouldAnimate = animateEntrance && !reduceMotion;
   const paths: HomePath[] = [
     {
@@ -113,9 +110,9 @@ export function CompanionHomeScene({
         creature={creature}
         enterFromLifted={!animateEntrance}
         environmentKey={environmentKey}
-        lifted={false}
+        lifted
         name={name}
-        title="Where shall we begin today?"
+        title={homeGreeting}
         visualKey={visualKey}
       />
 
@@ -149,54 +146,23 @@ export function CompanionHomeScene({
             darkColor="#FFD36E">
             {name}
           </ThemedText>
-          <View accessibilityElementsHidden pointerEvents="none" style={styles.topBarBalance} />
+          <Pressable
+            accessibilityLabel={`Trophy room. ${achievementProgress.earned} of ${achievementProgress.total} earned${achievementProgress.unseen ? `, ${achievementProgress.unseen} new` : ''}`}
+            accessibilityRole="button"
+            onPress={onOpenAchievements}
+            style={({ pressed }) => [styles.trophyButton, pressed && styles.pressed]}>
+            <IconSymbol color="#FFF4D1" name="trophy.fill" size={19} weight="bold" />
+            {achievementProgress.unseen ? (
+              <View style={styles.trophyBadge}>
+                <ThemedText style={styles.trophyBadgeLabel} lightColor="#3A2815" darkColor="#3A2815">
+                  {Math.min(9, achievementProgress.unseen)}
+                </ThemedText>
+              </View>
+            ) : null}
+          </Pressable>
         </View>
 
         <View style={[styles.hero, { minHeight: heroHeight }]} />
-
-        {dailyInvitation ? (
-          <Animated.View
-            entering={shouldAnimate ? FadeInUp.delay(70).duration(260) : undefined}
-            style={styles.invitationWrap}>
-            <Pressable
-              accessibilityHint="Opens today's single invitation"
-              accessibilityLabel={`${dailyInvitation.title}. ${dailyInvitation.body}`}
-              accessibilityRole="button"
-              onPress={onOpenDailyInvitation}
-              style={({ pressed }) => [styles.invitationCard, pressed && styles.pathCardPressed]}>
-              <View style={styles.invitationIcon}>
-                <IconSymbol
-                  color="#FFF7DF"
-                  name={dailyInvitation.destination === 'quest' ? 'sparkles' : 'bubble.left.fill'}
-                  size={23}
-                />
-              </View>
-              <View style={styles.invitationCopy}>
-                <ThemedText style={styles.invitationEyebrow} lightColor="#8B5C17" darkColor="#8B5C17">
-                  TODAY’S INVITATION
-                </ThemedText>
-                <ThemedText style={styles.invitationTitle} lightColor="#302116" darkColor="#302116">
-                  {dailyInvitation.title}
-                </ThemedText>
-                <ThemedText numberOfLines={2} style={styles.invitationBody} lightColor="#65513D" darkColor="#65513D">
-                  {dailyInvitation.body}
-                </ThemedText>
-              </View>
-              <View style={styles.pathArrow}>
-                <IconSymbol color="#5B411F" name="arrow.right" size={17} />
-              </View>
-            </Pressable>
-            <Pressable
-              accessibilityLabel="Leave this invitation for today"
-              accessibilityRole="button"
-              onPress={onSkipDailyInvitation}
-              style={({ pressed }) => [styles.invitationSkip, pressed && styles.pressed]}>
-              <ThemedText style={styles.invitationSkipLabel} lightColor="#6E5738" darkColor="#6E5738">
-                Not today
-              </ThemedText>
-            </Pressable>
-          </Animated.View>
-        ) : null}
 
         <Animated.View
           entering={
@@ -390,10 +356,31 @@ const styles = StyleSheet.create({
     textShadowOffset: { height: 3, width: 0 },
     textShadowRadius: 4,
   },
-  topBarBalance: {
+  trophyButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(35,32,25,0.82)',
+    borderColor: 'rgba(255,226,145,0.26)',
+    borderRadius: 15,
+    borderWidth: 1,
     height: 44,
+    justifyContent: 'center',
+    position: 'relative',
     width: 44,
   },
+  trophyBadge: {
+    alignItems: 'center',
+    backgroundColor: '#E7B951',
+    borderColor: '#FFF1C5',
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 17,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: -4,
+    top: -4,
+    width: 17,
+  },
+  trophyBadgeLabel: { ...KatchaUI.type.numeric, fontSize: 8, fontWeight: '900' },
   hero: {
     position: 'relative',
   },
@@ -402,62 +389,6 @@ const styles = StyleSheet.create({
     gap: 9,
     position: 'relative',
     zIndex: 4,
-  },
-  invitationWrap: {
-    gap: 5,
-    position: 'relative',
-    zIndex: 5,
-  },
-  invitationCard: {
-    alignItems: 'center',
-    backgroundColor: '#FFF1C8',
-    borderColor: 'rgba(188,126,28,0.48)',
-    borderCurve: 'continuous',
-    borderRadius: 23,
-    borderWidth: 1.5,
-    boxShadow: '0 12px 28px rgba(94,58,18,0.24), inset 0 1px 0 rgba(255,255,255,0.96)',
-    flexDirection: 'row',
-    gap: 12,
-    minHeight: 102,
-    padding: 14,
-  },
-  invitationIcon: {
-    alignItems: 'center',
-    backgroundColor: '#A86E20',
-    borderRadius: 18,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  invitationCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  invitationEyebrow: {
-    ...KatchaUI.type.meta,
-    fontSize: 8.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  invitationTitle: {
-    ...KatchaUI.type.companionCardTitle,
-    fontSize: 17,
-  },
-  invitationBody: {
-    ...KatchaUI.type.companionBody,
-    fontSize: 10.5,
-    lineHeight: 14,
-  },
-  invitationSkip: {
-    alignSelf: 'flex-end',
-    minHeight: 30,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  invitationSkipLabel: {
-    ...KatchaUI.type.meta,
-    fontSize: 10,
-    fontWeight: '800',
   },
   pathsReflow: {
     flexWrap: 'wrap',

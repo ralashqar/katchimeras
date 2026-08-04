@@ -25,7 +25,7 @@ function formingDaySignature(formingDay: HomeDayRecord | null) {
 }
 
 export function useDiscoveryRevealController(formingDay: HomeDayRecord | null) {
-  const { pending, markSeen, refresh } = useDiscoveries();
+  const { pending, markSeen, refresh, unlockedCount, totalCount, backfillCount, dismissBackfillNotice } = useDiscoveries();
   const formingSignature = useMemo(() => formingDaySignature(formingDay), [formingDay]);
 
   useEffect(() => {
@@ -43,5 +43,8 @@ export function useDiscoveryRevealController(formingDay: HomeDayRecord | null) {
   return {
     celebrateDiscovery,
     markDiscoverySeen: markSeen,
+    discoveryProgress: { unlocked: unlockedCount, total: totalCount },
+    discoveryBackfillCount: backfillCount,
+    dismissDiscoveryBackfill: dismissBackfillNotice,
   };
 }

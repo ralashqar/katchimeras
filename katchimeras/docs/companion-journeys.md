@@ -82,10 +82,10 @@ remain unchanged pending a later overlap audit informed by these authored roles.
 
 ## Current interaction model
 
-### Evolving daily invitations
+### Evolving daily companion content
 
-The fifty-four playable Journey families also share one authored daily-invitation
-system. A companion receives at most one new invitation per local day. The
+The playable Journey families share one authored daily-content system. A
+companion receives at most one new content selection per local day. The
 selection is persisted, deterministic, and ordered by: unfinished quest,
 unfinished Focus conversation, missing Focus, newly reached bond moment,
 progress review, contextual quest, then a rotating daily pulse.
@@ -98,8 +98,8 @@ progress review, contextual quest, then a rotating daily pulse.
   prompt exclusion, lifecycle events, and small reusable memory facts.
 - `utils/companion-content-storage.ts` persists under
   `katchadeck.companion-content-v1`.
-- The companion Home page leads with the invitation and offers a non-destructive
-  **Not today** action. Today promotes only the companion hatched that day.
+- The daily selection feeds quests, Focus, and check-ins without appearing as a
+  separate invitation panel. Today can still open a companion moment directly.
 - Repeatable real-life quests rotate three presentation variants while keeping
   the same quest ID, evidence contract, cooldown, and Journey contribution.
 - Quick goals remain independently completable, but only the first quick-goal
@@ -107,6 +107,19 @@ progress review, contextual quest, then a rotating daily pulse.
 
 Invitation analytics are local, metadata-only lifecycle records. They never
 contain journal text or free-text answer content.
+
+### First meeting
+
+An ordinary first visit to a logical family opens a three-beat companion intro:
+the first Focus preference, preferred support style, and an optional Focus
+handoff. The answer is persisted at family level and seeds Focus so it is not
+asked twice. Quest and camera restore routes bypass the intro. Deferring it
+prevents future automatic opening and adds a manual **Meet [Name]** action to
+**You**. Existing relationship history migrates as already introduced.
+
+Visits are also recorded at family level. A different skin receives only a
+one-line form greeting. A visit after fourteen days can use a short, non-blocking
+return line. Neither case repeats onboarding or resets bond, Focus, or memory.
 
 The player-facing model is intentionally simpler than the original staged Journey UI:
 

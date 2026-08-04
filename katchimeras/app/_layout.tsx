@@ -91,9 +91,11 @@ export default function RootLayout() {
           <Stack.Screen name="day-map/[dayId]" options={{ title: 'Day Map' }} />
           <Stack.Screen name="card/[cardId]" options={{ title: 'Daily card' }} />
           <Stack.Screen name="life-map" options={{ headerShown: false, title: 'Life Map' }} />
+          <Stack.Screen name="discoveries" options={{ headerShown: false, title: 'Discoveries' }} />
           <Stack.Screen name="location-privacy" options={{ title: 'Photo places' }} />
           <Stack.Screen name="hatch-your-past" options={{ headerShown: false, gestureEnabled: false, title: 'Hatch your past' }} />
           <Stack.Screen name="katchimera/[creatureId]" options={{ headerShown: false }} />
+          <Stack.Screen name="katchimera/[creatureId]/achievements" options={{ headerShown: false }} />
           <Stack.Screen name="katchimera/[creatureId]/quest/[questId]/game" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="game/[questId]" options={{ headerShown: false, gestureEnabled: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Katchimeras Preview' }} />

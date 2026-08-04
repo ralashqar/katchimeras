@@ -202,6 +202,15 @@ test('ordinary companion visits open on the new home route', () => {
   assert.equal(companionRouteBackAction(initial), 'close_experience');
 });
 
+test('the first-meeting introduction is a focused route that returns home', () => {
+  const initial = createCompanionInteractionState({});
+  const introduction = companionInteractionReducer(initial, { type: 'open_introduction' });
+  assert.deepEqual(introduction.route, { kind: 'introduction' });
+  assert.equal(companionRouteBackAction(introduction), 'return_to_destination');
+  const home = companionInteractionReducer(introduction, { type: 'return_to_destination' });
+  assert.deepEqual(home.route, { kind: 'home' });
+});
+
 test('companion destinations clear focused review state and preserve direction', () => {
   const initial = createCompanionInteractionState({ initialDestination: 'quest' });
   const reviewing = companionInteractionReducer(initial, { type: 'review_item', itemId: 'evidence-1' });

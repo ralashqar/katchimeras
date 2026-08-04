@@ -61,7 +61,7 @@ const BOND_EFFECTS: readonly CompanionCheckInOption[] = [
 ];
 
 const BOND_NEXT: readonly CompanionCheckInOption[] = [
-  { id: 'future-invitations', label: 'Bring it into future invitations' },
+  { id: 'future-invitations', label: 'Use it in future conversations' },
   { id: 'small-steps', label: 'Use it when suggesting small steps' },
   { id: 'check-later', label: 'Check in on it again later' },
   { id: 'just-remember', label: 'Just remember it for now' },
@@ -88,7 +88,7 @@ export function companionCheckInQuestion(input: {
       prompt: checkIn.contentPrompt ?? definition?.checkIn.prompt ?? `What stood out in this part of life today?`,
       helperText: checkIn.contentHelperText ?? (goal
         ? `Choose the moment that feels most relevant to “${goal.title}”.`
-        : `Choose the closest answer. ${role?.displayName ?? 'Your companion'} will keep it without judging it.`),
+        : 'Choose the closest answer. I’ll remember it without judging it.'),
       options: bondLevel
         ? checkIn.contentOptions ?? BOND_MOMENT_OPTIONS[bondLevel]
         : checkIn.contentOptions ?? definition?.checkIn.options.map((option) => ({ id: option.id, label: option.label })) ?? FALLBACK_MOMENTS,
@@ -99,7 +99,7 @@ export function companionCheckInQuestion(input: {
       return {
         id: 'effect',
         prompt: 'Why would that be useful to you?',
-        helperText: `${role?.displayName ?? 'Your companion'} will use this as guidance, not a fixed rule.`,
+        helperText: 'I’ll use this as guidance, not a fixed rule.',
         options: BOND_EFFECTS,
       };
     }
@@ -113,8 +113,8 @@ export function companionCheckInQuestion(input: {
   if (bondLevel) {
     return {
       id: 'next',
-      prompt: `How should ${role?.displayName ?? 'your companion'} use what you shared?`,
-      helperText: `${role?.displayName ?? 'Your companion'} will treat this as a preference, not a rule.`,
+      prompt: 'How should I use what you shared?',
+      helperText: 'I’ll treat this as a preference, not a rule.',
       options: BOND_NEXT,
     };
   }

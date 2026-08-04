@@ -8,7 +8,7 @@ Batch status and family-specific risk briefs are tracked in
 
 ## Speech-bubble copy budget
 
-Questionnaire prompts and daily-invitation questions share a compact speech
+Questionnaire prompts and companion questions share a compact speech
 bubble above the answer panel. Keep the prompt at or below 80 characters, its
 helper text at or below 120 characters, and both together at or below 170
 characters. Put nuance into answer choices, later questions, or quest guidance
@@ -99,6 +99,38 @@ new bond moment, due progress review, quest lane, then rotating content.
 
 Do not write any item in isolation. Read it in the state that selects it and in
 the three-question check-in that follows it.
+
+## First meeting and companion voice
+
+The old invitation panel is not part of the player-facing experience. The first
+ordinary visit to a logical companion family begins a short introduction in the
+companion page itself. A direct quest or camera-return route bypasses it.
+
+The introduction has three beats:
+
+1. The companion introduces itself in first person and asks the first Focus
+   preference question.
+2. The player chooses how they want support: gentle, practical, pattern-led, or
+   only when requested.
+3. The companion confirms what it will remember and offers an optional handoff
+   into Focus. That handoff reuses the first answer; it must not ask it again.
+
+Write companion-owned speech in first person: “I can remember that” and “How
+would you like me to help?” Avoid “Steppling will remember that” or “How should
+Steppling use this?” Navigation, task criteria, permissions, and system status
+remain neutral system language.
+
+Introduction copy belongs to a logical family, not a skin. A newly equipped
+skin may acknowledge its form in one line, but it must not repeat the full
+introduction or reset preferences. Leaving the introduction stores a deferred
+state and exposes a manual **Meet [Name]** action under **You**; it must not
+automatically reopen. After fourteen days away, use one warm return line with
+no guilt, absence count, catch-up demand, or blocking questionnaire.
+
+Keep each introduction bubble within the same mobile budget as other companion
+speech. The greeting must name the life area plainly, state the companion’s
+role without making therapeutic claims, and avoid promising adaptation the
+system cannot provide.
 
 ## Questionnaire model
 
@@ -221,8 +253,8 @@ Avoid relationship claims the system cannot support. Do not say the companion
 
 ### Preserve autonomy
 
-- Invitations are optional.
-- “Not today” must remain non-destructive.
+- Companion conversations are optional.
+- Leaving an introduction or check-in must remain non-destructive.
 - Continuing, changing, pausing, and completing are all valid.
 - Do not use guilt, streak anxiety, loss framing, or fear of disappointing the
   companion.
@@ -274,7 +306,7 @@ company, weather, location, or schedule sound universally controllable.
 - Do not make colour, emoji, or icon the only source of meaning.
 - Read every screen aloud. The question, helper, options, progress, and action
   should make sense in that order without relying on visual position.
-- Keep repeated interface terms stable: **invitation**, **Focus**, **quest**,
+- Keep repeated interface terms stable: **conversation**, **Focus**, **quest**,
   **quick goal**, **pause**, and **complete**.
 
 These rules follow the W3C guidance to use understandable words, short
@@ -319,11 +351,13 @@ necessary. Cadence is a schedule setting, not a streak promise.
 Reference files:
 
 - `constants/steppling-companion-content.ts` — fully authored reference pack;
+- `constants/companion-introductions.ts` — first-meeting and return copy;
 - `constants/companion-content.ts` — catalogue assembly and fallback generator;
 - `constants/companion-journeys.ts` — Focus questionnaire and Journey copy;
 - `constants/companion-quick-goals.ts` — quick-goal labels;
 - `utils/quests/definitions.ts` — quest, evidence, retry, and variant copy;
 - `utils/companion-check-in.ts` — shared follow-up questions;
+- `utils/companion-content.ts` — introduction, visit, and rotating-content state;
 - `utils/companion-journey.ts` — persisted Journey migration.
 
 When changing a Focus questionnaire:

@@ -294,7 +294,7 @@ function buildFamilyContent(familyId: KatchimeraFamilyId): CompanionContentItem[
       : level === 3
         ? `What has ${familyName} helped you notice that you might otherwise have missed?`
         : `What part of your history with ${familyName} feels most worth carrying forward?`),
-    helperText: authored?.helperText ?? 'This answer can shape later invitations. It does not lock you into anything.',
+    helperText: authored?.helperText ?? 'I can use this in later conversations. It does not lock you into anything.',
     options: authored?.options ?? BOND_MOMENT_OPTIONS[level],
     minimumBondLevel: level,
     cooldownDays: 3650,

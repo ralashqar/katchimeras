@@ -12,7 +12,6 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
 import { SegmentedControl } from '@/components/katchadeck/ui/segmented-control';
-import { DiscoveriesHallSheet } from '@/components/katchadeck/world/discoveries-hall-sheet';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchaDeckUI, Lantern } from '@/constants/theme';
@@ -58,9 +57,8 @@ export default function CollectionScreen() {
   const [view, setView] = useState<CollectionView>('cards');
   const [filters, setFilters] = useState<CardFilters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [discoveriesOpen, setDiscoveriesOpen] = useState(false);
   const { days } = useAllDays();
-  const { entries: discoveryEntries, unlockedCount: discoveriesUnlocked, totalCount: discoveriesTotal } = useDiscoveries();
+  const { unlockedCount: discoveriesUnlocked, totalCount: discoveriesTotal } = useDiscoveries();
 
   useFocusEffect(
     useCallback(() => {
@@ -150,7 +148,7 @@ export default function CollectionScreen() {
           <>
             <View style={styles.actionRow}>
               <KatchaButton label="Open the life map" onPress={() => router.push('/life-map')} variant="secondary" />
-              <KatchaButton label={`Discoveries · ${discoveriesUnlocked}/${discoveriesTotal}`} onPress={() => setDiscoveriesOpen(true)} variant="secondary" />
+              <KatchaButton label={`Discoveries · ${discoveriesUnlocked}/${discoveriesTotal}`} onPress={() => router.push('/discoveries')} variant="secondary" />
             </View>
             <CalendarMonth
               days={days}
@@ -191,9 +189,6 @@ export default function CollectionScreen() {
         </KatchaSheet>
       ) : null}
 
-      {discoveriesOpen ? (
-        <DiscoveriesHallSheet entries={discoveryEntries} unlockedCount={discoveriesUnlocked} totalCount={discoveriesTotal} onClose={() => setDiscoveriesOpen(false)} />
-      ) : null}
     </View>
   );
 }

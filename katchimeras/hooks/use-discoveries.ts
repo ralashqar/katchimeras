@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import type { HomeDayRecord } from '@/types/home';
 import type { DiscoveryCategory, DiscoveryDef, DiscoveryRecord, DiscoveryState } from '@/types/discoveries';
-import { DISCOVERY_CATALOG } from '@/utils/discoveries-catalog';
+import { DISCOVERY_CATALOG_VERSION, GLOBAL_DISCOVERY_CATALOG } from '@/utils/discoveries-catalog';
 import { buildDiscoveryContext } from '@/utils/discoveries-context';
 import { evaluateDiscoveries } from '@/utils/discoveries-engine';
 import { loadDiscoveryState, markAnimationSeen, recordUnlocks, saveDiscoveryState } from '@/utils/discoveries-storage';
@@ -72,10 +72,11 @@ export function useDiscoveriesFromArchive({ days, getDayById, refresh }: AllDays
     const now = new Date();
     const ctx = buildDiscoveryContext(days, now);
     const prev = stateRef.current;
-    const { newlyUnlocked } = evaluateDiscoveries(ctx, prev.unlocked);
-    if (newlyUnlocked.length === 0 && prev.baselined) return;
+    const { newlyUnlocked } = evaluateDiscoveries(ctx, prev.unlocked, GLOBAL_DISCOVERY_CATALOG);
+    const catalogChanged = (prev.catalogVersion ?? 1) < DISCOVERY_CATALOG_VERSION;
+    if (newlyUnlocked.length === 0 && prev.baselined && !catalogChanged) return;
 
-    const silent = !prev.baselined; // baseline pass → no celebrations
+    const silent = !prev.baselined || catalogChanged; // baseline/catalog migration → no celebration barrage
     const records: DiscoveryRecord[] = newlyUnlocked.map((def) => ({
       id: def.id,
       unlockedAt: now.getTime(),
@@ -83,19 +84,24 @@ export function useDiscoveriesFromArchive({ days, getDayById, refresh }: AllDays
       sourceMomentIds: [],
       seenAnimation: silent,
     }));
-    const next: DiscoveryState = { ...recordUnlocks(prev, records), version: 1, baselined: true };
+    const next: DiscoveryState = {
+      ...recordUnlocks(prev, records),
+      version: 1,
+      catalogVersion: DISCOVERY_CATALOG_VERSION,
+      baselined: true,
+    };
     saveDiscoveryState(next);
     setState(next);
     if (silent && records.length > 0) setBackfillCount(records.length);
   }, [days]);
 
   const entries = useMemo<DiscoveryEntry[]>(
-    () => DISCOVERY_CATALOG.map((def) => ({ def, record: state.unlocked[def.id] ?? null })),
+    () => GLOBAL_DISCOVERY_CATALOG.map((def) => ({ def, record: state.unlocked[def.id] ?? null })),
     [state]
   );
 
-  const unlockedCount = useMemo(() => Object.keys(state.unlocked).length, [state]);
-  const totalCount = DISCOVERY_CATALOG.length;
+  const unlockedCount = useMemo(() => entries.filter((entry) => entry.record).length, [entries]);
+  const totalCount = GLOBAL_DISCOVERY_CATALOG.length;
 
   const countsByCategory = useMemo<DiscoveryCategoryCount[]>(() => {
     const order: DiscoveryCategory[] = ['exploration', 'memory', 'life', 'journey', 'reflection', 'world'];

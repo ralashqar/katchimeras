@@ -72,6 +72,25 @@ export function companionDestinationStageLift(viewportHeight: number): number {
   return Math.min(150, Math.max(118, viewportHeight * 0.16));
 }
 
+/**
+ * Home keeps a little more breathing room than destination pages because its
+ * three primary paths sit side by side, while still handing content off much
+ * earlier than the old low cinematic pose.
+ */
+export function companionHomeHeroSpacer(viewportHeight: number): number {
+  return viewportHeight < 735
+    ? Math.min(218, Math.max(192, viewportHeight * 0.34))
+    : Math.min(270, Math.max(236, viewportHeight * 0.29));
+}
+
+export function companionSpeechTitleTier(
+  title: string,
+): 'standard' | 'medium' | 'long' {
+  if (title.length > 56) return 'long';
+  if (title.length > 36) return 'medium';
+  return 'standard';
+}
+
 export function companionSpeechBubbleDrop(viewportHeight: number): number {
   return Math.min(84, Math.max(64, viewportHeight * 0.09));
 }
