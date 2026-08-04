@@ -223,6 +223,30 @@ test('companion destinations clear focused review state and preserve direction',
   assert.equal(backToYou.direction, -1);
 });
 
+test('achievements open as a companion destination instead of remounting a route', () => {
+  const initial = createCompanionInteractionState({ initialDestination: 'goals' });
+  const achievements = companionInteractionReducer(initial, {
+    type: 'select_destination',
+    destination: 'achievements',
+  });
+  assert.deepEqual(achievements.route, { kind: 'destination', destination: 'achievements' });
+  assert.equal(companionRouteBackAction(achievements), 'return_to_home');
+
+  const interaction = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'companion-interaction-sheet.tsx'),
+    'utf8',
+  );
+  const kingdom = fs.readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'world', 'kingdom-companion-screen.tsx'),
+    'utf8',
+  );
+  assert.match(interaction, /selectDestination\('achievements'\)/);
+  assert.match(interaction, /CompanionTrophyRoomScreen creatureId=\{props\.creatureId\} embedded/);
+  assert.match(interaction, /route\.kind === 'home' \? homeGreeting : destinationHeroTitle/);
+  assert.match(interaction, /showStage=\{false\}/);
+  assert.doesNotMatch(kingdom, /pathname:\s*['"]\/katchimera\/\[creatureId\]\/achievements/);
+});
+
 test('focused companion routes unwind to their destination, then home, then Kingdom', () => {
   const initial = createCompanionInteractionState({ initialDestination: 'discovery' });
   const questionnaire = companionInteractionReducer(initial, {
@@ -286,9 +310,9 @@ test('goal picker returns to the dedicated goals destination', () => {
   const returned = companionInteractionReducer(picker, { type: 'return_to_destination' });
 
   assert.deepEqual(returned.route, { kind: 'destination', destination: 'goals' });
-  assert.match(interaction, /quickGoalPickerOpen \? 'Which small step feels right\?' : destinationHeroTitle/);
+  assert.match(interaction, /quickGoalPickerOpen \? 'Which small step feels right\?' : route\.kind === 'home' \? homeGreeting : destinationHeroTitle/);
   assert.match(interaction, /backLabel=\{quickGoalPickerOpen \? 'Goals'/);
-  assert.match(interaction, /\(route\.kind === 'destination' \|\| quickGoalPickerOpen\) && !questionnaireExperience/);
+  assert.match(interaction, /\) : !questionnaireExperience \? \(\s*<CompanionCinematicStage/);
   assert.match(interaction, /\(route\.kind === 'destination' \|\| quickGoalPickerOpen\) && !questGameVisible && !questionnaireExperience/);
   assert.match(quickGoals, /backgroundColor: '#211A13'/);
   assert.match(quickGoals, /styles\.scopedPresetRow/);

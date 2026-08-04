@@ -104,6 +104,7 @@ import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-
 import type { GoalTaskSourceRect } from '@/components/katchadeck/goals/goal-task-row';
 import { BondRewardFlightOverlay } from '@/components/katchadeck/goals/bond-reward-overlay';
 import { CompanionIntroduction } from './companion-introduction';
+import { CompanionTrophyRoomScreen } from './companion-trophy-room-screen';
 
 const LazyQuestExperienceHost = lazy(async () => {
   const module = await import('./quests/quest-experience-host');
@@ -173,7 +174,6 @@ export type CompanionInteractionSheetProps = {
     supportStyle: CompanionSupportStyle
   ) => void;
   onExperienceActiveChange?: (active: boolean) => void;
-  onOpenAchievements: () => void;
   achievementProgress: { earned: number; total: number; unseen: number };
   skins: readonly KingdomSkinOption[];
   equippedSkinId: KatchimeraSkinId | null;
@@ -487,9 +487,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
         ? 'You'
         : destination === 'goals'
           ? 'Goals'
-          : destination === 'insight'
-            ? 'Insight'
-            : 'Skins';
+          : destination === 'achievements'
+            ? 'Trophy room'
+            : destination === 'insight'
+              ? 'Insight'
+              : 'Skins';
   const questStatus = props.activeQuest
     ? 'Quest in progress'
     : props.offers.length
@@ -528,9 +530,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             : 'How did today feel?'
       : destination === 'goals'
         ? 'What feels doable today?'
-        : destination === 'insight'
-          ? 'Here’s what I noticed.'
-          : 'Which form feels like me?';
+        : destination === 'achievements'
+          ? 'These are our keepsakes'
+          : destination === 'insight'
+            ? 'Here’s what I noticed.'
+            : 'Which form feels like me?';
   const destinationHeroBody = destination === 'discovery'
     ? activeJourneyFocus
       ? 'Check in with me today, or adjust the focus we are working on together.'
@@ -603,17 +607,18 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             strong={questPresentation.backdrop === 'strong'}
             visualKey={props.visualKey}
           />
-        ) : (route.kind === 'destination' || quickGoalPickerOpen) && !questionnaireExperience ? (
+        ) : !questionnaireExperience ? (
           <CompanionCinematicStage
             bubbleBody={quickGoalPickerOpen ? 'Choose one for today, or make a small goal of your own.' : destinationHeroBody}
             bubbleVariant={destination === 'discovery' || quickGoalPickerOpen ? 'questionnaire' : 'default'}
             creature={visual.source}
             creatureTargetRef={creatureRewardTargetRef}
+            enterFromLifted={route.kind === 'home' && hasShownHome}
             environmentKey={props.homeEnvironmentKey ?? null}
             lifted
             name={props.name}
             showSpeechBubble
-            title={quickGoalPickerOpen ? 'Which small step feels right?' : destinationHeroTitle}
+            title={quickGoalPickerOpen ? 'Which small step feels right?' : route.kind === 'home' ? homeGreeting : destinationHeroTitle}
             visualKey={props.visualKey}
           />
         ) : null}
@@ -627,10 +632,11 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
             homeGreeting={homeGreeting}
             name={props.name}
             onClose={props.onClose}
-            onOpenAchievements={props.onOpenAchievements}
+            onOpenAchievements={() => selectDestination('achievements')}
             onSelectDestination={selectDestination}
             achievementProgress={props.achievementProgress}
             questStatus={questStatus}
+            showStage={false}
             showSkins={props.skins.length > 1}
             visualKey={props.visualKey}
             youStatus={youStatus}
@@ -950,6 +956,8 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
                     <View />
                   </CompanionSection>
                 )
+              ) : destination === 'achievements' ? (
+                <CompanionTrophyRoomScreen creatureId={props.creatureId} embedded />
               ) : destination === 'insight' ? (
                 <CompanionInsightThread insight={props.insight} />
               ) : destination === 'skins' ? (

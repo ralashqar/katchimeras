@@ -584,11 +584,6 @@ export function KingdomCompanionScreen({
           memorySaved={Boolean(savedOrigin)}
           bondProgress={quests.selectedBondProgress}
           achievementProgress={selectedAchievementProgress}
-          onOpenAchievements={() => {
-            const creatureId = quests.selectedResident?.creature.creatureId;
-            if (!creatureId) return;
-            router.push({ pathname: '/katchimera/[creatureId]/achievements', params: { creatureId } });
-          }}
           introductionDefinition={quests.selectedIntroductionDefinition}
           introductionRecord={quests.selectedIntroduction}
           introductionShouldAutoOpen={quests.selectedIntroductionShouldAutoOpen}

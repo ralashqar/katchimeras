@@ -29,7 +29,7 @@ export function companionInteractionReducer(
 ): CompanionInteractionState {
   switch (action.type) {
     case 'select_destination': {
-      const order: CompanionDestination[] = ['quest', 'discovery', 'goals', 'insight', 'skins'];
+      const order: CompanionDestination[] = ['quest', 'discovery', 'goals', 'achievements', 'insight', 'skins'];
       return {
         ...state,
         destination: action.destination,

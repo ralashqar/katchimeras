@@ -5,7 +5,7 @@ import type { QuestNextAction, QuestRuntimeState } from '@/utils/quests/runtime'
 import type { KatchimeraActivityLane, KatchimeraBondLevel } from '@/constants/katchimera-roles';
 
 export type CompanionThread = 'quest' | 'discovery' | 'insight' | 'skins';
-export type CompanionDestination = CompanionThread | 'goals';
+export type CompanionDestination = CompanionThread | 'goals' | 'achievements';
 
 export type CompanionQuestOfferViewModel = {
   id: string;

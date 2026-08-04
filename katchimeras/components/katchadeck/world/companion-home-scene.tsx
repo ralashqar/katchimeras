@@ -48,6 +48,7 @@ export function CompanionHomeScene({
   onSelectDestination,
   achievementProgress,
   questStatus,
+  showStage = true,
   showSkins,
   visualKey,
   youStatus,
@@ -64,6 +65,7 @@ export function CompanionHomeScene({
   onSelectDestination: (destination: CompanionDestination) => void;
   achievementProgress: { earned: number; total: number; unseen: number };
   questStatus: string;
+  showStage?: boolean;
   showSkins: boolean;
   visualKey: HomeVisualKey;
   youStatus: string;
@@ -106,15 +108,17 @@ export function CompanionHomeScene({
 
   return (
     <View style={styles.root}>
-      <CompanionCinematicStage
-        creature={creature}
-        enterFromLifted={!animateEntrance}
-        environmentKey={environmentKey}
-        lifted
-        name={name}
-        title={homeGreeting}
-        visualKey={visualKey}
-      />
+      {showStage ? (
+        <CompanionCinematicStage
+          creature={creature}
+          enterFromLifted={!animateEntrance}
+          environmentKey={environmentKey}
+          lifted
+          name={name}
+          title={homeGreeting}
+          visualKey={visualKey}
+        />
+      ) : null}
 
       <ScrollView
         bounces={false}
