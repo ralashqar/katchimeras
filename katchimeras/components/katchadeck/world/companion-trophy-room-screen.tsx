@@ -1,9 +1,8 @@
 import { Image } from 'expo-image';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
+import { FlatList, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { companionAchievementSections } from '@/constants/companion-achievements';
@@ -41,9 +40,15 @@ const PILLAR_ICON: Record<CompanionAchievementPillar, IconSymbolName> = {
   journey: 'map.fill',
 };
 
-const TROPHY_WIDTH = 132;
-const TROPHY_GAP = 14;
-const TROPHY_INTERVAL = TROPHY_WIDTH + TROPHY_GAP;
+const TROPHY_WIDTH = 144;
+const TROPHY_ART_SIZE = 132;
+const TIER_PRESENTATION = [
+  { label: 'Common', color: '#756B59' },
+  { label: 'Uncommon', color: '#66834F' },
+  { label: 'Rare', color: '#477E91' },
+  { label: 'Epic', color: '#8C5798' },
+  { label: 'Legendary', color: '#9A7421' },
+] as const;
 
 export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { creatureId: string; embedded?: boolean }) {
   const router = useRouter();
@@ -79,7 +84,6 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
       <TrophyArchive
         entries={entries}
         familyId={family.id}
-        lifeAreaLabel={family.lifeAreaLabel}
         unlocked={unlocked}
       />
     );
@@ -93,7 +97,7 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
           environmentKey={environmentKey}
           lifted
           name={family.displayName}
-          title="These are our keepsakes"
+          title="Look what we’ve achieved together!"
           visualKey={family.anchorVisualKey}
         />
       ) : null}
@@ -110,18 +114,16 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
         <View style={styles.topBalance} />
       </View>
       <ScrollView
-        contentInsetAdjustmentBehavior="never"
         contentContainerStyle={[
           styles.content,
           { paddingBottom: insets.bottom + 34, width: maxWidth },
         ]}
+        contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}>
         <View accessibilityElementsHidden pointerEvents="none" style={{ minHeight: companionQuestListSpacer(height) }} />
-
         <TrophyArchive
           entries={entries}
           familyId={family.id}
-          lifeAreaLabel={family.lifeAreaLabel}
           unlocked={unlocked}
         />
       </ScrollView>
@@ -132,12 +134,10 @@ export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { cr
 function TrophyArchive({
   entries,
   familyId,
-  lifeAreaLabel,
   unlocked,
 }: {
   entries: CompanionAchievementEntry[];
   familyId: string;
-  lifeAreaLabel: string;
   unlocked: number;
 }) {
   const reduceMotion = useReducedMotion();
@@ -145,73 +145,61 @@ function TrophyArchive({
   const sections = useMemo(() => companionAchievementSections(familyId), [familyId]);
   const [cabinetFilter, setCabinetFilter] = useState('all');
   const [selectedTrophyId, setSelectedTrophyId] = useState<string | null>(null);
-  const [cabinetWidth, setCabinetWidth] = useState(320);
-  const cabinetRef = useRef<FlatList<CompanionAchievementEntry>>(null);
   const previousCabinetFilterRef = useRef<string | null>(null);
-  const cabinetEntries = useMemo(
-    () => cabinetFilter === 'all' ? entries : entries.filter((entry) => entry.def.sectionId === cabinetFilter),
+  const cabinetEntries = useMemo(() => {
+    const filtered = cabinetFilter === 'all'
+      ? entries
+      : entries.filter((entry) => entry.def.sectionId === cabinetFilter);
+    return [...filtered].sort((left, right) => Number(Boolean(right.record)) - Number(Boolean(left.record)));
+  },
     [cabinetFilter, entries]
   );
   const cabinetEntryKey = cabinetEntries.map((entry) => entry.def.id).join('|');
-  const selectedEntry = cabinetEntries.find((entry) => entry.def.id === selectedTrophyId) ?? cabinetEntries[0] ?? null;
 
   useEffect(() => {
     const filterChanged = previousCabinetFilterRef.current !== cabinetFilter;
     previousCabinetFilterRef.current = cabinetFilter;
     const currentIndex = cabinetEntries.findIndex((entry) => entry.def.id === selectedTrophyId);
     if (!filterChanged && currentIndex >= 0) return;
-    const earnedEntries = cabinetEntries.filter((entry) => entry.record);
-    const next = earnedEntries.length
-      ? [...earnedEntries].sort((left, right) => (right.record?.earnedAt ?? 0) - (left.record?.earnedAt ?? 0))[0]
-      : [...cabinetEntries].sort((left, right) => right.ratio - left.ratio)[0] ?? null;
+    const next = cabinetEntries.find((entry) => entry.record)
+      ?? [...cabinetEntries].sort((left, right) => right.ratio - left.ratio)[0]
+      ?? null;
     setSelectedTrophyId(next?.def.id ?? null);
-    const nextIndex = next ? cabinetEntries.findIndex((entry) => entry.def.id === next.def.id) : -1;
-    if (nextIndex < 0) return;
-    setTimeout(() => {
-      cabinetRef.current?.scrollToOffset({ animated: false, offset: nextIndex * TROPHY_INTERVAL });
-    }, 30);
   }, [cabinetEntryKey, cabinetEntries, cabinetFilter, selectedTrophyId]);
 
-  const selectTrophy = (entry: CompanionAchievementEntry, index: number, scroll = true) => {
-    setSelectedTrophyId(entry.def.id);
-    if (scroll) {
-      cabinetRef.current?.scrollToOffset({ animated: !reduceMotion, offset: index * TROPHY_INTERVAL });
-    }
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-  };
-
-  const handleCabinetMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.max(0, Math.min(cabinetEntries.length - 1, Math.round(event.nativeEvent.contentOffset.x / TROPHY_INTERVAL)));
-    const entry = cabinetEntries[index];
-    if (entry) selectTrophy(entry, index, false);
-  };
-
-  const handleCabinetLayout = (event: LayoutChangeEvent) => {
-    setCabinetWidth(event.nativeEvent.layout.width);
-  };
-
   return (
-    <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(320)} style={styles.archive}>
-      <View style={styles.archiveHeading}>
-        <View style={styles.archiveHeadingCopy}>
-          <ThemedText selectable style={styles.archiveEyebrow} lightColor="#DDBB75" darkColor="#DDBB75">
-            {lifeAreaLabel}
-          </ThemedText>
-          <ThemedText selectable style={styles.archiveBody} lightColor="#E7D9C3" darkColor="#E7D9C3">
-            Every shelf remembers something you practised, noticed or completed together.
-          </ThemedText>
-        </View>
-        <View style={styles.archiveCountBadge}>
-          <ThemedText selectable style={styles.archiveCountValue} lightColor="#FFE7A8" darkColor="#FFE7A8">{unlocked}</ThemedText>
-          <ThemedText selectable style={styles.archiveCountLabel} lightColor="#CDBB9F" darkColor="#CDBB9F">earned</ThemedText>
-        </View>
-      </View>
-
-      <View accessibilityLabel={`${unlocked} of ${entries.length} trophies earned`} style={styles.cabinet}>
+    <Animated.View
+      accessibilityLabel={`${unlocked} of ${entries.length} trophies earned`}
+      entering={reduceMotion ? undefined : FadeInDown.duration(320)}
+      style={styles.archive}>
+      <View style={styles.cabinet}>
         <View style={styles.cabinetHeader}>
-          <ThemedText selectable style={styles.cabinetTitle} lightColor="#FFEBC0" darkColor="#FFEBC0">The cabinet</ThemedText>
-          <ThemedText selectable style={styles.cabinetMeta} lightColor="#D8C09A" darkColor="#D8C09A">your life, kept by theme</ThemedText>
+          <View style={styles.cabinetTitleRow}>
+            <IconSymbol color="#806126" name="sparkles" size={17} weight="semibold" />
+            <ThemedText selectable style={styles.cabinetTitle} lightColor="#3B2A1B" darkColor="#3B2A1B">Our keepsakes</ThemedText>
+          </View>
+          <ThemedText selectable style={styles.cabinetMeta} lightColor="#725B44" darkColor="#725B44">{unlocked} of {entries.length}</ThemedText>
         </View>
+        <FlatList
+          contentContainerStyle={styles.trophyListContent}
+          data={cabinetEntries}
+          extraData={selectedTrophyId}
+          horizontal
+          initialNumToRender={8}
+          keyExtractor={(entry) => entry.def.id}
+          keyboardShouldPersistTaps="handled"
+          removeClippedSubviews={false}
+          renderItem={({ item }) => (
+            <CarouselTrophy
+              entry={item}
+              isSelected={item.def.id === selectedTrophyId}
+              onPress={() => setSelectedTrophyId(item.def.id)}
+            />
+          )}
+          showsHorizontalScrollIndicator={false}
+          style={styles.cabinetViewport}
+          windowSize={7}
+        />
         <ScrollView contentContainerStyle={styles.cabinetFilters} horizontal showsHorizontalScrollIndicator={false}>
           {[{ id: 'all', label: 'All' }, ...sections].map((section) => {
             const selected = cabinetFilter === section.id;
@@ -222,41 +210,13 @@ function TrophyArchive({
                 key={section.id}
                 onPress={() => setCabinetFilter(section.id)}
                 style={[styles.cabinetFilter, selected && styles.cabinetFilterSelected]}>
-                <ThemedText style={styles.cabinetFilterLabel} lightColor={selected ? '#342719' : '#D8C7AA'} darkColor={selected ? '#342719' : '#D8C7AA'}>
+                <ThemedText style={styles.cabinetFilterLabel} lightColor={selected ? '#2E351C' : '#705B46'} darkColor={selected ? '#2E351C' : '#705B46'}>
                   {section.label}
                 </ThemedText>
               </Pressable>
             );
           })}
         </ScrollView>
-        <View onLayout={handleCabinetLayout} style={styles.cabinetViewport}>
-          <FlatList
-            ref={cabinetRef}
-            contentContainerStyle={{ paddingHorizontal: Math.max(0, (cabinetWidth - TROPHY_WIDTH) / 2) }}
-            data={cabinetEntries}
-            decelerationRate="fast"
-            disableIntervalMomentum
-            getItemLayout={(_data, index) => ({ index, length: TROPHY_INTERVAL, offset: TROPHY_INTERVAL * index })}
-            horizontal
-            initialNumToRender={7}
-            ItemSeparatorComponent={() => <View style={{ width: TROPHY_GAP }} />}
-            keyExtractor={(entry) => entry.def.id}
-            maxToRenderPerBatch={9}
-            onMomentumScrollEnd={handleCabinetMomentumEnd}
-            renderItem={({ item, index }) => (
-              <CarouselTrophy
-                entry={item}
-                isSelected={item.def.id === selectedEntry?.def.id}
-                onPress={() => selectTrophy(item, index)}
-                reduceMotion={reduceMotion}
-              />
-            )}
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={TROPHY_INTERVAL}
-            windowSize={7}
-          />
-        </View>
-        {selectedEntry ? <SelectedTrophyDetail entry={selectedEntry} /> : null}
       </View>
 
       {sections.map((section, sectionIndex) => {
@@ -267,15 +227,15 @@ function TrophyArchive({
           <Animated.View
             entering={reduceMotion ? undefined : FadeInDown.delay(80 + sectionIndex * 45).duration(280)}
             key={section.id}
-            style={styles.trackSection}>
+            style={[styles.trackSection, sectionIndex === 0 && styles.trackSectionFirst]}>
             <View style={styles.trackHeading}>
-              <View style={[styles.trackIcon, { backgroundColor: `${PILLAR_TINT[pillar]}22` }]}>
+              <View style={styles.trackIcon}>
                 <IconSymbol color={PILLAR_TINT[pillar]} name={PILLAR_ICON[pillar]} size={22} weight="semibold" />
               </View>
               <View style={styles.trackCopy}>
                 <View style={styles.trackTitleRow}>
                   <View style={styles.trackTitleAndHelp}>
-                    <ThemedText selectable style={styles.trackTitle} lightColor="#FFF6E4" darkColor="#FFF6E4">{section.label}</ThemedText>
+                    <ThemedText selectable style={styles.trackTitle} lightColor="#3B2A1B" darkColor="#3B2A1B">{section.label}</ThemedText>
                     <Pressable
                       accessibilityHint="Shows how this progress is recorded"
                       accessibilityLabel={`How to record ${section.label}`}
@@ -284,18 +244,18 @@ function TrophyArchive({
                       hitSlop={8}
                       onPress={() => setOpenHelpSectionId((current) => current === section.id ? null : section.id)}
                       style={({ pressed }) => [styles.helpButton, pressed && styles.helpButtonPressed]}>
-                      <IconSymbol color="#E2CFAF" name="questionmark.circle.fill" size={17} weight="semibold" />
+                      <IconSymbol color="#7A624A" name="questionmark.circle.fill" size={17} weight="semibold" />
                     </Pressable>
                   </View>
-                  <ThemedText selectable style={styles.trackCount} lightColor="#E2CFAF" darkColor="#E2CFAF">{found}/{sectionEntries.length}</ThemedText>
+                  <ThemedText selectable style={styles.trackCount} lightColor="#725B44" darkColor="#725B44">{found}/{sectionEntries.length}</ThemedText>
                 </View>
-                <ThemedText selectable style={styles.trackDescription} lightColor="#D6C7B1" darkColor="#D6C7B1">{section.description}</ThemedText>
+                <ThemedText selectable style={styles.trackDescription} lightColor="#78644E" darkColor="#78644E">{section.description}</ThemedText>
                 {openHelpSectionId === section.id ? (
                   <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(180)} style={styles.helpCallout}>
-                    <IconSymbol color="#E7BE68" name="sparkles" size={14} />
+                    <IconSymbol color="#8A6729" name="sparkles" size={14} />
                     <View style={styles.helpCalloutCopy}>
-                      <ThemedText selectable style={styles.helpCalloutTitle} lightColor="#FFE9BA" darkColor="#FFE9BA">How to record it</ThemedText>
-                      <ThemedText selectable style={styles.helpCalloutBody} lightColor="#E7DAC4" darkColor="#E7DAC4">{section.recordingHelp}</ThemedText>
+                      <ThemedText selectable style={styles.helpCalloutTitle} lightColor="#604623" darkColor="#604623">How to record it</ThemedText>
+                      <ThemedText selectable style={styles.helpCalloutBody} lightColor="#6E5942" darkColor="#6E5942">{section.recordingHelp}</ThemedText>
                     </View>
                   </Animated.View>
                 ) : null}
@@ -311,48 +271,71 @@ function TrophyArchive({
   );
 }
 
-function CarouselTrophy({ entry, isSelected, onPress, reduceMotion }: { entry: CompanionAchievementEntry; isSelected: boolean; onPress: () => void; reduceMotion: boolean }) {
+function CarouselTrophy({
+  entry,
+  isSelected,
+  onPress,
+}: {
+  entry: CompanionAchievementEntry;
+  isSelected: boolean;
+  onPress: () => void;
+}) {
   const earned = Boolean(entry.record);
-  const tint = PILLAR_TINT[entry.def.pillar];
-  const selection = useSharedValue(isSelected ? 1 : 0);
-  useEffect(() => {
-    selection.value = reduceMotion ? (isSelected ? 1 : 0) : withTiming(isSelected ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) });
-  }, [isSelected, reduceMotion, selection]);
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: 0.58 + selection.value * 0.42,
-    transform: [{ translateY: -selection.value * 8 }, { scale: 0.86 + selection.value * 0.14 }],
-  }));
+  const rarity = tierPresentation(entry);
   return (
-    <Pressable accessibilityLabel={`${entry.def.name}, tier ${entry.def.tier}, ${earned ? 'earned' : 'locked'}`} accessibilityRole="button" accessibilityState={{ selected: isSelected }} onPress={onPress} style={styles.carouselPressable}>
-      <Animated.View style={[styles.carouselTrophy, isSelected && { borderColor: `${tint}C8`, backgroundColor: `${tint}22` }, animatedStyle]}>
-        <View style={[styles.carouselGlow, isSelected && { backgroundColor: `${tint}42` }]} />
-        <Image contentFit="contain" source={companionAchievementIconSource(entry.def)} style={[styles.carouselArt, !earned && styles.artLocked]} transition={0} />
-        <View style={[styles.carouselTier, earned && { borderColor: `${tint}99` }]}>
-          <ThemedText style={styles.slotTier} lightColor={earned ? '#FFE8AF' : '#8E8274'} darkColor={earned ? '#FFE8AF' : '#8E8274'}>{roman(entry.def.tier)}</ThemedText>
-        </View>
-      </Animated.View>
+    <Pressable
+      accessibilityLabel={`${entry.def.name}, tier ${entry.def.tier}, ${earned ? 'earned' : 'locked'}`}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isSelected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.carouselTrophy,
+        !earned && styles.carouselTrophyLocked,
+        pressed && styles.carouselTrophyPressed,
+      ]}>
+      <View style={styles.carouselArtFrame}>
+        <Image
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          priority={isSelected ? 'high' : 'normal'}
+          source={companionAchievementIconSource(entry.def)}
+          style={[
+            styles.carouselArt,
+            { transform: [{ scale: trophyArtScale(entry) }] },
+          ]}
+          transition={0}
+        />
+        {earned ? (
+          <View style={styles.earnedCheck}>
+            <IconSymbol color="#F4FFE9" name="checkmark" size={11} weight="bold" />
+          </View>
+        ) : null}
+      </View>
+      <ThemedText numberOfLines={1} style={styles.trophyName} lightColor="#3B2A1B" darkColor="#3B2A1B">
+        {entry.def.name}
+      </ThemedText>
+      <ThemedText numberOfLines={1} style={styles.trophyRarity} lightColor={rarity.color} darkColor={rarity.color}>
+        {rarity.label}
+      </ThemedText>
+      <View style={[styles.trophySelection, isSelected && styles.trophySelectionActive]} />
     </Pressable>
   );
 }
 
-function SelectedTrophyDetail({ entry }: { entry: CompanionAchievementEntry }) {
-  const earned = Boolean(entry.record);
-  const tint = PILLAR_TINT[entry.def.pillar];
-  const date = entry.record ? new Date(entry.record.earnedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null;
-  return (
-    <Animated.View entering={FadeInDown.duration(180)} key={entry.def.id} style={styles.selectedTrophyDetail}>
-      <View style={styles.selectedTrophyTitleRow}>
-        <View style={styles.selectedTrophyCopy}>
-          <ThemedText selectable style={styles.selectedTrophyTitle} lightColor="#FFF0CC" darkColor="#FFF0CC">{entry.def.name}</ThemedText>
-          <ThemedText selectable style={styles.selectedTrophySection} lightColor="#CDBB9F" darkColor="#CDBB9F">{entry.def.sectionLabel}</ThemedText>
-        </View>
-        <ThemedText selectable style={styles.selectedTrophyStatus} lightColor={earned ? tint : '#CDBB9F'} darkColor={earned ? tint : '#CDBB9F'}>
-          {date ? `Earned ${date}` : `${formatProgress(entry.current)}/${formatProgress(entry.target)}`}
-        </ThemedText>
-      </View>
-      {!earned ? <View style={styles.selectedProgressTrack}><View style={[styles.selectedProgressFill, { backgroundColor: tint, width: `${Math.max(3, entry.ratio * 100)}%` }]} /></View> : null}
-    </Animated.View>
-  );
+function tierPresentation(entry: CompanionAchievementEntry) {
+  return TIER_PRESENTATION[Math.max(0, Math.min(TIER_PRESENTATION.length - 1, entry.def.tier - 1))];
+}
+
+/**
+ * Trophy sources share square canvases, but their visible alpha bounds vary
+ * considerably. Zoom only the padded sets inside the clipped presentation
+ * frame so the row and shelf dimensions remain unchanged.
+ */
+function trophyArtScale(entry: CompanionAchievementEntry): number {
+  if (entry.def.familyId === 'mossprout') return 1.9;
+  if (entry.def.pillar === 'quests') return 1.4;
+  if (entry.def.pillar === 'journey') return 1.25;
+  return 1;
 }
 
 function AchievementCard({ entry }: { entry: CompanionAchievementEntry }) {
@@ -367,7 +350,16 @@ function AchievementCard({ entry }: { entry: CompanionAchievementEntry }) {
       accessible
       style={[styles.card, earned ? { borderColor: `${tint}72` } : styles.cardLocked]}>
       <View style={[styles.cardIcon, earned && { backgroundColor: `${tint}25`, borderColor: `${tint}55` }]}>
-        <Image contentFit="contain" source={companionAchievementIconSource(entry.def)} style={[styles.cardArt, !earned && styles.artLocked]} transition={0} />
+        <Image
+          contentFit="contain"
+          source={companionAchievementIconSource(entry.def)}
+          style={[
+            styles.cardArt,
+            { transform: [{ scale: trophyArtScale(entry) }] },
+            !earned && styles.artLocked,
+          ]}
+          transition={0}
+        />
       </View>
       <View style={styles.cardBody}>
         <View style={styles.cardTitleRow}>
@@ -409,68 +401,60 @@ const styles = StyleSheet.create({
   topTitle: { ...KatchaUI.type.companionPageTitle, fontSize: 22, lineHeight: 27, textShadowColor: 'rgba(23,40,49,0.58)', textShadowOffset: { height: 2, width: 0 }, textShadowRadius: 3 },
   topCount: { ...KatchaUI.type.meta, fontSize: 10, fontVariant: ['tabular-nums'], textShadowColor: 'rgba(23,40,49,0.58)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
   topBalance: { height: 44, width: 44 },
-  archive: { backgroundColor: '#211F19', borderColor: 'rgba(255,232,180,0.22)', borderCurve: 'continuous', borderRadius: 30, borderWidth: 1, boxShadow: '0 18px 42px rgba(40,25,11,0.34), inset 0 1px 0 rgba(255,255,255,0.07)', gap: 18, padding: 14, paddingBottom: 20 },
-  archiveHeading: { alignItems: 'center', flexDirection: 'row', gap: 14, paddingHorizontal: 4, paddingTop: 3 },
-  archiveHeadingCopy: { flex: 1, gap: 4 },
-  archiveEyebrow: { ...KatchaUI.type.label, fontSize: 9.5 },
-  archiveBody: { ...KatchaUI.type.companionBody, fontSize: 11.5, lineHeight: 17 },
-  archiveCountBadge: { alignItems: 'center', backgroundColor: 'rgba(255,232,180,0.08)', borderColor: 'rgba(255,232,180,0.14)', borderRadius: 14, borderWidth: 1, minWidth: 54, paddingHorizontal: 9, paddingVertical: 7 },
-  archiveCountValue: { ...KatchaUI.type.numeric, fontSize: 17, fontVariant: ['tabular-nums'] },
-  archiveCountLabel: { ...KatchaUI.type.meta, fontSize: 8.5 },
-  cabinet: { backgroundColor: '#28251E', borderColor: 'rgba(255,227,159,0.24)', borderCurve: 'continuous', borderRadius: 25, borderWidth: 1, boxShadow: '0 13px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.09)', gap: 13, padding: 14 },
-  cabinetHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 },
-  cabinetTitle: { ...KatchaUI.type.title, fontSize: 15 },
-  cabinetMeta: { ...KatchaUI.type.meta, fontSize: 9.5 },
-  cabinetFilters: { gap: 7, paddingHorizontal: 2 },
-  cabinetFilter: { backgroundColor: 'rgba(255,239,204,0.07)', borderColor: 'rgba(255,239,204,0.12)', borderRadius: 999, borderWidth: 1, minHeight: 32, paddingHorizontal: 12, paddingVertical: 7 },
-  cabinetFilterSelected: { backgroundColor: '#E7BE68', borderColor: '#F5D993' },
-  cabinetFilterLabel: { ...KatchaUI.type.meta, fontSize: 9.5, fontWeight: '900' },
-  cabinetViewport: { marginHorizontal: -14, minHeight: 166, overflow: 'hidden' },
-  carouselPressable: { paddingBottom: 4, paddingTop: 14, width: TROPHY_WIDTH },
-  carouselTrophy: { alignItems: 'center', backgroundColor: 'rgba(12,12,10,0.46)', borderColor: 'rgba(255,255,255,0.08)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, height: 146, justifyContent: 'center', overflow: 'hidden', position: 'relative', width: TROPHY_WIDTH },
-  carouselGlow: { backgroundColor: 'rgba(255,232,180,0.08)', borderRadius: 999, height: 96, position: 'absolute', top: 18, width: 96 },
-  carouselArt: { height: 104, width: 104 },
-  carouselTier: { alignItems: 'center', backgroundColor: 'rgba(22,19,15,0.78)', borderColor: 'rgba(255,255,255,0.10)', borderRadius: 999, borderWidth: 1, bottom: 8, minWidth: 31, paddingHorizontal: 8, paddingVertical: 4, position: 'absolute' },
-  cardArt: { height: 38, width: 38 },
+  archive: { backgroundColor: '#DFC8A4', borderColor: 'rgba(104,72,38,0.24)', borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: '0 18px 38px rgba(46,29,13,0.34), inset 0 1px 0 rgba(255,248,230,0.72)', gap: 12, overflow: 'hidden', paddingBottom: 18, paddingHorizontal: 13, paddingTop: 15, position: 'relative', zIndex: 4 },
+  cabinet: { gap: 9 },
+  cabinetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 },
+  cabinetTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  cabinetTitle: { ...KatchaUI.type.title, fontSize: 18, lineHeight: 22 },
+  cabinetMeta: { ...KatchaUI.type.meta, fontSize: 10.5, fontVariant: ['tabular-nums'] },
+  cabinetFilters: { gap: 8, paddingHorizontal: 2 },
+  cabinetFilter: { backgroundColor: 'rgba(91,65,38,0.04)', borderColor: 'rgba(91,65,38,0.16)', borderRadius: 999, borderWidth: 1, minHeight: 37, paddingHorizontal: 16, paddingVertical: 9 },
+  cabinetFilterSelected: { backgroundColor: '#B9C66B', borderColor: '#C9D57C' },
+  cabinetFilterLabel: { ...KatchaUI.type.meta, fontSize: 10.5, fontWeight: '900' },
+  cabinetViewport: { marginHorizontal: -13 },
+  trophyListContent: { gap: 5, paddingHorizontal: 13 },
+  carouselTrophy: { alignItems: 'center', minHeight: 162, opacity: 1, paddingHorizontal: 4, paddingTop: 0, position: 'relative', width: TROPHY_WIDTH },
+  carouselTrophyLocked: { opacity: 0.42 },
+  carouselTrophyPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
+  carouselArtFrame: { alignItems: 'center', height: 120, justifyContent: 'center', overflow: 'hidden', position: 'relative', width: TROPHY_WIDTH - 4 },
+  carouselArt: { height: TROPHY_ART_SIZE, width: TROPHY_ART_SIZE },
+  earnedCheck: { alignItems: 'center', backgroundColor: '#4F8458', borderColor: '#D8F1C7', borderRadius: 999, borderWidth: 1.5, bottom: 2, boxShadow: '0 3px 8px rgba(22,55,27,0.28)', height: 24, justifyContent: 'center', position: 'absolute', right: 8, width: 24, zIndex: 4 },
+  trophyName: { ...KatchaUI.type.title, fontSize: 12.5, lineHeight: 16, paddingHorizontal: 2, textAlign: 'center' },
+  trophyRarity: { ...KatchaUI.type.meta, fontSize: 9.5, fontWeight: '800', lineHeight: 12, marginTop: 1, textAlign: 'center' },
+  trophySelection: { backgroundColor: 'transparent', borderRadius: 999, height: 4, marginTop: 4, width: 48 },
+  trophySelectionActive: { backgroundColor: '#B08B31' },
+  cardArt: { height: 78, width: 78 },
   artLocked: { opacity: 0.24 },
-  slotTier: { ...KatchaUI.type.numeric, fontSize: 8.5, fontVariant: ['tabular-nums'] },
-  selectedTrophyDetail: { backgroundColor: 'rgba(255,239,204,0.055)', borderColor: 'rgba(255,239,204,0.12)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, gap: 9, paddingHorizontal: 12, paddingVertical: 10 },
-  selectedTrophyTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  selectedTrophyCopy: { flex: 1, gap: 1 },
-  selectedTrophyTitle: { ...KatchaUI.type.title, fontSize: 14.5, lineHeight: 18 },
-  selectedTrophySection: { ...KatchaUI.type.meta, fontSize: 9.5 },
-  selectedTrophyStatus: { ...KatchaUI.type.numeric, fontSize: 9.5, fontVariant: ['tabular-nums'] },
-  selectedProgressTrack: { backgroundColor: 'rgba(255,239,204,0.10)', borderRadius: 999, height: 5, overflow: 'hidden' },
-  selectedProgressFill: { borderRadius: 999, height: '100%' },
-  trackSection: { gap: 10 },
+  trackSection: { borderColor: 'rgba(91,65,38,0.13)', borderTopWidth: 1, gap: 10, paddingHorizontal: 4, paddingTop: 18 },
+  trackSectionFirst: { borderTopWidth: 0, paddingTop: 4 },
   trackHeading: { alignItems: 'center', flexDirection: 'row', gap: 11, paddingHorizontal: 3 },
-  trackIcon: { alignItems: 'center', borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
+  trackIcon: { alignItems: 'center', height: 30, justifyContent: 'center', width: 30 },
   trackCopy: { flex: 1, gap: 1 },
   trackTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
   trackTitleAndHelp: { alignItems: 'center', flex: 1, flexDirection: 'row', gap: 7 },
   trackTitle: { ...KatchaUI.type.title, flexShrink: 1, fontSize: 17 },
   helpButton: { alignItems: 'center', borderRadius: 999, height: 30, justifyContent: 'center', width: 30 },
-  helpButtonPressed: { backgroundColor: 'rgba(255,233,186,0.10)' },
+  helpButtonPressed: { backgroundColor: 'rgba(91,65,38,0.08)' },
   trackCount: { ...KatchaUI.type.numeric, fontSize: 11, fontVariant: ['tabular-nums'] },
   trackDescription: { ...KatchaUI.type.meta, fontSize: 10.5, lineHeight: 14 },
-  helpCallout: { alignItems: 'flex-start', backgroundColor: 'rgba(255,237,197,0.08)', borderColor: 'rgba(255,226,164,0.16)', borderCurve: 'continuous', borderRadius: 13, borderWidth: 1, flexDirection: 'row', gap: 8, marginTop: 7, paddingHorizontal: 10, paddingVertical: 9 },
+  helpCallout: { alignItems: 'flex-start', backgroundColor: 'rgba(255,246,222,0.42)', borderColor: 'rgba(91,65,38,0.13)', borderCurve: 'continuous', borderRadius: 13, borderWidth: 1, flexDirection: 'row', gap: 8, marginTop: 7, paddingHorizontal: 10, paddingVertical: 9 },
   helpCalloutCopy: { flex: 1, gap: 2 },
   helpCalloutTitle: { ...KatchaUI.type.label, fontSize: 9 },
   helpCalloutBody: { ...KatchaUI.type.body, fontSize: 10.5, lineHeight: 15 },
   achievementList: { gap: 7 },
-  card: { alignItems: 'center', backgroundColor: '#E9D6B5', borderColor: 'rgba(116,79,39,0.22)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-2px 4px 11px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,248,230,0.72)', flexDirection: 'row', gap: 10, minHeight: 76, paddingHorizontal: 11, paddingVertical: 10 },
+  card: { alignItems: 'center', backgroundColor: '#E9D6B5', borderColor: 'rgba(116,79,39,0.22)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-2px 4px 11px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,248,230,0.72)', flexDirection: 'row', gap: 9, minHeight: 96, paddingHorizontal: 7, paddingVertical: 6 },
   cardLocked: { backgroundColor: '#CFC1AA', borderColor: 'rgba(83,72,57,0.16)', opacity: 0.88 },
-  cardIcon: { alignItems: 'center', backgroundColor: 'rgba(82,72,60,0.08)', borderColor: 'rgba(82,72,60,0.12)', borderRadius: 13, borderWidth: 1, height: 43, justifyContent: 'center', width: 43 },
-  cardBody: { flex: 1, gap: 7 },
+  cardIcon: { alignItems: 'center', alignSelf: 'stretch', backgroundColor: 'rgba(82,72,60,0.06)', borderColor: 'rgba(82,72,60,0.10)', borderRadius: 13, borderWidth: 1, justifyContent: 'center', minHeight: 82, overflow: 'hidden', width: 84 },
+  cardBody: { flex: 1, gap: 5, paddingRight: 3 },
   cardTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  cardTitle: { ...KatchaUI.type.title, flex: 1, fontSize: 14.5, lineHeight: 19 },
-  tierBadge: { alignItems: 'center', borderColor: 'rgba(70,59,48,0.20)', borderRadius: 9, borderWidth: 1, minWidth: 31, paddingHorizontal: 7, paddingVertical: 3 },
+  cardTitle: { ...KatchaUI.type.title, flex: 1, fontSize: 14, lineHeight: 17 },
+  tierBadge: { alignItems: 'center', borderColor: 'rgba(70,59,48,0.20)', borderRadius: 8, borderWidth: 1, minWidth: 29, paddingHorizontal: 6, paddingVertical: 2 },
   tierText: { ...KatchaUI.type.numeric, fontSize: 9, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  progressRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  progressRow: { alignItems: 'center', flexDirection: 'row', gap: 7 },
   progressTrack: { backgroundColor: 'rgba(69,51,34,0.14)', borderRadius: 999, flex: 1, height: 6, overflow: 'hidden' },
   progressFill: { borderRadius: 999, height: '100%' },
   progressValue: { ...KatchaUI.type.numeric, fontSize: 9.5, fontVariant: ['tabular-nums'] },
-  earnedRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  earnedRow: { alignItems: 'center', flexDirection: 'row', gap: 3 },
   earnedDate: { ...KatchaUI.type.meta, fontSize: 9, fontVariant: ['tabular-nums'] },
   missing: { alignItems: 'center', backgroundColor: '#171711', flex: 1, gap: 18, justifyContent: 'center', padding: 28 },
   missingTitle: { ...KatchaUI.type.display, textAlign: 'center' },

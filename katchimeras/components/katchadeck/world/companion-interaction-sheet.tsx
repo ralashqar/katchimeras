@@ -531,7 +531,7 @@ export function CompanionInteractionSheet(props: CompanionInteractionSheetProps)
       : destination === 'goals'
         ? 'What feels doable today?'
         : destination === 'achievements'
-          ? 'These are our keepsakes'
+          ? 'Look what we’ve achieved together!'
           : destination === 'insight'
             ? 'Here’s what I noticed.'
             : 'Which form feels like me?';
