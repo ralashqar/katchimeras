@@ -56,6 +56,54 @@ const JOURNAL_ART = {
   general: require('../assets/images/katchimeras/manual-journal/general.webp'),
 } satisfies Record<string, ImageSource>;
 
+const MOSS = {
+  'park-visits': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/park-visits-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/park-visits-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/park-visits-3.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/park-visits-4.webp'),
+  ],
+  'nature-places': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-places-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-places-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-places-3.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-places-4.webp'),
+  ],
+  'family-goals': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/family-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/family-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/family-goals-3.webp'),
+  ],
+  'companion-quests': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/companion-quests-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/companion-quests-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/companion-quests-3.webp'),
+  ],
+  'journey-goals': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/journey-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/journey-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/journey-goals-3.webp'),
+  ],
+  'blooms-kept': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/blooms-kept-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/blooms-kept-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/blooms-kept-3.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/blooms-kept-4.webp'),
+  ],
+  'wild-places-kept': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/wild-places-kept-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/wild-places-kept-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/wild-places-kept-3.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/wild-places-kept-4.webp'),
+  ],
+  'nature-field-guide': [
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-field-guide-1.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-field-guide-2.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-field-guide-3.webp'),
+    require('../assets/images/katchimeras/achievements/mossprout-v1/nature-field-guide-4.webp'),
+  ],
+} satisfies Record<string, readonly ImageSource[]>;
+
 const FAMILY_ART_KIND: Record<KatchimeraFamilyId, keyof typeof JOURNAL_ART> = {
   baristabbit: 'food', feastle: 'food', steppling: 'movement', flexel: 'movement', bedrotte: 'general',
   dawnle: 'general', mendle: 'general', gatherglow: 'people', heartmote: 'people', kindling: 'people',
@@ -65,6 +113,10 @@ const FAMILY_ART_KIND: Record<KatchimeraFamilyId, keyof typeof JOURNAL_ART> = {
 };
 
 export function companionAchievementIconSource(definition: CompanionAchievementDef): ImageSource {
+  if (definition.familyId === 'mossprout' && definition.sectionId in MOSS) {
+    const progression = MOSS[definition.sectionId as keyof typeof MOSS];
+    return progression[Math.min(progression.length - 1, definition.tier - 1)];
+  }
   const index = Math.max(0, Math.min(3, definition.tier - 1));
   if (definition.pillar === 'goals') return NOTES[index];
   if (definition.pillar === 'quests') return SHARED.quests[index];

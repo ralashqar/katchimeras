@@ -27,6 +27,8 @@ export type DiscoveryContext = {
   countryCount?: number; // needs reverse-geocode (deferred)
   // Memory
   photoCount: number;
+  photoDayCount: number;
+  distinctPhotoQualityCount: number;
   meaningfulMomentCount: number;
   voiceMemoryCount: number;
   foodMemoryCount: number;

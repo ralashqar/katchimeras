@@ -29,7 +29,9 @@ import { reviewPhotoJournalSubmission } from '@/utils/intelligence/photo-journal
 import { usePhotoAnalysisSession } from '@/hooks/use-photo-analysis-session';
 import { preparePhotoJournalAnalysis, enrichPhotoJournalRoute, type PhotoJournalCandidate, type PhotoJournalClassification, type PhotoJournalFieldProposal } from '@/utils/photo-journal-analysis';
 import { buildPhotoJournalEvidence, photoJournalEssenceLabels } from '@/utils/photo-journal-evidence';
-import { buildPhotoClassifiedMemory } from '@/utils/intelligence/classification';
+import { buildPhotoClassifiedMemory, withQualityConfirmation } from '@/utils/intelligence/classification';
+import { qualityDefinition } from '@/utils/intelligence/quality-registry';
+import { possiblePhotoAchievementMatches, type PhotoAchievementMatch } from '@/utils/photo-achievements';
 import { sceneFromPhotoSemanticFrame } from '@/utils/scene-classify';
 import type { PhotoSemanticFrame } from '@/utils/photo-semantic-frame';
 import { journalRouteForIds } from '@/utils/journal-routing';
@@ -85,6 +87,8 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
   const [journalSpecific, setJournalSpecific] = useState<string | null>(null);
   const [journalSpecificLoading, setJournalSpecificLoading] = useState(false);
   const [journalEnrichment, setJournalEnrichment] = useState<PhotoJournalFieldProposal | null>(null);
+  const [photoAchievementPrompt, setPhotoAchievementPrompt] = useState<PhotoAchievementMatch | null>(null);
+  const photoAchievementPromptRef = useRef<PhotoAchievementMatch | null>(null);
   const journalAnalysisStartedRef = useRef(false);
   const journalRequestRef = useRef(0);
   const enrichmentRequestRef = useRef(0);
@@ -150,6 +154,9 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
   } = usePhotoAnalysisSession({
     analyze, photoUri, sourceId, observedAt,
     onReady: ({ rawVision, vision, scene, memory }) => {
+      const prompt = memory ? possiblePhotoAchievementMatches(memory)[0] ?? null : null;
+      photoAchievementPromptRef.current = prompt;
+      setPhotoAchievementPrompt(prompt);
       setState('essence');
       intro.value = withTiming(1, { duration: 460, easing: Easing.out(Easing.cubic) });
       startJournalAnalysis(vision, rawVision);
@@ -241,7 +248,7 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
     syncSemanticSnapshot(analysis);
     setTags(buildEssenceTags(rawVisionRef.current, visionRef.current, analysis.semanticFrame));
     setJournalAnalysisState(analysis.kind === 'unrouted' ? 'failed' : 'ready');
-    if (analysis.selected) {
+    if (analysis.selected && !photoAchievementPromptRef.current) {
       openJournalRoute(analysis.selected, analysis);
     } else if (analysis.navigationAction === 'manual'
       && analysis.semanticFrame?.stage === 'foundation_reconciled') {
@@ -289,6 +296,17 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
     }
     setJournalFlowId(candidate.flowId);
     setJournalPickerOpen(true);
+  };
+
+  const handlePhotoAchievementConfirmation = (accepted: boolean) => {
+    const prompt = photoAchievementPromptRef.current;
+    const memory = clarificationRef.current;
+    if (!prompt || !memory) return;
+    clarificationRef.current = withQualityConfirmation(memory, prompt.qualityId, accepted, new Date(), prompt.centrality ?? 'supporting');
+    photoAchievementPromptRef.current = null;
+    setPhotoAchievementPrompt(null);
+    void Haptics.selectionAsync();
+    if (journalAnalysis?.selected) openJournalRoute(journalAnalysis.selected, journalAnalysis);
   };
 
   const handleOrdinaryMoment = () => {
@@ -401,6 +419,27 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
           </View>
           {state === 'essence' ? (
             <Animated.View entering={FadeInDown.delay(220).duration(320)} style={styles.captured}>
+              {photoAchievementPrompt ? (
+                <View style={styles.photoAchievementPrompt}>
+                  <View style={styles.photoAchievementPromptTitleRow}>
+                    <IconSymbol name="camera.macro" size={18} color="#E7BE68" />
+                    <ThemedText selectable style={styles.photoAchievementPromptTitle} lightColor="#FFF1CD" darkColor="#FFF1CD">
+                      Does this photo clearly show {qualityLabel(photoAchievementPrompt.qualityId)}?
+                    </ThemedText>
+                  </View>
+                  <ThemedText selectable style={styles.photoAchievementPromptBody} lightColor="#E7DAC4" darkColor="#E7DAC4">
+                    Confirming helps photo achievements stay accurate. Nothing leaves your device.
+                  </ThemedText>
+                  <View style={styles.photoAchievementPromptActions}>
+                    <Pressable accessibilityRole="button" onPress={() => handlePhotoAchievementConfirmation(false)} style={styles.photoAchievementPromptSecondary}>
+                      <ThemedText style={styles.photoAchievementPromptSecondaryText} lightColor="#E7DAC4" darkColor="#E7DAC4">Not really</ThemedText>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => handlePhotoAchievementConfirmation(true)} style={styles.photoAchievementPromptPrimary}>
+                      <ThemedText style={styles.photoAchievementPromptPrimaryText} lightColor="#2D2418" darkColor="#2D2418">Yes, it is</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
               <ThemedText type="display" style={styles.meaningTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
                 {routingQuestion}
               </ThemedText>
@@ -443,6 +482,11 @@ export function EssenceReview({ photoUri, questId, analyze, sourceId, observedAt
       {state === 'essence' && journalPickerOpen ? <ManualJournalSheet initialFlowId={journalFlowId} suggestedRoutes={journalAnalysis?.candidates.flatMap((candidate) => candidate.route ? [candidate.route] : [])} sourceType="photo" sourceId={sourceId ?? photoUri} thumbnailUri={photoUri} liveSpecific={journalSpecific} liveSpecificLoading={journalSpecificLoading} onRouteResolved={handleJournalRouteResolved} onBackFromInitial={() => setJournalPickerOpen(false)} onClose={onClose} onSave={handleJournalSave} /> : null}
     </View>
   );
+}
+
+function qualityLabel(qualityId: string): string {
+  const alias = qualityDefinition(qualityId)?.aliases[0] ?? qualityId.split('.').at(-1) ?? 'that subject';
+  return alias.toLowerCase();
 }
 
 function meaningForJournal(reaction: string | null | undefined): MeaningTag {
@@ -587,6 +631,26 @@ const styles = StyleSheet.create({
   essenceDot: { borderRadius: 999, height: 8, width: 8 },
   essenceLabel: { fontSize: 15, fontWeight: '800', lineHeight: 18 },
   captured: { alignItems: 'center', gap: 8, width: '100%' },
+  photoAchievementPrompt: {
+    backgroundColor: 'rgba(28,25,20,0.94)',
+    borderColor: 'rgba(231,190,104,0.42)',
+    borderCurve: 'continuous',
+    borderRadius: 22,
+    borderWidth: 1,
+    boxShadow: '0 14px 34px rgba(0,0,0,0.34)',
+    gap: 10,
+    maxWidth: 390,
+    padding: 16,
+    width: '100%',
+  },
+  photoAchievementPromptTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 9 },
+  photoAchievementPromptTitle: { flex: 1, fontSize: 16, fontWeight: '900', lineHeight: 21 },
+  photoAchievementPromptBody: { fontSize: 13, lineHeight: 18 },
+  photoAchievementPromptActions: { flexDirection: 'row', gap: 9, justifyContent: 'flex-end' },
+  photoAchievementPromptSecondary: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
+  photoAchievementPromptSecondaryText: { fontSize: 13, fontWeight: '800' },
+  photoAchievementPromptPrimary: { backgroundColor: '#E7BE68', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 },
+  photoAchievementPromptPrimaryText: { fontSize: 13, fontWeight: '900' },
   meaningTitle: { fontSize: 26, fontStyle: 'italic', lineHeight: 31, marginBottom: 10, textAlign: 'center' },
   meaningGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   meaningChip: {

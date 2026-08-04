@@ -1,0 +1,30 @@
+{
+  "family": "mossprout",
+  "styleReferences": [
+    "../../assets/images/katchimeras/cutouts_lod/mossprout_512.webp",
+    "../../assets/images/katchimeras/world/today/mossprout-full-spread.webp",
+    "../../assets/images/katchimeras/manual-journal/went_somewhere.webp"
+  ],
+  "sheets": [
+    {
+      "input": "mossprout-v1-sheet-a-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/mossprout-v1",
+      "rows": [
+        { "section": "park-visits", "tiers": 4 },
+        { "section": "nature-places", "tiers": 4 },
+        { "section": "family-goals", "tiers": 3 },
+        { "section": "companion-quests", "tiers": 3 }
+      ]
+    },
+    {
+      "input": "mossprout-v1-sheet-b-alpha.png",
+      "outDir": "../../assets/images/katchimeras/achievements/mossprout-v1",
+      "rows": [
+        { "section": "journey-goals", "tiers": 3 },
+        { "section": "blooms-kept", "tiers": 4 },
+        { "section": "wild-places-kept", "tiers": 4 },
+        { "section": "nature-field-guide", "tiers": 4 }
+      ]
+    }
+  ]
+}

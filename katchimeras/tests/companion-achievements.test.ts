@@ -7,13 +7,15 @@ import type { CompanionAchievementContext } from '@/types/companion-achievements
 import { buildCompanionAchievementContexts } from '@/utils/companion-achievements-context';
 import { companionAchievementEntries, evaluateCompanionAchievements } from '@/utils/companion-achievements-engine';
 import { COMPANION_OWNED_DISCOVERY_IDS as GLOBAL_OWNERSHIP_IDS, GLOBAL_DISCOVERY_CATALOG } from '@/utils/discoveries-catalog';
+import { buildPhotoAchievementSnapshot, evaluatePhotoQuality, MOSS_PHOTO_ACHIEVEMENT_RULES } from '@/utils/photo-achievements';
+import type { ClassifiedMemory, HomeDayRecord } from '@/types/home';
 
 test('every canonical companion owns a curated semantic collection', () => {
   assert.equal(katchimeraFamilies.length, 25);
   assert.equal(new Set(COMPANION_ACHIEVEMENT_CATALOG.map((def) => def.id)).size, COMPANION_ACHIEVEMENT_CATALOG.length);
   for (const family of katchimeraFamilies) {
     const familyDefs = COMPANION_ACHIEVEMENT_CATALOG.filter((def) => def.familyId === family.id);
-    assert.ok(familyDefs.length >= 12 && familyDefs.length <= 20, `${family.id}: ${familyDefs.length}`);
+    assert.ok(familyDefs.length >= 12, `${family.id}: ${familyDefs.length}`);
     assert.ok(familyDefs.some((def) => def.pillar === 'domain'), `${family.id}: domain`);
     assert.ok(familyDefs.some((def) => def.pillar === 'goals'), `${family.id}: goals`);
     assert.ok(familyDefs.some((def) => def.pillar === 'quests'), `${family.id}: quests`);
@@ -30,6 +32,34 @@ test('every canonical companion owns a curated semantic collection', () => {
   const flickerbun = COMPANION_ACHIEVEMENT_CATALOG.filter((def) => def.familyId === 'flickerbun');
   assert.ok(flickerbun.some((def) => def.metric.signal === 'flickerbun.distinctScreenTitles'));
   assert.ok(flickerbun.some((def) => def.metric.signal === 'flickerbun.cinemaVisits'));
+  const mossprout = COMPANION_ACHIEVEMENT_CATALOG.filter((def) => def.familyId === 'mossprout');
+  assert.equal(mossprout.length, 29);
+  assert.equal(mossprout.filter((def) => def.metric.kind === 'photo').length, 12);
+});
+
+test('photo achievements count only kept, prominent, physical-world photos and deduplicate sources', () => {
+  const memory = {
+    id: 'classified:photo:flower-1', sourceType: 'photo', sourceId: 'flower-1', dominantDomain: 'nature',
+    observations: [], facets: [], confirmations: [], entityIds: [], assignments: [],
+    promptState: { status: 'not_needed', answeredNodeIds: [], graphVersion: 1 }, createdAt: '2026-08-01T12:00:00Z', schemaVersion: 3,
+    qualities: [{ qualityId: 'nature.flowers', score: 0.92, centrality: 'supporting', status: 'inferred', sources: [], reasons: [] }],
+    photoAnalysis: { schemaVersion: 2, stage: 'complete', representation: { kind: 'real_world', confidence: 0.98, reasons: [] }, dominantSubjectId: null, subjects: [], selectedOcr: [], regions: [], providerRuns: [], alternatives: [] },
+  } as unknown as ClassifiedMemory;
+  const metric = { kind: 'photo' as const, ...MOSS_PHOTO_ACHIEVEMENT_RULES.blooms, target: 1, unit: 'photos', counting: 'total' as const };
+  const keptDay = {
+    id: 'day-1', isoDate: '2026-08-01', state: 'forming', classifiedMemories: [memory, memory],
+    journalRecords: [{ id: 'journal-1', source: { kind: 'photo', sourceId: 'flower-1' } }],
+  } as unknown as HomeDayRecord;
+  const snapshot = buildPhotoAchievementSnapshot([keptDay], [metric]);
+  assert.equal(snapshot.values[metric.signal], 1);
+  assert.equal(snapshot.photoDayCount, 1);
+  assert.equal(snapshot.distinctPhysicalQualityCount, 1);
+  assert.equal(buildPhotoAchievementSnapshot([{ ...keptDay, journalRecords: [] } as HomeDayRecord], [metric]).values[metric.signal], 0);
+
+  const depicted = { ...memory, photoAnalysis: { ...memory.photoAnalysis!, representation: { kind: 'screen_content' as const, confidence: 0.99, reasons: [] } } } as ClassifiedMemory;
+  assert.equal(evaluatePhotoQuality(depicted, 'nature.flowers').status, 'no_match');
+  const uncertain = { ...memory, qualities: [{ ...memory.qualities[0], score: 0.5 }] } as ClassifiedMemory;
+  assert.equal(evaluatePhotoQuality(uncertain, 'nature.flowers').status, 'possible');
 });
 
 test('evaluation reads semantic signals, remains monotonic and bounds progress', () => {
@@ -53,6 +83,22 @@ test('evaluation reads semantic signals, remains monotonic and bounds progress',
   const unlocked = Object.fromEntries(first.map((def) => [def.id, { id: def.id, earnedAt: 1, sourceDayId: undefined, seenCelebration: true }]));
   assert.equal(evaluateCompanionAchievements(context, unlocked, catalog).length, 0);
   assert.ok(companionAchievementEntries(context, unlocked, catalog).every((entry) => entry.ratio >= 0 && entry.ratio <= 1));
+});
+
+test('the engine evaluates catalogs larger than one hundred without truncation', () => {
+  const template = COMPANION_ACHIEVEMENT_CATALOG.find((def) => def.familyId === 'mossprout')!;
+  const catalog = Array.from({ length: 120 }, (_, index) => ({
+    ...template,
+    id: `mossprout.scale-test.${index + 1}`,
+    metric: { kind: 'signal' as const, signal: 'mossprout.scaleTest', target: index + 1, unit: 'finds', counting: 'total' as const },
+  }));
+  const context: CompanionAchievementContext = {
+    familyId: 'mossprout',
+    values: { 'mossprout.scaleTest': 120 },
+    sourceDayBySignal: {},
+  };
+  assert.equal(evaluateCompanionAchievements(context, {}, catalog).length, 120);
+  assert.equal(companionAchievementEntries(context, {}, catalog).length, 120);
 });
 
 test('section help explains the exact journal route and every section is actionable', () => {

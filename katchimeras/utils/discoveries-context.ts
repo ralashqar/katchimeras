@@ -1,5 +1,6 @@
 import type { HomeDayRecord } from '@/types/home';
 import type { DiscoveryContext } from '@/types/discoveries';
+import { buildPhotoAchievementSnapshot } from '@/utils/photo-achievements';
 
 // Folds every hydrated day (+ optional native health aggregates) into the lifetime
 // aggregates the Discovery rules read. Pure: inject `now`, no storage access. The
@@ -60,9 +61,10 @@ export function buildDiscoveryContext(
   now: Date,
   health: HealthAggregates = {}
 ): DiscoveryContext {
+  const photoSnapshot = buildPhotoAchievementSnapshot(days);
   const placeCategoryCounts: Record<string, number> = {};
   let uniquePlaceCount = 0;
-  let photoCount = 0;
+  let photoCount = photoSnapshot.keptPhotoCount;
   let meaningfulMomentCount = 0;
   let voiceMemoryCount = 0;
   let foodMemoryCount = 0;
@@ -88,7 +90,6 @@ export function buildDiscoveryContext(
 
     // Memory
     const meanings = day.capturedMeanings ?? [];
-    photoCount += meanings.length + (day.heroPhoto ? 1 : 0);
     const voice = (day.notes ?? []).filter((note) => note.kind === 'voice').length;
     voiceMemoryCount += voice;
     const foods = (day.foodMoments ?? []).length;
@@ -129,6 +130,8 @@ export function buildDiscoveryContext(
     placeCategoryCounts,
     countryCount: undefined,
     photoCount,
+    photoDayCount: photoSnapshot.photoDayCount,
+    distinctPhotoQualityCount: photoSnapshot.distinctPhysicalQualityCount,
     meaningfulMomentCount,
     voiceMemoryCount,
     foodMemoryCount,

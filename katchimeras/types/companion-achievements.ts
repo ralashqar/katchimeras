@@ -3,14 +3,29 @@ import type { KatchimeraFamilyId } from '@/types/katchimera';
 export type CompanionAchievementTier = 1 | 2 | 3 | 4 | 5;
 export type CompanionAchievementCounting = 'total' | 'distinct' | 'peak' | 'streak';
 export type CompanionAchievementPillar = 'domain' | 'collection' | 'goals' | 'quests' | 'journey';
+export type PhotoAchievementAggregation = 'total_photos' | 'distinct_qualities' | 'distinct_days';
+export type PhotoAchievementCentrality = 'primary' | 'supporting';
 
-export type CompanionAchievementMetric = {
+export type CompanionSignalAchievementMetric = {
   kind: 'signal';
   signal: string;
   target: number;
   unit: string;
   counting: CompanionAchievementCounting;
 };
+
+export type CompanionPhotoAchievementMetric = {
+  kind: 'photo';
+  signal: string;
+  qualityIds: readonly string[];
+  aggregation: PhotoAchievementAggregation;
+  minimumCentrality: PhotoAchievementCentrality;
+  target: number;
+  unit: string;
+  counting: 'total' | 'distinct';
+};
+
+export type CompanionAchievementMetric = CompanionSignalAchievementMetric | CompanionPhotoAchievementMetric;
 
 export type CompanionAchievementReward = {
   kind: 'trophy_room';
@@ -51,9 +66,10 @@ export type CompanionAchievementRecord = {
 };
 
 export type CompanionAchievementState = {
-  version: 2;
+  version: 3;
   baselined: boolean;
   migratedFromV1?: boolean;
+  catalogVersion?: number;
   unlocked: Record<string, CompanionAchievementRecord>;
 };
 

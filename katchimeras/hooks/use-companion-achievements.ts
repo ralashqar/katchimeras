@@ -26,6 +26,8 @@ import { loadCompanionQuickGoalState } from '@/utils/companion-quick-goal-storag
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
 import { loadDiscoveryState } from '@/utils/discoveries-storage';
 
+const COMPANION_ACHIEVEMENT_CATALOG_VERSION = 2;
+
 export function useCompanionAchievements() {
   const archive = useAllDays();
   const [state, setState] = useState<CompanionAchievementState>(loadCompanionAchievementState);
@@ -43,7 +45,8 @@ export function useCompanionAchievements() {
       quickGoals: loadCompanionQuickGoalState(),
     });
     const previous = loadCompanionAchievementState();
-    const silent = !previous.baselined || previous.migratedFromV1 === true;
+    const catalogChanged = (previous.catalogVersion ?? 1) < COMPANION_ACHIEVEMENT_CATALOG_VERSION;
+    const silent = !previous.baselined || previous.migratedFromV1 === true || catalogChanged;
     const legacyDiscoveries = loadDiscoveryState().unlocked;
     const now = Date.now();
     const records: CompanionAchievementRecord[] = [];
@@ -64,11 +67,12 @@ export function useCompanionAchievements() {
     }
     const next = {
       ...recordCompanionAchievementUnlocks(previous, records),
-      version: 2 as const,
+      version: 3 as const,
       baselined: true,
       migratedFromV1: false,
+      catalogVersion: COMPANION_ACHIEVEMENT_CATALOG_VERSION,
     };
-    if (records.length || !previous.baselined) saveCompanionAchievementState(next);
+    if (records.length || !previous.baselined || catalogChanged) saveCompanionAchievementState(next);
     setState(next);
     if (silent && records.length) setBackfillCount(records.length);
   }, [archive.days]);

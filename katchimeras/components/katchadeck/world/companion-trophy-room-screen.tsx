@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeInDown, useReducedMotion } from 'react-native-reanimated';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import Animated, { Easing, FadeInDown, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { companionAchievementSections } from '@/constants/companion-achievements';
@@ -39,6 +40,10 @@ const PILLAR_ICON: Record<CompanionAchievementPillar, IconSymbolName> = {
   quests: 'list.clipboard.fill',
   journey: 'map.fill',
 };
+
+const TROPHY_WIDTH = 132;
+const TROPHY_GAP = 14;
+const TROPHY_INTERVAL = TROPHY_WIDTH + TROPHY_GAP;
 
 export function CompanionTrophyRoomScreen({ creatureId, embedded = false }: { creatureId: string; embedded?: boolean }) {
   const router = useRouter();
@@ -138,6 +143,52 @@ function TrophyArchive({
   const reduceMotion = useReducedMotion();
   const [openHelpSectionId, setOpenHelpSectionId] = useState<string | null>(null);
   const sections = useMemo(() => companionAchievementSections(familyId), [familyId]);
+  const [cabinetFilter, setCabinetFilter] = useState('all');
+  const [selectedTrophyId, setSelectedTrophyId] = useState<string | null>(null);
+  const [cabinetWidth, setCabinetWidth] = useState(320);
+  const cabinetRef = useRef<FlatList<CompanionAchievementEntry>>(null);
+  const previousCabinetFilterRef = useRef<string | null>(null);
+  const cabinetEntries = useMemo(
+    () => cabinetFilter === 'all' ? entries : entries.filter((entry) => entry.def.sectionId === cabinetFilter),
+    [cabinetFilter, entries]
+  );
+  const cabinetEntryKey = cabinetEntries.map((entry) => entry.def.id).join('|');
+  const selectedEntry = cabinetEntries.find((entry) => entry.def.id === selectedTrophyId) ?? cabinetEntries[0] ?? null;
+
+  useEffect(() => {
+    const filterChanged = previousCabinetFilterRef.current !== cabinetFilter;
+    previousCabinetFilterRef.current = cabinetFilter;
+    const currentIndex = cabinetEntries.findIndex((entry) => entry.def.id === selectedTrophyId);
+    if (!filterChanged && currentIndex >= 0) return;
+    const earnedEntries = cabinetEntries.filter((entry) => entry.record);
+    const next = earnedEntries.length
+      ? [...earnedEntries].sort((left, right) => (right.record?.earnedAt ?? 0) - (left.record?.earnedAt ?? 0))[0]
+      : [...cabinetEntries].sort((left, right) => right.ratio - left.ratio)[0] ?? null;
+    setSelectedTrophyId(next?.def.id ?? null);
+    const nextIndex = next ? cabinetEntries.findIndex((entry) => entry.def.id === next.def.id) : -1;
+    if (nextIndex < 0) return;
+    setTimeout(() => {
+      cabinetRef.current?.scrollToOffset({ animated: false, offset: nextIndex * TROPHY_INTERVAL });
+    }, 30);
+  }, [cabinetEntryKey, cabinetEntries, cabinetFilter, selectedTrophyId]);
+
+  const selectTrophy = (entry: CompanionAchievementEntry, index: number, scroll = true) => {
+    setSelectedTrophyId(entry.def.id);
+    if (scroll) {
+      cabinetRef.current?.scrollToOffset({ animated: !reduceMotion, offset: index * TROPHY_INTERVAL });
+    }
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+  };
+
+  const handleCabinetMomentumEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.max(0, Math.min(cabinetEntries.length - 1, Math.round(event.nativeEvent.contentOffset.x / TROPHY_INTERVAL)));
+    const entry = cabinetEntries[index];
+    if (entry) selectTrophy(entry, index, false);
+  };
+
+  const handleCabinetLayout = (event: LayoutChangeEvent) => {
+    setCabinetWidth(event.nativeEvent.layout.width);
+  };
 
   return (
     <Animated.View entering={reduceMotion ? undefined : FadeInDown.duration(320)} style={styles.archive}>
@@ -161,9 +212,51 @@ function TrophyArchive({
           <ThemedText selectable style={styles.cabinetTitle} lightColor="#FFEBC0" darkColor="#FFEBC0">The cabinet</ThemedText>
           <ThemedText selectable style={styles.cabinetMeta} lightColor="#D8C09A" darkColor="#D8C09A">your life, kept by theme</ThemedText>
         </View>
-        <View style={styles.cabinetGrid}>
-          {entries.map((entry) => <CabinetSlot entry={entry} key={entry.def.id} />)}
+        <ScrollView contentContainerStyle={styles.cabinetFilters} horizontal showsHorizontalScrollIndicator={false}>
+          {[{ id: 'all', label: 'All' }, ...sections].map((section) => {
+            const selected = cabinetFilter === section.id;
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                key={section.id}
+                onPress={() => setCabinetFilter(section.id)}
+                style={[styles.cabinetFilter, selected && styles.cabinetFilterSelected]}>
+                <ThemedText style={styles.cabinetFilterLabel} lightColor={selected ? '#342719' : '#D8C7AA'} darkColor={selected ? '#342719' : '#D8C7AA'}>
+                  {section.label}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <View onLayout={handleCabinetLayout} style={styles.cabinetViewport}>
+          <FlatList
+            ref={cabinetRef}
+            contentContainerStyle={{ paddingHorizontal: Math.max(0, (cabinetWidth - TROPHY_WIDTH) / 2) }}
+            data={cabinetEntries}
+            decelerationRate="fast"
+            disableIntervalMomentum
+            getItemLayout={(_data, index) => ({ index, length: TROPHY_INTERVAL, offset: TROPHY_INTERVAL * index })}
+            horizontal
+            initialNumToRender={7}
+            ItemSeparatorComponent={() => <View style={{ width: TROPHY_GAP }} />}
+            keyExtractor={(entry) => entry.def.id}
+            maxToRenderPerBatch={9}
+            onMomentumScrollEnd={handleCabinetMomentumEnd}
+            renderItem={({ item, index }) => (
+              <CarouselTrophy
+                entry={item}
+                isSelected={item.def.id === selectedEntry?.def.id}
+                onPress={() => selectTrophy(item, index)}
+                reduceMotion={reduceMotion}
+              />
+            )}
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={TROPHY_INTERVAL}
+            windowSize={7}
+          />
         </View>
+        {selectedEntry ? <SelectedTrophyDetail entry={selectedEntry} /> : null}
       </View>
 
       {sections.map((section, sectionIndex) => {
@@ -218,18 +311,47 @@ function TrophyArchive({
   );
 }
 
-function CabinetSlot({ entry }: { entry: CompanionAchievementEntry }) {
+function CarouselTrophy({ entry, isSelected, onPress, reduceMotion }: { entry: CompanionAchievementEntry; isSelected: boolean; onPress: () => void; reduceMotion: boolean }) {
   const earned = Boolean(entry.record);
   const tint = PILLAR_TINT[entry.def.pillar];
+  const selection = useSharedValue(isSelected ? 1 : 0);
+  useEffect(() => {
+    selection.value = reduceMotion ? (isSelected ? 1 : 0) : withTiming(isSelected ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) });
+  }, [isSelected, reduceMotion, selection]);
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: 0.58 + selection.value * 0.42,
+    transform: [{ translateY: -selection.value * 8 }, { scale: 0.86 + selection.value * 0.14 }],
+  }));
   return (
-    <View accessibilityLabel={`${entry.def.name}, tier ${entry.def.tier}, ${earned ? 'earned' : 'locked'}`} style={[styles.slot, earned && { borderColor: `${tint}A8` }]}>
-      <View style={[styles.slotMedallion, earned && { backgroundColor: `${tint}38` }]}>
-        <Image contentFit="contain" source={companionAchievementIconSource(entry.def)} style={[styles.slotArt, !earned && styles.artLocked]} transition={0} />
+    <Pressable accessibilityLabel={`${entry.def.name}, tier ${entry.def.tier}, ${earned ? 'earned' : 'locked'}`} accessibilityRole="button" accessibilityState={{ selected: isSelected }} onPress={onPress} style={styles.carouselPressable}>
+      <Animated.View style={[styles.carouselTrophy, isSelected && { borderColor: `${tint}C8`, backgroundColor: `${tint}22` }, animatedStyle]}>
+        <View style={[styles.carouselGlow, isSelected && { backgroundColor: `${tint}42` }]} />
+        <Image contentFit="contain" source={companionAchievementIconSource(entry.def)} style={[styles.carouselArt, !earned && styles.artLocked]} transition={0} />
+        <View style={[styles.carouselTier, earned && { borderColor: `${tint}99` }]}>
+          <ThemedText style={styles.slotTier} lightColor={earned ? '#FFE8AF' : '#8E8274'} darkColor={earned ? '#FFE8AF' : '#8E8274'}>{roman(entry.def.tier)}</ThemedText>
+        </View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function SelectedTrophyDetail({ entry }: { entry: CompanionAchievementEntry }) {
+  const earned = Boolean(entry.record);
+  const tint = PILLAR_TINT[entry.def.pillar];
+  const date = entry.record ? new Date(entry.record.earnedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+  return (
+    <Animated.View entering={FadeInDown.duration(180)} key={entry.def.id} style={styles.selectedTrophyDetail}>
+      <View style={styles.selectedTrophyTitleRow}>
+        <View style={styles.selectedTrophyCopy}>
+          <ThemedText selectable style={styles.selectedTrophyTitle} lightColor="#FFF0CC" darkColor="#FFF0CC">{entry.def.name}</ThemedText>
+          <ThemedText selectable style={styles.selectedTrophySection} lightColor="#CDBB9F" darkColor="#CDBB9F">{entry.def.sectionLabel}</ThemedText>
+        </View>
+        <ThemedText selectable style={styles.selectedTrophyStatus} lightColor={earned ? tint : '#CDBB9F'} darkColor={earned ? tint : '#CDBB9F'}>
+          {date ? `Earned ${date}` : `${formatProgress(entry.current)}/${formatProgress(entry.target)}`}
+        </ThemedText>
       </View>
-      <ThemedText style={styles.slotTier} lightColor={earned ? '#FFE8AF' : '#8E8274'} darkColor={earned ? '#FFE8AF' : '#8E8274'}>
-        {roman(entry.def.tier)}
-      </ThemedText>
-    </View>
+      {!earned ? <View style={styles.selectedProgressTrack}><View style={[styles.selectedProgressFill, { backgroundColor: tint, width: `${Math.max(3, entry.ratio * 100)}%` }]} /></View> : null}
+    </Animated.View>
   );
 }
 
@@ -299,13 +421,27 @@ const styles = StyleSheet.create({
   cabinetHeader: { alignItems: 'baseline', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 3 },
   cabinetTitle: { ...KatchaUI.type.title, fontSize: 15 },
   cabinetMeta: { ...KatchaUI.type.meta, fontSize: 9.5 },
-  cabinetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  slot: { alignItems: 'center', backgroundColor: 'rgba(12,12,10,0.42)', borderColor: 'rgba(255,255,255,0.07)', borderRadius: 13, borderWidth: 1, flexBasis: '22%', flexGrow: 1, gap: 3, justifyContent: 'center', minHeight: 59, paddingVertical: 7 },
-  slotMedallion: { alignItems: 'center', borderRadius: 12, height: 34, justifyContent: 'center', width: 34 },
-  slotArt: { height: 31, width: 31 },
+  cabinetFilters: { gap: 7, paddingHorizontal: 2 },
+  cabinetFilter: { backgroundColor: 'rgba(255,239,204,0.07)', borderColor: 'rgba(255,239,204,0.12)', borderRadius: 999, borderWidth: 1, minHeight: 32, paddingHorizontal: 12, paddingVertical: 7 },
+  cabinetFilterSelected: { backgroundColor: '#E7BE68', borderColor: '#F5D993' },
+  cabinetFilterLabel: { ...KatchaUI.type.meta, fontSize: 9.5, fontWeight: '900' },
+  cabinetViewport: { marginHorizontal: -14, minHeight: 166, overflow: 'hidden' },
+  carouselPressable: { paddingBottom: 4, paddingTop: 14, width: TROPHY_WIDTH },
+  carouselTrophy: { alignItems: 'center', backgroundColor: 'rgba(12,12,10,0.46)', borderColor: 'rgba(255,255,255,0.08)', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, height: 146, justifyContent: 'center', overflow: 'hidden', position: 'relative', width: TROPHY_WIDTH },
+  carouselGlow: { backgroundColor: 'rgba(255,232,180,0.08)', borderRadius: 999, height: 96, position: 'absolute', top: 18, width: 96 },
+  carouselArt: { height: 104, width: 104 },
+  carouselTier: { alignItems: 'center', backgroundColor: 'rgba(22,19,15,0.78)', borderColor: 'rgba(255,255,255,0.10)', borderRadius: 999, borderWidth: 1, bottom: 8, minWidth: 31, paddingHorizontal: 8, paddingVertical: 4, position: 'absolute' },
   cardArt: { height: 38, width: 38 },
   artLocked: { opacity: 0.24 },
   slotTier: { ...KatchaUI.type.numeric, fontSize: 8.5, fontVariant: ['tabular-nums'] },
+  selectedTrophyDetail: { backgroundColor: 'rgba(255,239,204,0.055)', borderColor: 'rgba(255,239,204,0.12)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, gap: 9, paddingHorizontal: 12, paddingVertical: 10 },
+  selectedTrophyTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  selectedTrophyCopy: { flex: 1, gap: 1 },
+  selectedTrophyTitle: { ...KatchaUI.type.title, fontSize: 14.5, lineHeight: 18 },
+  selectedTrophySection: { ...KatchaUI.type.meta, fontSize: 9.5 },
+  selectedTrophyStatus: { ...KatchaUI.type.numeric, fontSize: 9.5, fontVariant: ['tabular-nums'] },
+  selectedProgressTrack: { backgroundColor: 'rgba(255,239,204,0.10)', borderRadius: 999, height: 5, overflow: 'hidden' },
+  selectedProgressFill: { borderRadius: 999, height: '100%' },
   trackSection: { gap: 10 },
   trackHeading: { alignItems: 'center', flexDirection: 'row', gap: 11, paddingHorizontal: 3 },
   trackIcon: { alignItems: 'center', borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },

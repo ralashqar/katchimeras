@@ -7,6 +7,7 @@ import type { CompanionJourneyState } from '@/utils/companion-journey';
 import type { CompanionQuickGoalState } from '@/utils/companion-quick-goals';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { questDefinition } from '@/utils/quests/definitions';
+import { buildPhotoAchievementSnapshot, MOSS_PHOTO_ACHIEVEMENT_RULES } from '@/utils/photo-achievements';
 
 export type CompanionAchievementSources = {
   days: HomeDayRecord[];
@@ -300,6 +301,22 @@ export function buildCompanionAchievementContexts(
   }
 
   setMax('steppling', 'steppling.walkingStreak', longestWalkingStreak(sources.days));
+
+  const photoSnapshot = buildPhotoAchievementSnapshot(
+    sources.days,
+    Object.values(MOSS_PHOTO_ACHIEVEMENT_RULES).map((rule) => ({
+      kind: 'photo' as const,
+      ...rule,
+      target: 1,
+      unit: 'photos',
+      counting: rule.aggregation === 'distinct_qualities' ? 'distinct' as const : 'total' as const,
+    }))
+  );
+  const mossprout = contexts.get('mossprout');
+  if (mossprout) {
+    Object.assign(mossprout.values, photoSnapshot.values);
+    Object.assign(mossprout.sourceDayBySignal, photoSnapshot.sourceDayBySignal);
+  }
 
   for (const [key, ids] of buckets) {
     const split = key.indexOf('|');

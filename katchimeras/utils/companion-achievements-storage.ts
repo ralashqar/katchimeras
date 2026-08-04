@@ -5,19 +5,22 @@ import type {
 import { getStoredJson, setStoredJson } from '@/utils/app-storage';
 
 const STORAGE_KEY = 'katchimera.companion-achievements.v1';
-const EMPTY: CompanionAchievementState = { version: 2, baselined: false, unlocked: {} };
+const EMPTY: CompanionAchievementState = { version: 3, baselined: false, catalogVersion: 2, unlocked: {} };
 
 export function loadCompanionAchievementState(): CompanionAchievementState {
   const stored = getStoredJson<unknown>(STORAGE_KEY, EMPTY);
   if (!stored || typeof stored !== 'object') return EMPTY;
   const candidate = stored as { version?: number; baselined?: boolean; migratedFromV1?: boolean; unlocked?: CompanionAchievementState['unlocked'] };
-  if (candidate.version !== 2 || !candidate.unlocked || typeof candidate.unlocked !== 'object') {
+  if (![2, 3].includes(candidate.version ?? 0) || !candidate.unlocked || typeof candidate.unlocked !== 'object') {
     return { ...EMPTY, migratedFromV1: candidate.version === 1 };
   }
   return {
-    version: 2,
+    version: 3,
     baselined: Boolean(candidate.baselined),
     migratedFromV1: Boolean(candidate.migratedFromV1),
+    catalogVersion: typeof (candidate as { catalogVersion?: unknown }).catalogVersion === 'number'
+      ? (candidate as { catalogVersion: number }).catalogVersion
+      : 1,
     unlocked: candidate.unlocked,
   };
 }

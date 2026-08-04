@@ -6,6 +6,7 @@ import type {
   CompanionAchievementTier,
 } from '@/types/companion-achievements';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import { MOSS_PHOTO_ACHIEVEMENT_RULES, type PhotoAchievementRule } from '@/utils/photo-achievements';
 
 type Ladder = {
   id: string;
@@ -212,6 +213,48 @@ function sharedLadder(
   );
 }
 
+function photoLadderDefs(
+  sectionId: string,
+  label: string,
+  description: string,
+  rule: PhotoAchievementRule,
+  thresholds: readonly number[],
+  singular: string,
+  plural: string
+): CompanionAchievementDef[] {
+  return thresholds.map((target, index) => {
+    const tier = Math.min(5, index + 1) as CompanionAchievementTier;
+    return {
+      id: `mossprout.${sectionId}.${target}`,
+      familyId: 'mossprout',
+      pillar: 'collection',
+      sectionId,
+      sectionLabel: label,
+      sectionDescription: description,
+      tier,
+      name: target === 1 ? `First ${singular}` : `${amount(target)} ${plural}`,
+      description,
+      criterion: rule.aggregation === 'distinct_qualities'
+        ? `Photograph ${amount(target)} different nature finds`
+        : `Keep ${amount(target)} ${target === 1 ? singular : plural}`,
+      iconKey: rule.signal,
+      metric: {
+        kind: 'photo',
+        ...rule,
+        target,
+        unit: rule.aggregation === 'distinct_qualities' ? 'finds' : 'photos',
+        counting: rule.aggregation === 'distinct_qualities' ? 'distinct' : 'total',
+      },
+      reward: {
+        kind: 'trophy_room',
+        label: `${label} ${tier >= 4 ? 'centerpiece' : `trophy ${tier}`}`,
+        roomZone: sectionId,
+        treatment: TREATMENTS[tier - 1],
+      },
+    };
+  });
+}
+
 function cheerletSignatureDefs(): CompanionAchievementDef[] {
   const items = [
     { id: 'birthday', name: 'Another year', description: 'A birthday marked as part of your story.', criterion: 'Mark a birthday', signal: 'cheerlet.birthdays', legacy: 'big_birthday' },
@@ -246,6 +289,11 @@ export const COMPANION_ACHIEVEMENT_CATALOG: readonly CompanionAchievementDef[] =
     ...sharedLadder(family.id, 'family-goals', 'Goals practised', `Goals completed with ${family.displayName}, including repeats.`, `${family.id}.quickGoals`, SHARED_THRESHOLDS, 'goal', 'goals'),
     ...sharedLadder(family.id, 'companion-quests', 'Quests completed', `Real-life and playful quests completed with ${family.displayName}.`, `${family.id}.quests`, QUEST_THRESHOLDS, 'quest', 'quests'),
     ...sharedLadder(family.id, 'journey-goals', 'Longer goals', `Longer Journey goals completed with ${family.displayName}.`, `${family.id}.journeyGoals`, JOURNEY_THRESHOLDS, 'Journey goal', 'journey'),
+    ...(family.id === 'mossprout' ? [
+      ...photoLadderDefs('blooms-kept', 'Blooms kept', 'Journal photos where flowers or blossom are a clear part of the scene.', MOSS_PHOTO_ACHIEVEMENT_RULES.blooms, [1, 5, 15, 30], 'bloom photo', 'bloom photos'),
+      ...photoLadderDefs('wild-places-kept', 'Wild places kept', 'Journal photos of green, wild or waterside places.', MOSS_PHOTO_ACHIEVEMENT_RULES.wildPlaces, [1, 5, 15, 30], 'wild-place photo', 'wild-place photos'),
+      ...photoLadderDefs('nature-field-guide', 'Nature field guide', 'Different kinds of nature confirmed across your journal photos.', MOSS_PHOTO_ACHIEVEMENT_RULES.fieldGuide, [3, 6, 9, 12], 'nature find', 'nature finds'),
+    ] : []),
     ...(family.id === 'cheerlet' ? cheerletSignatureDefs() : []),
   ];
 });
@@ -321,6 +369,9 @@ const RECORDING_HELP_BY_SIGNAL: Readonly<Record<string, string>> = {
   'pixooka.distinctGames': 'Record a Video game and enter its title. Each different confirmed title counts once.',
   'mossprout.parkVisits': 'In Today, add “Went somewhere”, choose Park or green space, and confirm the place.',
   'mossprout.distinctNaturePlaces': 'Confirm parks, gardens, forests or trails. Each different location counts once.',
+  'mossprout.photoBlooms': 'Keep a photo in the journal where flowers or blossom are a main or clear supporting subject. A screen showing flowers does not count. If the match is uncertain, confirm it during photo review.',
+  'mossprout.photoWildPlaces': 'Keep a photo in the journal of a park, garden, forest, beach, mountain or body of water. Each kept photo counts once.',
+  'mossprout.photoNatureQualities': 'Keep journal photos of different nature finds. Flowers, blossom, autumn, snow, water, mountains, stars, sunset, sky, forest, garden and beach can each count once.',
   'shellio.waterVisits': 'In Today, add “Went somewhere” and confirm a beach, coast, waterfront or swimming-pool place.',
   'shellio.swimEntries': 'In Today, add “Moved or exercised” and record swimming as the movement or sport.',
   'skylo.distinctVenues': 'Confirm a named place in a “Went somewhere” entry. The same venue only counts once.',

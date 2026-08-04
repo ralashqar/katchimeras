@@ -9,7 +9,7 @@ import type { DiscoveryDef } from '@/types/discoveries';
 
 const cat = (count: Record<string, number>, key: string) => count[key] ?? 0;
 
-export const DISCOVERY_CATALOG_VERSION = 3;
+export const DISCOVERY_CATALOG_VERSION = 4;
 
 export const DISCOVERY_CATALOG: DiscoveryDef[] = [
   // ───────────────────────── 🌍 Exploration ─────────────────────────
@@ -206,6 +206,46 @@ export const DISCOVERY_CATALOG: DiscoveryDef[] = [
     hidden: false,
     icon: '📷',
     test: (c) => c.photoCount >= 100,
+  },
+  {
+    id: 'photo_days_1', category: 'memory', name: 'A Day Through the Lens',
+    description: 'Kept a photo in the journal on one day.', rarity: 'common', hidden: false, icon: 'D1',
+    test: (c) => c.photoDayCount >= 1,
+  },
+  {
+    id: 'photo_days_7', category: 'memory', name: 'Seven Photo Days',
+    description: 'Kept journal photos on seven different days.', rarity: 'common', hidden: false, icon: 'D7',
+    test: (c) => c.photoDayCount >= 7,
+  },
+  {
+    id: 'photo_days_30', category: 'memory', name: 'A Month in Pictures',
+    description: 'Kept journal photos on thirty different days.', rarity: 'rare', hidden: false, icon: 'D30',
+    test: (c) => c.photoDayCount >= 30,
+  },
+  {
+    id: 'photo_days_100', category: 'memory', name: 'Life in Frames',
+    description: 'Kept journal photos on a hundred different days.', rarity: 'epic', hidden: false, icon: 'D100',
+    test: (c) => c.photoDayCount >= 100,
+  },
+  {
+    id: 'photo_qualities_5', category: 'memory', name: 'Curious Eye',
+    description: 'Photographed five different confirmed real-world subjects.', rarity: 'common', hidden: false, icon: 'Q5',
+    test: (c) => c.distinctPhotoQualityCount >= 5,
+  },
+  {
+    id: 'photo_qualities_10', category: 'memory', name: 'Looking Closer',
+    description: 'Photographed ten different confirmed real-world subjects.', rarity: 'rare', hidden: false, icon: 'Q10',
+    test: (c) => c.distinctPhotoQualityCount >= 10,
+  },
+  {
+    id: 'photo_qualities_20', category: 'memory', name: 'World Collector',
+    description: 'Photographed twenty different confirmed real-world subjects.', rarity: 'epic', hidden: false, icon: 'Q20',
+    test: (c) => c.distinctPhotoQualityCount >= 20,
+  },
+  {
+    id: 'photo_qualities_30', category: 'memory', name: 'Everything Noticed',
+    description: 'Photographed thirty different confirmed real-world subjects.', rarity: 'legendary', hidden: true, icon: 'Q30',
+    test: (c) => c.distinctPhotoQualityCount >= 30,
   },
   {
     id: 'meaningful_50',
