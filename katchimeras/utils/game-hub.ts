@@ -1,8 +1,11 @@
-import { canonicalFamilyId, katchimeraFamilies } from '@/constants/katchimera-skins';
+import { canonicalFamilyId, katchimeraFamilies, katchimeraSkinById } from '@/constants/katchimera-skins';
 import { katchimeraRoles } from '@/constants/katchimera-roles';
 import type { KatchimeraBondLevel } from '@/constants/katchimera-roles';
 import type { HomeVisualKey } from '@/types/home';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
+import type { KingdomCreature } from '@/types/kingdom';
+import { companionBondProgress, type CompanionBondState } from '@/utils/companion-bond';
+import { identityForCreature } from '@/utils/katchimera-identity';
 import type { CompanionQuestState } from '@/utils/katchimera-quests';
 import { completedQuestCount } from '@/utils/quests/experiences/difficulty';
 import { questDefinition, questPresentation } from '@/utils/quests/definitions';
@@ -121,6 +124,52 @@ export function buildGameHubItems(input: {
   });
 }
 
+export function buildOwnedGameCompanions(
+  creatures: readonly KingdomCreature[],
+  bond: CompanionBondState,
+): OwnedGameCompanion[] {
+  const seen = new Set<string>();
+  const owned: OwnedGameCompanion[] = [];
+  for (const creature of creatures) {
+    const identity = identityForCreature({ ...creature, encounterProfileId: null });
+    if (!identity || seen.has(identity.familyId)) continue;
+    seen.add(identity.familyId);
+    owned.push({
+      familyId: identity.familyId,
+      creatureId: identity.companionId,
+      name: katchimeraSkinById.get(identity.skinId)?.displayName ?? creature.name,
+      visualKey: creature.visualKey,
+      bondLevel: companionBondProgress(bond, identity.companionId).level,
+    });
+  }
+  return owned;
+}
+
 export function sortPlayableGames(items: readonly GameHubItem[]): GameHubItem[] {
   return [...items].sort((left, right) => (right.lastPlayedAt ?? 0) - (left.lastPlayedAt ?? 0));
+}
+
+export function selectTodayCareGame(items: readonly GameHubItem[], dayId: string): GameHubItem | null {
+  const playable = items.filter((item) => !item.locked && item.creatureId);
+  if (!playable.length) return null;
+  const unplayedToday = playable.filter((item) => !item.playedToday);
+  const pool = unplayedToday.length ? unplayedToday : playable;
+  const neverPlayed = pool.filter((item) => item.lastPlayedAt == null);
+  const mostRecentAt = Math.max(...pool.map((item) => item.lastPlayedAt ?? 0));
+  const notMostRecent = mostRecentAt > 0 && pool.length > 1
+    ? pool.filter((item) => (item.lastPlayedAt ?? 0) < mostRecentAt)
+    : pool;
+  const rotationPool = neverPlayed.length ? neverPlayed : notMostRecent.length ? notMostRecent : pool;
+  return [...rotationPool].sort((left, right) => {
+    return stableHash(`${dayId}:${left.questId}`) - stableHash(`${dayId}:${right.questId}`);
+  })[0] ?? null;
+}
+
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }

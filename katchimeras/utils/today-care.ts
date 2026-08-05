@@ -6,21 +6,23 @@ import { normalizeDayGrowthState, TODAY_GROWTH_REWARDS } from '@/utils/today-gro
 
 export type TodayCareTimeBucket = 'morning' | 'midday' | 'afternoon' | 'evening';
 export type TodayCareSource = 'system' | 'memory_quest' | 'quick_goal' | 'ai';
-export type TodayCareCompletionMode = 'artifact' | 'inline_check_in' | 'quick_goal';
+export type TodayCareCompletionMode = 'artifact' | 'inline_check_in' | 'quick_goal' | 'external_activity';
 export type TodayCareDestination =
   | { kind: 'inline_mood' }
   | { kind: 'inline_sleep' }
   | { kind: 'quick_category'; category: 'photo' | 'voice_note' | 'manual_journal' | 'place' | 'movement' | 'food' }
   | { kind: 'reflection' }
   | { kind: 'memory_quest'; questType: MemoryQuestType }
-  | { kind: 'quick_goal'; goalId: string; familyId: KatchimeraFamilyId };
+  | { kind: 'quick_goal'; goalId: string; familyId: KatchimeraFamilyId }
+  | { kind: 'photo_roll'; assetIds: string[] }
+  | { kind: 'mini_game'; questId: string };
 
 export type TodayCareActionDefinition = {
   id: string;
   title: string;
   description: string;
   icon: IconSymbolName;
-  category: 'check_in' | 'memory' | 'goal';
+  category: 'check_in' | 'memory' | 'goal' | 'play';
   completionKey: string;
   completionMode: TodayCareCompletionMode;
   destination: TodayCareDestination;
@@ -49,58 +51,70 @@ export type TodayCareQuickGoal = {
   completed: boolean;
 };
 
+export type TodayCareMiniGameSuggestion = {
+  companionName: string;
+  familyId: KatchimeraFamilyId;
+  questId: string;
+  title: string;
+};
+
+export type TodayCarePhotoRollSuggestion = {
+  assetIds: string[];
+  title: string;
+};
+
 const ALL_DAY: TodayCareTimeBucket[] = ['morning', 'midday', 'afternoon', 'evening'];
 const AFTER_MORNING: TodayCareTimeBucket[] = ['midday', 'afternoon', 'evening'];
 
 const CARE_CATALOG: TodayCareActionDefinition[] = [
   action({
-    id: 'mood', title: 'How are you feeling?', description: 'A quick check-in helps the egg understand today.',
+    id: 'mood', title: 'How are you feeling?', description: 'Choose the mood that feels closest.',
     icon: 'face.smiling', category: 'check_in', completionKey: 'mood', completionMode: 'inline_check_in',
     destination: { kind: 'inline_mood' }, growthSource: 'mood', priority: 100, eligibleTimeOfDay: ALL_DAY,
   }),
   action({
-    id: 'sleep', title: 'How was your sleep?', description: 'Tell the egg how your day began.',
+    id: 'sleep', title: 'How was your sleep?', description: 'Choose how well you slept last night.',
     icon: 'bed.double.fill', category: 'check_in', completionKey: 'sleep', completionMode: 'inline_check_in',
     destination: { kind: 'inline_sleep' }, growthSource: 'sleep', priority: 98, eligibleTimeOfDay: ALL_DAY,
   }),
   action({
-    id: 'journal', title: 'Write down one thing', description: 'A few honest words give the hatch more shape.',
+    id: 'journal', title: "Write in today's journal", description: 'Write a full journal entry in your own words.',
     icon: 'square.and.pencil', category: 'memory', completionKey: 'journal', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'manual_journal' }, growthSource: 'journal', priority: 94,
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'photo', title: 'Capture today’s moment', description: 'Keep one real detail from your day.',
+    id: 'photo', title: 'Take a photo from today', description: 'Capture a photo of something worth keeping.',
     icon: 'camera.fill', category: 'memory', completionKey: 'photo', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'photo' }, growthSource: 'photo', priority: 92,
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'voice', title: 'Leave a voice note', description: 'Say what happened while it is still fresh.',
+    id: 'voice', title: 'Record a voice note', description: 'Speak a short voice note about today.',
     icon: 'mic.fill', category: 'memory', completionKey: 'voice', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'voice_note' }, growthSource: 'voice_note', priority: 87,
     eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
   action({
-    id: 'reflection', title: 'What will you remember?', description: 'Give today a small meaning before it hatches.',
+    id: 'reflection', title: 'Reflect on today', description: 'Answer one guided question about your day.',
     icon: 'book.closed.fill', category: 'memory', completionKey: 'reflection', completionMode: 'artifact',
     destination: { kind: 'reflection' }, growthSource: 'reflection', priority: 96,
     eligibleTimeOfDay: ['evening'], journalFocused: true,
   }),
   action({
-    id: 'place', title: 'Remember where you went', description: 'Add a place that mattered today.',
+    id: 'place', title: 'Add a place you visited', description: 'Journal where you went and what happened.',
     icon: 'mappin.and.ellipse', category: 'memory', completionKey: 'place', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'place' }, growthSource: 'place', priority: 76,
     eligibleTimeOfDay: AFTER_MORNING, journalFocused: true,
   }),
   action({
-    id: 'movement', title: 'How did you move?', description: 'Keep a walk or journey as part of today’s story.',
+    id: 'movement', title: 'Journal how you moved', description: 'Record a walk, workout, or journey.',
     icon: 'figure.walk', category: 'memory', completionKey: 'movement', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'movement' }, growthSource: 'movement', priority: 70,
     eligibleTimeOfDay: AFTER_MORNING, journalFocused: true,
   }),
   action({
-    id: 'food', title: 'Keep a taste from today', description: 'Remember a meal, snack, or favourite drink.',
+    id: 'food', title: 'Journal a meal or drink', description: 'Record something you ate or drank today.',
     icon: 'fork.knife', category: 'memory', completionKey: 'food', completionMode: 'artifact',
     destination: { kind: 'quick_category', category: 'food' }, growthSource: 'journal', priority: 72,
     eligibleTimeOfDay: ['midday', 'evening'], journalFocused: true,
@@ -114,6 +128,8 @@ export function rankTodayCareActions(input: {
   quickGoals?: readonly TodayCareQuickGoal[];
   rotatingLimit?: number;
   reflectionAvailable?: boolean;
+  miniGameSuggestion?: TodayCareMiniGameSuggestion | null;
+  photoRollSuggestion?: TodayCarePhotoRollSuggestion | null;
 }): { active: RankedTodayCareAction[]; completed: RankedTodayCareAction[] } {
   const now = input.now ?? new Date();
   const bucket = careTimeBucket(now);
@@ -124,8 +140,52 @@ export function rankTodayCareActions(input: {
     .filter((definition) => definition.id !== 'reflection' || input.reflectionAvailable !== false)
     .map((definition) => ranked(definition, input.day.isoDate, 'system', isDefinitionAlreadySatisfied(definition.id, input.day)));
 
+  if (input.miniGameSuggestion) {
+    const game = input.miniGameSuggestion;
+    const definition = action({
+      id: 'mini_game_round',
+      title: `Play ${game.title}`,
+      description: `Complete one round with ${game.companionName}.`,
+      icon: 'gamecontroller.fill',
+      category: 'play',
+      completionKey: 'mini_game_round',
+      completionMode: 'external_activity',
+      destination: { kind: 'mini_game', questId: game.questId },
+      growthSource: 'mini_game',
+      priority: 89,
+      eligibleTimeOfDay: ALL_DAY,
+    });
+    candidates.push({
+      ...ranked(definition, input.day.isoDate, 'system', false),
+      familyId: game.familyId,
+      sourceId: game.questId,
+    });
+  }
+
+  if (input.photoRollSuggestion?.assetIds.length) {
+    const photoRoll = input.photoRollSuggestion;
+    const definition = action({
+      id: 'photo_roll',
+      title: photoRoll.title,
+      description: 'Choose a detected Photo Library image to journal.',
+      icon: 'photo.on.rectangle.angled',
+      category: 'memory',
+      completionKey: 'photo_roll',
+      completionMode: 'artifact',
+      destination: { kind: 'photo_roll', assetIds: photoRoll.assetIds },
+      growthSource: 'photo',
+      priority: 99,
+      eligibleTimeOfDay: ALL_DAY,
+      journalFocused: true,
+    });
+    candidates.push({
+      ...ranked(definition, input.day.isoDate, 'system', false),
+      sourceId: photoRoll.assetIds.join('|'),
+    });
+  }
+
   for (const quest of input.memoryQuests ?? []) {
-    if (quest.type === 'namePatch') continue;
+    if (quest.type === 'namePatch' || quest.type === 'markBigMoment') continue;
     if (quest.type === 'answerReflection' && input.reflectionAvailable === false) continue;
     const definition = memoryQuestAction(quest);
     candidates.push({
@@ -138,7 +198,7 @@ export function rankTodayCareActions(input: {
     const definition = action({
       id: `quick-goal:${goal.id}`,
       title: goal.title,
-      description: 'A small promise you made with one of your Katchimeras.',
+      description: 'Complete this Katchimera goal for today.',
       icon: 'checkmark',
       category: 'goal',
       completionKey: `quick-goal:${goal.id}`,
@@ -176,11 +236,14 @@ export function rankTodayCareActions(input: {
   const withoutDuplicateCompletions = dedupeCompletionKeys(rotating);
   const memory = withoutDuplicateCompletions.filter((candidate) => candidate.journalFocused);
   const goals = withoutDuplicateCompletions.filter((candidate) => candidate.category === 'goal');
+  const games = withoutDuplicateCompletions.filter((candidate) => candidate.category === 'play');
   const rotatingLimit = input.rotatingLimit ?? 3;
   const selected: RankedTodayCareAction[] = memory.slice(0, Math.min(2, rotatingLimit));
+  if (selected.length < rotatingLimit && games[0]) selected.push(games[0]);
   if (selected.length < rotatingLimit && goals[0]) selected.push(goals[0]);
-  for (const candidate of memory) {
+  for (const candidate of withoutDuplicateCompletions) {
     if (selected.length >= rotatingLimit) break;
+    if (candidate.category === 'goal') continue;
     if (!selected.some((item) => item.instanceId === candidate.instanceId)) selected.push(candidate);
   }
 
@@ -225,7 +288,7 @@ function memoryQuestAction(quest: MemoryQuest): TodayCareActionDefinition {
   return action({
     id: `memory-quest:${quest.id}`,
     title: quest.title,
-    description: quest.contextLabel ?? `Keep ${quest.rewardLabel.toLowerCase()} as part of today.`,
+    description: memoryQuestDescription(quest.type),
     icon: route.icon,
     category: 'memory',
     completionKey: route.completionKey,
@@ -236,6 +299,19 @@ function memoryQuestAction(quest: MemoryQuest): TodayCareActionDefinition {
     eligibleTimeOfDay: ALL_DAY,
     journalFocused: true,
   });
+}
+
+function memoryQuestDescription(type: MemoryQuestType): string {
+  switch (type) {
+    case 'captureMoment': return 'Take a photo of something that stood out today.';
+    case 'recordVoiceMemory': return 'Record a voice note while it is still fresh.';
+    case 'answerReflection': return 'Answer a guided reflection about today.';
+    case 'markPlace': return 'Journal a place you visited today.';
+    case 'markBigMoment': return 'Journal why today feels important.';
+    case 'saveFoodMemory': return 'Journal a meal, snack, or drink from today.';
+    case 'saveStudioMemory': return 'Journal something you watched, read, or enjoyed.';
+    case 'namePatch': return "Give today's collection of memories a name.";
+  }
 }
 
 function memoryQuestRoute(type: MemoryQuestType): {

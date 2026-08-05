@@ -41,7 +41,10 @@ export default function MomentCaptureScreen() {
   const params = useLocalSearchParams<{ target?: string; questId?: string; questCreatureId?: string; questRunId?: string }>();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  const { selectedDay, applyCapturedMoment, isTodayHatched, tomorrowDay } = useHomeScreenState();
+  const { selectedDay, applyCapturedMoment, isTodayHatched, tomorrowDay } = useHomeScreenState({
+    enableInteractiveServices: false,
+    persistHydrationRepairs: false,
+  });
   const requestedTarget = parseCaptureTarget(params.target);
   // Explicit route params win. Without one, preserve the old post-hatch default.
   const captureTarget: DayInputTarget = requestedTarget ?? (isTodayHatched ? 'tomorrow' : 'today');

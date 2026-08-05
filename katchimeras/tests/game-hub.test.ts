@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-import { gameCatalog, buildGameHubItems } from '@/utils/game-hub';
+import { gameCatalog, buildGameHubItems, selectTodayCareGame } from '@/utils/game-hub';
 import { questActivityLane, questDefinition } from '@/utils/quests/definitions';
 
 const emptyQuestState = () => ({ schemaVersion: 4 as const, quests: [], submissions: [], offerCycles: [], attempts: [] });
@@ -29,6 +29,38 @@ test('hub shows unowned games as locked previews and unlocks an owned family', (
   });
   assert.equal(owned.find((item) => item.questId === 'quest-coffee-ritual-brew-sequence')?.locked, false);
   assert.equal(owned.find((item) => item.questId === 'quest-feastle-merge')?.locked, true);
+});
+
+test('Today care rotates toward a least-recently played unlocked game', () => {
+  const items = buildGameHubItems({
+    companions: [{ familyId: 'feastle', creatureId: 'companion:feastle', name: 'Feastle', visualKey: 'feastle', bondLevel: 5 }],
+    questState: emptyQuestState(),
+    dayId: '2026-08-05',
+  });
+  const first = selectTodayCareGame(items, '2026-08-05');
+  assert.ok(first);
+
+  const afterPlayingFirst = items.map((item) => item.questId === first.questId
+    ? { ...item, lastPlayedAt: 1_754_435_000_000 }
+    : item);
+  const next = selectTodayCareGame(afterPlayingFirst, '2026-08-06');
+
+  assert.ok(next);
+  assert.notEqual(next.questId, first.questId);
+  assert.equal(next.familyId, 'feastle');
+});
+
+test('Today care uses the day to vary equally fresh game recommendations', () => {
+  const items = buildGameHubItems({
+    companions: [{ familyId: 'feastle', creatureId: 'companion:feastle', name: 'Feastle', visualKey: 'feastle', bondLevel: 5 }],
+    questState: emptyQuestState(),
+    dayId: '2026-08-05',
+  });
+  const recommendations = new Set(
+    Array.from({ length: 20 }, (_, offset) => selectTodayCareGame(items, `2026-08-${String(offset + 1).padStart(2, '0')}`)?.questId),
+  );
+
+  assert.ok(recommendations.size > 1);
 });
 
 test('hub and quick-launch games retain the authored world environments', () => {

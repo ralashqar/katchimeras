@@ -518,7 +518,6 @@ function InlineHeading({ action }: { action: RankedTodayCareAction }) {
     <View style={styles.inlineHeading}>
       <View style={styles.flexCopy}>
         <ThemedText style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
-        <ThemedText style={styles.rowBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{action.description}</ThemedText>
       </View>
       <Reward amount={action.growthReward} />
     </View>
@@ -636,12 +635,18 @@ function CompletedCareRow({ event, onFinished, reduceMotion }: {
 
   return (
     <Animated.View layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))} style={[styles.careDoor, styles.careDoorComplete, rowStyle]}>
-      <View style={[styles.doorIcon, styles.completedIcon]}>
-        <IconSymbol color={Meadow.leafDeep} name={event.action.icon} size={20} />
-      </View>
+      {event.action.category === 'play' && event.action.familyId ? (
+        <CompanionGoalPortrait familyId={event.action.familyId} size={38} />
+      ) : (
+        <View style={[styles.doorIcon, styles.completedIcon]}>
+          <IconSymbol color={Meadow.leafDeep} name={event.action.icon} size={20} />
+        </View>
+      )}
       <View style={styles.flexCopy}>
         <ThemedText numberOfLines={1} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{event.action.title}</ThemedText>
-        <ThemedText numberOfLines={1} style={styles.completedBody} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>Added to today · +{event.action.growthReward} Growth</ThemedText>
+        <ThemedText numberOfLines={1} style={styles.completedBody} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
+          {event.action.category === 'play' ? 'Round complete' : 'Added to today'} · +{event.action.growthReward} Growth
+        </ThemedText>
       </View>
       <Animated.View style={tickStyle}>
         <View collapsable={false} ref={sourceRef} style={styles.goalTickComplete}>
@@ -763,7 +768,6 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
             onPress={() => onOpenQuickGoal(goalId)}
             style={({ pressed }) => [styles.goalBody, pressed && styles.textPressed]}>
             <ThemedText numberOfLines={2} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
-            <ThemedText numberOfLines={1} style={styles.rowBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{action.description}</ThemedText>
           </Pressable>
           <Reward amount={action.growthReward} />
           <Animated.View style={tickStyle}>
@@ -821,10 +825,13 @@ function CareRow({ action, index, onNotToday, onStart, reduceMotion, swipeExtern
             accessibilityRole="button"
             onPress={onStart}
             style={({ pressed }) => [styles.careDoor, pressed && styles.rowPressed]}>
-            <View style={styles.doorIcon}><IconSymbol color={Meadow.goldDeep} name={action.icon} size={20} /></View>
+            {action.category === 'play' && action.familyId ? (
+              <CompanionGoalPortrait familyId={action.familyId} size={38} />
+            ) : (
+              <View style={styles.doorIcon}><IconSymbol color={Meadow.goldDeep} name={action.icon} size={20} /></View>
+            )}
             <View style={styles.flexCopy}>
               <ThemedText selectable style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
-              <ThemedText selectable style={styles.rowBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{action.description}</ThemedText>
             </View>
             <Reward amount={action.growthReward} />
             <IconSymbol color={Meadow.inkSoft} name="chevron.right" size={16} />

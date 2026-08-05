@@ -82,6 +82,7 @@ export function MomentPromptSheet({
   onQuickCategory,
 }: MomentPromptSheetProps) {
   const [selected, setSelected] = useState<ActiveDayPrompt | null>(initialPrompt);
+  const openedDirectlyRef = useRef(initialPrompt != null);
 
   return (
     <KatchaSheet header={selected ? undefined : { title: 'Add to today' }} onRequestClose={() => onClose()} surface="parchment">
@@ -102,6 +103,10 @@ export function MomentPromptSheet({
           }}
           onDismiss={() => {
             onPromptDismiss?.(selected.id);
+            if (openedDirectlyRef.current) {
+              onClose();
+              return;
+            }
             setSelected(null);
           }}
         />

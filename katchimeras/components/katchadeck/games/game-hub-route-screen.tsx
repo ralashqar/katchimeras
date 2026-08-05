@@ -3,14 +3,12 @@ import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { GameHubScreen } from '@/components/katchadeck/games/game-hub-screen';
-import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { homeRepository } from '@/storage/repositories/home-repository';
-import { companionBondProgress } from '@/utils/companion-bond';
 import { loadCompanionBondState } from '@/utils/companion-bond-storage';
-import { buildGameHubItems, type GameHubItem, type OwnedGameCompanion } from '@/utils/game-hub';
-import { companionIdResolverForHomeState, identityForCreature } from '@/utils/katchimera-identity';
+import { buildGameHubItems, buildOwnedGameCompanions, selectTodayCareGame, type GameHubItem } from '@/utils/game-hub';
+import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { acceptGameHubQuest, loadCompanionQuests, saveCompanionQuests } from '@/utils/katchimera-quests';
 import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
 import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
@@ -19,6 +17,10 @@ import { resolveInteractiveQuestConfig } from '@/utils/quests/interactive-sessio
 import { todayKatchimeraExplorationBackgroundKeyForPresentation } from '@/utils/today-exploration-backgrounds';
 import { localDayId } from '@/utils/world-identity-rules';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import {
+  cancelTodayCareGameRound,
+  consumeTodayCareGameRoundLaunch,
+} from '@/utils/today-care-game-round';
 
 function loadPersistentState() {
   const homeState = homeRepository.load();
@@ -54,23 +56,10 @@ export function GameHubRouteScreen() {
     ),
     [allKatchimerasAvailable, days, persistent.wardrobe]
   );
-  const companions = useMemo<OwnedGameCompanion[]>(() => {
-    const seen = new Set<string>();
-    const owned: OwnedGameCompanion[] = [];
-    for (const creature of kingdom.creatures) {
-      const identity = identityForCreature({ ...creature, encounterProfileId: null });
-      if (!identity || seen.has(identity.familyId)) continue;
-      seen.add(identity.familyId);
-      owned.push({
-        familyId: identity.familyId,
-        creatureId: identity.companionId,
-        name: katchimeraSkinById.get(identity.skinId)?.displayName ?? creature.name,
-        visualKey: creature.visualKey,
-        bondLevel: companionBondProgress(persistent.bond, identity.companionId).level,
-      });
-    }
-    return owned;
-  }, [kingdom.creatures, persistent.bond]);
+  const companions = useMemo(
+    () => buildOwnedGameCompanions(kingdom.creatures, persistent.bond),
+    [kingdom.creatures, persistent.bond],
+  );
   const dayId = localDayId();
   const items = useMemo(
     () => buildGameHubItems({ companions, questState: persistent.quests, dayId }),
@@ -85,13 +74,13 @@ export function GameHubRouteScreen() {
     }) ?? 'home';
   }, [days]);
 
-  const openGame = useCallback((item: GameHubItem) => {
-    if (!item.creatureId || item.locked) return;
+  const openGame = useCallback((item: GameHubItem, fromTodayCare = false): boolean => {
+    if (!item.creatureId || item.locked) return false;
     const latest = loadPersistentState();
     const acceptedAt = Date.now();
     const seed = `${item.creatureId}:${item.questId}:${dayId}:${acceptedAt.toString(36)}`;
     const config = resolveInteractiveQuestConfig(latest.quests, item.creatureId, item.questId, seed);
-    if (!config) return;
+    if (!config) return false;
     const accepted = acceptGameHubQuest(latest.quests, {
       questId: item.questId,
       creatureId: item.creatureId,
@@ -102,8 +91,29 @@ export function GameHubRouteScreen() {
       resolvedConfig: config,
     }, acceptedAt);
     saveCompanionQuests(accepted.state);
-    router.push({ pathname: '/game/[questId]', params: { questId: item.questId, creatureId: item.creatureId } });
+    router.push({
+      pathname: '/game/[questId]',
+      params: {
+        questId: item.questId,
+        creatureId: item.creatureId,
+        todayCareRound: fromTodayCare ? '1' : undefined,
+      },
+    });
+    return true;
   }, [dayId, router]);
+
+  useFocusEffect(useCallback(() => {
+    const launch = consumeTodayCareGameRoundLaunch();
+    if (!launch) return;
+    const requestedQuestId = launch.action.destination.kind === 'mini_game'
+      ? launch.action.destination.questId
+      : null;
+    const next = items.find((item) => item.questId === requestedQuestId && !item.locked && item.creatureId)
+      ?? selectTodayCareGame(items, dayId);
+    if (next && openGame(next, true)) return;
+    cancelTodayCareGameRound();
+    router.navigate('/today');
+  }, [dayId, items, openGame, router]));
 
   return (
     <GameHubScreen

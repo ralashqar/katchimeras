@@ -1523,7 +1523,8 @@ export type TodayGrowthSource =
   | 'quest'
   | 'reflection'
   | 'daily_seed'
-  | 'quick_goal';
+  | 'quick_goal'
+  | 'mini_game';
 
 export type TodayGrowthEvent = {
   /** Stable idempotency key. A successful source artifact may only award once. */

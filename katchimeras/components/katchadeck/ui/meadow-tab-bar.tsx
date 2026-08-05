@@ -2,6 +2,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import { Fragment } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
@@ -18,6 +19,8 @@ const HIDDEN_ROUTES = new Set(['index', 'world']);
 const INACTIVE = 'rgba(226, 221, 238, 0.72)';
 
 export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 10);
   const items = state.routes.filter((route) => {
     if (HIDDEN_ROUTES.has(route.name)) return false;
     // Screens hidden via `href: null` (e.g. Dev when the flag is off).
@@ -25,7 +28,15 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
     return options?.href !== null;
   });
   return (
-    <View pointerEvents="box-none" style={styles.wrap}>
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.wrap,
+        {
+          height: Math.max(96, 62 + bottomPadding),
+          paddingBottom: bottomPadding,
+        },
+      ]}>
       {items.map((route, index) => {
         const { options } = descriptors[route.key];
         const focused = state.routes[state.index]?.key === route.key;
@@ -65,16 +76,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(30, 30, 40, 0.96)',
     borderCurve: 'continuous',
-    borderRadius: 999,
-    bottom: 20,
-    boxShadow: '0 14px 30px rgba(10, 8, 4, 0.42)',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    bottom: 0,
+    boxShadow: '0 -8px 28px rgba(10, 8, 4, 0.34)',
     flexDirection: 'row',
-    height: 76,
     justifyContent: 'space-around',
-    left: 14,
+    left: 0,
     paddingHorizontal: 10,
     position: 'absolute',
-    right: 14,
+    right: 0,
   },
   item: {
     alignItems: 'center',

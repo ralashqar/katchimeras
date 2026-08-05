@@ -81,10 +81,18 @@ type HomeScreenStateOptions = {
    * Today's expensive native permission/media work.
    */
   enableInteractiveServices?: boolean;
+  /**
+   * Full app screens persist lifecycle/hydration repairs after loading. Short-
+   * lived capture routes can opt out so merely opening and cancelling a modal
+   * does not replace the repository state and make Today rebuild its UI.
+   * Explicit mutations still persist through useHomeStateMutation.
+   */
+  persistHydrationRepairs?: boolean;
 };
 
 export function useHomeScreenState({
   enableInteractiveServices = true,
+  persistHydrationRepairs = true,
 }: HomeScreenStateOptions = {}) {
   const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
@@ -164,7 +172,7 @@ export function useHomeScreenState({
   }, [syncState]);
 
   useEffect(() => {
-    if (!storedState) {
+    if (!storedState || !persistHydrationRepairs) {
       return;
     }
 
@@ -175,7 +183,7 @@ export function useHomeScreenState({
     // Non-mutation state writers (hatching, health import, hydration repair)
     // share the same non-blocking persistence path.
     void homeRepository.saveDeferred(storedState, { notify: false });
-  }, [storedState]);
+  }, [persistHydrationRepairs, storedState]);
 
   const viewModel = useMemo(() => {
     const now = new Date();

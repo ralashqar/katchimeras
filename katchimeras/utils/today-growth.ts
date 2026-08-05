@@ -18,6 +18,7 @@ export const TODAY_GROWTH_REWARDS: Readonly<Record<TodayGrowthSource, number>> =
   reflection: 15,
   daily_seed: 5,
   quick_goal: 8,
+  mini_game: 10,
 };
 
 export const TODAY_GROWTH_STAGE_THRESHOLDS = [0, 15, 35, 55, 70, 85, 100] as const;

@@ -122,7 +122,9 @@ async function loadDayPromptPhotoCandidates({
   try {
     const MediaLibrary = await import('expo-media-library');
     if (signal?.aborted) return [];
-    const permission = await MediaLibrary.requestPermissionsAsync(false);
+    const permission = mode === 'production'
+      ? await MediaLibrary.getPermissionsAsync(false)
+      : await MediaLibrary.requestPermissionsAsync(false);
     if (!permission.granted || signal?.aborted) {
       return [];
     }

@@ -40,6 +40,10 @@ import {
   todayKatchimeraExplorationBackgroundKeyForFamily,
 } from '@/utils/today-exploration-backgrounds';
 import { localDayId } from '@/utils/world-identity-rules';
+import {
+  cancelTodayCareGameRound,
+  completeTodayCareGameRound,
+} from '@/utils/today-care-game-round';
 
 function loadState() {
   const homeState = homeRepository.load();
@@ -48,7 +52,11 @@ function loadState() {
 }
 
 export function GameHubGameRouteScreen() {
-  const { creatureId = '', questId = '' } = useLocalSearchParams<{ creatureId: string; questId: string }>();
+  const { creatureId = '', questId = '', todayCareRound = '' } = useLocalSearchParams<{
+    creatureId: string;
+    questId: string;
+    todayCareRound?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { days } = useAllDays({ refreshOnFocus: false });
@@ -88,14 +96,17 @@ export function GameHubGameRouteScreen() {
   const [confirmExit, setConfirmExit] = useState(false);
   const completionInFlight = useRef(false);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fromTodayCare = todayCareRound === '1';
 
-  const returnToGames = useCallback(() => {
-    router.dismissTo('/games');
-  }, [router]);
+  const returnAfterRound = useCallback(() => {
+    if (fromTodayCare) router.dismissTo('/today');
+    else router.dismissTo('/games');
+  }, [fromTodayCare, router]);
 
   const abandon = useCallback(() => {
     if (!quest?.questRunId) {
-      returnToGames();
+      if (fromTodayCare) cancelTodayCareGameRound();
+      returnAfterRound();
       return;
     }
     const latest = loadState();
@@ -103,8 +114,9 @@ export function GameHubGameRouteScreen() {
       ? cancelQuestAttempt(latest.quests, runningAttemptId)
       : latest.quests;
     saveCompanionQuests(releaseGameHubQuest(cancelled, quest.questRunId));
-    returnToGames();
-  }, [quest?.questRunId, returnToGames, runningAttemptId]);
+    if (fromTodayCare) cancelTodayCareGameRound();
+    returnAfterRound();
+  }, [fromTodayCare, quest?.questRunId, returnAfterRound, runningAttemptId]);
 
   const requestExit = useCallback(() => {
     if (runningAttemptId) setConfirmExit(true);
@@ -166,8 +178,9 @@ export function GameHubGameRouteScreen() {
     });
     if (bond.awarded) saveCompanionBondState(bond.state);
     setRunningAttemptId(null);
-    returnToGames();
-  }, [creatureId, definition, returnToGames]);
+    if (fromTodayCare) completeTodayCareGameRound(attemptId, completedAt);
+    returnAfterRound();
+  }, [creatureId, definition, fromTodayCare, returnAfterRound]);
 
   const handleRunningChange = useCallback((running: boolean, attemptId?: string | null) => {
     if (running) {
@@ -178,7 +191,7 @@ export function GameHubGameRouteScreen() {
     setRunningAttemptId(null);
     // A game-owned back control ends its run by reporting running=false. The
     // companion flow then returns to its quest surface; this route mirrors that
-    // lifecycle but returns to Games. Completion reports false immediately
+    // lifecycle but returns to its launch surface. Completion reports false immediately
     // before onComplete, so defer long enough for completion to claim the exit.
     exitTimer.current = setTimeout(() => {
       if (!completionInFlight.current) abandon();
@@ -190,9 +203,9 @@ export function GameHubGameRouteScreen() {
       <View style={[styles.invalid, { paddingBottom: insets.bottom + 24, paddingTop: insets.top + 24 }]}>
         <IconSymbol name="exclamationmark.triangle.fill" size={29} color={Lantern.ember300} />
         <ThemedText selectable style={styles.invalidTitle} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>This game is no longer ready</ThemedText>
-        <ThemedText selectable style={styles.invalidBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Return to Games and launch a fresh round.</ThemedText>
-        <Pressable accessibilityRole="button" onPress={returnToGames} style={styles.returnButton}>
-          <ThemedText style={styles.returnLabel} lightColor="#23170A" darkColor="#23170A">Back to Games</ThemedText>
+        <ThemedText selectable style={styles.invalidBody} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>Return and launch a fresh round.</ThemedText>
+        <Pressable accessibilityRole="button" onPress={abandon} style={styles.returnButton}>
+          <ThemedText style={styles.returnLabel} lightColor="#23170A" darkColor="#23170A">Back to {fromTodayCare ? 'Today' : 'Games'}</ThemedText>
         </Pressable>
       </View>
     );
@@ -232,7 +245,7 @@ export function GameHubGameRouteScreen() {
           />
           {!fullBleed ? (
             <View style={[styles.gameBackPosition, { top: insets.top + 10 }]}>
-              <CompanionBackAction label="Games" onPress={requestExit} tone="night" />
+              <CompanionBackAction label={fromTodayCare ? 'Today' : 'Games'} onPress={requestExit} tone="night" />
             </View>
           ) : null}
           <View style={[
@@ -248,7 +261,7 @@ export function GameHubGameRouteScreen() {
         </>
       )}
       <KatchaDialog
-        body="Your current round will end and you’ll return to the Games hub. Your companion quest will stay exactly as it is."
+        body={`Your current round will end and you’ll return to ${fromTodayCare ? 'Today' : 'the Games hub'}. No Growth will be awarded.`}
         cancelLabel="Keep playing"
         confirmLabel="End round"
         onCancel={() => setConfirmExit(false)}

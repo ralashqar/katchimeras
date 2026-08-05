@@ -130,7 +130,14 @@ import {
 import { companionIdForFamily, katchimeraFamilies } from '@/constants/katchimera-skins';
 import { companionDestinationStageLift } from '@/utils/companion-home-layout';
 import { rankTodayCareActions, type RankedTodayCareAction } from '@/utils/today-care';
+import {
+  consumeTodayCareGameRoundCompletion,
+  requestTodayCareGameRound,
+} from '@/utils/today-care-game-round';
 import { pendingGrowthAwards, todayGrowthSummary } from '@/utils/today-growth';
+import { selectTodayCareGame } from '@/utils/game-hub';
+import { loadGameHubItemsForDays } from '@/utils/game-hub-state';
+import { buildTodayPhotoRollSuggestion } from '@/utils/today-photo-roll-suggestion';
 import { loadOnboardingProfile } from '@/utils/onboarding-state';
 import { resolveHatchHour } from '@/game/days/lifecycle';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
@@ -254,6 +261,15 @@ export default function HomeScreen() {
     updateCareAction,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
+  const todayCareGame = useMemo(() => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return null;
+    const items = loadGameHubItemsForDays({
+      allKatchimerasAvailable,
+      dayId: selectedDay.isoDate,
+      days: allDays,
+    });
+    return selectTodayCareGame(items, selectedDay.isoDate);
+  }, [allDays, allKatchimerasAvailable, selectedDay]);
   const quickGoalFamilyIds = useMemo(() => {
     if (allKatchimerasAvailable) {
       return katchimeraFamilies
@@ -661,6 +677,10 @@ export default function HomeScreen() {
     closePromptSheet,
     startEggFeed,
   });
+  const todayPhotoRollSuggestion = useMemo(() => {
+    if (!formingDay || !photoPrompt) return null;
+    return buildTodayPhotoRollSuggestion(formingDay, photoPrompt.photoCandidates);
+  }, [formingDay, photoPrompt]);
   const semanticQuestPrompt = quickNoteOpen ? activeSemanticQuestPrompt() : null;
   const pendingNoteRoutes = useMemo(() => pendingJournalNote ? noteRoutesForSignals(pendingJournalNote) : [], [pendingJournalNote]);
   const pendingNoteRoute = journalNoteRouteNeedsConfirmation(pendingNoteRoutes) ? null : pendingNoteRoutes[0] ?? null;
@@ -834,10 +854,17 @@ export default function HomeScreen() {
         familyId: item.goal.familyId,
         completed: Boolean(item.completion),
       })),
+      miniGameSuggestion: todayCareGame ? {
+        companionName: todayCareGame.displayCompanionName,
+        familyId: todayCareGame.familyId,
+        questId: todayCareGame.questId,
+        title: todayCareGame.title,
+      } : null,
+      photoRollSuggestion: todayPhotoRollSuggestion,
       rotatingLimit: 4,
       now: new Date(),
     });
-  }, [formingPrompts, memoryQuests, quickGoals.goalsForToday, selectedDay]);
+  }, [formingPrompts, memoryQuests, quickGoals.goalsForToday, selectedDay, todayCareGame, todayPhotoRollSuggestion]);
   const selectedCareGoal = selectedCareGoalId
     ? quickGoals.goalsForToday.find((item) => item.goal.id === selectedCareGoalId) ?? null
     : null;
@@ -859,7 +886,9 @@ export default function HomeScreen() {
     setMicrocopy('Set aside for today');
   }, [quickGoals, setMicrocopy, updateCareAction]);
   const handleCareStart = useCallback((action: RankedTodayCareAction) => {
-    if (action.completionMode === 'artifact') setPendingCareIntent(action);
+    if (action.completionMode === 'artifact' || action.completionMode === 'external_activity') {
+      setPendingCareIntent(action);
+    }
     switch (action.destination.kind) {
       case 'quick_goal':
         setSelectedCareGoalId(action.destination.goalId);
@@ -878,11 +907,54 @@ export default function HomeScreen() {
       case 'quick_category':
         void handleQuickCategory(action.destination.category);
         return;
+      case 'photo_roll': {
+        if (!photoPrompt) {
+          setPendingCareIntent(null);
+          return;
+        }
+        const eligibleIds = new Set(action.destination.assetIds);
+        const candidates = photoPrompt.photoCandidates.filter((candidate) => eligibleIds.has(candidate.assetId));
+        if (!candidates.length) {
+          setPendingCareIntent(null);
+          return;
+        }
+        openPromptSheet({ ...photoPrompt, photoCandidates: candidates });
+        return;
+      }
+      case 'mini_game':
+        requestTodayCareGameRound(action);
+        router.navigate('/games');
+        return;
       case 'inline_mood':
       case 'inline_sleep':
         return;
     }
-  }, [formingPrompts, handleQuest, handleQuickCategory, openManualJournal, openPromptSheet]);
+  }, [formingPrompts, handleQuest, handleQuickCategory, openManualJournal, openPromptSheet, photoPrompt, router]);
+
+  useFocusEffect(useCallback(() => {
+    const completion = consumeTodayCareGameRoundCompletion();
+    if (!completion) return;
+    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return;
+    if (!completion.action.instanceId.startsWith(`care:${selectedDay.isoDate}:`)) return;
+    const completedAt = new Date(completion.completedAt).toISOString();
+    setPendingCareIntent(completion.action);
+    awardTodayGrowth({
+      actionId: completion.action.id,
+      source: 'mini_game',
+      sourceId: completion.attemptId,
+    });
+    updateCareAction({
+      instanceId: completion.action.instanceId,
+      definitionId: completion.action.id,
+      sourceId: completion.attemptId,
+      status: 'completed',
+      deferredUntil: null,
+      completedAt,
+      dismissedAt: null,
+    });
+    pulseEgg();
+    setMicrocopy(`+${completion.action.growthReward} Growth`);
+  }, [awardTodayGrowth, pulseEgg, selectedDay, setMicrocopy, updateCareAction]));
 
   useFocusEffect(
     useCallback(() => {
@@ -1065,8 +1137,27 @@ export default function HomeScreen() {
     voiceNote.phase !== 'idle';
   useEffect(() => {
     if (!pendingCareIntent) return;
-    const completed = nurtureCare.completed.some((action) => action.instanceId === pendingCareIntent.instanceId);
+    const completedPhotoAssetId = pendingCareIntent.destination.kind === 'photo_roll'
+      && selectedDay?.kind === 'day'
+      ? pendingCareIntent.destination.assetIds.find((assetId) =>
+          selectedDay.heroPhoto?.assetId === assetId || selectedDay.usedPhotoAssetIds?.includes(assetId)
+        ) ?? null
+      : null;
+    const completed = Boolean(completedPhotoAssetId)
+      || nurtureCare.completed.some((action) => action.instanceId === pendingCareIntent.instanceId);
     if (!completed) return;
+    if (completedPhotoAssetId) {
+      const completedAt = new Date().toISOString();
+      updateCareAction({
+        instanceId: pendingCareIntent.instanceId,
+        definitionId: pendingCareIntent.id,
+        sourceId: completedPhotoAssetId,
+        status: 'completed',
+        deferredUntil: null,
+        completedAt,
+        dismissedAt: null,
+      });
+    }
     careCompletionSequenceRef.current += 1;
     setQueuedCareCompletion({
       action: pendingCareIntent,
@@ -1074,7 +1165,7 @@ export default function HomeScreen() {
     });
     setPendingCareIntent(null);
     careFlowWasBusyRef.current = false;
-  }, [nurtureCare.completed, pendingCareIntent]);
+  }, [nurtureCare.completed, pendingCareIntent, selectedDay, updateCareAction]);
   useEffect(() => {
     if (!pendingCareIntent) {
       careFlowWasBusyRef.current = false;

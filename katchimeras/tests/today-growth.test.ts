@@ -9,6 +9,14 @@ import {
   todayGrowthSummary,
 } from '../utils/today-growth';
 import { rankTodayCareActions } from '../utils/today-care';
+import { buildTodayPhotoRollSuggestion } from '../utils/today-photo-roll-suggestion';
+import {
+  cancelTodayCareGameRound,
+  completeTodayCareGameRound,
+  consumeTodayCareGameRoundCompletion,
+  consumeTodayCareGameRoundLaunch,
+  requestTodayCareGameRound,
+} from '../utils/today-care-game-round';
 
 function day(overrides: Partial<StoredHomeDayRecord> = {}): StoredHomeDayRecord {
   return {
@@ -143,6 +151,140 @@ test('Today care can fill a fourth rotating slot without adding another quick go
   assert.equal(rotating.filter((action) => action.destination.kind === 'quick_goal').length, 1);
 });
 
+test('Today care surfaces a playable mini-game while preserving two journal actions', () => {
+  const ranked = rankTodayCareActions({
+    day: day(),
+    memoryQuests: [
+      {
+        id: 'quest-2026-08-05-captureMoment',
+        type: 'captureMoment',
+        emoji: 'camera',
+        title: 'Capture something that stood out',
+        rewardLabel: 'a memory',
+        targetCell: 'memory',
+        essenceReward: 5,
+        completed: false,
+      },
+      {
+        id: 'quest-2026-08-05-answerReflection',
+        type: 'answerReflection',
+        emoji: 'leaf',
+        title: 'Give today a meaning',
+        rewardLabel: 'your reflection',
+        targetCell: 'reflection',
+        essenceReward: 4,
+        completed: false,
+      },
+    ],
+    miniGameSuggestion: {
+      companionName: 'Cheerlet',
+      familyId: 'cheerlet',
+      questId: 'quest-cheerlet-block-party',
+      title: 'Cheerlet\u2019s Block Party',
+    },
+    quickGoals: [{ id: 'goal-1', title: 'Celebrate one small win', familyId: 'cheerlet', completed: false }],
+    now: new Date(2026, 7, 5, 13, 0),
+    rotatingLimit: 4,
+  });
+  const rotating = ranked.active.filter((action) => action.category !== 'check_in');
+  const game = rotating.find((action) => action.destination.kind === 'mini_game');
+  assert.equal(rotating.length, 4);
+  assert.ok(rotating.filter((action) => action.journalFocused).length >= 2);
+  assert.equal(game?.title, 'Play Cheerlet\u2019s Block Party');
+  assert.equal(game?.familyId, 'cheerlet');
+  assert.deepEqual(game?.destination, { kind: 'mini_game', questId: 'quest-cheerlet-block-party' });
+  assert.equal(game?.growthReward, 10);
+  assert.equal(game?.completionMode, 'external_activity');
+});
+
+test('Today care surfaces a detected Photo Library journaling action', () => {
+  const suggestion = buildTodayPhotoRollSuggestion(day(), [{
+    assetId: 'library-photo-1',
+    capturedAt: '2026-08-05T12:30:00.000Z',
+    dayIsoDate: '2026-08-05',
+    source: 'camera_roll',
+    thumbnailUri: 'ph://library-photo-1',
+  }]);
+  assert.deepEqual(suggestion, {
+    assetIds: ['library-photo-1'],
+    title: 'Journal a detected photo',
+  });
+
+  const ranked = rankTodayCareActions({
+    day: day(),
+    now: new Date(2026, 7, 5, 13, 0),
+    photoRollSuggestion: suggestion,
+    rotatingLimit: 4,
+  });
+  const action = ranked.active.find((candidate) => candidate.destination.kind === 'photo_roll');
+  assert.equal(action?.title, 'Journal a detected photo');
+  assert.equal(action?.growthReward, 15);
+  assert.deepEqual(action?.destination, { kind: 'photo_roll', assetIds: ['library-photo-1'] });
+});
+
+test('Detected Photo Library suggestions prefer a geolocation cluster', () => {
+  const suggestion = buildTodayPhotoRollSuggestion({
+    isoDate: '2026-08-05',
+    dayMap: {
+      nodes: [{
+        id: 'cluster-park',
+        latitude: 51.5,
+        longitude: -0.12,
+        type: 'park',
+        importance: 3,
+        hasPhoto: true,
+        linkedMomentId: null,
+        photoThumbnailUri: 'ph://library-photo-1',
+        photos: [
+          { id: 'camera-roll-photo-library-photo-1', sourceId: 'library-photo-1', thumbnailUri: 'ph://library-photo-1', capturedAt: '2026-08-05T12:30:00.000Z', momentId: null },
+          { id: 'camera-roll-photo-library-photo-2', sourceId: 'library-photo-2', thumbnailUri: 'ph://library-photo-2', capturedAt: '2026-08-05T12:35:00.000Z', momentId: null },
+        ],
+        startedAt: '2026-08-05T12:30:00.000Z',
+        endedAt: '2026-08-05T12:35:00.000Z',
+        sampleCount: 2,
+        label: 'Riverside Park',
+      }],
+      path: [],
+      primaryLocationId: 'cluster-park',
+      viewport: null,
+      totalSamples: 2,
+    },
+  }, [
+    { assetId: 'library-photo-1', capturedAt: '2026-08-05T12:30:00.000Z', dayIsoDate: '2026-08-05', source: 'camera_roll', thumbnailUri: 'ph://library-photo-1' },
+    { assetId: 'library-photo-2', capturedAt: '2026-08-05T12:35:00.000Z', dayIsoDate: '2026-08-05', source: 'camera_roll', thumbnailUri: 'ph://library-photo-2' },
+    { assetId: 'library-photo-3', capturedAt: '2026-08-05T18:00:00.000Z', dayIsoDate: '2026-08-05', source: 'camera_roll', thumbnailUri: 'ph://library-photo-3' },
+  ]);
+
+  assert.deepEqual(suggestion, {
+    assetIds: ['library-photo-1', 'library-photo-2'],
+    title: 'Journal a photo from Riverside Park',
+  });
+});
+
+test('Mini-game care completion requires a consumed launch and successful attempt receipt', () => {
+  cancelTodayCareGameRound();
+  const action = rankTodayCareActions({
+    day: day(),
+    miniGameSuggestion: {
+      companionName: 'Cheerlet',
+      familyId: 'cheerlet',
+      questId: 'quest-cheerlet-block-party',
+      title: 'Cheerlet\u2019s Block Party',
+    },
+    now: new Date(2026, 7, 5, 13, 0),
+    rotatingLimit: 4,
+  }).active.find((candidate) => candidate.destination.kind === 'mini_game');
+  assert.ok(action);
+  requestTodayCareGameRound(action);
+  assert.equal(completeTodayCareGameRound('attempt-before-launch'), false);
+  assert.equal(consumeTodayCareGameRoundLaunch()?.action.instanceId, action.instanceId);
+  assert.equal(completeTodayCareGameRound('attempt-success', 1_754_396_400_000), true);
+  const completion = consumeTodayCareGameRoundCompletion();
+  assert.equal(completion?.attemptId, 'attempt-success');
+  assert.equal(completion?.action.instanceId, action.instanceId);
+  assert.equal(consumeTodayCareGameRoundCompletion(), null);
+});
+
 test('Concrete memory quests replace duplicate generic actions and route directly', () => {
   const quest = {
     id: 'quest-2026-08-05-captureMoment',
@@ -158,8 +300,31 @@ test('Concrete memory quests replace duplicate generic actions and route directl
   const photoActions = ranked.active.filter((action) => action.completionKey === 'photo');
   assert.equal(photoActions.length, 1);
   assert.equal(photoActions[0]?.source, 'memory_quest');
+  assert.equal(photoActions[0]?.description, 'Take a photo of something that stood out today.');
   assert.deepEqual(photoActions[0]?.destination, { kind: 'memory_quest', questType: 'captureMoment' });
   assert.equal(ranked.active.some((action) => action.id === 'quest'), false);
+});
+
+test('Today care excludes the big-moment quest and labels manual journaling clearly', () => {
+  const ranked = rankTodayCareActions({
+    day: day(),
+    memoryQuests: [{
+      id: 'quest-2026-08-05-markBigMoment',
+      type: 'markBigMoment',
+      emoji: 'star',
+      title: 'Mark today as a big moment',
+      rewardLabel: 'a landmark',
+      targetCell: 'chronicle',
+      essenceReward: 15,
+      completed: false,
+    }],
+    now: new Date(2026, 7, 5, 13, 0),
+  });
+  const journal = ranked.active.find((action) => action.id === 'journal');
+
+  assert.equal(ranked.active.some((action) => action.sourceId === 'quest-2026-08-05-markBigMoment'), false);
+  assert.equal(journal?.title, "Write in today's journal");
+  assert.deepEqual(journal?.destination, { kind: 'quick_category', category: 'manual_journal' });
 });
 
 test('Completed concrete quests remain available to the completion animator', () => {

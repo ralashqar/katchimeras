@@ -40,7 +40,10 @@ export default function PhotoEssenceRoute() {
   const explicitDayId = params.dayId ?? '';
 
   const { getDayById } = useAllDays();
-  const { selectedDay, applyCapturedMoment, applyCapturedMomentToDay, selectHeroPhoto } = useHomeScreenState();
+  const { selectedDay, applyCapturedMoment, applyCapturedMomentToDay, selectHeroPhoto } = useHomeScreenState({
+    enableInteractiveServices: false,
+    persistHydrationRepairs: false,
+  });
   const mapDay = explicitDayId ? getDayById(explicitDayId) : null;
   const dayScores = mapDay?.scores ?? (selectedDay?.kind === 'day' ? selectedDay.scores : null);
   const localUriRef = useRef<string | null>(null);
