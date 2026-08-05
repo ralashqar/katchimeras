@@ -21,6 +21,7 @@ export type EggFeed = {
   nonce: number;
   fromX: number;
   fromY: number;
+  imageSource?: number;
   toX: number;
   toY: number;
   label?: string;
@@ -59,7 +60,8 @@ function pathPoint(feed: EggFeed, p: number) {
 function FeedMote({ feed, onArrive }: { feed: EggFeed; onArrive: () => void }) {
   const progress = useSharedValue(0);
   const isPhoto = !!feed.photoUri;
-  const [dims, setDims] = useState({ w: isPhoto ? 64 : 120, h: isPhoto ? 64 : 40 });
+  const isIcon = feed.imageSource != null;
+  const [dims, setDims] = useState({ w: isPhoto ? 64 : isIcon ? 54 : 120, h: isPhoto ? 64 : isIcon ? 54 : 40 });
 
   useEffect(() => {
     progress.value = withTiming(
@@ -86,7 +88,7 @@ function FeedMote({ feed, onArrive }: { feed: EggFeed; onArrive: () => void }) {
   });
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View pointerEvents="none" style={styles.overlay}>
       {Array.from({ length: SPARK_COUNT }).map((_, index) => (
         <Spark key={index} feed={feed} progress={progress} index={index} />
       ))}
@@ -99,11 +101,15 @@ function FeedMote({ feed, onArrive }: { feed: EggFeed; onArrive: () => void }) {
           styles.mote,
           isPhoto
             ? styles.photoMote
+            : isIcon
+              ? [styles.iconMote, { borderColor: `${feed.tint}99`, boxShadow: `0 0 24px ${feed.tint}AA` }]
             : { backgroundColor: `${feed.tint}E6`, boxShadow: `0 0 22px ${feed.tint}AA` },
           moteStyle,
         ]}>
         {isPhoto ? (
           <Image contentFit="cover" source={{ uri: feed.photoUri }} style={styles.photo} transition={0} />
+        ) : isIcon ? (
+          <Image contentFit="contain" source={feed.imageSource} style={styles.feedIcon} transition={0} />
         ) : (
           <ThemedText style={styles.label} lightColor={Lantern.ink900} darkColor={Lantern.ink900} numberOfLines={1}>
             {feed.label}
@@ -144,6 +150,13 @@ function Spark({ feed, progress, index }: { feed: EggFeed; progress: SharedValue
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    // The redesigned Today experience owns z=40 and foreground atmosphere
+    // owns z=55. Feeding is transient gameplay feedback, so it must travel
+    // above both while remaining completely touch-through.
+    zIndex: 60,
+  },
   mote: {
     alignItems: 'center',
     borderCurve: 'continuous',
@@ -167,6 +180,18 @@ const styles = StyleSheet.create({
     width: 64,
   },
   photo: {
+    height: '100%',
+    width: '100%',
+  },
+  iconMote: {
+    backgroundColor: 'rgba(255,248,226,0.94)',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    height: 54,
+    padding: 4,
+    width: 54,
+  },
+  feedIcon: {
     height: '100%',
     width: '100%',
   },

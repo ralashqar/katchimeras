@@ -425,6 +425,50 @@ function resolvedFrame(packet, topLevel = 'food', confidence = 'high') {
       && humanPrincipal.salience > (humanPacket.signals.find((signal) => signal.name === 'structure')?.salience ?? 1),
     JSON.stringify(humanPacket.signals)
   );
+
+  const televisionWithDepictedPerson = {
+    vision: {
+      concepts: [
+        { name: 'person', peakConfidence: 0.862 },
+        { name: 'television', peakConfidence: 0.721 },
+        { name: 'cabinet', peakConfidence: 0.656 },
+        { name: 'document', peakConfidence: 0.530 },
+        { name: 'book', peakConfidence: 0.530 },
+      ],
+      details: ['television', 'cabinet', 'document'],
+      maxFaceCount: 0,
+      dominantSubjectCoverage: 0.37,
+      representation: { kind: 'real_world', confidence: 0.9, reasons: ['test'] },
+    },
+    raw: {
+      labels: [
+        { name: 'television', confidence: 0.721 },
+        { name: 'cabinet', confidence: 0.656 },
+        { name: 'carton', confidence: 0.548 },
+        { name: 'document', confidence: 0.530 },
+        { name: 'book', confidence: 0.530 },
+      ],
+      faceCount: 0,
+      humanCount: 0,
+      faces: [],
+      humans: [],
+      documentDetected: false,
+      regionClassifications: [],
+      recognizedText: [],
+    },
+  };
+  const depictedPersonPacket = evidence.buildPhotoJournalEvidence(televisionWithDepictedPerson.vision, televisionWithDepictedPerson.raw);
+  const depictedPersonFrame = semantic.buildPhotoSemanticFrame(depictedPersonPacket);
+  const depictedPersonSignal = depictedPersonPacket.signals.find((signal) => signal.id === 'vision:person');
+  check(
+    'aggregate-only person cannot displace a television without face or human geometry',
+    depictedPersonSignal?.salience > 0.8
+      && !depictedPersonFrame.primaryEvidenceKeys.includes('vision:person')
+      && !depictedPersonFrame.classificationEvidenceKeys.includes('vision:person')
+      && depictedPersonFrame.primaryEvidenceKeys[0] === 'vision:television'
+      && semantic.photoTopLevelEvidenceText(depictedPersonFrame).includes('Locked principal evidence: vision:television.'),
+    JSON.stringify({ signals: depictedPersonPacket.signals, frame: depictedPersonFrame })
+  );
   const peopleFrame = resolvedFrame(humanPacket, 'people');
   const injectedRelationship = analysis.normalizePhotoJournalEnumRoute(
     {

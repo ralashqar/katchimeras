@@ -9,7 +9,7 @@ import type { DaySleep, SleepQuality } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 
 // Generated 3D sleep-quality icons (FAL row, style-anchored to the sleep moon).
-const SLEEP_ART: Record<string, number> = {
+export const SLEEP_ART: Record<string, number> = {
   good: require('@/assets/images/katchimeras/today-icons/sleep/good.webp'),
   normal: require('@/assets/images/katchimeras/today-icons/sleep/normal.webp'),
   low: require('@/assets/images/katchimeras/today-icons/sleep/low.webp'),
@@ -19,7 +19,7 @@ const PARCHMENT = KatchaSurfacePalette.parchment;
 // Sleep — how the day began. Never a score or a failure; low sleep is just a
 // softer, mistier morning. Just the three options (selected one highlighted)
 // plus the Health hours when known — no atmosphere tag, no extra question.
-const OPTIONS: { quality: SleepQuality; emoji: string; label: string; accent: string }[] = [
+export const SLEEP_OPTIONS: { quality: SleepQuality; emoji: string; label: string; accent: string }[] = [
   { quality: 'good', emoji: '☀️', label: 'Good', accent: '#FFC36B' },
   { quality: 'normal', emoji: '🌤️', label: 'Okay', accent: '#A7D5FF' },
   { quality: 'low', emoji: '🌙', label: 'Low', accent: '#AAB2FF' },
@@ -56,7 +56,7 @@ export function SleepSheet({ sleep, onSet, onClose }: SleepSheetProps) {
       {/* Same tile language as the mood grid: art on top, label beneath,
           accent-tinted when selected. */}
       <View style={styles.row}>
-        {OPTIONS.map((option) => (
+        {SLEEP_OPTIONS.map((option) => (
           <SleepOptionTile
             key={option.quality}
             option={option}
@@ -76,7 +76,7 @@ function SleepOptionTile({
   selected,
   onSet,
 }: {
-  option: (typeof OPTIONS)[number];
+  option: (typeof SLEEP_OPTIONS)[number];
   selected: boolean;
   onSet?: (quality: SleepQuality, label: string, from: FeedSourceRect) => void;
 }) {

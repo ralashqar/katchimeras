@@ -11,6 +11,7 @@ import { AppFontFamilies, Lantern } from '@/constants/theme';
 import type { InlineVoiceNotePhase } from '@/hooks/use-inline-voice-note';
 
 type QuickNoteComposerProps = {
+  initialMode?: 'text' | 'voice';
   onClose: () => void;
   onCancel?: () => void;
   onSubmit: (text: string) => Promise<void>;
@@ -23,6 +24,7 @@ type QuickNoteComposerProps = {
 };
 
 export function QuickNoteComposer({
+  initialMode = 'text',
   onClose,
   onCancel = onClose,
   onSubmit,
@@ -102,7 +104,7 @@ export function QuickNoteComposer({
         ) : (
           <View style={styles.inputRow}>
             <TextInput
-              autoFocus
+              autoFocus={initialMode === 'text'}
               onChangeText={setText}
               onSubmitEditing={submit}
               placeholder="What happened?"

@@ -17,8 +17,7 @@ type UseTodayActionRouterParams = {
   openPromptSheet: (prompt?: ActiveDayPrompt | null) => void;
   closePromptSheet: () => void;
   openCapture: (questId?: string | null) => void;
-  openNoteCapture: () => void;
-  openQuickNote: () => void;
+  openQuickNote: (input?: 'text' | 'voice') => void;
   openObservatory: () => void;
   openManualJournal: (flowId?: string, categoryId?: string, contextId?: string | null) => void;
   requestMicrophonePermission?: () => Promise<{ granted?: boolean } | null>;
@@ -33,7 +32,6 @@ export function useTodayActionRouter({
   openPromptSheet,
   closePromptSheet,
   openCapture,
-  openNoteCapture,
   openQuickNote,
   openObservatory,
   openManualJournal,
@@ -68,13 +66,14 @@ export function useTodayActionRouter({
             const permission = await requestMicrophonePermission();
             if (!permission?.granted) break;
           }
-          openNoteCapture();
+          openQuickNote('voice');
           break;
         case 'answerReflection': {
           const reflectionPrompt = formingPrompts.find((prompt) =>
             ['feeling', 'inner_weather', 'day_word', 'meaning', 'gratitude', 'highlight'].includes(prompt.id)
           );
-          openPromptSheet(reflectionPrompt ?? null);
+          if (reflectionPrompt) openPromptSheet(reflectionPrompt);
+          else openManualJournal();
           break;
         }
         case 'markPlace':
@@ -94,7 +93,7 @@ export function useTodayActionRouter({
           break;
       }
     },
-    [formingPrompts, openCapture, openManualJournal, openNoteCapture, openPromptSheet, requestMicrophonePermission, sheets]
+    [formingPrompts, openCapture, openManualJournal, openPromptSheet, openQuickNote, requestMicrophonePermission, sheets]
   );
 
   const handleStatPress = useCallback(
@@ -244,9 +243,9 @@ export function useTodayActionRouter({
           const permission = await requestMicrophonePermission();
           if (!permission?.granted) return;
         }
-        openNoteCapture();
+        openQuickNote('voice');
       }
-      else if (id === 'written_note' || id === 'note') openQuickNote();
+      else if (id === 'written_note' || id === 'note') openQuickNote('text');
       else if (id === 'place') openManualJournal('went_somewhere');
       else if (id === 'food') openManualJournal('food');
       else if (id === 'studio') openManualJournal('studio');
@@ -259,7 +258,6 @@ export function useTodayActionRouter({
     [
       closePromptSheet,
       openCapture,
-      openNoteCapture,
       openQuickNote,
       openManualJournal,
       requestMicrophonePermission,
@@ -292,7 +290,7 @@ export function useTodayActionRouter({
             const permission = await requestMicrophonePermission();
             if (!permission?.granted) break;
           }
-          openNoteCapture();
+          openQuickNote('voice');
           break;
         case 'add_note':
           if (intent.journalRoute) {
@@ -302,7 +300,7 @@ export function useTodayActionRouter({
               intent.journalRoute.contextId
             );
           } else {
-            openQuickNote();
+            openQuickNote('text');
           }
           break;
         case 'open_health':
@@ -317,7 +315,6 @@ export function useTodayActionRouter({
       openCapture,
       openMemoryVault,
       openManualJournal,
-      openNoteCapture,
       openObservatory,
       openPromptSheet,
       openQuickNote,

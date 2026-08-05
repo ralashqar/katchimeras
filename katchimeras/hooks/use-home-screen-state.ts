@@ -13,6 +13,8 @@ import type {
   RecentPhotoAsset,
   StoredHomeState,
   ClassifiedMemory,
+  TodayCareActionState,
+  TodayGrowthSource,
 } from '@/types/home';
 import {
   addMomentToDay,
@@ -53,6 +55,8 @@ import {
   updateLocationPermissionState,
   updateTodayStepCount,
   updateClassifiedMemoryForToday,
+  awardGrowthForToday,
+  updateTodayCareAction,
 } from '@/game/days';
 import {
   listAvailableDayPrompts,
@@ -383,6 +387,20 @@ export function useHomeScreenState({
     mutateHomeState((state, profile, now) => startHatchCheckInForDay(state, dayId, reason, profile, now));
   }, [mutateHomeState]);
 
+  const awardGrowth = useCallback((
+    input: { source: TodayGrowthSource; sourceId: string; actionId?: string | null; amount?: number },
+    target: DayInputTarget = 'today',
+  ) => {
+    mutateHomeState((state, profile, now) => awardGrowthForToday(state, input, profile, now, target));
+  }, [mutateHomeState]);
+
+  const updateCareAction = useCallback((
+    input: Omit<TodayCareActionState, 'updatedAt'>,
+    target: DayInputTarget = 'today',
+  ) => {
+    mutateHomeState((state, profile, now) => updateTodayCareAction(state, input, profile, now, target));
+  }, [mutateHomeState]);
+
   const answerHatchCheckIn = useCallback(
     (dayId: string, input: { kind: 'flow' | 'category' | 'moment' | 'meaning'; id: string }) => {
       mutateHomeState((state, profile, now) => answerHatchCheckInForDay(state, dayId, input, profile, now));
@@ -580,6 +598,8 @@ export function useHomeScreenState({
     applyCapturedMomentToDay,
     dailySeeds,
     completeSeed,
+    awardGrowth,
+    updateCareAction,
     addNote,
     confirmPlace,
     saveDayPlace,

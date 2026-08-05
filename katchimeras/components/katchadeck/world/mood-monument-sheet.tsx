@@ -11,7 +11,7 @@ import type { HomeDayRecord } from '@/types/home';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 
 // Generated 3D mood faces (FAL grid, style-anchored to the mood chip smiley).
-const MOOD_ART: Record<string, number> = {
+export const MOOD_ART: Record<string, number> = {
   radiant: require('@/assets/images/katchimeras/today-icons/moods/radiant.webp'),
   light: require('@/assets/images/katchimeras/today-icons/moods/light.webp'),
   meh: require('@/assets/images/katchimeras/today-icons/moods/meh.webp'),
@@ -22,7 +22,7 @@ const PARCHMENT = KatchaSurfacePalette.parchment;
 
 export type MoodMonumentChoiceId = 'energized' | 'good' | 'meh' | 'drained' | 'stressed';
 
-type MoodChoice = {
+export type MoodChoice = {
   id: MoodMonumentChoiceId;
   state: 'radiant' | 'light' | 'meh' | 'heavy' | 'stormy';
   label: string;
@@ -31,7 +31,7 @@ type MoodChoice = {
   accent: string;
 };
 
-const MOOD_CHOICES: MoodChoice[] = [
+export const MOOD_CHOICES: MoodChoice[] = [
   { id: 'energized', state: 'radiant', label: 'Radiant', caption: 'Bright, alive, switched on', icon: 'face.very_happy', accent: '#FFC36B' },
   { id: 'good', state: 'light', label: 'Light', caption: 'Good, easy, open', icon: 'face.happy', accent: '#FFE08A' },
   { id: 'meh', state: 'meh', label: 'Meh', caption: 'Flat, neutral, just okay', icon: 'face.neutral', accent: '#A7D5FF' },

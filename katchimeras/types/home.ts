@@ -1512,6 +1512,48 @@ export type ManualJournalSubmission = {
   makeKeyMoment?: boolean;
 };
 
+export type TodayGrowthSource =
+  | 'mood'
+  | 'sleep'
+  | 'movement'
+  | 'place'
+  | 'photo'
+  | 'voice_note'
+  | 'journal'
+  | 'quest'
+  | 'reflection'
+  | 'daily_seed'
+  | 'quick_goal';
+
+export type TodayGrowthEvent = {
+  /** Stable idempotency key. A successful source artifact may only award once. */
+  id: string;
+  source: TodayGrowthSource;
+  sourceId: string;
+  actionId?: string | null;
+  amount: number;
+  awardedAt: string;
+};
+
+export type TodayCareActionStatus = 'active' | 'completed' | 'not_today';
+
+export type TodayCareActionState = {
+  instanceId: string;
+  definitionId: string;
+  sourceId?: string | null;
+  status: TodayCareActionStatus;
+  deferredUntil?: string | null;
+  completedAt?: string | null;
+  dismissedAt?: string | null;
+  updatedAt: string;
+};
+
+export type DayGrowthState = {
+  schemaVersion: 1;
+  events: TodayGrowthEvent[];
+  careActions: TodayCareActionState[];
+};
+
 export type StoredHomeDayRecord = {
   id: string;
   isoDate: string;
@@ -1559,6 +1601,8 @@ export type StoredHomeDayRecord = {
   journalRecords?: JournalRecord[];
   /** At most one pre-hatch journal record can be given extra salience. */
   keyJournalRecordId?: string | null;
+  /** Today-only nurturing progression. Archive presentation intentionally ignores it. */
+  growth?: DayGrowthState;
   // Coarse weather for the day (optional — resolved best-effort at hatch).
   weather?: DayWeather;
   // Live hatches freeze their sky. Reconstructed historical days keep an
@@ -1615,7 +1659,7 @@ export type StoredHomeDayRecord = {
 };
 
 export type StoredHomeState = {
-  version: 18;
+  version: 19;
   locationPermission: LocationPermissionState;
   activityPermission: ActivityPermissionState;
   healthPermission: HealthPermissionState;

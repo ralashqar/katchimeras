@@ -337,6 +337,20 @@ export function photoEvidenceSelectionRank(signal: PhotoJournalEvidenceSignal): 
 }
 
 export function photoEvidenceEligibility(signal: PhotoJournalEvidenceSignal): PhotoEvidenceEligibility {
+  const isPersonCluster = signal.clusterKey === 'person';
+  const hasGeometricHumanObservation = signal.sources.includes('human') || signal.sources.includes('face');
+  // Whole-image semantic classifiers commonly label a person depicted on a
+  // television, poster, or book cover. Without a face or human rectangle we
+  // cannot tell that depiction from a physically present principal person, so
+  // keep it out of the mechanically locked principal set. Dedicated geometry
+  // remains first-class evidence when a person is actually localized.
+  if (isPersonCluster && !hasGeometricHumanObservation) {
+    return {
+      selectionRank: photoEvidenceSelectionRank(signal),
+      primaryEligible: false,
+      eligibilityReason: 'person_label_requires_face_or_human_region',
+    };
+  }
   const hasDirectObservation = signal.sources.some((source) =>
     source === 'aggregate' || source === 'raw' || source === 'human' || source === 'face' || source === 'animal'
   );

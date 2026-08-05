@@ -6,8 +6,10 @@ import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-str
 import { Lantern } from '@/constants/theme';
 
 type EggFeedPayload = {
+  imageSource?: number;
   label?: string;
   photoUri?: string;
+  tint?: string;
 };
 
 export function useEggFeedController() {
@@ -41,11 +43,12 @@ export function useEggFeedController() {
         nonce: feedNonce.current,
         fromX: from.x + from.w / 2,
         fromY: from.y + from.h / 2,
+        imageSource: payload.imageSource,
         toX,
         toY,
         label: payload.label,
         photoUri: payload.photoUri,
-        tint: Lantern.ember300,
+        tint: payload.tint ?? Lantern.ember300,
       };
       eggFeedRef.current = nextFeed;
       setEggFeed(nextFeed);

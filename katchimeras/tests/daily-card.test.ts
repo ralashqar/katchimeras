@@ -267,7 +267,7 @@ test('v12 migration backfills one stable card without rerolling creature or rari
   const migratedAgain = upgradeStoredHomeState(migrated);
   const card = migrated.archivedDays[0].card;
 
-  assert.equal(migrated.version, 18);
+  assert.equal(migrated.version, 19);
   assert.equal(card?.provenance, 'legacy_backfill');
   assert.equal(card?.creatureId, creature.id);
   assert.equal(card?.rarity, 'rare');
@@ -297,7 +297,7 @@ test('v13 migration enriches a v1 card without changing its collectible identity
 
   const migrated = upgradeStoredHomeState(v13State);
   const card = migrated.archivedDays[0].card;
-  assert.equal(migrated.version, 18);
+  assert.equal(migrated.version, 19);
   assert.equal(card?.schemaVersion, 4);
   assert.equal(card?.id, built.id);
   assert.equal(card?.creatureId, built.creatureId);

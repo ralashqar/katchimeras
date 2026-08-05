@@ -34,6 +34,7 @@ type TodayKingdomEggHeroProps = {
   homeArchetypeId?: HomeArchetypeId | null;
   hideKingdomEnvironmentArt?: boolean;
   isReady?: boolean;
+  growthStage?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   onEggPress?: () => void;
   pinchStrength?: number;
   targetRef?: RefObject<View | null>;
@@ -47,6 +48,19 @@ type TodayKingdomEggOverlayProps = {
 };
 
 const TODAY_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const TODAY_EGG_CRACK_ONE_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-crack-1.png');
+const TODAY_EGG_CRACK_TWO_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-crack-2.png');
+const TODAY_GROWTH_SOURCES = [
+  require('../../../assets/images/katchimeras/cutouts/growth/egg-growth-0.png'),
+  require('../../../assets/images/katchimeras/cutouts/growth/egg-growth-1.png'),
+  require('../../../assets/images/katchimeras/cutouts/growth/egg-growth-2.png'),
+  require('../../../assets/images/katchimeras/cutouts/growth/egg-growth-3.png'),
+  require('../../../assets/images/katchimeras/cutouts/growth/egg-growth-4.png'),
+] as const;
+// The generated stages use square transparent canvases. These measured
+// baseline offsets keep their visible bottoms on the same authored platform
+// contact point as the original full-height egg cutout.
+const TODAY_GROWTH_BASELINE_OFFSETS = [40, 28, 35, 26, 30] as const;
 const SOFT_RING_SOURCE = require('../../../assets/images/katchimeras/soft-ring.png');
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -58,6 +72,7 @@ export function TodayKingdomEggHero({
   homeArchetypeId,
   hideKingdomEnvironmentArt = false,
   isReady = false,
+  growthStage,
   onEggPress,
   pinchStrength = 1,
   targetRef,
@@ -73,6 +88,20 @@ export function TodayKingdomEggHero({
   const eggFrame = explorationEggFrame
     ?? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
   const eggStageScale = explorationEggFrame?.scale ?? layout.eggStageScale;
+  const illustratedGrowthStage: 0 | 1 | 2 | 3 | 4 | null = growthStage != null && growthStage <= 4
+    ? growthStage as 0 | 1 | 2 | 3 | 4
+    : null;
+  const growthSource = growthStage == null
+    ? TODAY_EGG_SOURCE
+    : illustratedGrowthStage != null
+      ? TODAY_GROWTH_SOURCES[illustratedGrowthStage]
+      : growthStage === 5
+        ? TODAY_EGG_CRACK_ONE_SOURCE
+        : TODAY_EGG_CRACK_TWO_SOURCE;
+  const usesSquareGrowthArt = growthStage != null && growthStage <= 4;
+  const growthBaselineOffset = illustratedGrowthStage == null
+    ? 0
+    : TODAY_GROWTH_BASELINE_OFFSETS[illustratedGrowthStage] * eggStageScale;
   const feedbackShake = useSharedValue(0);
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
@@ -220,7 +249,7 @@ export function TodayKingdomEggHero({
             style={[
               styles.eggMotionFrame,
               eggMotionStyle,
-              { width: 200 * eggStageScale },
+              { width: (usesSquareGrowthArt ? 250 : 200) * eggStageScale },
             ]}>
             <Pressable
               accessibilityLabel="Today egg"
@@ -229,15 +258,21 @@ export function TodayKingdomEggHero({
               onPress={onEggPress}
               style={styles.eggImageFrame}>
               <Image
+                key={`growth-stage-${growthStage ?? 'base'}`}
                 allowDownscaling={false}
                 cachePolicy="memory-disk"
                 contentFit="contain"
                 pointerEvents="none"
                 priority="high"
                 recyclingKey="today-kingdom-egg-high-resolution"
-                source={TODAY_EGG_SOURCE}
-                style={StyleSheet.absoluteFill}
-                transition={0}
+                source={growthSource}
+                style={[
+                  StyleSheet.absoluteFill,
+                  growthBaselineOffset > 0
+                    ? { transform: [{ translateY: growthBaselineOffset }] }
+                    : null,
+                ]}
+                transition={220}
               />
             </Pressable>
           </Animated.View>

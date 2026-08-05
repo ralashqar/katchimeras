@@ -20,8 +20,6 @@ type StepsInput = Parameters<typeof setStepsInterpretationForToday>[1];
 
 type UseTodayMemoryWritersParams = {
   formingTarget: DayInputTarget;
-  isFormingToday: boolean;
-  todayHasMood: boolean;
   addFoodMoment: (input: AddFoodInput, target?: DayInputTarget) => void;
   addStudioMoment: (input: AddStudioInput, target?: DayInputTarget) => void;
   markBigMoment: (input: BigMomentInput, target?: DayInputTarget) => void;
@@ -34,15 +32,13 @@ type UseTodayMemoryWritersParams = {
   setMoodSheetOpen: (open: boolean) => void;
   setSleepSheetOpen: (open: boolean) => void;
   setStepsSheetOpen: (open: boolean) => void;
-  startEggFeed: (from: FeedSourceRect, payload: { label?: string; photoUri?: string }, commit: () => void) => void;
+  startEggFeed: (from: FeedSourceRect, payload: { imageSource?: number; label?: string; photoUri?: string; tint?: string }, commit: () => void) => void;
   pulseEgg: () => void;
   setMicrocopy: (message: string | null) => void;
 };
 
 export function useTodayMemoryWriters({
   formingTarget,
-  isFormingToday,
-  todayHasMood,
   addFoodMoment,
   addStudioMoment,
   markBigMoment,
@@ -92,9 +88,9 @@ export function useTodayMemoryWriters({
   );
 
   const handleConfirmMood = useCallback(
-    (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect) => {
+    (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource?: number, tint?: string) => {
       setMoodSheetOpen(false);
-      startEggFeed(from, { label }, () => {
+      startEggFeed(from, { imageSource, label, tint }, () => {
         answerDayPrompt({ kind: 'feeling', choiceIds: [choiceId] }, formingTarget);
         setMicrocopy(`Mood noted: ${label}`);
       });
@@ -103,15 +99,14 @@ export function useTodayMemoryWriters({
   );
 
   const handleSetSleep = useCallback(
-    (quality: SleepInput['quality'], label: string, from: FeedSourceRect) => {
+    (quality: SleepInput['quality'], label: string, from: FeedSourceRect, imageSource?: number, tint?: string) => {
       setSleepSheetOpen(false);
-      startEggFeed(from, { label }, () => {
+      startEggFeed(from, { imageSource, label, tint }, () => {
         setSleep({ quality, source: 'manual' }, formingTarget);
         setMicrocopy('Your morning, remembered');
-        if (isFormingToday && !todayHasMood) setMoodSheetOpen(true);
       });
     },
-    [formingTarget, isFormingToday, setMicrocopy, setMoodSheetOpen, setSleep, setSleepSheetOpen, startEggFeed, todayHasMood]
+    [formingTarget, setMicrocopy, setSleep, setSleepSheetOpen, startEggFeed]
   );
 
   const handleConfirmSteps = useCallback(

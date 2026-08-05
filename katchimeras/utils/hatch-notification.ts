@@ -1,6 +1,7 @@
 import type { StoredHomeState } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { resolveHatchHour } from '@/game/days';
+import { todayGrowthSummary } from '@/utils/today-growth';
 
 // The one notification that matters: "your day is ready to hatch" at the
 // user's chosen hour. A single dated notification is scheduled for the next
@@ -92,8 +93,7 @@ export async function syncHatchNotification(state: StoredHomeState, profile: Onb
 function resolveNextHatchDate(state: StoredHomeState, profile: OnboardingProfile) {
   const hatchHour = resolveHatchHour(profile);
   const now = new Date();
-  const todayTarget = new Date(now);
-  todayTarget.setHours(hatchHour, 0, 0, 0);
+  const todayTarget = todayGrowthSummary(state.today, hatchHour, now).effectiveHatchAt;
 
   const todayAlreadyHatched = state.today.state === 'hatched';
   if (!todayAlreadyHatched && todayTarget.getTime() > now.getTime()) {

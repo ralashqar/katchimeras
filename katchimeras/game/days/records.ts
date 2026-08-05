@@ -23,6 +23,7 @@ export function createEmptyStoredDay(now: Date, _profile: OnboardingProfile): St
     heroPhoto: null,
     creature: null,
     card: null,
+    growth: { schemaVersion: 1, events: [], careActions: [] },
     storedNonce: makeStoredNonce(now),
   };
 }

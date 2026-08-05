@@ -78,7 +78,7 @@ export function normalizeStoredHomeState(
   );
 
   return {
-    version: 18,
+    version: 19,
     locationPermission: upgradedState.locationPermission,
     activityPermission: upgradedState.activityPermission,
     healthPermission: upgradedState.healthPermission,

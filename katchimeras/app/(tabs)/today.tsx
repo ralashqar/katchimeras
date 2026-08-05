@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
   BackHandler,
@@ -56,8 +56,13 @@ import { EggFeedOverlay } from '@/components/katchadeck/home/egg-feed-overlay';
 import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katchadeck/home/today-category-ring';
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
 import {
+  TodayNurtureExperience,
+  type TodayCareCompletionEvent,
+} from '@/components/katchadeck/home/today-nurture-experience';
+import {
   QuickGoalsSheet,
 } from '@/components/katchadeck/goals/companion-quick-goals';
+import { QuickGoalActionModal } from '@/components/katchadeck/goals/quick-goal-action-modal';
 import { TodayGoalsExperience } from '@/components/katchadeck/goals/today-goals-experience';
 import { DayComicOverlay } from '@/components/katchadeck/home/day-comic-overlay';
 import { MicrocopyToast } from '@/components/katchadeck/home/microcopy-toast';
@@ -83,7 +88,6 @@ import { useMicrocopy } from '@/features/today/use-microcopy';
 import { useMomentFollowUpController } from '@/features/today/use-moment-follow-up-controller';
 import { useTodaySheetController } from '@/features/today/use-today-sheet-controller';
 import { useTodayActionRouter } from '@/features/today/use-today-action-router';
-import { useMorningPromptController } from '@/features/today/use-morning-prompt-controller';
 import { useObservatoryController } from '@/features/today/use-observatory-controller';
 import { useDiscoveryRevealController } from '@/features/today/use-discovery-reveal-controller';
 import { useCompanionAchievements } from '@/hooks/use-companion-achievements';
@@ -125,6 +129,10 @@ import {
 } from '@/utils/today-exploration-backgrounds';
 import { companionIdForFamily, katchimeraFamilies } from '@/constants/katchimera-skins';
 import { companionDestinationStageLift } from '@/utils/companion-home-layout';
+import { rankTodayCareActions, type RankedTodayCareAction } from '@/utils/today-care';
+import { pendingGrowthAwards, todayGrowthSummary } from '@/utils/today-growth';
+import { loadOnboardingProfile } from '@/utils/onboarding-state';
+import { resolveHatchHour } from '@/game/days/lifecycle';
 import type { CompanionQuickGoal, CompanionQuickGoalCompletion } from '@/utils/companion-quick-goals';
 import {
   activeSemanticQuestPrompt,
@@ -168,6 +176,7 @@ const QUICK_PROMPT_CATEGORIES: {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const screenFocused = useIsFocused();
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -176,6 +185,11 @@ export default function HomeScreen() {
   const [manualJournalOpen, setManualJournalOpen] = useState(false);
   const [quickGoalsOpen, setQuickGoalsOpen] = useState(false);
   const [quickGoalSheetMode, setQuickGoalSheetMode] = useState<'add' | 'manage' | null>(null);
+  const [selectedCareGoalId, setSelectedCareGoalId] = useState<string | null>(null);
+  const [pendingCareIntent, setPendingCareIntent] = useState<RankedTodayCareAction | null>(null);
+  const [queuedCareCompletion, setQueuedCareCompletion] = useState<TodayCareCompletionEvent | null>(null);
+  const careFlowWasBusyRef = useRef(false);
+  const careCompletionSequenceRef = useRef(0);
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
     completion: CompanionQuickGoalCompletion;
     goal: CompanionQuickGoal;
@@ -236,6 +250,8 @@ export default function HomeScreen() {
     updateClassifiedMemory,
     locationPermission,
     setLocationPermission,
+    awardGrowth: awardTodayGrowth,
+    updateCareAction,
   } = useHomeScreenState();
   const { days: allDays } = useAllDays();
   const quickGoalFamilyIds = useMemo(() => {
@@ -256,6 +272,22 @@ export default function HomeScreen() {
     dayId: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay.isoDate : null,
     availableFamilyIds: quickGoalFamilyIds,
   });
+  useEffect(() => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return;
+    for (const award of pendingGrowthAwards(selectedDay)) awardTodayGrowth(award);
+  }, [awardTodayGrowth, selectedDay]);
+  useEffect(() => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return;
+    for (const item of quickGoals.goalsForToday) {
+      if (!item.completion) continue;
+      awardTodayGrowth({
+        actionId: `quick-goal:${item.goal.id}`,
+        amount: 8,
+        source: 'quick_goal',
+        sourceId: item.completion.id,
+      });
+    }
+  }, [awardTodayGrowth, quickGoals.goalsForToday, selectedDay]);
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const reduceMotion = useReducedMotion();
   const goalsFocusProgress = useSharedValue(0);
@@ -594,12 +626,6 @@ export default function HomeScreen() {
       router.push({ pathname: '/moment-capture', params: { target: formingTarget, questId: questId ?? undefined } });
     });
   }, [formingTarget, navigateAfterTodayModalCloses, router]);
-  const openNoteCapture = useCallback(() => {
-    navigateAfterTodayModalCloses(() => {
-      router.push({ pathname: '/note-capture', params: { target: formingTarget } });
-    });
-  }, [formingTarget, navigateAfterTodayModalCloses, router]);
-
   // Quick TEXT note (tap the mic): an inline text box over the page — enter
   // interprets on-device and commits straight away, no full-screen flow.
   const { quickNoteOpen, setQuickNoteOpen, handleQuickNoteSubmit, voiceNote, pendingJournalNote, clearPendingJournalNote } = useNoteCaptureController({
@@ -612,6 +638,11 @@ export default function HomeScreen() {
     pulseEgg,
     setMicrocopy,
   });
+  const [quickNoteInitialMode, setQuickNoteInitialMode] = useState<'text' | 'voice'>('text');
+  const openQuickNoteOverlay = useCallback((input: 'text' | 'voice' = 'text') => {
+    setQuickNoteInitialMode(input);
+    navigateAfterTodayModalCloses(() => setQuickNoteOpen(true));
+  }, [navigateAfterTodayModalCloses, setQuickNoteOpen]);
 
   const {
     photoPrompt,
@@ -642,18 +673,6 @@ export default function HomeScreen() {
     handledPhotoSig,
     timelineDays,
   });
-  // Morning sequence — the ONLY auto prompts, as their real sheets: sleep
-  // first (Apple Health answers it silently when it can), then mood, exactly
-  // as if the user tapped the Sleep then Mood tiles. Keyed on the day's
-  // INSTANCE (id + storedNonce) so "reset today" re-arms the sequence while a
-  // plain dismiss doesn't nag.
-  const { todayHasMood } = useMorningPromptController({
-    timelineDays,
-    setSleep,
-    setMoodSheetOpen,
-    setSleepSheetOpen,
-  });
-
   // The Observatory (what Katchimera has noticed) + Travel Memory controls —
   // reached through the Crossroads reader until it gets its own Kingdom home.
   const { observatoryOpen, setObservatoryOpen, observations, travelMemory } = useObservatoryController({
@@ -711,8 +730,6 @@ export default function HomeScreen() {
     handleConfirmSteps,
   } = useTodayMemoryWriters({
     formingTarget,
-    isFormingToday: Boolean(isFormingToday),
-    todayHasMood,
     addFoodMoment,
     addStudioMoment,
     markBigMoment,
@@ -738,6 +755,7 @@ export default function HomeScreen() {
     handleStatPress,
     handleCategoryPress,
     handleCameraPress,
+    handleQuickCategory,
     handleQuestActionIntent,
   } = useTodayActionRouter({
     categories,
@@ -748,8 +766,7 @@ export default function HomeScreen() {
     openPromptSheet,
     closePromptSheet,
     openCapture: openMomentCapture,
-    openNoteCapture,
-    openQuickNote: () => setQuickNoteOpen(true),
+    openQuickNote: openQuickNoteOverlay,
     openObservatory: () => setObservatoryOpen(true),
     openManualJournal,
     requestMicrophonePermission,
@@ -797,6 +814,75 @@ export default function HomeScreen() {
     },
     [categories, formingDay]
   );
+  const nurtureGrowth = useMemo(() => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return null;
+    return todayGrowthSummary(selectedDay, resolveHatchHour(loadOnboardingProfile()), new Date());
+  }, [selectedDay]);
+  const nurtureCare = useMemo(() => {
+    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') {
+      return { active: [], completed: [] };
+    }
+    return rankTodayCareActions({
+      day: selectedDay,
+      memoryQuests,
+      reflectionAvailable: formingPrompts.some((prompt) =>
+        ['gratitude', 'highlight', 'meaning', 'day_word', 'inner_weather'].includes(prompt.id)
+      ),
+      quickGoals: quickGoals.goalsForToday.map((item) => ({
+        id: item.goal.id,
+        title: item.goal.title,
+        familyId: item.goal.familyId,
+        completed: Boolean(item.completion),
+      })),
+      rotatingLimit: 4,
+      now: new Date(),
+    });
+  }, [formingPrompts, memoryQuests, quickGoals.goalsForToday, selectedDay]);
+  const selectedCareGoal = selectedCareGoalId
+    ? quickGoals.goalsForToday.find((item) => item.goal.id === selectedCareGoalId) ?? null
+    : null;
+  const handleCareNotToday = useCallback((action: RankedTodayCareAction) => {
+    const timestamp = new Date().toISOString();
+    if (action.destination.kind === 'quick_goal') {
+      quickGoals.skipGoal(action.destination.goalId);
+    }
+    updateCareAction({
+      instanceId: action.instanceId,
+      definitionId: action.id,
+      sourceId: action.sourceId ?? null,
+      status: 'not_today',
+      deferredUntil: null,
+      completedAt: null,
+      dismissedAt: timestamp,
+    });
+    setPendingCareIntent((current) => current?.instanceId === action.instanceId ? null : current);
+    setMicrocopy('Set aside for today');
+  }, [quickGoals, setMicrocopy, updateCareAction]);
+  const handleCareStart = useCallback((action: RankedTodayCareAction) => {
+    if (action.completionMode === 'artifact') setPendingCareIntent(action);
+    switch (action.destination.kind) {
+      case 'quick_goal':
+        setSelectedCareGoalId(action.destination.goalId);
+        return;
+      case 'memory_quest':
+        void handleQuest(action.destination.questType);
+        return;
+      case 'reflection': {
+        const reflection = formingPrompts.find((prompt) =>
+          ['gratitude', 'highlight', 'meaning', 'day_word', 'inner_weather'].includes(prompt.id)
+        );
+        if (reflection) openPromptSheet(reflection);
+        else openManualJournal();
+        return;
+      }
+      case 'quick_category':
+        void handleQuickCategory(action.destination.category);
+        return;
+      case 'inline_mood':
+      case 'inline_sleep':
+        return;
+    }
+  }, [formingPrompts, handleQuest, handleQuickCategory, openManualJournal, openPromptSheet]);
 
   useFocusEffect(
     useCallback(() => {
@@ -946,8 +1032,12 @@ export default function HomeScreen() {
   // follow-up, recording, or hatch on screen. It then celebrates the
   // highest-rarity pending unlock first (same order as the World page).
   const flowBusy =
+    !screenFocused ||
     isHatching ||
     quickGoalsOpen ||
+    quickGoalSheetMode !== null ||
+    quickGoalJournal !== null ||
+    selectedCareGoalId !== null ||
     hatchCheckInOpen ||
     hasActivePrompt ||
     promptSheetOpen ||
@@ -973,6 +1063,35 @@ export default function HomeScreen() {
     !!studioFollowUp ||
     !!comicGen ||
     voiceNote.phase !== 'idle';
+  useEffect(() => {
+    if (!pendingCareIntent) return;
+    const completed = nurtureCare.completed.some((action) => action.instanceId === pendingCareIntent.instanceId);
+    if (!completed) return;
+    careCompletionSequenceRef.current += 1;
+    setQueuedCareCompletion({
+      action: pendingCareIntent,
+      id: `${pendingCareIntent.instanceId}:${careCompletionSequenceRef.current}`,
+    });
+    setPendingCareIntent(null);
+    careFlowWasBusyRef.current = false;
+  }, [nurtureCare.completed, pendingCareIntent]);
+  useEffect(() => {
+    if (!pendingCareIntent) {
+      careFlowWasBusyRef.current = false;
+      return;
+    }
+    if (flowBusy) {
+      careFlowWasBusyRef.current = true;
+      return;
+    }
+    if (!careFlowWasBusyRef.current) return;
+    const timer = setTimeout(() => {
+      const completed = nurtureCare.completed.some((action) => action.instanceId === pendingCareIntent.instanceId);
+      if (!completed) setPendingCareIntent(null);
+      careFlowWasBusyRef.current = false;
+    }, 240);
+    return () => clearTimeout(timer);
+  }, [flowBusy, nurtureCare.completed, pendingCareIntent]);
   const explorationMotion = useTodayExplorationBackgroundMotion({
     activeKey: selectedDayId,
     canSwipeNext: explorationTransitionPages.next != null,
@@ -1325,13 +1444,60 @@ export default function HomeScreen() {
 
       </ScrollView>
 
+      {isFormingToday && selectedDay?.kind === 'day' && nurtureGrowth ? (
+        <TodayNurtureExperience
+          actions={nurtureCare.active}
+          bottomInset={insets.bottom}
+          completionEvent={flowBusy ? null : queuedCareCompletion}
+          day={selectedDay}
+          eggTargetRef={eggTargetRef}
+          feedbackKey={eggFeedKey}
+          growth={nurtureGrowth}
+          homeArchetypeId={homeArchetypeId}
+          onAddJournal={() => openManualJournal()}
+          onAddTextNote={() => openQuickNoteOverlay('text')}
+          onAddVoiceNote={() => openQuickNoteOverlay('voice')}
+          onAddPhoto={openMomentCapture}
+          onCareNotToday={handleCareNotToday}
+          onCareStart={handleCareStart}
+          onCompleteQuickGoal={(goalId) => {
+            const receipt = quickGoals.completeGoal(goalId);
+            if (receipt.newlyCompleted) {
+              pulseEgg();
+              setMicrocopy('+8 Growth');
+            }
+            return receipt;
+          }}
+          onCompletionAnimationEnd={(eventId) => {
+            setQueuedCareCompletion((current) => current?.id === eventId ? null : current);
+          }}
+          onOpenQuickGoal={setSelectedCareGoalId}
+          onChooseMood={(choiceId, label, from, imageSource, accent) => {
+            const action = nurtureCare.active.find((candidate) => candidate.id === 'mood');
+            if (action) setPendingCareIntent(action);
+            handleConfirmMood(choiceId, label, from, imageSource, accent);
+          }}
+          onChooseSleep={(quality, label, from, imageSource, accent) => {
+            const action = nurtureCare.active.find((candidate) => candidate.id === 'sleep');
+            if (action) setPendingCareIntent(action);
+            handleSetSleep(quality, label, from, imageSource, accent);
+          }}
+          onReveal={handleRevealPress}
+          onSelectDay={navigateToDay}
+          careSwipeExternalGesture={explorationMotion.gesture}
+          sceneTranslateX={explorationMotion.translateX}
+          timelineDays={timelineDays}
+          topInset={insets.top}
+        />
+      ) : null}
+
       {/* Bottom dock — the +/camera/mic row (or hatch CTA) with the category/
           stats panel beneath, PINNED above the tab bar (absolute, not flow) so
           content above can never push it around. Hidden while a prompt has the
           page collapsed and during the hatch reveal. The panel also shows on
           the TOMORROW view once today has hatched (viewedDay resolves it);
           before the hatch, tomorrow stays a locked egg with no panel. */}
-      {!isHatching && !quickGoalsOpen && !hasActivePrompt ? (
+      {!isFormingToday && !isHatching && !quickGoalsOpen && !hasActivePrompt ? (
         <Pressable
           accessibilityLabel={`Discoveries. ${discoveryProgress.unlocked} of ${discoveryProgress.total} found`}
           accessibilityRole="button"
@@ -1365,7 +1531,7 @@ export default function HomeScreen() {
           state={quickGoals.state}
         />
       ) : null}
-      {!isHatching && !hasActivePrompt && !quickGoalsOpen ? (
+      {!isFormingToday && !isHatching && !hasActivePrompt && !quickGoalsOpen ? (
         <TodayBottomDock
           canHatch={isDay ? selectedDay.canHatch : false}
           isForming={isForming}
@@ -1447,6 +1613,7 @@ export default function HomeScreen() {
 
       {quickNoteOpen ? (
         <QuickNoteComposer
+          initialMode={quickNoteInitialMode}
           onClose={() => setQuickNoteOpen(false)}
           onCancel={() => {
             cancelSemanticNoteQuestCapture();
@@ -1469,6 +1636,8 @@ export default function HomeScreen() {
           prompts={popupPrompts.filter((prompt) => prompt.id === 'meaningful_photo')}
           initialPrompt={initialPrompt}
           suggestions={suggestedPromptActions}
+          quickCategories={QUICK_PROMPT_CATEGORIES}
+          onQuickCategory={handleQuickCategory}
           onSelectSuggestion={(suggestion) => {
             if (!suggestion.sourceMemoryId || !formingDay) return false;
             const memory = formingDay.classifiedMemories?.find((candidate) => candidate.id === suggestion.sourceMemoryId);
@@ -1524,6 +1693,24 @@ export default function HomeScreen() {
             setQuickGoalJournal({ completion, goal });
           }}
           state={quickGoals.state}
+        />
+      ) : null}
+      {selectedCareGoal ? (
+        <QuickGoalActionModal
+          item={selectedCareGoal}
+          onComplete={() => quickGoals.completeGoal(selectedCareGoal.goal.id)}
+          onDismiss={() => setSelectedCareGoalId(null)}
+          onRemember={() => {
+            const completion = quickGoals.state.completions.find((candidate) =>
+              candidate.goalId === selectedCareGoal.goal.id
+              && candidate.dayId === (selectedDay?.kind === 'day' ? selectedDay.isoDate : '')
+            ) ?? selectedCareGoal.completion;
+            setSelectedCareGoalId(null);
+            if (completion) setQuickGoalJournal({ completion, goal: selectedCareGoal.goal });
+          }}
+          onSkip={() => quickGoals.skipGoal(selectedCareGoal.goal.id)}
+          onSnooze={() => quickGoals.snoozeGoal(selectedCareGoal.goal.id)}
+          onUndo={() => quickGoals.undoGoal(selectedCareGoal.goal.id)}
         />
       ) : null}
       {quickGoalJournal ? (
@@ -1635,7 +1822,7 @@ export default function HomeScreen() {
         onOpenIntelligenceLab={() => router.push('/intelligence-lab')}
         setObservatoryOpen={setObservatoryOpen}
         onCapturePhoto={openMomentCapture}
-        onCaptureNote={openNoteCapture}
+        onCaptureNote={openQuickNoteOverlay}
         openPromptSheet={openPromptSheet}
         openManualJournal={openManualJournal}
         handleOpenDayMap={handleOpenDayMap}

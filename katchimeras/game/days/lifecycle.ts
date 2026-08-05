@@ -2,6 +2,7 @@ import { HOME_HATCH_HOUR } from '@/constants/home-mvp';
 import type { HomeDayState, StoredHomeDayRecord } from '@/types/home';
 import type { OnboardingProfile } from '@/utils/onboarding-state';
 import { resolveDayLifecycleState } from '@/utils/day-state';
+import { activeGrowthEnergy, earlyHatchMinutesForEnergy } from '@/utils/today-growth';
 import { toLocalDateId } from './date';
 import { dayHasShape } from './shape';
 
@@ -18,7 +19,9 @@ export function resolveDayState(day: StoredHomeDayRecord, now: Date, hatchHour: 
     hasShape: dayHasShape(day),
     isSameDay: day.isoDate === toLocalDateId(now),
     hour: now.getHours(),
+    minute: now.getMinutes(),
     hatchHour,
+    earlyHatchMinutes: earlyHatchMinutesForEnergy(activeGrowthEnergy(day)),
   });
 }
 

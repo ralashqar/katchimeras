@@ -271,10 +271,12 @@ export function TodayExplorationBackground({
   backgroundKey,
   imageSize,
   translateX,
+  verticalOffset = 0,
 }: {
   backgroundKey: TodayExplorationBackgroundKey;
   imageSize: number;
   translateX?: SharedValue<number>;
+  verticalOffset?: number;
 }) {
   const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
   const background = TODAY_EXPLORATION_BACKGROUND_SOURCES[backgroundKey];
@@ -290,7 +292,7 @@ export function TodayExplorationBackground({
           {
             height: imageSize,
             left: (viewportWidth - imageSize) / 2,
-            top: (viewportHeight - imageSize) / 2,
+            top: (viewportHeight - imageSize) / 2 + verticalOffset,
             width: imageSize,
           },
           panStyle,

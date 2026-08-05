@@ -1,5 +1,6 @@
 import type {
   ClassifiedMemory,
+  DayGrowthState,
   HealthPermissionState,
   LocationPermissionState,
   JournalRecord,
@@ -113,6 +114,7 @@ type Version15StoredHomeState = Omit<StoredHomeState, 'version' | 'archivedDays'
 };
 type Version16StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 16 };
 type Version17StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 17 };
+type Version18StoredHomeState = Omit<StoredHomeState, 'version'> & { version: 18 };
 type Version7StoredHomeState = Omit<Version8StoredHomeState, 'version' | 'personalEntities' | 'cloudIntelligenceEnabled'> & {
   version: 7;
 };
@@ -120,6 +122,7 @@ type Version6StoredHomeState = Omit<Version7StoredHomeState, 'version'> & { vers
 
 export type UpgradeableStoredHomeState =
   | StoredHomeState
+  | Version18StoredHomeState
   | Version17StoredHomeState
   | Version16StoredHomeState
   | Version15StoredHomeState
@@ -139,10 +142,29 @@ export type UpgradeableStoredHomeState =
   | LegacyStoredHomeState;
 
 export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): StoredHomeState {
+  if ('version' in inputState && inputState.version === 19) {
+    return {
+      ...inputState,
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
+      tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
+    };
+  }
+
+  if ('version' in inputState && inputState.version === 18) {
+    return {
+      ...inputState,
+      version: 19,
+      archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
+      today: ensureStoredDayFields(inputState.today),
+      tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
+    };
+  }
+
   if ('version' in inputState && inputState.version === 17) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -152,7 +174,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 16) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       aspectHistory: inputState.aspectHistory ?? {},
       skinHistory: inputState.skinHistory ?? {},
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -164,7 +186,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 15) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -174,7 +196,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 14) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -184,7 +206,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 13) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -194,7 +216,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 12) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -204,7 +226,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 11) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -214,7 +236,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 10) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -224,7 +246,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 9) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
       today: ensureStoredDayFields(inputState.today),
       tomorrow: inputState.tomorrow ? ensureStoredDayFields(inputState.tomorrow) : undefined,
@@ -234,7 +256,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 8) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       personalEntities: inputState.personalEntities ?? [],
       cloudIntelligenceEnabled: inputState.cloudIntelligenceEnabled === true,
       archivedDays: inputState.archivedDays.map(ensureStoredDayFields),
@@ -246,7 +268,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && (inputState.version === 7 || inputState.version === 6)) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -259,7 +281,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 5) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       encounterHistory: inputState.encounterHistory ?? {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -271,7 +293,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   if ('version' in inputState && inputState.version === 4) {
     return {
       ...inputState,
-      version: 18,
+      version: 19,
       encounterHistory: {},
       personalEntities: [],
       cloudIntelligenceEnabled: false,
@@ -282,7 +304,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 3) {
     return {
-      version: 18,
+      version: 19,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: inputState.healthPermission,
@@ -296,7 +318,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
 
   if ('version' in inputState && inputState.version === 2) {
     return {
-      version: 18,
+      version: 19,
       locationPermission: inputState.locationPermission,
       activityPermission: 'unknown',
       healthPermission: 'unknown',
@@ -311,7 +333,7 @@ export function upgradeStoredHomeState(inputState: UpgradeableStoredHomeState): 
   const legacy = inputState as LegacyStoredHomeState;
 
   return {
-    version: 18,
+    version: 19,
     locationPermission: 'unknown',
     activityPermission: 'unknown',
     healthPermission: 'unknown',
@@ -377,6 +399,7 @@ function ensureStoredDayFields(
     keyJournalRecordId: 'keyJournalRecordId' in day && typeof day.keyJournalRecordId === 'string' && journalRecords.some((record) => record.id === day.keyJournalRecordId)
       ? day.keyJournalRecordId
       : null,
+    growth: normalizeDayGrowthState('growth' in day ? day.growth : undefined),
     stepsCount: 'stepsCount' in day && typeof day.stepsCount === 'number' ? Math.max(0, Math.round(day.stepsCount)) : 0,
     visitedPlaceCount:
       'visitedPlaceCount' in day && typeof day.visitedPlaceCount === 'number'
@@ -420,6 +443,38 @@ function ensureStoredDayFields(
         }),
       };
   return reconcileDaySkySnapshot(withCard);
+}
+
+function normalizeDayGrowthState(value: unknown): DayGrowthState {
+  if (!value || typeof value !== 'object') return { schemaVersion: 1, events: [], careActions: [] };
+  const candidate = value as Partial<DayGrowthState>;
+  const events = Array.isArray(candidate.events)
+    ? candidate.events.filter((event) => (
+        event != null
+        && typeof event === 'object'
+        && typeof event.id === 'string'
+        && typeof event.sourceId === 'string'
+        && typeof event.source === 'string'
+        && typeof event.amount === 'number'
+        && Number.isFinite(event.amount)
+        && typeof event.awardedAt === 'string'
+      )).map((event) => ({ ...event, amount: Math.max(0, Math.round(event.amount)) }))
+    : [];
+  const careActions = Array.isArray(candidate.careActions)
+    ? candidate.careActions.filter((action) => (
+        action != null
+        && typeof action === 'object'
+        && typeof action.instanceId === 'string'
+        && typeof action.definitionId === 'string'
+        && ['active', 'completed', 'not_today'].includes(action.status)
+        && typeof action.updatedAt === 'string'
+      ))
+    : [];
+  return {
+    schemaVersion: 1,
+    events: [...new Map(events.map((event) => [event.id, event])).values()],
+    careActions: [...new Map(careActions.map((action) => [action.instanceId, action])).values()],
+  };
 }
 
 function migrateLegacyJournalRecords(day: StoredHomeDayRecord): JournalRecord[] {

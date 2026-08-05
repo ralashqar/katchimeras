@@ -46,7 +46,7 @@ const BIG_MOMENT_EMOJI: Record<string, string> = {
 // means (incl. a Big Moment) → fold into today and fly into the Memory Vault.
 export default function NoteCaptureScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ target?: string }>();
+  const params = useLocalSearchParams<{ target?: string; input?: string }>();
   const insets = useSafeAreaInsets();
   const { addManualJournalEntry, isTodayHatched, cloudIntelligenceEnabled, selectedDay, tomorrowDay } = useHomeScreenState();
   const requestedTarget = parseCaptureTarget(params.target);
@@ -86,9 +86,10 @@ export default function NoteCaptureScreen() {
   // Auto-focus the box so the keyboard is up immediately — tapping the note
   // button means "I want to write". (After the modal's fade so focus sticks.)
   useEffect(() => {
+    if (params.input === 'voice') return;
     const id = setTimeout(() => inputRef.current?.focus(), 350);
     return () => clearTimeout(id);
-  }, []);
+  }, [params.input]);
 
   const stopRecording = async () => {
     recordingRef.current = false;
@@ -209,7 +210,7 @@ export default function NoteCaptureScreen() {
           <IconSymbol name="xmark" size={20} color={Lantern.moon50} />
         </Pressable>
         <ThemedText style={styles.title} lightColor={Lantern.moon50} darkColor={Lantern.moon50}>
-          Add a note
+          {params.input === 'voice' ? 'Add a voice note' : 'Add a note'}
         </ThemedText>
         <View style={styles.closeButton} />
       </View>
@@ -217,7 +218,7 @@ export default function NoteCaptureScreen() {
       {phase === 'input' ? (
         <View style={styles.body}>
           <ThemedText style={styles.prompt} lightColor={Lantern.moon300} darkColor={Lantern.moon300}>
-            Speak or type what stood out {targetLabel}.
+            {params.input === 'voice' ? `Hold the microphone and speak about ${targetLabel}.` : `Type what stood out ${targetLabel}, or hold the microphone to speak.`}
           </ThemedText>
 
           {captureError ? (

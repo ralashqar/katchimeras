@@ -60,7 +60,7 @@ export function createInitialHomeState(profile: OnboardingProfile, now: Date): S
   });
 
   return {
-    version: 18,
+    version: 19,
     aspectHistory: {},
     skinHistory: {},
     personalEntities: [],

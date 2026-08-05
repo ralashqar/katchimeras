@@ -39,7 +39,7 @@ type TodaySheetHostProps = {
   onOpenIntelligenceLab?: () => void;
   setObservatoryOpen: (open: boolean) => void;
   onCapturePhoto: () => void;
-  onCaptureNote: () => void;
+  onCaptureNote: (input?: 'text' | 'voice') => void;
   openPromptSheet: () => void;
   openManualJournal: (flowId?: string) => void;
   handleOpenDayMap: (dayId: string) => void;
@@ -187,7 +187,7 @@ export function TodaySheetHost({
             viewedIsForming
               ? () => {
                   setMemoryVaultOpen(false);
-                  onCaptureNote();
+                  onCaptureNote('voice');
                 }
               : undefined
           }
@@ -195,7 +195,7 @@ export function TodaySheetHost({
             viewedIsForming
               ? () => {
                   setMemoryVaultOpen(false);
-                  onCaptureNote();
+                  onCaptureNote('text');
                 }
               : undefined
           }

@@ -31,6 +31,8 @@ import type {
   ManualJournalSubmission,
   JournalNoteClassification,
   JournalRouteProposal,
+  TodayCareActionState,
+  TodayGrowthSource,
 } from '@/types/home';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
 import { rememberPersonalContext } from '@/utils/intelligence/classification';
@@ -99,6 +101,7 @@ import { withRefreshedPhotoLocationsForDay, withSeededPhotoLocationsByDay } from
 import { createEmptyStoredDay, readInputDay, writeInputDay } from './records';
 import { normalizeStoredHomeState } from './state-normalization';
 import { toLocalDateId } from './date';
+import { awardGrowth, setCareActionState } from '@/utils/today-growth';
 
 export type SelectHeroPhotoInput = {
   assetId: string;
@@ -283,6 +286,42 @@ export function completeSeedForToday(
     return normalizeStoredHomeState(state, profile, now);
   }
 
+  const awarded = awardGrowth(nextDay, {
+    source: 'daily_seed',
+    sourceId: seedId,
+    actionId: `seed:${seedId}`,
+    awardedAt: now,
+  });
+  return normalizeStoredHomeState(writeInputDay(state, target, awarded.day), profile, now);
+}
+
+export function awardGrowthForToday(
+  state: StoredHomeState,
+  input: {
+    source: TodayGrowthSource;
+    sourceId: string;
+    actionId?: string | null;
+    amount?: number;
+  },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const result = awardGrowth(base, { ...input, awardedAt: now });
+  if (!result.awarded) return state;
+  return normalizeStoredHomeState(writeInputDay(state, target, result.day), profile, now);
+}
+
+export function updateTodayCareAction(
+  state: StoredHomeState,
+  input: Omit<TodayCareActionState, 'updatedAt'>,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const nextDay = setCareActionState(base, { ...input, updatedAt: now.toISOString() });
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 

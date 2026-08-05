@@ -15,6 +15,8 @@ export function resolveDayLifecycleState(input: {
   isSameDay: boolean;
   hour: number;
   hatchHour: number;
+  minute?: number;
+  earlyHatchMinutes?: number;
 }): HomeDayState {
   const { hasCreature, storedState, hasShape, isSameDay, hour, hatchHour } = input;
 
@@ -33,7 +35,9 @@ export function resolveDayLifecycleState(input: {
 
   // Today: ready only once the live clock has reached the hatch hour.
   if (isSameDay) {
-    return hour >= hatchHour ? 'ready_to_hatch' : 'forming';
+    const currentMinutes = hour * 60 + (input.minute ?? 0);
+    const readyMinutes = hatchHour * 60 - Math.max(0, input.earlyHatchMinutes ?? 0);
+    return currentMinutes >= readyMinutes ? 'ready_to_hatch' : 'forming';
   }
 
   // A past day with shape is always available to hatch.
