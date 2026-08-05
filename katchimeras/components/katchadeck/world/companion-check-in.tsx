@@ -284,9 +284,9 @@ export function CompanionCheckInPage({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
-  card: { backgroundColor: '#FFF3D7', borderColor: '#D8B974', borderCurve: 'continuous', borderRadius: 21, borderWidth: 1, boxShadow: '0 9px 22px rgba(10,7,4,0.25), inset 0 1px 0 rgba(255,255,255,0.9)', gap: 14, padding: 16 },
-  cardEmphasized: { borderColor: '#E4B852', borderWidth: 2, boxShadow: '0 12px 28px rgba(10,7,4,0.3), inset 0 1px 0 rgba(255,255,255,0.94)' },
-  cardComplete: { backgroundColor: '#EEF0D9', borderColor: '#9EAC79' },
+  card: { backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, gap: 14, padding: 16 },
+  cardEmphasized: { backgroundColor: KatchaUI.companionPanel.cardSelected, borderColor: '#E4B852', borderWidth: 2, boxShadow: KatchaUI.companionPanel.cardShadow },
+  cardComplete: { backgroundColor: KatchaUI.companionPanel.cardComplete, borderColor: '#9EAC79' },
   cardTop: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
   cardIcon: { alignItems: 'center', backgroundColor: '#F3DFA7', borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
   cardIconComplete: { backgroundColor: Meadow.leafDeep },

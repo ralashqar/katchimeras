@@ -10,6 +10,7 @@ import {
   type CompanionJourneyGoalStatus,
 } from '@/constants/companion-journeys';
 import { AppFontFamilies } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
 import type { HomeVisualKey } from '@/types/home';
 import {
@@ -55,10 +56,10 @@ export function CompanionJourneyDiscoveryThread({
     <View style={[styles.goalCard, styles.youGoalCard]}>
       <View style={styles.goalTopRow}>
         <View style={styles.goalCopy}>
-          <ThemedText style={styles.goalMeta} lightColor="#E7BE68" darkColor="#E7BE68">
+          <ThemedText style={styles.goalMeta} lightColor="#806126" darkColor="#806126">
             YOUR CURRENT FOCUS
           </ThemedText>
-          <ThemedText selectable style={styles.goalTitle} lightColor="#FFF4DA" darkColor="#FFF4DA">
+          <ThemedText selectable style={styles.goalTitle} lightColor={KatchaUI.companionPanel.ink} darkColor={KatchaUI.companionPanel.ink}>
             {activeFocus.title}
           </ThemedText>
         </View>
@@ -73,13 +74,13 @@ export function CompanionJourneyDiscoveryThread({
     <View style={[styles.startCard, styles.youStartCard, !activeFocus && styles.startCardPrimary]}>
       <View style={styles.startHeading}>
         <View style={[styles.startIcon, styles.youStartIcon]}>
-          <IconSymbol color="#E7BE68" name="bubble.left.and.bubble.right.fill" size={22} />
+          <IconSymbol color="#806126" name="bubble.left.and.bubble.right.fill" size={22} />
         </View>
         <View style={styles.startCopy}>
-          <ThemedText style={styles.startTitle} lightColor="#FFF4DA" darkColor="#FFF4DA">
+          <ThemedText style={styles.startTitle} lightColor={KatchaUI.companionPanel.ink} darkColor={KatchaUI.companionPanel.ink}>
             {conversation ? 'Continue where you left off' : activeFocus ? 'Choose a different focus' : 'Choose your first focus'}
           </ThemedText>
-          <ThemedText style={styles.helper} lightColor="#D8C6A4" darkColor="#D8C6A4">
+          <ThemedText style={styles.helper} lightColor={KatchaUI.companionPanel.inkSoft} darkColor={KatchaUI.companionPanel.inkSoft}>
             {conversation
               ? 'Your completed answers are saved.'
               : activeFocus
@@ -526,7 +527,7 @@ function GoalAction({
   night?: boolean;
   onPress: () => void;
 }) {
-  const color = night ? '#E7D7B8' : Meadow.inkSoft;
+  const color = Meadow.inkSoft;
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.goalAction, night && styles.youGoalAction, pressed && styles.pressed]}>
       <IconSymbol color={color} name={icon} size={14} />
@@ -730,12 +731,12 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#FFF9EA', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, color: Meadow.ink, fontFamily: AppFontFamilies.manrope, fontSize: 14, minHeight: 92, padding: 12, textAlignVertical: 'top' },
   primaryButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 44, paddingHorizontal: 14 },
   primaryButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '900' },
-  startCard: { backgroundColor: 'rgba(255,248,232,0.92)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 10px 28px rgba(37,42,29,0.2), inset 0 1px 0 rgba(255,255,255,0.8)', gap: 14, padding: 16 },
-  youStartCard: { backgroundColor: '#30271E', borderColor: '#584934', boxShadow: 'none' },
+  startCard: { backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, gap: 14, padding: 16 },
+  youStartCard: { backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder },
   startCardPrimary: { borderColor: Meadow.goldDeep, borderWidth: 1.5 },
   startHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: 12 },
   startIcon: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderRadius: 15, height: 44, justifyContent: 'center', width: 44 },
-  youStartIcon: { backgroundColor: '#493A25', borderColor: '#6B5430', borderWidth: 1 },
+  youStartIcon: { backgroundColor: 'rgba(128,97,38,0.14)', borderColor: 'rgba(128,97,38,0.24)', borderWidth: 1 },
   startButton: { alignSelf: 'stretch' },
   suggestionCard: { backgroundColor: 'rgba(255,248,232,0.62)', borderColor: Meadow.goldDeep, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 12, padding: 15 },
   suggestionList: { gap: 7 },
@@ -746,9 +747,9 @@ const styles = StyleSheet.create({
   resultTextActionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '900' },
   goalsSection: { gap: 9 },
   sectionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '900', letterSpacing: 1.2, paddingHorizontal: 4 },
-  goalCard: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '0 7px 18px rgba(37,42,29,0.16), inset 0 1px 0 rgba(255,255,255,0.72)', gap: 10, padding: 14 },
-  goalCardPrimary: { backgroundColor: Meadow.goldSoft, borderColor: Meadow.goldDeep },
-  youGoalCard: { backgroundColor: '#3A2D20', borderColor: '#695333', boxShadow: 'none' },
+  goalCard: { backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, gap: 10, padding: 14 },
+  goalCardPrimary: { backgroundColor: KatchaUI.companionPanel.cardSelected, borderColor: Meadow.goldDeep },
+  youGoalCard: { backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder },
   goalTopRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   goalCopy: { flex: 1, gap: 3 },
   goalMeta: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900', letterSpacing: 0.9 },
@@ -757,7 +758,7 @@ const styles = StyleSheet.create({
   smallButtonLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10, fontWeight: '900' },
   goalActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   goalAction: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 4, minHeight: 32, paddingHorizontal: 9 },
-  youGoalAction: { backgroundColor: '#2A2119', borderColor: '#665237' },
+  youGoalAction: { backgroundColor: KatchaUI.companionPanel.softBackground, borderColor: KatchaUI.companionPanel.softBorder },
   goalActionLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
   progressCard: { backgroundColor: 'rgba(255,248,232,0.54)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, gap: 11, padding: 14 },
   progressHeading: { alignItems: 'center', flexDirection: 'row', gap: 9 },

@@ -256,13 +256,13 @@ export function CompanionQuickGoalPicker({
     <>
     <View style={styles.scopedPicker}>
       <View style={styles.scopedHeading}>
-        <ThemedText style={styles.scopedEyebrow} lightColor="#E9BE61" darkColor="#E9BE61">
+        <ThemedText style={styles.scopedEyebrow} lightColor="#806126" darkColor="#806126">
           {templates.length} IDEAS FOR TODAY
         </ThemedText>
-        <ThemedText selectable style={styles.scopedTitle} lightColor="#FFF8E7" darkColor="#FFF8E7">
+        <ThemedText selectable style={styles.scopedTitle} lightColor={KatchaUI.companionPanel.ink} darkColor={KatchaUI.companionPanel.ink}>
           Pick a small step
         </ThemedText>
-        <ThemedText selectable style={styles.scopedDescription} lightColor="#D8C5AD" darkColor="#D8C5AD">
+        <ThemedText selectable style={styles.scopedDescription} lightColor={KatchaUI.companionPanel.inkSoft} darkColor={KatchaUI.companionPanel.inkSoft}>
           Made for you and {family?.displayName ?? 'your companion'}. You can change it later.
         </ThemedText>
       </View>
@@ -334,7 +334,7 @@ export function CompanionQuickGoalPicker({
       </Pressable>
 
       {feedback ? (
-        <ThemedText accessibilityLiveRegion="polite" selectable style={styles.scopedFeedback} lightColor="#F4D690" darkColor="#F4D690">
+        <ThemedText accessibilityLiveRegion="polite" selectable style={styles.scopedFeedback} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
           {feedback}
         </ThemedText>
       ) : null}
@@ -1110,14 +1110,14 @@ function GoalManageButton({
 }
 
 const styles = StyleSheet.create({
-  companionPanel: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)', gap: 10, marginBottom: 12, padding: 14 },
+  companionPanel: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, gap: 10, marginBottom: 12, padding: 14, paddingBottom: 16 },
   scopedPicker: {
-    backgroundColor: '#211A13',
-    borderColor: 'rgba(248,220,165,0.2)',
+    backgroundColor: KatchaUI.companionPanel.background,
+    borderColor: KatchaUI.companionPanel.border,
     borderCurve: 'continuous',
     borderRadius: 30,
     borderWidth: 1,
-    boxShadow: '0 18px 42px rgba(31,20,10,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
+    boxShadow: KatchaUI.companionPanel.shadow,
     gap: 14,
     marginBottom: 12,
     padding: 18,
@@ -1129,12 +1129,12 @@ const styles = StyleSheet.create({
   scopedDescription: { ...KatchaUI.type.companionBody, fontSize: 12.5, lineHeight: 18 },
   scopedPresetRow: {
     alignItems: 'center',
-    backgroundColor: '#FFF8E7',
-    borderColor: 'rgba(236,204,140,0.62)',
+    backgroundColor: KatchaUI.companionPanel.cardBackground,
+    borderColor: KatchaUI.companionPanel.cardBorder,
     borderCurve: 'continuous',
     borderRadius: 18,
     borderWidth: 1,
-    boxShadow: '0 4px 12px rgba(16,10,6,0.18), inset 0 1px 0 rgba(255,255,255,0.9)',
+    boxShadow: KatchaUI.companionPanel.cardShadow,
     flexDirection: 'row',
     gap: 10,
     minHeight: 68,
@@ -1204,8 +1204,8 @@ const styles = StyleSheet.create({
   otherGoalLabel: { ...KatchaUI.type.label, fontSize: 8.5, letterSpacing: 1 },
   otherGoalRow: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,249,234,0.48)',
-    borderColor: 'rgba(119,86,43,0.16)',
+    backgroundColor: KatchaUI.companionPanel.softBackground,
+    borderColor: KatchaUI.companionPanel.softBorder,
     borderCurve: 'continuous',
     borderRadius: 16,
     borderWidth: 1,
@@ -1239,12 +1239,12 @@ const styles = StyleSheet.create({
   todayGoalList: { gap: 10 },
   todayGoalCard: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,249,234,0.88)',
-    borderColor: 'rgba(185,145,77,0.24)',
+    backgroundColor: KatchaUI.companionPanel.cardBackground,
+    borderColor: KatchaUI.companionPanel.cardBorder,
     borderCurve: 'continuous',
     borderRadius: 20,
     borderWidth: 1,
-    boxShadow: '0 5px 14px rgba(91,61,24,0.10)',
+    boxShadow: KatchaUI.companionPanel.cardShadow,
     flexDirection: 'row',
     gap: 11,
     minHeight: 76,
@@ -1252,7 +1252,7 @@ const styles = StyleSheet.create({
     paddingRight: 11,
     paddingVertical: 7,
   },
-  todayGoalCardComplete: { backgroundColor: 'rgba(244,248,232,0.92)', borderColor: 'rgba(78,112,72,0.28)' },
+  todayGoalCardComplete: { backgroundColor: KatchaUI.companionPanel.cardComplete, borderColor: 'rgba(78,112,72,0.28)' },
   todayGoalCardPressed: { opacity: 0.9, transform: [{ scale: 0.988 }] },
   todayGoalCopy: { flex: 1, gap: 3, minWidth: 0 },
   todayGoalTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900', letterSpacing: -0.15, lineHeight: 18 },
@@ -1285,8 +1285,8 @@ const styles = StyleSheet.create({
   manageGoalsLinkText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
   goalsEmptyState: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,249,234,0.64)',
-    borderColor: Meadow.cardBorder,
+    backgroundColor: KatchaUI.companionPanel.softBackground,
+    borderColor: KatchaUI.companionPanel.softBorder,
     borderCurve: 'continuous',
     borderRadius: 18,
     borderWidth: 1,
@@ -1305,7 +1305,7 @@ const styles = StyleSheet.create({
   familyPillSelected: { backgroundColor: Meadow.goldSoft, borderColor: Meadow.goldDeep },
   familyPillText: { fontFamily: AppFontFamilies.manrope, fontSize: 11, fontWeight: '900' },
   presetList: { gap: 7 },
-  presetRow: { alignItems: 'center', backgroundColor: 'rgba(255,249,234,0.78)', borderColor: Meadow.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 9, minHeight: 60, paddingHorizontal: 8, paddingVertical: 6 },
+  presetRow: { alignItems: 'center', backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, flexDirection: 'row', gap: 9, minHeight: 60, paddingHorizontal: 8, paddingVertical: 6 },
   presetAdd: { alignItems: 'center', borderColor: Meadow.goldDeep, borderRadius: 999, borderWidth: 1, height: 32, justifyContent: 'center', width: 32 },
   presetAdded: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
   presetCopy: { flex: 1, gap: 2 },

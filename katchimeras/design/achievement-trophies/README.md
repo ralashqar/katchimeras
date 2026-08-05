@@ -65,7 +65,7 @@ Preventing bad crops starts in the generation prompt, not only in post-processin
      --input input.png --out output-alpha.png
    ```
 
-   The connected remover also clears enclosed key-colour holes conservatively. Increase `--interior-distance` toward `90` only when a source has obvious key-colour pockets inside handles or arches and the subject palette remains well separated from the key.
+   The connected remover also clears enclosed key-colour holes conservatively and reconstructs foreground RGB on partially transparent pixels, preventing a magenta fringe when trophies are composited over the warm cabinet panel. Increase `--interior-distance` toward `90` only when a source has obvious key-colour pockets inside handles or arches and the subject palette remains well separated from the key.
 
 7. Describe the sheet in `<family>-vN.json`. Use legacy `rows` for a square 4×4 sheet, or `grid` plus explicit zero-based `cells` for any layout. Generated grid lines are not always mathematically even: inspect the alpha sheet and put optional `columnCuts` and `rowCuts` through the real transparent gutters so artwork cannot bleed between cells. If a safe gutter shifts between rows or columns, give that cell measured `[left, top, right, bottom]` pixel `bounds` instead of forcing one global cut:
 
@@ -147,6 +147,6 @@ Keep batches thematically coherent so their palettes and object metaphors can be
 | Complete | Connection | Gatherglow, Heartmote, Kindling, Snuglet, Waglet |
 | Complete | Daily rhythm | Tasklet, Errandimp, Bedrotte, Dawnle, Mendle |
 | Complete | Creativity | Pagelet, Relicoon, Museling, Encora, Flickerbun, Pixooka |
-| Next | Exploration | Skylo, Voyagle, Cheerlet |
+| Complete | Exploration | Skylo, Voyagle, Cheerlet |
 
-Review each completed family in the trophy-room UI before generating the next batch. This catches family-specific scale, contrast and concept problems before they are repeated.
+All 25 canonical Katchimera families now have reviewed bespoke v1 trophy art. Continue to review each new family in the trophy-room UI before extending the catalogue; this catches family-specific scale, contrast and concept problems before they are repeated.

@@ -1,0 +1,7 @@
+Create six isolated Katchimeras achievement keepsakes in an EXACT 3 columns by 2 rows production sprite sheet. Match the style board's cozy rounded miniature 3D look and Skylo palette: slate blue, city blue, cream, terracotta, warm window gold, muted teal, walnut, and restrained brass. References are style-only; no characters or scenes.
+
+Perfectly flat uniform #ff00ff background. Repeat: EXACT 3-by-2 grid. One compact connected subject per cell, centered, no more than 68% occupancy, at least 10% uninterrupted pure-magenta gutter on every side, and clear gutters between cells. Nothing touches boundaries. No shadows, floor, reflections, text, numbers, characters, panels, cups, medals, ribbons, or generic awards.
+
+Row 1 — COMPANION QUESTS tiers I–III: the same urban explorer satchel progressing from a small slate-blue crossbody bag with folded blank map, to a cream-trimmed bag with brass compass, route cards, and tiny binoculars, to a richly equipped city explorer pack with secured map tube, compact camera, transit token, compass, and warm glowing marker.
+
+Row 2 — JOURNEY GOALS tiers I–III: the same miniature city gateway progressing from a simple rounded cream arch over one blue paving step, to a terracotta-and-blue civic arch with lamp and route marker, to a complete neighbourhood portal with layered skyline, glowing lamps, central compass paving, and three connected stepping stones.

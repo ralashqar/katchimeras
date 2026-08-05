@@ -21,6 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import { Meadow } from '@/constants/meadow-theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { AppFontFamilies } from '@/constants/theme';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
@@ -313,11 +314,11 @@ export function CompanionGoalPortrait({
 const styles = StyleSheet.create({
   swipeContainer: { borderCurve: 'continuous', borderRadius: 19, overflow: 'hidden' },
   row: {
-    alignItems: 'center', backgroundColor: '#FFF9EA', borderColor: 'rgba(185,145,77,0.25)',
-    borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, flexDirection: 'row', gap: 8,
+    alignItems: 'center', backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder,
+    borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, flexDirection: 'row', gap: 8,
     minHeight: 74, paddingHorizontal: 8, paddingVertical: 7,
   },
-  rowComplete: { backgroundColor: '#F3F6E7', borderColor: 'rgba(78,112,72,0.28)' },
+  rowComplete: { backgroundColor: KatchaUI.companionPanel.cardComplete, borderColor: 'rgba(78,112,72,0.28)' },
   rowCelebrating: {
     backgroundColor: '#FFF5CC',
     borderColor: 'rgba(201, 151, 42, 0.62)',

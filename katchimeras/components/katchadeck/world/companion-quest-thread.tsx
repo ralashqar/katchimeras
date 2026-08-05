@@ -31,9 +31,9 @@ export function CompanionQuestChoices({
     <View style={styles.choiceRoot}>
       <View style={styles.choiceHeading}>
         <View>
-          <ThemedText style={styles.choiceTitle} lightColor="#FFF9EA" darkColor="#FFF9EA">Choose a quest</ThemedText>
+          <ThemedText style={styles.choiceTitle} lightColor={KatchaUI.companionPanel.ink} darkColor={KatchaUI.companionPanel.ink}>Choose a quest</ThemedText>
         </View>
-        <ThemedText style={styles.available} lightColor="#FFF5DA" darkColor="#FFF5DA">{availableCount} available</ThemedText>
+        <ThemedText style={styles.available} lightColor={KatchaUI.companionPanel.inkSoft} darkColor={KatchaUI.companionPanel.inkSoft}>{availableCount} available</ThemedText>
       </View>
       <View style={styles.offerList}>
         {offers.map((offer) => {
@@ -437,22 +437,19 @@ function questMatchQuestion(item: QuestSubmissionItem): string {
 }
 
 const styles = StyleSheet.create({
-  choiceRoot: { gap: 12, paddingBottom: 8, paddingTop: 4 },
+  choiceRoot: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, gap: 12, marginBottom: 12, padding: 14, paddingBottom: 16 },
   choiceHeading: { alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'space-between' },
   choiceTitle: {
     ...KatchaUI.type.companionPageTitle,
     fontSize: 24,
     lineHeight: 28,
-    textShadowColor: 'rgba(20,30,24,0.72)',
-    textShadowOffset: { height: 1, width: 0 },
-    textShadowRadius: 5,
   },
-  available: { backgroundColor: 'rgba(25,34,27,0.62)', borderRadius: 999, fontSize: 10.5, fontVariant: ['tabular-nums'], overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 5 },
+  available: { backgroundColor: KatchaUI.companionPanel.softBackground, borderColor: KatchaUI.companionPanel.softBorder, borderRadius: 999, borderWidth: 1, fontSize: 10.5, fontVariant: ['tabular-nums'], overflow: 'hidden', paddingHorizontal: 9, paddingVertical: 5 },
   offerList: { gap: 9 },
-  offer: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.92)', borderColor: 'rgba(255,255,255,0.64)', borderCurve: 'continuous', borderRadius: 20, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.20), inset 0 1px 0 rgba(255,255,255,0.78)', flexDirection: 'row', gap: 11, minHeight: 108, padding: 9 },
-  offerCompleted: { backgroundColor: 'rgba(239,247,226,0.96)', borderColor: 'rgba(85,104,75,0.48)' },
+  offer: { alignItems: 'center', backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, flexDirection: 'row', gap: 11, minHeight: 108, padding: 9 },
+  offerCompleted: { backgroundColor: KatchaUI.companionPanel.cardComplete, borderColor: 'rgba(85,104,75,0.48)' },
   offerUnavailable: { opacity: 0.72 },
-  offerSelected: { backgroundColor: 'rgba(255,244,204,0.97)', borderColor: Meadow.goldDeep, boxShadow: '0 10px 25px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,235,0.9), 0 0 0 1px rgba(229,190,106,0.24)' },
+  offerSelected: { backgroundColor: KatchaUI.companionPanel.cardSelected, borderColor: Meadow.goldDeep, boxShadow: '0 10px 25px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,235,0.9), 0 0 0 1px rgba(229,190,106,0.24)' },
   offerArt: { alignItems: 'center', backgroundColor: 'rgba(138,112,80,0.10)', borderColor: 'rgba(255,248,230,0.28)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, boxShadow: 'inset 0 1px 0 rgba(255,248,230,0.38)', height: 82, justifyContent: 'center', width: 72 },
   offerArtCompleted: { backgroundColor: 'rgba(107,128,95,0.15)', borderColor: 'rgba(85,104,75,0.28)' },
   offerArtSelected: { backgroundColor: Meadow.goldSoft },
@@ -471,13 +468,13 @@ const styles = StyleSheet.create({
   radio: { alignItems: 'center', borderColor: Meadow.cardBorder, borderRadius: 999, borderWidth: 1, height: 22, justifyContent: 'center', width: 22 },
   radioSelected: { backgroundColor: Meadow.goldDeep, borderColor: Meadow.goldDeep },
   radioCompleted: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
-  root: { backgroundColor: 'rgba(255,248,232,0.93)', borderColor: 'rgba(255,255,255,0.64)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1, boxShadow: '0 8px 22px rgba(37,42,29,0.20), inset 0 1px 0 rgba(255,255,255,0.78)', gap: 18, marginBottom: 12, padding: 16 },
+  root: { backgroundColor: KatchaUI.companionPanel.background, borderColor: KatchaUI.companionPanel.border, borderCurve: 'continuous', borderRadius: 29, borderWidth: 1, boxShadow: KatchaUI.companionPanel.shadow, gap: 18, marginBottom: 12, padding: 16 },
   intro: { gap: 8 },
   activeSummary: { gap: 10 },
   activeGoals: { gap: 7, paddingTop: 2 },
-  activeGoal: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.32)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.13), inset 0 1px 0 rgba(255,248,230,0.48)', flexDirection: 'row', gap: 11, minHeight: 58, paddingHorizontal: 11, paddingVertical: 9 },
+  activeGoal: { alignItems: 'center', backgroundColor: KatchaUI.companionPanel.cardBackground, borderColor: KatchaUI.companionPanel.cardBorder, borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, flexDirection: 'row', gap: 11, minHeight: 58, paddingHorizontal: 11, paddingVertical: 9 },
   activeCheck: { flexShrink: 0 },
-  photoCapture: { backgroundColor: 'rgba(255,247,222,0.72)', borderColor: 'rgba(183,132,42,0.34)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, boxShadow: '-2px 4px 10px rgba(58,38,18,0.14), inset 0 1px 0 rgba(255,255,255,0.72)', gap: 10, padding: 11 },
+  photoCapture: { backgroundColor: KatchaUI.companionPanel.cardSelected, borderColor: 'rgba(183,132,42,0.34)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: KatchaUI.companionPanel.cardShadow, gap: 10, padding: 11 },
   photoCaptureHeading: { alignItems: 'center', flexDirection: 'row', gap: 10 },
   photoCaptureIcon: { alignItems: 'center', backgroundColor: 'rgba(231,185,81,0.20)', borderCurve: 'continuous', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
   photoCaptureCopy: { flex: 1, gap: 1, minWidth: 0 },
@@ -489,7 +486,7 @@ const styles = StyleSheet.create({
   photoCaptureHint: { fontSize: 10.5, lineHeight: 14, paddingHorizontal: 2 },
   inlineStatus: { alignItems: 'flex-start', backgroundColor: 'rgba(255,248,232,0.38)', borderCurve: 'continuous', borderRadius: 13, flexDirection: 'row', gap: 7, paddingHorizontal: 9, paddingVertical: 8 },
   inlineStatusText: { flex: 1, fontSize: 11, lineHeight: 15 },
-  captureMethods: { backgroundColor: 'rgba(255,248,232,0.28)', borderColor: 'rgba(122,84,44,0.15)', borderCurve: 'continuous', borderRadius: 19, borderWidth: 1, gap: 8, padding: 9 },
+  captureMethods: { backgroundColor: KatchaUI.companionPanel.softBackground, borderColor: KatchaUI.companionPanel.softBorder, borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, gap: 8, padding: 9 },
   captureMethodsLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.65, paddingHorizontal: 2, textTransform: 'uppercase' },
   captureMethod: { alignItems: 'center', backgroundColor: 'rgba(255,250,239,0.52)', borderColor: 'rgba(122,84,44,0.15)', borderCurve: 'continuous', borderRadius: 14, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 8, minHeight: 50, paddingHorizontal: 9, paddingVertical: 7 },
   captureMethodProminent: { backgroundColor: 'rgba(231,185,81,0.22)', borderColor: 'rgba(183,132,42,0.48)', boxShadow: '-2px 3px 7px rgba(58,38,18,0.12), inset 0 1px 0 rgba(255,248,230,0.56)' },

@@ -1,0 +1,7 @@
+Create six isolated Katchimeras achievement keepsakes in an EXACT 3 columns by 2 rows production sprite sheet. Match the style board's cozy rounded miniature 3D look and Voyagle palette: sea teal, aqua, mint, parchment, saddle leather, coral, walnut, and antique brass. References are style-only; no characters or scenes.
+
+Perfectly flat uniform #ff00ff background. Repeat: EXACT 3-by-2 grid. One compact connected subject per cell, centered, no more than 68% occupancy, at least 10% uninterrupted pure-magenta gutter on every side, and clear gutters between cells. Nothing touches boundaries. No shadows, floor, reflections, text, numbers, characters, panels, cups, medals, ribbons, or generic awards.
+
+Row 1 — COMPANION QUESTS tiers I–III: the same traveller's backpack progressing from a small teal pack with blank luggage tag, to a leather-trimmed pack with compass, rolled map, and bottle, to a richly equipped expedition pack with secured telescope, camera, map tube, coral route pennant, compass, and warm brass fittings.
+
+Row 2 — JOURNEY GOALS tiers I–III: the same miniature departure gateway progressing from a simple parchment-and-teal arch with one route step, to a brass compass arch with coral pennant and two map-shaped steps, to a complete voyage portal with globe crown, glowing route arc, twin waymarkers, luggage details, and three connected stepping stones.

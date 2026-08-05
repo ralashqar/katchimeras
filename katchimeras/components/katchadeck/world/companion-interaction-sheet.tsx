@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { KatchaDialog } from '@/components/katchadeck/ui/katcha-dialog';
 import { ThemedText } from '@/components/themed-text';
 import { Lantern } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { useCompanionExperienceController } from '@/features/companion/use-companion-experience-controller';
 import type { HomeVisualKey, MemoryQualityScore } from '@/types/home';
 import type {
@@ -1040,15 +1041,15 @@ const styles = StyleSheet.create({
   openGameAction: { paddingTop: 12 },
   quickGoalStack: { gap: 8, marginBottom: 12 },
   youStack: {
-    backgroundColor: '#211A13',
-    borderColor: 'rgba(248,220,165,0.2)',
+    backgroundColor: KatchaUI.companionPanel.background,
+    borderColor: KatchaUI.companionPanel.border,
     borderCurve: 'continuous',
     borderRadius: 30,
     borderWidth: 1,
-    boxShadow: '0 18px 42px rgba(31,20,10,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
+    boxShadow: KatchaUI.companionPanel.shadow,
     gap: 14,
-    padding: 18,
-    paddingBottom: 20,
+    padding: 14,
+    paddingBottom: 16,
   },
   footer: { backgroundColor: 'transparent', paddingBottom: 2, paddingHorizontal: 2, paddingTop: 7 },
   saved: { alignItems: 'center', gap: 8, justifyContent: 'center', minHeight: 220, paddingHorizontal: 24 },

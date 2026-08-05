@@ -73,7 +73,10 @@ export function CompanionHomeScene({
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { fontScale, height, width } = useWindowDimensions();
-  const reflowPaths = width < 375 || fontScale > 1.15;
+  // The shared archive panel adds an inner inset around these cards, so the
+  // featured + paired layout reads better than three squeezed columns on
+  // standard 390pt phones as well as smaller devices.
+  const reflowPaths = width < 410 || fontScale > 1.15;
   const tablet = width >= 700;
   const heroHeight = companionHomeHeroSpacer(height);
   const shouldAnimate = animateEntrance && !reduceMotion;
@@ -168,6 +171,7 @@ export function CompanionHomeScene({
 
         <View style={[styles.hero, { minHeight: heroHeight }]} />
 
+        <View style={styles.homePanel}>
         <Animated.View
           entering={
             shouldAnimate
@@ -217,10 +221,10 @@ export function CompanionHomeScene({
           </View>
           <View style={styles.bondCopy}>
             <View style={styles.bondHeading}>
-              <ThemedText style={styles.bondTitle} lightColor="#FFF9EA" darkColor="#FFF9EA">
+              <ThemedText style={styles.bondTitle} lightColor={KatchaUI.companionPanel.ink} darkColor={KatchaUI.companionPanel.ink}>
                 Bond level {bondProgress.level}
               </ThemedText>
-              <ThemedText style={styles.bondValue} lightColor="#F6DE9A" darkColor="#F6DE9A">
+              <ThemedText style={styles.bondValue} lightColor="#806126" darkColor="#806126">
                 {bondProgress.isMax
                   ? 'Max'
                   : `${bondProgress.segmentPoints}/${bondProgress.segmentTarget}`}
@@ -237,14 +241,15 @@ export function CompanionHomeScene({
             <ThemedText
               numberOfLines={1}
               style={styles.bondHint}
-              lightColor="#EEE4D3"
-              darkColor="#EEE4D3">
+              lightColor={KatchaUI.companionPanel.inkSoft}
+              darkColor={KatchaUI.companionPanel.inkSoft}>
               {bondProgress.isMax
                 ? `${name} trusts you completely.`
                 : `${bondProgress.pointsRemaining} bond until ${bondProgress.nextLabel}.`}
             </ThemedText>
           </View>
         </Animated.View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -388,6 +393,19 @@ const styles = StyleSheet.create({
   hero: {
     position: 'relative',
   },
+  homePanel: {
+    backgroundColor: KatchaUI.companionPanel.background,
+    borderColor: KatchaUI.companionPanel.border,
+    borderCurve: 'continuous',
+    borderRadius: 29,
+    borderWidth: 1,
+    boxShadow: KatchaUI.companionPanel.shadow,
+    gap: 10,
+    padding: 12,
+    paddingBottom: 14,
+    position: 'relative',
+    zIndex: 4,
+  },
   paths: {
     flexDirection: 'row',
     gap: 9,
@@ -399,13 +417,12 @@ const styles = StyleSheet.create({
   },
   pathCard: {
     alignItems: 'center',
-    backgroundColor: '#FFF7E4',
-    borderColor: 'rgba(105,75,39,0.24)',
+    backgroundColor: KatchaUI.companionPanel.cardBackground,
+    borderColor: KatchaUI.companionPanel.cardBorder,
     borderCurve: 'continuous',
-    borderRadius: 23,
+    borderRadius: 18,
     borderWidth: 1,
-    boxShadow:
-      '0 10px 24px rgba(79,52,25,0.20), inset 0 1px 0 rgba(255,255,255,0.94)',
+    boxShadow: KatchaUI.companionPanel.cardShadow,
     flex: 1,
     gap: 7,
     minHeight: 164,
@@ -413,6 +430,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   pathCardQuest: {
+    backgroundColor: KatchaUI.companionPanel.cardSelected,
     borderColor: 'rgba(205,149,40,0.80)',
     borderWidth: 1.5,
     boxShadow:
@@ -492,8 +510,9 @@ const styles = StyleSheet.create({
   },
   utilityAction: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,246,224,0.74)',
-    borderColor: 'rgba(105,75,39,0.18)',
+    backgroundColor: KatchaUI.companionPanel.softBackground,
+    borderColor: KatchaUI.companionPanel.softBorder,
+    borderCurve: 'continuous',
     borderRadius: 16,
     borderWidth: 1,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.72)',
@@ -510,13 +529,12 @@ const styles = StyleSheet.create({
   },
   bondCard: {
     alignItems: 'center',
-    backgroundColor: 'rgba(35,32,25,0.88)',
-    borderColor: 'rgba(255,226,145,0.28)',
+    backgroundColor: '#D2BB95',
+    borderColor: KatchaUI.companionPanel.cardBorder,
     borderCurve: 'continuous',
     borderRadius: 20,
     borderWidth: 1,
-    boxShadow:
-      '0 8px 20px rgba(55,36,18,0.25), inset 0 1px 0 rgba(255,255,255,0.12)',
+    boxShadow: KatchaUI.companionPanel.cardShadow,
     flexDirection: 'row',
     gap: 12,
     minHeight: 68,
@@ -551,7 +569,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   bondTrack: {
-    backgroundColor: 'rgba(255,248,224,0.18)',
+    backgroundColor: 'rgba(69,51,34,0.14)',
     borderRadius: 999,
     height: 6,
     overflow: 'hidden',

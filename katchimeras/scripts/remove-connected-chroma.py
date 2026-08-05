@@ -48,6 +48,20 @@ def remove_connected_background(
     ramp = np.clip((distance - transparent_distance) / denominator, 0.0, 1.0)
     alpha = rgba[:, :, 3].astype(np.float32)
     alpha[removable] = np.minimum(alpha[removable], ramp[removable] * 255.0)
+
+    # Generated anti-aliased edges are composited against the chroma key. Merely
+    # lowering their alpha leaves key-coloured RGB behind, which becomes a pink
+    # halo when the trophy is rendered over the warm cabinet panel. Approximate
+    # the original foreground colour before saving the new alpha.
+    partial = removable & (alpha > 0.0) & (alpha < 255.0)
+    if np.any(partial):
+        alpha_fraction = np.maximum(alpha[partial, None] / 255.0, 0.05)
+        foreground = (
+            rgb[partial] - key[None, :] * (1.0 - alpha_fraction)
+        ) / alpha_fraction
+        rgba[:, :, :3][partial] = np.rint(np.clip(foreground, 0.0, 255.0)).astype(
+            np.uint8
+        )
     rgba[:, :, 3] = np.rint(alpha).astype(np.uint8)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

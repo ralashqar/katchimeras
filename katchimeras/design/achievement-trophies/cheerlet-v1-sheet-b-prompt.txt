@@ -1,0 +1,7 @@
+Create six isolated Katchimeras achievement keepsakes in an EXACT 3 columns by 2 rows production sprite sheet. Match the style board's cozy rounded miniature 3D look and Cheerlet palette: sunshine gold, cream, coral, raspberry, turquoise, mint, peach, walnut, and festive brass. References are style-only; no characters or scenes.
+
+Perfectly flat uniform #ff00ff background. Repeat: EXACT 3-by-2 grid. One compact connected subject per cell, centered, no more than 68% occupancy, at least 10% uninterrupted pure-magenta gutter on every side, and clear gutters between cells. Nothing touches boundaries. No shadows, floor, reflections, text, numbers, characters, panels, cups, medals, ribbons, or generic awards.
+
+Row 1 — COMPANION QUESTS tiers I–III: the same celebration helper bag progressing from a small coral-and-cream satchel with one wrapped parcel, to a turquoise-trimmed party bag with bunting roll, flower, and lantern, to a richly equipped festival pack with secured gifts, folded bunting, candle, party hat, flowers, star lantern, and warm brass fittings.
+
+Row 2 — JOURNEY GOALS tiers I–III: the same miniature festival gateway progressing from a simple rounded cream arch with one coral flag, to a coral-and-teal bunting arch with lanterns and two star-shaped steps, to a complete celebration portal with glowing star crown, gifts, flowers, layered bunting, warm lanterns, and three connected stepping stones.

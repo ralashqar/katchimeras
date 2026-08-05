@@ -9,6 +9,7 @@ import type {
   KatchimeraRoleDefinition,
 } from '@/constants/katchimera-roles';
 import { AppFontFamilies } from '@/constants/theme';
+import { KatchaUI } from '@/constants/katcha-ui';
 import { Meadow } from '@/constants/meadow-theme';
 import type { CompanionDiscoveryAnswer } from '@/utils/companion-discovery';
 
@@ -185,12 +186,12 @@ const styles = StyleSheet.create({
   title: { fontFamily: AppFontFamilies.manrope, fontSize: 23, fontWeight: '900', letterSpacing: -0.55, lineHeight: 28 },
   description: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '600', lineHeight: 19 },
   card: {
-    backgroundColor: 'rgba(255,248,232,0.92)',
-    borderColor: Meadow.cardBorder,
+    backgroundColor: KatchaUI.companionPanel.cardBackground,
+    borderColor: KatchaUI.companionPanel.cardBorder,
     borderCurve: 'continuous',
     borderRadius: 18,
     borderWidth: 1,
-    boxShadow: '0 8px 22px rgba(37,42,29,0.18), inset 0 1px 0 rgba(255,255,255,0.76)',
+    boxShadow: KatchaUI.companionPanel.cardShadow,
     gap: 9,
     padding: 15,
   },
@@ -199,8 +200,8 @@ const styles = StyleSheet.create({
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 2 },
   option: { backgroundColor: Meadow.goldSoft, borderCurve: 'continuous', borderRadius: 14, minHeight: 40, justifyContent: 'center', paddingHorizontal: 13 },
   optionText: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontWeight: '800' },
-  answerRow: { alignItems: 'center', backgroundColor: Meadow.goldSoft, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 7, padding: 11 },
-  answerBlock: { backgroundColor: Meadow.goldSoft, borderCurve: 'continuous', borderRadius: 14, gap: 7, padding: 4 },
+  answerRow: { alignItems: 'center', backgroundColor: KatchaUI.companionPanel.softBackground, borderCurve: 'continuous', borderRadius: 14, flexDirection: 'row', gap: 7, padding: 11 },
+  answerBlock: { backgroundColor: KatchaUI.companionPanel.softBackground, borderCurve: 'continuous', borderRadius: 14, gap: 7, padding: 4 },
   answerCopy: { flex: 1, gap: 2 },
   answerLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '900', letterSpacing: 0.8, textTransform: 'uppercase' },
   answerText: { fontFamily: AppFontFamilies.manrope, fontSize: 13, fontWeight: '700', lineHeight: 18 },

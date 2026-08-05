@@ -145,7 +145,7 @@ test('You questionnaires require answer confirmation and task consent', () => {
   assert.match(interaction, /bubbleVariant=\{destination === 'discovery' \|\| quickGoalPickerOpen \? 'questionnaire' : 'default'\}/);
   assert.match(interaction, /showSpeechBubble/);
   assert.doesNotMatch(interaction, /styles\.youHeading|styles\.youIntro/);
-  assert.match(interaction, /backgroundColor: '#211A13'/);
+  assert.match(interaction, /backgroundColor: KatchaUI\.companionPanel\.background/);
   assert.doesNotMatch(interaction, /talk about you/i);
   assert.doesNotMatch(journey, /Find a new focus/);
   assert.doesNotMatch(journey, /previous focus kept in history/);
@@ -314,7 +314,7 @@ test('goal picker returns to the dedicated goals destination', () => {
   assert.match(interaction, /backLabel=\{quickGoalPickerOpen \? 'Goals'/);
   assert.match(interaction, /\) : !questionnaireExperience \? \(\s*<CompanionCinematicStage/);
   assert.match(interaction, /\(route\.kind === 'destination' \|\| quickGoalPickerOpen\) && !questGameVisible && !questionnaireExperience/);
-  assert.match(quickGoals, /backgroundColor: '#211A13'/);
+  assert.match(quickGoals, /backgroundColor: KatchaUI\.companionPanel\.background/);
   assert.match(quickGoals, /styles\.scopedPresetRow/);
   assert.match(quickGoals, /<QuickGoalComposerModal/);
   assert.match(quickGoals, /<QuickGoalActionModal/);

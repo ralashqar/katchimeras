@@ -751,6 +751,95 @@ const PIXOOKA = {
 } satisfies Record<string, readonly ImageSource[]>;
 
 
+const SKYLO = {
+  'local-places': [
+    require('../assets/images/katchimeras/achievements/skylo-v1/local-places-1.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/local-places-2.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/local-places-3.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/local-places-4.webp'),
+  ],
+  'cities': [
+    require('../assets/images/katchimeras/achievements/skylo-v1/cities-1.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/cities-2.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/cities-3.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/cities-4.webp'),
+  ],
+  'family-goals': [
+    require('../assets/images/katchimeras/achievements/skylo-v1/family-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/family-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/family-goals-3.webp'),
+  ],
+  'companion-quests': [
+    require('../assets/images/katchimeras/achievements/skylo-v1/companion-quests-1.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/companion-quests-2.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/companion-quests-3.webp'),
+  ],
+  'journey-goals': [
+    require('../assets/images/katchimeras/achievements/skylo-v1/journey-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/journey-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/skylo-v1/journey-goals-3.webp'),
+  ],
+} satisfies Record<string, readonly ImageSource[]>;
+
+const VOYAGLE = {
+  'travel-moments': [
+    require('../assets/images/katchimeras/achievements/voyagle-v1/travel-moments-1.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/travel-moments-2.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/travel-moments-3.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/travel-moments-4.webp'),
+  ],
+  'destinations': [
+    require('../assets/images/katchimeras/achievements/voyagle-v1/destinations-1.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/destinations-2.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/destinations-3.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/destinations-4.webp'),
+  ],
+  'family-goals': [
+    require('../assets/images/katchimeras/achievements/voyagle-v1/family-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/family-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/family-goals-3.webp'),
+  ],
+  'companion-quests': [
+    require('../assets/images/katchimeras/achievements/voyagle-v1/companion-quests-1.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/companion-quests-2.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/companion-quests-3.webp'),
+  ],
+  'journey-goals': [
+    require('../assets/images/katchimeras/achievements/voyagle-v1/journey-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/journey-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/voyagle-v1/journey-goals-3.webp'),
+  ],
+} satisfies Record<string, readonly ImageSource[]>;
+
+const CHEERLET = {
+  'life-events': [
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/life-events-1.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/life-events-2.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/life-events-3.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/life-events-4.webp'),
+  ],
+  'chapter-types': [
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/chapter-types-1.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/chapter-types-2.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/chapter-types-3.webp'),
+  ],
+  'family-goals': [
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/family-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/family-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/family-goals-3.webp'),
+  ],
+  'companion-quests': [
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/companion-quests-1.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/companion-quests-2.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/companion-quests-3.webp'),
+  ],
+  'journey-goals': [
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/journey-goals-1.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/journey-goals-2.webp'),
+    require('../assets/images/katchimeras/achievements/cheerlet-v1/journey-goals-3.webp'),
+  ],
+} satisfies Record<string, readonly ImageSource[]>;
+
 const FAMILY_ART_KIND: Record<KatchimeraFamilyId, keyof typeof JOURNAL_ART> = {
   baristabbit: 'food', feastle: 'food', steppling: 'movement', flexel: 'movement', bedrotte: 'general',
   dawnle: 'general', mendle: 'general', gatherglow: 'people', heartmote: 'people', kindling: 'people',
@@ -847,6 +936,18 @@ export function companionAchievementIconSource(definition: CompanionAchievementD
   }
   if (definition.familyId === 'pixooka' && definition.sectionId in PIXOOKA) {
     const progression = PIXOOKA[definition.sectionId as keyof typeof PIXOOKA];
+    return progression[Math.min(progression.length - 1, definition.tier - 1)];
+  }
+  if (definition.familyId === 'skylo' && definition.sectionId in SKYLO) {
+    const progression = SKYLO[definition.sectionId as keyof typeof SKYLO];
+    return progression[Math.min(progression.length - 1, definition.tier - 1)];
+  }
+  if (definition.familyId === 'voyagle' && definition.sectionId in VOYAGLE) {
+    const progression = VOYAGLE[definition.sectionId as keyof typeof VOYAGLE];
+    return progression[Math.min(progression.length - 1, definition.tier - 1)];
+  }
+  if (definition.familyId === 'cheerlet' && definition.sectionId in CHEERLET) {
+    const progression = CHEERLET[definition.sectionId as keyof typeof CHEERLET];
     return progression[Math.min(progression.length - 1, definition.tier - 1)];
   }
 
