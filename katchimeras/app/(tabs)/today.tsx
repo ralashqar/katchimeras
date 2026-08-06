@@ -1715,7 +1715,7 @@ function HomeScreen() {
           <TodayNurtureExperience
           actions={nurtureCare.active}
           bottomInset={insets.bottom}
-          completionEvent={flowBusy ? null : queuedCareCompletion}
+          completionEvent={queuedCareCompletion?.action.category === 'check_in' ? queuedCareCompletion : flowBusy ? null : queuedCareCompletion}
           day={formingDay}
           eggTargetRef={eggTargetRef}
           feedbackKey={eggFeedKey}

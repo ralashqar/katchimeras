@@ -11,6 +11,8 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -21,6 +23,7 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 
+import { ThemedText } from '@/components/themed-text';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import { kingdomHomeTileForIdentity, kingdomSurfaceTileAlignment } from '@/utils/kingdom-surface-tiles';
 import {
@@ -37,6 +40,7 @@ import {
   subscribeTodayEnergyFeedback,
 } from '@/features/today/today-energy-feedback';
 import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
+import { useTodayEnvironmentMotionValues } from '@/components/katchadeck/home/today-environment-motion';
 import todayScene from '@/data/today-scene.json';
 
 type TodayKingdomEggHeroProps = {
@@ -46,13 +50,23 @@ type TodayKingdomEggHeroProps = {
   explorationStageTop?: number;
   homeArchetypeId?: HomeArchetypeId | null;
   hideKingdomEnvironmentArt?: boolean;
+  isActivated?: boolean;
   isReady?: boolean;
   growthStage?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   growthProgress?: number;
   deferGrowthUntilEnergyArrival?: boolean;
   onEggPress?: () => void;
   pinchStrength?: number;
+  showDormantIndicator?: boolean;
   targetRef?: RefObject<View | null>;
+};
+
+type DormantEggScreenAnchor = {
+  focusX: number;
+  focusY: number;
+  left: number;
+  sceneTranslateX: SharedValue<number>;
+  top: number;
 };
 
 type TodayKingdomEggOverlayProps = {
@@ -67,6 +81,15 @@ const SOFT_RING_SOURCE = require('../../../assets/images/katchimeras/soft-ring.p
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 const EGG_RAY_COUNT = 12;
 const EGG_RAY_INDICES = Array.from({ length: EGG_RAY_COUNT }, (_, index) => index);
+const ACTIVATION_CONFETTI = Array.from({ length: 18 }, (_, index) => ({
+  angle: (-160 + index * (320 / 17)) * (Math.PI / 180),
+  color: ['#FFE68A', '#FFB85C', '#F49AC1', '#91D8C7', '#A7D5FF'][index % 5],
+  delay: (index % 6) * 0.035,
+  distance: 82 + (index % 4) * 18,
+  height: 9 + (index % 3) * 3,
+  rotation: index % 2 === 0 ? 220 : -190,
+  width: index % 3 === 0 ? 5 : 7,
+}));
 
 export function TodayKingdomEggHero({
   accentColor = '#F4CE7A',
@@ -75,12 +98,14 @@ export function TodayKingdomEggHero({
   explorationStageTop,
   homeArchetypeId,
   hideKingdomEnvironmentArt = false,
+  isActivated = true,
   isReady = false,
   growthStage = 0,
   growthProgress,
   deferGrowthUntilEnergyArrival = false,
   onEggPress,
   pinchStrength = 1,
+  showDormantIndicator = true,
   targetRef,
 }: TodayKingdomEggHeroProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -105,9 +130,30 @@ export function TodayKingdomEggHero({
   sourceEnergyRatioRef.current = energyRatio;
   const feedbackShake = useSharedValue(0);
   const feedbackPulse = useSharedValue(0);
+  const activationPulse = useSharedValue(0);
+  const activationCelebration = useSharedValue(0);
+  const previousActivationRef = useRef(isActivated);
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
   const readyShake = useSharedValue(0);
+
+  useEffect(() => {
+    const wasActivated = previousActivationRef.current;
+    previousActivationRef.current = isActivated;
+    if (wasActivated || !isActivated) return;
+    cancelAnimation(activationPulse);
+    cancelAnimation(activationCelebration);
+    activationPulse.value = withSequence(
+      withTiming(1, { duration: reduceMotion ? 100 : 210, easing: Easing.out(Easing.cubic) }),
+      withTiming(0.28, { duration: reduceMotion ? 120 : 260, easing: Easing.inOut(Easing.cubic) }),
+      withTiming(0, { duration: reduceMotion ? 120 : 360, easing: Easing.out(Easing.cubic) }),
+    );
+    activationCelebration.value = 0;
+    activationCelebration.value = withTiming(1, {
+      duration: reduceMotion ? 480 : 1250,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [activationCelebration, activationPulse, isActivated, reduceMotion]);
 
   useEffect(() => {
     const applyGrowth = () => {
@@ -216,7 +262,8 @@ export function TodayKingdomEggHero({
     return {
       transform: [
         { rotateZ: `${shake * 2.8}deg` },
-        { scale: (0.5 + visualGrowth.value * 0.5) * (1 + feedbackPulse.value * 0.045) },
+        { translateY: -activationPulse.value * (reduceMotion ? 2 : 7) },
+        { scale: (0.5 + visualGrowth.value * 0.5) * (1 + feedbackPulse.value * 0.045 + activationPulse.value * (reduceMotion ? 0.06 : 0.16)) },
       ],
     };
   });
@@ -271,6 +318,12 @@ export function TodayKingdomEggHero({
             feedbackKey={feedbackKey}
             growth={visualGrowth}
             growthIntensity={growthIntensity}
+            stageHeight={eggFrame.height}
+            stageScale={eggStageScale}
+          />
+          <EggActivationCelebration
+            progress={activationCelebration}
+            reduceMotion={reduceMotion}
             stageHeight={eggFrame.height}
             stageScale={eggStageScale}
           />
@@ -329,9 +382,171 @@ export function TodayKingdomEggHero({
               />
             </Pressable>
           </Animated.View>
+          {!isActivated && showDormantIndicator ? <DormantEggZzz growth={visualGrowth} reduceMotion={reduceMotion} stageScale={eggStageScale} /> : null}
         </View>
       </TodayFallbackCloudScene>
     </View>
+  );
+}
+
+export function TodayDormantEggIndicator({ energyRatio, focusX, focusY, left, sceneTranslateX, stageScale, top }: {
+  energyRatio: number;
+  focusX: number;
+  focusY: number;
+  left: number;
+  sceneTranslateX: SharedValue<number>;
+  stageScale: number;
+  top: number;
+}) {
+  const reduceMotion = useReducedMotion();
+  const visualGrowth = useSharedValue(eggVisualGrowthForEnergyRatio(energyRatio));
+  useEffect(() => {
+    visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(energyRatio), {
+      duration: reduceMotion ? 90 : 520,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [energyRatio, reduceMotion, visualGrowth]);
+  return (
+    <DormantEggZzz
+      growth={visualGrowth}
+      reduceMotion={reduceMotion}
+      screenAnchor={{ focusX, focusY, left, sceneTranslateX, top }}
+      stageScale={stageScale}
+    />
+  );
+}
+
+function DormantEggZzz({ growth, reduceMotion, screenAnchor, stageScale }: {
+  growth: SharedValue<number>;
+  reduceMotion: boolean;
+  screenAnchor?: DormantEggScreenAnchor;
+  stageScale: number;
+}) {
+  const environmentMotion = useTodayEnvironmentMotionValues();
+  const drift = useSharedValue(0);
+  useEffect(() => {
+    cancelAnimation(drift);
+    if (reduceMotion) {
+      drift.value = 0.35;
+      return;
+    }
+    drift.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(drift);
+  }, [drift, reduceMotion]);
+  const animatedStyle = useAnimatedStyle(() => {
+    const parentZoom = Math.max(1, environmentMotion?.pinchScale.value ?? 1);
+    const growthLift = growth.value * 34 * stageScale;
+    if (screenAnchor) {
+      return {
+        opacity: 0.62 + drift.value * 0.28,
+        transform: [
+          {
+            translateX: screenAnchor.sceneTranslateX.value * parentZoom
+              + (parentZoom - 1) * (screenAnchor.left - screenAnchor.focusX),
+          },
+          {
+            translateY: (parentZoom - 1) * (screenAnchor.top - screenAnchor.focusY)
+              - drift.value * 5
+              - growthLift,
+          },
+          { rotate: `${-3 + drift.value * 5}deg` },
+          { scale: 0.96 + drift.value * 0.05 },
+        ],
+      };
+    }
+    return {
+      opacity: 0.62 + drift.value * 0.28,
+      transform: [
+        { translateY: -drift.value * 5 - growthLift },
+        { rotate: `${-3 + drift.value * 5}deg` },
+        // The egg/environment retain their shared pinch transform, while the
+        // sleep indicator stays a sharp screen-space overlay instead of a
+        // magnified native-text texture.
+        { scale: (0.96 + drift.value * 0.05) / parentZoom },
+      ],
+    };
+  });
+  return (
+    <Animated.View
+      entering={FadeIn.duration(reduceMotion ? 80 : 220)}
+      exiting={FadeOut.duration(reduceMotion ? 80 : 180)}
+      pointerEvents="none"
+      style={[
+        styles.zzz,
+        screenAnchor
+          ? { left: screenAnchor.left, top: screenAnchor.top }
+          : { marginLeft: 92 * stageScale, top: 62 * stageScale },
+        animatedStyle,
+      ]}>
+      <ThemedText style={[styles.zzzSmall, { transform: [{ translateY: 10 * stageScale }] }]} lightColor="#FFF4C7" darkColor="#FFF4C7">z</ThemedText>
+      <ThemedText style={styles.zzzMedium} lightColor="#FFE69A" darkColor="#FFE69A">z</ThemedText>
+      <ThemedText style={styles.zzzLarge} lightColor="#FFD46F" darkColor="#FFD46F">Z</ThemedText>
+    </Animated.View>
+  );
+}
+
+function EggActivationCelebration({ progress, reduceMotion, stageHeight, stageScale }: {
+  progress: SharedValue<number>;
+  reduceMotion: boolean;
+  stageHeight: number;
+  stageScale: number;
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.activationCelebration, { height: stageHeight, width: 330 * stageScale }]}>
+      {ACTIVATION_CONFETTI.map((particle, index) => (
+        <ActivationConfettiParticle
+          key={`egg-activation-confetti-${index}`}
+          particle={particle}
+          progress={progress}
+          reduceMotion={reduceMotion}
+          stageScale={stageScale}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ActivationConfettiParticle({ particle, progress, reduceMotion, stageScale }: {
+  particle: (typeof ACTIVATION_CONFETTI)[number];
+  progress: SharedValue<number>;
+  reduceMotion: boolean;
+  stageScale: number;
+}) {
+  const animatedStyle = useAnimatedStyle(() => {
+    const localProgress = Math.max(0, Math.min(1, (progress.value - particle.delay) / (1 - particle.delay)));
+    const visibility = Math.min(1, localProgress * 7) * (1 - localProgress);
+    const distance = reduceMotion ? particle.distance * 0.3 : particle.distance;
+    return {
+      opacity: visibility * (reduceMotion ? 0.55 : 1),
+      transform: [
+        { translateX: Math.cos(particle.angle) * distance * localProgress * stageScale },
+        { translateY: (Math.sin(particle.angle) * distance * localProgress + localProgress * localProgress * 52) * stageScale },
+        { rotate: `${particle.rotation * localProgress}deg` },
+        { scale: 0.7 + visibility * 0.55 },
+      ],
+    };
+  });
+  return (
+    <Animated.View
+      style={[
+        styles.activationConfetti,
+        {
+          backgroundColor: particle.color,
+          height: particle.height * stageScale,
+          width: particle.width * stageScale,
+        },
+        animatedStyle,
+      ]}
+    />
   );
 }
 
@@ -634,6 +849,7 @@ const styles = StyleSheet.create({
   stage: {
     alignItems: 'center',
     height: TODAY_KINGDOM_STAGE_HEIGHT,
+    overflow: 'visible',
     width: '100%',
   },
   tile: {
@@ -644,6 +860,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     left: 0,
+    overflow: 'visible',
     position: 'absolute',
     right: 0,
     zIndex: 3,
@@ -655,6 +872,20 @@ const styles = StyleSheet.create({
     height: '100%',
     transformOrigin: 'center bottom',
     zIndex: 3,
+  },
+  activationCelebration: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+    position: 'absolute',
+    zIndex: 2,
+  },
+  activationConfetti: {
+    borderCurve: 'continuous',
+    borderRadius: 3,
+    boxShadow: '0 1px 3px rgba(88, 53, 16, 0.24)',
+    position: 'absolute',
   },
   feedRing: {
     alignSelf: 'center',
@@ -677,6 +908,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     zIndex: 1,
   },
+  zzz: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 1,
+    overflow: 'visible',
+    padding: 4,
+    position: 'absolute',
+    zIndex: 5,
+  },
+  zzzSmall: { fontSize: 15, fontWeight: '900', textShadowColor: 'rgba(77,45,15,0.42)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
+  zzzMedium: { fontSize: 21, fontWeight: '900', textShadowColor: 'rgba(77,45,15,0.42)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
+  zzzLarge: { fontSize: 29, fontWeight: '900', lineHeight: 38, marginLeft: -7, minWidth: 36, paddingHorizontal: 3, textAlign: 'center', textShadowColor: 'rgba(77,45,15,0.46)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 3 },
   belowEgg: {
     alignItems: 'center',
     left: 0,

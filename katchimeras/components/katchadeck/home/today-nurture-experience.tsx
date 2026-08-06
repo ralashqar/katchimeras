@@ -23,7 +23,7 @@ import Animated, {
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
-import { TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
+import { TodayDormantEggIndicator, TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
 import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { CompanionGoalPortrait } from '@/components/katchadeck/goals/goal-task-row';
 import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-completion-celebration';
@@ -233,12 +233,25 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             growthStage={growth.stage}
             hideKingdomEnvironmentArt
             homeArchetypeId={homeArchetypeId}
+            isActivated={growth.isActivated}
             isReady={ready}
             pinchStrength={0}
+            showDormantIndicator={false}
             targetRef={eggTargetRef}
           />
         </Animated.View>
       </TodayEnvironmentViewportMotionLayer>
+      {!growth.isActivated ? (
+        <TodayDormantEggIndicator
+          energyRatio={growth.energyRatio}
+          focusX={windowWidth / 2}
+          focusY={scenePinchFocusY}
+          left={windowWidth / 2 + 4 * explorationEggFrame.scale}
+          sceneTranslateX={sceneTranslateX}
+          stageScale={explorationEggFrame.scale}
+          top={stageTop + sceneLift + explorationEggFrame.top + 62 * explorationEggFrame.scale}
+        />
+      ) : null}
       <View pointerEvents="none" style={styles.environmentFade} />
       <View pointerEvents="none" style={[styles.meterAnchor, { top: stageTop - 8 }]}>
         <GrowthMeter growth={growth} />
