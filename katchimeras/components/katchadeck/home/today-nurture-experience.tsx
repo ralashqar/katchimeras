@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type View as ViewType } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -24,7 +24,7 @@ import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-str
 import { LanternTimeline } from '@/components/katchadeck/home/lantern-timeline';
 import { TodayExplorationBackground } from '@/components/katchadeck/home/today-exploration-background';
 import { TodayKingdomEggHero } from '@/components/katchadeck/home/today-kingdom-egg-hero';
-import { KatchaSheet } from '@/components/katchadeck/ui/katcha-sheet';
+import { WorldActionStack } from '@/components/katchadeck/world/world-action-stack';
 import { CompanionGoalPortrait } from '@/components/katchadeck/goals/goal-task-row';
 import { GoalCompletionCelebration } from '@/components/katchadeck/goals/goal-completion-celebration';
 import {
@@ -34,15 +34,26 @@ import {
 } from '@/components/katchadeck/world/mood-monument-sheet';
 import { SLEEP_ART, SLEEP_OPTIONS } from '@/components/katchadeck/world/sleep-sheet';
 import { ThemedText } from '@/components/themed-text';
-import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies } from '@/constants/theme';
+import {
+  homeTabBarHeight,
+  HOME_ACTIONS_TAB_BAR_GAP,
+  HOME_ACTIONS_Y_OFFSET,
+  HOME_SCENE_Y_OFFSET,
+} from '@/constants/home-loop-layout';
 import { Meadow } from '@/constants/meadow-theme';
+import { GROWTH_ENERGY_ART, todayCareArt } from '@/constants/today-care-art';
 import type { HomeDayRecord, HomeTimelineDay, SleepQuality } from '@/types/home';
 import type { HomeArchetypeId } from '@/types/world-identity';
 import type { RankedTodayCareAction } from '@/utils/today-care';
 import type { TodayGrowthSummary } from '@/utils/today-growth';
 import type { CompanionQuickGoalCompletionReceipt } from '@/hooks/use-companion-quick-goals';
 import {
+  TodayEnvironmentViewportMotionLayer,
+} from '@/components/katchadeck/home/today-environment-motion';
+import {
+  todayExplorationEggStageFrame,
   TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
@@ -51,21 +62,23 @@ type TodayNurtureExperienceProps = {
   actions: RankedTodayCareAction[];
   completionEvent: TodayCareCompletionEvent | null;
   day: HomeDayRecord;
+  energyFeedbackAmount: number;
+  energyFeedbackKey: number;
   feedbackKey: number;
   growth: TodayGrowthSummary;
   homeArchetypeId?: HomeArchetypeId | null;
   onAddJournal: () => void;
   onAddPhoto: () => void;
   onAddTextNote: () => void;
-  onAddVoiceNote: () => void;
   onCareNotToday: (action: RankedTodayCareAction) => void;
-  onCareStart: (action: RankedTodayCareAction) => void;
+  onCareStart: (action: RankedTodayCareAction, rewardFrom: FeedSourceRect) => void;
   onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
   onCompletionAnimationEnd: (eventId: string) => void;
   onOpenQuickGoal: (goalId: string) => void;
-  onChooseMood: (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource: number, accent: string) => void;
-  onChooseSleep: (quality: SleepQuality, label: string, from: FeedSourceRect, imageSource: number, accent: string) => void;
+  onChooseMood: (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
+  onChooseSleep: (quality: SleepQuality, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
   onReveal: () => void;
+  onRewardFlight: (from: FeedSourceRect, action: RankedTodayCareAction, onArrive: () => void) => void;
   onSelectDay: (dayId: string) => void;
   careSwipeExternalGesture: GestureType;
   sceneTranslateX: SharedValue<number>;
@@ -78,6 +91,7 @@ type TodayNurtureExperienceProps = {
 export type TodayCareCompletionEvent = {
   id: string;
   action: RankedTodayCareAction;
+  rewardAlreadyAnimated?: boolean;
 };
 
 type CheckInSelection = {
@@ -95,13 +109,14 @@ export function TodayNurtureExperience({
   completionEvent,
   day,
   eggTargetRef,
+  energyFeedbackAmount,
+  energyFeedbackKey,
   feedbackKey,
   growth,
   homeArchetypeId,
   onAddJournal,
   onAddPhoto,
   onAddTextNote,
-  onAddVoiceNote,
   onCareNotToday,
   onCareStart,
   onCompleteQuickGoal,
@@ -110,6 +125,7 @@ export function TodayNurtureExperience({
   onChooseMood,
   onChooseSleep,
   onReveal,
+  onRewardFlight,
   onSelectDay,
   careSwipeExternalGesture,
   sceneTranslateX,
@@ -117,12 +133,12 @@ export function TodayNurtureExperience({
   topInset,
 }: TodayNurtureExperienceProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [actionContentHeight, setActionContentHeight] = useState(0);
   const [checkInSelection, setCheckInSelection] = useState<CheckInSelection | null>(null);
   const checkInSelectionRef = useRef<CheckInSelection | null>(null);
   const checkInLaunchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduceMotion = useReducedMotion();
-  const ready = day.canHatch || growth.isReady;
+  const ready = growth.isActivated && (day.canHatch || growth.isReady);
   const moodAction = actions.find((action) => action.id === 'mood');
   const sleepAction = actions.find((action) => action.id === 'sleep');
   const displayedMoodAction = moodAction ?? (checkInSelection?.kind === 'mood' ? checkInSelection.action : undefined);
@@ -133,27 +149,43 @@ export function TodayNurtureExperience({
     && completionEvent.action.category !== 'check_in'
     && completionEvent.action.destination.kind !== 'quick_goal';
   const stageTop = topInset + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
-  const sceneVerticalNudge = 10;
-  const contentVerticalNudge = 18;
+  const sceneVerticalNudge = HOME_SCENE_Y_OFFSET;
+  const contentVerticalNudge = HOME_ACTIONS_Y_OFFSET;
   const sceneLift = -100 + sceneVerticalNudge;
-  const panelStart = Math.max(316, windowHeight * 0.465) + contentVerticalNudge;
+  const minimumPanelStart = Math.max(316, windowHeight * 0.465) + contentVerticalNudge;
+  const tabBarHeight = homeTabBarHeight(bottomInset);
+  const tabBarTop = windowHeight - tabBarHeight;
+  const anchoredPanelStart = tabBarTop - HOME_ACTIONS_TAB_BAR_GAP - actionContentHeight;
+  const panelStart = actionContentHeight > 0
+    ? Math.max(minimumPanelStart, anchoredPanelStart)
+    : minimumPanelStart;
   const sceneSpacerHeight = Math.max(240, panelStart - topInset - 8);
+  const explorationEggFrame = todayExplorationEggStageFrame(
+    windowWidth,
+    windowHeight,
+    stageTop,
+  );
+  const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
   const eggPanStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: sceneTranslateX.value }],
   }));
   useEffect(() => () => {
     if (checkInLaunchTimerRef.current) clearTimeout(checkInLaunchTimerRef.current);
   }, []);
-  const beginCheckInSelection = useCallback((selection: CheckInSelection, from: FeedSourceRect) => {
+  const handleActionContentLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    setActionContentHeight((current) => Math.abs(current - nextHeight) < 0.5 ? current : nextHeight);
+  }, []);
+  const beginCheckInSelection = useCallback((selection: CheckInSelection, from: FeedSourceRect, currencyFrom: FeedSourceRect) => {
     if (checkInSelectionRef.current) return;
     checkInSelectionRef.current = selection;
     setCheckInSelection(selection);
     const launchFeed = () => {
       checkInLaunchTimerRef.current = null;
       if (selection.kind === 'mood') {
-        onChooseMood(selection.id as MoodMonumentChoiceId, selection.label, from, selection.image, selection.accent);
+        onChooseMood(selection.id as MoodMonumentChoiceId, selection.label, from, selection.image, selection.accent, currencyFrom);
       } else {
-        onChooseSleep(selection.id as SleepQuality, selection.label, from, selection.image, selection.accent);
+        onChooseSleep(selection.id as SleepQuality, selection.label, from, selection.image, selection.accent, currencyFrom);
       }
     };
     if (reduceMotion) {
@@ -176,28 +208,33 @@ export function TodayNurtureExperience({
 
   return (
     <View style={styles.root}>
-      <TodayExplorationBackground
-        backgroundKey="home"
-        imageSize={Math.max(windowHeight, windowWidth)}
-        translateX={sceneTranslateX}
-        verticalOffset={sceneLift}
-      />
-      <View pointerEvents="none" style={styles.environmentFade} />
-      <Animated.View pointerEvents="none" style={[styles.eggStage, { top: stageTop + sceneLift }, eggPanStyle]}>
-        <TodayKingdomEggHero
-          accentColor={day.egg.accentColor}
-          coreColor={day.egg.coreColor}
-          explorationStageTop={stageTop}
-          feedbackKey={feedbackKey}
-          growthStage={growth.stage}
-          hideKingdomEnvironmentArt
-          homeArchetypeId={homeArchetypeId}
-          isReady={ready}
-          targetRef={eggTargetRef}
+      <TodayEnvironmentViewportMotionLayer
+        focusY={scenePinchFocusY}
+        viewportHeight={windowHeight}>
+        <TodayExplorationBackground
+          backgroundKey="home"
+          imageSize={Math.max(windowHeight, windowWidth)}
+          translateX={sceneTranslateX}
+          verticalOffset={sceneLift}
         />
-      </Animated.View>
+        <Animated.View pointerEvents="none" style={[styles.eggStage, { top: stageTop + sceneLift }, eggPanStyle]}>
+          <TodayKingdomEggHero
+            accentColor={day.egg.accentColor}
+            coreColor={day.egg.coreColor}
+            explorationStageTop={stageTop}
+            feedbackKey={feedbackKey}
+            growthStage={growth.stage}
+            hideKingdomEnvironmentArt
+            homeArchetypeId={homeArchetypeId}
+            isReady={ready}
+            pinchStrength={0}
+            targetRef={eggTargetRef}
+          />
+        </Animated.View>
+      </TodayEnvironmentViewportMotionLayer>
+      <View pointerEvents="none" style={styles.environmentFade} />
       <View pointerEvents="none" style={[styles.meterAnchor, { top: stageTop - 8 }]}>
-        <GrowthMeter growth={growth} />
+        <GrowthMeter feedbackAmount={energyFeedbackAmount} feedbackKey={energyFeedbackKey} growth={growth} />
       </View>
       <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
@@ -205,26 +242,31 @@ export function TodayNurtureExperience({
         <LanternTimeline days={timelineDays} interactionLocked={false} onSelect={onSelectDay} selectedId={day.id} />
       </Animated.View>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: Math.max(104, bottomInset + 70), paddingTop: topInset + 8 }}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
         style={styles.contentScroll}>
         <View pointerEvents="none" style={{ height: sceneSpacerHeight }} />
 
-        {ready ? (
-          <View style={styles.pageInset}>
-            <Pressable accessibilityRole="button" onPress={onReveal} style={({ pressed }) => [styles.reveal, pressed && styles.pressed]}>
-              <IconSymbol color={Meadow.ink} name="sparkles" size={22} />
-              <ThemedText style={styles.revealLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>Reveal the hatch</ThemedText>
-            </Pressable>
-          </View>
-        ) : (
-          <AddMemoryButton onPress={() => setAddSheetOpen(true)} />
-        )}
+        <View onLayout={handleActionContentLayout}>
+          {ready ? (
+            <View style={styles.pageInset}>
+              <Pressable accessibilityRole="button" onPress={onReveal} style={({ pressed }) => [styles.reveal, pressed && styles.pressed]}>
+                <IconSymbol color={Meadow.ink} name="sparkles" size={22} />
+                <ThemedText style={styles.revealLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>Reveal the hatch</ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <FormingActionCluster
+              onAdd={onAddJournal}
+              onCamera={onAddPhoto}
+              onNote={onAddTextNote}
+            />
+          )}
 
-        <Animated.View
-          layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}
-          style={styles.careSection}>
+          <Animated.View
+            layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}
+            style={styles.careSection}>
           {displayedMoodAction || displayedSleepAction ? (
             <Animated.View
               layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}
@@ -234,7 +276,7 @@ export function TodayNurtureExperience({
                   action={displayedMoodAction}
                   completionEvent={completionIsCheckIn && completionEvent?.action.instanceId === displayedMoodAction.instanceId ? completionEvent : null}
                   interactionLocked={checkInSelection != null}
-                  onChoose={(selection, from) => beginCheckInSelection({ ...selection, action: displayedMoodAction, kind: 'mood' }, from)}
+                  onChoose={(selection, from, currencyFrom) => beginCheckInSelection({ ...selection, action: displayedMoodAction, kind: 'mood' }, from, currencyFrom)}
                   onFinished={finishCheckInSelection}
                   reduceMotion={reduceMotion}
                   selection={checkInSelection?.kind === 'mood' ? checkInSelection : null}
@@ -245,7 +287,7 @@ export function TodayNurtureExperience({
                   action={displayedSleepAction}
                   completionEvent={completionIsCheckIn && completionEvent?.action.instanceId === displayedSleepAction.instanceId ? completionEvent : null}
                   interactionLocked={checkInSelection != null}
-                  onChoose={(selection, from) => beginCheckInSelection({ ...selection, action: displayedSleepAction, kind: 'sleep' }, from)}
+                  onChoose={(selection, from, currencyFrom) => beginCheckInSelection({ ...selection, action: displayedSleepAction, kind: 'sleep' }, from, currencyFrom)}
                   onFinished={finishCheckInSelection}
                   reduceMotion={reduceMotion}
                   selection={checkInSelection?.kind === 'sleep' ? checkInSelection : null}
@@ -255,7 +297,13 @@ export function TodayNurtureExperience({
           ) : null}
 
           {completionIsStandard && completionEvent ? (
-            <CompletedCareRow event={completionEvent} key={completionEvent.id} onFinished={onCompletionAnimationEnd} reduceMotion={reduceMotion} />
+            <CompletedCareRow
+              event={completionEvent}
+              key={completionEvent.id}
+              onFinished={onCompletionAnimationEnd}
+              onRewardFlight={onRewardFlight}
+              reduceMotion={reduceMotion}
+            />
           ) : null}
 
           {remainingActions.map((action, index) => action.destination.kind === 'quick_goal' ? (
@@ -268,6 +316,7 @@ export function TodayNurtureExperience({
               onCompleteQuickGoal={onCompleteQuickGoal}
               onNotToday={() => onCareNotToday(action)}
               onOpenQuickGoal={onOpenQuickGoal}
+              onRewardFlight={onRewardFlight}
               swipeExternalGesture={careSwipeExternalGesture}
               reduceMotion={reduceMotion}
             />
@@ -277,9 +326,9 @@ export function TodayNurtureExperience({
               index={index}
               key={action.instanceId}
               onNotToday={() => onCareNotToday(action)}
-              onStart={() => {
+              onStart={(rewardFrom) => {
                 if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-                onCareStart(action);
+                onCareStart(action, rewardFrom);
               }}
               swipeExternalGesture={careSwipeExternalGesture}
               reduceMotion={reduceMotion}
@@ -295,77 +344,30 @@ export function TodayNurtureExperience({
               </View>
             </Animated.View>
           ) : null}
-        </Animated.View>
+          </Animated.View>
+        </View>
       </ScrollView>
-      <AddMemorySheet
-        onClose={() => setAddSheetOpen(false)}
-        onJournal={onAddJournal}
-        onPhoto={onAddPhoto}
-        onTextNote={onAddTextNote}
-        onVoiceNote={onAddVoiceNote}
-        open={addSheetOpen}
-      />
     </View>
   );
 }
 
-function AddMemoryButton({ onPress }: { onPress: () => void }) {
+function FormingActionCluster({ onAdd, onCamera, onNote }: {
+  onAdd: () => void;
+  onCamera: () => void;
+  onNote: () => void;
+}) {
   return (
     <View style={styles.addMemoryCluster}>
-      <Pressable accessibilityLabel="Add memory" accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.addMemoryButton, pressed && styles.addMemoryPressed]}>
-        <IconSymbol color={Meadow.ink} name="plus" size={38} />
-      </Pressable>
+      <WorldActionStack
+        onAdd={onAdd}
+        onCamera={onCamera}
+        onMicPressIn={() => {}}
+        onMicPressOut={() => {}}
+        onMicTap={onNote}
+        onNote={onNote}
+        orientation="horizontal"
+      />
     </View>
-  );
-}
-
-function AddMemorySheet({ onClose, onJournal, onPhoto, onTextNote, onVoiceNote, open }: {
-  onClose: () => void;
-  onJournal: () => void;
-  onPhoto: () => void;
-  onTextNote: () => void;
-  onVoiceNote: () => void;
-  open: boolean;
-}) {
-  const choose = (action: () => void) => {
-    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-    onClose();
-    requestAnimationFrame(action);
-  };
-  return (
-    <KatchaSheet
-      header={{ eyebrow: 'Add to today', title: 'Choose a memory', subtitle: 'Keep one real piece of your day.' }}
-      onRequestClose={onClose}
-      open={open}
-      surface="parchment">
-      <View style={styles.addGrid}>
-        <AddMemoryOption caption="Take or choose a picture" icon="camera.fill" label="Photo" onPress={() => choose(onPhoto)} reward={15} />
-        <AddMemoryOption caption="Record something in your words" icon="mic.fill" label="Voice note" onPress={() => choose(onVoiceNote)} reward={18} />
-        <AddMemoryOption caption="Use the guided journal" icon="square.and.pencil" label="Journal entry" onPress={() => choose(onJournal)} reward={20} />
-        <AddMemoryOption caption="Write down one quick thought" icon="bubble.left.and.bubble.right.fill" label="Written note" onPress={() => choose(onTextNote)} reward={20} />
-      </View>
-    </KatchaSheet>
-  );
-}
-
-function AddMemoryOption({ caption, icon, label, onPress, reward }: {
-  caption: string;
-  icon: IconSymbolName;
-  label: string;
-  onPress: () => void;
-  reward: number;
-}) {
-  return (
-    <Pressable accessibilityHint={caption} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.addOption, pressed && styles.addOptionPressed]}>
-      <View style={styles.addOptionTop}>
-        <View style={styles.addOptionIcon}><IconSymbol color={Meadow.goldDeep} name={icon} size={23} /></View>
-        <Reward amount={reward} />
-      </View>
-      <View style={styles.addOptionCopy}>
-        <ThemedText style={styles.addOptionTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{label}</ThemedText>
-        <ThemedText style={styles.addOptionBody} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>{caption}</ThemedText>
-      </View>
-    </Pressable>
   );
 }
 
@@ -380,7 +382,7 @@ function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFi
   action: RankedTodayCareAction;
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
-  onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect) => void;
+  onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
   reduceMotion: boolean;
   selection: CheckInSelection | null;
@@ -403,7 +405,7 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   action: RankedTodayCareAction;
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
-  onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect) => void;
+  onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
   reduceMotion: boolean;
   selection: CheckInSelection | null;
@@ -428,7 +430,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
-  onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect) => void;
+  onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
   reduceMotion: boolean;
   selection: CheckInSelection | null;
@@ -439,6 +441,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
   const panelScale = useSharedValue(1);
   const panelX = useSharedValue(0);
   const panelOpacity = useSharedValue(1);
+  const rewardRef = useRef<ViewType | null>(null);
   const completedEventRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -492,7 +495,7 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
         pointerEvents="none"
         style={[styles.inlineSelectionPulse, { backgroundColor: selection?.accent ?? 'transparent' }, pulseStyle]}
       />
-      <InlineHeading action={action} />
+      <InlineHeading action={action} rewardRef={rewardRef} />
       <View style={wide ? styles.sleepGrid : styles.moodGrid}>
         {choices.map((choice) => (
           <MeasuredChoice
@@ -502,7 +505,15 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
             image={choice.image}
             key={choice.id}
             label={choice.label}
-            onPress={(from) => onChoose(choice, from)}
+            onPress={(from) => {
+              if (rewardRef.current) {
+                rewardRef.current.measureInWindow((x, y, width, height) => {
+                  onChoose(choice, from, { h: height, w: width, x, y });
+                });
+              } else {
+                onChoose(choice, from, from);
+              }
+            }}
             reduceMotion={reduceMotion}
             selected={selection?.id === choice.id}
             wide={wide}
@@ -513,13 +524,15 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
   );
 }
 
-function InlineHeading({ action }: { action: RankedTodayCareAction }) {
+function InlineHeading({ action, rewardRef }: { action: RankedTodayCareAction; rewardRef: RefObject<ViewType | null> }) {
   return (
     <View style={styles.inlineHeading}>
       <View style={styles.flexCopy}>
         <ThemedText style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
       </View>
-      <Reward amount={action.growthReward} />
+      <View collapsable={false} ref={rewardRef}>
+        <Reward amount={action.growthReward} />
+      </View>
     </View>
   );
 }
@@ -589,31 +602,71 @@ function MeasuredChoice({ accent, disabled, dimmed, image, label, onPress, reduc
   );
 }
 
-function CompletedCareRow({ event, onFinished, reduceMotion }: {
+function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
   event: TodayCareCompletionEvent;
   onFinished: (eventId: string) => void;
+  onRewardFlight: (from: FeedSourceRect, action: RankedTodayCareAction, onArrive: () => void) => void;
   reduceMotion: boolean;
 }) {
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const sourceRef = useRef<ViewType | null>(null);
+  const flightStartedRef = useRef(false);
   const [source, setSource] = useState<FeedSourceRect | null>(null);
   const rowX = useSharedValue(0);
   const rowOpacity = useSharedValue(1);
   const rowScale = useSharedValue(0.985);
   const tickScale = useSharedValue(0.72);
+  const artX = useSharedValue(0);
+  const artRotation = useSharedValue(0);
+  const artScale = useSharedValue(1);
   const rowStyle = useAnimatedStyle(() => ({
     opacity: rowOpacity.value,
     transform: [{ translateX: rowX.value }, { scale: rowScale.value }],
   }));
   const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: tickScale.value }] }));
+  const artStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: artX.value },
+      { rotate: `${artRotation.value}deg` },
+      { scale: artScale.value },
+    ],
+  }));
+  const beginExit = useCallback(() => {
+    rowX.value = withTiming(windowWidth + 24, {
+      duration: reduceMotion ? 100 : 250,
+      easing: Easing.in(Easing.cubic),
+    }, (finished) => {
+      if (finished) runOnJS(onFinished)(event.id);
+    });
+    rowOpacity.value = withDelay(
+      reduceMotion ? 0 : 70,
+      withTiming(0, { duration: reduceMotion ? 80 : 150, easing: Easing.in(Easing.quad) }),
+    );
+  }, [event.id, onFinished, reduceMotion, rowOpacity, rowX, windowWidth]);
 
   useEffect(() => {
+    let rewardTimer: ReturnType<typeof setTimeout> | null = null;
     const frame = requestAnimationFrame(() => {
-      sourceRef.current?.measureInWindow((x, y, width, height) => setSource({ h: height, w: width, x, y }));
+      const launch = (rect: FeedSourceRect) => {
+        setSource(rect);
+        rewardTimer = setTimeout(() => {
+          if (flightStartedRef.current) return;
+          flightStartedRef.current = true;
+          if (event.rewardAlreadyAnimated) beginExit();
+          else onRewardFlight(rect, event.action, beginExit);
+        }, reduceMotion ? 40 : 170);
+      };
+      if (sourceRef.current) {
+        sourceRef.current.measureInWindow((x, y, width, height) => launch({ h: height, w: width, x, y }));
+      } else {
+        launch({ h: 36, w: 36, x: windowWidth / 2 - 18, y: windowHeight * 0.68 });
+      }
     });
     if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (reduceMotion) {
       rowScale.value = withTiming(1, { duration: 80 });
       tickScale.value = withTiming(1, { duration: 100 });
+      artScale.value = withSequence(withTiming(1.06, { duration: 80 }), withTiming(1, { duration: 110 }));
     } else {
       rowScale.value = withSequence(
         withTiming(1.018, { duration: 110, easing: Easing.out(Easing.cubic) }),
@@ -623,33 +676,49 @@ function CompletedCareRow({ event, onFinished, reduceMotion }: {
         withTiming(1.12, { duration: 120, easing: Easing.out(Easing.cubic) }),
         withTiming(1, { duration: 170, easing: Easing.out(Easing.back(1.05)) }),
       );
-      rowX.value = withDelay(620, withTiming(42, { duration: 260, easing: Easing.in(Easing.cubic) }));
-      rowOpacity.value = withDelay(680, withTiming(0, { duration: 210, easing: Easing.in(Easing.quad) }));
+      artScale.value = withSequence(
+        withTiming(1.1, { duration: 100, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 170, easing: Easing.out(Easing.cubic) }),
+      );
+      artX.value = withSequence(
+        withTiming(-3, { duration: 45 }),
+        withTiming(4, { duration: 55 }),
+        withTiming(-2, { duration: 50 }),
+        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) }),
+      );
+      artRotation.value = withSequence(
+        withTiming(-3, { duration: 45 }),
+        withTiming(4, { duration: 55 }),
+        withTiming(-1.5, { duration: 50 }),
+        withTiming(0, { duration: 70, easing: Easing.out(Easing.cubic) }),
+      );
     }
-    const timer = setTimeout(() => onFinished(event.id), reduceMotion ? 260 : 920);
     return () => {
       cancelAnimationFrame(frame);
-      clearTimeout(timer);
+      if (rewardTimer) clearTimeout(rewardTimer);
     };
-  }, [event.id, onFinished, reduceMotion, rowOpacity, rowScale, rowX, tickScale]);
+  }, [artRotation, artScale, artX, beginExit, event.action, event.rewardAlreadyAnimated, onRewardFlight, reduceMotion, rowScale, tickScale, windowHeight, windowWidth]);
 
   return (
     <Animated.View layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))} style={[styles.careDoor, styles.careDoorComplete, rowStyle]}>
-      {event.action.category === 'play' && event.action.familyId ? (
-        <CompanionGoalPortrait familyId={event.action.familyId} size={38} />
-      ) : (
-        <View style={[styles.doorIcon, styles.completedIcon]}>
-          <IconSymbol color={Meadow.leafDeep} name={event.action.icon} size={20} />
-        </View>
-      )}
+      <Animated.View style={artStyle}>
+        {event.action.category === 'play' && event.action.familyId ? (
+          <CompanionGoalPortrait familyId={event.action.familyId} size={38} />
+        ) : (
+          <CareActionArt action={event.action} completed />
+        )}
+      </Animated.View>
       <View style={styles.flexCopy}>
         <ThemedText numberOfLines={1} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{event.action.title}</ThemedText>
         <ThemedText numberOfLines={1} style={styles.completedBody} lightColor={Meadow.leafDeep} darkColor={Meadow.leafDeep}>
-          {event.action.category === 'play' ? 'Round complete' : 'Added to today'} · +{event.action.growthReward} Growth
+          {event.action.category === 'play' ? 'Round complete' : 'Added to today'}
         </ThemedText>
       </View>
+      <View collapsable={false} ref={sourceRef}>
+        <Reward amount={event.action.growthReward} />
+      </View>
       <Animated.View style={tickStyle}>
-        <View collapsable={false} ref={sourceRef} style={styles.goalTickComplete}>
+        <View style={styles.goalTickComplete}>
           <View style={styles.completedTick}><IconSymbol color="#FFF9E9" name="checkmark" size={18} /></View>
         </View>
       </Animated.View>
@@ -661,7 +730,7 @@ function CompletedCareRow({ event, onFinished, reduceMotion }: {
   );
 }
 
-function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal, onNotToday, onOpenQuickGoal, reduceMotion, swipeExternalGesture }: {
+function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal, onNotToday, onOpenQuickGoal, onRewardFlight, reduceMotion, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   familyId: Parameters<typeof CompanionGoalPortrait>[0]['familyId'];
   goalId: string;
@@ -669,10 +738,13 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
   onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
   onNotToday: () => void;
   onOpenQuickGoal: (goalId: string) => void;
+  onRewardFlight: (from: FeedSourceRect, action: RankedTodayCareAction, onArrive: () => void) => void;
   reduceMotion: boolean;
   swipeExternalGesture: GestureType;
 }) {
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const tickRef = useRef<ViewType | null>(null);
+  const rewardRef = useRef<ViewType | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const celebratingRef = useRef(false);
   const [celebrating, setCelebrating] = useState(false);
@@ -735,15 +807,19 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
     }
 
     schedule(() => {
-      if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, reduceMotion ? 60 : 230);
-    schedule(() => onCompleteQuickGoal(goalId), reduceMotion ? 220 : 900);
+      const complete = () => {
+        if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onCompleteQuickGoal(goalId);
+      };
+      if (source) onRewardFlight(source, action, complete);
+      else complete();
+    }, reduceMotion ? 60 : 190);
   };
   const handleComplete = () => {
-    if (tickRef.current) {
-      tickRef.current.measureInWindow((x, y, width, height) => beginCompletion({ h: height, w: width, x, y }));
+    if (rewardRef.current) {
+      rewardRef.current.measureInWindow((x, y, width, height) => beginCompletion({ h: height, w: width, x, y }));
     } else {
-      beginCompletion(null);
+      beginCompletion({ h: 38, w: 38, x: windowWidth - 64, y: windowHeight * 0.68 });
     }
   };
 
@@ -769,7 +845,9 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
             style={({ pressed }) => [styles.goalBody, pressed && styles.textPressed]}>
             <ThemedText numberOfLines={2} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
           </Pressable>
-          <Reward amount={action.growthReward} />
+          <View collapsable={false} ref={rewardRef}>
+            <Reward amount={action.growthReward} />
+          </View>
           <Animated.View style={tickStyle}>
             <View collapsable={false} ref={tickRef}>
               <Pressable
@@ -808,10 +886,18 @@ function CareRow({ action, index, onNotToday, onStart, reduceMotion, swipeExtern
   action: RankedTodayCareAction;
   index: number;
   onNotToday: () => void;
-  onStart: () => void;
+  onStart: (rewardFrom: FeedSourceRect) => void;
   reduceMotion: boolean;
   swipeExternalGesture: GestureType;
 }) {
+  const rewardRef = useRef<ViewType | null>(null);
+  const handleStart = () => {
+    if (rewardRef.current) {
+      rewardRef.current.measureInWindow((x, y, width, height) => onStart({ h: height, w: width, x, y }));
+    } else {
+      onStart({ h: 32, w: 54, x: 0, y: 0 });
+    }
+  };
   return (
     <Animated.View layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}>
       <Animated.View entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.delay(Math.min(index, 5) * 45).duration(220)}>
@@ -823,22 +909,37 @@ function CareRow({ action, index, onNotToday, onStart, reduceMotion, swipeExtern
           <Pressable
             accessibilityHint="Double tap to start. Swipe right to reveal Skip, then swipe right again to dismiss."
             accessibilityRole="button"
-            onPress={onStart}
+            onPress={handleStart}
             style={({ pressed }) => [styles.careDoor, pressed && styles.rowPressed]}>
             {action.category === 'play' && action.familyId ? (
               <CompanionGoalPortrait familyId={action.familyId} size={38} />
             ) : (
-              <View style={styles.doorIcon}><IconSymbol color={Meadow.goldDeep} name={action.icon} size={20} /></View>
+              <CareActionArt action={action} />
             )}
             <View style={styles.flexCopy}>
               <ThemedText selectable style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
             </View>
-            <Reward amount={action.growthReward} />
+            <View collapsable={false} ref={rewardRef}>
+              <Reward amount={action.growthReward} />
+            </View>
             <IconSymbol color={Meadow.inkSoft} name="chevron.right" size={16} />
           </Pressable>
         </CareSwipeShell>
       </Animated.View>
     </Animated.View>
+  );
+}
+
+function CareActionArt({ action, completed = false }: { action: RankedTodayCareAction; completed?: boolean }) {
+  const art = todayCareArt(action.artKey);
+  return (
+    <View style={[styles.doorIcon, completed && styles.completedIcon]}>
+      {art ? (
+        <Image contentFit="contain" source={art} style={styles.doorIconArt} transition={0} />
+      ) : (
+        <IconSymbol color={completed ? Meadow.leafDeep : Meadow.goldDeep} name={action.icon} size={20} />
+      )}
+    </View>
   );
 }
 
@@ -1013,30 +1114,85 @@ function CareSwipeShell({ children, disabled = false, externalGesture, label, on
 function Reward({ amount }: { amount: number }) {
   return (
     <View style={styles.reward}>
-      <IconSymbol color={Meadow.goldDeep} name="sparkles" size={12} />
+      <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.rewardEnergyIcon} transition={0} />
       <ThemedText style={styles.rewardText} lightColor={Meadow.goldDeep} darkColor={Meadow.goldDeep}>+{amount}</ThemedText>
     </View>
   );
 }
 
-function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
-  const progress = useSharedValue(growth.progress / 100);
+function GrowthMeter({ feedbackAmount, feedbackKey, growth }: { feedbackAmount: number; feedbackKey: number; growth: TodayGrowthSummary }) {
+  const [displayedEnergy, setDisplayedEnergy] = useState(growth.activeEnergy);
+  const previousEnergyRef = useRef(growth.activeEnergy);
+  const latestEnergyRef = useRef(growth.activeEnergy);
+  const lastLandingAtRef = useRef(0);
+  latestEnergyRef.current = growth.activeEnergy;
+  const progress = useSharedValue(Math.min(1, growth.activeEnergy / growth.energyTarget));
+  const targetGlow = useSharedValue(0);
+  const targetReachedRef = useRef(growth.activeEnergy >= growth.energyTarget);
   useEffect(() => {
-    progress.value = withTiming(growth.progress / 100, { duration: 620, easing: Easing.out(Easing.cubic) });
-  }, [growth.progress, progress]);
+    lastLandingAtRef.current = Date.now();
+    setDisplayedEnergy((current) => Math.min(growth.energyTarget, current + Math.max(0, feedbackAmount)));
+  }, [feedbackAmount, feedbackKey, growth.energyTarget]);
+  useEffect(() => {
+    const previous = previousEnergyRef.current;
+    previousEnergyRef.current = growth.activeEnergy;
+    if (growth.activeEnergy <= previous || Date.now() - lastLandingAtRef.current < 420) {
+      setDisplayedEnergy(growth.activeEnergy);
+      return;
+    }
+    // A source-of-truth award often lands before its five visual tokens. Keep
+    // the meter frozen long enough for the payout to count up one arrival at a
+    // time, then reconcile as a safety net if an animation was interrupted.
+    const timer = setTimeout(() => setDisplayedEnergy(growth.activeEnergy), 1600);
+    return () => clearTimeout(timer);
+  }, [growth.activeEnergy]);
+  useEffect(() => {
+    progress.value = withTiming(Math.min(1, displayedEnergy / growth.energyTarget), {
+      duration: 480,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [displayedEnergy, growth.energyTarget, progress]);
   const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
+  useEffect(() => {
+    const reached = displayedEnergy >= growth.energyTarget;
+    if (reached && !targetReachedRef.current) {
+      targetGlow.value = withSequence(
+        withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) }),
+        withTiming(0, { duration: 420, easing: Easing.out(Easing.cubic) }),
+      );
+    }
+    targetReachedRef.current = reached;
+  }, [displayedEnergy, growth.energyTarget, targetGlow]);
+  const targetGlowStyle = useAnimatedStyle(() => ({ opacity: targetGlow.value }));
   const countdown = useMemo(() => formatCountdown(growth.effectiveHatchAt), [growth.effectiveHatchAt]);
+  const actionsRemaining = Math.max(0, growth.activationActionTarget - growth.qualifyingActionCount);
+  const status = growth.isActivated
+    ? `${countdown}${growth.savedMinutes >= 1 ? ` · ${Math.round(growth.savedMinutes)} min closer` : ''}`
+    : actionsRemaining === 1
+      ? 'Complete 1 more action to wake the egg'
+      : `Complete ${actionsRemaining} actions to wake the egg`;
   return (
-    <View accessibilityLabel={`${Math.round(growth.progress)} percent grown. ${countdown}`} accessibilityRole="progressbar" style={styles.meterCard}>
-      <View style={styles.track}>
-        <Animated.View style={[styles.fill, fillStyle]} />
-        <View style={styles.trackShine} />
-        <ThemedText selectable style={styles.meterPercent} lightColor="#FFFBE9" darkColor="#FFFBE9">{Math.round(growth.progress)}%</ThemedText>
+    <View
+      accessibilityLabel={`${displayedEnergy} of ${growth.energyTarget} Growth Energy. ${status}`}
+      accessibilityRole="progressbar"
+      style={styles.meterCard}>
+      <View style={styles.trackContainer}>
+        <View style={styles.track}>
+          <Animated.View style={[styles.fill, fillStyle]} />
+          <Animated.View pointerEvents="none" style={[styles.energyTargetGlow, targetGlowStyle]} />
+          <View style={styles.trackShine} />
+        </View>
+        <View pointerEvents="none" style={styles.energyValue}>
+          <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.energyMeterIcon} transition={0} />
+          <ThemedText selectable style={styles.meterPercent} lightColor="#FFFBE9" darkColor="#FFFBE9">
+            {displayedEnergy} / {growth.energyTarget}
+          </ThemedText>
+        </View>
       </View>
       <View style={styles.countdownPill}>
-        <IconSymbol color="#F3D37B" name="timer" size={13} />
+        <IconSymbol color="#F3D37B" name={growth.isActivated ? 'timer' : 'sparkles'} size={13} />
         <ThemedText selectable style={styles.countdown} lightColor="#F6EACB" darkColor="#F6EACB">
-          {countdown}{growth.earlyMinutes >= 1 ? ` · ${Math.round(growth.earlyMinutes)} min closer` : ''}
+          {status}
         </ThemedText>
       </View>
     </View>
@@ -1060,27 +1216,22 @@ const styles = StyleSheet.create({
   environmentFade: { bottom: 0, experimental_backgroundImage: 'linear-gradient(to bottom, rgba(247,241,226,0) 0%, rgba(247,241,226,0.72) 62%, #F7F1E2 100%)', height: 150, left: 0, position: 'absolute', right: 0, zIndex: 1 },
   meterAnchor: { left: 0, position: 'absolute', right: 0, zIndex: 4 },
   meterCard: { alignItems: 'center', alignSelf: 'center', gap: 8, width: '78%' },
-  meterPercent: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontVariant: ['tabular-nums'], fontWeight: '900', left: 0, position: 'absolute', right: 0, textAlign: 'center', top: 1 },
+  meterPercent: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  energyValue: { alignItems: 'center', ...StyleSheet.absoluteFillObject, flexDirection: 'row', gap: 4, justifyContent: 'center', overflow: 'visible', zIndex: 1 },
+  energyMeterIcon: { height: 24, transform: [{ scale: 1.46 }], width: 24 },
+  energyTargetGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,235,154,0.34)', borderRadius: 999, boxShadow: '0 0 16px rgba(255,225,116,0.72)' },
   countdown: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '800' },
   countdownPill: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(31,27,19,0.76)', borderColor: 'rgba(255,239,196,0.18)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 28, paddingHorizontal: 11 },
-  track: { backgroundColor: 'rgba(31,27,19,0.72)', borderColor: 'rgba(255,239,196,0.32)', borderRadius: 999, borderWidth: 2, boxShadow: '0 5px 14px rgba(20,16,9,0.32), inset 0 1px 3px rgba(0,0,0,0.30)', height: 23, overflow: 'hidden', position: 'relative', width: '100%' },
+  trackContainer: { height: 23, overflow: 'visible', position: 'relative', width: '100%' },
+  track: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(31,27,19,0.72)', borderColor: 'rgba(255,239,196,0.32)', borderRadius: 999, borderWidth: 2, boxShadow: '0 5px 14px rgba(20,16,9,0.32), inset 0 1px 3px rgba(0,0,0,0.30)', overflow: 'hidden' },
   fill: { ...StyleSheet.absoluteFillObject, backgroundColor: '#82B94D', borderRadius: 999, transformOrigin: 'left' },
   trackShine: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, height: 4, left: 7, position: 'absolute', right: 7, top: 3 },
   pageInset: { paddingHorizontal: Meadow.space.page },
   addMemoryCluster: { alignItems: 'center', minHeight: 67, paddingBottom: 5 },
-  addMemoryButton: { alignItems: 'center', backgroundColor: '#F5E6BE', borderColor: 'rgba(255,253,238,0.78)', borderCurve: 'continuous', borderRadius: 999, borderWidth: 2, boxShadow: '0 8px 22px rgba(30,20,8,0.40), inset 0 2px 0 rgba(255,255,247,0.82), inset 0 -3px 5px rgba(116,80,30,0.15)', height: 62, justifyContent: 'center', width: 62 },
-  addMemoryPressed: { transform: [{ translateY: 1 }, { scale: 0.97 }] },
-  addGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, paddingTop: 4 },
-  addOption: { backgroundColor: 'rgba(255,248,232,0.38)', borderColor: 'rgba(122,84,44,0.16)', borderCurve: 'continuous', borderRadius: 18, borderWidth: 1, boxShadow: '-2px 3px 7px rgba(58,38,18,0.14), inset 0 1px 0 rgba(255,248,230,0.50)', flexBasis: '47%', flexGrow: 1, gap: 12, minHeight: 130, padding: 12 },
-  addOptionPressed: { backgroundColor: 'rgba(255,244,204,0.58)', borderColor: Meadow.goldDeep, transform: [{ scale: 0.975 }] },
-  addOptionTop: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
-  addOptionIcon: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.20)', borderCurve: 'continuous', borderRadius: 13, height: 43, justifyContent: 'center', width: 43 },
-  addOptionCopy: { gap: 3 },
-  addOptionTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '800', lineHeight: 18 },
-  addOptionBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '600', lineHeight: 14 },
   doorIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.54)', borderColor: 'rgba(255,248,230,0.56)', borderCurve: 'continuous', borderRadius: 11, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
+  doorIconArt: { height: 32, width: 32 },
   rowPressed: { backgroundColor: 'rgba(255,244,204,0.55)', transform: [{ scale: 0.988 }] },
-  careSection: { gap: 5, paddingBottom: 24, paddingHorizontal: Meadow.space.page, paddingTop: 14 },
+  careSection: { gap: 5, paddingHorizontal: Meadow.space.page, paddingTop: 14 },
   checkInGroup: { gap: 6 },
   inlineCard: { backgroundColor: 'rgba(246,237,214,0.96)', borderColor: 'rgba(122,84,44,0.20)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 4px 10px rgba(34,24,12,0.22), inset 0 1px 0 rgba(255,252,238,0.72)', gap: 8, overflow: 'hidden', padding: 9, position: 'relative' },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
@@ -1108,6 +1259,7 @@ const styles = StyleSheet.create({
   goalTickComplete: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
   goalTickPressed: { opacity: 0.72, transform: [{ scale: 0.94 }] },
   reward: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.22)', borderRadius: 10, flexDirection: 'row', gap: 2, paddingHorizontal: 6, paddingVertical: 4 },
+  rewardEnergyIcon: { height: 22, transform: [{ scale: 1.5 }], width: 22 },
   rewardText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
   notTodayActionFrame: { backgroundColor: '#8F6046', bottom: 0, left: 0, position: 'absolute', top: 0, width: CARE_REVEAL_WIDTH + CARE_UNDERLAY_OVERLAP },
   notTodayAction: { alignItems: 'center', flexDirection: 'row', gap: 5, height: '100%', justifyContent: 'center', paddingHorizontal: 10, width: CARE_REVEAL_WIDTH },

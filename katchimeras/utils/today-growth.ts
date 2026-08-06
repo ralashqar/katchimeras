@@ -22,13 +22,21 @@ export const TODAY_GROWTH_REWARDS: Readonly<Record<TodayGrowthSource, number>> =
 };
 
 export const TODAY_GROWTH_STAGE_THRESHOLDS = [0, 15, 35, 55, 70, 85, 100] as const;
-export const TODAY_MAX_EARLY_HATCH_MINUTES = 60;
-export const TODAY_ENERGY_FOR_MAX_EARLY_HATCH = 40;
-export const TODAY_MAX_ACTIVE_PROGRESS = 25;
+export const TODAY_ENERGY_TARGET = 100;
+export const TODAY_ACTIVATION_ACTION_COUNT = 2;
+export const TODAY_TIME_FLOOR_RATIO = 0.7;
+export const TODAY_MAX_ACCELERATION_RATIO = 1 - TODAY_TIME_FLOOR_RATIO;
 
 export type TodayGrowthSummary = {
   activeEnergy: number;
+  energyTarget: number;
+  energyRatio: number;
+  qualifyingActionCount: number;
+  activationActionTarget: number;
+  incubationStartedAt: Date | null;
+  isActivated: boolean;
   earlyMinutes: number;
+  savedMinutes: number;
   effectiveHatchAt: Date;
   scheduledHatchAt: Date;
   progress: number;
@@ -116,6 +124,27 @@ export function activeGrowthEnergy(day: Pick<StoredHomeDayRecord, 'growth'>): nu
   return normalizeDayGrowthState(day.growth).events.reduce((sum, event) => sum + event.amount, 0);
 }
 
+export function todayGrowthActivation(day: Pick<StoredHomeDayRecord, 'growth'>): {
+  qualifyingActionCount: number;
+  incubationStartedAt: Date | null;
+  isActivated: boolean;
+} {
+  const qualifyingEvents = normalizeDayGrowthState(day.growth).events
+    .filter((event) => event.source !== 'daily_seed' && event.amount > 0)
+    .map((event) => ({ event, awardedAt: new Date(event.awardedAt) }))
+    .filter((item) => !Number.isNaN(item.awardedAt.getTime()))
+    .sort((left, right) => {
+      const timestamp = left.awardedAt.getTime() - right.awardedAt.getTime();
+      return timestamp || left.event.id.localeCompare(right.event.id);
+    });
+  const activationEvent = qualifyingEvents[TODAY_ACTIVATION_ACTION_COUNT - 1] ?? null;
+  return {
+    qualifyingActionCount: qualifyingEvents.length,
+    incubationStartedAt: activationEvent?.awardedAt ?? null,
+    isActivated: activationEvent != null,
+  };
+}
+
 /** Reconciles successful day artifacts into reward receipts without coupling every capture sheet to Growth. */
 export function pendingGrowthAwards(day: StoredHomeDayRecord): PendingGrowthAward[] {
   const awards: PendingGrowthAward[] = [];
@@ -160,39 +189,57 @@ export function pendingGrowthAwards(day: StoredHomeDayRecord): PendingGrowthAwar
   return awards;
 }
 
-export function earlyHatchMinutesForEnergy(energy: number): number {
-  return Math.min(
-    TODAY_MAX_EARLY_HATCH_MINUTES,
-    Math.max(0, energy) / TODAY_ENERGY_FOR_MAX_EARLY_HATCH * TODAY_MAX_EARLY_HATCH_MINUTES,
-  );
-}
-
 export function todayGrowthSummary(
   day: Pick<StoredHomeDayRecord, 'isoDate' | 'growth'>,
   hatchHour: number,
   now = new Date(),
+  options: { incubationNotBefore?: Date | null } = {},
 ): TodayGrowthSummary {
   const scheduledHatchAt = localDateAt(day.isoDate, hatchHour, 0);
   const activeEnergy = activeGrowthEnergy(day);
-  const earlyMinutes = earlyHatchMinutesForEnergy(activeEnergy);
-  const effectiveHatchAt = new Date(scheduledHatchAt.getTime() - earlyMinutes * 60_000);
-  const growthStart = localDateAt(day.isoDate, 6, 0);
-  const duration = Math.max(1, scheduledHatchAt.getTime() - growthStart.getTime());
-  const elapsed = Math.max(0, now.getTime() - growthStart.getTime());
-  const passiveProgress = Math.min(100, Math.max(0, elapsed / duration * 100));
-  const activeProgress = Math.min(
-    TODAY_MAX_ACTIVE_PROGRESS,
-    Math.max(0, activeEnergy) / TODAY_ENERGY_FOR_MAX_EARLY_HATCH * TODAY_MAX_ACTIVE_PROGRESS,
-  );
-  const isReady = now.getTime() >= effectiveHatchAt.getTime();
-  const progress = isReady ? 100 : Math.min(99, passiveProgress + activeProgress);
+  const energyRatio = Math.min(1, Math.max(0, activeEnergy) / TODAY_ENERGY_TARGET);
+  const activation = todayGrowthActivation(day);
+  const incubationStartedAt = activation.incubationStartedAt
+    ? new Date(Math.max(
+        activation.incubationStartedAt.getTime(),
+        options.incubationNotBefore?.getTime() ?? Number.NEGATIVE_INFINITY,
+      ))
+    : null;
+  const scheduledAt = scheduledHatchAt.getTime();
+  const startedAt = incubationStartedAt?.getTime() ?? scheduledAt;
+  const normalIncubationDuration = Math.max(0, scheduledAt - startedAt);
+  const savedMilliseconds = normalIncubationDuration * TODAY_MAX_ACCELERATION_RATIO * energyRatio;
+  const effectiveHatchAt = incubationStartedAt
+    ? new Date(Math.max(startedAt, scheduledAt - savedMilliseconds))
+    : scheduledHatchAt;
+  const effectiveDuration = Math.max(0, effectiveHatchAt.getTime() - startedAt);
+  const elapsed = incubationStartedAt ? Math.max(0, now.getTime() - startedAt) : 0;
+  const isReady = activation.isActivated && now.getTime() >= effectiveHatchAt.getTime();
+  const progress = !activation.isActivated
+    ? 0
+    : isReady
+      ? 100
+      : effectiveDuration <= 0
+        ? 99
+        : Math.min(99, Math.max(0, elapsed / effectiveDuration * 100));
+  const savedMinutes = savedMilliseconds / 60_000;
   return {
     activeEnergy,
-    earlyMinutes,
+    energyTarget: TODAY_ENERGY_TARGET,
+    energyRatio,
+    qualifyingActionCount: activation.qualifyingActionCount,
+    activationActionTarget: TODAY_ACTIVATION_ACTION_COUNT,
+    incubationStartedAt,
+    isActivated: activation.isActivated,
+    earlyMinutes: savedMinutes,
+    savedMinutes,
     effectiveHatchAt,
     scheduledHatchAt,
     progress,
-    stage: growthStageForProgress(progress),
+    // Visual growth is an immediate reflection of earned Energy. Time still
+    // controls hatch readiness, but waiting alone must not silently swap the
+    // plant-growth artwork while the page is open.
+    stage: growthStageForEnergy(activeEnergy),
     isReady,
   };
 }
@@ -203,6 +250,10 @@ export function growthStageForProgress(progress: number): TodayGrowthSummary['st
     if (progress >= TODAY_GROWTH_STAGE_THRESHOLDS[index]) stage = index as TodayGrowthSummary['stage'];
   }
   return stage;
+}
+
+export function growthStageForEnergy(energy: number): TodayGrowthSummary['stage'] {
+  return growthStageForProgress(Math.max(0, energy));
 }
 
 export function growthEventId(source: TodayGrowthSource, sourceId: string): string {

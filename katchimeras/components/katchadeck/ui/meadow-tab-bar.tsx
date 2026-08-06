@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { homeTabBarHeight, HOME_TAB_BAR_MIN_BOTTOM_PADDING } from '@/constants/home-loop-layout';
 import { Lantern } from '@/constants/theme';
 import { Meadow } from '@/constants/meadow-theme';
 
@@ -20,7 +21,7 @@ const INACTIVE = 'rgba(226, 221, 238, 0.72)';
 
 export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const bottomPadding = Math.max(insets.bottom, 10);
+  const bottomPadding = Math.max(insets.bottom, HOME_TAB_BAR_MIN_BOTTOM_PADDING);
   const items = state.routes.filter((route) => {
     if (HIDDEN_ROUTES.has(route.name)) return false;
     // Screens hidden via `href: null` (e.g. Dev when the flag is off).
@@ -33,7 +34,7 @@ export function MeadowTabBar({ state, descriptors, navigation }: BottomTabBarPro
       style={[
         styles.wrap,
         {
-          height: Math.max(96, 62 + bottomPadding),
+          height: homeTabBarHeight(insets.bottom),
           paddingBottom: bottomPadding,
         },
       ]}>

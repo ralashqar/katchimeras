@@ -85,11 +85,19 @@ export function MomentPromptSheet({
   const openedDirectlyRef = useRef(initialPrompt != null);
 
   return (
-    <KatchaSheet header={selected ? undefined : { title: 'Add to today' }} onRequestClose={() => onClose()} surface="parchment">
+    <KatchaSheet
+      header={selected ? undefined : { title: 'Add to today' }}
+      maxHeight={selected ? '88%' : '74%'}
+      onRequestClose={() => onClose()}
+      scroll={selected != null}
+      surface="parchment">
       {selected ? (
         <DayPromptStrip
           prompt={selected}
           dismissLabel="Back"
+          showDismiss={!openedDirectlyRef.current}
+          embedded
+          presentation="parchment"
           // Answering or picking a photo feeds the egg (handled by the parent),
           // then the sheet closes; "Later" just returns to the category list.
           onAnswer={(kind, choiceIds, from) => {

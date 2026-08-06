@@ -270,11 +270,13 @@ export function useTodayExplorationBackgroundMotion({
 export function TodayExplorationBackground({
   backgroundKey,
   imageSize,
+  onLoad,
   translateX,
   verticalOffset = 0,
 }: {
   backgroundKey: TodayExplorationBackgroundKey;
   imageSize: number;
+  onLoad?: () => void;
   translateX?: SharedValue<number>;
   verticalOffset?: number;
 }) {
@@ -303,6 +305,7 @@ export function TodayExplorationBackground({
           contentFit="fill"
           pointerEvents="none"
           priority="high"
+          onLoad={onLoad}
           recyclingKey={background.recyclingKey}
           source={background.source}
           style={StyleSheet.absoluteFill}

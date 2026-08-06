@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { DASHBOARD_STAT_ART } from '@/constants/journal-art-sources';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { PlacesModal } from '@/components/katchadeck/home/places-modal';
 import { CATEGORY_ART, VARIANT_ART } from '@/components/katchadeck/home/today-category-ring';
@@ -23,10 +24,10 @@ const MEANING_META: Record<string, { icon: IconSymbolName; accent: string }> = {
 const MEANING_FALLBACK: { icon: IconSymbolName; accent: string } = { icon: 'sparkles', accent: '#FFC36B' };
 
 const STAT_ART: Record<DayStatKey, number> = {
-  steps: require('../../../assets/images/katchimeras/card-icons/steps.png'),
-  places: require('../../../assets/images/katchimeras/card-icons/place.png'),
-  photos: require('../../../assets/images/katchimeras/card-icons/photos.png'),
-  moments: require('../../../assets/images/katchimeras/card-icons/highlight.png'),
+  steps: DASHBOARD_STAT_ART.steps,
+  places: DASHBOARD_STAT_ART.places,
+  photos: DASHBOARD_STAT_ART.photos,
+  moments: DASHBOARD_STAT_ART.moments,
 };
 // The 'Through the day' card is parked while the v3 layout settles.
 const SHOW_TIMELINE_SECTION = false;

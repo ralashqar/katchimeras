@@ -5,11 +5,13 @@ import type { StoredHomeDayRecord } from '../types/home';
 import {
   activeGrowthEnergy,
   awardGrowth,
-  earlyHatchMinutesForEnergy,
+  growthStageForEnergy,
+  TODAY_ENERGY_TARGET,
   todayGrowthSummary,
 } from '../utils/today-growth';
 import { rankTodayCareActions } from '../utils/today-care';
 import { buildTodayPhotoRollSuggestion } from '../utils/today-photo-roll-suggestion';
+import { splitEnergyAcrossTokens } from '../utils/energy-payout';
 import {
   cancelTodayCareGameRound,
   completeTodayCareGameRound,
@@ -42,6 +44,15 @@ function day(overrides: Partial<StoredHomeDayRecord> = {}): StoredHomeDayRecord 
   };
 }
 
+test('Energy payouts use five arrivals and preserve the exact reward', () => {
+  for (const amount of [5, 8, 10, 15, 18, 20, 25]) {
+    const tokens = splitEnergyAcrossTokens(amount);
+    assert.equal(tokens.length, 5);
+    assert.equal(tokens.reduce((sum, token) => sum + token, 0), amount);
+    assert.ok(tokens.every((token) => token > 0));
+  }
+});
+
 test('Growth awards are source-id idempotent', () => {
   const first = awardGrowth(day(), { source: 'photo', sourceId: 'asset-1', awardedAt: new Date('2026-08-05T12:00:00') });
   const second = awardGrowth(first.day, { source: 'photo', sourceId: 'asset-1', awardedAt: new Date('2026-08-05T12:01:00') });
@@ -50,39 +61,122 @@ test('Growth awards are source-id idempotent', () => {
   assert.equal(activeGrowthEnergy(second.day), 15);
 });
 
-test('Growth can move hatch forward by at most one hour', () => {
-  assert.equal(earlyHatchMinutesForEnergy(0), 0);
-  assert.equal(earlyHatchMinutesForEnergy(20), 30);
-  assert.equal(earlyHatchMinutesForEnergy(40), 60);
-  assert.equal(earlyHatchMinutesForEnergy(400), 60);
+test('Egg art stages advance directly at Energy thresholds', () => {
+  assert.deepEqual(
+    [0, 14, 15, 34, 35, 54, 55, 69, 70, 84, 85, 99, 100, 140].map(growthStageForEnergy),
+    [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
+  );
 });
 
-test('Passive Growth reaches ready at the configured time without interaction', () => {
-  const before = todayGrowthSummary(day(), 20, new Date(2026, 7, 5, 19, 59));
-  const ready = todayGrowthSummary(day(), 20, new Date(2026, 7, 5, 20, 0));
-  assert.equal(before.isReady, false);
-  assert.equal(ready.isReady, true);
-  assert.equal(Math.round(ready.progress), 100);
+test('Waiting changes incubation progress without changing an Energy-driven egg stage', () => {
+  let growingDay = awardGrowth(day(), {
+    source: 'journal', sourceId: 'entry-1', awardedAt: new Date(2026, 7, 5, 8, 0),
+  }).day;
+  growingDay = awardGrowth(growingDay, {
+    source: 'sleep', sourceId: 'sleep-1', awardedAt: new Date(2026, 7, 5, 8, 5),
+  }).day;
+  const morning = todayGrowthSummary(growingDay, 20, new Date(2026, 7, 5, 9, 0));
+  const evening = todayGrowthSummary(growingDay, 20, new Date(2026, 7, 5, 19, 0));
+  assert.ok(evening.progress > morning.progress);
+  assert.equal(morning.activeEnergy, 28);
+  assert.equal(morning.stage, 1);
+  assert.equal(evening.stage, morning.stage);
 });
 
-test('Active Growth visibly advances the egg before hatch time', () => {
-  const growingDay = day();
-  const baseline = todayGrowthSummary(growingDay, 21, new Date(2026, 7, 5, 12, 0));
-  growingDay.growth = {
-    schemaVersion: 1,
-    careActions: [],
-    events: [{
-      id: 'growth:journal:entry-1',
-      source: 'journal',
-      sourceId: 'entry-1',
-      actionId: 'journal',
-      amount: 20,
-      awardedAt: new Date(2026, 7, 5, 12, 0).toISOString(),
-    }],
-  };
-  const nurtured = todayGrowthSummary(growingDay, 21, new Date(2026, 7, 5, 12, 0));
-  assert.ok(nurtured.progress >= baseline.progress + 12);
-  assert.ok(nurtured.effectiveHatchAt.getTime() < baseline.effectiveHatchAt.getTime());
+test('Incubation requires two rewarded actions even after the scheduled hatch time', () => {
+  const first = awardGrowth(day(), {
+    source: 'journal',
+    sourceId: 'entry-1',
+    awardedAt: new Date(2026, 7, 5, 8, 0),
+  }).day;
+  const dormant = todayGrowthSummary(first, 20, new Date(2026, 7, 5, 21, 0));
+  assert.equal(dormant.isActivated, false);
+  assert.equal(dormant.qualifyingActionCount, 1);
+  assert.equal(dormant.progress, 0);
+  assert.equal(dormant.isReady, false);
+
+  const second = awardGrowth(first, {
+    source: 'sleep',
+    sourceId: 'sleep-1',
+    awardedAt: new Date(2026, 7, 5, 21, 1),
+  }).day;
+  const activated = todayGrowthSummary(second, 20, new Date(2026, 7, 5, 21, 1));
+  assert.equal(activated.isActivated, true);
+  assert.equal(activated.incubationStartedAt?.getTime(), new Date(2026, 7, 5, 21, 1).getTime());
+  assert.equal(activated.isReady, true);
+});
+
+test('Daily seed Energy does not satisfy the action activation gate', () => {
+  let seeded = awardGrowth(day(), {
+    source: 'daily_seed', sourceId: 'seed', awardedAt: new Date(2026, 7, 5, 7, 0),
+  }).day;
+  seeded = awardGrowth(seeded, {
+    source: 'mood', sourceId: 'mood-1', awardedAt: new Date(2026, 7, 5, 7, 5),
+  }).day;
+  const summary = todayGrowthSummary(seeded, 20, new Date(2026, 7, 5, 21, 0));
+  assert.equal(summary.activeEnergy, 10);
+  assert.equal(summary.qualifyingActionCount, 1);
+  assert.equal(summary.isActivated, false);
+  assert.equal(summary.isReady, false);
+});
+
+test('One hundred Energy preserves a seventy-percent time floor', () => {
+  let growingDay = awardGrowth(day(), {
+    source: 'journal', sourceId: 'entry-1', amount: 40, awardedAt: new Date(2026, 7, 5, 8, 0),
+  }).day;
+  growingDay = awardGrowth(growingDay, {
+    source: 'sleep', sourceId: 'sleep-1', amount: 60, awardedAt: new Date(2026, 7, 5, 8, 0),
+  }).day;
+  const summary = todayGrowthSummary(growingDay, 20, new Date(2026, 7, 5, 12, 0));
+  const normalDuration = new Date(2026, 7, 5, 20, 0).getTime() - new Date(2026, 7, 5, 8, 0).getTime();
+  const effectiveDuration = summary.effectiveHatchAt.getTime() - summary.incubationStartedAt!.getTime();
+  assert.equal(summary.activeEnergy, TODAY_ENERGY_TARGET);
+  assert.ok(Math.abs(effectiveDuration - normalDuration * 0.7) < 1);
+  assert.ok(Math.abs(summary.savedMinutes - normalDuration * 0.3 / 60_000) < 0.001);
+});
+
+test('Energy accelerates incubation linearly and caps timing at the target', () => {
+  const makeGrowthDay = (energy: number) => day({
+    growth: {
+      schemaVersion: 1,
+      careActions: [],
+      events: [
+        { id: 'growth:journal:first', source: 'journal', sourceId: 'first', actionId: 'journal', amount: 20, awardedAt: new Date(2026, 7, 5, 8, 0).toISOString() },
+        { id: 'growth:sleep:second', source: 'sleep', sourceId: 'second', actionId: 'sleep', amount: Math.max(0, energy - 20), awardedAt: new Date(2026, 7, 5, 8, 5).toISOString() },
+      ],
+    },
+  });
+  const fifty = todayGrowthSummary(makeGrowthDay(50), 20, new Date(2026, 7, 5, 12, 0));
+  const hundred = todayGrowthSummary(makeGrowthDay(100), 20, new Date(2026, 7, 5, 12, 0));
+  const overflow = todayGrowthSummary(makeGrowthDay(140), 20, new Date(2026, 7, 5, 12, 0));
+  assert.ok(hundred.effectiveHatchAt.getTime() < fifty.effectiveHatchAt.getTime());
+  assert.equal(overflow.activeEnergy, 140);
+  assert.equal(overflow.energyRatio, 1);
+  assert.equal(overflow.effectiveHatchAt.getTime(), hundred.effectiveHatchAt.getTime());
+  assert.ok(hundred.progress > fifty.progress);
+});
+
+test('Tomorrow can grow before rollover without starting its incubation clock early', () => {
+  let tomorrow = awardGrowth(day({ isoDate: '2026-08-06', id: 'day-2026-08-06' }), {
+    source: 'journal', sourceId: 'entry-1', awardedAt: new Date(2026, 7, 5, 21, 0),
+  }).day;
+  tomorrow = awardGrowth(tomorrow, {
+    source: 'photo', sourceId: 'photo-1', awardedAt: new Date(2026, 7, 5, 21, 5),
+  }).day;
+  const dayStart = new Date(2026, 7, 6, 0, 0);
+  const preview = todayGrowthSummary(
+    tomorrow,
+    20,
+    new Date(2026, 7, 5, 22, 0),
+    { incubationNotBefore: dayStart },
+  );
+
+  assert.equal(preview.activeEnergy, 35);
+  assert.equal(preview.stage, 2);
+  assert.equal(preview.isActivated, true);
+  assert.equal(preview.incubationStartedAt?.getTime(), dayStart.getTime());
+  assert.equal(preview.progress, 0);
+  assert.equal(preview.isReady, false);
 });
 
 test('Care queue is memory-first, bounded, and respects Not today', () => {
@@ -107,6 +201,153 @@ test('Care queue is memory-first, bounded, and respects Not today', () => {
   });
   const next = rankTodayCareActions({ day: dismissed, now: new Date(2026, 7, 5, 13, 2) });
   assert.equal(next.active.some((item) => item.id === 'mood'), false);
+});
+
+test('A completed journal category does not repeat and another journal action replaces it', () => {
+  const withFoodJournal = day({
+    journalRecords: [{
+      id: 'journal-food-1',
+      schemaVersion: 1,
+      idempotencyKey: 'journal-food-1',
+      source: { kind: 'manual', sourceId: 'manual-food-1' },
+      flowId: 'food',
+      flowVersion: 1,
+      categoryId: 'meal',
+      canonicalQualityIds: [],
+      fields: { specific: 'Lunch' },
+      feeling: null,
+      note: null,
+      attachments: [],
+      confirmedFacets: [],
+      createdAt: '2026-08-05T12:30:00.000Z',
+    }],
+  });
+  const ranked = rankTodayCareActions({
+    day: withFoodJournal,
+    now: new Date(2026, 7, 5, 13, 0),
+    rotatingLimit: 4,
+  });
+
+  assert.equal(ranked.active.some((action) => action.completionKey === 'food'), false);
+  assert.equal(ranked.active.some((action) => action.id === 'journal'), true);
+});
+
+test('Photo and voice journal artifacts remain available to the care completion animator', () => {
+  const journalBase = {
+    schemaVersion: 1 as const,
+    flowId: 'general',
+    flowVersion: 1,
+    categoryId: 'general',
+    canonicalQualityIds: [],
+    fields: {},
+    feeling: null,
+    note: null,
+    attachments: [],
+    confirmedFacets: [],
+    createdAt: '2026-08-05T12:30:00.000Z',
+  };
+  const withMediaJournals = day({
+    journalRecords: [
+      {
+        ...journalBase,
+        id: 'journal-photo-1',
+        idempotencyKey: 'journal-photo-1',
+        source: { kind: 'photo', sourceId: 'photo-1', thumbnailUri: 'ph://photo-1' },
+      },
+      {
+        ...journalBase,
+        id: 'journal-voice-1',
+        idempotencyKey: 'journal-voice-1',
+        source: { kind: 'voice_note', sourceId: 'voice-1', audioUri: 'file://voice-1.m4a', durationMs: 1200 },
+      },
+    ],
+  });
+  const ranked = rankTodayCareActions({
+    day: withMediaJournals,
+    now: new Date(2026, 7, 5, 13, 0),
+    rotatingLimit: 4,
+  });
+
+  assert.equal(ranked.active.some((action) => action.completionKey === 'photo'), false);
+  assert.equal(ranked.active.some((action) => action.completionKey === 'voice'), false);
+  assert.equal(ranked.completed.some((action) => action.instanceId === 'care:2026-08-05:photo'), true);
+  assert.equal(ranked.completed.some((action) => action.instanceId === 'care:2026-08-05:voice'), true);
+});
+
+test('An artifact completes the exact concrete care action that launched its capture flow', () => {
+  const quest = {
+    id: 'quest-2026-08-05-captureMoment',
+    type: 'captureMoment' as const,
+    emoji: 'camera',
+    title: 'Keep one moment from lunch',
+    rewardLabel: 'a linked memory',
+    targetCell: 'memory' as const,
+    essenceReward: 5,
+    completed: false,
+  };
+  const captured = day({
+    journalRecords: [{
+      id: 'journal-photo-quest',
+      schemaVersion: 1,
+      idempotencyKey: 'journal-photo-quest',
+      source: { kind: 'photo', sourceId: 'photo-quest', thumbnailUri: 'ph://photo-quest' },
+      flowId: 'general',
+      flowVersion: 1,
+      categoryId: 'general',
+      canonicalQualityIds: [],
+      fields: {},
+      feeling: null,
+      note: null,
+      attachments: [],
+      confirmedFacets: [],
+      createdAt: '2026-08-05T12:30:00.000Z',
+    }],
+  });
+  const ranked = rankTodayCareActions({
+    day: captured,
+    memoryQuests: [quest],
+    now: new Date(2026, 7, 5, 13, 0),
+  });
+
+  assert.equal(
+    ranked.completed.some((action) => action.instanceId === 'care:2026-08-05:memory-quest:photo'),
+    true,
+  );
+});
+
+test('Dismissing a concrete category also suppresses its generic replacement for the day', () => {
+  const dismissedPhotoQuest = day({
+    growth: {
+      schemaVersion: 1,
+      events: [],
+      careActions: [{
+        instanceId: 'care:2026-08-05:memory-quest:photo',
+        definitionId: 'memory-quest:photo',
+        sourceId: 'quest-photo-1',
+        status: 'not_today',
+        dismissedAt: '2026-08-05T13:00:00.000Z',
+        updatedAt: '2026-08-05T13:00:00.000Z',
+      }],
+    },
+  });
+  const ranked = rankTodayCareActions({
+    day: dismissedPhotoQuest,
+    memoryQuests: [{
+      id: 'quest-photo-2',
+      type: 'captureMoment',
+      emoji: 'camera',
+      title: 'Capture another moment',
+      rewardLabel: 'a memory',
+      targetCell: 'memory',
+      essenceReward: 5,
+      completed: false,
+    }],
+    now: new Date(2026, 7, 5, 13, 1),
+    rotatingLimit: 4,
+  });
+
+  assert.equal(ranked.active.some((action) => action.completionKey === 'photo'), false);
+  assert.equal(ranked.active.some((action) => action.completionKey === 'journal'), true);
 });
 
 test('Mood and sleep remain the first care choices throughout the day', () => {
@@ -197,6 +438,46 @@ test('Today care surfaces a playable mini-game while preserving two journal acti
   assert.equal(game?.completionMode, 'external_activity');
 });
 
+test('Today care never repeats a completed mini-game but may offer a different one', () => {
+  const completedQuestId = 'quest-cheerlet-block-party';
+  const completedGameDay = day({
+    growth: {
+      schemaVersion: 1,
+      events: [],
+      careActions: [{
+        instanceId: `care:2026-08-05:mini_game_round:${completedQuestId}`,
+        definitionId: `mini_game_round:${completedQuestId}`,
+        sourceId: 'attempt-1',
+        status: 'completed',
+        completedAt: '2026-08-05T13:05:00.000Z',
+        updatedAt: '2026-08-05T13:05:00.000Z',
+      }],
+    },
+  });
+  const same = rankTodayCareActions({
+    day: completedGameDay,
+    miniGameSuggestion: {
+      companionName: 'Cheerlet', familyId: 'cheerlet', questId: completedQuestId, title: 'Cheerlet’s Block Party',
+    },
+    now: new Date(2026, 7, 5, 13, 6),
+    rotatingLimit: 4,
+  });
+  assert.equal(same.active.some((action) => action.destination.kind === 'mini_game'), false);
+
+  const different = rankTodayCareActions({
+    day: completedGameDay,
+    miniGameSuggestion: {
+      companionName: 'Cheerlet', familyId: 'cheerlet', questId: 'quest-cheerlet-parade-sort', title: 'Cheerlet’s Parade Sort',
+    },
+    now: new Date(2026, 7, 5, 13, 6),
+    rotatingLimit: 4,
+  });
+  assert.equal(
+    different.active.find((action) => action.destination.kind === 'mini_game')?.destination.kind,
+    'mini_game',
+  );
+});
+
 test('Today care surfaces a detected Photo Library journaling action', () => {
   const suggestion = buildTodayPhotoRollSuggestion(day(), [{
     assetId: 'library-photo-1',
@@ -258,6 +539,9 @@ test('Detected Photo Library suggestions prefer a geolocation cluster', () => {
   assert.deepEqual(suggestion, {
     assetIds: ['library-photo-1', 'library-photo-2'],
     title: 'Journal a photo from Riverside Park',
+    placeName: 'Riverside Park',
+    startedAt: '2026-08-05T12:30:00.000Z',
+    endedAt: '2026-08-05T12:35:00.000Z',
   });
 });
 

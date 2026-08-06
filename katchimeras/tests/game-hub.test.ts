@@ -63,6 +63,16 @@ test('Today care uses the day to vary equally fresh game recommendations', () =>
   assert.ok(recommendations.size > 1);
 });
 
+test('Today care stops suggesting games once every available game was played today', () => {
+  const items = buildGameHubItems({
+    companions: [{ familyId: 'feastle', creatureId: 'companion:feastle', name: 'Feastle', visualKey: 'feastle', bondLevel: 5 }],
+    questState: emptyQuestState(),
+    dayId: '2026-08-05',
+  }).map((item) => item.locked ? item : { ...item, playedToday: true });
+
+  assert.equal(selectTodayCareGame(items, '2026-08-05'), null);
+});
+
 test('hub and quick-launch games retain the authored world environments', () => {
   const hub = readFileSync('components/katchadeck/games/game-hub-screen.tsx', 'utf8');
   const route = readFileSync('components/katchadeck/games/game-hub-game-route-screen.tsx', 'utf8');

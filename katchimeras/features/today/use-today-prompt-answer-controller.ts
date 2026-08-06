@@ -20,6 +20,7 @@ type UseTodayPromptAnswerControllerParams = {
   answerDayPrompt: (input: PromptAnswerInput, target?: DayInputTarget) => void;
   answerPhotoMeaning: (input: { choiceIds: string[] }, target?: DayInputTarget) => void;
   closePromptSheet: () => void;
+  deferRewardToCare?: boolean;
   startEggFeed: (from: FeedSourceRect, payload: { label?: string; photoUri?: string }, commit: () => void) => void;
 };
 
@@ -31,6 +32,7 @@ export function useTodayPromptAnswerController({
   answerDayPrompt,
   answerPhotoMeaning,
   closePromptSheet,
+  deferRewardToCare = false,
   startEggFeed,
 }: UseTodayPromptAnswerControllerParams) {
   const router = useRouter();
@@ -60,15 +62,21 @@ export function useTodayPromptAnswerController({
         .find((prompt) => prompt?.id === kind)
         ?.options.find((option) => option.id === choiceIds[0])?.label;
 
-      startEggFeed(from, { label }, () => {
+      const commit = () => {
         if (isPhotoMeaning) {
           answerPhotoMeaning({ choiceIds }, formingTarget);
         } else {
           answerDayPrompt({ kind, choiceIds }, formingTarget);
         }
-      });
+      };
+
+      // A care-card launch owns one coherent completion sequence after this
+      // sheet closes. Do not also fly the prompt label into the egg first;
+      // commit immediately and let the completed action row pay out Energy.
+      if (deferRewardToCare) commit();
+      else startEggFeed(from, { label }, commit);
     },
-    [answerDayPrompt, answerPhotoMeaning, formingActivePrompt, formingDay, formingPrompts, formingTarget, startEggFeed]
+    [answerDayPrompt, answerPhotoMeaning, deferRewardToCare, formingActivePrompt, formingDay, formingPrompts, formingTarget, startEggFeed]
   );
 
   const handleSelectHeroPhoto = useCallback(

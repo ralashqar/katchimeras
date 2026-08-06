@@ -21,6 +21,7 @@ import {
   todayTileWindowIndices,
 } from '@/utils/today-tile-window';
 import type { TodayExplorationSwipeDirection } from '@/utils/today-exploration-gesture';
+import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 
 type UseTodayNavigationControllerParams = {
   windowWidth: number;
@@ -31,8 +32,9 @@ type UseTodayNavigationControllerParams = {
   isHatching: boolean;
   promptSheetOpen: boolean;
   comicOpen: boolean;
+  deferCaptureRewardToCare?: boolean;
   selectTimelineDay: (dayId: string) => void;
-  startEggFeed: (from: FeedSourceRect, payload: { label?: string; photoUri?: string }, commit: () => void) => void;
+  startEggFeed: (from: FeedSourceRect, payload: { energyAmount?: number; label?: string; photoUri?: string }, commit: () => void) => void;
 };
 
 export function useTodayNavigationController({
@@ -44,6 +46,7 @@ export function useTodayNavigationController({
   isHatching,
   promptSheetOpen,
   comicOpen,
+  deferCaptureRewardToCare = false,
   selectTimelineDay,
   startEggFeed,
 }: UseTodayNavigationControllerParams) {
@@ -155,9 +158,13 @@ export function useTodayNavigationController({
       if (!feed) {
         return;
       }
+      // Capture routes already persisted their artifact. When they originated
+      // from a care card, that card's shared completion row owns the visible
+      // coin payout and outro after Today regains focus.
+      if (deferCaptureRewardToCare) return;
       const from: FeedSourceRect = { x: windowWidth / 2 - 30, y: windowHeight - 150, w: 60, h: 60 };
-      startEggFeed(from, { photoUri: feed.photoUri }, () => {});
-    }, [startEggFeed, windowHeight, windowWidth])
+      startEggFeed(from, { energyAmount: TODAY_GROWTH_REWARDS.photo, photoUri: feed.photoUri }, () => {});
+    }, [deferCaptureRewardToCare, startEggFeed, windowHeight, windowWidth])
   );
 
   useFocusEffect(

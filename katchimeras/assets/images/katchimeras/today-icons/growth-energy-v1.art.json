@@ -1,0 +1,22 @@
+{
+  "id": "today_growth_energy_v1",
+  "use": "Daily Growth Energy meter, reward badges, and egg-feed animation",
+  "generation": {
+    "provider": "fal",
+    "model": "fal-ai/nano-banana-2",
+    "pipeline": "scripts/asset-pipeline.py generate",
+    "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/concept/today_growth_energy_v1/today_growth_energy_v1/1785943313713-590734a9-3f15-45fa-8ad6-96e3caf54ec6.png",
+    "prompt": "Create one isolated Growth Energy icon for a premium cozy mobile game. One magical seed-shaped droplet of warm amber light, wrapped on one side by a small jade-green leaf, with a bright four-point star core. Premium rounded polished 3D Katchimeras mobile-game icon, soft studio lighting, friendly proportions, strong silhouette, readable at 20 pixels, centered with generous padding on a plain pale neutral studio background. It must feel like nurture energy, not money. No coin, gem, button, shop currency, text, letters, numbers, watermark, scenery, UI frame, cast shadow, or extra objects."
+  },
+  "matting": {
+    "provider": "fal",
+    "model": "fal-ai/birefnet/v2",
+    "pipeline": "scripts/asset-pipeline.py matte",
+    "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/cutouts/today-growth-energy-v1/1785943331397.png",
+    "alphaVerified": true
+  },
+  "outputs": {
+    "master": "growth-energy-v1.png",
+    "runtime": "growth-energy-v1.webp"
+  }
+}

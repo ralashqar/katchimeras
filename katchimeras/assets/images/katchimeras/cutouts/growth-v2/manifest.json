@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "generationModel": "fal-ai/nano-banana-2/edit",
+  "matteModel": "fal-ai/birefnet/v2 General Use (Heavy)",
+  "repositoryMatteEnum": "BiRefNet_lite",
+  "matteSettings": {
+    "operatingResolution": "1024x1024",
+    "refineForeground": true
+  },
+  "styleReferences": [
+    "assets\\images\\katchimeras\\world\\backgrounds\\home\\home-exploration-v1.png",
+    "assets\\images\\katchimeras\\evolution-grids\\baristabbit-three-stage-medium-v3\\cells\\stage-03-adult.png"
+  ],
+  "canvas": {
+    "width": 768,
+    "height": 768,
+    "baseline": 724
+  },
+  "assets": [
+    {
+      "kind": "growth",
+      "stage": 0,
+      "file": "egg-growth-0.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  A very young tiny cream Katchimeras egg growing like a plant, intact, with two plump green seed leaves at its base and one tiny curled shoot on top. Sparse simple warm-gold oval markings. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  The shell is completely intact: absolutely no crack, fracture, hole, missing piece, internal light, glow aura, or particles. The egg grows like a plant but remains unmistakably an egg. No photoreal detail and no legacy illustration style.",
+      "generationRecordId": "a7cc7fe8-69b7-4908-8cab-409f0560e29a",
+      "alphaBounds": [
+        264,
+        464,
+        504,
+        724
+      ],
+      "visibleHeight": 260,
+      "visibleWidth": 240
+    },
+    {
+      "kind": "growth",
+      "stage": 1,
+      "file": "egg-growth-1.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  The exact same intact egg identity, visibly taller and fuller. Keep the two base leaves; the top curl unfurls into one short shoot with a rounded leaf. Keep markings sparse. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  The shell is completely intact: absolutely no crack, fracture, hole, missing piece, internal light, glow aura, or particles. The egg grows like a plant but remains unmistakably an egg. No photoreal detail and no legacy illustration style. Image 3 is the immediately previous stage: preserve its exact egg identity, camera, lighting, markings, and baseline while applying only this next growth step.",
+      "generationRecordId": "c51d6967-0301-4591-8c66-94745683f1e9",
+      "alphaBounds": [
+        242,
+        404,
+        525,
+        724
+      ],
+      "visibleHeight": 320,
+      "visibleWidth": 283
+    },
+    {
+      "kind": "growth",
+      "stage": 2,
+      "file": "egg-growth-2.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  The exact same intact egg, clearly larger again. The top shoot has two rounded leaves. One clean bright-green vine wraps only the lowest quarter of the shell with three chunky leaves. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  The shell is completely intact: absolutely no crack, fracture, hole, missing piece, internal light, glow aura, or particles. The egg grows like a plant but remains unmistakably an egg. No photoreal detail and no legacy illustration style. Image 3 is the immediately previous stage: preserve its exact egg identity, camera, lighting, markings, and baseline while applying only this next growth step.",
+      "generationRecordId": "4edb1aad-0985-4b90-b454-79a6873dc486",
+      "alphaBounds": [
+        224,
+        344,
+        543,
+        724
+      ],
+      "visibleHeight": 380,
+      "visibleWidth": 319
+    },
+    {
+      "kind": "growth",
+      "stage": 3,
+      "file": "egg-growth-3.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  The exact same intact egg, larger and fuller again. Extend the vine in one loose turn around the lower third with five chunky rounded leaves. Keep the egg dominant. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  The shell is completely intact: absolutely no crack, fracture, hole, missing piece, internal light, glow aura, or particles. The egg grows like a plant but remains unmistakably an egg. No photoreal detail and no legacy illustration style. Image 3 is the immediately previous stage: preserve its exact egg identity, camera, lighting, markings, and baseline while applying only this next growth step.",
+      "generationRecordId": "c73aa0c3-ed65-4d70-95c7-3d19e9876a7f",
+      "alphaBounds": [
+        198,
+        284,
+        569,
+        724
+      ],
+      "visibleHeight": 440,
+      "visibleWidth": 371
+    },
+    {
+      "kind": "growth",
+      "stage": 4,
+      "file": "egg-growth-4.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  The exact same intact egg, larger and rounder again. The vine curls diagonally across the lower half with seven chunky leaves; a second short vine rises from the opposite base and ends in one closed bud. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  The shell is completely intact: absolutely no crack, fracture, hole, missing piece, internal light, glow aura, or particles. The egg grows like a plant but remains unmistakably an egg. No photoreal detail and no legacy illustration style. Image 3 is the immediately previous stage: preserve its exact egg identity, camera, lighting, markings, and baseline while applying only this next growth step.",
+      "generationRecordId": "5abe1003-51d1-46b9-8a87-f19d20d253b3",
+      "alphaBounds": [
+        118,
+        224,
+        650,
+        724
+      ],
+      "visibleHeight": 500,
+      "visibleWidth": 532
+    },
+    {
+      "kind": "growth",
+      "stage": 5,
+      "file": "egg-growth-5.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  The exact same completely intact near-adult egg, taller and fuller. Two loose bright-green vines curl around the lower two-thirds with ten chunky leaves and two small closed white buds. Leave broad clean shell areas visible. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  The shell is completely intact: absolutely no crack, fracture, hole, missing piece, internal light, glow aura, or particles. The egg grows like a plant but remains unmistakably an egg. No photoreal detail and no legacy illustration style. Image 3 is the immediately previous stage: preserve its exact egg identity, camera, lighting, markings, and baseline while applying only this next growth step.",
+      "generationRecordId": "3c164711-33cc-4c09-a1a9-0dae2a7be77c",
+      "alphaBounds": [
+        86,
+        164,
+        681,
+        724
+      ],
+      "visibleHeight": 560,
+      "visibleWidth": 595
+    },
+    {
+      "kind": "growth",
+      "stage": 6,
+      "file": "egg-growth-6.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  The exact same completely intact fully grown egg at its largest mature size. Open the two buds into small simple five-petal white flowers with round yellow centers and add one tiny closed bud by the top sprout. Healthy warm sheen only; no magical aura. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  The shell is completely intact: absolutely no crack, fracture, hole, missing piece, internal light, glow aura, or particles. The egg grows like a plant but remains unmistakably an egg. No photoreal detail and no legacy illustration style. Image 3 is the immediately previous stage: preserve its exact egg identity, camera, lighting, markings, and baseline while applying only this next growth step.",
+      "generationRecordId": "30d48bb8-67c3-4746-89fa-6f6ce302cca2",
+      "alphaBounds": [
+        52,
+        104,
+        716,
+        724
+      ],
+      "visibleHeight": 620,
+      "visibleWidth": 664
+    },
+    {
+      "kind": "hatch",
+      "phase": 1,
+      "file": "egg-hatch-crack-1.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  Preserve Image 3 exactly. Add only one small readable hairline Y-shaped crack near the upper-middle shell with restrained warm-gold light in the line. Shell remains closed. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  This is a hatch-animation-only edit. Do not change size, shape, shell markings, sprout, vines, leaves, flowers, camera, lighting, or framing. No hole, missing piece, creature, particles, aura, nest, platform, scenery, text, or watermark.",
+      "generationRecordId": "3383d81f-f2c4-4534-90af-e41a3242149f",
+      "alphaBounds": [
+        51,
+        104,
+        716,
+        724
+      ],
+      "visibleHeight": 620,
+      "visibleWidth": 665
+    },
+    {
+      "kind": "hatch",
+      "phase": 2,
+      "file": "egg-hatch-crack-2.png",
+      "prompt": "Match Image 1, the actual in-game Today environment: deliberately simplified low-detail toy-diorama 3D, large rounded shapes, bold clean color blocks, smooth materials, minimal surface texture, bright friendly daylight, and simple mobile-game highlights. Image 2 is only a secondary reference for polished cute 3D finish. Do not copy scene objects or add a face.  Preserve Image 3 exactly. Extend its existing crack into five clean branching hairline cracks across the upper half with warm-gold light. Shell remains closed and one beat from opening. The object is isolated on one perfectly flat uniform pure-black background for BiRefNet Heavy. No gradient, scenery, floor, cast shadow, platform, pedestal, soil, pot, basket, nest, moss bed, twigs, text, border, watermark, UI, or other object.  This is a hatch-animation-only edit. Do not change size, shape, shell markings, sprout, vines, leaves, flowers, camera, lighting, or framing. No hole, missing piece, creature, particles, aura, nest, platform, scenery, text, or watermark.",
+      "generationRecordId": "af4f1411-c776-4b4b-9399-f8ac2da1331a",
+      "alphaBounds": [
+        52,
+        104,
+        716,
+        724
+      ],
+      "visibleHeight": 620,
+      "visibleWidth": 664
+    }
+  ]
+}

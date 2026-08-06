@@ -12,6 +12,7 @@ type WorldActionStackProps = {
   onMicPressIn: () => void;
   onMicPressOut: () => void;
   onAdd: () => void;
+  onNote?: () => void;
   // Manually mark where you are right now as a place (when passive missed it).
   onAddPlace?: () => void;
   // Optional trailing sparkle action (Today wires it to the Quest Board).
@@ -35,6 +36,7 @@ export function WorldActionStack({
   onMicPressIn,
   onMicPressOut,
   onAdd,
+  onNote,
   onAddPlace,
   onSparkle,
   recording = false,
@@ -42,6 +44,40 @@ export function WorldActionStack({
   cameraBadge,
   placeBadge,
 }: WorldActionStackProps) {
+  if (orientation === 'horizontal' && onNote) {
+    return (
+      <View style={styles.rootRow}>
+        <Animated.View entering={popEnter(140)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Write a note"
+            onPress={onNote}
+            style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+            <IconSymbol name="square.and.pencil" size={22} color={Lantern.moon50} />
+          </Pressable>
+        </Animated.View>
+        <Animated.View entering={popEnter(100)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add a memory"
+            onPress={onAdd}
+            style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
+            <IconSymbol name="plus" size={34} color={Meadow.ink} />
+          </Pressable>
+        </Animated.View>
+        <Animated.View entering={popEnter(180)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Capture a moment with the camera${cameraBadge ? ` (${cameraBadge} new photos to review)` : ''}`}
+            onPress={onCamera}
+            style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
+            <IconSymbol name="camera.fill" size={22} color={Lantern.moon50} />
+            <ActionBadge count={cameraBadge} />
+          </Pressable>
+        </Animated.View>
+      </View>
+    );
+  }
   return (
     <View style={orientation === 'horizontal' ? styles.rootRow : styles.root}>
       <Animated.View entering={popEnter(140)}>
@@ -141,6 +177,7 @@ const styles = StyleSheet.create({
     boxShadow: '0 6px 14px rgba(20, 12, 4, 0.32), inset 0 1px 0 rgba(255, 248, 230, 0.25)',
   },
   recording: { backgroundColor: Lantern.auroraRose, borderColor: Lantern.auroraRose },
+  pressed: { transform: [{ translateY: 1 }, { scale: 0.97 }] },
   // The big matte-ivory "+" — a physical button resting on the path: soft
   // top bevel, real shadow, thin dark glyph (no glow halo).
   primary: {

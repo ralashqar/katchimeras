@@ -76,6 +76,12 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/cutouts/_egg_backup/egg-crack-1.png
 /katchimeras/assets/images/katchimeras/cutouts/_egg_backup/egg-crack-2.png
 /katchimeras/assets/images/katchimeras/cutouts/crustling.png
+/katchimeras/assets/images/katchimeras/cutouts/growth-v2/manifest.json
+/katchimeras/assets/images/katchimeras/cutouts/growth/egg-growth-0.png
+/katchimeras/assets/images/katchimeras/cutouts/growth/egg-growth-1.png
+/katchimeras/assets/images/katchimeras/cutouts/growth/egg-growth-2.png
+/katchimeras/assets/images/katchimeras/cutouts/growth/egg-growth-3.png
+/katchimeras/assets/images/katchimeras/cutouts/growth/egg-growth-4.png
 /katchimeras/assets/images/katchimeras/cutouts/pagelet.png
 /katchimeras/assets/images/katchimeras/environments/coffee_cafe/base.png
 /katchimeras/assets/images/katchimeras/environments/coffee_cafe/foreground.webp
@@ -505,6 +511,11 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/shellio.png
 /katchimeras/assets/images/katchimeras/steppling.png
 /katchimeras/assets/images/katchimeras/today-icons/_grid.png
+/katchimeras/assets/images/katchimeras/today-icons/growth-energy-v1.art.json
+/katchimeras/assets/images/katchimeras/today-icons/growth-energy-v1.png
+/katchimeras/assets/images/katchimeras/today-icons/growth-energy-v1.webp
+/katchimeras/assets/images/katchimeras/today-icons/growth-energy-v2.art.json
+/katchimeras/assets/images/katchimeras/today-icons/growth-energy-v2.png
 /katchimeras/assets/images/katchimeras/today-icons/moods/_grid.png
 /katchimeras/assets/images/katchimeras/today-icons/moods/peaceful.webp
 /katchimeras/assets/images/katchimeras/today-icons/sleep/_grid.png
@@ -1209,7 +1220,6 @@ __pycache__/
 /katchimeras/assets/images/katchimeras/world/props/artefact_memory_lantern.png
 /katchimeras/assets/images/katchimeras/world/props/artefact_museum_banner.png
 /katchimeras/assets/images/katchimeras/world/props/artefact_trail_bridge.png
-/katchimeras/assets/images/katchimeras/world/props/artefact_voice_crystal.png
 /katchimeras/assets/images/katchimeras/world/props/fence_strip.png
 /katchimeras/assets/images/katchimeras/world/props/food_stall.png
 /katchimeras/assets/images/katchimeras/world/props/sleep_good.png

@@ -4,6 +4,10 @@ import type { DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 export type TodayPhotoRollSuggestion = {
   assetIds: string[];
   title: string;
+  placeName?: string;
+  placeAddress?: string;
+  startedAt?: string;
+  endedAt?: string;
 };
 
 export function buildTodayPhotoRollSuggestion(
@@ -17,6 +21,9 @@ export function buildTodayPhotoRollSuggestion(
   const largestCluster = (day.dayMap?.nodes ?? [])
     .map((node) => ({
       name: node.label?.trim() || 'A place from this day',
+      address: node.address?.trim() || undefined,
+      startedAt: node.startedAt,
+      endedAt: node.endedAt,
       assetIds: node.photos
         .map((photo) => photo.sourceId ?? sourceIdFromPhotoId(photo.id))
         .filter((sourceId) => candidateIds.has(sourceId)),
@@ -32,6 +39,10 @@ export function buildTodayPhotoRollSuggestion(
       title: genericPlace
         ? `Journal one of ${largestCluster.assetIds.length} photos from this place`
         : `Journal a photo from ${specificPlace}`,
+      ...(!genericPlace ? { placeName: specificPlace } : {}),
+      ...(largestCluster.address ? { placeAddress: largestCluster.address } : {}),
+      ...(largestCluster.startedAt ? { startedAt: largestCluster.startedAt } : {}),
+      ...(largestCluster.endedAt ? { endedAt: largestCluster.endedAt } : {}),
     };
   }
 

@@ -1,4 +1,5 @@
 import type { StoredHomeDayRecord } from '@/types/home';
+import { todayGrowthActivation } from '@/utils/today-growth';
 
 export function dayInputSignature(day: StoredHomeDayRecord): string {
   const journalSignature = (day.journalRecords ?? [])
@@ -10,6 +11,7 @@ export function dayInputSignature(day: StoredHomeDayRecord): string {
 
 export function dayHasShape(day: StoredHomeDayRecord) {
   return (
+    todayGrowthActivation(day).isActivated ||
     day.moments.length > 0 ||
     day.stepsCount > 0 ||
     day.locationSampleCount > 0 ||

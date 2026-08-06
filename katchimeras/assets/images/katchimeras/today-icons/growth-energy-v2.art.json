@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "generationModel": "fal-ai/nano-banana-2/edit",
+  "generationRecordId": "018b698d-9a7c-46da-876d-73cc198bb8ec",
+  "sourceUrl": "https://ecwlxvidbrvatqtyttpw.supabase.co/storage/v1/object/public/katchimera-art-dev/concept/today_growth_energy/today_growth_energy_v2/1785960293062-866779d3-02ad-422a-9a9e-894254ad3ed8.png",
+  "styleReference": "assets/images/katchimeras/world/backgrounds/home/home-exploration-v1.png",
+  "prompt": "Use Image 1 only as the art-style reference: the actual Katchimeras Today environment's\ndeliberately simple cozy toy-diorama 3D style, broad rounded forms, clean color blocks,\nsmooth soft material, and bold mobile-game readability. Create ONE Growth Energy currency\ntoken centered and very large: a SOLID chunky rounded warm-gold coin shaped like a soft\nhexagonal pebble, with its entire silhouette filled by opaque gold and ONE large cream\nfour-point sparkle raised on its front face. It is a solid coin, never a ring. Use at\nmost three broad colors, a single soft highlight, a thick soft bevel, and no tiny detail.\nIt must remain unmistakable and readable at 20 pixels. It is a currency token, NOT an egg.\nIsolate it on a perfectly flat uniform pure-black background for background removal.\nNo ring, opening, cutout, hole, egg, shell speckles, cracks, facets, crystal texture, moss, vines, leaves, flowers,\nparticles, aura, scenery, floor, platform, cast shadow, text, letters, numbers, border,\nwatermark, UI, or any second object.",
+  "matteModel": "fal-ai/birefnet/v2 General Use (Heavy)",
+  "repositoryMatteEnum": "BiRefNet_lite",
+  "matteSettings": {
+    "operatingResolution": "1024x1024",
+    "refineForeground": true
+  },
+  "matteRepair": {
+    "method": "restore-border-disconnected-transparent-components-from-fal-source",
+    "alphaSubjectThreshold": 16,
+    "interiorFringeRestoreRadius": 8,
+    "restoredPixels": 363440,
+    "preservesBiRefNetExteriorEdge": true
+  },
+  "outputs": {
+    "master": "growth-energy-v2.png",
+    "runtime": "growth-energy-v2.webp"
+  },
+  "alphaBounds": [
+    56,
+    41,
+    455,
+    471
+  ]
+}

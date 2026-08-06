@@ -149,11 +149,18 @@ export function sortPlayableGames(items: readonly GameHubItem[]): GameHubItem[] 
   return [...items].sort((left, right) => (right.lastPlayedAt ?? 0) - (left.lastPlayedAt ?? 0));
 }
 
-export function selectTodayCareGame(items: readonly GameHubItem[], dayId: string): GameHubItem | null {
-  const playable = items.filter((item) => !item.locked && item.creatureId);
+export function selectTodayCareGame(
+  items: readonly GameHubItem[],
+  dayId: string,
+  excludedQuestIds: ReadonlySet<string> = new Set(),
+): GameHubItem | null {
+  const playable = items.filter((item) => !item.locked && item.creatureId && !excludedQuestIds.has(item.questId));
   if (!playable.length) return null;
   const unplayedToday = playable.filter((item) => !item.playedToday);
-  const pool = unplayedToday.length ? unplayedToday : playable;
+  // Today Care is a discovery queue, not an endless replay prompt. Once every
+  // available game has been completed today, leave the slot to another action.
+  if (!unplayedToday.length) return null;
+  const pool = unplayedToday;
   const neverPlayed = pool.filter((item) => item.lastPlayedAt == null);
   const mostRecentAt = Math.max(...pool.map((item) => item.lastPlayedAt ?? 0));
   const notMostRecent = mostRecentAt > 0 && pool.length > 1

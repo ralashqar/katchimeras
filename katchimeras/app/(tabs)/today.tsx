@@ -24,6 +24,10 @@ import Animated, {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
+import {
+  TodayPhotoLibrarySheet,
+  type TodayPhotoLibrarySheetContent,
+} from '@/components/katchadeck/home/today-photo-library-sheet';
 import { ManualJournalSheet } from '@/components/katchadeck/home/manual-journal-sheet';
 import { CreatureHero } from '@/components/katchadeck/home/creature-hero';
 import { HatchCheckInSheet } from '@/components/katchadeck/home/hatch-check-in-sheet';
@@ -44,6 +48,7 @@ import {
   useTodayExplorationBackgroundMotion,
 } from '@/components/katchadeck/home/today-exploration-background';
 import { TodayTileHatchReveal } from '@/components/katchadeck/home/today-tile-hatch-reveal';
+import { TodayHatchEnvironmentCrossfade } from '@/components/katchadeck/home/today-hatch-environment-crossfade';
 import { ResolvedAtmosphereLayer } from '@/components/katchadeck/world/atmosphere-layer';
 import {
   TodayEnvironmentMotionProvider,
@@ -73,6 +78,8 @@ import { presenceEnter } from '@/components/katchadeck/motion';
 import { ThemedText } from '@/components/themed-text';
 import { hasQuickGoalTemplates } from '@/constants/companion-quick-goals';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { GROWTH_ENERGY_ART } from '@/constants/today-care-art';
+import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
 import todayScene from '@/data/today-scene.json';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
 import { useAllDays } from '@/hooks/use-all-days';
@@ -98,6 +105,7 @@ import { useTodayShareComicController } from '@/features/today/use-today-share-c
 import { useTodayCategoryModel } from '@/features/today/use-today-category-model';
 import { useTodayNavigationController } from '@/features/today/use-today-navigation-controller';
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
+import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
 import type { ClassifiedMemory, HomeDayRecord, HomeTimelineDay } from '@/types/home';
@@ -134,7 +142,7 @@ import {
   consumeTodayCareGameRoundCompletion,
   requestTodayCareGameRound,
 } from '@/utils/today-care-game-round';
-import { pendingGrowthAwards, todayGrowthSummary } from '@/utils/today-growth';
+import { pendingGrowthAwards, TODAY_GROWTH_REWARDS, todayGrowthSummary } from '@/utils/today-growth';
 import { selectTodayCareGame } from '@/utils/game-hub';
 import { loadGameHubItemsForDays } from '@/utils/game-hub-state';
 import { buildTodayPhotoRollSuggestion } from '@/utils/today-photo-roll-suggestion';
@@ -149,7 +157,7 @@ import {
 
 // Hatched-day extras, parked so the numbers card stays at its usual anchor
 // (same pattern as the photos/timeline sections in day-journal-sections).
-const SHOW_HATCHED_ACTION_DOCK = false;
+const SHOW_HATCHED_ACTION_DOCK = true;
 const SHOW_HATCHED_REFLECTION_CARD = false;
 
 type TodayExplorationPageDescriptor = {
@@ -184,6 +192,13 @@ const QUICK_PROMPT_CATEGORIES: {
 export default function HomeScreen() {
   const router = useRouter();
   const screenFocused = useIsFocused();
+  const [growthNow, setGrowthNow] = useState(() => new Date());
+  useEffect(() => {
+    if (!screenFocused) return;
+    setGrowthNow(new Date());
+    const timer = setInterval(() => setGrowthNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, [screenFocused]);
   const allKatchimerasAvailable = useDevAllKatchimerasAvailable();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -195,7 +210,10 @@ export default function HomeScreen() {
   const [selectedCareGoalId, setSelectedCareGoalId] = useState<string | null>(null);
   const [pendingCareIntent, setPendingCareIntent] = useState<RankedTodayCareAction | null>(null);
   const [queuedCareCompletion, setQueuedCareCompletion] = useState<TodayCareCompletionEvent | null>(null);
+  const [todayPhotoLibrarySheet, setTodayPhotoLibrarySheet] = useState<TodayPhotoLibrarySheetContent | null>(null);
   const careFlowWasBusyRef = useRef(false);
+  const careRewardRequestKeyAtStartRef = useRef(0);
+  const incubationActivatedRef = useRef<boolean | null>(null);
   const careCompletionSequenceRef = useRef(0);
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
     completion: CompanionQuickGoalCompletion;
@@ -260,16 +278,61 @@ export default function HomeScreen() {
     awardGrowth: awardTodayGrowth,
     updateCareAction,
   } = useHomeScreenState();
+  const {
+    isHatching,
+    presentation: hatchPresentation,
+    handleHatchEnvironmentReady,
+    handleHatchSubjectReady,
+    handleReveal,
+  } = useTodayHatchRevealController({
+    selectedDay,
+    triggerHatchIfReady,
+  });
   const { days: allDays } = useAllDays();
+  const isDay = selectedDay?.kind === 'day';
+  const homeLoopPresentation = useMemo(() => resolveHomeLoopPresentation({
+    activeDayPrompt,
+    availableDayPrompts,
+    isHatching,
+    isTodayHatched,
+    selectedDay,
+    tomorrowActivePrompt,
+    tomorrowAvailablePrompts,
+    tomorrowDay,
+  }), [
+    activeDayPrompt,
+    availableDayPrompts,
+    isHatching,
+    isTodayHatched,
+    selectedDay,
+    tomorrowActivePrompt,
+    tomorrowAvailablePrompts,
+    tomorrowDay,
+  ]);
+  const isFormingToday = homeLoopPresentation.mode === 'forming-today';
+  const onTomorrowForming = homeLoopPresentation.mode === 'forming-tomorrow';
+  const isForming = homeLoopPresentation.forming !== null;
+  const formingTarget = homeLoopPresentation.forming?.target ?? 'today';
+  const formingDay = homeLoopPresentation.forming?.day ?? null;
+  const formingPrompts = homeLoopPresentation.forming?.prompts ?? availableDayPrompts;
+  const formingActivePrompt = homeLoopPresentation.forming?.activePrompt ?? null;
   const todayCareGame = useMemo(() => {
-    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return null;
+    if (!formingDay) return null;
     const items = loadGameHubItemsForDays({
       allKatchimerasAvailable,
-      dayId: selectedDay.isoDate,
+      dayId: formingDay.isoDate,
       days: allDays,
     });
-    return selectTodayCareGame(items, selectedDay.isoDate);
-  }, [allDays, allKatchimerasAvailable, selectedDay]);
+    const excludedQuestIds = new Set(
+      (formingDay.growth?.careActions ?? []).flatMap((action) => {
+        const prefix = 'mini_game_round:';
+        return action.definitionId.startsWith(prefix) && action.status !== 'active'
+          ? [action.definitionId.slice(prefix.length)]
+          : [];
+      }),
+    );
+    return selectTodayCareGame(items, formingDay.isoDate, excludedQuestIds);
+  }, [allDays, allKatchimerasAvailable, formingDay]);
   const quickGoalFamilyIds = useMemo(() => {
     if (allKatchimerasAvailable) {
       return katchimeraFamilies
@@ -285,15 +348,15 @@ export default function HomeScreen() {
     return [...ids];
   }, [allDays, allKatchimerasAvailable]);
   const quickGoals = useCompanionQuickGoals({
-    dayId: selectedDay?.kind === 'day' && selectedDay.isToday ? selectedDay.isoDate : null,
+    dayId: formingDay?.isoDate ?? null,
     availableFamilyIds: quickGoalFamilyIds,
   });
   useEffect(() => {
-    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return;
-    for (const award of pendingGrowthAwards(selectedDay)) awardTodayGrowth(award);
-  }, [awardTodayGrowth, selectedDay]);
+    if (!formingDay) return;
+    for (const award of pendingGrowthAwards(formingDay)) awardTodayGrowth(award, formingTarget);
+  }, [awardTodayGrowth, formingDay, formingTarget]);
   useEffect(() => {
-    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return;
+    if (!formingDay) return;
     for (const item of quickGoals.goalsForToday) {
       if (!item.completion) continue;
       awardTodayGrowth({
@@ -301,9 +364,9 @@ export default function HomeScreen() {
         amount: 8,
         source: 'quick_goal',
         sourceId: item.completion.id,
-      });
+      }, formingTarget);
     }
-  }, [awardTodayGrowth, quickGoals.goalsForToday, selectedDay]);
+  }, [awardTodayGrowth, formingDay, formingTarget, quickGoals.goalsForToday]);
   const [clarificationMemory, setClarificationMemory] = useState<ClassifiedMemory | null>(null);
   const reduceMotion = useReducedMotion();
   const goalsFocusProgress = useSharedValue(0);
@@ -311,12 +374,33 @@ export default function HomeScreen() {
   const {
     eggFeed,
     eggFeedKey,
+    eggFeedRewardAmount,
+    eggFeedRewardKey,
+    eggFeedRewardRequestKey,
     eggTargetRef,
     heroStageRef,
     startEggFeed,
     handleEggFeedArrive,
+    handleEnergyTokenArrive,
     pulseEgg,
+    setNextEnergyCurrencySource,
   } = useEggFeedController();
+  useEffect(() => {
+    if (!pendingCareIntent) setNextEnergyCurrencySource(null);
+  }, [pendingCareIntent, setNextEnergyCurrencySource]);
+  const handleCareRewardFlight = useCallback((
+    from: Parameters<typeof startEggFeed>[0],
+    action: RankedTodayCareAction,
+    onArrive: () => void,
+  ) => {
+    startEggFeed(from, {
+      currencyFrom: from,
+      energyAmount: action.growthReward,
+      energyOnly: true,
+      imageSource: GROWTH_ENERGY_ART,
+      tint: Lantern.ember300,
+    }, onArrive);
+  }, [startEggFeed]);
   const { promptSheetOpen, initialPrompt, openPromptSheet, closePromptSheet } = usePromptSheetController();
 
   useFocusEffect(
@@ -357,15 +441,6 @@ export default function HomeScreen() {
     }
   }, [backfillStatus.completedVersion, refreshState]);
 
-  const {
-    isHatching,
-    presentation: hatchPresentation,
-    handleHatchAssetsReady,
-    handleReveal,
-  } = useTodayHatchRevealController({
-    selectedDay,
-    triggerHatchIfReady,
-  });
   const handleRevealPress = useCallback(() => {
     if (selectedDay?.kind !== 'day' || !selectedDay.canHatch) return;
     const reason = hatchCheckInEligibility(selectedDay);
@@ -392,22 +467,10 @@ export default function HomeScreen() {
     });
   }
 
-  const isDay = selectedDay?.kind === 'day';
   const isHatched = isDay && selectedDay.state === 'hatched' && selectedDay.creature;
   const selectedHatchedCompanionId = isDay && selectedDay.state === 'hatched' && selectedDay.creature
     ? identityForCreature(selectedDay.creature)?.companionId ?? null
     : null;
-  const isFormingToday = isDay && selectedDay.isToday && selectedDay.state !== 'hatched';
-
-  // Once today has hatched, the Tomorrow page becomes a forming egg the user can
-  // pre-feed (moments / prompts / camera) until the rollover. The forming target
-  // + which day/prompts to use are unified here so the same UI drives both.
-  const onTomorrowForming = selectedDay?.kind === 'tomorrow' && isTodayHatched;
-  const isForming = isFormingToday || onTomorrowForming;
-  const formingTarget = onTomorrowForming ? 'tomorrow' : 'today';
-  const formingDay = onTomorrowForming ? tomorrowDay : isFormingToday ? selectedDay : null;
-  const formingPrompts = onTomorrowForming ? tomorrowAvailablePrompts : availableDayPrompts;
-  const formingActivePrompt = onTomorrowForming ? tomorrowActivePrompt : activeDayPrompt;
   const selectedKatchimeraExplorationKey =
     isDay && selectedDay.state === 'hatched' && selectedDay.creature
       ? todayKatchimeraExplorationBackgroundKeyForPresentation({
@@ -675,6 +738,7 @@ export default function HomeScreen() {
     answerDayPrompt,
     answerPhotoMeaning,
     closePromptSheet,
+    deferRewardToCare: pendingCareIntent?.completionKey === 'reflection',
     startEggFeed,
   });
   const todayPhotoRollSuggestion = useMemo(() => {
@@ -732,6 +796,7 @@ export default function HomeScreen() {
     observatoryOpen ||
     manualJournalOpen ||
     quickNoteOpen ||
+    todayPhotoLibrarySheet !== null ||
     clarificationMemory !== null;
 
   const { foodFollowUp, studioFollowUp, clearFoodFollowUp, clearStudioFollowUp } = useMomentFollowUpController({
@@ -835,15 +900,32 @@ export default function HomeScreen() {
     [categories, formingDay]
   );
   const nurtureGrowth = useMemo(() => {
-    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return null;
-    return todayGrowthSummary(selectedDay, resolveHatchHour(loadOnboardingProfile()), new Date());
-  }, [selectedDay]);
+    if (!formingDay) return null;
+    return todayGrowthSummary(
+      formingDay,
+      resolveHatchHour(loadOnboardingProfile()),
+      growthNow,
+      onTomorrowForming
+        ? { incubationNotBefore: new Date(`${formingDay.isoDate}T00:00:00`) }
+        : undefined,
+    );
+  }, [formingDay, growthNow, onTomorrowForming]);
+  useEffect(() => {
+    if (!nurtureGrowth) {
+      incubationActivatedRef.current = null;
+      return;
+    }
+    if (incubationActivatedRef.current === false && nurtureGrowth.isActivated) {
+      setMicrocopy('Incubation started');
+    }
+    incubationActivatedRef.current = nurtureGrowth.isActivated;
+  }, [nurtureGrowth, setMicrocopy]);
   const nurtureCare = useMemo(() => {
-    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') {
+    if (!formingDay) {
       return { active: [], completed: [] };
     }
     return rankTodayCareActions({
-      day: selectedDay,
+      day: formingDay,
       memoryQuests,
       reflectionAvailable: formingPrompts.some((prompt) =>
         ['gratitude', 'highlight', 'meaning', 'day_word', 'inner_weather'].includes(prompt.id)
@@ -861,10 +943,10 @@ export default function HomeScreen() {
         title: todayCareGame.title,
       } : null,
       photoRollSuggestion: todayPhotoRollSuggestion,
-      rotatingLimit: 4,
+      rotatingLimit: 3,
       now: new Date(),
     });
-  }, [formingPrompts, memoryQuests, quickGoals.goalsForToday, selectedDay, todayCareGame, todayPhotoRollSuggestion]);
+  }, [formingDay, formingPrompts, memoryQuests, quickGoals.goalsForToday, todayCareGame, todayPhotoRollSuggestion]);
   const selectedCareGoal = selectedCareGoalId
     ? quickGoals.goalsForToday.find((item) => item.goal.id === selectedCareGoalId) ?? null
     : null;
@@ -881,13 +963,15 @@ export default function HomeScreen() {
       deferredUntil: null,
       completedAt: null,
       dismissedAt: timestamp,
-    });
+    }, formingTarget);
     setPendingCareIntent((current) => current?.instanceId === action.instanceId ? null : current);
     setMicrocopy('Set aside for today');
-  }, [quickGoals, setMicrocopy, updateCareAction]);
-  const handleCareStart = useCallback((action: RankedTodayCareAction) => {
+  }, [formingTarget, quickGoals, setMicrocopy, updateCareAction]);
+  const handleCareStart = useCallback((action: RankedTodayCareAction, rewardFrom: Parameters<typeof startEggFeed>[0]) => {
     if (action.completionMode === 'artifact' || action.completionMode === 'external_activity') {
+      careRewardRequestKeyAtStartRef.current = eggFeedRewardRequestKey;
       setPendingCareIntent(action);
+      setNextEnergyCurrencySource(rewardFrom);
     }
     switch (action.destination.kind) {
       case 'quick_goal':
@@ -918,7 +1002,13 @@ export default function HomeScreen() {
           setPendingCareIntent(null);
           return;
         }
-        openPromptSheet({ ...photoPrompt, photoCandidates: candidates });
+        setTodayPhotoLibrarySheet({
+          candidates,
+          ...(action.destination.placeName ? { placeName: action.destination.placeName } : {}),
+          ...(action.destination.placeAddress ? { placeAddress: action.destination.placeAddress } : {}),
+          ...(action.destination.startedAt ? { startedAt: action.destination.startedAt } : {}),
+          ...(action.destination.endedAt ? { endedAt: action.destination.endedAt } : {}),
+        });
         return;
       }
       case 'mini_game':
@@ -929,20 +1019,20 @@ export default function HomeScreen() {
       case 'inline_sleep':
         return;
     }
-  }, [formingPrompts, handleQuest, handleQuickCategory, openManualJournal, openPromptSheet, photoPrompt, router]);
+  }, [eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource]);
 
   useFocusEffect(useCallback(() => {
     const completion = consumeTodayCareGameRoundCompletion();
     if (!completion) return;
-    if (selectedDay?.kind !== 'day' || !selectedDay.isToday || selectedDay.state === 'hatched') return;
-    if (!completion.action.instanceId.startsWith(`care:${selectedDay.isoDate}:`)) return;
+    if (!formingDay) return;
+    if (!completion.action.instanceId.startsWith(`care:${formingDay.isoDate}:`)) return;
     const completedAt = new Date(completion.completedAt).toISOString();
     setPendingCareIntent(completion.action);
     awardTodayGrowth({
       actionId: completion.action.id,
       source: 'mini_game',
       sourceId: completion.attemptId,
-    });
+    }, formingTarget);
     updateCareAction({
       instanceId: completion.action.instanceId,
       definitionId: completion.action.id,
@@ -951,10 +1041,9 @@ export default function HomeScreen() {
       deferredUntil: null,
       completedAt,
       dismissedAt: null,
-    });
-    pulseEgg();
-    setMicrocopy(`+${completion.action.growthReward} Growth`);
-  }, [awardTodayGrowth, pulseEgg, selectedDay, setMicrocopy, updateCareAction]));
+    }, formingTarget);
+    setMicrocopy(`+${completion.action.growthReward} Growth Energy`);
+  }, [awardTodayGrowth, formingDay, formingTarget, setMicrocopy, updateCareAction]));
 
   useFocusEffect(
     useCallback(() => {
@@ -980,6 +1069,13 @@ export default function HomeScreen() {
     explorationFramingOverride?: boolean,
   ) => {
     const active = mode === 'active';
+    // The forming nurture experience renders its own centered egg above this
+    // timeline scene and owns the payout destination. Sharing one ref across
+    // that egg plus current/neighbor timeline eggs lets an off-screen page win
+    // the ref race, sending Energy toward the left or right edge.
+    const ownsEggRewardTarget = active
+      && !isForming
+      && timelineDay.id === selectedDayId;
     const pageUsesExplorationFraming =
       explorationFramingOverride
       ?? (active && explorationBackgroundActive);
@@ -987,7 +1083,7 @@ export default function HomeScreen() {
       return (
         <TodayTileHatchReveal
           homeArchetypeId={homeArchetypeId}
-          onAssetsReady={handleHatchAssetsReady}
+          onAssetsReady={handleHatchSubjectReady}
           presentation={hatchPresentation}
         />
       );
@@ -1032,19 +1128,21 @@ export default function HomeScreen() {
         isReady={active && day?.state === 'ready_to_hatch'}
         onEggPress={active && day?.canAddMoments ? () => openManualJournal() : undefined}
         pinchStrength={active ? 1 : todayScene.homeEnvironment.motion.neighborPinchStrength}
-        targetRef={active ? eggTargetRef : undefined}
+        targetRef={ownsEggRewardTarget ? eggTargetRef : undefined}
       />
     );
   }, [
     eggFeedKey,
     eggTargetRef,
     explorationBackgroundActive,
-    handleHatchAssetsReady,
+    handleHatchSubjectReady,
     hatchPresentation,
     homeArchetypeId,
     isHatching,
+    isForming,
     openManualJournal,
     resolvedHeroStageTop,
+    selectedDayId,
     tomorrowDay,
   ]);
 
@@ -1089,6 +1187,7 @@ export default function HomeScreen() {
     isHatching,
     promptSheetOpen: promptSheetOpen || hatchCheckInOpen || quickGoalsOpen,
     comicOpen: Boolean(comicGen),
+    deferCaptureRewardToCare: pendingCareIntent?.completionKey === 'photo',
     selectTimelineDay,
     startEggFeed,
   });
@@ -1130,6 +1229,7 @@ export default function HomeScreen() {
     nameSheetOpen ||
     manualJournalOpen ||
     quickNoteOpen ||
+    todayPhotoLibrarySheet !== null ||
     clarificationMemory !== null ||
     !!foodFollowUp ||
     !!studioFollowUp ||
@@ -1138,9 +1238,9 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!pendingCareIntent) return;
     const completedPhotoAssetId = pendingCareIntent.destination.kind === 'photo_roll'
-      && selectedDay?.kind === 'day'
+      && formingDay
       ? pendingCareIntent.destination.assetIds.find((assetId) =>
-          selectedDay.heroPhoto?.assetId === assetId || selectedDay.usedPhotoAssetIds?.includes(assetId)
+          formingDay.heroPhoto?.assetId === assetId || formingDay.usedPhotoAssetIds?.includes(assetId)
         ) ?? null
       : null;
     const completed = Boolean(completedPhotoAssetId)
@@ -1156,16 +1256,17 @@ export default function HomeScreen() {
         deferredUntil: null,
         completedAt,
         dismissedAt: null,
-      });
+      }, formingTarget);
     }
     careCompletionSequenceRef.current += 1;
     setQueuedCareCompletion({
       action: pendingCareIntent,
       id: `${pendingCareIntent.instanceId}:${careCompletionSequenceRef.current}`,
+      rewardAlreadyAnimated: eggFeedRewardRequestKey !== careRewardRequestKeyAtStartRef.current,
     });
     setPendingCareIntent(null);
     careFlowWasBusyRef.current = false;
-  }, [nurtureCare.completed, pendingCareIntent, selectedDay, updateCareAction]);
+  }, [eggFeedRewardRequestKey, formingDay, formingTarget, nurtureCare.completed, pendingCareIntent, updateCareAction]);
   useEffect(() => {
     if (!pendingCareIntent) {
       careFlowWasBusyRef.current = false;
@@ -1281,7 +1382,13 @@ export default function HomeScreen() {
     <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>
-      {explorationPresentationActive ? (
+      {isHatching ? (
+        <TodayHatchEnvironmentCrossfade
+          imageSize={Math.max(windowHeight, windowWidth)}
+          onDestinationReady={handleHatchEnvironmentReady}
+          presentation={hatchPresentation}
+        />
+      ) : explorationPresentationActive ? (
         <View
           pointerEvents="none"
           style={styles.explorationBackgroundPlane}>
@@ -1305,6 +1412,7 @@ export default function HomeScreen() {
                 <TodayExplorationBackground
                   backgroundKey={displayedExplorationPrevious.backgroundKey}
                   imageSize={explorationMotion.imageSize}
+                  verticalOffset={HOME_SCENE_Y_OFFSET}
                 />
               ) : displayedExplorationPrevious.fallbackBackground ? (
                 <TodaySceneBackdrop
@@ -1324,6 +1432,7 @@ export default function HomeScreen() {
                 <TodayExplorationBackground
                   backgroundKey={displayedExplorationCurrent.backgroundKey}
                   imageSize={explorationMotion.imageSize}
+                  verticalOffset={HOME_SCENE_Y_OFFSET}
                 />
               ) : displayedExplorationCurrent.fallbackBackground ? (
                 <TodaySceneBackdrop
@@ -1350,6 +1459,7 @@ export default function HomeScreen() {
                 <TodayExplorationBackground
                   backgroundKey={displayedExplorationNext.backgroundKey}
                   imageSize={explorationMotion.imageSize}
+                  verticalOffset={HOME_SCENE_Y_OFFSET}
                 />
               ) : displayedExplorationNext.fallbackBackground ? (
                 <TodaySceneBackdrop
@@ -1535,27 +1645,27 @@ export default function HomeScreen() {
 
       </ScrollView>
 
-      {isFormingToday && selectedDay?.kind === 'day' && nurtureGrowth ? (
+      {isForming && formingDay && nurtureGrowth && !isHatching ? (
         <TodayNurtureExperience
           actions={nurtureCare.active}
           bottomInset={insets.bottom}
           completionEvent={flowBusy ? null : queuedCareCompletion}
-          day={selectedDay}
+          day={formingDay}
           eggTargetRef={eggTargetRef}
+          energyFeedbackKey={eggFeedRewardKey}
+          energyFeedbackAmount={eggFeedRewardAmount}
           feedbackKey={eggFeedKey}
           growth={nurtureGrowth}
           homeArchetypeId={homeArchetypeId}
           onAddJournal={() => openManualJournal()}
           onAddTextNote={() => openQuickNoteOverlay('text')}
-          onAddVoiceNote={() => openQuickNoteOverlay('voice')}
           onAddPhoto={openMomentCapture}
           onCareNotToday={handleCareNotToday}
           onCareStart={handleCareStart}
           onCompleteQuickGoal={(goalId) => {
             const receipt = quickGoals.completeGoal(goalId);
             if (receipt.newlyCompleted) {
-              pulseEgg();
-              setMicrocopy('+8 Growth');
+              setMicrocopy('+8 Growth Energy');
             }
             return receipt;
           }}
@@ -1563,17 +1673,24 @@ export default function HomeScreen() {
             setQueuedCareCompletion((current) => current?.id === eventId ? null : current);
           }}
           onOpenQuickGoal={setSelectedCareGoalId}
-          onChooseMood={(choiceId, label, from, imageSource, accent) => {
+          onChooseMood={(choiceId, label, from, imageSource, accent, currencyFrom) => {
             const action = nurtureCare.active.find((candidate) => candidate.id === 'mood');
-            if (action) setPendingCareIntent(action);
-            handleConfirmMood(choiceId, label, from, imageSource, accent);
+            if (action) {
+              careRewardRequestKeyAtStartRef.current = eggFeedRewardRequestKey;
+              setPendingCareIntent(action);
+            }
+            handleConfirmMood(choiceId, label, from, imageSource, accent, currencyFrom);
           }}
-          onChooseSleep={(quality, label, from, imageSource, accent) => {
+          onChooseSleep={(quality, label, from, imageSource, accent, currencyFrom) => {
             const action = nurtureCare.active.find((candidate) => candidate.id === 'sleep');
-            if (action) setPendingCareIntent(action);
-            handleSetSleep(quality, label, from, imageSource, accent);
+            if (action) {
+              careRewardRequestKeyAtStartRef.current = eggFeedRewardRequestKey;
+              setPendingCareIntent(action);
+            }
+            handleSetSleep(quality, label, from, imageSource, accent, currencyFrom);
           }}
           onReveal={handleRevealPress}
+          onRewardFlight={handleCareRewardFlight}
           onSelectDay={navigateToDay}
           careSwipeExternalGesture={explorationMotion.gesture}
           sceneTranslateX={explorationMotion.translateX}
@@ -1622,7 +1739,7 @@ export default function HomeScreen() {
           state={quickGoals.state}
         />
       ) : null}
-      {!isFormingToday && !isHatching && !hasActivePrompt && !quickGoalsOpen ? (
+      {!isForming && (!isHatching || hatchShowsResident) && !hasActivePrompt && !quickGoalsOpen ? (
         <TodayBottomDock
           canHatch={isDay ? selectedDay.canHatch : false}
           isForming={isForming}
@@ -1666,7 +1783,11 @@ export default function HomeScreen() {
         />
       ) : null}
 
-      <EggFeedOverlay feed={eggFeed} onArrive={handleEggFeedArrive} />
+      <EggFeedOverlay
+        feed={eggFeed}
+        onArrive={handleEggFeedArrive}
+        onEnergyTokenArrive={handleEnergyTokenArrive}
+      />
 
       {/* Cinematic egg and Katchimera scenes bypass TodayHexNeighborhood, whose
           foreground slot normally owns rain, snow, motes, petals, and other
@@ -1747,6 +1868,16 @@ export default function HomeScreen() {
           onClose={closePromptSheet}
         />
       ) : null}
+      {todayPhotoLibrarySheet ? (
+        <TodayPhotoLibrarySheet
+          content={todayPhotoLibrarySheet}
+          onClose={() => setTodayPhotoLibrarySheet(null)}
+          onSelect={(photo, from) => {
+            setTodayPhotoLibrarySheet(null);
+            handleSelectHeroPhoto(photo, from);
+          }}
+        />
+      ) : null}
       {manualJournalOpen ? (
         <ManualJournalSheet
           allowRemoteIntelligence={cloudIntelligenceEnabled}
@@ -1758,7 +1889,19 @@ export default function HomeScreen() {
           onSave={(submission) => {
             addManualJournalEntry(submission, formingTarget);
             closeManualJournal();
-            pulseEgg();
+            const hasPhotoText = submission.sourceType === 'photo'
+              && Boolean(submission.note?.trim() || Object.values(submission.fields).some((value) => Array.isArray(value) ? value.length > 0 : Boolean(value)));
+            const energyAmount = submission.sourceType === 'photo'
+              ? hasPhotoText ? 25 : TODAY_GROWTH_REWARDS.photo
+              : submission.linkedNote?.kind === 'voice'
+                ? TODAY_GROWTH_REWARDS.voice_note
+                : TODAY_GROWTH_REWARDS.journal;
+            startEggFeed({ h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 }, {
+              energyAmount,
+              energyOnly: true,
+              imageSource: GROWTH_ENERGY_ART,
+              tint: Lantern.ember300,
+            }, () => {});
             setMicrocopy('Added to today');
           }}
         />
@@ -2028,7 +2171,7 @@ const styles = StyleSheet.create({
     height: TODAY_KINGDOM_STAGE_HEIGHT,
     isolation: 'isolate',
     justifyContent: 'center',
-    marginTop: 26,
+    marginTop: 26 + HOME_SCENE_Y_OFFSET,
     overflow: 'visible',
     position: 'relative',
     // Keep the entire scenic neighborhood in one low stacking plane. UI

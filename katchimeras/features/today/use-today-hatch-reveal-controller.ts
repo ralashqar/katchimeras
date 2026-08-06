@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { AppState } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import type { HomeDayRecord, HomeTimelineDay } from '@/types/home';
 import type { HatchCommitResult } from '@/features/today/use-hatch-controller';
@@ -16,17 +17,25 @@ type UseTodayHatchRevealControllerParams = {
 
 const HATCH_REVEAL_WATCHDOG_MS = 12_000;
 const PHASE_DELAYS_MS = {
-  revealing: 300,
-  worldShift: 560,
-  settling: 1_080,
-  tomorrowArrival: 1_340,
-  complete: 1_680,
+  revealing: 650,
+  worldShift: 900,
+  settling: 1_600,
+  tomorrowArrival: 2_100,
+  complete: 2_600,
+} as const;
+const REDUCED_PHASE_DELAYS_MS = {
+  revealing: 60,
+  worldShift: 120,
+  settling: 220,
+  tomorrowArrival: 300,
+  complete: 420,
 } as const;
 
 export function useTodayHatchRevealController({
   selectedDay,
   triggerHatchIfReady,
 }: UseTodayHatchRevealControllerParams) {
+  const reduceMotion = useReducedMotion();
   const [presentation, dispatch] = useReducer(
     todayHatchPresentationReducer,
     IDLE_TODAY_HATCH_PRESENTATION,
@@ -37,6 +46,7 @@ export function useTodayHatchRevealController({
   const runIdRef = useRef(0);
   const committedRunIdRef = useRef(0);
   const presentationScheduledRef = useRef(false);
+  const assetsReadyRef = useRef({ environment: false, subject: false });
   const appIsActiveRef = useRef(AppState.currentState === 'active');
 
   const clearTimers = useCallback(() => {
@@ -53,6 +63,7 @@ export function useTodayHatchRevealController({
     hatchingActiveRef.current = false;
     committedRunIdRef.current = 0;
     presentationScheduledRef.current = false;
+    assetsReadyRef.current = { environment: false, subject: false };
     clearTimers();
     dispatch({ type: 'reset' });
   }, [clearTimers]);
@@ -75,23 +86,35 @@ export function useTodayHatchRevealController({
         if (runIdRef.current === runId && hatchingActiveRef.current) callback();
       }, delay));
     };
-    schedule(PHASE_DELAYS_MS.revealing, () => {
+    const phaseDelays = reduceMotion ? REDUCED_PHASE_DELAYS_MS : PHASE_DELAYS_MS;
+    schedule(phaseDelays.revealing, () => {
       dispatch({ type: 'advance', phase: 'revealing' });
       if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     });
-    schedule(PHASE_DELAYS_MS.worldShift, () => dispatch({ type: 'advance', phase: 'world_shift' }));
-    schedule(PHASE_DELAYS_MS.settling, () => {
+    schedule(phaseDelays.worldShift, () => dispatch({ type: 'advance', phase: 'world_shift' }));
+    schedule(phaseDelays.settling, () => {
       dispatch({ type: 'advance', phase: 'settling' });
       if (process.env.EXPO_OS === 'ios') void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     });
-    schedule(PHASE_DELAYS_MS.tomorrowArrival, () => dispatch({ type: 'advance', phase: 'tomorrow_arrival' }));
-    schedule(PHASE_DELAYS_MS.complete, handleHatchComplete);
-  }, [handleHatchComplete]);
+    schedule(phaseDelays.tomorrowArrival, () => dispatch({ type: 'advance', phase: 'tomorrow_arrival' }));
+    schedule(phaseDelays.complete, handleHatchComplete);
+  }, [handleHatchComplete, reduceMotion]);
 
-  const handleHatchAssetsReady = useCallback(() => {
+  const markHatchAssetReady = useCallback((kind: 'environment' | 'subject') => {
     const runId = committedRunIdRef.current;
-    if (runId > 0) schedulePresentation(runId);
+    assetsReadyRef.current[kind] = true;
+    if (runId > 0 && assetsReadyRef.current.environment && assetsReadyRef.current.subject) {
+      schedulePresentation(runId);
+    }
   }, [schedulePresentation]);
+  const handleHatchEnvironmentReady = useCallback(
+    () => markHatchAssetReady('environment'),
+    [markHatchAssetReady],
+  );
+  const handleHatchSubjectReady = useCallback(
+    () => markHatchAssetReady('subject'),
+    [markHatchAssetReady],
+  );
 
   const handleReveal = useCallback(async () => {
     if (hatchingActiveRef.current || selectedDay?.kind !== 'day' || !selectedDay.canHatch) {
@@ -103,6 +126,7 @@ export function useTodayHatchRevealController({
     runIdRef.current = runId;
     committedRunIdRef.current = 0;
     presentationScheduledRef.current = false;
+    assetsReadyRef.current = { environment: false, subject: false };
     hatchingActiveRef.current = true;
     dispatch({ type: 'begin', day: daySnapshot });
     watchdogRef.current = setTimeout(() => {
@@ -143,7 +167,8 @@ export function useTodayHatchRevealController({
   return {
     isHatching: presentation.phase !== 'idle',
     presentation,
-    handleHatchAssetsReady,
+    handleHatchEnvironmentReady,
+    handleHatchSubjectReady,
     handleReveal,
     handleHatchComplete,
   };

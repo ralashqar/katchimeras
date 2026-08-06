@@ -14,6 +14,7 @@ import Animated, {
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Meadow } from '@/constants/meadow-theme';
+import { KatchaSurfacePalette, resolveParchmentAccent } from '@/constants/katcha-ui';
 import type { DayPromptKind } from '@/types/home';
 import type { ActiveDayPrompt, DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
 
@@ -27,6 +28,11 @@ type DayPromptStripProps = {
   onDismiss: (kind: DayPromptKind) => void;
   onSelectHeroPhoto: (photo: DayPromptPhotoCandidate, from: FeedSourceRect) => void;
   dismissLabel?: string;
+  /** Hide the secondary dismissal when the parent sheet already owns closing. */
+  showDismiss?: boolean;
+  /** Removes the card shell when this content already lives inside a sheet. */
+  embedded?: boolean;
+  presentation?: 'night' | 'parchment';
 };
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -37,8 +43,18 @@ const CHIP_ACCENTS = ['#FFC36B', '#92D7FF', '#9DDCB8', '#D5B8FF', '#F2C2A8', '#F
 
 // Secondary cream — matches the shared Meadow sheet's muted copy.
 const CREAM_SOFT = 'rgba(251,243,228,0.75)';
+const PARCHMENT = KatchaSurfacePalette.parchment;
 
-export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto, dismissLabel = 'Later' }: DayPromptStripProps) {
+export function DayPromptStrip({
+  prompt,
+  onAnswer,
+  onDismiss,
+  onSelectHeroPhoto,
+  dismissLabel = 'Later',
+  showDismiss = true,
+  embedded = false,
+  presentation = 'night',
+}: DayPromptStripProps) {
   if (!prompt) {
     return null;
   }
@@ -54,23 +70,29 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto,
       key={prompt.id}
       entering={FadeIn.duration(220)}
       exiting={FadeOut.duration(150)}
-      style={styles.wrap}>
-      <View style={styles.header}>
+      style={[
+        styles.wrap,
+        presentation === 'parchment' && styles.wrapParchment,
+        embedded && styles.wrapEmbedded,
+      ]}>
+      <View style={[styles.header, embedded && !showDismiss && styles.headerWithSheetClose]}>
         <Animated.View entering={FadeInDown.duration(280).easing(motionEasing)} style={styles.titleBlock}>
-          <ThemedText style={styles.title} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
+          <ThemedText style={styles.title} lightColor={presentation === 'parchment' ? PARCHMENT.text : Meadow.chipLabel} darkColor={presentation === 'parchment' ? PARCHMENT.text : Meadow.chipLabel}>
             {prompt.title}
           </ThemedText>
           {prompt.body ? (
-            <ThemedText style={styles.body} lightColor={CREAM_SOFT} darkColor={CREAM_SOFT}>
+            <ThemedText style={styles.body} lightColor={presentation === 'parchment' ? PARCHMENT.textSecondary : CREAM_SOFT} darkColor={presentation === 'parchment' ? PARCHMENT.textSecondary : CREAM_SOFT}>
               {prompt.body}
             </ThemedText>
           ) : null}
         </Animated.View>
-        <Pressable accessibilityRole="button" onPress={() => onDismiss(prompt.id)} style={styles.dismiss}>
-          <ThemedText style={styles.dismissLabel} lightColor={CREAM_SOFT} darkColor={CREAM_SOFT}>
-            {dismissLabel}
-          </ThemedText>
-        </Pressable>
+        {showDismiss ? (
+          <Pressable accessibilityRole="button" onPress={() => onDismiss(prompt.id)} style={[styles.dismiss, presentation === 'parchment' && styles.dismissParchment]}>
+            <ThemedText style={styles.dismissLabel} lightColor={presentation === 'parchment' ? PARCHMENT.textSecondary : CREAM_SOFT} darkColor={presentation === 'parchment' ? PARCHMENT.textSecondary : CREAM_SOFT}>
+              {dismissLabel}
+            </ThemedText>
+          </Pressable>
+        ) : null}
       </View>
 
       {prompt.id === 'meaningful_photo' ? (
@@ -80,6 +102,7 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto,
               key={photo.assetId}
               index={index}
               photo={photo}
+              presentation={presentation}
               onPick={(from) => onSelectHeroPhoto(photo, from)}
             />
           ))}
@@ -93,6 +116,7 @@ export function DayPromptStrip({ prompt, onAnswer, onDismiss, onSelectHeroPhoto,
               label={option.label}
               icon={option.icon}
               accent={CHIP_ACCENTS[index % CHIP_ACCENTS.length]}
+              presentation={presentation}
               onPick={(from) => onAnswer(prompt.id, [option.id], from)}
             />
           ))}
@@ -108,12 +132,14 @@ function PromptChip({
   accent,
   index,
   onPick,
+  presentation,
 }: {
   label: string;
   icon: IconSymbolName;
   accent: string;
   index: number;
   onPick: (from: FeedSourceRect) => void;
+  presentation: 'night' | 'parchment';
 }) {
   const ref = useRef<View | null>(null);
   const scale = useSharedValue(1);
@@ -135,9 +161,9 @@ function PromptChip({
           scale.value = withSpring(1, { damping: 14, stiffness: 240 });
         }}
         onPress={pick}
-        style={[styles.chip, animatedStyle]}>
-        <IconSymbol name={icon} size={15} color={accent} />
-        <ThemedText style={styles.chipLabel} lightColor={Meadow.chipLabel} darkColor={Meadow.chipLabel}>
+        style={[styles.chip, presentation === 'parchment' && styles.chipParchment, animatedStyle]}>
+        <IconSymbol name={icon} size={15} color={presentation === 'parchment' ? resolveParchmentAccent(accent).foreground : accent} />
+        <ThemedText style={styles.chipLabel} lightColor={presentation === 'parchment' ? PARCHMENT.text : Meadow.chipLabel} darkColor={presentation === 'parchment' ? PARCHMENT.text : Meadow.chipLabel}>
           {label}
         </ThemedText>
       </AnimatedPressable>
@@ -149,10 +175,12 @@ function PromptPhoto({
   photo,
   index,
   onPick,
+  presentation,
 }: {
   photo: DayPromptPhotoCandidate;
   index: number;
   onPick: (from: FeedSourceRect) => void;
+  presentation: 'night' | 'parchment';
 }) {
   const ref = useRef<View | null>(null);
   const scale = useSharedValue(1);
@@ -174,7 +202,7 @@ function PromptPhoto({
           scale.value = withSpring(1, { damping: 14, stiffness: 240 });
         }}
         onPress={pick}
-        style={[styles.photoButton, animatedStyle]}>
+        style={[styles.photoButton, presentation === 'parchment' && styles.photoButtonParchment, animatedStyle]}>
         <Image contentFit="cover" source={{ uri: photo.thumbnailUri }} style={styles.photo} transition={120} />
       </AnimatedPressable>
     </Animated.View>
@@ -196,11 +224,30 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 45,
   },
+  wrapParchment: {
+    backgroundColor: PARCHMENT.elevated,
+    borderColor: PARCHMENT.borderStrong,
+    boxShadow: PARCHMENT.cardShadow,
+  },
+  wrapEmbedded: {
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    boxShadow: 'none',
+    marginTop: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   header: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     gap: 10,
     justifyContent: 'space-between',
+  },
+  headerWithSheetClose: {
+    // Reserve the shared sheet close button's hit area without rendering a
+    // second navigation control beside it.
+    paddingRight: 44,
   },
   titleBlock: {
     flex: 1,
@@ -223,6 +270,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 6,
+  },
+  dismissParchment: {
+    backgroundColor: PARCHMENT.subtle,
+    borderColor: PARCHMENT.borderStrong,
   },
   dismissLabel: {
     fontSize: 11,
@@ -249,6 +300,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     paddingVertical: 9,
   },
+  chipParchment: {
+    backgroundColor: 'rgba(255,248,232,0.62)',
+    borderColor: PARCHMENT.borderStrong,
+    boxShadow: '-1px 2px 6px rgba(58,38,18,0.14), inset 0 1px 0 rgba(255,248,230,0.58)',
+  },
   chipLabel: {
     fontSize: 13,
     fontWeight: '800',
@@ -268,6 +324,11 @@ const styles = StyleSheet.create({
     height: 74,
     overflow: 'hidden',
     width: 74,
+  },
+  photoButtonParchment: {
+    backgroundColor: PARCHMENT.subtle,
+    borderColor: PARCHMENT.borderStrong,
+    boxShadow: PARCHMENT.cardShadow,
   },
   photo: {
     height: '100%',

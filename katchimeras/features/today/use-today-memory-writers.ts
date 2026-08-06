@@ -11,6 +11,7 @@ import type {
 import type { MoodMonumentChoiceId } from '@/components/katchadeck/world/mood-monument-sheet';
 import type { DayInputTarget } from '@/types/home';
 import { resolveFoodMomentDisplay, resolveStudioMomentDisplay } from '@/utils/memory-display';
+import { TODAY_GROWTH_REWARDS } from '@/utils/today-growth';
 
 type AddFoodInput = Parameters<typeof addFoodMomentForToday>[1];
 type AddStudioInput = Parameters<typeof addStudioMomentForToday>[1];
@@ -32,7 +33,7 @@ type UseTodayMemoryWritersParams = {
   setMoodSheetOpen: (open: boolean) => void;
   setSleepSheetOpen: (open: boolean) => void;
   setStepsSheetOpen: (open: boolean) => void;
-  startEggFeed: (from: FeedSourceRect, payload: { imageSource?: number; label?: string; photoUri?: string; tint?: string }, commit: () => void) => void;
+  startEggFeed: (from: FeedSourceRect, payload: { currencyFrom?: FeedSourceRect; energyAmount?: number; imageSource?: number; label?: string; photoUri?: string; tint?: string }, commit: () => void) => void;
   pulseEgg: () => void;
   setMicrocopy: (message: string | null) => void;
 };
@@ -88,9 +89,9 @@ export function useTodayMemoryWriters({
   );
 
   const handleConfirmMood = useCallback(
-    (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource?: number, tint?: string) => {
+    (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource?: number, tint?: string, currencyFrom?: FeedSourceRect) => {
       setMoodSheetOpen(false);
-      startEggFeed(from, { imageSource, label, tint }, () => {
+      startEggFeed(from, { currencyFrom, energyAmount: TODAY_GROWTH_REWARDS.mood, imageSource, label, tint }, () => {
         answerDayPrompt({ kind: 'feeling', choiceIds: [choiceId] }, formingTarget);
         setMicrocopy(`Mood noted: ${label}`);
       });
@@ -99,9 +100,9 @@ export function useTodayMemoryWriters({
   );
 
   const handleSetSleep = useCallback(
-    (quality: SleepInput['quality'], label: string, from: FeedSourceRect, imageSource?: number, tint?: string) => {
+    (quality: SleepInput['quality'], label: string, from: FeedSourceRect, imageSource?: number, tint?: string, currencyFrom?: FeedSourceRect) => {
       setSleepSheetOpen(false);
-      startEggFeed(from, { imageSource, label, tint }, () => {
+      startEggFeed(from, { currencyFrom, energyAmount: TODAY_GROWTH_REWARDS.sleep, imageSource, label, tint }, () => {
         setSleep({ quality, source: 'manual' }, formingTarget);
         setMicrocopy('Your morning, remembered');
       });

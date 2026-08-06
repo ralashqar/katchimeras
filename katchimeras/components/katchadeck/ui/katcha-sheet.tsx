@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -89,6 +89,10 @@ export function KatchaSheet({
   const tallHeight = Math.min(availableTallHeight, window.height * (tablet ? 0.84 : 0.93));
   const expanded = size !== 'compact';
 
+  useEffect(() => {
+    if (open) dragY.value = 0;
+  }, [dragY, open]);
+
   const close = (reason: KatchaSheetCloseReason) => onRequestClose(reason);
   const dismissPan = Gesture.Pan()
     .activeOffsetY(10)
@@ -126,26 +130,34 @@ export function KatchaSheet({
         <Pressable accessibilityLabel="Close popup" onPressIn={() => close('backdrop')} style={StyleSheet.absoluteFill} />
       </Animated.View>
       <Animated.View
-        accessibilityViewIsModal
         entering={reduceMotion ? FadeIn.duration(80) : SlideInDown.duration(KatchaUI.motion.sheetIn)}
         exiting={reduceMotion ? FadeOut.duration(80) : SlideOutDown.duration(KatchaUI.motion.sheetOut)}
         style={[
-          styles.sheet,
-          dragStyle,
-          { backgroundColor: palette.background, borderColor: palette.borderStrong, boxShadow: palette.shadow },
+          styles.sheetFrame,
           {
             bottom: size === 'full' ? 0 : size === 'tall' ? bottomClearance : Meadow.overlay.bottomClearance,
-            borderRadius: size === 'full' ? 0 : KatchaUI.radius.sheet,
-            borderWidth: size === 'full' ? 0 : 1,
             height: size === 'full' ? window.height : size === 'tall' ? tallHeight : undefined,
             left: size === 'full' ? 0 : horizontalInset,
             maxHeight: expanded ? (size === 'full' ? window.height : tallHeight) : maxHeight,
-            paddingBottom: size === 'full' ? 0 : 14,
-            paddingHorizontal: size === 'full' ? 0 : 16,
-            paddingTop: size === 'full' ? 0 : 10,
             right: size === 'full' ? 0 : horizontalInset,
           },
         ]}>
+        <Animated.View
+          accessibilityViewIsModal
+          style={[
+            styles.sheet,
+            expanded && styles.expanded,
+            dragStyle,
+            { backgroundColor: palette.background, borderColor: palette.borderStrong, boxShadow: palette.shadow },
+            {
+              borderRadius: size === 'full' ? 0 : KatchaUI.radius.sheet,
+              borderWidth: size === 'full' ? 0 : 1,
+              maxHeight: expanded ? (size === 'full' ? window.height : tallHeight) : maxHeight,
+              paddingBottom: size === 'full' ? 0 : 14,
+              paddingHorizontal: size === 'full' ? 0 : 16,
+              paddingTop: size === 'full' ? 0 : 10,
+            },
+          ]}>
         {size !== 'full' ? (
           <GestureDetector gesture={dismissPan}>
             <Pressable accessible={false} onPress={() => close('backdrop')} style={StyleSheet.absoluteFill} />
@@ -178,6 +190,7 @@ export function KatchaSheet({
             <IconSymbol name="xmark" size={13} color={palette.textSecondary} />
           </Pressable>
         ) : null}
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -218,7 +231,8 @@ const styles = StyleSheet.create({
   modalRoot: { flex: 1 },
   overlay: { ...StyleSheet.absoluteFillObject },
   backdrop: { ...StyleSheet.absoluteFillObject },
-  sheet: { gap: 8, position: 'absolute' },
+  sheetFrame: { position: 'absolute' },
+  sheet: { gap: 8 },
   content: { gap: 10 },
   fullBleedContent: { gap: 0, paddingBottom: 0, paddingHorizontal: 0, paddingTop: 0 },
   expanded: { flex: 1, minHeight: 0 },

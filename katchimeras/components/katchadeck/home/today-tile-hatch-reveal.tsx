@@ -12,7 +12,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useEffect, useState } from 'react';
 
-import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
 import { CreatureGroundShadow } from '@/components/katchadeck/creature-ground-shadow';
 import { buildCreatureKicker } from '@/components/katchadeck/home/creature-hero';
 import { ThemedText } from '@/components/themed-text';
@@ -25,7 +24,6 @@ import {
   kingdomSurfaceTileAlignment,
 } from '@/utils/kingdom-surface-tiles';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
-import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import {
   TODAY_KINGDOM_STAGE_HEIGHT,
   todayEggStageFrame,
@@ -64,29 +62,21 @@ export function TodayTileHatchReveal({
     kingdomSurfaceTileAlignment(residentTile),
     homeAlignment,
   );
-  const homeSource = kingdomHexTileSourceForLod(homeTile, homeLayout.tileSize > 512 ? 'full' : 'medium');
-  const residentSource = kingdomHexTileSourceForLod(
-    residentTile,
-    residentLayout.tileSize > 512 ? 'full' : 'medium',
-  );
   const creatureSource = creature
     ? resolveCreatureArtSource(creature.visualKey, { variantCell: creature.variantCell })
     : null;
-  const [residentReady, setResidentReady] = useState(false);
   const [creatureReady, setCreatureReady] = useState(false);
 
   useEffect(() => {
-    setResidentReady(false);
     setCreatureReady(false);
   }, [creature?.id]);
 
   useEffect(() => {
-    if (creature && residentReady && creatureReady) onAssetsReady?.();
-  }, [creature, creatureReady, onAssetsReady, residentReady]);
+    if (creature && creatureReady) onAssetsReady?.();
+  }, [creature, creatureReady, onAssetsReady]);
 
   const eggExit = useSharedValue(0);
   const creatureEntry = useSharedValue(0);
-  const worldShift = useSharedValue(0);
   const titleEntry = useSharedValue(0);
   const shake = useSharedValue(0);
   const crackOne = useSharedValue(0);
@@ -124,24 +114,16 @@ export function TodayTileHatchReveal({
         easing: quick ? Easing.out(Easing.cubic) : Easing.out(Easing.back(1.45)),
       });
     }
-    if (phaseAtLeast(phase, 'world_shift')) {
-      worldShift.value = withTiming(1, {
-        duration: quick ? 150 : 520,
-        easing: Easing.inOut(Easing.cubic),
-      });
-    }
     if (phaseAtLeast(phase, 'settling')) {
       titleEntry.value = withTiming(1, {
         duration: quick ? 120 : 300,
         easing: Easing.out(Easing.cubic),
       });
     }
-  }, [crackOne, crackTwo, creatureEntry, eggExit, presentation.phase, reduceMotion, shake, titleEntry, worldShift]);
+  }, [crackOne, crackTwo, creatureEntry, eggExit, presentation.phase, reduceMotion, shake, titleEntry]);
 
   useEffect(() => () => cancelAnimation(shake), [shake]);
 
-  const homeEnvironmentStyle = useAnimatedStyle(() => ({ opacity: 1 - worldShift.value }));
-  const residentEnvironmentStyle = useAnimatedStyle(() => ({ opacity: worldShift.value }));
   const eggStyle = useAnimatedStyle(() => ({
     opacity: 1 - eggExit.value,
     transform: [
@@ -173,51 +155,7 @@ export function TodayTileHatchReveal({
 
   return (
     <View pointerEvents="none" style={styles.stage}>
-      <TodayFallbackCloudScene
-        focusY={homeLayout.eggCenterY}
-        frontTop={Math.max(homeLayout.tileFaceBottomY, residentLayout.tileFaceBottomY)}
-        environment={(
-          <>
-            <AnimatedImage
-              cachePolicy="memory-disk"
-              contentFit="contain"
-              pointerEvents="none"
-              source={homeSource}
-              style={[
-                styles.tile,
-                {
-                  height: homeLayout.tileFrame.height,
-                  marginLeft: homeLayout.tileFrame.left,
-                  top: homeLayout.tileFrame.top,
-                  width: homeLayout.tileFrame.width,
-                },
-                homeEnvironmentStyle,
-              ]}
-              transition={0}
-            />
-            {creature ? (
-              <AnimatedImage
-                cachePolicy="memory-disk"
-                contentFit="contain"
-                pointerEvents="none"
-                priority="high"
-                onLoad={() => setResidentReady(true)}
-                source={residentSource}
-                style={[
-                  styles.tile,
-                  {
-                    height: residentLayout.tileFrame.height,
-                    marginLeft: residentLayout.tileFrame.left,
-                    top: residentLayout.tileFrame.top,
-                    width: residentLayout.tileFrame.width,
-                  },
-                  residentEnvironmentStyle,
-                ]}
-                transition={0}
-              />
-            ) : null}
-          </>
-        )}>
+      <View style={styles.scene}>
         <Animated.View
           style={[
             styles.egg,
@@ -298,7 +236,7 @@ export function TodayTileHatchReveal({
             />
           </Animated.View>
         ) : null}
-      </TodayFallbackCloudScene>
+      </View>
 
       {creature ? (
         <Animated.View
@@ -392,8 +330,5 @@ const styles = StyleSheet.create({
     height: TODAY_KINGDOM_STAGE_HEIGHT,
     width: '100%',
   },
-  tile: {
-    left: '50%',
-    position: 'absolute',
-  },
+  scene: { ...StyleSheet.absoluteFillObject },
 });

@@ -4,23 +4,26 @@ import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
-  type SharedValue,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
+  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
+import { GROWTH_ENERGY_ART } from '@/constants/today-care-art';
 import { Lantern } from '@/constants/theme';
+import { splitEnergyAcrossTokens } from '@/utils/energy-payout';
 
-// A single "feeding" flight: the essence of the answer the user tapped — a
-// tinted mote carrying a word, or a small photo — arcs up from the chip and is
-// drawn down into the egg, accelerating as it lands so it reads as absorbed. A
-// short comet trail of fading sparks follows the same arc just behind it.
 export type EggFeed = {
+  energyAmount?: number;
+  energyOnly?: boolean;
   nonce: number;
   fromX: number;
   fromY: number;
+  currencyFromX?: number;
+  currencyFromY?: number;
   imageSource?: number;
   toX: number;
   toY: number;
@@ -32,131 +35,206 @@ export type EggFeed = {
 type EggFeedOverlayProps = {
   feed: EggFeed | null;
   onArrive: () => void;
+  onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
 };
 
-const FLIGHT_MS = 560;
-const ARC_LIFT = 52;
-const SPARK_COUNT = 5;
-const SPARK_LAG = 0.07;
+const SOURCE_FLIGHT_MS = 500;
+const TOKEN_COUNT = 5;
+const TOKEN_RISE_MS = 180;
+const TOKEN_HOVER_MS = 260;
+const TOKEN_FLIGHT_MS = 440;
+const TOKEN_STAGGER_MS = 78;
+const TOKEN_SIZE = 46;
 
-export function EggFeedOverlay({ feed, onArrive }: EggFeedOverlayProps) {
-  if (!feed) {
-    return null;
-  }
-  return <FeedMote key={feed.nonce} feed={feed} onArrive={onArrive} />;
+const BURST_VECTORS = [
+  { x: -31, y: -48, rotation: -12 },
+  { x: -16, y: -57, rotation: -6 },
+  { x: 0, y: -62, rotation: 0 },
+  { x: 16, y: -57, rotation: 6 },
+  { x: 31, y: -48, rotation: 12 },
+] as const;
+
+export function EggFeedOverlay({ feed, onArrive, onEnergyTokenArrive }: EggFeedOverlayProps) {
+  if (!feed) return null;
+  return (
+    <FeedPayout
+      feed={feed}
+      key={feed.nonce}
+      onArrive={onArrive}
+      onEnergyTokenArrive={onEnergyTokenArrive}
+    />
+  );
 }
 
-// The arced flight path, shared by the mote and every trailing spark so the
-// trail rides exactly behind the mote.
-function pathPoint(feed: EggFeed, p: number) {
-  'worklet';
-  const clamped = Math.max(0, Math.min(1, p));
-  return {
-    cx: feed.fromX + (feed.toX - feed.fromX) * clamped,
-    cy: feed.fromY + (feed.toY - feed.fromY) * clamped - Math.sin(Math.PI * clamped) * ARC_LIFT,
-  };
-}
-
-function FeedMote({ feed, onArrive }: { feed: EggFeed; onArrive: () => void }) {
-  const progress = useSharedValue(0);
-  const isPhoto = !!feed.photoUri;
-  const isIcon = feed.imageSource != null;
-  const [dims, setDims] = useState({ w: isPhoto ? 64 : isIcon ? 54 : 120, h: isPhoto ? 64 : isIcon ? 54 : 40 });
-
-  useEffect(() => {
-    progress.value = withTiming(
-      1,
-      // Ease IN so the mote speeds up as it reaches the egg — a "drawn in" feel.
-      { duration: FLIGHT_MS, easing: Easing.in(Easing.cubic) },
-      (finished) => {
-        if (finished) {
-          runOnJS(onArrive)();
-        }
-      }
-    );
-  }, [onArrive, progress]);
-
-  const moteStyle = useAnimatedStyle(() => {
-    const p = progress.value;
-    const { cx, cy } = pathPoint(feed, p);
-    const scale = 1 - 0.64 * p;
-    const opacity = p < 0.82 ? 1 : Math.max(0, 1 - (p - 0.82) / 0.18);
-    return {
-      opacity,
-      transform: [{ translateX: cx - dims.w / 2 }, { translateY: cy - dims.h / 2 }, { scale }],
-    };
-  });
+function FeedPayout({ feed, onArrive, onEnergyTokenArrive }: {
+  feed: EggFeed;
+  onArrive: () => void;
+  onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
+}) {
+  const tokenAmounts = splitEnergyAcrossTokens(feed.energyAmount ?? 0, TOKEN_COUNT);
+  const hasEnergyPayout = tokenAmounts.length > 0;
 
   return (
     <View pointerEvents="none" style={styles.overlay}>
-      {Array.from({ length: SPARK_COUNT }).map((_, index) => (
-        <Spark key={index} feed={feed} progress={progress} index={index} />
+      {!feed.energyOnly ? (
+        <SourceMote feed={feed} completesFeed={!hasEnergyPayout} onArrive={onArrive} />
+      ) : null}
+      {tokenAmounts.map((amount, index) => (
+        <EnergyToken
+          amount={amount}
+          count={tokenAmounts.length}
+          feed={feed}
+          index={index}
+          key={`${feed.nonce}:energy:${index}`}
+          onArrive={onArrive}
+          onEnergyTokenArrive={onEnergyTokenArrive}
+        />
       ))}
-      <Animated.View
-        onLayout={(event) => {
-          const { width, height } = event.nativeEvent.layout;
-          if (width && height) setDims({ w: width, h: height });
-        }}
-        style={[
-          styles.mote,
-          isPhoto
-            ? styles.photoMote
-            : isIcon
-              ? [styles.iconMote, { borderColor: `${feed.tint}99`, boxShadow: `0 0 24px ${feed.tint}AA` }]
-            : { backgroundColor: `${feed.tint}E6`, boxShadow: `0 0 22px ${feed.tint}AA` },
-          moteStyle,
-        ]}>
-        {isPhoto ? (
-          <Image contentFit="cover" source={{ uri: feed.photoUri }} style={styles.photo} transition={0} />
-        ) : isIcon ? (
-          <Image contentFit="contain" source={feed.imageSource} style={styles.feedIcon} transition={0} />
-        ) : (
-          <ThemedText style={styles.label} lightColor={Lantern.ink900} darkColor={Lantern.ink900} numberOfLines={1}>
-            {feed.label}
-          </ThemedText>
-        )}
-      </Animated.View>
+      {feed.energyOnly && !hasEnergyPayout ? <ImmediateArrival onArrive={onArrive} /> : null}
     </View>
   );
 }
 
-// One trailing spark — a small tinted dot that follows the flight path a few
-// frames behind the mote and shrinks/fades the further back it is.
-function Spark({ feed, progress, index }: { feed: EggFeed; progress: SharedValue<number>; index: number }) {
-  const size = 13 - index * 1.6;
-  const trail = (index + 1) * SPARK_LAG;
+function ImmediateArrival({ onArrive }: { onArrive: () => void }) {
+  useEffect(() => {
+    const frame = requestAnimationFrame(onArrive);
+    return () => cancelAnimationFrame(frame);
+  }, [onArrive]);
+  return null;
+}
 
-  const sparkStyle = useAnimatedStyle(() => {
+function SourceMote({ feed, completesFeed, onArrive }: {
+  feed: EggFeed;
+  completesFeed: boolean;
+  onArrive: () => void;
+}) {
+  const progress = useSharedValue(0);
+  const isPhoto = Boolean(feed.photoUri);
+  const isIcon = feed.imageSource != null;
+  const [dims, setDims] = useState({ w: isPhoto ? 64 : isIcon ? 54 : 120, h: isPhoto ? 64 : isIcon ? 54 : 40 });
+
+  useEffect(() => {
+    progress.value = withTiming(1, { duration: SOURCE_FLIGHT_MS, easing: Easing.in(Easing.cubic) }, (finished) => {
+      if (finished && completesFeed) runOnJS(onArrive)();
+    });
+  }, [completesFeed, onArrive, progress]);
+
+  const animatedStyle = useAnimatedStyle(() => {
     const p = progress.value;
-    const { cx, cy } = pathPoint(feed, p - trail);
-    // Hidden before launch and once the head has landed; brightest mid-flight.
-    const visible = p > trail && p < 0.92 ? 1 : 0;
-    const fade = (1 - index / SPARK_COUNT) * 0.7;
+    const cx = feed.fromX + (feed.toX - feed.fromX) * p;
+    const cy = feed.fromY + (feed.toY - feed.fromY) * p - Math.sin(Math.PI * p) * 52;
     return {
-      opacity: visible * fade,
-      transform: [{ translateX: cx - size / 2 }, { translateY: cy - size / 2 }, { scale: 1 - 0.4 * p }],
+      opacity: p < 0.82 ? 1 : Math.max(0, 1 - (p - 0.82) / 0.18),
+      transform: [
+        { translateX: cx - dims.w / 2 },
+        { translateY: cy - dims.h / 2 },
+        { scale: 1 - 0.64 * p },
+      ],
     };
   });
 
   return (
     <Animated.View
+      onLayout={(event) => {
+        const { width, height } = event.nativeEvent.layout;
+        if (width && height) setDims({ w: width, h: height });
+      }}
       style={[
-        styles.spark,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: feed.tint, boxShadow: `0 0 10px ${feed.tint}` },
-        sparkStyle,
-      ]}
-    />
+        styles.mote,
+        isPhoto ? styles.photoMote : isIcon ? [styles.iconMote, { borderColor: `${feed.tint}99` }] : { backgroundColor: `${feed.tint}E6` },
+        animatedStyle,
+      ]}>
+      {isPhoto ? (
+        <Image contentFit="cover" source={{ uri: feed.photoUri }} style={styles.photo} transition={0} />
+      ) : isIcon ? (
+        <Image contentFit="contain" source={feed.imageSource} style={styles.feedIcon} transition={0} />
+      ) : (
+        <ThemedText numberOfLines={1} style={styles.label} lightColor={Lantern.ink900} darkColor={Lantern.ink900}>
+          {feed.label}
+        </ThemedText>
+      )}
+    </Animated.View>
+  );
+}
+
+function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive }: {
+  amount: number;
+  count: number;
+  feed: EggFeed;
+  index: number;
+  onArrive: () => void;
+  onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
+}) {
+  const riseProgress = useSharedValue(0);
+  const flightProgress = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
+  const vector = BURST_VECTORS[index] ?? BURST_VECTORS[BURST_VECTORS.length - 1];
+
+  useEffect(() => {
+    const riseDuration = reduceMotion ? 100 : TOKEN_RISE_MS;
+    const hoverDuration = reduceMotion ? 90 : TOKEN_HOVER_MS;
+    const stagger = reduceMotion ? index * 28 : index * TOKEN_STAGGER_MS;
+    const flightDuration = reduceMotion ? 250 : TOKEN_FLIGHT_MS;
+    // All five tokens rise on the same frame and settle into one readable
+    // hover cluster. Only the homing flights are staggered.
+    riseProgress.value = withTiming(1, {
+      duration: riseDuration,
+      easing: Easing.out(Easing.cubic),
+    });
+    flightProgress.value = withDelay(riseDuration + hoverDuration + stagger, withTiming(1, {
+      duration: flightDuration,
+      easing: Easing.in(Easing.cubic),
+    }, (finished) => {
+      if (!finished) return;
+      if (onEnergyTokenArrive) runOnJS(onEnergyTokenArrive)(amount, index, count);
+      if (index === count - 1) runOnJS(onArrive)();
+    }));
+  }, [amount, count, flightProgress, index, onArrive, onEnergyTokenArrive, reduceMotion, riseProgress]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const startX = feed.currencyFromX ?? feed.fromX;
+    const startY = feed.currencyFromY ?? feed.fromY;
+    const rise = riseProgress.value;
+    const q = flightProgress.value;
+    const hoverX = startX + vector.x;
+    const hoverY = startY + vector.y;
+    const inverse = 1 - q;
+    const controlX = (hoverX + feed.toX) / 2 + (index % 2 === 0 ? -24 : 24);
+    const controlY = Math.min(hoverY, feed.toY) - 82 - index * 3;
+    const stagedX = startX + vector.x * rise;
+    const stagedY = startY + vector.y * rise;
+    const cx = q === 0
+      ? stagedX
+      : inverse * inverse * hoverX + 2 * inverse * q * controlX + q * q * feed.toX;
+    const cy = q === 0
+      ? stagedY
+      : inverse * inverse * hoverY + 2 * inverse * q * controlY + q * q * feed.toY;
+    const scale = q > 0 ? 1.06 - q * 0.80 : 0.54 + rise * 0.52;
+    const opacity = rise <= 0.04
+      ? rise / 0.04
+      : q < 0.88
+        ? 1
+        : Math.max(0, (1 - q) / 0.12);
+    return {
+      opacity,
+      transform: [
+        { translateX: cx - TOKEN_SIZE / 2 },
+        { translateY: cy - TOKEN_SIZE / 2 },
+        { rotate: `${vector.rotation * (1 - q)}deg` },
+        { scale },
+      ],
+    };
+  });
+
+  return (
+    <Animated.View style={[styles.energyToken, animatedStyle]}>
+      <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.energyTokenArt} transition={0} />
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    // The redesigned Today experience owns z=40 and foreground atmosphere
-    // owns z=55. Feeding is transient gameplay feedback, so it must travel
-    // above both while remaining completely touch-through.
-    zIndex: 60,
-  },
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 60 },
   mote: {
     alignItems: 'center',
     borderCurve: 'continuous',
@@ -173,16 +251,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,241,228,0.5)',
     borderRadius: 18,
     borderWidth: 1.5,
-    boxShadow: '0 0 24px rgba(255,195,107,0.7)',
     height: 64,
     overflow: 'hidden',
     padding: 0,
     width: 64,
   },
-  photo: {
-    height: '100%',
-    width: '100%',
-  },
+  photo: { height: '100%', width: '100%' },
   iconMote: {
     backgroundColor: 'rgba(255,248,226,0.94)',
     borderRadius: 18,
@@ -191,18 +265,19 @@ const styles = StyleSheet.create({
     padding: 4,
     width: 54,
   },
-  feedIcon: {
-    height: '100%',
-    width: '100%',
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '800',
-    lineHeight: 16,
-  },
-  spark: {
+  feedIcon: { height: '100%', width: '100%' },
+  label: { fontSize: 13, fontWeight: '800', lineHeight: 16 },
+  energyToken: {
+    alignItems: 'center',
+    height: TOKEN_SIZE,
+    justifyContent: 'center',
     left: 0,
     position: 'absolute',
     top: 0,
+    width: TOKEN_SIZE,
+  },
+  energyTokenArt: {
+    height: '100%',
+    width: '100%',
   },
 });

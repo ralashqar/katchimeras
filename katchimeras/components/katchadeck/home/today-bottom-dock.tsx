@@ -251,7 +251,7 @@ function IconAction({
 
 const styles = StyleSheet.create({
   bottomDock: {
-    bottom: 106,
+    bottom: 96,
     gap: 12,
     left: 16,
     position: 'absolute',
