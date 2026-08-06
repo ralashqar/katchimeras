@@ -39,10 +39,15 @@ export function useEggFeedController() {
   const queuedFeedsRef = useRef<EggFeedRequest[]>([]);
   const launchPendingRef = useRef(false);
   const launchRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finalEnergyFeedbackFrameRef = useRef<number | null>(null);
+  const pendingFinalEnergyFeedbackRef = useRef<{ amount: number; count: number; index: number } | null>(null);
 
   useEffect(() => () => {
     if (launchRetryTimerRef.current) clearTimeout(launchRetryTimerRef.current);
+    if (finalEnergyFeedbackFrameRef.current != null) cancelAnimationFrame(finalEnergyFeedbackFrameRef.current);
     launchRetryTimerRef.current = null;
+    finalEnergyFeedbackFrameRef.current = null;
+    pendingFinalEnergyFeedbackRef.current = null;
     launchPendingRef.current = false;
     queuedFeedsRef.current = [];
     pendingFeedCommit.current = null;
@@ -137,15 +142,34 @@ export function useEggFeedController() {
   }, [launchFeedRequest]);
 
   const handleEggFeedArrive = useCallback(() => {
+    // Mood and sleep commit on the fifth token. Publish that final arrival on
+    // the next frame so React has first rendered the newly earned Energy. The
+    // egg then grows and pulses from the same up-to-date value instead of
+    // pulsing at its old size and falling back to a delayed reconciliation.
     pendingFeedCommit.current?.();
     pendingFeedCommit.current = null;
+    if (pendingFinalEnergyFeedbackRef.current) {
+      if (finalEnergyFeedbackFrameRef.current != null) {
+        cancelAnimationFrame(finalEnergyFeedbackFrameRef.current);
+      }
+      finalEnergyFeedbackFrameRef.current = requestAnimationFrame(() => {
+        finalEnergyFeedbackFrameRef.current = null;
+        const feedback = pendingFinalEnergyFeedbackRef.current;
+        pendingFinalEnergyFeedbackRef.current = null;
+        if (feedback) publishTodayEnergyFeedback(feedback.amount, feedback.index, feedback.count);
+      });
+    }
     clearFeed();
     const next = queuedFeedsRef.current.shift();
     if (next) launchFeedRequest(next);
   }, [clearFeed, launchFeedRequest]);
 
   const handleEnergyTokenArrive = useCallback((amount: number, index: number, count: number) => {
-    publishTodayEnergyFeedback(amount, index, count);
+    if (index === count - 1) {
+      pendingFinalEnergyFeedbackRef.current = { amount, count, index };
+    } else {
+      publishTodayEnergyFeedback(amount, index, count);
+    }
     // Token-by-token meter and egg feedback stay on the focused external
     // channel. The forming egg subscribes directly, so the final token no
     // longer forces the entire Today route through a React render merely to

@@ -56,6 +56,33 @@ test('a final token landing remains visible to an activation commit in the next 
   assert.equal(isRecentFinalTodayEnergyArrival(arrival, (arrival.publishedAt ?? 0) + 1201), false);
 });
 
+test('hatch readiness never overrides the earned Energy used for egg size', () => {
+  const heroSource = readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-kingdom-egg-hero.tsx'),
+    'utf8',
+  );
+  assert.doesNotMatch(heroSource, /const energyRatio = isReady/);
+  assert.match(
+    heroSource,
+    /const energyRatio = Math\.min\(1, Math\.max\(0, growthProgress \?\? growthStage \/ 6\)\)/,
+  );
+});
+
+test('the final feed token publishes only after its Energy commit can render', () => {
+  const controllerSource = readFileSync(
+    path.join(process.cwd(), 'features', 'today', 'use-egg-feed-controller.ts'),
+    'utf8',
+  );
+  assert.match(
+    controllerSource,
+    /pendingFeedCommit\.current\?\.\(\)[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?publishTodayEnergyFeedback/,
+  );
+  assert.match(
+    controllerSource,
+    /if \(index === count - 1\) \{[\s\S]*?pendingFinalEnergyFeedbackRef\.current = \{ amount, count, index \};[\s\S]*?\} else \{[\s\S]*?publishTodayEnergyFeedback/,
+  );
+});
+
 test('manual journal action feedback waits until its native sheet is dismissed', () => {
   const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
   const journalSource = readFileSync(

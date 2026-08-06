@@ -11,7 +11,6 @@ import Animated, {
   LinearTransition,
   runOnJS,
   type SharedValue,
-  ZoomIn,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -188,13 +187,19 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const completionIsStandard = completionEvent != null
     && completionEvent.action.category !== 'check_in'
     && completionEvent.action.destination.kind !== 'quick_goal';
+  const checkInTransitionActive = checkInSelection != null
+    || (completionIsCheckIn && completionEvent != null);
   const settledRemainingActionsRef = useRef(remainingActions);
   useLayoutEffect(() => {
-    if (!completionIsStandard) settledRemainingActionsRef.current = remainingActions;
-  }, [completionIsStandard, remainingActions]);
+    if (!completionIsStandard && !checkInTransitionActive) {
+      settledRemainingActionsRef.current = remainingActions;
+    }
+  }, [checkInTransitionActive, completionIsStandard, remainingActions]);
   const displayedRemainingActions = completionIsStandard && completionEvent
     ? settledRemainingActionsRef.current.filter((action) => action.instanceId !== completionEvent.action.instanceId)
-    : remainingActions;
+    : checkInTransitionActive
+      ? settledRemainingActionsRef.current
+      : remainingActions;
   const stageTop = topInset + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
   const sceneVerticalNudge = HOME_SCENE_Y_OFFSET;
   const contentVerticalNudge = HOME_ACTIONS_Y_OFFSET;
@@ -209,7 +214,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
   const fixedActionClusterTop = explorationEggFrame.contactY + sceneLift + HOME_EGG_ACTIONS_GAP;
   const basePanelStart = Math.max(316, windowHeight * 0.465) + contentVerticalNudge;
-  const minimumPanelStart = ready || fixedActionClusterHeight === 0
+  const minimumPanelStart = fixedActionClusterHeight === 0
     ? basePanelStart
     : Math.max(basePanelStart, fixedActionClusterTop + fixedActionClusterHeight + 8);
   const anchoredPanelStart = tabBarTop - HOME_ACTIONS_TAB_BAR_GAP - actionContentHeight;
@@ -217,6 +222,12 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     ? Math.max(minimumPanelStart, anchoredPanelStart)
     : minimumPanelStart;
   const sceneSpacerHeight = Math.max(240, panelStart - topInset - 8);
+  const actionHandoffLayout = useMemo(
+    () => reduceMotion
+      ? undefined
+      : LinearTransition.duration(260).easing(Easing.inOut(Easing.cubic)),
+    [reduceMotion],
+  );
   const eggPanStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: sceneTranslateX.value }],
   }));
@@ -308,35 +319,32 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         style={[styles.timelineFixed, { top: topInset + 8 }]}>
         <LanternTimeline days={timelineDays} interactionLocked={false} onSelect={onSelectDay} selectedId={day.id} />
       </Animated.View>
-      {!ready ? (
-        <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
+      <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
+        {ready ? (
+          <HatchRevealAction onReveal={onReveal} reduceMotion={reduceMotion} />
+        ) : (
           <FormingActionCluster
             onAdd={onAddJournal}
             onCamera={onAddPhoto}
             onNote={onAddTextNote}
           />
-        </View>
-      ) : null}
+        )}
+      </View>
       <ScrollView
         contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
         contentInsetAdjustmentBehavior="never"
         showsVerticalScrollIndicator={false}
         style={styles.contentScroll}>
-        <View pointerEvents="none" style={{ height: sceneSpacerHeight }} />
+        <Animated.View
+          layout={actionHandoffLayout}
+          pointerEvents="none"
+          style={{ height: sceneSpacerHeight }}
+        />
 
         <View onLayout={handleActionContentLayout}>
-          {ready ? (
-            <View style={styles.pageInset}>
-              <Pressable accessibilityRole="button" onPress={onReveal} style={({ pressed }) => [styles.reveal, pressed && styles.pressed]}>
-                <IconSymbol color={Meadow.ink} name="sparkles" size={22} />
-                <ThemedText style={styles.revealLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>Reveal the hatch</ThemedText>
-              </Pressable>
-            </View>
-          ) : null}
-
-          <View style={styles.careSection}>
+          <Animated.View layout={actionHandoffLayout} style={styles.careSection}>
           {displayedMoodAction || displayedSleepAction ? (
-            <View style={styles.checkInGroup}>
+            <Animated.View layout={actionHandoffLayout} style={styles.checkInGroup}>
               {displayedMoodAction ? (
                 <InlineMood
                   action={displayedMoodAction}
@@ -364,7 +372,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
                   swipeExternalGesture={careSwipeExternalGesture}
                 />
               ) : null}
-            </View>
+            </Animated.View>
           ) : null}
 
           {completionIsStandard && completionEvent ? (
@@ -415,7 +423,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
               </View>
             </Animated.View>
           ) : null}
-          </View>
+          </Animated.View>
         </View>
       </ScrollView>
     </View>
@@ -439,6 +447,35 @@ function FormingActionCluster({ onAdd, onCamera, onNote }: {
         orientation="horizontal"
       />
     </View>
+  );
+}
+
+function HatchRevealAction({ onReveal, reduceMotion }: {
+  onReveal: () => void;
+  reduceMotion: boolean;
+}) {
+  const handleReveal = () => {
+    if (process.env.EXPO_OS === 'ios') {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    onReveal();
+  };
+
+  return (
+    <Animated.View
+      entering={reduceMotion
+        ? FadeIn.duration(80)
+        : FadeIn.duration(220).easing(Easing.out(Easing.cubic))}
+      style={styles.hatchRevealCluster}>
+      <Pressable
+        accessibilityLabel="Reveal the hatch"
+        accessibilityRole="button"
+        onPress={handleReveal}
+        style={({ pressed }) => [styles.reveal, pressed && styles.revealPressed]}>
+        <IconSymbol color={Meadow.ink} name="sparkles" size={22} />
+        <ThemedText style={styles.revealLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>Reveal the hatch</ThemedText>
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -596,9 +633,12 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
 
   return (
     <Animated.View
+      layout={reduceMotion
+        ? undefined
+        : LinearTransition.duration(260).easing(Easing.inOut(Easing.cubic))}
       entering={reduceMotion
         ? FadeIn.duration(70)
-        : FadeInUp.duration(220).easing(Easing.out(Easing.cubic))}>
+        : FadeIn.delay(35).duration(210).easing(Easing.out(Easing.cubic))}>
       <CareSwipeShell
         disabled={interactionLocked}
         externalGesture={swipeExternalGesture}
@@ -906,7 +946,6 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
   swipeExternalGesture: GestureType;
 }) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
-  const tickRef = useRef<ViewType | null>(null);
   const rewardRef = useRef<ViewType | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const celebratingRef = useRef(false);
@@ -914,7 +953,6 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
   const [celebrationSource, setCelebrationSource] = useState<FeedSourceRect | null>(null);
   const rowX = useSharedValue(0);
   const rowOpacity = useSharedValue(1);
-  const tickScale = useSharedValue(1);
   const portraitX = useSharedValue(0);
   const portraitRotation = useSharedValue(0);
   const portraitScale = useSharedValue(1);
@@ -931,7 +969,6 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
     opacity: chargeGlow.value,
     transform: [{ scale: 0.985 + chargeGlow.value * 0.025 }],
   }));
-  const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: tickScale.value }] }));
   const portraitStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: portraitX.value },
@@ -948,9 +985,7 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
     setCelebrating(true);
     if (process.env.EXPO_OS === 'ios') void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (reduceMotion) {
-      tickScale.value = withSequence(withTiming(1.1, { duration: 80 }), withTiming(1, { duration: 100 }));
-    } else {
+    if (!reduceMotion) {
       chargeGlow.value = withSequence(
         withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
         withTiming(0.62, { duration: 300, easing: Easing.out(Easing.cubic) }),
@@ -978,10 +1013,6 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
         withTiming(5, { duration: 70, easing: Easing.inOut(Easing.quad) }),
         withTiming(-2.5, { duration: 60, easing: Easing.inOut(Easing.quad) }),
         withTiming(0, { duration: 85, easing: Easing.out(Easing.cubic) }),
-      );
-      tickScale.value = withSequence(
-        withTiming(1.13, { duration: 120, easing: Easing.out(Easing.cubic) }),
-        withTiming(1, { duration: 170, easing: Easing.out(Easing.back(1.05)) }),
       );
       rowX.value = withDelay(620, withTiming(42, { duration: 260, easing: Easing.in(Easing.cubic) }));
       rowOpacity.value = withDelay(680, withTiming(0, { duration: 210, easing: Easing.in(Easing.quad) }));
@@ -1014,51 +1045,39 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
         label={action.title}
         onDismiss={onNotToday}
         reduceMotion={reduceMotion}>
-        <Animated.View style={[styles.careDoor, celebrating && styles.careDoorComplete, rowStyle]}>
-          {celebrating ? (
-            <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
-          ) : null}
-          <Animated.View style={portraitStyle}>
-            <CompanionGoalPortrait familyId={familyId} size={38} />
-          </Animated.View>
+        <Animated.View style={rowStyle}>
           <Pressable
             accessibilityHint="Opens this goal"
+            accessibilityLabel={action.title}
             accessibilityRole="button"
             disabled={celebrating}
             onPress={() => onOpenQuickGoal(goalId, handleComplete)}
-            style={({ pressed }) => [styles.goalBody, pressed && styles.textPressed]}>
-            <ThemedText numberOfLines={2} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
-          </Pressable>
-          <View collapsable={false} ref={rewardRef}>
-            <Reward amount={action.growthReward} />
-          </View>
-          <Animated.View style={tickStyle}>
-            <View collapsable={false} ref={tickRef}>
-              <Pressable
-                accessibilityLabel={`Complete ${action.title}`}
-                accessibilityRole="button"
-                disabled={celebrating}
-                onPress={handleComplete}
-                style={({ pressed }) => [styles.goalTick, celebrating && styles.goalTickComplete, pressed && styles.goalTickPressed]}>
-                {celebrating ? (
-                  <Animated.View entering={reduceMotion ? undefined : ZoomIn.duration(190)}>
-                    <IconSymbol color="#FFF9E9" name="checkmark" size={18} />
-                  </Animated.View>
-                ) : <IconSymbol color={Meadow.goldDeep} name="checkmark" size={16} />}
-              </Pressable>
+            style={({ pressed }) => [styles.careDoor, celebrating && styles.careDoorComplete, pressed && styles.rowPressed]}>
+            {celebrating ? (
+              <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
+            ) : null}
+            <Animated.View style={portraitStyle}>
+              <CompanionGoalPortrait familyId={familyId} size={38} />
+            </Animated.View>
+            <View style={styles.flexCopy}>
+              <ThemedText numberOfLines={2} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
             </View>
-          </Animated.View>
-          {celebrating ? (
-            <GoalCompletionCelebration
-              reducedMotion={reduceMotion}
-              source={celebrationSource ? {
-                height: celebrationSource.h,
-                width: celebrationSource.w,
-                x: celebrationSource.x,
-                y: celebrationSource.y,
-              } : null}
-            />
-          ) : null}
+            <View collapsable={false} ref={rewardRef}>
+              <Reward amount={action.growthReward} />
+            </View>
+            <IconSymbol color={Meadow.inkSoft} name="chevron.right" size={16} />
+            {celebrating ? (
+              <GoalCompletionCelebration
+                reducedMotion={reduceMotion}
+                source={celebrationSource ? {
+                  height: celebrationSource.h,
+                  width: celebrationSource.w,
+                  x: celebrationSource.x,
+                  y: celebrationSource.y,
+                } : null}
+              />
+            ) : null}
+          </Pressable>
         </Animated.View>
       </CareSwipeShell>
       </Animated.View>
@@ -1456,8 +1475,8 @@ const styles = StyleSheet.create({
   track: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(31,27,19,0.72)', borderColor: 'rgba(255,239,196,0.32)', borderRadius: 999, borderWidth: 2, boxShadow: '0 5px 14px rgba(20,16,9,0.32), inset 0 1px 3px rgba(0,0,0,0.30)', overflow: 'hidden' },
   fill: { ...StyleSheet.absoluteFillObject, backgroundColor: '#82B94D', borderRadius: 999, transformOrigin: 'left' },
   trackShine: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 999, height: 4, left: 7, position: 'absolute', right: 7, top: 3 },
-  pageInset: { paddingHorizontal: Meadow.space.page },
   addMemoryCluster: { alignItems: 'center', minHeight: 67, paddingBottom: 5 },
+  hatchRevealCluster: { alignItems: 'center', justifyContent: 'center', minHeight: 72, paddingBottom: 5 },
   doorIcon: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.54)', borderColor: 'rgba(255,248,230,0.56)', borderCurve: 'continuous', borderRadius: 11, borderWidth: 1, height: 36, justifyContent: 'center', width: 36 },
   doorIconArt: { height: 32, width: 32 },
   rowPressed: { backgroundColor: 'rgba(255,244,204,0.55)', transform: [{ scale: 0.988 }] },
@@ -1491,10 +1510,6 @@ const styles = StyleSheet.create({
   completedIcon: { backgroundColor: 'rgba(123,166,91,0.16)', borderColor: 'rgba(78,112,72,0.24)' },
   completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
   completedTick: { alignItems: 'center', backgroundColor: '#527A49', borderColor: 'rgba(255,248,218,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 3px 8px rgba(49,79,42,0.24), inset 0 1px 0 rgba(255,255,255,0.2)', height: 34, justifyContent: 'center', width: 34 },
-  goalBody: { flex: 1, gap: 2, justifyContent: 'center', minWidth: 0 },
-  goalTick: { alignItems: 'center', borderColor: Meadow.goldDeep, borderRadius: 999, borderWidth: 1.5, height: 36, justifyContent: 'center', width: 36 },
-  goalTickComplete: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
-  goalTickPressed: { opacity: 0.72, transform: [{ scale: 0.94 }] },
   reward: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.22)', borderRadius: 10, flexDirection: 'row', gap: 2, paddingHorizontal: 6, paddingVertical: 4 },
   rewardEnergyIcon: { height: 22, transform: [{ scale: 1.5 }], width: 22 },
   rewardText: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
@@ -1502,10 +1517,9 @@ const styles = StyleSheet.create({
   notTodayAction: { alignItems: 'center', flexDirection: 'row', gap: 5, height: '100%', justifyContent: 'center', paddingHorizontal: 10, width: CARE_REVEAL_WIDTH },
   notTodayPressed: { backgroundColor: '#744A35' },
   notTodayLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '900' },
-  textPressed: { opacity: 0.58 },
   thriving: { alignItems: 'center', backgroundColor: 'rgba(255,248,232,0.38)', borderColor: Meadow.cardBorder, borderRadius: 18, borderWidth: 1, flexDirection: 'row', gap: 11, minHeight: 76, padding: 11 },
   smallIconWell: { alignItems: 'center', backgroundColor: 'rgba(229,190,106,0.18)', borderRadius: 12, height: 40, justifyContent: 'center', width: 40 },
-  reveal: { alignItems: 'center', backgroundColor: Meadow.gold, borderColor: 'rgba(255,244,204,0.72)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 56, paddingHorizontal: 18 },
+  reveal: { alignItems: 'center', backgroundColor: Meadow.gold, borderColor: 'rgba(255,244,204,0.72)', borderRadius: 999, borderWidth: 1, boxShadow: '-3px 6px 16px rgba(92,57,20,0.25), inset 0 1px 0 rgba(255,252,234,0.78)', flexDirection: 'row', gap: 8, justifyContent: 'center', minHeight: 56, paddingHorizontal: 20 },
   revealLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '900' },
-  pressed: { opacity: 0.88, transform: [{ scale: 0.985 }] },
+  revealPressed: { opacity: 0.88, transform: [{ translateY: 1 }, { scale: 0.97 }] },
 });

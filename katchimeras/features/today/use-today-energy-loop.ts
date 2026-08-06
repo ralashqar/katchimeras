@@ -90,7 +90,8 @@ export function useTodayEnergyLoop() {
     // derive the replacement list, and mount the incoming row in that same
     // frame; that synchronized React/layout boundary caused a visible hitch on
     // slower devices. Give the compositor one clean frame, then publish the
-    // incoming slot and keep geometry frozen until its short intro settles.
+    // incoming slot. The entering phase remains active while its short intro
+    // settles, while the presentation layer animates the new geometry.
     if (handoffFrameRef.current != null) return;
     setStatus('entering');
     handoffFrameRef.current = requestAnimationFrame(() => {

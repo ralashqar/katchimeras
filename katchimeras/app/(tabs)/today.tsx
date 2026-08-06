@@ -1740,7 +1740,6 @@ function HomeScreen() {
           <TodayNurtureExperience
           actionTransitionActive={
             energyLoopStatus === 'rewarding'
-              || energyLoopStatus === 'entering'
           }
           actions={nurtureCare.active}
           bottomInset={insets.bottom}

@@ -130,9 +130,11 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   const eggFrame = explorationEggFrame
     ?? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
   const eggStageScale = explorationEggFrame?.scale ?? layout.eggStageScale;
-  const energyRatio = isReady
-    ? 1
-    : Math.min(1, Math.max(0, growthProgress ?? growthStage / 6));
+  // Readiness is controlled by incubation time; visual size is controlled by
+  // earned Energy. Never promote the visual ratio when the hatch clock becomes
+  // ready, otherwise activation after an elapsed wait jumps a partly-fed egg
+  // straight to its maximum size.
+  const energyRatio = Math.min(1, Math.max(0, growthProgress ?? growthStage / 6));
   const growthIntensity = eggVisualGrowthForEnergyRatio(energyRatio);
   const visualGrowth = useSharedValue(growthIntensity);
   const sourceEnergyRatioRef = useRef(energyRatio);
@@ -287,7 +289,10 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
 
   useEffect(() => {
     if (feedbackKey <= 0) return;
-    if (activationStateRef.current === 'pending') startActivationCelebration();
+    if (activationStateRef.current === 'pending') {
+      triggerEggFeedback();
+      startActivationCelebration();
+    }
     else if (activationStateRef.current !== 'running') triggerEggFeedback();
     triggerRadianceFlare();
   }, [feedbackKey, startActivationCelebration, triggerEggFeedback, triggerRadianceFlare]);
@@ -306,7 +311,10 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
         duration: reduceMotion ? 90 : 520,
         easing: Easing.out(Easing.cubic),
       });
-      if (activationStateRef.current === 'pending') startActivationCelebration();
+      if (activationStateRef.current === 'pending') {
+        triggerEggFeedback();
+        startActivationCelebration();
+      }
       else if (activationStateRef.current !== 'running') triggerEggFeedback();
       triggerRadianceFlare();
     });
@@ -346,7 +354,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       transform: [
         { rotateZ: `${shake * 2.8}deg` },
         { translateY: -activationPulse.value * (reduceMotion ? 2 : 7) },
-        { scale: (0.5 + visualGrowth.value * 0.5) * (1 + feedbackPulse.value * 0.045 + activationPulse.value * (reduceMotion ? 0.06 : 0.16)) },
+        { scale: (0.5 + visualGrowth.value * 0.5) * (1 + feedbackPulse.value * 0.045 + activationPulse.value * (reduceMotion ? 0.035 : 0.075)) },
       ],
     };
   });
