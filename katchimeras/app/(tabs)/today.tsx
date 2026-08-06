@@ -1788,7 +1788,7 @@ function HomeScreen() {
           isForming={isForming}
           isHatched={Boolean(isHatched)}
           viewedDay={viewedDay}
-          showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK}
+          showHatchedActionDock={SHOW_HATCHED_ACTION_DOCK && Boolean(isDay && selectedDay.isToday)}
           showHatchedReflectionCard={SHOW_HATCHED_REFLECTION_CARD}
           showCompanionInvitation={Boolean(isDay && selectedDay.isToday && selectedHatchedCompanionId)}
           companionName={isHatched ? selectedDay.creature?.name : undefined}

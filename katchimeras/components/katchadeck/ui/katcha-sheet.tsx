@@ -88,6 +88,16 @@ export function KatchaSheet({
   const availableTallHeight = Math.max(0, window.height - topClearance - bottomClearance);
   const tallHeight = Math.min(availableTallHeight, window.height * (tablet ? 0.84 : 0.93));
   const expanded = size !== 'compact';
+  const compactBottom = Meadow.overlay.bottomClearance;
+  const compactAvailableHeight = Math.max(0, window.height - topClearance - compactBottom);
+  const requestedCompactHeight = typeof maxHeight === 'number'
+    ? maxHeight
+    : window.height * (Number.parseFloat(maxHeight) / 100);
+  // Resolve percentage limits against the viewport once. Applying the same
+  // percentage to both this positioning frame and its child surface made the
+  // inner sheet a percentage of an already-constrained parent, so compact
+  // sheets could collapse while their children continued painting outside.
+  const compactMaxHeight = Math.min(compactAvailableHeight, requestedCompactHeight);
 
   useEffect(() => {
     if (open) dragY.value = 0;
@@ -138,7 +148,6 @@ export function KatchaSheet({
             bottom: size === 'full' ? 0 : size === 'tall' ? bottomClearance : Meadow.overlay.bottomClearance,
             height: size === 'full' ? window.height : size === 'tall' ? tallHeight : undefined,
             left: size === 'full' ? 0 : horizontalInset,
-            maxHeight: expanded ? (size === 'full' ? window.height : tallHeight) : maxHeight,
             right: size === 'full' ? 0 : horizontalInset,
           },
         ]}>
@@ -152,8 +161,8 @@ export function KatchaSheet({
             {
               borderRadius: size === 'full' ? 0 : KatchaUI.radius.sheet,
               borderWidth: size === 'full' ? 0 : 1,
-              maxHeight: expanded ? (size === 'full' ? window.height : tallHeight) : maxHeight,
-              paddingBottom: size === 'full' ? 0 : 14,
+              maxHeight: expanded ? (size === 'full' ? window.height : tallHeight) : compactMaxHeight,
+              paddingBottom: size === 'full' ? 0 : 18,
               paddingHorizontal: size === 'full' ? 0 : 16,
               paddingTop: size === 'full' ? 0 : 10,
             },

@@ -56,7 +56,10 @@ export function MoodMonumentSheet({
   return (
     <KatchaSheet
       header={{ eyebrow: 'Mood Monument', title: editable ? 'How did today feel overall?' : 'How this day felt' }}
+      maxHeight="82%"
       onRequestClose={() => onClose()}
+      scroll
+      scrollContentStyle={styles.sheetContent}
       surface="parchment">
       {/* All five moods on one compact grid (3 + 2), no per-mood captions. */}
       <View style={styles.choiceGrid}>
@@ -145,6 +148,7 @@ function currentMoodChoice(day: HomeDayRecord): MoodChoice | null {
 }
 
 const styles = StyleSheet.create({
+  sheetContent: { paddingBottom: 4 },
   // 3 tiles up top, 2 (centered) below — one glance, one tap.
   choiceGrid: {
     flexDirection: 'row',
@@ -208,6 +212,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PARCHMENT.borderStrong,
     backgroundColor: PARCHMENT.subtle,
+    marginTop: 2,
   },
   secondaryLabel: { fontSize: 13.5, fontWeight: '800' },
 });
