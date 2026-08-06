@@ -53,6 +53,34 @@ export function preserveFinalizedHatches(
   return { ...incoming, today, tomorrow, archivedDays, encounterHistory, aspectHistory, skinHistory };
 }
 
+/**
+ * Rejects the characteristic stale-writer failure where the current calendar
+ * day is replaced by a newly-created empty record. Normal Today operations are
+ * append-only for prompts, growth and journals; clearing all of them together
+ * is only valid through the explicit reset command.
+ */
+export function preserveActiveTodayFromEmptyDowngrade(
+  current: StoredHomeState | null | undefined,
+  incoming: StoredHomeState,
+): StoredHomeState {
+  if (!current) return incoming;
+  if (current.today.id !== incoming.today.id || current.today.isoDate !== incoming.today.isoDate) return incoming;
+  if (!hasNurtureProgress(current.today) || hasNurtureProgress(incoming.today)) return incoming;
+  return { ...incoming, today: current.today };
+}
+
+function hasNurtureProgress(day: StoredHomeDayRecord): boolean {
+  return (day.growth?.events.length ?? 0) > 0
+    || (day.growth?.careActions.length ?? 0) > 0
+    || day.promptAnswers.length > 0
+    || (day.journalRecords?.length ?? 0) > 0
+    || (day.manualJournalEntries?.length ?? 0) > 0
+    || day.moments.length > 0
+    || day.sleep != null
+    || day.heroPhoto != null
+    || (day.capturedMeanings?.length ?? 0) > 0;
+}
+
 function indexDays(state: StoredHomeState): Map<string, StoredHomeDayRecord> {
   const indexed = new Map<string, StoredHomeDayRecord>();
   for (const day of [...state.archivedDays, state.today, ...(state.tomorrow ? [state.tomorrow] : [])]) {

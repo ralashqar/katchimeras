@@ -146,14 +146,15 @@ export function useEggFeedController() {
 
   const handleEnergyTokenArrive = useCallback((amount: number, index: number, count: number) => {
     publishTodayEnergyFeedback(amount, index, count);
-    // Token-by-token meter updates are isolated in its own external store. The
-    // large Today route only rerenders once, when the final token wakes the egg.
-    if (index === count - 1) pulseEgg();
+    // Token-by-token meter and egg feedback stay on the focused external
+    // channel. The forming egg subscribes directly, so the final token no
+    // longer forces the entire Today route through a React render merely to
+    // start a UI-thread pulse.
     if (process.env.EXPO_OS === 'ios') {
       if (index === count - 1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       else void Haptics.selectionAsync();
     }
-  }, [pulseEgg]);
+  }, []);
 
   return {
     eggFeed,

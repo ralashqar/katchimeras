@@ -50,3 +50,16 @@ test('game mode releases background UI work and avoids full Kingdom hydration', 
   assert.match(captureSource, /enabled: !!todayId && !gameActive/g);
   assert.doesNotMatch(gameSource, /useAllDays|deriveKingdom|applyWardrobeToKingdom/);
 });
+
+test('Today remounts from current home state before a cancelled capture can show fresh check-ins', () => {
+  const homeStateSource = readFileSync(path.join(process.cwd(), 'hooks', 'use-home-screen-state.ts'), 'utf8');
+  const mutationSource = readFileSync(path.join(process.cwd(), 'features', 'today', 'use-home-state-mutation.ts'), 'utf8');
+  const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
+  assert.match(
+    homeStateSource,
+    /useState<StoredHomeState \| null>\(\(\) => homeRepository\.load\(\)\)/,
+  );
+  assert.match(homeStateSource, /hasSynchronizedStateRef\.current\s*&&\s*!forceDerive/);
+  assert.match(mutationSource, /const current = homeRepository\.load\(\) \?\? storedStateRef\?\.current \?\? null/);
+  assert.match(todaySource, /homeRepository\.flush\(\)\.then\(\(\) => \{\s*router\.push\(\{ pathname: '\/moment-capture'/);
+});

@@ -1,18 +1,25 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
+  BlendColor,
   Canvas,
   Circle,
+  Group,
+  Image as SkiaImage,
+  Path,
   RadialGradient as SkiaRadialGradient,
+  useImage,
+  usePathValue,
   vec,
 } from '@shopify/react-native-skia';
-import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
+import { memo, type ReactNode, type RefObject, useCallback, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
   FadeOut,
+  useDerivedValue,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -37,6 +44,7 @@ import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
 import { eggVisualGrowthForEnergyRatio } from '@/utils/today-growth';
 import {
   getTodayEnergyFeedbackSnapshot,
+  isRecentFinalTodayEnergyArrival,
   subscribeTodayEnergyFeedback,
 } from '@/features/today/today-energy-feedback';
 import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
@@ -78,20 +86,23 @@ type TodayKingdomEggOverlayProps = {
 
 const TODAY_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
 const SOFT_RING_SOURCE = require('../../../assets/images/katchimeras/soft-ring.png');
-const AnimatedImage = Animated.createAnimatedComponent(Image);
 const EGG_RAY_COUNT = 12;
 const EGG_RAY_INDICES = Array.from({ length: EGG_RAY_COUNT }, (_, index) => index);
+const ACTIVATION_CONFETTI_COLORS = ['#FFE68A', '#FFB85C', '#F49AC1', '#91D8C7', '#A7D5FF'] as const;
 const ACTIVATION_CONFETTI = Array.from({ length: 18 }, (_, index) => ({
   angle: (-160 + index * (320 / 17)) * (Math.PI / 180),
-  color: ['#FFE68A', '#FFB85C', '#F49AC1', '#91D8C7', '#A7D5FF'][index % 5],
+  colorIndex: index % ACTIVATION_CONFETTI_COLORS.length,
   delay: (index % 6) * 0.035,
   distance: 82 + (index % 4) * 18,
   height: 9 + (index % 3) * 3,
   rotation: index % 2 === 0 ? 220 : -190,
   width: index % 3 === 0 ? 5 : 7,
 }));
+const ACTIVATION_CONFETTI_BY_COLOR = ACTIVATION_CONFETTI_COLORS.map((_, colorIndex) =>
+  ACTIVATION_CONFETTI.filter((particle) => particle.colorIndex === colorIndex)
+);
 
-export function TodayKingdomEggHero({
+export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   accentColor = '#F4CE7A',
   coreColor = '#FFF1B8',
   feedbackKey = 0,
@@ -132,15 +143,31 @@ export function TodayKingdomEggHero({
   const feedbackPulse = useSharedValue(0);
   const activationPulse = useSharedValue(0);
   const activationCelebration = useSharedValue(0);
+  const radianceFlare = useSharedValue(0);
   const previousActivationRef = useRef(isActivated);
+  const activationStateRef = useRef<'idle' | 'pending' | 'running'>('idle');
+  const activationFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activationResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
   const readyShake = useSharedValue(0);
 
-  useEffect(() => {
-    const wasActivated = previousActivationRef.current;
-    previousActivationRef.current = isActivated;
-    if (wasActivated || !isActivated) return;
+  const triggerRadianceFlare = useCallback(() => {
+    cancelAnimation(radianceFlare);
+    radianceFlare.value = withSequence(
+      withTiming(1, { duration: reduceMotion ? 65 : 90, easing: Easing.out(Easing.cubic) }),
+      withDelay(
+        reduceMotion ? 90 : 190,
+        withTiming(0, { duration: reduceMotion ? 280 : 760, easing: Easing.out(Easing.cubic) }),
+      ),
+    );
+  }, [radianceFlare, reduceMotion]);
+
+  const startActivationCelebration = useCallback(() => {
+    activationStateRef.current = 'running';
+    if (activationFallbackTimerRef.current) clearTimeout(activationFallbackTimerRef.current);
+    if (activationResetTimerRef.current) clearTimeout(activationResetTimerRef.current);
+    activationFallbackTimerRef.current = null;
     cancelAnimation(activationPulse);
     cancelAnimation(activationCelebration);
     activationPulse.value = withSequence(
@@ -153,7 +180,47 @@ export function TodayKingdomEggHero({
       duration: reduceMotion ? 480 : 1250,
       easing: Easing.out(Easing.cubic),
     });
-  }, [activationCelebration, activationPulse, isActivated, reduceMotion]);
+    activationResetTimerRef.current = setTimeout(() => {
+      activationResetTimerRef.current = null;
+      activationStateRef.current = 'idle';
+    }, reduceMotion ? 520 : 1300);
+  }, [activationCelebration, activationPulse, reduceMotion]);
+
+  useEffect(() => {
+    const wasActivated = previousActivationRef.current;
+    previousActivationRef.current = isActivated;
+    if (!isActivated) {
+      if (activationFallbackTimerRef.current) clearTimeout(activationFallbackTimerRef.current);
+      if (activationResetTimerRef.current) clearTimeout(activationResetTimerRef.current);
+      activationFallbackTimerRef.current = null;
+      activationResetTimerRef.current = null;
+      activationStateRef.current = 'idle';
+      return;
+    }
+    if (wasActivated) return;
+    if (!deferGrowthUntilEnergyArrival) {
+      startActivationCelebration();
+      return;
+    }
+    // The final token callback and the feed commit are dispatched back-to-back
+    // from the UI thread. The token can therefore publish just before React
+    // commits `isActivated`. Treat that recent landing as the awaited arrival
+    // instead of missing it and waiting for the 2.2s interruption fallback.
+    if (isRecentFinalTodayEnergyArrival(getTodayEnergyFeedbackSnapshot())) {
+      startActivationCelebration();
+      return;
+    }
+    activationStateRef.current = 'pending';
+    activationFallbackTimerRef.current = setTimeout(
+      startActivationCelebration,
+      2200,
+    );
+  }, [deferGrowthUntilEnergyArrival, isActivated, startActivationCelebration]);
+
+  useEffect(() => () => {
+    if (activationFallbackTimerRef.current) clearTimeout(activationFallbackTimerRef.current);
+    if (activationResetTimerRef.current) clearTimeout(activationResetTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const applyGrowth = () => {
@@ -181,30 +248,12 @@ export function TodayKingdomEggHero({
     };
   }, [deferGrowthUntilEnergyArrival, energyRatio, reduceMotion, visualGrowth]);
 
-  useEffect(() => {
-    if (!deferGrowthUntilEnergyArrival) return;
-    return subscribeTodayEnergyFeedback(() => {
-      const arrival = getTodayEnergyFeedbackSnapshot();
-      if (arrival.index < 0 || arrival.index !== arrival.count - 1) return;
-      if (growthFallbackTimerRef.current) clearTimeout(growthFallbackTimerRef.current);
-      growthFallbackTimerRef.current = null;
-      const arrivedEnergyRatio = sourceEnergyRatioRef.current;
-      visualEnergyRatioRef.current = arrivedEnergyRatio;
-      cancelAnimation(visualGrowth);
-      visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(arrivedEnergyRatio), {
-        duration: reduceMotion ? 90 : 520,
-        easing: Easing.out(Easing.cubic),
-      });
-    });
-  }, [deferGrowthUntilEnergyArrival, reduceMotion, visualGrowth]);
-
   // Journal writers already bump feedbackKey after a successful commit. Keep
   // the kingdom-quality image intact and animate its wrapper so feeding the egg
   // remains tactile without restoring the old membrane/drag raster treatment.
   // The shell rattles independently from the two outward energy rings, matching
   // the original LanternEgg feedback instead of scaling the shell itself.
-  useEffect(() => {
-    if (feedbackKey <= 0) return;
+  const triggerEggFeedback = useCallback(() => {
     cancelAnimation(feedbackShake);
     cancelAnimation(feedbackPulse);
     feedbackPulse.value = withSequence(
@@ -234,7 +283,41 @@ export function TodayKingdomEggHero({
         easing: Easing.out(Easing.cubic),
       }),
     );
-  }, [feedbackKey, feedbackPulse, feedbackShake, reduceMotion, ripple, rippleEcho]);
+  }, [feedbackPulse, feedbackShake, reduceMotion, ripple, rippleEcho]);
+
+  useEffect(() => {
+    if (feedbackKey <= 0) return;
+    if (activationStateRef.current === 'pending') startActivationCelebration();
+    else if (activationStateRef.current !== 'running') triggerEggFeedback();
+    triggerRadianceFlare();
+  }, [feedbackKey, startActivationCelebration, triggerEggFeedback, triggerRadianceFlare]);
+
+  useEffect(() => {
+    if (!deferGrowthUntilEnergyArrival) return;
+    return subscribeTodayEnergyFeedback(() => {
+      const arrival = getTodayEnergyFeedbackSnapshot();
+      if (arrival.index < 0 || arrival.index !== arrival.count - 1) return;
+      if (growthFallbackTimerRef.current) clearTimeout(growthFallbackTimerRef.current);
+      growthFallbackTimerRef.current = null;
+      const arrivedEnergyRatio = sourceEnergyRatioRef.current;
+      visualEnergyRatioRef.current = arrivedEnergyRatio;
+      cancelAnimation(visualGrowth);
+      visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(arrivedEnergyRatio), {
+        duration: reduceMotion ? 90 : 520,
+        easing: Easing.out(Easing.cubic),
+      });
+      if (activationStateRef.current === 'pending') startActivationCelebration();
+      else if (activationStateRef.current !== 'running') triggerEggFeedback();
+      triggerRadianceFlare();
+    });
+  }, [
+    deferGrowthUntilEnergyArrival,
+    reduceMotion,
+    startActivationCelebration,
+    triggerEggFeedback,
+    triggerRadianceFlare,
+    visualGrowth,
+  ]);
 
   useEffect(() => {
     cancelAnimation(readyShake);
@@ -267,14 +350,6 @@ export function TodayKingdomEggHero({
       ],
     };
   });
-  const rippleStyle = useAnimatedStyle(() => ({
-    opacity: (1 - ripple.value) * 0.9,
-    transform: [{ scale: 0.42 + ripple.value * 1.02 }],
-  }));
-  const rippleEchoStyle = useAnimatedStyle(() => ({
-    opacity: (1 - rippleEcho.value) * 0.58,
-    transform: [{ scale: 0.36 + rippleEcho.value * 1.16 }],
-  }));
 
   return (
     <View pointerEvents="box-none" style={styles.stage}>
@@ -315,7 +390,7 @@ export function TodayKingdomEggHero({
           <EggRadiance
             accentColor={accentColor}
             coreColor={coreColor}
-            feedbackKey={feedbackKey}
+            flare={radianceFlare}
             growth={visualGrowth}
             growthIntensity={growthIntensity}
             stageHeight={eggFrame.height}
@@ -327,35 +402,13 @@ export function TodayKingdomEggHero({
             stageHeight={eggFrame.height}
             stageScale={eggStageScale}
           />
-          <AnimatedImage
-            contentFit="contain"
-            pointerEvents="none"
-            source={SOFT_RING_SOURCE}
-            style={[
-              styles.feedRing,
-              {
-                height: 304 * eggStageScale,
-                width: 304 * eggStageScale,
-              },
-              rippleStyle,
-            ]}
-            tintColor={accentColor}
-            transition={0}
-          />
-          <AnimatedImage
-            contentFit="contain"
-            pointerEvents="none"
-            source={SOFT_RING_SOURCE}
-            style={[
-              styles.feedRing,
-              {
-                height: 342 * eggStageScale,
-                width: 342 * eggStageScale,
-              },
-              rippleEchoStyle,
-            ]}
-            tintColor={coreColor}
-            transition={0}
+          <EggRippleField
+            accentColor={accentColor}
+            coreColor={coreColor}
+            primary={ripple}
+            secondary={rippleEcho}
+            stageHeight={eggFrame.height}
+            stageScale={eggStageScale}
           />
           <Animated.View
             style={[
@@ -387,7 +440,7 @@ export function TodayKingdomEggHero({
       </TodayFallbackCloudScene>
     </View>
   );
-}
+});
 
 export function TodayDormantEggIndicator({ energyRatio, focusX, focusY, left, sceneTranslateX, stageScale, top }: {
   energyRatio: number;
@@ -498,62 +551,135 @@ function EggActivationCelebration({ progress, reduceMotion, stageHeight, stageSc
   stageHeight: number;
   stageScale: number;
 }) {
+  const canvasSize = 430 * stageScale;
+  const opacity = useDerivedValue(() => {
+    const reveal = Math.min(1, progress.value * 8);
+    return reveal * (1 - progress.value) * (reduceMotion ? 0.58 : 1);
+  });
+
   return (
     <View
       pointerEvents="none"
-      style={[styles.activationCelebration, { height: stageHeight, width: 330 * stageScale }]}>
-      {ACTIVATION_CONFETTI.map((particle, index) => (
-        <ActivationConfettiParticle
-          key={`egg-activation-confetti-${index}`}
-          particle={particle}
-          progress={progress}
-          reduceMotion={reduceMotion}
-          stageScale={stageScale}
-        />
-      ))}
+      style={[styles.activationCelebration, { height: canvasSize, top: (stageHeight - canvasSize) / 2, width: canvasSize }]}>
+      <Canvas style={{ height: canvasSize, width: canvasSize }}>
+        <Group opacity={opacity}>
+          {ACTIVATION_CONFETTI_COLORS.map((color, colorIndex) => (
+            <ActivationConfettiPath
+              canvasSize={canvasSize}
+              color={color}
+              key={color}
+              particles={ACTIVATION_CONFETTI_BY_COLOR[colorIndex]}
+              progress={progress}
+              reduceMotion={reduceMotion}
+              stageScale={stageScale}
+            />
+          ))}
+        </Group>
+      </Canvas>
     </View>
   );
 }
 
-function ActivationConfettiParticle({ particle, progress, reduceMotion, stageScale }: {
-  particle: (typeof ACTIVATION_CONFETTI)[number];
+function EggRippleField({ accentColor, coreColor, primary, secondary, stageHeight, stageScale }: {
+  accentColor: string;
+  coreColor: string;
+  primary: SharedValue<number>;
+  secondary: SharedValue<number>;
+  stageHeight: number;
+  stageScale: number;
+}) {
+  const ringImage = useImage(SOFT_RING_SOURCE);
+  const canvasSize = 540 * stageScale;
+  const center = canvasSize / 2;
+  const primarySize = 304 * stageScale;
+  const secondarySize = 342 * stageScale;
+  const primaryOpacity = useDerivedValue(() => (1 - primary.value) * 0.9);
+  const secondaryOpacity = useDerivedValue(() => (1 - secondary.value) * 0.58);
+  const primaryTransform = useDerivedValue(() => [{ scale: 0.42 + primary.value * 1.02 }]);
+  const secondaryTransform = useDerivedValue(() => [{ scale: 0.36 + secondary.value * 1.16 }]);
+
+  if (!ringImage) return null;
+  return (
+    <Canvas
+      pointerEvents="none"
+      style={[
+        styles.feedRing,
+        { height: canvasSize, top: (stageHeight - canvasSize) / 2, width: canvasSize },
+      ]}>
+      <Group opacity={primaryOpacity} origin={vec(center, center)} transform={primaryTransform}>
+        <SkiaImage
+          fit="contain"
+          height={primarySize}
+          image={ringImage}
+          width={primarySize}
+          x={(canvasSize - primarySize) / 2}
+          y={(canvasSize - primarySize) / 2}>
+          <BlendColor color={accentColor} mode="srcIn" />
+        </SkiaImage>
+      </Group>
+      <Group opacity={secondaryOpacity} origin={vec(center, center)} transform={secondaryTransform}>
+        <SkiaImage
+          fit="contain"
+          height={secondarySize}
+          image={ringImage}
+          width={secondarySize}
+          x={(canvasSize - secondarySize) / 2}
+          y={(canvasSize - secondarySize) / 2}>
+          <BlendColor color={coreColor} mode="srcIn" />
+        </SkiaImage>
+      </Group>
+    </Canvas>
+  );
+}
+
+function ActivationConfettiPath({ canvasSize, color, particles, progress, reduceMotion, stageScale }: {
+  canvasSize: number;
+  color: string;
+  particles: (typeof ACTIVATION_CONFETTI)[number][];
   progress: SharedValue<number>;
   reduceMotion: boolean;
   stageScale: number;
 }) {
-  const animatedStyle = useAnimatedStyle(() => {
-    const localProgress = Math.max(0, Math.min(1, (progress.value - particle.delay) / (1 - particle.delay)));
-    const visibility = Math.min(1, localProgress * 7) * (1 - localProgress);
-    const distance = reduceMotion ? particle.distance * 0.3 : particle.distance;
-    return {
-      opacity: visibility * (reduceMotion ? 0.55 : 1),
-      transform: [
-        { translateX: Math.cos(particle.angle) * distance * localProgress * stageScale },
-        { translateY: (Math.sin(particle.angle) * distance * localProgress + localProgress * localProgress * 52) * stageScale },
-        { rotate: `${particle.rotation * localProgress}deg` },
-        { scale: 0.7 + visibility * 0.55 },
-      ],
-    };
+  const path = usePathValue((nextPath) => {
+    'worklet';
+    const center = canvasSize / 2;
+    for (let index = 0; index < particles.length; index += 1) {
+      const particle = particles[index];
+      const localProgress = Math.max(0, Math.min(1, (progress.value - particle.delay) / (1 - particle.delay)));
+      if (localProgress <= 0 || localProgress >= 1) continue;
+      const visibility = Math.min(1, localProgress * 7) * (1 - localProgress);
+      const distance = (reduceMotion ? particle.distance * 0.3 : particle.distance) * stageScale;
+      const x = center + Math.cos(particle.angle) * distance * localProgress;
+      const y = center + (Math.sin(particle.angle) * distance * localProgress
+        + localProgress * localProgress * 52 * stageScale);
+      const sizeScale = 0.7 + visibility * 0.55;
+      const halfWidth = particle.width * stageScale * sizeScale / 2;
+      const halfHeight = particle.height * stageScale * sizeScale / 2;
+      const rotation = particle.rotation * localProgress * Math.PI / 180;
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      const x1 = x + (-halfWidth * cos + halfHeight * sin);
+      const y1 = y + (-halfWidth * sin - halfHeight * cos);
+      const x2 = x + (halfWidth * cos + halfHeight * sin);
+      const y2 = y + (halfWidth * sin - halfHeight * cos);
+      const x3 = x + (halfWidth * cos - halfHeight * sin);
+      const y3 = y + (halfWidth * sin + halfHeight * cos);
+      const x4 = x + (-halfWidth * cos - halfHeight * sin);
+      const y4 = y + (-halfWidth * sin + halfHeight * cos);
+      nextPath.moveTo(x1, y1);
+      nextPath.lineTo(x2, y2);
+      nextPath.lineTo(x3, y3);
+      nextPath.lineTo(x4, y4);
+      nextPath.close();
+    }
   });
-  return (
-    <Animated.View
-      style={[
-        styles.activationConfetti,
-        {
-          backgroundColor: particle.color,
-          height: particle.height * stageScale,
-          width: particle.width * stageScale,
-        },
-        animatedStyle,
-      ]}
-    />
-  );
+  return <Path color={color} path={path} />;
 }
 
 function EggRadiance({
   accentColor,
   coreColor,
-  feedbackKey,
+  flare,
   growth,
   growthIntensity,
   stageHeight,
@@ -561,7 +687,7 @@ function EggRadiance({
 }: {
   accentColor: string;
   coreColor: string;
-  feedbackKey: number;
+  flare: SharedValue<number>;
   growth: SharedValue<number>;
   growthIntensity: number;
   stageHeight: number;
@@ -570,10 +696,7 @@ function EggRadiance({
   const reduceMotion = useReducedMotion();
   const rotation = useSharedValue(0);
   const breath = useSharedValue(0);
-  const flare = useSharedValue(0);
   const raySize = 430 * stageScale;
-  const glowSize = 280 * stageScale;
-  const outerGlowSize = 370 * stageScale;
 
   useEffect(() => {
     cancelAnimation(rotation);
@@ -605,20 +728,6 @@ function EggRadiance({
     };
   }, [breath, growthIntensity, reduceMotion, rotation]);
 
-  useEffect(() => {
-    if (feedbackKey <= 0) return;
-    cancelAnimation(flare);
-    // Coin arrivals are staggered closely. Each one should reinforce the same
-    // luminous charge rather than snapping the aura dark before rebuilding it.
-    flare.value = withSequence(
-      withTiming(1, { duration: reduceMotion ? 65 : 90, easing: Easing.out(Easing.cubic) }),
-      withDelay(
-        reduceMotion ? 90 : 190,
-        withTiming(0, { duration: reduceMotion ? 280 : 760, easing: Easing.out(Easing.cubic) }),
-      ),
-    );
-  }, [feedbackKey, flare, reduceMotion]);
-
   const rayStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, 0.08 + growth.value * 0.72 + breath.value * 0.05 + flare.value * 0.15),
     transform: [
@@ -626,19 +735,12 @@ function EggRadiance({
       { scale: 0.58 + growth.value * 0.4 + breath.value * 0.025 },
     ],
   }));
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, 0.1 + growth.value * 0.42 + breath.value * 0.06 + flare.value * 0.68),
-    transform: [{ scale: 0.58 + growth.value * 0.36 + breath.value * 0.025 + flare.value * 0.16 }],
-  }));
-  const outerGlowStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, 0.04 + growth.value * 0.25 + breath.value * 0.04 + flare.value * 0.72),
-    transform: [{ scale: 0.56 + growth.value * 0.38 + breath.value * 0.035 + flare.value * 0.22 }],
-  }));
-
   return (
     <>
       <Animated.View
         pointerEvents="none"
+        renderToHardwareTextureAndroid
+        shouldRasterizeIOS
         style={[
           styles.rayField,
           {
@@ -713,75 +815,82 @@ function EggRadiance({
           );
         })}
       </Animated.View>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ambientGlow,
-          {
-            height: outerGlowSize,
-            top: (stageHeight - outerGlowSize) / 2,
-            width: outerGlowSize,
-          },
-          outerGlowStyle,
-        ]}>
-        <FeatheredEggGlow
-          colors={[
-            'rgba(255, 248, 188, 0.92)',
-            'rgba(255, 222, 91, 0.68)',
-            'rgba(255, 202, 47, 0.22)',
-            'rgba(255, 198, 42, 0)',
-          ]}
-          positions={[0, 0.28, 0.62, 1]}
-          size={outerGlowSize}
-        />
-      </Animated.View>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ambientGlow,
-          {
-            height: glowSize,
-            top: (stageHeight - glowSize) / 2,
-            width: glowSize,
-          },
-          glowStyle,
-        ]}>
-        <FeatheredEggGlow
-          colors={[
-            coreColor,
-            accentColor,
-            'rgba(255, 216, 79, 0.28)',
-            'rgba(255, 208, 62, 0)',
-          ]}
-          positions={[0, 0.3, 0.68, 1]}
-          size={glowSize}
-        />
-      </Animated.View>
+      <EggGlowField
+        accentColor={accentColor}
+        breath={breath}
+        coreColor={coreColor}
+        flare={flare}
+        growth={growth}
+        stageHeight={stageHeight}
+        stageScale={stageScale}
+      />
     </>
   );
 }
 
-function FeatheredEggGlow({
-  colors,
-  positions,
-  size,
-}: {
-  colors: string[];
-  positions: number[];
-  size: number;
+function EggGlowField({ accentColor, breath, coreColor, flare, growth, stageHeight, stageScale }: {
+  accentColor: string;
+  breath: SharedValue<number>;
+  coreColor: string;
+  flare: SharedValue<number>;
+  growth: SharedValue<number>;
+  stageHeight: number;
+  stageScale: number;
 }) {
+  // Leave transparent padding inside the single surface so scaled glow groups
+  // retain the same feathered overflow the former independently scaled views
+  // had, without clipping at the Canvas boundary.
+  const size = 460 * stageScale;
   const center = size / 2;
+  const outerRadius = 185 * stageScale;
+  const innerRadius = 140 * stageScale;
+  const outerOpacity = useDerivedValue(() =>
+    Math.min(1, 0.04 + growth.value * 0.25 + breath.value * 0.04 + flare.value * 0.72)
+  );
+  const innerOpacity = useDerivedValue(() =>
+    Math.min(1, 0.1 + growth.value * 0.42 + breath.value * 0.06 + flare.value * 0.68)
+  );
+  const outerTransform = useDerivedValue(() => [{
+    scale: 0.56 + growth.value * 0.38 + breath.value * 0.035 + flare.value * 0.22,
+  }]);
+  const innerTransform = useDerivedValue(() => [{
+    scale: 0.58 + growth.value * 0.36 + breath.value * 0.025 + flare.value * 0.16,
+  }]);
 
   return (
-    <Canvas pointerEvents="none" style={{ height: size, width: size }}>
-      <Circle cx={center} cy={center} r={center}>
-        <SkiaRadialGradient
-          c={vec(center, center)}
-          colors={colors}
-          positions={positions}
-          r={center}
-        />
-      </Circle>
+    <Canvas
+      pointerEvents="none"
+      style={[styles.ambientGlow, { height: size, top: (stageHeight - size) / 2, width: size }]}>
+      <Group opacity={outerOpacity} origin={vec(center, center)} transform={outerTransform}>
+        <Circle cx={center} cy={center} r={outerRadius}>
+          <SkiaRadialGradient
+            c={vec(center, center)}
+            colors={[
+              'rgba(255, 248, 188, 0.92)',
+              'rgba(255, 222, 91, 0.68)',
+              'rgba(255, 202, 47, 0.22)',
+              'rgba(255, 198, 42, 0)',
+            ]}
+            positions={[0, 0.28, 0.62, 1]}
+            r={outerRadius}
+          />
+        </Circle>
+      </Group>
+      <Group opacity={innerOpacity} origin={vec(center, center)} transform={innerTransform}>
+        <Circle cx={center} cy={center} r={innerRadius}>
+          <SkiaRadialGradient
+            c={vec(center, center)}
+            colors={[
+              coreColor,
+              accentColor,
+              'rgba(255, 216, 79, 0.28)',
+              'rgba(255, 208, 62, 0)',
+            ]}
+            positions={[0, 0.3, 0.68, 1]}
+            r={innerRadius}
+          />
+        </Circle>
+      </Group>
     </Canvas>
   );
 }
@@ -880,12 +989,6 @@ const styles = StyleSheet.create({
     overflow: 'visible',
     position: 'absolute',
     zIndex: 2,
-  },
-  activationConfetti: {
-    borderCurve: 'continuous',
-    borderRadius: 3,
-    boxShadow: '0 1px 3px rgba(88, 53, 16, 0.24)',
-    position: 'absolute',
   },
   feedRing: {
     alignSelf: 'center',

@@ -1,7 +1,10 @@
 import { getStoredJson, getStoredRaw, removeStoredValue, setStoredRaw, setStoredRawAsync } from '@/utils/app-storage';
 import { HOME_STORAGE_KEY } from '@/constants/home-mvp';
 import type { StoredHomeState } from '@/types/home';
-import { preserveFinalizedHatches } from '@/game/days/state-integrity';
+import {
+  preserveActiveTodayFromEmptyDowngrade,
+  preserveFinalizedHatches,
+} from '@/game/days/state-integrity';
 import {
   mergeStoredHomeState,
   splitStoredHomeState,
@@ -48,15 +51,19 @@ export function loadStoredHomeStateRaw(): string | null {
 export type HomeSaveOptions = {
   notify?: boolean;
   allowHatchDowngrade?: boolean;
+  allowTodayReset?: boolean;
   /** The caller changed only Today/Tomorrow or top-level active metadata. */
   preserveArchive?: boolean;
 };
 
 export function saveStoredHomeState(state: StoredHomeState, options?: HomeSaveOptions) {
   const currentState = loadStoredHomeState();
-  const protectedState = options?.allowHatchDowngrade
+  const hatchProtectedState = options?.allowHatchDowngrade
     ? state
     : preserveFinalizedHatches(currentState, state);
+  const protectedState = options?.allowTodayReset
+    ? hatchProtectedState
+    : preserveActiveTodayFromEmptyDowngrade(currentState, hatchProtectedState);
   warnIfHatchDowngradeWasPrevented(state, protectedState);
   cachedHomeState = protectedState;
   const archiveChanged = !options?.preserveArchive
@@ -76,9 +83,12 @@ export function saveStoredHomeState(state: StoredHomeState, options?: HomeSaveOp
 // this coalescing async writer while reads are served immediately from memory.
 export function saveStoredHomeStateDeferred(state: StoredHomeState, options?: HomeSaveOptions) {
   const currentState = loadStoredHomeState();
-  const protectedState = options?.allowHatchDowngrade
+  const hatchProtectedState = options?.allowHatchDowngrade
     ? state
     : preserveFinalizedHatches(currentState, state);
+  const protectedState = options?.allowTodayReset
+    ? hatchProtectedState
+    : preserveActiveTodayFromEmptyDowngrade(currentState, hatchProtectedState);
   warnIfHatchDowngradeWasPrevented(state, protectedState);
   cachedHomeState = protectedState;
   pendingDeferredState = protectedState;

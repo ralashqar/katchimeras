@@ -1,4 +1,4 @@
-import { Image } from 'expo-image';
+import { Image, type ImageRef } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type View as ViewType } from 'react-native';
@@ -61,6 +61,7 @@ import {
 import { useTodayEnergyFeedback } from '@/features/today/today-energy-feedback';
 
 type TodayNurtureExperienceProps = {
+  actionTransitionActive: boolean;
   actions: RankedTodayCareAction[];
   completionEvent: TodayCareCompletionEvent | null;
   day: HomeDayRecord;
@@ -73,7 +74,7 @@ type TodayNurtureExperienceProps = {
   onCareNotToday: (action: RankedTodayCareAction) => void;
   onCareStart: (action: RankedTodayCareAction, rewardFrom: FeedSourceRect) => void;
   onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
-  onCompletionAnimationEnd: (eventId: string) => void;
+  onCompletionAnimationEnd: (eventId: string, onHandoff?: () => void) => void;
   onOpenQuickGoal: (goalId: string, completeFromOrigin: () => void) => void;
   onChooseMood: (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
   onChooseSleep: (quality: SleepQuality, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
@@ -104,6 +105,7 @@ type CheckInSelection = {
 };
 
 export const TodayNurtureExperience = memo(function TodayNurtureExperience({
+  actionTransitionActive,
   actions,
   bottomInset,
   completionEvent,
@@ -132,13 +134,46 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
 }: TodayNurtureExperienceProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const [actionContentHeight, setActionContentHeight] = useState(0);
+  const pendingActionContentHeightRef = useRef(0);
   const [fixedActionClusterHeight, setFixedActionClusterHeight] = useState(0);
   const [checkInSelection, setCheckInSelection] = useState<CheckInSelection | null>(null);
+  const [preloadedSleepArt, setPreloadedSleepArt] = useState<Partial<Record<SleepQuality, ImageRef>>>({});
   const checkInSelectionRef = useRef<CheckInSelection | null>(null);
   const reduceMotion = useReducedMotion();
   const ready = growth.isActivated && (day.canHatch || growth.isReady);
   const moodAction = actions.find((action) => action.id === 'mood');
   const sleepAction = actions.find((action) => action.id === 'sleep');
+  useEffect(() => {
+    let active = true;
+    const retainedRefs: ImageRef[] = [];
+    void Promise.all(SLEEP_OPTIONS.map(async (option) => {
+      try {
+        const imageRef = await Image.loadAsync(SLEEP_ART[option.quality], {
+          maxHeight: 96,
+          maxWidth: 96,
+        });
+        if (!active) {
+          imageRef.release();
+          return null;
+        }
+        retainedRefs.push(imageRef);
+        return [option.quality, imageRef] as const;
+      } catch {
+        return null;
+      }
+    })).then((entries) => {
+      if (!active) return;
+      const nextArt: Partial<Record<SleepQuality, ImageRef>> = {};
+      entries.forEach((entry) => {
+        if (entry) nextArt[entry[0]] = entry[1];
+      });
+      setPreloadedSleepArt(nextArt);
+    });
+    return () => {
+      active = false;
+      retainedRefs.forEach((imageRef) => imageRef.release());
+    };
+  }, []);
   // Keep the completed check-in mounted until its own exit finishes. The next
   // sequential check-in may already be active in state, but mounting both at
   // once makes the incoming panel reflow twice as the outgoing panel leaves.
@@ -187,8 +222,16 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   }));
   const handleActionContentLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
+    pendingActionContentHeightRef.current = nextHeight;
+    if (actionTransitionActive) return;
     setActionContentHeight((current) => Math.abs(current - nextHeight) < 0.5 ? current : nextHeight);
-  }, []);
+  }, [actionTransitionActive]);
+  useEffect(() => {
+    if (actionTransitionActive) return;
+    const nextHeight = pendingActionContentHeightRef.current;
+    if (nextHeight <= 0) return;
+    setActionContentHeight((current) => Math.abs(current - nextHeight) < 0.5 ? current : nextHeight);
+  }, [actionTransitionActive]);
   const handleFixedActionClusterLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
     setFixedActionClusterHeight((current) => Math.abs(current - nextHeight) < 0.5 ? current : nextHeight);
@@ -206,9 +249,13 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     }
   }, [onChooseMood, onChooseSleep]);
   const finishCheckInSelection = useCallback((eventId: string) => {
-    checkInSelectionRef.current = null;
-    setCheckInSelection(null);
-    onCompletionAnimationEnd(eventId);
+    // The loop controller reserves the next compositor frame for the incoming
+    // action. Release the outgoing check-in inside that handoff so clearing the
+    // completion and mounting Sleep are one React commit, not adjacent commits.
+    onCompletionAnimationEnd(eventId, () => {
+      checkInSelectionRef.current = null;
+      setCheckInSelection(null);
+    });
   }, [onCompletionAnimationEnd]);
 
   return (
@@ -287,13 +334,9 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
             </View>
           ) : null}
 
-          <Animated.View
-            layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}
-            style={styles.careSection}>
+          <View style={styles.careSection}>
           {displayedMoodAction || displayedSleepAction ? (
-            <Animated.View
-              layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}
-              style={styles.checkInGroup}>
+            <View style={styles.checkInGroup}>
               {displayedMoodAction ? (
                 <InlineMood
                   action={displayedMoodAction}
@@ -315,12 +358,13 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
                   onChoose={(selection, from, currencyFrom) => beginCheckInSelection({ ...selection, action: displayedSleepAction, kind: 'sleep' }, from, currencyFrom)}
                   onFinished={finishCheckInSelection}
                   onSkip={() => onCareNotToday(displayedSleepAction)}
+                  preloadedArt={preloadedSleepArt}
                   reduceMotion={reduceMotion}
                   selection={checkInSelection?.kind === 'sleep' ? checkInSelection : null}
                   swipeExternalGesture={careSwipeExternalGesture}
                 />
               ) : null}
-            </Animated.View>
+            </View>
           ) : null}
 
           {completionIsStandard && completionEvent ? (
@@ -371,7 +415,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
               </View>
             </Animated.View>
           ) : null}
-          </Animated.View>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -400,8 +444,9 @@ function FormingActionCluster({ onAdd, onCamera, onNote }: {
 
 type InlineChoice = {
   accent: string;
+  feedImage: number;
   id: string;
-  image: number;
+  image: number | ImageRef;
   label: string;
 };
 
@@ -419,7 +464,13 @@ function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFi
   return (
     <InlineCheckInPanel
       action={action}
-      choices={MOOD_CHOICES.map((choice) => ({ accent: choice.accent, id: choice.id, image: MOOD_ART[choice.state], label: choice.label }))}
+      choices={MOOD_CHOICES.map((choice) => ({
+        accent: choice.accent,
+        feedImage: MOOD_ART[choice.state],
+        id: choice.id,
+        image: MOOD_ART[choice.state],
+        label: choice.label,
+      }))}
       completionEvent={completionEvent}
       interactionLocked={interactionLocked}
       onChoose={onChoose}
@@ -432,13 +483,14 @@ function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFi
   );
 }
 
-function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
+function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onFinished, onSkip, preloadedArt, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
   onSkip: () => void;
+  preloadedArt: Partial<Record<SleepQuality, ImageRef>>;
   reduceMotion: boolean;
   selection: CheckInSelection | null;
   swipeExternalGesture: GestureType;
@@ -446,7 +498,13 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
   return (
     <InlineCheckInPanel
       action={action}
-      choices={SLEEP_OPTIONS.map((option) => ({ accent: option.accent, id: option.quality, image: SLEEP_ART[option.quality], label: option.label }))}
+      choices={SLEEP_OPTIONS.map((option) => ({
+        accent: option.accent,
+        feedImage: SLEEP_ART[option.quality],
+        id: option.quality,
+        image: preloadedArt[option.quality] ?? SLEEP_ART[option.quality],
+        label: option.label,
+      }))}
       completionEvent={completionEvent}
       interactionLocked={interactionLocked}
       onChoose={onChoose}
@@ -490,18 +548,28 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
     }
     panelPulse.value = withSequence(
       withTiming(1, { duration: 120, easing: Easing.out(Easing.cubic) }),
-      withTiming(0.46, { duration: 240, easing: Easing.out(Easing.cubic) }),
+      withTiming(0.62, { duration: 240, easing: Easing.out(Easing.cubic) }),
     );
     panelScale.value = withSequence(
-      withTiming(1.012, { duration: 115, easing: Easing.out(Easing.cubic) }),
-      withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) }),
+      withTiming(1.024, { duration: 115, easing: Easing.out(Easing.cubic) }),
+      withTiming(1.012, { duration: 180, easing: Easing.out(Easing.cubic) }),
     );
   }, [panelPulse, panelScale, reduceMotion, selection]);
 
   useEffect(() => {
     if (!completionEvent || completedEventRef.current === completionEvent.id) return;
     completedEventRef.current = completionEvent.id;
-    const exitDelay = reduceMotion ? 40 : 100;
+    const exitDelay = reduceMotion ? 40 : 180;
+    if (!reduceMotion) {
+      panelPulse.value = withSequence(
+        withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) }),
+        withDelay(70, withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) })),
+      );
+      panelScale.value = withSequence(
+        withTiming(1.032, { duration: 105, easing: Easing.out(Easing.cubic) }),
+        withDelay(45, withTiming(0.99, { duration: 280, easing: Easing.in(Easing.cubic) })),
+      );
+    }
     panelX.value = withDelay(
       exitDelay,
       withTiming(windowWidth + 24, {
@@ -518,13 +586,13 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
         easing: Easing.in(Easing.quad),
       }),
     );
-  }, [completionEvent, onFinished, panelOpacity, panelX, reduceMotion, windowWidth]);
+  }, [completionEvent, onFinished, panelOpacity, panelPulse, panelScale, panelX, reduceMotion, windowWidth]);
 
   const panelStyle = useAnimatedStyle(() => ({
     opacity: panelOpacity.value,
     transform: [{ translateX: panelX.value }, { scale: panelScale.value }],
   }));
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: panelPulse.value * 0.18 }));
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: panelPulse.value * 0.28 }));
 
   return (
     <Animated.View
@@ -553,12 +621,18 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
                 key={choice.id}
                 label={choice.label}
                 onPress={(from) => {
+                  const selectedChoice = {
+                    accent: choice.accent,
+                    id: choice.id,
+                    image: choice.feedImage,
+                    label: choice.label,
+                  };
                   if (rewardRef.current) {
                     rewardRef.current.measureInWindow((x, y, width, height) => {
-                      onChoose(choice, from, { h: height, w: width, x, y });
+                      onChoose(selectedChoice, from, { h: height, w: width, x, y });
                     });
                   } else {
-                    onChoose(choice, from, from);
+                    onChoose(selectedChoice, from, from);
                   }
                 }}
                 reduceMotion={reduceMotion}
@@ -608,7 +682,7 @@ function MeasuredChoice({ accent, disabled, dimmed, image, label, onPress, reduc
   accent: string;
   disabled: boolean;
   dimmed: boolean;
-  image: number;
+  image: number | ImageRef;
   label: string;
   onPress: (from: FeedSourceRect) => void;
   reduceMotion: boolean;
@@ -686,6 +760,7 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
   const artX = useSharedValue(0);
   const artRotation = useSharedValue(0);
   const artScale = useSharedValue(1);
+  const chargeGlow = useSharedValue(0);
   const rowStyle = useAnimatedStyle(() => ({
     opacity: rowOpacity.value,
     transform: [{ translateX: rowX.value }, { scale: rowScale.value }],
@@ -698,18 +773,36 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
       { scale: artScale.value },
     ],
   }));
+  const chargeGlowStyle = useAnimatedStyle(() => ({
+    opacity: chargeGlow.value,
+    transform: [{ scale: 0.985 + chargeGlow.value * 0.025 }],
+  }));
   const beginExit = useCallback(() => {
-    rowX.value = withTiming(windowWidth + 24, {
-      duration: reduceMotion ? 100 : 250,
-      easing: Easing.in(Easing.cubic),
-    }, (finished) => {
-      if (finished) runOnJS(onFinished)(event.id);
-    });
+    const exitDelay = reduceMotion ? 0 : 120;
+    if (!reduceMotion) {
+      chargeGlow.value = withSequence(
+        withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) }),
+        withDelay(70, withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) })),
+      );
+      rowScale.value = withSequence(
+        withTiming(1.04, { duration: 105, easing: Easing.out(Easing.cubic) }),
+        withTiming(0.985, { duration: 270, easing: Easing.in(Easing.cubic) }),
+      );
+    }
+    rowX.value = withDelay(
+      exitDelay,
+      withTiming(windowWidth + 24, {
+        duration: reduceMotion ? 100 : 250,
+        easing: Easing.in(Easing.cubic),
+      }, (finished) => {
+        if (finished) runOnJS(onFinished)(event.id);
+      }),
+    );
     rowOpacity.value = withDelay(
-      reduceMotion ? 0 : 70,
+      exitDelay + (reduceMotion ? 0 : 70),
       withTiming(0, { duration: reduceMotion ? 80 : 150, easing: Easing.in(Easing.quad) }),
     );
-  }, [event.id, onFinished, reduceMotion, rowOpacity, rowX, windowWidth]);
+  }, [chargeGlow, event.id, onFinished, reduceMotion, rowOpacity, rowScale, rowX, windowWidth]);
 
   useEffect(() => {
     let rewardTimer: ReturnType<typeof setTimeout> | null = null;
@@ -735,9 +828,13 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
       tickScale.value = withTiming(1, { duration: 100 });
       artScale.value = withSequence(withTiming(1.06, { duration: 80 }), withTiming(1, { duration: 110 }));
     } else {
+      chargeGlow.value = withSequence(
+        withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
+        withTiming(0.62, { duration: 320, easing: Easing.out(Easing.cubic) }),
+      );
       rowScale.value = withSequence(
-        withTiming(1.018, { duration: 110, easing: Easing.out(Easing.cubic) }),
-        withTiming(1, { duration: 170, easing: Easing.out(Easing.back(1.05)) }),
+        withTiming(1.03, { duration: 110, easing: Easing.out(Easing.cubic) }),
+        withTiming(1.015, { duration: 190, easing: Easing.out(Easing.cubic) }),
       );
       tickScale.value = withSequence(
         withTiming(1.12, { duration: 120, easing: Easing.out(Easing.cubic) }),
@@ -764,10 +861,11 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
       cancelAnimationFrame(frame);
       if (rewardTimer) clearTimeout(rewardTimer);
     };
-  }, [artRotation, artScale, artX, beginExit, event.action, event.rewardAlreadyAnimated, onRewardFlight, reduceMotion, rowScale, tickScale, windowHeight, windowWidth]);
+  }, [artRotation, artScale, artX, beginExit, chargeGlow, event.action, event.rewardAlreadyAnimated, onRewardFlight, reduceMotion, rowScale, tickScale, windowHeight, windowWidth]);
 
   return (
-    <Animated.View layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))} style={[styles.careDoor, styles.careDoorComplete, rowStyle]}>
+    <Animated.View style={[styles.careDoor, styles.careDoorComplete, rowStyle]}>
+      <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
       <Animated.View style={artStyle}>
         {event.action.category === 'play' && event.action.familyId ? (
           <CompanionGoalPortrait familyId={event.action.familyId} size={38} />
@@ -820,12 +918,18 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
   const portraitX = useSharedValue(0);
   const portraitRotation = useSharedValue(0);
   const portraitScale = useSharedValue(1);
+  const rowScale = useSharedValue(1);
+  const chargeGlow = useSharedValue(0);
 
   useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
 
   const rowStyle = useAnimatedStyle(() => ({
     opacity: rowOpacity.value,
-    transform: [{ translateX: rowX.value }],
+    transform: [{ translateX: rowX.value }, { scale: rowScale.value }],
+  }));
+  const chargeGlowStyle = useAnimatedStyle(() => ({
+    opacity: chargeGlow.value,
+    transform: [{ scale: 0.985 + chargeGlow.value * 0.025 }],
   }));
   const tickStyle = useAnimatedStyle(() => ({ transform: [{ scale: tickScale.value }] }));
   const portraitStyle = useAnimatedStyle(() => ({
@@ -847,6 +951,18 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
     if (reduceMotion) {
       tickScale.value = withSequence(withTiming(1.1, { duration: 80 }), withTiming(1, { duration: 100 }));
     } else {
+      chargeGlow.value = withSequence(
+        withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) }),
+        withTiming(0.62, { duration: 300, easing: Easing.out(Easing.cubic) }),
+        withDelay(100, withTiming(1, { duration: 90, easing: Easing.out(Easing.cubic) })),
+        withTiming(0, { duration: 260, easing: Easing.out(Easing.cubic) }),
+      );
+      rowScale.value = withSequence(
+        withTiming(1.027, { duration: 120, easing: Easing.out(Easing.cubic) }),
+        withTiming(1.014, { duration: 180, easing: Easing.out(Easing.cubic) }),
+        withDelay(220, withTiming(1.04, { duration: 100, easing: Easing.out(Easing.cubic) })),
+        withTiming(0.985, { duration: 260, easing: Easing.in(Easing.cubic) }),
+      );
       portraitScale.value = withSequence(
         withTiming(1.08, { duration: 120, easing: Easing.out(Easing.cubic) }),
         withTiming(1, { duration: 180, easing: Easing.out(Easing.back(1.05)) }),
@@ -899,6 +1015,9 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
         onDismiss={onNotToday}
         reduceMotion={reduceMotion}>
         <Animated.View style={[styles.careDoor, celebrating && styles.careDoorComplete, rowStyle]}>
+          {celebrating ? (
+            <Animated.View pointerEvents="none" style={[styles.completionChargeGlow, chargeGlowStyle]} />
+          ) : null}
           <Animated.View style={portraitStyle}>
             <CompanionGoalPortrait familyId={familyId} size={38} />
           </Animated.View>
@@ -1368,6 +1487,7 @@ const styles = StyleSheet.create({
   careSwipeContainer: { backgroundColor: 'transparent', borderCurve: 'continuous', borderRadius: 15, overflow: 'hidden', position: 'relative' },
   careDoor: { alignItems: 'center', backgroundColor: 'rgba(246,237,214,0.98)', borderColor: 'rgba(122,84,44,0.20)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 4px 10px rgba(34,24,12,0.22), inset 0 1px 0 rgba(255,252,238,0.72)', flexDirection: 'row', gap: 8, minHeight: 56, paddingHorizontal: 9, paddingVertical: 6 },
   careDoorComplete: { backgroundColor: 'rgba(242,245,220,0.98)', borderColor: 'rgba(78,112,72,0.28)', boxShadow: '0 5px 12px rgba(48,72,38,0.18), inset 0 1px 0 rgba(255,255,244,0.82)' },
+  completionChargeGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,225,126,0.18)', borderColor: 'rgba(255,229,137,0.82)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1.5, boxShadow: '0 0 22px rgba(255,210,91,0.64), inset 0 0 15px rgba(255,244,190,0.36)' },
   completedIcon: { backgroundColor: 'rgba(123,166,91,0.16)', borderColor: 'rgba(78,112,72,0.24)' },
   completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
   completedTick: { alignItems: 'center', backgroundColor: '#527A49', borderColor: 'rgba(255,248,218,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 3px 8px rgba(49,79,42,0.24), inset 0 1px 0 rgba(255,255,255,0.2)', height: 34, justifyContent: 'center', width: 34 },

@@ -81,6 +81,7 @@ import { GROWTH_ENERGY_ART } from '@/constants/today-care-art';
 import { HOME_SCENE_Y_OFFSET } from '@/constants/home-loop-layout';
 import todayScene from '@/data/today-scene.json';
 import { useHomeScreenState } from '@/hooks/use-home-screen-state';
+import { homeRepository } from '@/storage/repositories/home-repository';
 import { useAllDays } from '@/hooks/use-all-days';
 import { useCompanionQuickGoals } from '@/hooks/use-companion-quick-goals';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
@@ -239,7 +240,10 @@ function HomeScreen() {
     startIntent: startCareIntent,
     status: energyLoopStatus,
   } = useTodayEnergyLoop();
-  useTodayEnergyFrameProbe(energyLoopStatus === 'rewarding' || energyLoopStatus === 'settling');
+  useTodayEnergyFrameProbe(
+    energyLoopStatus === 'rewarding'
+      || energyLoopStatus === 'entering',
+  );
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
     completion: CompanionQuickGoalCompletion;
     goal: CompanionQuickGoal;
@@ -249,6 +253,8 @@ function HomeScreen() {
   const [manualJournalInitialFlowId, setManualJournalInitialFlowId] = useState<string | null>(null);
   const [manualJournalInitialChoiceId, setManualJournalInitialChoiceId] = useState<string | null>(null);
   const [manualJournalInitialContextId, setManualJournalInitialContextId] = useState<string | null>(null);
+  const deferredJournalCareCompletionRef = useRef<string | null>(null);
+  const deferredJournalCareTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openManualJournal = useCallback((flowId?: string, categoryId?: string, contextId?: string | null) => {
     setManualJournalInitialFlowId(flowId ?? null);
     setManualJournalInitialChoiceId(categoryId ?? null);
@@ -260,6 +266,18 @@ function HomeScreen() {
     setManualJournalInitialFlowId(null);
     setManualJournalInitialChoiceId(null);
     setManualJournalInitialContextId(null);
+  }, []);
+  const queueCareCompletionAfterJournalDismiss = useCallback((action: RankedTodayCareAction) => {
+    if (deferredJournalCareTimerRef.current) clearTimeout(deferredJournalCareTimerRef.current);
+    deferredJournalCareCompletionRef.current = action.instanceId;
+    deferredJournalCareTimerRef.current = runAfterNativeModalDismiss(() => {
+      deferredJournalCareTimerRef.current = null;
+      deferredJournalCareCompletionRef.current = null;
+      queueCareCompletion(action, false);
+    });
+  }, [queueCareCompletion]);
+  useEffect(() => () => {
+    if (deferredJournalCareTimerRef.current) clearTimeout(deferredJournalCareTimerRef.current);
   }, []);
   const {
     activeDayPrompt,
@@ -729,7 +747,13 @@ function HomeScreen() {
 
   const openMomentCapture = useCallback((questId?: string | null) => {
     navigateAfterTodayModalCloses(() => {
-      router.push({ pathname: '/moment-capture', params: { target: formingTarget, questId: questId ?? undefined } });
+      // Today is intentionally unmounted behind the full-screen camera. Make
+      // every completed check-in/energy write durable before that boundary so
+      // a camera cancellation (or memory-pressure route reload) cannot revive
+      // an older empty day from native storage.
+      void homeRepository.flush().then(() => {
+        router.push({ pathname: '/moment-capture', params: { target: formingTarget, questId: questId ?? undefined } });
+      });
     });
   }, [formingTarget, navigateAfterTodayModalCloses, router]);
   // Quick TEXT note (tap the mic): an inline text box over the page — enter
@@ -1299,6 +1323,7 @@ function HomeScreen() {
     voiceNote.phase !== 'idle';
   useLayoutEffect(() => {
     if (!pendingCareIntent) return;
+    if (deferredJournalCareCompletionRef.current === pendingCareIntent.instanceId) return;
     const completedPhotoAssetId = pendingCareIntent.destination.kind === 'photo_roll'
       && formingDay
       ? pendingCareIntent.destination.assetIds.find((assetId) =>
@@ -1713,6 +1738,10 @@ function HomeScreen() {
       {isForming && formingDay && nurtureGrowth && !isHatching ? (
         <TodayEnergyProfiler>
           <TodayNurtureExperience
+          actionTransitionActive={
+            energyLoopStatus === 'rewarding'
+              || energyLoopStatus === 'entering'
+          }
           actions={nurtureCare.active}
           bottomInset={insets.bottom}
           completionEvent={queuedCareCompletion?.action.category === 'check_in' ? queuedCareCompletion : flowBusy ? null : queuedCareCompletion}
@@ -1928,6 +1957,7 @@ function HomeScreen() {
           initialFlowId={manualJournalInitialFlowId}
           initialChoiceId={manualJournalInitialChoiceId}
           initialContext={manualJournalInitialContextId}
+          hapticOnSave={!pendingCareIntent}
           onClose={closeManualJournal}
           onSave={(submission) => {
             const completingCareAction = pendingCareIntent
@@ -1936,7 +1966,7 @@ function HomeScreen() {
               : null;
             const deferRewardToCareRow = completingCareAction != null;
             if (completingCareAction) {
-              queueCareCompletion(completingCareAction, false);
+              queueCareCompletionAfterJournalDismiss(completingCareAction);
             }
             addManualJournalEntry(submission, formingTarget);
             closeManualJournal();

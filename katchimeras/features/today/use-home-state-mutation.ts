@@ -22,13 +22,17 @@ export function useHomeStateMutation(
       const now = new Date();
       const profile = loadOnboardingProfile();
       const startedAt = performance.now();
-      const current = storedStateRef?.current;
+      // More than one short-lived route can own this hook. Always rebase a
+      // mutation on the repository's newest in-memory state so a late callback
+      // from an unfocused/unmounting screen cannot replace Today's progress
+      // with that screen's older snapshot.
+      const current = homeRepository.load() ?? storedStateRef?.current ?? null;
       // The hook already owns a hydrated, current-day state. Rehydrating the
       // entire archive before every tap doubled normalization work. Only do it
       // when the state is absent or midnight rollover is actually required.
       const baseState = current?.today.isoDate === toLocalDateId(now)
         ? current
-        : hydrateHomeState(current ?? homeRepository.load(), profile, now).state;
+        : hydrateHomeState(current, profile, now).state;
       const hydratedAt = performance.now();
       const next = mutation(baseState, profile, now);
       const mutatedAt = performance.now();

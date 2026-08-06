@@ -96,10 +96,18 @@ export function useHomeScreenState({
   enableInteractiveServices = true,
   persistHydrationRepairs = true,
 }: HomeScreenStateOptions = {}) {
-  const [storedState, setStoredState] = useState<StoredHomeState | null>(null);
+  // Today is intentionally unmounted while full-screen routes (notably the
+  // camera) are active. Seed a remount from the repository's in-memory state
+  // so cancelling capture cannot render a brand-new day/check-in queue before
+  // the focus effect restores the real state.
+  const [storedState, setStoredState] = useState<StoredHomeState | null>(() => homeRepository.load());
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
-  const scheduledStateRef = useRef<StoredHomeState | null>(null);
+  // The lazy initial value came directly from the repository and is already
+  // scheduled/durable. Do not write it back during the first remount effect;
+  // the focus hydration below will persist only an actually-derived repair.
+  const scheduledStateRef = useRef<StoredHomeState | null>(storedState);
+  const hasSynchronizedStateRef = useRef(false);
   const mutateHomeState = useHomeStateMutation(setStoredState, storedStateRef, scheduledStateRef);
 
   useEffect(() => {
@@ -115,10 +123,16 @@ export function useHomeScreenState({
     // memory. Avoid cloning/normalizing the whole archive merely because a
     // screen regained focus. Timed/foreground refreshes still force lifecycle
     // derivation for hatch-hour and midnight transitions.
-    if (!forceDerive && repositoryState && repositoryState === storedStateRef.current) {
+    if (
+      hasSynchronizedStateRef.current
+      && !forceDerive
+      && repositoryState
+      && repositoryState === storedStateRef.current
+    ) {
       return;
     }
     const hydrated = hydrateHomeState(repositoryState ?? storedStateRef.current, profile, now);
+    hasSynchronizedStateRef.current = true;
 
     // Repository notifications can arrive while an async screen callback is
     // still in flight. Update the mutation source synchronously so that callback

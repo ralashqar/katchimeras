@@ -4,7 +4,10 @@ import test from 'node:test';
 import { prepareTodayForDevRehatch } from '@/game/days/dev';
 import { withStartedHatchCheckIn } from '@/game/days/mutations/day-fields';
 import { preserveVisibleHatchForMap } from '@/game/days/map-hatch-invariant';
-import { preserveFinalizedHatches } from '@/game/days/state-integrity';
+import {
+  preserveActiveTodayFromEmptyDowngrade,
+  preserveFinalizedHatches,
+} from '@/game/days/state-integrity';
 import type { HomeDayRecord, StoredHomeState } from '@/types/home';
 import { buildHatchCheckInPlan, currentHatchCheckInQuestion, hatchCheckInEligibility, hatchReflectionMoments } from '@/utils/hatch-check-in';
 import { dayForDevHatchSelection } from '@/utils/forced-low-signal-hatch';
@@ -152,4 +155,36 @@ test('hatch finality follows a day id across today, tomorrow, and archive slots'
     count: 2,
     lastSeenIsoDate: '2026-07-20',
   });
+});
+
+test('a stale camera-route writer cannot replace Today progress with an empty day', () => {
+  const current = state();
+  current.today.state = 'forming';
+  current.today.creature = null;
+  current.today.card = null;
+  current.today.growth = {
+    schemaVersion: 1,
+    events: [{
+      id: 'mood-reward',
+      source: 'mood',
+      sourceId: 'mood-answer',
+      amount: 20,
+      awardedAt: '2026-07-20T09:00:00.000Z',
+    }],
+    careActions: [],
+  };
+  current.today.promptAnswers = [{ id: 'mood-answer' }] as never;
+  const stale = {
+    ...current,
+    today: {
+      ...current.today,
+      growth: { schemaVersion: 1 as const, events: [], careActions: [] },
+      journalRecords: [],
+      promptAnswers: [],
+    },
+  };
+
+  const reconciled = preserveActiveTodayFromEmptyDowngrade(current, stale);
+  assert.equal(reconciled.today.growth?.events[0]?.id, 'mood-reward');
+  assert.equal(reconciled.today.promptAnswers[0]?.id, 'mood-answer');
 });

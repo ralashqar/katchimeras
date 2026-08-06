@@ -85,6 +85,7 @@ export type JournalComposerProps = {
   promptBody?: string;
   promptTitle?: string;
   saveLabel?: string;
+  hapticOnSave?: boolean;
   initialInputMode?: QuestJournalCaptureMode;
   onBackFromInitial?: () => void;
   returnToOriginOnBack?: boolean;
@@ -123,6 +124,7 @@ export function JournalComposer({
   promptBody,
   promptTitle,
   saveLabel = 'Save memory',
+  hapticOnSave = true,
   initialInputMode = 'guided',
   onBackFromInitial,
   returnToOriginOnBack = false,
@@ -373,7 +375,7 @@ export function JournalComposer({
     const savedJournalSource = trimmedNote && resolvedJournalSource?.kind === 'manual' && resolvedJournalSource.origin?.kind === 'companion_quest'
       ? { kind: 'text_note' as const, sourceId: resolvedJournalSource.sourceId, origin: resolvedJournalSource.origin }
       : resolvedJournalSource;
-    successHaptic();
+    if (hapticOnSave) successHaptic();
     onSave({
       sessionId,
       flowId: flow.id,

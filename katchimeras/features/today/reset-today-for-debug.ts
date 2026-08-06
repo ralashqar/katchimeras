@@ -27,6 +27,6 @@ export function resetTodayForDebug(now = new Date()): StoredHomeState | null {
   clearBaseCustomisation();
 
   const next = resetTodayInState(state, loadOnboardingProfile(), now);
-  homeRepository.save(next, { allowHatchDowngrade: true });
+  homeRepository.save(next, { allowHatchDowngrade: true, allowTodayReset: true });
   return next;
 }
