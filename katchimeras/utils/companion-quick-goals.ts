@@ -343,6 +343,19 @@ export function undoCompanionQuickGoal(
   };
 }
 
+/** Clears only one day's receipts so recurring goal definitions remain intact. */
+export function resetCompanionQuickGoalProgressForDay(
+  state: CompanionQuickGoalState,
+  dayId: string
+): CompanionQuickGoalState {
+  const completions = state.completions.filter((item) => item.dayId !== dayId);
+  const dismissals = state.dismissals.filter((item) => item.dayId !== dayId);
+  if (completions.length === state.completions.length && dismissals.length === state.dismissals.length) {
+    return state;
+  }
+  return { ...state, completions, dismissals };
+}
+
 export function markQuickGoalCompletionJournaled(
   state: CompanionQuickGoalState,
   completionId: string,

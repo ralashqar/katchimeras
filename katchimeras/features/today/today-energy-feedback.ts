@@ -15,6 +15,19 @@ export function publishTodayEnergyFeedback(amount: number, index: number, count:
   listeners.forEach((listener) => listener());
 }
 
+export function clearTodayEnergyFeedback(): void {
+  snapshot = { amount: 0, count: 0, index: -1, key: snapshot.key + 1 };
+  listeners.forEach((listener) => listener());
+}
+
+export function getTodayEnergyFeedbackSnapshot(): TodayEnergyFeedback {
+  return snapshot;
+}
+
+export function subscribeTodayEnergyFeedback(listener: () => void): () => void {
+  return subscribe(listener);
+}
+
 export function useTodayEnergyFeedback(): TodayEnergyFeedback {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }

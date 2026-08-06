@@ -37,6 +37,7 @@ export function completeTodayCareGameRound(attemptId: string, completedAt = Date
 export function cancelTodayCareGameRound(): void {
   pendingLaunch = null;
   activeRound = null;
+  pendingCompletion = null;
 }
 
 export function consumeTodayCareGameRoundCompletion(): TodayCareGameRoundCompletion | null {

@@ -6,7 +6,7 @@ import {
   RadialGradient as SkiaRadialGradient,
   vec,
 } from '@shopify/react-native-skia';
-import { type ReactNode, type RefObject, useEffect } from 'react';
+import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   cancelAnimation,
@@ -18,6 +18,7 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import type { HomeArchetypeId } from '@/types/world-identity';
@@ -30,6 +31,11 @@ import {
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
 import { kingdomHexTileSourceForLod } from '@/utils/world-visuals';
+import { eggVisualGrowthForEnergyRatio } from '@/utils/today-growth';
+import {
+  getTodayEnergyFeedbackSnapshot,
+  subscribeTodayEnergyFeedback,
+} from '@/features/today/today-energy-feedback';
 import { TodayFallbackCloudScene } from '@/components/katchadeck/home/today-fallback-cloud-scene';
 import todayScene from '@/data/today-scene.json';
 
@@ -42,6 +48,8 @@ type TodayKingdomEggHeroProps = {
   hideKingdomEnvironmentArt?: boolean;
   isReady?: boolean;
   growthStage?: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  growthProgress?: number;
+  deferGrowthUntilEnergyArrival?: boolean;
   onEggPress?: () => void;
   pinchStrength?: number;
   targetRef?: RefObject<View | null>;
@@ -69,6 +77,8 @@ export function TodayKingdomEggHero({
   hideKingdomEnvironmentArt = false,
   isReady = false,
   growthStage = 0,
+  growthProgress,
+  deferGrowthUntilEnergyArrival = false,
   onEggPress,
   pinchStrength = 1,
   targetRef,
@@ -84,12 +94,63 @@ export function TodayKingdomEggHero({
   const eggFrame = explorationEggFrame
     ?? todayEggStageFrame(layout.eggCenterY, layout.eggStageScale);
   const eggStageScale = explorationEggFrame?.scale ?? layout.eggStageScale;
-  const growthIntensity = isReady ? 1 : Math.min(1, Math.max(0, growthStage / 6));
+  const energyRatio = isReady
+    ? 1
+    : Math.min(1, Math.max(0, growthProgress ?? growthStage / 6));
+  const growthIntensity = eggVisualGrowthForEnergyRatio(energyRatio);
+  const visualGrowth = useSharedValue(growthIntensity);
+  const sourceEnergyRatioRef = useRef(energyRatio);
+  const visualEnergyRatioRef = useRef(energyRatio);
+  const growthFallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  sourceEnergyRatioRef.current = energyRatio;
   const feedbackShake = useSharedValue(0);
   const feedbackPulse = useSharedValue(0);
   const ripple = useSharedValue(1);
   const rippleEcho = useSharedValue(1);
   const readyShake = useSharedValue(0);
+
+  useEffect(() => {
+    const applyGrowth = () => {
+      visualEnergyRatioRef.current = energyRatio;
+      cancelAnimation(visualGrowth);
+      visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(energyRatio), {
+        duration: reduceMotion ? 90 : 520,
+        easing: Easing.out(Easing.cubic),
+      });
+    };
+    if (!deferGrowthUntilEnergyArrival || energyRatio <= visualEnergyRatioRef.current) {
+      applyGrowth();
+      return () => cancelAnimation(visualGrowth);
+    }
+    // Persisted energy commits before its reward flight. Reconcile only if the
+    // arrival animation is interrupted and never publishes its final token.
+    growthFallbackTimerRef.current = setTimeout(() => {
+      growthFallbackTimerRef.current = null;
+      applyGrowth();
+    }, 2200);
+    return () => {
+      if (growthFallbackTimerRef.current) clearTimeout(growthFallbackTimerRef.current);
+      growthFallbackTimerRef.current = null;
+      cancelAnimation(visualGrowth);
+    };
+  }, [deferGrowthUntilEnergyArrival, energyRatio, reduceMotion, visualGrowth]);
+
+  useEffect(() => {
+    if (!deferGrowthUntilEnergyArrival) return;
+    return subscribeTodayEnergyFeedback(() => {
+      const arrival = getTodayEnergyFeedbackSnapshot();
+      if (arrival.index < 0 || arrival.index !== arrival.count - 1) return;
+      if (growthFallbackTimerRef.current) clearTimeout(growthFallbackTimerRef.current);
+      growthFallbackTimerRef.current = null;
+      const arrivedEnergyRatio = sourceEnergyRatioRef.current;
+      visualEnergyRatioRef.current = arrivedEnergyRatio;
+      cancelAnimation(visualGrowth);
+      visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(arrivedEnergyRatio), {
+        duration: reduceMotion ? 90 : 520,
+        easing: Easing.out(Easing.cubic),
+      });
+    });
+  }, [deferGrowthUntilEnergyArrival, reduceMotion, visualGrowth]);
 
   // Journal writers already bump feedbackKey after a successful commit. Keep
   // the kingdom-quality image intact and animate its wrapper so feeding the egg
@@ -101,17 +162,17 @@ export function TodayKingdomEggHero({
     cancelAnimation(feedbackShake);
     cancelAnimation(feedbackPulse);
     feedbackPulse.value = withSequence(
-      withTiming(1, { duration: reduceMotion ? 70 : 90, easing: Easing.out(Easing.cubic) }),
-      withTiming(0, { duration: reduceMotion ? 150 : 260, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration: reduceMotion ? 70 : 110, easing: Easing.out(Easing.cubic) }),
+      withTiming(0, { duration: reduceMotion ? 150 : 320, easing: Easing.out(Easing.cubic) }),
     );
     if (!reduceMotion) {
       feedbackShake.value = 0;
       feedbackShake.value = withSequence(
-        withTiming(1, { duration: 50, easing: Easing.linear }),
-        withTiming(-1, { duration: 55, easing: Easing.linear }),
-        withTiming(0.72, { duration: 55, easing: Easing.linear }),
-        withTiming(-0.42, { duration: 55, easing: Easing.linear }),
-        withTiming(0, { duration: 80, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 75, easing: Easing.linear }),
+        withTiming(-1, { duration: 80, easing: Easing.linear }),
+        withTiming(0.72, { duration: 85, easing: Easing.linear }),
+        withTiming(-0.42, { duration: 90, easing: Easing.linear }),
+        withTiming(0, { duration: 130, easing: Easing.out(Easing.cubic) }),
       );
     }
     ripple.value = 0;
@@ -137,11 +198,11 @@ export function TodayKingdomEggHero({
     }
     readyShake.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 55, easing: Easing.linear }),
-        withTiming(-1, { duration: 55, easing: Easing.linear }),
-        withTiming(0.65, { duration: 55, easing: Easing.linear }),
-        withTiming(-0.35, { duration: 55, easing: Easing.linear }),
-        withTiming(0, { duration: 75, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 75, easing: Easing.linear }),
+        withTiming(-1, { duration: 80, easing: Easing.linear }),
+        withTiming(0.65, { duration: 85, easing: Easing.linear }),
+        withTiming(-0.35, { duration: 90, easing: Easing.linear }),
+        withTiming(0, { duration: 130, easing: Easing.out(Easing.cubic) }),
         withDelay(2600, withTiming(0, { duration: 1 })),
       ),
       -1,
@@ -154,9 +215,8 @@ export function TodayKingdomEggHero({
     const shake = feedbackShake.value + readyShake.value;
     return {
       transform: [
-        { translateX: shake * 5 },
         { rotateZ: `${shake * 2.8}deg` },
-        { scale: 1 + feedbackPulse.value * 0.045 },
+        { scale: (0.5 + visualGrowth.value * 0.5) * (1 + feedbackPulse.value * 0.045) },
       ],
     };
   });
@@ -209,6 +269,7 @@ export function TodayKingdomEggHero({
             accentColor={accentColor}
             coreColor={coreColor}
             feedbackKey={feedbackKey}
+            growth={visualGrowth}
             growthIntensity={growthIntensity}
             stageHeight={eggFrame.height}
             stageScale={eggStageScale}
@@ -278,6 +339,7 @@ function EggRadiance({
   accentColor,
   coreColor,
   feedbackKey,
+  growth,
   growthIntensity,
   stageHeight,
   stageScale,
@@ -285,6 +347,7 @@ function EggRadiance({
   accentColor: string;
   coreColor: string;
   feedbackKey: number;
+  growth: SharedValue<number>;
   growthIntensity: number;
   stageHeight: number;
   stageScale: number;
@@ -342,20 +405,20 @@ function EggRadiance({
   }, [feedbackKey, flare, reduceMotion]);
 
   const rayStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, 0.48 + growthIntensity * 0.34 + breath.value * 0.07 + flare.value * 0.14),
+    opacity: Math.min(1, 0.08 + growth.value * 0.72 + breath.value * 0.05 + flare.value * 0.15),
     transform: [
       { rotate: `${rotation.value * 360}deg` },
-      { scale: 0.985 + breath.value * 0.03 },
+      { scale: 0.58 + growth.value * 0.4 + breath.value * 0.025 },
     ],
-  }), [growthIntensity]);
+  }));
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, 0.2 + growthIntensity * 0.34 + breath.value * 0.07 + flare.value * 0.68),
-    transform: [{ scale: 0.92 + growthIntensity * 0.06 + breath.value * 0.025 + flare.value * 0.16 }],
-  }), [growthIntensity]);
+    opacity: Math.min(1, 0.1 + growth.value * 0.42 + breath.value * 0.06 + flare.value * 0.68),
+    transform: [{ scale: 0.58 + growth.value * 0.36 + breath.value * 0.025 + flare.value * 0.16 }],
+  }));
   const outerGlowStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, 0.1 + growthIntensity * 0.2 + breath.value * 0.045 + flare.value * 0.72),
-    transform: [{ scale: 0.9 + growthIntensity * 0.07 + breath.value * 0.035 + flare.value * 0.22 }],
-  }), [growthIntensity]);
+    opacity: Math.min(1, 0.04 + growth.value * 0.25 + breath.value * 0.04 + flare.value * 0.72),
+    transform: [{ scale: 0.56 + growth.value * 0.38 + breath.value * 0.035 + flare.value * 0.22 }],
+  }));
 
   return (
     <>
@@ -590,6 +653,7 @@ const styles = StyleSheet.create({
   },
   eggMotionFrame: {
     height: '100%',
+    transformOrigin: 'center bottom',
     zIndex: 3,
   },
   feedRing: {

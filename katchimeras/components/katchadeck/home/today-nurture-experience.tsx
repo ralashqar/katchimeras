@@ -135,7 +135,6 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const [fixedActionClusterHeight, setFixedActionClusterHeight] = useState(0);
   const [checkInSelection, setCheckInSelection] = useState<CheckInSelection | null>(null);
   const checkInSelectionRef = useRef<CheckInSelection | null>(null);
-  const checkInLaunchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reduceMotion = useReducedMotion();
   const ready = growth.isActivated && (day.canHatch || growth.isReady);
   const moodAction = actions.find((action) => action.id === 'mood');
@@ -186,9 +185,6 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const eggPanStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: sceneTranslateX.value }],
   }));
-  useEffect(() => () => {
-    if (checkInLaunchTimerRef.current) clearTimeout(checkInLaunchTimerRef.current);
-  }, []);
   const handleActionContentLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
     setActionContentHeight((current) => Math.abs(current - nextHeight) < 0.5 ? current : nextHeight);
@@ -201,27 +197,15 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
     if (checkInSelectionRef.current) return;
     checkInSelectionRef.current = selection;
     setCheckInSelection(selection);
-    const launchFeed = () => {
-      checkInLaunchTimerRef.current = null;
-      if (selection.kind === 'mood') {
-        onChooseMood(selection.id as MoodMonumentChoiceId, selection.label, from, selection.image, selection.accent, currencyFrom);
-      } else {
-        onChooseSleep(selection.id as SleepQuality, selection.label, from, selection.image, selection.accent, currencyFrom);
-      }
-    };
-    if (reduceMotion) {
-      launchFeed();
+    // The panel response, selected mood/sleep icon, and energy burst all begin
+    // from the same tap. FeedPayout mounts the source mote and coins together.
+    if (selection.kind === 'mood') {
+      onChooseMood(selection.id as MoodMonumentChoiceId, selection.label, from, selection.image, selection.accent, currencyFrom);
     } else {
-      // Let the source artwork complete its short in-panel shake before the
-      // flying copy is mounted over it, so both beats remain readable.
-      checkInLaunchTimerRef.current = setTimeout(launchFeed, 230);
+      onChooseSleep(selection.id as SleepQuality, selection.label, from, selection.image, selection.accent, currencyFrom);
     }
-  }, [onChooseMood, onChooseSleep, reduceMotion]);
+  }, [onChooseMood, onChooseSleep]);
   const finishCheckInSelection = useCallback((eventId: string) => {
-    if (checkInLaunchTimerRef.current) {
-      clearTimeout(checkInLaunchTimerRef.current);
-      checkInLaunchTimerRef.current = null;
-    }
     checkInSelectionRef.current = null;
     setCheckInSelection(null);
     onCompletionAnimationEnd(eventId);
@@ -242,8 +226,10 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
           <TodayKingdomEggHero
             accentColor={day.egg.accentColor}
             coreColor={day.egg.coreColor}
+            deferGrowthUntilEnergyArrival
             explorationStageTop={stageTop}
             feedbackKey={feedbackKey}
+            growthProgress={growth.energyRatio}
             growthStage={growth.stage}
             hideKingdomEnvironmentArt
             homeArchetypeId={homeArchetypeId}
@@ -1188,39 +1174,79 @@ function Reward({ amount }: { amount: number }) {
 
 function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
   const feedback = useTodayEnergyFeedback();
+  const reduceMotion = useReducedMotion();
+  const [meterTargetEnergy, setMeterTargetEnergy] = useState(growth.activeEnergy);
   const [displayedEnergy, setDisplayedEnergy] = useState(growth.activeEnergy);
+  const displayedEnergyRef = useRef(growth.activeEnergy);
   const previousEnergyRef = useRef(growth.activeEnergy);
-  const latestEnergyRef = useRef(growth.activeEnergy);
   const lastLandingAtRef = useRef(0);
-  latestEnergyRef.current = growth.activeEnergy;
+  const seenFeedbackKeyRef = useRef(feedback.key);
   const progress = useSharedValue(Math.min(1, growth.activeEnergy / growth.energyTarget));
+  const iconPulse = useSharedValue(0);
   const targetGlow = useSharedValue(0);
   const targetReachedRef = useRef(growth.activeEnergy >= growth.energyTarget);
+  displayedEnergyRef.current = displayedEnergy;
+  useEffect(() => () => {
+    cancelAnimation(progress);
+    cancelAnimation(iconPulse);
+    cancelAnimation(targetGlow);
+  }, [iconPulse, progress, targetGlow]);
   useEffect(() => {
-    lastLandingAtRef.current = Date.now();
+    if (feedback.key === seenFeedbackKeyRef.current) return;
+    seenFeedbackKeyRef.current = feedback.key;
     if (feedback.index < 0) return;
-    setDisplayedEnergy((current) => Math.min(growth.energyTarget, current + Math.max(0, feedback.amount)));
-  }, [feedback.amount, feedback.index, feedback.key, growth.energyTarget]);
+    lastLandingAtRef.current = Date.now();
+    setMeterTargetEnergy((current) => Math.min(growth.energyTarget, current + Math.max(0, feedback.amount)));
+    cancelAnimation(iconPulse);
+    iconPulse.value = withSequence(
+      withTiming(1, { duration: reduceMotion ? 45 : 85, easing: Easing.out(Easing.cubic) }),
+      withTiming(0, { duration: reduceMotion ? 90 : 170, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [feedback.amount, feedback.index, feedback.key, growth.energyTarget, iconPulse, reduceMotion]);
   useEffect(() => {
     const previous = previousEnergyRef.current;
     previousEnergyRef.current = growth.activeEnergy;
     if (growth.activeEnergy <= previous || Date.now() - lastLandingAtRef.current < 420) {
-      setDisplayedEnergy(growth.activeEnergy);
+      setMeterTargetEnergy(growth.activeEnergy);
       return;
     }
     // A source-of-truth award often lands before its five visual tokens. Keep
     // the meter frozen long enough for the payout to count up one arrival at a
     // time, then reconcile as a safety net if an animation was interrupted.
-    const timer = setTimeout(() => setDisplayedEnergy(growth.activeEnergy), 1600);
+    const timer = setTimeout(() => setMeterTargetEnergy(growth.activeEnergy), 1600);
     return () => clearTimeout(timer);
   }, [growth.activeEnergy]);
   useEffect(() => {
-    progress.value = withTiming(Math.min(1, displayedEnergy / growth.energyTarget), {
-      duration: 480,
+    progress.value = withTiming(Math.min(1, meterTargetEnergy / growth.energyTarget), {
+      duration: reduceMotion ? 90 : 360,
       easing: Easing.out(Easing.cubic),
     });
-  }, [displayedEnergy, growth.energyTarget, progress]);
+  }, [growth.energyTarget, meterTargetEnergy, progress, reduceMotion]);
+  useEffect(() => {
+    const from = displayedEnergyRef.current;
+    const to = meterTargetEnergy;
+    if (from === to || reduceMotion) {
+      setDisplayedEnergy(to);
+      return;
+    }
+    const startedAt = performance.now();
+    const duration = 240;
+    let frame = 0;
+    const tick = (now: number) => {
+      const elapsed = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - elapsed, 3);
+      const next = Math.round(from + (to - from) * eased);
+      displayedEnergyRef.current = next;
+      setDisplayedEnergy(next);
+      if (elapsed < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [meterTargetEnergy, reduceMotion]);
   const fillStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: progress.value }] }));
+  const iconPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1.46 + iconPulse.value * 0.34 }],
+  }));
   useEffect(() => {
     const reached = displayedEnergy >= growth.energyTarget;
     if (reached && !targetReachedRef.current) {
@@ -1251,7 +1277,9 @@ function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
           <View style={styles.trackShine} />
         </View>
         <View pointerEvents="none" style={styles.energyValue}>
-          <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.energyMeterIcon} transition={0} />
+          <Animated.View style={[styles.energyMeterIconFrame, iconPulseStyle]}>
+            <Image contentFit="contain" source={GROWTH_ENERGY_ART} style={styles.energyMeterIcon} transition={0} />
+          </Animated.View>
           <ThemedText selectable style={styles.meterPercent} lightColor="#FFFBE9" darkColor="#FFFBE9">
             {displayedEnergy} / {growth.energyTarget}
           </ThemedText>
@@ -1287,7 +1315,8 @@ const styles = StyleSheet.create({
   meterCard: { alignItems: 'center', alignSelf: 'center', gap: 8, width: '78%' },
   meterPercent: { fontFamily: AppFontFamilies.manrope, fontSize: 12.5, fontVariant: ['tabular-nums'], fontWeight: '900' },
   energyValue: { alignItems: 'center', ...StyleSheet.absoluteFillObject, flexDirection: 'row', gap: 4, justifyContent: 'center', overflow: 'visible', zIndex: 1 },
-  energyMeterIcon: { height: 24, transform: [{ scale: 1.46 }], width: 24 },
+  energyMeterIconFrame: { height: 24, width: 24 },
+  energyMeterIcon: { height: '100%', width: '100%' },
   energyTargetGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,235,154,0.34)', borderRadius: 999, boxShadow: '0 0 16px rgba(255,225,116,0.72)' },
   countdown: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '800' },
   countdownPill: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(31,27,19,0.76)', borderColor: 'rgba(255,239,196,0.18)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 5, minHeight: 28, paddingHorizontal: 11 },

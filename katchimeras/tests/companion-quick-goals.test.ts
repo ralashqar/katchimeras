@@ -22,6 +22,7 @@ import {
   normaliseCompanionQuickGoalState,
   quickGoalTemplateStatusForDay,
   quickGoalsForDay,
+  resetCompanionQuickGoalProgressForDay,
   rollCompanionQuickGoalsToDay,
   skipCompanionQuickGoal,
   snoozeCompanionQuickGoal,
@@ -237,6 +238,30 @@ test('completion, journal linkage, undo, and bond rewards are idempotent', () =>
   assert.equal(undone.undone, true);
   assert.equal(removed.removed, true);
   assert.equal(removed.state.events.length, 0);
+});
+
+test('debug day reset clears only that day quick-goal receipts and preserves recurring goals', () => {
+  let state = addCompanionQuickGoal(emptyCompanionQuickGoalState(), {
+    familyId: 'tasklet',
+    title: 'Choose one next action',
+    cadence: { kind: 'daily' },
+  }, 100).state;
+  const completionGoalId = state.goals[0]!.id;
+  state = completeCompanionQuickGoal(state, completionGoalId, '2026-07-25', 200).state;
+  state = completeCompanionQuickGoal(state, completionGoalId, '2026-07-26', 300).state;
+  state = addCompanionQuickGoal(state, {
+    familyId: 'skylo',
+    title: 'Take a local detour',
+    cadence: { kind: 'daily' },
+  }, 400).state;
+  const dismissalGoalId = state.goals[1]!.id;
+  state = skipCompanionQuickGoal(state, dismissalGoalId, '2026-07-25', 500).state;
+  state = skipCompanionQuickGoal(state, dismissalGoalId, '2026-07-26', 600).state;
+
+  const reset = resetCompanionQuickGoalProgressForDay(state, '2026-07-25');
+  assert.equal(reset.goals.length, 2);
+  assert.deepEqual(reset.completions.map((item) => item.dayId), ['2026-07-26']);
+  assert.deepEqual(reset.dismissals.map((item) => item.dayId), ['2026-07-26']);
 });
 
 test('normalization removes orphaned completions and keeps family-level ownership', () => {

@@ -31,6 +31,7 @@ import {
 import {
   loadCompanionQuickGoalState,
   saveCompanionQuickGoalState,
+  subscribeCompanionQuickGoalResets,
 } from '@/utils/companion-quick-goal-storage';
 import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import { loadCompanionQuests } from '@/utils/katchimera-quests';
@@ -78,6 +79,11 @@ export function useCompanionQuickGoals({
   useFocusEffect(useCallback(() => {
     refresh();
   }, [refresh]));
+
+  useEffect(
+    () => subscribeCompanionQuickGoalResets(refresh),
+    [refresh]
+  );
 
   useEffect(() => {
     if (!dayId) return;

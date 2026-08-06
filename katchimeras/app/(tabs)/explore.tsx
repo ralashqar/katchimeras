@@ -35,7 +35,8 @@ import { aggregatePhotoVision, buildVisionSignals } from '@/utils/vision-signals
 import { requestComicBeats } from '@/utils/day-reflection';
 import { encounterLiveCast } from '@/constants/encounter-cast';
 import { katchimeraEncounterProfiles } from '@/constants/katchimera-encounter-profiles';
-import { getCreatureVisual, prepareTodayForDevRehatch, resetTodayInState, type DevRehatchMode } from '@/game/days';
+import { getCreatureVisual, prepareTodayForDevRehatch, type DevRehatchMode } from '@/game/days';
+import { resetTodayForDebug } from '@/features/today/reset-today-for-debug';
 import { clearTodayPatch } from '@/utils/today-patch-storage';
 import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
@@ -131,21 +132,14 @@ export default function ExploreScreen() {
   function handleResetToday() {
     Alert.alert(
       'Reset today only?',
-      'Clears just TODAY back to a blank day. Keeps onboarding, past days, discoveries, and essence.',
+      'Clears TODAY, its journals and energy receipts back to a blank day. Keeps onboarding, past days, recurring goals, discoveries, and essence.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Reset today',
           style: 'destructive',
           onPress: () => {
-            const state = homeRepository.load();
-            if (state) {
-              homeRepository.save(resetTodayInState(state, loadOnboardingProfile(), new Date()), {
-                allowHatchDowngrade: true,
-              });
-            }
-            clearTodayPatch();
-            clearBaseCustomisation();
+            resetTodayForDebug();
             router.replace('/(tabs)');
           },
         },

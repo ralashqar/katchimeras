@@ -2,12 +2,14 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withDelay,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -175,6 +177,7 @@ function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive
 }) {
   const riseProgress = useSharedValue(0);
   const flightProgress = useSharedValue(0);
+  const hoverPhase = useSharedValue(0);
   const reduceMotion = useReducedMotion();
   const vector = BURST_VECTORS[index] ?? BURST_VECTORS[BURST_VECTORS.length - 1];
 
@@ -189,6 +192,13 @@ function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive
       duration: riseDuration,
       easing: Easing.out(Easing.cubic),
     });
+    hoverPhase.value = reduceMotion
+      ? withTiming(1, { duration: 560, easing: Easing.linear })
+      : withRepeat(
+          withTiming(1, { duration: 720, easing: Easing.linear }),
+          -1,
+          false,
+        );
     flightProgress.value = withDelay(riseDuration + hoverDuration + stagger, withTiming(1, {
       duration: flightDuration,
       easing: Easing.in(Easing.cubic),
@@ -197,27 +207,38 @@ function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive
       if (onEnergyTokenArrive) runOnJS(onEnergyTokenArrive)(amount, index, count);
       if (index === count - 1) runOnJS(onArrive)();
     }));
-  }, [amount, count, flightProgress, index, onArrive, onEnergyTokenArrive, reduceMotion, riseProgress]);
+    return () => {
+      cancelAnimation(flightProgress);
+      cancelAnimation(hoverPhase);
+      cancelAnimation(riseProgress);
+    };
+  }, [amount, count, flightProgress, hoverPhase, index, onArrive, onEnergyTokenArrive, reduceMotion, riseProgress]);
 
   const animatedStyle = useAnimatedStyle(() => {
     const startX = feed.currencyFromX ?? feed.fromX;
     const startY = feed.currencyFromY ?? feed.fromY;
     const rise = riseProgress.value;
     const q = flightProgress.value;
-    const hoverX = startX + vector.x;
-    const hoverY = startY + vector.y;
+    const burstX = startX + vector.x;
+    const burstY = startY + vector.y;
     const inverse = 1 - q;
-    const controlX = (hoverX + feed.toX) / 2 + (index % 2 === 0 ? -24 : 24);
-    const controlY = Math.min(hoverY, feed.toY) - 82 - index * 3;
+    const controlX = (burstX + feed.toX) / 2 + (index % 2 === 0 ? -24 : 24);
+    const controlY = Math.min(burstY, feed.toY) - 82 - index * 3;
     const stagedX = startX + vector.x * rise;
     const stagedY = startY + vector.y * rise;
-    const cx = q === 0
+    const baseX = q === 0
       ? stagedX
-      : inverse * inverse * hoverX + 2 * inverse * q * controlX + q * q * feed.toX;
-    const cy = q === 0
+      : inverse * inverse * burstX + 2 * inverse * q * controlX + q * q * feed.toX;
+    const baseY = q === 0
       ? stagedY
-      : inverse * inverse * hoverY + 2 * inverse * q * controlY + q * q * feed.toY;
+      : inverse * inverse * burstY + 2 * inverse * q * controlY + q * q * feed.toY;
+    const hoverEnvelope = rise * inverse;
+    const phase = hoverPhase.value * Math.PI * 2 + index * 0.92;
+    const hoverStrength = reduceMotion ? 0.5 : 1;
+    const cx = baseX + Math.cos(phase) * 3 * hoverEnvelope * hoverStrength;
+    const cy = baseY + Math.sin(phase) * 4 * hoverEnvelope * hoverStrength;
     const scale = q > 0 ? 1.06 - q * 0.80 : 0.54 + rise * 0.52;
+    const hoverScale = 1 + Math.sin(phase + 0.6) * 0.035 * hoverEnvelope * hoverStrength;
     const opacity = rise <= 0.04
       ? rise / 0.04
       : q < 0.88
@@ -229,7 +250,7 @@ function EnergyToken({ amount, count, feed, index, onArrive, onEnergyTokenArrive
         { translateX: cx - TOKEN_SIZE / 2 },
         { translateY: cy - TOKEN_SIZE / 2 },
         { rotate: `${vector.rotation * (1 - q)}deg` },
-        { scale },
+        { scale: scale * hoverScale },
       ],
     };
   });

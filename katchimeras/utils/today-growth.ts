@@ -28,6 +28,18 @@ export const TODAY_ACTIVATION_ACTION_COUNT = 2;
 export const TODAY_TIME_FLOOR_RATIO = 0.7;
 export const TODAY_MAX_ACCELERATION_RATIO = 1 - TODAY_TIME_FLOOR_RATIO;
 
+/**
+ * The egg reaches its full visual size at half energy, then stays capped.
+ * Keeping this curve separate from growth stages avoids visible size jumps.
+ */
+export function eggVisualGrowthForEnergyRatio(energyRatio: number): number {
+  return Math.min(1, Math.max(0, energyRatio) * 2);
+}
+
+export function eggScaleForEnergyRatio(energyRatio: number): number {
+  return 0.5 + eggVisualGrowthForEnergyRatio(energyRatio) * 0.5;
+}
+
 export type TodayGrowthSummary = {
   activeEnergy: number;
   energyTarget: number;

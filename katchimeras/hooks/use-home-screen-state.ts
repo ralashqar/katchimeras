@@ -120,6 +120,10 @@ export function useHomeScreenState({
     }
     const hydrated = hydrateHomeState(repositoryState ?? storedStateRef.current, profile, now);
 
+    // Repository notifications can arrive while an async screen callback is
+    // still in flight. Update the mutation source synchronously so that callback
+    // cannot rebuild and persist the pre-reset Today before React commits.
+    storedStateRef.current = hydrated.state;
     setStoredState(hydrated.state);
     setSelectedDayId((current) => {
       // Follow a selected Today across midnight. The old tile stays immediately

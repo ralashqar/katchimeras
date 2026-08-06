@@ -24,6 +24,8 @@ type EggFeedRequest = {
   commit: () => void;
 };
 
+const EGG_FEED_TARGET_Y_RATIO = 0.64;
+
 export function useEggFeedController() {
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
   const [eggFeedKey, setEggFeedKey] = useState(0);
@@ -89,9 +91,13 @@ export function useEggFeedController() {
       setEggFeed(nextFeed);
     };
 
-    const destination = eggTargetRef.current ?? heroStageRef.current;
+    const eggDestination = eggTargetRef.current;
+    const destination = eggDestination ?? heroStageRef.current;
     if (destination) {
-      destination.measureInWindow((x, y, w, h) => launch(x + w / 2, y + h / 2));
+      // The egg scales around its bottom edge. Aim below the layout centre so
+      // rewards still disappear into the shell at its half-size starting state.
+      const targetYRatio = eggDestination ? EGG_FEED_TARGET_Y_RATIO : 0.5;
+      destination.measureInWindow((x, y, w, h) => launch(x + w / 2, y + h * targetYRatio));
       return;
     }
 

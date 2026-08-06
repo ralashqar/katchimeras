@@ -6,6 +6,8 @@ import {
   activeGrowthEnergy,
   awardGrowth,
   completeEnergyAction,
+  eggScaleForEnergyRatio,
+  eggVisualGrowthForEnergyRatio,
   growthStageForEnergy,
   TODAY_ENERGY_TARGET,
   todayGrowthSummary,
@@ -72,6 +74,17 @@ test('Energy payouts use five arrivals and preserve the exact reward', () => {
     assert.equal(tokens.reduce((sum, token) => sum + token, 0), amount);
     assert.ok(tokens.every((token) => token > 0));
   }
+});
+
+test('egg grows continuously from half size and reaches its existing maximum at half energy', () => {
+  assert.equal(eggScaleForEnergyRatio(-1), 0.5);
+  assert.equal(eggScaleForEnergyRatio(0), 0.5);
+  assert.equal(eggScaleForEnergyRatio(0.25), 0.75);
+  assert.equal(eggScaleForEnergyRatio(0.5), 1);
+  assert.equal(eggScaleForEnergyRatio(1), 1);
+  assert.equal(eggVisualGrowthForEnergyRatio(0.25), 0.5);
+  assert.equal(eggVisualGrowthForEnergyRatio(0.5), 1);
+  assert.equal(eggVisualGrowthForEnergyRatio(2), 1);
 });
 
 test('Growth awards are source-id idempotent', () => {
@@ -702,6 +715,12 @@ test('Mini-game care completion requires a consumed launch and successful attemp
   const completion = consumeTodayCareGameRoundCompletion();
   assert.equal(completion?.attemptId, 'attempt-success');
   assert.equal(completion?.action.instanceId, action.instanceId);
+  assert.equal(consumeTodayCareGameRoundCompletion(), null);
+
+  requestTodayCareGameRound(action);
+  consumeTodayCareGameRoundLaunch();
+  assert.equal(completeTodayCareGameRound('attempt-reset-before-return'), true);
+  cancelTodayCareGameRound();
   assert.equal(consumeTodayCareGameRoundCompletion(), null);
 });
 
