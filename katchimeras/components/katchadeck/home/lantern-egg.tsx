@@ -114,6 +114,7 @@ export function LanternEgg({
       -1,
       false
     );
+    return () => cancelAnimation(pulse);
   }, [pulse]);
 
   const fireRipple = () => {

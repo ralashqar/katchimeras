@@ -15,6 +15,7 @@ import type {
   ClassifiedMemory,
   TodayCareActionState,
   TodayGrowthSource,
+  TodayEnergyActionCompletion,
 } from '@/types/home';
 import {
   addMomentToDay,
@@ -56,6 +57,7 @@ import {
   updateTodayStepCount,
   updateClassifiedMemoryForToday,
   awardGrowthForToday,
+  completeTodayEnergyAction,
   updateTodayCareAction,
 } from '@/game/days';
 import {
@@ -150,6 +152,8 @@ export function useHomeScreenState({
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         syncState(true);
+      } else {
+        void homeRepository.flush();
       }
     });
 
@@ -409,6 +413,13 @@ export function useHomeScreenState({
     mutateHomeState((state, profile, now) => updateTodayCareAction(state, input, profile, now, target));
   }, [mutateHomeState]);
 
+  const completeEnergyAction = useCallback((
+    input: TodayEnergyActionCompletion,
+    target: DayInputTarget = 'today',
+  ) => {
+    mutateHomeState((state, profile, now) => completeTodayEnergyAction(state, input, profile, now, target));
+  }, [mutateHomeState]);
+
   const answerHatchCheckIn = useCallback(
     (dayId: string, input: { kind: 'flow' | 'category' | 'moment' | 'meaning'; id: string }) => {
       mutateHomeState((state, profile, now) => answerHatchCheckInForDay(state, dayId, input, profile, now));
@@ -607,6 +618,7 @@ export function useHomeScreenState({
     dailySeeds,
     completeSeed,
     awardGrowth,
+    completeEnergyAction,
     updateCareAction,
     addNote,
     confirmPlace,

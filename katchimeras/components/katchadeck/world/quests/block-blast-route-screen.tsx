@@ -25,6 +25,7 @@ import { questDefinition } from '@/utils/quests/definitions';
 import type { QuestResult } from '@/utils/quests/experiences/types';
 import { localDayId } from '@/utils/world-identity-rules';
 import { reportFlowReady } from '@/utils/flow-performance';
+import { acquireLifecycleResource, scheduleLifecycleAudit } from '@/utils/lifecycle-performance';
 
 type BlockBlastConfig = {
   packId: 'cheerlet-party';
@@ -71,7 +72,15 @@ export function BlockBlastRouteScreen({
   }), [activeQuest?.resolvedConfig]);
   const seed = activeQuest?.offerSeed ?? `${creatureId}:${questId}:${localDayId()}`;
 
-  useEffect(() => reportFlowReady('katchimera-block-blast'), []);
+  useEffect(() => {
+    const releaseRoute = acquireLifecycleResource('game_route', questId);
+    const cancelReadyReport = reportFlowReady('katchimera-block-blast');
+    return () => {
+      cancelReadyReport();
+      releaseRoute();
+      scheduleLifecycleAudit(`katchimera-block-blast:${questId}:exit`);
+    };
+  }, [questId]);
 
   const startAttempt = useCallback((configSnapshot: Record<string, unknown>) => {
     const latest = loadQuestState();

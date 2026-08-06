@@ -1549,6 +1549,17 @@ export type TodayCareActionState = {
   updatedAt: string;
 };
 
+/** One exact-once receipt for the action row and the Growth Energy it earned. */
+export type TodayEnergyActionCompletion = {
+  careAction: Omit<TodayCareActionState, 'updatedAt' | 'status'> & { status?: 'completed' };
+  growth: {
+    source: TodayGrowthSource;
+    sourceId: string;
+    actionId?: string | null;
+    amount?: number;
+  };
+};
+
 export type DayGrowthState = {
   schemaVersion: 1;
   events: TodayGrowthEvent[];

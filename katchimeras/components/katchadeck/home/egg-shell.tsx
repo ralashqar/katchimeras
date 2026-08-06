@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { StyleSheet } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   type SharedValue,
   useAnimatedStyle,
@@ -71,6 +72,7 @@ export function EggShell({
       -1,
       false
     );
+    return () => cancelAnimation(breathe);
   }, [breathe]);
 
   useEffect(() => {

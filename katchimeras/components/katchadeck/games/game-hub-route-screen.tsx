@@ -17,6 +17,7 @@ import { resolveInteractiveQuestConfig } from '@/utils/quests/interactive-sessio
 import { todayKatchimeraExplorationBackgroundKeyForPresentation } from '@/utils/today-exploration-backgrounds';
 import { localDayId } from '@/utils/world-identity-rules';
 import { withDevAvailableKatchimeras } from '@/utils/dev-katchimera-availability';
+import { markFlowStart } from '@/utils/flow-performance';
 import {
   cancelTodayCareGameRound,
   consumeTodayCareGameRoundLaunch,
@@ -91,11 +92,14 @@ export function GameHubRouteScreen() {
       resolvedConfig: config,
     }, acceptedAt);
     saveCompanionQuests(accepted.state);
+    markFlowStart('game-hub-game');
     router.push({
       pathname: '/game/[questId]',
       params: {
         questId: item.questId,
         creatureId: item.creatureId,
+        companionName: item.displayCompanionName,
+        visualKey: item.displayVisualKey ?? undefined,
         todayCareRound: fromTodayCare ? '1' : undefined,
       },
     });

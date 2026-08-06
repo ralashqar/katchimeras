@@ -22,6 +22,7 @@ import Animated, {
 
 import { ThemedText } from '@/components/themed-text';
 import { AnimatedBorderHighlight } from '@/components/katchadeck/ui/animated-border-highlight';
+import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { KatchaSurfaceProvider } from '@/components/katchadeck/ui/katcha-surface';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -118,6 +119,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
   const flightId = useRef(0);
   const spawnAnimationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingCommitFrames = useRef(new Set<number>());
+  const feedbackTimers = useDisposableTimers('merge-feedback');
 
   useEffect(() => () => {
     if (spawnAnimationTimer.current) clearTimeout(spawnAnimationTimer.current);
@@ -284,7 +286,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     const next = mergeRoundReducer(current, { type: 'move', from, to }, config.moveBudget);
     if (next === current) {
       setInvalidCell(to);
-      setTimeout(() => setInvalidCell(null), 260);
+      feedbackTimers.schedule(() => setInvalidCell(null), 260);
       haptic('warning');
       announce('Those items do not match.');
       return false;
@@ -313,7 +315,7 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       const upgraded = mergeItemDefinition(next.board[to]!.definitionId);
       if (reduceMotion) {
         setMergedCell(to);
-        setTimeout(() => setMergedCell(null), 100);
+        feedbackTimers.schedule(() => setMergedCell(null), 100);
       }
       haptic('merge');
       commit(next, `Merged into ${upgraded.name}. ${config.moveBudget - next.movesUsed} actions left.`);
@@ -322,15 +324,15 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
       commit(next);
     }
     return true;
-  }, [addFlight, announce, boardBorder, boardPadding, cellSize, commit, config.moveBudget, gap, haptic, reduceMotion, serve]);
+  }, [addFlight, announce, boardBorder, boardPadding, cellSize, commit, config.moveBudget, feedbackTimers, gap, haptic, reduceMotion, serve]);
 
   const finishFlight = useCallback((id: number, kind: MergeFlight['kind'], to: number | null) => {
     setFlights((current) => current.filter((flight) => flight.id !== id));
     if (kind === 'merge' && to != null) {
       setMergedCell(to);
-      setTimeout(() => setMergedCell((current) => current === to ? null : current), 430);
+      feedbackTimers.schedule(() => setMergedCell((current) => current === to ? null : current), 430);
     }
-  }, []);
+  }, [feedbackTimers]);
 
   const pickCell = useCallback((cell: number) => {
     setDraggingCell(cell);
@@ -369,14 +371,14 @@ export function MergeQuest({ config, packId, seed, recentOrderIds, best = null, 
     setSelectedCell(null);
     if (merging) {
       setMergedCell(cell);
-      setTimeout(() => setMergedCell(null), reduceMotion ? 100 : 430);
+      feedbackTimers.schedule(() => setMergedCell(null), reduceMotion ? 100 : 430);
       haptic('merge');
       commit(next, `Merged into ${name}. ${config.moveBudget - next.movesUsed} actions left.`);
     } else {
       haptic('move');
       commit(next, `${name} moved.`);
     }
-  }, [announce, commit, config.moveBudget, haptic, reduceMotion, selectedCell, serve]);
+  }, [announce, commit, config.moveBudget, feedbackTimers, haptic, reduceMotion, selectedCell, serve]);
 
   const readyDefinitionIds = useMemo(
     () => new Set(state.orders.filter((order) => !order.completed).map((order) => order.targetId)),

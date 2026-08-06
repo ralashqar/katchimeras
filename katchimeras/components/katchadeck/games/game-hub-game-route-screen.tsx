@@ -10,16 +10,15 @@ import { BlockBlastGameShell } from '@/components/katchadeck/world/quests/block-
 import { QuestExperienceHost } from '@/components/katchadeck/world/quests/quest-experience-host';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { katchimeraSkinById } from '@/constants/katchimera-skins';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
-import { useAllDays } from '@/hooks/use-all-days';
 import { homeRepository } from '@/storage/repositories/home-repository';
+import type { HomeVisualKey } from '@/types/home';
 import { questBondEventKind, recordCompanionBondEvent } from '@/utils/companion-bond';
 import { loadCompanionBondState, saveCompanionBondState } from '@/utils/companion-bond-storage';
 import { resolveCreatureArtSource } from '@/utils/creature-art';
 import { gameCatalogEntry } from '@/utils/game-hub';
 import { companionQuestPresentation } from '@/utils/companion-interaction';
-import { companionIdResolverForHomeState, identityForCreature } from '@/utils/katchimera-identity';
+import { companionIdResolverForHomeState } from '@/utils/katchimera-identity';
 import {
   cancelQuestAttempt,
   completeInteractiveQuest,
@@ -29,9 +28,8 @@ import {
   saveCompanionQuests,
   startQuestAttempt,
 } from '@/utils/katchimera-quests';
-import { applyWardrobeToKingdom } from '@/utils/katchimera-wardrobe';
-import { loadKatchimeraWardrobe } from '@/utils/katchimera-wardrobe-storage';
-import { deriveKingdom } from '@/utils/kingdom-engine';
+import { reportFlowReady } from '@/utils/flow-performance';
+import { acquireLifecycleResource, scheduleLifecycleAudit } from '@/utils/lifecycle-performance';
 import { questDefinition } from '@/utils/quests/definitions';
 import { isInteractiveExecution, type QuestResult } from '@/utils/quests/experiences/types';
 import { questExperienceHistory } from '@/utils/quests/interactive-session';
@@ -52,20 +50,22 @@ function loadState() {
 }
 
 export function GameHubGameRouteScreen() {
-  const { creatureId = '', questId = '', todayCareRound = '' } = useLocalSearchParams<{
+  const {
+    companionName: launchCompanionName = '',
+    creatureId = '',
+    questId = '',
+    todayCareRound = '',
+    visualKey: launchVisualKey = '',
+  } = useLocalSearchParams<{
+    companionName?: string;
     creatureId: string;
     questId: string;
     todayCareRound?: string;
+    visualKey?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { days } = useAllDays({ refreshOnFocus: false });
   const initial = useMemo(loadState, []);
-  const wardrobe = useMemo(loadKatchimeraWardrobe, []);
-  const kingdom = useMemo(
-    () => applyWardrobeToKingdom(deriveKingdom(days), wardrobe),
-    [days, wardrobe],
-  );
   const quest = gameHubQuestFor(initial.quests, creatureId, questId);
   const definition = questDefinition(questId);
   const execution = definition?.execution;
@@ -73,19 +73,8 @@ export function GameHubGameRouteScreen() {
   const presentation = companionQuestPresentation(isInteractiveExecution(execution) ? execution : null);
   const fullBleed = presentation.layout === 'fullBleed';
   const isBlockBlast = execution?.kind === 'block_blast';
-  const companion = useMemo(
-    () => kingdom.creatures.find((creature) => (
-      identityForCreature({ ...creature, encounterProfileId: null })?.companionId === creatureId
-    )) ?? null,
-    [creatureId, kingdom.creatures],
-  );
-  const companionIdentity = companion
-    ? identityForCreature({ ...companion, encounterProfileId: null })
-    : null;
-  const visualKey = companion?.visualKey ?? entry?.visualKey ?? null;
-  const companionName = companion && companionIdentity
-    ? katchimeraSkinById.get(companionIdentity.skinId)?.displayName ?? companion.name
-    : entry?.companionName ?? 'Katchimera';
+  const visualKey = (launchVisualKey || entry?.visualKey || null) as HomeVisualKey | null;
+  const companionName = launchCompanionName || entry?.companionName || 'Katchimera';
   const environmentKey = visualKey
     ? todayKatchimeraExplorationBackgroundKeyForEnvironment(visualKey)
       ?? todayKatchimeraExplorationBackgroundKeyForFamily(entry?.familyId)
@@ -97,6 +86,16 @@ export function GameHubGameRouteScreen() {
   const completionInFlight = useRef(false);
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fromTodayCare = todayCareRound === '1';
+
+  useEffect(() => {
+    const releaseRoute = acquireLifecycleResource('game_route', questId);
+    const cancelReadyReport = reportFlowReady('game-hub-game');
+    return () => {
+      cancelReadyReport();
+      releaseRoute();
+      scheduleLifecycleAudit(`game-hub-game:${questId}:exit`);
+    };
+  }, [questId]);
 
   const returnAfterRound = useCallback(() => {
     if (fromTodayCare) router.dismissTo('/today');

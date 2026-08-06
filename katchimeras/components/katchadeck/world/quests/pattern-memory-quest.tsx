@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { Lantern } from '@/constants/theme';
+import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import {
   createPattern,
   patternComplete,
@@ -180,7 +181,7 @@ export function PatternMemoryQuest({
   const [playing, setPlaying] = useState(false);
   const attempt = useRef<string | null>(null);
   const startedAt = useRef(0);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const timers = useDisposableTimers('pattern-memory');
   const length = Math.min(config.maxLength, config.startLength + round);
   const pattern = useMemo(() => createPattern(`${seed}:${round}`, length), [length, round, seed]);
   const complete = round >= config.rounds;
@@ -188,28 +189,21 @@ export function PatternMemoryQuest({
   const padSize = Math.max(104, Math.min(136, (Math.min(width, 360) - 40) / 2, (height - 260) / 2));
 
   const play = useCallback(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
+    timers.cancelAll();
     setPlaying(true);
     pattern.forEach((pad, index) => {
-      timers.current.push(
-        setTimeout(() => {
+      timers.schedule(() => {
           setActive(pad);
           if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
-        }, index * config.playbackMs),
-      );
-      timers.current.push(
-        setTimeout(() => setActive(null), index * config.playbackMs + config.playbackMs * 0.62),
-      );
+        }, index * config.playbackMs);
+      timers.schedule(() => setActive(null), index * config.playbackMs + config.playbackMs * 0.62);
     });
-    timers.current.push(setTimeout(() => setPlaying(false), pattern.length * config.playbackMs));
-  }, [config.playbackMs, pattern]);
+    timers.schedule(() => setPlaying(false), pattern.length * config.playbackMs);
+  }, [config.playbackMs, pattern, timers]);
 
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
   useEffect(() => {
     if (!appActive) {
-      timers.current.forEach(clearTimeout);
-      timers.current = [];
+      timers.cancelAll();
       setPlaying(false);
       setActive(null);
       return;
@@ -238,17 +232,17 @@ export function PatternMemoryQuest({
     if (playing || complete) return;
     const next = [...input, pad];
     setActive(pad);
-    setTimeout(() => setActive(null), 160);
+    timers.schedule(() => setActive(null), 160);
     if (!patternMatches(pattern, next)) {
       setMistakes((value) => value + 1);
       setInput([]);
-      setTimeout(() => setRound((value) => value + 1), 420);
+      timers.schedule(() => setRound((value) => value + 1), 420);
       return;
     }
     if (patternComplete(pattern, next)) {
       setWon((value) => value + 1);
       setInput([]);
-      setTimeout(() => setRound((value) => value + 1), 420);
+      timers.schedule(() => setRound((value) => value + 1), 420);
     } else {
       setInput(next);
     }

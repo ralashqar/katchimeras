@@ -32,6 +32,7 @@ import type {
   JournalNoteClassification,
   JournalRouteProposal,
   TodayCareActionState,
+  TodayEnergyActionCompletion,
   TodayGrowthSource,
 } from '@/types/home';
 import { classifyScene, type SceneRead } from '@/utils/scene-classify';
@@ -101,7 +102,7 @@ import { withRefreshedPhotoLocationsForDay, withSeededPhotoLocationsByDay } from
 import { createEmptyStoredDay, readInputDay, writeInputDay } from './records';
 import { normalizeStoredHomeState } from './state-normalization';
 import { toLocalDateId } from './date';
-import { awardGrowth, setCareActionState } from '@/utils/today-growth';
+import { awardGrowth, completeEnergyAction, setCareActionState } from '@/utils/today-growth';
 
 export type SelectHeroPhotoInput = {
   assetId: string;
@@ -323,6 +324,23 @@ export function updateTodayCareAction(
   const base = readInputDay(state, target, profile, now);
   const nextDay = setCareActionState(base, { ...input, updatedAt: now.toISOString() });
   return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+}
+
+/**
+ * Commits the reward receipt and its care-row completion in one normalization
+ * and one repository write. Replaying the same receipt remains idempotent.
+ */
+export function completeTodayEnergyAction(
+  state: StoredHomeState,
+  input: TodayEnergyActionCompletion,
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today'
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  const completed = completeEnergyAction(base, input, now);
+  if (!completed.changed) return state;
+  return normalizeStoredHomeState(writeInputDay(state, target, completed.day), profile, now);
 }
 
 export function confirmPlaceForToday(

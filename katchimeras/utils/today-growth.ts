@@ -4,6 +4,7 @@ import type {
   TodayCareActionState,
   TodayGrowthEvent,
   TodayGrowthSource,
+  TodayEnergyActionCompletion,
 } from '@/types/home';
 
 export const TODAY_GROWTH_REWARDS: Readonly<Record<TodayGrowthSource, number>> = {
@@ -117,6 +118,32 @@ export function setCareActionState(
         next,
       ],
     },
+  };
+}
+
+export function completeEnergyAction(
+  day: StoredHomeDayRecord,
+  input: TodayEnergyActionCompletion,
+  completedAt = new Date(),
+): { day: StoredHomeDayRecord; awarded: boolean; changed: boolean } {
+  const awarded = awardGrowth(day, { ...input.growth, awardedAt: completedAt });
+  const previousCare = normalizeDayGrowthState(day.growth).careActions.find(
+    (item) => item.instanceId === input.careAction.instanceId
+  );
+  if (!awarded.awarded && previousCare?.status === 'completed') {
+    return { day, awarded: false, changed: false };
+  }
+  return {
+    day: setCareActionState(awarded.day, {
+      ...input.careAction,
+      status: 'completed',
+      completedAt: input.careAction.completedAt ?? completedAt.toISOString(),
+      dismissedAt: null,
+      deferredUntil: null,
+      updatedAt: completedAt.toISOString(),
+    }),
+    awarded: awarded.awarded,
+    changed: true,
   };
 }
 

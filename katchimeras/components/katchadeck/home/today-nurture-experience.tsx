@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
@@ -58,13 +58,12 @@ import {
   TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA,
   TODAY_KINGDOM_STAGE_HEIGHT,
 } from '@/utils/today-kingdom-hero-layout';
+import { useTodayEnergyFeedback } from '@/features/today/today-energy-feedback';
 
 type TodayNurtureExperienceProps = {
   actions: RankedTodayCareAction[];
   completionEvent: TodayCareCompletionEvent | null;
   day: HomeDayRecord;
-  energyFeedbackAmount: number;
-  energyFeedbackKey: number;
   feedbackKey: number;
   growth: TodayGrowthSummary;
   homeArchetypeId?: HomeArchetypeId | null;
@@ -104,14 +103,12 @@ type CheckInSelection = {
   label: string;
 };
 
-export function TodayNurtureExperience({
+export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   actions,
   bottomInset,
   completionEvent,
   day,
   eggTargetRef,
-  energyFeedbackAmount,
-  energyFeedbackKey,
   feedbackKey,
   growth,
   homeArchetypeId,
@@ -258,7 +255,7 @@ export function TodayNurtureExperience({
       </TodayEnvironmentViewportMotionLayer>
       <View pointerEvents="none" style={styles.environmentFade} />
       <View pointerEvents="none" style={[styles.meterAnchor, { top: stageTop - 8 }]}>
-        <GrowthMeter feedbackAmount={energyFeedbackAmount} feedbackKey={energyFeedbackKey} growth={growth} />
+        <GrowthMeter growth={growth} />
       </View>
       <Animated.View
         entering={reduceMotion ? FadeIn.duration(80) : FadeIn.duration(220)}
@@ -380,7 +377,7 @@ export function TodayNurtureExperience({
       </ScrollView>
     </View>
   );
-}
+});
 
 function FormingActionCluster({ onAdd, onCamera, onNote }: {
   onAdd: () => void;
@@ -1189,7 +1186,8 @@ function Reward({ amount }: { amount: number }) {
   );
 }
 
-function GrowthMeter({ feedbackAmount, feedbackKey, growth }: { feedbackAmount: number; feedbackKey: number; growth: TodayGrowthSummary }) {
+function GrowthMeter({ growth }: { growth: TodayGrowthSummary }) {
+  const feedback = useTodayEnergyFeedback();
   const [displayedEnergy, setDisplayedEnergy] = useState(growth.activeEnergy);
   const previousEnergyRef = useRef(growth.activeEnergy);
   const latestEnergyRef = useRef(growth.activeEnergy);
@@ -1200,8 +1198,9 @@ function GrowthMeter({ feedbackAmount, feedbackKey, growth }: { feedbackAmount: 
   const targetReachedRef = useRef(growth.activeEnergy >= growth.energyTarget);
   useEffect(() => {
     lastLandingAtRef.current = Date.now();
-    setDisplayedEnergy((current) => Math.min(growth.energyTarget, current + Math.max(0, feedbackAmount)));
-  }, [feedbackAmount, feedbackKey, growth.energyTarget]);
+    if (feedback.index < 0) return;
+    setDisplayedEnergy((current) => Math.min(growth.energyTarget, current + Math.max(0, feedback.amount)));
+  }, [feedback.amount, feedback.index, feedback.key, growth.energyTarget]);
   useEffect(() => {
     const previous = previousEnergyRef.current;
     previousEnergyRef.current = growth.activeEnergy;

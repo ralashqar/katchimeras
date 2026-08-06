@@ -5,6 +5,7 @@ import type { StoredHomeDayRecord } from '../types/home';
 import {
   activeGrowthEnergy,
   awardGrowth,
+  completeEnergyAction,
   growthStageForEnergy,
   TODAY_ENERGY_TARGET,
   todayGrowthSummary,
@@ -79,6 +80,28 @@ test('Growth awards are source-id idempotent', () => {
   assert.equal(first.awarded, true);
   assert.equal(second.awarded, false);
   assert.equal(activeGrowthEnergy(second.day), 15);
+});
+
+test('energy action completion updates reward and care state atomically and idempotently', () => {
+  const input = {
+    growth: { source: 'mini_game' as const, sourceId: 'attempt-1', actionId: 'game-1', amount: 10 },
+    careAction: {
+      instanceId: 'care:2026-08-05:game-1',
+      definitionId: 'game-1',
+      sourceId: 'attempt-1',
+      completedAt: '2026-08-05T12:00:00.000Z',
+      deferredUntil: null,
+      dismissedAt: null,
+    },
+  };
+  const first = completeEnergyAction(day(), input, new Date('2026-08-05T12:00:00.000Z'));
+  const second = completeEnergyAction(first.day, input, new Date('2026-08-05T12:01:00.000Z'));
+  assert.equal(first.awarded, true);
+  assert.equal(first.changed, true);
+  assert.equal(activeGrowthEnergy(first.day), 10);
+  assert.equal(first.day.growth?.careActions[0]?.status, 'completed');
+  assert.equal(second.changed, false);
+  assert.equal(second.day, first.day);
 });
 
 test('Egg art stages advance directly at Energy thresholds', () => {

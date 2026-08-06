@@ -1,4 +1,5 @@
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 export type BlockBlastSound = 'place' | 'clear' | 'combo' | 'game_over';
 export type BlockBlastSoundPlayers = Partial<Record<BlockBlastSound, AudioPlayer>>;
@@ -9,16 +10,27 @@ const TONES: Record<BlockBlastSound, string> = {
   combo: 'data:audio/wav;base64,UklGRhQBAABXQVZFZm10IBAAAAABAAEAoA8AAEAfAAACABAAZGF0YfAAAAAAALUVuR4lFiMB2Otc4t7pzv2iEoUcChYtA9ruo+Qi6u77sw8uGp0V4QS28Qfnt+pl+u0MvxfiFEAGY/R+6ZbrMflZCkEV4RNIB9z2AOy57FX4/ge+Ep8S+QcZ+YPuGO7O9+EFPhAkEVYIFPv+8Kzvm/cIBMsNeA9fCMr8Z/Nu8br3dgJuC6QNGQg2/rb1U/Mn+DEBLwmvC4YHVf/j91X13/g5ABYHowmsBiUA5vlp99v5kv8rBYgHjwWkALj7h/kW+zv/dANpBTcE0gBR/ab7ivw1//kBTQOpArAArf68/TD+f/++AD8B7QA+AMX/wf8=',
   game_over: 'data:audio/wav;base64,UklGRhQBAABXQVZFZm10IBAAAAABAAEAoA8AAEAfAAACABAAZGF0YfAAAAAAALIYlx0sC0zwNeK/6wQF5xkZGs8FVO3x473wRQkSGhwW4gBg63TmqPWrDEoZ1RGO/GrqkelP+igPrxd6DfH4ZOoV7Yb+uBBoFTwJIPY069DwKQJjEaISSAUn9LvskPQeBTkRiw/GAQTz0e4m+FQHVRBTDNb+r/JM8Wr7wwjWDicJjPwU8wD0OP5vCeQMMwb3+hj0v/Z2AGUJqAqcAxn6m/Ve+RECughNCH8B6/l197f7AgOJB/0F9P9f+n75p/1IA/YF4gMJ/1z7jPsU/+8CKAQeAsH+xPx2/ez/CAJGAtEAGP9z/hb/JgCvAHoADwA=',
 };
+const playerReleases = new WeakMap<AudioPlayer, () => void>();
 
 export function createBlockBlastSoundPlayers(): BlockBlastSoundPlayers {
   return {};
 }
 
 export function disposeBlockBlastSoundPlayers(players: BlockBlastSoundPlayers) {
-  Object.values(players).forEach((player) => player?.remove());
+  Object.values(players).forEach((player) => {
+    if (!player) return;
+    player.remove();
+    playerReleases.get(player)?.();
+    playerReleases.delete(player);
+  });
 }
 
 export function playBlockBlastSound(players: BlockBlastSoundPlayers, sound: BlockBlastSound) {
-  const player = players[sound] ?? (players[sound] = createAudioPlayer(TONES[sound]));
+  let player = players[sound];
+  if (!player) {
+    player = createAudioPlayer(TONES[sound]);
+    players[sound] = player;
+    playerReleases.set(player, acquireLifecycleResource('audio_player', `block-blast:${sound}`));
+  }
   void player.seekTo(0).then(() => player.play()).catch(() => undefined);
 }

@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { KatchimeraBackButton } from '@/components/katchadeck/ui/katchimera-back-button';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
+import { useDisposableTimers } from '@/hooks/use-disposable-timers';
 import {
   BLOCK_BLAST_PACK,
   BLOCK_BLAST_RULESET,
@@ -95,6 +96,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
   const nextClearHapticAt = useRef(0);
   const streakTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const players = useMemo(createBlockBlastSoundPlayers, []);
+  const commitTimers = useDisposableTimers('block-blast-commit');
   const reduceMotion = useReducedMotion();
   const { width, height } = useWindowDimensions();
   const boardSize = Math.max(248, Math.min(width - 34, 390, height - 315));
@@ -232,7 +234,7 @@ export function BlockBlastQuest({ config, seed, onAttemptStart, onAttemptCancel,
     gameRef.current = next;
     setSelectedPieceId(null);
     setHover(null);
-    setTimeout(() => {
+    commitTimers.schedule(() => {
       let nextProfile = saveBlockBlastActiveRun(profileRef.current, next);
       if (cleared > 0) {
         const combo = next.combo > 1;

@@ -3,6 +3,8 @@ import {
   clearStoredHomeState,
   loadStoredHomeState,
   loadStoredHomeStateRaw,
+  loadStoredHomeArchivePage,
+  flushStoredHomeStateWrites,
   saveStoredHomeState,
   saveStoredHomeStateDeferred,
   subscribeHomeStateChanges,
@@ -16,6 +18,8 @@ export type HomeRepository = {
   saveDeferred: (state: StoredHomeState, options?: HomeSaveOptions) => Promise<void>;
   clear: () => void;
   subscribe: (listener: () => void) => () => void;
+  loadArchivePage: (offset: number, limit: number) => StoredHomeState['archivedDays'];
+  flush: () => Promise<void>;
 };
 
 export const homeRepository: HomeRepository = {
@@ -25,4 +29,6 @@ export const homeRepository: HomeRepository = {
   saveDeferred: saveStoredHomeStateDeferred,
   clear: clearStoredHomeState,
   subscribe: subscribeHomeStateChanges,
+  loadArchivePage: loadStoredHomeArchivePage,
+  flush: flushStoredHomeStateWrites,
 };

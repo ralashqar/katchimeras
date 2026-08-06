@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AppFontFamilies, Lantern } from '@/constants/theme';
 import type { QuestResult } from '@/utils/quests/experiences/types';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 import { QuestExperiencePreview } from './quest-experience-ui';
 
 type Config = { challengeId: 'step_sprint' | 'step_time_trial'; target: number; durationMs: number | null; tier: number };
@@ -29,6 +30,8 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
   const attemptId = useRef<string | null>(null);
   const startedAt = useRef(0);
   const watch = useRef<{ remove: () => void } | null>(null);
+  const watchRelease = useRef<(() => void) | null>(null);
+  const mounted = useRef(true);
   const restartWatchAtGo = useRef<(() => void) | null>(null);
   const interval = useRef<ReturnType<typeof setInterval> | null>(null);
   const displayInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -44,6 +47,8 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
   const cleanup = useCallback(() => {
     watch.current?.remove();
     watch.current = null;
+    watchRelease.current?.();
+    watchRelease.current = null;
     restartWatchAtGo.current = null;
     if (interval.current) clearInterval(interval.current);
     interval.current = null;
@@ -90,7 +95,13 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
     return () => subscription.remove();
   }, [cancel, phase]);
 
-  useEffect(() => cleanup, [cleanup]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      cleanup();
+    };
+  }, [cleanup]);
 
   const succeed = useCallback((finalSteps: number, finalElapsed: number) => {
     if (finished.current || !attemptId.current) return;
@@ -148,13 +159,17 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
     displayTarget.current = 0;
     try {
       const { Pedometer } = await import('expo-sensors');
+      if (!mounted.current) return;
       if (!(await Pedometer.isAvailableAsync())) {
+        if (!mounted.current) return;
         setMessage('Live step tracking is not available on this device.');
         setPhase('cancelled');
         return;
       }
       let permission = await Pedometer.getPermissionsAsync();
+      if (!mounted.current) return;
       if (!permission.granted && permission.canAskAgain !== false) permission = await Pedometer.requestPermissionsAsync();
+      if (!mounted.current) return;
       if (!permission.granted) {
         setMessage('Allow Motion & Fitness access to play this quest.');
         setPhase('cancelled');
@@ -172,10 +187,21 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
         animateDisplayedSteps(next);
         if (next >= config.target) succeed(next, elapsed);
       };
-      const beginWatching = () => Pedometer.watchStepCount(handleReading);
+      const beginWatching = () => {
+        const nextWatch = Pedometer.watchStepCount(handleReading);
+        if (!mounted.current) {
+          nextWatch.remove();
+          return null;
+        }
+        watchRelease.current?.();
+        watchRelease.current = acquireLifecycleResource('pedometer_watcher', 'live-step-game');
+        return nextWatch;
+      };
       watch.current = beginWatching();
       restartWatchAtGo.current = () => {
         watch.current?.remove();
+        watchRelease.current?.();
+        watchRelease.current = null;
         rawSteps.current = 0;
         baselineSteps.current = 0;
         watch.current = beginWatching();
@@ -191,6 +217,7 @@ export function LiveStepQuest({ config, onAttemptStart, onAttemptCancel, onCompl
       }, PEDOMETER_WARMUP_MS + (index + 1) * 1000)));
       preparationTimers.current.push(setTimeout(startClock, PEDOMETER_WARMUP_MS + 3000));
     } catch {
+      if (!mounted.current) return;
       cleanup();
       attemptActive.current = false;
       onRunningChange(false);

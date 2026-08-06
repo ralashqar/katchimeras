@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import type { EggFeed } from '@/components/katchadeck/home/egg-feed-overlay';
 import type { FeedSourceRect } from '@/components/katchadeck/home/day-prompt-strip';
 import { Lantern } from '@/constants/theme';
+import { publishTodayEnergyFeedback } from '@/features/today/today-energy-feedback';
 
 type EggFeedPayload = {
   currencyFrom?: FeedSourceRect;
@@ -26,8 +27,6 @@ type EggFeedRequest = {
 export function useEggFeedController() {
   const [eggFeed, setEggFeed] = useState<EggFeed | null>(null);
   const [eggFeedKey, setEggFeedKey] = useState(0);
-  const [eggFeedRewardKey, setEggFeedRewardKey] = useState(0);
-  const [eggFeedRewardAmount, setEggFeedRewardAmount] = useState(0);
   const [eggFeedRewardRequestKey, setEggFeedRewardRequestKey] = useState(0);
   const eggTargetRef = useRef<View | null>(null);
   const heroStageRef = useRef<View | null>(null);
@@ -140,9 +139,10 @@ export function useEggFeedController() {
   }, [clearFeed, launchFeedRequest]);
 
   const handleEnergyTokenArrive = useCallback((amount: number, index: number, count: number) => {
-    setEggFeedRewardAmount(amount);
-    setEggFeedRewardKey((key) => key + 1);
-    pulseEgg();
+    publishTodayEnergyFeedback(amount, index, count);
+    // Token-by-token meter updates are isolated in its own external store. The
+    // large Today route only rerenders once, when the final token wakes the egg.
+    if (index === count - 1) pulseEgg();
     if (process.env.EXPO_OS === 'ios') {
       if (index === count - 1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       else void Haptics.selectionAsync();
@@ -152,8 +152,6 @@ export function useEggFeedController() {
   return {
     eggFeed,
     eggFeedKey,
-    eggFeedRewardKey,
-    eggFeedRewardAmount,
     eggFeedRewardRequestKey,
     eggTargetRef,
     heroStageRef,

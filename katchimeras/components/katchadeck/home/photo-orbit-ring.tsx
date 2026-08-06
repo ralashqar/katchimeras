@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -71,6 +72,10 @@ function PhotoOrbitNode({
       -1,
       true
     );
+    return () => {
+      cancelAnimation(progress);
+      cancelAnimation(bob);
+    };
   }, [bob, index, progress]);
 
   const animatedStyle = useAnimatedStyle(() => ({

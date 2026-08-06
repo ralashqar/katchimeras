@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -33,6 +34,7 @@ export function AddMomentOrbit({ actions, radius = 126, onSelectAction }: AddMom
       -1,
       true
     );
+    return () => cancelAnimation(ringRotation);
   }, [ringRotation]);
 
   const ringStyle = useAnimatedStyle(() => ({
@@ -86,6 +88,10 @@ function OrbitActionNode({
       -1,
       true
     );
+    return () => {
+      cancelAnimation(progress);
+      cancelAnimation(bob);
+    };
   }, [bob, index, progress]);
 
   const animatedStyle = useAnimatedStyle(() => ({

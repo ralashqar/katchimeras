@@ -49,6 +49,16 @@ export async function setStoredJsonAsync<T>(key: string, value: T) {
   await Storage.setItemAsync(key, JSON.stringify(value));
 }
 
+export function setStoredRaw(key: string, value: string) {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(key, value);
+}
+
+export async function setStoredRawAsync(key: string, value: string) {
+  await Storage.setItemAsync(key, value);
+}
+
 export function removeStoredValue(key: string) {
   const storage = getStorage();
 

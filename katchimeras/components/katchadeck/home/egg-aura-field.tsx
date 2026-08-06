@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -116,6 +117,7 @@ export function EggAuraField({
       -1,
       false
     );
+    return () => cancelAnimation(idlePulse);
   }, [idlePulse]);
 
   useEffect(() => {

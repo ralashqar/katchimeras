@@ -36,7 +36,7 @@ export function useHomeStateMutation(
       if (storedStateRef) storedStateRef.current = next;
       if (scheduledStateRef) scheduledStateRef.current = next;
       setStoredState(next);
-      void homeRepository.saveDeferred(next, { notify: false });
+      void homeRepository.saveDeferred(next, { notify: false, preserveArchive: true });
       const completedAt = performance.now();
       if (__DEV__ && completedAt - startedAt > 80) {
         console.warn(

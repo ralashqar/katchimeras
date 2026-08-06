@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import type { LocationPermissionState } from '@/types/home';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 type UseDayLocationCaptureOptions = {
   enabled: boolean;
@@ -41,6 +42,7 @@ export function useDayLocationCapture({
 
     let active = true;
     let subscription: { remove: () => void } | null = null;
+    let releaseResource: (() => void) | null = null;
 
     async function startWatching() {
       const Location = await import('expo-location');
@@ -86,7 +88,7 @@ export function useDayLocationCapture({
         return;
       }
 
-      subscription = await Location.watchPositionAsync(
+      const nextSubscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.Balanced,
           distanceInterval: 120,
@@ -106,6 +108,12 @@ export function useDayLocationCapture({
           });
         }
       );
+      if (!active) {
+        nextSubscription.remove();
+        return;
+      }
+      subscription = nextSubscription;
+      releaseResource = acquireLifecycleResource('location_watcher', 'day-capture');
     }
 
     startWatching();
@@ -113,6 +121,7 @@ export function useDayLocationCapture({
     return () => {
       active = false;
       subscription?.remove();
+      releaseResource?.();
     };
   }, [appActive, enabled, isFocused, onPermissionResolved, onSample, permissionState, requireFocus]);
 }

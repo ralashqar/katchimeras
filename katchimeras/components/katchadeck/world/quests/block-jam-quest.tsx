@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { Easing, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, type SharedValue, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import {
@@ -438,6 +438,7 @@ function ExitRail({ door, cell, pitch, outer, boardWidth, boardHeight, active, e
     } else {
       energy.value = withTiming(active ? .72 : .16, { duration: reduceMotion ? 30 : 150, easing: Easing.out(Easing.cubic) });
     }
+    return () => cancelAnimation(energy);
   }, [active, energy, exiting, reduceMotion]);
   const coreAnimated = useAnimatedStyle(() => ({ opacity: .48 + energy.value * .52, transform: [{ scale: 1 + energy.value * .035 }] }));
   const auraAnimated = useAnimatedStyle(() => ({ opacity: energy.value * .72, transform: [{ scale: .94 + energy.value * .12 }] }));

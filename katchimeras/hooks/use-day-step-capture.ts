@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 
 import type { ActivityPermissionState } from '@/types/home';
 import { toLocalDateId } from '@/game/days/date';
+import { acquireLifecycleResource } from '@/utils/lifecycle-performance';
 
 export type DayStepCountReading = {
   stepsCount: number;
@@ -41,6 +42,7 @@ export function useDayStepCapture({
   }, []);
 
   useEffect(() => {
+    if (!enabled || !appActive || (requireFocus && !isFocused)) return;
     const interval = setInterval(() => {
       setLocalDayId((current) => {
         const next = toLocalDateId(new Date());
@@ -49,7 +51,7 @@ export function useDayStepCapture({
     }, 60_000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [appActive, enabled, isFocused, requireFocus]);
 
   useEffect(() => {
     if (process.env.EXPO_OS === 'web' || !enabled || !appActive || (requireFocus && !isFocused)) {
@@ -58,6 +60,7 @@ export function useDayStepCapture({
 
     let active = true;
     let watchSubscription: { remove: () => void } | null = null;
+    let releaseResource: (() => void) | null = null;
     let baselineSteps = 0;
 
     function getStartOfDay() {
@@ -133,6 +136,7 @@ export function useDayStepCapture({
 
         emitStepCount(baselineSteps + (result.steps ?? 0));
       });
+      releaseResource = acquireLifecycleResource('pedometer_watcher', 'day-capture');
     }
 
     void startWatching();
@@ -140,6 +144,7 @@ export function useDayStepCapture({
     return () => {
       active = false;
       watchSubscription?.remove();
+      releaseResource?.();
     };
   }, [appActive, enabled, isFocused, localDayId, onPermissionResolved, onStepCount, permissionState, requireFocus]);
 }

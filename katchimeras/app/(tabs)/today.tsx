@@ -62,7 +62,6 @@ import { TodayCategoryRing, type TodayCategoryRingItem } from '@/components/katc
 import { TodayBottomDock } from '@/components/katchadeck/home/today-bottom-dock';
 import {
   TodayNurtureExperience,
-  type TodayCareCompletionEvent,
 } from '@/components/katchadeck/home/today-nurture-experience';
 import {
   QuickGoalsSheet,
@@ -104,6 +103,9 @@ import { useTodayShareComicController } from '@/features/today/use-today-share-c
 import { useTodayCategoryModel } from '@/features/today/use-today-category-model';
 import { useTodayNavigationController } from '@/features/today/use-today-navigation-controller';
 import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-reveal-controller';
+import { useTodayEnergyLoop } from '@/features/today/use-today-energy-loop';
+import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
+import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
@@ -193,7 +195,13 @@ const QUICK_PROMPT_CATEGORIES: {
   { id: 'sleep', title: 'Sleep', icon: 'bed.double.fill', accent: '#AAB2FF', section: 'more' },
 ];
 
-export default function HomeScreen() {
+export default function TodayRouteScreen() {
+  const screenFocused = useIsFocused();
+  if (!screenFocused) return <View style={styles.inactiveScreen} />;
+  return <HomeScreen />;
+}
+
+function HomeScreen() {
   const router = useRouter();
   const screenFocused = useIsFocused();
   const [growthNow, setGrowthNow] = useState(() => new Date());
@@ -212,22 +220,26 @@ export default function HomeScreen() {
   const [quickGoalsOpen, setQuickGoalsOpen] = useState(false);
   const [quickGoalSheetMode, setQuickGoalSheetMode] = useState<'add' | 'manage' | null>(null);
   const [selectedCareGoalId, setSelectedCareGoalId] = useState<string | null>(null);
-  const [pendingCareIntent, setPendingCareIntent] = useState<RankedTodayCareAction | null>(null);
-  const [queuedCareCompletion, setQueuedCareCompletion] = useState<TodayCareCompletionEvent | null>(null);
   const selectedCareGoalCompletionRef = useRef<(() => void) | null>(null);
   const [todayPhotoLibrarySheet, setTodayPhotoLibrarySheet] = useState<TodayPhotoLibrarySheetContent | null>(null);
-  const careFlowWasBusyRef = useRef(false);
-  const careRewardRequestKeyAtStartRef = useRef(0);
   const incubationActivatedRef = useRef<boolean | null>(null);
-  const careCompletionSequenceRef = useRef(0);
-  const queueCareCompletion = useCallback((action: RankedTodayCareAction, rewardAlreadyAnimated: boolean) => {
-    careCompletionSequenceRef.current += 1;
-    setQueuedCareCompletion({
-      action,
-      id: `${action.instanceId}:${careCompletionSequenceRef.current}`,
-      rewardAlreadyAnimated,
-    });
-  }, []);
+  const {
+    clearIntent: clearCareIntent,
+    completionEvent: queuedCareCompletion,
+    finishCompletion: finishCareCompletion,
+    flowWasBusyRef: careFlowWasBusyRef,
+    markDestinationOpen: markCareDestinationOpen,
+    markDomainCommit: markCareDomainCommit,
+    markRewardLaunch: markCareRewardLaunch,
+    markTokenArrival: markCareTokenArrival,
+    noteFlowBusy: noteCareFlowBusy,
+    pendingIntent: pendingCareIntent,
+    queueCompletion: queueCareCompletion,
+    rewardAlreadyAnimated: careRewardAlreadyAnimated,
+    startIntent: startCareIntent,
+    status: energyLoopStatus,
+  } = useTodayEnergyLoop();
+  useTodayEnergyFrameProbe(energyLoopStatus === 'rewarding' || energyLoopStatus === 'settling');
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
     completion: CompanionQuickGoalCompletion;
     goal: CompanionQuickGoal;
@@ -287,6 +299,7 @@ export default function HomeScreen() {
     locationPermission,
     setLocationPermission,
     awardGrowth: awardTodayGrowth,
+    completeEnergyAction,
     updateCareAction,
   } = useHomeScreenState();
   const {
@@ -385,8 +398,6 @@ export default function HomeScreen() {
   const {
     eggFeed,
     eggFeedKey,
-    eggFeedRewardAmount,
-    eggFeedRewardKey,
     eggFeedRewardRequestKey,
     eggTargetRef,
     heroStageRef,
@@ -404,6 +415,7 @@ export default function HomeScreen() {
     action: RankedTodayCareAction,
     onArrive: () => void,
   ) => {
+    markCareRewardLaunch();
     startEggFeed(from, {
       currencyFrom: from,
       energyAmount: action.growthReward,
@@ -411,7 +423,11 @@ export default function HomeScreen() {
       imageSource: GROWTH_ENERGY_ART,
       tint: Lantern.ember300,
     }, onArrive);
-  }, [startEggFeed]);
+  }, [markCareRewardLaunch, startEggFeed]);
+  const handleEnergyArrival = useCallback((amount: number, index: number, count: number) => {
+    markCareTokenArrival(index, count);
+    handleEnergyTokenArrive(amount, index, count);
+  }, [handleEnergyTokenArrive, markCareTokenArrival]);
   const { promptSheetOpen, initialPrompt, openPromptSheet, closePromptSheet } = usePromptSheetController();
 
   useFocusEffect(
@@ -975,15 +991,15 @@ export default function HomeScreen() {
       completedAt: null,
       dismissedAt: timestamp,
     }, formingTarget);
-    setPendingCareIntent((current) => current?.instanceId === action.instanceId ? null : current);
+    if (pendingCareIntent?.instanceId === action.instanceId) clearCareIntent('not_today');
     setMicrocopy('Set aside for today');
-  }, [formingTarget, quickGoals, setMicrocopy, updateCareAction]);
+  }, [clearCareIntent, formingTarget, pendingCareIntent, quickGoals, setMicrocopy, updateCareAction]);
   const handleCareStart = useCallback((action: RankedTodayCareAction, rewardFrom: Parameters<typeof startEggFeed>[0]) => {
     if (action.completionMode === 'artifact' || action.completionMode === 'external_activity') {
-      careRewardRequestKeyAtStartRef.current = eggFeedRewardRequestKey;
-      setPendingCareIntent(action);
+      startCareIntent(action, eggFeedRewardRequestKey);
       setNextEnergyCurrencySource(rewardFrom);
     }
+    markCareDestinationOpen();
     switch (action.destination.kind) {
       case 'quick_goal':
         setSelectedCareGoalId(action.destination.goalId);
@@ -1004,13 +1020,13 @@ export default function HomeScreen() {
         return;
       case 'photo_roll': {
         if (!photoPrompt) {
-          setPendingCareIntent(null);
+          clearCareIntent('photo_prompt_unavailable');
           return;
         }
         const eligibleIds = new Set(action.destination.assetIds);
         const candidates = photoPrompt.photoCandidates.filter((candidate) => eligibleIds.has(candidate.assetId));
         if (!candidates.length) {
-          setPendingCareIntent(null);
+          clearCareIntent('photo_candidates_unavailable');
           return;
         }
         setTodayPhotoLibrarySheet({
@@ -1030,7 +1046,42 @@ export default function HomeScreen() {
       case 'inline_sleep':
         return;
     }
-  }, [eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource]);
+  }, [clearCareIntent, eggFeedRewardRequestKey, formingPrompts, handleQuest, handleQuickCategory, markCareDestinationOpen, openManualJournal, openPromptSheet, photoPrompt, router, setNextEnergyCurrencySource, startCareIntent]);
+  const handleNurtureMood = useCallback((
+    choiceId: Parameters<typeof handleConfirmMood>[0],
+    label: string,
+    from: Parameters<typeof startEggFeed>[0],
+    imageSource: number,
+    accent: string,
+    currencyFrom: Parameters<typeof startEggFeed>[0],
+  ) => {
+    const action = nurtureCare.active.find((candidate) => candidate.id === 'mood');
+    if (action) startCareIntent(action, eggFeedRewardRequestKey);
+    handleConfirmMood(choiceId, label, from, imageSource, accent, currencyFrom);
+  }, [eggFeedRewardRequestKey, handleConfirmMood, nurtureCare.active, startCareIntent]);
+  const handleNurtureSleep = useCallback((
+    quality: Parameters<typeof handleSetSleep>[0],
+    label: string,
+    from: Parameters<typeof startEggFeed>[0],
+    imageSource: number,
+    accent: string,
+    currencyFrom: Parameters<typeof startEggFeed>[0],
+  ) => {
+    const action = nurtureCare.active.find((candidate) => candidate.id === 'sleep');
+    if (action) startCareIntent(action, eggFeedRewardRequestKey);
+    handleSetSleep(quality, label, from, imageSource, accent, currencyFrom);
+  }, [eggFeedRewardRequestKey, handleSetSleep, nurtureCare.active, startCareIntent]);
+  const handleNurtureAddJournal = useCallback(() => openManualJournal(), [openManualJournal]);
+  const handleNurtureAddTextNote = useCallback(() => openQuickNoteOverlay('text'), [openQuickNoteOverlay]);
+  const handleNurtureCompleteGoal = useCallback((goalId: string) => {
+    const receipt = quickGoals.completeGoal(goalId);
+    if (receipt.newlyCompleted) setMicrocopy('+8 Growth Energy');
+    return receipt;
+  }, [quickGoals, setMicrocopy]);
+  const handleNurtureOpenGoal = useCallback((goalId: string, completeFromOrigin: () => void) => {
+    selectedCareGoalCompletionRef.current = completeFromOrigin;
+    setSelectedCareGoalId(goalId);
+  }, []);
 
   useFocusEffect(useCallback(() => {
     const completion = consumeTodayCareGameRoundCompletion();
@@ -1038,23 +1089,25 @@ export default function HomeScreen() {
     if (!formingDay) return;
     if (!completion.action.instanceId.startsWith(`care:${formingDay.isoDate}:`)) return;
     const completedAt = new Date(completion.completedAt).toISOString();
-    setPendingCareIntent(completion.action);
-    awardTodayGrowth({
-      actionId: completion.action.id,
-      source: 'mini_game',
-      sourceId: completion.attemptId,
+    if (!pendingCareIntent) startCareIntent(completion.action, eggFeedRewardRequestKey);
+    completeEnergyAction({
+      growth: {
+        actionId: completion.action.id,
+        source: 'mini_game',
+        sourceId: completion.attemptId,
+      },
+      careAction: {
+        instanceId: completion.action.instanceId,
+        definitionId: completion.action.id,
+        sourceId: completion.attemptId,
+        deferredUntil: null,
+        completedAt,
+        dismissedAt: null,
+      },
     }, formingTarget);
-    updateCareAction({
-      instanceId: completion.action.instanceId,
-      definitionId: completion.action.id,
-      sourceId: completion.attemptId,
-      status: 'completed',
-      deferredUntil: null,
-      completedAt,
-      dismissedAt: null,
-    }, formingTarget);
+    markCareDomainCommit();
     setMicrocopy(`+${completion.action.growthReward} Growth Energy`);
-  }, [awardTodayGrowth, formingDay, formingTarget, setMicrocopy, updateCareAction]));
+  }, [completeEnergyAction, eggFeedRewardRequestKey, formingDay, formingTarget, markCareDomainCommit, pendingCareIntent, setMicrocopy, startCareIntent]));
 
   useFocusEffect(
     useCallback(() => {
@@ -1257,40 +1310,45 @@ export default function HomeScreen() {
     if (!completed) return;
     if (completedPhotoAssetId) {
       const completedAt = new Date().toISOString();
-      updateCareAction({
-        instanceId: pendingCareIntent.instanceId,
-        definitionId: pendingCareIntent.id,
-        sourceId: completedPhotoAssetId,
-        status: 'completed',
-        deferredUntil: null,
-        completedAt,
-        dismissedAt: null,
+      completeEnergyAction({
+        growth: {
+          actionId: pendingCareIntent.id,
+          source: pendingCareIntent.growthSource,
+          sourceId: completedPhotoAssetId,
+          amount: pendingCareIntent.growthReward,
+        },
+        careAction: {
+          instanceId: pendingCareIntent.instanceId,
+          definitionId: pendingCareIntent.id,
+          sourceId: completedPhotoAssetId,
+          deferredUntil: null,
+          completedAt,
+          dismissedAt: null,
+        },
       }, formingTarget);
     }
+    markCareDomainCommit();
     queueCareCompletion(
       pendingCareIntent,
-      eggFeedRewardRequestKey !== careRewardRequestKeyAtStartRef.current,
+      careRewardAlreadyAnimated(eggFeedRewardRequestKey),
     );
-    setPendingCareIntent(null);
-    careFlowWasBusyRef.current = false;
-  }, [eggFeedRewardRequestKey, formingDay, formingTarget, nurtureCare.completed, pendingCareIntent, queueCareCompletion, updateCareAction]);
+  }, [careRewardAlreadyAnimated, completeEnergyAction, eggFeedRewardRequestKey, formingDay, formingTarget, markCareDomainCommit, nurtureCare.completed, pendingCareIntent, queueCareCompletion]);
   useEffect(() => {
     if (!pendingCareIntent) {
-      careFlowWasBusyRef.current = false;
       return;
     }
     if (flowBusy) {
-      careFlowWasBusyRef.current = true;
+      noteCareFlowBusy(true);
       return;
     }
     if (!careFlowWasBusyRef.current) return;
     const timer = setTimeout(() => {
       const completed = nurtureCare.completed.some((action) => action.instanceId === pendingCareIntent.instanceId);
-      if (!completed) setPendingCareIntent(null);
+      if (!completed) clearCareIntent('flow_closed_without_completion');
       careFlowWasBusyRef.current = false;
     }, 240);
     return () => clearTimeout(timer);
-  }, [flowBusy, nurtureCare.completed, pendingCareIntent]);
+  }, [careFlowWasBusyRef, clearCareIntent, flowBusy, noteCareFlowBusy, nurtureCare.completed, pendingCareIntent]);
   const explorationMotion = useTodayExplorationBackgroundMotion({
     activeKey: selectedDayId,
     canSwipeNext: explorationTransitionPages.next != null,
@@ -1653,52 +1711,26 @@ export default function HomeScreen() {
       </ScrollView>
 
       {isForming && formingDay && nurtureGrowth && !isHatching ? (
-        <TodayNurtureExperience
+        <TodayEnergyProfiler>
+          <TodayNurtureExperience
           actions={nurtureCare.active}
           bottomInset={insets.bottom}
           completionEvent={flowBusy ? null : queuedCareCompletion}
           day={formingDay}
           eggTargetRef={eggTargetRef}
-          energyFeedbackKey={eggFeedRewardKey}
-          energyFeedbackAmount={eggFeedRewardAmount}
           feedbackKey={eggFeedKey}
           growth={nurtureGrowth}
           homeArchetypeId={homeArchetypeId}
-          onAddJournal={() => openManualJournal()}
-          onAddTextNote={() => openQuickNoteOverlay('text')}
+          onAddJournal={handleNurtureAddJournal}
+          onAddTextNote={handleNurtureAddTextNote}
           onAddPhoto={openMomentCapture}
           onCareNotToday={handleCareNotToday}
           onCareStart={handleCareStart}
-          onCompleteQuickGoal={(goalId) => {
-            const receipt = quickGoals.completeGoal(goalId);
-            if (receipt.newlyCompleted) {
-              setMicrocopy('+8 Growth Energy');
-            }
-            return receipt;
-          }}
-          onCompletionAnimationEnd={(eventId) => {
-            setQueuedCareCompletion((current) => current?.id === eventId ? null : current);
-          }}
-          onOpenQuickGoal={(goalId, completeFromOrigin) => {
-            selectedCareGoalCompletionRef.current = completeFromOrigin;
-            setSelectedCareGoalId(goalId);
-          }}
-          onChooseMood={(choiceId, label, from, imageSource, accent, currencyFrom) => {
-            const action = nurtureCare.active.find((candidate) => candidate.id === 'mood');
-            if (action) {
-              careRewardRequestKeyAtStartRef.current = eggFeedRewardRequestKey;
-              setPendingCareIntent(action);
-            }
-            handleConfirmMood(choiceId, label, from, imageSource, accent, currencyFrom);
-          }}
-          onChooseSleep={(quality, label, from, imageSource, accent, currencyFrom) => {
-            const action = nurtureCare.active.find((candidate) => candidate.id === 'sleep');
-            if (action) {
-              careRewardRequestKeyAtStartRef.current = eggFeedRewardRequestKey;
-              setPendingCareIntent(action);
-            }
-            handleSetSleep(quality, label, from, imageSource, accent, currencyFrom);
-          }}
+          onCompleteQuickGoal={handleNurtureCompleteGoal}
+          onCompletionAnimationEnd={finishCareCompletion}
+          onOpenQuickGoal={handleNurtureOpenGoal}
+          onChooseMood={handleNurtureMood}
+          onChooseSleep={handleNurtureSleep}
           onReveal={handleRevealPress}
           onRewardFlight={handleCareRewardFlight}
           onSelectDay={navigateToDay}
@@ -1706,7 +1738,8 @@ export default function HomeScreen() {
           sceneTranslateX={explorationMotion.translateX}
           timelineDays={timelineDays}
           topInset={insets.top}
-        />
+          />
+        </TodayEnergyProfiler>
       ) : null}
 
       {/* Bottom dock — the +/camera/mic row (or hatch CTA) with the category/
@@ -1796,7 +1829,7 @@ export default function HomeScreen() {
       <EggFeedOverlay
         feed={eggFeed}
         onArrive={handleEggFeedArrive}
-        onEnergyTokenArrive={handleEnergyTokenArrive}
+        onEnergyTokenArrive={handleEnergyArrival}
       />
 
       {/* Cinematic egg and Katchimera scenes bypass TodayHexNeighborhood, whose
@@ -1904,8 +1937,6 @@ export default function HomeScreen() {
             const deferRewardToCareRow = completingCareAction != null;
             if (completingCareAction) {
               queueCareCompletion(completingCareAction, false);
-              setPendingCareIntent(null);
-              careFlowWasBusyRef.current = false;
             }
             addManualJournalEntry(submission, formingTarget);
             closeManualJournal();
@@ -2156,6 +2187,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  inactiveScreen: { backgroundColor: '#11131B', flex: 1 },
   screen: {
     backgroundColor: Lantern.ink950,
     flex: 1,
