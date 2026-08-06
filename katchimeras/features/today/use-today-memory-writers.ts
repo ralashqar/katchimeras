@@ -33,7 +33,7 @@ type UseTodayMemoryWritersParams = {
   setMoodSheetOpen: (open: boolean) => void;
   setSleepSheetOpen: (open: boolean) => void;
   setStepsSheetOpen: (open: boolean) => void;
-  startEggFeed: (from: FeedSourceRect, payload: { currencyFrom?: FeedSourceRect; energyAmount?: number; imageSource?: number; label?: string; photoUri?: string; tint?: string }, commit: () => void) => void;
+  startEggFeed: (from: FeedSourceRect, payload: { currencyFrom?: FeedSourceRect; energyAmount?: number; framelessImage?: boolean; imageSource?: number; label?: string; photoUri?: string; tint?: string }, commit: () => void) => void;
   pulseEgg: () => void;
   setMicrocopy: (message: string | null) => void;
 };
@@ -91,7 +91,7 @@ export function useTodayMemoryWriters({
   const handleConfirmMood = useCallback(
     (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource?: number, tint?: string, currencyFrom?: FeedSourceRect) => {
       setMoodSheetOpen(false);
-      startEggFeed(from, { currencyFrom, energyAmount: TODAY_GROWTH_REWARDS.mood, imageSource, label, tint }, () => {
+      startEggFeed(from, { currencyFrom, energyAmount: TODAY_GROWTH_REWARDS.mood, framelessImage: true, imageSource, label, tint }, () => {
         answerDayPrompt({ kind: 'feeling', choiceIds: [choiceId] }, formingTarget);
         setMicrocopy(`Mood noted: ${label}`);
       });
@@ -102,7 +102,7 @@ export function useTodayMemoryWriters({
   const handleSetSleep = useCallback(
     (quality: SleepInput['quality'], label: string, from: FeedSourceRect, imageSource?: number, tint?: string, currencyFrom?: FeedSourceRect) => {
       setSleepSheetOpen(false);
-      startEggFeed(from, { currencyFrom, energyAmount: TODAY_GROWTH_REWARDS.sleep, imageSource, label, tint }, () => {
+      startEggFeed(from, { currencyFrom, energyAmount: TODAY_GROWTH_REWARDS.sleep, framelessImage: true, imageSource, label, tint }, () => {
         setSleep({ quality, source: 'manual' }, formingTarget);
         setMicrocopy('Your morning, remembered');
       });

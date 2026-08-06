@@ -1,38 +1,84 @@
 import * as Haptics from 'expo-haptics';
-import { useEffect, useMemo } from 'react';
-import { Pressable, Share, StyleSheet, View } from 'react-native';
+import {
+  Canvas,
+  Circle,
+  RadialGradient as SkiaRadialGradient,
+  vec,
+} from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useState } from 'react';
+import { Modal, Pressable, ScrollView, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  cancelAnimation,
   Easing,
   FadeIn,
+  FadeInUp,
   FadeOut,
-  ZoomIn,
+  FadeOutUp,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
+import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { companionAchievementIconSource } from '@/constants/achievement-icon-sources';
 import { katchimeraFamilyById } from '@/constants/katchimera-skins';
 import { KatchaUI } from '@/constants/katcha-ui';
+import { TODAY_ATMOSPHERE_BACKGROUND_SOURCES } from '@/constants/today-atmosphere-background-sources.gen';
+import { getCreatureVisual } from '@/game/days';
 import type { CompanionAchievementDef } from '@/types/companion-achievements';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ThemedText } from '@/components/themed-text';
-import { companionAchievementIconSource } from '@/constants/achievement-icon-sources';
+import { orderAchievementCelebrationQueue } from '@/utils/achievement-celebration';
 
 const TIER_TINT = ['#A87045', '#8295A6', '#B9872F', '#75609B', '#9B6A32'] as const;
+const TRANSITION_OUT_MS = 180;
+const SPLASH_GOLD = '#F6C653';
+const SPLASH_GOLD_DEEP = '#75450A';
+const SPLASH_INK = '#173D57';
+const ACHIEVEMENT_RAY_COUNT = 18;
+const ACHIEVEMENT_RAY_INDICES = Array.from(
+  { length: ACHIEVEMENT_RAY_COUNT },
+  (_, index) => index,
+);
+
+type Props = {
+  achievements: readonly CompanionAchievementDef[];
+  onAchievementSeen: (id: string) => void;
+  onComplete?: () => void;
+  preview?: boolean;
+};
 
 export function CompanionAchievementCelebration({
   achievements,
-  onDismiss,
-}: {
-  achievements: CompanionAchievementDef[];
-  onDismiss: () => void;
-}) {
+  onAchievementSeen,
+  onComplete,
+  preview = false,
+}: Props) {
   const reduceMotion = useReducedMotion();
-  const featured = useMemo(() => [...achievements].sort((a, b) => b.tier - a.tier)[0], [achievements]);
+  const insets = useSafeAreaInsets();
+  const { height, width } = useWindowDimensions();
+  const [queue] = useState(() => orderAchievementCelebrationQueue(achievements));
+  const [index, setIndex] = useState(0);
+  const [visible, setVisible] = useState(queue.length > 0);
+  const [advancing, setAdvancing] = useState(false);
+  const [bottomDockHeight, setBottomDockHeight] = useState(238);
+  const featured = queue[index] ?? null;
   const family = featured ? katchimeraFamilyById.get(featured.familyId) : null;
+  const companionSource = family?.anchorVisualKey
+    ? getCreatureVisual(family.anchorVisualKey).source
+    : null;
   const tint = featured ? TIER_TINT[featured.tier - 1] : TIER_TINT[0];
+  const medallionSize = Math.max(205, Math.min(320, width * 0.76, height * 0.36));
+  const coinSize = medallionSize * 0.5;
+  const iconSize = medallionSize * 0.92;
+  const raySize = medallionSize + 104;
+  const titleSize = width < 360 ? 36 : 42;
+  const bottomDockBottom = Math.max(12, insets.bottom + 8);
 
   useEffect(() => {
     if (!featured || process.env.EXPO_OS !== 'ios') return;
@@ -40,9 +86,8 @@ export function CompanionAchievementCelebration({
     else void Haptics.impactAsync(featured.tier >= 2 ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light);
   }, [featured]);
 
-  if (!featured || !family) return null;
-
-  const share = async () => {
+  const share = useCallback(async () => {
+    if (!featured || !family) return;
     try {
       await Share.share({
         message: `${family.displayName} achievement · ${featured.name}\n${featured.description}\n${featured.criterion}`,
@@ -50,51 +95,319 @@ export function CompanionAchievementCelebration({
     } catch {
       // Share cancellation and unavailable share targets are harmless.
     }
-  };
+  }, [family, featured]);
+
+  const advance = useCallback(() => {
+    if (!featured || advancing) return;
+    setAdvancing(true);
+    if (index < queue.length - 1) {
+      if (!preview) onAchievementSeen(featured.id);
+      setIndex((current) => current + 1);
+      setTimeout(() => setAdvancing(false), reduceMotion ? 80 : 260);
+      return;
+    }
+    setIndex(queue.length);
+    setTimeout(() => {
+      if (!preview) onAchievementSeen(featured.id);
+      setVisible(false);
+      onComplete?.();
+    }, reduceMotion ? 80 : TRANSITION_OUT_MS);
+  }, [advancing, featured, index, onAchievementSeen, onComplete, preview, queue.length, reduceMotion]);
+
+  if (!queue.length) return null;
 
   return (
-    <View accessibilityViewIsModal style={styles.overlay}>
-      <Animated.View entering={FadeIn.duration(180)} exiting={FadeOut.duration(160)} style={styles.backdrop} />
-      <CelebrationParticles tier={featured.tier} tint={tint} />
-      <Animated.View
-        accessibilityLiveRegion="polite"
-        entering={reduceMotion ? FadeIn.duration(100) : ZoomIn.springify().damping(14).mass(0.85)}
-        exiting={FadeOut.duration(160)}
-        style={styles.card}>
-        <View style={[styles.halo, { backgroundColor: tint }]} />
-        <ThemedText selectable style={styles.eyebrow} lightColor={tint} darkColor={tint}>
-          {featured.tier >= 4 ? 'A centerpiece awakens' : 'Trophy room updated'}
-        </ThemedText>
-        <View style={[styles.trophy, { backgroundColor: `${tint}24`, borderColor: `${tint}62` }]}>
-          <Image accessibilityLabel={featured.name} contentFit="contain" source={companionAchievementIconSource(featured)} style={styles.trophyArt} transition={0} />
-          <View style={[styles.tierMedal, { backgroundColor: tint }]}>
-            <ThemedText style={styles.tierMedalText} lightColor="#FFF8E9" darkColor="#FFF8E9">{roman(featured.tier)}</ThemedText>
-          </View>
-        </View>
-        <ThemedText selectable style={styles.family} lightColor="#7A5A32" darkColor="#7A5A32">{family.displayName}</ThemedText>
-        <ThemedText selectable style={styles.title} lightColor="#342315" darkColor="#342315">{featured.name}</ThemedText>
-        <ThemedText selectable style={styles.body} lightColor="#624B34" darkColor="#624B34">{featured.description}</ThemedText>
-        <View style={styles.reward}>
-          <IconSymbol color={tint} name="sparkles" size={15} />
-          <ThemedText selectable style={styles.rewardText} lightColor="#4A3825" darkColor="#4A3825">{featured.reward.label} added to the room</ThemedText>
-        </View>
-        {achievements.length > 1 ? (
-          <View style={styles.stackNotice}>
-            <ThemedText selectable style={styles.stackText} lightColor="#5A4630" darkColor="#5A4630">
-              +{achievements.length - 1} more {achievements.length === 2 ? 'achievement' : 'achievements'} earned
-            </ThemedText>
-          </View>
+    <Modal
+      animationType={reduceMotion ? 'none' : 'fade'}
+      navigationBarTranslucent
+      onRequestClose={advance}
+      presentationStyle="fullScreen"
+      statusBarTranslucent
+      transparent={false}
+      visible={visible}>
+      <StatusBar style="dark" />
+      <View accessibilityViewIsModal style={styles.screen}>
+        <Image
+          contentFit="cover"
+          contentPosition="center"
+          source={TODAY_ATMOSPHERE_BACKGROUND_SOURCES.clear_day.source}
+          style={StyleSheet.absoluteFill}
+          transition={0}
+        />
+        {featured ? <CelebrationParticles key={`particles-${featured.id}`} tier={featured.tier} tint={tint} /> : null}
+        {featured && family ? (
+          <Animated.View
+            accessibilityLiveRegion="polite"
+            entering={reduceMotion ? FadeIn.duration(100) : FadeInUp.duration(260).easing(Easing.out(Easing.cubic))}
+            exiting={reduceMotion ? FadeOut.duration(80) : FadeOutUp.duration(TRANSITION_OUT_MS).easing(Easing.in(Easing.cubic))}
+            key={featured.id}
+            style={styles.foreground}>
+            <ScrollView
+              contentContainerStyle={[
+                styles.scrollContent,
+                {
+                  paddingBottom: bottomDockHeight + bottomDockBottom + 18,
+                  paddingTop: Math.max(22, insets.top + 12),
+                },
+              ]}
+              contentInsetAdjustmentBehavior="never"
+              showsVerticalScrollIndicator={false}
+              style={styles.heroScroll}>
+              <View style={styles.headingBlock}>
+                <View style={styles.headingMeta}>
+                  <ThemedText selectable style={styles.eyebrow} lightColor={SPLASH_GOLD_DEEP} darkColor={SPLASH_GOLD_DEEP}>
+                    Achievement unlocked
+                  </ThemedText>
+                  {queue.length > 1 ? (
+                    <ThemedText selectable style={styles.queueCount} lightColor={SPLASH_GOLD_DEEP} darkColor={SPLASH_GOLD_DEEP}>
+                      {index + 1} of {queue.length}
+                    </ThemedText>
+                  ) : null}
+                </View>
+                <ThemedText selectable style={[styles.title, { fontSize: titleSize, lineHeight: titleSize + 3 }]} lightColor={SPLASH_GOLD} darkColor={SPLASH_GOLD}>
+                  {featured.name}
+                </ThemedText>
+                <ThemedText selectable style={styles.description} lightColor={SPLASH_INK} darkColor={SPLASH_INK}>
+                  {featured.description}
+                </ThemedText>
+              </View>
+
+              <View style={[styles.hero, { height: raySize, width: raySize }]}>
+                <AchievementRays size={raySize} />
+                <Animated.View
+                  entering={reduceMotion ? FadeIn.duration(100) : FadeIn.duration(220).delay(80)}
+                  style={[
+                    styles.achievementStage,
+                    {
+                      height: iconSize,
+                      width: iconSize,
+                    },
+                  ]}>
+                  <View
+                    style={[
+                      styles.medallion,
+                      {
+                        height: coinSize,
+                        left: (iconSize - coinSize) / 2,
+                        top: (iconSize - coinSize) / 2,
+                        width: coinSize,
+                      },
+                    ]}>
+                    <LinearGradient
+                      colors={['#FFF7C7', '#F4C65C', '#D28C28']}
+                      end={{ x: 0.75, y: 1 }}
+                      start={{ x: 0.2, y: 0 }}
+                      style={[StyleSheet.absoluteFill, styles.medallionGradient]}
+                    />
+                    <View style={styles.medallionInset} />
+                  </View>
+                  <BreathingAchievementIcon achievement={featured} size={iconSize} />
+                </Animated.View>
+              </View>
+            </ScrollView>
+
+            <View
+              onLayout={({ nativeEvent }) => setBottomDockHeight(Math.ceil(nativeEvent.layout.height))}
+              style={[styles.bottomDock, { bottom: bottomDockBottom }]}>
+              <View style={styles.bottomBlock}>
+                <View style={styles.familyChip}>
+                  <ThemedText selectable style={styles.family} lightColor={SPLASH_INK} darkColor={SPLASH_INK}>
+                    {family.displayName} · {featured.criterion}
+                  </ThemedText>
+                </View>
+                <View style={styles.rewardCard}>
+                  {companionSource ? (
+                    <Image
+                      accessibilityLabel={`${family.displayName} Katchimera`}
+                      contentFit="contain"
+                      source={companionSource}
+                      style={styles.rewardCompanion}
+                      transition={0}
+                    />
+                  ) : (
+                    <View style={styles.rewardFallbackIcon}>
+                      <IconSymbol color={SPLASH_GOLD_DEEP} name="sparkles" size={30} />
+                    </View>
+                  )}
+                  <View style={styles.rewardCopy}>
+                    <ThemedText selectable style={styles.rewardTitle} lightColor="#3A2A1D" darkColor="#3A2A1D">
+                      {featured.reward.label}
+                    </ThemedText>
+                    <ThemedText selectable style={styles.rewardBody} lightColor="#4F3A25" darkColor="#4F3A25">
+                      Added to the trophy room
+                    </ThemedText>
+                  </View>
+                </View>
+                <View style={styles.actions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={advancing}
+                    onPress={share}
+                    style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}>
+                    <IconSymbol color="#31536B" name="square.and.arrow.up" size={17} />
+                    <ThemedText style={styles.shareLabel} lightColor="#31536B" darkColor="#31536B">Share</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={advancing}
+                    onPress={advance}
+                    style={({ pressed }) => [styles.continueButton, pressed && styles.pressed]}>
+                    <ThemedText style={styles.continueLabel} lightColor="#FFF9EC" darkColor="#FFF9EC">
+                      {index < queue.length - 1 ? 'Next achievement' : 'Continue'}
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
         ) : null}
-        <View style={styles.actions}>
-          <Pressable accessibilityRole="button" onPress={share} style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}>
-            <ThemedText style={styles.shareLabel} lightColor="#5C452D" darkColor="#5C452D">Share</ThemedText>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={onDismiss} style={({ pressed }) => [styles.continueButton, { backgroundColor: tint }, pressed && styles.pressed]}>
-            <ThemedText style={styles.continueLabel} lightColor="#FFF9EC" darkColor="#FFF9EC">Continue</ThemedText>
-          </Pressable>
-        </View>
-      </Animated.View>
-    </View>
+      </View>
+    </Modal>
+  );
+}
+
+function BreathingAchievementIcon({
+  achievement,
+  size,
+}: {
+  achievement: CompanionAchievementDef;
+  size: number;
+}) {
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(reduceMotion ? 1 : 0.97);
+  useEffect(() => {
+    if (reduceMotion) {
+      scale.value = 1;
+      return;
+    }
+    scale.value = withRepeat(
+      withTiming(1.055, { duration: 1_450, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+    return () => cancelAnimation(scale);
+  }, [reduceMotion, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Animated.View style={[styles.achievementIcon, { height: size, width: size }, style]}>
+      <Image
+        accessibilityLabel={achievement.name}
+        contentFit="contain"
+        source={companionAchievementIconSource(achievement)}
+        style={StyleSheet.absoluteFill}
+        transition={0}
+      />
+    </Animated.View>
+  );
+}
+
+function AchievementRays({ size }: { size: number }) {
+  const reduceMotion = useReducedMotion();
+  const rotation = useSharedValue(0);
+  const breath = useSharedValue(0);
+  useEffect(() => {
+    cancelAnimation(rotation);
+    cancelAnimation(breath);
+    if (reduceMotion) {
+      rotation.value = 0;
+      breath.value = 0.45;
+      return;
+    }
+    rotation.value = withRepeat(withTiming(360, { duration: 32_000, easing: Easing.linear }), -1, false);
+    breath.value = withRepeat(withTiming(1, { duration: 2_800, easing: Easing.inOut(Easing.sin) }), -1, true);
+    return () => {
+      cancelAnimation(rotation);
+      cancelAnimation(breath);
+    };
+  }, [breath, reduceMotion, rotation]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.76 + breath.value * 0.1,
+    transform: [
+      { rotate: `${rotation.value}deg` },
+      { scale: 0.985 + breath.value * 0.03 },
+    ],
+  }));
+  return (
+    <Animated.View pointerEvents="none" style={[styles.rays, { height: size, width: size }, style]}>
+      <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Circle cx={size / 2} cy={size / 2} r={size * 0.39}>
+          <SkiaRadialGradient
+            c={vec(size / 2, size / 2)}
+            colors={[
+              'rgba(255, 252, 218, 0.82)',
+              'rgba(255, 230, 121, 0.38)',
+              'rgba(255, 211, 74, 0.12)',
+              'rgba(255, 205, 62, 0)',
+            ]}
+            positions={[0, 0.34, 0.7, 1]}
+            r={size * 0.39}
+          />
+        </Circle>
+      </Canvas>
+      {ACHIEVEMENT_RAY_INDICES.map((index) => {
+        const longRay = index % 3 === 0;
+        const rayLength = size * (longRay ? 0.47 : index % 2 === 0 ? 0.42 : 0.38);
+        const rayWidth = size * (longRay ? 0.024 : 0.015);
+        const haloWidth = rayWidth * 2.6;
+        const rayTop = size / 2 - rayLength;
+        return (
+          <View
+            key={index}
+            style={[styles.raySpokeFrame, { transform: [{ rotate: `${index * (360 / ACHIEVEMENT_RAY_COUNT)}deg` }] }]}>
+            <LinearGradient
+              colors={[
+                'rgba(255, 242, 167, 0.48)',
+                'rgba(255, 226, 104, 0.3)',
+                'rgba(255, 211, 66, 0.11)',
+                'rgba(255, 204, 54, 0)',
+              ]}
+              end={{ x: 0.5, y: 0 }}
+              locations={[0, 0.55, 0.78, 1]}
+              start={{ x: 0.5, y: 1 }}
+              style={[
+                styles.rayBeam,
+                {
+                  borderRadius: haloWidth / 2,
+                  height: rayLength,
+                  left: size / 2 - haloWidth / 2,
+                  top: rayTop,
+                  width: haloWidth,
+                },
+              ]}
+            />
+            <LinearGradient
+              colors={longRay
+                ? [
+                    'rgba(255, 253, 220, 0.96)',
+                    'rgba(255, 236, 142, 0.74)',
+                    'rgba(255, 213, 75, 0.28)',
+                    'rgba(255, 205, 58, 0)',
+                  ]
+                : [
+                    'rgba(255, 248, 198, 0.84)',
+                    'rgba(255, 228, 119, 0.58)',
+                    'rgba(255, 207, 67, 0.2)',
+                    'rgba(255, 199, 49, 0)',
+                  ]}
+              end={{ x: 0.5, y: 0 }}
+              locations={[0, 0.56, 0.79, 1]}
+              start={{ x: 0.5, y: 1 }}
+              style={[
+                styles.rayBeam,
+                {
+                  borderRadius: rayWidth / 2,
+                  height: rayLength,
+                  left: size / 2 - rayWidth / 2,
+                  top: rayTop,
+                  width: rayWidth,
+                },
+              ]}
+            />
+          </View>
+        );
+      })}
+    </Animated.View>
   );
 }
 
@@ -113,10 +426,10 @@ export function CelebrationParticles({ tier, tint }: { tier: number; tint: strin
 function ConfettiPiece({ index, tier, tint }: { index: number; tier: number; tint: string }) {
   const progress = useSharedValue(0);
   const angle = (index / (12 + tier * 8)) * Math.PI * 2;
-  const distance = 105 + (index % 5) * 24 + tier * 8;
-  const verticalBias = 45 + (index % 4) * 13;
+  const distance = 118 + (index % 5) * 27 + tier * 9;
+  const verticalBias = 52 + (index % 4) * 13;
   useEffect(() => {
-    progress.value = withTiming(1, { duration: 720 + (index % 6) * 70, easing: Easing.out(Easing.cubic) });
+    progress.value = withTiming(1, { duration: 760 + (index % 6) * 70, easing: Easing.out(Easing.cubic) });
   }, [index, progress]);
   const style = useAnimatedStyle(() => ({
     opacity: 1 - Math.max(0, progress.value - 0.78) / 0.22,
@@ -127,36 +440,45 @@ function ConfettiPiece({ index, tier, tint }: { index: number; tier: number; tin
       { scale: 0.55 + progress.value * 0.45 },
     ],
   }));
-  return <Animated.View style={[styles.confetti, { backgroundColor: index % 3 === 0 ? '#F3D68B' : index % 3 === 1 ? tint : '#E9EFE1' }, style]} />;
-}
-
-function roman(tier: number): string {
-  return ['I', 'II', 'III', 'IV', 'V'][tier - 1] ?? String(tier);
+  return <Animated.View style={[styles.confetti, { backgroundColor: index % 3 === 0 ? '#F6D66E' : index % 3 === 1 ? tint : '#F8F1D5' }, style]} />;
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 80 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(18,15,11,0.74)' },
-  confettiLayer: { alignItems: 'center', height: 1, justifyContent: 'center', left: '50%', position: 'absolute', top: '48%', width: 1, zIndex: 2 },
-  confetti: { borderRadius: 3, height: 10, position: 'absolute', width: 6 },
-  card: { alignItems: 'center', backgroundColor: '#EAD4AC', borderColor: 'rgba(255,248,224,0.82)', borderCurve: 'continuous', borderRadius: 30, borderWidth: 1, boxShadow: '0 26px 68px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.72)', gap: 8, maxWidth: 480, overflow: 'hidden', paddingBottom: 18, paddingHorizontal: 22, paddingTop: 24, width: '100%', zIndex: 3 },
-  halo: { borderRadius: 999, height: 220, opacity: 0.14, position: 'absolute', top: -120, width: 220 },
-  eyebrow: { ...KatchaUI.type.label, fontSize: 9 },
-  trophy: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 24, borderWidth: 1, height: 100, justifyContent: 'center', marginVertical: 3, position: 'relative', width: 100 },
-  trophyArt: { height: 88, width: 88 },
-  tierMedal: { alignItems: 'center', borderColor: 'rgba(255,255,255,0.72)', borderRadius: 999, borderWidth: 1, bottom: -6, height: 25, justifyContent: 'center', position: 'absolute', right: -6, width: 25 },
-  tierMedalText: { ...KatchaUI.type.numeric, fontSize: 9, fontWeight: '900' },
-  family: { ...KatchaUI.type.label, fontSize: 9.5 },
-  title: { ...KatchaUI.type.display, fontSize: 31, lineHeight: 35, textAlign: 'center' },
-  body: { ...KatchaUI.type.body, maxWidth: 330, textAlign: 'center' },
-  reward: { alignItems: 'center', flexDirection: 'row', gap: 6, paddingTop: 3 },
-  rewardText: { ...KatchaUI.type.meta, fontSize: 10.5, fontWeight: '800' },
-  stackNotice: { backgroundColor: 'rgba(84,60,35,0.08)', borderRadius: 11, marginTop: 2, paddingHorizontal: 11, paddingVertical: 6 },
-  stackText: { ...KatchaUI.type.meta, fontSize: 10.5, fontWeight: '800' },
-  actions: { flexDirection: 'row', gap: 9, paddingTop: 8, width: '100%' },
-  shareButton: { alignItems: 'center', borderColor: 'rgba(85,59,34,0.22)', borderRadius: 15, borderWidth: 1, flex: 1, justifyContent: 'center', minHeight: 46 },
+  screen: { flex: 1, overflow: 'hidden' },
+  foreground: { ...StyleSheet.absoluteFillObject },
+  heroScroll: { flex: 1, width: '100%' },
+  scrollContent: { alignItems: 'center', flexGrow: 1, gap: 12, justifyContent: 'space-between', paddingHorizontal: 22 },
+  headingBlock: { alignItems: 'center', gap: 9, maxWidth: 560, paddingHorizontal: 6, width: '100%' },
+  headingMeta: { alignItems: 'center', backgroundColor: 'rgba(255,247,218,0.76)', borderColor: 'rgba(255,255,255,0.7)', borderRadius: 999, borderWidth: 1, flexDirection: 'row', gap: 12, justifyContent: 'center', minHeight: 29, paddingHorizontal: 13, paddingVertical: 5 },
+  eyebrow: { fontFamily: 'Manrope', fontSize: 11.5, fontWeight: '900', letterSpacing: 1.4, textTransform: 'uppercase' },
+  queueCount: { fontFamily: 'Manrope', fontSize: 11.5, fontVariant: ['tabular-nums'], fontWeight: '900', letterSpacing: 0.2 },
+  title: { fontFamily: 'FredokaBold', letterSpacing: -1.05, maxWidth: 540, textAlign: 'center', textShadowColor: 'rgba(78,54,18,0.3)', textShadowOffset: { height: 2, width: 0 }, textShadowRadius: 3 },
+  description: { fontFamily: 'Manrope', fontSize: 16, fontWeight: '800', letterSpacing: -0.15, lineHeight: 23, maxWidth: 410, textAlign: 'center', textShadowColor: 'rgba(255,255,255,0.62)', textShadowOffset: { height: 1, width: 0 }, textShadowRadius: 2 },
+  hero: { alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  achievementStage: { alignItems: 'center', justifyContent: 'center', overflow: 'visible', position: 'relative' },
+  achievementIcon: { zIndex: 2 },
+  rays: { alignItems: 'center', justifyContent: 'center', position: 'absolute' },
+  raySpokeFrame: { ...StyleSheet.absoluteFillObject },
+  rayBeam: { position: 'absolute' },
+  medallion: { alignItems: 'center', borderCurve: 'continuous', borderRadius: 999, boxShadow: '0 14px 34px rgba(159,109,29,0.24), inset 0 2px 0 rgba(255,255,255,0.76)', justifyContent: 'center', overflow: 'visible', position: 'absolute', zIndex: 0 },
+  medallionGradient: { borderRadius: 999 },
+  medallionInset: { alignItems: 'center', backgroundColor: 'rgba(255,251,220,0.2)', borderRadius: 999, height: '86%', justifyContent: 'center', overflow: 'visible', width: '86%' },
+  bottomDock: { alignItems: 'center', left: 0, paddingHorizontal: 22, position: 'absolute', right: 0, zIndex: 5 },
+  bottomBlock: { alignItems: 'center', gap: 12, maxWidth: 520, width: '100%' },
+  familyChip: { backgroundColor: 'rgba(255,249,224,0.9)', borderColor: 'rgba(255,255,255,0.82)', borderCurve: 'continuous', borderRadius: 13, borderWidth: 1, boxShadow: '0 5px 14px rgba(45,102,131,0.13), inset 0 1px 0 rgba(255,255,255,0.72)', paddingHorizontal: 14, paddingVertical: 7 },
+  family: { fontFamily: 'Manrope', fontSize: 13, fontWeight: '800', letterSpacing: 0.05, lineHeight: 18, maxWidth: 430, textAlign: 'center' },
+  rewardCard: { alignItems: 'center', backgroundColor: 'rgba(255,246,219,0.93)', borderColor: 'rgba(255,255,255,0.78)', borderCurve: 'continuous', borderRadius: 22, borderWidth: 1.5, boxShadow: '0 12px 28px rgba(52,94,118,0.2), inset 0 1px 0 rgba(255,255,255,0.8)', flexDirection: 'row', gap: 10, minHeight: 92, overflow: 'visible', paddingHorizontal: 14, paddingVertical: 10, width: '100%' },
+  rewardCompanion: { height: 86, marginLeft: -3, marginVertical: -7, width: 86 },
+  rewardFallbackIcon: { alignItems: 'center', height: 62, justifyContent: 'center', width: 62 },
+  rewardCopy: { flex: 1, gap: 2 },
+  rewardTitle: { fontFamily: 'FredokaBold', fontSize: 16, letterSpacing: -0.15, lineHeight: 20 },
+  rewardBody: { fontFamily: 'Manrope', fontSize: 12.5, fontWeight: '700', letterSpacing: 0.02, lineHeight: 17 },
+  actions: { flexDirection: 'row', gap: 10, width: '100%' },
+  shareButton: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.44)', borderColor: 'rgba(36,88,125,0.2)', borderCurve: 'continuous', borderRadius: 17, borderWidth: 1, flexDirection: 'row', gap: 7, justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 },
   shareLabel: { ...KatchaUI.type.action },
-  continueButton: { alignItems: 'center', borderRadius: 15, boxShadow: '0 7px 17px rgba(64,45,25,0.24)', flex: 1, justifyContent: 'center', minHeight: 46 },
-  continueLabel: { ...KatchaUI.type.action },
-  pressed: { opacity: 0.86, transform: [{ scale: 0.98 }] },
+  continueButton: { alignItems: 'center', backgroundColor: '#315F7D', borderCurve: 'continuous', borderRadius: 17, boxShadow: '0 8px 18px rgba(34,73,99,0.28)', flex: 1, justifyContent: 'center', minHeight: 50, paddingHorizontal: 18 },
+  continueLabel: { ...KatchaUI.type.action, textAlign: 'center' },
+  pressed: { opacity: 0.88, transform: [{ scale: 0.98 }] },
+  confettiLayer: { alignItems: 'center', height: 1, justifyContent: 'center', left: '50%', position: 'absolute', top: '53%', width: 1, zIndex: 2 },
+  confetti: { borderRadius: 3, height: 11, position: 'absolute', width: 7 },
 });

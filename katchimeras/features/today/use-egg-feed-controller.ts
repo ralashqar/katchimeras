@@ -10,6 +10,7 @@ type EggFeedPayload = {
   currencyFrom?: FeedSourceRect;
   energyAmount?: number;
   energyOnly?: boolean;
+  framelessImage?: boolean;
   imageSource?: number;
   label?: string;
   photoUri?: string;
@@ -77,6 +78,7 @@ export function useEggFeedController() {
         currencyFromY: payload.currencyFrom ? payload.currencyFrom.y + payload.currencyFrom.h / 2 : undefined,
         energyAmount: payload.energyAmount,
         energyOnly: payload.energyOnly,
+        framelessImage: payload.framelessImage,
         imageSource: payload.imageSource,
         toX,
         toY,

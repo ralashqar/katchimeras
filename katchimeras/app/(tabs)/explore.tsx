@@ -14,7 +14,9 @@ import { GlassPanel } from '@/components/katchadeck/ui/glass-panel';
 import { KatchaButton } from '@/components/katchadeck/ui/katcha-button';
 import { SectionHeader } from '@/components/katchadeck/ui/section-header';
 import { ThemedText } from '@/components/themed-text';
+import { CompanionAchievementCelebration } from '@/components/katchadeck/world/companion-achievement-celebration';
 import { createStarterReveal } from '@/constants/katchadeck';
+import { COMPANION_ACHIEVEMENT_CATALOG } from '@/constants/companion-achievements';
 import { DEV_DEBUG_NAV_ENABLED } from '@/constants/dev';
 import { useDevAllKatchimerasAvailable } from '@/hooks/use-dev-all-katchimeras-available';
 import { KatchaDeckUI } from '@/constants/theme';
@@ -39,6 +41,8 @@ import { clearBaseCustomisation } from '@/utils/world-base-customisation';
 import { resetWorldIdentityOnboarding } from '@/utils/world-identity';
 import { setAllKatchimerasAvailableEnabled } from '@/utils/dev-settings';
 import type { DayVisionSummary, PhotoVisionResult, StoredHomeDayRecord } from '@/types/home';
+import type { CompanionAchievementDef } from '@/types/companion-achievements';
+import { pickRandomAchievement } from '@/utils/achievement-celebration';
 
 export default function ExploreScreen() {
   const router = useRouter();
@@ -57,6 +61,8 @@ export default function ExploreScreen() {
   } | null>(null);
   const [backfilling, setBackfilling] = useState(false);
   const [promptPhotoLoading, setPromptPhotoLoading] = useState(false);
+  const [achievementPreview, setAchievementPreview] = useState<CompanionAchievementDef | null>(null);
+  const [lastAchievementPreviewId, setLastAchievementPreviewId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -333,6 +339,12 @@ export default function ExploreScreen() {
     router.replace('/(tabs)');
   }
 
+  function handlePreviewRandomAchievement() {
+    const next = pickRandomAchievement(COMPANION_ACHIEVEMENT_CATALOG, lastAchievementPreviewId);
+    setAchievementPreview(next);
+    setLastAchievementPreviewId(next?.id ?? null);
+  }
+
   return (
     <View style={styles.screen}>
       <AmbientBackground
@@ -413,6 +425,7 @@ export default function ExploreScreen() {
                   variant="secondary"
                 />
                 <KatchaButton label="Preview comic beats (LLM)" onPress={handlePreviewComicBeats} variant="secondary" />
+                <KatchaButton label="Preview random achievement splash" onPress={handlePreviewRandomAchievement} variant="secondary" />
                 <KatchaButton label="Preview Hatch Your Past" onPress={() => router.push('/hatch-your-past')} variant="secondary" />
                 <KatchaButton label="Reset home loop" onPress={handleResetHomeLoop} variant="secondary" />
                 <KatchaButton label="Replay personality + zodiac" onPress={handleReplayWorldIdentity} variant="secondary" />
@@ -576,6 +589,14 @@ export default function ExploreScreen() {
           />
         </Animated.View>
       </ScrollView>
+      {achievementPreview ? (
+        <CompanionAchievementCelebration
+          achievements={[achievementPreview]}
+          onAchievementSeen={() => {}}
+          onComplete={() => setAchievementPreview(null)}
+          preview
+        />
+      ) : null}
     </View>
   );
 }

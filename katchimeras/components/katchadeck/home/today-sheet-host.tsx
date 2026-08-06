@@ -13,23 +13,17 @@ import { SanctuarySheet } from '@/components/katchadeck/world/sanctuary-sheet';
 import { SleepSheet } from '@/components/katchadeck/world/sleep-sheet';
 import { StepsPromptSheet } from '@/components/katchadeck/world/steps-prompt-sheet';
 import { StudioMomentSheet, StudioVaultSheet } from '@/components/katchadeck/world/studio-vault-sheet';
-import type { FoodMomentFollowUp, StudioMomentFollowUp } from '@/features/today/use-moment-follow-up-controller';
 import type { TodaySheetController } from '@/features/today/use-today-sheet-controller';
 import type { DayInputTarget, HomeDayRecord, LocationPermissionState } from '@/types/home';
 import type { MemoryQuest, MemoryQuestType } from '@/utils/memory-quests-engine';
 import type { Observation } from '@/utils/observations-engine';
 
-type FoodConfirmInput = Parameters<ComponentProps<typeof FoodMomentSheet>['onConfirm']>[0];
-type StudioConfirmInput = Parameters<ComponentProps<typeof StudioMomentSheet>['onConfirm']>[0];
 type TodaySheetHostProps = {
   viewedDay: HomeDayRecord | null;
   viewedIsForming: boolean;
   formingTarget: DayInputTarget;
   sheets: TodaySheetController;
   observatoryOpen: boolean;
-  foodFollowUp: FoodMomentFollowUp | null;
-  studioFollowUp: StudioMomentFollowUp | null;
-  suppressFollowUps: boolean;
   memoryQuests: MemoryQuest[];
   recentAvgSteps: number | null;
   observations: Observation[];
@@ -56,11 +50,6 @@ type TodaySheetHostProps = {
   removeDayPlace: (id: string, target?: DayInputTarget) => void;
   dismissPlaceCandidate: (id: string, target?: DayInputTarget) => void;
   setLocationPermission: (permission: LocationPermissionState) => void;
-  setFoodMomentMeaning: (input: { momentId: string; meaning: FoodConfirmInput['meaning'] }, target?: DayInputTarget) => void;
-  setStudioMomentRating: (input: { momentId: string; rating: StudioConfirmInput['rating'] }, target?: DayInputTarget) => void;
-  clearFoodFollowUp: () => void;
-  clearStudioFollowUp: () => void;
-  pulseEgg: () => void;
   setMicrocopy: (message: string | null) => void;
   setDayName: (name: string, target?: DayInputTarget) => void;
 };
@@ -71,9 +60,6 @@ export function TodaySheetHost({
   formingTarget,
   sheets,
   observatoryOpen,
-  foodFollowUp,
-  studioFollowUp,
-  suppressFollowUps,
   memoryQuests,
   recentAvgSteps,
   observations,
@@ -100,11 +86,6 @@ export function TodaySheetHost({
   removeDayPlace,
   dismissPlaceCandidate,
   setLocationPermission,
-  setFoodMomentMeaning,
-  setStudioMomentRating,
-  clearFoodFollowUp,
-  clearStudioFollowUp,
-  pulseEgg,
   setMicrocopy,
   setDayName,
 }: TodaySheetHostProps) {
@@ -152,23 +133,6 @@ export function TodaySheetHost({
     return null;
   }
 
-  const blockingSheetOpen =
-    memoryVaultOpen ||
-    foodPickerOpen ||
-    foodVaultOpen ||
-    studioPickerOpen ||
-    studioVaultOpen ||
-    sanctuaryOpen ||
-    moodSheetOpen ||
-    sleepSheetOpen ||
-    questBoardOpen ||
-    bigMomentPickerOpen ||
-    stepsSheetOpen ||
-    journeySheetOpen ||
-    placesVaultOpen ||
-    observatoryOpen ||
-    nameSheetOpen;
-
   return (
     <>
       {memoryVaultOpen ? (
@@ -204,30 +168,6 @@ export function TodaySheetHost({
       ) : null}
       {foodPickerOpen ? (
         <FoodMomentSheet onConfirm={handleAddFood} onClose={() => setFoodPickerOpen(false)} />
-      ) : null}
-      {foodFollowUp && !blockingSheetOpen && !suppressFollowUps ? (
-        <FoodMomentSheet
-          suggested={{ label: foodFollowUp.label, emoji: foodFollowUp.emoji }}
-          onConfirm={({ meaning }) => {
-            setFoodMomentMeaning({ momentId: foodFollowUp.momentId, meaning }, formingTarget);
-            clearFoodFollowUp();
-            pulseEgg();
-            setMicrocopy(`${foodFollowUp.emoji} ${foodFollowUp.label} - noted`);
-          }}
-          onClose={clearFoodFollowUp}
-        />
-      ) : null}
-      {studioFollowUp && !blockingSheetOpen && !suppressFollowUps ? (
-        <StudioMomentSheet
-          suggested={{ mediaType: studioFollowUp.mediaType, label: studioFollowUp.label, emoji: studioFollowUp.emoji }}
-          onConfirm={({ rating }) => {
-            setStudioMomentRating({ momentId: studioFollowUp.momentId, rating }, formingTarget);
-            clearStudioFollowUp();
-            pulseEgg();
-            setMicrocopy(`${studioFollowUp.emoji} ${studioFollowUp.label} - noted`);
-          }}
-          onClose={clearStudioFollowUp}
-        />
       ) : null}
       {foodVaultOpen ? (
         <FoodVaultSheet

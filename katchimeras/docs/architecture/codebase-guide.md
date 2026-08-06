@@ -84,7 +84,6 @@ Current Today controllers live in `features/today/`:
 - `use-morning-prompt-controller.ts`: morning sleep/mood prompt sequence.
 - `use-observatory-controller.ts`: observations and travel memory model.
 - `use-discovery-reveal-controller.ts`: discovery celebration timing.
-- `use-moment-follow-up-controller.ts`: food/studio follow-up prompts.
 - `use-microcopy.ts`: transient toast copy.
 - `use-today-share-comic-controller.ts`: share card and generated comic flow.
 

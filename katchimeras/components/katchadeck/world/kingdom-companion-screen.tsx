@@ -831,10 +831,10 @@ export function KingdomCompanionScreen({
           }}
         />
       ) : null}
-      {companionAchievements.pending.length > 0 && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
+      {isFocused && companionAchievements.pending.length > 0 && !questExperienceActive && !embeddedJournal && !questNoteCapture ? (
         <CompanionAchievementCelebration
           achievements={companionAchievements.pending}
-          onDismiss={() => companionAchievements.markSeen(companionAchievements.pending.map((def) => def.id))}
+          onAchievementSeen={(id) => companionAchievements.markSeen([id])}
         />
       ) : null}
       <KatchaDialog

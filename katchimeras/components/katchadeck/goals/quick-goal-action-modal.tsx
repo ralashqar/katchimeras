@@ -36,6 +36,7 @@ type GoalAction = 'complete' | 'done' | 'remember' | 'skip' | 'snooze' | 'undo';
 export function QuickGoalActionModal({
   item,
   onComplete,
+  onCompleteFromOrigin,
   onDismiss,
   onRemember,
   onSkip,
@@ -44,6 +45,7 @@ export function QuickGoalActionModal({
 }: {
   item: CompanionQuickGoalForDay;
   onComplete: () => CompanionQuickGoalCompletionReceipt;
+  onCompleteFromOrigin?: () => void;
   onDismiss: () => void;
   onRemember: () => void;
   onSkip: () => void;
@@ -176,6 +178,10 @@ export function QuickGoalActionModal({
   const handleAction = (action: GoalAction) => {
     if (busy) return;
     if (action === 'complete') {
+      if (onCompleteFromOrigin) {
+        dismiss(onCompleteFromOrigin);
+        return;
+      }
       setBusy(true);
       const receipt = onComplete();
       if (!receipt.completion) {

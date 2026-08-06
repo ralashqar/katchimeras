@@ -9,7 +9,7 @@ import {
   TODAY_ENERGY_TARGET,
   todayGrowthSummary,
 } from '../utils/today-growth';
-import { rankTodayCareActions } from '../utils/today-care';
+import { journalFlowCompletesTodayCareAction, rankTodayCareActions } from '../utils/today-care';
 import { buildTodayPhotoRollSuggestion } from '../utils/today-photo-roll-suggestion';
 import { splitEnergyAcrossTokens } from '../utils/energy-payout';
 import {
@@ -762,4 +762,12 @@ test('Morning still has three journal-focused rotating actions', () => {
   const rotating = ranked.active.filter((action) => action.category !== 'check_in');
   assert.equal(rotating.length, 3);
   assert.equal(rotating.every((action) => action.journalFocused), true);
+});
+
+test('journal care rewards defer only when the saved flow completes the originating action', () => {
+  assert.equal(journalFlowCompletesTodayCareAction('studio', 'studio'), true);
+  assert.equal(journalFlowCompletesTodayCareAction('food', 'food'), true);
+  assert.equal(journalFlowCompletesTodayCareAction('general', 'journal'), true);
+  assert.equal(journalFlowCompletesTodayCareAction('studio', 'journal'), false);
+  assert.equal(journalFlowCompletesTodayCareAction('general', 'studio'), false);
 });

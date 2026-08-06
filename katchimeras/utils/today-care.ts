@@ -476,6 +476,21 @@ function hasJournalFlow(day: StoredHomeDayRecord, flowId: string): boolean {
   return day.journalRecords?.some((record) => record.flowId === flowId) ?? false;
 }
 
+const CARE_COMPLETION_KEY_BY_JOURNAL_FLOW: Readonly<Record<string, string>> = {
+  big_event: 'event',
+  food: 'food',
+  general: 'journal',
+  movement: 'movement',
+  people: 'people',
+  studio: 'studio',
+  went_somewhere: 'place',
+  work: 'work',
+};
+
+export function journalFlowCompletesTodayCareAction(flowId: string, completionKey: string): boolean {
+  return CARE_COMPLETION_KEY_BY_JOURNAL_FLOW[flowId] === completionKey;
+}
+
 function artifactCompletionKeys(day: StoredHomeDayRecord): Set<string> {
   const keys = new Set<string>();
   if (day.promptAnswers.some((answer) => answer.kind === 'feeling' && !answer.dismissed)) keys.add('mood');

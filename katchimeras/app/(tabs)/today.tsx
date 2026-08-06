@@ -21,7 +21,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { MomentPromptSheet, type PromptMenuSection } from '@/components/katchadeck/home/moment-prompt-sheet';
 import {
@@ -92,7 +92,6 @@ import { ProgressBackfillNotice } from '@/components/katchadeck/world/progress-b
 import { useEggFeedController } from '@/features/today/use-egg-feed-controller';
 import { usePromptSheetController } from '@/features/today/use-prompt-sheet-controller';
 import { useMicrocopy } from '@/features/today/use-microcopy';
-import { useMomentFollowUpController } from '@/features/today/use-moment-follow-up-controller';
 import { useTodaySheetController } from '@/features/today/use-today-sheet-controller';
 import { useTodayActionRouter } from '@/features/today/use-today-action-router';
 import { useObservatoryController } from '@/features/today/use-observatory-controller';
@@ -138,6 +137,7 @@ import {
 import { companionIdForFamily, katchimeraFamilies } from '@/constants/katchimera-skins';
 import { companionDestinationStageLift } from '@/utils/companion-home-layout';
 import {
+  journalFlowCompletesTodayCareAction,
   rankTodayCareActions,
   type RankedTodayCareAction,
   type TodayCareContextCategory,
@@ -214,11 +214,20 @@ export default function HomeScreen() {
   const [selectedCareGoalId, setSelectedCareGoalId] = useState<string | null>(null);
   const [pendingCareIntent, setPendingCareIntent] = useState<RankedTodayCareAction | null>(null);
   const [queuedCareCompletion, setQueuedCareCompletion] = useState<TodayCareCompletionEvent | null>(null);
+  const selectedCareGoalCompletionRef = useRef<(() => void) | null>(null);
   const [todayPhotoLibrarySheet, setTodayPhotoLibrarySheet] = useState<TodayPhotoLibrarySheetContent | null>(null);
   const careFlowWasBusyRef = useRef(false);
   const careRewardRequestKeyAtStartRef = useRef(0);
   const incubationActivatedRef = useRef<boolean | null>(null);
   const careCompletionSequenceRef = useRef(0);
+  const queueCareCompletion = useCallback((action: RankedTodayCareAction, rewardAlreadyAnimated: boolean) => {
+    careCompletionSequenceRef.current += 1;
+    setQueuedCareCompletion({
+      action,
+      id: `${action.instanceId}:${careCompletionSequenceRef.current}`,
+      rewardAlreadyAnimated,
+    });
+  }, []);
   const [quickGoalJournal, setQuickGoalJournal] = useState<{
     completion: CompanionQuickGoalCompletion;
     goal: CompanionQuickGoal;
@@ -260,8 +269,6 @@ export default function HomeScreen() {
     setStepsInterpretation,
     addFoodMoment,
     addStudioMoment,
-    setFoodMomentMeaning,
-    setStudioMomentRating,
     setDayName,
     isTodayHatched,
     tomorrowDay,
@@ -782,34 +789,6 @@ export default function HomeScreen() {
   } = useDiscoveryRevealController(formingDay);
   const companionAchievements = useCompanionAchievements();
 
-  const anyManualSheetOpen =
-    memoryVaultOpen ||
-    foodPickerOpen ||
-    foodVaultOpen ||
-    studioPickerOpen ||
-    studioVaultOpen ||
-    sanctuaryOpen ||
-    moodSheetOpen ||
-    sleepSheetOpen ||
-    questBoardOpen ||
-    bigMomentPickerOpen ||
-    placesVaultOpen ||
-    stepsSheetOpen ||
-    journeySheetOpen ||
-    nameSheetOpen ||
-    observatoryOpen ||
-    manualJournalOpen ||
-    quickNoteOpen ||
-    todayPhotoLibrarySheet !== null ||
-    clarificationMemory !== null;
-
-  const { foodFollowUp, studioFollowUp, clearFoodFollowUp, clearStudioFollowUp } = useMomentFollowUpController({
-    formingDay,
-    blocked: promptSheetOpen || isHatching || anyManualSheetOpen,
-    suppressFoodFollowUp: anyManualSheetOpen,
-    suppressStudioFollowUp: anyManualSheetOpen,
-  });
-
   const {
     handleAddFood,
     handleAddStudio,
@@ -1263,11 +1242,9 @@ export default function HomeScreen() {
     quickNoteOpen ||
     todayPhotoLibrarySheet !== null ||
     clarificationMemory !== null ||
-    !!foodFollowUp ||
-    !!studioFollowUp ||
     !!comicGen ||
     voiceNote.phase !== 'idle';
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!pendingCareIntent) return;
     const completedPhotoAssetId = pendingCareIntent.destination.kind === 'photo_roll'
       && formingDay
@@ -1290,15 +1267,13 @@ export default function HomeScreen() {
         dismissedAt: null,
       }, formingTarget);
     }
-    careCompletionSequenceRef.current += 1;
-    setQueuedCareCompletion({
-      action: pendingCareIntent,
-      id: `${pendingCareIntent.instanceId}:${careCompletionSequenceRef.current}`,
-      rewardAlreadyAnimated: eggFeedRewardRequestKey !== careRewardRequestKeyAtStartRef.current,
-    });
+    queueCareCompletion(
+      pendingCareIntent,
+      eggFeedRewardRequestKey !== careRewardRequestKeyAtStartRef.current,
+    );
     setPendingCareIntent(null);
     careFlowWasBusyRef.current = false;
-  }, [eggFeedRewardRequestKey, formingDay, formingTarget, nurtureCare.completed, pendingCareIntent, updateCareAction]);
+  }, [eggFeedRewardRequestKey, formingDay, formingTarget, nurtureCare.completed, pendingCareIntent, queueCareCompletion, updateCareAction]);
   useEffect(() => {
     if (!pendingCareIntent) {
       careFlowWasBusyRef.current = false;
@@ -1704,7 +1679,10 @@ export default function HomeScreen() {
           onCompletionAnimationEnd={(eventId) => {
             setQueuedCareCompletion((current) => current?.id === eventId ? null : current);
           }}
-          onOpenQuickGoal={setSelectedCareGoalId}
+          onOpenQuickGoal={(goalId, completeFromOrigin) => {
+            selectedCareGoalCompletionRef.current = completeFromOrigin;
+            setSelectedCareGoalId(goalId);
+          }}
           onChooseMood={(choiceId, label, from, imageSource, accent, currencyFrom) => {
             const action = nurtureCare.active.find((candidate) => candidate.id === 'mood');
             if (action) {
@@ -1919,6 +1897,16 @@ export default function HomeScreen() {
           initialContext={manualJournalInitialContextId}
           onClose={closeManualJournal}
           onSave={(submission) => {
+            const completingCareAction = pendingCareIntent
+              && journalFlowCompletesTodayCareAction(submission.flowId, pendingCareIntent.completionKey)
+              ? pendingCareIntent
+              : null;
+            const deferRewardToCareRow = completingCareAction != null;
+            if (completingCareAction) {
+              queueCareCompletion(completingCareAction, false);
+              setPendingCareIntent(null);
+              careFlowWasBusyRef.current = false;
+            }
             addManualJournalEntry(submission, formingTarget);
             closeManualJournal();
             const hasPhotoText = submission.sourceType === 'photo'
@@ -1928,12 +1916,14 @@ export default function HomeScreen() {
               : submission.linkedNote?.kind === 'voice'
                 ? TODAY_GROWTH_REWARDS.voice_note
                 : TODAY_GROWTH_REWARDS.journal;
-            startEggFeed({ h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 }, {
-              energyAmount,
-              energyOnly: true,
-              imageSource: GROWTH_ENERGY_ART,
-              tint: Lantern.ember300,
-            }, () => {});
+            if (!deferRewardToCareRow) {
+              startEggFeed({ h: 54, w: 54, x: windowWidth / 2 - 27, y: windowHeight - 190 }, {
+                energyAmount,
+                energyOnly: true,
+                imageSource: GROWTH_ENERGY_ART,
+                tint: Lantern.ember300,
+              }, () => {});
+            }
             setMicrocopy('Added to today');
           }}
         />
@@ -1965,7 +1955,15 @@ export default function HomeScreen() {
         <QuickGoalActionModal
           item={selectedCareGoal}
           onComplete={() => quickGoals.completeGoal(selectedCareGoal.goal.id)}
-          onDismiss={() => setSelectedCareGoalId(null)}
+          onCompleteFromOrigin={() => {
+            const completeFromOrigin = selectedCareGoalCompletionRef.current;
+            selectedCareGoalCompletionRef.current = null;
+            requestAnimationFrame(() => completeFromOrigin?.());
+          }}
+          onDismiss={() => {
+            selectedCareGoalCompletionRef.current = null;
+            setSelectedCareGoalId(null);
+          }}
           onRemember={() => {
             const completion = quickGoals.state.completions.find((candidate) =>
               candidate.goalId === selectedCareGoal.goal.id
@@ -2076,9 +2074,6 @@ export default function HomeScreen() {
         formingTarget={formingTarget}
         sheets={sheets}
         observatoryOpen={observatoryOpen}
-        foodFollowUp={foodFollowUp}
-        studioFollowUp={studioFollowUp}
-        suppressFollowUps={promptSheetOpen || hatchCheckInOpen || isHatching || quickNoteOpen || clarificationMemory !== null}
         memoryQuests={memoryQuests}
         recentAvgSteps={recentAvgSteps}
         observations={observations}
@@ -2105,11 +2100,6 @@ export default function HomeScreen() {
         removeDayPlace={removeDayPlace}
         dismissPlaceCandidate={dismissPlaceCandidate}
         setLocationPermission={setLocationPermission}
-        setFoodMomentMeaning={setFoodMomentMeaning}
-        setStudioMomentRating={setStudioMomentRating}
-        clearFoodFollowUp={clearFoodFollowUp}
-        clearStudioFollowUp={clearStudioFollowUp}
-        pulseEgg={pulseEgg}
         setMicrocopy={setMicrocopy}
         setDayName={setDayName}
       />
@@ -2118,10 +2108,10 @@ export default function HomeScreen() {
       {celebrateDiscovery && !flowBusy ? (
         <DiscoveryReveal discovery={celebrateDiscovery} onDismiss={() => markDiscoverySeen(celebrateDiscovery.id)} />
       ) : null}
-      {!celebrateDiscovery && companionAchievements.pending.length > 0 && !flowBusy ? (
+      {screenFocused && !celebrateDiscovery && companionAchievements.pending.length > 0 && !flowBusy ? (
         <CompanionAchievementCelebration
           achievements={companionAchievements.pending}
-          onDismiss={() => companionAchievements.markSeen(companionAchievements.pending.map((def) => def.id))}
+          onAchievementSeen={(id) => companionAchievements.markSeen([id])}
         />
       ) : null}
       {!celebrateDiscovery && companionAchievements.pending.length === 0 && !flowBusy && (companionAchievements.backfillCount > 0 || discoveryBackfillCount > 0) ? (

@@ -19,6 +19,7 @@ import { splitEnergyAcrossTokens } from '@/utils/energy-payout';
 export type EggFeed = {
   energyAmount?: number;
   energyOnly?: boolean;
+  framelessImage?: boolean;
   nonce: number;
   fromX: number;
   fromY: number;
@@ -111,6 +112,7 @@ function SourceMote({ feed, completesFeed, onArrive }: {
   const progress = useSharedValue(0);
   const isPhoto = Boolean(feed.photoUri);
   const isIcon = feed.imageSource != null;
+  const isFramelessIcon = isIcon && feed.framelessImage;
   const [dims, setDims] = useState({ w: isPhoto ? 64 : isIcon ? 54 : 120, h: isPhoto ? 64 : isIcon ? 54 : 40 });
 
   useEffect(() => {
@@ -141,7 +143,13 @@ function SourceMote({ feed, completesFeed, onArrive }: {
       }}
       style={[
         styles.mote,
-        isPhoto ? styles.photoMote : isIcon ? [styles.iconMote, { borderColor: `${feed.tint}99` }] : { backgroundColor: `${feed.tint}E6` },
+        isPhoto
+          ? styles.photoMote
+          : isFramelessIcon
+            ? styles.framelessIconMote
+            : isIcon
+              ? [styles.iconMote, { borderColor: `${feed.tint}99` }]
+              : { backgroundColor: `${feed.tint}E6` },
         animatedStyle,
       ]}>
       {isPhoto ? (
@@ -263,6 +271,11 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     height: 54,
     padding: 4,
+    width: 54,
+  },
+  framelessIconMote: {
+    height: 54,
+    padding: 0,
     width: 54,
   },
   feedIcon: { height: '100%', width: '100%' },

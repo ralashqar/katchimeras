@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
@@ -75,7 +75,7 @@ type TodayNurtureExperienceProps = {
   onCareStart: (action: RankedTodayCareAction, rewardFrom: FeedSourceRect) => void;
   onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
   onCompletionAnimationEnd: (eventId: string) => void;
-  onOpenQuickGoal: (goalId: string) => void;
+  onOpenQuickGoal: (goalId: string, completeFromOrigin: () => void) => void;
   onChooseMood: (choiceId: MoodMonumentChoiceId, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
   onChooseSleep: (quality: SleepQuality, label: string, from: FeedSourceRect, imageSource: number, accent: string, currencyFrom: FeedSourceRect) => void;
   onReveal: () => void;
@@ -157,6 +157,13 @@ export function TodayNurtureExperience({
   const completionIsStandard = completionEvent != null
     && completionEvent.action.category !== 'check_in'
     && completionEvent.action.destination.kind !== 'quick_goal';
+  const settledRemainingActionsRef = useRef(remainingActions);
+  useLayoutEffect(() => {
+    if (!completionIsStandard) settledRemainingActionsRef.current = remainingActions;
+  }, [completionIsStandard, remainingActions]);
+  const displayedRemainingActions = completionIsStandard && completionEvent
+    ? settledRemainingActionsRef.current.filter((action) => action.instanceId !== completionEvent.action.instanceId)
+    : remainingActions;
   const stageTop = topInset + TODAY_EXPLORATION_HERO_STAGE_TOP_AFTER_SAFE_AREA;
   const sceneVerticalNudge = HOME_SCENE_Y_OFFSET;
   const contentVerticalNudge = HOME_ACTIONS_Y_OFFSET;
@@ -330,7 +337,7 @@ export function TodayNurtureExperience({
             />
           ) : null}
 
-          {remainingActions.map((action, index) => action.destination.kind === 'quick_goal' ? (
+          {displayedRemainingActions.map((action, index) => action.destination.kind === 'quick_goal' ? (
             <TodayCareGoalRow
               action={action}
               familyId={action.destination.familyId}
@@ -359,7 +366,7 @@ export function TodayNurtureExperience({
             />
           ))}
 
-          {!actions.length && !checkInSelection ? (
+          {!actions.length && !checkInSelection && !completionIsStandard ? (
             <Animated.View entering={FadeIn.duration(180)} style={styles.thriving}>
               <View style={styles.smallIconWell}><IconSymbol color={Meadow.leafDeep} name="leaf.fill" size={20} /></View>
               <View style={styles.flexCopy}>
@@ -782,9 +789,7 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
         <Reward amount={event.action.growthReward} />
       </View>
       <Animated.View style={tickStyle}>
-        <View style={styles.goalTickComplete}>
-          <View style={styles.completedTick}><IconSymbol color="#FFF9E9" name="checkmark" size={18} /></View>
-        </View>
+        <View style={styles.completedTick}><IconSymbol color="#FFF9E9" name="checkmark" size={17} /></View>
       </Animated.View>
       <GoalCompletionCelebration
         reducedMotion={reduceMotion}
@@ -801,7 +806,7 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
   index: number;
   onCompleteQuickGoal: (goalId: string) => CompanionQuickGoalCompletionReceipt;
   onNotToday: () => void;
-  onOpenQuickGoal: (goalId: string) => void;
+  onOpenQuickGoal: (goalId: string, completeFromOrigin: () => void) => void;
   onRewardFlight: (from: FeedSourceRect, action: RankedTodayCareAction, onArrive: () => void) => void;
   reduceMotion: boolean;
   swipeExternalGesture: GestureType;
@@ -905,7 +910,7 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
             accessibilityHint="Opens this goal"
             accessibilityRole="button"
             disabled={celebrating}
-            onPress={() => onOpenQuickGoal(goalId)}
+            onPress={() => onOpenQuickGoal(goalId, handleComplete)}
             style={({ pressed }) => [styles.goalBody, pressed && styles.textPressed]}>
             <ThemedText numberOfLines={2} style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
           </Pressable>
@@ -1321,10 +1326,10 @@ const styles = StyleSheet.create({
   quickChoiceLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 9.5, fontWeight: '800', textAlign: 'center' },
   careSwipeContainer: { backgroundColor: 'transparent', borderCurve: 'continuous', borderRadius: 15, overflow: 'hidden', position: 'relative' },
   careDoor: { alignItems: 'center', backgroundColor: 'rgba(246,237,214,0.98)', borderColor: 'rgba(122,84,44,0.20)', borderCurve: 'continuous', borderRadius: 15, borderWidth: 1, boxShadow: '0 4px 10px rgba(34,24,12,0.22), inset 0 1px 0 rgba(255,252,238,0.72)', flexDirection: 'row', gap: 8, minHeight: 56, paddingHorizontal: 9, paddingVertical: 6 },
-  careDoorComplete: { backgroundColor: 'rgba(235,244,211,0.98)', borderColor: 'rgba(78,112,72,0.34)' },
+  careDoorComplete: { backgroundColor: 'rgba(242,245,220,0.98)', borderColor: 'rgba(78,112,72,0.28)', boxShadow: '0 5px 12px rgba(48,72,38,0.18), inset 0 1px 0 rgba(255,255,244,0.82)' },
   completedIcon: { backgroundColor: 'rgba(123,166,91,0.16)', borderColor: 'rgba(78,112,72,0.24)' },
-  completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontVariant: ['tabular-nums'], fontWeight: '800', lineHeight: 14 },
-  completedTick: { alignItems: 'center', backgroundColor: Meadow.leafDeep, borderColor: '#FFF3C4', borderRadius: 999, borderWidth: 1.5, height: 36, justifyContent: 'center', width: 36 },
+  completedBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '700', lineHeight: 14 },
+  completedTick: { alignItems: 'center', backgroundColor: '#527A49', borderColor: 'rgba(255,248,218,0.9)', borderRadius: 999, borderWidth: 1.5, boxShadow: '0 3px 8px rgba(49,79,42,0.24), inset 0 1px 0 rgba(255,255,255,0.2)', height: 34, justifyContent: 'center', width: 34 },
   goalBody: { flex: 1, gap: 2, justifyContent: 'center', minWidth: 0 },
   goalTick: { alignItems: 'center', borderColor: Meadow.goldDeep, borderRadius: 999, borderWidth: 1.5, height: 36, justifyContent: 'center', width: 36 },
   goalTickComplete: { backgroundColor: Meadow.leafDeep, borderColor: Meadow.leafDeep },
