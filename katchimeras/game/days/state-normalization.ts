@@ -94,6 +94,55 @@ export function normalizeStoredHomeState(
   };
 }
 
+/**
+ * Normalizes only the active Today/Tomorrow envelope after an in-session input.
+ * The archive is already normalized when it enters the repository and cannot
+ * change during these mutations. Re-running migrations, cloning 120 archived
+ * days, and rebuilding identity histories on every tap was the largest JS-thread
+ * cost in the reward path.
+ *
+ * Lifecycle boundaries still use normalizeStoredHomeState so midnight rollover,
+ * migrations, hatch transitions, and archive repairs retain the full invariant.
+ */
+export function normalizeActiveHomeState(
+  state: StoredHomeState,
+  profile: OnboardingProfile,
+  now: Date,
+): StoredHomeState {
+  const todayDateId = toLocalDateId(now);
+  const tomorrowDate = tomorrowDateId(now);
+  if (
+    state.today.isoDate !== todayDateId
+    || (state.tomorrow != null && state.tomorrow.isoDate !== tomorrowDate)
+  ) {
+    return normalizeStoredHomeState(state, profile, now);
+  }
+
+  const hatchHour = resolveHatchHour(profile);
+  const today = updateStoredDayDerivedFields(
+    state.today,
+    state.archivedDays,
+    now,
+    hatchHour,
+    true,
+  );
+  const tomorrow = state.tomorrow && dayHasShape(state.tomorrow)
+    ? updateStoredDayDerivedFields(
+        { ...state.tomorrow, state: 'forming' },
+        [...state.archivedDays, today],
+        now,
+        hatchHour,
+        true,
+      )
+    : undefined;
+
+  return {
+    ...state,
+    today,
+    tomorrow,
+  };
+}
+
 function mergeHistory(
   current: StoredHomeState['aspectHistory'],
   derived: NonNullable<StoredHomeState['aspectHistory']>

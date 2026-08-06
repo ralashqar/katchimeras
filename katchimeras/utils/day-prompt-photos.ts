@@ -6,6 +6,7 @@ import { analyzePhotoLuminance, getPhotoThumbnailDataUri } from '@/utils/photo-v
 import { computePhotoSignature } from '@/utils/photo-similarity';
 import { buildProcessedPhotoFilter } from '@/utils/processed-photos';
 import type { DayPromptPhotoCandidate } from '@/utils/day-prompt-engine';
+import { loadRecentPhotoAssetPage } from '@/utils/recent-photo-assets';
 
 export const DEV_PROMPT_PHOTO_CANDIDATES_KEY = 'katchadeck.dev_prompt_photo_candidates_v1';
 
@@ -129,12 +130,17 @@ async function loadDayPromptPhotoCandidates({
       return [];
     }
 
-    const page = await MediaLibrary.getAssetsAsync({
-      ...(mode === 'production' ? { createdAfter: startOfYesterday(now).getTime() } : {}),
-      first: mode === 'production' ? PRODUCTION_SCAN_SIZE : DEV_SCAN_SIZE,
-      mediaType: MediaLibrary.MediaType.photo,
-      sortBy: [['creationTime', false]],
-    });
+    const assets = mode === 'production'
+      ? await loadRecentPhotoAssetPage(
+          MediaLibrary,
+          startOfYesterday(now).getTime(),
+          PRODUCTION_SCAN_SIZE,
+        )
+      : (await MediaLibrary.getAssetsAsync({
+          first: DEV_SCAN_SIZE,
+          mediaType: MediaLibrary.MediaType.photo,
+          sortBy: [['creationTime', false]],
+        })).assets;
     if (signal?.aborted) return [];
 
     const scanned: PromptPhotoAsset[] = [];
@@ -142,7 +148,7 @@ async function loadDayPromptPhotoCandidates({
     const yesterdayIso = toLocalDateId(shiftDate(now, -1));
     const allowedDates = new Set([todayIso, yesterdayIso]);
 
-    for (const asset of page.assets) {
+    for (const asset of assets) {
       if (signal?.aborted) return [];
       if (mode === 'production' && !allowedDates.has(toLocalDateId(new Date(asset.creationTime)))) {
         continue;

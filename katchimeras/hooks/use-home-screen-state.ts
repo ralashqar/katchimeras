@@ -41,6 +41,7 @@ import {
   setStepsInterpretationForToday,
   setFeaturedMemoryForToday,
   setDayNameForToday,
+  deriveHomeViewModel,
   deriveTomorrowDayRecord,
   dismissDayPromptForToday,
   hydrateAllDays,
@@ -58,6 +59,7 @@ import {
   updateClassifiedMemoryForToday,
   awardGrowthForToday,
   completeTodayEnergyAction,
+  completeInlineTodayEnergyAction,
   updateTodayCareAction,
 } from '@/game/days';
 import {
@@ -90,23 +92,31 @@ type HomeScreenStateOptions = {
    * Explicit mutations still persist through useHomeStateMutation.
    */
   persistHydrationRepairs?: boolean;
+  /** Temporarily yield native media discovery while a visible interaction runs. */
+  pauseInteractiveServices?: boolean;
 };
 
 export function useHomeScreenState({
   enableInteractiveServices = true,
   persistHydrationRepairs = true,
+  pauseInteractiveServices = false,
 }: HomeScreenStateOptions = {}) {
   // Today is intentionally unmounted while full-screen routes (notably the
   // camera) are active. Seed a remount from the repository's in-memory state
   // so cancelling capture cannot render a brand-new day/check-in queue before
   // the focus effect restores the real state.
-  const [storedState, setStoredState] = useState<StoredHomeState | null>(() => homeRepository.load());
+  const initialRepositoryStateRef = useRef<StoredHomeState | null | undefined>(undefined);
+  if (initialRepositoryStateRef.current === undefined) {
+    initialRepositoryStateRef.current = homeRepository.load();
+  }
+  const [storedState, setStoredState] = useState<StoredHomeState | null>(() =>
+    hydrateHomeState(initialRepositoryStateRef.current ?? null, loadOnboardingProfile(), new Date()).state
+  );
   const [selectedDayId, setSelectedDayId] = useState<string>('today');
   const storedStateRef = useRef<StoredHomeState | null>(storedState);
-  // The lazy initial value came directly from the repository and is already
-  // scheduled/durable. Do not write it back during the first remount effect;
-  // the focus hydration below will persist only an actually-derived repair.
-  const scheduledStateRef = useRef<StoredHomeState | null>(storedState);
+  // Track the repository object separately. If hydration created or repaired
+  // state, the persistence effect sees a new identity and schedules it once.
+  const scheduledStateRef = useRef<StoredHomeState | null>(initialRepositoryStateRef.current ?? null);
   const hasSynchronizedStateRef = useRef(false);
   const mutateHomeState = useHomeStateMutation(setStoredState, storedStateRef, scheduledStateRef);
 
@@ -210,7 +220,9 @@ export function useHomeScreenState({
   const viewModel = useMemo(() => {
     const now = new Date();
     const profile = loadOnboardingProfile();
-    return hydrateHomeState(storedState, profile, now);
+    return storedState
+      ? deriveHomeViewModel(storedState, profile, now)
+      : hydrateHomeState(null, profile, now);
   }, [storedState]);
 
   const timelineDays = viewModel.timelineDays;
@@ -246,6 +258,7 @@ export function useHomeScreenState({
     dayState: promptCandidateDay.state,
     enabled: enableInteractiveServices,
     interactionKey: selectedDayId,
+    paused: pauseInteractiveServices,
   });
   const { triggerHatchIfReady } = useHatchController({
     selectedDay,
@@ -436,6 +449,15 @@ export function useHomeScreenState({
     target: DayInputTarget = 'today',
   ) => {
     mutateHomeState((state, profile, now) => completeTodayEnergyAction(state, input, profile, now, target));
+  }, [mutateHomeState]);
+
+  const completeInlineEnergyAction = useCallback((
+    input: Parameters<typeof completeInlineTodayEnergyAction>[1],
+    target: DayInputTarget = 'today',
+  ) => {
+    mutateHomeState((state, profile, now) =>
+      completeInlineTodayEnergyAction(state, input, profile, now, target)
+    );
   }, [mutateHomeState]);
 
   const answerHatchCheckIn = useCallback(
@@ -637,6 +659,7 @@ export function useHomeScreenState({
     completeSeed,
     awardGrowth,
     completeEnergyAction,
+    completeInlineEnergyAction,
     updateCareAction,
     addNote,
     confirmPlace,

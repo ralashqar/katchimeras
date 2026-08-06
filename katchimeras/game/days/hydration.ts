@@ -85,6 +85,19 @@ export function hydrateHomeState(
 } {
   const baseState = storedState ?? createInitialHomeState(profile, now);
   const normalized = normalizeStoredHomeState(baseState, profile, now);
+  return deriveHomeViewModel(normalized, profile, now);
+}
+
+/** Builds the visible five-day window without re-normalizing a current state. */
+export function deriveHomeViewModel(
+  normalized: StoredHomeState,
+  profile: OnboardingProfile,
+  now: Date,
+): {
+  state: StoredHomeState;
+  timelineDays: HomeTimelineDay[];
+  todayId: string;
+} {
   const weekProfile = computeWeekProfile([
     ...normalized.archivedDays.slice(-4),
     normalized.today,

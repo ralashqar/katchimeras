@@ -176,7 +176,6 @@ export function useEggFeedController() {
     // start a UI-thread pulse.
     if (process.env.EXPO_OS === 'ios') {
       if (index === count - 1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      else void Haptics.selectionAsync();
     }
   }, []);
 

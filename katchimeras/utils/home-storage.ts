@@ -11,6 +11,7 @@ import {
   type ActiveHomeEnvelope,
   type ArchiveHomeEnvelope,
 } from '@/utils/home-storage-partition';
+import { waitForCriticalInteractionIdle } from '@/utils/critical-interaction';
 
 const listeners = new Set<() => void>();
 export const HOME_ACTIVE_STORAGE_KEY = `${HOME_STORAGE_KEY}:active-v1`;
@@ -106,6 +107,7 @@ export function saveStoredHomeStateDeferred(state: StoredHomeState, options?: Ho
 async function drainDeferredWrites() {
   // Yield to navigation/rendering before serialization and native I/O.
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  await waitForCriticalInteractionIdle();
   try {
     while (pendingDeferredState) {
       const state = pendingDeferredState;

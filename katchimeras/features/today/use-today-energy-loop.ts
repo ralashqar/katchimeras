@@ -14,7 +14,7 @@ export type TodayEnergyLoopStatus =
   | 'rewarding'
   | 'entering';
 
-const ACTION_INTRO_SETTLE_MS = 260;
+const ACTION_INTRO_SETTLE_MS = 160;
 
 export function useTodayEnergyLoop() {
   const [pendingIntent, setPendingIntentState] = useState<RankedTodayCareAction | null>(null);

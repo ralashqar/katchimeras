@@ -107,6 +107,7 @@ import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-
 import { useTodayEnergyLoop } from '@/features/today/use-today-energy-loop';
 import { useTodayEnergyFrameProbe } from '@/features/today/use-today-energy-frame-probe';
 import { TodayEnergyProfiler } from '@/features/today/today-energy-profiler';
+import { useAppActivity } from '@/features/performance/app-activity';
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
@@ -204,6 +205,7 @@ export default function TodayRouteScreen() {
 
 function HomeScreen() {
   const router = useRouter();
+  const { beginCriticalInteraction, criticalInteractionActive } = useAppActivity();
   const screenFocused = useIsFocused();
   const [growthNow, setGrowthNow] = useState(() => new Date());
   useEffect(() => {
@@ -240,6 +242,11 @@ function HomeScreen() {
     startIntent: startCareIntent,
     status: energyLoopStatus,
   } = useTodayEnergyLoop();
+  const energyLoopBusy = energyLoopStatus !== 'idle';
+  useEffect(() => {
+    if (!energyLoopBusy) return;
+    return beginCriticalInteraction();
+  }, [beginCriticalInteraction, energyLoopBusy]);
   useTodayEnergyFrameProbe(
     energyLoopStatus === 'rewarding'
       || energyLoopStatus === 'entering',
@@ -318,8 +325,9 @@ function HomeScreen() {
     setLocationPermission,
     awardGrowth: awardTodayGrowth,
     completeEnergyAction,
+    completeInlineEnergyAction,
     updateCareAction,
-  } = useHomeScreenState();
+  } = useHomeScreenState({ pauseInteractiveServices: criticalInteractionActive });
   const {
     isHatching,
     presentation: hatchPresentation,
@@ -1080,9 +1088,42 @@ function HomeScreen() {
     currencyFrom: Parameters<typeof startEggFeed>[0],
   ) => {
     const action = nurtureCare.active.find((candidate) => candidate.id === 'mood');
-    if (action) startCareIntent(action, eggFeedRewardRequestKey);
-    handleConfirmMood(choiceId, label, from, imageSource, accent, currencyFrom);
-  }, [eggFeedRewardRequestKey, handleConfirmMood, nurtureCare.active, startCareIntent]);
+    if (!action) {
+      handleConfirmMood(choiceId, label, from, imageSource, accent, currencyFrom);
+      return;
+    }
+    startCareIntent(action, eggFeedRewardRequestKey);
+    startEggFeed(from, {
+      currencyFrom,
+      energyAmount: action.growthReward,
+      framelessImage: true,
+      imageSource,
+      label,
+      tint: accent,
+    }, () => {
+      const completedAt = new Date().toISOString();
+      completeInlineEnergyAction({
+        artifact: { kind: 'mood', choiceId },
+        completion: {
+          growth: {
+            actionId: action.id,
+            amount: action.growthReward,
+            source: action.growthSource,
+            sourceId: choiceId,
+          },
+          careAction: {
+            instanceId: action.instanceId,
+            definitionId: action.id,
+            sourceId: choiceId,
+            deferredUntil: null,
+            completedAt,
+            dismissedAt: null,
+          },
+        },
+      }, formingTarget);
+      setMicrocopy(`Mood noted: ${label}`);
+    });
+  }, [completeInlineEnergyAction, eggFeedRewardRequestKey, formingTarget, handleConfirmMood, nurtureCare.active, setMicrocopy, startCareIntent, startEggFeed]);
   const handleNurtureSleep = useCallback((
     quality: Parameters<typeof handleSetSleep>[0],
     label: string,
@@ -1092,9 +1133,42 @@ function HomeScreen() {
     currencyFrom: Parameters<typeof startEggFeed>[0],
   ) => {
     const action = nurtureCare.active.find((candidate) => candidate.id === 'sleep');
-    if (action) startCareIntent(action, eggFeedRewardRequestKey);
-    handleSetSleep(quality, label, from, imageSource, accent, currencyFrom);
-  }, [eggFeedRewardRequestKey, handleSetSleep, nurtureCare.active, startCareIntent]);
+    if (!action) {
+      handleSetSleep(quality, label, from, imageSource, accent, currencyFrom);
+      return;
+    }
+    startCareIntent(action, eggFeedRewardRequestKey);
+    startEggFeed(from, {
+      currencyFrom,
+      energyAmount: action.growthReward,
+      framelessImage: true,
+      imageSource,
+      label,
+      tint: accent,
+    }, () => {
+      const completedAt = new Date().toISOString();
+      completeInlineEnergyAction({
+        artifact: { kind: 'sleep', sleep: { quality, source: 'manual' } },
+        completion: {
+          growth: {
+            actionId: action.id,
+            amount: action.growthReward,
+            source: action.growthSource,
+            sourceId: quality,
+          },
+          careAction: {
+            instanceId: action.instanceId,
+            definitionId: action.id,
+            sourceId: quality,
+            deferredUntil: null,
+            completedAt,
+            dismissedAt: null,
+          },
+        },
+      }, formingTarget);
+      setMicrocopy('Your morning, remembered');
+    });
+  }, [completeInlineEnergyAction, eggFeedRewardRequestKey, formingTarget, handleSetSleep, nurtureCare.active, setMicrocopy, startCareIntent, startEggFeed]);
   const handleNurtureAddJournal = useCallback(() => openManualJournal(), [openManualJournal]);
   const handleNurtureAddTextNote = useCallback(() => openQuickNoteOverlay('text'), [openQuickNoteOverlay]);
   const handleNurtureCompleteGoal = useCallback((goalId: string) => {
@@ -1471,6 +1545,8 @@ function HomeScreen() {
     <TodayEnvironmentMotionProvider motion={environmentMotion}>
     <GestureDetector gesture={pageGesture}>
     <View style={styles.screen}>
+      {!isForming ? (
+      <>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, goalsSceneLiftStyle]}>
       {isHatching ? (
         <TodayHatchEnvironmentCrossfade
@@ -1734,12 +1810,15 @@ function HomeScreen() {
         )}
 
       </ScrollView>
+      </>
+      ) : null}
 
       {isForming && formingDay && nurtureGrowth && !isHatching ? (
         <TodayEnergyProfiler>
           <TodayNurtureExperience
           actionTransitionActive={
             energyLoopStatus === 'rewarding'
+            || energyLoopStatus === 'entering'
           }
           actions={nurtureCare.active}
           bottomInset={insets.bottom}

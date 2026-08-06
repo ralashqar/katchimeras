@@ -100,7 +100,7 @@ import {
 } from './mutations';
 import { withRefreshedPhotoLocationsForDay, withSeededPhotoLocationsByDay } from './photo-locations';
 import { createEmptyStoredDay, readInputDay, writeInputDay } from './records';
-import { normalizeStoredHomeState } from './state-normalization';
+import { normalizeActiveHomeState, normalizeStoredHomeState } from './state-normalization';
 import { toLocalDateId } from './date';
 import { awardGrowth, completeEnergyAction, setCareActionState } from '@/utils/today-growth';
 
@@ -205,7 +205,7 @@ export function addMomentToDay(
   const moment = createMoment(momentInput, now);
   const nextDay = withAppendedMoment(base, moment);
 
-  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+  return normalizeActiveHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function answerDayPromptForToday(
@@ -223,7 +223,7 @@ export function answerDayPromptForToday(
   const base = readInputDay(state, target, profile, now);
   const nextDay = withPromptAnswer(base, answer);
 
-  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+  return normalizeActiveHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function startHatchCheckInForDay(
@@ -293,7 +293,7 @@ export function completeSeedForToday(
     actionId: `seed:${seedId}`,
     awardedAt: now,
   });
-  return normalizeStoredHomeState(writeInputDay(state, target, awarded.day), profile, now);
+  return normalizeActiveHomeState(writeInputDay(state, target, awarded.day), profile, now);
 }
 
 export function awardGrowthForToday(
@@ -311,7 +311,7 @@ export function awardGrowthForToday(
   const base = readInputDay(state, target, profile, now);
   const result = awardGrowth(base, { ...input, awardedAt: now });
   if (!result.awarded) return state;
-  return normalizeStoredHomeState(writeInputDay(state, target, result.day), profile, now);
+  return normalizeActiveHomeState(writeInputDay(state, target, result.day), profile, now);
 }
 
 export function updateTodayCareAction(
@@ -323,7 +323,7 @@ export function updateTodayCareAction(
 ): StoredHomeState {
   const base = readInputDay(state, target, profile, now);
   const nextDay = setCareActionState(base, { ...input, updatedAt: now.toISOString() });
-  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+  return normalizeActiveHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 /**
@@ -340,7 +340,50 @@ export function completeTodayEnergyAction(
   const base = readInputDay(state, target, profile, now);
   const completed = completeEnergyAction(base, input, now);
   if (!completed.changed) return state;
-  return normalizeStoredHomeState(writeInputDay(state, target, completed.day), profile, now);
+  return normalizeActiveHomeState(writeInputDay(state, target, completed.day), profile, now);
+}
+
+export type InlineTodayEnergyArtifact =
+  | { kind: 'mood'; choiceId: string }
+  | { kind: 'sleep'; sleep: DaySleep };
+
+/** Applies the inline artifact, Growth receipt, and care completion in one commit. */
+export function completeInlineTodayEnergyAction(
+  state: StoredHomeState,
+  input: {
+    artifact: InlineTodayEnergyArtifact;
+    completion: TodayEnergyActionCompletion;
+  },
+  profile: OnboardingProfile,
+  now: Date,
+  target: DayInputTarget = 'today',
+): StoredHomeState {
+  const base = readInputDay(state, target, profile, now);
+  let day = base;
+  let artifactSourceId = input.completion.growth.sourceId;
+  if (input.artifact.kind === 'mood') {
+    const answer = createDayPromptAnswer({
+      kind: 'feeling',
+      choiceIds: [input.artifact.choiceId],
+    }, now);
+    if (answer) {
+      day = withPromptAnswer(day, answer);
+      artifactSourceId = answer.id;
+    }
+  } else {
+    day = withSleep(day, input.artifact.sleep, now);
+    artifactSourceId = day.sleep?.recordedAt ?? `${day.isoDate}:sleep`;
+  }
+  const completed = completeEnergyAction(day, {
+    growth: { ...input.completion.growth, sourceId: artifactSourceId },
+    careAction: { ...input.completion.careAction, sourceId: artifactSourceId },
+  }, now);
+  if (!completed.changed && day === base) return state;
+  return normalizeActiveHomeState(
+    writeInputDay(state, target, completed.day),
+    profile,
+    now,
+  );
 }
 
 export function confirmPlaceForToday(
@@ -525,7 +568,7 @@ export function setSleepForToday(
   const base = readInputDay(state, target, profile, now);
   const nextDay = withSleep(base, sleep, now);
 
-  return normalizeStoredHomeState(writeInputDay(state, target, nextDay), profile, now);
+  return normalizeActiveHomeState(writeInputDay(state, target, nextDay), profile, now);
 }
 
 export function setStepsInterpretationForToday(

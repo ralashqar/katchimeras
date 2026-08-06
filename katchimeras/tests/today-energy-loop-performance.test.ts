@@ -94,3 +94,28 @@ test('manual journal action feedback waits until its native sheet is dismissed',
   assert.match(todaySource, /hapticOnSave=\{!pendingCareIntent\}/);
   assert.match(journalSource, /if \(hapticOnSave\) successHaptic\(\)/);
 });
+
+test('inline completion uses one active-day normalization for artifact, Growth, and care', () => {
+  const actionsSource = readFileSync(path.join(process.cwd(), 'game', 'days', 'actions.ts'), 'utf8');
+  const atomicFunction = actionsSource.match(
+    /export function completeInlineTodayEnergyAction[\s\S]*?\n}\n\nexport function/,
+  )?.[0] ?? '';
+
+  assert.match(atomicFunction, /artifact\.kind === 'mood'/);
+  assert.match(atomicFunction, /completeEnergyAction\(/);
+  assert.match(atomicFunction, /return normalizeActiveHomeState\(/);
+  assert.equal((atomicFunction.match(/normalizeActiveHomeState\(/g) ?? []).length, 1);
+});
+
+test('forming nurture presentation does not mount the legacy Today scene underneath', () => {
+  const todaySource = readFileSync(path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'), 'utf8');
+  const heroSource = readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-kingdom-egg-hero.tsx'),
+    'utf8',
+  );
+  assert.match(todaySource, /\{!isForming \? \(\s*<>[\s\S]*?<ScrollView/);
+  assert.match(todaySource, /energyLoopStatus === 'rewarding'[\s\S]*?\|\| energyLoopStatus === 'entering'/);
+  assert.match(heroSource, /enabled=\{!hideKingdomEnvironmentArt\}/);
+  assert.match(heroSource, /egg-base\.webp/);
+  assert.doesNotMatch(heroSource, /TODAY_EGG_SOURCE[\s\S]{0,400}allowDownscaling=\{false\}/);
+});

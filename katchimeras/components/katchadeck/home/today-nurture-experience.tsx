@@ -1,7 +1,7 @@
 import { Image, type ImageRef } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { memo, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type View as ViewType } from 'react-native';
+import { InteractionManager, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type View as ViewType } from 'react-native';
 import { Gesture, GestureDetector, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -144,32 +144,39 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const sleepAction = actions.find((action) => action.id === 'sleep');
   useEffect(() => {
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const retainedRefs: ImageRef[] = [];
-    void Promise.all(SLEEP_OPTIONS.map(async (option) => {
-      try {
-        const imageRef = await Image.loadAsync(SLEEP_ART[option.quality], {
-          maxHeight: 96,
-          maxWidth: 96,
+    const task = InteractionManager.runAfterInteractions(() => {
+      timer = setTimeout(() => {
+        void Promise.all(SLEEP_OPTIONS.map(async (option) => {
+          try {
+            const imageRef = await Image.loadAsync(SLEEP_ART[option.quality], {
+              maxHeight: 96,
+              maxWidth: 96,
+            });
+            if (!active) {
+              imageRef.release();
+              return null;
+            }
+            retainedRefs.push(imageRef);
+            return [option.quality, imageRef] as const;
+          } catch {
+            return null;
+          }
+        })).then((entries) => {
+          if (!active) return;
+          const nextArt: Partial<Record<SleepQuality, ImageRef>> = {};
+          entries.forEach((entry) => {
+            if (entry) nextArt[entry[0]] = entry[1];
+          });
+          setPreloadedSleepArt(nextArt);
         });
-        if (!active) {
-          imageRef.release();
-          return null;
-        }
-        retainedRefs.push(imageRef);
-        return [option.quality, imageRef] as const;
-      } catch {
-        return null;
-      }
-    })).then((entries) => {
-      if (!active) return;
-      const nextArt: Partial<Record<SleepQuality, ImageRef>> = {};
-      entries.forEach((entry) => {
-        if (entry) nextArt[entry[0]] = entry[1];
-      });
-      setPreloadedSleepArt(nextArt);
+      }, 250);
     });
     return () => {
       active = false;
+      task.cancel();
+      if (timer) clearTimeout(timer);
       retainedRefs.forEach((imageRef) => imageRef.release());
     };
   }, []);
@@ -225,7 +232,7 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
   const actionHandoffLayout = useMemo(
     () => reduceMotion
       ? undefined
-      : LinearTransition.duration(260).easing(Easing.inOut(Easing.cubic)),
+      : LinearTransition.duration(180).easing(Easing.inOut(Easing.cubic)),
     [reduceMotion],
   );
   const eggPanStyle = useAnimatedStyle(() => ({
@@ -342,9 +349,9 @@ export const TodayNurtureExperience = memo(function TodayNurtureExperience({
         />
 
         <View onLayout={handleActionContentLayout}>
-          <Animated.View layout={actionHandoffLayout} style={styles.careSection}>
+          <Animated.View style={styles.careSection}>
           {displayedMoodAction || displayedSleepAction ? (
-            <Animated.View layout={actionHandoffLayout} style={styles.checkInGroup}>
+            <Animated.View style={styles.checkInGroup}>
               {displayedMoodAction ? (
                 <InlineMood
                   action={displayedMoodAction}
@@ -633,9 +640,6 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
 
   return (
     <Animated.View
-      layout={reduceMotion
-        ? undefined
-        : LinearTransition.duration(260).easing(Easing.inOut(Easing.cubic))}
       entering={reduceMotion
         ? FadeIn.duration(70)
         : FadeIn.delay(35).duration(210).easing(Easing.out(Easing.cubic))}>
@@ -792,7 +796,6 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const sourceRef = useRef<ViewType | null>(null);
   const flightStartedRef = useRef(false);
-  const [source, setSource] = useState<FeedSourceRect | null>(null);
   const rowX = useSharedValue(0);
   const rowOpacity = useSharedValue(1);
   const rowScale = useSharedValue(0.985);
@@ -848,13 +851,12 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
     let rewardTimer: ReturnType<typeof setTimeout> | null = null;
     const frame = requestAnimationFrame(() => {
       const launch = (rect: FeedSourceRect) => {
-        setSource(rect);
         rewardTimer = setTimeout(() => {
           if (flightStartedRef.current) return;
           flightStartedRef.current = true;
           if (event.rewardAlreadyAnimated) beginExit();
           else onRewardFlight(rect, event.action, beginExit);
-        }, reduceMotion ? 40 : 170);
+        }, reduceMotion ? 30 : 60);
       };
       if (sourceRef.current) {
         sourceRef.current.measureInWindow((x, y, width, height) => launch({ h: height, w: width, x, y }));
@@ -925,10 +927,6 @@ function CompletedCareRow({ event, onFinished, onRewardFlight, reduceMotion }: {
       <Animated.View style={tickStyle}>
         <View style={styles.completedTick}><IconSymbol color="#FFF9E9" name="checkmark" size={17} /></View>
       </Animated.View>
-      <GoalCompletionCelebration
-        reducedMotion={reduceMotion}
-        source={source ? { height: source.h, width: source.w, x: source.x, y: source.y } : null}
-      />
     </Animated.View>
   );
 }
@@ -1036,8 +1034,7 @@ function TodayCareGoalRow({ action, familyId, goalId, index, onCompleteQuickGoal
   };
 
   return (
-    <Animated.View
-      layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}>
+    <Animated.View>
       <Animated.View entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.delay(Math.min(index, 5) * 45).duration(220)}>
       <CareSwipeShell
         disabled={celebrating}
@@ -1102,7 +1099,7 @@ function CareRow({ action, index, onNotToday, onStart, reduceMotion, swipeExtern
     }
   };
   return (
-    <Animated.View layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}>
+    <Animated.View>
       <Animated.View entering={reduceMotion ? FadeIn.duration(80) : FadeInUp.delay(Math.min(index, 5) * 45).duration(220)}>
         <CareSwipeShell
           externalGesture={swipeExternalGesture}

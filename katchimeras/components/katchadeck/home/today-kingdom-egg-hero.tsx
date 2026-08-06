@@ -84,7 +84,7 @@ type TodayKingdomEggOverlayProps = {
   homeArchetypeId?: HomeArchetypeId | null;
 };
 
-const TODAY_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.png');
+const TODAY_EGG_SOURCE = require('../../../assets/images/katchimeras/cutouts/egg-base.webp');
 const SOFT_RING_SOURCE = require('../../../assets/images/katchimeras/soft-ring.png');
 const EGG_RAY_COUNT = 12;
 const EGG_RAY_INDICES = Array.from({ length: EGG_RAY_COUNT }, (_, index) => index);
@@ -160,7 +160,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       withTiming(1, { duration: reduceMotion ? 65 : 90, easing: Easing.out(Easing.cubic) }),
       withDelay(
         reduceMotion ? 90 : 190,
-        withTiming(0, { duration: reduceMotion ? 280 : 760, easing: Easing.out(Easing.cubic) }),
+        withTiming(0, { duration: reduceMotion ? 240 : 420, easing: Easing.out(Easing.cubic) }),
       ),
     );
   }, [radianceFlare, reduceMotion]);
@@ -179,13 +179,13 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     );
     activationCelebration.value = 0;
     activationCelebration.value = withTiming(1, {
-      duration: reduceMotion ? 480 : 1250,
+      duration: reduceMotion ? 420 : 700,
       easing: Easing.out(Easing.cubic),
     });
     activationResetTimerRef.current = setTimeout(() => {
       activationResetTimerRef.current = null;
       activationStateRef.current = 'idle';
-    }, reduceMotion ? 520 : 1300);
+    }, reduceMotion ? 460 : 760);
   }, [activationCelebration, activationPulse, reduceMotion]);
 
   useEffect(() => {
@@ -215,7 +215,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     activationStateRef.current = 'pending';
     activationFallbackTimerRef.current = setTimeout(
       startActivationCelebration,
-      2200,
+      1200,
     );
   }, [deferGrowthUntilEnergyArrival, isActivated, startActivationCelebration]);
 
@@ -229,7 +229,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       visualEnergyRatioRef.current = energyRatio;
       cancelAnimation(visualGrowth);
       visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(energyRatio), {
-        duration: reduceMotion ? 90 : 520,
+        duration: reduceMotion ? 90 : 280,
         easing: Easing.out(Easing.cubic),
       });
     };
@@ -242,7 +242,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     growthFallbackTimerRef.current = setTimeout(() => {
       growthFallbackTimerRef.current = null;
       applyGrowth();
-    }, 2200);
+    }, 1200);
     return () => {
       if (growthFallbackTimerRef.current) clearTimeout(growthFallbackTimerRef.current);
       growthFallbackTimerRef.current = null;
@@ -274,14 +274,14 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
     }
     ripple.value = 0;
     ripple.value = withTiming(1, {
-      duration: reduceMotion ? 260 : 680,
+      duration: reduceMotion ? 220 : 420,
       easing: Easing.out(Easing.cubic),
     });
     rippleEcho.value = 0;
     rippleEcho.value = withDelay(
       reduceMotion ? 50 : 120,
       withTiming(1, {
-        duration: reduceMotion ? 260 : 680,
+        duration: reduceMotion ? 220 : 420,
         easing: Easing.out(Easing.cubic),
       }),
     );
@@ -308,7 +308,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
       visualEnergyRatioRef.current = arrivedEnergyRatio;
       cancelAnimation(visualGrowth);
       visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(arrivedEnergyRatio), {
-        duration: reduceMotion ? 90 : 520,
+        duration: reduceMotion ? 90 : 280,
         easing: Easing.out(Easing.cubic),
       });
       if (activationStateRef.current === 'pending') {
@@ -362,6 +362,7 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
   return (
     <View pointerEvents="box-none" style={styles.stage}>
       <TodayFallbackCloudScene
+        enabled={!hideKingdomEnvironmentArt}
         focusY={explorationEggFrame?.centerY
           ?? layout.eggCenterY
             + TODAY_KINGDOM_STAGE_HEIGHT * todayScene.homeEgg.verticalLowerStageHeightRatio}
@@ -431,7 +432,6 @@ export const TodayKingdomEggHero = memo(function TodayKingdomEggHero({
               onPress={onEggPress}
               style={styles.eggImageFrame}>
               <Image
-                allowDownscaling={false}
                 cachePolicy="memory-disk"
                 contentFit="contain"
                 pointerEvents="none"
@@ -463,7 +463,7 @@ export function TodayDormantEggIndicator({ energyRatio, focusX, focusY, left, sc
   const visualGrowth = useSharedValue(eggVisualGrowthForEnergyRatio(energyRatio));
   useEffect(() => {
     visualGrowth.value = withTiming(eggVisualGrowthForEnergyRatio(energyRatio), {
-      duration: reduceMotion ? 90 : 520,
+      duration: reduceMotion ? 90 : 280,
       easing: Easing.out(Easing.cubic),
     });
   }, [energyRatio, reduceMotion, visualGrowth]);
