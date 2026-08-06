@@ -250,6 +250,8 @@ export function useTodayActionRouter({
       else if (id === 'food') openManualJournal('food');
       else if (id === 'studio') openManualJournal('studio');
       else if (id === 'movement') openManualJournal('movement');
+      else if (id === 'people') openManualJournal('people');
+      else if (id === 'work') openManualJournal('work');
       else if (id === 'sleep') sheets.setSleepSheetOpen(true);
       else if (id === 'mood') sheets.setMoodSheetOpen(true);
       else if (id === 'life_event') openManualJournal('big_event');

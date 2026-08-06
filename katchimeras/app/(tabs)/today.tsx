@@ -108,7 +108,7 @@ import { useTodayHatchRevealController } from '@/features/today/use-today-hatch-
 import { resolveHomeLoopPresentation } from '@/features/today/home-loop-presentation';
 import { QuickNoteComposer } from '@/components/katchadeck/home/quick-note-composer';
 import { MemoryClarificationSheet } from '@/components/katchadeck/world/memory-clarification-sheet';
-import type { ClassifiedMemory, HomeDayRecord, HomeTimelineDay } from '@/types/home';
+import type { ClassifiedMemory, HomeDayRecord, HomeTimelineDay, MemoryDomain } from '@/types/home';
 import type { KatchimeraFamilyId } from '@/types/katchimera';
 import { consumeQuestActionIntent } from '@/utils/quest-action-signal';
 import { consumeCompanionNavigationIntent } from '@/utils/companion-navigation-intent';
@@ -137,7 +137,11 @@ import {
 } from '@/utils/today-exploration-backgrounds';
 import { companionIdForFamily, katchimeraFamilies } from '@/constants/katchimera-skins';
 import { companionDestinationStageLift } from '@/utils/companion-home-layout';
-import { rankTodayCareActions, type RankedTodayCareAction } from '@/utils/today-care';
+import {
+  rankTodayCareActions,
+  type RankedTodayCareAction,
+  type TodayCareContextCategory,
+} from '@/utils/today-care';
 import {
   consumeTodayCareGameRoundCompletion,
   requestTodayCareGameRound,
@@ -920,6 +924,33 @@ export default function HomeScreen() {
     }
     incubationActivatedRef.current = nurtureGrowth.isActivated;
   }, [nurtureGrowth, setMicrocopy]);
+  const careContextualCategories = useMemo(() => {
+    const result = new Set<TodayCareContextCategory>();
+    const categoryMap: Partial<Record<(typeof categories)[number]['id'], TodayCareContextCategory>> = {
+      photos: 'photo',
+      places: 'place',
+      journey: 'movement',
+      food: 'food',
+      studio: 'studio',
+    };
+    const memoryCategoryMap: Partial<Record<MemoryDomain, TodayCareContextCategory>> = {
+      people: 'people',
+      food: 'food',
+      media: 'studio',
+      movement: 'movement',
+      place: 'place',
+      work: 'work',
+    };
+    for (const category of categories) {
+      const careCategory = categoryMap[category.id];
+      if (careCategory && category.needsAttention) result.add(careCategory);
+    }
+    for (const memory of formingDay?.classifiedMemories ?? []) {
+      const careCategory = memoryCategoryMap[memory.dominantDomain];
+      if (careCategory) result.add(careCategory);
+    }
+    return [...result];
+  }, [categories, formingDay?.classifiedMemories]);
   const nurtureCare = useMemo(() => {
     if (!formingDay) {
       return { active: [], completed: [] };
@@ -943,10 +974,11 @@ export default function HomeScreen() {
         title: todayCareGame.title,
       } : null,
       photoRollSuggestion: todayPhotoRollSuggestion,
+      contextualCategories: careContextualCategories,
       rotatingLimit: 3,
       now: new Date(),
     });
-  }, [formingDay, formingPrompts, memoryQuests, quickGoals.goalsForToday, todayCareGame, todayPhotoRollSuggestion]);
+  }, [careContextualCategories, formingDay, formingPrompts, memoryQuests, quickGoals.goalsForToday, todayCareGame, todayPhotoRollSuggestion]);
   const selectedCareGoal = selectedCareGoalId
     ? quickGoals.goalsForToday.find((item) => item.goal.id === selectedCareGoalId) ?? null
     : null;

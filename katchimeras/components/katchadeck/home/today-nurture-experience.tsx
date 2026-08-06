@@ -40,6 +40,7 @@ import {
   homeTabBarHeight,
   HOME_ACTIONS_TAB_BAR_GAP,
   HOME_ACTIONS_Y_OFFSET,
+  HOME_EGG_ACTIONS_GAP,
   HOME_SCENE_Y_OFFSET,
 } from '@/constants/home-loop-layout';
 import { Meadow } from '@/constants/meadow-theme';
@@ -134,6 +135,7 @@ export function TodayNurtureExperience({
 }: TodayNurtureExperienceProps) {
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const [actionContentHeight, setActionContentHeight] = useState(0);
+  const [fixedActionClusterHeight, setFixedActionClusterHeight] = useState(0);
   const [checkInSelection, setCheckInSelection] = useState<CheckInSelection | null>(null);
   const checkInSelectionRef = useRef<CheckInSelection | null>(null);
   const checkInLaunchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,8 +143,15 @@ export function TodayNurtureExperience({
   const ready = growth.isActivated && (day.canHatch || growth.isReady);
   const moodAction = actions.find((action) => action.id === 'mood');
   const sleepAction = actions.find((action) => action.id === 'sleep');
-  const displayedMoodAction = moodAction ?? (checkInSelection?.kind === 'mood' ? checkInSelection.action : undefined);
-  const displayedSleepAction = sleepAction ?? (checkInSelection?.kind === 'sleep' ? checkInSelection.action : undefined);
+  // Keep the completed check-in mounted until its own exit finishes. The next
+  // sequential check-in may already be active in state, but mounting both at
+  // once makes the incoming panel reflow twice as the outgoing panel leaves.
+  const displayedMoodAction = checkInSelection
+    ? checkInSelection.kind === 'mood' ? checkInSelection.action : undefined
+    : moodAction;
+  const displayedSleepAction = checkInSelection
+    ? checkInSelection.kind === 'sleep' ? checkInSelection.action : undefined
+    : sleepAction;
   const remainingActions = actions.filter((action) => action.id !== 'mood' && action.id !== 'sleep');
   const completionIsCheckIn = completionEvent?.action.category === 'check_in';
   const completionIsStandard = completionEvent != null
@@ -152,20 +161,24 @@ export function TodayNurtureExperience({
   const sceneVerticalNudge = HOME_SCENE_Y_OFFSET;
   const contentVerticalNudge = HOME_ACTIONS_Y_OFFSET;
   const sceneLift = -100 + sceneVerticalNudge;
-  const minimumPanelStart = Math.max(316, windowHeight * 0.465) + contentVerticalNudge;
   const tabBarHeight = homeTabBarHeight(bottomInset);
   const tabBarTop = windowHeight - tabBarHeight;
-  const anchoredPanelStart = tabBarTop - HOME_ACTIONS_TAB_BAR_GAP - actionContentHeight;
-  const panelStart = actionContentHeight > 0
-    ? Math.max(minimumPanelStart, anchoredPanelStart)
-    : minimumPanelStart;
-  const sceneSpacerHeight = Math.max(240, panelStart - topInset - 8);
   const explorationEggFrame = todayExplorationEggStageFrame(
     windowWidth,
     windowHeight,
     stageTop,
   );
   const scenePinchFocusY = stageTop + sceneLift + explorationEggFrame.centerY;
+  const fixedActionClusterTop = explorationEggFrame.contactY + sceneLift + HOME_EGG_ACTIONS_GAP;
+  const basePanelStart = Math.max(316, windowHeight * 0.465) + contentVerticalNudge;
+  const minimumPanelStart = ready || fixedActionClusterHeight === 0
+    ? basePanelStart
+    : Math.max(basePanelStart, fixedActionClusterTop + fixedActionClusterHeight + 8);
+  const anchoredPanelStart = tabBarTop - HOME_ACTIONS_TAB_BAR_GAP - actionContentHeight;
+  const panelStart = actionContentHeight > 0
+    ? Math.max(minimumPanelStart, anchoredPanelStart)
+    : minimumPanelStart;
+  const sceneSpacerHeight = Math.max(240, panelStart - topInset - 8);
   const eggPanStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: sceneTranslateX.value }],
   }));
@@ -175,6 +188,10 @@ export function TodayNurtureExperience({
   const handleActionContentLayout = useCallback((event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
     setActionContentHeight((current) => Math.abs(current - nextHeight) < 0.5 ? current : nextHeight);
+  }, []);
+  const handleFixedActionClusterLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    setFixedActionClusterHeight((current) => Math.abs(current - nextHeight) < 0.5 ? current : nextHeight);
   }, []);
   const beginCheckInSelection = useCallback((selection: CheckInSelection, from: FeedSourceRect, currencyFrom: FeedSourceRect) => {
     if (checkInSelectionRef.current) return;
@@ -241,6 +258,15 @@ export function TodayNurtureExperience({
         style={[styles.timelineFixed, { top: topInset + 8 }]}>
         <LanternTimeline days={timelineDays} interactionLocked={false} onSelect={onSelectDay} selectedId={day.id} />
       </Animated.View>
+      {!ready ? (
+        <View onLayout={handleFixedActionClusterLayout} style={[styles.fixedActionCluster, { top: fixedActionClusterTop }]}>
+          <FormingActionCluster
+            onAdd={onAddJournal}
+            onCamera={onAddPhoto}
+            onNote={onAddTextNote}
+          />
+        </View>
+      ) : null}
       <ScrollView
         contentContainerStyle={{ paddingBottom: tabBarHeight + HOME_ACTIONS_TAB_BAR_GAP, paddingTop: topInset + 8 }}
         contentInsetAdjustmentBehavior="never"
@@ -256,13 +282,7 @@ export function TodayNurtureExperience({
                 <ThemedText style={styles.revealLabel} lightColor={Meadow.ink} darkColor={Meadow.ink}>Reveal the hatch</ThemedText>
               </Pressable>
             </View>
-          ) : (
-            <FormingActionCluster
-              onAdd={onAddJournal}
-              onCamera={onAddPhoto}
-              onNote={onAddTextNote}
-            />
-          )}
+          ) : null}
 
           <Animated.View
             layout={reduceMotion ? undefined : LinearTransition.duration(220).easing(Easing.out(Easing.cubic))}
@@ -278,8 +298,10 @@ export function TodayNurtureExperience({
                   interactionLocked={checkInSelection != null}
                   onChoose={(selection, from, currencyFrom) => beginCheckInSelection({ ...selection, action: displayedMoodAction, kind: 'mood' }, from, currencyFrom)}
                   onFinished={finishCheckInSelection}
+                  onSkip={() => onCareNotToday(displayedMoodAction)}
                   reduceMotion={reduceMotion}
                   selection={checkInSelection?.kind === 'mood' ? checkInSelection : null}
+                  swipeExternalGesture={careSwipeExternalGesture}
                 />
               ) : null}
               {displayedSleepAction ? (
@@ -289,8 +311,10 @@ export function TodayNurtureExperience({
                   interactionLocked={checkInSelection != null}
                   onChoose={(selection, from, currencyFrom) => beginCheckInSelection({ ...selection, action: displayedSleepAction, kind: 'sleep' }, from, currencyFrom)}
                   onFinished={finishCheckInSelection}
+                  onSkip={() => onCareNotToday(displayedSleepAction)}
                   reduceMotion={reduceMotion}
                   selection={checkInSelection?.kind === 'sleep' ? checkInSelection : null}
+                  swipeExternalGesture={careSwipeExternalGesture}
                 />
               ) : null}
             </Animated.View>
@@ -378,14 +402,16 @@ type InlineChoice = {
   label: string;
 };
 
-function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFinished, reduceMotion, selection }: {
+function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
+  onSkip: () => void;
   reduceMotion: boolean;
   selection: CheckInSelection | null;
+  swipeExternalGesture: GestureType;
 }) {
   return (
     <InlineCheckInPanel
@@ -395,20 +421,24 @@ function InlineMood({ action, completionEvent, interactionLocked, onChoose, onFi
       interactionLocked={interactionLocked}
       onChoose={onChoose}
       onFinished={onFinished}
+      onSkip={onSkip}
       reduceMotion={reduceMotion}
       selection={selection}
+      swipeExternalGesture={swipeExternalGesture}
     />
   );
 }
 
-function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onFinished, reduceMotion, selection }: {
+function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture }: {
   action: RankedTodayCareAction;
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
+  onSkip: () => void;
   reduceMotion: boolean;
   selection: CheckInSelection | null;
+  swipeExternalGesture: GestureType;
 }) {
   return (
     <InlineCheckInPanel
@@ -418,22 +448,26 @@ function InlineSleep({ action, completionEvent, interactionLocked, onChoose, onF
       interactionLocked={interactionLocked}
       onChoose={onChoose}
       onFinished={onFinished}
+      onSkip={onSkip}
       reduceMotion={reduceMotion}
       selection={selection}
+      swipeExternalGesture={swipeExternalGesture}
       wide
     />
   );
 }
 
-function InlineCheckInPanel({ action, choices, completionEvent, interactionLocked, onChoose, onFinished, reduceMotion, selection, wide = false }: {
+function InlineCheckInPanel({ action, choices, completionEvent, interactionLocked, onChoose, onFinished, onSkip, reduceMotion, selection, swipeExternalGesture, wide = false }: {
   action: RankedTodayCareAction;
   choices: InlineChoice[];
   completionEvent: TodayCareCompletionEvent | null;
   interactionLocked: boolean;
   onChoose: (selection: Omit<CheckInSelection, 'action' | 'kind'>, from: FeedSourceRect, currencyFrom: FeedSourceRect) => void;
   onFinished: (eventId: string) => void;
+  onSkip: () => void;
   reduceMotion: boolean;
   selection: CheckInSelection | null;
+  swipeExternalGesture: GestureType;
   wide?: boolean;
 }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -490,47 +524,77 @@ function InlineCheckInPanel({ action, choices, completionEvent, interactionLocke
   const pulseStyle = useAnimatedStyle(() => ({ opacity: panelPulse.value * 0.18 }));
 
   return (
-    <Animated.View style={[styles.inlineCard, panelStyle]}>
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.inlineSelectionPulse, { backgroundColor: selection?.accent ?? 'transparent' }, pulseStyle]}
-      />
-      <InlineHeading action={action} rewardRef={rewardRef} />
-      <View style={wide ? styles.sleepGrid : styles.moodGrid}>
-        {choices.map((choice) => (
-          <MeasuredChoice
-            accent={choice.accent}
-            disabled={interactionLocked}
-            dimmed={selection != null && selection.id !== choice.id}
-            image={choice.image}
-            key={choice.id}
-            label={choice.label}
-            onPress={(from) => {
-              if (rewardRef.current) {
-                rewardRef.current.measureInWindow((x, y, width, height) => {
-                  onChoose(choice, from, { h: height, w: width, x, y });
-                });
-              } else {
-                onChoose(choice, from, from);
-              }
-            }}
-            reduceMotion={reduceMotion}
-            selected={selection?.id === choice.id}
-            wide={wide}
+    <Animated.View
+      entering={reduceMotion
+        ? FadeIn.duration(70)
+        : FadeInUp.duration(220).easing(Easing.out(Easing.cubic))}>
+      <CareSwipeShell
+        disabled={interactionLocked}
+        externalGesture={swipeExternalGesture}
+        label={action.title}
+        onDismiss={onSkip}
+        reduceMotion={reduceMotion}>
+        <Animated.View style={[styles.inlineCard, panelStyle]}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.inlineSelectionPulse, { backgroundColor: selection?.accent ?? 'transparent' }, pulseStyle]}
           />
-        ))}
-      </View>
+          <InlineHeading action={action} disabled={interactionLocked} onSkip={onSkip} rewardRef={rewardRef} />
+          <View style={wide ? styles.sleepGrid : styles.moodGrid}>
+            {choices.map((choice) => (
+              <MeasuredChoice
+                accent={choice.accent}
+                disabled={interactionLocked}
+                dimmed={selection != null && selection.id !== choice.id}
+                image={choice.image}
+                key={choice.id}
+                label={choice.label}
+                onPress={(from) => {
+                  if (rewardRef.current) {
+                    rewardRef.current.measureInWindow((x, y, width, height) => {
+                      onChoose(choice, from, { h: height, w: width, x, y });
+                    });
+                  } else {
+                    onChoose(choice, from, from);
+                  }
+                }}
+                reduceMotion={reduceMotion}
+                selected={selection?.id === choice.id}
+                wide={wide}
+              />
+            ))}
+          </View>
+        </Animated.View>
+      </CareSwipeShell>
     </Animated.View>
   );
 }
 
-function InlineHeading({ action, rewardRef }: { action: RankedTodayCareAction; rewardRef: RefObject<ViewType | null> }) {
+function InlineHeading({ action, disabled, onSkip, rewardRef }: {
+  action: RankedTodayCareAction;
+  disabled: boolean;
+  onSkip: () => void;
+  rewardRef: RefObject<ViewType | null>;
+}) {
+  const handleSkip = () => {
+    if (process.env.EXPO_OS === 'ios') void Haptics.selectionAsync();
+    onSkip();
+  };
   return (
     <View style={styles.inlineHeading}>
-      <View style={styles.flexCopy}>
-        <ThemedText style={styles.rowTitle} lightColor={Meadow.ink} darkColor={Meadow.ink}>{action.title}</ThemedText>
-      </View>
-      <View collapsable={false} ref={rewardRef}>
+      <Pressable
+        accessibilityLabel={`Skip ${action.title} for today`}
+        accessibilityRole="button"
+        disabled={disabled}
+        hitSlop={8}
+        onPress={handleSkip}
+        style={({ pressed }) => [styles.inlineSkip, disabled && styles.inlineSkipDisabled, pressed && styles.inlineSkipPressed]}>
+        <ThemedText style={styles.inlineSkipLabel} lightColor={Meadow.inkSoft} darkColor={Meadow.inkSoft}>Skip</ThemedText>
+      </Pressable>
+      <ThemedText numberOfLines={1} style={[styles.rowTitle, styles.inlineQuestion]} lightColor={Meadow.ink} darkColor={Meadow.ink}>
+        {action.title}
+      </ThemedText>
+      <View collapsable={false} ref={rewardRef} style={styles.inlineReward}>
         <Reward amount={action.growthReward} />
       </View>
     </View>
@@ -1212,6 +1276,7 @@ const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFillObject, backgroundColor: '#F7F1E2', zIndex: 40 },
   contentScroll: { position: 'relative', zIndex: 6 },
   timelineFixed: { left: 0, paddingHorizontal: 2, position: 'absolute', right: 0, zIndex: 20 },
+  fixedActionCluster: { left: 0, position: 'absolute', right: 0, zIndex: 12 },
   eggStage: { alignItems: 'center', height: TODAY_KINGDOM_STAGE_HEIGHT, justifyContent: 'center', left: 0, overflow: 'visible', position: 'absolute', right: 0, zIndex: 2 },
   environmentFade: { bottom: 0, experimental_backgroundImage: 'linear-gradient(to bottom, rgba(247,241,226,0) 0%, rgba(247,241,226,0.72) 62%, #F7F1E2 100%)', height: 150, left: 0, position: 'absolute', right: 0, zIndex: 1 },
   meterAnchor: { left: 0, position: 'absolute', right: 0, zIndex: 4 },
@@ -1235,7 +1300,13 @@ const styles = StyleSheet.create({
   checkInGroup: { gap: 6 },
   inlineCard: { backgroundColor: 'rgba(246,237,214,0.96)', borderColor: 'rgba(122,84,44,0.20)', borderCurve: 'continuous', borderRadius: 16, borderWidth: 1, boxShadow: '0 4px 10px rgba(34,24,12,0.22), inset 0 1px 0 rgba(255,252,238,0.72)', gap: 8, overflow: 'hidden', padding: 9, position: 'relative' },
   inlineSelectionPulse: { ...StyleSheet.absoluteFillObject, borderRadius: 16 },
-  inlineHeading: { alignItems: 'flex-start', flexDirection: 'row', gap: 8 },
+  inlineHeading: { alignItems: 'center', justifyContent: 'center', minHeight: 30, position: 'relative' },
+  inlineQuestion: { paddingHorizontal: 66, textAlign: 'center', width: '100%' },
+  inlineSkip: { alignItems: 'center', backgroundColor: 'rgba(122,84,44,0.08)', borderCurve: 'continuous', borderRadius: 999, justifyContent: 'center', left: 0, minHeight: 28, paddingHorizontal: 9, position: 'absolute', top: 1, zIndex: 2 },
+  inlineSkipDisabled: { opacity: 0.42 },
+  inlineSkipPressed: { backgroundColor: 'rgba(122,84,44,0.16)', transform: [{ scale: 0.96 }] },
+  inlineSkipLabel: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '800' },
+  inlineReward: { position: 'absolute', right: 0, top: 1, zIndex: 2 },
   flexCopy: { flex: 1, gap: 2 },
   rowTitle: { fontFamily: AppFontFamilies.manrope, fontSize: 14, fontWeight: '800', lineHeight: 17 },
   rowBody: { fontFamily: AppFontFamilies.manrope, fontSize: 10.5, fontWeight: '600', lineHeight: 14 },

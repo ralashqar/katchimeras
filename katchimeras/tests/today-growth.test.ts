@@ -44,6 +44,26 @@ function day(overrides: Partial<StoredHomeDayRecord> = {}): StoredHomeDayRecord 
   };
 }
 
+function afterCareCheckIns(record: StoredHomeDayRecord = day()): StoredHomeDayRecord {
+  return {
+    ...record,
+    promptAnswers: [
+      ...record.promptAnswers.filter((answer) => answer.kind !== 'feeling'),
+      {
+        id: `care-mood-${record.isoDate}`,
+        kind: 'feeling',
+        choiceIds: ['good'],
+        labels: ['Good'],
+        createdAt: `${record.isoDate}T08:00:00.000Z`,
+        source: 'prompt_chip',
+        semanticTags: ['feeling:good'],
+        scoreBias: {},
+      },
+    ],
+    sleep: record.sleep ?? { quality: 'good', source: 'manual', recordedAt: `${record.isoDate}T08:00:00.000Z` },
+  };
+}
+
 test('Energy payouts use five arrivals and preserve the exact reward', () => {
   for (const amount of [5, 8, 10, 15, 18, 20, 25]) {
     const tokens = splitEnergyAcrossTokens(amount);
@@ -179,13 +199,10 @@ test('Tomorrow can grow before rollover without starting its incubation clock ea
   assert.equal(preview.isReady, false);
 });
 
-test('Care queue is memory-first, bounded, and respects Not today', () => {
+test('Care queue presents mood then sleep sequentially before rotating actions', () => {
   const base = day();
   const first = rankTodayCareActions({ day: base, now: new Date(2026, 7, 5, 13, 0) });
-  assert.equal(first.active.length, 5);
-  assert.equal(first.active[0]?.id, 'mood');
-  assert.equal(first.active[1]?.id, 'sleep');
-  assert.ok(first.active.slice(2).filter((action) => action.journalFocused).length >= 2);
+  assert.deepEqual(first.active.map((item) => item.id), ['mood']);
   const dismissed = day({
     growth: {
       schemaVersion: 1,
@@ -201,9 +218,100 @@ test('Care queue is memory-first, bounded, and respects Not today', () => {
   });
   const next = rankTodayCareActions({ day: dismissed, now: new Date(2026, 7, 5, 13, 2) });
   assert.equal(next.active.some((item) => item.id === 'mood'), false);
+  assert.deepEqual(next.active.map((item) => item.id), ['sleep']);
 });
 
-test('A completed journal category does not repeat and another journal action replaces it', () => {
+test('A reset day starts with a category-specific action instead of generic journaling', () => {
+  const ranked = rankTodayCareActions({
+    day: afterCareCheckIns(),
+    now: new Date(2026, 7, 5, 13, 0),
+    rotatingLimit: 3,
+  });
+  const rotating = ranked.active.filter((action) => action.category !== 'check_in');
+
+  assert.equal(rotating.some((action) => action.id === 'journal'), false);
+  assert.equal(
+    rotating.some((action) => ['place', 'movement', 'food', 'studio', 'people', 'work'].includes(action.completionKey)),
+    true,
+  );
+});
+
+test('Contextual care replaces generic journaling and may fill all three rotating slots', () => {
+  const ranked = rankTodayCareActions({
+    day: afterCareCheckIns(),
+    contextualCategories: ['food', 'place', 'people'],
+    now: new Date(2026, 7, 5, 16, 0),
+    rotatingLimit: 3,
+  });
+  const rotating = ranked.active.filter((action) => action.category !== 'check_in');
+
+  assert.deepEqual(
+    new Set(rotating.map((action) => action.completionKey)),
+    new Set(['food', 'place', 'people']),
+  );
+  assert.equal(rotating.some((action) => action.id === 'journal'), false);
+  assert.deepEqual(
+    rotating.find((action) => action.id === 'people')?.destination,
+    { kind: 'quick_category', category: 'people' },
+  );
+});
+
+test('Skipping generic journaling keeps it dismissed while other memory actions replace it', () => {
+  const skipped = day({
+    growth: {
+      schemaVersion: 1,
+      events: [],
+      careActions: [{
+        instanceId: 'care:2026-08-05:journal',
+        definitionId: 'journal',
+        status: 'not_today',
+        dismissedAt: '2026-08-05T13:00:00.000Z',
+        updatedAt: '2026-08-05T13:00:00.000Z',
+      }],
+    },
+  });
+  const ranked = rankTodayCareActions({ day: afterCareCheckIns(skipped), now: new Date(2026, 7, 5, 13, 1) });
+  const rotating = ranked.active.filter((action) => action.category !== 'check_in');
+
+  assert.equal(rotating.length, 3);
+  assert.equal(rotating.some((action) => action.completionKey === 'journal'), false);
+  assert.ok(rotating.every((action) => action.completionKey !== 'journal'));
+});
+
+test('Skipping a category suppresses concrete quest aliases for the rest of the day', () => {
+  const skipped = day({
+    growth: {
+      schemaVersion: 1,
+      events: [],
+      careActions: [{
+        instanceId: 'care:2026-08-05:food',
+        definitionId: 'food',
+        status: 'not_today',
+        dismissedAt: '2026-08-05T13:00:00.000Z',
+        updatedAt: '2026-08-05T13:00:00.000Z',
+      }],
+    },
+  });
+  const ranked = rankTodayCareActions({
+    day: afterCareCheckIns(skipped),
+    contextualCategories: ['food'],
+    memoryQuests: [{
+      id: 'quest-2026-08-05-saveFoodMemory',
+      type: 'saveFoodMemory',
+      emoji: 'food',
+      title: 'Save lunch',
+      rewardLabel: 'the food vault',
+      targetCell: 'foodVault',
+      essenceReward: 5,
+      completed: false,
+    }],
+    now: new Date(2026, 7, 5, 13, 1),
+  });
+
+  assert.equal(ranked.active.some((action) => action.completionKey === 'food'), false);
+});
+
+test('A completed journal category does not repeat and another memory action replaces it', () => {
   const withFoodJournal = day({
     journalRecords: [{
       id: 'journal-food-1',
@@ -223,13 +331,14 @@ test('A completed journal category does not repeat and another journal action re
     }],
   });
   const ranked = rankTodayCareActions({
-    day: withFoodJournal,
+    day: afterCareCheckIns(withFoodJournal),
     now: new Date(2026, 7, 5, 13, 0),
     rotatingLimit: 4,
   });
 
   assert.equal(ranked.active.some((action) => action.completionKey === 'food'), false);
-  assert.equal(ranked.active.some((action) => action.id === 'journal'), true);
+  assert.equal(ranked.active.filter((action) => action.category !== 'check_in').length, 4);
+  assert.equal(ranked.active.some((action) => action.id === 'journal'), false);
 });
 
 test('Photo and voice journal artifacts remain available to the care completion animator', () => {
@@ -263,7 +372,7 @@ test('Photo and voice journal artifacts remain available to the care completion 
     ],
   });
   const ranked = rankTodayCareActions({
-    day: withMediaJournals,
+    day: afterCareCheckIns(withMediaJournals),
     now: new Date(2026, 7, 5, 13, 0),
     rotatingLimit: 4,
   });
@@ -304,7 +413,7 @@ test('An artifact completes the exact concrete care action that launched its cap
     }],
   });
   const ranked = rankTodayCareActions({
-    day: captured,
+    day: afterCareCheckIns(captured),
     memoryQuests: [quest],
     now: new Date(2026, 7, 5, 13, 0),
   });
@@ -315,7 +424,7 @@ test('An artifact completes the exact concrete care action that launched its cap
   );
 });
 
-test('Dismissing a concrete category also suppresses its generic replacement for the day', () => {
+test('Dismissing a concrete category suppresses its aliases and selects another specific category', () => {
   const dismissedPhotoQuest = day({
     growth: {
       schemaVersion: 1,
@@ -331,7 +440,7 @@ test('Dismissing a concrete category also suppresses its generic replacement for
     },
   });
   const ranked = rankTodayCareActions({
-    day: dismissedPhotoQuest,
+    day: afterCareCheckIns(dismissedPhotoQuest),
     memoryQuests: [{
       id: 'quest-photo-2',
       type: 'captureMoment',
@@ -347,17 +456,21 @@ test('Dismissing a concrete category also suppresses its generic replacement for
   });
 
   assert.equal(ranked.active.some((action) => action.completionKey === 'photo'), false);
-  assert.equal(ranked.active.some((action) => action.completionKey === 'journal'), true);
+  assert.equal(ranked.active.some((action) => action.completionKey === 'journal'), false);
+  assert.equal(
+    ranked.active.some((action) => ['place', 'movement', 'food', 'studio', 'people', 'work'].includes(action.completionKey)),
+    true,
+  );
 });
 
-test('Mood and sleep remain the first care choices throughout the day', () => {
+test('Mood remains the first sequential check-in throughout the day', () => {
   const evening = rankTodayCareActions({ day: day(), now: new Date(2026, 7, 5, 20, 0) });
-  assert.deepEqual(evening.active.slice(0, 2).map((action) => action.id), ['mood', 'sleep']);
+  assert.deepEqual(evening.active.map((action) => action.id), ['mood']);
 });
 
 test('Today care reserves two rotating slots for memories and caps quick goals at one', () => {
   const ranked = rankTodayCareActions({
-    day: day(),
+    day: afterCareCheckIns(),
     now: new Date(2026, 7, 5, 16, 0),
     quickGoals: [
       { id: 'goal-1', title: 'Water the herbs', familyId: 'mossprout', completed: false },
@@ -378,7 +491,7 @@ test('Today care reserves two rotating slots for memories and caps quick goals a
 
 test('Today care can fill a fourth rotating slot without adding another quick goal', () => {
   const ranked = rankTodayCareActions({
-    day: day(),
+    day: afterCareCheckIns(),
     now: new Date(2026, 7, 5, 16, 0),
     quickGoals: [
       { id: 'goal-1', title: 'Water the herbs', familyId: 'mossprout', completed: false },
@@ -394,7 +507,7 @@ test('Today care can fill a fourth rotating slot without adding another quick go
 
 test('Today care surfaces a playable mini-game while preserving two journal actions', () => {
   const ranked = rankTodayCareActions({
-    day: day(),
+    day: afterCareCheckIns(),
     memoryQuests: [
       {
         id: 'quest-2026-08-05-captureMoment',
@@ -455,7 +568,7 @@ test('Today care never repeats a completed mini-game but may offer a different o
     },
   });
   const same = rankTodayCareActions({
-    day: completedGameDay,
+    day: afterCareCheckIns(completedGameDay),
     miniGameSuggestion: {
       companionName: 'Cheerlet', familyId: 'cheerlet', questId: completedQuestId, title: 'Cheerlet’s Block Party',
     },
@@ -465,7 +578,7 @@ test('Today care never repeats a completed mini-game but may offer a different o
   assert.equal(same.active.some((action) => action.destination.kind === 'mini_game'), false);
 
   const different = rankTodayCareActions({
-    day: completedGameDay,
+    day: afterCareCheckIns(completedGameDay),
     miniGameSuggestion: {
       companionName: 'Cheerlet', familyId: 'cheerlet', questId: 'quest-cheerlet-parade-sort', title: 'Cheerlet’s Parade Sort',
     },
@@ -492,7 +605,7 @@ test('Today care surfaces a detected Photo Library journaling action', () => {
   });
 
   const ranked = rankTodayCareActions({
-    day: day(),
+    day: afterCareCheckIns(),
     now: new Date(2026, 7, 5, 13, 0),
     photoRollSuggestion: suggestion,
     rotatingLimit: 4,
@@ -548,7 +661,7 @@ test('Detected Photo Library suggestions prefer a geolocation cluster', () => {
 test('Mini-game care completion requires a consumed launch and successful attempt receipt', () => {
   cancelTodayCareGameRound();
   const action = rankTodayCareActions({
-    day: day(),
+    day: afterCareCheckIns(),
     miniGameSuggestion: {
       companionName: 'Cheerlet',
       familyId: 'cheerlet',
@@ -580,7 +693,7 @@ test('Concrete memory quests replace duplicate generic actions and route directl
     essenceReward: 5,
     completed: false,
   };
-  const ranked = rankTodayCareActions({ day: day(), memoryQuests: [quest], now: new Date(2026, 7, 5, 13, 0) });
+  const ranked = rankTodayCareActions({ day: afterCareCheckIns(), memoryQuests: [quest], now: new Date(2026, 7, 5, 13, 0) });
   const photoActions = ranked.active.filter((action) => action.completionKey === 'photo');
   assert.equal(photoActions.length, 1);
   assert.equal(photoActions[0]?.source, 'memory_quest');
@@ -589,9 +702,9 @@ test('Concrete memory quests replace duplicate generic actions and route directl
   assert.equal(ranked.active.some((action) => action.id === 'quest'), false);
 });
 
-test('Today care excludes the big-moment quest and labels manual journaling clearly', () => {
+test('Today care excludes the big-moment quest and does not force generic journaling', () => {
   const ranked = rankTodayCareActions({
-    day: day(),
+    day: afterCareCheckIns(),
     memoryQuests: [{
       id: 'quest-2026-08-05-markBigMoment',
       type: 'markBigMoment',
@@ -604,11 +717,8 @@ test('Today care excludes the big-moment quest and labels manual journaling clea
     }],
     now: new Date(2026, 7, 5, 13, 0),
   });
-  const journal = ranked.active.find((action) => action.id === 'journal');
-
   assert.equal(ranked.active.some((action) => action.sourceId === 'quest-2026-08-05-markBigMoment'), false);
-  assert.equal(journal?.title, "Write in today's journal");
-  assert.deepEqual(journal?.destination, { kind: 'quick_category', category: 'manual_journal' });
+  assert.equal(ranked.active.some((action) => action.id === 'journal'), false);
 });
 
 test('Completed concrete quests remain available to the completion animator', () => {
@@ -639,7 +749,7 @@ test('Reflection actions are withheld when no working reflection flow exists', (
     completed: false,
   };
   const ranked = rankTodayCareActions({
-    day: day(),
+    day: afterCareCheckIns(),
     memoryQuests: [reflectionQuest],
     now: new Date(2026, 7, 5, 20, 0),
     reflectionAvailable: false,
@@ -648,7 +758,7 @@ test('Reflection actions are withheld when no working reflection flow exists', (
 });
 
 test('Morning still has three journal-focused rotating actions', () => {
-  const ranked = rankTodayCareActions({ day: day(), now: new Date(2026, 7, 5, 9, 0) });
+  const ranked = rankTodayCareActions({ day: afterCareCheckIns(), now: new Date(2026, 7, 5, 9, 0) });
   const rotating = ranked.active.filter((action) => action.category !== 'check_in');
   assert.equal(rotating.length, 3);
   assert.equal(rotating.every((action) => action.journalFocused), true);

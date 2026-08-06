@@ -1,6 +1,7 @@
 /** Optical offsets shared by the forming, hatch, and settled Home compositions. */
 export const HOME_SCENE_Y_OFFSET = 22;
 export const HOME_ACTIONS_Y_OFFSET = 36;
+export const HOME_EGG_ACTIONS_GAP = 12;
 
 /** Keep the forming action stack visually attached to the floating tab bar. */
 export const HOME_ACTIONS_TAB_BAR_GAP = 20;

@@ -7,6 +7,7 @@ import { normalizeDayGrowthState, TODAY_GROWTH_REWARDS } from '@/utils/today-gro
 export type TodayCareTimeBucket = 'morning' | 'midday' | 'afternoon' | 'evening';
 export type TodayCareSource = 'system' | 'memory_quest' | 'quick_goal' | 'ai';
 export type TodayCareCompletionMode = 'artifact' | 'inline_check_in' | 'quick_goal' | 'external_activity';
+export type TodayCareContextCategory = 'photo' | 'place' | 'movement' | 'food' | 'studio' | 'people' | 'work';
 export type TodayCareArtKey =
   | 'mood'
   | 'sleep'
@@ -25,7 +26,7 @@ export type TodayCareArtKey =
 export type TodayCareDestination =
   | { kind: 'inline_mood' }
   | { kind: 'inline_sleep' }
-  | { kind: 'quick_category'; category: 'photo' | 'voice_note' | 'manual_journal' | 'place' | 'movement' | 'food' }
+  | { kind: 'quick_category'; category: 'photo' | 'voice_note' | 'manual_journal' | 'place' | 'movement' | 'food' | 'studio' | 'people' | 'work' | 'life_event' }
   | { kind: 'reflection' }
   | { kind: 'memory_quest'; questType: MemoryQuestType }
   | { kind: 'quick_goal'; goalId: string; familyId: KatchimeraFamilyId }
@@ -92,6 +93,7 @@ export type TodayCarePhotoRollSuggestion = {
 
 const ALL_DAY: TodayCareTimeBucket[] = ['morning', 'midday', 'afternoon', 'evening'];
 const AFTER_MORNING: TodayCareTimeBucket[] = ['midday', 'afternoon', 'evening'];
+const CATEGORY_SPECIFIC_COMPLETION_KEYS = new Set(['place', 'movement', 'food', 'studio', 'people', 'work']);
 
 const CARE_CATALOG: TodayCareActionDefinition[] = [
   action({
@@ -137,14 +139,32 @@ const CARE_CATALOG: TodayCareActionDefinition[] = [
   action({
     id: 'movement', title: 'Journal how you moved', description: 'Record a walk, workout, or journey.',
     icon: 'figure.walk', artKey: 'movement', category: 'memory', completionKey: 'movement', completionMode: 'artifact',
-    destination: { kind: 'quick_category', category: 'movement' }, growthSource: 'movement', priority: 70,
+    destination: { kind: 'quick_category', category: 'movement' }, growthSource: 'movement', priority: 76,
     eligibleTimeOfDay: AFTER_MORNING, journalFocused: true,
   }),
   action({
     id: 'food', title: 'Journal a meal or drink', description: 'Record something you ate or drank today.',
     icon: 'fork.knife', artKey: 'food', category: 'memory', completionKey: 'food', completionMode: 'artifact',
-    destination: { kind: 'quick_category', category: 'food' }, growthSource: 'journal', priority: 72,
+    destination: { kind: 'quick_category', category: 'food' }, growthSource: 'journal', priority: 76,
     eligibleTimeOfDay: ['midday', 'evening'], journalFocused: true,
+  }),
+  action({
+    id: 'studio', title: 'Keep something that inspired you', description: 'Record something you watched, read, played, or made.',
+    icon: 'books.vertical.fill', artKey: 'studio', category: 'memory', completionKey: 'studio', completionMode: 'artifact',
+    destination: { kind: 'quick_category', category: 'studio' }, growthSource: 'journal', priority: 76,
+    eligibleTimeOfDay: ALL_DAY, journalFocused: true,
+  }),
+  action({
+    id: 'people', title: 'Remember who was part of today', description: 'Record time with someone, a pet, or time by yourself.',
+    icon: 'person.2.fill', artKey: 'people', category: 'memory', completionKey: 'people', completionMode: 'artifact',
+    destination: { kind: 'quick_category', category: 'people' }, growthSource: 'journal', priority: 76,
+    eligibleTimeOfDay: ALL_DAY, journalFocused: true,
+  }),
+  action({
+    id: 'work', title: 'Record what you worked on', description: 'Keep a piece of progress, effort, study, or making.',
+    icon: 'briefcase.fill', artKey: 'work', category: 'memory', completionKey: 'work', completionMode: 'artifact',
+    destination: { kind: 'quick_category', category: 'work' }, growthSource: 'journal', priority: 76,
+    eligibleTimeOfDay: ALL_DAY, journalFocused: true,
   }),
 ];
 
@@ -157,13 +177,19 @@ export function rankTodayCareActions(input: {
   reflectionAvailable?: boolean;
   miniGameSuggestion?: TodayCareMiniGameSuggestion | null;
   photoRollSuggestion?: TodayCarePhotoRollSuggestion | null;
+  contextualCategories?: readonly TodayCareContextCategory[];
 }): { active: RankedTodayCareAction[]; completed: RankedTodayCareAction[] } {
   const now = input.now ?? new Date();
   const bucket = careTimeBucket(now);
   const state = normalizeDayGrowthState(input.day.growth);
   const stateById = new Map(state.careActions.map((item) => [item.instanceId, item]));
+  const contextualKeys = new Set<string>(input.contextualCategories ?? []);
+  for (const quest of input.memoryQuests ?? []) {
+    const key = memoryQuestRoute(quest.type).completionKey;
+    if (['place', 'food', 'studio'].includes(key)) contextualKeys.add(key);
+  }
   const candidates: RankedTodayCareAction[] = CARE_CATALOG
-    .filter((definition) => definition.eligibleTimeOfDay.includes(bucket))
+    .filter((definition) => definition.eligibleTimeOfDay.includes(bucket) || contextualKeys.has(definition.completionKey))
     .filter((definition) => definition.id !== 'reflection' || input.reflectionAvailable !== false)
     .map((definition) => ranked(definition, input.day.isoDate, 'system', isDefinitionAlreadySatisfied(definition.id, input.day)));
 
@@ -258,8 +284,8 @@ export function rankTodayCareActions(input: {
   );
   for (const key of artifactCompletionKeys(input.day)) completedKeys.add(key);
   const dismissedKeys = new Set(
-    candidates.flatMap((candidate) => stateById.get(candidate.instanceId)?.status === 'not_today'
-      ? [candidate.completionKey]
+    state.careActions.flatMap((stored) => stored.status === 'not_today'
+      ? storedCompletionKey(stored.definitionId)
       : []),
   );
 
@@ -287,27 +313,63 @@ export function rankTodayCareActions(input: {
   const checkIns = eligible
     .filter((candidate) => candidate.category === 'check_in')
     .sort(compareCandidates);
+  if (checkIns.length > 0) {
+    return {
+      active: checkIns.slice(0, 1),
+      completed: completed.sort((left, right) => (right.completedAt ?? '').localeCompare(left.completedAt ?? '')),
+    };
+  }
   const rotating = eligible
     .filter((candidate) => candidate.category !== 'check_in')
+    .map((candidate) => contextualKeys.has(candidate.completionKey)
+      ? { ...candidate, priority: candidate.priority + 40 }
+      : candidate)
     .sort(compareCandidates);
   const withoutDuplicateCompletions = dedupeCompletionKeys(rotating);
   const memory = withoutDuplicateCompletions.filter((candidate) => candidate.journalFocused);
   const goals = withoutDuplicateCompletions.filter((candidate) => candidate.category === 'goal');
   const games = withoutDuplicateCompletions.filter((candidate) => candidate.category === 'play');
   const rotatingLimit = input.rotatingLimit ?? 3;
-  const selected: RankedTodayCareAction[] = memory.slice(0, Math.min(2, rotatingLimit));
+  const contextualMemory = memory.filter((candidate) => contextualKeys.has(candidate.completionKey));
+  const selected: RankedTodayCareAction[] = contextualMemory.slice(0, rotatingLimit);
+  const memoryTarget = Math.min(2, rotatingLimit);
+  if (selected.length < memoryTarget) {
+    const categorySpecific = memory.find((candidate) => (
+      candidate.id !== 'journal'
+      && CATEGORY_SPECIFIC_COMPLETION_KEYS.has(candidate.completionKey)
+      && !selected.some((item) => item.instanceId === candidate.instanceId)
+    ));
+    if (categorySpecific) selected.push(categorySpecific);
+  }
+  for (const candidate of memory) {
+    if (selected.length >= memoryTarget) break;
+    // Generic journaling is a last resort, not a competitor to a concrete action.
+    if (candidate.id === 'journal') continue;
+    if (!selected.some((item) => item.instanceId === candidate.instanceId)) selected.push(candidate);
+  }
   if (selected.length < rotatingLimit && games[0]) selected.push(games[0]);
   if (selected.length < rotatingLimit && goals[0]) selected.push(goals[0]);
   for (const candidate of withoutDuplicateCompletions) {
     if (selected.length >= rotatingLimit) break;
-    if (candidate.category === 'goal') continue;
+    if (candidate.category === 'goal' || candidate.id === 'journal') continue;
     if (!selected.some((item) => item.instanceId === candidate.instanceId)) selected.push(candidate);
+  }
+  if (selected.length < rotatingLimit) {
+    const journalFallback = memory.find((candidate) => candidate.id === 'journal');
+    if (journalFallback) selected.push(journalFallback);
   }
 
   return {
     active: [...checkIns, ...selected],
     completed: completed.sort((left, right) => (right.completedAt ?? '').localeCompare(left.completedAt ?? '')),
   };
+}
+
+function storedCompletionKey(definitionId: string): string[] {
+  if (definitionId.startsWith('memory-quest:')) return [definitionId.slice('memory-quest:'.length)];
+  if (definitionId === 'photo_roll') return ['photo'];
+  if (definitionId.startsWith('mini_game_round:')) return [`mini_game:${definitionId.slice('mini_game_round:'.length)}`];
+  return [definitionId];
 }
 
 export function careTimeBucket(date: Date): TodayCareTimeBucket {
