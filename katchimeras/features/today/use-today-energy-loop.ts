@@ -14,7 +14,8 @@ export type TodayEnergyLoopStatus =
   | 'rewarding'
   | 'entering';
 
-const ACTION_INTRO_SETTLE_MS = 160;
+const ACTION_INTRO_SETTLE_MS = 340;
+const REWARD_LOCK_TIMEOUT_MS = 5_000;
 
 export function useTodayEnergyLoop() {
   const [pendingIntent, setPendingIntentState] = useState<RankedTodayCareAction | null>(null);
@@ -26,18 +27,22 @@ export function useTodayEnergyLoop() {
   const traceIdRef = useRef<string | null>(null);
   const handoffFrameRef = useRef<number | null>(null);
   const introTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rewardLockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (handoffFrameRef.current != null) cancelAnimationFrame(handoffFrameRef.current);
     if (introTimerRef.current) clearTimeout(introTimerRef.current);
+    if (rewardLockTimerRef.current) clearTimeout(rewardLockTimerRef.current);
     if (traceIdRef.current) markTodayEnergyPhase(traceIdRef.current, 'cancelled', { reason: 'unmount' });
   }, []);
 
   const startIntent = useCallback((action: RankedTodayCareAction, rewardRequestKey: number) => {
     if (handoffFrameRef.current != null) cancelAnimationFrame(handoffFrameRef.current);
     if (introTimerRef.current) clearTimeout(introTimerRef.current);
+    if (rewardLockTimerRef.current) clearTimeout(rewardLockTimerRef.current);
     handoffFrameRef.current = null;
     introTimerRef.current = null;
+    rewardLockTimerRef.current = null;
     if (traceIdRef.current) markTodayEnergyPhase(traceIdRef.current, 'cancelled', { reason: 'replaced' });
     traceIdRef.current = startTodayEnergyTrace(action.id);
     rewardRequestKeyAtStartRef.current = rewardRequestKey;
@@ -63,8 +68,10 @@ export function useTodayEnergyLoop() {
   const clearIntent = useCallback((reason = 'cancelled') => {
     if (handoffFrameRef.current != null) cancelAnimationFrame(handoffFrameRef.current);
     if (introTimerRef.current) clearTimeout(introTimerRef.current);
+    if (rewardLockTimerRef.current) clearTimeout(rewardLockTimerRef.current);
     handoffFrameRef.current = null;
     introTimerRef.current = null;
+    rewardLockTimerRef.current = null;
     if (traceIdRef.current) markTodayEnergyPhase(traceIdRef.current, 'cancelled', { reason });
     traceIdRef.current = null;
     flowWasBusyRef.current = false;
@@ -85,7 +92,7 @@ export function useTodayEnergyLoop() {
     setStatus('rewarding');
   }, []);
 
-  const finishCompletion = useCallback((eventId: string, onHandoff?: () => void) => {
+  const finishRewardHandoff = useCallback((onHandoff?: () => void) => {
     // The outgoing row has completed its UI-thread transform. Do not remove it,
     // derive the replacement list, and mount the incoming row in that same
     // frame; that synchronized React/layout boundary caused a visible hitch on
@@ -93,10 +100,11 @@ export function useTodayEnergyLoop() {
     // incoming slot. The entering phase remains active while its short intro
     // settles, while the presentation layer animates the new geometry.
     if (handoffFrameRef.current != null) return;
+    if (rewardLockTimerRef.current) clearTimeout(rewardLockTimerRef.current);
+    rewardLockTimerRef.current = null;
     setStatus('entering');
     handoffFrameRef.current = requestAnimationFrame(() => {
       handoffFrameRef.current = null;
-      setCompletionEvent((current) => current?.id === eventId ? null : current);
       onHandoff?.();
       introTimerRef.current = setTimeout(() => {
         introTimerRef.current = null;
@@ -107,9 +115,34 @@ export function useTodayEnergyLoop() {
     });
   }, []);
 
+  const finishCompletion = useCallback((eventId: string, onHandoff?: () => void) => {
+    finishRewardHandoff(() => {
+      setCompletionEvent((current) => current?.id === eventId ? null : current);
+      onHandoff?.();
+    });
+  }, [finishRewardHandoff]);
+
+  const finishRewardOnly = useCallback(() => {
+    // Quick goals animate and remove their originating row directly, so they
+    // have no TodayCareCompletionEvent whose outro can finish the shared loop.
+    // Still run the same entering/idle handoff so replacement (or empty) state
+    // can settle and interactions are always restored.
+    finishRewardHandoff();
+  }, [finishRewardHandoff]);
+
   const markRewardLaunch = useCallback(() => {
     if (traceIdRef.current) markTodayEnergyPhase(traceIdRef.current, 'reward_launch');
     setStatus('rewarding');
+    if (rewardLockTimerRef.current) clearTimeout(rewardLockTimerRef.current);
+    rewardLockTimerRef.current = setTimeout(() => {
+      rewardLockTimerRef.current = null;
+      if (traceIdRef.current) markTodayEnergyPhase(traceIdRef.current, 'cancelled', { reason: 'reward_timeout' });
+      traceIdRef.current = null;
+      flowWasBusyRef.current = false;
+      setPendingIntentState(null);
+      setCompletionEvent(null);
+      setStatus('idle');
+    }, REWARD_LOCK_TIMEOUT_MS);
   }, []);
 
   const markTokenArrival = useCallback((index: number, count: number) => {
@@ -133,6 +166,7 @@ export function useTodayEnergyLoop() {
     clearIntent,
     completionEvent,
     finishCompletion,
+    finishRewardOnly,
     flowWasBusyRef,
     markDestinationOpen,
     markDomainCommit,
@@ -149,6 +183,7 @@ export function useTodayEnergyLoop() {
     clearIntent,
     completionEvent,
     finishCompletion,
+    finishRewardOnly,
     markDestinationOpen,
     markDomainCommit,
     markRewardLaunch,

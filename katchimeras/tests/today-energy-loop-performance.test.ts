@@ -81,6 +81,10 @@ test('the final feed token publishes only after its Energy commit can render', (
     controllerSource,
     /if \(index === count - 1\) \{[\s\S]*?pendingFinalEnergyFeedbackRef\.current = \{ amount, count, index \};[\s\S]*?\} else \{[\s\S]*?publishTodayEnergyFeedback/,
   );
+  assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Soft/);
+  assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Light/);
+  assert.match(controllerSource, /Haptics\.ImpactFeedbackStyle\.Medium/);
+  assert.match(controllerSource, /growthHapticTimerRef\.current = setTimeout\([\s\S]*?170/);
 });
 
 test('manual journal action feedback waits until its native sheet is dismissed', () => {
@@ -113,9 +117,41 @@ test('forming nurture presentation does not mount the legacy Today scene underne
     path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-kingdom-egg-hero.tsx'),
     'utf8',
   );
+  const nurtureSource = readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'today-nurture-experience.tsx'),
+    'utf8',
+  );
+  const feedSource = readFileSync(
+    path.join(process.cwd(), 'components', 'katchadeck', 'home', 'egg-feed-overlay.tsx'),
+    'utf8',
+  );
   assert.match(todaySource, /\{!isForming \? \(\s*<>[\s\S]*?<ScrollView/);
   assert.match(todaySource, /energyLoopStatus === 'rewarding'[\s\S]*?\|\| energyLoopStatus === 'entering'/);
+  assert.match(todaySource, /actionListLocked=\{[\s\S]*?energyLoopStatus === 'launching'[\s\S]*?energyLoopStatus === 'awaiting_completion'[\s\S]*?energyLoopStatus === 'rewarding'/);
   assert.match(heroSource, /enabled=\{!hideKingdomEnvironmentArt\}/);
   assert.match(heroSource, /egg-base\.webp/);
   assert.doesNotMatch(heroSource, /TODAY_EGG_SOURCE[\s\S]{0,400}allowDownscaling=\{false\}/);
+  assert.match(nurtureSource, /FadeInUp\.delay\(55\)\.duration\(320\)/);
+  assert.match(nurtureSource, /function useActionRowLayout[\s\S]*?LinearTransition\.duration\(300\)/);
+  assert.ok((nurtureSource.match(/<Animated\.View layout=\{rowLayout\}>/g) ?? []).length >= 3);
+  assert.match(nurtureSource, /<Animated\.View layout=\{actionHandoffLayout\} style=\{styles\.checkInGroup\}>/);
+  assert.match(nurtureSource, /const INITIAL_ACTION_STACK_SETTLE_MS = 560/);
+  assert.match(nurtureSource, /const ACTION_BATCH_LAYOUT_SETTLE_MS = 680/);
+  assert.match(nurtureSource, /newlyIntroducedRemainingActionIds\.has\(action\.instanceId\)[\s\S]*?ACTION_BATCH_LAYOUT_SETTLE_MS \+ index \* 55/);
+  assert.match(nurtureSource, /if \(!actionListLocked && !completionIsStandard && !checkInTransitionActive\)/);
+  assert.match(nurtureSource, /checkInTransitionActive \|\| actionListLocked[\s\S]*?settledRemainingActionsRef\.current/);
+  assert.ok((nurtureSource.match(/FadeInUp\.delay\(entryDelayMs\)\.duration\(300\)/g) ?? []).length >= 2);
+  assert.match(nurtureSource, /actionStackOpacity\.value = withTiming\(1,[\s\S]*?duration: reduceMotion \? 100 : 360/);
+  assert.match(nurtureSource, /pointerEvents=\{actionStackInteractive \? 'auto' : 'none'\}/);
+  assert.match(nurtureSource, /fixedActionClusterTop \+ fixedActionClusterHeight \+ 8/);
+  assert.match(
+    nurtureSource,
+    /const nurtureToastTop = fixedActionClusterTop[\s\S]*?Math\.max\(fixedActionClusterHeight, NURTURE_ACTION_CLUSTER_FALLBACK_HEIGHT\)[\s\S]*?NURTURE_TOAST_TOP_GAP/,
+  );
+  assert.doesNotMatch(nurtureSource, /const nurtureToastTop = panelStart/);
+  assert.match(nurtureSource, /<MicrocopyToast message=\{microcopy\} placementStyle=\{\{ top: nurtureToastTop \}\} \/>/);
+  assert.match(todaySource, /<MicrocopyToast message=\{isForming && formingDay && nurtureGrowth && !isHatching \? null : microcopy\} \/>/);
+  assert.match(feedSource, /const TOKEN_HOVER_MS = 150/);
+  assert.match(feedSource, /const TOKEN_FLIGHT_MS = 380/);
+  assert.match(feedSource, /const TOKEN_STAGGER_MS = 65/);
 });

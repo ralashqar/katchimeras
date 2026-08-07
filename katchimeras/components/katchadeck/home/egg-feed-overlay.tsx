@@ -41,12 +41,12 @@ type EggFeedOverlayProps = {
   onEnergyTokenArrive?: (amount: number, index: number, count: number) => void;
 };
 
-const SOURCE_FLIGHT_MS = 360;
+const SOURCE_FLIGHT_MS = 460;
 const TOKEN_COUNT = 5;
-const TOKEN_RISE_MS = 100;
-const TOKEN_HOVER_MS = 80;
-const TOKEN_FLIGHT_MS = 300;
-const TOKEN_STAGGER_MS = 35;
+const TOKEN_RISE_MS = 140;
+const TOKEN_HOVER_MS = 150;
+const TOKEN_FLIGHT_MS = 380;
+const TOKEN_STAGGER_MS = 65;
 const TOKEN_SIZE = 46;
 
 const BURST_VECTORS = [

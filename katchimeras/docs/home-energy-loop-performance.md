@@ -38,8 +38,8 @@ every animation commit.
 - Mood and sleep completion write the artifact, Growth event, and care state in
   one state mutation and normalize only Today/Tomorrow. Full archive
   normalization remains reserved for hydration and lifecycle boundaries.
-- The five-token reward remains legible but lands in roughly 620 ms; egg growth
-  and activation settle within the intended 0.8–1.0 second interaction rhythm.
+- The five-token reward remains legible but lands in roughly 930 ms; egg growth
+  and activation settle within the intended 0.9–1.2 second reward rhythm.
 - While a reward is entering or playing, layout handoffs are frozen, photo
   discovery is cancelled/paused, location and pedometer samples are buffered,
   and deferred persistence waits for the interaction lease to end.

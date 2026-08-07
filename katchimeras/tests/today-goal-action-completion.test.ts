@@ -22,6 +22,18 @@ test('Today goal popup returns completion to its originating action row', () => 
   assert.match(nurture, /onOpenQuickGoal\(goalId, handleComplete\)/);
   assert.match(today, /selectedCareGoalCompletionRef/);
   assert.match(today, /requestAnimationFrame\(\(\) => completeFromOrigin\?\.\(\)\)/);
+  assert.match(today, /const receipt = quickGoals\.completeGoal\(goalId\)[\s\S]*?finishCareRewardOnly\(\)/);
+});
+
+test('Today quick-goal rewards always release the shared interaction lock', () => {
+  const energyLoop = fs.readFileSync(
+    path.join(process.cwd(), 'features', 'today', 'use-today-energy-loop.ts'),
+    'utf8',
+  );
+
+  assert.match(energyLoop, /const finishRewardOnly = useCallback\(\(\) => \{[\s\S]*?finishRewardHandoff\(\)/);
+  assert.match(energyLoop, /const REWARD_LOCK_TIMEOUT_MS = 5_000/);
+  assert.match(energyLoop, /reason: 'reward_timeout'[\s\S]*?setCompletionEvent\(null\)[\s\S]*?setStatus\('idle'\)/);
 });
 
 test('Today holds replacement actions until the completed row exits', () => {
@@ -39,15 +51,15 @@ test('Today holds replacement actions until the completed row exits', () => {
   );
 });
 
-test('first rotating journal completion is queued synchronously after check-ins', () => {
+test('first rotating journal completion is queued after its native sheet dismisses', () => {
   const today = fs.readFileSync(
     path.join(process.cwd(), 'app', '(tabs)', 'today.tsx'),
     'utf8',
   );
 
   assert.match(today, /const completingCareAction = pendingCareIntent/);
-  assert.match(today, /queueCareCompletion\(completingCareAction, false\)/);
-  assert.match(today, /setPendingCareIntent\(null\)/);
+  assert.match(today, /queueCareCompletionAfterJournalDismiss\(completingCareAction\)/);
+  assert.match(today, /addManualJournalEntry\(submission, formingTarget\);[\s\S]*?closeManualJournal\(\)/);
 });
 
 test('mood and sleep fly frameless artwork to the egg', () => {

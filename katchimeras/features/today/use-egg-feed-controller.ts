@@ -39,13 +39,16 @@ export function useEggFeedController() {
   const queuedFeedsRef = useRef<EggFeedRequest[]>([]);
   const launchPendingRef = useRef(false);
   const launchRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const growthHapticTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finalEnergyFeedbackFrameRef = useRef<number | null>(null);
   const pendingFinalEnergyFeedbackRef = useRef<{ amount: number; count: number; index: number } | null>(null);
 
   useEffect(() => () => {
     if (launchRetryTimerRef.current) clearTimeout(launchRetryTimerRef.current);
+    if (growthHapticTimerRef.current) clearTimeout(growthHapticTimerRef.current);
     if (finalEnergyFeedbackFrameRef.current != null) cancelAnimationFrame(finalEnergyFeedbackFrameRef.current);
     launchRetryTimerRef.current = null;
+    growthHapticTimerRef.current = null;
     finalEnergyFeedbackFrameRef.current = null;
     pendingFinalEnergyFeedbackRef.current = null;
     launchPendingRef.current = false;
@@ -175,7 +178,20 @@ export function useEggFeedController() {
     // longer forces the entire Today route through a React render merely to
     // start a UI-thread pulse.
     if (process.env.EXPO_OS === 'ios') {
-      if (index === count - 1) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const finalToken = index === count - 1;
+      const style = finalToken
+        ? Haptics.ImpactFeedbackStyle.Medium
+        : index >= Math.ceil(count / 2)
+          ? Haptics.ImpactFeedbackStyle.Light
+          : Haptics.ImpactFeedbackStyle.Soft;
+      void Haptics.impactAsync(style);
+      if (finalToken) {
+        if (growthHapticTimerRef.current) clearTimeout(growthHapticTimerRef.current);
+        growthHapticTimerRef.current = setTimeout(() => {
+          growthHapticTimerRef.current = null;
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+        }, 170);
+      }
     }
   }, []);
 

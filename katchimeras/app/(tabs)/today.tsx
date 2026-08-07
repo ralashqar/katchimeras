@@ -230,6 +230,7 @@ function HomeScreen() {
     clearIntent: clearCareIntent,
     completionEvent: queuedCareCompletion,
     finishCompletion: finishCareCompletion,
+    finishRewardOnly: finishCareRewardOnly,
     flowWasBusyRef: careFlowWasBusyRef,
     markDestinationOpen: markCareDestinationOpen,
     markDomainCommit: markCareDomainCommit,
@@ -1174,8 +1175,9 @@ function HomeScreen() {
   const handleNurtureCompleteGoal = useCallback((goalId: string) => {
     const receipt = quickGoals.completeGoal(goalId);
     if (receipt.newlyCompleted) setMicrocopy('+8 Growth Energy');
+    finishCareRewardOnly();
     return receipt;
-  }, [quickGoals, setMicrocopy]);
+  }, [finishCareRewardOnly, quickGoals, setMicrocopy]);
   const handleNurtureOpenGoal = useCallback((goalId: string, completeFromOrigin: () => void) => {
     selectedCareGoalCompletionRef.current = completeFromOrigin;
     setSelectedCareGoalId(goalId);
@@ -1816,6 +1818,11 @@ function HomeScreen() {
       {isForming && formingDay && nurtureGrowth && !isHatching ? (
         <TodayEnergyProfiler>
           <TodayNurtureExperience
+          actionListLocked={
+            energyLoopStatus === 'launching'
+            || energyLoopStatus === 'awaiting_completion'
+            || energyLoopStatus === 'rewarding'
+          }
           actionTransitionActive={
             energyLoopStatus === 'rewarding'
             || energyLoopStatus === 'entering'
@@ -1828,6 +1835,7 @@ function HomeScreen() {
           feedbackKey={eggFeedKey}
           growth={nurtureGrowth}
           homeArchetypeId={homeArchetypeId}
+          microcopy={microcopy}
           onAddJournal={handleNurtureAddJournal}
           onAddTextNote={handleNurtureAddTextNote}
           onAddPhoto={openMomentCapture}
@@ -2242,7 +2250,7 @@ function HomeScreen() {
         setMicrocopy={setMicrocopy}
         setDayName={setDayName}
       />
-      <MicrocopyToast message={microcopy} />
+      <MicrocopyToast message={isForming && formingDay && nurtureGrowth && !isHatching ? null : microcopy} />
 
       {celebrateDiscovery && !flowBusy ? (
         <DiscoveryReveal discovery={celebrateDiscovery} onDismiss={() => markDiscoverySeen(celebrateDiscovery.id)} />
